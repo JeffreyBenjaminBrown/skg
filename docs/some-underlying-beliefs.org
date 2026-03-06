@@ -1,0 +1,9 @@
+* why Skg
+Skg is the result of a few beliefs about knowledge:
+
+- [[./docs/wise-people-say-write.md][Writing is powerful.]] It can -- like schooling, meditation, or therapy -- radically help a person.
+- [[./docs/sharing-is-powerful.md][Even at small scales, sharing is powerful.]] There are people to learn from in every domain.
+- The freedom to think and write privately is important.
+- The freedom to divide, join, connect and traverse ideas is important.
+- Reading can, and sometimes should, be like meditating. Too much novelty wastes a better opportunity. We should collect, arrange, and traverse that which we most value, like how the ancients lovingly memorized poems.
+- Writing and reading are intertwined. A writer can usefully suggest options to a reader (likely the writer's future self), and a reader can navigate more consciously than typical linear reading envisions.

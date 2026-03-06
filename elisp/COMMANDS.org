@@ -1,52 +1,135 @@
 * user-facing skg commands
-** whole buffer requests
-*** skg-open-empty-content-view
-*** skg-request-title-matches
-asks Rust to search the Tantivy index
-for titles matching the search terms,
-and displays the results in a buffer.
-*** skg-request-single-root-content-view-from-id
-causes Emacs to ask Rust to ask TypeDB for a content-view document
-containing the node with the specified ID.
-Rust builds an s-expression representing an org-document
-based on the result, and sends that to Emacs,
-causing Emacs to open an org-mode buffer displaying the results.
-*** skg-request-save-buffer
-** ids and links
-*** skg-edit-id-stack
-*** skg-next-id
-*** skg-previous-id
-*** skg-push-id-to-stack
-*** skg-replace-id-stack-from-buffer
-*** skg-validate-id-stack-buffer
-*** skg-visit-link
-** view requests
-*** skg-request-aliases-view
-*** skg-request-containerward-view
-*** skg-request-sourceward-view
+** summoning views of the graph
+   There are other kinds of views too,
+   but most time will be spent in this kind.
+*** skg-new-empty-view
+    Asks you to pick a data source,
+    and then provides a root node with that source.
+**** why
+     Every node needs a source.
+     Children can inherit from their parents,
+     but to make a root (which has no parents)
+     you need to choose its source explicitly.
+*** skg-search-titles
+    Run 'skg-view-node' (below)
+    from one of the links in the search results
+    to go to the view from that node.
+*** skg-view-node
+    The usual way to call this is when the cursor is on a link
+    -- for instance, after searching for a title.
+    It opens a new view from the target of that link,
+    or goes to the one that was already open if it exists.
+**** the unusual way to call it
+     is from metadata, rather than a link.
+     If skg-heralds-view is enabled, which it probably is,
+     then each node's metadata is the collection of weird colored text
+     at the beginning of its title.
+     If the cursor is on that, calling this function
+     will bring up a fresh view of that node
+     (or go to a preexisting one if there is one).
+*** skg-save
+    Each time you save, your view is rebuilt.
+    This is because you can put 'requests' into your view,
+    in which you request more data,
+    such as a node's ancestors, or the nodes that link to it.
+    Since views can overlap,
+    saving one open view can change another.
+    For this reason the client will warn you
+    if you have unsaved edits in one view
+    and beegin to edit another one.
+    It won't stop you, but the results could be bad.
+** changing how views look
+*** skg-heralds-view
+    This command toggles it.
+    This toggles whether, at the start of every node,
+    metadata is shown in its full plain-text glory,
+    or is instead summarized via brief 'heralds'.
+    It is turned on at every view by default.
+*** skg-diff-view
+    If you use git to manage your data,
+    enable this view to see what you've changed since your last commit,
+    i.e. how your worktree differs from HEAD.
+** requesting changes to views
+*** skg-branch-aliases
+    See what other text you could search for to find this node.
+    You can always search for its title.
+    Most nodes have a title and no aliases.
+*** skg-branch-containerward
+*** skg-branch-sourceward
+*** skg-definitive-view
+    A view of a node can be definitive or indefinitive.
+    Typically the first place in the buffer that depicts a node
+    is the definitive view of it. So that other views of that node
+    cannot contradict it, they are 'indefinitive': Edits to them
+    cannot affect the node they depict. They are also truncated --
+    that is, shown without content --
+    in order to prevent the view from becoming redundant and huge.
+
+    If you want to see the definitive view of that node
+    from a place where it is currently shown in an indefinitive form,
+    call this function. It will make the current definitive view
+    (if it exists) indefinitive, and then draw a definitive view here.
 ** metadata edits
 *** skg-set-metadata-indefinitive
-*** skg-edit-first-sexpr-on-line
-*** skg-edit-sexp-at-or-after-point
-** misc
-*** heralds-minor-mode
+    This marks a node as 'indefinitiive',
+    as described above.
+    In brief, it means edits to its title, body or
+      (more importantly) children
+    will not affect it
+      (although edits to its children will affect those children,
+      unless they are also indefinitive).
+*** skg-set-metadata-delete
+    This marks a node for deletion from the graph.
+    Upon saving the view, it will vanish not just from this view,
+    but from the graph itself.
+*** skg-metadata-view
+    When called from a node in a view of the graph,
+    this switches to a view of the metadata of that node,
+    with one item per line.
+    It's easy to edit this way.
+    Note that some properties don't make sense to edit,
+    like the count of how many contents it has.
+    (If you want to change how much content a node has,
+    don't change the node's metadata; change its children in the view.)
+** IDs, links and the linkstack
+*** some background
+**** IDs are mostly invisible, but good to know about.
+     Every node has an ID,
+     which you can see if you disable skg-heralds-view.
+     Every link also has an ID and a label,
+     but all you see when you look at the ID is the label,
+     unless you disable org-mode (say, by switching to text-mode).
+     You should never need to see IDs explicitly.
+**** The linkstack
+     is, like it sounds, a stack of links.
+     A stack is just a list that you interact with,
+     mostly from one side, the 'top':
+     You can 'push' something onto the top of the stack,
+     and you can 'pop' something off of the top of the stack.
+     But you can also jump to a view of your entire stack,
+     using (copying, pasting, deleting) it
+     without any restrictions on order.
+*** skg-view-node
+    Visits anything with an ID.
+    Defined in more detail earlier in this document.
+*** skg-next-id
+    Makes the cursor hop among two kinds of IDs:
+    The ID associated with a node in the view,
+    and the ID associated with a link in a node's title.
+    Every node has an ID,
+    but a title can include multiple or no links.
+*** skg-previous-id
+    See skg-next-id, above.
+*** skg-push-to-linkstack
+    Use this to store a link to the ID the cursor is at.
+*** skg-linkstack-view
+    View and maybe edit the set of links you've stored.
+** not important but cool
 *** org-ancestry
-** git diff mode
-*** skg-git-diff-toggle
-Toggles git diff mode on the server.
-When enabled, subsequent content views and saves are annotated
-with git diff information (what changed between HEAD and worktree).
-Save the buffer (~skg-request-save-buffer~)
-or request a fresh content view to see the effect.
-** tcp (likely never needed)
-*** skg-doc-disconnect
-*** skg-verify-connection
-sends a simple ping to the Rust server
-to verify the connection is working. The server responds with a
-confirmation message that is displayed in the minibuffer.
-
-Surprisingly, the TCP connection
-does not need to be explicitly launched,
-because each of the client's `request-*` functions
-calls `(skg-tcp-connect-to-rust)`
-(which is idempotent and cheap to rerun).
+    If you're at a headline so deep in the tree
+    that you can't remember where it came from,
+    this brings you to a new view showing only that ancestry.
+    This actually works in org-mode outside of skg.
+    (skg uses org-mode, but org-mode can be used without skg.)
+** undocumented, maybe uninteresting
+*** skg-request-containerward-stats

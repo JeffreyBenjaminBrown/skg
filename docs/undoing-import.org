@@ -1,0 +1,12 @@
+* If you ever want to, extracting your data from Skg might be annoying.
+
+Skg will add an address to every node in your graph.
+That is important for making diffs readable and sharing easy.
+That data can be returned to another system,
+but the new addresses are likely to serve no purpose there.
+
+Skg will let you create 'subscribes', 'overrides' and 'hides'
+relationships between nodes.
+Other systems do not naturally express such relationships.
+If you want to return your data from Skg to an earlier system,
+that data will be lost without special code to preserve it.

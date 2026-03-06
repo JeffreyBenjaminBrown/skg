@@ -7,7 +7,7 @@ There is no :interactive nil option. To hide a minor mode from M-x,
 use (put 'mode-name 'completion-predicate #'ignore) after defining it.
 
 *** defalias makes both names available in M-x
-(defalias 'skg-id-copy 'skg-push-id-to-stack) makes skg-id-copy
+(defalias 'skg-id-copy 'skg-push-to-linkstack) makes skg-id-copy
 available as M-x skg-id-copy, inheriting the interactive spec
 from the target function. Both names work.
 

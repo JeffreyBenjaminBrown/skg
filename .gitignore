@@ -12,7 +12,10 @@
 /.npm
 /.ssh/
 /_burying
-/bash/kill-servers.sh
+
+ # generated each time by run-servers.sh
+/bash/shutdown-servers.sh
+
 /call-trees
 /claude-tries-skg
 /data

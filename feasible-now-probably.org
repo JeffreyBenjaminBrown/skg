@@ -609,8 +609,5 @@ Oh and similarly for previous.
 ** DONE add better user-facing names to the user-facing functions
    Both names should be available in the M-x window,
    but others should not.
-
-   alias for skg-push-id-to-stack : skg-id-copy
-
 ** DONE Why is skg-id-stack-mode available to me in the M-x window? It's not supposed to be user-facing.
    Please put the response in claude-to-jeff.org

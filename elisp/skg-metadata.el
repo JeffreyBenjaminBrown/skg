@@ -13,7 +13,6 @@
   "Mark the headline at point for deletion.
 Edits the metadata to include `delete` in the `editRequest` section.
 Does NOT save; call `skg-request-save-buffer' afterward."
-  (interactive)
   (skg-edit-metadata-at-point '(skg (node (editRequest delete)))))
 
 (defun skg-set-metadata-indefinitive ()

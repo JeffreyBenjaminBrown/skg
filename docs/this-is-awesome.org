@@ -1,0 +1,33 @@
+* Skg is software for manipulating and sharing knowledge.
+(Yes, we already do those things, but poorly; please keep reading.)
+
+Skg extends the concept of personal knowledge management (familiar from software like logseq, org-roam, Notion, Roam, Obsidian, Tana, and others) to an experience that can be shared.
+
+PKM software has many fanatics, working in isolation. That's because anyone who builds a knowledge base becomes attached to its idiosyncratic structure. I might find another user's knowledge base interesting, but (without something like Skg) I can only integrate their knowledge into my own by copying the data. Copying it means their future edits will not be transmitted to my copy. That puts a limit on how deeply we can share our thought processes.
+
+Skg relaxes that limit. It permits the shared creation of a web of knowledge. One user can 'reshape' another's data however they want -- reordering parts, moving one part into another, deleting parts, etc. -- without affecting how the other user sees their data, and without the disconnect that copying would imply. (How Skg allows this is described below.)
+
+As a side benefit, Skg will also permit private webs of knowledge that integrate seamlessly with the public one.
+* the Skg experience in more detail
+** How weird is this?
+Skg, like all knowledge software, embeds knowledge in a geometry. That might initially seem like a strange thing to do, but being able to connect and easily navigate across ideas quickly feels natural, and after that, essential.
+
+Skg will resemble current social media, but more inquisitive, less performative. In Skg we will not supply and browse streams, but rather from slowly-growing pools of knowledge. What one presents to the world involves less doing and more being.
+
+But conversely, how one explores knowledge in Skg is less passive, and more conscious, than stereotypical phone use. You will only read what you actively choose. There is no feed.
+
+Skg will be like academia, but rewarding (if you count views) generality, not specificity.
+** Quantum (as in Schrodinger's cat) information can overcome the dictator problem.
+A loud minority of humans avoid and resent Wikipedia for dictating a single truth around a given topic. Whether that criticism is fair can be debated, but the criticism cannot apply to Skg.
+
+In Skg there is room for all knowledge, multiply categorized. Different writers can testify to different things. Nobody dictates "the" article on anything; there are only views onto the collective information. You curate what you see, can promote and render invisible (to yourself and anyone who wants your lens) whole people or person-topic pairs, however you wish. The result will be comprehensible and navigable, due to two innovations: (1) graphs, and (2) letting the user, not an alien invisible algorithm, choose what to see.
+** Knowledge is a linked forest.
+Everyone naturally writes (at least sometimes) tree-shaped documents: They write some text, then divide it into sections, divide some sections into subsections, etc. Dividing it makes it a tree. Multiple such documents are called a forest. Every physical library of paper books is, in this sense, a forest.
+
+A forest becomes a linked forest when it includes [[ordinary internet-style text hpyerlinks]]. This is the data model that all good knowledge software uses. So does the internet.
+
+Skg uses the linked forest model, too, but extends it with a few new relationships needed to facilitate sharing. See 'the data model' below.
+** Integrate your linked forest with others'.
+Hopefully some people will share some of their trees (documents, knowledge), and you will find some trees by other people interesting. If so, Skg will let you do what *feels like* editing their data -- reordering branches, hiding branches, plugging branches from their tree into branches of your own trees. You're not actually changing their data; you're creating a lens onto it. When the original author edits those branches, you'll receive their changes.
+
+If someone integrates your data into theirs, and they share the* context they integrated it into, and you look, you might learn more about the topic. You can thereby both learn from each other, without either having to teach -- just reading and writing for understanding.

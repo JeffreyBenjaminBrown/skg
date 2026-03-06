@@ -1,12 +1,20 @@
+* if the node immediately branches, these should show all branches
+** skg-branch-containerward
+** skg-branch-sourceward
+* ONGOING rename user commands
+Let's hide the name skg-request-title-matches from the user,
+and instead give them the alias skg-search-titles.
+* These should be unavailable to the user.
+  skg-request-title-matches
+  skg-request-single-root-content-view-from-id
+  skg-request-save-buffer
+  skg-validate-id-stack-buffer
+  skg-edit-sexp-at-or-after-point
+  skg-set-metadata-indefinitive
+  heralds-minor-mode
 * review, comment the new context-generation code
 * to reload skg in Emacs
-  (let ((dir "~/hodal/skg/elisp"))
-    (add-to-list 'load-path dir)
-    (dolist (sub (directory-files dir t "\\`[^.]"))
-      (when (file-directory-p sub)
-        (add-to-list 'load-path sub)))
-    (mapc (lambda (f) (load f t t))
-          (directory-files dir t "\\.el$")))
+  (load-file "~/hodal/skg/elisp/skg-init.el")
 * some skg-request-* functions save, others don't
 * rename path_to_end_cycle_and_or_branches
   -> path_to_first_nonlinearity

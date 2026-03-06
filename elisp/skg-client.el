@@ -3,7 +3,7 @@
 ;;; For instructions see USAGE.md, in this same folder.
 ;;;
 ;;; USER-FACING FUNCTIONS
-;;;   skg-doc-disconnect
+;;;   skg-disconnect
 
 (require 'cl-lib)
 
@@ -17,6 +17,7 @@
 (require 'skg-request-file-path)
 (require 'skg-request-git-diff-mode)
 (require 'skg-new-empty-view)
+(require 'skg-commands)
 (require 'skg-state)
 
 (defun skg-client-init (file)
@@ -87,7 +88,7 @@ Prevents permanently locked buffers if the server crashes mid-save."
   (when (not (string-prefix-p "open" event))
     (skg--unlock-all-save-locked)) )
 
-(defun skg-doc-disconnect ()
+(defun skg-disconnect ()
   "Manually close the connection to the Rust server."
   (interactive)
   (when (process-live-p skg-rust-tcp-proc)

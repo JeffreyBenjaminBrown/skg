@@ -6,7 +6,16 @@
 ;;; DATA USED/ASSUMED: See /api.md.
 
 (defun skg-verify-connection ()
-  "Verify connection to the Rust server."
+  "Verify connection to the Rust server,
+by sending a simple ping to the Rust server
+to verify the connection is working. The server responds with a
+confirmation message that is displayed in the minibuffer.
+
+Surprisingly, the TCP connection
+does not need to be explicitly launched,
+because each of the client's `request-*` functions
+calls `(skg-tcp-connect-to-rust)`
+(which is idempotent and cheap to rerun)."
   (interactive)
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
          (request-sexp "((request . \"verify connection\"))\n"))

@@ -9,5 +9,5 @@ Fixed by adding a completion-predicate after the definition:
   (put 'skg-id-stack-mode 'completion-predicate #'ignore)
 
 This tells Emacs's completion machinery to exclude it from M-x
-results, while still letting 'skg-edit-id-stack' activate it
+results, while still letting 'skg-linkstack-view' activate it
 programmatically.

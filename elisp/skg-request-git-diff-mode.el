@@ -1,9 +1,9 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; USER-FACING FUNCTIONS
-;;;   skg-git-diff-toggle
+;;;   skg-diff-view
 
-(defun skg-git-diff-toggle ()
+(defun skg-diff-view ()
   "Toggle git diff mode on the server.
 When enabled, subsequent content views and saves show
 what changed between HEAD and the worktree."
@@ -18,6 +18,7 @@ what changed between HEAD and the worktree."
     (process-send-string tcp-proc request-sexp)))
 
 (defun skg--git-diff-mode-result (_tcp-proc string)
-  (message "%s" (string-trim string)))
+  (message "%s" (string-trim string))
+  (skg-request-save-buffer))
 
 (provide 'skg-request-git-diff-mode)

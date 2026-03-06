@@ -61,9 +61,10 @@ and truncates to a reasonable length."
         (concat (substring trimmed 0 (- max-len 3)) "...")
       trimmed)))
 
+;; Retaining for tests. Not user-facing;
+;; dominated by 'skg-new-empty-view'.
 (defun skg-open-empty-content-view ()
   "Open a new, empty skg content view buffer."
-  (interactive)
   (skg-open-org-buffer-from-text
    nil "" skg-fallback-buffer-name))
 

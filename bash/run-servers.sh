@@ -1,25 +1,22 @@
 # USAGE:
-#   Default:
+# - TO START
+#   By default, this uses data/skgconfig.toml:
 #     ./bash/run-servers.sh
-#       uses data/real/skgconfig.toml
-#   Override, general:
-#     SKG_CONFIG=another_skg_config ./bash/run-servers.sh
-#   Override, for dev/test data:
-#     SKG_CONFIG=data/default/skgconfig.toml ./bash/run-servers.sh
-SKG_CONFIG="${SKG_CONFIG:-data/real/skgconfig.toml}"
+#   You can override that default to use data somewhere else,
+#     by running this:
+#       SKG_CONFIG=another_skg_config ./bash/run-servers.sh
+#     or by editing SKG_CONFIG in ./bash/run-servers.sh
+# - TO SHUTDOWN
+#   - If foregrounded at command line, use
+#     Ctrl-C
+#   - If in background at command line, run
+#       ./bash/shutdown-servers.sh
+#     or do it yourself:
+#       kill -TERM -PID # kills the whole group
+#     If you do it yourself, the PID was printed when it started,
+#       and if that printout is buried, can be found running `ps -af`.
 
-# USAGE:
-#   Start
-#     Run from command line, probably in background.
-#   End
-#     If foregrounded at command line, use
-#       Ctrl-C
-#     If in background at command line,
-#       use
-#         kill -TERM -PID # kills the whole group
-#       The PID
-#         is printed when it starts,
-#         and if buried can be found running `ps -af`.
+SKG_CONFIG="${SKG_CONFIG:-data/skgconfig.toml}"
 
 is_typedb_running() {
   if pgrep -f 'typedb_server_bin' >/dev/null 2>&1; then
@@ -88,10 +85,10 @@ echo "Script PID: $$"
 echo "Process group: $(ps -o pgid= -p $$)"
 
 # Create kill script for easy shutdown
-echo "#!/bin/bash" >     bash/kill-servers.sh
-echo "kill -TERM -$$" >> bash/kill-servers.sh
-chmod +x                 bash/kill-servers.sh
-echo "Created bash/kill-servers.sh - run it to stop all servers"
+echo "#!/bin/bash" >     bash/shutdown-servers.sh
+echo "kill -TERM -$$" >> bash/shutdown-servers.sh
+chmod +x                 bash/shutdown-servers.sh
+echo "Created bash/shutdown-servers.sh - run it to stop all servers"
 
 # Check and start TypeDB server if needed
 if is_typedb_running; then

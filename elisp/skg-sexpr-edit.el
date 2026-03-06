@@ -4,7 +4,6 @@
 ;;;
 ;;; User-facing functions:
 ;;;   skg-edit-first-sexpr-on-line
-;;;   skg-edit-sexp-at-or-after-point
 
 (require 'skg-sexpr-org-bijection)
 (require 'skg-sexpr-search)
@@ -46,7 +45,6 @@ Kill the buffer to cancel without saving."
 
 (defun skg-edit--commit ()
   "Save changes from org buffer back to the source sexp."
-  (interactive)
   (let* ((org-text (buffer-substring-no-properties (point-min) (point-max)))
          (new-sexp (org-to-sexp org-text))
          (new-text (prin1-to-string new-sexp))
@@ -80,7 +78,6 @@ Kill the buffer to cancel without saving."
 Opens a temporary org buffer with the sexp converted to org headlines.
 Use C-c C-c to save changes back to the source buffer.
 Kill the buffer to cancel without saving."
-  (interactive)
   (skg-edit-sexp-with-finder #'skg-sexp-at-or-after-point))
 
 (defun skg-edit-sexp-with-finder (finder-fn)

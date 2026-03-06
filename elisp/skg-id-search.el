@@ -3,15 +3,12 @@
 ;;; PURPOSE: Extract, search for, and visit (in a new view) IDs.
 ;;;
 ;;; USER-FACING FUNCTIONS
-;;;   skg-visit-link
-;;;   skg-visit-next-id
-;;;   skg-visit-previous-id
 ;;;   skg-next-id
 ;;;   skg-previous-id
-;;;   skg-push-id-to-stack (alias: skg-id-copy)
+;;;   skg-view-node
+;;;   skg-push-to-linkstack (alias: skg-id-copy)
 ;;;   skg-validate-id-stack-buffer
-;;;   skg-replace-id-stack-from-buffer
-;;;   skg-edit-id-stack
+;;;   skg-linkstack-view
 
 ;; todo ? speed : This could be more efficient.
 ;; It re-reads the same text a few times.
@@ -32,7 +29,6 @@ If that ID is already a root of an open view,
 switch to that view's buffer instead of opening a new one.
 (The server figures that out.)
 If point is not on a link, print a message and do nothing."
-  (interactive)
   (let* ( ( pos ( point ))
           ( line-start ( line-beginning-position ))
           ( line-end ( line-end-position ))
@@ -60,26 +56,9 @@ If point is not on a link, print a message and do nothing."
           (skg-request-single-root-content-view-from-id link-id))
       (message "Point not on a link")) ))
 
-(defun skg-visit-next-id ()
-  "Move to the next ID and open a content view for it."
-  (interactive)
-  (let (( start (point) ))
-    (skg-next-id)
-    (if (= (point) start)
-        (message "No next ID found")
-      (skg--visit-id-at-point) )))
-
-(defun skg-visit-previous-id ()
-  "Move to the previous ID and open a content view for it."
-  (interactive)
-  (let (( start (point) ))
-    (skg-previous-id)
-    (if (= (point) start)
-        (message "No previous ID found")
-      (skg--visit-id-at-point) )))
-
-(defun skg--visit-id-at-point ()
+(defun skg-view-node ()
   "If point is on metadata or a link, open a content view for that ID."
+  (interactive)
   (let (( result (or (skg--point-in-metadata-p)
                      (skg--point-in-link-p)) ))
     (if result
@@ -153,7 +132,7 @@ Otherwise return nil."
                 skg-start ))
           (error nil) )) )))
 
-(defun skg-push-id-to-stack ()
+(defun skg-push-to-linkstack ()
   "Push (id label) pair to `skg-id-stack' if point is on metadata or a link.
 For metadata, id comes from (id X) and label is the headline title.
 For links, id and label come from [[id:X][label]].
@@ -171,8 +150,6 @@ Does nothing if point is not within metadata or a link."
           (message "pushed (%s, %s) to skg-id-stack"
                    (skg--truncate-id id) label) )
       (message "Nothing pushed to skg-id-stack; point on neither a link nor a metadata sexp.") )))
-
-(defalias 'skg-id-copy 'skg-push-id-to-stack)
 
 (defun skg--point-in-metadata-p ()
   "If point is within metadata, return (id . title). Otherwise nil."
@@ -328,7 +305,7 @@ Returns (error MESSAGE) if validation fails."
     map )
   "Keymap for `skg-id-stack-mode'.")
 
-(defun skg-edit-id-stack ()
+(defun skg-linkstack-view ()
   "Open a buffer to edit `skg-id-stack'.
 The buffer displays the stack in org format
 (label headlines and ID bodies).
@@ -364,7 +341,7 @@ Overrides save to update `skg-id-stack' instead of writing to a file."
   :keymap skg-id-stack-mode-map)
 
 ;; Hide from M-x: this mode is only activated
-;; programmatically by 'skg-edit-id-stack'.
+;; programmatically by 'skg-linkstack-view'.
 (put 'skg-id-stack-mode 'completion-predicate #'ignore)
 
 (provide 'skg-id-search)
