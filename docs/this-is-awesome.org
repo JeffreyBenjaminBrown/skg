@@ -24,7 +24,7 @@ In Skg there is room for all knowledge, multiply categorized. Different writers 
 ** Knowledge is a linked forest.
 Everyone naturally writes (at least sometimes) tree-shaped documents: They write some text, then divide it into sections, divide some sections into subsections, etc. Dividing it makes it a tree. Multiple such documents are called a forest. Every physical library of paper books is, in this sense, a forest.
 
-A forest becomes a linked forest when it includes [[ordinary internet-style text hpyerlinks]]. This is the data model that all good knowledge software uses. So does the internet.
+A forest becomes a linked forest when it includes [[https://en.wikipedia.org/wiki/Hyperlink][ordinary internet-style text hpyerlinks]]. This is the data model that all good knowledge software uses. So does the internet.
 
 Skg uses the linked forest model, too, but extends it with a few new relationships needed to facilitate sharing. See 'the data model' below.
 ** Integrate your linked forest with others'.

@@ -1,9 +1,6 @@
 * if the node immediately branches, these should show all branches
 ** skg-branch-containerward
 ** skg-branch-sourceward
-* ONGOING rename user commands
-Let's hide the name skg-request-title-matches from the user,
-and instead give them the alias skg-search-titles.
 * These should be unavailable to the user.
   skg-request-title-matches
   skg-request-single-root-content-view-from-id

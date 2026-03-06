@@ -1,52 +1,21 @@
-* using Skg
-Everything runs locally on your machine. You don't have to share.
-Skg is free software, without a ghost of a path to making money.
-
-This is just enough for a programmer to see how to get it working.
-Please ask an AI for help setting it up.
-** build the Docker container
-   https://github.com/JeffreyBenjaminBrown/docker-typedb-rust
-** start the Docker container
-   See ./bash/docker.sh
-** within the Docker container
-*** start TypeDB server
-    See ./bash/run-servers.sh
-*** optional : import data from org-roam
-    cargo run --bin skg -- import-org-roam [source] [target]
-    Soon, there will be more sources to import from.
-
-    [[./docs/undoing-import.org][Extracting your data from Skg after importing it might be annoying.]]
-    I'm hoping you won't want to make the return trip,
-    and haven't coded for it, but it would be easy.
-** set up your data folder
-   You can make your thoughts entirely private, entirely public,
-   or a mix, and you can share with anyone.
-   See example-data/ for how.
-** start the client
-```elisp
-(progn
-  (load-file "./elisp/skg-init.el")
-  (skg-client-init "./data/skgconfig.toml"))
-```
-** [[./elisp/COMMANDS.org][play with the client]]
-** stop the server later if you want
-   ```
-   ./bash/shutdown-servers.sh
-   ```
-
-   You can't do anything cool in the client
-   when the server isn't running.
-* [[./docs/this-is-awesome.org][what's special about Skg]] : the power, the experience
-* [[./docs/data-model.org][the Skg data model]]
-* Want to help?
-  Please say so! I would work hard to bring you onboard.
-* Want to learn about the code?
-The graph uses [[./schema.tql][this TypeDB schema]]. The server is written in Rust, which makes TypeDB queries. Clients could be written for other editors; I've written one for Emacs, using Emacs Lisp.
+* Skg is software for manipulating and sharing knowledge.
+  [[./docs/this-is-awesome.org][Here's one pitch for it.]]
+* [[./docs/setup.org][How to set up Skg]]
+  This includes how to import data from org-roam.
+* [[./docs/COMMANDS.org][Commands available in Skg]]
+* [[./docs/data-model.org][The Skg data model]]
+  Describes the ideas but not the code.
+* to understand the code
+The graph uses [[./schema.tql][this TypeDB schema]]. The server is written in Rust, which makes TypeDB queries. Clients could be written for other editors; so far I've written one, for Emacs, in Emacs Lisp.
 
 The API, the view metadata format, and the .skg file format are described in [[./api-and-formats.md][api-and-formats.md]].
 
-More reasonable jumping-off points include:
-- [[./elisp/COMMANDS.org][using the client]]
-- [[./server/types/][the types]] (in the server)
-- [[./server/main.rs][main]] (in the server)
-- [[./TODO.org][TODO]] and [[./feasible-now-probably.org]]
+Some other reasonable jumping-off points include:
+- [[./server/types/][the types]] (in the server), especially
+  - [[./server/types/skgnode.rs][skgnode.rs]] -- what nodes in the graph are
+  - [[./server/types/viewnode.rs][viewnode.rs]] -- how nodes in the graph are represented on-screen
+- [[./server/main.rs][main]]
+- [[https://github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org][my org-roam notes about Skg online]]
+- [[./feasible-now-probably.org][how I implemented some recent features using Claude]]
+* to help
+  Tell me you want to! I would work hard to bring you onboard.

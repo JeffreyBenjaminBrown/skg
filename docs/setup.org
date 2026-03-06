@@ -1,0 +1,37 @@
+* Setting up Skg
+Everything runs locally on your machine. You don't have to share.
+Skg is free software, without a ghost of a path to making money.
+
+This is just enough for a programmer to see how to get it working.
+Please ask an AI for help setting it up.
+** build the Docker container
+   https://github.com/JeffreyBenjaminBrown/docker-typedb-rust
+** start the Docker container
+   See ./bash/docker.sh
+** within the Docker container
+*** start TypeDB server
+    See ./bash/run-servers.sh
+*** optional : import data from org-roam
+    cargo run --bin skg -- import-org-roam [source] [target]
+    Soon, there will be more sources to import from.
+
+    [[../docs/undoing-import.org][Extracting your data from Skg after importing it might be annoying.]]
+    I'm hoping you won't want to make the return trip,
+    and haven't coded for it, but it would be easy.
+** set up your data folder
+   You can make your thoughts entirely private, entirely public,
+   or a mix, and you can share with anyone.
+   See example-data/ for how.
+** start the client
+```elisp
+(progn
+  (load-file "./elisp/skg-init.el")
+  (skg-client-init "./data/skgconfig.toml"))
+```
+** Now you can use it. See [[../docs/COMMANDS.org][commands]].
+** stop the server later if you want
+   ```
+   ./bash/shutdown-servers.sh
+   ```
+
+   You can't use the client (much) when the server isn't running.
