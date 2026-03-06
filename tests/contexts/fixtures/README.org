@@ -1,0 +1,40 @@
+These are used to test the five context origin types.
+
+The graph looks like this:
+
+```
+  * root-1 ;; Root context origin
+  ** shared ;; MultiContained context origin
+  *** in-shared-1
+  *** in-shared-2
+  ** in-root-1
+  ** had-id
+  *** in-had-id-1
+  *** in-had-id-2
+  * root-2 ;; Root context origin
+  ** shared ;; MultiContained context origin (already seen)
+  ** link-target ;; LinkTarget context origin
+  * [[link-target][link-source]] ;; Root context origin
+  * cycle-1 ;; CycleMember context origin
+  ** cycle-2 ;; CycleMember context origin
+  *** cycle-1 ;; CycleMember context origin (already seen)
+  *** from-cycle-2
+  ** from-cycle-1
+```
+
+We should get the following contexts:
+
+[ [ origins : [cycle-1 : CycleMember, cycle-2 : CycleMember],
+    context : [cycle-1, cycle-2, from-cycle-1, from-cycle-2] ],
+  [ origins : [ the link : Root ],
+    context : [the link] ],
+  [ origins : [root-2 : Root],
+    context : [root-2 : Root] ],
+  [ origins : [root-1],
+    context : [root-1, in-root-1] ],
+  [ origins : [in-root-2-but-linked-to : LinkTarget],
+    context : [in-root-2-but-linked-to ] ],
+  [ origins : [shared : MultiContained],
+    context : [shared, in-shared-1, in-shared-2] ],
+  [ origins : [had-id : HadId],
+    context : [had-id, in-had-id-1, in-had-id-2 ] ] ]

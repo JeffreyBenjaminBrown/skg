@@ -1,4 +1,3 @@
-* test context generation with all five kinds of origin
 * if the node immediately branches, these should show all branches
 ** skg-branch-containerward
 ** skg-branch-sourceward

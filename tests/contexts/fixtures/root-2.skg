@@ -1,0 +1,6 @@
+ids:
+- root-2
+title: root-2
+contains:
+- shared
+- link-target
