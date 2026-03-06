@@ -65,7 +65,7 @@ DATA
 cleanup_test_data() {
     echo "=== Restoring test data ==="
 
-    cleanup_tantivy_index "$TEST_DIR/data/index.tantivy"
+    cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
 
     for file in "${SKG_FILES[@]}"; do
         local backup=$(find "$TEST_DIR/data/skg-data" -name "$file.skg.backup.*" | head -1)
@@ -96,7 +96,7 @@ TEMP_CONFIG=$(mktemp)
 DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" <<EOF
 db_name = "$DB_NAME"
-tantivy_folder = "$TEST_DIR/data/index.tantivy"
+tantivy_folder = "$TEST_DIR/data/.index.tantivy"
 port = $AVAILABLE_PORT
 delete_on_quit = true
 

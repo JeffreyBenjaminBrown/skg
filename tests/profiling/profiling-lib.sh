@@ -20,7 +20,7 @@ run_profiling_test() {
 
   BENCH_TMPDIR=$(mktemp -d)
   DATA_DIR="$BENCH_TMPDIR/skg-data"
-  TANTIVY_DIR="$BENCH_TMPDIR/index.tantivy"
+  TANTIVY_DIR="$BENCH_TMPDIR/.index.tantivy"
 
   # Generate test data
   echo ""

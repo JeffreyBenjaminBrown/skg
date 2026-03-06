@@ -16,6 +16,7 @@
 (require 'skg-request-verify-connection)
 (require 'skg-request-file-path)
 (require 'skg-request-git-diff-mode)
+(require 'skg-new-empty-view)
 (require 'skg-state)
 
 (defun skg-client-init (file)

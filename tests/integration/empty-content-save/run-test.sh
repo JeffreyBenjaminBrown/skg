@@ -20,7 +20,7 @@ prepare_data_dirs() {
   echo "=== Preparing data directories ==="
   rm -rf "$TEST_DIR/data"
   mkdir -p "$TEST_DIR/data/skg"
-  mkdir -p "$TEST_DIR/data/index.tantivy"
+  mkdir -p "$TEST_DIR/data/.index.tantivy"
   echo "✓ Created empty data directories"
 }
 
@@ -30,7 +30,7 @@ cleanup_test_data() {
     rm -f "$TEST_DIR/data/skg/"*
     echo "✓ Emptied skg data directory"
   fi
-  cleanup_tantivy_index "$TEST_DIR/data/index.tantivy"
+  cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
 }
 
 enhanced_cleanup() {
@@ -52,7 +52,7 @@ TEMP_CONFIG=$(mktemp)
 DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
 db_name = "$DB_NAME"
-tantivy_folder = "$TEST_DIR/data/index.tantivy"
+tantivy_folder = "$TEST_DIR/data/.index.tantivy"
 port = $AVAILABLE_PORT
 delete_on_quit = true
 

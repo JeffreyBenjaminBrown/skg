@@ -1,0 +1,18 @@
+db_name = "skg-dev"
+tantivy_folder = "example-data/.index.tantivy"
+port = 1730 # TCP port for Rust-Emacs API communication.
+
+[[sources]]
+nickname = "private"
+path = "example-data/private"
+user_owns_it = true
+
+[[sources]]
+nickname = "public"
+path = "example-data/public"
+user_owns_it = true
+
+[[sources]]
+nickname = "Fred"
+path = "example-data/Fred"
+user_owns_it = false

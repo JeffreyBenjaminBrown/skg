@@ -1,6 +1,6 @@
 *.log
 *~
-/**/index.tantivy
+/**/.index.tantivy
 /.bash_history
 /.cache
 /.claude*
@@ -17,11 +17,12 @@
 /claude-tries-skg
 /data
 /devel-handy/temp.org
+/example-data
 /plans-done
 /rust-indent/
 /target
-/tests/results
 /tests/**/generated/
+/tests/results
 /tests/tantivy/generated_aliases/
 Cargo.lock
 TAGS

@@ -58,7 +58,7 @@ cleanup_test_data() {
     fi
 
     # Clean up Tantivy index contents but keep the directory
-    cleanup_tantivy_index "$TEST_DIR/data/index.tantivy"
+    cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
 
     # Restore original 1.skg if backup exists
     BACKUP_FILE=$(find "$TEST_DIR/data/skg-data" -name "1.skg.backup.*" | head -1)
@@ -92,7 +92,7 @@ TEMP_CONFIG=$(mktemp)
 DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
 db_name = "$DB_NAME"
-tantivy_folder = "$TEST_DIR/data/index.tantivy"
+tantivy_folder = "$TEST_DIR/data/.index.tantivy"
 port = $AVAILABLE_PORT
 delete_on_quit = true
 

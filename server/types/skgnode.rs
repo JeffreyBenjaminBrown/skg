@@ -3,6 +3,8 @@ use serde::{Serialize, Deserialize};
 use crate::util::option_vec_is_empty_or_none;
 use super::misc::{ID, SourceName};
 
+/// This could be extended.
+/// A .skg file can have any number of associated FileProperties.
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum FileProperty {

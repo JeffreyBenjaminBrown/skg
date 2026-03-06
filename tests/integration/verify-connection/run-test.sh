@@ -21,7 +21,7 @@ echo "Project root: $PROJECT_ROOT"
 
 
 # Clean up Tantivy index to prevent bloat
-cleanup_tantivy_index "$TEST_DIR/data/index.tantivy"
+cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
 
 # Set up cleanup trap
 trap cleanup EXIT
@@ -38,7 +38,7 @@ TEMP_CONFIG=$(mktemp)
 DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
 db_name = "$DB_NAME"
-tantivy_folder = "$TEST_DIR/data/index.tantivy"
+tantivy_folder = "$TEST_DIR/data/.index.tantivy"
 port = $AVAILABLE_PORT
 delete_on_quit = true
 

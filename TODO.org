@@ -1,8 +1,15 @@
+* review, comment the new context-generation code
+* to reload skg in Emacs
+  (let ((dir "~/hodal/skg/elisp"))
+    (add-to-list 'load-path dir)
+    (dolist (sub (directory-files dir t "\\`[^.]"))
+      (when (file-directory-p sub)
+        (add-to-list 'load-path sub)))
+    (mapc (lambda (f) (load f t t))
+          (directory-files dir t "\\.el$")))
 * some skg-request-* functions save, others don't
 * rename path_to_end_cycle_and_or_branches
   -> path_to_first_nonlinearity
-* to reload skg in Emacs
-(mapc (lambda (f) (load f t t)) (directory-files "~/hodal/skg/elisp" t "\\.el$"))
 * figure out how to work in parallel with Claude
   Need two copies of the repo.
   Claude advances features while I review older code.

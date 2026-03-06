@@ -16,11 +16,11 @@ use std::error::Error;
 //
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ContextOriginType {
+pub enum ContextOriginType { // These are listed in priority order.
   Root,
-  CycleMember,
+  CycleMember, // A treelike set might have no single root, but rather a rootlike cycle. In that case every member of the cycle should be almost as prominent in search results as a true root.
   Target,
-  HadID,
+  HadID, // If something had an org-roam ID when imported, even if it was not linked to, it was probably considered important enough at some point to be worth linking to.
   MultiContained,
 }
 

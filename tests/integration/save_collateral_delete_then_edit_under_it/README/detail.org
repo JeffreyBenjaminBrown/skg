@@ -450,7 +450,7 @@ All under =tests/integration/save_collateral_delete_then_edit_under_it/=.
 | =data/skg-data/subee.skg=         | Fixture: node subee           |
 | =data/skg-data/subee-1.skg=       | Fixture: node subee-1         |
 | =data/skg-data/also-hidden.skg=   | Fixture: node also-hidden     |
-| =data/index.tantivy/.gitkeep=     | Empty Tantivy index directory |
+| =data/.index.tantivy/.gitkeep=     | Empty Tantivy index directory |
 
 =run-test.sh= follows existing pattern. Differences:
 - Five fixture files to back up / restore

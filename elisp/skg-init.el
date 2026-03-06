@@ -29,6 +29,8 @@
 ;;;     skg-validate-id-stack-buffer
 ;;;     skg-replace-id-stack-from-buffer
 ;;;     skg-edit-id-stack
+;;;   elisp/skg-new-empty-view.el
+;;;     skg-new-empty-view
 ;;;   elisp/skg-buffer.el
 ;;;     skg-open-empty-content-view
 ;;;   elisp/skg-request-title-matches.el

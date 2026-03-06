@@ -1,22 +1,23 @@
+Skg is free software, without a ghost of a path to making money.
+
 * usage
-** import org-roam data
-cargo run --bin skg -- import-org-roam [source] [target]
-** run the server
-*** TODO merge this documentation
+  This is just enough for a programmer to see how to get it working.
+  Please ask an AI for help setting it up.
+** build the Docker container
+   https://github.com/JeffreyBenjaminBrown/docker-typedb-rust
+** start the Docker container
+   See ./bash/docker.sh
+** within the Docker container
+*** start TypeDB server
+    See ./bash/run-servers.sh
+*** optional : import org-roam data
+    cargo run --bin skg -- import-org-roam [source] [target]
+** set up a data repo
 ** [[./elisp/USAGE.md][play with the client]]
-* why Skg
-Skg is the result of a few beliefs about knowledge:
+* Skg is software for manipulating and sharing knowledge.
+(Yes, we already do those things, but poorly; please keep reading.)
 
-- [[./docs/wise-people-say-write.md][Writing is powerful.]] It can -- like schooling, meditation, or therapy -- radically help a person.
-- [[./docs/sharing-is-powerful.md][Even at small scales, sharing is powerful.]] There are people to learn from in every domain.
-- The freedom to think and write privately is important.
-- The freedom to divide, join, connect and traverse ideas is important.
-- Reading can, and sometimes should, be like meditating. Too much novelty wastes a better opportunity. We should collect, arrange, and traverse that which we most value, like how the ancients lovingly memorized poems.
-- Writing and reading are intertwined. A writer can usefully suggest options to a reader (likely the writer's future self), and a reader can navigate more consciously than typical linear reading envisions.
-
-Skg is free software, without even a known path toward monetization.
-* what Skg is
-Skg is software for manipulating and sharing knowledge. (Yes, we already do those things, but poorly; please keep reading.) Skg extends the concept of personal knowledge management (familiar from software like logseq, org-roam, Notion, Roam, Obsidian, Tana, and others) to an experience that can be shared.
+Skg extends the concept of personal knowledge management (familiar from software like logseq, org-roam, Notion, Roam, Obsidian, Tana, and others) to an experience that can be shared.
 
 PKM software has many fanatics, working in isolation. That's because anyone who builds a knowledge base becomes attached to its idiosyncratic structure. I might find another user's knowledge base interesting, but (without something like Skg) I can only integrate their knowledge into my own by copying the data. Copying it means their future edits will not be transmitted to my copy. That puts a limit on how deeply we can share our thought processes.
 
