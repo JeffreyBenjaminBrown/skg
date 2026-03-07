@@ -1,9 +1,8 @@
 * [[./docs/en-espanol][En Español]]
 * deciding whether a node is a relationship is up to the user
 * generalize it : a node is a map from one to many
-* nodes as relationships
-** ? solved
-   split links in 2, containers and non-containers
+* nodes as relationships ? solved
+  split links in 2, containers and non-containers
 * These should be unavailable to the user.
   skg-request-title-matches
   skg-request-single-root-content-view-from-id

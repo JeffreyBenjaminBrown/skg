@@ -1,6 +1,6 @@
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
 use crate::dbs::typedb::nodes::which_ids_exist;
-use crate::dbs::typedb::search::containerward_path_stats_bulk;
+use crate::dbs::typedb::paths::containerward_path_stats_bulk;
 use crate::git_ops::read_repo::skgnode_from_git_head;
 use crate::to_org::complete::sharing::{ maybe_add_hiddenInSubscribeeCol_branch, type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;

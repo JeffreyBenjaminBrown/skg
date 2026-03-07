@@ -4,7 +4,7 @@ pub mod contains_from_pids;
 
 use skg::test_utils::run_with_test_db;
 use skg::dbs::typedb::search::find_related_nodes;
-use skg::dbs::typedb::search::{
+use skg::dbs::typedb::paths::{
   path_containerward_to_first_nonlinearity,
   PathToFirstNonlinearity};
 use skg::types::misc::{ID, SkgConfig};

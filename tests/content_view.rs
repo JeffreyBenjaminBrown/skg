@@ -5,7 +5,7 @@ use std::error::Error;
 
 use skg::to_org::render::content_view::{multi_root_view, single_root_view};
 use skg::test_utils::run_with_test_db;
-use skg::dbs::typedb::search::path_containerward_to_first_nonlinearity;
+use skg::dbs::typedb::paths::path_containerward_to_first_nonlinearity;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::memory::SkgNodeMap;
 

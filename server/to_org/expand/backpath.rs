@@ -10,7 +10,7 @@
 use crate::to_org::util::{
   get_id_from_treenode, skgnode_and_viewnode_from_id,
   remove_completed_view_request};
-use crate::dbs::typedb::search::{
+use crate::dbs::typedb::paths::{
   paths_to_first_nonlinearities,
   PathToFirstNonlinearity};
 use crate::types::misc::{ID, SkgConfig, SourceName};
