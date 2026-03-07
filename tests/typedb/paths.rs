@@ -1,4 +1,7 @@
 // cargo test --test typedb -- typedb::paths
+//
+// To understand the graph, see
+// tests/typedb/paths/fixtures/README.org
 
 use skg::dbs::typedb::paths::{
   path_containerward_to_first_nonlinearity,

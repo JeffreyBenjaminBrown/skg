@@ -1,0 +1,106 @@
+* Test plan for multi-cycle fork
+
+** Graph
+
+Contains edges (X contains Y):
+| container | content |
+|-----------+---------|
+| b         | a       |
+| b         | e       |
+| c         | b       |
+| d         | e       |
+| d         | c       |
+| e         | d       |
+| f         | e       |
+
+Fixtures are at [[./tests/rebuild/fixtures-multi-cycle/][fixtures-multi-cycle/]].
+
+** What the test does
+
+Two assertions, both using the same TypeDB graph:
+
+*** Part 1: assert on 'PathToFirstNonlinearity' struct
+
+Call 'path_containerward_to_first_nonlinearity' on node a.
+Assert:
+- path = [b, c, d, e]
+- cycle_nodes = {b, d}
+- branches = {b, d, f}
+
+This verifies that multiple cycle nodes are detected
+within a single fork. It's the core thing the spec
+is designed to exercise.
+
+*** Part 2: assert on the rendered tree
+
+Call 'build_and_integrate_containerward_path' on a.
+Assert the tree matches:
+
+  * a
+  ** b
+  *** c
+  **** d
+  ***** e
+  ****** f
+  ****** d
+  ****** b
+
+Branch ordering: 'integrate_branches_in_node' sorts [b, d, f]
+then prepends in order, so the visual order is reversed: f, d, b.
+
+Note: cycle_nodes is discarded when branches is non-empty
+(line 141 of [[./server/to_org/expand/backpath.rs][backpath.rs]]).
+The rendered tree doesn't distinguish cycle-branches
+from non-cycle-branches. That's why part 1 exists.
+
+** What code paths this exercises
+
+'path_to_first_nonlinearity' walks a → b → c → d → e,
+each step finding exactly one container that isn't in path_set.
+At e, it finds containers {b, d, f}: three related nodes,
+two of which (b, d) are in path_set. Returns with non-empty path,
+non-empty branches, and non-empty cycle_nodes.
+
+'paths_to_first_nonlinearities' receives a result
+where path is non-empty, so it returns a singleton list.
+This is distinct from 'test_fork_expansion_at_origin',
+where path is empty and sub-expansion triggers.
+
+Together the two tests cover:
+- immediate fork at origin → sub-expansion (existing test)
+- linear path then fork with multiple cycles → singleton (this test)
+
+** Imports needed for the test
+
+#+begin_src rust
+  use skg::dbs::typedb::paths::{
+    path_containerward_to_first_nonlinearity,
+    PathToFirstNonlinearity};
+  use skg::to_org::expand::backpath::build_and_integrate_containerward_path;
+#+end_src
+
+* DONE Problems
+
+** DONE The spec drawing omits the '}' marker
+   Not a real issue; intermediate materials use evolving notation.
+
+** DONE cycle_nodes information is discarded at render time
+   Addressed: Part 1 of the test asserts on the struct directly.
+
+** DONE The contentward drawing has d and f as roots, but neither is a true root
+   f is a true root (nothing contains it). d is not (e contains d).
+   The user updated feasible.org accordingly.
+
+** DONE e has three containers but the spec text says "fork"
+   In skg, 'fork' means any N > 1. No issue.
+
+** DONE Branch ordering in the rendered output
+   Sorted [b, d, f] then prepended → visual order [f, d, b].
+   The spec was updated to match.
+
+** DONE Should the test call 'build_and_integrate_containerward_path' or go lower?
+   Both. Part 1 calls 'path_containerward_to_first_nonlinearity' directly.
+   Part 2 calls 'build_and_integrate_containerward_path'.
+   This test exercises the "linear then fork" path through
+   'paths_to_first_nonlinearities' (singleton return).
+   The existing test exercises the "immediate fork" path (sub-expansion).

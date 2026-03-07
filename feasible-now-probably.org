@@ -9,6 +9,37 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
+* show contentward paths from search results
+  Let's make a search result buffer immutable.
+  (Elsewhere the code already does this at some point,
+  and it's not by the obvious 'make everything read-only'.
+  Please find that and describe what we do instead,
+  and why, in your report.)
+  This will allow us to present an initial list of links
+  (as is currently done),
+  then compute containerward paths from each item
+  and rerender the buffer with those paths under each item.
+  This should use the recent code that
+  explores every path from the origin
+  if the origin immediately forks.
+
+  Initially, under each node, let's write
+  'containerward paths in progress, should appear soon',
+  and then replace that (body) with the path
+  (potentially many recursive descendents in the tree,
+  but also possibly none if the origin is a root).
+
+  This will require extending the API between the client and server.
+
+  We should also 'background'
+  the containerward path generation in the server.
+  That is, if the user asks the server for anything else,
+  give priority to the new request.
+  This is because they are likely, for instance,
+  to click on a link in the search results before
+  we have computed how to extend those results containerward.
+  It would be silly to make the user wait for an updated search buffer
+  when they already know which search result they want to see next.
 * DONE test the multiple-cycles-in-one-fork thing
    see range
    0913144fc780a8314bec7ba00ba3b534b17e6fee

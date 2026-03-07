@@ -1,0 +1,36 @@
+* for an extremely detailed walkthrough, see
+  ./analysis-by-claude.org
+* the high-level logic
+Consider the following cyclic rendering of a containment graph as a forest:
+```
+  // In this graph, each parent contains its children.
+  * d // a root in this view *but not* the graph
+  ** e
+  *** d
+  ** c
+  *** b
+  **** a
+  **** e
+  * f // a root in this view *and* the graph
+  ** e
+```
+
+If we start with this bare buffer:
+```
+  * a
+```
+
+put a containerward view request on a, and save
+(or maybe saving always happens when we add the request?),
+we should get this:
+```
+  // In this graph, each child contains its parent.
+  * a
+  ** b
+  *** c
+  **** d
+  ***** e
+  ****** f
+  ****** d // cycle
+  ****** b // cycle
+```
