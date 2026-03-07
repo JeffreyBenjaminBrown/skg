@@ -183,7 +183,7 @@ pub async fn setup_test_tantivy_and_typedb_dbs (
     SkgConfig::fromSourcesAndDbName (
       sources, db_name, tantivy_folder ) };
   let driver: TypeDBDriver = TypeDBDriver::new(
-    "127.0.0.1:1729",
+    crate::consts::TYPEDB_ADDRESS,
     Credentials::new("admin", "password"),
     DriverOptions::new(false, None)?
   ) . await ?;

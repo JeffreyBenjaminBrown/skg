@@ -52,7 +52,7 @@ impl Drop for TestDbGuard {
         rt . block_on(async {
           let driver_result: Result<TypeDBDriver, _> =
             TypeDBDriver::new(
-              "127.0.0.1:1729",
+              crate::consts::TYPEDB_ADDRESS,
               Credentials::new("admin", "password"),
               match DriverOptions::new(false, None) {
                 Ok (opts) => opts,

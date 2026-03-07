@@ -118,7 +118,8 @@ fn busysignal_accept_loop (
         // Set a read timeout so we don't block forever
         // if init finishes while we're mid-read.
         stream . set_read_timeout (
-          Some (std::time::Duration::from_millis (500)) )
+          Some (std::time::Duration::from_millis (
+            skg::consts::BUSYSIGNAL_READ_TIMEOUT_MS )) )
           . ok ();
         let mut reader: BufReader<std::net::TcpStream> =
           BufReader::new (
@@ -137,7 +138,8 @@ fn busysignal_accept_loop (
         if e . kind ()
            == std::io::ErrorKind::WouldBlock => {
           std::thread::sleep (
-            std::time::Duration::from_millis (100) ); }
+            std::time::Duration::from_millis (
+              skg::consts::BUSYSIGNAL_POLL_INTERVAL_MS ) ); }
       Err (e) => {
         eprintln! ("Busysignal accept error: {}", e); } } } }
 

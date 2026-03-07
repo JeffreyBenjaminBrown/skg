@@ -88,9 +88,11 @@ where
   Ok (map)
 }
 
-fn default_port() -> u16 { 1730 }
+fn default_port() -> u16 {
+  crate::consts::DEFAULT_PORT }
 
-fn default_initial_node_limit() -> usize { 1000 }
+fn default_initial_node_limit() -> usize {
+  crate::consts::DEFAULT_INITIAL_NODE_LIMIT }
 
 
 //
@@ -180,9 +182,9 @@ impl SkgConfig {
       db_name            : db_name . to_string(),
       tantivy_folder     : PathBuf::from (tantivy_folder),
       sources,
-      port               : 1730,
+      port               : crate::consts::DEFAULT_PORT,
       delete_on_quit     : false,
-      initial_node_limit : 1000,
+      initial_node_limit : crate::consts::DEFAULT_INITIAL_NODE_LIMIT,
       timing_log         : false,
       config_dir         : PathBuf::from ("."), }}
 

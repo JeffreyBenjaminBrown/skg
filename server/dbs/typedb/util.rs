@@ -13,7 +13,7 @@ pub(crate) fn connect_to_typedb () -> TypeDBDriver {
   println! ("Connecting to TypeDB...");
   block_on ( async {
     TypeDBDriver::new (
-      "127.0.0.1:1729",
+      crate::consts::TYPEDB_ADDRESS,
       Credentials::new ("admin", "password"),
       DriverOptions::new (false, None) . unwrap() )
       . await

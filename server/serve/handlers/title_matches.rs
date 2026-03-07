@@ -1,3 +1,10 @@
+/// PITFALL: Uses two layers of truncation.
+/// Tantivy truncates its search after (unimaginable) 1e5 results.
+/// The server (outside of Tantivy) then sorts those results
+/// to surface roots and other high-value gometries,
+/// which are truncated for display.
+
+use crate::consts::SEARCH_DISPLAY_LIMIT;
 use crate::context::ContextOriginType;
 use crate::dbs::tantivy::search_index;
 use crate::org_to_text::viewnode_to_text;
@@ -156,7 +163,8 @@ pub fn format_matches_as_org_mode (
       b . 1 . first () . map ( |(s, _)| *s ) . unwrap_or (0.0);
     score_b . partial_cmp (& score_a)
     . unwrap_or (std::cmp::Ordering::Equal) } );
-  for (id, matches) in id_entries {
+  for (id, matches) in id_entries . into_iter()
+    . take (SEARCH_DISPLAY_LIMIT) {
     // First (best) match becomes level-2 headline
     let (score, title) : &(f32, String) = &matches[0];
     result . push_str (

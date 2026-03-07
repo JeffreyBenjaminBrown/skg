@@ -46,12 +46,13 @@ impl ContextOriginType {
       "MultiContained" => Some (ContextOriginType::MultiContained),
       _                => None, } }
   pub fn multiplier ( &self, ) -> f32 {
-    match self { // 3.2 is close to sqrt 2, logarithmically halfway from 1 to 10.
-      ContextOriginType::Root           => 100.0,
-      ContextOriginType::CycleMember    =>  32.0,
-      ContextOriginType::Target         =>  10.0,
-      ContextOriginType::HadID          =>  10.0,
-      ContextOriginType::MultiContained =>   3.2, }} }
+    use crate::consts::*;
+    match self {
+      ContextOriginType::Root           => MULTIPLIER_ROOT,
+      ContextOriginType::CycleMember    => MULTIPLIER_CYCLE_MEMBER,
+      ContextOriginType::Target         => MULTIPLIER_TARGET,
+      ContextOriginType::HadID          => MULTIPLIER_HAD_ID,
+      ContextOriginType::MultiContained => MULTIPLIER_MULTI_CONTAINED, }} }
 
 /// Maps each node to the nodes it contains.
 pub type MapToContent = HashMap<ID, Vec<ID>>;

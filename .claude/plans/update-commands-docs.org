@@ -1,0 +1,86 @@
+* Update [[./docs/COMMANDS.org][COMMANDS.org]] with undocumented commands
+
+** What COMMANDS.org currently covers
+
+All the main user-facing commands are documented.
+I compared every interactive function in the elisp/ directory
+against the entries in COMMANDS.org.
+
+** Commands missing from COMMANDS.org
+
+*** skg-disconnect
+    Defined in [[./elisp/skg-client.el][skg-client.el]].
+    Closes the TCP connection to the server.
+    Belongs under a new "connection management" section,
+    or under "not important but cool".
+
+*** skg-verify-connection
+    Defined in [[./elisp/skg-request-verify-connection.el][skg-request-verify-connection.el]].
+    Sends a ping to the server and reports whether it responds.
+    Same section as skg-disconnect.
+
+*** skg-visit-file-diff
+    Defined in [[./elisp/skg-request-file-path.el][skg-request-file-path.el]].
+    Probably related to skg-diff-view.
+    Needs investigation: is this user-facing or internal?
+
+*** skg-view-from-node-id
+    Alias for 'skg-request-single-root-content-view-from-id'.
+    Defined in [[./elisp/skg-commands.el][skg-commands.el]].
+    Seems like a lower-level version of skg-view-node.
+    COMMANDS.org mentions skg-view-node but not this alias.
+    Maybe it should be documented as an alternative entry point,
+    or maybe skg-view-node supersedes it.
+
+** Proposed changes to COMMANDS.org
+
+Add a section "** connection management" before "** not important but cool":
+
+#+begin_src org
+  ** connection management
+  *** skg-disconnect
+      Closes the connection to the skg server.
+      The connection will be re-established automatically
+      on the next command that needs it.
+  *** skg-verify-connection
+      Sends a ping to the server and reports whether it responds.
+      Useful for debugging connection issues.
+#+end_src
+
+Add skg-request-containerward-stats description to the undocumented section,
+or move it to a real section if it's user-facing enough.
+
+** What about the 'last week' qualifier?
+
+The spec says "introduced in the last week."
+I don't have access to the git history by date,
+but comparing the current interactive commands against COMMANDS.org,
+the four commands above are the gap.
+Some of them may have existed for a long time.
+
+* Problems
+
+** The spec says "elisp/COMMANDS.org" but the file is at docs/COMMANDS.org
+   The feasible.org item references "elisp/COMMANDS.org"
+   but the actual file is [[./docs/COMMANDS.org][docs/COMMANDS.org]].
+
+** 'skg-set-metadata-delete' is not interactive
+   It's listed in COMMANDS.org as a user-facing command,
+   but in [[./elisp/skg-metadata.el][skg-metadata.el]] it lacks '(interactive)'.
+   Compare with 'skg-set-metadata-indefinitive' which does have it.
+   This looks like a bug. Should it get '(interactive)' added?
+
+** 'skg-visit-file-diff' — is it user-facing?
+   It's interactive, but I'm not sure if it's meant
+   for direct user invocation or if it's called
+   from other commands. Should it be documented?
+
+** "Introduced in the last week" is vague
+   I can't determine which commands are new
+   without checking git blame on each defun.
+   Should I just document everything that's missing,
+   regardless of when it was introduced?
+
+** This task is small enough to not need a plan
+   The actual change is: add 2-4 short entries to an org file.
+   Should I just do it rather than planning it?

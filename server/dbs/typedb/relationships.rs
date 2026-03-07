@@ -51,7 +51,8 @@ async fn create_relationships_for_one_node (
   let primary_id : &ID = node . primary_id ()?;
   let options : TransactionOptions =
     TransactionOptions::new() . transaction_timeout (
-      Duration::from_secs (super::TRANSACTION_TIMEOUT_SECS));
+      Duration::from_secs (
+        crate::consts::TYPEDB_TRANSACTION_TIMEOUT_SECS));
   let tx : Transaction =
     driver . transaction_with_options (
       db_name, TransactionType::Write, options )

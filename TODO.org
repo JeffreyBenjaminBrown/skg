@@ -1,4 +1,4 @@
-* [[./docs/en-espanol][En Español]]
+* [[./docs/en-espanol.org][En Español]]
 * deciding whether a node is a relationship is up to the user
 * generalize it : a node is a map from one to many
 * nodes as relationships ? solved

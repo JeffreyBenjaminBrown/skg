@@ -30,7 +30,8 @@ pub async fn create_all_nodes (
 
   let options : TransactionOptions =
     TransactionOptions::new()
-      . transaction_timeout (std::time::Duration::from_secs (super::TRANSACTION_TIMEOUT_SECS));
+      . transaction_timeout (std::time::Duration::from_secs (
+        crate::consts::TYPEDB_TRANSACTION_TIMEOUT_SECS));
   let tx : Transaction =
     driver . transaction_with_options ( db_name,
                                        TransactionType::Write,

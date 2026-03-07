@@ -213,7 +213,8 @@ pub(super) fn update_tantivy_from_saveinstructions (
 ) -> Result<usize, Box<dyn Error>> {
 
   let mut writer: IndexWriter =
-    tantivy_index . index . writer (50_000_000)?;
+    tantivy_index . index . writer (
+      crate::consts::TANTIVY_WRITER_BUFFER_BYTES)?;
   delete_nodes_by_id_from_index(
     // Delete all IDs, be they from Saves or Deletes.
     // (The entry for each Save is then recreated.)

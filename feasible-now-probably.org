@@ -9,7 +9,40 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
-* show contentward paths from search results
+* ONGOING search bug
+  'motivation' from public/ is not in search results.
+  I translated public/ to .skg files, which are at data/public/.
+  Searching for 'motivation' should return, among others,
+  a root with ID
+  7b52eb18-91c5-4f83-be4f-40ff8a918541
+
+  In public/ note that the file motivation.org
+  does not have the title 'motivation',
+  but that is one of its aliases.
+  Its title is 'motivation | ambition | voluntarity | intention | purpose',
+  and its aliases are each of the individual tokens
+  'motivation ambition voluntarity intention purpose'
+
+  There might be a bug in how we translate the ROAM_ALIASES field
+  when importing from org-roam.
+  If its value were, for instance,
+    a b "c d" e
+  that should create four aliases.
+  Stated differently, aliases are separated by whitespace
+  but can themselves include whitespace if wrapped in quotation marks.
+* bucket the aliases in search results
+  Search results should stuff aliases into an 'aliases' bucket --
+  so they would be grandchildren, under a ViewNode of type Aliases --
+  if there are synonyms.
+  (The best-matched synonym is the label used at level 1, right?)
+  This will allow us to also present containerward paths
+  under search results,
+  without burying them under many lines of aliases.
+* AWAITS first bucket the aliases in search results : show contentward paths from search results
+** plan
+   contentward-paths-in-search-plan.org
+   I haven't finished adding TODO items to it.
+** the idea
   Let's make a search result buffer immutable.
   (Elsewhere the code already does this at some point,
   and it's not by the obvious 'make everything read-only'.
@@ -633,7 +666,11 @@ There's already code somewhere for distinguishing None from Some([]) in a SkgNod
   which views are collateral,
   before computing how to update things.
 * update elisp/COMMANDS.org with any new user-facing commands
-  (or aliases) introduced in the last week
+** elaboration
+   both the commands and the aliases for them
+   introduced in, say, the first week of march 2026
+** Claude planned for this already
+   see ./claude/plans/update-commands-plan.org
 * more things should probably preserve preexisting views
   the way 'skg-visit-link' does.
 * replace term: 'integration' -> 'assimilation'

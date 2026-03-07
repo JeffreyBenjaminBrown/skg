@@ -65,8 +65,10 @@ pub(super) fn mk_tantivy_schema() -> schema::Schema {
     "context_origin_type", schema::STRING | schema::STORED);
   schema_builder . build() }
 
-/// Returns the top 10 matching Tantivy "Documents"
-/// (see glossary, above).
+/// Returns ALL matching Tantivy "Documents" (see glossary, above).
+/// No limit: context-based reranking (multipliers up to 100x)
+/// can reorder results arbitrarily, so the caller must see
+/// every match. The caller truncates after reranking.
 pub fn search_index (
   tantivy_index : &TantivyIndex,
   query_text    : &str
@@ -92,7 +94,8 @@ pub fn search_index (
   Ok (( {
     let best_matches : Vec < ( f32, tantivy::DocAddress ) > =
       searcher . search (
-        &query, &TopDocs::with_limit (10) )?;
+        &query, &TopDocs::with_limit (
+          crate::consts::TANTIVY_SEARCH_LIMIT ) )?;
     best_matches },
        searcher )) }
 
@@ -106,7 +109,8 @@ pub fn update_index_with_nodes (
 ) -> Result<usize, Box<dyn Error>> {
 
   let mut writer: IndexWriter =
-    tantivy_index . index . writer (50_000_000)?;
+    tantivy_index . index . writer (
+      crate::consts::TANTIVY_WRITER_BUFFER_BYTES)?;
   delete_nodes_from_index(
     // Delete those IDs from the index. (They'll come back.)
     nodes . iter(), &mut writer, tantivy_index)?;
@@ -203,7 +207,8 @@ pub fn update_context_origin_types (
   let searcher : Searcher =
     reader . searcher ();
   let mut writer : IndexWriter =
-    tantivy_index . index . writer (50_000_000) ?;
+    tantivy_index . index . writer (
+      crate::consts::TANTIVY_WRITER_BUFFER_BYTES) ?;
   let mut updated_count : usize = 0;
   for (pid, context_type) in context_types_by_id {
     let query : Box < dyn Query > =
@@ -213,7 +218,9 @@ pub fn update_context_origin_types (
           tantivy_index . id_field, pid . as_str () ),
         schema::IndexRecordOption::Basic ));
     let results : Vec < (f32, tantivy::DocAddress) > =
-      searcher . search (&query, &TopDocs::with_limit (100)) ?;
+      searcher . search (
+        &query, &TopDocs::with_limit (
+          crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT )) ?;
     if results . is_empty () { continue; }
     writer . delete_term ( // Delete all documents for this ID.
       Term::from_field_text (
