@@ -1,3 +1,9 @@
+* [[./docs/en-espanol][En Español]]
+* deciding whether a node is a relationship is up to the user
+* generalize it : a node is a map from one to many
+* nodes as relationships
+** ? solved
+   split links in 2, containers and non-containers
 * These should be unavailable to the user.
   skg-request-title-matches
   skg-request-single-root-content-view-from-id
@@ -156,6 +162,10 @@ fold-preservation
     see [[./not_using/pids_from_ids]]
 ** dedup some code
 *** is_ancestor duplicates something done a different way elsewhere
+* ? lessons learned
+** Backpaths could have been easier.
+   Just let the user add all containers from one node at a time.
+   Linear paths seem unlikely backward anyway.
 * document
 ** that filenames must correspond to PIDs
 ** the dangers of repeated nodes to the user
