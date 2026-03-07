@@ -30,7 +30,7 @@ If anything blocks your progress that needs my attention, ping me.
   that should create four aliases.
   Stated differently, aliases are separated by whitespace
   but can themselves include whitespace if wrapped in quotation marks.
-* bucket the aliases in search results
+* DONE bucket the aliases in search results
   Search results should stuff aliases into an 'aliases' bucket --
   so they would be grandchildren, under a ViewNode of type Aliases --
   if there are synonyms.
@@ -38,7 +38,7 @@ If anything blocks your progress that needs my attention, ping me.
   This will allow us to also present containerward paths
   under search results,
   without burying them under many lines of aliases.
-* AWAITS first bucket the aliases in search results : show contentward paths from search results
+* ONGOING show contentward paths from search results
 ** plan
    contentward-paths-in-search-plan.org
    I haven't finished adding TODO items to it.
