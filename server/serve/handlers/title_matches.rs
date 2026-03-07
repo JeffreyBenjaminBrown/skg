@@ -11,7 +11,8 @@ use crate::org_to_text::viewnode_to_text;
 use crate::serve::util::send_response;
 use crate::types::misc::{TantivyIndex, ID, SourceName};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode, default_truenode};
+use crate::types::viewnode::{
+  ViewNode, ViewNodeKind, TrueNode, Scaffold, default_truenode};
 
 use sexp::Sexp;
 use std::collections::HashMap;
@@ -182,23 +183,29 @@ pub fn format_matches_as_org_mode (
                 format! ( "score: {:.2}, [[id:{}][{}]]",
                           score, id, title )) } ), } )
       . expect ("TrueNode rendering never fails"));
-    for (score, title) in matches . iter() . skip (1) {
-      // The rest, if any, become level-3 headlines.
+    if matches . len() > 1 {
+      // Present any matching aliases (or the title, if an alias was the best match) as children of an AliasCol scaffold.
       result . push_str (
         & viewnode_to_text (
           3,
           & ViewNode {
             focused : false,
-            folded  : false,
-            kind    : ViewNodeKind::True (
-              TrueNode {
-                indefinitive : true,
-                .. default_truenode (
-                  ID::from(id . clone()),
-                  SourceName::from ("search"),
-                  format! ( "score: {:.2}, [[id:{}][{}]]",
-                            score, id, title )) } ), } )
-        . expect ("TrueNode rendering never fails")); }}
+            folded  : true,
+            kind    : ViewNodeKind::Scaff (
+              Scaffold::AliasCol ), } )
+        . expect ("AliasCol rendering never fails"));
+      for (_score, title) in matches . iter() . skip (1) {
+        result . push_str (
+          & viewnode_to_text (
+            4,
+            & ViewNode {
+              focused : false,
+              folded  : false,
+              kind    : ViewNodeKind::Scaff (
+                Scaffold::Alias {
+                  text : title . clone(),
+                  diff : None } ), } )
+          . expect ("Alias rendering never fails")); } }}
   result }
 
 pub fn search_terms_from_request (
