@@ -1,0 +1,410 @@
+* Show containerward paths from search results
+
+** What we're building
+
+When the user searches for titles, the results buffer currently shows
+a flat list of matches. We want to enrich each result with its
+containerward path — the chain of containers leading up from that node,
+rendered as nested children. This uses the same 'paths_to_first_nonlinearities'
+machinery that already powers 'skg-branch-containerward'.
+
+The results buffer is immutable (the user cannot edit it).
+The server sends an initial response with placeholder text
+under each result, then a second response with the actual paths.
+The user can interact with Emacs (including clicking search result links)
+while the paths are being computed.
+
+** How the search results buffer is currently made immutable
+
+It isn't, actually. The search buffer gets 'org-mode' and 'heralds-minor-mode'
+but no read-only protection. The user can freely type into it.
+
+For the *save* pipeline, skg uses overlay modification hooks
+(defined in [[./elisp/skg-request-save/skg-lock-buffers.el][skg-lock-buffers.el]])
+rather than 'buffer-read-only'. The reason:
+- Overlay hooks fire a custom error message
+  ("skg: buffer locked -- save in progress").
+- 'inhibit-read-only' does NOT suppress overlay hooks,
+  so the overlay must be explicitly removed before
+  'skg-replace-buffer-with-new-content' updates the buffer.
+  This is desirable: it forces the code to consciously unlock
+  before writing, preventing accidental overwrites.
+
+For search results, though, we want permanent immutability
+(the buffer should never be user-editable), not transient locking.
+A simpler mechanism suffices: 'buffer-read-only'.
+The server code already uses '(let ((inhibit-read-only t)) ...)'
+when writing into the buffer, so read-only won't interfere
+with programmatic updates.
+
+** The two-phase protocol
+
+Currently, search uses a simple request/response:
+  - Client sends: '((request . "title matches") (terms . "SEARCH_TERMS"))\n'
+  - Server sends: plain text (org-mode formatted results)
+  - Client handler: 'skg-doc--response-handler' → 'skg-display-search-results'
+
+We change to a two-phase length-prefixed protocol,
+following the precedent set by the save handler:
+
+*** Phase 1: immediate results with placeholders
+
+The server sends a length-prefixed response containing the search results
+as they exist today, but with a placeholder body under each level-2 headline:
+
+  #+begin_src org
+    * (skg type:searchResult) second
+    ** (skg (node (id 5a) (source search) indefinitive)) score: 1.29, [[id:5a][imperfect test second]]
+    containerward paths in progress, should appear soon
+    ** (skg (node (id 2a) (source search) indefinitive)) score: 0.98, [[id:2a][This is a second test file.]]
+    containerward paths in progress, should appear soon
+  #+end_src
+
+The client displays this immediately and makes the buffer read-only.
+
+*** Phase 2: enriched results with paths
+
+The server computes containerward paths from each search result node
+and sends a second length-prefixed response.
+This replaces the buffer contents entirely
+(like save phase 2 replaces the saved buffer).
+
+  #+begin_src org
+    * (skg type:searchResult) second
+    ** (skg (node (id 5a) (source search) indefinitive)) score: 1.29, [[id:5a][imperfect test second]]
+    *** (skg (node (id container-of-5a) (source search) indefinitive parentIgnores)) container-of-5a
+    **** (skg (node (id root) (source search) indefinitive parentIgnores)) root
+    ** (skg (node (id 2a) (source search) indefinitive)) score: 0.98, [[id:2a][This is a second test file.]]
+    *** (skg (node (id container-of-2a) (source search) indefinitive parentIgnores)) container-of-2a
+  #+end_src
+
+If a search result node is already a root (no containers),
+no children appear under it — the placeholder simply disappears.
+
+** Backgrounding and priority
+
+The spec says: if the user asks the server for anything else,
+give priority to the new request. Currently the server has
+a synchronous per-connection loop:
+'read_line' → route → handle → respond → 'read_line'.
+The connection thread is blocked during path computation
+and cannot read new requests.
+
+To enable priority, we need the path computation
+to happen off the connection thread. The design:
+
+*** Server: spawn a background task for phase 2
+
+After sending the phase 1 response,
+'handle_title_matches_request' spawns a new 'std::thread'
+to compute paths and send the phase 2 response.
+The connection thread returns to the request loop immediately.
+
+The spawned thread needs:
+- A clone of the 'TcpStream' (for writing the response)
+- A clone of the 'Arc<TypeDBDriver>'
+- A clone of the 'SkgConfig' (for db_name)
+- The list of result IDs to compute paths for
+- The phase 1 text (to reconstruct the enriched version)
+
+*** Server: cancel background task on new request
+
+There is a subtlety: while the background thread is computing paths,
+the connection thread is reading the next request. If a new request
+arrives, the background thread's eventual response
+will confuse the client (which expects a response to the new request).
+
+Solution: a shared 'AtomicBool' flag.
+- The connection thread sets it to 'true' when a new request arrives.
+- The background thread checks it before sending its response.
+  If 'true', it discards the response silently.
+
+The client must also handle this:
+if the user issues a new request before phase 2 arrives,
+the client should discard any stale phase 2 responses.
+The client manages this by clearing 'skg-lp--completion-handler'
+when a new request is sent — if a stale phase 2 message arrives later,
+no handler is installed and it is ignored.
+
+Actually, this is already handled by how 'skg-doc--response-handler'
+works: each new request overwrites it. The background response
+arrives as raw TCP data and goes through 'skg-handle-rust-response',
+which calls 'skg-doc--response-handler'. If the user has issued
+a new request, the handler is already replaced. The stale phase 2
+data would be misinterpreted as a response to the new request.
+
+This means the 'AtomicBool' cancellation on the server side
+is essential: the background thread must NOT write to the stream
+if the connection has moved on.
+
+*** Mutex on TcpStream writes
+
+With two threads writing to the same 'TcpStream' (connection thread
+for new requests, background thread for phase 2), we need
+a 'Mutex<TcpStream>' or 'Arc<Mutex<TcpStream>>' to prevent interleaving.
+The connection thread takes the lock to send responses;
+the background thread takes the lock to send the phase 2 response.
+The lock also serializes the 'cancelled' check with the write:
+the background thread locks, checks cancelled, writes if not cancelled.
+
+** Files to modify
+
+*** [[./server/serve/handlers/title_matches.rs][title_matches.rs]] — two-phase response
+
+**** Change 'handle_title_matches_request' signature
+
+Add 'typedb_driver: &Arc<TypeDBDriver>',
+'config: &SkgConfig',
+and 'stream_mutex: &Arc<Mutex<TcpStream>>'
+(or pass the stream through the mutex).
+Also add 'cancelled: &Arc<AtomicBool>'.
+
+**** Send phase 1 via length-prefixed response
+
+Call 'generate_title_matches_response' as today,
+then add placeholder body text under each level-2 headline.
+Send via 'send_response_with_length_prefix'.
+
+**** Spawn background thread for phase 2
+
+Extract the IDs from the phase 1 results.
+Spawn 'std::thread::spawn' with cloned resources.
+In the background thread:
+- For each ID, call 'path_containerward_to_first_nonlinearity'
+  (or 'paths_to_first_nonlinearities' if we want fork expansion).
+- Build an enriched org-mode string with path children under each result.
+- Check 'cancelled'. If not cancelled, lock the stream mutex
+  and send via 'send_response_with_length_prefix'.
+
+**** New function: 'generate_enriched_search_results'
+
+Takes the phase 1 match data and a map from ID to 'Vec<PathToFirstNonlinearity>'.
+Rebuilds the org-mode string with containerward path children
+under each level-2 headline, replacing the placeholder body.
+
+**** New function: 'compute_paths_for_search_results'
+
+Takes a 'Vec<ID>' and returns a map from ID to its containerward paths.
+Calls 'paths_to_first_nonlinearities' for each ID.
+Can parallelize across IDs using 'futures::future::join_all'.
+
+*** [[./server/serve.rs][serve.rs]] — stream mutex, cancellation flag
+
+**** Wrap TcpStream in Arc<Mutex>
+
+Change 'handle_emacs' to wrap the stream in 'Arc<Mutex<TcpStream>>'.
+All handler calls that write to the stream must lock the mutex.
+
+**** Add cancellation flag
+
+Create 'Arc<AtomicBool>' at connection start.
+Before routing each new request, set it to 'true'
+(cancelling any in-flight background task).
+After routing, create a fresh 'AtomicBool' for the next request.
+
+Pass the flag to 'handle_title_matches_request'.
+
+*** [[./elisp/skg-request-title-matches.el][skg-request-title-matches.el]] — two-phase client
+
+**** Phase 1 handler
+
+Install 'skg-lp-handle-generic-chunk' as 'skg-doc--response-handler'
+(same pattern as save). The LP completion handler for phase 1:
+- Display the search results (with placeholders).
+- Make the buffer read-only.
+- Install a phase 2 completion handler.
+
+**** Phase 2 handler
+
+The phase 2 LP completion handler:
+- Replace the buffer contents with the enriched results.
+- Re-enable read-only.
+
+**** Make the search buffer read-only
+
+After inserting content, set 'buffer-read-only' to 't'.
+Use '(let ((inhibit-read-only t)) ...)' around the insert,
+as is already done in the save pipeline.
+
+*** [[./server/serve/util.rs][util.rs]] — possibly no changes
+
+The existing 'send_response_with_length_prefix' works.
+If we use the mutex, the caller is responsible for locking first.
+
+** Rendering the containerward paths
+
+Each search result is a level-2 headline. Its containerward path
+becomes a chain of level-3, level-4, ... headlines below it.
+
+For a result node with ID 'x' whose containerward path is
+'[a, b, c]' (where 'a' is x's container, 'b' is a's container, etc.)
+and the path ends in branches '{d, e}':
+
+  #+begin_src org
+    ** (skg (node (id x) (source search) indefinitive)) score: 1.29, [[id:x][title of x]]
+    *** (skg (node (id a) (source search) indefinitive parentIgnores)) title of a
+    **** (skg (node (id b) (source search) indefinitive parentIgnores)) title of b
+    ***** (skg (node (id c) (source search) indefinitive parentIgnores)) title of c
+    ****** (skg (node (id e) (source search) indefinitive parentIgnores)) title of e
+    ****** (skg (node (id d) (source search) indefinitive parentIgnores)) title of d
+  #+end_src
+
+Branch ordering follows the same convention as 'integrate_branches_in_node':
+sorted then prepended (so visual order is reversed from sorted order).
+
+For fork expansion (origin immediately forks): each branch is expanded
+to its own first nonlinearity, producing multiple path subtrees.
+
+Titles for path nodes must be fetched from TypeDB or Tantivy.
+We can use the Tantivy index (which has title_or_alias_field)
+to avoid TypeDB queries for title lookup.
+
+** What about level-3 alias headlines?
+
+Currently, if a search result ID has multiple matching aliases,
+they appear as level-3 headlines under the level-2 result.
+With containerward paths also at level 3,
+this creates ambiguity in the tree.
+
+Options:
+1. Put aliases at level 3 and paths starting at level 3.
+   Aliases have "score:" prefix; path nodes have metadata with 'parentIgnores'.
+   They look different enough.
+2. Drop aliases from the enriched view — the primary title suffices.
+3. Keep aliases only in phase 1 (when paths are placeholders);
+   phase 2 replaces the entire subtree under each result.
+
+I recommend option 3: phase 2 replaces the level-2 headline's
+subtree entirely. This is simplest and avoids aliase/path confusion.
+
+* Problems
+
+** The stream mutex changes a lot of code
+
+Wrapping 'TcpStream' in 'Arc<Mutex<TcpStream>>' means
+every handler that writes to the stream must lock the mutex.
+That's 'handle_save_buffer_request', 'handle_single_root_view_request',
+'handle_title_matches_request', 'handle_close_view_request',
+'handle_get_file_path_request', 'handle_verify_connection_request',
+'handle_shutdown_request', 'handle_git_diff_mode_request',
+and 'send_response' / 'send_response_with_length_prefix' themselves.
+
+A lighter alternative: don't share the stream at all.
+Instead, the background thread builds the enriched string
+and stores it in a shared slot ('Arc<Mutex<Option<String>>>').
+The connection thread checks this slot before reading the next request
+(non-blocking check; if Some, send it and clear the slot).
+This keeps the stream single-writer (the connection thread only),
+avoiding the mutex on every handler.
+
+The tradeoff: a small delay before the phase 2 response is sent
+(it must wait for the connection thread to poll).
+In practice this is negligible: the connection thread polls
+immediately after handling any request or after a brief timeout
+on 'read_line'. We can use 'set_read_timeout' on the TcpStream
+to make 'read_line' return after, say, 100ms if no data arrives.
+
+This is architecturally cleaner. I recommend this approach.
+
+*** TODO please elaborate
+    The client will be polling every 100 ms?
+    Will the user feel that as a reduction in its responsiveness?
+    Can Emacs multi-thread -- in general, and in this case in particular?
+
+** The 'read_line' loop blocks waiting for client input
+
+The connection thread's 'read_line' blocks indefinitely.
+For the polling approach (check background result before reading),
+we need either:
+- A read timeout (TcpStream::set_read_timeout)
+- Non-blocking reads with polling
+- An 'mpsc' channel that merges client input and background results
+
+The timeout approach is simplest: set a 100ms read timeout,
+and after each timeout, check the background slot.
+
+*** TODO It feels like we need Emacs to poll.
+    A timeout won't work; the search results could be big.
+    But please tell me if I'm missing options.
+
+** Title lookup for path nodes requires data access
+
+Each node in a containerward path needs its title for rendering.
+Options:
+- Tantivy: 'search_index' by exact ID (fast, already indexed).
+- TypeDB: query 'title' attribute by PID.
+- Memory: 'SkgnodesInMemory' has SkgNodes with titles,
+  but it only covers open views, not all nodes.
+
+Tantivy is the best option. Every node has at least one document
+in the index (from import or save). We can look up the title
+by searching for exact ID match.
+
+But wait — Tantivy documents store 'title_or_alias', not 'title'.
+A node might have multiple documents (one per alias).
+We want the primary title, which corresponds to the highest-scored
+document for that ID (or the one that isn't an alias).
+Actually, for the path display, any title/alias suffices.
+The user just needs to see what the container is.
+
+*** TODO Don't search results group titles and aliases
+    together under the same ID?
+
+** Cancellation granularity
+
+The 'AtomicBool' cancellation is coarse:
+any new request cancels the background path computation.
+This means even a 'verify-connection' request
+cancels the in-progress search enrichment.
+This is acceptable: verify-connection is rare,
+and the cost is just losing the path enrichment
+(the search results themselves are already displayed).
+
+** The save handler also writes two LP messages
+
+The save handler sends an early lock message and then the full response,
+both length-prefixed. This works because the client installs
+a two-phase LP handler chain.
+
+For search, we do the same: install a phase 1 handler
+that displays results and installs a phase 2 handler.
+If the phase 2 never arrives (cancelled),
+the buffer just keeps its placeholder text — acceptable.
+
+** Testing
+
+The background/cancellation behavior is hard to unit-test.
+The core testable units are:
+- 'generate_enriched_search_results' (pure: match data + paths → org string)
+- 'compute_paths_for_search_results' (async but deterministic given a graph)
+
+The two-phase protocol can be tested via integration tests
+(start server, send search, verify two LP responses).
+Cancellation testing requires simulating a second request
+during path computation — this may be best left to manual testing.
+
+** Is 'std::thread::spawn' the right concurrency primitive?
+
+The server uses 'futures::executor::block_on' for async code.
+The background path computation calls async functions
+('paths_to_first_nonlinearities'). So the spawned thread
+would run 'block_on(compute_paths(...))'.
+
+An alternative is 'tokio::spawn', but the server doesn't use tokio.
+'std::thread::spawn' with 'block_on' is consistent
+with the existing architecture.
+
+** This task is significantly bigger than the previous ones
+
+It touches the core server loop architecture (stream sharing,
+background threads, cancellation), the client protocol
+(two-phase LP for search), and the search rendering pipeline.
+It might be worth splitting into sub-tasks:
+1. Make search buffer read-only (small, self-contained).
+2. Add containerward path computation for search results
+   (server-side, synchronous — phase 2 blocks the connection thread).
+3. Background the path computation with cancellation.
+
+Step 2 is useful on its own even without backgrounding:
+the user gets enriched search results, just with a delay.
+Step 3 is the polish that makes it non-blocking.
