@@ -23,6 +23,11 @@ Non-ephemeral data, by contrast,
 remains on disk when the app terminates,
 and can be recovered by a later session.
 
+## fork : can be any number > 1
+
+Some people intpret a fork as a binary choice.
+In Skg a fork can split into any number.
+
 ## interp = interpretation
 
 ## kv-pair = key-value pair

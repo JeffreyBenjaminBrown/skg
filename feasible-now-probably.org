@@ -9,23 +9,23 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
-* ONGOING if the backpath from a node immediately branches, show each branch
-** TODO test the multiple-cycles-in-one-fork thing
+* DONE test the multiple-cycles-in-one-fork thing
    see range
    0913144fc780a8314bec7ba00ba3b534b17e6fee
    ..
    283b387894a9d8e9f04823a6021140db37a5b9af
-*** spec
+** spec
 Consider the following cyclic rendering of a containment graph as a forest:
 ```
-  * d
+  // In this graph, each parent contains its children.
+  * d // a root in the view *but not* the graph
   ** e
   *** d
   ** c
   *** b
   **** a
   **** e
-  * f
+  * f // a root in the view *and* the graph
   ** e
 ```
 
@@ -38,6 +38,7 @@ put a containerward view request on a, and save
 (or maybe saving always happens when we add the request?),
 we should get this:
 ```
+  // In this graph, each child contains its parent.
   * a
   ** b
   *** c
@@ -47,6 +48,7 @@ we should get this:
   ****** d // cycle
   ****** b // cycle
 ```
+* DONE if the backpath from a node immediately branches, show each branch
 ** DONE A fork could include multiple cycles!
    If the end of the path is a fork, *any subset* of the fork might all be cycles.
    So the cycle_node field should change to cycle_nodes,
