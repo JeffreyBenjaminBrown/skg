@@ -7,10 +7,10 @@ Please ask an AI for help setting it up.
 ** build the Docker container
    https://github.com/JeffreyBenjaminBrown/docker-typedb-rust
 ** start the Docker container
-   See ./bash/docker.sh
+   See ../bash/docker.sh
 ** within the Docker container
 *** start TypeDB server
-    See ./bash/run-servers.sh
+    See ../bash/run-servers.sh
 *** optional : import data from org-roam
     cargo run --bin skg -- import-org-roam [source] [target]
     Soon, there will be more sources to import from.
@@ -25,13 +25,13 @@ Please ask an AI for help setting it up.
 ** start the client
 ```elisp
 (progn
-  (load-file "./elisp/skg-init.el")
-  (skg-client-init "./data/skgconfig.toml"))
+  (load-file "../elisp/skg-init.el")
+  (skg-client-init "../data/skgconfig.toml"))
 ```
 ** Now you can use it. See [[../docs/COMMANDS.org][commands]].
 ** stop the server later if you want
    ```
-   ./bash/shutdown-servers.sh
+   ../bash/shutdown-servers.sh
    ```
 
    You can't use the client (much) when the server isn't running.
