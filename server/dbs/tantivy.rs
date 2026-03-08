@@ -40,12 +40,16 @@ pub(crate) fn open_existing_tantivy_index (
   let context_origin_type_field : schema::Field =
     schema . get_field ("context_origin_type")
     . ok_or ("Schema missing 'context_origin_type' field") ?;
+  let is_title_field : schema::Field =
+    schema . get_field ("is_title")
+    . ok_or ("Schema missing 'is_title' field") ?;
   Ok ( TantivyIndex {
     index              : Arc::new (index),
     id_field,
     title_or_alias_field,
     source_field,
-    context_origin_type_field, } ) }
+    context_origin_type_field,
+    is_title_field, } ) }
 
 /// The only Tantivy schema used so far.
 /// It includes three fields:
@@ -63,6 +67,8 @@ pub(super) fn mk_tantivy_schema() -> schema::Schema {
     "source", schema::STRING | schema::STORED);
   schema_builder . add_text_field(
     "context_origin_type", schema::STRING | schema::STORED);
+  schema_builder . add_text_field(
+    "is_title", schema::STRING | schema::STORED);
   schema_builder . build() }
 
 /// Returns ALL matching Tantivy "Documents" (see glossary, above).
@@ -165,11 +171,9 @@ where I: IntoIterator<Item = &'a SkgNode>, {
       indexed_count += 1; }}
   Ok (indexed_count) }
 
-/// TODO : This must return the actual title.
-/// For that, Tantivy will need to distinguish aliases from titles.
-/// Look up a title (or alias) for a node by its exact primary ID.
-/// Returns the first title_or_alias found, or None if the ID
-/// is not in the index.
+/// Look up the canonical title for a node by its exact primary ID.
+/// Prefers the document marked is_title="true"; falls back to the
+/// first title_or_alias found if no title document exists.
 pub fn title_by_id (
   tantivy_index : &TantivyIndex,
   id            : &ID,
@@ -185,15 +189,32 @@ pub fn title_by_id (
       schema::IndexRecordOption::Basic ));
   let results : Vec < (f32, tantivy::DocAddress) > =
     searcher . search (
-      &query, &TopDocs::with_limit (1) ) . ok () ?;
-  let (_score, doc_address) : &(f32, tantivy::DocAddress) =
-    results . first () ?;
-  let retrieved_doc : Document =
-    searcher . doc (*doc_address) . ok () ?;
-  retrieved_doc
-    . get_first ( tantivy_index . title_or_alias_field )
-    . and_then ( |v| v . as_text () )
-    . map ( |s| s . to_string () ) }
+      &query, &TopDocs::with_limit (
+        crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT ) ) . ok () ?;
+  let mut fallback : Option < String > = None;
+  for (_score, doc_address) in &results {
+    let retrieved_doc : Document =
+      searcher . doc (*doc_address) . ok () ?;
+    let is_title : bool =
+      retrieved_doc
+        . get_first ( tantivy_index . is_title_field )
+        . and_then ( |v| v . as_text () )
+        . map ( |s| s == "true" )
+        . unwrap_or (false);
+    let title_or_alias : Option < String > =
+      retrieved_doc
+        . get_first ( tantivy_index . title_or_alias_field )
+        . and_then ( |v| v . as_text () )
+        . map ( |s| s . to_string () );
+    if is_title {
+      return title_or_alias; }
+    if fallback . is_none () {
+      fallback = title_or_alias; } }
+  eprintln! (
+    "WARNING: title_by_id: no is_title=\"true\" document \
+     found for ID {}. Falling back to first title_or_alias.",
+    id );
+  fallback }
 
 /* -------------------- Private helpers -------------------- */
 
@@ -211,18 +232,23 @@ fn create_documents_from_node (
   if let Some (aliases) = &node . aliases {
     titles_and_aliases . extend(
       aliases . clone () ); }
-  for title_or_alias in titles_and_aliases {
+  for (i, title_or_alias) in
+    titles_and_aliases . iter() . enumerate()
+  { let is_title : &str =
+      if i == 0 { "true" } else { "false" };
     documents . push (
       doc!(
         tantivy_index . id_field =>
           primary_id . as_str (),
         tantivy_index . title_or_alias_field =>
           replace_each_link_with_its_label (
-            & title_or_alias ),
+            title_or_alias ),
         tantivy_index . source_field =>
           node . source . as_str(),
         tantivy_index . context_origin_type_field =>
-          "" ) ); }
+          "",
+        tantivy_index . is_title_field =>
+          is_title ) ); }
   Ok (documents) }
 
 /// Updates context_origin_type for all documents matching each ID.
@@ -268,6 +294,11 @@ pub fn update_context_origin_types (
           . get_first ( tantivy_index . source_field )
           . and_then ( |v| v . as_text () )
           . unwrap_or ("") . to_string ();
+      let is_title : String =
+        retrieved_doc
+          . get_first ( tantivy_index . is_title_field )
+          . and_then ( |v| v . as_text () )
+          . unwrap_or ("false") . to_string ();
       writer . add_document ( doc! (
         tantivy_index . id_field =>
           pid . as_str (),
@@ -276,7 +307,9 @@ pub fn update_context_origin_types (
         tantivy_index . source_field =>
           source . as_str (),
         tantivy_index . context_origin_type_field =>
-          context_type . as_str () )) ?;
+          context_type . as_str (),
+        tantivy_index . is_title_field =>
+          is_title . as_str () )) ?;
       updated_count += 1; } }
   commit_with_status (
     &mut writer, updated_count, "Context-updated") ?;

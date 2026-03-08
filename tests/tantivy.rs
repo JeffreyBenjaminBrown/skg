@@ -6,7 +6,7 @@ use tantivy::schema as schema;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::in_fs_wipe_index_then_create_it;
-use skg::dbs::tantivy::{search_index, update_index_with_nodes};
+use skg::dbs::tantivy::{search_index, title_by_id, update_index_with_nodes};
 use skg::types::misc::{TantivyIndex, ID};
 use skg::types::skgnode::{SkgNode, empty_skgnode};
 
@@ -257,3 +257,36 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   println!("All alias tests passed!");
   Ok (())
 }
+
+#[test]
+fn test_title_by_id_returns_title_not_alias (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let empty_node : SkgNode = empty_skgnode ();
+  let mut node = empty_node . clone ();
+  { node . ids     = vec![ID::new ("node-with-aliases")];
+    node . title   =               "The Real Title" . to_string ();
+    node . aliases = Some (vec![   "Alias One" . to_string (),
+                                   "Alias Two" . to_string () ]); }
+  let nodes : Vec<SkgNode> = vec![node];
+  let index_dir : &str =
+    "/tmp/tantivy-test-title-by-id";
+  let (tantivy_index, indexed_count) : (TantivyIndex, usize) =
+    in_fs_wipe_index_then_create_it (
+      &nodes,
+      Path::new (index_dir) )?;
+  assert_eq! (indexed_count, 3,
+    "Expected 3 documents (1 title + 2 aliases)");
+  let result : Option<String> =
+    title_by_id (
+      &tantivy_index,
+      &ID::new ("node-with-aliases") );
+  assert_eq! (result, Some ("The Real Title" . to_string ()),
+    "title_by_id should return the title, not an alias");
+  let missing : Option<String> =
+    title_by_id (
+      &tantivy_index,
+      &ID::new ("nonexistent-id") );
+  assert_eq! (missing, None,
+    "title_by_id should return None for missing IDs");
+  println! ("title_by_id test passed!");
+  Ok (( )) }

@@ -65,6 +65,7 @@ pub struct TantivyIndex {
   pub title_or_alias_field      : Field,
   pub source_field              : Field,
   pub context_origin_type_field : Field,
+  pub is_title_field            : Field,
 }
 
 //
