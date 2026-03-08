@@ -12,12 +12,11 @@ Please ask an AI for help setting it up.
 *** start TypeDB server
     See ../bash/run-servers.sh
 *** optional : import data from org-roam
-    cargo run --bin skg -- import-org-roam [source] [target]
-    Soon, there will be more sources to import from.
+    cargo run --bin skg -- import-org-roam [source] [target] [nickname]
+    (Eventually importing will support more formats.)
 
-    [[../docs/undoing-import.org][Extracting your data from Skg after importing it might be annoying.]]
-    I'm hoping you won't want to make the return trip,
-    and haven't coded for it, but it would be easy.
+    After importing it into and manipulating it in Skg,
+    extracting your data [[../docs/undoing-import.org][might be annoying.]]
 ** set up your data folder
    You can make your thoughts entirely private, entirely public,
    or a mix, and you can share with anyone.

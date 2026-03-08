@@ -5,6 +5,7 @@ use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 use crate::types::textlinks::textlinks_from_node;
 
+use futures::stream::{self, StreamExt};
 use typedb_driver::{
   Transaction,
   TransactionOptions,
@@ -22,22 +23,24 @@ pub const OUTBOUND_RELATIONSHIP_TYPES : &[(&str, &str, &str)] = &[
   ("overrides_view_of",             "replacement", "replaced"),
 ];
 
+/// Maps `create_relationships_for_one_node` over `nodes`,
+/// bounded by TYPEDB_CONCURRENT_TRANSACTIONS
+/// to avoid overwhelming TypeDB with concurrent transactions.
+/// Each node gets its own transaction.
+/// PITFALL : Does not create `has_extra_id` relationships.
 pub async fn create_all_relationships (
-  // Maps `create_relationships_for_one_node` over `nodes` in parallel,
-  // each node in its own transaction.
-  // PITFALL : Does not create `has_extra_id` relationships.
   db_name    : &str,
   driver     : &TypeDBDriver,
   nodes      : &[SkgNode]
 )-> Result < (), Box<dyn Error> > {
   println! ("Creating relationships ...");
-  let futures : Vec < _ > =
-    nodes . iter ()
-    . map ( |node| create_relationships_for_one_node (
-              db_name, driver, node ))
-    . collect ();
   let results : Vec < Result < (), Box < dyn Error > > > =
-    futures::future::join_all (futures) . await;
+    stream::iter ( nodes . iter ()
+      . map ( |node| create_relationships_for_one_node (
+                db_name, driver, node )) )
+    . buffer_unordered (
+        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+    . collect () . await;
   for result in results {
     result ?; }
   Ok (()) }

@@ -6,42 +6,39 @@ use crate::dbs::typedb::util::concept_document::{
 
 use super::util::ConceptRowStream;
 
-use futures::StreamExt;
+use futures::stream::{self, StreamExt};
 use std::collections::{ HashSet, BTreeSet };
 use std::error::Error;
 use typedb_driver::{
   Transaction,
-  TransactionOptions,
   TransactionType,
   TypeDBDriver,
 };
 use typedb_driver::answer::{QueryAnswer, ConceptRow};
 
+/// Maps `create_one_node_in_own_tx` over `nodes`,
+/// bounded by TYPEDB_CONCURRENT_TRANSACTIONS
+/// to avoid overwhelming TypeDB with concurrent transactions.
+/// Creates all `node` entities, all `extra_id` entities,
+/// and all `has_extra_id` relationships.
+///
+/// PITFALL: In the TypeDB sense (but not the skg sense)
+/// this creates relationships -- 'has_extra_id' ones, specifically.
 pub async fn create_all_nodes (
-  // Maps `create_node` over `nodes`, creating:
-  //   all `node`         entities
-  //   all `extra_id`     entities
-  //   all `has_extra_id` relationships
-  // Then commits.
   db_name : &str,
   driver  : &TypeDBDriver,
   nodes   : &[SkgNode]
 )-> Result < (), Box<dyn Error> > {
-
-  let options : TransactionOptions =
-    TransactionOptions::new()
-      . transaction_timeout (std::time::Duration::from_secs (
-        crate::consts::TYPEDB_TRANSACTION_TIMEOUT_SECS));
-  let tx : Transaction =
-    driver . transaction_with_options ( db_name,
-                                       TransactionType::Write,
-                                       options )
-    . await ?;
   println!("Creating nodes ...");
-  for node in nodes {
-    create_node ( node, &tx )
-      . await ?; }
-  tx . commit () . await ?;
+  let results : Vec < Result < (), Box < dyn Error > > > =
+    stream::iter ( nodes . iter ()
+      . map ( |node| create_one_node_in_own_tx (
+                db_name, driver, node )) )
+    . buffer_unordered (
+        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+    . collect () . await;
+  for result in results {
+    result ?; }
   Ok (()) }
 
 /// Creates (in TypeDB) nodes whose primary IDs are not in the DB.

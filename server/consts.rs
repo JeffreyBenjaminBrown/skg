@@ -19,6 +19,11 @@ pub const TANTIVY_PER_ID_LOOKUP_LIMIT : usize = 100;
 /// The default is too short for bulk init.
 pub const TYPEDB_TRANSACTION_TIMEOUT_SECS : u64 = 600;
 
+/// Max concurrent TypeDB transactions during bulk operations.
+/// (Massively improves performance --
+/// initial relationship creation fell from > 10 min to ~20 sec.)
+pub const TYPEDB_CONCURRENT_TRANSACTIONS : usize = 64;
+
 /// TypeDB server address.
 pub const TYPEDB_ADDRESS : &str = "127.0.0.1:1729";
 

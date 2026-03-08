@@ -53,7 +53,8 @@ start_skg_with_restart() {
 
   echo "Cargo output will be logged to logs/skg.log"
   echo "cargo-watch starting..."
-  cargo watch -i 'data/' -x "run --bin skg -- $SKG_CONFIG" > logs/skg.log 2>&1
+  cargo watch -w server/ -x "run --bin skg -- $SKG_CONFIG" \
+    > logs/skg.log 2>&1 # "-w server/" says "only watch server/"
 }
 
 cleanup() { # trap handler for graceful shutdown
