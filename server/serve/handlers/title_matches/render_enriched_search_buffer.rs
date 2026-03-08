@@ -2,15 +2,20 @@
 /// for executing a containerward view request from a saved buffer.
 
 use crate::dbs::tantivy::title_by_id;
-use crate::dbs::typedb::paths::{
-  paths_to_first_nonlinearities,
-  PathToFirstNonlinearity};
+use crate::dbs::typedb::paths::PathToFirstNonlinearity;
+use crate::dbs::typedb::search::find_container_ids_of_pid;
 use crate::org_to_text::viewnode_to_text;
-use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
+use crate::types::misc::{TantivyIndex, ID, SourceName};
 use crate::types::viewnode::mk_indefinitive_viewnode;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use typedb_driver::TypeDBDriver;
+
+struct TrackedPath {
+  origin   : ID,          // the path starts here
+  path     : Vec<ID>,     // does not include the origin
+  visited  : HashSet<ID>, // *does* include the origin
+}
 
 /// Append containerward path headlines after each search result
 /// in an already-formatted org-mode string.
@@ -57,26 +62,191 @@ pub(super) fn enrich_with_containerward_paths (
   enriched }
 
 /// Compute containerward paths for a list of search result IDs.
-/// Returns a map from each ID to its paths.
-pub(super) fn compute_paths_for_search_results (
-  ids           : &[ID],
-  typedb_driver : &TypeDBDriver,
-  config        : &SkgConfig,
-) -> HashMap < ID, Vec < PathToFirstNonlinearity > > {
-  let mut result : HashMap < ID, Vec < PathToFirstNonlinearity > > =
+/// Uses level-by-level frontier expansion: at each depth level,
+/// all active paths share a single round of parallel TypeDB queries
+/// (via find_container_ids_of_pid + join_all). Convergent paths
+/// merge, so each distinct container is queried only once per level.
+pub(super) async fn compute_containerward_paths_using_parallel_frontier
+  ( ids     : &[ID],
+    db_name : &str,
+    driver  : &TypeDBDriver,
+  ) -> HashMap < ID, Vec < PathToFirstNonlinearity > > {
+  let mut finished : HashMap < ID, Vec<PathToFirstNonlinearity> > =
     HashMap::new ();
-  for id in ids {
-    match futures::executor::block_on (
-      paths_to_first_nonlinearities (
-        &config . db_name, typedb_driver, id,
-        "contains", "contained", "container" ) ) {
-      Ok (paths) => {
-        result . insert ( id . clone (), paths ); },
-      Err (e) => {
-        eprintln! (
-          "Error computing containerward paths for {}: {}",
-          id . as_str (), e ); } } }
-  result }
+  let mut frontier : Vec<(ID, TrackedPath)> =
+    seed_frontier_from_origins (
+      ids, db_name, driver, &mut finished ) . await;
+  while ! frontier . is_empty () {
+    let containers_map : HashMap<ID, HashSet<ID>> =
+      query_containers_for_unique_frontier_ids (
+        &frontier, db_name, driver ) . await;
+    let mut next_frontier : Vec<(ID, TrackedPath)> = Vec::new ();
+    for (current_id, tracked) in frontier {
+      let containers : HashSet<ID> =
+        containers_map . get (&current_id)
+        . cloned ()
+        . unwrap_or_default ();
+      advance_tracked_path (
+        tracked, containers,
+        &mut finished, &mut next_frontier ); }
+    frontier = next_frontier; }
+  finished }
+
+/// Query containers of each origin ID in parallel.
+/// Roots and immediate forks are finished directly;
+/// single-container origins seed the frontier for climbing.
+async fn seed_frontier_from_origins (
+  ids      : &[ID],
+  db_name  : &str,
+  driver   : &TypeDBDriver,
+  finished : &mut HashMap < ID, Vec<PathToFirstNonlinearity> >,
+) -> Vec<(ID, TrackedPath)> {
+  let init_futures : Vec<_> =
+    ids . iter ()
+    . map ( |id| find_container_ids_of_pid ( db_name, driver, id ) )
+    . collect ();
+  let init_results =
+    futures::future::join_all (init_futures) . await;
+  let mut frontier : Vec<(ID, TrackedPath)> = Vec::new ();
+  for (id, containers_result) in ids . iter () . zip (init_results) {
+    let containers : HashSet<ID> =
+      containers_result . unwrap_or_default ();
+    let visited : HashSet<ID> =
+      HashSet::from ( [ id . clone () ] );
+    if containers . is_empty () {
+      // Root: no path.
+      finished . entry ( id . clone () )
+        . or_insert_with (Vec::new)
+        . push ( PathToFirstNonlinearity {
+          path        : vec![],
+          cycle_nodes : HashSet::new (),
+          branches    : HashSet::new () } );
+    } else if containers . len () > 1 {
+      // Immediate fork: expand each branch separately.
+      let mut sorted : Vec<ID> =
+        containers . into_iter () . collect ();
+      sorted . sort ();
+      for branch_id in sorted {
+        let mut branch_set : HashSet<ID> = visited . clone ();
+        if ! branch_set . insert ( branch_id . clone () ) {
+          // Cycle back to origin.
+          finished . entry ( id . clone () )
+            . or_insert_with (Vec::new)
+            . push ( PathToFirstNonlinearity {
+              path        : vec![ branch_id . clone () ],
+              cycle_nodes : HashSet::from ( [ branch_id ] ),
+              branches    : HashSet::new () } );
+        } else {
+          frontier . push ((
+            branch_id . clone (),
+            TrackedPath {
+              origin   : id . clone (),
+              path     : vec![ branch_id . clone () ],
+              visited  : branch_set } )); } }
+    } else {
+      // Single container: start climbing.
+      let container : ID =
+        containers . into_iter () . next () . unwrap ();
+      let mut new_set : HashSet<ID> = visited;
+      if ! new_set . insert ( container . clone () ) {
+        finished . entry ( id . clone () )
+          . or_insert_with (Vec::new)
+          . push ( PathToFirstNonlinearity {
+            path        : vec![ container . clone () ],
+            cycle_nodes : HashSet::from ( [ container ] ),
+            branches    : HashSet::new () } );
+      } else {
+        frontier . push ((
+          container . clone (),
+          TrackedPath {
+            origin   : id . clone (),
+            path     : vec![ container . clone () ],
+            visited  : new_set } )); } } }
+  frontier }
+
+/// Deduplicate frontier IDs and query each distinct one's
+/// containers in parallel via join_all.
+async fn query_containers_for_unique_frontier_ids (
+  frontier : &[(ID, TrackedPath)],
+  db_name  : &str,
+  driver   : &TypeDBDriver,
+) -> HashMap<ID, HashSet<ID>> {
+  let unique_frontier_ids : Vec<ID> = {
+    let mut seen : HashSet<ID> = HashSet::new ();
+    frontier . iter ()
+      . filter_map ( |(id, _)| {
+        if seen . insert ( id . clone () ) {
+          Some ( id . clone () )
+        } else { None } } )
+      . collect () };
+  let futures : Vec<_> =
+    unique_frontier_ids . iter ()
+    . map ( |pid|
+      find_container_ids_of_pid ( db_name, driver, pid ) )
+    . collect ();
+  let results =
+    futures::future::join_all (futures) . await;
+  let mut containers_map : HashMap<ID, HashSet<ID>> =
+    HashMap::new ();
+  for (id, r) in unique_frontier_ids . into_iter ()
+                 . zip (results)
+  { containers_map . insert (
+      id, r . unwrap_or_default () ); }
+  containers_map }
+
+/// Given a tracked path and its current node's containers,
+/// either finish the path (root, fork, or cycle)
+/// or extend it and push onto next_frontier.
+fn advance_tracked_path (
+  tracked        : TrackedPath,
+  containers     : HashSet<ID>,
+  finished       : &mut HashMap < ID, Vec<PathToFirstNonlinearity> >,
+  next_frontier  : &mut Vec<(ID, TrackedPath)>,
+) {
+  if containers . is_empty () {
+    // Reached root.
+    finished . entry ( tracked . origin )
+      . or_insert_with (Vec::new)
+      . push ( PathToFirstNonlinearity {
+        path        : tracked . path,
+        cycle_nodes : HashSet::new (),
+        branches    : HashSet::new () } );
+  } else if containers . len () > 1 {
+    // Fork mid-path.
+    let cycle_nodes : HashSet<ID> =
+      containers . iter ()
+      . filter ( |c| tracked . visited . contains (c) )
+      . cloned ()
+      . collect ();
+    finished . entry ( tracked . origin )
+      . or_insert_with (Vec::new)
+      . push ( PathToFirstNonlinearity {
+        path        : tracked . path,
+        cycle_nodes,
+        branches    : containers } );
+  } else {
+    // Single container: keep climbing.
+    let container : ID =
+      containers . into_iter () . next () . unwrap ();
+    if tracked . visited . contains (&container) {
+      // Cycle.
+      finished . entry ( tracked . origin )
+        . or_insert_with (Vec::new)
+        . push ( PathToFirstNonlinearity {
+          path        : tracked . path,
+          cycle_nodes : HashSet::from ( [ container ] ),
+          branches    : HashSet::new () } );
+    } else {
+      let mut next_path : Vec<ID> = tracked . path;
+      next_path . push ( container . clone () );
+      let mut next_set : HashSet<ID> = tracked . visited;
+      next_set . insert ( container . clone () );
+      next_frontier . push ((
+        container,
+        TrackedPath {
+          origin   : tracked . origin,
+          path     : next_path,
+          visited  : next_set } )); } } }
 
 /// Render containerward paths as nested org-mode headlines
 /// under a search result.

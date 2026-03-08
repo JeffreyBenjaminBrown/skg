@@ -22,7 +22,7 @@ use crate::types::misc::{ID, SourceName};
 /// Assumes the input is a primary ID (not an extra ID).
 /// Skips the extra_id `or` pattern used by find_related_nodes,
 /// which is the dominant cost in that query.
-pub(crate) async fn find_container_ids_of_pid (
+pub async fn find_container_ids_of_pid (
   db_name : &str,
   driver  : &TypeDBDriver,
   pid     : &ID,

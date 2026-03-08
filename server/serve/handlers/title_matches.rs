@@ -1,7 +1,7 @@
 mod render_enriched_search_buffer;
 use render_enriched_search_buffer::{
   enrich_with_containerward_paths,
-  compute_paths_for_search_results};
+  compute_containerward_paths_using_parallel_frontier};
 
 /// PITFALL: Uses two layers of truncation.
 /// Tantivy truncates its search after (unimaginable) 1e5 results.
@@ -130,8 +130,10 @@ fn spawn_enrichment_thread (
               ids_clone . len ());
     let paths_by_id
       : HashMap < ID, Vec < PathToFirstNonlinearity > > =
-      compute_paths_for_search_results (
-        &ids_clone, &driver_clone, &config_clone );
+      futures::executor::block_on (
+        compute_containerward_paths_using_parallel_frontier (
+          &ids_clone, &config_clone . db_name,
+          &driver_clone ) );
     println! ("search enrichment: paths computed ({} entries)",
               paths_by_id . len ());
     if cancel_clone . load (Ordering::SeqCst) {

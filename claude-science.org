@@ -578,3 +578,110 @@ $r1 isa contains (container: $c1, contained: $node);
 $r2 isa contains (container: $c2, contained: $node);
 not { $c1 is $c2; };
 #+end_example
+
+* Parallelizing containerward path computation for search results
+
+** Context
+
+Search enrichment computes containerward paths for each search result.
+The current code (~compute_paths_for_search_results~) calls
+~paths_to_first_nonlinearities~ sequentially for each result ID.
+Each call issues multiple TypeDB queries (one per path level)
+using ~find_related_nodes~, which includes an expensive extra_id
+=or= pattern (~200ms/query).
+
+Goal: apply parallelization patterns from ~containerward_path_stats_bulk~.
+
+** Hypotheses
+
+1. *Cross-ID parallel (join_all)*: Running all ~paths_to_first_nonlinearities~
+   calls concurrently should give ~Nx speedup (N = number of result IDs).
+   Limited by TypeDB server concurrency and per-query cost.
+
+2. *Level-by-level frontier*: Adapted from ~containerward_path_stats_bulk~.
+   Uses ~find_container_ids_of_pid~ (no extra_id =or=, ~15ms/query)
+   instead of ~find_related_nodes~ (~200ms/query). Deduplicates frontier
+   nodes across all paths at each level. Should be dramatically faster
+   because (a) queries are ~13x cheaper and (b) convergent paths
+   merge, reducing total queries.
+
+** Method
+
+Benchmark tool: =tools/bench-containerward-paths.rs=
+- Loads 28,697-node real dataset
+- Picks N non-root IDs (nodes that have containers)
+- Runs three strategies: Sequential, Parallel (join_all), Frontier
+- Compares results for correctness (path contents must match)
+- Measures wall-clock time for each
+
+** Results (28,697-node dataset, representative runs)
+
+| N (IDs) | Sequential | Parallel (join_all) | Frontier | Par speedup | Frontier speedup |
+|---------+------------+---------------------+----------+-------------+------------------|
+|       1 |     0.325s |              0.362s |   0.005s | 0.9x        | 70x              |
+|       3 |     0.980s |              0.466s |   0.008s | 2.1x        | 126x             |
+|       5 |     1.746s |              0.536s |   0.010s | 3.3x        | 179x             |
+|      10 |     3.258s |              0.630s |   0.009s | 5.2x        | 347x             |
+|      20 |     6.192s |              1.131s |   0.012s | 5.5x        | 503x             |
+
+All results verified: paths match between strategies.
+
+** Analysis
+
+*** Why the frontier approach wins so decisively
+
+Three compounding factors:
+
+1. *Cheaper queries*: ~find_container_ids_of_pid~ (~15ms) vs
+   ~find_related_nodes~ (~200ms). The extra_id =or= pattern
+   in ~find_related_nodes~ is the dominant cost, and it's unnecessary
+   when inputs are known to be primary IDs.
+
+2. *Frontier deduplication*: Multiple search results may converge
+   onto the same container. The frontier approach queries each
+   distinct container only once per level, while the per-ID
+   approaches query redundantly.
+
+3. *Breadth-first batching*: At each level, all frontier queries
+   run in parallel via ~join_all~. The wall-clock cost per level
+   is max(query_times), not sum(query_times).
+
+*** Scaling behavior
+
+- Sequential scales linearly: O(N × depth × query_time)
+- Parallel (join_all) scales sub-linearly: O(depth × max_query_time)
+  but limited by TypeDB concurrency (~4-16 sweet spot)
+- Frontier scales nearly flat: O(depth × max(|frontier|, 1) × cheap_query_time)
+  because frontier size stays small (convergent paths)
+
+*** For N=10 (the SEARCH_DISPLAY_LIMIT)
+
+The frontier approach takes ~9ms vs sequential's ~3.3s.
+This means search enrichment can complete nearly instantly
+instead of taking seconds.
+
+** The extra_id question
+
+~find_related_nodes~ handles both primary IDs and extra IDs
+(org-roam legacy IDs). ~find_container_ids_of_pid~ assumes
+primary IDs only. In the search enrichment context, IDs come
+from Tantivy, which indexes primary IDs only, so this assumption
+is safe. This is the same reasoning used by ~containerward_path_stats_bulk~.
+
+** Implementation plan
+
+Replace ~compute_paths_for_search_results~ with the frontier approach.
+The function already lives in the search enrichment module
+(=render_enriched_search_buffer.rs=), so the change is localized.
+
+The frontier approach already handles all path termination cases:
+- Root (no containers)
+- Fork (multiple containers)
+- Cycle (container already in path)
+- Immediate fork at origin (expand each branch)
+
+** Verification
+
+All tests pass:
+- ~cargo nextest run --test tantivy~ (3 tests)
+- Benchmark correctness checks: all strategies produce identical paths

@@ -175,8 +175,12 @@ fold-preservation
 ** dedup some code
 *** is_ancestor duplicates something done a different way elsewhere
 * ? lessons learned
-** Backpaths could have been easier.
-   Just let the user add all containers from one node at a time.
+** Validate ancestry, not descendents.
+   For instance, "an alias should have an aliascol parent"
+   is easier to say than "an aliascol's children can only be aliases".
+   (Because it prevents combinatorial explosion?)
+** Sourceward paths could have been easier.
+   Just let the user add all sources from one node at a time.
    Linear paths seem unlikely backward anyway.
 * document
 ** that filenames must correspond to PIDs

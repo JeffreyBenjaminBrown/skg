@@ -157,7 +157,7 @@ pub async fn path_sourceward_to_first_nonlinearity (
     "source"
   ) . await }
 
-pub(crate) async fn paths_to_first_nonlinearities (
+pub async fn paths_to_first_nonlinearities (
   db_name     : &str,
   driver      : &TypeDBDriver,
   node        : &ID,
@@ -208,7 +208,7 @@ pub(crate) async fn paths_to_first_nonlinearities (
 ///     and the function returns.
 /// Note that 2 and 3 can coincide. That is the only case
 ///   in which are all three outputs non-null.
-pub(crate) async fn path_to_first_nonlinearity (
+pub async fn path_to_first_nonlinearity (
   db_name     : &str,
   driver      : &TypeDBDriver,
   node        : &ID,
