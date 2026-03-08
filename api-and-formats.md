@@ -10,9 +10,11 @@ So far there are these endpoints:
   - Request: ((request . "verify connection"))
   - Response: Plain text with newline termination: "This is the skg server verifying the connection."
 
+
 - Search in titles
   - Request: ((request . "title matches") (terms . "SEARCH_TERMS"))
-  - Response: Plain text with newline termination.
+  - Response (phase 1, immediate): LP buffer content with response-type "search-results".
+  - Response (phase 2, background): LP buffer content with response-type "search-enrichment".
 
 - Single root content tree view from ID
   - Request: ((request . "single root content view") (id . "NODE_ID") (view-uri . "URI"))

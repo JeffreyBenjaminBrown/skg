@@ -67,7 +67,7 @@ fn test_title_matches_org_format (
       let matches_by_id =
         group_matches_by_id (
           best_matches, searcher, &tantivy_index );
-      let result : String =
+      let (result, _result_ids) : (String, Vec<ID>) =
         format_matches_as_org_mode (
           search_terms,
           matches_by_id );
@@ -89,31 +89,37 @@ fn test_title_matches_org_format (
               return Some ( (id, title) ); }} }
         None }
 
+      // Extract alias lines (level-4 "skg alias" entries)
+      fn extract_alias ( line: &str ) -> Option < String > {
+        if line . starts_with ("**** (skg alias) ") {
+          Some ( line [ "**** (skg alias) " . len () ..  ]
+                 . to_string () )
+        } else { None } }
+
       // Find level-2 headlines (start with "** ")
       let mut level2_headlines : Vec < (String, String) > =
         Vec::new ();
-      let mut level3_under_current : Vec < (String, String) > =
+      let mut aliases_under_current : Vec < String > =
         Vec::new ();
-      let mut all_level3_groups : Vec < Vec < (String, String) > > =
+      let mut all_alias_groups : Vec < Vec < String > > =
         Vec::new ();
 
       for line in &lines {
         if line . starts_with ("** ") {
-          if ! level3_under_current . is_empty () {
-            // Save any accumulated level-3 headlines
-            all_level3_groups . push (
-              level3_under_current . clone () );
-            level3_under_current . clear (); }
+          if ! aliases_under_current . is_empty () {
+            // Save any accumulated aliases
+            all_alias_groups . push (
+              aliases_under_current . clone () );
+            aliases_under_current . clear (); }
           if let Some (link) = extract_link (line) {
             // Extract this level-2 headline
             level2_headlines . push (link); }
-        } else if line . starts_with ("*** ") {
-          // Extract level-3 headline
-          if let Some (link) = extract_link (line) {
-            level3_under_current . push (link); }} }
-      if ! level3_under_current . is_empty () {
+        } else if let Some (alias) = extract_alias (line) {
+          // Extract alias
+          aliases_under_current . push (alias); } }
+      if ! aliases_under_current . is_empty () {
         // Don't forget the last group
-        all_level3_groups . push (level3_under_current); }
+        all_alias_groups . push (aliases_under_current); }
 
       // Verify the structure
       assert_eq! ( level2_headlines . len (), 2,
@@ -131,25 +137,19 @@ fn test_title_matches_org_format (
       assert_eq! ( level2_headlines [ 1 ] . 1, "cheese makes me happy",
                    "Second level-2 should be 'cheese makes me happy'" );
 
-      // First level-2 should have 2 level-3 children
-      assert_eq! ( all_level3_groups . len (), 1,
-                   "Should have exactly 1 group of level-3 headlines (second level-2 should have no children)" );
-      assert_eq! ( all_level3_groups [ 0 ] . len (), 2,
-                   "First level-2 should have exactly 2 children" );
+      // First level-2 should have 2 alias children
+      assert_eq! ( all_alias_groups . len (), 1,
+                   "Should have exactly 1 group of aliases (second level-2 should have none)" );
+      assert_eq! ( all_alias_groups [ 0 ] . len (), 2,
+                   "First level-2 should have exactly 2 alias children" );
 
-      // Verify the level-3 headlines under first level-2
-      let level3_titles : Vec < String > =
-        all_level3_groups [ 0 ] . iter () . map ( |(_, t)| t . clone () ) . collect ();
-      assert! ( level3_titles . contains ( &"bear cheese" . to_string () ),
-                "Should have 'bear cheese' as a level-3" );
-      assert! ( level3_titles . contains ( &"the cheese" . to_string () ),
-                "Should have 'the cheese' as a level-3" );
-
-      // All level-3s should have same ID as their parent
-      for (id, _) in &all_level3_groups [ 0 ] {
-        assert_eq! ( id, "id_1",
-                     "All level-3 headlines should have same ID as parent" );
-      }
+      // Verify the alias texts under first level-2
+      assert! ( all_alias_groups [ 0 ] . contains (
+                  &"bear cheese" . to_string () ),
+                "Should have 'bear cheese' as an alias" );
+      assert! ( all_alias_groups [ 0 ] . contains (
+                  &"the cheese" . to_string () ),
+                "Should have 'the cheese' as an alias" );
 
       println! ("✓ Org-mode format verified successfully");
       Ok ( () )

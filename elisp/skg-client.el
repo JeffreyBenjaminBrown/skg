@@ -19,6 +19,7 @@
 (require 'skg-new-empty-view)
 (require 'skg-commands)
 (require 'skg-state)
+(require 'skg-length-prefix)
 
 (defun skg-client-init (file)
   (defvar skg-port (skg-port-from-toml file))
@@ -61,26 +62,19 @@
   skg-rust-tcp-proc)
 
 (defun skg-handle-rust-response (tcp-proc string)
-  "Route the response from Rust to the appropriate handler.
-.
-PITFALL: The handler is already determined before the client receives a response to handle. The client only ever receives something from Rust because the client asked for it. The client sets the handler when it asks.
-.
-TODO: So far the only response handlers are these:
-  skg-display-search-results
-  skg-open-org-buffer-from-rust-s-exp
-and neither of them uses the `tcp-proc` argument. Unless it will be used by later handlers, it should be deleted."
+  "Route the response from Rust to the LP handler.
+All server responses are length-prefixed with response-type tags.
+The client's LP machine reassembles each message and dispatches by type
+via `skg-response-handler-map'."
   (let ((trimmed (string-trim-left string)))
     (if (string-prefix-p "((busy" trimmed) ;; the busy signal
         (let ((parsed (car (read-from-string trimmed))))
           (message "%s" (cdr (assq 'busy parsed)))
           (skg--unlock-all-save-locked)
-          (setq skg-doc--response-handler  nil
-                skg-lp--completion-handler nil
-                skg-lp--buf               (unibyte-string)
-                skg-lp--bytes-left        nil))
-      (if skg-doc--response-handler
-          (funcall skg-doc--response-handler tcp-proc string)
-        (error "skg-doc--response-handler is nil; no handler defined for incoming data")) )) )
+          (setq skg-response-handler-map nil
+                skg-lp--pending-count     0)
+          (skg-lp-reset))
+      (skg-lp-handle-generic-chunk tcp-proc string) )) )
 
 (defun skg--tcp-sentinel (_proc event)
   "Unlock all save-locked buffers when the TCP connection closes.

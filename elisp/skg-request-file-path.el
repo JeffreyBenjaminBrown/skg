@@ -12,6 +12,7 @@
 
 (require 'skg-id-search)
 (require 'skg-state)
+(require 'skg-length-prefix)
 
 (defun skg-visit-file-diff ()
   "Open a magit diff for the .skg file of the node at point.
@@ -30,8 +31,11 @@ and opens a magit diff of just that file."
                 (source (skg--extract-source-from-metadata-sexp sexp)))
             (if (not (and id source))
                 (message "Could not extract id or source from metadata.")
-              (setq skg-doc--response-handler
-                    #'skg--file-diff-result)
+              (skg-register-response-handler
+               'get-file-path
+               #'skg--file-diff-result
+               t)
+              (skg-lp-reset)
               (let* ((tcp-proc (skg-tcp-connect-to-rust))
                      (request-sexp
                       (concat (prin1-to-string
@@ -41,18 +45,23 @@ and opens a magit diff of just that file."
                               "\n")))
                 (process-send-string tcp-proc request-sexp)) )) )) )) )
 
-(defun skg--file-diff-result (_tcp-proc string)
+(defun skg--file-diff-result (_tcp-proc payload)
   "Handle the server response for a get-file-path request.
-STRING is the response: either a relative path or an error message."
-  (let ((response (string-trim string)))
-    (if (string-prefix-p "File not found" response)
-        (message "%s" response)
-      (if (string-prefix-p "Error" response)
-          (message "%s" response)
-        (let ((resolved-path
-               (expand-file-name response skg-config-dir)))
-          (let ((default-directory ;; DANGER: magit reads this implicitly to find the git repo via magit-toplevel. The .skg source dir is its own repo, separate from the outer project repo.
-                 (file-name-directory resolved-path)))
-            (magit-diff-range "HEAD" nil (list resolved-path)) )) )) ))
+PAYLOAD is the tagged LP response."
+  (let* ((response (read payload))
+         (raw-content (cadr (assoc 'content response)))
+         (content (and raw-content (format "%s" raw-content)))
+         (path (and content (string-trim content))))
+    (cond
+     ((or (not path) (string-prefix-p "File not found" path))
+      (message "%s" (or path "No path received")))
+     ((string-prefix-p "Error" path)
+      (message "%s" path))
+     (t
+      (let ((resolved-path
+             (expand-file-name path skg-config-dir)))
+        (let ((default-directory ;; DANGER: magit reads this implicitly to find the git repo via magit-toplevel. The .skg source dir is its own repo, separate from the outer project repo.
+               (file-name-directory resolved-path)))
+          (magit-diff-range "HEAD" nil (list resolved-path)) )) ))))
 
 (provide 'skg-request-file-path)

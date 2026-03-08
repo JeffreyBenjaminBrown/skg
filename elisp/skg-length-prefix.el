@@ -1,6 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Read length-prefixed messages from the server.
+;;; PURPOSE: Read length-prefixed messages from the server
+;;; and dispatch by response-type via skg-response-handler-map.
 ;;; (This file does not handle adding length prefixes to outgoing
 ;;; messages. That's easier, and done inline where messages are sent,
 ;;; e.g., in skg-request-save.el.)
@@ -8,11 +9,14 @@
 ;;; USER-FACING FUNCTIONS
 ;;;   (none)
 
+(require 'skg-state)
+
 (defun skg-lp-handle-generic-chunk (tcp-proc chunk)
-  "Top-level filter. Accumulate CHUNK bytes, then step the LP machine until we must wait or we finish one message.
-Reads the completion handler from `skg-lp--completion-handler'.
-After :done, if the handler installed a successor and there is
-buffered data, continues the loop."
+  "Consumes the message stream in chunks. When a message is completed, dispatches it and continues for the remaining chunks. In more detail:
+.
+Top-level filter. Accumulate CHUNK bytes, then step the LP machine until we must wait or we finish one message.
+After :done, dispatches by response-type via `skg-response-handler-map'.
+If there is buffered data and a handler matched, continues the loop."
   ;; Append bytes
   (setq skg-lp--buf (skg-lp-append-chunk skg-lp--buf chunk))
   ;; Repeatedly advance the state machine; stop when it returns a terminal result.
@@ -31,25 +35,49 @@ buffered data, continues the loop."
                skg-lp--bytes-left left)
          (cl-return nil))
 
-        ;; Completed a full body → call completion handler, keep any remainder.
-        ;; If the handler installed a successor and there is buffered data,
-        ;; continue the loop to process the next LP message.
+        ;; Completed a full body → dispatch by response-type.
         (`(:done ,payload ,remainder)
          (setq skg-lp--buf        remainder
                skg-lp--bytes-left nil)
-         (funcall skg-lp--completion-handler tcp-proc payload)
-         (if (and skg-lp--completion-handler
-                  (> (length skg-lp--buf) 0))
-             nil ; continue loop -- more data and a successor handler
+         (skg-lp--dispatch-by-type tcp-proc payload)
+         (if (> (length skg-lp--buf) 0)
+             nil ; continue loop -- more data may contain another LP message
            (cl-return nil)))
 
         ;; Hard error → reset state and signal.
         (`(:error ,msg)
          (setq skg-lp--buf                (unibyte-string)
-               skg-lp--bytes-left         nil
-               skg-lp--completion-handler  nil
-               skg-doc--response-handler   nil)
+               skg-lp--bytes-left         nil)
          (error "%s" msg)))))
+
+(defun skg-lp--dispatch-by-type (tcp-proc payload)
+  "Parse PAYLOAD as s-exp, extract response-type, and dispatch
+via `skg-response-handler-map'.
+Keys in the map and response-type values are symbols
+because the sexp crate emits simple strings unquoted."
+  (condition-case err
+      (let* ((response (read payload))
+             (type-entry (assoc 'response-type response))
+             (response-type (cadr type-entry)))
+        (if (not response-type)
+            (message "skg: response missing response-type: %s"
+                     (substring payload 0 (min 80 (length payload))))
+          (let ((handler-entry (assoc response-type skg-response-handler-map)))
+            (if (not handler-entry)
+                (message "skg: no handler for response type: %s" response-type)
+              (let ((handler  (cadr handler-entry))
+                    (one-shot (cddr handler-entry)))
+                (funcall handler tcp-proc payload)
+                (when one-shot ;; It shot, so remove it. If instead the funcall errors, this 'when' statement will not fire, so the (stale? recoverable?) handler will not have been removed.
+                  (setq skg-response-handler-map
+                        (assoc-delete-all response-type
+                                         skg-response-handler-map))
+                  (setq skg-lp--pending-count
+                        (max 0 (1- skg-lp--pending-count))))
+                ) ))))
+    (error
+     (message "skg: dispatch error: %S for payload: %s"
+              err (substring payload 0 (min 80 (length payload)))) )))
 
 (defun skg-lp-step (buf bytes-left)
   "One pure(ish) step of the LP machine.

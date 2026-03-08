@@ -24,9 +24,8 @@ Please ask an AI for help setting it up.
    See example-data/ for how.
 ** start the client
 ```elisp
-(progn
-  (load-file "../elisp/skg-init.el")
-  (skg-client-init "../data/skgconfig.toml"))
+  (progn                                                                   (load-file "../elisp/skg-reload.el")
+    (skg-reload)                                                           (skg-client-init "../data/skgconfig.toml"))
 ```
 ** Now you can use it. See [[../docs/COMMANDS.org][commands]].
 ** stop the server later if you want

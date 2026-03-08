@@ -24,11 +24,12 @@ Returns the buffer, or nil on timeout."
 
 (defun skg-test-wait-for-response (&optional timeout-secs)
   "Wait for the current request's response to be fully processed.
-Polls until skg-doc--response-handler becomes nil, which happens
-when the LP completion handler finishes (for content-view and save
-requests). Returns t on success, nil on timeout."
+Polls until no one-shot handlers are pending and the LP machine
+is idle. Returns t on success, nil on timeout."
   (skg-test-wait-for
-   (lambda () (null skg-doc--response-handler))
+   (lambda () (and (= 0 skg-lp--pending-count)
+                   (null skg-lp--bytes-left)
+                   (= 0 (length skg-lp--buf))))
    timeout-secs))
 
 (provide 'test-wait)

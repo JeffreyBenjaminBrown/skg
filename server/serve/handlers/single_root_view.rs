@@ -3,9 +3,10 @@ use crate::to_org::render::content_view::single_root_view;
 use crate::serve::timing_log::timed;
 use crate::serve::util::{
   view_uri_from_request,
-  send_response,
   send_response_with_length_prefix,
-  format_buffer_response_sexp};
+  format_buffer_response_sexp,
+  tag_sexp_response,
+  tag_text_response};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::misc::{SkgConfig, ID};
 use crate::types::viewnode::ViewUri;
@@ -43,7 +44,9 @@ pub fn handle_single_root_view_request (
                 existing_uri . 0 . clone () )) ] ) ] )
           . to_string ();
         send_response_with_length_prefix (
-          stream, &switch_sexp );
+          stream,
+          & tag_sexp_response (
+            "content-view", &switch_sexp ));
         return; }
       let response_sexp : String =
         timed ( config, "single_root_view", || {
@@ -73,12 +76,16 @@ pub fn handle_single_root_view_request (
                   & vec![] ) }} } ) } );
       send_response_with_length_prefix (
         stream,
-        & response_sexp ); },
+        & tag_sexp_response (
+          "content-view", &response_sexp )); },
     Err (err) => {
       let error_msg : String = format!(
         "Error extracting node ID: {}", err);
       println! ( "{}", error_msg ) ;
-      send_response ( stream, &error_msg ); } } }
+      send_response_with_length_prefix (
+        stream,
+        & tag_text_response (
+          "content-view", &error_msg )); } } }
 
 pub fn node_id_from_single_root_view_request (
   request : &str

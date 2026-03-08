@@ -3,6 +3,8 @@
 ;;; USER-FACING FUNCTIONS
 ;;;   skg-diff-view
 
+(require 'skg-length-prefix)
+
 (defun skg-diff-view ()
   "Toggle git diff mode on the server.
 When enabled, subsequent content views and saves show
@@ -13,12 +15,16 @@ what changed between HEAD and the worktree."
           (concat (prin1-to-string
                    '((request . "git diff mode toggle")))
                   "\n")))
-    (setq skg-doc--response-handler
-          #'skg--git-diff-mode-result)
+    (skg-register-response-handler
+     'git-diff-mode
+     (lambda (_tcp-proc payload)
+       (let* ((response (read payload))
+              (content (cadr (assoc 'content response))))
+         (message "%s" (or (and content (format "%s" content))
+                           "toggled"))
+         (skg-request-save-buffer)))
+     t)
+    (skg-lp-reset)
     (process-send-string tcp-proc request-sexp)))
-
-(defun skg--git-diff-mode-result (_tcp-proc string)
-  (message "%s" (string-trim string))
-  (skg-request-save-buffer))
 
 (provide 'skg-request-git-diff-mode)

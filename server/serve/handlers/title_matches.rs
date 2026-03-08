@@ -1,3 +1,8 @@
+mod render_enriched_search_buffer;
+use render_enriched_search_buffer::{
+  enrich_with_containerward_paths,
+  compute_paths_for_search_results};
+
 /// PITFALL: Uses two layers of truncation.
 /// Tantivy truncates its search after (unimaginable) 1e5 results.
 /// The server (outside of Tantivy) then sorts those results
@@ -7,78 +12,165 @@
 use crate::consts::SEARCH_DISPLAY_LIMIT;
 use crate::context::ContextOriginType;
 use crate::dbs::tantivy::search_index;
+use crate::dbs::typedb::paths::PathToFirstNonlinearity;
 use crate::org_to_text::viewnode_to_text;
-use crate::serve::util::send_response;
-use crate::types::misc::{TantivyIndex, ID, SourceName};
+use crate::serve::util::{
+  send_response_with_length_prefix,
+  tag_text_response};
+use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::viewnode::{
-  ViewNode, ViewNodeKind, TrueNode, Scaffold, default_truenode};
+  ViewNode, ViewNodeKind, TrueNode, Scaffold,
+  default_truenode};
 
-use sexp::Sexp;
+use sexp::{Sexp, Atom};
 use std::collections::HashMap;
 use std::net::TcpStream;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use tantivy::{Document, Searcher};
+use typedb_driver::TypeDBDriver;
 
 pub type MatchGroups =
   HashMap < String,              // ID
             Vec < ( f32,         // score (after multiplier)
                     String ) >>; // title or alias
 
-/// Extracts search terms from request,
-/// finds matching titles,
-/// and sends a corresponding document to Emacs.
+/// Provides two responses, one fast and one slow.
+/// The slower one is 'enriched'
+/// with containerward paths at each search hit,
+/// and is processed in the background -- the user need not await it.
 pub fn handle_title_matches_request (
-  stream        : &mut TcpStream,
-  request       : &str,
-  tantivy_index : &TantivyIndex,
+  stream           : &mut TcpStream,
+  request          : &str,
+  tantivy_index    : &TantivyIndex,
+  typedb_driver    : &Arc<TypeDBDriver>,
+  config           : &SkgConfig,
+  enrichment_slot  : &Arc<Mutex<Option<String>>>,
+  search_cancelled : &Arc<AtomicBool>,
 ) {
   match search_terms_from_request (request) {
     Ok (search_terms) => {
-      send_response (
-        stream,
-        & generate_title_matches_response (
-          &search_terms,
-          tantivy_index )); },
+      // --- Phase 1: immediate results without paths ---
+      match search_index ( tantivy_index,
+                           &search_terms ) {
+        Ok (( best_matches, searcher )) => {
+          if best_matches . is_empty () {
+            send_response_with_length_prefix (
+              stream,
+              & tag_text_response (
+                "search-results",
+                "No matches found." ));
+            return; }
+          let matches_by_id : MatchGroups =
+            group_matches_by_id (
+              best_matches,
+              searcher,
+              tantivy_index );
+          let (result, result_ids) : (String, Vec<ID>) =
+            format_matches_as_org_mode (
+              &search_terms,
+              matches_by_id );
+          send_response_with_length_prefix (
+            // Sends phase 1 tagged LP response
+            stream,
+            & tag_text_response (
+              "search-results", &result ));
+          spawn_enrichment_thread (
+            // --- Phase 2: background path computation ---
+            enrichment_slot, search_cancelled,
+            typedb_driver, config, tantivy_index,
+            &search_terms, &result_ids, &result ); },
+        Err (e) => {
+          send_response_with_length_prefix (
+            stream,
+            & tag_text_response (
+              "search-results",
+              & format! ("Error searching index: {}", e) )); } } },
     Err (err) => {
       let error_msg : String =
         format! (
           "Error extracting search terms: {}", err );
       println! ( "{}", error_msg ) ;
-      send_response (
-        stream, &error_msg ); } } }
+      send_response_with_length_prefix (
+        stream,
+        & tag_text_response (
+          "search-results", &error_msg )); } } }
 
-/// Runs `search_index`.
-/// Returns an org-mode formatted string with grouped results by ID.
-/// The resulting buffer looks something like this:
-///   * (skg type:searchResult) second
-///   ** score: 1.29, [[id:5a][imperfect test second]]
-///   *** score: 1.17, [[id:5a][perfect match test second]]
-///   ** score: 0.98, [[id:2a][This is a second test file.]]
-///   ** score: 0.98, [[id:7f2d15e3-2d6e-4670-9700-fb6baabd6062][I am adding a second child.]]
-/// That is, the root says what was searched for,
-/// each level-2 headline is a distinct matching node,
-/// and each level-3 headline is a distinct matching alias
-/// for its parent, if any exist.
-fn generate_title_matches_response (
-  search_terms  : &str,
-  tantivy_index : &TantivyIndex,
+/// Spawn a background thread to compute containerward paths
+/// and write the enriched results to the shared slot.
+/// Clears any stale enrichment and resets the cancellation flag
+/// before spawning.
+fn spawn_enrichment_thread (
+  enrichment_slot  : &Arc<Mutex<Option<String>>>,
+  search_cancelled : &Arc<AtomicBool>,
+  typedb_driver    : &Arc<TypeDBDriver>,
+  config           : &SkgConfig,
+  tantivy_index    : &TantivyIndex,
+  search_terms     : &str,
+  result_ids       : &[ID],
+  base_org         : &str,
+) {
+  // P8: clear stale enrichment before spawning
+  { let mut guard : std::sync::MutexGuard<Option<String>> =
+      enrichment_slot . lock () . unwrap ();
+    *guard = None; }
+  search_cancelled . store (false, Ordering::SeqCst);
+  let slot_clone    : Arc<Mutex<Option<String>>> =
+    Arc::clone (enrichment_slot);
+  let cancel_clone  : Arc<AtomicBool> = Arc::clone (search_cancelled);
+  let driver_clone  : Arc<TypeDBDriver> = Arc::clone (typedb_driver);
+  let config_clone  : SkgConfig = config . clone ();
+  let tantivy_clone : TantivyIndex = tantivy_index . clone ();
+  let terms_clone   : String = search_terms . to_string ();
+  let ids_clone     : Vec<ID> = result_ids . to_vec ();
+  let base_org      : String = base_org . to_string ();
+  std::thread::spawn ( move || {
+    println! ("search enrichment: thread started for {} IDs",
+              ids_clone . len ());
+    let paths_by_id
+      : HashMap < ID, Vec < PathToFirstNonlinearity > > =
+      compute_paths_for_search_results (
+        &ids_clone, &driver_clone, &config_clone );
+    println! ("search enrichment: paths computed ({} entries)",
+              paths_by_id . len ());
+    if cancel_clone . load (Ordering::SeqCst) {
+      println! ("search enrichment: cancelled after paths");
+      return; }
+    let enriched : String =
+      enrich_with_containerward_paths (
+        &base_org, &ids_clone, &paths_by_id,
+        &tantivy_clone );
+    if cancel_clone . load (Ordering::SeqCst) {
+      println! ("search enrichment: cancelled after enrich");
+      return; }
+    let tagged : String =
+      mk_search_enrichment_sexp (
+        &terms_clone, &enriched );
+    println! ("search enrichment: writing to slot ({} bytes)",
+              tagged . len ());
+    let mut guard : std::sync::MutexGuard<Option<String>> =
+      slot_clone . lock () . unwrap ();
+    *guard = Some (tagged); } ); }
+
+/// Build the tagged s-exp for a search enrichment payload.
+/// Format: (("response-type" "search-enrichment")
+///          ("terms" "TERMS") ("content" "ORG"))
+fn mk_search_enrichment_sexp (
+  terms   : &str,
+  content : &str,
 ) -> String {
-  match search_index ( tantivy_index,
-                       search_terms ) {
-    Ok (( best_matches, searcher )) => {
-      if best_matches . is_empty () {
-        "No matches found." . to_string ()
-      } else {
-        let matches_by_id : MatchGroups =
-          group_matches_by_id (
-            best_matches,
-            searcher,
-            tantivy_index );
-        format_matches_as_org_mode (
-          search_terms,
-          matches_by_id ) }},
-    Err (e) => {
-      format!("Error searching index: {}", e) }} }
+  Sexp::List ( vec! [
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "response-type" . to_string () )),
+      Sexp::Atom ( Atom::S ( "search-enrichment" . to_string () )), ] ),
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "terms"   . to_string () )),
+      Sexp::Atom ( Atom::S ( terms     . to_string () )), ] ),
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "content" . to_string () )),
+      Sexp::Atom ( Atom::S ( content   . to_string () )), ] ),
+  ] ) . to_string () }
 
 /// Groups raw Tantivy results by ID.
 /// Applies context-based score multipliers:
@@ -124,10 +216,11 @@ pub fn group_matches_by_id (
 
 /// Formats grouped matches as an org-mode document.
 /// Sorts IDs by best (adjusted) score, and matches within each ID by score.
+/// Returns the formatted string and the ordered list of result IDs.
 pub fn format_matches_as_org_mode (
   search_terms  : &str,
   matches_by_id : MatchGroups,
-) -> String {
+) -> (String, Vec<ID>) {
   let mut result : String =
     String::new();
   result . push_str (
@@ -164,8 +257,10 @@ pub fn format_matches_as_org_mode (
       b . 1 . first () . map ( |(s, _)| *s ) . unwrap_or (0.0);
     score_b . partial_cmp (& score_a)
     . unwrap_or (std::cmp::Ordering::Equal) } );
+  let mut result_ids : Vec < ID > = Vec::new ();
   for (id, matches) in id_entries . into_iter()
     . take (SEARCH_DISPLAY_LIMIT) {
+    result_ids . push ( ID::from ( id . clone () ) );
     // First (best) match becomes level-2 headline
     let (score, title) : &(f32, String) = &matches[0];
     result . push_str (
@@ -205,8 +300,8 @@ pub fn format_matches_as_org_mode (
                 Scaffold::Alias {
                   text : title . clone(),
                   diff : None } ), } )
-          . expect ("Alias rendering never fails")); } }}
-  result }
+          . expect ("Alias rendering never fails")); } } }
+  (result, result_ids) }
 
 pub fn search_terms_from_request (
   request : &str

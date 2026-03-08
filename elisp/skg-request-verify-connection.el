@@ -5,6 +5,8 @@
 ;;;
 ;;; DATA USED/ASSUMED: See /api.md.
 
+(require 'skg-length-prefix)
+
 (defun skg-verify-connection ()
   "Verify connection to the Rust server,
 by sending a simple ping to the Rust server
@@ -19,15 +21,15 @@ calls `(skg-tcp-connect-to-rust)`
   (interactive)
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
          (request-sexp "((request . \"verify connection\"))\n"))
-    (setq skg-doc--response-handler
-          ;; Prepare for response.
-          #'skg-verify-connection-result)
+    (skg-register-response-handler
+     'verify-connection
+     (lambda (_tcp-proc payload)
+       (let* ((response (read payload))
+              (content (cadr (assoc 'content response))))
+         (message "%s" (or (and content (format "%s" content))
+                           "connected"))))
+     t)
+    (skg-lp-reset)
     (process-send-string tcp-proc request-sexp)))
-
-(defun skg-verify-connection-result (tcp-proc string)
-  "Display verify connection result from the Rust server."
-  (let ((response (string-trim string)))
-    (message "%s" response)
-    response))
 
 (provide 'skg-request-verify-connection)

@@ -39,14 +39,19 @@ unlocked when the early response arrives."
     ;; server's early response.
     (skg--lock-all-skg-buffers)
 
-    (setq
-     skg-lp--buf (unibyte-string)
-     skg-lp--bytes-left nil
-     skg-lp--completion-handler
+    ;; Register handlers in the dispatch map
+    (skg-register-response-handler
+     'save-lock
      (lambda (_tcp-proc payload)
-       (skg--save-phase-1-handler saved-uri save-buffer payload))
-     skg-doc--response-handler
-     #'skg-lp-handle-generic-chunk)
+       (skg--save-lock-handler saved-uri save-buffer payload))
+     t)
+    (skg-register-response-handler
+     'save-result
+     (lambda (_tcp-proc payload)
+       (skg--save-result-handler save-buffer payload))
+     t)
+
+    (skg-lp-reset)
 
     ;; Send the request line first
     (process-send-string tcp-proc request-s-exp)
@@ -55,33 +60,22 @@ unlocked when the early response arrives."
     (process-send-string tcp-proc header)
     (process-send-string tcp-proc buffer-contents)))
 
-(defun skg--save-phase-1-handler (saved-uri save-buffer payload)
-  "Auto-detecting handler for the first LP message of a save response.
-If PAYLOAD contains 'lock-collateral-views', it is the early lock
-message: unlock non-collateral buffers and install phase 2.
-Otherwise it is a direct save response (e.g. server error before
-the early message was sent): handle it as the phase 2 response.
-(There are only two phases.)"
+(defun skg--save-lock-handler (saved-uri save-buffer payload)
+  "Handle the save-lock LP message (tagged with response-type).
+Unlocks non-collateral buffers."
   (condition-case err
       (let* ((response (read payload))
              (collateral-entry (assoc 'lock-collateral-views response)))
-        (if collateral-entry
-            (let ((collateral-uris (cadr collateral-entry)))
-              (skg--unlock-non-collateral-buffers
-               saved-uri collateral-uris)
-              (setq skg-lp--completion-handler
-                    (lambda (_tcp-proc payload)
-                      (skg--save-phase-2-handler
-                       save-buffer payload)) ))
-          (skg--save-phase-2-handler save-buffer payload)))
+        (when collateral-entry
+          (let ((collateral-uris (cadr collateral-entry)))
+            (skg--unlock-non-collateral-buffers
+             saved-uri collateral-uris))))
     (error
      (skg--unlock-all-save-locked)
-     (setq skg-lp--completion-handler nil
-           skg-doc--response-handler  nil)
-     (message "ERROR in save phase 1 handler: %S" err)) ))
+     (message "ERROR in save-lock handler: %S" err)) ))
 
-(defun skg--save-phase-2-handler (save-buffer payload)
-  "Handle the full save response.
+(defun skg--save-result-handler (save-buffer payload)
+  "Handle the full save-result LP message (tagged with response-type).
 Unlocks all save-locked buffers, then processes the save response.
 Unlock MUST happen before `skg-handle-save-sexp' because
 `skg-replace-buffer-with-new-content' calls erase-buffer + insert,
@@ -91,9 +85,7 @@ which would trigger overlay modification-hooks if still present."
         (skg--unlock-all-save-locked)
         (with-current-buffer save-buffer
           (skg-handle-save-sexp payload)))
-    (skg--unlock-all-save-locked)
-    (setq skg-lp--completion-handler nil
-          skg-doc--response-handler  nil)) )
+    (skg--unlock-all-save-locked)) )
 
 (defun skg-handle-save-sexp (sexp-string)
   "Parse and handle save response s-exp: ((content ...) (errors (...)) (other-views-to-update ((URI_1 CONTENT_1) ...)))."
@@ -146,30 +138,30 @@ moves point to focused headline, and removes focus marker."
     (skg-remove-focused-marker)
     (message "Buffer updated with processed content from Rust")))
 
+(defun skg-show-save-feedback (buffer-name message-text content)
+  "Display CONTENT in BUFFER-NAME and show MESSAGE-TEXT in minibuffer."
+  (with-current-buffer (get-buffer-create buffer-name)
+    (let ((inhibit-read-only t))
+      (erase-buffer)
+      (insert content)
+      (org-mode)
+      (set-buffer-modified-p nil)
+      (goto-char (point-min)))
+    (display-buffer buffer-name)
+    (message "%s" message-text)))
+
 (defun skg-show-save-errors (error-content)
   "Show save errors in a new buffer with org-mode."
-  (let ((error-buffer-name "*SKG Save Errors - Inconsistencies Found*"))
-    (with-current-buffer (get-buffer-create error-buffer-name)
-      (let ((inhibit-read-only t))
-        (erase-buffer)
-        (insert error-content)
-        (org-mode)
-        (set-buffer-modified-p nil)
-        (goto-char (point-min)))
-      (display-buffer error-buffer-name)
-      (message "Save failed - errors shown in %s" error-buffer-name))))
+  (skg-show-save-feedback
+   "*SKG Save Errors - Inconsistencies Found*"
+   "Save failed - errors shown in *SKG Save Errors - Inconsistencies Found*"
+   error-content))
 
 (defun skg-show-save-warnings (warning-content)
   "Show save warnings in a new buffer."
-  (let ((warning-buffer-name "*SKG Save Warnings*"))
-    (with-current-buffer (get-buffer-create warning-buffer-name)
-      (let ((inhibit-read-only t))
-        (erase-buffer)
-        (insert warning-content)
-        (org-mode)
-        (set-buffer-modified-p nil)
-        (goto-char (point-min)))
-      (display-buffer warning-buffer-name)
-      (message "Save succeeded with warnings - see %s" warning-buffer-name))))
+  (skg-show-save-feedback
+   "*SKG Save Warnings*"
+   "Save succeeded with warnings - see *SKG Save Warnings*"
+   warning-content))
 
 (provide 'skg-request-save)

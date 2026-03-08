@@ -165,6 +165,35 @@ where I: IntoIterator<Item = &'a SkgNode>, {
       indexed_count += 1; }}
   Ok (indexed_count) }
 
+/// TODO : This must return the actual title.
+/// For that, Tantivy will need to distinguish aliases from titles.
+/// Look up a title (or alias) for a node by its exact primary ID.
+/// Returns the first title_or_alias found, or None if the ID
+/// is not in the index.
+pub fn title_by_id (
+  tantivy_index : &TantivyIndex,
+  id            : &ID,
+) -> Option < String > {
+  let reader : IndexReader =
+    tantivy_index . index . reader () . ok () ?;
+  let searcher : Searcher =
+    reader . searcher ();
+  let query : Box < dyn Query > =
+    Box::new ( tantivy::query::TermQuery::new (
+      Term::from_field_text (
+        tantivy_index . id_field, id . as_str () ),
+      schema::IndexRecordOption::Basic ));
+  let results : Vec < (f32, tantivy::DocAddress) > =
+    searcher . search (
+      &query, &TopDocs::with_limit (1) ) . ok () ?;
+  let (_score, doc_address) : &(f32, tantivy::DocAddress) =
+    results . first () ?;
+  let retrieved_doc : Document =
+    searcher . doc (*doc_address) . ok () ?;
+  retrieved_doc
+    . get_first ( tantivy_index . title_or_alias_field )
+    . and_then ( |v| v . as_text () )
+    . map ( |s| s . to_string () ) }
 
 /* -------------------- Private helpers -------------------- */
 

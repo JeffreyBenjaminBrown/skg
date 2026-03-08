@@ -4,7 +4,36 @@ use crate::types::viewnode::ViewUri;
 use sexp::{Sexp, Atom};
 use std::error::Error;
 use std::io::{BufRead, BufReader, Read, Write};
-use std::net::TcpStream; // handles two-way communication
+use std::net::TcpStream;
+
+/// Prepend a (response-type "TYPE") entry to an existing s-exp string.
+/// Input:  "((content "...") (errors (...)))"
+/// Output: "(("response-type" "TYPE") (content "...") (errors (...)))"
+pub fn tag_sexp_response (
+  response_type : &str,
+  sexp_payload  : &str,
+) -> String {
+  let tag : String =
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "response-type" . to_string () )),
+      Sexp::Atom ( Atom::S ( response_type   . to_string () )),
+    ] ) . to_string ();
+  format! ( "({} {}", tag, &sexp_payload [ 1.. ] ) }
+
+/// Wrap plain text in a tagged s-exp for LP delivery.
+/// Output: (("response-type" "TYPE") ("content" "TEXT"))
+pub fn tag_text_response (
+  response_type : &str,
+  text          : &str,
+) -> String {
+  Sexp::List ( vec! [
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "response-type" . to_string () )),
+      Sexp::Atom ( Atom::S ( response_type   . to_string () )), ] ),
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "content"       . to_string () )),
+      Sexp::Atom ( Atom::S ( text            . to_string () )), ] ),
+  ] ) . to_string () }
 
 pub fn send_response (
   stream   : &mut TcpStream,

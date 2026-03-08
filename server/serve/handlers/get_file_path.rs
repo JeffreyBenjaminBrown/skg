@@ -1,4 +1,7 @@
-use crate::serve::util::{value_from_request_sexp, send_response};
+use crate::serve::util::{
+  value_from_request_sexp,
+  send_response_with_length_prefix,
+  tag_text_response};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::util::path_from_pid_and_source;
 
@@ -17,15 +20,21 @@ pub fn handle_get_file_path_request (
     "id", request ) {
     Ok  (v) => v,
     Err (e) => {
-      send_response ( stream,
-                      &format! ( "Error: {}", e ) );
+      send_response_with_length_prefix (
+        stream,
+        & tag_text_response (
+          "get-file-path",
+          &format! ( "Error: {}", e ) ));
       return; } };
   let source : String = match value_from_request_sexp (
     "source", request ) {
     Ok  (v) => v,
     Err (e) => {
-      send_response ( stream,
-                      &format! ( "Error: {}", e ) );
+      send_response_with_length_prefix (
+        stream,
+        & tag_text_response (
+          "get-file-path",
+          &format! ( "Error: {}", e ) ));
       return; } };
   let raw_path : String = path_from_pid_and_source (
     config,
@@ -34,9 +43,11 @@ pub fn handle_get_file_path_request (
   let abs_path : PathBuf = match fs::canonicalize (&raw_path) {
     Ok  (p) => p,
     Err (_) => {
-      send_response (
+      send_response_with_length_prefix (
         stream,
-        & format! ( "File not found: {}", raw_path ) );
+        & tag_text_response (
+          "get-file-path",
+          & format! ( "File not found: {}", raw_path ) ));
       return; } };
   let config_dir : PathBuf = // Canonicalize to match abs_path
     // (both must be absolute for strip_prefix to work).
@@ -48,4 +59,7 @@ pub fn handle_get_file_path_request (
     . map ( |p| p . to_string_lossy () . into_owned () )
     . unwrap_or_else ( |_| abs_path . to_string_lossy ()
                        . into_owned () );
-  send_response ( stream, &rel_path ); }
+  send_response_with_length_prefix (
+    stream,
+    & tag_text_response (
+      "get-file-path", &rel_path )); }

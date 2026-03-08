@@ -11,7 +11,7 @@
 
 (defun skg-request-single-root-content-view-from-id (node-id &optional tcp-proc)
   "Ask Rust for an single root content view view of NODE-ID.
-Installs a length-prefixed response handler.
+Registers a response handler in the dispatch map.
 Optional TCP-PROC allows reusing an existing connection."
   (interactive "sNode ID: ")
   (let* ((tcp-proc (or tcp-proc (skg-tcp-connect-to-rust)))
@@ -25,16 +25,13 @@ Optional TCP-PROC allows reusing an existing connection."
                      (id . ,clean-id)
                      (view-uri . ,view-uri)))
                   "\n")))
-    (setq ;; Prepare LP state and handler
-     skg-lp--buf               (unibyte-string) ;; empty string
-     skg-lp--bytes-left        nil
-     skg-lp--completion-handler
+    ;; Register handler in dispatch map (one-shot)
+    (skg-register-response-handler
+     'content-view
      (lambda (tcp-proc payload)
-       (skg-handle-content-view-sexp tcp-proc payload view-uri)
-       (setq skg-lp--completion-handler nil
-             skg-doc--response-handler  nil))
-     skg-doc--response-handler
-     #'skg-lp-handle-generic-chunk)
+       (skg-handle-content-view-sexp tcp-proc payload view-uri))
+     t)
+    (skg-lp-reset)
     (process-send-string tcp-proc request-s-exp)) )
 
 (defun skg-handle-content-view-sexp (tcp-proc sexp-string view-uri)

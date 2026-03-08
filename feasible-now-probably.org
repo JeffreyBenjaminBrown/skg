@@ -39,10 +39,13 @@ If anything blocks your progress that needs my attention, ping me.
   under search results,
   without burying them under many lines of aliases.
 * ONGOING show contentward paths from search results
-** plan
+** ONGOING review code
+** AWAITS must index alisa v. title in Tantivy
+   title_by_id should return *the* title, not any alias. Which I guess means we have to index title- vs. alias-ness.
+** DONE plan
    contentward-paths-in-search-plan.org
    I haven't finished adding TODO items to it.
-** the idea
+** DONE the idea
   Let's make a search result buffer immutable.
   (Elsewhere the code already does this at some point,
   and it's not by the obvious 'make everything read-only'.
@@ -665,6 +668,7 @@ There's already code somewhere for distinguishing None from Some([]) in a SkgNod
   This will require Rust to immediately tell Emacs
   which views are collateral,
   before computing how to update things.
+* regex search
 * update elisp/COMMANDS.org with any new user-facing commands
 ** elaboration
    both the commands and the aliases for them

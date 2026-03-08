@@ -10,8 +10,9 @@ use crate::serve::util::{
   format_buffer_response_sexp_with_updates,
   format_collateral_uris_sexp,
   read_length_prefixed_content,
-  send_response,
-  send_response_with_length_prefix};
+  send_response_with_length_prefix,
+  tag_sexp_response,
+  tag_text_response};
 use crate::types::errors::SaveError;
 use crate::types::git::{SourceDiff, GitDiffStatus};
 use crate::types::misc::{ID, SourceName, SkgConfig, TantivyIndex};
@@ -82,7 +83,8 @@ pub fn handle_save_buffer_request (
         let lock_sexp : String =
           format_collateral_uris_sexp ( &uris_to_lock );
         send_response_with_length_prefix (
-          stream, &lock_sexp ); }
+          stream,
+          & tag_sexp_response ( "save-lock", &lock_sexp )); }
       timed ( config, "update_from_and_rerender_buffer", || {
         match block_on(
           update_from_and_rerender_buffer (
@@ -95,7 +97,9 @@ pub fn handle_save_buffer_request (
         { Ok (save_response) => {
             send_response_with_length_prefix (
               stream,
-              & save_response . to_sexp_string () ); }
+              & tag_sexp_response (
+                "save-result",
+                & save_response . to_sexp_string () )); }
           Err (err) => { // Check if this is a SaveError that should be formatted for the client
             if let Some (save_error) = err . downcast_ref::<SaveError>() {
               let response_sexp : String =
@@ -103,17 +107,25 @@ pub fn handle_save_buffer_request (
                   & format_save_error_as_org (save_error) )
                 . to_string ();
               send_response_with_length_prefix (
-                stream, & response_sexp );
+                stream,
+                & tag_sexp_response (
+                  "save-result", & response_sexp ));
             } else {
               let error_msg : String =
                 format!("Error processing buffer content: {}", err);
               println!("{}", error_msg);
-              send_response(stream, &error_msg); }} }} ); }
+              send_response_with_length_prefix (
+                stream,
+                & tag_text_response (
+                  "save-result", &error_msg )); }} }} ); }
     Err (err) => {
       let error_msg : String =
         format! ("Error reading buffer content: {}", err );
       println! ( "{}", error_msg );
-      send_response ( stream, &error_msg ); }} }
+      send_response_with_length_prefix (
+        stream,
+        & tag_text_response (
+          "save-result", &error_msg )); }} }
 
 /// Create an s-expression with nil content and an error message.
 fn empty_response_sexp (

@@ -1,3 +1,16 @@
+* magit bug!
+I just copoied this text from magit:
+
+  ```elisp
+  -(progn
+  -  (load-file "../elisp/skg-init.el")
+  -  (skg-client-init "../data/skgconfig.toml"))
+  +  (progn                                                                   (load-file "../elisp/skg-reload.el")
+  +    (skg-reload)                                                           (skg-client-init "../data/skgconfig.toml"))
+   ```
+But when I look at it in magit,
+I don't see any of the lines without a + or - in front.
+What's going on?
 * [[./docs/en-espanol.org][En Español]]
 * deciding whether a node is a relationship is up to the user
 * generalize it : a node is a map from one to many
