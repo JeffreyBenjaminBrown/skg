@@ -6,8 +6,8 @@ use tantivy::schema as schema;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::in_fs_wipe_index_then_create_it;
-use skg::dbs::tantivy::{search_index, title_by_id, update_index_with_nodes};
-use skg::types::misc::{TantivyIndex, ID};
+use skg::dbs::tantivy::{search_index, title_and_source_by_id, update_index_with_nodes};
+use skg::types::misc::{ID, SourceName, TantivyIndex};
 use skg::types::skgnode::{SkgNode, empty_skgnode};
 
 #[test]
@@ -276,17 +276,18 @@ fn test_title_by_id_returns_title_not_alias (
       Path::new (index_dir) )?;
   assert_eq! (indexed_count, 3,
     "Expected 3 documents (1 title + 2 aliases)");
-  let result : Option<String> =
-    title_by_id (
+  let result : Option<(String, SourceName)> =
+    title_and_source_by_id (
       &tantivy_index,
       &ID::new ("node-with-aliases") );
-  assert_eq! (result, Some ("The Real Title" . to_string ()),
-    "title_by_id should return the title, not an alias");
-  let missing : Option<String> =
-    title_by_id (
+  assert_eq! (result . as_ref () . map ( |(t, _)| t . as_str () ),
+    Some ("The Real Title"),
+    "title_and_source_by_id should return the title, not an alias");
+  let missing : Option<(String, SourceName)> =
+    title_and_source_by_id (
       &tantivy_index,
       &ID::new ("nonexistent-id") );
   assert_eq! (missing, None,
-    "title_by_id should return None for missing IDs");
-  println! ("title_by_id test passed!");
+    "title_and_source_by_id should return None for missing IDs");
+  println! ("title_and_source_by_id test passed!");
   Ok (( )) }

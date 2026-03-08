@@ -38,17 +38,22 @@
     (process-send-string tcp-proc request-s-exp)))
 
 (defun skg--display-search-phase1 (payload search-terms)
-  "Display phase 1 search results (without paths)."
+  "Display phase 1 search results (without paths).
+Sets skg-view-uri to \"search:TERMS\" and registers a
+kill-buffer-hook to send close-view to the server."
   (let* ((response (read payload))
-         (content (skg--as-string (cadr (assoc 'content response)))))
+         (content (skg--as-string (cadr (assoc 'content response))))
+         (view-uri (concat "search:" search-terms)))
     (when content
       (with-current-buffer
           (get-buffer-create (skg-search-buffer-name search-terms))
-        (let ((inhibit-read-only t)) ;; Buffer may already be read-only from a previous search with the same terms.
+        (let ((inhibit-read-only t))
           (skg--replace-search-content content)
           (org-mode)
           (heralds-minor-mode)
           (goto-char (point-min)))
+        (setq skg-view-uri view-uri)
+        (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
         (setq buffer-read-only t)
         (switch-to-buffer (current-buffer)) ))))
 

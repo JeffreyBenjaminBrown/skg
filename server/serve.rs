@@ -4,7 +4,7 @@
 ///
 /// In this module, Arc<AtomicBool> is used as the search cancellation flag. The connection thread sets it to true when a new search arrives; the background enrichment  thread checks it before writing to the slot. store and load with Ordering::Relaxed (or SeqCst) are the typical operations — no lock, no blocking, just a single instruction.
 ///
-/// The advantage over Arc<Mutex<bool>>: no lock contention, no possibility of deadlock, and much cheaper (a few nanoseconds vs. potentially microseconds for mutex acquire/release). The tradeoff: atomics only work for simple values — you can't atomically update a String or a struct, which is why the enrichment payload itself uses Arc<Mutex<Option<String>>>.
+/// The advantage over Arc<Mutex<bool>>: no lock contention, no possibility of deadlock, and much cheaper (a few nanoseconds vs. potentially microseconds for mutex acquire/release). The tradeoff: atomics only work for simple values — you can't atomically update a String or a struct, which is why the enrichment payload itself uses Arc<Mutex<Option<SearchEnrichmentPayload>>>.
 
 pub mod handlers;
 pub mod parse_metadata_sexp;
@@ -16,12 +16,18 @@ use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::get_file_path::handle_get_file_path_request;
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
-use crate::serve::handlers::title_matches::handle_title_matches_request;
+use crate::serve::handlers::title_matches::{
+  handle_title_matches_request,
+  SearchEnrichmentPayload,
+  mk_search_enrichment_sexp};
 use crate::serve::util::{
   request_type_from_request,
   send_response_with_length_prefix,
   tag_text_response};
+use crate::org_to_text::viewnode_forest_to_string;
+use crate::serve::handlers::title_matches::render_enriched_search_buffer::insert_containerward_paths_into_forest;
 use crate::types::misc::{SkgConfig, TantivyIndex};
+use crate::types::viewnode::ViewUri;
 use crate::types::memory::SkgnodesInMemory;
 
 use std::io::{BufRead, BufReader};
@@ -96,7 +102,7 @@ fn handle_emacs (
       memory            : SkgnodesInMemory::new () };
 
   let enrichment_slot // To update search results once containerward paths (the 'enrichment') have been computed.
-    : Arc<Mutex<Option<String>>> =
+    : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::new ( Mutex::new (None) );
   let search_cancelled : Arc<AtomicBool> =
     Arc::new ( AtomicBool::new (false) );
@@ -153,7 +159,8 @@ fn handle_emacs (
                 &typedb_driver,
                 config,
                 &enrichment_slot,
-                &search_cancelled );
+                &search_cancelled,
+                &mut conn_state );
             } else if request_type == "verify connection" {
               handle_verify_connection_request(
                 &mut stream);
@@ -193,12 +200,35 @@ fn handle_emacs (
         if e . kind () == std::io::ErrorKind::WouldBlock
         || e . kind () == std::io::ErrorKind::TimedOut =>
       { // Idle timeout — drain enrichment slot if populated.
+        // RACE NOTE: A stale enrichment payload from a cancelled search
+        // could theoretically land here if the old background thread
+        // passed its cancellation check just before the new search
+        // cleared the slot. This is harmless: same terms + unchanged
+        // index = identical results, and a fresh enrichment will
+        // overwrite shortly after.
         if let Ok (mut guard) = enrichment_slot . try_lock () {
-          if let Some (enrichment) = guard . take () {
-            println! ("slot drain: sending enrichment ({} bytes)",
-                      enrichment . len ());
-            send_response_with_length_prefix (
-              &mut stream, &enrichment ); } } }
+          if let Some (payload) = guard . take () {
+            let uri : ViewUri =
+              ViewUri ( format! ("search:{}", payload . terms) );
+            // Remove the view temporarily so we can mutably borrow
+            // both its forest and the pool without conflicting borrows
+            // on conn_state.memory.
+            if let Some (mut vs) = conn_state . memory . views . remove (&uri) {
+              insert_containerward_paths_into_forest (
+                &mut vs . forest, &payload . result_ids,
+                &payload . paths_by_id, &tantivy_index,
+                &mut conn_state . memory . pool, config );
+              let enriched : String =
+                viewnode_forest_to_string ( &vs . forest )
+                . expect ("search forest rendering never fails");
+              let enriched_sexp : String =
+                mk_search_enrichment_sexp (
+                  &payload . terms, &enriched );
+              conn_state . memory . views . insert ( uri, vs );
+              println! ("slot drain: sending enrichment ({} bytes)",
+                        enriched_sexp . len ());
+              send_response_with_length_prefix (
+                &mut stream, &enriched_sexp ); }} }}
       Err (_) => break, // real error
     } }
   println!("Emacs disconnected: {peer}"); }

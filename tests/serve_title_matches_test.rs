@@ -1,11 +1,12 @@
 // cargo test --test serve_title_matches_test
 
 use skg::dbs::tantivy::search_index;
+use skg::org_to_text::viewnode_forest_to_string;
 use skg::types::misc::{ID, TantivyIndex};
 use skg::types::skgnode::{SkgNode, empty_skgnode};
 use skg::dbs::init::in_fs_wipe_index_then_create_it;
 use skg::serve::handlers::title_matches::{
-  group_matches_by_id, format_matches_as_org_mode};
+  group_matches_by_id, build_search_forest};
 
 use std::path::Path;
 use std::fs;
@@ -67,10 +68,13 @@ fn test_title_matches_org_format (
       let matches_by_id =
         group_matches_by_id (
           best_matches, searcher, &tantivy_index );
-      let (result, _result_ids) : (String, Vec<ID>) =
-        format_matches_as_org_mode (
+      let (forest, _result_ids) =
+        build_search_forest (
           search_terms,
-          matches_by_id );
+          &matches_by_id );
+      let result : String =
+        viewnode_forest_to_string ( &forest )
+        . expect ("search forest rendering never fails");
       let lines : Vec < &str > =
         result . lines () . collect ();
 

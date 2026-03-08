@@ -1,7 +1,5 @@
-mod render_enriched_search_buffer;
-use render_enriched_search_buffer::{
-  enrich_with_containerward_paths,
-  compute_containerward_paths_using_parallel_frontier};
+pub mod render_enriched_search_buffer;
+use render_enriched_search_buffer::compute_containerward_paths_using_parallel_frontier;
 
 /// PITFALL: Uses two layers of truncation.
 /// Tantivy truncates its search after (unimaginable) 1e5 results.
@@ -13,28 +11,46 @@ use crate::consts::SEARCH_DISPLAY_LIMIT;
 use crate::context::ContextOriginType;
 use crate::dbs::tantivy::search_index;
 use crate::dbs::typedb::paths::PathToFirstNonlinearity;
-use crate::org_to_text::viewnode_to_text;
+use crate::org_to_text::viewnode_forest_to_string;
+use crate::serve::ConnectionState;
 use crate::serve::util::{
   send_response_with_length_prefix,
   tag_text_response};
+use crate::types::memory::skgnode_from_map_or_disk;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::viewnode::{
-  ViewNode, ViewNodeKind, TrueNode, Scaffold,
-  default_truenode};
+  ViewNode, ViewNodeKind, TrueNode, Scaffold, ViewUri,
+  default_truenode, forest_root_viewnode,
+  mk_indefinitive_viewnode};
 
+use ego_tree::{Tree, NodeId, NodeMut};
 use sexp::{Sexp, Atom};
 use std::collections::HashMap;
 use std::net::TcpStream;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use tantivy::{Document, Searcher};
 use typedb_driver::TypeDBDriver;
 
+/// Maps each ID to search hits (plural -- IDs can have aliases,
+/// so one ID might get multiple matches).
+/// The score incorporates a context-based multiplier:
+/// Each result's BM25 score from Tantivy is multiplied by
+/// the multiplier corresponding to its context_origin_type.
+/// Non-origins keep their raw score (multiplier = 1).
 pub type MatchGroups =
-  HashMap < String,              // ID
-            Vec < ( f32,         // score (after multiplier)
-                    String ) >>; // title or alias
+  HashMap < ID, ( SourceName,
+                  Vec < ( f32,           // score (after multiplier)
+                          String ) >) >; // title or alias
+
+/// Structured enrichment data passed through the slot,
+/// replacing the raw rendered String.
+pub struct SearchEnrichmentPayload {
+  pub terms       : String,
+  pub result_ids  : Vec<ID>,
+  pub paths_by_id : HashMap<ID, Vec<PathToFirstNonlinearity>>,
+}
 
 /// Provides two responses, one fast and one slow.
 /// The slower one is 'enriched'
@@ -46,8 +62,9 @@ pub fn handle_title_matches_request (
   tantivy_index    : &TantivyIndex,
   typedb_driver    : &Arc<TypeDBDriver>,
   config           : &SkgConfig,
-  enrichment_slot  : &Arc<Mutex<Option<String>>>,
+  enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
+  conn_state       : &mut ConnectionState,
 ) {
   match search_terms_from_request (request) {
     Ok (search_terms) => {
@@ -67,20 +84,34 @@ pub fn handle_title_matches_request (
               best_matches,
               searcher,
               tantivy_index );
-          let (result, result_ids) : (String, Vec<ID>) =
-            format_matches_as_org_mode (
+          let (forest, result_ids) : (Tree<ViewNode>, Vec<ID>) =
+            build_search_forest (
               &search_terms,
-              matches_by_id );
+              &matches_by_id );
+          let rendered : String =
+            // Render first, before register_view moves the forest
+            viewnode_forest_to_string ( &forest )
+            . expect ("search forest rendering never fails");
+          for (id, (source, _)) in &matches_by_id {
+            // Populate pool with SkgNodes for each result ID.
+            let _ = skgnode_from_map_or_disk (
+              id, source,
+              &mut conn_state . memory . pool, config ); }
+          let uri : ViewUri =
+            ViewUri ( format! ("search:{}", search_terms) );
+          conn_state . memory . register_view (
+            // Register the search view.
+            uri, forest, &result_ids );
           send_response_with_length_prefix (
-            // Sends phase 1 tagged LP response
+            // phase 1 (unenriched) tagged LP response
             stream,
             & tag_text_response (
-              "search-results", &result ));
+              "search-results", &rendered ));
           spawn_enrichment_thread (
-            // --- Phase 2: background path computation ---
+            // phase 2 (enriched) search results, backgrounded
             enrichment_slot, search_cancelled,
-            typedb_driver, config, tantivy_index,
-            &search_terms, &result_ids, &result ); },
+            typedb_driver, config,
+            &search_terms, &result_ids ); },
         Err (e) => {
           send_response_with_length_prefix (
             stream,
@@ -98,33 +129,29 @@ pub fn handle_title_matches_request (
           "search-results", &error_msg )); } } }
 
 /// Spawn a background thread to compute containerward paths
-/// and write the enriched results to the shared slot.
+/// and write the structured payload to the shared slot.
 /// Clears any stale enrichment and resets the cancellation flag
 /// before spawning.
 fn spawn_enrichment_thread (
-  enrichment_slot  : &Arc<Mutex<Option<String>>>,
+  enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
   typedb_driver    : &Arc<TypeDBDriver>,
   config           : &SkgConfig,
-  tantivy_index    : &TantivyIndex,
   search_terms     : &str,
   result_ids       : &[ID],
-  base_org         : &str,
 ) {
-  // P8: clear stale enrichment before spawning
-  { let mut guard : std::sync::MutexGuard<Option<String>> =
+  { // Clear stale enrichment before spawning.
+    let mut guard : MutexGuard<Option<SearchEnrichmentPayload>> =
       enrichment_slot . lock () . unwrap ();
     *guard = None; }
   search_cancelled . store (false, Ordering::SeqCst);
-  let slot_clone    : Arc<Mutex<Option<String>>> =
+  let slot_clone    : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::clone (enrichment_slot);
   let cancel_clone  : Arc<AtomicBool> = Arc::clone (search_cancelled);
   let driver_clone  : Arc<TypeDBDriver> = Arc::clone (typedb_driver);
   let config_clone  : SkgConfig = config . clone ();
-  let tantivy_clone : TantivyIndex = tantivy_index . clone ();
   let terms_clone   : String = search_terms . to_string ();
   let ids_clone     : Vec<ID> = result_ids . to_vec ();
-  let base_org      : String = base_org . to_string ();
   std::thread::spawn ( move || {
     println! ("search enrichment: thread started for {} IDs",
               ids_clone . len ());
@@ -139,26 +166,18 @@ fn spawn_enrichment_thread (
     if cancel_clone . load (Ordering::SeqCst) {
       println! ("search enrichment: cancelled after paths");
       return; }
-    let enriched : String =
-      enrich_with_containerward_paths (
-        &base_org, &ids_clone, &paths_by_id,
-        &tantivy_clone );
-    if cancel_clone . load (Ordering::SeqCst) {
-      println! ("search enrichment: cancelled after enrich");
-      return; }
-    let tagged : String =
-      mk_search_enrichment_sexp (
-        &terms_clone, &enriched );
-    println! ("search enrichment: writing to slot ({} bytes)",
-              tagged . len ());
-    let mut guard : std::sync::MutexGuard<Option<String>> =
+    println! ("search enrichment: writing payload to slot");
+    let mut guard : MutexGuard<Option<SearchEnrichmentPayload>> =
       slot_clone . lock () . unwrap ();
-    *guard = Some (tagged); } ); }
+    *guard = Some ( SearchEnrichmentPayload {
+      terms       : terms_clone,
+      result_ids  : ids_clone,
+      paths_by_id } ); } ); }
 
 /// Build the tagged s-exp for a search enrichment payload.
 /// Format: (("response-type" "search-enrichment")
 ///          ("terms" "TERMS") ("content" "ORG"))
-fn mk_search_enrichment_sexp (
+pub fn mk_search_enrichment_sexp (
   terms   : &str,
   content : &str,
 ) -> String {
@@ -190,16 +209,22 @@ pub fn group_matches_by_id (
     match searcher . doc (doc_address) {
       Ok (retrieved_doc) => {
         let retrieved_doc : Document = retrieved_doc;
-        let id_opt : Option < String > =
+        let id_opt : Option < ID > =
           retrieved_doc
             . get_first ( tantivy_index . id_field )
             . and_then ( |v| v . as_text() )
-            . map ( |s| s . to_string() );
+            . map ( |s| ID::from (s) );
         let title_opt : Option < String > =
           retrieved_doc
             . get_first ( tantivy_index . title_or_alias_field )
             . and_then ( |v| v . as_text() )
             . map ( |s| s . to_string() );
+        let source : SourceName =
+          SourceName::from (
+            retrieved_doc
+              . get_first ( tantivy_index . source_field )
+              . and_then ( |v| v . as_text () )
+              . unwrap_or ("") );
         let multiplier : f32 =
           retrieved_doc
             . get_first ( tantivy_index . context_origin_type_field )
@@ -210,100 +235,104 @@ pub fn group_matches_by_id (
         if let (Some (id), Some (title)) = (id_opt, title_opt) {
           result_acc
             . entry (id)
-            . or_insert_with (Vec::new)
+            . or_insert_with ( || (source, Vec::new ()) )
+            . 1
             . push (( adjusted_score, title )); }},
       Err (e) => { eprintln! (
         "Error retrieving document: {}", e ); }} }
   result_acc }
 
-/// Formats grouped matches as an org-mode document.
-/// Sorts IDs by best (adjusted) score, and matches within each ID by score.
-/// Returns the formatted string and the ordered list of result IDs.
-pub fn format_matches_as_org_mode (
+/// Builds a Tree<ViewNode> representing the search results.
+/// Returns the forest and the ordered list of result IDs.
+///
+/// Tree structure:
+///   BufferRoot
+///   └── TrueNode "search-results" (level 1, parentIgnores)
+///       ├── TrueNode per result (level 2, indefinitive)
+///       │   └── AliasCol + Alias children (if aliases matched)
+///       └── ...
+pub fn build_search_forest (
   search_terms  : &str,
-  matches_by_id : MatchGroups,
-) -> (String, Vec<ID>) {
-  let mut result : String =
-    String::new();
-  result . push_str (
-    & viewnode_to_text (
-      1,
-      & ViewNode {
-        focused : false,
-        folded  : false,
-        kind    : ViewNodeKind::True (
-          // The unique level-1 headline states the search terms.
-          TrueNode {
-            parent_ignores : true,
-            .. default_truenode (
-              ID::from ("search-results"),
-              SourceName::from ("search"),
-              search_terms . to_string() ) } ), } )
-    . expect ("TrueNode rendering never fails"));
-  let mut id_entries
-    : Vec < ( String,               // ID
-              Vec < ( f32,          // score
-                      String ) >) > // title or alias
-    = ( matches_by_id . into_iter()
-        . map ( | (id, mut matches) | {
-          // Sort matches within each ID by score
-          // (descending, so the first is the best).
-          matches . sort_by( |a, b|
-                              b . 0 . partial_cmp (&a . 0) . unwrap() );
-          (id, matches) } )
-        . collect() );
-  id_entries . sort_by ( |a, b| {
+  matches_by_id : &MatchGroups,
+) -> (Tree<ViewNode>, Vec<ID>) {
+  let mut forest : Tree<ViewNode> =
+    Tree::new ( forest_root_viewnode () );
+  let level1_treeid : NodeId = {
+    // The unique level-1 search-results heading
+    let mut root_mut : NodeMut<ViewNode> =
+      forest . root_mut ();
+    root_mut . append ( ViewNode {
+      focused : false,
+      folded  : false,
+      kind    : ViewNodeKind::True (
+        // TODO : This ought to use a new, separate kind of ViewNode.
+        TrueNode { parent_ignores : true,
+                   .. default_truenode (
+                     ID::from ("search-results"),
+                     SourceName::from ("search"),
+                     search_terms . to_string () ) } ) }
+    ). id () };
+  let mut id_entries : Vec < ( &ID,
+                               &SourceName,
+                               &Vec < ( f32, String ) > ) > =
+    matches_by_id . iter ()
+    . map ( |(id, (source, matches))| // flatten
+             (id, source, matches) )
+    . collect ();
+  id_entries . sort_by ( |a, b| { // sort by best score (descending)
     let score_a : f32 =
-      a . 1 . first () . map ( |(s, _)| *s ) . unwrap_or (0.0);
+      a . 2 . first () . map ( |(s, _)| *s ) . unwrap_or (0.0);
     let score_b : f32 =
-      b . 1 . first () . map ( |(s, _)| *s ) . unwrap_or (0.0);
+      b . 2 . first () . map ( |(s, _)| *s ) . unwrap_or (0.0);
     score_b . partial_cmp (& score_a)
     . unwrap_or (std::cmp::Ordering::Equal) } );
   let mut result_ids : Vec < ID > = Vec::new ();
-  for (id, matches) in id_entries . into_iter()
-    . take (SEARCH_DISPLAY_LIMIT) {
-    result_ids . push ( ID::from ( id . clone () ) );
-    // First (best) match becomes level-2 headline
-    let (score, title) : &(f32, String) = &matches[0];
-    result . push_str (
-      & viewnode_to_text (
-        2,
-        & ViewNode {
-          focused : false,
-          folded  : false,
-          kind    : ViewNodeKind::True (
-            TrueNode {
-              indefinitive : true,
-              .. default_truenode (
-                ID::from(id . clone()),
-                SourceName::from ("search"),
-                format! ( "score: {:.2}, [[id:{}][{}]]",
-                          score, id, title )) } ), } )
-      . expect ("TrueNode rendering never fails"));
-    if matches . len() > 1 {
-      // Present any matching aliases (or the title, if an alias was the best match) as children of an AliasCol scaffold.
-      result . push_str (
-        & viewnode_to_text (
-          3,
-          & ViewNode {
+  for (id, _source, matches) in id_entries . iter ()
+        . take (SEARCH_DISPLAY_LIMIT)
+    { result_ids . push ( (*id) . clone () );
+      let mut sorted_matches : Vec < &(f32, String) > =
+        // We borrow from matches_by_id.
+        // Sort matches by score descending for display.
+        matches . iter () . collect ();
+      sorted_matches . sort_by ( |a, b|
+        b . 0 . partial_cmp (&a . 0) . unwrap () );
+      let (score, title) : &(f32, String) = sorted_matches [0];
+      let level2_treeid : NodeId = {
+        // We make one of these, indefinitive, for each ID found
+        let mut level1_mut : NodeMut<ViewNode> =
+          forest . get_mut (level1_treeid) . unwrap ();
+        level1_mut . append (
+          mk_indefinitive_viewnode (
+            (*id) . clone (),
+            SourceName::from ("search"),
+            format! ( "score: {:.2}, [[id:{}][{}]]",
+                      score, id . as_str (), title ),
+            true ))
+        . id () };
+      if sorted_matches . len () > 1 {
+        // We bury all but the best match in an AliasCol.
+        // PITFALL: The title might not be the best match,
+        // in which case this makes it look like an alias.
+        let aliascol_id : NodeId = {
+          let mut level2_mut : NodeMut<ViewNode> =
+            forest . get_mut (level2_treeid) . unwrap ();
+          level2_mut . append ( ViewNode {
             focused : false,
             folded  : true,
             kind    : ViewNodeKind::Scaff (
-              Scaffold::AliasCol ), } )
-        . expect ("AliasCol rendering never fails"));
-      for (_score, title) in matches . iter() . skip (1) {
-        result . push_str (
-          & viewnode_to_text (
-            4,
-            & ViewNode {
-              focused : false,
-              folded  : false,
-              kind    : ViewNodeKind::Scaff (
-                Scaffold::Alias {
-                  text : title . clone(),
-                  diff : None } ), } )
-          . expect ("Alias rendering never fails")); } } }
-  (result, result_ids) }
+              Scaffold::AliasCol ) } )
+          . id () };
+        for (_score, title) in sorted_matches . iter () . skip (1) {
+          let mut aliascol_mut : NodeMut<ViewNode> =
+            forest . get_mut (aliascol_id) . unwrap ();
+          aliascol_mut . append ( ViewNode {
+            focused : false,
+            folded  : false,
+            kind    : ViewNodeKind::Scaff (
+              Scaffold::Alias {
+                text : title . clone (),
+                diff : None } ) } ); }} }
+  (forest, result_ids) }
 
 pub fn search_terms_from_request (
   request : &str

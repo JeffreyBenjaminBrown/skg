@@ -38,7 +38,8 @@ If anything blocks your progress that needs my attention, ping me.
   This will allow us to also present containerward paths
   under search results,
   without burying them under many lines of aliases.
-* ONGOING show contentward paths from search results
+* DONE show contentward paths from search results
+** DONE speed it up
 ** DONE review code
 ** DONE must index alias v. title in Tantivy
 title_by_id should return *the* title, not any alias. Which I guess means we have to index title- vs. alias-ness.

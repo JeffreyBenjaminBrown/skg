@@ -23,10 +23,15 @@ pub type SkgNodeMap = HashMap<ID, SkgNode>;
 /// See also: SkgNodeMap (the per-request working set).
 pub struct SkgnodesInMemory {
   pub pool        : HashMap<ID, SkgNode>,
-  views           : HashMap<ViewUri, ViewState>, // TODO ? OPTIMIZE:
+  pub views       : HashMap<ViewUri, ViewState>,
+  // Includes both (graph) content views and search result views. See the definition of 'ViewUri'.
+  // TODO ? OPTIMIZE:
   // The reverse lookup (PID -> views) is computed by scanning `views` via views_containing(). This is O(views) per call, fine for < 10 views. If the number of views grows large, consider a bijective map (HashMap<ID, HashSet<ViewUri>> maintained alongside this one) for O(1) reverse lookups.
-  pub id_resolver : HashMap<ID, (ID, SourceName)>, // TODO ? OPTIMIZE:
+
+  pub id_resolver : HashMap<ID, (ID, SourceName)>,
+  // TODO ? OPTIMIZE:
   // id_resolver is not yet wired into the render pipeline (which would require threading &mut SkgnodesInMemory through render_initial_forest_bfs and complete_viewtree). If pid_and_source_from_id remains a bottleneck after pool seeding, wire id_resolver into skgnode_and_viewnode_from_id, or apply the batch-query optimization from typedb-batching.org.
+
   root_ids        : ManyToMany<ID, ViewUri>, // Maps every root ID (primary + extra) ↔ ViewUri. Supports many-to-many because a view can have multiple roots, and an ID could be a root in multiple views. Maintained by register_view / update_view / unregister_view.
 }
 

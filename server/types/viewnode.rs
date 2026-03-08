@@ -15,6 +15,12 @@ use std::str::FromStr;
 // Type declarations
 //
 
+/// Identifies a buffer in the client.
+/// Usually it refers to a (graph) content view,
+/// in which case it is a v4 UUID
+/// (which the client generates, using org-id-uuid).
+/// But a ViewUri can also refer to a search results view,
+/// in which case the URI is "search: [query string from user]".
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ViewUri ( pub String );
 

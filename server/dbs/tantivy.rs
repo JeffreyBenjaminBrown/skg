@@ -5,7 +5,7 @@
 // See the Tantivy section in glossary.md.
 
 use crate::types::textlinks::replace_each_link_with_its_label;
-use crate::types::misc::{ID, TantivyIndex};
+use crate::types::misc::{ID, SourceName, TantivyIndex};
 use crate::types::skgnode::SkgNode;
 
 use tantivy::{Index, IndexWriter, doc, Term, IndexReader, Searcher, Document};
@@ -171,13 +171,13 @@ where I: IntoIterator<Item = &'a SkgNode>, {
       indexed_count += 1; }}
   Ok (indexed_count) }
 
-/// Look up the canonical title for a node by its exact primary ID.
+/// Look up the canonical title and source for a node by its exact primary ID.
 /// Prefers the document marked is_title="true"; falls back to the
 /// first title_or_alias found if no title document exists.
-pub fn title_by_id (
+pub fn title_and_source_by_id (
   tantivy_index : &TantivyIndex,
   id            : &ID,
-) -> Option < String > {
+) -> Option < (String, SourceName) > {
   let reader : IndexReader =
     tantivy_index . index . reader () . ok () ?;
   let searcher : Searcher =
@@ -191,7 +191,7 @@ pub fn title_by_id (
     searcher . search (
       &query, &TopDocs::with_limit (
         crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT ) ) . ok () ?;
-  let mut fallback : Option < String > = None;
+  let mut fallback : Option < (String, SourceName) > = None;
   for (_score, doc_address) in &results {
     let retrieved_doc : Document =
       searcher . doc (*doc_address) . ok () ?;
@@ -206,12 +206,20 @@ pub fn title_by_id (
         . get_first ( tantivy_index . title_or_alias_field )
         . and_then ( |v| v . as_text () )
         . map ( |s| s . to_string () );
+    let source : SourceName =
+      SourceName::from (
+        retrieved_doc
+          . get_first ( tantivy_index . source_field )
+          . and_then ( |v| v . as_text () )
+          . unwrap_or ("") );
     if is_title {
-      return title_or_alias; }
+      return title_or_alias . map (
+        |t| (t, source) ); }
     if fallback . is_none () {
-      fallback = title_or_alias; } }
+      fallback = title_or_alias . map (
+        |t| (t, source) ); } }
   eprintln! (
-    "WARNING: title_by_id: no is_title=\"true\" document \
+    "WARNING: title_and_source_by_id: no is_title=\"true\" document \
      found for ID {}. Falling back to first title_or_alias.",
     id );
   fallback }
