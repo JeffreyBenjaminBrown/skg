@@ -1,13 +1,15 @@
 // cargo test --test serve_title_matches_test
 
-use skg::dbs::tantivy::search_index;
+use skg::context::ContextOriginType;
+use skg::dbs::tantivy::{search_index, update_context_origin_types};
 use skg::org_to_text::viewnode_forest_to_string;
 use skg::types::misc::{ID, TantivyIndex};
 use skg::types::skgnode::{SkgNode, empty_skgnode};
 use skg::dbs::init::in_fs_wipe_index_then_create_it;
 use skg::serve::handlers::title_matches::{
-  group_matches_by_id, build_search_forest};
+  group_matches_by_id, build_search_forest, SearchScope};
 
+use std::collections::HashMap;
 use std::path::Path;
 use std::fs;
 
@@ -67,7 +69,8 @@ fn test_title_matches_org_format (
         search_index ( &tantivy_index, search_terms ) ?;
       let matches_by_id =
         group_matches_by_id (
-          best_matches, searcher, &tantivy_index );
+          best_matches, searcher, &tantivy_index,
+          &SearchScope::Everything );
       let (forest, _result_ids) =
         build_search_forest (
           search_terms,
@@ -154,6 +157,27 @@ fn test_title_matches_org_format (
       assert! ( all_alias_groups [ 0 ] . contains (
                   &"the cheese" . to_string () ),
                 "Should have 'the cheese' as an alias" );
+
+      // --- origins_only filtering ---
+      // Stamp id_1 as Root; id_2 has no origin type.
+      let mut context_types : HashMap < ID, String > =
+        HashMap::new ();
+      context_types . insert (
+        ID::new ("id_1"),
+        ContextOriginType::Root . label () . to_string () );
+      update_context_origin_types (
+        &tantivy_index, &context_types ) ?;
+
+      let ( best_matches_2, searcher_2 ) =
+        search_index ( &tantivy_index, search_terms ) ?;
+      let matches_filtered =
+        group_matches_by_id (
+          best_matches_2, searcher_2, &tantivy_index,
+          &SearchScope::Rooty );
+      assert_eq! ( matches_filtered . len (), 1,
+                   "origins_only should return only the Root node" );
+      assert! ( matches_filtered . contains_key ( &ID::new ("id_1") ),
+                "origins_only should keep id_1 (Root)" );
 
       println! ("✓ Org-mode format verified successfully");
       Ok ( () )

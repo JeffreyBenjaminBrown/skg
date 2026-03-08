@@ -73,7 +73,7 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
 (defun phase-0-search ()
   "Search for 'has' and wait for results."
   (message "=== PHASE 0: Searching for 'has' ===")
-  (skg-request-title-matches "has")
+  (skg-search-titles-everywhere "has")
   (message "Sent title-matches request")
 
   ;; Wait for search results buffer to contain the expected link

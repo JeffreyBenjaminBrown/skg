@@ -10,7 +10,7 @@ use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::types::skgnode::SkgNode;
 use crate::types::viewnode::mk_indefinitive_viewnode;
 
-use ego_tree::{NodeId, NodeMut, NodeRef, Tree;
+use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use crate::types::viewnode::ViewNode;
 use std::collections::{HashMap, HashSet};
 use typedb_driver::TypeDBDriver;

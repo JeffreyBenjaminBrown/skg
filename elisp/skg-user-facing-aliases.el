@@ -1,9 +1,11 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; PURPOSE: User-facing command aliases.
-;;; The internal function names reflect implementation details
-;;; (e.g. skg-request-title-matches). This file provides
-;;; short, memorable names for interactive use.
+;;; Some internal function names reflect implementation details,
+;;; yet are user-facing. This file provides short,
+;;; memorable user-facing names for those functions.
+;;; (Not every user-facing command is involved in this file --
+;;; only the ones that need aliases.)
 
 ;; No requires here — the underlying functions are loaded by skg-client.el,
 ;; which also requires this file. Adding requires here would create a cycle.
@@ -15,7 +17,6 @@ and hide INTERNAL from M-x completion."
      (defalias ',alias ',internal)
      (put ',internal 'completion-predicate #'ignore)) )
 
-(skg-alias skg-search-titles     skg-request-title-matches)
 (skg-alias skg-view-from-node-id skg-request-single-root-content-view-from-id)
 (skg-alias skg-save              skg-request-save-buffer)
 (skg-alias skg-metadata-view     skg-edit-first-sexpr-on-line)
@@ -25,4 +26,4 @@ and hide INTERNAL from M-x completion."
 (skg-alias skg-branch-sourceward    skg-request-sourceward-view)
 (skg-alias skg-definitive-view      skg-request-definitive-view)
 
-(provide 'skg-commands)
+(provide 'skg-user-facing-aliases)

@@ -12,7 +12,10 @@ So far there are these endpoints:
 
 
 - Search in titles
-  - Request: ((request . "title matches") (terms . "SEARCH_TERMS"))
+  - Request: ((request . "title matches") (terms . "SEARCH_TERMS") (scope . "SCOPE"))
+  - `scope` is optional; defaults to "rooty".
+    - "rooty": only returns nodes with relationships suggesting they are especially rootlike -- so literal roots, but also cycle-roots, link targets, and things that had an ID when imported. Defined in the negative, 'rooty' excludes MultiContained and untyped nodes.
+    - "everywhere": returns all Tantivy matches regardless of origin type, including the humblest leaves.
   - Response (phase 1, immediate): LP buffer content with response-type "search-results".
   - Response (phase 2, background): LP buffer content with response-type "search-enrichment".
 

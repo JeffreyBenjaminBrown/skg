@@ -1,7 +1,8 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; USER-FACING FUNCTIONS
-;;;   skg-request-title-matches
+;;;   skg-search-titles
+;;;   skg-search-titles-everywhere
 ;;;
 ;;; DATA USED/ASSUMED: See /api.md.
 
@@ -10,9 +11,19 @@
 (require 'skg-length-prefix)
 (require 'heralds-minor-mode)
 
-(defun skg-request-title-matches (search-terms)
-  "Request title matches from the Rust server."
+(defun skg-search-titles (search-terms)
+  "Search titles, showing only origin nodes (roots, targets, etc.)."
   (interactive "sSearch terms: ")
+  (skg--request-title-matches search-terms "rooty"))
+
+(defun skg-search-titles-everywhere (search-terms)
+  "Search titles, showing all matches including non-origin nodes."
+  (interactive "sSearch terms: ")
+  (skg--request-title-matches search-terms "everywhere"))
+
+(defun skg--request-title-matches (search-terms scope)
+  "Request title matches from the Rust server.
+SCOPE is \"rooty\" (filtered) or \"everywhere\" (unfiltered)."
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
          (clean-terms (if (stringp search-terms)
                           (substring-no-properties search-terms)
@@ -20,7 +31,8 @@
          (request-s-exp
           (concat (prin1-to-string
                    `((request . "title matches")
-                     (terms . ,clean-terms)))
+                     (terms . ,clean-terms)
+                     (scope . ,scope)))
                   "\n")))
     ;; Register phase 1 handler (one-shot)
     (skg-register-response-handler

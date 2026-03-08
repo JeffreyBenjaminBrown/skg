@@ -7,16 +7,16 @@
 ;;;     skg-id-stack (variable)
 ;;;   elisp/skg-client.el
 ;;;     skg-disconnect
-;;;   elisp/skg-commands.el
+;;;   elisp/skg-user-facing-aliases.el
 ;;;     skg-heralds-view
-;;;   elisp/skg-commands.el
+;;;   elisp/skg-user-facing-aliases.el
 ;;;     skg-branch-aliases
-;;;   elisp/skg-commands.el
+;;;   elisp/skg-user-facing-aliases.el
 ;;;     skg-branch-containerward
 ;;;     skg-branch-sourceward
-;;;   elisp/skg-commands.el
+;;;   elisp/skg-user-facing-aliases.el
 ;;;     skg-save
-;;;   elisp/skg-commands.el
+;;;   elisp/skg-user-facing-aliases.el
 ;;;     skg-view-from-node-id
 ;;;   elisp/skg-request-verify-connection.el
 ;;;     skg-verify-connection
@@ -34,11 +34,11 @@
 ;;;     skg-new-empty-view
 ;;;   elisp/skg-buffer.el
 ;;;     skg-open-empty-content-view
-;;;   elisp/skg-commands.el
+;;;   elisp/skg-user-facing-aliases.el
 ;;;     skg-metadata-view
-;;;   elisp/skg-commands.el
+;;;   elisp/skg-user-facing-aliases.el
 ;;;     skg-search-titles
-;;;   elisp/skg-commands.el
+;;;   elisp/skg-user-facing-aliases.el
 ;;;     skg-set-indefinitive
 
 (let ;; Add project directories to load-path

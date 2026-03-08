@@ -10,31 +10,31 @@
   "Unload all skg features and reload from disk."
   (interactive)
   (let ((skg-features
-         '( skg-commands
+         '( skg-buffer
             skg-client
-            skg-request-title-matches
-            skg-request-save
-            skg-request-single-root-content-view
-            skg-request-verify-connection
+            skg-compare-sexpr
+            skg-focus
+            skg-id-search
+            skg-length-prefix
+            skg-lens
+            skg-lock-buffers
+            skg-metadata
+            skg-new-empty-view
+            skg-org-fold
             skg-request-file-path
             skg-request-git-diff-mode
+            skg-request-save
+            skg-request-single-root-content-view
+            skg-request-title-matches
+            skg-request-verify-connection
             skg-request-views
-            skg-new-empty-view
-            skg-length-prefix
-            skg-state
-            skg-buffer
-            skg-metadata
-            skg-id-search
-            skg-lock-buffers
-            skg-org-fold
-            skg-focus
-            skg-sexpr-edit
-            skg-sexpr-search
             skg-sexpr-dsl-for-edits
+            skg-sexpr-edit
             skg-sexpr-org-bijection
-            skg-compare-sexpr
-            skg-lens
+            skg-sexpr-search
+            skg-state
             skg-test-utils
+            skg-user-facing-aliases
             heralds-minor-mode )))
     (dolist (feat skg-features)
       (when (featurep feat)

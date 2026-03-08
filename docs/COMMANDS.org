@@ -11,9 +11,17 @@
      but to make a root (which has no parents)
      you need to choose its source explicitly.
 *** skg-search-titles
+    Searches titles and aliases, but only shows "interesting" nodes:
+    roots, cycle members, link targets, and nodes that had an
+    org-roam ID before import. This filters out multi-contained
+    nodes and nodes with no special graph role.
     Run 'skg-view-node' (below)
     from one of the links in the search results
     to go to the view from that node.
+*** skg-search-titles-everywhere
+    Like skg-search-titles, but shows all matches
+    regardless of graph role — including multi-contained
+    and otherwise unremarkable nodes.
 *** skg-view-node
     The usual way to call this is when the cursor is on a link
     -- for instance, after searching for a title.

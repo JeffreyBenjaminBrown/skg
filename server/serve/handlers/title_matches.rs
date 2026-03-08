@@ -33,6 +33,12 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use tantivy::{Document, Searcher};
 use typedb_driver::TypeDBDriver;
 
+/// "Rooty" nodes have the most interesting graph structure:
+/// literal roots, cycle-roots, link targets,
+/// and things that had an ID when imported.
+/// The default search scope is Rooty.
+pub enum SearchScope { Rooty, Everything }
+
 /// Maps each ID to search hits (plural -- IDs can have aliases,
 /// so one ID might get multiple matches).
 /// The score incorporates a context-based multiplier:
@@ -66,7 +72,28 @@ pub fn handle_title_matches_request (
   search_cancelled : &Arc<AtomicBool>,
   conn_state       : &mut ConnectionState,
 ) {
-  match search_terms_from_request (request) {
+  let parsed_sexp : Result < Sexp, String > =
+    sexp::parse (request)
+    . map_err ( |e| format! (
+      "Failed to parse S-expression: {}", e ) );
+  let sexp : Sexp = match parsed_sexp {
+    Ok (s) => s,
+    Err (err) => {
+      println! ( "{}", err );
+      send_response_with_length_prefix (
+        stream,
+        & tag_text_response (
+          "search-results", &err ));
+      return; } };
+  let search_terms : Result < String, String > =
+    extract_v_from_kv_pair_in_sexp ( &sexp, "terms" );
+  let scope : SearchScope =
+    match extract_v_from_kv_pair_in_sexp ( &sexp, "scope" )
+          . unwrap_or ( "rooty" . to_string () )
+          . as_str ()
+    { "everywhere" => SearchScope::Everything,
+      _            => SearchScope::Rooty };
+  match search_terms {
     Ok (search_terms) => {
       // --- Phase 1: immediate results without paths ---
       match search_index ( tantivy_index,
@@ -83,7 +110,8 @@ pub fn handle_title_matches_request (
             group_matches_by_id (
               best_matches,
               searcher,
-              tantivy_index );
+              tantivy_index,
+              &scope );
           let (forest, result_ids) : (Tree<ViewNode>, Vec<ID>) =
             build_search_forest (
               &search_terms,
@@ -202,6 +230,7 @@ pub fn group_matches_by_id (
   best_matches  : Vec < (f32, tantivy::DocAddress) >,
   searcher      : Searcher,
   tantivy_index : &TantivyIndex,
+  scope         : &SearchScope,
 ) -> MatchGroups {
   let mut result_acc : MatchGroups =
     HashMap::new();
@@ -225,12 +254,18 @@ pub fn group_matches_by_id (
               . get_first ( tantivy_index . source_field )
               . and_then ( |v| v . as_text () )
               . unwrap_or ("") );
-        let multiplier : f32 =
+        let origin_type : Option < ContextOriginType > =
           retrieved_doc
             . get_first ( tantivy_index . context_origin_type_field )
             . and_then ( |v| v . as_text () )
-            . and_then ( ContextOriginType::from_label )
-            . map_or ( 1.0, |t| t . multiplier() );
+            . and_then ( ContextOriginType::from_label );
+        if matches! ( scope, SearchScope::Rooty ) {
+          match origin_type {
+            None => continue,
+            Some ( ContextOriginType::MultiContained ) => continue,
+            _ => {} } }
+        let multiplier : f32 =
+          origin_type . map_or ( 1.0, |t| t . multiplier() );
         let adjusted_score : f32 = score * multiplier;
         if let (Some (id), Some (title)) = (id_opt, title_opt) {
           result_acc
@@ -333,14 +368,3 @@ pub fn build_search_forest (
                 text : title . clone (),
                 diff : None } ) } ); }} }
   (forest, result_ids) }
-
-pub fn search_terms_from_request (
-  request : &str
-) -> Result<String, String> {
-  extract_v_from_kv_pair_in_sexp (
-    & { let sexp : Sexp =
-          sexp::parse (request)
-          . map_err ( |e| format! (
-            "Failed to parse S-expression: {}", e ) ) ?;
-        sexp },
-    "terms" ) }

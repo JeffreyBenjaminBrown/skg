@@ -13,8 +13,8 @@
 (defun test-title-search ()
   "Search for 'apples' and verify search results."
   (message "=== PHASE 1: Requesting title matches for 'apples' ===")
-  (skg-request-title-matches "apples")
-  (message "Called skg-request-title-matches")
+  (skg-search-titles-everywhere "apples")
+  (message "Called skg-search-titles-everywhere")
 
   ;; Wait for the search buffer to be created
   (skg-test-wait-for-buffer (skg-search-buffer-name "apples"))
