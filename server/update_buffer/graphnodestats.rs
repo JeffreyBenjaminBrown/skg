@@ -2,7 +2,6 @@ use crate::dbs::typedb::search::all_graphnodestats::{
   fetch_all_graphnodestats,
   graphnodestats_for_pid,
   AllGraphNodeStats};
-use crate::serve::timing_log::{timed, timed_async};
 use crate::to_org::util::collect_ids_from_tree;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
@@ -25,20 +24,23 @@ pub async fn set_graphnodestats_in_forest (
                HashMap < ID, HashSet < ID > > ),
              Box<dyn Error> > {
   let pids : Vec < ID > =
-    timed ( config, "collect_ids_from_tree",
-            || collect_ids_from_tree (forest));
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "collect_ids_from_tree" ). entered();
+      collect_ids_from_tree (forest) };
   let stats : AllGraphNodeStats =
-    timed_async ( config, "fetch_all_graphnodestats",
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "fetch_all_graphnodestats" ). entered();
       fetch_all_graphnodestats (
-        & config . db_name, driver, & pids )) . await ?;
+        & config . db_name, driver, & pids ) . await } ?;
   let root_treeid : NodeId = forest . root () . id ();
-  timed ( config, "set_graphnodestats_recursive",
-          || set_metadata_relationships_in_node_recursive (
-               forest,
-               root_treeid,
-               & stats,
-               map,
-               config ));
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "set_graphnodestats_recursive" ). entered();
+    set_metadata_relationships_in_node_recursive (
+      forest,
+      root_treeid,
+      & stats,
+      map,
+      config ) };
   Ok (( stats . container_to_contents,
         stats . content_to_containers )) }
 

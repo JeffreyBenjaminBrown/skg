@@ -4,7 +4,6 @@ use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
 use crate::merge::merge_nodes;
 use crate::save::update_graph_minus_merges;
 use crate::serve::ConnectionState;
-use crate::serve::timing_log::{timed, timed_async};
 use crate::serve::util::{
   view_uri_from_request,
   format_buffer_response_sexp_with_updates,
@@ -73,7 +72,7 @@ pub fn handle_save_buffer_request (
         if let Some (skgnode)
           = conn_state . memory . pool . get (&pid)
           { it . insert ( pid, skgnode . clone () ); }} }
-    eprintln!("save-diagnostic: view-uri={}, pool-size={}, pool-total={}",
+    tracing::debug!("save-diagnostic: view-uri={}, pool-size={}, pool-total={}",
               match &viewuri_from_request_result {
                 Ok (uri) => uri . 0 . as_str(),
                 Err (_) => "<nil>" },
@@ -91,7 +90,8 @@ pub fn handle_save_buffer_request (
         send_response_with_length_prefix (
           stream,
           & tag_sexp_response ( "save-lock", &lock_sexp )); }
-      timed ( config, "update_from_and_rerender_buffer", || {
+      { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+          "update_from_and_rerender_buffer" ). entered();
         match block_on(
           update_from_and_rerender_buffer (
             & initial_buffer_content,
@@ -119,15 +119,15 @@ pub fn handle_save_buffer_request (
             } else {
               let error_msg : String =
                 format!("Error processing buffer content: {}", err);
-              println!("{}", error_msg);
+              tracing::error!("{}", error_msg);
               send_response_with_length_prefix (
                 stream,
                 & tag_text_response (
-                  "save-result", &error_msg )); }} }} ); }
+                  "save-result", &error_msg )); }} } }; }
     Err (err) => {
       let error_msg : String =
         format! ("Error reading buffer content: {}", err );
-      println! ( "{}", error_msg );
+      tracing::error! ( "{}", error_msg );
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
@@ -173,13 +173,13 @@ pub async fn update_from_and_rerender_buffer (
 
   let (forest, save_instructions, merge_instructions)
     : ( Tree<ViewNode>, Vec<DefineNode>, Vec<Merge> )
-    = timed_async (
-        config,
-        "buffer_to_viewnode_forest_and_save_instructions",
+    = { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+            "buffer_to_viewnode_forest_and_save_instructions"
+          ) . entered();
         buffer_to_viewnode_forest_and_save_instructions (
           org_buffer_text, config, typedb_driver,
-          &saveview_skgnodes_pre_save )
-      ) . await . map_err (
+          &saveview_skgnodes_pre_save ) . await
+      } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
   if forest . root() . children() . next() . is_none()
     { return Err ( "Nothing to save found in org_buffer_text"
@@ -187,23 +187,23 @@ pub async fn update_from_and_rerender_buffer (
 
   { // update the graph
     let save_replacement : Option<TantivyIndex> =
-      timed_async ( config, "update_graph_minus_merges",
-                    update_graph_minus_merges (
-                      save_instructions . clone(),
-                      config . clone(),
-                      tantivy_index,
-                      typedb_driver )
-                  ) . await ?;
+      { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+          "update_graph_minus_merges" ). entered();
+        update_graph_minus_merges (
+          save_instructions . clone(),
+          config . clone(),
+          tantivy_index,
+          typedb_driver ) . await } ?;
     if let Some (new_index) = save_replacement {
       *tantivy_index = new_index; }
     let merge_replacement : Option<TantivyIndex> =
-      timed_async ( config, "merge_nodes",
-                    merge_nodes (
-                      merge_instructions,
-                      config . clone(),
-                      tantivy_index,
-                      typedb_driver )
-                  ) . await ?;
+      { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+          "merge_nodes" ). entered();
+        merge_nodes (
+          merge_instructions,
+          config . clone(),
+          tantivy_index,
+          typedb_driver ) . await } ?;
     if let Some (new_index) = merge_replacement {
       *tantivy_index = new_index; } }
 
@@ -236,7 +236,7 @@ pub fn validate_no_merge_commits (
               source )); },
           Ok (false) => {},
           Err (e) => { // Git error - log but continue
-            eprintln! ( "Warning: Could not check merge commit status for '{}': {}",
+            tracing::warn! ( "Could not check merge commit status for '{}': {}",
                         source, e ); }} }} }
   Ok (( )) }
 
@@ -252,8 +252,8 @@ pub fn compute_diff_for_every_source (
       Ok (diff) => {
         source_diffs . insert ( source_name . clone(), diff ); },
       Err (e) => { // Log error but continue with other sources
-        eprintln! (
-          "Warning: Failed to compute diff for source '{}': {}",
+        tracing::warn! (
+          "Failed to compute diff for source '{}': {}",
           source_name, e ); }} }
   source_diffs }
 

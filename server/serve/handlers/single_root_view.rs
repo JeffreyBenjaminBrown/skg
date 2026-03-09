@@ -1,6 +1,5 @@
 use crate::serve::ConnectionState;
 use crate::to_org::render::content_view::single_root_view;
-use crate::serve::timing_log::timed;
 use crate::serve::util::{
   view_uri_from_request,
   send_response_with_length_prefix,
@@ -49,8 +48,9 @@ pub fn handle_single_root_view_request (
             "content-view", &switch_sexp ));
         return; }
       let response_sexp : String =
-        timed ( config, "single_root_view", || {
-          block_on ( async {
+      { let _span : tracing::span::EnteredSpan =
+          tracing::info_span!( "single_root_view" ). entered();
+        block_on ( async {
             match single_root_view (
               typedb_driver,
               config,
@@ -73,7 +73,7 @@ pub fn handle_single_root_view_request (
                   "Error generating document: {}", e);
                 format_buffer_response_sexp (
                   & error_content,
-                  & vec![] ) }} } ) } );
+                  & vec![] ) }} } ) };
       send_response_with_length_prefix (
         stream,
         & tag_sexp_response (
@@ -81,7 +81,7 @@ pub fn handle_single_root_view_request (
     Err (err) => {
       let error_msg : String = format!(
         "Error extracting node ID: {}", err);
-      println! ( "{}", error_msg ) ;
+      tracing::error! ( "{}", error_msg ) ;
       send_response_with_length_prefix (
         stream,
         & tag_text_response (

@@ -57,6 +57,7 @@
    'load-path
    (expand-file-name "elisp/skg-request-save" project-root)) )
 
+(require 'skg-log)
 (require 'skg-buffer)
 (require 'skg-client)
 (require 'skg-id-search)

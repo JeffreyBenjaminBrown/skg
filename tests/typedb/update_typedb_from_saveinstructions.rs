@@ -61,8 +61,7 @@ fn test_update_nodes_and_relationships2 (
     update_typedb_from_saveinstructions (
       & config . db_name,
       & driver,
-      & reconciled_instructions,
-      & config ) . await ?;
+      & reconciled_instructions ). await ?;
 
     // Node 3 should not exist (deleted)
     let existing_node3_ids : HashSet<String> = which_ids_exist (

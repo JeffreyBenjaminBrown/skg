@@ -12,7 +12,6 @@ use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_all_outbound_relationships;
 use crate::dbs::typedb::util::connect_to_typedb;
-use crate::serve::timing_log::timed;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::skgnode::SkgNode;
 
@@ -69,7 +68,7 @@ pub fn initialize_dbs (
     match incremental_init (
       config, &driver, marker_mtime )
       { Ok (( tantivy_index )) => {
-          println! ("Incremental init succeeded.");
+          tracing::info! ("Incremental init succeeded.");
           touch_init_marker (&marker_path);
           // Incremental init only reads modified files.
           // We must read all files for the full set.
@@ -79,7 +78,7 @@ pub fn initialize_dbs (
           return init_data_from_nodes (
             &nodes, Arc::new (driver), tantivy_index ); }
         Err (e) => {
-          println! ("Incremental init failed ({}), \
+          tracing::warn! ("Incremental init failed ({}), \
                      falling back to full rebuild.", e); }} }
   let init_data : InitData =
     full_init (config, driver);
@@ -131,21 +130,21 @@ fn incremental_init (
   let tantivy_index : TantivyIndex =
     open_existing_tantivy_index (
       Path::new ( &config . tantivy_folder )) ?;
-  println! ("Reading modified .skg files...");
+  tracing::info! ("Reading modified .skg files...");
   let nodes : Vec<SkgNode> =
     read_modified_skg_files_from_sources (
       config, marker_mtime ) ?;
   if nodes . is_empty() {
-    println! ("No modified .skg files found.");
+    tracing::info! ("No modified .skg files found.");
     return Ok (tantivy_index); }
-  println! ("{} modified .skg file(s) found.", nodes . len());
+  tracing::info! (count = nodes . len(), "Modified .skg file(s) found.");
   block_on ( async {
     let t0 : Instant = Instant::now();
     let created : usize =
       create_only_nodes_with_no_ids_present (
         &config . db_name, driver, &nodes ) . await ?;
-    println! ("  new nodes: {} ({:.1}s)",
-              created, t0 . elapsed() . as_secs_f64());
+    tracing::info! (created, elapsed_s = ?t0 . elapsed(),
+              "New nodes created");
     let t1 : Instant = Instant::now();
     let pids : Vec<crate::types::misc::ID> =
       nodes . iter()
@@ -155,19 +154,19 @@ fn incremental_init (
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     delete_all_outbound_relationships (
       &config . db_name, driver, &pids ) . await ?;
-    println! ("  deleted stale relationships ({:.1}s)",
-              t1 . elapsed() . as_secs_f64());
+    tracing::info! (elapsed_s = ?t1 . elapsed(),
+              "Deleted stale relationships");
     let t2 : Instant = Instant::now();
     create_all_relationships (
       &config . db_name, driver, &nodes ) . await ?;
-    println! ("  recreated relationships ({:.1}s)",
-              t2 . elapsed() . as_secs_f64());
+    tracing::info! (elapsed_s = ?t2 . elapsed(),
+              "Recreated relationships");
     Ok::<(), Box<dyn Error>> (( )) } ) ?;
   let t3 : Instant = Instant::now();
   let indexed : usize =
     update_index_with_nodes (&nodes, &tantivy_index) ?;
-  println! ("  tantivy: updated {} documents ({:.1}s)",
-            indexed, t3 . elapsed() . as_secs_f64());
+  tracing::info! (indexed, elapsed_s = ?t3 . elapsed(),
+            "Tantivy: updated documents");
   Ok (tantivy_index) }
 
 fn init_data_from_nodes (
@@ -202,36 +201,41 @@ fn full_init (
   config : &SkgConfig,
   driver : TypeDBDriver,
 ) -> InitData {
-  println! ("Performing full init...");
+  tracing::info! ("Performing full init...");
   let nodes : Vec<SkgNode> =
-    timed ( config, "read_all_skg_files", || {
-      println! ("Reading .skg files from all sources...");
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "read_all_skg_files" ). entered();
+      tracing::info! ("Reading .skg files from all sources...");
       read_all_skg_files_from_sources (config)
       . unwrap_or_else ( |e| {
-        eprintln! ("Failed to read .skg files: {}", e);
-        std::process::exit (1); } ) } );
-  println! ("{} .skg files were read from {} source(s)",
-            nodes . len(), config . sources . len());
-  timed ( config, "populate_typedb", || {
+        tracing::error! ("Failed to read .skg files: {}", e);
+        std::process::exit (1); } ) };
+  tracing::info! (files = nodes . len(),
+            sources = config . sources . len(),
+            ".skg files read from source(s)");
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "populate_typedb" ). entered();
     block_on ( async {
       if let Err (e) = populate_typedb_from_nodes (
         config, &driver, &nodes
       ) . await {
-        eprintln! ("Failed to populate TypeDB: {}", e);
-        std::process::exit (1); }} ) } );
-  println! ("TypeDB database initialized successfully.");
+        tracing::error! ("Failed to populate TypeDB: {}", e);
+        std::process::exit (1); }} ) };
+  tracing::info! ("TypeDB database initialized successfully.");
   let tantivy_index : TantivyIndex =
-    timed ( config, "initialize_tantivy", || {
-      initialize_tantivy_from_nodes (config, &nodes) } );
-  timed ( config, "extract_context_data_from_nodes", ||
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "initialize_tantivy" ). entered();
+      initialize_tantivy_from_nodes (config, &nodes) };
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "extract_context_data_from_nodes" ). entered();
     init_data_from_nodes (
-      &nodes, Arc::new (driver), tantivy_index ) ) }
+      &nodes, Arc::new (driver), tantivy_index ) } }
 
 fn touch_init_marker (
   path : &Path,
 ) {
   if let Err (e) = fs::write (path, b"") {
-    eprintln! ("Warning: could not touch init marker {:?}: {}",
+    tracing::warn! ("Could not touch init marker {:?}: {}",
                path, e); } }
 
 pub fn initialize_typedb_from_nodes (
@@ -240,15 +244,15 @@ pub fn initialize_typedb_from_nodes (
 ) -> Arc<TypeDBDriver> {
   // Connects to the TypeDB server,
   // then populates it with the provided SkgNodes.
-  println! ("Initializing TypeDB database...");
+  tracing::info! ("Initializing TypeDB database...");
   let driver : TypeDBDriver = connect_to_typedb();
   block_on ( async {
     if let Err (e) = populate_typedb_from_nodes (
       config, &driver, nodes
     ) . await {
-      eprintln! ( "Failed to populate TypeDB: {}", e );
+      tracing::error! ( "Failed to populate TypeDB: {}", e );
       std::process::exit (1); }} );
-  println! ("TypeDB database initialized successfully.");
+  tracing::info! ("TypeDB database initialized successfully.");
   Arc::new (driver) }
 
 /// Destroys and rebuilds the TypeDB database from .skg files on disk.
@@ -281,31 +285,30 @@ async fn populate_typedb_from_nodes (
     & config . db_name,
     driver,
     nodes ) . await ?;
-  println! ("  nodes: {:.1}s", t0 . elapsed() . as_secs_f64());
+  tracing::info! (elapsed_s = ?t0 . elapsed(), "TypeDB nodes created");
   let t1 : Instant = Instant::now();
   create_all_relationships (
     & config . db_name,
     driver,
     nodes ) . await ?;
-  println! ("  relationships: {:.1}s", t1 . elapsed() . as_secs_f64());
+  tracing::info! (elapsed_s = ?t1 . elapsed(), "TypeDB relationships created");
   Ok (( )) }
 
 fn initialize_tantivy_from_nodes (
   config : & SkgConfig,
   nodes  : & [SkgNode],
 ) -> TantivyIndex {
-  println! ("Initializing Tantivy index...");
+  tracing::info! ("Initializing Tantivy index...");
   let (tantivy_index, indexed_count)
     : ( TantivyIndex, usize ) =
     in_fs_wipe_index_then_create_it (
       nodes,
       Path::new ( & config . tantivy_folder )
     ) . unwrap_or_else ( |e| {
-      eprintln! ("Failed to create Tantivy index: {}", e);
+      tracing::error! ("Failed to create Tantivy index: {}", e);
       std::process::exit (1); } );
-  println! (
-    "Tantivy index initialized successfully. Indexed {} files.",
-    indexed_count);
+  tracing::info! (indexed_count,
+    "Tantivy index initialized successfully.");
   tantivy_index }
 
 /// Destroys and rebuilds the Tantivy index from .skg files on disk.
@@ -383,12 +386,11 @@ pub async fn overwrite_new_empty_db (
 
   let databases : &DatabaseManager = driver . databases ();
   if databases . contains (db_name) . await ? {
-    println! ( "Deleting existing database '{}'...",
-                db_name );
+    tracing::info! ( db_name, "Deleting existing database" );
     { let database : Arc<Database> =
         databases . get (db_name) . await ?;
       database } . delete () . await ?; }
-  println! ( "Creating empty database '{}'...", db_name );
+  tracing::info! ( db_name, "Creating empty database" );
   databases . create (db_name) . await ?;
   Ok (()) }
 
@@ -401,7 +403,7 @@ pub async fn define_schema (
     driver . transaction ( db_name,
                          TransactionType::Schema )
     . await ?;
-  println! ("Defining schema ...");
+  tracing::info! ("Defining schema ...");
   tx . query ( {
     let schema : String = fs::read_to_string
       ("schema.tql")

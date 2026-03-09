@@ -100,7 +100,7 @@ where
       Ok (inner) => { cleanup_result?; inner },
       Err (panic_payload) => {
         if let Err (e) = cleanup_result {
-          eprintln!("Cleanup error after test panic: {}", e); }
+          tracing::error!("Cleanup error after test panic: {}", e); }
         std::panic::resume_unwind(panic_payload) }, }
   });
 

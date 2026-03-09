@@ -1,5 +1,4 @@
 use crate::dbs::typedb::search::pid_and_source_from_id;
-use crate::serve::timing_log::{timed_async, push_buffer_timing_entry_manually};
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
@@ -43,11 +42,11 @@ pub async fn skgnode_and_viewnode_from_id (
   skgid  : &ID,
   map    : &mut SkgNodeMap,
 ) -> Result < ( SkgNode, ViewNode ), Box<dyn Error> > {
-  let label : String = format! ("skgnode_and_viewnode_from_id({})", skgid);
   let (pid_resolved, source) : (ID, SourceName) =
-    timed_async ( config, &label,
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "skgnode_and_viewnode_from_id" ). entered();
       pid_and_source_from_id(
-        &config . db_name, driver, skgid)) . await?
+        &config . db_name, driver, skgid) . await? }
     . ok_or_else( || format!(
       "ID '{}' not found in database", skgid ))?;
   skgnode_and_viewnode_from_pid_and_source (
@@ -119,9 +118,10 @@ pub async fn complete_branch_minus_content (
   if truenode_in_tree_is_indefinitive ( tree, node_id )?
   { clobberIndefinitiveViewnode (
       tree, map, node_id, config ) ?; }
-  timed_async ( config, "maybe_add_subscribeeCol_branch",
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "maybe_add_subscribeeCol_branch" ). entered();
     maybe_add_subscribeeCol_branch (
-      tree, map, node_id, config, driver )) . await ?;
+      tree, map, node_id, config, driver ) . await } ?;
   Ok (( )) }
 
 /// Does only what it says -- in particular,
@@ -324,10 +324,9 @@ pub async fn build_node_branch_minus_content (
         Ok (root_treeid) },
       _ => Err("build_node_branch_minus_content: tree_and_parent and map must both be Some or both be None" . into()),
     };
-  if config . timing_log {
-    push_buffer_timing_entry_manually (
-      config, &format! ("build_node_branch_minus_content({})", skgid),
-      t0 . elapsed () ); }
+  tracing::info!("{}: {:.3}s",
+                 format! ("build_node_branch_minus_content({})", skgid),
+                 t0 . elapsed () . as_secs_f64());
   result }
 
 /// Collect content child IDs from a node.

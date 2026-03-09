@@ -11,7 +11,6 @@ use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::{InitData, initialize_dbs};
 use skg::import_org_roam::import_org_roam_directory;
 use skg::serve::serve;
-use skg::serve::timing_log::{clear_timing_log, timed};
 use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 
 use std::collections::HashSet;
@@ -22,6 +21,8 @@ use std::net::TcpListener;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use typedb_driver::TypeDBDriver;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -38,11 +39,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             "data/skgconfig.toml" . to_string() };
         config_path } ) ?;
 
+  init_tracing (&config);
+
   let listener: TcpListener = // precedes initialize_dbs so Emacs can connect during init
     TcpListener::bind (
       & format! ("0.0.0.0:{}", config . port) ) ?;
-  println! ("Listening on port {} for Emacs connections...",
-            config . port);
+  tracing::info! (port = config . port,
+                  "Listening for Emacs connections");
   listener . set_nonblocking (true) ?;
 
   // The "busy signal". See definition of 'busysignal_accept_loop'.
@@ -58,10 +61,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         busysignal_listener,
         init_done_clone ); } );
 
-  clear_timing_log (&config);
   let init : InitData =
-    timed ( &config, "initialize_dbs",
-            || initialize_dbs (&config));
+    { let _span : tracing::span::EnteredSpan = tracing::info_span! (
+        "initialize_dbs") . entered ();
+      initialize_dbs (&config) };
   let typedb_driver : Arc<TypeDBDriver> = init . driver;
   let tantivy_index : TantivyIndex = init . tantivy_index;
 
@@ -72,7 +75,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let link_targets : HashSet<ID> = init . link_targets;
     let map_to_content    : MapToContent    = init . map_to_content;
     let map_to_containers : MapToContainers = init . map_to_containers;
-    timed ( &config, "context_computation", || {
+    { let _span : tracing::span::EnteredSpan = tracing::info_span! (
+          "context_computation") . entered ();
       match compute_and_store_context_types (
         &tantivy_index,
         &had_id_set,
@@ -81,10 +85,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         &map_to_content,
         &map_to_containers )
       { Ok (_) => {}
-        Err (e) => { eprintln! (
-          "Warning: context computation failed: {}. \
-           Search results will not have context-based ranking.", e
-        ); }} } ); }
+        Err (e) => { tracing::warn! (
+          error = %e,
+          "context computation failed, search results will not have context-based ranking"
+        ); }} }}
   // had_id_set, all_node_ids, link_targets, map_to_content, map_to_containers
   // are dropped here, freeing memory before the serve loop.
 
@@ -92,7 +96,7 @@ fn main() -> Result<(), Box<dyn Error>> {
   busysignal_handle . join ()
     . expect ("busysignal thread panicked");
   listener . set_nonblocking (false) ?;
-  println! ("Server ready.");
+  tracing::info! ("Server ready");
 
   serve (config, typedb_driver, tantivy_index, listener)
     . map_err ( |e| Box::new (e)
@@ -112,7 +116,7 @@ fn busysignal_accept_loop (
     match listener . accept () {
       Ok (( stream, addr )) => {
         let mut stream: std::net::TcpStream = stream;
-        println! ("Busysignal: connection from {}", addr);
+        tracing::debug! ("Busysignal: connection from {}", addr);
         stream . set_nonblocking (false)
           . ok ();
         // Set a read timeout so we don't block forever
@@ -141,20 +145,84 @@ fn busysignal_accept_loop (
             std::time::Duration::from_millis (
               skg::consts::BUSYSIGNAL_POLL_INTERVAL_MS ) ); }
       Err (e) => {
-        eprintln! ("Busysignal accept error: {}", e); } } } }
+        tracing::warn! ("Busysignal accept error: {}", e); } } } }
 
 fn run_import (
   args : &[String],
 ) -> Result<(), Box<dyn Error>> {
   if args . len() < 5 {
-    eprintln! ("Usage: cargo run -- import-org-roam <org-dir> <skg-output-dir> <source-nickname>");
+    tracing::error! ("Usage: cargo run -- import-org-roam <org-dir> <skg-output-dir> <source-nickname>");
     std::process::exit (1); }
   let org_dir    : &Path       = Path::new (&args[2]);
   let output_dir : &Path       = Path::new (&args[3]);
   let source     : SourceName  = SourceName::from (&args[4]);
   let stats : skg::import_org_roam::ImportStats =
     import_org_roam_directory (org_dir, output_dir, &source)?;
-  println! ("{}", stats);
+  tracing::info! ("{}", stats);
   for err in &stats . errors {
-    eprintln! ("  {}", err); }
+    tracing::warn! ("  {}", err); }
   Ok (( )) }
+
+/// Set up where log output goes. Three destinations:
+///
+/// 1. Stderr (always on): human-readable lines like
+///      2026-03-09T14:00:00 INFO Listening for Emacs connections port=1730
+///    Verbosity is controlled by the RUST_LOG environment variable.
+///    Default is "info". Examples:
+///      RUST_LOG=debug                              — everything
+///      RUST_LOG=info,skg::update_buffer=debug      — one module louder
+///    See https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html
+///
+/// 2. Human-readable file (always on):
+///    Same format and content as stderr,
+///    appended to <config_dir>/logs/server-to-user.log.
+///    Useful when the server runs in the background and stderr is lost.
+///
+/// 3. JSON file (when timing_log = true in skgconfig.toml):
+///    Appends one JSON object per log event to <config_dir>/logs/server.jsonl.
+///    Queryable with jq, e.g.:
+///      jq 'select(.fields.message | test("rerender"))' data/logs/server.jsonl
+fn init_tracing (
+  config : &SkgConfig,
+) {
+  use tracing_subscriber as tsub;
+  use tracing_appender as tapp;
+  use tsub::fmt::format::FmtSpan;
+  use tsub::Layer;
+  let logs_dir : std::path::PathBuf =
+    config . config_dir . join ("logs");
+  std::fs::create_dir_all (&logs_dir) . ok ();
+  let env_filter : tsub::EnvFilter =
+    tsub::EnvFilter::try_from_default_env ()
+    . unwrap_or_else ( |_| tsub::EnvFilter::new ("info") );
+  let stderr_layer : Box<dyn Layer<_> + Send + Sync> =
+    Box::new (
+      tsub::fmt::layer ()
+      . with_writer (std::io::stderr)
+      . with_target (false)
+      . with_span_events (FmtSpan::CLOSE) );
+  let user_log_appender : tapp::rolling::RollingFileAppender =
+    tapp::rolling::never (&logs_dir, "server-to-user.log");
+  let user_log_layer : Box<dyn Layer<_> + Send + Sync> =
+    Box::new (
+      tsub::fmt::layer ()
+      . with_writer (user_log_appender)
+      . with_target (false)
+      . with_ansi (false) // omit the terminal color escape codes stderr receives
+      . with_span_events (FmtSpan::CLOSE) );
+  let json_layer : Option<Box<dyn Layer<_> + Send + Sync>> =
+    if config . timing_log {
+      let file_appender : tapp::rolling::RollingFileAppender =
+        tapp::rolling::never (&logs_dir, "server.jsonl");
+      Some ( Box::new (
+        tsub::fmt::layer ()
+        . json ()
+        . with_writer (file_appender)
+        . with_span_events (FmtSpan::CLOSE) ))
+    } else { None };
+  tsub::registry ()
+    . with (env_filter)
+    . with (stderr_layer)
+    . with (user_log_layer)
+    . with (json_layer)
+    . init (); }

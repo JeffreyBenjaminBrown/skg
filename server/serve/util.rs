@@ -39,10 +39,10 @@ pub fn send_response (
   stream   : &mut TcpStream,
   response : &str,
 ) { if let Err (e) = writeln! (stream, "{}", response) {
-      eprintln!("Failed to send response: {}", e);
+      tracing::error!("Failed to send response: {}", e);
       return; }
     if let Err (e) = stream . flush () {
-      eprintln!("Failed to flush response: {}", e); } }
+      tracing::error!("Failed to flush response: {}", e); } }
 
 pub fn send_response_with_length_prefix (
   // Responds "Content-Length: <bytes>\r\n\r\n" + payload
@@ -51,19 +51,19 @@ pub fn send_response_with_length_prefix (
 ) { let payload : &[u8] = response . as_bytes ();
     let preview_len : usize = payload . len () . min (200);
     let preview : &str = &response [..preview_len];
-    println!("Sending response ({} bytes): {}{}",
+    tracing::debug!("Sending response ({} bytes): {}{}",
              payload . len (), preview,
              if payload . len () > 200 { "..." } else { "" });
     let header : String = format! ( "Content-Length: {}\r\n\r\n",
                                      payload . len () );
     if let Err (e) = stream . write_all ( header . as_bytes () ) {
-      eprintln!("Failed to send length-prefixed response: {}", e);
+      tracing::error!("Failed to send length-prefixed response: {}", e);
       return; }
     if let Err (e) = stream . write_all (payload) {
-      eprintln!("Failed to send length-prefixed response: {}", e);
+      tracing::error!("Failed to send length-prefixed response: {}", e);
       return; }
     if let Err (e) = stream . flush () {
-      eprintln!("Failed to flush length-prefixed response: {}", e); } }
+      tracing::error!("Failed to flush length-prefixed response: {}", e); } }
 
 pub fn request_type_from_request (
   request : &str

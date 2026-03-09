@@ -5,6 +5,7 @@
 ;;;
 ;;; DATA USED/ASSUMED: See /api.md.
 
+(require 'skg-log)
 (require 'skg-length-prefix)
 (require 'skg-buffer)
 (require 'skg-request-save) ; For skg-show-save-errors and skg-show-save-warnings
@@ -47,7 +48,7 @@ VIEW-URI is the pre-generated UUID to assign to the new buffer."
             (let ((buf (skg-find-buffer-by-uri switch-uri)))
               (cond
                ((not buf)
-                (message "skg: server said switch to view %s, but no buffer found" switch-uri))
+                (skg-log 'warn 'view "server said switch to view %s, but no buffer found" switch-uri))
                ((eq buf (current-buffer))
                 (message "Already viewing this node (it is a root of this view)"))
                (t (switch-to-buffer buf))))
@@ -65,7 +66,7 @@ VIEW-URI is the pre-generated UUID to assign to the new buffer."
                                    errors-list)))
                 (skg-show-save-warnings errors-text)) ))))
     (error
-     (message "ERROR parsing content view response: %S" err)
-     (message "Sexp string was: %S" sexp-string))))
+     (skg-log 'error 'view "parsing content view response: %S" err)
+     (skg-log 'error 'view "sexp string was: %S" sexp-string))))
 
 (provide 'skg-request-single-root-content-view)

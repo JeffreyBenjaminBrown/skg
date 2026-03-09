@@ -23,41 +23,41 @@ pub async fn merge_nodes (
   tantivy_index      : &TantivyIndex,
   driver             : &TypeDBDriver,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
-  println!(
+  tracing::info!(
     "Merging nodes in FS, TypeDB, and Tantivy, in that order ..." );
   let db_name : &str = &config . db_name;
 
-  { println!("1) Merging in filesystem ...");
+  { tracing::info!("1) Merging in filesystem ...");
     fs::merge_nodes_in_fs (
       config . clone (),
       &merge_instructions ) ?;
-    println!("   Filesystem merge complete."); }
+    tracing::info!("   Filesystem merge complete."); }
 
   if let Err (e)
     = typedb::merge_nodes_in_typedb (
       db_name,
       driver,
       &merge_instructions ) . await
-    { eprintln!("   TypeDB merge failed: {}. Rebuilding from disk...", e);
+    { tracing::error!("   TypeDB merge failed: {}. Rebuilding from disk...", e);
       rebuild_typedb_from_disk (&config, driver) . await
         . map_err ( |e2| -> Box<dyn Error> { format!(
            "TypeDB rebuild also failed: {}. Restart the server.", e2)
            . into () } ) ?;
-      eprintln!(
+      tracing::warn!(
         "Merge succeeded, but TypeDB had to be rebuilt from disk.");
     } else {
-      println!("   TypeDB merge complete."); }
+      tracing::info!("   TypeDB merge complete."); }
 
   match tantivy::merge_nodes_in_tantivy (
     &merge_instructions, tantivy_index )
-    { Ok (()) => { println!("   Tantivy merge complete.");
+    { Ok (()) => { tracing::info!("   Tantivy merge complete.");
                    Ok (None) }
       Err (e) => {
-        eprintln!("Tantivy merge failed: {}. Rebuilding from disk...", e);
+        tracing::error!("Tantivy merge failed: {}. Rebuilding from disk...", e);
         let new_index : TantivyIndex =
           rebuild_tantivy_from_disk (&config)
           . map_err (|e2| -> Box<dyn Error> {
             format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
             . into () }) ?;
-        eprintln!("Merge succeeded, but Tantivy had to be rebuilt from disk.");
+        tracing::warn!("Merge succeeded, but Tantivy had to be rebuilt from disk.");
         Ok (Some (new_index)) }} }

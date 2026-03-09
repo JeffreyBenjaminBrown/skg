@@ -10,7 +10,7 @@ pub type ConceptRowStream =
                              typedb_driver::Result<ConceptRow>>;
 
 pub(crate) fn connect_to_typedb () -> TypeDBDriver {
-  println! ("Connecting to TypeDB...");
+  tracing::info! ("Connecting to TypeDB...");
   block_on ( async {
     TypeDBDriver::new (
       crate::consts::TYPEDB_ADDRESS,
@@ -18,7 +18,7 @@ pub(crate) fn connect_to_typedb () -> TypeDBDriver {
       DriverOptions::new (false, None) . unwrap() )
       . await
       . unwrap_or_else ( |e| {
-        eprintln! ("Error connecting to TypeDB: {}", e);
+        tracing::error! ("Error connecting to TypeDB: {}", e);
         std::process::exit (1); } ) } ) }
 
 pub async fn delete_database (
@@ -28,7 +28,7 @@ pub async fn delete_database (
   let databases : &DatabaseManager = driver . databases ();
   if databases . contains (db_name) . await ? {
     databases . get (db_name) . await ? . delete () . await ?;
-    println! ( "Database '{}' deleted successfully", db_name ); }
+    tracing::info! ( "Database '{}' deleted successfully", db_name ); }
   Ok (( )) }
 
 /// Returns the string it finds

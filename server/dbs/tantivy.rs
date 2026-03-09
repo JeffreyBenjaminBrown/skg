@@ -84,8 +84,8 @@ pub fn search_index (
       Searcher ),
     Box <dyn std::error::Error> > {
 
-  println! (
-    "\nFinding files with titles or aliases matching \"{}\".",
+  tracing::info! (
+    "Finding files with titles or aliases matching \"{}\".",
     query_text);
   let searcher : Searcher = {
     let reader : IndexReader =
@@ -218,8 +218,8 @@ pub fn title_and_source_by_id (
     if fallback . is_none () {
       fallback = title_or_alias . map (
         |t| (t, source) ); } }
-  eprintln! (
-    "WARNING: title_and_source_by_id: no is_title=\"true\" document \
+  tracing::warn! (
+    "title_and_source_by_id: no is_title=\"true\" document \
      found for ID {}. Falling back to first title_or_alias.",
     id );
   fallback }
@@ -329,9 +329,9 @@ pub fn commit_with_status (
   operation: &str,
 ) -> Result<(), Box<dyn Error>> {
   if indexed_count > 0 {
-    println!( "{} {} documents. Committing changes...",
+    tracing::info!( "{} {} documents. Committing changes...",
               operation, indexed_count );
     writer . commit () ?;
   } else {
-    println!("No documents to process found."); }
+    tracing::debug!("No documents to process found."); }
   Ok (( )) }

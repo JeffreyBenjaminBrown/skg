@@ -5,7 +5,6 @@ use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::nodes::delete_nodes_from_pids;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_out_links;
-use crate::serve::timing_log::{timed, timed_async, push_buffer_timing_entry_manually};
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 use crate::types::skgnode::SkgNode;
@@ -29,19 +28,20 @@ pub async fn update_graph_minus_merges (
   tantivy_index : &TantivyIndex,
   driver        : &TypeDBDriver,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
-  println!("Updating (1) FS, (2) TypeDB, and (3) Tantivy ...");
+  tracing::info!("Updating (1) FS, (2) TypeDB, and (3) Tantivy ...");
   let db_name : &str = &config . db_name;
 
   { // Step 1: FS (source of truth)
     // TODO: Print per-source write information
-    println!( "1) Writing {} instruction(s) to disk ...",
+    tracing::info!( "1) Writing {} instruction(s) to disk ...",
                { let total_input : usize = instructions . len ();
                  total_input } );
     let (deleted_count, written_count) : (usize, usize) =
-      timed ( &config, "update_fs_from_saveinstructions",
-              || update_fs_from_saveinstructions (
-                   instructions . clone (), config . clone () )) ?;
-    println!( "   Deleted {} file(s), wrote {} file(s).",
+      { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+          "update_fs_from_saveinstructions") . entered ();
+        update_fs_from_saveinstructions (
+          instructions . clone (), config . clone () ) } ?;
+    tracing::info!( "   Deleted {} file(s), wrote {} file(s).",
               deleted_count, written_count ); }
 
   // Steps 2 & 3: TypeDB (async) and Tantivy (sync) in parallel.
@@ -57,18 +57,20 @@ pub async fn update_graph_minus_merges (
         . map_err ( |e| e . to_string () );
       (result, t0 . elapsed ()) });
 
-  if let Err (e) = timed_async ( // Step 2: TypeDB
-    &config, "update_typedb_from_saveinstructions",
+  if let Err (e) = { // Step 2: TypeDB
+    let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "update_typedb_from_saveinstructions") . entered ();
     update_typedb_from_saveinstructions (
-      db_name, driver, &instructions, &config )) . await
-    { eprintln!("TypeDB update failed: {}. Rebuilding from disk...", e);
+      db_name, driver, &instructions ) . await }
+    { tracing::error!(
+        "TypeDB update failed: {}. Rebuilding from disk...", e);
       rebuild_typedb_from_disk (&config, driver) . await
         . map_err (|e2| -> Box<dyn Error> {
           format!("TypeDB rebuild also failed: {}. Restart the server.", e2)
           . into () }) ?;
-      eprintln!("Save succeeded, but TypeDB had to be rebuilt from disk.");
+      tracing::warn!("Save succeeded, but TypeDB had to be rebuilt from disk.");
     } else {
-      println!("   TypeDB update complete."); }
+      tracing::info!("   TypeDB update complete."); }
 
   // Step 3: collect Tantivy result from its thread
   let (tantivy_result, tantivy_duration)
@@ -76,23 +78,22 @@ pub async fn update_graph_minus_merges (
     tantivy_handle . join ()
     . map_err (|_| -> Box<dyn Error> {
       "Tantivy thread panicked" . into () }) ?;
-  push_buffer_timing_entry_manually (
-    &config, "update_tantivy_from_saveinstructions",
-    tantivy_duration );
+  tracing::info!("{}: {:.3}s", "update_tantivy_from_saveinstructions",
+    tantivy_duration . as_secs_f64 ());
   match tantivy_result
     { Ok (indexed_count) => {
-        println!( "   Tantivy updated for {} document(s).",
+        tracing::info!( "   Tantivy updated for {} document(s).",
                   indexed_count );
-        println!("All updates finished successfully.");
+        tracing::info!("All updates finished successfully.");
         Ok (None) }
       Err (e) => {
-        eprintln!("Tantivy update failed: {}. Rebuilding from disk...", e);
+        tracing::error!("Tantivy update failed: {}. Rebuilding from disk...", e);
         let new_index : TantivyIndex =
           rebuild_tantivy_from_disk (&config)
           . map_err (|e2| -> Box<dyn Error> {
             format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
             . into () }) ?;
-        eprintln!("Save succeeded, but Tantivy had to be rebuilt from disk.");
+        tracing::warn!("Save succeeded, but Tantivy had to be rebuilt from disk.");
         Ok (Some (new_index)) } } }
 
 /// Update the DB from a batch of `DefineNode`s:
@@ -109,7 +110,6 @@ pub async fn update_typedb_from_saveinstructions (
   db_name : &str,
   driver  : &TypeDBDriver,
   instructions : &Vec<DefineNode>,
-  config  : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
 
   // PITFALL: Below, each get(0) on an 'ids' field
@@ -130,14 +130,14 @@ pub async fn update_typedb_from_saveinstructions (
       . map ( |DeleteNode { id, .. }| id . clone() )
       . collect ();
     if ! to_delete_pids . is_empty () {
-      println!("Deleting nodes with PIDs: {:?}", to_delete_pids);
-      timed_async (
-        config, "delete_nodes_from_pids",
+      tracing::debug!("Deleting nodes with PIDs: {:?}", to_delete_pids);
+      { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+          "delete_nodes_from_pids") . entered ();
         // PITFALL: deletions cascade in TypeDB by default,
         // so we are left with no incomplete relationships.
         delete_nodes_from_pids (
           db_name, driver, & to_delete_pids )
-      ) . await ?; }}
+        . await } ?; }}
 
   { // create | update
     let to_write_skgnodes : Vec<SkgNode> =
@@ -151,24 +151,24 @@ pub async fn update_typedb_from_saveinstructions (
                       . get (0)
                       . cloned() )
       . collect ();
-    timed_async (
-      config, "create_only_nodes_with_no_ids_present",
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "create_only_nodes_with_no_ids_present") . entered ();
       create_only_nodes_with_no_ids_present (
         db_name, driver, & to_write_skgnodes )
-    ) . await ?;
-    timed_async (
-      config, "delete_out_links",
+      . await } ?;
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "delete_out_links") . entered ();
       delete_out_links (
         db_name, driver,
         & to_write_pids, // Will barf if nonempty, which is good.
         "contains",
         "container" )
-    ) . await ?;
-    timed_async (
-      config, "create_all_relationships",
+      . await } ?;
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "create_all_relationships") . entered ();
       create_all_relationships (
         db_name, driver, & to_write_skgnodes )
-    ) . await ?; }
+      . await } ?; }
 
   Ok (( )) }
 

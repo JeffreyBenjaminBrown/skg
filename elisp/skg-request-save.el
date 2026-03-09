@@ -3,6 +3,7 @@
 ;;; USER-FACING FUNCTIONS
 ;;;   skg-request-save-buffer
 
+(require 'skg-log)
 (require 'skg-length-prefix)
 (require 'skg-org-fold)
 (require 'skg-focus)
@@ -81,7 +82,7 @@ Unlocks non-collateral buffers."
              saved-uri collateral-uris))))
     (error
      (skg--unlock-all-save-locked)
-     (message "ERROR in save-lock handler: %S" err)) ))
+     (skg-log 'error 'save "save-lock handler error: %S" err)) ))
 
 (defun skg--save-result-handler (save-buffer payload)
   "Handle the full save-result LP message (tagged with response-type).
@@ -125,8 +126,8 @@ which would trigger overlay modification-hooks if still present."
                  errors-text)
               (skg-show-save-errors ;; Failure with errors
                errors-text)))))
-    (error (message "ERROR parsing save response: %S" err)
-           (message "Sexp string was: %S" sexp-string))))
+    (error (skg-log 'error 'save "parsing save response: %S" err)
+           (skg-log 'error 'save "sexp string was: %S" sexp-string))))
 
 (defun skg-replace-buffer-with-new-content (_tcp-proc new-content)
   "Replace the current buffer contents with NEW-CONTENT from Rust.

@@ -79,7 +79,7 @@ pub fn handle_title_matches_request (
   let sexp : Sexp = match parsed_sexp {
     Ok (s) => s,
     Err (err) => {
-      println! ( "{}", err );
+      tracing::error! ( "{}", err );
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
@@ -150,7 +150,7 @@ pub fn handle_title_matches_request (
       let error_msg : String =
         format! (
           "Error extracting search terms: {}", err );
-      println! ( "{}", error_msg ) ;
+      tracing::error! ( "{}", error_msg ) ;
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
@@ -181,7 +181,7 @@ fn spawn_enrichment_thread (
   let terms_clone   : String = search_terms . to_string ();
   let ids_clone     : Vec<ID> = result_ids . to_vec ();
   std::thread::spawn ( move || {
-    println! ("search enrichment: thread started for {} IDs",
+    tracing::info! ("search enrichment: thread started for {} IDs",
               ids_clone . len ());
     let paths_by_id
       : HashMap < ID, Vec < PathToFirstNonlinearity > > =
@@ -189,12 +189,12 @@ fn spawn_enrichment_thread (
         compute_containerward_paths_using_parallel_frontier (
           &ids_clone, &config_clone . db_name,
           &driver_clone ) );
-    println! ("search enrichment: paths computed ({} entries)",
+    tracing::info! ("search enrichment: paths computed ({} entries)",
               paths_by_id . len ());
     if cancel_clone . load (Ordering::SeqCst) {
-      println! ("search enrichment: cancelled after paths");
+      tracing::info! ("search enrichment: cancelled after paths");
       return; }
-    println! ("search enrichment: writing payload to slot");
+    tracing::info! ("search enrichment: writing payload to slot");
     let mut guard : MutexGuard<Option<SearchEnrichmentPayload>> =
       slot_clone . lock () . unwrap ();
     *guard = Some ( SearchEnrichmentPayload {
@@ -273,7 +273,7 @@ pub fn group_matches_by_id (
             . or_insert_with ( || (source, Vec::new ()) )
             . 1
             . push (( adjusted_score, title )); }},
-      Err (e) => { eprintln! (
+      Err (e) => { tracing::error! (
         "Error retrieving document: {}", e ); }} }
   result_acc }
 

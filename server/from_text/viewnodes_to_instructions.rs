@@ -63,7 +63,7 @@ fn filter_unchanged_save_instructions (
       DefineNode::Delete (_) => true, })
     . collect();
   let removed_count : usize = initial_count - filtered . len();
-  eprintln!("filter_unchanged_save_instructions: \
+  tracing::debug!("filter_unchanged_save_instructions: \
              kept {} of {} instructions ({} unchanged filtered out)",
             filtered . len(), initial_count, removed_count);
   filtered }

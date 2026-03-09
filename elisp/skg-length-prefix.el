@@ -9,6 +9,7 @@
 ;;; USER-FACING FUNCTIONS
 ;;;   (none)
 
+(require 'skg-log)
 (require 'skg-state)
 
 (defun skg-lp-handle-generic-chunk (tcp-proc chunk)
@@ -60,11 +61,11 @@ because the sexp crate emits simple strings unquoted."
              (type-entry (assoc 'response-type response))
              (response-type (cadr type-entry)))
         (if (not response-type)
-            (message "skg: response missing response-type: %s"
+            (skg-log 'warn 'dispatch "response missing response-type: %s"
                      (substring payload 0 (min 80 (length payload))))
           (let ((handler-entry (assoc response-type skg-response-handler-map)))
             (if (not handler-entry)
-                (message "skg: no handler for response type: %s" response-type)
+                (skg-log 'warn 'dispatch "no handler for response type: %s" response-type)
               (let ((handler  (cadr handler-entry))
                     (one-shot (cddr handler-entry)))
                 (funcall handler tcp-proc payload)
@@ -76,7 +77,7 @@ because the sexp crate emits simple strings unquoted."
                         (max 0 (1- skg-lp--pending-count))))
                 ) ))))
     (error
-     (message "skg: dispatch error: %S for payload: %s"
+     (skg-log 'error 'dispatch "dispatch error: %S for payload: %s"
               err (substring payload 0 (min 80 (length payload)))) )))
 
 (defun skg-lp-step (buf bytes-left)

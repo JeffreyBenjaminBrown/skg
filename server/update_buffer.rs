@@ -14,7 +14,6 @@ use crate::serve::ConnectionState;
 use crate::serve::handlers::save_buffer::{
   SaveResponse,
   compute_diff_for_every_source, deleted_ids_to_source};
-use crate::serve::timing_log::timed_async;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::git::{SourceDiff, NodeDiffStatus};
 use crate::types::misc::{ID, SourceName, SkgConfig};
@@ -74,16 +73,17 @@ pub async fn update_views_after_save (
   let mut errors : Vec<String> = Vec::new ();
   let mut saved_view_mut : Tree<ViewNode> = saved_view;
   let saved_text : String =
-    timed_async ( config, "rerender_view (saved)",
-                  rerender_view (
-                    &mut saved_view_mut,
-                    &mut skgnode_map,
-                    &source_diffs,
-                    config,
-                    typedb_driver,
-                    &mut errors,
-                    &deleted_since_head_pid_src_map,
-                    &deleted_by_this_save_pids )) . await ?;
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "rerender_view (saved)" ). entered();
+      rerender_view (
+        &mut saved_view_mut,
+        &mut skgnode_map,
+        &source_diffs,
+        config,
+        typedb_driver,
+        &mut errors,
+        &deleted_since_head_pid_src_map,
+        &deleted_by_this_save_pids ) . await } ?;
   let mut collateral_views : Vec<(ViewUri, String)> = Vec::new ();
   if let Ok (uri) = viewuri_from_request_result {
     merge_skgnodemap_into_pool (&skgnode_map, conn_state);
@@ -93,13 +93,14 @@ pub async fn update_views_after_save (
       find_collateral_view_uris (
         uri, &save_instructions, conn_state);
     if collateral_uris . is_empty () {
-      eprintln!("update_views_after_save: no collateral views");
+      tracing::debug!("update_views_after_save: no collateral views");
     } else {
-      eprintln!("update_views_after_save: {} collateral view(s): {:?}",
-                collateral_uris . len (),
-                collateral_uris . iter ()
-                  . map ( |u| &u . 0 )
-                  . collect::<Vec<_>> ()); }
+      tracing::info!(
+        "update_views_after_save: {} collateral view(s): {:?}",
+        collateral_uris . len (),
+        collateral_uris . iter ()
+          . map ( |u| &u . 0 )
+          . collect::<Vec<_>> ()); }
     for curi in collateral_uris { // Identical pipeline, with each view building on the pool enriched by prior views.
       let mut forest : Tree<ViewNode> = match
         conn_state . memory . viewuri_to_view (&curi) {
@@ -110,15 +111,14 @@ pub async fn update_views_after_save (
             continue; } };
       let mut map : SkgNodeMap =
         seed_skgnodemap_from_pool (&curi, conn_state);
-      let label : String =
-        format! ("rerender_view ({})", curi . 0);
-      match timed_async (
-        config, &label,
+      match { let _span : tracing::span::EnteredSpan =
+                tracing::info_span!( "rerender_view (collateral)"
+                ). entered();
         rerender_view (
           &mut forest, &mut map,
           &source_diffs, config, typedb_driver,
           &mut errors, &deleted_since_head_pid_src_map,
-          &deleted_by_this_save_pids )) . await
+          &deleted_by_this_save_pids ) . await }
       { Ok (text) => {
           merge_skgnodemap_into_pool (&map, conn_state);
           conn_state . memory . update_view (&curi, forest);
@@ -145,9 +145,10 @@ fn find_collateral_view_uris (
       DefineNode::Delete (dn) =>
         Some ( dn . id . clone () ) } )
     . collect ();
-  eprintln!("find_collateral_view_uris: {} changed PIDs, {} views in memory",
-            changed_pids . len (),
-            conn_state . memory . views . len ());
+  tracing::debug!(
+    "find_collateral_view_uris: {} changed PIDs, {} views in memory",
+    changed_pids . len (),
+    conn_state . memory . views . len ());
   let uris : HashSet<ViewUri> =
     changed_pids . iter ()
     . flat_map ( |pid| conn_state . memory . views_containing (pid) )
@@ -192,22 +193,22 @@ async fn rerender_view (
   deleted_by_this_save_pids      : &HashSet<ID>,
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : std::time::Instant = std::time::Instant::now ();
-  eprintln!("rerender_view: starting");
+  tracing::debug!("rerender_view: starting");
   remove_branches_that_git_marked_removed (forest) ?;
   clear_diff_metadata (forest) ?;
   let mut defmap : DefinitiveMap = DefinitiveMap::new ();
-  eprintln!("rerender_view: starting complete_viewtree");
+  tracing::debug!("rerender_view: starting complete_viewtree");
   complete_viewtree (
     forest, map, &mut defmap,
     source_diffs, config, typedb_driver,
     errors, deleted_since_head_pid_src_map,
     deleted_by_this_save_pids ) . await ?;
-  eprintln!("rerender_view: complete_viewtree done ({:.3}s), starting graphnodestats",
+  tracing::debug!("rerender_view: complete_viewtree done ({:.3}s), starting graphnodestats",
             t_rerender . elapsed () . as_secs_f64 ());
   let ( container_to_contents, content_to_containers ) =
     set_graphnodestats_in_forest (
       forest, map, config, typedb_driver ) . await ?;
-  eprintln!("rerender_view: graphnodestats done ({:.3}s), rendering to string",
+  tracing::debug!("rerender_view: graphnodestats done ({:.3}s), rendering to string",
             t_rerender . elapsed () . as_secs_f64 ());
   set_viewnodestats_in_forest (
     forest,
@@ -215,7 +216,7 @@ async fn rerender_view (
     &content_to_containers );
   let result : Result<String, Box<dyn Error>> =
     viewnode_forest_to_string (forest);
-  eprintln!("rerender_view: done ({:.3}s)",
+  tracing::debug!("rerender_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
   result }
 

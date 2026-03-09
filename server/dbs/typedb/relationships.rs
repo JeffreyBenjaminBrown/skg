@@ -33,7 +33,7 @@ pub async fn create_all_relationships (
   driver     : &TypeDBDriver,
   nodes      : &[SkgNode]
 )-> Result < (), Box<dyn Error> > {
-  println! ("Creating relationships ...");
+  tracing::info! ("Creating relationships ...");
   let results : Vec < Result < (), Box < dyn Error > > > =
     stream::iter ( nodes . iter ()
       . map ( |node| create_relationships_for_one_node (

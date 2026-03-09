@@ -29,7 +29,7 @@ pub async fn create_all_nodes (
   driver  : &TypeDBDriver,
   nodes   : &[SkgNode]
 )-> Result < (), Box<dyn Error> > {
-  println!("Creating nodes ...");
+  tracing::info!("Creating nodes ...");
   let results : Vec < Result < (), Box < dyn Error > > > =
     stream::iter ( nodes . iter ()
       . map ( |node| create_one_node_in_own_tx (
@@ -66,7 +66,7 @@ pub async fn create_only_nodes_with_no_ids_present (
     if ! known_ids . contains (
       node . primary_id()? . as_str () )
     { to_create . push (node); }}
-  println! ( "Creating {} new nodes ...",
+  tracing::info! ( "Creating {} new nodes ...",
               to_create . len () );
   let futures : Vec < _ > =
     to_create . iter ()

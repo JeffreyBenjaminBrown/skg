@@ -45,7 +45,7 @@ impl Drop for TestDbGuard {
           match tokio::runtime::Runtime::new() {
             Ok (rt) => rt,
             Err (e) => {
-              eprintln!(
+              tracing::error!(
                 "TestDbGuard: failed to create runtime \
                  for cleanup of '{}': {}", db_name, e);
               return; }, };
@@ -57,7 +57,7 @@ impl Drop for TestDbGuard {
               match DriverOptions::new(false, None) {
                 Ok (opts) => opts,
                 Err (e) => {
-                  eprintln!(
+                  tracing::error!(
                     "TestDbGuard: failed to create driver options \
                      for cleanup of '{}': {}", db_name, e);
                   return; }, },
@@ -70,15 +70,15 @@ impl Drop for TestDbGuard {
                   &driver,
                   tantivy_folder . as_deref(),
                 ) . await
-              { eprintln!(
+              { tracing::error!(
                   "TestDbGuard: cleanup failed for '{}': {}",
                   db_name, e); }
               else
-              { eprintln!(
+              { tracing::info!(
                   "TestDbGuard: emergency cleanup succeeded \
                    for '{}'", db_name); }},
             Err (e) => {
-              eprintln!(
+              tracing::error!(
                 "TestDbGuard: failed to connect to TypeDB \
                  for cleanup of '{}': {}", db_name, e); }, }; }); });
     // Best-effort: wait for the cleanup thread.

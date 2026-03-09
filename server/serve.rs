@@ -8,7 +8,6 @@
 
 pub mod handlers;
 pub mod parse_metadata_sexp;
-pub mod timing_log;
 pub mod util;
 
 use crate::dbs::typedb::util::delete_database;
@@ -60,7 +59,7 @@ pub fn serve (
     let driver_for_signal : Arc<TypeDBDriver> = Arc::clone (&typedb_driver);
     let config_for_signal : SkgConfig = config . clone ();
     ctrlc::set_handler ( move || {
-      println! ("\nReceived shutdown signal...");
+      tracing::info! ("Received shutdown signal...");
       cleanup_and_shutdown (
         &driver_for_signal,
         &config_for_signal );
@@ -83,7 +82,7 @@ pub fn serve (
             tantivy_index_clone,
             & config_clone, ) } ); }
       Err (e) => {
-        eprintln!("Connection failed: {e}"); }} }
+        tracing::error!(error = %e, "Connection failed"); }} }
   Ok (( )) }
 
 /// This function directs requests from the stream to one of
@@ -109,7 +108,7 @@ fn handle_emacs (
 
   let peer : SocketAddr =
     stream . peer_addr() . unwrap();
-  println!("Emacs connected: {peer}");
+  tracing::info!(peer = %peer, "Emacs connected");
   stream . set_read_timeout (
     Some ( Duration::from_millis (100) ))
     . expect ("set_read_timeout failed");
@@ -122,7 +121,7 @@ fn handle_emacs (
     match reader . read_line (&mut request_header) {
       Ok (0) => break, // emacs disconnected
       Ok (_n) => {
-        println! ( "Received request: {}", request_header . trim_end () );
+        tracing::info! ( request = request_header . trim_end (), "Received request" );
         match request_type_from_request (&request_header) {
           // For most types of requests, the header is the entire request, and the reader is no longer needed. For saving, though, the reader still contains the buffer content, so it is passed along.
           Ok (request_type) => {
@@ -180,14 +179,13 @@ fn handle_emacs (
               let error_msg : String =
                 format! ( "Unsupported request type: {}",
                            request_type );
-              println!("{}", error_msg);
+              tracing::warn!(msg = %error_msg, "Unsupported request type");
               send_response_with_length_prefix (
                 &mut stream,
                 & tag_text_response (
                   "error", &error_msg )); }}
           Err (err) => {
-            println!("Error determining request type: {}",
-                     err);
+            tracing::error!(error = %err, "Error determining request type");
             send_response_with_length_prefix (
               &mut stream,
               & tag_text_response (
@@ -225,13 +223,13 @@ fn handle_emacs (
                 mk_search_enrichment_sexp (
                   &payload . terms, &enriched );
               conn_state . memory . views . insert ( uri, vs );
-              println! ("slot drain: sending enrichment ({} bytes)",
-                        enriched_sexp . len ());
+              tracing::debug! (bytes = enriched_sexp . len (),
+                               "slot drain: sending enrichment");
               send_response_with_length_prefix (
                 &mut stream, &enriched_sexp ); }} }}
       Err (_) => break, // real error
     } }
-  println!("Emacs disconnected: {peer}"); }
+  tracing::info!(peer = %peer, "Emacs disconnected"); }
 
 /// Handle git diff mode toggle request.
 /// Request format: ((request . "git diff mode toggle"))
@@ -243,7 +241,7 @@ fn handle_git_diff_mode_request (
   let msg = if conn_state . diff_mode_enabled
     { "Git diff mode enabled" } else
     { "Git diff mode disabled" };
-  println! ( "{}", msg );
+  tracing::info! ( msg = msg, "Git diff mode toggled" );
   send_response_with_length_prefix (
     stream,
     & tag_text_response ( "git-diff-mode", msg )); }
@@ -275,9 +273,9 @@ fn cleanup_and_shutdown (
   config        : &SkgConfig,
 ) {
   if config . delete_on_quit {
-    println! (
-      "Deleting database '{}' before shutdown...",
-      config . db_name );
+    tracing::info! (
+      db_name = %config . db_name,
+      "Deleting database before shutdown" );
 
     // Wait briefly to allow any pending operations to complete.
     // This helps ensure the database isn't marked as "in use".
@@ -290,7 +288,7 @@ fn cleanup_and_shutdown (
         delete_database (
           typedb_driver, & config . db_name )
         . await {
-          eprintln! ( "Failed to delete database: {}", e );
+          tracing::error! ( error = %e, "Failed to delete database" );
         }} ); }
-  println! ("Shutdown complete.");
+  tracing::info! ("Shutdown complete.");
   std::process::exit (0); }

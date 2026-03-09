@@ -2,7 +2,6 @@ use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   partition_subscribee_content_for_subscriber,
   what_node_hides,
   what_nodes_contain };
-use crate::serve::timing_log::timed_async;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
@@ -76,13 +75,15 @@ pub async fn maybe_add_subscribeeCol_branch (
   let hidden_outside_content : HashSet < ID > = {
     // hidden IDs that are outside all subscribee content
     let r_hides : HashSet < ID > =
-      timed_async ( config, "what_node_hides",
+      { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+          "what_node_hides" ). entered();
         what_node_hides (
-          &config . db_name, driver, & subscriber_pid )) . await ?;
+          &config . db_name, driver, & subscriber_pid ) . await } ?;
     let all_subscribee_content : HashSet < ID > =
-      timed_async ( config, "what_nodes_contain",
+      { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+          "what_nodes_contain" ). entered();
         what_nodes_contain (
-          &config . db_name, driver, & subscribee_ids )) . await ?;
+          &config . db_name, driver, & subscribee_ids ) . await } ?;
     r_hides . iter ()
       . filter ( | id | ! all_subscribee_content . contains (id) )
       . cloned () . collect () };

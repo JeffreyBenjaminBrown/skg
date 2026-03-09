@@ -23,7 +23,6 @@ use buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use viewnodes_to_instructions::viewnode_forest_to_nonmerge_save_instructions;
 use validate_foreign_nodes::{validate_and_filter_foreign_instructions, validate_merges_involve_only_owned_nodes};
 
-use crate::serve::timing_log::{timed, timed_async};
 use crate::types::memory::SkgNodeMap;
 
 use ego_tree::Tree;
@@ -40,48 +39,57 @@ pub async fn buffer_to_viewnode_forest_and_save_instructions (
              SaveError> {
   let ( mut unchecked_forest, parsing_errors )
     : ( Tree<UncheckedViewNode>, Vec<BufferValidationError> )
-    = timed ( config, "org_to_uninterpreted_nodes",
-              || org_to_uninterpreted_nodes (buffer_text))
+    = { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+          "org_to_uninterpreted_nodes" ). entered();
+        org_to_uninterpreted_nodes (buffer_text) }
       . map_err (SaveError::ParseError) ?;
-  timed_async ( config, "add_missing_info_to_forest",
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "add_missing_info_to_forest" ). entered();
     // Precedes all validation functions.
     // For why, see the header comment of one of them,
     // 'find_buffer_errors_for_saving'.
     add_missing_info_to_forest (
       & mut unchecked_forest, & config . db_name, driver, pool )
-  ) . await . map_err (SaveError::DatabaseError) ?;
+    . await } . map_err (SaveError::DatabaseError) ?;
   { // If saving is impossible, don't.
     let mut validation_errors : Vec<BufferValidationError> =
-      timed_async ( config, "find_buffer_errors_for_saving",
+      { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+          "find_buffer_errors_for_saving" ). entered();
         find_buffer_errors_for_saving (
           & unchecked_forest, config, driver )
-      ) . await . map_err (SaveError::DatabaseError) ?;
+        . await } . map_err (SaveError::DatabaseError) ?;
     validation_errors . extend (parsing_errors);
     if ! validation_errors . is_empty () {
       return Err ( SaveError::BufferValidationErrors (
         validation_errors ) ); }}
   let viewnode_forest : Tree<ViewNode> =
-    timed ( config, "unchecked_to_checked_tree",
-            || unchecked_to_checked_tree (unchecked_forest))
-      . map_err ( |e| SaveError::ParseError (e) ) ?;
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "unchecked_to_checked_tree" ). entered();
+      unchecked_to_checked_tree (unchecked_forest) }
+        . map_err ( |e| SaveError::ParseError (e) ) ?;
   let nonmerge_instructions : Vec<DefineNode> =
-    timed_async ( config, "viewnode_forest_to_nonmerge_save_instructions",
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "viewnode_forest_to_nonmerge_save_instructions" ). entered();
       viewnode_forest_to_nonmerge_save_instructions (
         & viewnode_forest, config, driver, pool )
-    ) . await . map_err (SaveError::DatabaseError) ?;
+      . await } . map_err (SaveError::DatabaseError) ?;
   let nonmerge_instructions : Vec<DefineNode> =
-    timed_async ( config, "validate_and_filter_foreign_instructions",
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "validate_and_filter_foreign_instructions" ). entered();
       validate_and_filter_foreign_instructions (
         nonmerge_instructions, config, driver )
-    ) . await . map_err (SaveError::BufferValidationErrors) ?;
+      . await } . map_err (SaveError::BufferValidationErrors) ?;
   let merge_instructions : Vec<Merge> =
-    timed_async ( config, "instructiontriples_from_the_merges_in_an_viewnode_forest",
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+          "instructiontriples_from_the_merges_in_an_viewnode_forest"
+        ). entered();
       instructiontriples_from_the_merges_in_an_viewnode_forest (
         & viewnode_forest, config, driver )
-    ) . await . map_err (SaveError::DatabaseError) ?;
-  timed ( config, "validate_merges_involve_only_owned_nodes",
-          || validate_merges_involve_only_owned_nodes (
-            & merge_instructions, config ))
+      . await } . map_err (SaveError::DatabaseError) ?;
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "validate_merges_involve_only_owned_nodes" ). entered();
+    validate_merges_involve_only_owned_nodes (
+      & merge_instructions, config ) }
     . map_err (SaveError::BufferValidationErrors) ?;
 
   Ok ((viewnode_forest,

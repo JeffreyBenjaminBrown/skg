@@ -152,10 +152,10 @@ fn report_duplicate_ids(
   let count: usize = duplicates . len();
   if count <= 10 {
     // Report to stderr only
-    eprintln!("\nError: Found {} duplicate ID(s) across sources:",
+    tracing::error!("Found {} duplicate ID(s) across sources:",
               count);
     for (id, sources) in duplicates . iter() {
-      eprintln!("  - ID '{}' in sources: {}",
+      tracing::error!("  - ID '{}' in sources: {}",
                 id, sources . join (", ")); }
   } else { // Write to org file
     let filename: &str = "initialization-error_duplicate-ids.org";
@@ -179,9 +179,9 @@ fn report_duplicate_ids(
       for source in sorted_sources {
         content . push_str(&format!("** {}\n", source)); }}
     fs::write(filename, content)?;
-    eprintln!("\nError: Found {} duplicate ID(s) across sources.",
+    tracing::error!("Found {} duplicate ID(s) across sources.",
               count);
-    eprintln!("Details written to: {}", filename); }
+    tracing::error!("Details written to: {}", filename); }
   Ok (( )) }
 
 /// Reports file loading errors.
@@ -211,8 +211,8 @@ fn report_load_errors(
   }
 
   fs::write(filename, content)?;
-  eprintln!("\nError: Found {} unreadable file(s).", count);
-  eprintln!("Details written to: {}", filename);
+  tracing::error!("Found {} unreadable file(s).", count);
+  tracing::error!("Details written to: {}", filename);
 
   Ok(())
 }

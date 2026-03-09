@@ -1,59 +1,16 @@
-* Claude's questions, hypotheses, discoveries and methods
+* Claude's reference notes, discoveries and methods
+This file is a reference repository for patterns, benchmarks and
+techniques discovered during development. Bug investigations live
+in their own files (e.g. save-is-slow.org); only brief summaries
+appear here.
 
-** Investigations
+** TypeQL v3 reference
 
-*** "Cannot visit link" bug (2026-03-09)
-**** Bug report
-     User opens view of "motivation | ambition | ..." (ID 7b52eb18-...),
-     requests containerward view from a child. The containerward branch
-     shows the parent node (7b52eb18-...) again as an indefinitive child
-     at the bottom. User puts point there, calls skg-next-id then
-     skg-view-from-node, expects a new view. Sees only
-     "Reverting buffer 'skg.log'" (unrelated auto-revert noise).
-**** Hypotheses tested
-     - format "%S" length mismatch with buffer text: REJECTED.
-       Tested with exact metadata from bug report; lengths match (206=206).
-     - Emacs read failing on metadata sexp: REJECTED.
-       read parses the sexp correctly, condition-case not triggered.
-     - Heralds overlays interfering with buffer text: REJECTED.
-       Overlays set display property but don't modify buffer text.
-       looking-at and re-search-forward operate on buffer text.
-     - skg-next-id landing on wrong position: REJECTED.
-       Traced the logic; metadata position is correctly computed.
-**** Root cause: switch-to-view of already-current buffer
-     The node (7b52eb18-...) is the ROOT of the current view.
-     When skg-view-from-node sends a content view request for it,
-     the server's handle_single_root_view_request checks
-     view_uri_for_root_id, finds it's already a root of an open view,
-     and returns ((switch-to-view URI)). Emacs receives this,
-     looks up the buffer for that URI, and calls switch-to-buffer —
-     but it's the SAME buffer the user is already in.
-     Nothing visibly happens. The "Visiting node: ..." message
-     is immediately overwritten by the auto-revert of skg.log.
-**** Fix
-     In skg-handle-content-view-sexp, when the switch-to-view buffer
-     is the current buffer, show a message like
-     "Already viewing this node (scroll to top to see it)"
-     instead of silently calling switch-to-buffer.
-
-** Discoveries
-
-*** Emacs: define-minor-mode always creates an interactive command
-There is no :interactive nil option. To hide a minor mode from M-x,
-use (put 'mode-name 'completion-predicate #'ignore) after defining it.
-
-*** defalias makes both names available in M-x
-(defalias 'skg-id-copy 'skg-push-to-linkstack) makes skg-id-copy
-available as M-x skg-id-copy, inheriting the interactive spec
-from the target function. Both names work.
-
-*** TypeQL v3: defining and querying node properties
-
-**** Value types
+*** Value types
 TypeDB v3 supports: =string=, =integer=, =double=, =boolean=, =datetime=.
 NOT =long= (use =integer=). NOT =float= (use =double=).
 
-**** Attribute definition
+*** Attribute definition
 #+begin_example
 define
   attribute depth, value integer;
@@ -61,20 +18,20 @@ define
     owns depth;
 #+end_example
 
-**** Cardinality
+*** Cardinality
 Default =owns= is =@card(0..1)= — one value per attribute type.
 Adding a second value causes commit error [CNT5].
 For multi-valued: =owns nickname @card(0..);=.
 
-**** Reserved words
+*** Reserved words
 =label= is reserved in TypeQL v3. Cannot use as identifier. ([DEX31])
 
-**** Querying by property value
+*** Querying by property value
 Exact match: =has tag "leaf"=
 Bind and compare: =has depth $d; $d > 1;=
 Boolean: =has is_root true=
 
-**** Bulk container lookup (key for optimization)
+*** Bulk container lookup
 Single query returning (contained, container) pairs for N nodes:
 #+begin_example
 match
@@ -87,7 +44,7 @@ select $child_id, $parent_id;
 Nodes with no container simply don't appear in results (root detection).
 Performance: 5 nodes ~143ms, 20 nodes ~156ms (nearly flat scaling).
 
-**** Fetch syntax (clean JSON output)
+*** Fetch syntax (clean JSON output)
 #+begin_example
 fetch {
   "contained": $child_id,
@@ -106,7 +63,7 @@ fetch {
 };
 #+end_example
 
-**** Disjunction patterns and performance
+*** Disjunction patterns and performance
 =$child_id == "x"= style (bind then compare) ~143ms for 5 nodes.
 =$contained has id "x"= style (attribute lookup) ~181ms for 5 nodes.
 The == style is faster because it compares already-bound values.
@@ -124,11 +81,11 @@ but in-process the =or= pattern for extra_id fallback dominates:
 Lesson: the extra_id =or= clause is very expensive.
 When you know inputs are primary IDs, skip it.
 
-**** Reduce (aggregation)
+*** Reduce (aggregation)
 =reduce $count = count;= — global count.
 =reduce $count = count groupby $child_id;= — grouped (one word: groupby).
 
-**** Update syntax (v3)
+*** Update syntax (v3)
 Delete uses =has $var of $entity=:
 #+begin_example
 match $n isa node, has id "e", has tag $old_tag;
@@ -136,10 +93,10 @@ delete has $old_tag of $n;
 insert $n has tag "leaf";
 #+end_example
 
-**** Computed values with let
+*** Computed values with let
 =let $doubled = $d * 2;= works after match clause.
 
-**** Optional match (try)
+*** Optional match (try)
 #+begin_example
 try {
   $parent isa node, has id $pid;
@@ -149,23 +106,24 @@ try {
 Returns empty $pid for nodes with no container. Both matched
 and unmatched rows are included in results.
 
-**** Shared variable joins
+*** Shared variable joins
 Two entities sharing a variable are joined:
 =has depth $d= on both =$target= and =$sibling= finds same-depth nodes.
 
-**** Relation properties
+*** Relation properties
 Relations can own attributes:
 =relation contains, owns weight;=
 Query: =$rel isa contains (...), has weight $w;=
 
-**** Identity vs equality
+*** Identity vs equality
 =not { $c1 is $c2; }= tests identity (different instances).
 =$child_id == "c"= tests value equality.
+=$r1 != $r2= does NOT work in v3 — throws [REP1].
 
-**** Entity inheritance
+*** Entity inheritance
 =entity special_node sub node;= — subtypes inherit all owns/plays.
 
-*** TypeQL v3: recursive functions (=fun=)
+*** Recursive functions (=fun=)
 
 TypeDB v3.7.0 has NO rules (removed from v2). Instead it has =fun=.
 No =function= keyword — it's =fun=.
@@ -191,7 +149,6 @@ define
 **** Recursive tabling
 TypeDB automatically tables recursive functions to break cycles.
 For a cycle h→i→h, =ancestors(h)= returns ={i, h}= — finite.
-The tabling mechanism prevents infinite recursion.
 
 **** Variable scoping in disjunctions
 Variables inside =not { }= or =try { }= or disjunction branches are locally scoped.
@@ -244,8 +201,7 @@ fun end_of_containerward_path_v2($n: node) -> { node }:
 #+end_example
 Exclusivity: the recursive branch fires only when the node is
 neither root nor fork. Without this, TypeQL's non-exclusive =or=
-causes ALL matching branches to contribute, returning spurious
-results (e.g. fork node returns itself AND its ancestors' endpoints).
+causes ALL matching branches to contribute.
 
 **distinct-end-of-containerward-path** (also stops at cycles):
 Pass the origin node as an extra parameter. Add a fourth branch:
@@ -269,455 +225,123 @@ fun distinct_end($origin: node, $n: node) -> { node }:
     };
   return { $result };
 #+end_example
-Called as =distinct_end($n, $n)=. Results:
-| input  | result | reason                       |
-|--------+--------+------------------------------|
-| c      | root1  | climbs c→b→a→root1           |
-| f      | f      | fork returns itself          |
-| root1  | root1  | root returns itself          |
-| h      | i      | h→i, i's container=h=origin  |
-| i      | h      | i→h, h's container=i=origin  |
+Called as =distinct_end($n, $n)=.
+LIMITATION: Only detects cycles back to the *origin node*.
 
-LIMITATION: This only detects cycles back to the *origin node*.
-A cycle not involving the origin would not be caught this way.
-For the skg use case this is sufficient (we always start from
-the queried node itself).
+** Performance methods and patterns
 
-** Methods
-
-*** Adding data to an existing pipeline
-When enriching an existing pipeline (e.g. adding graphnodestats to
-search results), the pattern is:
-1. Extract the new data source's IDs from the existing intermediate results
-2. Fetch the new data in bulk (parallel per-PID queries for TypeDB,
-   disk reads for .skg files)
-3. Build a lookup map (HashMap<ID, NewData>)
-4. Pass the map to the formatter, which looks up each ID
-
-This avoids restructuring the existing pipeline; the new data
-flows alongside it via a parallel map.
-
-*** TypeDB query performance: avoid N-way disjunctions with `or` patterns
-N-way disjunctions (={$id == "a";} or {$id == "b";} or ...=) combined
-with `or` patterns (like the extra_id fallback) scale very poorly.
-Instead, run one query per ID in parallel via =join_all=.
-Each individual query is fast (~15ms); N of them interleave
-on a single-threaded executor with minimal overhead.
-This is why both =all_graphnodestats= and =containerward_path_stats_bulk=
-use per-PID parallel queries rather than single bulk queries.
-
-* Parallelizing TypeDB and Tantivy updates in the save pipeline
-
-** Context
-
-The save pipeline (~update_graph_minus_merges~) updates three stores
-sequentially: FS (source of truth), TypeDB, and Tantivy.
-TypeDB and Tantivy are independent after the FS write completes.
-
-** Baseline (sequential, from tests/profiling/simple-edit)
-
-  update_graph_minus_merges:                     1.392s
-    update_fs_from_saveinstructions:             0.026s  (2%)
-    update_typedb_from_saveinstructions:          0.760s  (55%)
-    update_tantivy_from_saveinstructions:         0.606s  (44%)
-
-** Changes
-
-1. Added ~config~ parameter to ~update_typedb_from_saveinstructions~
-   and wrapped its 4 sub-operations with ~timed_async~:
-   - ~delete_nodes_from_pids~
-   - ~create_only_nodes_with_no_ids_present~
-   - ~delete_out_links~
-   - ~create_all_relationships~
-
-2. Parallelized TypeDB (async) and Tantivy (sync) using
-   ~std::thread::spawn~ for Tantivy. The spawned thread runs
-   the sync Tantivy work while the async TypeDB work runs
-   on the main thread. After both complete, Tantivy's duration
-   is recorded via ~push_buffer_timing_entry_manually~.
-
-** Post-parallelization profiling (781-node dataset)
-
-  update_graph_minus_merges:                          6.779s
-    update_fs_from_saveinstructions:                  0.050s
-    update_typedb_from_saveinstructions:              6.728s
-      create_only_nodes_with_no_ids_present:          1.504s  (22%)
-      delete_out_links:                               1.195s  (18%)
-      create_all_relationships:                       4.027s  (60%)
-    update_tantivy_from_saveinstructions:             1.020s
-
-Tantivy (1.020s) ran concurrently with TypeDB (6.728s).
-Total wall time equals TypeDB time (6.779s), not TypeDB + Tantivy
-(would have been ~7.748s). Savings: ~1s on this dataset.
-
-** Per-node parallel TypeDB operations (join_all)
-
-Applied the same ~futures::future::join_all~ pattern from
-~fetch_all_graphnodestats~ to three TypeDB write operations:
-
-1. ~create_all_relationships~: each node gets its own write
-   transaction, all run concurrently. 4.027s → 0.735s (5.5×).
-2. ~delete_out_links~: each ID gets its own write transaction.
-   1.275s → 0.499s (2.6×).
-3. ~create_only_nodes_with_no_ids_present~: each new node gets
-   its own transaction. No improvement (0.97s) because most
-   nodes already exist; the bulk ~which_ids_exist~ check dominates.
-
-Final numbers:
-
-  update_from_and_rerender_buffer:                    3.987s
-    update_graph_minus_merges:                        2.231s
-      update_fs_from_saveinstructions:                0.025s
-      update_typedb_from_saveinstructions:            2.206s
-        create_only_nodes_with_no_ids_present:        0.971s  (44%)
-        delete_out_links:                             0.499s  (23%)
-        create_all_relationships:                     0.735s  (33%)
-      update_tantivy_from_saveinstructions:           0.710s  (parallel)
-
-Overall: ~update_from_and_rerender_buffer~ 16.2s → 4.0s (4× speedup).
-
-** Per-ID parallel reads: attempted and reverted
-
-Tried converting ~which_ids_exist~ and ~pids_from_ids~ from
-bulk disjunction queries to per-ID parallel queries (same
-pattern that worked for write operations). Both regressed or
-showed no improvement:
-
-- ~which_ids_exist~: 0.97s → 1.3s (no benefit)
-- ~pids_from_ids~: 0.90s → 2.8s (significant regression)
-- ~fetch_all_graphnodestats~ (unchanged): 0.7s → 4.4s in same run
-
-The regression was confirmed as TypeDB server contention:
-too many concurrent read transactions. The bulk disjunction
-pattern is already efficient for these read queries. Reverted.
-
-** Insight: when per-ID parallel queries help vs. hurt
+*** When per-ID parallel queries help vs. hurt
 
 Per-ID parallel queries (via ~join_all~) work well for:
 - *Write* transactions (~create_all_relationships~, ~delete_out_links~)
-  where the sequential write-buffer buildup is the bottleneck.
+  where sequential write-buffer buildup is the bottleneck.
 
 They do NOT help for:
 - *Read* queries that already use efficient bulk disjunctions
   (~which_ids_exist~, ~pids_from_ids~).
-- Complex nested queries where the per-query overhead is high
-  (~pids_from_ids~ with nested match/fetch).
+- Complex nested queries where per-query overhead is high.
 
-The TypeDB server shows significant run-to-run variance
-(~fetch_all_graphnodestats~ varies 0.7s–4.4s without code changes),
-likely due to internal GC, connection pool state, or I/O scheduling.
-
-** Stable results (representative run, 781-node dataset)
-
-  update_from_and_rerender_buffer:                    ~4-5s
-    buffer_to_viewnode_forest_and_save_instructions:  ~1.0s
-      add_missing_info_to_forest:                     ~0.9s  (pids_from_ids bulk query)
-    update_graph_minus_merges:                        ~2.1s
-      update_fs_from_saveinstructions:                ~0.02s
-      update_typedb_from_saveinstructions:             ~2.1s
-        create_only_nodes_with_no_ids_present:         ~0.9s  (which_ids_exist bulk query)
-        delete_out_links:                              ~0.4s  (join_all)
-        create_all_relationships:                      ~0.8s  (join_all)
-      update_tantivy_from_saveinstructions:            ~0.6s  (parallel thread)
-    rerender_view (saved):                             ~0.7-2s (varies)
-      fetch_all_graphnodestats:                        ~0.7-2s (join_all, variable)
-
-* Context computation performance (28,698-node real dataset)
+TypeDB server shows significant run-to-run variance
+(~fetch_all_graphnodestats~ varies 0.7s–4.4s without code changes).
+Concurrency sweet spot: ~4-16 for per-node TypeDB queries.
 
-** Benchmark tool: tools/bench-context.rs
-
-Measures origin identification, contains map loading, context growth
-strategies, concurrency effects, and batch query performance.
-Database: skg-real (28,698 nodes, 26,097 contains edges).
-
-** E0: Origin identification
-
-| Query              |  Count |   Time |
-|--------------------+--------+--------|
-| Roots              |  2,603 | 13.7s  |
-| Link targets       |  3,146 |  2.5s  |
-| Multi-contained    |      2 |  3.4s  |
-| All 3 in parallel  |  —     | 11.9s  |
-| Total origins      |  3,553 |  —     |
+*** Adding data to an existing pipeline
 
-The roots query dominates — it must check every node for the
-absence of a =contains= relation. Running all 3 in parallel
-saves ~8s vs sequential (~19.6s → ~11.9s).
-
-** E1: Full contains map load
-
-#+begin_example
-  7,758 containers, 26,097 edges loaded in 22.0s
-  Reverse map (contained → containers) built in 0.000s
-#+end_example
-
-A single TypeQL query fetches all (container, contained) pairs.
-This is the biggest single cost but enables O(1) lookups.
-
-** E2: Per-node queries vs in-memory growth (20-origin sample)
-
-| Strategy          |  Time    | Members |
-|-------------------+----------+---------|
-| Per-node queries  |  195.1s  | same    |
-| In-memory lookup  |  0.001s  | same    |
-| Speedup           |  202,153x |        |
-
-Results agree exactly — the in-memory approach is correct and
-dramatically faster.
+Pattern for enriching an existing pipeline:
+1. Extract new data source's IDs from existing intermediate results
+2. Fetch new data in bulk (parallel per-PID queries for TypeDB,
+   disk reads for .skg files)
+3. Build a lookup map (HashMap<ID, NewData>)
+4. Pass the map to the formatter, which looks up each ID
 
-** E3: Full in-memory growth (all 3,553 origins)
+*** Regex compilation: always use static LazyLock in hot paths
 
-#+begin_example
-  0.124s for 3553 origins
-  Total members: 40,316
-  Median context size: 1
-  Max context size: (varies, largest tree)
-#+end_example
-
-Growing ALL origins takes only 124ms in-memory. Extrapolating
-per-query growth for all origins: ~34,664s (~9.6 hours).
+~Regex::new()~ per-call cost 20s for 28k nodes (textlinks.rs).
+Fix: ~static LazyLock<Regex>~. Impact: 20s → 0.18s (112x).
+Also sped up Tantivy indexing (~21s → ~0.7s for 29k docs).
 
-** E4: Cycle detection
+** Performance benchmarks
 
-#+begin_example
-  Covered: (most nodes)
-  Remainder: (few, if any)
-  Cycles found: 0 in real dataset
-#+end_example
+*** Save pipeline parallelization (781-node dataset)
 
-The real dataset has no containment cycles.
+Parallelized TypeDB+Tantivy (thread::spawn for Tantivy),
+then per-node parallel TypeDB writes (join_all):
 
-** E5: Concurrency sweep (per-query growth, 20 origins)
+| Step                                     |   Time |
+|------------------------------------------+--------|
+| update_from_and_rerender_buffer          |  ~4-5s |
+|   buffer_to_viewnode_forest...           |  ~1.0s |
+|   update_graph_minus_merges              |  ~2.1s |
+|     update_fs                            | ~0.02s |
+|     update_typedb                        |  ~2.1s |
+|       create_only_nodes (bulk)           |  ~0.9s |
+|       delete_out_links (join_all)        |  ~0.4s |
+|       create_all_relationships (join_all)|  ~0.8s |
+|     update_tantivy (parallel thread)     |  ~0.6s |
+|   rerender_view (saved)                  | ~0.7-2s|
 
-| Concurrency |   Time | Note              |
-|-------------+--------+-------------------|
-|           1 | 499.0s | catastrophic      |
-|           4 |   9.9s | 50x faster        |
-|          16 |   7.3s | diminishing gains |
-|          64 |   7.4s | no further gain   |
+Overall: 16.2s → 4.0s (4× speedup).
 
-Sweet spot is concurrency ~4-16 for per-node TypeDB queries.
-But even at optimal concurrency, per-query is ~200x slower
-than in-memory.
+*** Context computation (28,698-node dataset)
 
-** E6: Batch queries
+Zero TypeDB queries — everything from SkgNodes loaded at init:
 
-| Batch size |  Per-node |  Batch  |  Ratio  |
-|------------+-----------+---------+---------|
-|          1 |   0.015s  |  0.015s |  1.0x   |
-|          5 |   0.062s  |  0.098s |  0.6x   |
-|         10 |   0.121s  |  0.245s |  0.5x   |
-|         20 |   0.238s  |  0.498s |  0.5x   |
+| Step                        | Source       | Time   |
+|-----------------------------+--------------+--------|
+| Read .skg files             | disk (init)  | 0.865s |
+| Extract context data        | SkgNodes     | 0.249s |
+| Populate Tantivy            | SkgNodes     | 0.651s |
+| Context computation         | in-memory    | 0.615s |
+| Total                       |              | 2.380s |
 
-Batch queries are SLOWER (0.4-0.6x) than per-node queries.
-The disjunction overhead grows superlinearly with batch size.
+Original per-query approach: ~34,664s. Final: <2.4s (~14,000x).
 
-** E7: End-to-end estimates
-
-| Strategy     | Components                              |  Total   |
-|--------------+-----------------------------------------+----------|
-| In-memory    | Origins 11.9s + Map 22.0s + Growth 0.1s | ~34s     |
-| Per-query    | Origins 11.9s + Growth extrapolated      | ~34,664s |
-| Speedup      |                                          | 1,019x   |
+*** Containerward path computation for search results
 
-** Conclusion: in-memory contains map is the clear winner
+| N (IDs) | Sequential | Frontier | Speedup |
+|---------+------------+----------+---------|
+|       1 |     0.325s |   0.005s | 70x     |
+|      10 |     3.258s |   0.009s | 347x    |
+|      20 |     6.192s |   0.012s | 503x    |
 
-The in-memory strategy costs ~34s total (dominated by two TypeDB reads:
-origin identification and contains map loading). The per-query approach
-would take ~9.6 hours. The growth phase itself is negligible at 0.1s.
-
-Optimization priority and results:
-1. (Done) In-memory growth — 1,019x speedup (per-query → in-memory)
-2. (Done) Derive roots + multi-contained from contains map — saves ~17s
-3. (Done) Build contains maps from SkgNodes instead of TypeDB — saves ~22s
-4. (Done) Return had_id_set from init — avoids re-reading 28k .skg files
-5. (Done) Parse link targets from node text — eliminates last TypeDB query
+Frontier approach wins due to: cheaper queries (no extra_id =or=,
+~15ms vs ~200ms), frontier deduplication, breadth-first batching.
 
-** Final optimized pipeline
+** Emacs discoveries
 
-Zero TypeDB queries. Everything is computed from the SkgNodes
-that are already loaded during =initialize_dbs=:
+*** define-minor-mode always creates an interactive command
+No :interactive nil option. To hide from M-x:
+=(put 'mode-name 'completion-predicate #'ignore)=
 
-| Step                        | Source       | Measured  |
-|-----------------------------+--------------+-----------|
-| Read .skg files             | disk (init)  | 0.865s    |
-| Build contains maps         | SkgNodes     | 0.037s    |
-| Derive roots, multi-cont.   | maps         | (in 0.6s) |
-| Compute had_id_set          | SkgNodes     | 0.001s    |
-| Parse link targets          | SkgNodes     | 0.183s    |
-| Grow+detect+update Tantivy  | in-memory    | 0.615s    |
-| Total context computation   |              | 0.615s    |
+*** defalias makes both names available in M-x
+=(defalias 'skg-id-copy 'skg-push-to-linkstack)= makes skg-id-copy
+available as M-x skg-id-copy, inheriting the interactive spec.
 
-=compute_and_store_context_types= is now fully synchronous.
-No async, no TypeDB driver parameter.
+** Bug investigation summaries
 
-Total went from ~34,664s (original per-query) → ~34s (in-memory growth)
-→ ~22s (derive origins from maps) → ~2.5s (build maps from SkgNodes)
-→ <1s (parse link targets from text). Overall: ~34,664x from original.
+For full investigation narratives, see the dedicated files.
 
-** Regex compilation bug in textlinks (discovered via benchmark)
+*** "Saving takes forever" (RESOLVED — see save-is-slow.org)
 
-When =link_targets_from_nodes= was introduced (optimization #5), it called
-=textlinks_from_text= which compiled =Regex::new(...)= on every call.
-With 28,698 nodes, this compiled the regex 28,698 times.
+Root cause: when a search view (~search:TERM~) is open and a save
+modifies a PID in the search results, the search view becomes a
+collateral view. ~rerender_view~ calls ~path_from_pid_and_source~
+for nodes with fake ~source="search"~. The ~.expect()~ panics,
+killing the save handler, so Emacs never receives ~save-result~
+and hangs forever.
 
-Additionally, =replace_each_link_with_its_label= (used by Tantivy
-indexing) had the same bug. Called for each of 29,438 Tantivy documents.
+Fix: filter search views from collateral lists in
+~find_collateral_view_uris~ and ~uris_of_views_to_lock~.
+Result: 120+ seconds → 0.245 seconds.
 
-Fix: moved both regexes to =static LazyLock<Regex>= (compiled once).
+Remaining: ~path_from_pid_and_source~ uses ~.expect()~ (latent
+crash risk for any invalid source). Deferred.
 
-*** Benchmark: link_targets extraction
+*** "Cannot visit link" (self-contained, no separate file)
 
-| Metric              | Before fix | After fix | Speedup |
-|---------------------+------------+-----------+---------|
-| link_targets        | 20.413s    | 0.183s    | 112x    |
-| Extract total       | 20.481s    | 0.249s    | 82x     |
-| Tantivy populate    | 21.052s    | 0.651s    | 32x     |
-
-*** Benchmark: full pipeline (28,698 nodes, in-memory context)
-
-| Step                        | Time   | % of total |
-|-----------------------------+--------+------------|
-| Read .skg files             | 0.865s | 36%        |
-| Extract context data        | 0.249s | 10.5%      |
-| Populate Tantivy            | 0.651s | 27%        |
-| Context computation         | 0.615s | 26%        |
-| Total                       | 2.380s | 100%       |
-
-Context computation across repeated runs: 0.601s, 0.610s, 0.615s, 0.715s, 0.767s, 0.777s.
-
-*** Impact beyond context computation
-
-The fix also speeds up:
-- Tantivy indexing at init (~21s → ~0.7s for 29k docs)
-- =replace_each_link_with_its_label= in the save pipeline
-- =textlinks_from_text= in TypeDB relationship creation
-
-*** Lesson
-
-When moving computation from DB queries to in-process code,
-watch for per-call initialization costs (regex compilation,
-connection setup, etc.) that were invisible when each query
-was already expensive.
-
-** TypeDB v3 compatibility fix
-
-==$r1 != $r2== does NOT work in TypeDB v3.
-It throws: =[REP1] The variable 'r1' cannot be declared as both
-a 'AttributeOrValue' and as a 'Object'=.
-
-Fix: use identity testing with =not=:
-#+begin_example
-$c1 isa node;
-$c2 isa node;
-$r1 isa contains (container: $c1, contained: $node);
-$r2 isa contains (container: $c2, contained: $node);
-not { $c1 is $c2; };
-#+end_example
-
-* Parallelizing containerward path computation for search results
-
-** Context
-
-Search enrichment computes containerward paths for each search result.
-The current code (~compute_paths_for_search_results~) calls
-~paths_to_first_nonlinearities~ sequentially for each result ID.
-Each call issues multiple TypeDB queries (one per path level)
-using ~find_related_nodes~, which includes an expensive extra_id
-=or= pattern (~200ms/query).
-
-Goal: apply parallelization patterns from ~containerward_path_stats_bulk~.
-
-** Hypotheses
-
-1. *Cross-ID parallel (join_all)*: Running all ~paths_to_first_nonlinearities~
-   calls concurrently should give ~Nx speedup (N = number of result IDs).
-   Limited by TypeDB server concurrency and per-query cost.
-
-2. *Level-by-level frontier*: Adapted from ~containerward_path_stats_bulk~.
-   Uses ~find_container_ids_of_pid~ (no extra_id =or=, ~15ms/query)
-   instead of ~find_related_nodes~ (~200ms/query). Deduplicates frontier
-   nodes across all paths at each level. Should be dramatically faster
-   because (a) queries are ~13x cheaper and (b) convergent paths
-   merge, reducing total queries.
-
-** Method
-
-Benchmark tool: =tools/bench-containerward-paths.rs=
-- Loads 28,697-node real dataset
-- Picks N non-root IDs (nodes that have containers)
-- Runs three strategies: Sequential, Parallel (join_all), Frontier
-- Compares results for correctness (path contents must match)
-- Measures wall-clock time for each
-
-** Results (28,697-node dataset, representative runs)
-
-| N (IDs) | Sequential | Parallel (join_all) | Frontier | Par speedup | Frontier speedup |
-|---------+------------+---------------------+----------+-------------+------------------|
-|       1 |     0.325s |              0.362s |   0.005s | 0.9x        | 70x              |
-|       3 |     0.980s |              0.466s |   0.008s | 2.1x        | 126x             |
-|       5 |     1.746s |              0.536s |   0.010s | 3.3x        | 179x             |
-|      10 |     3.258s |              0.630s |   0.009s | 5.2x        | 347x             |
-|      20 |     6.192s |              1.131s |   0.012s | 5.5x        | 503x             |
-
-All results verified: paths match between strategies.
-
-** Analysis
-
-*** Why the frontier approach wins so decisively
-
-Three compounding factors:
-
-1. *Cheaper queries*: ~find_container_ids_of_pid~ (~15ms) vs
-   ~find_related_nodes~ (~200ms). The extra_id =or= pattern
-   in ~find_related_nodes~ is the dominant cost, and it's unnecessary
-   when inputs are known to be primary IDs.
-
-2. *Frontier deduplication*: Multiple search results may converge
-   onto the same container. The frontier approach queries each
-   distinct container only once per level, while the per-ID
-   approaches query redundantly.
-
-3. *Breadth-first batching*: At each level, all frontier queries
-   run in parallel via ~join_all~. The wall-clock cost per level
-   is max(query_times), not sum(query_times).
-
-*** Scaling behavior
-
-- Sequential scales linearly: O(N × depth × query_time)
-- Parallel (join_all) scales sub-linearly: O(depth × max_query_time)
-  but limited by TypeDB concurrency (~4-16 sweet spot)
-- Frontier scales nearly flat: O(depth × max(|frontier|, 1) × cheap_query_time)
-  because frontier size stays small (convergent paths)
-
-*** For N=10 (the SEARCH_DISPLAY_LIMIT)
-
-The frontier approach takes ~9ms vs sequential's ~3.3s.
-This means search enrichment can complete nearly instantly
-instead of taking seconds.
-
-** The extra_id question
-
-~find_related_nodes~ handles both primary IDs and extra IDs
-(org-roam legacy IDs). ~find_container_ids_of_pid~ assumes
-primary IDs only. In the search enrichment context, IDs come
-from Tantivy, which indexes primary IDs only, so this assumption
-is safe. This is the same reasoning used by ~containerward_path_stats_bulk~.
-
-** Implementation plan
-
-Replace ~compute_paths_for_search_results~ with the frontier approach.
-The function already lives in the search enrichment module
-(=render_enriched_search_buffer.rs=), so the change is localized.
-
-The frontier approach already handles all path termination cases:
-- Root (no containers)
-- Fork (multiple containers)
-- Cycle (container already in path)
-- Immediate fork at origin (expand each branch)
-
-** Verification
-
-All tests pass:
-- ~cargo nextest run --test tantivy~ (3 tests)
-- Benchmark correctness checks: all strategies produce identical paths
+When requesting a content view for a node that's already the ROOT
+of the current view, the server returns =((switch-to-view URI))=.
+Emacs calls switch-to-buffer on the same buffer — nothing happens.
+
+Fix: in ~skg-handle-content-view-sexp~, detect same-buffer case
+and show "Already viewing this node (scroll to top to see it)".

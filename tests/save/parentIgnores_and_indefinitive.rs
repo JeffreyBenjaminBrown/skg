@@ -54,8 +54,7 @@ fn test_parentignores_and_indefinitive(
         update_typedb_from_saveinstructions(
           &config . db_name,
           driver,
-          &save_instructions,
-          config, ) . await?;
+          &save_instructions, ). await?;
         update_fs_from_saveinstructions(
           save_instructions,
           config . clone(), )?;

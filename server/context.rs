@@ -77,25 +77,25 @@ pub fn compute_and_store_context_types (
   contains_map  : &MapToContent,
   reverse_map   : &MapToContainers,
 ) -> Result<HashMap<ID, String>, Box<dyn Error>> {
-  println! ("Computing context origin types...");
+  tracing::info! ("Computing context origin types...");
   let edge_count : usize =
     contains_map . values () . map ( |v| v . len () ) . sum ();
-  println! ("  {} nodes, {} edges, {} link targets.",
+  tracing::info! ("  {} nodes, {} edges, {} link targets.",
             all_node_ids . len (), edge_count, link_targets . len ());
   let mut origin_types : HashMap<ID, ContextOriginType> =
     identify_origins (
       all_node_ids, reverse_map, link_targets, had_id_set );
-  println! ("  {} origins identified.", origin_types . len ());
+  tracing::info! ("  {} origins identified.", origin_types . len ());
   let mut all_contexts : Vec<HashSet<ID>> =
     grow_all_contexts (&origin_types, contains_map);
-  println! ("  {} treelike contexts grown.", all_contexts . len ());
+  tracing::info! ("  {} treelike contexts grown.", all_contexts . len ());
   extend_contexts_for_cycles (
     all_node_ids,
     contains_map,
     reverse_map,
     &mut origin_types,
     &mut all_contexts );
-  println! ("  {} total contexts after cycle detection.",
+  tracing::info! ("  {} total contexts after cycle detection.",
             all_contexts . len ());
   let context_types_by_id : HashMap<ID, String> =
     // Converts ContextOriginType too String for Tantivy.
@@ -106,7 +106,7 @@ pub fn compute_and_store_context_types (
   let updated : usize = // update Tantivy
     update_context_origin_types (
       tantivy_index, &context_types_by_id ) ?;
-  println! ("  {} Tantivy documents updated with context types.",
+  tracing::info! ("  {} Tantivy documents updated with context types.",
             updated);
   Ok (context_types_by_id) }
 

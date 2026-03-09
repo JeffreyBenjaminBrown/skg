@@ -15,7 +15,7 @@ pub fn validate_source_paths_creating_owned_ones_if_needed (
     if !source . path . exists() { // If it doesn't exist
       if source . user_owns_it { // and it's owned, create it
         fs::create_dir_all(&source . path)?;
-        eprintln!("Created directory for source '{}': {:?}",
+        tracing::info!("Created directory for source '{}': {:?}",
                   nickname, source . path);
       } else { // and it's foreign, fail
         return Err(io::Error::new(
