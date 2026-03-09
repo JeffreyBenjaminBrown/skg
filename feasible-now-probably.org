@@ -44,7 +44,7 @@ If anything blocks your progress that needs my attention, ping me.
   I expect to be taken to a new view rooted at that node.
   I see instead only the minibuffer message
     "Reverting buffer ‘skg.log’"
-* report graphnodestats for search results
+* DONE report graphnodestats for search results
 * importing from org-roam does not seem to update indices
 * the user should be able to write 'indef' in metadata
 * the skg metadata view should show "ABSENT fieldname"
@@ -102,7 +102,7 @@ If anything blocks your progress that needs my attention, ping me.
     collateral content, explicitly clear its modified flag
     (or better, don't touch it at all — the real fix is
     the first-change-hook re-registration).
-* TODO Saving takes forever.
+* DONE Saving takes forever.
   Added bare "JEFF TESTING SKG" leaf to "motivation",
   and (skg focused) appeared,
   and then it took forever for the buffer to update

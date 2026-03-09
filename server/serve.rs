@@ -19,6 +19,7 @@ use crate::serve::handlers::title_matches::{
   handle_title_matches_request,
   SearchEnrichmentPayload,
   mk_search_enrichment_sexp};
+use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
 use crate::serve::util::{
   request_type_from_request,
   send_response_with_length_prefix,
@@ -100,7 +101,7 @@ fn handle_emacs (
       diff_mode_enabled : false,
       memory            : SkgnodesInMemory::new () };
 
-  let enrichment_slot // To update search results once containerward paths (the 'enrichment') have been computed.
+  let enrichment_slot // To update search results once the 'enrichment' (containerward paths + graphnodestats) has been computed.
     : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::new ( Mutex::new (None) );
   let search_cancelled : Arc<AtomicBool> =
@@ -216,6 +217,12 @@ fn handle_emacs (
                 &mut vs . forest, &payload . result_ids,
                 &payload . paths_by_id, &tantivy_index,
                 &mut conn_state . memory . pool, config );
+              { let root_treeid : ego_tree::NodeId =
+                  vs . forest . root () . id ();
+                set_metadata_relationships_in_node_recursive (
+                  &mut vs . forest, root_treeid,
+                  &payload . graphnodestats, // these graphnodestats were pre-fetched by the enrichment thread.
+                  &mut conn_state . memory . pool, config ); }
               let enriched : String =
                 viewnode_forest_to_string ( &vs . forest )
                 . expect ("search forest rendering never fails");

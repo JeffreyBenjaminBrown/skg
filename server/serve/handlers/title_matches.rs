@@ -11,6 +11,8 @@ use crate::consts::SEARCH_DISPLAY_LIMIT;
 use crate::context::ContextOriginType;
 use crate::dbs::tantivy::search_index;
 use crate::dbs::typedb::paths::PathToFirstNonlinearity;
+use crate::dbs::typedb::search::all_graphnodestats::{
+  AllGraphNodeStats, fetch_all_graphnodestats};
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::serve::ConnectionState;
 use crate::serve::util::{
@@ -26,7 +28,7 @@ use crate::types::viewnode::{
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use sexp::{Sexp, Atom};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -53,14 +55,15 @@ pub type MatchGroups =
 /// Structured enrichment data passed through the slot,
 /// replacing the raw rendered String.
 pub struct SearchEnrichmentPayload {
-  pub terms       : String,
-  pub result_ids  : Vec<ID>,
-  pub paths_by_id : HashMap<ID, Vec<PathToFirstNonlinearity>>,
+  pub terms          : String,
+  pub result_ids     : Vec<ID>,
+  pub paths_by_id    : HashMap<ID, Vec<PathToFirstNonlinearity>>,
+  pub graphnodestats : AllGraphNodeStats,
 }
 
 /// Provides two responses, one fast and one slow.
 /// The slower one is 'enriched'
-/// with containerward paths at each search hit,
+/// with containerward paths and graphnodestats at each search hit,
 /// and is processed in the background -- the user need not await it.
 pub fn handle_title_matches_request (
   stream           : &mut TcpStream,
@@ -157,9 +160,9 @@ pub fn handle_title_matches_request (
           "search-results", &error_msg )); } } }
 
 /// Spawn a background thread to compute containerward paths
-/// and write the structured payload to the shared slot.
-/// Clears any stale enrichment and resets the cancellation flag
-/// before spawning.
+/// and graphnodestats, then write the structured payload
+/// to the shared slot. Clears any stale enrichment and resets
+/// the cancellation flag before spawning.
 fn spawn_enrichment_thread (
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
@@ -169,6 +172,7 @@ fn spawn_enrichment_thread (
   result_ids       : &[ID],
 ) {
   { // Clear stale enrichment before spawning.
+    // todo ? Instead, permit multiple enrichments for different search result buffers to coexist.
     let mut guard : MutexGuard<Option<SearchEnrichmentPayload>> =
       enrichment_slot . lock () . unwrap ();
     *guard = None; }
@@ -194,13 +198,43 @@ fn spawn_enrichment_thread (
     if cancel_clone . load (Ordering::SeqCst) {
       tracing::info! ("search enrichment: cancelled after paths");
       return; }
+    let all_enriched_ids : Vec<ID> = {
+      // Collect all IDs that will appear in the enriched forest:
+      // result IDs + every ID from containerward paths.
+      let mut id_set : HashSet<ID> = HashSet::new ();
+      for id in &ids_clone {
+        id_set . insert ( id . clone () ); }
+      for paths in paths_by_id . values () {
+        for path in paths {
+          for node_id in &path . path {
+            id_set . insert ( node_id . clone () ); }
+          for b in &path . branches {
+            id_set . insert ( b . clone () ); }
+          for c in &path . cycle_nodes {
+            id_set . insert ( c . clone () ); }} }
+      id_set . into_iter () . collect () };
+    let graphnodestats : AllGraphNodeStats =
+      futures::executor::block_on (
+        fetch_all_graphnodestats (
+          &config_clone . db_name,
+          &driver_clone,
+          &all_enriched_ids ) )
+      . unwrap_or_else ( |e| {
+        tracing::warn! ("search enrichment: graphnodestats failed: {}", e);
+        AllGraphNodeStats::empty () } );
+    tracing::info! ("search enrichment: graphnodestats fetched for {} IDs",
+              all_enriched_ids . len ());
+    if cancel_clone . load (Ordering::SeqCst) {
+      tracing::info! ("search enrichment: cancelled after graphnodestats");
+      return; }
     tracing::info! ("search enrichment: writing payload to slot");
     let mut guard : MutexGuard<Option<SearchEnrichmentPayload>> =
       slot_clone . lock () . unwrap ();
     *guard = Some ( SearchEnrichmentPayload {
-      terms       : terms_clone,
-      result_ids  : ids_clone,
-      paths_by_id } ); } ); }
+      terms          : terms_clone,
+      result_ids     : ids_clone,
+      paths_by_id,
+      graphnodestats } ); } ); }
 
 /// Build the tagged s-exp for a search enrichment payload.
 /// Format: (("response-type" "search-enrichment")
