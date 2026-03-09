@@ -126,16 +126,17 @@ moves point to focused headline, and removes focus marker."
   (let ((inhibit-read-only t))
     (erase-buffer)
     (insert new-content)
-    (set-buffer-modified-p nil
-      ;; TODO: Use this in other places, too.
-      ;; TODO: Don't call this here, but at the call site, because from the call site we can see whether the content was just saved (in which case buffer-modified should be nil) or perhaps was changed in some other way for which it should be t instead of nil.
-      )
     ;; Process folding markers
     (skg-fold-marked-headlines)
     (skg-remove-folded-markers)
     ;; Process focus marker
     (skg-goto-focused-headline)
     (skg-remove-focused-marker)
+    ;; Clear modified flag and re-register the one-shot hook
+    ;; AFTER all buffer modifications are done.
+    (set-buffer-modified-p nil)
+    (add-hook 'first-change-hook
+              #'skg-warn-if-other-buffer-modified nil t)
     (message "Buffer updated with processed content from Rust")))
 
 (defun skg-show-save-feedback (buffer-name message-text content)

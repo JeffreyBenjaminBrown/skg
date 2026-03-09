@@ -9,12 +9,68 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
-* Bug: Second buffer keeps thinking first has unsaved changes
+* ONGOING Bug: Second buffer keeps thinking first has unsaved changes
   I can save (C-x C-s) that first buffer,
   and the second keeps warning me if I try to edit it.
+  Also the second continues to show "**"
+  in the (menu bar? just above minibuffer, below main window)
+  which indicates that there are unsaved changes.
+** Analysis
+   Two bugs, possibly both present:
+*** DONE 'first-change-hook' consumed by collateral updates, never re-added
+    'skg-warn-if-other-buffer-modified' is registered
+    on each content-view buffer's 'first-change-hook'
+    (see skg-buffer.el:86). Emacs removes 'first-change-hook'
+    entries after they fire (it's a one-shot hook).
+    When saving buffer A triggers a collateral update of buffer B,
+    'skg-replace-buffer-with-new-content' calls 'erase-buffer',
+    which transitions B from unmodified to modified,
+    firing and consuming B's hook. 'set-buffer-modified-p nil'
+    then clears B's modified flag, but the hook is already gone.
+    Result: the next time the user edits B,
+    no warning fires even if A has unsaved changes.
+    Conversely, if the hook was NOT consumed
+    (e.g. B was already modified when the collateral update ran),
+    it persists and warns based on stale state.
+    Fix: re-register 'first-change-hook' after every
+    'skg-replace-buffer-with-new-content' call,
+    both for the saved buffer and for collateral buffers.
+*** "**" on buffer B: collateral update marks B modified
+    'skg-replace-buffer-with-new-content' calls 'set-buffer-modified-p nil'
+    at the end (skg-request-save.el:129), which should clear B's flag.
+    But if there is an error between erase-buffer and
+    set-buffer-modified-p (e.g. in fold/focus processing),
+    the flag stays t and B shows "**".
+    It could also happen if the collateral branch
+    (skg-handle-save-sexp lines 100-108) does not reach B
+    because B shares nodes with A but the server does not include
+    B in 'other-views-to-update' — then B was modified by the
+    save-lock overlay removal (which calls erase/insert? no,
+    it only deletes the overlay) or by 'skg-add-folded-markers'
+    if B happened to be current. Actually the most likely cause:
+    if B's collateral update is skipped but B was locked
+    (skg--lock-all-skg-buffers locked it), and the unlock
+    path works correctly, B is left in whatever modified state
+    it had before. If A's save process mutated B
+    (e.g. through 'first-change-hook' side effects), B stays "**".
+    Fix: after unlocking, if a buffer was not updated by
+    collateral content, explicitly clear its modified flag
+    (or better, don't touch it at all — the real fix is
+    the first-change-hook re-registration).
+* Bug: Saving takes forever.
+  Added bare "JEFF TESTING SKG" leaf to "motivation",
+  and (skg focused) appeared,
+  and then it took forever for the buffer to update
+  (so that (skg focused) is replaced with a dot).
+* Bug: C-x C-s not always overridden by skg-save
+  in skg buffers. Maybe the first one it always does,
+  but subsequent ones not so? Not sure what the pattern is.
 * Bug: Upon adding parengIgnores to a truenode's metadata buffer and trying to save
 Debugger entered--Lisp error: (wrong-type-argument commandp skg-edit--commit)
   command-execute(skg-edit--commit)
+* do (set-buffer-modified-p nil) in more places
+  e.g. after modifying a node's metadata
+    (and in particular, after closing that window metadata window)
 * DONE search bug
   'motivation' from public/ is not in search results.
   I translated public/ to .skg files, which are at data/public/.

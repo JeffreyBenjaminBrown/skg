@@ -1,6 +1,15 @@
-* wanted immediately upon trying it
-** do until all of node's children
-** delete in view-descendents all parent-ignores branches
+* saving "* (skg (indefinitive)) title"
+  does not make a
+    new node with an
+    indefinitive viewnode
+* dogfooding
+** I damaged my data.
+   I think I did. Searching for 'motivation' used,
+   I'm sure, to return a hit with exactly that title.
+** I wanted immediately upon trying it.
+*** do until all of node's children
+*** delete in view-descendents all parent-ignores branches
+** Branching containerward is slow.
 * magit bug!
 I just copoied this text from magit:
 
