@@ -15,26 +15,26 @@
     roots, cycle members, link targets, and nodes that had an
     org-roam ID before import. This filters out multi-contained
     nodes and nodes with no special graph role.
-    Run 'skg-view-node' (below)
+    Run 'skg-view-from-node' (below)
     from one of the links in the search results
     to go to the view from that node.
 *** skg-search-titles-everywhere
     Like skg-search-titles, but shows all matches
     regardless of graph role — including multi-contained
     and otherwise unremarkable nodes.
-*** skg-view-node
-    The usual way to call this is when the cursor is on a link
-    -- for instance, after searching for a title.
-    It opens a new view from the target of that link,
-    or goes to the one that was already open if it exists.
-**** the unusual way to call it
-     is from metadata, rather than a link.
-     If skg-heralds-view is enabled, which it probably is,
-     then each node's metadata is the collection of weird colored text
-     at the beginning of its title.
-     If the cursor is on that, calling this function
-     will bring up a fresh view of that node
-     (or go to a preexisting one if there is one).
+*** skg-view-from-node
+    Calling this when the cursor is on a link or a node's metadata
+    will open a new view from the ID it finds there,
+    or go to the view of it that was already open if that exists.
+
+    If you're not sure whether the cursor is on something visitable
+    (a link or a node's metadata),
+    use skg-next-id and skg-previous-id
+    to identify where those are.
+*** skg-view-from-id
+    This requires a literal v4 UUID string, like
+    3861db2c-7f16-4814-b403-52b5e05d5e0a
+    Can be useful going from git to skg.
 *** skg-save
     Each time you save, your view is rebuilt.
     This is because you can put 'requests' into your view,
@@ -117,7 +117,7 @@
      But you can also jump to a view of your entire stack,
      using (copying, pasting, deleting) it
      without any restrictions on order.
-*** skg-view-node
+*** skg-view-from-node
     Visits anything with an ID.
     Defined in more detail earlier in this document.
 *** skg-next-id

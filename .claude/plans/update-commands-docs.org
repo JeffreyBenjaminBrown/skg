@@ -24,13 +24,13 @@ against the entries in COMMANDS.org.
     Probably related to skg-diff-view.
     Needs investigation: is this user-facing or internal?
 
-*** skg-view-from-node-id
+*** skg-view-id-rep-id
     Alias for 'skg-request-single-root-content-view-from-id'.
     Defined in [[./elisp/skg-commands.el][skg-commands.el]].
-    Seems like a lower-level version of skg-view-node.
-    COMMANDS.org mentions skg-view-node but not this alias.
+    Seems like a lower-level version of skg-view-id-rep.
+    COMMANDS.org mentions skg-view-id-rep but not this alias.
     Maybe it should be documented as an alternative entry point,
-    or maybe skg-view-node supersedes it.
+    or maybe skg-view-id-rep supersedes it.
 
 ** Proposed changes to COMMANDS.org
 

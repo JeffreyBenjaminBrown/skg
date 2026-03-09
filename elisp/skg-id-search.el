@@ -5,7 +5,7 @@
 ;;; USER-FACING FUNCTIONS
 ;;;   skg-next-id
 ;;;   skg-previous-id
-;;;   skg-view-node
+;;;   skg-view-from-node
 ;;;   skg-push-to-linkstack (alias: skg-id-copy)
 ;;;   skg-validate-id-stack-buffer
 ;;;   skg-linkstack-view
@@ -56,7 +56,7 @@ If point is not on a link, print a message and do nothing."
           (skg-request-single-root-content-view-from-id link-id))
       (message "Point not on a link")) ))
 
-(defun skg-view-node ()
+(defun skg-view-from-node ()
   "If point is on metadata or a link, open a content view for that ID."
   (interactive)
   (let (( result (or (skg--point-in-metadata-p)
@@ -66,6 +66,12 @@ If point is not on a link, print a message and do nothing."
           (message "Visiting node: %s" id)
           (skg-request-single-root-content-view-from-id id))
       (message "No ID found at point") )))
+
+(defun skg-view-from-id (id)
+  "Open a content view for ID, prompting when called interactively. (skg-view-from-node is usually more convenient.)"
+  (interactive "sNode ID: ")
+  (message "Visiting node: %s" id)
+  (skg-request-single-root-content-view-from-id id))
 
 (defun skg-next-id ()
   "Move point to the next ID occurrence.

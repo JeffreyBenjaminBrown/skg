@@ -9,7 +9,42 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
-* ONGOING Bug: Second buffer keeps thinking first has unsaved changes
+* Bug: Cannot visit link.
+  I opened the node titled
+    'motivation | ambition | voluntarity | intention | purpose'
+  which has
+    ID 7b52eb18-91c5-4f83-be4f-40ff8a918541,
+  and requested a containerward view from its child
+    ** (skg (node (id 5020e623-f323-42b9-86ec-a26fd463e3c2) (source public) (graphStats (linksIn 1)))) Is silence motivating?
+  Now the first part of the view looks like
+    * (skg (node (id 7b52eb18-91c5-4f83-be4f-40ff8a918541) (source public) (graphStats (containers 0) (contents 54) (linksIn 18) aliasing))) motivation | ambition | voluntarity | intention | purpose
+    ** (skg (node (id 666a1467-5043-494d-8130-9a8442e06dc7) (source public) (graphStats (contents 6)))) see also
+    *** (skg (node (id 144dbb7b-6963-4b3f-b34f-4b2200b0c93f) (source public))) [[id:4c25a3eb-4f21-4c20-9fee-2a18275ca089][choice]]
+    *** (skg (node (id 948c0ff1-7ade-4991-89be-af52294cfc67) (source public))) [[id:55a3533c-da70-445b-bd9a-0b950f52b85d][hope]]
+    *** (skg (node (id 47accc6e-a1e6-4616-b3aa-e4853d1b5fa8) (source public))) [[id:b7ff0805-4a7d-4f56-85ab-78dcdf88e8f8][solution]]
+    *** (skg (node (id 038e69a1-97e0-4395-9387-de059d890dc3) (source public))) [[id:4c25a3eb-4f21-4c20-9fee-2a18275ca089][volition]]
+    *** (skg (node (id 25940c5b-580d-441a-8d0c-6cc58392d8de) (source public))) [[id:ceb94f7b-a3a8-4d3e-9497-d3916b992b0c][temptation]]
+    *** (skg (node (id c14f3d40-6e04-4de0-9ec8-fd5d09c7aaae) (source public))) [[id:2a3b94f6-9958-4c61-9cb2-b88806575825][action]]
+    ** (skg (node (id eebe2954-e3b5-4de8-81aa-1edd39673a40) (source public))) [[id:06854e99-a20b-4a16-866e-a04e877a3711][pleasure & motivation]]
+    ** (skg (node (id 47cc3148-d9f8-4843-9cc3-905b2f9e9259) (source public))) [[id:1cd8051b-95ee-4f73-a05e-624200b52c90][the feeling of forcing it]]
+    ** (skg (node (id 5020e623-f323-42b9-86ec-a26fd463e3c2) (source public) (graphStats (linksIn 1)))) Is silence motivating?
+      Turning off {music, podcasts, recorded content from others} really makes me want to work. Perhaps by undistracting me from discomfort.
+    *** (skg (node (id 7b52eb18-91c5-4f83-be4f-40ff8a918541) (source public) parentIgnores indefinitive (graphStats (containers 0) (contents 54) (linksIn 18) aliasing) (viewStats cycle notInParent containsParent))) motivation | ambition | voluntarity | intention | purpose
+  When I put point at the start of the last of those lines
+    (the one with id 7b52eb18-91c5-4f83-be4f-40ff8a918541)
+  invoke skg-next-id, and then invoke skg-view-from-node,
+  I expect to be taken to a new view rooted at that node.
+  I see instead only the minibuffer message
+    "Reverting buffer ‘skg.log’"
+* the user should be able to write 'indef' in metadata
+* the skg metadata view should show "ABSENT fieldname"
+  next to absent fields
+  and let the user cycle between those states
+  with shift-right (and shift-left,
+  although for binary menus that's a redundant shortcut)
+* DONE a function skg-view-from-id
+  to match skg-view-from-node
+* DONE Bug: Second buffer keeps thinking first has unsaved changes
   I can save (C-x C-s) that first buffer,
   and the second keeps warning me if I try to edit it.
   Also the second continues to show "**"
@@ -57,17 +92,17 @@ If anything blocks your progress that needs my attention, ping me.
     collateral content, explicitly clear its modified flag
     (or better, don't touch it at all — the real fix is
     the first-change-hook re-registration).
-* Bug: Saving takes forever.
+* Bug: Upon adding parengIgnores to a truenode's metadata buffer and trying to save
+Debugger entered--Lisp error: (wrong-type-argument commandp skg-edit--commit)
+  command-execute(skg-edit--commit)
+* MAYBE DONE ? Saving takes forever.
   Added bare "JEFF TESTING SKG" leaf to "motivation",
   and (skg focused) appeared,
   and then it took forever for the buffer to update
   (so that (skg focused) is replaced with a dot).
-* Bug: C-x C-s not always overridden by skg-save
+* MAYBE DONE ? C-x C-s not always overridden by skg-save
   in skg buffers. Maybe the first one it always does,
   but subsequent ones not so? Not sure what the pattern is.
-* Bug: Upon adding parengIgnores to a truenode's metadata buffer and trying to save
-Debugger entered--Lisp error: (wrong-type-argument commandp skg-edit--commit)
-  command-execute(skg-edit--commit)
 * do (set-buffer-modified-p nil) in more places
   e.g. after modifying a node's metadata
     (and in particular, after closing that window metadata window)

@@ -1,7 +1,13 @@
-* saving "* (skg (indefinitive)) title"
-  does not make a
-    new node with an
-    indefinitive viewnode
+* The buffer ought to indicate that it is waiting for the server to update it.
+* present view of node's root(like) containerward ancestors
+** Hopefully a root, otherwise a cycle; links are ignored.
+** Useful when checking changes
+   "This node changed; show it to me in context."
+   e.g. with git
+* 'C-c C-o' ought to be the skg-visit-node shortcut.
+  To match what it does (follow a link) in org-mode.
+* (skg focused) should not appear in the buffer
+  just in what is sent to the server
 * dogfooding
 ** I damaged my data.
    I think I did. Searching for 'motivation' used,
