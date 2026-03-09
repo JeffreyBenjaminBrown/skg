@@ -1,5 +1,4 @@
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, EditRequest, GraphNodeStats };
-crate::types::viewnode::
 
 use ego_tree::{NodeRef, Tree};
 use std::error::Error;
@@ -135,7 +134,7 @@ fn scaffold_metadata_to_string (
         vec! [ "searchResult" . to_string () ];
       sr_parts . push ( format! ( "(id {})", id . 0 ));
       sr_parts . push ( format! ( "(source {})", source ));
-      if let Some (gs) = search_result_graph_stats (graphStats) {
+      if let Some (gs) = graphnodestats_to_sexp (graphStats) {
         sr_parts . push (gs); }
       parts . push ( format! ( "({})", sr_parts . join (" ") )); }
   }
@@ -151,32 +150,7 @@ fn true_node_metadata_to_string (
   fn node_sexp ( true_node : & TrueNode ) -> String {
 
     fn graph_stats ( true_node : & TrueNode ) -> Option < String > {
-      let mut parts : Vec < String > = Vec::new ();
-      if true_node . graphStats . numContainers != Some (1) {
-        if let Some (count) = true_node . graphStats . numContainers {
-          parts . push ( format! ( "(containers {})", count )); }}
-      if true_node . graphStats . numContents != Some (0) {
-        if let Some (count) = true_node . graphStats . numContents {
-          parts . push ( format! ( "(contents {})", count )); }}
-      if true_node . graphStats . numLinksIn != Some (0) {
-        if let Some (count) = true_node . graphStats . numLinksIn {
-          parts . push ( format! ( "(linksIn {})", count )); }}
-      if true_node . graphStats . aliasing {
-        parts . push ( "aliasing" . to_string () ); }
-      if true_node . graphStats . extraIDs {
-        parts . push ( "extraIDs" . to_string () ); }
-      if true_node . graphStats . overriding {
-        parts . push ( "overriding" . to_string () ); }
-      if true_node . graphStats . subscribing {
-        parts . push ( "subscribing" . to_string () ); }
-      if let Some (ref cp) = true_node . graphStats . containerwardPath {
-        if cp . length > 0 || cp . forks > 1 || cp . cycles { // If none of those fires, the node is a root, so don't report is containerwardPath stats.
-          parts . push (
-            format! ( "(containerwardPath {})",
-                      cp . to_display_atom () )); }}
-      if parts . is_empty () { None }
-      else { Some ( format! (
-               "(graphStats {})", parts . join (" ") )) }}
+      graphnodestats_to_sexp ( & true_node . graphStats ) }
 
     fn view_stats ( true_node : & TrueNode ) -> Option < String > {
       let mut parts : Vec < String > = Vec::new ();
@@ -264,7 +238,7 @@ fn deleted_scaff_metadata_to_string (
                            kind . repr_in_client () ) );
   parts . join (" ") }
 
-fn search_result_graph_stats (
+fn graphnodestats_to_sexp (
   gs : &GraphNodeStats,
 ) -> Option < String > {
   let mut parts : Vec < String > = Vec::new ();
