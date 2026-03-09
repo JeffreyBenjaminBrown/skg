@@ -45,9 +45,12 @@ VIEW-URI is the pre-generated UUID to assign to the new buffer."
         (if switch-uri
             ;; The requested ID is already a root of an open view.
             (let ((buf (skg-find-buffer-by-uri switch-uri)))
-              (if buf
-                  (switch-to-buffer buf)
-                (message "skg: server said switch to view %s, but no buffer found" switch-uri)))
+              (cond
+               ((not buf)
+                (message "skg: server said switch to view %s, but no buffer found" switch-uri))
+               ((eq buf (current-buffer))
+                (message "Already viewing this node (it is a root of this view)"))
+               (t (switch-to-buffer buf))))
           ;; Normal content view response.
           (let ((content-value (cadr (assoc 'content response)))
                 (errors-list (cadr (assoc 'errors response))))
