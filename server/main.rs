@@ -1,6 +1,6 @@
 /// USAGE:
 /// There is an optional command-line argument: the config file path.
-/// See the SkgConfig type at server/types/misc.rs,
+/// See api-and-formats.md § skgconfig.toml,
 /// or the example at data/skgconfig.toml.
 ///
 /// Subcommand: import-org-roam <org-dir> <skg-output-dir> <source-nickname>
@@ -55,11 +55,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     Arc::clone (&init_done);
   let busysignal_listener: TcpListener =
     listener . try_clone () ?;
+  let logs_dir_for_busysignal : String =
+    config . logs_dir () . display () . to_string ();
   let busysignal_handle: std::thread::JoinHandle<()> =
     std::thread::spawn ( move || {
       busysignal_accept_loop (
         busysignal_listener,
-        init_done_clone ); } );
+        init_done_clone,
+        &logs_dir_for_busysignal ); } );
 
   let init : InitData =
     { let _span : tracing::span::EnteredSpan = tracing::info_span! (
@@ -96,7 +99,7 @@ fn main() -> Result<(), Box<dyn Error>> {
   busysignal_handle . join ()
     . expect ("busysignal thread panicked");
   listener . set_nonblocking (false) ?;
-  tracing::info! ("Server ready");
+  tracing::info! ("Server ready.");
 
   serve (config, typedb_driver, tantivy_index, listener)
     . map_err ( |e| Box::new (e)
@@ -108,10 +111,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn busysignal_accept_loop (
   listener  : TcpListener,
   init_done : Arc<AtomicBool>,
+  logs_dir  : &str,
 ) {
-  let init_msg: &str =
+  let init_msg : String = format! (
     "((busy . \"Server is initializing, please wait. \
-     See logs/skg.log for progress.\"))\n";
+     See {}/server-to-user.log for progress.\"))\n",
+    logs_dir );
   while ! init_done . load (Ordering::Acquire) {
     match listener . accept () {
       Ok (( stream, addr )) => {
@@ -175,11 +180,11 @@ fn run_import (
 ///
 /// 2. Human-readable file (always on):
 ///    Same format and content as stderr,
-///    appended to <config_dir>/logs/server-to-user.log.
+///    appended to <data_root>/logs/server-to-user.log.
 ///    Useful when the server runs in the background and stderr is lost.
 ///
 /// 3. JSON file (when timing_log = true in skgconfig.toml):
-///    Appends one JSON object per log event to <config_dir>/logs/server.jsonl.
+///    Appends one JSON object per log event to <data_root>/logs/server.jsonl.
 ///    Queryable with jq, e.g.:
 ///      jq 'select(.fields.message | test("rerender"))' data/logs/server.jsonl
 fn init_tracing (
@@ -190,16 +195,19 @@ fn init_tracing (
   use tsub::fmt::format::FmtSpan;
   use tsub::Layer;
   let logs_dir : std::path::PathBuf =
-    config . config_dir . join ("logs");
+    config . logs_dir ();
   std::fs::create_dir_all (&logs_dir) . ok ();
   let env_filter : tsub::EnvFilter =
     tsub::EnvFilter::try_from_default_env ()
     . unwrap_or_else ( |_| tsub::EnvFilter::new ("info") );
+  let stderr_is_tty : bool =
+    std::io::IsTerminal::is_terminal (&std::io::stderr ());
   let stderr_layer : Box<dyn Layer<_> + Send + Sync> =
     Box::new (
       tsub::fmt::layer ()
       . with_writer (std::io::stderr)
       . with_target (false)
+      . with_ansi (stderr_is_tty)
       . with_span_events (FmtSpan::CLOSE) );
   let user_log_appender : tapp::rolling::RollingFileAppender =
     tapp::rolling::never (&logs_dir, "server-to-user.log");

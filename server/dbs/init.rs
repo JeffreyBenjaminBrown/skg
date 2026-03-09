@@ -55,10 +55,11 @@ pub fn initialize_dbs (
 ) -> InitData {
   let driver : TypeDBDriver = connect_to_typedb();
   let marker_path : PathBuf =
-    config . config_dir . join (".skg_init_marker");
+    config . data_root . join (".skg_init_marker");
   let can_incremental : bool = block_on ( async {
     can_do_incremental_init (
-      &driver, &config . db_name, &marker_path
+      &driver, &config . db_name, &marker_path,
+      Path::new ( &config . tantivy_folder )
     ) . await } );
   if can_incremental {
     let marker_mtime : std::time::SystemTime =
@@ -85,14 +86,17 @@ pub fn initialize_dbs (
   touch_init_marker (&marker_path);
   init_data }
 
-/// Checks the three preconditions for incremental init:
+/// Checks the four preconditions for incremental init:
 /// 1. TypeDB database exists
 /// 2. Marker file exists
 /// 3. schema.tql mtime <= marker mtime
+/// 4. Tantivy index directory contains files
+///    (guards against manual deletion of index contents)
 async fn can_do_incremental_init (
-  driver      : &TypeDBDriver,
-  db_name     : &str,
-  marker_path : &Path,
+  driver        : &TypeDBDriver,
+  db_name       : &str,
+  marker_path   : &Path,
+  tantivy_path  : &Path,
 ) -> bool {
   let db_exists : bool =
     match driver . databases() . contains (db_name) . await {
@@ -114,7 +118,17 @@ async fn can_do_incremental_init (
     {
       Ok (t)  => t,
       Err (_) => return false, };
-  schema_mtime <= marker_mtime }
+  if schema_mtime > marker_mtime { return false; }
+  let tantivy_has_files : bool =
+    tantivy_path . is_dir ()
+    && fs::read_dir (tantivy_path)
+       . map ( |mut entries| entries . next () . is_some () )
+       . unwrap_or (false);
+  if ! tantivy_has_files {
+    tracing::warn! (
+      "Tantivy index directory is empty or missing; forcing full rebuild.");
+    return false; }
+  true }
 
 /// PITFALL: Deleted .skg files are not detected by this path.
 /// Their nodes remain as orphans in TypeDB. This doesn't happen in

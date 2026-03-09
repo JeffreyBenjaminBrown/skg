@@ -49,13 +49,13 @@ pub fn handle_get_file_path_request (
           "get-file-path",
           & format! ( "File not found: {}", raw_path ) ));
       return; } };
-  let config_dir : PathBuf = // Canonicalize to match abs_path
+  let data_root : PathBuf = // Canonicalize to match abs_path
     // (both must be absolute for strip_prefix to work).
-    fs::canonicalize ( & config . config_dir )
-    . unwrap_or ( config . config_dir . clone () );
+    fs::canonicalize ( & config . data_root )
+    . unwrap_or ( config . data_root . clone () );
   let rel_path : String =
     abs_path
-    . strip_prefix (&config_dir)
+    . strip_prefix (&data_root)
     . map ( |p| p . to_string_lossy () . into_owned () )
     . unwrap_or_else ( |_| abs_path . to_string_lossy ()
                        . into_owned () );

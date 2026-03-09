@@ -4,5 +4,5 @@ port = 0
 
 [[sources]]
 nickname = "test"
-path = "tests/tantivy/fixtures"
+path = "."
 user_owns_it = true

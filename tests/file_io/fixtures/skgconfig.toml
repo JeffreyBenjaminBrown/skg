@@ -4,7 +4,7 @@ port = 0
 
 [[sources]]
 nickname = "fixtures"
-path = "tests/file_io/fixtures"
+path = "."
 user_owns_it = true
 
 [[sources]]

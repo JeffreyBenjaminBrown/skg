@@ -37,6 +37,7 @@ LINE-NUMBER is zero-based."
     (with-current-buffer buffer
       (erase-buffer)
       (org-mode)
+      (setq skg-view-uri (org-id-uuid))
       (insert skg-sourceward-base-buffer)
       (goto-char (point-min))
       (forward-line line-number)

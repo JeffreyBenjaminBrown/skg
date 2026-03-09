@@ -3,7 +3,7 @@ use crate::types::misc::{SkgConfig, SkgfileSource, SourceName};
 use std::collections::HashMap;
 use std::fs;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// If a source path does not exist:
 /// - If it is marked owned (in the config), create it.
@@ -35,10 +35,11 @@ pub fn load_config (
   let mut config: SkgConfig = {
     let contents: String = fs::read_to_string (path) ?;
     toml::from_str (&contents) ? };
-  config . config_dir = Path::new (path)
+  config . data_root = Path::new (path)
     . parent()
     . unwrap_or ( Path::new (".") )
     . to_path_buf();
+  make_paths_absolute (&mut config);
   validate_source_paths_creating_owned_ones_if_needed(
     &config . sources)?;
   Ok (config) }
@@ -81,10 +82,11 @@ pub fn load_config_with_overrides (
   let mut config: SkgConfig = {
     let contents: String = fs::read_to_string (path)?;
     toml::from_str (&contents)? };
-  config . config_dir = Path::new (path)
+  config . data_root = Path::new (path)
     . parent()
     . unwrap_or ( Path::new (".") )
     . to_path_buf();
+  make_paths_absolute (&mut config);
   if let Some (name) = db_name {
     config . db_name = name . to_string();
     config . tantivy_folder =
@@ -99,3 +101,17 @@ pub fn load_config_with_overrides (
   validate_source_paths_creating_owned_ones_if_needed(
     &config . sources)?;
   Ok (config) }
+
+/// Resolve relative paths in the config against data_root.
+/// Absolute paths are left unchanged.
+fn make_paths_absolute (
+  config : &mut SkgConfig,
+) {
+  let root : PathBuf = config . data_root . clone ();
+  if config . tantivy_folder . is_relative () {
+    config . tantivy_folder = root . join (
+      &config . tantivy_folder ); }
+  for source in config . sources . values_mut () {
+    if source . path . is_relative () {
+      source . path = root . join (
+        &source . path ); } } }

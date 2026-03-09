@@ -17,6 +17,7 @@
 #       and if that printout is buried, can be found running `ps -af`.
 
 SKG_CONFIG="${SKG_CONFIG:-data/skgconfig.toml}"
+DATA_ROOT="$(dirname "$SKG_CONFIG")"
 
 is_typedb_running() {
   if pgrep -f 'typedb_server_bin' >/dev/null 2>&1; then
@@ -29,13 +30,15 @@ is_typedb_running() {
 start_typedb() {
   echo ""
   echo "Starting TypeDB server..."
-  nohup typedb server > logs/typedb.log 2>&1 < /dev/null &
+  mkdir -p "$DATA_ROOT/logs"
+  nohup typedb server > "$DATA_ROOT/logs/typedb.log" 2>&1 < /dev/null &
   echo "TypeDB server started in background (PID: $!)"
+  echo "TypeDB logging to $DATA_ROOT/logs/typedb.log"
   echo "Waiting for TypeDB server to be ready..."
   for i in {1..30}; do
     # Wait for TypeDB to be ready (max 30 seconds)
     if is_typedb_running; then
-      echo "TypeDB server is ready, and logging to logs/typedb.log."
+      echo "TypeDB server is ready."
       return 0
     fi
     sleep 1
@@ -51,10 +54,10 @@ start_skg_with_restart() {
   # Kill any existing cargo-watch processes (fallback to broader kill since we're not tracking PID)
   pkill -f "cargo watch.*skg" 2>/dev/null || true
 
-  echo "Cargo output will be logged to logs/skg.log"
   echo "cargo-watch starting..."
+  echo "Server logs go to $DATA_ROOT/logs/server-to-user.log and $DATA_ROOT/logs/server.jsonl"
   cargo watch -w server/ -x "run --bin skg -- $SKG_CONFIG" \
-    > logs/skg.log 2>&1 # "-w server/" says "only watch server/"
+    > /dev/null 2>&1 # "-w server/" says "only watch server/"
 }
 
 cleanup() { # trap handler for graceful shutdown

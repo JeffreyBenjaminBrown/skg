@@ -4,15 +4,15 @@ port = 1730
 
 [[sources]]
 nickname = "public"
-path = "tests/multi_source_errors/fixtures/public"
+path = "public"
 user_owns_it = true
 
 [[sources]]
 nickname = "private"
-path = "tests/multi_source_errors/fixtures/private"
+path = "private"
 user_owns_it = true
 
 [[sources]]
 nickname = "ext"
-path = "tests/multi_source_errors/fixtures/ext"
+path = "ext"
 user_owns_it = false

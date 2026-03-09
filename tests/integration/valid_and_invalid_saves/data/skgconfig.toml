@@ -1,8 +1,8 @@
 db_name = "skg-test-valid-invalid-saves"
-tantivy_folder = "tests/integration/valid_and_invalid_saves/data/.index.tantivy"
+tantivy_folder = ".index.tantivy"
 port = 1731
 
 [[sources]]
 nickname = "main"
-path = "tests/integration/valid_and_invalid_saves/data/skg"
+path = "skg"
 user_owns_it = true

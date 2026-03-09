@@ -88,6 +88,43 @@ if and only if it adheres to the following:
   - Extra whitespace is ignored.
   - Keys and values should contain no whitespace.
 
+# skgconfig.toml
+
+The server's configuration file. See example-data/ for an example.
+
+Pass its path as a command-line argument (default: `data/skgconfig.toml`) when starting the server (see `bash/run-servers.sh`). The directory containing the file is the **data root**; all relative paths in the config are resolved against it.
+
+## Fields
+
+| Field                | Required | Default | Description                                                      |
+|----------------------|----------|---------|------------------------------------------------------------------|
+| `db_name`            | yes      |         | TypeDB database name.                                            |
+| `tantivy_folder`     | yes      |         | Directory for the Tantivy search index. Relative to data root.   |
+| `port`               | no       | 1730    | TCP port for Rust-Emacs communication.                           |
+| `initial_node_limit` | no       | 100     | Max nodes to render in initial content views.                    |
+| `delete_on_quit`     | no       | false   | Delete the TypeDB database on server shutdown. Mainly for tests. |
+| `timing_log`         | no       | false   | When true, writes a JSON log to `<data_root>/logs/server.jsonl`. |
+
+## Sources
+
+Each `[[sources]]` entry defines a directory of `.skg` files:
+
+| Field          | Required | Description |
+|----------------|----------|-------------|
+| `nickname`     | yes      | Unique name for this source (used in metadata, provenance). |
+| `path`         | yes      | Directory containing `.skg` files. Relative to data root. |
+| `user_owns_it` | yes      | `true` if the user can create/edit nodes here; `false` for foreign (read-only) sources. |
+
+## Log files
+
+The server writes to `<data_root>/logs/`:
+- `server-to-user.log` — human-readable log (always on).
+- `server.jsonl` — structured JSON log (when `timing_log = true`). Queryable with `jq`.
+
+## Example
+
+See `example-data/skgconfig.toml`.
+
 # The .skg file format
 
 It is a specialization of YAML -- that is, every .skg file is valid YAML, although not vice-versa. The fields might change; the definitive source of truth is in `server/types.rs`. But for the moment they are:

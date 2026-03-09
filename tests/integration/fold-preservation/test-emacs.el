@@ -47,6 +47,7 @@
     (with-current-buffer buffer
       (erase-buffer)
       (org-mode)
+      (setq skg-view-uri (org-id-uuid))
       (insert (concat "* (skg (node (source main))) a\n"
                       "* (skg (node (source main))) b\n"
                       "** c\n"

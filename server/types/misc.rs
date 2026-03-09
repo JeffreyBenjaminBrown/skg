@@ -30,27 +30,30 @@ pub struct SkgfileSource {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct SkgConfig {
-  pub db_name        : String,
-  pub tantivy_folder : PathBuf,
+  #[serde (skip)]
+  pub data_root      : PathBuf, // Directory containing skgconfig.toml. Other relative paths (tantivy_folder, source paths) are resolved against this at load time.
 
   #[serde ( deserialize_with = "deserialize_sources" )]
   pub sources        : HashMap<SourceName, SkgfileSource>,
+  pub db_name        : String,
+  pub tantivy_folder : PathBuf,
 
   #[serde(default = "default_port")]
   pub port           : u16,  // TCP port for Rust-Emacs comms.
-
-  #[serde (default)] // defaults to false
-  pub delete_on_quit : bool, // Delete TypeDB db on server shutdown.
 
   #[serde(default = "default_initial_node_limit")]
   pub initial_node_limit : usize, // Max nodes to render in initial content views.
 
   #[serde (default)] // defaults to false
-  pub timing_log     : bool, // Write timing data to <config_dir>/timing.log.
+  pub delete_on_quit : bool, // Delete TypeDB db on server shutdown. Tests use it.
 
-  #[serde (skip)]
-  pub config_dir     : PathBuf, // Directory containing skgconfig.toml.
+  #[serde (default)] // defaults to false
+  pub timing_log     : bool, // Write JSON log to <data_root>/logs/server.jsonl.
 }
+
+impl SkgConfig {
+  pub fn logs_dir ( &self ) -> PathBuf {
+    self . data_root . join ("logs") } }
 
 /// Each source has a unique nickname, defined in the SkgConfig,
 /// used in ViewNode metadata to track provenance.
@@ -163,14 +166,14 @@ impl SkgConfig {
     sources : HashMap<SourceName, SkgfileSource>
   ) -> Self {
     SkgConfig {
+      data_root          : PathBuf::from ("."),
+      sources,
       db_name            : "unused" . to_string(),
       tantivy_folder     : PathBuf::from ("/tmp/unused"),
-      sources,
       port               : 0,
-      delete_on_quit     : false,
       initial_node_limit : 100,
-      timing_log         : false,
-      config_dir         : PathBuf::from ("."), }}
+      delete_on_quit     : false,
+      timing_log         : false, }}
 
   /// Creates a SkgConfig with test-appropriate values for db_name and tantivy_folder.
   /// Useful for tests that actually connect to TypeDB and create Tantivy indices.
@@ -180,14 +183,14 @@ impl SkgConfig {
     tantivy_folder : &str,
   ) -> Self {
     SkgConfig {
+      data_root          : PathBuf::from ("."),
+      sources,
       db_name            : db_name . to_string(),
       tantivy_folder     : PathBuf::from (tantivy_folder),
-      sources,
       port               : crate::consts::DEFAULT_PORT,
-      delete_on_quit     : false,
       initial_node_limit : crate::consts::DEFAULT_INITIAL_NODE_LIMIT,
-      timing_log         : false,
-      config_dir         : PathBuf::from ("."), }}
+      delete_on_quit     : false,
+      timing_log         : false, }}
 
   pub fn user_owns_source (
     &self,

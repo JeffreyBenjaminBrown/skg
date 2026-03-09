@@ -4,10 +4,10 @@ port = 3047
 
 [[sources]]
 nickname = "main"
-path = "tests/save/validate_foreign_nodes/fixtures/main"
+path = "fixtures/main"
 user_owns_it = true
 
 [[sources]]
 nickname = "foreign"
-path = "tests/save/validate_foreign_nodes/fixtures/foreign"
+path = "fixtures/foreign"
 user_owns_it = false

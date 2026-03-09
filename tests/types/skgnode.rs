@@ -34,14 +34,14 @@ fn test_skgnode_for_viewnode_with_id_in_map() {
                          SourceName::from ("main"),
                          "Test" . to_string() )) };
   let config : SkgConfig = SkgConfig {
-    db_name : "test-db" . to_string(),
-    tantivy_folder : PathBuf::from ("/tmp/tantivy"),
-    sources : HashMap::new(),
-    port : 3000,
-    delete_on_quit : false,
+    data_root          : PathBuf::from ("."),
+    sources            : HashMap::new(),
+    db_name            : "test-db" . to_string(),
+    tantivy_folder     : PathBuf::from ("/tmp/tantivy"),
+    port               : 3000,
     initial_node_limit : 100,
-    timing_log : false,
-    config_dir : PathBuf::from ("."),
+    delete_on_quit     : false,
+    timing_log         : false,
   };
 
   let result :
@@ -80,14 +80,14 @@ fn test_skgnode_for_viewnode_with_id_not_in_map() {
       });
     s };
   let config : SkgConfig = SkgConfig {
-    db_name : "test-db" . to_string(),
-    tantivy_folder : PathBuf::from ("/tmp/tantivy"),
+    data_root          : PathBuf::from ("."),
     sources,
-    port : 3000,
-    delete_on_quit : false,
+    db_name            : "test-db" . to_string(),
+    tantivy_folder     : PathBuf::from ("/tmp/tantivy"),
+    port               : 3000,
     initial_node_limit : 100,
-    timing_log : false,
-    config_dir : PathBuf::from ("."),
+    delete_on_quit     : false,
+    timing_log         : false,
   };
   let result : Result<Option<&SkgNode>, Box<dyn Error>> =
     // Should error because the file doesn't exist on disk
@@ -120,14 +120,14 @@ fn test_skgnode_for_viewnode_scaffold() {
     };
 
   let config : SkgConfig = SkgConfig {
-    db_name : "test-db" . to_string(),
-    tantivy_folder : PathBuf::from ("/tmp/tantivy"),
-    sources : HashMap::new(),
-    port : 3000,
-    delete_on_quit : false,
+    data_root          : PathBuf::from ("."),
+    sources            : HashMap::new(),
+    db_name            : "test-db" . to_string(),
+    tantivy_folder     : PathBuf::from ("/tmp/tantivy"),
+    port               : 3000,
     initial_node_limit : 100,
-    timing_log : false,
-    config_dir : PathBuf::from ("."),
+    delete_on_quit     : false,
+    timing_log         : false,
   };
 
   let result :
