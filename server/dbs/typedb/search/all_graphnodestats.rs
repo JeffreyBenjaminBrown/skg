@@ -39,6 +39,18 @@ pub struct AllGraphNodeStats {
   pub content_to_containers : HashMap < ID, HashSet < ID > >,
 }
 
+impl AllGraphNodeStats {
+  pub fn empty () -> AllGraphNodeStats {
+    AllGraphNodeStats {
+      num_containers        : HashMap::new (),
+      num_contents          : HashMap::new (),
+      num_links_in          : HashMap::new (),
+      has_subscribes        : HashSet::new (),
+      has_overrides         : HashSet::new (),
+      container_to_contents : HashMap::new (),
+      content_to_containers : HashMap::new (),
+    } } }
+
 /// Extract GraphNodeStats for a single PID
 /// from AllGraphNodeStats and an optional disk SkgNode.
 pub fn graphnodestats_for_pid (

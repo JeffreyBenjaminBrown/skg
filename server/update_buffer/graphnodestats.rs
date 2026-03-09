@@ -5,6 +5,7 @@ use crate::dbs::typedb::search::all_graphnodestats::{
 use crate::to_org::util::collect_ids_from_tree;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
+use crate::types::skgnode::SkgNode;
 use crate::types::viewnode::{GraphNodeStats, ViewNode, ViewNodeKind};
 
 use std::collections::{HashSet, HashMap};
@@ -44,7 +45,7 @@ pub async fn set_graphnodestats_in_forest (
   Ok (( stats . container_to_contents,
         stats . content_to_containers )) }
 
-fn set_metadata_relationships_in_node_recursive (
+pub fn set_metadata_relationships_in_node_recursive (
   tree   : &mut Tree<ViewNode>,
   treeid : NodeId,
   stats  : &AllGraphNodeStats,
@@ -56,9 +57,15 @@ fn set_metadata_relationships_in_node_recursive (
     { // PITFALL: Uses 'false' for phantom and deleted nodes. Getting 'true' where appropriate would be expensive, requiring inquiry into the git history not just of the phantom, but also of things it was connected to.
       if let ViewNodeKind::True (t)
         = & tree . get (treeid) . unwrap () . value () . kind
-        { let skgnode_opt = skgnode_from_map_or_disk (
-              &t . id, &t . source, map, config
-            ) . ok ();
+        { let skgnode_opt : Option<&SkgNode> =
+            // PITFALL: skgnode_from_map_or_disk panics if the source isn't in the config (e.g. "search" for search result nodes). Guard against this by only attempting disk lookup when the source exists.
+            // TODO: Better would be to use a new kind of ViewNode for search results.
+            if map . contains_key (&t . id)
+               || config . sources . contains_key (&t . source)
+              { skgnode_from_map_or_disk (
+                  &t . id, &t . source, map, config
+                  ). ok ()
+              } else { None };
           Some ( graphnodestats_for_pid (
             &t . id, stats, skgnode_opt )) }
         else { None } // Scaff, Deleted, DeletedScaff

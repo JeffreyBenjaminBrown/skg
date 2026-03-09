@@ -1,4 +1,4 @@
-;;; Integration test: search enrichment (background containerward paths)
+;;; Integration test: search enrichment (background containerward paths + graphnodestats)
 ;;;
 ;;; Searches for "bravo" (matches leaf-b).
 ;;; Phase 1: search results appear immediately (no paths).
@@ -50,13 +50,21 @@
            (content (and buf (with-current-buffer buf
                                (buffer-substring-no-properties
                                 (point-min) (point-max))))))
-      (if found
+      (unless found
+        (message "✗ FAIL: containerward path 'container alpha' not found after 30s")
+        (message "Buffer content:\n%s" content)
+        (kill-emacs 1))
+      (message "✓ containerward path enrichment arrived")
+      ;; Phase 3: verify graphnodestats in enriched results.
+      ;; container-a is a root with 1 content,
+      ;; so its line should include (graphStats (containers 0) (contents 1)).
+      (if (string-match-p "graphStats" content)
           (progn
-            (message "✓ PASS: containerward path enrichment arrived")
+            (message "✓ PASS: graphnodestats present in enriched search results")
             (message "Buffer content:\n%s" content)
             (kill-emacs 0))
         (progn
-          (message "✗ FAIL: containerward path 'container alpha' not found after 30s")
+          (message "✗ FAIL: graphnodestats not found in enriched search results")
           (message "Buffer content:\n%s" content)
           (kill-emacs 1))))))
 

@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Integration test: search enrichment (background containerward paths)
+# Integration test: search enrichment (background containerward paths + graphnodestats)
 # Searches for "leaf bravo", verifies the search buffer appears,
 # then waits for the background enrichment to add the containerward
-# path from leaf-b back to container-a.
+# path from leaf-b back to container-a, with graphnodestats.
 
 set -e
 

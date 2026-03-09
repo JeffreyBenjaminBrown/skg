@@ -34,14 +34,14 @@ SCOPE is \"rooty\" (filtered) or \"everywhere\" (unfiltered)."
                      (terms . ,clean-terms)
                      (scope . ,scope)))
                   "\n")))
-    ;; Register phase 1 handler (one-shot)
     (skg-register-response-handler
+     ;; Register phase 1 handler (one-shot)
      'search-results
      (lambda (_tcp-proc payload)
        (skg--display-search-phase1 payload clean-terms))
      t)
-    ;; Register phase 2 handler for search results enriched with paths. Persists until fired or replaced.
     (skg-register-response-handler
+     ;; Register phase 2 handler for search results 'enriched' with containerward paths and graphnodestats. Persists until fired or replaced.
      'search-enrichment
      (lambda (_tcp-proc payload)
        (skg--display-search-enrichment payload))
@@ -78,7 +78,7 @@ kill-buffer-hook to send close-view to the server."
 
 (defun skg--display-search-enrichment (payload)
   "Replace search buffer with results
-'enriched' with containerward paths.
+'enriched' with containerward paths and graphnodestats.
 PAYLOAD contains response-type, terms, and content."
   (let* ((response (read payload))
          (terms   (skg--as-string (cadr (assoc 'terms   response))))
