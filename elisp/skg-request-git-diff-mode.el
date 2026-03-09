@@ -11,6 +11,7 @@ When enabled, subsequent content views and saves show
 what changed between HEAD and the worktree."
   (interactive)
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
+         (save-buffer (current-buffer))
          (request-sexp
           (concat (prin1-to-string
                    '((request . "git diff mode toggle")))
@@ -22,7 +23,9 @@ what changed between HEAD and the worktree."
               (content (cadr (assoc 'content response))))
          (message "%s" (or (and content (format "%s" content))
                            "toggled"))
-         (skg-request-save-buffer)))
+         (with-current-buffer ;; Use with-current-buffer because the process filter runs in whatever buffer is current when the TCP response arrives — NOT the buffer the user called skg-diff-view from.
+             save-buffer
+           (skg-request-save-buffer))))
      t)
     (skg-lp-reset)
     (process-send-string tcp-proc request-sexp)))

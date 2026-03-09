@@ -49,6 +49,11 @@ pub fn send_response_with_length_prefix (
   stream   : &mut TcpStream,
   response : &str,
 ) { let payload : &[u8] = response . as_bytes ();
+    let preview_len : usize = payload . len () . min (200);
+    let preview : &str = &response [..preview_len];
+    println!("Sending response ({} bytes): {}{}",
+             payload . len (), preview,
+             if payload . len () > 200 { "..." } else { "" });
     let header : String = format! ( "Content-Length: {}\r\n\r\n",
                                      payload . len () );
     if let Err (e) = stream . write_all ( header . as_bytes () ) {

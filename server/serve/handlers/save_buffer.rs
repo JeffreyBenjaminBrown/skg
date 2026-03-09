@@ -73,6 +73,12 @@ pub fn handle_save_buffer_request (
         if let Some (skgnode)
           = conn_state . memory . pool . get (&pid)
           { it . insert ( pid, skgnode . clone () ); }} }
+    eprintln!("save-diagnostic: view-uri={}, pool-size={}, pool-total={}",
+              match &viewuri_from_request_result {
+                Ok (uri) => uri . 0 . as_str(),
+                Err (_) => "<nil>" },
+              it . len(),
+              conn_state . memory . pool . len());
     it };
   match read_length_prefixed_content (reader) {
     Ok (initial_buffer_content) => {
@@ -282,9 +288,10 @@ fn uris_of_views_to_lock (
     Err (_)  => return Vec::new () };
   let pids : Vec<ID> =
     conn_state . memory . viewuri_to_pids (saved_uri);
-  let mut collateral : HashSet<ViewUri> = HashSet::new ();
+  let mut collateral_views : HashSet<ViewUri> = HashSet::new ();
   for pid in &pids {
     for uri in conn_state . memory . views_containing (pid) {
-      if &uri != saved_uri {
-        collateral . insert (uri); } } }
-  collateral . into_iter () . collect () }
+      if &uri != saved_uri
+        && ! uri . 0 . starts_with ("search:") // TODO: Formalize with an enum.
+      { collateral_views . insert (uri); } } }
+  collateral_views . into_iter () . collect () }

@@ -38,6 +38,8 @@ pub async fn replace_ids_with_pids(
     if pool . contains_key (&id) {
       pids_from_pool . insert ( id . clone(), Some (id) );
     } else { unknown_ids . push (id); }}
+  eprintln!("replace_ids_with_pids: {} in pool, {} need TypeDB query",
+            pids_from_pool . len(), unknown_ids . len());
   let pids_from_typedb: HashMap<ID, Option<ID>> =
     pids_from_ids( db_name, driver, &unknown_ids
     ) . await?;

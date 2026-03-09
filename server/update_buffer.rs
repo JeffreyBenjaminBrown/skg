@@ -92,6 +92,14 @@ pub async fn update_views_after_save (
     let collateral_uris : Vec<ViewUri> =
       find_collateral_view_uris (
         uri, &save_instructions, conn_state);
+    if collateral_uris . is_empty () {
+      eprintln!("update_views_after_save: no collateral views");
+    } else {
+      eprintln!("update_views_after_save: {} collateral view(s): {:?}",
+                collateral_uris . len (),
+                collateral_uris . iter ()
+                  . map ( |u| &u . 0 )
+                  . collect::<Vec<_>> ()); }
     for curi in collateral_uris { // Identical pipeline, with each view building on the pool enriched by prior views.
       let mut forest : Tree<ViewNode> = match
         conn_state . memory . viewuri_to_view (&curi) {
@@ -137,10 +145,15 @@ fn find_collateral_view_uris (
       DefineNode::Delete (dn) =>
         Some ( dn . id . clone () ) } )
     . collect ();
+  eprintln!("find_collateral_view_uris: {} changed PIDs, {} views in memory",
+            changed_pids . len (),
+            conn_state . memory . views . len ());
   let uris : HashSet<ViewUri> =
     changed_pids . iter ()
     . flat_map ( |pid| conn_state . memory . views_containing (pid) )
     . filter ( |uri| uri != saved_uri )
+    . filter ( |uri| ! uri . 0 . starts_with ("search:") ) // Search views contain fake "search" source nodes that crash rerender_view. They don't need collateral updates: the search results are fixed until the user searches again.
+    // TODO: Formalize with an enum the distinction between search views and content views.
     . collect ();
   uris . into_iter () . collect () }
 
@@ -178,22 +191,33 @@ async fn rerender_view (
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   deleted_by_this_save_pids      : &HashSet<ID>,
 ) -> Result<String, Box<dyn Error>> {
+  let t_rerender : std::time::Instant = std::time::Instant::now ();
+  eprintln!("rerender_view: starting");
   remove_branches_that_git_marked_removed (forest) ?;
   clear_diff_metadata (forest) ?;
   let mut defmap : DefinitiveMap = DefinitiveMap::new ();
+  eprintln!("rerender_view: starting complete_viewtree");
   complete_viewtree (
     forest, map, &mut defmap,
     source_diffs, config, typedb_driver,
     errors, deleted_since_head_pid_src_map,
     deleted_by_this_save_pids ) . await ?;
+  eprintln!("rerender_view: complete_viewtree done ({:.3}s), starting graphnodestats",
+            t_rerender . elapsed () . as_secs_f64 ());
   let ( container_to_contents, content_to_containers ) =
     set_graphnodestats_in_forest (
       forest, map, config, typedb_driver ) . await ?;
+  eprintln!("rerender_view: graphnodestats done ({:.3}s), rendering to string",
+            t_rerender . elapsed () . as_secs_f64 ());
   set_viewnodestats_in_forest (
     forest,
     &container_to_contents,
     &content_to_containers );
-  viewnode_forest_to_string (forest) }
+  let result : Result<String, Box<dyn Error>> =
+    viewnode_forest_to_string (forest);
+  eprintln!("rerender_view: done ({:.3}s)",
+            t_rerender . elapsed () . as_secs_f64 ());
+  result }
 
 /// Strip from the forest every branch whose root
 ///   is marked as removed or removed-here.

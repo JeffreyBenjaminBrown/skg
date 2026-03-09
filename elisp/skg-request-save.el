@@ -34,6 +34,15 @@ unlocked when the early response arrives."
          (content-length (length content-bytes))
          (header (format "Content-Length: %d\r\n\r\n" content-length)))
 
+    (unless skg-view-uri
+      ;; Guard: refuse to save when skg-view-uri is nil.
+      ;; A nil view-uri causes an unfiltered save (all instructions
+      ;; sent to TypeDB even if unchanged) AND the server won't update
+      ;; its memory, so the work is both slow and wasted.
+      (error "Cannot save: skg-view-uri is nil in buffer '%s' (content-view-mode=%s). Re-open the view."
+             (buffer-name)
+             (if (bound-and-true-p skg-content-view-mode) "on" "off")))
+
     ;; Lock ALL skg content-view buffers immediately, before sending.
     ;; This eliminates the race window between the send and the
     ;; server's early response.
