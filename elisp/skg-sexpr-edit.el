@@ -1,6 +1,9 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; PURPOSE: Interactive s-expression editing utilities.
+;;; From a 'source buffer', the user can call skg-metadata-view
+;;; (or similar commands) to open a new 'sexp edit' buffer,
+;;; where the sexp is rendered as an org-tree.
 ;;;
 ;;; User-facing functions:
 ;;;   skg-edit-first-sexpr-on-line
@@ -44,7 +47,8 @@ Kill the buffer to cancel without saving."
 ;;
 
 (defun skg-edit--commit ()
-  "Save changes from org buffer back to the source sexp."
+  "Save changes from sexp-edit buffer back to the source sexp."
+  (interactive)
   (let* ((org-text (buffer-substring-no-properties (point-min) (point-max)))
          (new-sexp (org-to-sexp org-text))
          (new-text (prin1-to-string new-sexp))

@@ -9,6 +9,14 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
+* DONE Bug: C-c C-c not saving metadata in skg-metadata-view
+  The top of the metadata buffer says
+    "Press 'C-c C-c' to save changes, or 'C-x k' to cancel."
+  but doing that just opens a new small temporary window with
+  ```
+  Debugger entered--Lisp error: (wrong-type-argument commandp skg-edit--commit)
+  command-execute(skg-edit--commit)
+  ```
 * DONE Bug: Cannot visit link.
   I opened the node titled
     'motivation | ambition | voluntarity | intention | purpose'
@@ -100,7 +108,7 @@ Debugger entered--Lisp error: (wrong-type-argument commandp skg-edit--commit)
   and (skg focused) appeared,
   and then it took forever for the buffer to update
   (so that (skg focused) is replaced with a dot).
-* MAYBE DONE ? C-x C-s not always overridden by skg-save
+* TODO Bug: C-x C-s not always overridden by skg-save
   in skg buffers. Maybe the first one it always does,
   but subsequent ones not so? Not sure what the pattern is.
 * do (set-buffer-modified-p nil) in more places

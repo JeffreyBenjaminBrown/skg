@@ -1,5 +1,41 @@
 * Claude's questions, hypotheses, discoveries and methods
 
+** Investigations
+
+*** "Cannot visit link" bug (2026-03-09)
+**** Bug report
+     User opens view of "motivation | ambition | ..." (ID 7b52eb18-...),
+     requests containerward view from a child. The containerward branch
+     shows the parent node (7b52eb18-...) again as an indefinitive child
+     at the bottom. User puts point there, calls skg-next-id then
+     skg-view-from-node, expects a new view. Sees only
+     "Reverting buffer 'skg.log'" (unrelated auto-revert noise).
+**** Hypotheses tested
+     - format "%S" length mismatch with buffer text: REJECTED.
+       Tested with exact metadata from bug report; lengths match (206=206).
+     - Emacs read failing on metadata sexp: REJECTED.
+       read parses the sexp correctly, condition-case not triggered.
+     - Heralds overlays interfering with buffer text: REJECTED.
+       Overlays set display property but don't modify buffer text.
+       looking-at and re-search-forward operate on buffer text.
+     - skg-next-id landing on wrong position: REJECTED.
+       Traced the logic; metadata position is correctly computed.
+**** Root cause: switch-to-view of already-current buffer
+     The node (7b52eb18-...) is the ROOT of the current view.
+     When skg-view-from-node sends a content view request for it,
+     the server's handle_single_root_view_request checks
+     view_uri_for_root_id, finds it's already a root of an open view,
+     and returns ((switch-to-view URI)). Emacs receives this,
+     looks up the buffer for that URI, and calls switch-to-buffer —
+     but it's the SAME buffer the user is already in.
+     Nothing visibly happens. The "Visiting node: ..." message
+     is immediately overwritten by the auto-revert of skg.log.
+**** Fix
+     In skg-handle-content-view-sexp, when the switch-to-view buffer
+     is the current buffer, show a message like
+     "Already viewing this node (scroll to top to see it)"
+     instead of silently calling switch-to-buffer.
+
 ** Discoveries
 
 *** Emacs: define-minor-mode always creates an interactive command

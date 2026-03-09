@@ -132,7 +132,9 @@
     Use this to store a link to the ID the cursor is at.
 *** skg-linkstack-view
     View and maybe edit the set of links you've stored.
-** not important but cool
+** not skg but useful
+*** skg-visit-file-diff
+    Opens a magit view of the changes to the file.
 *** org-ancestry
     If you're at a headline so deep in the tree
     that you can't remember where it came from,
