@@ -1,3 +1,6 @@
+* wanted immediately upon trying it
+** do until all of node's children
+** delete in view-descendents all parent-ignores branches
 * magit bug!
 I just copoied this text from magit:
 

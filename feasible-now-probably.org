@@ -9,6 +9,12 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
+* Bug: Second buffer keeps thinking first has unsaved changes
+  I can save (C-x C-s) that first buffer,
+  and the second keeps warning me if I try to edit it.
+* Bug: Upon adding parengIgnores to a truenode's metadata buffer and trying to save
+Debugger entered--Lisp error: (wrong-type-argument commandp skg-edit--commit)
+  command-execute(skg-edit--commit)
 * DONE search bug
   'motivation' from public/ is not in search results.
   I translated public/ to .skg files, which are at data/public/.
