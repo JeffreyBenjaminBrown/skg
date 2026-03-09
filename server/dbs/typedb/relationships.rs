@@ -196,6 +196,7 @@ pub async fn delete_all_outbound_relationships (
 /// Returns the number of IDs processed
 /// (not the number of relations deleted,
 /// which would be more work).
+/// Bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
 pub async fn delete_out_links (
   db_name  : &str,
   driver   : &TypeDBDriver,
@@ -203,13 +204,13 @@ pub async fn delete_out_links (
   relation : &str,   // e.g. "contains"
   role     : &str,   // e.g. "container"
 ) -> Result < usize, Box<dyn Error> > {
-  let futures : Vec < _ > =
-    ids . iter ()
-    . map ( |id| delete_out_links_for_one_id (
-              db_name, driver, id, relation, role ))
-    . collect ();
   let results : Vec < Result < (), Box < dyn Error > > > =
-    futures::future::join_all (futures) . await;
+    stream::iter ( ids . iter ()
+      . map ( |id| delete_out_links_for_one_id (
+                db_name, driver, id, relation, role )) )
+    . buffer_unordered (
+        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+    . collect () . await;
   for result in results {
     result ?; }
   Ok ( ids . len () ) }

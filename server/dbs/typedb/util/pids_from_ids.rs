@@ -7,16 +7,13 @@ use typedb_driver::{
   TransactionType,
   TypeDBDriver,
 };
-use futures::StreamExt;
+use futures::stream::{self, StreamExt};
 use ego_tree::{NodeRef, NodeMut, NodeId, Tree};
 
 use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind};
 use crate::types::misc::ID;
 use crate::types::memory::SkgNodeMap;
-use crate::dbs::typedb::util::concept_document::{
-  extract_id_from_node,
-  extract_id_from_map,
-  build_id_disjunction};
+use crate::dbs::typedb::util::concept_document::extract_id_from_node;
 
 /// Collect all IDs, batch-lookup their PIDs in TypeDB, then replace.
 /// Only query TypeDB for nodes not already in the skgnodemap.
@@ -88,91 +85,64 @@ pub fn assign_pids_throughout_tree_from_map (
       { assign_pids_throughout_tree_from_map (
         child_mut, pid_map ); }} }}
 
-/// PURPOSE: Run one TypeDB query, using nested subqueries,
-/// to look up PIDs for multiple IDs.
-/// (That it is one query complicates things but makes them faster.)
-/// Return a HashMap mapping each ID to its PID (or None if not found).
+/// Look up PIDs for multiple IDs.
+/// Sends one query per ID, bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
+/// Returns a HashMap mapping each ID to its PID (or None if not found).
 pub async fn pids_from_ids (
-  db_name : &str,
-  driver  : &TypeDBDriver,
+  db_name  : &str,
+  driver   : &TypeDBDriver,
   node_ids : &[ID]
 ) -> Result < HashMap < ID, Option < ID > >, Box < dyn Error > > {
   if node_ids . is_empty () {
     return Ok ( HashMap::new () ); }
+  let results : Vec < (ID, Option<ID>) > =
+    stream::iter ( node_ids . iter ()
+      . map ( |id| pid_from_one_id (
+                db_name, driver, id . clone () )) )
+    . buffer_unordered (
+        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+    . collect () . await;
+  let result : HashMap < ID, Option < ID > > =
+    results . into_iter () . collect ();
+  Ok (result) }
+
+/// Look up the PID for a single ID.
+async fn pid_from_one_id (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  id      : ID,
+) -> (ID, Option<ID>) {
+  let pid : Option<ID> =
+    pid_from_one_id_inner (db_name, driver, &id)
+    . await . ok () . flatten ();
+  (id, pid) }
+
+async fn pid_from_one_id_inner (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  id      : &ID,
+) -> Result < Option<ID>, Box<dyn Error> > {
   let tx : Transaction =
     driver . transaction (
       db_name, TransactionType::Read
     ) . await ?;
-  let answer : QueryAnswer =
-    tx . query ( {
-      let disjunction_clauses : String =
-        build_id_disjunction ( node_ids, "id" );
-      let query : String =
-        format! (
-          // Query for (id, primary_id) pairs.
-          // Outer match finds IDs, either as node IDs or extra IDs.
-          // Inner match finds PIDs.
-          r#"match
-            {{ $node isa node, has id $id; }} or
-            {{ $e isa extra_id, has id $id;
-               $rel isa has_extra_id ( extra_id: $e ); }};
-            {};
-            fetch {{
-              "id": $id,
-              "primary_ids": [
-                match
-                  {{ $node2 isa node, has id $id2, has id $primary_id;
-                     $node2 has id $id; }} or
-                  {{ $e2 isa extra_id, has id $id2;
-                     $node2 isa node, has id $primary_id;
-                     $rel2 isa has_extra_id ( node: $node2,
-                                              extra_id: $e2 );
-                     $e2 has id $id; }};
-                fetch {{ "primary_id": $primary_id }};
-              ]
-            }};"#,
-          disjunction_clauses );
-      query } ) . await ?;
-  let mut result : HashMap < ID, Option < ID > > =
-    HashMap::new ();
-  for node_id in node_ids {
-    // Initialize all IDs with None
-    result . insert ( node_id . clone (), None ); }
-  if let QueryAnswer::ConceptDocumentStream ( _, mut stream ) = answer
-  { // Process the nested subquery results.
-    // Each document has the structure:
-    //   {"id": <some-id>, "primary_ids": [{"primary_id": <pid>}]}
-    // The nested "primary_ids" list comes from the inner match/fetch.
-    while let Some (doc_result)
-      = stream . next () . await
-    { let doc : ConceptDocument =
-        doc_result ?;
-
-      // TypeDB returns documents as a tree of Nodes.
-      // Root is Option<Node>, which can be Map, List, or Leaf.
-      // We expect root to be a Map with keys "id" and "primary_ids".
+  if let QueryAnswer::ConceptDocumentStream ( _, mut stream ) = {
+    let answer : QueryAnswer = tx . query ( format! (
+      r#"match
+           {{ $node isa node, has id $primary_id;
+              $node has id "{}"; }} or
+           {{ $e isa extra_id, has id "{}";
+              $rel isa has_extra_id ( extra_id: $e, node: $node );
+              $node isa node, has id $primary_id; }};
+           fetch {{
+             "primary_id": $primary_id
+           }};"#,
+      id, id ) ) . await ?;
+    answer }
+  { if let Some (doc_result) = stream . next () . await {
+      let doc : ConceptDocument = doc_result ?;
       if let Some ( Node::Map ( ref map ) ) = doc . root {
-
-        // Extract the ID from the outer fetch
-        let id_opt : Option < ID > =
-          map . get ("id")
-          . and_then (extract_id_from_node);
-
-        // Extract the primary_id from the nested subquery result.
-        // The value at "primary_ids" is a Node::List with one Map.
-        let primary_id_opt : Option < ID > =
-          map . get ("primary_ids")
-          . and_then (
-            | node : & Node |
-            // Unwrap Node::List, get first element
-            if let Node::List (list) = node
-            { list . first () }
-            else { None } )
-          . and_then (
-            | first_node : & Node |
-            // Extract "primary_id" from the map
-            extract_id_from_map ( first_node, "primary_id" ) );
-
-        if let Some (id) = id_opt {
-          result . insert ( id, primary_id_opt ); }} }}
-  Ok (result) }
+        return Ok (
+          map . get ("primary_id")
+          . and_then (extract_id_from_node) ); }}}
+  Ok (None) }

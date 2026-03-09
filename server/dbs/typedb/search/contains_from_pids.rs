@@ -7,17 +7,14 @@ use typedb_driver::{
   TransactionType,
   TypeDBDriver,
 };
-use futures::StreamExt;
+use futures::stream::{self, StreamExt};
 
 use crate::types::misc::ID;
-use crate::dbs::typedb::util::concept_document::{
-  extract_id_from_node,
-  extract_id_from_map,
-  build_id_disjunction};
+use crate::dbs::typedb::util::concept_document::extract_id_from_map;
 
 
-/// PURPOSE: Run one TypeDB query, using nested subqueries,
-/// to find all 'contains' relations among a collection of nodes.
+/// PURPOSE: Find all 'contains' relations among a collection of nodes.
+/// Sends one query per PID, bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
 /// Takes a vector of IDs (PIDs) and returns two maps:
 /// 1. container_to_contents: Map from each container to the set of nodes it contains
 /// 2. content_to_containers: Map from each contained node to the set of containers
@@ -30,108 +27,93 @@ pub async fn contains_from_pids (
     ( HashMap < ID, HashSet < ID > >, // maps container to contents
       HashMap < ID, HashSet < ID > >), // maps content to containers
   Box < dyn Error > > {
-
   if pids . is_empty () {
     return Ok (( HashMap::new (), HashMap::new () )); }
+  let pid_set : HashSet<ID> =
+    pids . iter () . cloned () . collect ();
+  let results : Vec < Result <
+      (ID, Vec<ID>, Vec<ID>),
+      Box<dyn Error> > > =
+    stream::iter ( pids . iter ()
+      . map ( |pid| contains_for_one_pid (
+                db_name, driver, pid )) )
+    . buffer_unordered (
+        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+    . collect () . await;
   let mut container_to_contents : HashMap < ID, HashSet < ID > > =
     HashMap::new ();
   let mut content_to_containers : HashMap < ID, HashSet < ID > > =
     HashMap::new ();
-  let pid_set : HashSet<ID> = // the input pids
-    pids . iter () . cloned () . collect ();
+  for result in results {
+    let (node_id, contained_ids, container_ids)
+      : (ID, Vec<ID>, Vec<ID>) = result ?;
+    for contained_id in contained_ids {
+      // Only track if contained_id is in our input set.
+      if pid_set . contains (&contained_id) {
+        container_to_contents
+          . entry ( node_id . clone () )
+          . or_insert_with (HashSet::new)
+          . insert (contained_id); }}
+    for container_id in container_ids {
+      // Only track if container_id is in our input set.
+      if pid_set . contains (&container_id) {
+        content_to_containers
+          . entry ( node_id . clone () )
+          . or_insert_with (HashSet::new)
+          . insert (container_id); }}}
+  Ok (( container_to_contents,
+        content_to_containers )) }
+
+/// Query contains and contained_by for a single PID.
+async fn contains_for_one_pid (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  pid     : &ID,
+) -> Result < (ID, Vec<ID>, Vec<ID>), Box<dyn Error> > {
   let tx : Transaction =
     driver . transaction (
       db_name, TransactionType::Read
     ) . await ?;
-
   if let QueryAnswer::ConceptDocumentStream ( _, mut stream ) = {
-    let answer : QueryAnswer =
-      tx . query ( {
-        let disjunction_clauses : String =
-          build_id_disjunction ( pids, "node_id" );
-        let query : String = (
-          // - Outer match finds each node in our input set
-          // - First nested fetch finds what this node contains (if any)
-          // - Second nested fetch finds what contains this node (if any)
-          format! (
-            r#"match
-              {{ $node isa node, has id $node_id; }} or
-              {{ $e isa extra_id, has id $node_id;
-                 $rel isa has_extra_id ( extra_id: $e ); }};
-              {};
-              fetch {{
-                "node_id": $node_id,
-                "contains": [
-                  match
-                    {{ $node2 isa node, has id $contained_id;
-                       $node3 isa node, has id $node_id;
-                       $rel2 isa contains ( container: $node3,
-                                            contained: $node2 ); }} or
-                    {{ $node2 isa node, has id $contained_id;
-                       $e2 isa extra_id, has id $node_id;
-                       $node3 isa node;
-                       $extra_rel isa has_extra_id ( node: $node3,
-                                                     extra_id: $e2 );
-                       $rel2 isa contains ( container: $node3,
-                                            contained: $node2 ); }};
-                  fetch {{ "contained_id": $contained_id }};
-                ],
-                "contained_by": [
-                  match
-                    {{ $node4 isa node, has id $container_id;
-                       $node5 isa node, has id $node_id;
-                       $rel3 isa contains ( container: $node4,
-                                            contained: $node5 ); }} or
-                    {{ $node4 isa node, has id $container_id;
-                       $e3 isa extra_id, has id $node_id;
-                       $node5 isa node;
-                       $extra_rel2 isa has_extra_id ( node: $node5,
-                                                      extra_id: $e3 );
-                       $rel3 isa contains ( container: $node4,
-                                            contained: $node5 ); }};
-                  fetch {{ "container_id": $container_id }};
-                ]
-              }};"#,
-            disjunction_clauses ) );
-        query } ) . await ?;
+    let answer : QueryAnswer = tx . query ( format! (
+      r#"match
+           $node isa node, has id "{}";
+           fetch {{
+             "contains": [
+               match
+                 $child isa node, has id $contained_id;
+                 $rel isa contains ( container: $node,
+                                     contained: $child );
+               fetch {{ "contained_id": $contained_id }};
+             ],
+             "contained_by": [
+               match
+                 $parent isa node, has id $container_id;
+                 $rel2 isa contains ( container: $parent,
+                                      contained: $node );
+               fetch {{ "container_id": $container_id }};
+             ]
+           }};"#,
+      pid ) ) . await ?;
     answer }
-  { // Process the nested subquery results.
-    // Each document has the structure:
-    //   {"node_id": <id>, "contains": [...], "contained_by": [...]}
-    while let Some (doc_result)
-      = stream . next () . await
-    { let doc : ConceptDocument =
-        doc_result ?;
-      if let Some ( Node::Map ( ref map ) )
-      = doc . root
-      { let node_id_opt : Option < ID > =
-          map . get ("node_id")
-          . and_then (extract_id_from_node);
-        if let Some (node_id) = node_id_opt {
-          if let Some ( Node::List (contains_list) ) = (
-            // Extract contained nodes (what this node contains)
-            map . get ("contains"))
-          { for item in contains_list {
-            if let Some (contained_id) =
+  { if let Some (doc_result) = stream . next () . await {
+      let doc : ConceptDocument = doc_result ?;
+      if let Some ( Node::Map ( ref map ) ) = doc . root {
+        let mut contained_ids : Vec<ID> = Vec::new ();
+        let mut container_ids : Vec<ID> = Vec::new ();
+        if let Some ( Node::List (contains_list) ) =
+          map . get ("contains")
+        { for item in contains_list {
+            if let Some (id) =
               extract_id_from_map ( item, "contained_id" )
-            { // Only track if contained_id is in our input set
-              if pid_set . contains (& contained_id) {
-                container_to_contents
-                  . entry ( node_id . clone () )
-                  . or_insert_with (HashSet::new)
-                  . insert (contained_id);
-              }} }}
-          if let Some ( Node::List (contained_by_list) ) = (
-            // Extract containers (what contains this node)
-            map . get ("contained_by"))
-          { for item in contained_by_list {
-            if let Some (container_id) =
+            { contained_ids . push (id); }}}
+        if let Some ( Node::List (contained_by_list) ) =
+          map . get ("contained_by")
+        { for item in contained_by_list {
+            if let Some (id) =
               extract_id_from_map ( item, "container_id" )
-            { // Only track if container_id is in our input set
-              if pid_set . contains (& container_id) {
-                content_to_containers
-                  . entry ( node_id . clone () )
-                  . or_insert_with (HashSet::new)
-                  . insert (container_id); }} }} }} }}
-  Ok (( container_to_contents,
-        content_to_containers )) }
+            { container_ids . push (id); }}}
+        return Ok (( pid . clone (),
+                     contained_ids,
+                     container_ids )); }}}
+  Ok (( pid . clone (), Vec::new (), Vec::new () )) }

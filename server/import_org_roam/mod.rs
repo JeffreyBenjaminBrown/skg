@@ -1,8 +1,9 @@
 pub mod parse;
 
 use crate::types::misc::{ID, SourceName};
-use crate::types::skgnode::SkgNode;
+use crate::types::skgnode::{FileProperty, SkgNode};
 
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::fs;
@@ -48,6 +49,10 @@ pub fn import_org_roam_directory (
     files_read    : 0,
     nodes_written : 0,
     errors        : Vec::new(), };
+  // Collect all nodes into a map keyed by primary ID.
+  // When multiple org files define the same ID,
+  // merge their children rather than clobbering.
+  let mut node_map : HashMap<ID, SkgNode> = HashMap::new();
   for entry in WalkDir::new (org_dir)
     . into_iter()
     . filter_map (|e| e . ok() )
@@ -60,18 +65,75 @@ pub fn import_org_roam_directory (
       parse::parse_org_file (path);
     for mut node in nodes {
       node . source = source . clone();
-      match write_skgnode_to_dir (&node, output_dir) {
-        Ok (()) => { stats . nodes_written += 1; }
+      match node . primary_id() {
+        Ok (pid) => {
+          let pid : ID = pid . clone();
+          if let Some (existing) = node_map . get_mut (&pid) {
+            merge_into_existing (existing, &node);
+            tracing::warn! (
+              id = %pid,
+              "Overloaded ID — multiple org-roam nodes use this ID. \
+               Merging their content."); }
+          else {
+            node_map . insert (pid, node); }}
         Err (e) => {
           let msg : String = format! (
-            "Error writing node '{}' from {:?}: {}",
+            "Error: node '{}' from {:?}: {}",
             node . title, path, e);
           stats . errors . push (msg); }}}}
+  for (_pid, node) in &node_map {
+    match write_skgnode_to_dir (node, output_dir) {
+      Ok (()) => { stats . nodes_written += 1; }
+      Err (e) => {
+        let msg : String = format! (
+          "Error writing node '{}': {}",
+          node . title, e);
+        stats . errors . push (msg); }}}
   Ok (stats) }
 
 //
 // File writing
 //
+
+/// Merge a duplicate node into an existing one with the same ID.
+/// Appends children, body text, and aliases from the newcomer.
+/// Tags the result with Was_Overloaded.
+fn merge_into_existing (
+  existing : &mut SkgNode,
+  newcomer : &SkgNode,
+) {
+  if ! existing . misc . contains (&FileProperty::Was_Overloaded) {
+    existing . misc . push (FileProperty::Was_Overloaded); }
+  if let Some (new_children) = &newcomer . contains {
+    // Merge contents.
+    let merged : &mut Vec<ID> =
+      existing . contains . get_or_insert_with (Vec::new);
+    for child in new_children {
+      if ! merged . contains (child) {
+        merged . push (child . clone()); }} }
+  { // Append the newcomer's title and body into the existing body,
+    // separated by an informative marker.
+    let separator : &str =
+      "\n\n====== imported from a distinct org-roam node with the same ID ======";
+    let mut appendage : String = String::new();
+    appendage . push_str (separator);
+    appendage . push_str (&format! ("\ntitle: {}", newcomer . title));
+    if let Some (new_body) = &newcomer . body {
+      appendage . push_str (&format! ("\nbody: {}", new_body)); }
+    let body : &mut String =
+      existing . body . get_or_insert_with (String::new);
+    body . push_str (&appendage); }
+  if let Some (new_aliases) = &newcomer . aliases {
+    // Merge aliases.
+    let merged : &mut Vec<String> =
+      existing . aliases . get_or_insert_with (Vec::new);
+    for alias in new_aliases {
+      if ! merged . contains (alias) {
+        merged . push (alias . clone()); }}}
+  if newcomer . misc . contains (&FileProperty::Had_ID_Before_Import)
+    && ! existing . misc . contains (&FileProperty::Had_ID_Before_Import)
+    { // Preserve Had_ID_Before_Import from either side.
+      existing . misc . push (FileProperty::Had_ID_Before_Import); }}
 
 fn write_skgnode_to_dir (
   node       : &SkgNode,

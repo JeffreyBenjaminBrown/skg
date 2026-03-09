@@ -2,8 +2,8 @@ pub mod all_graphnodestats;
 pub mod contains_from_pids;
 pub mod hidden_in_subscribee_content;
 
-use futures::StreamExt;
-use std::collections::{HashMap, HashSet};
+use futures::stream::{self, StreamExt};
+use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::{
   answer::{ConceptRow, QueryAnswer, ConceptDocument,
@@ -14,7 +14,7 @@ use typedb_driver::{
 };
 
 use crate::dbs::typedb::util::ConceptRowStream;
-use crate::dbs::typedb::util::concept_document::{build_id_disjunction, extract_id_from_node};
+use crate::dbs::typedb::util::concept_document::extract_id_from_node;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::types::misc::{ID, SourceName};
 
@@ -53,6 +53,7 @@ pub async fn find_container_ids_of_pid (
 /// Generalized function to find related nodes via a specified relationship.
 /// Returns the IDs of nodes in the `output_role` position
 /// related to any of the input nodes.
+/// Sends one query per input ID, bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
 pub async fn find_related_nodes (
   db_name     : &str,
   driver      : &TypeDBDriver,
@@ -63,50 +64,63 @@ pub async fn find_related_nodes (
 ) -> Result < HashSet<ID>, Box<dyn Error> > {
   if nodes . is_empty () {
     return Ok ( HashSet::new () ); }
+  let relation : String    = relation    . to_string ();
+  let input_role : String  = input_role  . to_string ();
+  let output_role : String = output_role . to_string ();
+  let sets : Vec < Result < HashSet<ID>, Box<dyn Error> > > =
+    stream::iter ( nodes . iter ()
+      . map ( |id| find_related_nodes_for_one_id (
+                db_name, driver, id,
+                &relation, &input_role, &output_role )) )
+    . buffer_unordered (
+        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+    . collect () . await;
+  let mut result : HashSet<ID> = HashSet::new ();
+  for set in sets {
+    result . extend ( set ? ); }
+  Ok (result) }
+
+/// Find related nodes for a single input ID.
+async fn find_related_nodes_for_one_id (
+  db_name     : &str,
+  driver      : &TypeDBDriver,
+  id          : &ID,
+  relation    : &str,
+  input_role  : &str,
+  output_role : &str,
+) -> Result < HashSet<ID>, Box<dyn Error> > {
+  let output_id_var : String =
+    format! ("{}_id", output_role);
   let tx : Transaction =
     driver . transaction (
       db_name, TransactionType::Read
     ) . await ?;
-  let input_id_var : String =
-    format!("{}_id", input_role);
-  let output_id_var : String =
-    format!("{}_id", output_role);
   let mut stream : ConceptRowStream = {
-    let answer : QueryAnswer = tx . query ( {
-      let input_disjunction : String =
-        build_id_disjunction ( nodes, &input_id_var );
-      let match_clause : String =
-        format!( r#" match
-                       ${} isa node, has id ${};
-                    {{ ${} isa node, has id ${}; }} or
-                    {{ ${} isa node;
-                       $e isa extra_id, has id ${};
-                       $extra_rel isa has_extra_id ( node:     ${},
-                                                     extra_id: $e ); }};
-                    {};"#,
-                     output_role, output_id_var,
-                     input_role, input_id_var,
-                     input_role, input_id_var, input_role,
-                     input_disjunction );
-      let relationship_and_select : String = format!( r#"
-                       $rel isa {} ( {}: ${},
-                                     {}: ${} );
-                       select ${};"#,
-                       relation, input_role, input_role,
-                       output_role, output_role,
-                       output_id_var );
-      let query : String = format!(
-        "{}{}", match_clause, relationship_and_select);
-      query } ) . await?;
+    let answer : QueryAnswer = tx . query ( format! (
+      r#"match
+           ${output} isa node, has id ${output_id};
+           {{ ${input} isa node, has id "{}"; }} or
+           {{ ${input} isa node;
+              $e isa extra_id, has id "{}";
+              $extra_rel isa has_extra_id ( node:     ${input},
+                                            extra_id: $e ); }};
+           $rel isa {relation} ( {input}: ${input},
+                                  {output}: ${output} );
+           select ${output_id};"#,
+      id, id,
+      input = input_role,
+      output = output_role,
+      output_id = output_id_var,
+      relation = relation ) ) . await ?;
     answer } . into_rows ();
-  let mut related_nodes : HashSet<ID> = HashSet::new ();
+  let mut found : HashSet<ID> = HashSet::new ();
   while let Some (row_result) = stream . next () . await {
     let row : ConceptRow = row_result ?;
     if let Some (concept) = row . get (&output_id_var) ? {
-      related_nodes . insert ( ID (
+      found . insert ( ID (
         extract_payload_from_typedb_string_rep (
-          &concept . to_string () )) ); }}
-  Ok (related_nodes) }
+          &concept . to_string () )) ); } }
+  Ok (found) }
 
 /// Runs a single TypeDB query to get both PID and source.
 /// Returns None if not found.

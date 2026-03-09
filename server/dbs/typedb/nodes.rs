@@ -1,8 +1,5 @@
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
-use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
-use crate::dbs::typedb::util::concept_document::{
-  build_disjunction, build_has_id_disjunction};
 
 use super::util::ConceptRowStream;
 
@@ -14,7 +11,7 @@ use typedb_driver::{
   TransactionType,
   TypeDBDriver,
 };
-use typedb_driver::answer::{QueryAnswer, ConceptRow};
+use typedb_driver::answer::QueryAnswer;
 
 /// Maps `create_one_node_in_own_tx` over `nodes`,
 /// bounded by TYPEDB_CONCURRENT_TRANSACTIONS
@@ -48,7 +45,6 @@ pub async fn create_only_nodes_with_no_ids_present (
   driver  : &TypeDBDriver,
   nodes   : &Vec <SkgNode>
 ) -> Result < usize, Box<dyn Error> > {
-
   let mut all_pids : BTreeSet < String > =
     BTreeSet::new ();
   for node in nodes {
@@ -60,24 +56,26 @@ pub async fn create_only_nodes_with_no_ids_present (
       driver,
       &all_pids
     ) . await ?;
-  let mut to_create : Vec < &SkgNode > =
-    Vec::new ();
-  for node in nodes {
-    if ! known_ids . contains (
-      node . primary_id()? . as_str () )
-    { to_create . push (node); }}
+  let to_create : Vec < &SkgNode > =
+    nodes . iter ()
+    . filter ( |node|
+      node . primary_id ()
+        . map ( |pid| ! known_ids . contains (pid . as_str ()) )
+        . unwrap_or (false) )
+    . collect ();
   tracing::info! ( "Creating {} new nodes ...",
               to_create . len () );
-  let futures : Vec < _ > =
-    to_create . iter ()
-    . map ( |node| create_one_node_in_own_tx (
-              db_name, driver, node ))
-    . collect ();
   let results : Vec < Result < (), Box < dyn Error > > > =
-    futures::future::join_all (futures) . await;
-  for result in results {
-    result ?; }
-  Ok ( to_create . len () ) }
+    stream::iter ( to_create . iter ()
+      . map ( |node| create_one_node_in_own_tx (
+                db_name, driver, node )) )
+    . buffer_unordered (
+        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+    . collect () . await;
+  for result in &results {
+    if let Err (e) = result {
+      return Err (format! ("Failed to create node: {}", e) . into()); }}
+  Ok ( results . len () ) }
 
 async fn create_one_node_in_own_tx (
   db_name : &str,
@@ -91,46 +89,48 @@ async fn create_one_node_in_own_tx (
   tx . commit () . await ?;
   Ok (()) }
 
-/// Batch existence check:
-/// Given a set of candidate ID *strings*,
+/// Parallel existence check:
+/// Given a set of candidate ID strings,
 /// return the subset that already exist in the DB.
+/// Sends one query per ID, bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
 pub async fn which_ids_exist (
   db_name : &str,
   driver  : &TypeDBDriver,
   ids     : &BTreeSet < String >
 ) -> Result < HashSet < String >, Box<dyn Error> > {
-
   if ids . is_empty () {
     return Ok ( HashSet::new () ); }
+  let results : Vec < Option < String > > =
+    stream::iter ( ids . iter ()
+      . map ( |id| check_one_id_exists (
+                db_name, driver, id . clone () )) )
+    . buffer_unordered (
+        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+    . collect () . await;
+  let found : HashSet < String > =
+    results . into_iter ()
+    . flatten ()
+    . collect ();
+  Ok (found) }
+
+/// Check whether a single ID exists in the DB.
+/// Returns Some(id) if it exists, None otherwise.
+async fn check_one_id_exists (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  id      : String,
+) -> Option < String > {
   let tx : Transaction =
     driver . transaction (
-      db_name,
-      TransactionType::Read
-    ) . await ?;
-  let mut rows : ConceptRowStream = {
-    let answer : QueryAnswer =
-      tx . query ( {
-        let or_block : String =
-          build_disjunction(
-            ids . iter(),
-            |v| format!("{{$found == \"{}\";}}", v) );
-        let query : String = format! (
-          "match $found isa id;\n{};\nselect $found;",
-          or_block );
-        query } ) . await ?;
-    answer } . into_rows ();
-  let mut found : HashSet < String > =
-    HashSet::new ();
-  while let Some (row_res) = rows . next () . await {
-    let row : ConceptRow = row_res ?;
-    if let Some (concept) =
-      row . get ("found") ? {
-        found . insert ( {
-          let payload : String =
-            extract_payload_from_typedb_string_rep (
-              & concept . to_string () );
-          payload } ); }}
-  Ok (found) }
+      db_name, TransactionType::Read ) . await . ok () ?;
+  let answer : QueryAnswer =
+    tx . query ( format! (
+      "match $n isa node, has id \"{}\"; select $n;",
+      id ) ) . await . ok () ?;
+  let mut rows : ConceptRowStream = answer . into_rows ();
+  if rows . next () . await . is_some () {
+    Some (id) }
+  else { None } }
 
 pub async fn create_node (
   // Creates: the `node`,
@@ -180,58 +180,46 @@ async fn insert_extra_ids (
 /// ASSUMES: All input IDs are PIDs.
 /// PURPOSE: Delete the node corresponding to every ID it receives,
 /// including its extra IDs.
+/// Sends one transaction per node,
+/// bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
 pub async fn delete_nodes_from_pids (
   db_name : &str,
   driver  : &TypeDBDriver,
   ids     : &[ID]
 ) -> Result < (), Box<dyn Error> > {
   if ids . is_empty() { return Ok ( () ); }
+  let results : Vec < Result < (), Box < dyn Error > > > =
+    stream::iter ( ids . iter ()
+      . map ( |id| delete_one_node_from_pid (
+                db_name, driver, id )) )
+    . buffer_unordered (
+        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+    . collect () . await;
+  for result in results {
+    result ?; }
+  Ok ( () ) }
+
+/// Delete a single node and its extra IDs in one transaction.
+async fn delete_one_node_from_pid (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  id      : &ID,
+) -> Result < (), Box<dyn Error> > {
   let tx : Transaction =
     driver . transaction (
-      db_name, TransactionType::Write
-    ) . await ?;
-  let pid_or_clause : String =
-    build_has_id_disjunction(ids, "node");
-  let answer : QueryAnswer = {
-    let extra_ids_query : String = format! (
-      // To find every associated extra_id.
-      r#"match $node isa node;
-        {};
-        $e isa extra_id;
-        $rel isa has_extra_id ( node: $node, extra_id: $e );
-        $e has id $extra_id_value;
-        select $extra_id_value;"#,
-      pid_or_clause );
-    tx . query (extra_ids_query) . await ? };
-  let mut extra_id_values : Vec<String> =
-    Vec::new();
-  let mut rows : ConceptRowStream = answer . into_rows();
-  while let Some (row_res) = rows . next() . await {
-    let row : ConceptRow = row_res?;
-    if let Some (concept) = row . get ("extra_id_value")? {
-      extra_id_values . push ( {
-        let extra_id_value : String =
-          extract_payload_from_typedb_string_rep(
-            &concept . to_string());
-        extra_id_value } ); }}
-  { // delete nodes
-    let _answer : QueryAnswer = tx . query ( {
-      let delete_nodes_from_pids_query : String = format! (
-        r#"match $node isa node;
-        {};
-        delete $node;"#,
-        pid_or_clause );
-      delete_nodes_from_pids_query } ) . await ?; }
-  { // Delete extra_ids
-    if !extra_id_values . is_empty() {
-      let _answer : QueryAnswer = tx . query ( {
-        let extra_id_or_clause : String =
-          build_has_id_disjunction(&extra_id_values, "e");
-        let delete_extra_ids_query : String = format! (
-          r#"match $e isa extra_id;
-          {};
-          delete $e;"#,
-          extra_id_or_clause );
-        delete_extra_ids_query } ) . await ?; }}
+      db_name, TransactionType::Write ) . await ?;
+  // Find and delete extra_ids first (they reference the node).
+  tx . query ( format! (
+    r#"match
+         $node isa node, has id "{}";
+         $e isa extra_id;
+         $rel isa has_extra_id ( node: $node, extra_id: $e );
+       delete $rel, $e;"#,
+    id . as_str () ) ) . await . ok (); // ok(): no-op if none exist
+  // Delete the node.
+  tx . query ( format! (
+    r#"match $node isa node, has id "{}";
+       delete $node;"#,
+    id . as_str () ) ) . await ?;
   tx . commit () . await ?;
-  Ok ( () ) }
+  Ok (()) }
