@@ -1,0 +1,275 @@
+#+title: Type system critique
+#+author: Claude (with Jeff's seed idea)
+
+Skg's types encode a lot of domain knowledge, but they also
+permit invalid states, use booleans and strings where sum types
+would be safer, and rely on comments to document invariants that
+the compiler could enforce. This document catalogs those issues.
+
+* TODO ViewUri: string convention instead of enum
+
+ViewUri is a bare String newtype. Content views use a UUID;
+search views use the prefix "search: ". Multiple call sites
+discriminate with ~uri.0.starts_with("search:")~.
+
+A ~save_buffer~ handler must guard against saving search views
+(they have no .skg files). A ~rerender_view~ handler must
+exclude them or ~path_from_pid_and_source~ panics on the fake
+source. Both guards are ad-hoc string checks.
+
+#+begin_src rust
+// Current (stringly typed)
+pub struct ViewUri ( pub String );
+
+// Better
+pub enum ViewUri {
+  ContentView ( String ), // UUID
+  SearchResults ( String ), // query
+}
+#+end_src
+
+Every ~starts_with("search:")~ check becomes a match arm.
+Impossible to forget.
+
+* TODO indefinitive: boolean with shadow invariants
+
+When ~indefinitive = true~:
+- ~body~ must be ~None~
+- ~edit_request~ must be ~None~
+- ~view_requests~ must be empty
+- the node generates no save instructions
+
+None of these are enforced by the type. They are scattered
+across constructors (~mk_indefinitive_viewnode~ hardcodes
+body=None, edit_request=None) and validation
+(~BufferValidationError~ if edit_request is present).
+
+A sum type would make the invariant structural:
+
+#+begin_src rust
+pub enum TrueNodeMode {
+  Definitive {
+    body          : Option<String>,
+    edit_request  : Option<EditRequest>,
+    view_requests : HashSet<ViewRequest>,
+  },
+  Indefinitive,
+}
+#+end_src
+
+Then a function that needs a definitive node can require
+~Definitive~ directly, eliminating ~if t.indefinitive { return }~
+guards and the associated ~unreachable!~ / ~panic!~ arms.
+
+* TODO SkgNode.ids: Vec allows empty
+
+The ~ids~ field is ~Vec<ID>~ with a comment "Must be nonempty."
+There is a TODO in the source suggesting a nonempty list type.
+~primary_id()~ returns ~Result~ to handle the empty case that
+should never arise.
+
+#+begin_src rust
+// Current
+pub ids : Vec<ID>,
+
+// Better (two fields)
+pub pid       : ID,
+pub extra_ids : Vec<ID>,
+#+end_src
+
+Or use a nonempty-vec crate. Either way, ~primary_id()~ becomes
+infallible.
+
+* TODO Option<Vec<T>>: conflating "unknown" and "empty"
+
+~SkgNode~ uses ~Option<Vec<ID>>~ for ~contains~,
+~subscribes_to~, ~hides_from_its_subscriptions~, and
+~overrides_view_of~. The semantics:
+
+- ~None~ = "ViewNode said nothing; clobber with disk data later"
+- ~Some(vec![])~ = "user explicitly set this to empty"
+
+This is a meaningful distinction (see
+~supplement_none_fields_from_disk_if_save~) but ~Option<Vec>~ is
+fragile. A dedicated type makes the intent explicit:
+
+#+begin_src rust
+pub enum MaybeSpecified<T> {
+  Unspecified,       // was None: inherit from disk
+  Specified(Vec<T>), // was Some: use this value (even if empty)
+}
+#+end_src
+
+* TODO Functions that take ViewNodeKind but only handle TrueNode
+
+Many functions ~match~ on ~ViewNodeKind~ and ~panic!~ or
+~unreachable!~ on non-True variants:
+
+#+begin_example
+let ViewNodeKind::True (t) = &mut viewnode.kind
+  else { panic!("expected TrueNode") };
+#+end_example
+
+These should instead take ~&mut TrueNode~ directly, pushing the
+check to the caller (who is already in a ~match~ arm). This
+converts a runtime panic into a compile-time guarantee.
+
+* TODO Request/response types: stringly typed protocol
+
+Request types ("save-buffer", "search", "kill-buffer", ...)
+and response tags ("search-results", "save-lock", ...) are bare
+strings throughout the serve layer. An enum for each would catch
+typos at compile time and make the protocol self-documenting.
+
+* TODO UncheckedTrueNode: everything optional, but some fields always present
+
+~UncheckedTrueNode~ makes ~id_opt~ and ~source_opt~ optional
+(the whole point of "unchecked"). But it also carries
+~graphStats~, ~viewStats~, ~edit_request~, ~view_requests~, and
+~diff~, all of which are always present in the checked version
+too. Only ~id~ and ~source~ actually benefit from the
+checked/unchecked split.
+
+The two-struct approach adds boilerplate for 11 fields when only
+2 fields change optionality. An alternative: make TrueNode
+generic over its ID/source representation, or use a builder
+pattern.
+
+* AWAITS NodeDiffStatus mixes file, relationship, and source concerns
+
+#+begin_src rust
+pub enum NodeDiffStatus {
+  New,         // file was added
+  NewHere,     // exists in HEAD but not in this relationship
+  Removed,     // exists in HEAD, not in worktree
+  RemovedHere, // exists in worktree, not in this relationship
+  NotInGit,    // source is not a git repo
+}
+#+end_src
+
+Three different concerns in one enum:
+1. File-level diff (New, Removed)
+2. Relationship-level diff (NewHere, RemovedHere)
+3. Source metadata (NotInGit)
+
+Splitting into separate types would prevent, e.g., a Scaffold
+from being assigned ~NotInGit~ (which only makes sense for
+sources).
+
+* AWAITS Phantom nodes: inferred from diff, not typed
+
+A "phantom" node is a TrueNode where
+~diff == Some(Removed) || diff == Some(RemovedHere)~. The
+method ~is_phantom()~ encodes this. Phantom nodes must be
+skipped during preorder completion (no .skg file on disk), and
+they are display-only.
+
+This combines two concerns in one enum:
+- file-level change kind (New, Modified, Removed, NotInGit)
+- relationship-level change kind (NewHere, RemovedHere)
+
+And the "phantom" concept is an implicit consequence, not a
+first-class variant.
+
+#+begin_src rust
+// Possible split
+pub enum NodePresence {
+  Live { diff : Option<LiveDiffStatus> },
+  Phantom { reason : PhantomReason },
+}
+
+pub enum LiveDiffStatus { New, NewHere, Modified, NotInGit }
+pub enum PhantomReason  { Removed, RemovedHere }
+#+end_src
+
+This would let code that should never touch phantoms take
+~Live~ directly instead of checking ~is_phantom()~ at runtime.
+
+* AWAITS Scaffold parent-child rules: not typed
+
+The local validator (~validate_local_structure~) checks that:
+- Alias is under AliasCol
+- AliasCol is under TrueNode
+- ID is under IDCol
+- etc.
+
+These rules exist only as runtime predicates. A typed tree
+(where Scaffold children are constrained by their parent's type)
+would prevent illegal structures at construction time. This is
+hard to do with ~ego_tree~ (it's homogeneous), but worth noting
+as a long-term aspiration.
+
+* AWAITS path_from_pid_and_source: panics on invalid source
+
+This function uses ~.expect()~ and crashes the server if passed
+a source name not in the config. It should return ~Result~.
+The same pattern appears in a few other places (e.g. some
+~.unwrap()~ calls on map lookups in hot paths).
+
+Every ~.expect()~ that can fire on user-influenced data is a
+latent server crash. A type-level audit of "which functions can
+panic on bad input?" would be worthwhile.
+
+* AWAITS EditRequest + ViewRequest: no constraint on combinations
+
+~edit_request: Option<EditRequest>~ allows at most one edit
+request. ~view_requests: HashSet<ViewRequest>~ allows many view
+requests. But certain combinations are semantically nonsensical:
+
+- Delete + Definitive view request
+- Delete + Containerward view request
+- Merge + any view request (merge is destructive)
+
+These are validated at runtime, not prevented by types. A
+state-machine encoding would make illegal combinations
+unrepresentable.
+
+* AWAITS GraphNodeStats defaults: possibly misleading
+
+#+begin_src rust
+impl Default for GraphNodeStats {
+  fn default() -> Self {
+    GraphNodeStats {
+      numContainers     : Some(1),  // assumes single container
+      numContents       : Some(0),
+      numLinksIn        : Some(0),
+      containerwardPath : None,
+    }}}
+#+end_src
+
+~numContainers: Some(1)~ is the right default for root nodes but
+wrong for everything else. These stats are overwritten later by
+~set_graphnodestats_in_forest~, so the defaults are transient.
+But if any code path skips that enrichment (e.g. a new view type
+that doesn't call it), the defaults silently produce wrong data.
+
+Consider ~numContainers: None~ as the default, and treating
+~None~ as "not yet computed" in the renderer.
+
+* DONE parentIsContainer / parentIsContent: two bools instead of one enum
+
+ViewNodeStats has:
+
+#+begin_src rust
+pub parentIsContainer : bool,
+pub parentIsContent   : bool,
+#+end_src
+
+These are near-mutually-exclusive. The type permits
+~(true, true)~, which has no meaning. Should be:
+
+#+begin_src rust
+pub enum ParentRelation {
+  Container,   // parent contains this node
+  Content,     // this node contains its parent
+  Neither,     // parent is a scaffold, or no parent
+}
+#+end_src
+
+The default ~(true, false)~ encodes "Container" but is
+misleading when the parent is a Scaffold (neither relationship
+applies). A three-valued enum would be self-documenting.
+
+** Jeff here: Both can be true.
+   That's a cycle.
+   Should be unusual, but we can't prevent the user from making those.

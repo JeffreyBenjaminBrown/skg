@@ -53,50 +53,17 @@ pub(crate) fn insert_containerward_paths_into_search_view (
         // Each path step becomes a deeper child.
         let mut parent_nid : NodeId = level2_nid;
         for path_node_id in &path . path {
-          let (title, source) : (String, SourceName) =
-            title_and_source_by_id ( tantivy_index, path_node_id )
-            . unwrap_or_else ( ||
-              ( path_node_id . as_str () . to_string (),
-                SourceName::from ("search") ) );
-          let _ = skgnode_from_map_or_disk (
-            path_node_id, &source, pool, config );
-          let child_nid : NodeId = {
-            let mut parent_mut : NodeMut<ViewNode> =
-              forest . get_mut (parent_nid) . unwrap ();
-            parent_mut . append ( ViewNode {
-              focused : false,
-              folded  : false,
-              kind    : ViewNodeKind::Scaff (
-                Scaffold::SearchResult {
-                  id         : path_node_id . clone (),
-                  source,
-                  title,
-                  graphStats : GraphNodeStats::default () } ) } )
-            . id () };
-          parent_nid = child_nid; }
+          parent_nid = append_search_result_child_from_tantivy (
+            path_node_id, parent_nid,
+            forest, tantivy_index, pool, config ); }
         if ! path . branches . is_empty () // It ends at a fork.
         { let mut sorted_branches : Vec < &ID > =
             path . branches . iter () . collect ();
           sorted_branches . sort ();
           for branch_id in sorted_branches {
-            let (title, source) : (String, SourceName) =
-              title_and_source_by_id ( tantivy_index, branch_id )
-              . unwrap_or_else ( ||
-                ( branch_id . as_str () . to_string (),
-                  SourceName::from ("search") ) );
-            let _ = skgnode_from_map_or_disk (
-              branch_id, &source, pool, config );
-            let mut parent_mut : NodeMut<ViewNode> =
-              forest . get_mut (parent_nid) . unwrap ();
-            parent_mut . append ( ViewNode {
-              focused : false,
-              folded  : false,
-              kind    : ViewNodeKind::Scaff (
-                Scaffold::SearchResult {
-                  id         : branch_id . clone (),
-                  source,
-                  title,
-                  graphStats : GraphNodeStats::default () } ) } ); }}
+            append_search_result_child_from_tantivy (
+              branch_id, parent_nid,
+              forest, tantivy_index, pool, config ); }}
         if ! path . cycle_nodes . is_empty ()
            && path . branches . is_empty ()
            // it ends at a non-fork cycle
@@ -104,24 +71,41 @@ pub(crate) fn insert_containerward_paths_into_search_view (
             path . cycle_nodes . iter () . collect ();
           sorted_cycles . sort ();
           for cycle_id in sorted_cycles {
-            let (title, source) : (String, SourceName) =
-              title_and_source_by_id ( tantivy_index, cycle_id )
-              . unwrap_or_else ( ||
-                ( cycle_id . as_str () . to_string (),
-                  SourceName::from ("search") ) );
-            let _ = skgnode_from_map_or_disk (
-              cycle_id, &source, pool, config );
-            let mut parent_mut : NodeMut<ViewNode> =
-              forest . get_mut (parent_nid) . unwrap ();
-            parent_mut . append ( ViewNode {
-              focused : false,
-              folded  : false,
-              kind    : ViewNodeKind::Scaff (
-                Scaffold::SearchResult {
-                  id         : cycle_id . clone (),
-                  source,
-                  title,
-                  graphStats : GraphNodeStats::default () } ) } ); }} }} }}
+            append_search_result_child_from_tantivy (
+              cycle_id, parent_nid,
+              forest, tantivy_index, pool, config ); }} }} }}
+
+/// Looks up a node's title and source from Tantivy,
+/// populates the SkgNode pool, and
+/// appends a SearchResult scaffold child under the given parent.
+/// Returns the new child's NodeId.
+fn append_search_result_child_from_tantivy (
+  node_id       : &ID,
+  parent_nid    : NodeId,
+  forest        : &mut Tree<ViewNode>,
+  tantivy_index : &TantivyIndex,
+  pool          : &mut HashMap<ID, SkgNode>,
+  config        : &SkgConfig,
+) -> NodeId {
+  let (title, source) : (String, SourceName) =
+    title_and_source_by_id ( tantivy_index, node_id )
+    . unwrap_or_else ( ||
+      ( node_id . as_str () . to_string (),
+        SourceName::from ("search") ) );
+  let _ = skgnode_from_map_or_disk (
+    node_id, &source, pool, config );
+  let mut parent_mut : NodeMut<ViewNode> =
+    forest . get_mut (parent_nid) . unwrap ();
+  parent_mut . append ( ViewNode {
+    focused : false,
+    folded  : false,
+    kind    : ViewNodeKind::Scaff (
+      Scaffold::SearchResult {
+        id         : node_id . clone (),
+        source,
+        title,
+        graphStats : GraphNodeStats::default () } ) } )
+  . id () }
 
 /// Compute containerward paths for a list of search result IDs.
 /// Uses level-by-level frontier expansion: at each depth level,
