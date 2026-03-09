@@ -6,7 +6,7 @@ use crate::to_org::util::collect_ids_from_tree;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::skgnode::SkgNode;
-use crate::types::viewnode::{GraphNodeStats, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{GraphNodeStats, Scaffold, ViewNode, ViewNodeKind};
 
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
@@ -55,25 +55,38 @@ pub fn set_metadata_relationships_in_node_recursive (
   // PITFALL: Disk lookup (skgnode_from_map_or_disk) mutably borrows map, so it must happen in a separate block from the mutable tree borrow below.
   let new_stats : Option < GraphNodeStats > =
     { // PITFALL: Uses 'false' for phantom and deleted nodes. Getting 'true' where appropriate would be expensive, requiring inquiry into the git history not just of the phantom, but also of things it was connected to.
-      if let ViewNodeKind::True (t)
-        = & tree . get (treeid) . unwrap () . value () . kind
-        { let skgnode_opt : Option<&SkgNode> =
-            // PITFALL: skgnode_from_map_or_disk panics if the source isn't in the config (e.g. "search" for search result nodes). Guard against this by only attempting disk lookup when the source exists.
-            // TODO: Better would be to use a new kind of ViewNode for search results.
-            if map . contains_key (&t . id)
-               || config . sources . contains_key (&t . source)
+      match & tree . get (treeid) . unwrap () . value () . kind {
+        ViewNodeKind::True (t) => {
+          let skgnode_opt : Option<&SkgNode> =
+            skgnode_from_map_or_disk (
+              &t . id, &t . source, map, config
+            ). ok ();
+          Some ( graphnodestats_for_pid (
+            &t . id, stats, skgnode_opt )) },
+        ViewNodeKind::Scaff (
+          Scaffold::SearchResult { id, source, .. }
+        ) => {
+          let skgnode_opt : Option<&SkgNode> =
+            if map . contains_key (id)
+               || config . sources . contains_key (source)
               { skgnode_from_map_or_disk (
-                  &t . id, &t . source, map, config
-                  ). ok ()
+                  id, source, map, config
+                ). ok ()
               } else { None };
           Some ( graphnodestats_for_pid (
-            &t . id, stats, skgnode_opt )) }
-        else { None } // Scaff, Deleted, DeletedScaff
+            id, stats, skgnode_opt )) },
+        _ => None } // Other Scaff, Deleted, DeletedScaff
     };
-  if let Some (gs) = new_stats {
-    if let ViewNodeKind::True (t)
-      = &mut tree . get_mut (treeid) . unwrap () . value () . kind
-      { t . graphStats = gs; } }
+  match new_stats {
+    Some (gs) => match &mut tree . get_mut (treeid)
+                         . unwrap () . value () . kind {
+      ViewNodeKind::True (t) =>
+        { t . graphStats = gs; },
+      ViewNodeKind::Scaff (
+        Scaffold::SearchResult { graphStats, .. }
+      ) => { *graphStats = gs; },
+      _ => {} },
+    None => {} }
   let child_treeids : Vec < NodeId > =
     tree . get (treeid) . unwrap ()
     . children () . map ( | c | c . id () ) . collect ();

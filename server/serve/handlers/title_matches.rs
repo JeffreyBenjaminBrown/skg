@@ -11,20 +11,14 @@ use crate::consts::SEARCH_DISPLAY_LIMIT;
 use crate::context::ContextOriginType;
 use crate::dbs::tantivy::search_index;
 use crate::dbs::typedb::paths::PathToFirstNonlinearity;
-use crate::dbs::typedb::search::all_graphnodestats::{
-  AllGraphNodeStats, fetch_all_graphnodestats};
+use crate::dbs::typedb::search::all_graphnodestats::{ AllGraphNodeStats, fetch_all_graphnodestats};
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::serve::ConnectionState;
-use crate::serve::util::{
-  send_response_with_length_prefix,
-  tag_text_response};
+use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
 use crate::types::memory::skgnode_from_map_or_disk;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
-use crate::types::viewnode::{
-  ViewNode, ViewNodeKind, TrueNode, Scaffold, ViewUri,
-  default_truenode, forest_root_viewnode,
-  mk_indefinitive_viewnode};
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ViewUri, GraphNodeStats, forest_root_viewnode};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use sexp::{Sexp, Atom};
@@ -333,14 +327,10 @@ pub fn build_search_forest (
     root_mut . append ( ViewNode {
       focused : false,
       folded  : false,
-      kind    : ViewNodeKind::True (
-        // TODO : This ought to use a new, separate kind of ViewNode.
-        TrueNode { parent_ignores : true,
-                   .. default_truenode (
-                     ID::from ("search-results"),
-                     SourceName::from ("search"),
-                     search_terms . to_string () ) } ) }
-    ). id () };
+      kind    : ViewNodeKind::Scaff (
+        Scaffold::SearchResultCol {
+          query : search_terms . to_string () } ) } )
+    . id () };
   let mut id_entries : Vec < ( &ID,
                                &SourceName,
                                &Vec < ( f32, String ) > ) > =
@@ -356,7 +346,7 @@ pub fn build_search_forest (
     score_b . partial_cmp (& score_a)
     . unwrap_or (std::cmp::Ordering::Equal) } );
   let mut result_ids : Vec < ID > = Vec::new ();
-  for (id, _source, matches) in id_entries . iter ()
+  for (id, source, matches) in id_entries . iter ()
         . take (SEARCH_DISPLAY_LIMIT)
     { result_ids . push ( (*id) . clone () );
       let mut sorted_matches : Vec < &(f32, String) > =
@@ -367,16 +357,19 @@ pub fn build_search_forest (
         b . 0 . partial_cmp (&a . 0) . unwrap () );
       let (score, title) : &(f32, String) = sorted_matches [0];
       let level2_treeid : NodeId = {
-        // We make one of these, indefinitive, for each ID found
+        // We make one of these for each ID found
         let mut level1_mut : NodeMut<ViewNode> =
           forest . get_mut (level1_treeid) . unwrap ();
-        level1_mut . append (
-          mk_indefinitive_viewnode (
-            (*id) . clone (),
-            SourceName::from ("search"),
-            format! ( "score: {:.2}, [[id:{}][{}]]",
-                      score, id . as_str (), title ),
-            true ))
+        level1_mut . append ( ViewNode {
+          focused : false,
+          folded  : false,
+          kind    : ViewNodeKind::Scaff (
+            Scaffold::SearchResult {
+              id         : (*id) . clone (),
+              source     : (*source) . clone (),
+              title      : format! ( "score: {:.2}, [[id:{}][{}]]",
+                                     score, id . as_str (), title ),
+              graphStats : GraphNodeStats::default () } ) } )
         . id () };
       if sorted_matches . len () > 1 {
         // We bury all but the best match in an AliasCol.

@@ -111,7 +111,7 @@ pub struct ViewNodeStats {
 /// Scaffold nodes are display-only structures
 /// that don't correspond per se to nodes in the graph,
 /// but encode information about the ViewNodes around them.
-#[derive( Debug, Clone, PartialEq, Eq )]
+#[derive( Debug, Clone, PartialEq )]
 pub enum Scaffold {
   Alias { text: String, // an alias for the node's grandparent
           diff: Option<FieldDiffStatus> },
@@ -122,6 +122,11 @@ pub enum Scaffold {
   ID { id: ID, // an ID of the node's grandparent.
        diff: Option<FieldDiffStatus> },
   IDCol, // Collects (as children) Scaffold::IDs for its parent.
+  SearchResultCol { query : String }, // Shows search results as its children. The query string is shown as its title.
+  SearchResult { id         : ID,
+                 source     : SourceName,
+                 title      : String,
+                 graphStats : GraphNodeStats },
   SubscribeeCol, // Collects subscribees for its parent.
   TextChanged, // Indicates title/body changed between disk and HEAD. Visible in 'git diff mode'.
 }
@@ -136,10 +141,12 @@ pub enum ScaffoldKind { Alias,
                         BufferRoot,
                         HiddenInSubscribeeCol,
                         HiddenOutsideOfSubscribeeCol,
-                        SubscribeeCol,
-                        TextChanged,
                         IDCol,
-                        ID, }
+                        ID,
+                        SearchResultCol,
+                        SearchResult,
+                        SubscribeeCol,
+                        TextChanged, }
 
 /// Requests for editing operations on a node.
 /// Only one edit request is allowed per node.
@@ -208,6 +215,8 @@ impl ScaffoldKind {
     ("textChanged",                  ScaffoldKind::TextChanged),
     ("idCol",                        ScaffoldKind::IDCol),
     ("id",                           ScaffoldKind::ID),
+    ("searchResultCol",              ScaffoldKind::SearchResultCol),
+    ("searchResult",                 ScaffoldKind::SearchResult),
   ];
 
   /// String representation as used in Emacs metadata sexps.
@@ -231,6 +240,7 @@ impl ScaffoldKind {
       ScaffoldKind::SubscribeeCol                => "it subscribes to these",
       ScaffoldKind::HiddenInSubscribeeCol        => "hidden from this subscription",
       ScaffoldKind::HiddenOutsideOfSubscribeeCol => "hidden from all subscriptions",
+      ScaffoldKind::SearchResultCol              => "",
       _                                          => "",
     }} }
 
@@ -247,6 +257,8 @@ impl Scaffold {
       Scaffold::TextChanged                  => ScaffoldKind::TextChanged,
       Scaffold::IDCol                        => ScaffoldKind::IDCol,
       Scaffold::ID { .. }                    => ScaffoldKind::ID,
+      Scaffold::SearchResultCol { .. }       => ScaffoldKind::SearchResultCol,
+      Scaffold::SearchResult { .. }          => ScaffoldKind::SearchResult,
     }}
 
   /// Compare scaffold kinds. For Alias/ID, compares variant only (ignoring payload).
@@ -259,9 +271,11 @@ impl Scaffold {
 
   pub fn title (&self) -> &str {
     match self {
-      Scaffold::Alias { text, .. } => text,
-      Scaffold::ID { id, .. }      => id,
-      _                            => self . kind () . default_title (),
+      Scaffold::Alias           { text, .. }  => text,
+      Scaffold::ID              { id, .. }    => id,
+      Scaffold::SearchResultCol { query, .. } => query,
+      Scaffold::SearchResult    { title, .. } => title,
+      _ => self . kind () . default_title (),
     }}
 
   /// A distinguishable label for use in error messages.
@@ -273,6 +287,10 @@ impl Scaffold {
         format!( "scaffold:alias({})", text ),
       Scaffold::ID { id, .. } =>
         format!( "scaffold:id({})", id ),
+      Scaffold::SearchResultCol { query, .. } =>
+        format!( "scaffold:searchResultCol({})", query ),
+      Scaffold::SearchResult { id, .. } =>
+        format!( "scaffold:searchResult({})", id ),
       _ =>
         format!( "scaffold:{}", self . repr_in_client() ),
     }} }

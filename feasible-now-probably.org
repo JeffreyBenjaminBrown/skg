@@ -107,6 +107,15 @@ If anything blocks your progress that needs my attention, ping me.
   and (skg focused) appeared,
   and then it took forever for the buffer to update
   (so that (skg focused) is replaced with a dot).
+* TODO items seem to disappear from the Tantivy index.
+  I search for some text. I visit one of the results.
+  I add a new leaf with 'JEFF TESTING'.
+  I save. Now when I search for the same text,
+  the node I previously visited is no longer in the search results.
+
+  (THis will be annoying to test,
+  because the fact that the index keeps mutating
+  makes it hard to repeat.)
 * TODO Bug: C-x C-s not always overridden by skg-save
   in skg buffers. Maybe the first one it always does,
   but subsequent ones not so? Not sure what the pattern is.

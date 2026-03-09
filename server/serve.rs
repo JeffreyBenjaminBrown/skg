@@ -25,7 +25,7 @@ use crate::serve::util::{
   send_response_with_length_prefix,
   tag_text_response};
 use crate::org_to_text::viewnode_forest_to_string;
-use crate::serve::handlers::title_matches::render_enriched_search_buffer::insert_containerward_paths_into_forest;
+use crate::serve::handlers::title_matches::render_enriched_search_buffer::insert_containerward_paths_into_search_view;
 use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::viewnode::ViewUri;
 use crate::types::memory::SkgnodesInMemory;
@@ -213,7 +213,7 @@ fn handle_emacs (
             // both its forest and the pool without conflicting borrows
             // on conn_state.memory.
             if let Some (mut vs) = conn_state . memory . views . remove (&uri) {
-              insert_containerward_paths_into_forest (
+              insert_containerward_paths_into_search_view (
                 &mut vs . forest, &payload . result_ids,
                 &payload . paths_by_id, &tantivy_index,
                 &mut conn_state . memory . pool, config );

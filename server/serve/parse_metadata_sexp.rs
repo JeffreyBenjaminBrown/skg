@@ -54,6 +54,8 @@ pub struct ViewnodeMetadata {
   pub is_deleted_node: bool,
   // When Some, this is a DeletedScaff carrying its kind.
   pub deleted_scaff_kind: Option<ScaffoldKind>,
+  // When true, this is a SearchResult scaffold (id, source, graphStats are used).
+  pub is_search_result: bool,
 }
 
 pub fn default_metadata() -> ViewnodeMetadata {
@@ -72,7 +74,8 @@ pub fn default_metadata() -> ViewnodeMetadata {
     truenode_diff: None,
     scaffold_diff: None,
     is_deleted_node: false,
-    deleted_scaff_kind: None, }}
+    deleted_scaff_kind: None,
+    is_search_result: false, }}
 
 /// Create an UncheckedViewNode from parsed metadata components.
 /// This is the bridge between parsing (ViewnodeMetadata) and runtime (UncheckedViewNode).
@@ -86,6 +89,15 @@ pub fn viewnode_from_metadata (
     : (UncheckedViewNodeKind, Option<BufferValidationError>)
     = if let Some (kind) = metadata . deleted_scaff_kind {
         ( UncheckedViewNodeKind::DeletedScaff (kind), None )
+      } else if metadata . is_search_result {
+        ( UncheckedViewNodeKind::Scaff ( Scaffold::SearchResult {
+            id         : metadata . id . clone ()
+                           . unwrap_or_else ( || ID::from ("")),
+            source     : metadata . source . clone ()
+                           . unwrap_or_else ( || SourceName::from ("")),
+            title,
+            graphStats : metadata . graphStats . clone (),
+          } ), None )
       } else if metadata . is_deleted_node {
         ( UncheckedViewNodeKind::Deleted ( DeletedNode {
             id     : metadata . id . clone ()
@@ -110,6 +122,9 @@ pub fn viewnode_from_metadata (
           Scaffold::ID    { .. } => Scaffold::ID {
                               id: title . clone () . into (),
                               diff: metadata . scaffold_diff },
+          Scaffold::SearchResultCol { .. } =>
+            Scaffold::SearchResultCol {
+              query: title . clone () },
           other => other . clone () };
         ( UncheckedViewNodeKind::Scaff (scaffold_with_title), error )
       } else {
@@ -189,6 +204,9 @@ pub fn parse_metadata_to_viewnodemd (
               ScaffoldKind::from_client_string (&kind_str)
                 . ok_or_else ( || format! ( "Invalid ScaffoldKind value: {}", kind_str ) ) ?;
             result . deleted_scaff_kind = Some (kind); },
+          "searchResult" => {
+            result . is_search_result = true;
+            parse_search_result_sexp ( &items[1..], &mut result ) ?; },
           // Note: "alias" as a list like (alias "string") is no longer supported.
           // Use bare "alias" atom instead - the alias string comes from headline title.
           // Legacy format detection - reject with helpful error
@@ -222,6 +240,8 @@ pub fn parse_metadata_to_viewnodemd (
             result . scaffold = Some (Scaffold::IDCol),
           "id" =>
             result . scaffold = Some ( Scaffold::ID { id: ID::default(), diff: None } ),
+          "searchResultCol" =>
+            result . scaffold = Some ( Scaffold::SearchResultCol { query: String::new () } ),
           "deletedScaffold" =>
             return Err ( "deletedScaffold as bare atom is no longer supported; use (deletedScaffold kindString)" . to_string () ),
           _ => {
@@ -314,6 +334,37 @@ fn parse_deleted_sexp (
           _ => { return Err ( format! ( "Unknown deleted key: {}",
                                          key )); }} },
       _ => { return Err ( "Unexpected element in deleted sexp"
+                           . to_string () ); }} }
+  Ok (( )) }
+
+/// Parse the (searchResult (id X) (source S) [(graphStats ...)]) contents.
+fn parse_search_result_sexp (
+  items    : &[Sexp],
+  metadata : &mut ViewnodeMetadata,
+) -> Result<(), String> {
+  for element in items {
+    match element {
+      Sexp::List (subitems) if subitems . len () >= 1 => {
+        let key : String =
+          atom_to_string ( &subitems[0] ) ?;
+        match key . as_str () {
+          "id" => {
+            if subitems . len () != 2 {
+              return Err ( "searchResult id requires exactly one value" . to_string () ); }
+            let value : String =
+              atom_to_string ( &subitems[1] ) ?;
+            metadata . id = Some ( ID::from (value)); },
+          "source" => {
+            if subitems . len () != 2 {
+              return Err ( "searchResult source requires exactly one value" . to_string () ); }
+            let value : String =
+              atom_to_string ( &subitems[1] ) ?;
+            metadata . source = Some ( SourceName::from (value)); },
+          "graphStats" => {
+            parse_graphstats_sexp ( &subitems[1..], &mut metadata . graphStats ) ?; },
+          _ => { return Err ( format! ( "Unknown searchResult key: {}",
+                                         key )); }} },
+      _ => { return Err ( "Unexpected element in searchResult sexp"
                            . to_string () ); }} }
   Ok (( )) }
 

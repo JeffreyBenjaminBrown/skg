@@ -1,4 +1,3 @@
-* distinguish search nodes from truenodes
 * visit a node from its URI or filename
   e.g. with cursor on the filename in
   557a869b-02ba-4c59-a5d3-5fb469a12353.skg
@@ -20,6 +19,8 @@
 *** do until all of node's children
 *** delete in view-descendents all parent-ignores branches
 ** Branching containerward is slow.
+* import org-roam
+  cargo run --bin skg -- import-org-roam public/ data/public/ public
 * magit bug!
 I just copoied this text from magit:
 

@@ -1,6 +1,5 @@
-use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, EditRequest,
-};
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, EditRequest, GraphNodeStats };
+crate::types::viewnode::
 
 use ego_tree::{NodeRef, Tree};
 use std::error::Error;
@@ -129,6 +128,16 @@ fn scaffold_metadata_to_string (
       parts . push ( "id" . to_string () );
       if let Some (d) = diff {
         parts . push ( format! ( "(diff {})", d . repr_in_client() ) ); }}
+    Scaffold::SearchResultCol { .. } =>
+      parts . push ( "searchResultCol" . to_string () ),
+    Scaffold::SearchResult { id, source, graphStats, .. } => {
+      let mut sr_parts : Vec < String > =
+        vec! [ "searchResult" . to_string () ];
+      sr_parts . push ( format! ( "(id {})", id . 0 ));
+      sr_parts . push ( format! ( "(source {})", source ));
+      if let Some (gs) = search_result_graph_stats (graphStats) {
+        sr_parts . push (gs); }
+      parts . push ( format! ( "({})", sr_parts . join (" ") )); }
   }
   Ok ( parts . join (" ")) }
 
@@ -254,6 +263,36 @@ fn deleted_scaff_metadata_to_string (
   parts . push ( format! ( "(deletedScaffold {})",
                            kind . repr_in_client () ) );
   parts . join (" ") }
+
+fn search_result_graph_stats (
+  gs : &GraphNodeStats,
+) -> Option < String > {
+  let mut parts : Vec < String > = Vec::new ();
+  if gs . numContainers != Some (1) {
+    if let Some (count) = gs . numContainers {
+      parts . push ( format! ( "(containers {})", count )); }}
+  if gs . numContents != Some (0) {
+    if let Some (count) = gs . numContents {
+      parts . push ( format! ( "(contents {})", count )); }}
+  if gs . numLinksIn != Some (0) {
+    if let Some (count) = gs . numLinksIn {
+      parts . push ( format! ( "(linksIn {})", count )); }}
+  if gs . aliasing {
+    parts . push ( "aliasing" . to_string () ); }
+  if gs . extraIDs {
+    parts . push ( "extraIDs" . to_string () ); }
+  if gs . overriding {
+    parts . push ( "overriding" . to_string () ); }
+  if gs . subscribing {
+    parts . push ( "subscribing" . to_string () ); }
+  if let Some (ref cp) = gs . containerwardPath {
+    if cp . length > 0 || cp . forks > 1 || cp . cycles {
+      parts . push (
+        format! ( "(containerwardPath {})",
+                  cp . to_display_atom () )); }}
+  if parts . is_empty () { None }
+  else { Some ( format! (
+           "(graphStats {})", parts . join (" ") )) }}
 
 fn org_bullet ( level: usize ) -> String {
   "*" . repeat ( level . max (1)) }

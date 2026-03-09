@@ -8,10 +8,10 @@ use crate::dbs::typedb::search::find_container_ids_of_pid;
 use crate::types::memory::skgnode_from_map_or_disk;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::types::skgnode::SkgNode;
-use crate::types::viewnode::mk_indefinitive_viewnode;
+use crate::types::viewnode::{
+  ViewNode, ViewNodeKind, Scaffold, GraphNodeStats};
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
-use crate::types::viewnode::ViewNode;
 use std::collections::{HashMap, HashSet};
 use typedb_driver::TypeDBDriver;
 
@@ -24,7 +24,7 @@ struct TrackedPath {
 /// Insert containerward path nodes into the search forest,
 /// under each level-2 result node.
 /// Also populates the pool with SkgNodes for each path node.
-pub(crate) fn insert_containerward_paths_into_forest (
+pub(crate) fn insert_containerward_paths_into_search_view (
   forest        : &mut Tree<ViewNode>,
   result_ids    : &[ID],
   paths_by_id   : &HashMap < ID, Vec < PathToFirstNonlinearity > >,
@@ -63,12 +63,15 @@ pub(crate) fn insert_containerward_paths_into_forest (
           let child_nid : NodeId = {
             let mut parent_mut : NodeMut<ViewNode> =
               forest . get_mut (parent_nid) . unwrap ();
-            parent_mut . append (
-              mk_indefinitive_viewnode (
-                path_node_id . clone (),
-                source,
-                title,
-                true ))
+            parent_mut . append ( ViewNode {
+              focused : false,
+              folded  : false,
+              kind    : ViewNodeKind::Scaff (
+                Scaffold::SearchResult {
+                  id         : path_node_id . clone (),
+                  source,
+                  title,
+                  graphStats : GraphNodeStats::default () } ) } )
             . id () };
           parent_nid = child_nid; }
         if ! path . branches . is_empty () // It ends at a fork.
@@ -85,12 +88,15 @@ pub(crate) fn insert_containerward_paths_into_forest (
               branch_id, &source, pool, config );
             let mut parent_mut : NodeMut<ViewNode> =
               forest . get_mut (parent_nid) . unwrap ();
-            parent_mut . append (
-              mk_indefinitive_viewnode (
-                branch_id . clone (),
-                source,
-                title,
-                true )); }}
+            parent_mut . append ( ViewNode {
+              focused : false,
+              folded  : false,
+              kind    : ViewNodeKind::Scaff (
+                Scaffold::SearchResult {
+                  id         : branch_id . clone (),
+                  source,
+                  title,
+                  graphStats : GraphNodeStats::default () } ) } ); }}
         if ! path . cycle_nodes . is_empty ()
            && path . branches . is_empty ()
            // it ends at a non-fork cycle
@@ -107,12 +113,15 @@ pub(crate) fn insert_containerward_paths_into_forest (
               cycle_id, &source, pool, config );
             let mut parent_mut : NodeMut<ViewNode> =
               forest . get_mut (parent_nid) . unwrap ();
-            parent_mut . append (
-              mk_indefinitive_viewnode (
-                cycle_id . clone (),
-                source,
-                title,
-                true )); }} }} }}
+            parent_mut . append ( ViewNode {
+              focused : false,
+              folded  : false,
+              kind    : ViewNodeKind::Scaff (
+                Scaffold::SearchResult {
+                  id         : cycle_id . clone (),
+                  source,
+                  title,
+                  graphStats : GraphNodeStats::default () } ) } ); }} }} }}
 
 /// Compute containerward paths for a list of search result IDs.
 /// Uses level-by-level frontier expansion: at each depth level,
