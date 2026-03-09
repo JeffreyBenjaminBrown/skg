@@ -14,8 +14,8 @@ If anything blocks your progress that needs my attention, ping me.
     "Press 'C-c C-c' to save changes, or 'C-x k' to cancel."
   but doing that just opens a new small temporary window with
   ```
-  Debugger entered--Lisp error: (wrong-type-argument commandp skg-edit--commit)
-  command-execute(skg-edit--commit)
+  Debugger entered--Lisp error: (wrong-type-argument commandp skg-sexp-edit--commit)
+  command-execute(skg-sexp-edit--commit)
   ```
 * DONE Bug: Cannot visit link.
   I opened the node titled
@@ -100,10 +100,7 @@ If anything blocks your progress that needs my attention, ping me.
     collateral content, explicitly clear its modified flag
     (or better, don't touch it at all — the real fix is
     the first-change-hook re-registration).
-* Bug: Upon adding parengIgnores to a truenode's metadata buffer and trying to save
-Debugger entered--Lisp error: (wrong-type-argument commandp skg-edit--commit)
-  command-execute(skg-edit--commit)
-* MAYBE DONE ? Saving takes forever.
+* TODO Saving takes forever.
   Added bare "JEFF TESTING SKG" leaf to "motivation",
   and (skg focused) appeared,
   and then it took forever for the buffer to update

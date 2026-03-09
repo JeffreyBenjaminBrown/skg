@@ -1,3 +1,6 @@
+* visit a node from its URI or filename
+  e.g. with cursor on the filename in
+  557a869b-02ba-4c59-a5d3-5fb469a12353.skg
 * The buffer ought to indicate that it is waiting for the server to update it.
 * present view of node's root(like) containerward ancestors
 ** Hopefully a root, otherwise a cycle; links are ignored.
@@ -9,7 +12,7 @@
 * (skg focused) should not appear in the buffer
   just in what is sent to the server
 * dogfooding
-** I damaged my data.
+** I may have damaged my data.
    I think I did. Searching for 'motivation' used,
    I'm sure, to return a hit with exactly that title.
 ** I wanted immediately upon trying it.

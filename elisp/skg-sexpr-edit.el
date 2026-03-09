@@ -15,46 +15,46 @@
 ;; Buffer-local variables for the edit buffer
 ;;
 
-(defvar-local skg-edit--source-buffer nil
+(defvar-local skg-sexp-edit--source-buffer nil
   "The buffer containing the sexp being edited.")
 
-(defvar-local skg-edit--sexp-start nil
+(defvar-local skg-sexp-edit--start nil
   "Start position of the sexp in the source buffer.")
 
-(defvar-local skg-edit--sexp-end nil
+(defvar-local skg-sexp-edit--end nil
   "End position of the sexp in the source buffer.")
 
 ;;
 ;; Minor mode for the edit buffer
 ;;
 
-(defvar skg-sexpr-edit-mode-map
+(defvar skg-sexp-edit-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-c") #'skg-edit--commit)
+    (define-key map (kbd "C-c C-c") #'skg-sexp-edit--commit)
     map)
-  "Keymap for skg-sexpr-edit-mode.")
+  "Keymap for skg-sexp-edit-mode.")
 
-(define-minor-mode skg-sexpr-edit-mode
+(define-minor-mode skg-sexp-edit-mode
   "Minor mode for editing sexps as org text.
-\\<skg-sexpr-edit-mode-map>
-\\[skg-edit--commit] to save changes back to the source buffer.
+\\<skg-sexp-edit-mode-map>
+\\[skg-sexp-edit--commit] to save changes back to the source buffer.
 Kill the buffer to cancel without saving."
   :lighter " SExp-Edit"
-  :keymap skg-sexpr-edit-mode-map)
+  :keymap skg-sexp-edit-mode-map)
 
 ;;
 ;; Core implementation
 ;;
 
-(defun skg-edit--commit ()
+(defun skg-sexp-edit--commit ()
   "Save changes from sexp-edit buffer back to the source sexp."
   (interactive)
   (let* ((org-text (buffer-substring-no-properties (point-min) (point-max)))
          (new-sexp (org-to-sexp org-text))
          (new-text (prin1-to-string new-sexp))
-         (source-buffer skg-edit--source-buffer)
-         (start skg-edit--sexp-start)
-         (end skg-edit--sexp-end))
+         (source-buffer skg-sexp-edit--source-buffer)
+         (start skg-sexp-edit--start)
+         (end skg-sexp-edit--end))
     (kill-buffer)
     (switch-to-buffer source-buffer)
     (goto-char start)
@@ -101,9 +101,9 @@ buffer, leaving point at the end of the sexp."
       (insert org-text)
       (goto-char (point-min))
       (org-mode)
-      (skg-sexpr-edit-mode 1)
-      (setq-local skg-edit--source-buffer source-buffer)
-      (setq-local skg-edit--sexp-start sexp-start)
-      (setq-local skg-edit--sexp-end sexp-end))))
+      (skg-sexp-edit-mode 1)
+      (setq-local skg-sexp-edit--source-buffer source-buffer)
+      (setq-local skg-sexp-edit--start sexp-start)
+      (setq-local skg-sexp-edit--end sexp-end))))
 
 (provide 'skg-sexpr-edit)
