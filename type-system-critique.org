@@ -31,7 +31,7 @@ pub enum ViewUri {
 Every ~starts_with("search:")~ check becomes a match arm.
 Impossible to forget.
 
-* TODO Functions that take ViewNodeKind but only handle TrueNode
+* DONE Functions that take ViewNodeKind but only handle TrueNode
 
 Many functions ~match~ on ~ViewNodeKind~ and ~panic!~ or
 ~unreachable!~ on non-True variants:
@@ -65,6 +65,13 @@ pub enum MaybeSpecified<T> {
 }
 #+end_src
 
+* TODO Request/response types: stringly typed protocol
+
+Request types ("save-buffer", "search", "kill-buffer", ...)
+and response tags ("search-results", "save-lock", ...) are bare
+strings throughout the serve layer. An enum for each would catch
+typos at compile time and make the protocol self-documenting.
+
 * TODO SkgNode.ids: Vec allows empty
 
 The ~ids~ field is ~Vec<ID>~ with a comment "Must be nonempty."
@@ -83,13 +90,6 @@ pub extra_ids : Vec<ID>,
 
 Or use a nonempty-vec crate. Either way, ~primary_id()~ becomes
 infallible.
-
-* TODO Request/response types: stringly typed protocol
-
-Request types ("save-buffer", "search", "kill-buffer", ...)
-and response tags ("search-results", "save-lock", ...) are bare
-strings throughout the serve layer. An enum for each would catch
-typos at compile time and make the protocol self-documenting.
 
 * TODO UncheckedTrueNode: everything optional, but some fields always present
 

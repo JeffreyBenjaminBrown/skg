@@ -3,20 +3,34 @@
 use crate::to_org::util::{skgnode_and_viewnode_from_id, get_id_from_treenode};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, Scaffold,
-    mk_indefinitive_viewnode,
+    ViewNode, ViewNodeKind, TrueNode, Scaffold,
+    mk_indefinitive_from_viewnode,
     viewnode_from_scaffold };
 use crate::types::unchecked_viewnode::{
     UncheckedViewNode, UncheckedViewNodeKind };
 use crate::types::skgnode::SkgNode;
 use crate::types::memory::SkgNodeMap;
 use crate::types::list::dedup_vector;
-use super::generic::with_node_mut;
+use super::generic::{write_at_node_in_tree, with_node_mut};
 
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
+
+/// Apply a mutating function to the TrueNode at the given tree position.
+/// Errors if the node is not found or is not a TrueNode.
+pub fn write_at_truenode_in_tree<F, R> (
+  tree   : &mut Tree<ViewNode>,
+  treeid : NodeId,
+  f      : F,
+) -> Result<R, String>
+where F: FnOnce (&mut TrueNode) -> R {
+  write_at_node_in_tree ( tree, treeid, |viewnode| {
+    match &mut viewnode . kind {
+      ViewNodeKind::True (t) => Ok ( f (t) ),
+      _ => Err ( "write_at_truenode_in_tree: expected TrueNode"
+                   . to_string () ) }} ) ? }
 
 /// Extract (ID, source) from a TrueNode in the tree.
 /// Returns an error if the node is not found or not a TrueNode.
@@ -154,15 +168,10 @@ pub async fn append_indefinitive_from_disk_as_child (
   let ( _skgnode, content_viewnode ) : ( SkgNode, ViewNode ) =
     skgnode_and_viewnode_from_id (
       config, driver, node_id, map ) . await ?;
-  let (id, source, title) : (ID, SourceName, String)
-  = match &content_viewnode . kind
-  { ViewNodeKind::True (t) => (
-      t . id . clone(),
-      t . source . clone(),
-      t . title . clone( )),
-    _ => return Err("append_indefinitive_from_disk_as_child: expected TrueNode" . into()) };
-  let viewnode : ViewNode = mk_indefinitive_viewnode (
-    id, source, title, parent_ignores );
+  let viewnode : ViewNode =
+    mk_indefinitive_from_viewnode (
+      content_viewnode, parent_ignores )
+    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   with_node_mut (
     tree, parent_id,
     |mut parent_mut| {

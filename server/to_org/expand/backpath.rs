@@ -13,10 +13,10 @@ use crate::to_org::util::{
 use crate::dbs::typedb::paths::{
   paths_to_first_nonlinearities,
   PathToFirstNonlinearity};
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::ViewRequest;
 use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, mk_indefinitive_viewnode };
+    ViewNode, mk_indefinitive_from_viewnode };
 use crate::types::memory::SkgNodeMap;
 use crate::types::tree::viewnode_skgnode::{
   find_child_by_id, find_children_by_ids};
@@ -234,16 +234,10 @@ async fn prepend_indefinitive_child_with_parent_ignores (
     skgnode_and_viewnode_from_id (
       config, driver, child_skgid, map
     ) . await ?;
-  let (id, source, title) : (ID, SourceName, String)
-  = match &child_viewnode . kind
-  { ViewNodeKind::True (t) => (
-      t . id . clone(),
-      t . source . clone(),
-      t . title . clone() ),
-    _ =>
-      return Err("prepend_indefinitive_child_with_parent_ignores: expected TrueNode" . into()) };
-  let viewnode : ViewNode = mk_indefinitive_viewnode (
-    id, source, title, true );
+  let viewnode : ViewNode =
+    mk_indefinitive_from_viewnode (
+      child_viewnode, true )
+    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   let new_child_treeid : NodeId =
     tree . get_mut (parent_treeid) . unwrap ()
     . prepend (viewnode) . id ();

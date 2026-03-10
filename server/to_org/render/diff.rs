@@ -7,7 +7,7 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_diff_status};
 use crate::types::memory::find_source_many_ways;
 use crate::types::skgnode::SkgNode;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, viewnode_from_scaffold, mk_phantom_viewnode, };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Scaffold, viewnode_from_scaffold, mk_phantom_viewnode, };
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::types::tree::viewnode_skgnode::pid_and_source_from_treenode;
 
@@ -83,9 +83,11 @@ fn process_truenode_diff (
     match source_diff . skgnode_diffs . get (&file_path) {
       Some (d) => d,
       None => return Ok (( )) }};
-  if maybe_mark_added_or_deleted ( // simpler than modifications
-      &mut node_mut, skgnode_diff ) ?
-    { return Ok (( )); }
+  { let ViewNodeKind::True ( ref mut t )
+      = node_mut . value() . kind
+      else { return Ok (( )) }; // not a TrueNode, nothing to do
+    if maybe_mark_added_or_deleted ( t, skgnode_diff )
+      { return Ok (( )); }}
   if let Some ( ref node_changes ) = skgnode_diff . node_changes {
     if node_changes . text_changed { // changes to text
       node_mut . prepend (
@@ -100,28 +102,19 @@ fn process_truenode_diff (
       config ) ?; }
   Ok (( )) }
 
-/// Try to handle file-level diff status (Added/Deleted).
-/// Returns - true if handled (caller should return),
-///         - false for Modified files.
+/// Mark a node, if appropriate, New or Removed.
+/// Returns true if it did that,
+/// false if it changed nothing (for Modified files).
 fn maybe_mark_added_or_deleted (
-  node_mut     : &mut NodeMut<ViewNode>,
+  t            : &mut TrueNode,
   skgnode_diff : &SkgnodeDiff,
-) -> Result<bool, String> {
-  let node_diff_status : Option<NodeDiffStatus> =
-    match skgnode_diff . status {
-      GitDiffStatus::Added    => Some (NodeDiffStatus::New),
-      GitDiffStatus::Deleted  => Some (NodeDiffStatus::Removed),
-      GitDiffStatus::Modified => None };
-  match node_diff_status {
-    Some (diff_status) => {
-      if let ViewNodeKind::True ( ref mut t )
-        = node_mut . value() . kind
-        { t . diff = Some (diff_status); }
-      else { return Err ( // if caller is correct, this is unreachable
-               "maybe_mark_added_or_deleted: expected TrueNode"
-               . to_string() ) }
-      Ok (true) },
-    None => Ok (false) }}
+) -> bool {
+  match skgnode_diff . status {
+    GitDiffStatus::Added    => { t . diff = Some (NodeDiffStatus::New);
+                                 true },
+    GitDiffStatus::Deleted  => { t . diff = Some (NodeDiffStatus::Removed);
+                                 true },
+    GitDiffStatus::Modified => false }}
 
 /// Prepend an IDCol scaffold to the input's children,
 /// populated with ID scaffold grandchildren.

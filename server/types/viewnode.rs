@@ -473,6 +473,21 @@ pub fn mk_indefinitive_viewnode (
                             None, // edit_request
                             HashSet::new ( )) } // view_requests
 
+/// Convert a definitive ViewNode to indefinitive.
+/// Errors if the input is not a TrueNode.
+pub fn mk_indefinitive_from_viewnode (
+  viewnode       : ViewNode,
+  parent_ignores : bool,
+) -> Result < ViewNode, String > {
+  let ViewNodeKind::True (t) = viewnode . kind
+    else { return Err (
+      "mk_indefinitive_from_viewnode: expected TrueNode"
+        . to_string () ) };
+  Ok ( mk_indefinitive_viewnode ( t . id,
+                                  t . source,
+                                  t . title,
+                                  parent_ignores )) }
+
 /// Create a ViewNode with *nearly* full metadata control.
 /// The exception is that the 'GraphNodeStats' and 'ViewNodeStats' are intentionally omitted,
 /// because it would be difficult and dangerous to set that in isolation,
@@ -488,15 +503,15 @@ pub fn mk_viewnode (
   view_requests  : HashSet < ViewRequest >,
 ) -> ViewNode {
   ViewNode { focused : false,
-            folded  : false,
-            kind    : ViewNodeKind::True (
-              TrueNode { body,
-                         parent_ignores,
-                         indefinitive,
-                         edit_request,
-                         view_requests,
-                         .. default_truenode (
-                           id, source, title ) } ) }}
+             folded  : false,
+             kind    : ViewNodeKind::True (
+               TrueNode { body,
+                          parent_ignores,
+                          indefinitive,
+                          edit_request,
+                          view_requests,
+                          .. default_truenode (
+                            id, source, title ) } ) }}
 
 /// Create a Scaffold ViewNode from a Scaffold.
 pub fn viewnode_from_scaffold ( scaffold : Scaffold ) -> ViewNode {

@@ -12,8 +12,8 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ContainerwardPathStats, mk_indefinitive_viewnode };
 use crate::types::skgnode::SkgNode;
 use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
-use crate::types::tree::generic::{read_at_node_in_tree, write_at_node_in_tree};
-use crate::types::tree::viewnode_skgnode::pid_and_source_from_treenode;
+use crate::types::tree::generic::read_at_node_in_tree;
+use crate::types::tree::viewnode_skgnode::{write_at_truenode_in_tree, pid_and_source_from_treenode};
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use std::collections::{BTreeSet,HashSet,HashMap};
@@ -75,12 +75,8 @@ async fn execute_containerwardstats_request (
       length : 0,
       forks  : 1,
       cycles : false } );
-  write_at_node_in_tree (
-    tree, node_id,
-    |viewnode| {
-      let ViewNodeKind::True (t) : &mut ViewNodeKind =
-        &mut viewnode . kind
-        else { unreachable! ("complete_truenode already verified this is a TrueNode") };
+  write_at_truenode_in_tree (
+    tree, node_id, |t| {
       t . graphStats . containerwardPath = Some (cp);
       t . view_requests . remove (& ViewRequest::ContainerwardStats); } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -132,12 +128,8 @@ async fn execute_definitive_view_request (
           forest, node_id, config ) ?; }
       else { from_disk_replace_title_body_and_skgnode (
                forest, map, node_id, config ) ?; }
-    write_at_node_in_tree (
-      forest, node_id,
-      |viewnode| {
-        let ViewNodeKind::True (t) : &mut ViewNodeKind =
-          &mut viewnode . kind
-          else { unreachable! ("complete_truenode already verified this is a TrueNode") };
+    write_at_truenode_in_tree (
+      forest, node_id, |t| {
         t . view_requests . remove (& ViewRequest::Definitive);
         t . indefinitive = false; } )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -314,10 +306,7 @@ fn from_disk_replace_title_body_and_skgnode (
   if title . is_empty () {
     return Err ( format! ( "SkgNode {} has empty title", pid ) . into () ); }
   let body : Option < String > = skgnode . body . clone ();
-  write_at_node_in_tree ( tree, node_id, |viewnode| { // Update viewnode
-    let ViewNodeKind::True (t) : &mut ViewNodeKind =
-      &mut viewnode . kind
-      else { unreachable! ("complete_truenode already verified this is a TrueNode") };
+  write_at_truenode_in_tree ( tree, node_id, |t| {
     t . title = title;
     t . body = body; } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -430,12 +419,8 @@ fn from_git_replace_title_body (
       "from_git_replace_title_body" ) ?;
   let skgnode : SkgNode =
     skgnode_from_git_head ( &pid, &src, config ) ?;
-  write_at_node_in_tree (
-    tree, node_id,
-    |viewnode| {
-      let ViewNodeKind::True (t) : &mut ViewNodeKind =
-        &mut viewnode . kind
-        else { unreachable! ("complete_truenode already verified this is a TrueNode") };
+  write_at_truenode_in_tree (
+    tree, node_id, |t| {
       t . title = skgnode . title;
       t . body = skgnode . body; } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;

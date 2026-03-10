@@ -5,7 +5,8 @@ use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::skgnode::SkgNode;
 use crate::types::tree::generations::collect_generation_ids;
-use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree, with_node_mut};
+use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
+use crate::types::tree::viewnode_skgnode::write_at_truenode_in_tree;
 use crate::types::viewnode::ViewRequest;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, forest_root_viewnode, mk_definitive_viewnode };
 
@@ -85,14 +86,9 @@ pub(super) fn makeIndefinitiveAndClobber (
   node_id : NodeId,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  write_at_node_in_tree (
+  write_at_truenode_in_tree (
     tree, node_id,
-    |viewnode| {
-      let ViewNodeKind::True (t) : &mut ViewNodeKind =
-        &mut viewnode . kind
-        else { panic! (
-                 "makeIndefinitiveAndClobber: expected TrueNode" ) };
-      t . indefinitive = true; }
+    |t| { t . indefinitive = true; }
     ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   clobberIndefinitiveViewnode ( tree, map, node_id, config ) ?;
   Ok (( )) }
@@ -139,16 +135,12 @@ pub fn make_indef_if_repeat_then_extend_defmap (
   let pid : ID = // Will error if node is a Scaffold.
     get_id_from_treenode ( tree, node_id ) ?;
   let is_indefinitive : bool =
-    write_at_node_in_tree ( // PITFALL: Does more than read.
+    write_at_truenode_in_tree (
       tree, node_id,
-      |viewnode|
-        { let ViewNodeKind::True (t) : &mut ViewNodeKind
-            = &mut viewnode . kind
-            else { unreachable!("In make_indef_if_repeat_then_extend_defmap, get_id_from_treenode already verified TrueNode"); };
-          if defMap . contains_key (&pid)
-            { // It's a repeat, so make it indefinitive.
-              t . indefinitive = true; }
-            t . indefinitive } )
+      |t| { if defMap . contains_key (&pid)
+               { // It's a repeat, so make it indefinitive.
+                 t . indefinitive = true; }
+             t . indefinitive } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   if !is_indefinitive {
     defMap . insert ( pid, node_id ); }
@@ -163,10 +155,7 @@ pub fn detect_and_mark_cycle_v1 (
   let is_cycle : bool = {
     let pid : ID = get_id_from_treenode ( tree, node_id ) ?;
     is_ancestor_id ( tree, node_id, &pid ) ? };
-  write_at_node_in_tree ( tree, node_id, |viewnode| {
-    let ViewNodeKind::True (t) : &mut ViewNodeKind =
-      &mut viewnode . kind
-      else { panic! ("detect_and_mark_cycle_v1: expected TrueNode") };
+  write_at_truenode_in_tree ( tree, node_id, |t| {
     t . viewStats . cycle = is_cycle; } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (( )) }
