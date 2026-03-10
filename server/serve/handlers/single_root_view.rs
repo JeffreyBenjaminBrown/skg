@@ -8,7 +8,7 @@ use crate::serve::util::{
   tag_text_response};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::misc::{SkgConfig, ID};
-use crate::types::viewnode::ViewUri;
+use crate::types::memory::ViewUri;
 
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
@@ -40,7 +40,7 @@ pub fn handle_single_root_view_request (
               Sexp::Atom ( Atom::S (
                 "switch-to-view" . to_string () )),
               Sexp::Atom ( Atom::S (
-                existing_uri . 0 . clone () )) ] ) ] )
+                existing_uri . repr_in_client () )) ] ) ] )
           . to_string ();
         send_response_with_length_prefix (
           stream,

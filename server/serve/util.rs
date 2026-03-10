@@ -1,5 +1,5 @@
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
-use crate::types::viewnode::ViewUri;
+use crate::types::memory::ViewUri;
 
 use sexp::{Sexp, Atom};
 use std::error::Error;
@@ -78,7 +78,7 @@ pub fn view_uri_from_request (
   request : &str,
 ) -> Result<ViewUri, String> {
   value_from_request_sexp ( "view-uri", request )
-    . map (ViewUri) }
+    . map (ViewUri::from_client_string) }
 
 /// Extract a value from a request like
 /// ((request . "type") (key . 'xyz))
@@ -127,7 +127,7 @@ pub(super) fn format_buffer_response_sexp_with_updates (
         collateral_views
           . iter ()
           . map ( |(uri, content)| Sexp::List ( vec! [
-            Sexp::Atom ( Atom::S ( uri . 0 . clone () )),
+            Sexp::Atom ( Atom::S ( uri . repr_in_client () )),
             Sexp::Atom ( Atom::S ( content . clone () )) ] ) )
           . collect () ) ] );
   Sexp::List ( vec! [
@@ -151,7 +151,7 @@ pub(super) fn format_collateral_uris_sexp (
 ) -> String {
   let uri_sexps : Vec<Sexp> =
     uris . iter ()
-    . map ( |u| Sexp::Atom ( Atom::S ( u . 0 . clone () )) )
+    . map ( |u| Sexp::Atom ( Atom::S ( u . repr_in_client () )) )
     . collect ();
   Sexp::List ( vec! [
     Sexp::List ( vec! [

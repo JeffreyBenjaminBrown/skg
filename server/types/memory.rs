@@ -2,7 +2,7 @@ use crate::dbs::filesystem::one_node::{skgnodes_from_ids, skgnode_from_pid_and_s
 use crate::types::many_to_many::ManyToMany;
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::skgnode::SkgNode;
-use crate::types::viewnode::{ViewUri, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use super::misc::{ID, SkgConfig, SourceName};
 use super::phantom::source_from_disk;
 
@@ -14,6 +14,13 @@ use typedb_driver::TypeDBDriver;
 //
 // Type declarations
 //
+
+/// Identifies a buffer in the client.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ViewUri {
+  ContentView (String), // UUID
+  SearchView  (String), // query
+}
 
 pub type SkgNodeMap = HashMap<ID, SkgNode>;
 
@@ -46,6 +53,21 @@ pub struct ViewState {
 //
 // Implementations
 //
+
+impl ViewUri {
+  /// Serialize to the client string format.
+  pub fn repr_in_client ( &self ) -> String {
+    match self {
+      ViewUri::ContentView (s) => s . clone (),
+      ViewUri::SearchView  (q) => format! ("search:{}", q) } }
+  /// Parse a client string to a ViewUri.
+  pub fn from_client_string ( s : String ) -> ViewUri {
+    if let Some (query) = s . strip_prefix ("search:") {
+      ViewUri::SearchView ( query . to_string () )
+    } else {
+      ViewUri::ContentView (s) } }
+  pub fn is_search ( &self ) -> bool {
+    matches! ( self, ViewUri::SearchView (_) ) } }
 
 impl SkgnodesInMemory {
   pub fn new () -> Self {

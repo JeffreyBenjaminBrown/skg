@@ -18,7 +18,8 @@ use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
 use crate::types::memory::skgnode_from_map_or_disk;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ViewUri, GraphNodeStats, forest_root_viewnode};
+use crate::types::memory::ViewUri;
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, GraphNodeStats, forest_root_viewnode};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use sexp::{Sexp, Atom};
@@ -123,7 +124,7 @@ pub fn handle_title_matches_request (
               id, source,
               &mut conn_state . memory . pool, config ); }
           let uri : ViewUri =
-            ViewUri ( format! ("search:{}", search_terms) );
+            ViewUri::SearchView ( search_terms . clone () );
           conn_state . memory . register_view (
             // Register the search view.
             uri, forest, &result_ids );

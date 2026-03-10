@@ -17,7 +17,8 @@ use crate::types::git::{SourceDiff, GitDiffStatus};
 use crate::types::misc::{ID, SourceName, SkgConfig, TantivyIndex};
 use crate::types::save::{DefineNode, Merge, format_save_error_as_org};
 use crate::types::memory::SkgNodeMap;
-use crate::types::viewnode::{ViewNode, ViewUri};
+use crate::types::memory::ViewUri;
+use crate::types::viewnode::ViewNode;
 use crate::update_buffer::update_views_after_save;
 
 use ego_tree::Tree;
@@ -74,8 +75,8 @@ pub fn handle_save_buffer_request (
           { it . insert ( pid, skgnode . clone () ); }} }
     tracing::debug!("save-diagnostic: view-uri={}, pool-size={}, pool-total={}",
               match &viewuri_from_request_result {
-                Ok (uri) => uri . 0 . as_str(),
-                Err (_) => "<nil>" },
+                Ok (uri) => uri . repr_in_client (),
+                Err (_) => "<nil>" . to_string () },
               it . len(),
               conn_state . memory . pool . len());
     it };
@@ -292,6 +293,6 @@ fn uris_of_views_to_lock (
   for pid in &pids {
     for uri in conn_state . memory . views_containing (pid) {
       if &uri != saved_uri
-        && ! uri . 0 . starts_with ("search:") // TODO: Formalize with an enum.
+        && ! uri . is_search ()
       { collateral_views . insert (uri); } } }
   collateral_views . into_iter () . collect () }

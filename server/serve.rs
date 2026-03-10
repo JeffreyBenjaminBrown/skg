@@ -27,7 +27,7 @@ use crate::serve::util::{
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::serve::handlers::title_matches::render_enriched_search_buffer::insert_containerward_paths_into_search_view;
 use crate::types::misc::{SkgConfig, TantivyIndex};
-use crate::types::viewnode::ViewUri;
+use crate::types::memory::ViewUri;
 use crate::types::memory::SkgnodesInMemory;
 
 use std::io::{BufRead, BufReader};
@@ -208,7 +208,7 @@ fn handle_emacs (
         if let Ok (mut guard) = enrichment_slot . try_lock () {
           if let Some (payload) = guard . take () {
             let uri : ViewUri =
-              ViewUri ( format! ("search:{}", payload . terms) );
+              ViewUri::SearchView ( payload . terms . clone () );
             // Remove the view temporarily so we can mutably borrow
             // both its forest and the pool without conflicting borrows
             // on conn_state.memory.

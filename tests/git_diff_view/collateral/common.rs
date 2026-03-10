@@ -5,7 +5,8 @@ pub use super::super::common::*;
 pub use ego_tree::Tree;
 
 pub use skg::serve::handlers::save_buffer::SaveResponse;
-pub use skg::types::viewnode::{ViewUri, ViewNode};
+pub use skg::types::memory::ViewUri;
+pub use skg::types::viewnode::ViewNode;
 
 /// The expected initial diff view for a containing b (text changed).
 pub const GIT_DIFF_VIEW: &str = "\

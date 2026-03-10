@@ -49,8 +49,8 @@ fn test_collateral_view_preserves_diff_annotations()
 
       // 3. Register buffer 1 and buffer 2,
       //    both viewing the same forest rooted at "a".
-      let uri_1 : ViewUri = ViewUri ( "buffer-1" . to_string() );
-      let uri_2 : ViewUri = ViewUri ( "buffer-2" . to_string() );
+      let uri_1 : ViewUri = ViewUri::ContentView ( "buffer-1" . to_string() );
+      let uri_2 : ViewUri = ViewUri::ContentView ( "buffer-2" . to_string() );
       conn_state . memory . register_view (
         uri_1 . clone (), forest . clone (), &pids );
       conn_state . memory . register_view (

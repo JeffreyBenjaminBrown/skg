@@ -22,7 +22,8 @@ use crate::types::memory::{SkgNodeMap, skgnode_map_from_save_instructions};
 use crate::types::tree::generic::{
   do_everywhere_in_tree_dfs,
   do_everywhere_in_tree_dfs_prunable};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, ViewUri};
+use crate::types::memory::ViewUri;
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -99,7 +100,7 @@ pub async fn update_views_after_save (
         "update_views_after_save: {} collateral view(s): {:?}",
         collateral_uris . len (),
         collateral_uris . iter ()
-          . map ( |u| &u . 0 )
+          . map ( |u| u . repr_in_client () )
           . collect::<Vec<_>> ()); }
     for curi in collateral_uris { // Identical pipeline, with each view building on the pool enriched by prior views.
       let mut forest : Tree<ViewNode> = match
@@ -107,7 +108,8 @@ pub async fn update_views_after_save (
           Some (f) => f . clone (),
           None => {
             errors . push ( format! (
-              "Collateral view {}: no viewforest found", curi . 0 ));
+              "Collateral view {}: no viewforest found",
+              curi . repr_in_client () ));
             continue; } };
       let mut map : SkgNodeMap =
         seed_skgnodemap_from_pool (&curi, conn_state);
@@ -125,7 +127,8 @@ pub async fn update_views_after_save (
           collateral_views . push (( curi, text )); },
         Err (e) => {
           errors . push ( format! (
-            "Collateral view {}: {}", curi . 0, e )); } } } }
+            "Collateral view {}: {}",
+            curi . repr_in_client (), e )); } } } }
   Ok ( SaveResponse { saved_view : saved_text,
                        errors, collateral_views } ) }
 
@@ -153,8 +156,7 @@ fn find_collateral_view_uris (
     changed_pids . iter ()
     . flat_map ( |pid| conn_state . memory . views_containing (pid) )
     . filter ( |uri| uri != saved_uri )
-    . filter ( |uri| ! uri . 0 . starts_with ("search:") ) // Search views contain fake "search" source nodes that crash rerender_view. They don't need collateral updates: the search results are fixed until the user searches again.
-    // TODO: Formalize with an enum the distinction between search views and content views.
+    . filter ( |uri| ! uri . is_search () ) // Search views don't need collateral updates: the search results are fixed until the user searches again.
     . collect ();
   uris . into_iter () . collect () }
 

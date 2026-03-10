@@ -6,7 +6,7 @@ permit invalid states, use booleans and strings where sum types
 would be safer, and rely on comments to document invariants that
 the compiler could enforce. This document catalogs those issues.
 
-* TODO ViewUri: string convention instead of enum
+* DONE ViewUri: string convention instead of enum
 
 ViewUri is a bare String newtype. Content views use a UUID;
 search views use the prefix "search: ". Multiple call sites
@@ -30,6 +30,80 @@ pub enum ViewUri {
 
 Every ~starts_with("search:")~ check becomes a match arm.
 Impossible to forget.
+
+* TODO Functions that take ViewNodeKind but only handle TrueNode
+
+Many functions ~match~ on ~ViewNodeKind~ and ~panic!~ or
+~unreachable!~ on non-True variants:
+
+#+begin_example
+let ViewNodeKind::True (t) = &mut viewnode.kind
+  else { panic!("expected TrueNode") };
+#+end_example
+
+These should instead take ~&mut TrueNode~ directly, pushing the
+check to the caller (who is already in a ~match~ arm). This
+converts a runtime panic into a compile-time guarantee.
+
+* TODO Option<Vec<T>>: conflating "unknown" and "empty"
+
+~SkgNode~ uses ~Option<Vec<ID>>~ for ~contains~,
+~subscribes_to~, ~hides_from_its_subscriptions~, and
+~overrides_view_of~. The semantics:
+
+- ~None~ = "ViewNode said nothing; clobber with disk data later"
+- ~Some(vec![])~ = "user explicitly set this to empty"
+
+This is a meaningful distinction (see
+~supplement_none_fields_from_disk_if_save~) but ~Option<Vec>~ is
+fragile. A dedicated type makes the intent explicit:
+
+#+begin_src rust
+pub enum MaybeSpecified<T> {
+  Unspecified,       // was None: inherit from disk
+  Specified(Vec<T>), // was Some: use this value (even if empty)
+}
+#+end_src
+
+* TODO SkgNode.ids: Vec allows empty
+
+The ~ids~ field is ~Vec<ID>~ with a comment "Must be nonempty."
+There is a TODO in the source suggesting a nonempty list type.
+~primary_id()~ returns ~Result~ to handle the empty case that
+should never arise.
+
+#+begin_src rust
+// Current
+pub ids : Vec<ID>,
+
+// Better (two fields)
+pub pid       : ID,
+pub extra_ids : Vec<ID>,
+#+end_src
+
+Or use a nonempty-vec crate. Either way, ~primary_id()~ becomes
+infallible.
+
+* TODO Request/response types: stringly typed protocol
+
+Request types ("save-buffer", "search", "kill-buffer", ...)
+and response tags ("search-results", "save-lock", ...) are bare
+strings throughout the serve layer. An enum for each would catch
+typos at compile time and make the protocol self-documenting.
+
+* TODO UncheckedTrueNode: everything optional, but some fields always present
+
+~UncheckedTrueNode~ makes ~id_opt~ and ~source_opt~ optional
+(the whole point of "unchecked"). But it also carries
+~graphStats~, ~viewStats~, ~edit_request~, ~view_requests~, and
+~diff~, all of which are always present in the checked version
+too. Only ~id~ and ~source~ actually benefit from the
+checked/unchecked split.
+
+The two-struct approach adds boilerplate for 11 fields when only
+2 fields change optionality. An alternative: make TrueNode
+generic over its ID/source representation, or use a builder
+pattern.
 
 * TODO indefinitive: boolean with shadow invariants
 
@@ -60,80 +134,6 @@ pub enum TrueNodeMode {
 Then a function that needs a definitive node can require
 ~Definitive~ directly, eliminating ~if t.indefinitive { return }~
 guards and the associated ~unreachable!~ / ~panic!~ arms.
-
-* TODO SkgNode.ids: Vec allows empty
-
-The ~ids~ field is ~Vec<ID>~ with a comment "Must be nonempty."
-There is a TODO in the source suggesting a nonempty list type.
-~primary_id()~ returns ~Result~ to handle the empty case that
-should never arise.
-
-#+begin_src rust
-// Current
-pub ids : Vec<ID>,
-
-// Better (two fields)
-pub pid       : ID,
-pub extra_ids : Vec<ID>,
-#+end_src
-
-Or use a nonempty-vec crate. Either way, ~primary_id()~ becomes
-infallible.
-
-* TODO Option<Vec<T>>: conflating "unknown" and "empty"
-
-~SkgNode~ uses ~Option<Vec<ID>>~ for ~contains~,
-~subscribes_to~, ~hides_from_its_subscriptions~, and
-~overrides_view_of~. The semantics:
-
-- ~None~ = "ViewNode said nothing; clobber with disk data later"
-- ~Some(vec![])~ = "user explicitly set this to empty"
-
-This is a meaningful distinction (see
-~supplement_none_fields_from_disk_if_save~) but ~Option<Vec>~ is
-fragile. A dedicated type makes the intent explicit:
-
-#+begin_src rust
-pub enum MaybeSpecified<T> {
-  Unspecified,       // was None: inherit from disk
-  Specified(Vec<T>), // was Some: use this value (even if empty)
-}
-#+end_src
-
-* TODO Functions that take ViewNodeKind but only handle TrueNode
-
-Many functions ~match~ on ~ViewNodeKind~ and ~panic!~ or
-~unreachable!~ on non-True variants:
-
-#+begin_example
-let ViewNodeKind::True (t) = &mut viewnode.kind
-  else { panic!("expected TrueNode") };
-#+end_example
-
-These should instead take ~&mut TrueNode~ directly, pushing the
-check to the caller (who is already in a ~match~ arm). This
-converts a runtime panic into a compile-time guarantee.
-
-* TODO Request/response types: stringly typed protocol
-
-Request types ("save-buffer", "search", "kill-buffer", ...)
-and response tags ("search-results", "save-lock", ...) are bare
-strings throughout the serve layer. An enum for each would catch
-typos at compile time and make the protocol self-documenting.
-
-* TODO UncheckedTrueNode: everything optional, but some fields always present
-
-~UncheckedTrueNode~ makes ~id_opt~ and ~source_opt~ optional
-(the whole point of "unchecked"). But it also carries
-~graphStats~, ~viewStats~, ~edit_request~, ~view_requests~, and
-~diff~, all of which are always present in the checked version
-too. Only ~id~ and ~source~ actually benefit from the
-checked/unchecked split.
-
-The two-struct approach adds boilerplate for 11 fields when only
-2 fields change optionality. An alternative: make TrueNode
-generic over its ID/source representation, or use a builder
-pattern.
 
 * AWAITS NodeDiffStatus mixes file, relationship, and source concerns
 
