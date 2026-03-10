@@ -8,7 +8,7 @@ use crate::types::tree::generations::collect_generation_ids;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_skgnode::write_at_truenode_in_tree;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, forest_root_viewnode, mk_definitive_viewnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, forest_root_viewnode, mk_definitive_viewnode };
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use ego_tree::iter::Edge;
@@ -77,9 +77,8 @@ pub(super) fn skgnode_and_viewnode_from_pid_and_source (
     skgnode . body . clone () );
   Ok (( skgnode . clone (), viewnode )) }
 
-/// Set 'indefinitive' to true,
-/// reset title and source,
-/// and set body to None.
+/// Set node to indefinitive,
+/// and reset title and source.
 pub(super) fn makeIndefinitiveAndClobber (
   tree    : &mut Tree<ViewNode>,
   map     : &mut SkgNodeMap,
@@ -88,7 +87,7 @@ pub(super) fn makeIndefinitiveAndClobber (
 ) -> Result < (), Box<dyn Error> > {
   write_at_truenode_in_tree (
     tree, node_id,
-    |t| { t . indefinitive = true; }
+    |t| { t . indef_or_def = IndefOrDef::Indefinitive; }
     ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   clobberIndefinitiveViewnode ( tree, map, node_id, config ) ?;
   Ok (( )) }
@@ -139,8 +138,8 @@ pub fn make_indef_if_repeat_then_extend_defmap (
       tree, node_id,
       |t| { if defMap . contains_key (&pid)
                { // It's a repeat, so make it indefinitive.
-                 t . indefinitive = true; }
-             t . indefinitive } )
+                 t . indef_or_def = IndefOrDef::Indefinitive; }
+             t . is_indefinitive () } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   if !is_indefinitive {
     defMap . insert ( pid, node_id ); }
@@ -377,7 +376,7 @@ pub fn truenode_in_tree_is_indefinitive (
                            |viewnode| viewnode . kind . clone() )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   match node_kind {
-    ViewNodeKind::True (t)    => Ok (t . indefinitive),
+    ViewNodeKind::True (t)    => Ok (t . is_indefinitive ()),
     ViewNodeKind::Deleted (_) => Ok (false),
     ViewNodeKind::Scaff (_)   => Err ( "is_indefinitive: caller should not pass a Scaffold" . into( )),
     ViewNodeKind::DeletedScaff (_) => Err ( "is_indefinitive: caller should not pass a DeletedScaff" . into( )),

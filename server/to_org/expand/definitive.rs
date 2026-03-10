@@ -9,7 +9,7 @@ use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_t
 use crate::to_org::util::{ DefinitiveMap, build_node_branch_minus_content, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
 use crate::types::git::NodeDiffStatus;
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ContainerwardPathStats, mk_indefinitive_viewnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ContainerwardPathStats, IndefOrDef, mk_indefinitive_viewnode };
 use crate::types::skgnode::SkgNode;
 use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::tree::generic::read_at_node_in_tree;
@@ -121,18 +121,20 @@ async fn execute_definitive_view_request (
     indefinitize_content_subtree ( forest, map,
                                    preexisting_node_id,
                                    visited, config ) ?; }}
-  { // Replace title/body, remove request, mark definitive, add to visited.
+  { // Remove request, mark definitive, replace title/body, add to visited.
+    write_at_truenode_in_tree (
+      forest, node_id, |t| {
+        t . view_requests . remove (& ViewRequest::Definitive);
+        t . indef_or_def = IndefOrDef::Definitive {
+          body         : None,
+          edit_request : None }; } )
+      . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_removed_node
       { from_git_replace_title_body (
           // PITFALL: This per-node git lookup might be slow. Hard to see how to batch the lookoup, though, since it's from git.
           forest, node_id, config ) ?; }
       else { from_disk_replace_title_body_and_skgnode (
                forest, map, node_id, config ) ?; }
-    write_at_truenode_in_tree (
-      forest, node_id, |t| {
-        t . view_requests . remove (& ViewRequest::Definitive);
-        t . indefinitive = false; } )
-      . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     visited . insert ( node_pid . clone(), node_id ); }
   if is_removed_node {
     extendDefinitiveSubtree_fromGit (
@@ -310,7 +312,9 @@ fn from_disk_replace_title_body_and_skgnode (
   let body : Option < String > = skgnode . body . clone ();
   write_at_truenode_in_tree ( tree, node_id, |t| {
     t . title = title;
-    t . body = body; } )
+    if let IndefOrDef::Definitive { body: ref mut b, .. }
+      = t . indef_or_def
+      { *b = body; } } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (( )) }
 
@@ -424,6 +428,8 @@ fn from_git_replace_title_body (
   write_at_truenode_in_tree (
     tree, node_id, |t| {
       t . title = skgnode . title;
-      t . body = skgnode . body; } )
+      if let IndefOrDef::Definitive { body: ref mut b, .. }
+        = t . indef_or_def
+        { *b = skgnode . body; } } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (( )) }

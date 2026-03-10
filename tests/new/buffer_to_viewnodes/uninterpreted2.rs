@@ -95,8 +95,8 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
     _ => panic!("expected TrueNode") };
   assert_eq!(parentIgnores_node . title(), "parentIgnores node");
   assert_eq!(parentIgnores_t . parent_ignores, true);
-  assert_eq!(parentIgnores_t . indefinitive, true);
-  assert_eq!(parentIgnores_node . body(), Some(&"ParentIgnores body" . to_string()));
+  assert_eq!(parentIgnores_t . is_indefinitive (), true);
+  assert_eq!(parentIgnores_node . body(), None);
 
   // Test cycling node
   let cycle_node = tree_roots[2] . value();
@@ -136,8 +136,8 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   assert_eq!(first_t . parent_ignores, false);
   assert_eq!(first_node . focused, false);
   assert_eq!(first_node . folded, false);
-  assert_eq!(first_t . indefinitive, false);
-  assert_eq!(first_t . edit_request, None);
+  assert_eq!(first_t . is_indefinitive (), false);
+  assert_eq!(first_t . edit_request (), None);
 
   // Test second node - should have no body
   let second_node = tree_roots[1] . value();

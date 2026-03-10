@@ -4,7 +4,7 @@ use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an
 use skg::merge::merge_nodes;
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SourceName};
-use skg::types::viewnode::{EditRequest, ViewNode, ViewNodeKind, TrueNode, forest_root_viewnode, default_truenode};
+use skg::types::viewnode::{EditRequest, ViewNode, ViewNodeKind, TrueNode, IndefOrDef, forest_root_viewnode, default_truenode};
 use skg::types::skgnode::SkgNode;
 use skg::types::save::Merge;
 use skg::dbs::filesystem::one_node::skgnode_from_pid_and_source;
@@ -25,7 +25,9 @@ fn mk_test_viewnode (
   edit_request : Option<EditRequest>,
 ) -> ViewNode {
   let t : TrueNode = TrueNode {
-    edit_request,
+    indef_or_def : IndefOrDef::Definitive {
+      body         : None,
+      edit_request },
     .. default_truenode ( ID::from (id),
                           SourceName::from ("main"),
                           title . to_string() ) };

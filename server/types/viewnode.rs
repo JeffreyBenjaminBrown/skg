@@ -51,23 +51,35 @@ pub type UncheckedTrueNode = TrueNode_Generic < Option < ID >,
 #[derive( Debug, Clone, PartialEq )]
 pub struct TrueNode_Generic < Id, Src > {
   pub title          : String,
-  pub body           : Option < String >,
   pub id             : Id,
   pub source         : Src,
   pub parent_ignores : bool, // When true, if the buffer is saved, this node has no effect on its parent. It is effectively a new tree root, but it does not have to be located at the top of the buffer tree with the other roots.
   // PITFALL : Don't move parent_ignores to ViewNodeStats. Doing so might seem tidy, because parent_ignores describes another relationship between the node and its view-ancestry. But parent_ignores is different because the user can in some cases reasonably change its value. That is, parent_ignores is not dictated solely by the view, but instead by some combination of the view and the user's intentions.
 
-  pub indefinitive  : bool, // When the user saves a buffer, an 'indefinitive' viewnode representing node N will not affect N in the graph. It is just a view of N, not a way to edit N. However, its presence as a content-child of some other node P will still cause P's content to be updated in the graph.
-
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
   pub graphStats    : GraphNodeStats,
   pub viewStats     : ViewNodeStats,
 
-  pub edit_request  : Option < EditRequest >,
   pub view_requests : HashSet < ViewRequest >,
 
   pub diff          : Option < NodeDiffStatus >,
+
+  pub indef_or_def  : IndefOrDef,
 }
+
+/// Each TrueNode has one of these.
+/// - A Definitive represents an editable view.
+///   The user's changes to title, body and children
+///   will be written to disk and the dbs when they save.
+/// - An Indefinitive represents a read-only view,
+///   in which case the body is not presented.
+///   (TODO ? Maybe it should be.)
+#[derive( Debug, Clone, PartialEq )]
+pub enum IndefOrDef {
+  Definitive {
+    body         : Option < String >,
+    edit_request : Option < EditRequest >, },
+  Indefinitive, }
 
 /// Containerward path statistics: how a node relates to the
 /// container hierarchy (path length, fork count, cycle detection).
@@ -174,7 +186,24 @@ impl < Id, Src > TrueNode_Generic < Id, Src > {
   ) -> bool {
     matches!( self . diff,
               Some (NodeDiffStatus::Removed)
-            | Some (NodeDiffStatus::RemovedHere) ) }}
+            | Some (NodeDiffStatus::RemovedHere) ) }
+
+  pub fn is_indefinitive (&self) -> bool {
+    matches! ( self . indef_or_def,
+               IndefOrDef::Indefinitive ) }
+
+  pub fn body (&self) -> Option < &String > {
+    match &self . indef_or_def {
+      IndefOrDef::Definitive { body, .. } =>
+        body . as_ref(),
+      IndefOrDef::Indefinitive => None, }}
+
+  pub fn edit_request (&self) -> Option < &EditRequest > {
+    match &self . indef_or_def {
+      IndefOrDef::Definitive { edit_request, .. } =>
+        edit_request . as_ref(),
+      IndefOrDef::Indefinitive => None, }}
+}
 
 impl ContainerwardPathStats {
   pub fn to_display_atom (&self) -> String {
@@ -335,7 +364,7 @@ impl ViewNode {
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn body (&self) -> Option < &String > {
     match &self . kind {
-      ViewNodeKind::True    (t) => t . body . as_ref (),
+      ViewNodeKind::True    (t) => t . body (),
       ViewNodeKind::Scaff   (_) => None,
       ViewNodeKind::Deleted (d) => d . body . as_ref (),
       ViewNodeKind::DeletedScaff (_) => None,
@@ -422,16 +451,16 @@ pub fn default_truenode (
 ) -> TrueNode {
   TrueNode {
     title,
-    body           : None,
     id,
     source,
     parent_ignores : false,
-    indefinitive   : false,
     graphStats     : GraphNodeStats::default(),
     viewStats      : ViewNodeStats::default(),
-    edit_request   : None,
     view_requests  : HashSet::new(),
     diff           : None,
+    indef_or_def   : IndefOrDef::Definitive {
+      body         : None,
+      edit_request : None },
   }}
 
 /// Create an indefinitive phantom ViewNode with a diff status.
@@ -455,10 +484,10 @@ pub fn mk_definitive_viewnode (
 ) -> ViewNode { mk_viewnode ( id,
                             source,
                             title,
-                            body,
                             false,              // parent_ignores
-                            false,              // indefinitive
-                            None,               // edit_request
+                            IndefOrDef::Definitive {
+                              body,
+                              edit_request : None },
                             HashSet::new () ) } // view_requests
 
 /// Create an indefinitive ViewNode from disk data.
@@ -471,13 +500,12 @@ pub fn mk_indefinitive_viewnode (
 ) -> ViewNode { mk_viewnode ( id,
                             source,
                             title,
-                            None, // body
                             parent_ignores,
-                            true, // indefinitive
-                            None, // edit_request
+                            IndefOrDef::Indefinitive,
                             HashSet::new ( )) } // view_requests
 
 /// Convert a definitive ViewNode to indefinitive.
+/// Discards body and edit_request.
 /// Errors if the input is not a TrueNode.
 pub fn mk_indefinitive_from_viewnode (
   viewnode       : ViewNode,
@@ -500,20 +528,16 @@ pub fn mk_viewnode (
   id             : ID,
   source         : SourceName,
   title          : String,
-  body           : Option < String >,
   parent_ignores : bool,
-  indefinitive   : bool,
-  edit_request   : Option < EditRequest >,
+  indef_or_def   : IndefOrDef,
   view_requests  : HashSet < ViewRequest >,
 ) -> ViewNode {
   ViewNode { focused : false,
              folded  : false,
              kind    : ViewNodeKind::True (
-               TrueNode { body,
-                          parent_ignores,
-                          indefinitive,
-                          edit_request,
+               TrueNode { parent_ignores,
                           view_requests,
+                          indef_or_def,
                           .. default_truenode (
                             id, source, title ) } ) }}
 

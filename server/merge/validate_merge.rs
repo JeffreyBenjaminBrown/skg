@@ -46,7 +46,8 @@ pub async fn validate_merge_requests(
       None => { errors . push(format!(
                   "Acquirer node '{}' must have an ID", t . title));
                 continue; }};
-    if let Some(EditRequest::Merge (acquiree_id)) = &t . edit_request
+    if let Some(EditRequest::Merge (acquiree_id))
+      = t . edit_request ()
     { let pair_errors : Vec<String> = validate_merge_pair(
         config, driver, acquirer_id, acquiree_id,
         &merge_validation_data . to_delete_ids) . await?;
@@ -73,10 +74,11 @@ fn collect_merge_validation_data<'a>(
       let viewnode : &UncheckedViewNode = node_ref . value();
       if let UncheckedViewNodeKind::True (t) = &viewnode . kind {
         if let Some (id) = &t . id {
-          if matches!(&t . edit_request, Some (EditRequest::Delete)) {
+          if matches!(t . edit_request (),
+                      Some (EditRequest::Delete)) {
             to_delete_ids . insert(id . clone()); } // mutate!
           if let Some(EditRequest::Merge (acquiree_id))
-          = &t . edit_request
+          = t . edit_request ()
           { acquirer_viewnodes . push (viewnode); // mutate!
             acquirer_to_acquirees // mutate!
               . entry(id . clone())

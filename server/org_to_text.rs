@@ -166,7 +166,7 @@ fn true_node_metadata_to_string (
 
     fn edit_request ( true_node : & TrueNode
                     ) -> Option < String > {
-      true_node . edit_request . as_ref () . map ( | edit_req | {
+      true_node . edit_request () . map ( | edit_req | {
         let edit_str : String = match edit_req {
           EditRequest::Merge (id) => format! ( "(merge {})", id . 0 ),
           EditRequest::Delete => "delete" . to_string () };
@@ -190,7 +190,7 @@ fn true_node_metadata_to_string (
     parts . push ( format! ( "(source {})", true_node . source ));
     if true_node . parent_ignores {
       parts . push ( "parentIgnores" . to_string () ); }
-    if true_node . indefinitive {
+    if true_node . is_indefinitive () {
       parts . push ( "indefinitive" . to_string () ); }
     if let Some (s) = graph_stats (true_node)
     { parts . push (s); }

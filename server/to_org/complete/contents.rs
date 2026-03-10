@@ -11,7 +11,6 @@ use std::error::Error;
 /// uses SkgNodeMap or lookup on disk to:
 /// - Reset title.
 /// - Reset source.
-/// - Set body to None.
 ///
 /// EXPECTS: The input node is indefinitive.
 pub fn clobberIndefinitiveViewnode (
@@ -29,8 +28,7 @@ pub fn clobberIndefinitiveViewnode (
   let source : SourceName = skgnode . source . clone();
   write_at_truenode_in_tree ( tree, treeid, |t| {
     t . title = title;
-    t . source = source;
-    t . body = None; }
+    t . source = source; }
   ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
 
   Ok (( )) }

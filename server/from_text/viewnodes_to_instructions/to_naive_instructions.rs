@@ -1,6 +1,6 @@
 use crate::types::git::NodeDiffStatus;
 use crate::types::viewnode::EditRequest;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, TrueNode};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, TrueNode, IndefOrDef};
 use crate::types::misc::{ID, MSV};
 use crate::types::skgnode::SkgNode;
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
@@ -82,29 +82,31 @@ fn maybe_instruction_from_treenode (
   node_id : NodeId,
   t       : &TrueNode
 ) -> Result<Option<DefineNode>, String> {
-  if t . indefinitive { return Ok (None); }
-  if t . edit_request == Some (EditRequest::Delete) {
-    return Ok(Some(DefineNode::Delete(DeleteNode {
-      id     : t . id    . clone(),
-      source : t . source . clone() } )) ); }
-  let node_ref : NodeRef<ViewNode> =
-    tree . get (node_id) . ok_or(
-      "maybe_instruction_from_treenode: node not found")?;
-  Ok(Some(DefineNode::Save(SaveNode(SkgNode {
-    title:   t . title . clone(),
-    aliases: collect_grandchild_aliases_for_viewnode(
-      tree, node_id)?,
-    source:  t . source . clone(),
-    pid:     t . id . clone(),
-    extra_ids: vec![],
-    body:    t . body . clone(),
-    contains:
-      collect_contents_to_save_from_children (&node_ref),
-    subscribes_to:
-      collect_subscribees( tree, node_id )?,
-    hides_from_its_subscriptions: MSV::Unspecified,
-    overrides_view_of: MSV::Unspecified,
-    misc: Vec::new () } )) )) }
+  match &t . indef_or_def {
+    IndefOrDef::Indefinitive => return Ok (None),
+    IndefOrDef::Definitive { body, edit_request } => {
+      if *edit_request == Some (EditRequest::Delete) {
+        return Ok(Some(DefineNode::Delete(DeleteNode {
+          id     : t . id    . clone(),
+          source : t . source . clone() } )) ); }
+      let node_ref : NodeRef<ViewNode> =
+        tree . get (node_id) . ok_or(
+          "maybe_instruction_from_treenode: node not found")?;
+      Ok(Some(DefineNode::Save(SaveNode(SkgNode {
+        title:   t . title . clone(),
+        aliases: collect_grandchild_aliases_for_viewnode(
+          tree, node_id)?,
+        source:  t . source . clone(),
+        pid:     t . id . clone(),
+        extra_ids: vec![],
+        body:    body . clone(),
+        contains:
+          collect_contents_to_save_from_children (&node_ref),
+        subscribes_to:
+          collect_subscribees( tree, node_id )?,
+        hides_from_its_subscriptions: MSV::Unspecified,
+        overrides_view_of: MSV::Unspecified,
+        misc: Vec::new () } )) )) }}}
 
 /// Treats the input tree as the source of truth; does not read dbs.
 /// Returns None if no SubscribeeCol found,
@@ -163,8 +165,8 @@ fn collect_contents_to_save_from_children<'a> (
                     Some (NodeDiffStatus::RemovedHere) );
         if ! t . parent_ignores
            && ! is_phantom
-           && ! matches!( t . edit_request,
-                          Some (EditRequest::Delete))
+           && ! matches!( t . edit_request (),
+                          Some (&EditRequest::Delete))
         { contents . push( t . id . clone() ); }},
       _ => continue }}
   contents }

@@ -9,7 +9,7 @@ pub use super::viewnode::UncheckedTrueNode;
 use super::viewnode::{
   ViewNode, ViewNodeKind, TrueNode,
   Scaffold, ScaffoldKind, DeletedNode,
-  GraphNodeStats, ViewNodeStats,
+  GraphNodeStats, ViewNodeStats, IndefOrDef,
 };
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use ego_tree::{Tree, NodeId, NodeMut};
@@ -51,16 +51,14 @@ impl TryFrom<UncheckedTrueNode> for TrueNode {
       || format!("Node '{}' has no source", u . title))?;
     Ok(TrueNode {
       title          : u . title,
-      body           : u . body,
       id,
       source,
       parent_ignores : u . parent_ignores,
-      indefinitive   : u . indefinitive,
       graphStats     : u . graphStats,
       viewStats      : u . viewStats,
-      edit_request   : u . edit_request,
       view_requests  : u . view_requests,
       diff           : u . diff,
+      indef_or_def   : u . indef_or_def,
     })
   }
 }
@@ -98,16 +96,14 @@ impl From<TrueNode> for UncheckedTrueNode {
   fn from(t: TrueNode) -> Self {
     UncheckedTrueNode {
       title          : t . title,
-      body           : t . body,
       id             : Some(t . id),
       source         : Some(t . source),
       parent_ignores : t . parent_ignores,
-      indefinitive   : t . indefinitive,
       graphStats     : t . graphStats,
       viewStats      : t . viewStats,
-      edit_request   : t . edit_request,
       view_requests  : t . view_requests,
       diff           : t . diff,
+      indef_or_def   : t . indef_or_def,
     }
   }
 }
@@ -245,16 +241,16 @@ impl Default for UncheckedTrueNode {
   fn default() -> Self {
     UncheckedTrueNode {
       title          : String::new(),
-      body           : None,
       id             : None,
       source         : None,
       parent_ignores : false,
-      indefinitive   : false,
       graphStats     : GraphNodeStats::default(),
       viewStats      : ViewNodeStats::default(),
-      edit_request   : None,
       view_requests  : HashSet::new(),
       diff           : None,
+      indef_or_def   : IndefOrDef::Definitive {
+        body         : None,
+        edit_request : None },
     }
   }
 }
@@ -296,7 +292,7 @@ impl UncheckedViewNode {
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn body (&self) -> Option<&String> {
     match &self . kind {
-      UncheckedViewNodeKind::True (t)    => t . body . as_ref(),
+      UncheckedViewNodeKind::True (t)    => t . body (),
       UncheckedViewNodeKind::Scaff (_)   => None,
       UncheckedViewNodeKind::Deleted (d) => d . body . as_ref(),
       UncheckedViewNodeKind::DeletedScaff (_) => None, }}

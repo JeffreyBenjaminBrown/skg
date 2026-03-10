@@ -71,7 +71,9 @@ pub async fn complete_subscribee_col_preorder (
       tree, node, 1,
       |vn : &ViewNode| match &vn . kind {
         ViewNodeKind::True (t) =>
-          Some(( t . id . clone(), t . source . clone(), t . indefinitive )),
+          Some(( t . id . clone(),
+                 t . source . clone(),
+                 t . is_indefinitive () )),
         _ => None } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
     . ok_or ("complete_subscribee_col_preorder: parent is not a TrueNode") ?;

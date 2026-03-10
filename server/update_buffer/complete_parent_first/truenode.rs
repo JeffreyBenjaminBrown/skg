@@ -97,7 +97,7 @@ pub fn complete_truenode_preorder (
   { let is_indefinitive : bool =
       read_at_node_in_tree( tree, node,
         |vn : &ViewNode| match &vn . kind {
-          ViewNodeKind::True (t) => t . indefinitive,
+          ViewNodeKind::True (t) => t . is_indefinitive (),
           _ => false } ) ?;
     if is_indefinitive {
       clobberIndefinitiveViewnode( tree, map, node, config ) ?;
@@ -108,7 +108,7 @@ pub fn complete_truenode_preorder (
       read_at_node_in_tree ( tree, node,
         |vn : &ViewNode| match &vn . kind {
           ViewNodeKind::True (t) =>
-            ( t . title . clone(), t . body . clone() ),
+            ( t . title . clone(), t . body () . cloned() ),
           _ => ( String::new(), None ) } ) ?;
     write_at_node_in_tree ( tree, node,
       |vn : &mut ViewNode| {

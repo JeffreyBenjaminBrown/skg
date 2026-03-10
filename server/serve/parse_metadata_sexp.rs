@@ -19,7 +19,7 @@ use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{NodeDiffStatus, FieldDiffStatus};
-use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode, ContainerwardPathStats};
+use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode, ContainerwardPathStats, IndefOrDef};
 use crate::types::unchecked_viewnode::{
     UncheckedViewNode, UncheckedViewNodeKind, UncheckedTrueNode,
 };
@@ -129,19 +129,24 @@ pub fn viewnode_from_metadata (
         ( UncheckedViewNodeKind::Scaff (scaffold_with_title), error )
       } else {
       // UncheckedTrueNode
-      ( UncheckedViewNodeKind::True ( UncheckedTrueNode {
-          title,
-          body,
-          id               : metadata . id . clone (),
-          source           : metadata . source . clone (),
-          parent_ignores   : metadata . parent_ignores,
-          indefinitive     : metadata . indefinitive,
-          graphStats       : metadata . graphStats . clone (),
-          viewStats        : metadata . viewStats . clone (),
-          edit_request     : metadata . edit_request . clone (),
-          view_requests    : metadata . view_requests . clone (),
-          diff             : metadata . truenode_diff, } ),
-        None )
+      { let indef_or_def : IndefOrDef =
+          if metadata . indefinitive
+          { IndefOrDef::Indefinitive }
+          else
+          { IndefOrDef::Definitive {
+              body,
+              edit_request : metadata . edit_request . clone () } };
+        ( UncheckedViewNodeKind::True ( UncheckedTrueNode {
+            title,
+            id               : metadata . id . clone (),
+            source           : metadata . source . clone (),
+            parent_ignores   : metadata . parent_ignores,
+            graphStats       : metadata . graphStats . clone (),
+            viewStats        : metadata . viewStats . clone (),
+            view_requests    : metadata . view_requests . clone (),
+            diff             : metadata . truenode_diff,
+            indef_or_def, } ),
+          None ) }
     };
   ( UncheckedViewNode { focused : metadata . focused,
                        folded  : metadata . folded,

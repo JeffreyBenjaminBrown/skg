@@ -83,14 +83,15 @@ fn collect_instructions(
     if let UncheckedViewNodeKind::True (t) = &viewnode . kind {
       if let Some (id) = &t . id {
         let delete_instruction : WhetherToDelete =
-          if matches!(t . edit_request, Some (EditRequest::Delete)) {
+          if matches!(t . edit_request (),
+                      Some (&EditRequest::Delete)) {
             WhetherToDelete::Delete
           } else { WhetherToDelete::DoNotDelete };
         id_toDelete_instructions // record delete_instruction
           . entry(id . clone())
           . or_insert_with (HashSet::new)
           . insert (delete_instruction);
-        if ! t . indefinitive {
+        if ! t . is_indefinitive () {
           // Increment the count for this defining container
           *id_defining_count . entry(id . clone())
             . or_insert (0) += 1; }

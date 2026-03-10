@@ -46,7 +46,7 @@ async fn optmerge_from_viewnode (
   let t : &TrueNode = match &node . kind {
     ViewNodeKind::True (t) => t,
     _ => return Ok (None) };
-  let acquiree_id = match &t . edit_request {
+  let acquiree_id = match t . edit_request () {
     Some(EditRequest::Merge (id)) => id,
     _ => return Ok (None) };
   let acquirer_id : &ID = &t . id;

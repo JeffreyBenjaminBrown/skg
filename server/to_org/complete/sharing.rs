@@ -59,7 +59,7 @@ pub async fn maybe_add_subscribeeCol_branch (
       read_at_node_in_tree(
         tree, node_id,
         |vn| matches!( &vn . kind,
-                        ViewNodeKind::True (t) if t . indefinitive ) )
+                        ViewNodeKind::True (t) if t . is_indefinitive () ) )
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_indefinitive { return Ok(( )); } }
   { // Skip if there already is one.

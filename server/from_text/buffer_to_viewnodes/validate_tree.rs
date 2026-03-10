@@ -96,7 +96,7 @@ fn validate_definitive_view_requests (
       { if t . view_requests . contains (&ViewRequest::Definitive)
         { if let Some (id) = &t . id {
           { // Error: must be indefinitive
-            if ! t . indefinitive
+            if ! t . is_indefinitive ()
             { errors . push( BufferValidationError::DefinitiveRequestOnDefinitiveNode( id . clone() )); }}
           { // Error: must be childless
             if node_ref . children() . next() . is_some()

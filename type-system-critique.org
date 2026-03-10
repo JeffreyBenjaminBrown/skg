@@ -116,7 +116,7 @@ Every ~.expect()~ that can fire on user-influenced data is a
 latent server crash. A type-level audit of "which functions can
 panic on bad input?" would be worthwhile.
 
-* AWAITS indefinitive: boolean with shadow invariants
+* DONE indefinitive: boolean with shadow invariants
 
 When ~indefinitive = true~:
 - ~body~ must be ~None~
@@ -146,7 +146,8 @@ Then a function that needs a definitive node can require
 ~Definitive~ directly, eliminating ~if t.indefinitive { return }~
 guards and the associated ~unreachable!~ / ~panic!~ arms.
 
-* AWAITS NodeDiffStatus mixes file, relationship, and source concerns
+* AWAITS together : diff stuff
+** AWAITS NodeDiffStatus mixes file, relationship, and source concerns
 
 #+begin_src rust
 pub enum NodeDiffStatus {
@@ -167,7 +168,7 @@ Splitting into separate types would prevent, e.g., a Scaffold
 from being assigned ~NotInGit~ (which only makes sense for
 sources).
 
-* AWAITS Phantom nodes: inferred from diff, not typed
+** AWAITS Phantom nodes: inferred from diff, not typed
 
 A "phantom" node is a TrueNode where
 ~diff == Some(Removed) || diff == Some(RemovedHere)~. The
@@ -210,7 +211,7 @@ would prevent illegal structures at construction time. This is
 hard to do with ~ego_tree~ (it's homogeneous), but worth noting
 as a long-term aspiration.
 
-* DONE ? EditRequest + ViewRequest: no constraint on combinations
+* AWAITS ? EditRequest + ViewRequest: no constraint on combinations
 
 ~edit_request: Option<EditRequest>~ allows at most one edit
 request. ~view_requests: HashSet<ViewRequest>~ allows many view
@@ -245,6 +246,9 @@ that doesn't call it), the defaults silently produce wrong data.
 
 Consider ~numContainers: None~ as the default, and treating
 ~None~ as "not yet computed" in the renderer.
+
+** Jeff here: Most nodes in a tree have only one container
+   and most of the graph should be treelike.
 
 * DONE parentIsContainer / parentIsContent: two bools instead of one enum
 

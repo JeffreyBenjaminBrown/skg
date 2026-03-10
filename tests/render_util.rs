@@ -3,7 +3,7 @@
 use skg::org_to_text::viewnode_to_text;
 use skg::types::viewnode::ViewNodeStats;
 use skg::types::viewnode::{
-    ViewNode, ViewNodeKind, Scaffold, TrueNode,
+    ViewNode, ViewNodeKind, Scaffold, TrueNode, IndefOrDef,
     viewnode_from_scaffold, default_truenode };
 use skg::types::misc::{ID, SourceName};
 
@@ -24,7 +24,9 @@ fn test_viewnode_to_text_no_metadata () {
 #[test]
 fn test_viewnode_to_text_with_body () {
   let t : TrueNode = TrueNode {
-    body : Some ( "Test body content" . to_string() ),
+    indef_or_def : IndefOrDef::Definitive {
+      body         : Some ( "Test body content" . to_string() ),
+      edit_request : None },
     .. default_truenode ( ID::from ("test"),
                           SourceName::from ("main"),
                           "Test Title" . to_string() ) };
@@ -49,7 +51,7 @@ fn test_viewnode_to_text_with_metadata () {
 #[test]
 fn test_viewnode_to_text_with_id_metadata () {
   let t : TrueNode = TrueNode {
-    indefinitive : true,
+    indef_or_def : IndefOrDef::Indefinitive,
     .. default_truenode ( ID::from ("test123"),
                           SourceName::from ("main"),
                           "Test Title" . to_string() ) };
