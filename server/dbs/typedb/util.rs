@@ -9,7 +9,7 @@ pub type ConceptRowStream =
   futures::stream::BoxStream<'static,
                              typedb_driver::Result<ConceptRow>>;
 
-pub(crate) fn connect_to_typedb () -> TypeDBDriver {
+pub fn connect_to_typedb () -> TypeDBDriver {
   tracing::info! ("Connecting to TypeDB...");
   block_on ( async {
     TypeDBDriver::new (

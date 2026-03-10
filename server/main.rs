@@ -9,6 +9,7 @@
 use skg::context::{compute_and_store_context_types, MapToContent, MapToContainers};
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::{InitData, initialize_dbs};
+use skg::dbs::typedb::util::{connect_to_typedb, delete_database};
 use skg::import_org_roam::import_org_roam_directory;
 use skg::serve::serve;
 use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
@@ -69,36 +70,22 @@ fn main() -> Result<(), Box<dyn Error>> {
         init_done_clone,
         &logs_dir_for_busysignal ); } );
 
-  let init : InitData =
+  install_shutdown_signal_handler (&config);
+
+  let InitData { driver        : typedb_driver,
+                  tantivy_index,
+                  had_id_set,
+                  all_node_ids,
+                  link_targets,
+                  map_to_content,
+                  map_to_containers } : InitData =
     { let _span : tracing::span::EnteredSpan = tracing::info_span! (
         "initialize_dbs") . entered ();
       initialize_dbs (&config) };
-  let typedb_driver : Arc<TypeDBDriver> = init . driver;
-  let tantivy_index : TantivyIndex = init . tantivy_index;
 
-  // Compute context origin types for search ranking.
-  // Fully in-memory: all data is pre-computed from SkgNodes at init.
-  { let had_id_set   : HashSet<ID> = init . had_id_set;
-    let all_node_ids : HashSet<ID> = init . all_node_ids;
-    let link_targets : HashSet<ID> = init . link_targets;
-    let map_to_content    : MapToContent    = init . map_to_content;
-    let map_to_containers : MapToContainers = init . map_to_containers;
-    { let _span : tracing::span::EnteredSpan = tracing::info_span! (
-          "context_computation") . entered ();
-      match compute_and_store_context_types (
-        &tantivy_index,
-        &had_id_set,
-        &all_node_ids,
-        &link_targets,
-        &map_to_content,
-        &map_to_containers )
-      { Ok (_) => {}
-        Err (e) => { tracing::warn! (
-          error = %e,
-          "context computation failed, search results will not have context-based ranking"
-        ); }} }}
-  // had_id_set, all_node_ids, link_targets, map_to_content, map_to_containers
-  // are dropped here, freeing memory before the serve loop.
+  compute_context_rankings (
+    &tantivy_index, had_id_set, all_node_ids,
+    link_targets, map_to_content, map_to_containers );
 
   init_done . store (true, Ordering::Release);
   busysignal_handle . join ()
@@ -156,6 +143,59 @@ fn busysignal_accept_loop (
               skg::consts::BUSYSIGNAL_POLL_INTERVAL_MS ) ); }
       Err (e) => {
         tracing::warn! ("Busysignal accept error: {}", e); } } } }
+
+/// Installed BEFORE initialize_dbs,
+/// so that a kill during init still cleans up the database.
+/// Uses its own TypeDB connection (the main driver doesn't exist yet).
+fn install_shutdown_signal_handler (
+  config : &SkgConfig,
+) {
+  let db_name_for_signal : String = config . db_name . clone ();
+  let delete_on_quit : bool = config . delete_on_quit;
+  ctrlc::set_handler ( move || {
+    tracing::info! ("Received shutdown signal...");
+    if delete_on_quit {
+      tracing::info! (
+        db_name = %db_name_for_signal,
+        "Deleting database before shutdown" );
+      let driver : TypeDBDriver = connect_to_typedb ();
+      futures::executor::block_on ( async {
+        if let Err (e) =
+          delete_database (&driver, &db_name_for_signal)
+          . await {
+            tracing::error! (
+              error = %e,
+              "Failed to delete database" ); }} ); }
+    tracing::info! ("Shutdown complete.");
+    std::process::exit (0);
+  } ) . expect ("Error setting Ctrl+C handler"); }
+
+/// Compute context origin types for search ranking.
+/// Fully in-memory: all data is pre-computed from SkgNodes at init.
+/// Consumes (and frees) the large lookup maps after use.
+fn compute_context_rankings (
+  tantivy_index     : &TantivyIndex,
+  had_id_set        : HashSet<ID>,
+  all_node_ids      : HashSet<ID>,
+  link_targets      : HashSet<ID>,
+  map_to_content    : MapToContent,
+  map_to_containers : MapToContainers,
+) {
+  let _span : tracing::span::EnteredSpan = tracing::info_span! (
+    "context_computation") . entered ();
+  match compute_and_store_context_types (
+    tantivy_index,
+    &had_id_set,
+    &all_node_ids,
+    &link_targets,
+    &map_to_content,
+    &map_to_containers )
+  { Ok (_) => {}
+    Err (e) => { tracing::warn! (
+      error = %e,
+      "context computation failed, \
+       search results will not have context-based ranking"
+    ); }} }
 
 fn run_import (
   args : &[String],

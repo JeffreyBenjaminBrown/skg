@@ -55,17 +55,6 @@ pub fn serve (
   emacs_listener : TcpListener,
 ) -> std::io::Result<()> {
 
-  { // Set up signal handler for Ctrl+C and SIGTERM,
-    // for graceful shutdown with database cleanup.
-    let driver_for_signal : Arc<TypeDBDriver> = Arc::clone (&typedb_driver);
-    let config_for_signal : SkgConfig = config . clone ();
-    ctrlc::set_handler ( move || {
-      tracing::info! ("Received shutdown signal...");
-      cleanup_and_shutdown (
-        &driver_for_signal,
-        &config_for_signal );
-    } ) . expect ("Error setting Ctrl+C handler"); }
-
   for stream_res in emacs_listener . incoming() { // the loop
     match stream_res {
       Ok (stream) => {
