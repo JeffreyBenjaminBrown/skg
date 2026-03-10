@@ -55,7 +55,7 @@ pub fn completeAliasCol (
     = match node_changes {
       None => { // No git diff view: Easy.
         let goals : Vec<String> =
-          parent_skgnode . aliases . clone() . unwrap_or_default();
+          parent_skgnode . aliases . or_default() . to_vec();
         ( goals, HashMap::new() ) }
       Some (nc) => { // Git diff view.
         let mut goals : Vec<String> = Vec::new();

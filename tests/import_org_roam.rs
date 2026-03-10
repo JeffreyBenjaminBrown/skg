@@ -39,7 +39,7 @@ fn test_minimal_file () {
   assert_eq! (nodes[0] . title, "My Node");
   assert_eq! (nodes[0] . ids, vec![ ID::new ("abc-123") ]);
   assert! (nodes[0] . body . is_none());
-  assert! (nodes[0] . contains . is_none()); }
+  assert! (nodes[0] . contains . is_empty()); }
 
 #[test]
 fn test_file_with_body () {
@@ -85,8 +85,8 @@ fn test_nested_id_headlines () {
   // File-level node
   assert_eq! (nodes[0] . title, "Parent");
   assert_eq! (nodes[0] . ids, vec![ ID::new ("file-id") ]);
-  let contained : &Vec<ID> =
-    nodes[0] . contains . as_ref() . unwrap();
+  let contained : &[ID] =
+    &nodes[0] . contains;
   assert_eq! (contained . len(), 2);
   assert_eq! (contained[0], ID::new ("child-1"));
   assert_eq! (contained[1], ID::new ("child-2"));
@@ -119,16 +119,16 @@ fn test_non_id_headline_becomes_node () {
   assert_eq! (nodes . len(), 3);
   assert_eq! (nodes[0] . title, "Parent");
   assert_eq! (nodes[0] . ids, vec![ ID::new ("file-id") ]);
-  let contained : &Vec<ID> =
-    nodes[0] . contains . as_ref() . unwrap();
+  let contained : &[ID] =
+    &nodes[0] . contains;
   assert_eq! (contained . len(), 1);
   assert! (nodes[0] . body . is_none());
   // Headline node (generated ID)
   assert_eq! (nodes[1] . title, "just a regular headline");
   assert_eq! (nodes[1] . body . as_deref(),
               Some ("  Some text under it.") );
-  let hl_contained : &Vec<ID> =
-    nodes[1] . contains . as_ref() . unwrap();
+  let hl_contained : &[ID] =
+    &nodes[1] . contains;
   assert_eq! (hl_contained . len(), 1);
   // Sub-headline node
   assert_eq! (nodes[2] . title, "sub-headline");
@@ -157,14 +157,14 @@ fn test_id_headline_under_non_id_headline () {
   // 3 nodes: file, intermediary, deep-child
   assert_eq! (nodes . len(), 3);
   // Root contains intermediary (generated ID)
-  let root_contained : &Vec<ID> =
-    nodes[0] . contains . as_ref() . unwrap();
+  let root_contained : &[ID] =
+    &nodes[0] . contains;
   assert_eq! (root_contained . len(), 1);
   assert! (nodes[0] . body . is_none());
   // Intermediary contains deep-child
   assert_eq! (nodes[1] . title, "intermediary (no ID)");
-  let mid_contained : &Vec<ID> =
-    nodes[1] . contains . as_ref() . unwrap();
+  let mid_contained : &[ID] =
+    &nodes[1] . contains;
   assert_eq! (mid_contained . len(), 1);
   assert_eq! (mid_contained[0], ID::new ("deep-child"));
   // Deep child
@@ -187,8 +187,8 @@ fn test_roam_aliases () {
   let nodes : Vec<SkgNode> =
     parse_org_file (f . path());
   assert_eq! (nodes . len(), 1);
-  let aliases : &Vec<String> =
-    nodes[0] . aliases . as_ref() . unwrap();
+  let aliases : &[String] =
+    nodes[0] . aliases . or_default();
   assert_eq! (aliases, &vec![
     "machine learning", "energy", "dark matter" ]); }
 
@@ -292,10 +292,10 @@ fn test_power_org_structure () {
   assert_eq! (nodes . len(), 6);
   // File-level node
   assert_eq! (nodes[0] . title, "energy");
-  assert_eq! (nodes[0] . aliases . as_ref() . unwrap(),
+  assert_eq! (nodes[0] . aliases . or_default(),
               &vec!["energy", "power", "force", "work", "strength"]);
-  let file_contained : &Vec<ID> =
-    nodes[0] . contains . as_ref() . unwrap();
+  let file_contained : &[ID] =
+    &nodes[0] . contains;
   assert_eq! (file_contained . len(), 3);
   // The :ID: child's contained ID is known
   assert_eq! (file_contained[1],
@@ -305,13 +305,13 @@ fn test_power_org_structure () {
   assert_eq! (nodes[1] . title,
               "see also [[id:80cfe814][constraint]]");
   assert! (nodes[1] . body . is_none());
-  assert! (nodes[1] . contains . is_none());
+  assert! (nodes[1] . contains . is_empty());
   // "the feeling of forcing it" — has :ID: and 2 sub-headlines
   assert_eq! (nodes[2] . title, "the feeling of forcing it");
   assert_eq! (nodes[2] . ids,
               vec![ ID::new ("1cd8051b-95ee-4f73-a05e-624200b52c90") ]);
-  let forcing_contained : &Vec<ID> =
-    nodes[2] . contains . as_ref() . unwrap();
+  let forcing_contained : &[ID] =
+    &nodes[2] . contains;
   assert_eq! (forcing_contained . len(), 2);
   assert! (nodes[2] . body . is_none());
   // Sub-headlines of "the feeling of forcing it"
@@ -322,7 +322,7 @@ fn test_power_org_structure () {
   assert_eq! (nodes[5] . title, "etymology : sociology, physics");
   assert_eq! (nodes[5] . body . as_deref(),
               Some ("  Power implies choice; energy, only possibility.") );
-  assert! (nodes[5] . contains . is_none()); }
+  assert! (nodes[5] . contains . is_empty()); }
 
 #[test]
 fn test_music_and_consciousness () {
@@ -346,18 +346,18 @@ fn test_music_and_consciousness () {
   assert_eq! (nodes[0] . ids, vec![ ID::new ("01104862") ]);
   assert_eq! (nodes[0] . body . as_deref(),
               Some ("= things about consciousness that music highlights") );
-  let contained : &Vec<ID> =
-    nodes[0] . contains . as_ref() . unwrap();
+  let contained : &[ID] =
+    &nodes[0] . contains;
   assert_eq! (contained . len(), 2);
   // Headline nodes — titles preserve the [[id:...][...]] links
   assert_eq! (nodes[1] . title,
               "[[id:39029f2f][Effort and observation are somewhat disjunctive.]]");
   assert! (nodes[1] . body . is_none());
-  assert! (nodes[1] . contains . is_none());
+  assert! (nodes[1] . contains . is_empty());
   assert_eq! (nodes[2] . title,
               "[[id:681da8ea][Music illuminates (the?) infinite nature of want.]]");
   assert! (nodes[2] . body . is_none());
-  assert! (nodes[2] . contains . is_none()); }
+  assert! (nodes[2] . contains . is_empty()); }
 
 #[test]
 fn test_had_id_before_import () {

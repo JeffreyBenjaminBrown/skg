@@ -333,7 +333,7 @@ pub(super) fn content_ids_if_definitive_else_empty (
       Ok (id) => id,
       Err (_) => return Ok ( Vec::new () ), };
   Ok ( map . get (&node_id)
-    . and_then ( |skgnode| skgnode . contains . clone () )
+    . map ( |skgnode| skgnode . contains . clone () )
     . unwrap_or_default () ) }
 
 /// Collect ego_tree::NodeIds after

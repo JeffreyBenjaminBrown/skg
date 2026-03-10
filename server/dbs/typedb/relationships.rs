@@ -80,7 +80,7 @@ pub async fn create_relationships_from_node (
   let primary_id : &ID = node . primary_id()?;
   insert_relationship_from_list (
     primary_id . as_str (),
-    node . contains . as_ref() . unwrap_or(&vec![]),
+    &node . contains,
     "contains",
     "container",
     "contained",
@@ -100,7 +100,7 @@ pub async fn create_relationships_from_node (
     . map_err(|e| format!("Failed to create 'textlinks_to' relationships: {}", e))?;
   insert_relationship_from_list (
     primary_id . as_str (),
-    node . subscribes_to . as_ref() . unwrap_or(&vec![]),
+    node . subscribes_to . or_default(),
     "subscribes",
     "subscriber",
     "subscribee",
@@ -108,7 +108,7 @@ pub async fn create_relationships_from_node (
     . map_err(|e| format!("Failed to create 'subscribes' relationships: {}", e))?;
   insert_relationship_from_list (
     primary_id . as_str (),
-    node . hides_from_its_subscriptions . as_ref() . unwrap_or(&vec![]),
+    node . hides_from_its_subscriptions . or_default(),
     "hides_from_its_subscriptions",
     "hider",
     "hidden",
@@ -116,7 +116,7 @@ pub async fn create_relationships_from_node (
     . map_err(|e| format!("Failed to create 'hides_from_its_subscriptions' relationships: {}", e))?;
   insert_relationship_from_list(
     primary_id . as_str (),
-    node . overrides_view_of . as_ref() . unwrap_or(&vec![]),
+    node . overrides_view_of . or_default(),
     "overrides_view_of",
     "replacement",
     "replaced",
@@ -131,21 +131,21 @@ fn count_relationships (
   node : &SkgNode,
 ) -> usize {
   let contains : usize =
-    node . contains . as_ref() . map_or (0, |v| v . len());
+    node . contains . len();
   let textlinks : usize =
     textlinks_from_node (node) . len();
   let subscribes : usize =
-    node . subscribes_to . as_ref() . map_or (0, |v| v . len());
+    node . subscribes_to . or_default() . len();
   let hides : usize =
-    node . hides_from_its_subscriptions . as_ref() . map_or (0, |v| v . len());
+    node . hides_from_its_subscriptions . or_default() . len();
   let overrides : usize =
-    node . overrides_view_of . as_ref() . map_or (0, |v| v . len());
+    node . overrides_view_of . or_default() . len();
   contains + textlinks + subscribes + hides + overrides }
 
 pub async fn insert_relationship_from_list (
   // Instantiates a relationship in the database. Does not commit.
   primary_id: &str,
-  id_list: &Vec<ID>,   // Length = 2. Order matters. Might equal node.contains, node.subscribes_to, etc.
+  id_list: &[ID],      // Length = 2. Order matters. Might equal node.contains, node.subscribes_to, etc.
   relation_name: &str, // "contains", "subscribes", etc.
   from_role: &str,     // "container", "subscriber", etc.
   to_role: &str,       // "contained", "subscribee", etc.

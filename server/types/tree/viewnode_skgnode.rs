@@ -1,7 +1,7 @@
 /// Node access utilities for ego_tree::Tree<ViewNode> and Tree<UncheckedViewNode>
 
 use crate::to_org::util::{skgnode_and_viewnode_from_id, get_id_from_treenode};
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, MaybeSpecified, SkgConfig, SourceName};
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, TrueNode, Scaffold,
     mk_indefinitive_from_viewnode,
@@ -106,8 +106,7 @@ pub fn pids_for_subscriber_and_its_subscribees (
   let skgnode : &SkgNode =
     map . get (&pid) . ok_or ("pids_for_subscriber_and_its_subscribees: SkgNode should exist in map") ?;
   Ok (( skgnode . ids [0] . clone (),
-        ( skgnode . subscribes_to . clone ()
-          . unwrap_or_default () )) ) }
+        skgnode . subscribes_to . or_default() . to_vec() )) }
 
 /// Extract PIDs for a Subscribee and its grandparent (the subscriber).
 /// Expects: subscriber -> SubscribeeCol -> Subscribee (this node)
@@ -214,13 +213,13 @@ pub(crate) fn collect_child_aliases_at_aliascol (
 pub fn collect_grandchild_aliases_for_viewnode (
   tree: &Tree<ViewNode>,
   node_id: NodeId,
-) -> Result<Option<Vec<String>>, String> {
+) -> Result<MaybeSpecified<String>, String> {
   let alias_col_id : Option<NodeId> =
     unique_scaffold_child (
       tree, node_id, &Scaffold::AliasCol )
     . map_err ( |e| e . to_string() ) ?;
   match alias_col_id {
-    None => Ok (None),
+    None => Ok (MaybeSpecified::Unspecified),
     Some (col_id) => {
       let aliases : Vec<String> = {
         let col_ref : NodeRef<ViewNode> = tree . get (col_id) . expect ("collect_grandchild_aliases_for_viewnode: AliasCol not found");
@@ -235,7 +234,7 @@ pub fn collect_grandchild_aliases_for_viewnode (
           aliases . push(
             alias_child . value() . title() . to_string() ); }
         aliases };
-      Ok(Some(dedup_vector (aliases))) }} }
+      Ok( MaybeSpecified::Specified(dedup_vector (aliases)) ) }} }
 
 /// Find a child node by its ID.
 /// Returns the NodeId of the child if found, None otherwise.

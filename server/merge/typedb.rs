@@ -81,9 +81,8 @@ async fn merge_one_node_in_typedb(
       // PITFALL: Must happen after rerouting 'contains',
       // to know which hide relatinoships to filter out.
       tx, acquirer_id, acquiree_id,
-      ( &updated_acquirer . contains . as_ref() . map(
-        |v| v . iter() . cloned() . collect()) . unwrap_or_default()
-      )) . await ?;
+      &updated_acquirer . contains
+        . iter() . cloned() . collect() ) . await ?;
     reroute_relationships_for_merge (
       tx, acquiree_id, acquirer_id,
       "overrides_view_of", "replacement", "replaced" ) . await ?;

@@ -165,7 +165,7 @@ fn test_move_text_changed_to_unedited_node_respawns()
       let node_12 = read_skgnode(repo_path, "12")?;
       assert_eq!(node_12 . title, "12",
         "12.skg should be unchanged");
-      let contains_12 = node_12 . contains . unwrap_or_default();
+      let contains_12 = node_12 . contains;
       assert!(contains_12 . is_empty(),
         "12.skg should not have any children");
 

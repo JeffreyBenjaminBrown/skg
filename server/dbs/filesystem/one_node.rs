@@ -82,7 +82,7 @@ pub async fn fetch_aliases_from_file (
     config, driver, &skgid
   ) . await {
     Ok ( Some (skgnode)) =>
-      skgnode . aliases . unwrap_or_default(),
+      skgnode . aliases . into_vec(),
     _ => Vec::new(), }}
 
 pub fn write_skgnode_to_source (

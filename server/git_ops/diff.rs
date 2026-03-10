@@ -86,14 +86,14 @@ fn compare_skgnodes (
     old . body  != new . body;
   let aliases_diff : Vec<Diff_Item<String>> =
     compute_interleaved_diff (
-      & old . aliases . clone() . unwrap_or_default(),
-      & new . aliases . clone() . unwrap_or_default() );
+      old . aliases . or_default(),
+      new . aliases . or_default() );
   let ids_diff : Vec<Diff_Item<ID>> =
     compute_interleaved_diff ( & old . ids, & new . ids );
   let contains_diff : Vec<Diff_Item<ID>> =
     compute_interleaved_diff (
-      & old . contains . clone() . unwrap_or_default(),
-      & new . contains . clone() . unwrap_or_default() );
+      &old . contains,
+      &new . contains );
   NodeChanges {
     text_changed,
     aliases_diff,

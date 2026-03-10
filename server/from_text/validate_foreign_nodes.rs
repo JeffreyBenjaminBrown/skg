@@ -1,7 +1,9 @@
-use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::errors::BufferValidationError;
-use crate::types::save::{DefineNode, SaveNode, DeleteNode, Merge};
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
+use crate::types::errors::BufferValidationError;
+use crate::types::misc::{ID, MaybeSpecified, SkgConfig, SourceName};
+use crate::types::save::{DefineNode, SaveNode, DeleteNode, Merge};
+use crate::types::skgnode::SkgNode;
+
 use typedb_driver::TypeDBDriver;
 
 /// Validates that foreign (read-only) nodes are not being modified.
@@ -109,40 +111,41 @@ pub(super) fn validate_merges_involve_only_owned_nodes(
 /// Some([]) and None are equivalent, so we normalize them for comparison.
 ///
 /// For *non-definitive* fields (aliases, overrides_view_of,
-/// subscribes_to, hides_from_its_subscriptions): None means "no opinion"
+/// subscribes_to, hides_from_its_subscriptions): Unspecified means "no opinion"
 /// (because the user did not mention it in the buffer),
 /// and therefore does not represent an edit.
 pub(crate) fn buffernode_differs_from_disknode(
-  buffer_node: &crate::types::skgnode::SkgNode,
-  disk_node: &crate::types::skgnode::SkgNode,
+  buffer_node: &SkgNode,
+  disk_node: &SkgNode,
 ) -> bool {
-  fn nondefinitive_matches<T: Clone + PartialEq>(
-    // for fields where None means "no opinion", not "should be empty"
-    buffer: &Option<Vec<T>>,
-    disk: &Option<Vec<T>>,
-  ) -> bool { buffer . is_none()
-              || flatten_opt_vec (buffer) == flatten_opt_vec (disk)
+  fn fields_match<T: Clone + PartialEq>(
+    buffer: &MaybeSpecified<T>,
+    disk: &MaybeSpecified<T>,
+  ) -> bool { buffer . is_unspecified()
+              || flatten_ms (buffer) == flatten_ms (disk)
             }
 
   let title_matches: bool = buffer_node . title == disk_node . title;
   let body_matches: bool = buffer_node . body == disk_node . body;
   let contains_matches: bool =
-    flatten_opt_vec(&buffer_node . contains) ==
-    flatten_opt_vec(&disk_node . contains);
-  !( title_matches                                                               &&
-     body_matches                                                                &&
-     contains_matches                                                            &&
-     nondefinitive_matches(&buffer_node . aliases, &disk_node . aliases)             &&
-     nondefinitive_matches(&buffer_node . subscribes_to, &disk_node . subscribes_to) &&
-     nondefinitive_matches(&buffer_node . hides_from_its_subscriptions,
-                           &disk_node . hides_from_its_subscriptions)              &&
-     nondefinitive_matches(&buffer_node . overrides_view_of,
-                           &disk_node . overrides_view_of)) }
+    buffer_node . contains == disk_node . contains;
+  !( title_matches
+     && body_matches
+     && contains_matches
+     && fields_match( &buffer_node . aliases,
+                      &disk_node . aliases)
+     && fields_match( &buffer_node . subscribes_to,
+                      &disk_node . subscribes_to)
+     && fields_match( &buffer_node . hides_from_its_subscriptions,
+                      &disk_node . hides_from_its_subscriptions)
+     && fields_match( &buffer_node . overrides_view_of,
+                      &disk_node . overrides_view_of)) }
 
-/// Lets us treat Some([]) and None as equivalent.
-pub(crate) fn flatten_opt_vec<T: Clone>(
-  v: &Option<Vec<T>>
-) -> Option<Vec<T>> {
+/// Lets us treat Specified([]) and Unspecified as equivalent.
+pub(crate) fn flatten_ms<T: Clone>(
+  v: &MaybeSpecified<T>
+) -> MaybeSpecified<T> {
   match v {
-    Some (vec) if vec . is_empty() => None,
-    other => other . clone(), }}
+    MaybeSpecified::Specified (vec) if vec . is_empty() =>
+      MaybeSpecified::Unspecified,
+    other => other . clone() }}

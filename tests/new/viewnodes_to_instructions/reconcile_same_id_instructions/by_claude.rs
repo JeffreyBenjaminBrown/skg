@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use skg::from_text::viewnodes_to_instructions::reconcile_same_id_instructions::collect_dup_instructions;
 use skg::test_utils::extract_skgnode_if_save_else_error;
-use skg::types::misc::{ID, SourceName};
+use skg::types::misc::{ID, MaybeSpecified, SourceName};
 use skg::types::skgnode::SkgNode;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 
@@ -18,14 +18,16 @@ fn create_test_node(
 ) -> SkgNode {
     SkgNode {
         title: title . to_string(),
-        aliases,
+        aliases: match aliases {
+          None => MaybeSpecified::Unspecified,
+          Some (v) => MaybeSpecified::Specified (v) },
         source: SourceName::from ("main"),
         ids: vec![ID::from (id)],
         body,
-        contains: Some (contains),
-        subscribes_to: None,
-        hides_from_its_subscriptions: None,
-        overrides_view_of: None,
+        contains,
+        subscribes_to: MaybeSpecified::Unspecified,
+        hides_from_its_subscriptions: MaybeSpecified::Unspecified,
+        overrides_view_of: MaybeSpecified::Unspecified,
         misc: Vec::new (),
     }
 }
@@ -188,7 +190,7 @@ fn test_alias_collection_and_deduplication() {
     // Collect all aliases
     let mut all_aliases : Vec<String> = vec![];
     for instr in &instructions {
-      if let Some (aliases)
+      if let MaybeSpecified::Specified (aliases)
         = &extract_skgnode_if_save_else_error (instr) . aliases
         { all_aliases . extend( aliases . iter() . cloned() ); }}
 
@@ -313,7 +315,7 @@ fn test_defining_instruction_takes_precedence() {
     // Simulate the logic: last Save instruction should win
     let mut last_title : Option<String> = None;
     let mut last_body : Option<String> = None;
-    let mut last_content : Option<Vec<ID>> = None;
+    let mut last_content : Vec<ID> = vec![];
 
     for instr in &instructions {
         if instr . is_save() {
@@ -328,7 +330,7 @@ fn test_defining_instruction_takes_precedence() {
     // Last Save instruction should win
     assert_eq!(last_title, Some("Last Title" . to_string()));
     assert_eq!(last_body, Some("Last Body" . to_string()));
-    assert_eq!(last_content, Some(vec![ID::from ("content3")]));
+    assert_eq!(last_content, vec![ID::from ("content3")]);
 }
 
 #[test]
@@ -351,9 +353,9 @@ fn test_initial_content_from_disk_when_no_defining() {
 
     for instr in &instructions {
       if instr . is_save() {
-        if let Some (contents)
-          = &extract_skgnode_if_save_else_error (instr) . contains
-          { all_contents . extend(contents . iter() . cloned()); }} }
+        let contents : &Vec<ID> =
+          &extract_skgnode_if_save_else_error (instr) . contains;
+        all_contents . extend(contents . iter() . cloned() ); }}
 
     // Should collect content from both instructions
     assert_eq!(all_contents,

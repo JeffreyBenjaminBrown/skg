@@ -9,7 +9,7 @@ use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, HeadlineInfo};
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
-use crate::types::misc::{SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName};
+use crate::types::misc::{MaybeSpecified, SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::skgnode::SkgNode;
 use crate::types::unchecked_viewnode::{ UncheckedViewNode, UncheckedViewNodeKind };
@@ -439,19 +439,19 @@ pub fn strip_org_comments(s: &str) -> String {
 pub fn skgnode_example () -> SkgNode {
   SkgNode {
     title: "This text gets indexed." . to_string(),
-    aliases: None,
+    aliases: MaybeSpecified::Unspecified,
     source: SourceName::from ("main"),
     ids: vec![ ID::new ("example") ],
     body: Some( r#"This one string could span pages.
 It better be okay with newlines."# . to_string() ),
-    contains: Some(vec![ ID::new ("1"),
-                         ID::new ("2"),
-                         ID::new ("3")]),
-    subscribes_to: Some(vec![ID::new ("11"),
+    contains: vec![ ID::new ("1"),
+                    ID::new ("2"),
+                    ID::new ("3")],
+    subscribes_to: MaybeSpecified::Specified(vec![ID::new ("11"),
                              ID::new ("12"),
                              ID::new ("13")]),
-    hides_from_its_subscriptions: None,
-    overrides_view_of: None,
+    hides_from_its_subscriptions: MaybeSpecified::Unspecified,
+    overrides_view_of: MaybeSpecified::Unspecified,
     misc: Vec::new (), }}
 
 /// Extract SkgNode from Save variant; panics on Delete.

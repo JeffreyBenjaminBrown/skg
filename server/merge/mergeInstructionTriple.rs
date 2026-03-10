@@ -1,6 +1,6 @@
 use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::types::save::{Merge, SaveNode, DeleteNode};
-use crate::types::misc::{SkgConfig, ID};
+use crate::types::misc::{MaybeSpecified, SkgConfig, ID};
 use crate::types::viewnode::EditRequest;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode};
 use crate::types::skgnode::SkgNode;
@@ -97,56 +97,58 @@ fn three_merged_skgnodes(
     // [preserver] + acquirer's old content + acquiree's old content
     let mut combined : Vec<ID> =
       vec![ acquiree_text_preserver . primary_id()? . clone() ];
-    combined . extend(
-      acquirer_from_disk . contains . clone() . unwrap_or_default() );
-    combined . extend(
-      acquiree_from_disk . contains . clone() . unwrap_or_default() );
+    combined . extend_from_slice(
+      &acquirer_from_disk . contains );
+    combined . extend_from_slice(
+      &acquiree_from_disk . contains );
     dedup_vector (combined) };
   updated_acquirer . contains = // update 'contains'
-    Some(new_contains . clone());
+    new_contains . clone();
   { // Combine subscribes_to
     let mut combined : Vec<ID> =
-      acquirer_from_disk . subscribes_to . clone() . unwrap_or_default();
-    combined . extend(
-      acquiree_from_disk . subscribes_to . clone() . unwrap_or_default() );
-    updated_acquirer . subscribes_to = Some(dedup_vector (combined)); }
+      acquirer_from_disk . subscribes_to . or_default() . to_vec();
+    combined . extend_from_slice(
+      acquiree_from_disk . subscribes_to . or_default() );
+    updated_acquirer . subscribes_to =
+      MaybeSpecified::Specified(dedup_vector (combined)); }
   { // Combine hides_from_its_subscriptions,
     // filtering to hide nothing that the acquirer contains.
     let mut combined : Vec<ID> =
       acquirer_from_disk . hides_from_its_subscriptions
-      . clone() . unwrap_or_default();
-    combined . extend(
+      . or_default() . to_vec();
+    combined . extend_from_slice(
       acquiree_from_disk . hides_from_its_subscriptions
-        . clone() . unwrap_or_default() );
+        . or_default() );
     updated_acquirer . hides_from_its_subscriptions =
-      Some( { let deduped_and_filtered : Vec<ID> =
-                // if it's in 'new_contains', then it's not here
-                setlike_vector_subtraction(
-                    dedup_vector (combined),
-                    &new_contains);
-              deduped_and_filtered } ); }
+      MaybeSpecified::Specified(
+        { let deduped_and_filtered : Vec<ID> =
+            // if it's in 'new_contains', then it's not here
+            setlike_vector_subtraction(
+                dedup_vector (combined),
+                &new_contains);
+          deduped_and_filtered } ); }
   { // Combine overrides_view_of
     let mut combined : Vec<ID> =
       acquirer_from_disk . overrides_view_of
-      . clone() . unwrap_or_default();
-    combined . extend(
+      . or_default() . to_vec();
+    combined . extend_from_slice(
       acquiree_from_disk . overrides_view_of
-        . clone() . unwrap_or_default() );
+        . or_default() );
     updated_acquirer . overrides_view_of =
-      Some(dedup_vector (combined)); }
+      MaybeSpecified::Specified(dedup_vector (combined)); }
   Ok (updated_acquirer) }
 
 /// Create an acquiree_text_preserver from the acquiree's data
 fn create_acquiree_text_preserver(acquiree: &SkgNode) -> SkgNode {
   SkgNode {
     title: format!("MERGED: {}", acquiree . title),
-    aliases: None,
+    aliases: MaybeSpecified::Unspecified,
     source: acquiree . source . clone(),
     ids: vec![ID(uuid::Uuid::new_v4() . to_string())],
     body: acquiree . body . clone(),
-    contains                     : Some(vec![]),
-    subscribes_to                : Some(vec![]),
-    hides_from_its_subscriptions : Some(vec![]),
-    overrides_view_of            : Some(vec![]),
+    contains                     : vec![],
+    subscribes_to                : MaybeSpecified::Specified(vec![]),
+    hides_from_its_subscriptions : MaybeSpecified::Specified(vec![]),
+    overrides_view_of            : MaybeSpecified::Specified(vec![]),
     misc                         : Vec::new (),
   }}

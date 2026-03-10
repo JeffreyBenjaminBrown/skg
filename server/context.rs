@@ -301,14 +301,13 @@ pub fn contains_maps_from_nodes (
   let mut reverse : MapToContainers = HashMap::new ();
   for node in nodes {
     if let Ok (pid) = node . primary_id () {
-      if let Some (children) = &node . contains {
-        for child_id in children {
-          forward . entry (pid . clone ())
-            . or_insert_with (Vec::new)
-            . push (child_id . clone ());
-          reverse . entry (child_id . clone ())
-            . or_insert_with (Vec::new)
-            . push (pid . clone ()); }} }}
+      for child_id in &node . contains {
+        forward . entry (pid . clone ())
+          . or_insert_with (Vec::new)
+          . push (child_id . clone ());
+        reverse . entry (child_id . clone ())
+          . or_insert_with (Vec::new)
+          . push (pid . clone ()); } }}
   ( forward, reverse ) }
 
 /// Collect all link target IDs from titles and bodies.

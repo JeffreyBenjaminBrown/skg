@@ -3,15 +3,6 @@ use std::collections::HashSet;
 use std::hash::Hash;
 use std::path::PathBuf;
 
-/// PITFALL: Looks dead, but actually used
-/// by serde's `skip_serializing_if` attribute.
-pub fn option_vec_is_empty_or_none<T> (
-  option_vec: &Option<Vec<T>>
-) -> bool {
-  match option_vec {
-    None => true,
-    Some (vec) => vec . is_empty(), }}
-
 pub fn path_from_pid_and_source (
   config : &SkgConfig,
   source : &SourceName,

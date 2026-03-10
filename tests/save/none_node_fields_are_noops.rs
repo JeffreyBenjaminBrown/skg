@@ -5,7 +5,7 @@ use std::error::Error;
 use skg::from_text::supplement_from_disk::
   supplement_none_fields_from_disk_if_save;
 use skg::test_utils::run_with_test_db;
-use skg::types::misc::{ID, SkgConfig};
+use skg::types::misc::{ID, MaybeSpecified, SkgConfig};
 use skg::types::save::{DefineNode, SaveNode};
 use skg::types::skgnode::{SkgNode, empty_skgnode};
 use skg::types::memory::SkgNodeMap;
@@ -44,38 +44,38 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . ids     = vec![ ID::new ("test_node") ];
-      user_node . aliases = None; }
+      user_node . aliases = MaybeSpecified::Unspecified; }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . aliases,
-      Some ( vec![ "alias 1 on disk" . to_string (),
+      MaybeSpecified::Specified ( vec![ "alias 1 on disk" . to_string (),
                    "alias 2 on disk" . to_string () ]),
-      "None aliases from client should be replaced aliases from disk." ); }
+      "Unspecified aliases from client should be replaced aliases from disk." ); }
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . ids     = vec![ ID::new ("test_node") ];
-      user_node . aliases = Some ( vec![] ); }
+      user_node . aliases = MaybeSpecified::Specified ( vec![] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . aliases,
-      Some ( vec![] ),
-      "Some ( [] ) aliases from client should be preserved, not replaced by data from disk." ); }
+      MaybeSpecified::Specified ( vec![] ),
+      "Specified ( [] ) aliases from client should be preserved, not replaced by data from disk." ); }
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . ids     = vec![ ID::new ("test_node") ];
-      user_node . aliases = Some ( vec![ "new alias" . to_string () ] ); }
+      user_node . aliases = MaybeSpecified::Specified ( vec![ "new alias" . to_string () ] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . aliases,
-      Some ( vec![ "new alias" . to_string () ] ),
+      MaybeSpecified::Specified ( vec![ "new alias" . to_string () ] ),
       "Aliases from client should be preserved, not replaced by data from disk." ); }
 
   Ok (( )) }
@@ -100,38 +100,38 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . ids     = vec![ ID::new ("test_node") ];
-      user_node . subscribes_to = None; }
+      user_node . subscribes_to = MaybeSpecified::Unspecified; }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . subscribes_to,
-      Some ( vec![ ID::new ("sub_1_on_disk"),
+      MaybeSpecified::Specified ( vec![ ID::new ("sub_1_on_disk"),
                    ID::new ("sub_2_on_disk") ]),
-      "None subscribes_to from client should be replaced with subscribes_to from disk." ); }
+      "Unspecified subscribes_to from client should be replaced with subscribes_to from disk." ); }
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . ids     = vec![ ID::new ("test_node") ];
-      user_node . subscribes_to = Some ( vec![] ); }
+      user_node . subscribes_to = MaybeSpecified::Specified ( vec![] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . subscribes_to,
-      Some ( vec![] ),
-      "Some ( [] ) subscribes_to from client should be preserved, not replaced by data from disk." ); }
+      MaybeSpecified::Specified ( vec![] ),
+      "Specified ( [] ) subscribes_to from client should be preserved, not replaced by data from disk." ); }
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . ids     = vec![ ID::new ("test_node") ];
-      user_node . subscribes_to = Some ( vec![ ID::new ("new_sub") ] ); }
+      user_node . subscribes_to = MaybeSpecified::Specified ( vec![ ID::new ("new_sub") ] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . subscribes_to,
-      Some ( vec![ ID::new ("new_sub") ] ),
+      MaybeSpecified::Specified ( vec![ ID::new ("new_sub") ] ),
       "subscribes_to from client should be preserved, not replaced by data from disk." ); }
 
   Ok (( )) }
@@ -156,37 +156,37 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . ids     = vec![ ID::new ("test_node") ];
-      user_node . hides_from_its_subscriptions = None; }
+      user_node . hides_from_its_subscriptions = MaybeSpecified::Unspecified; }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . hides_from_its_subscriptions,
-      Some ( vec![ ID::new ("hide_1_on_disk") ]),
-      "None hides_from_its_subscriptions from client should be replaced with hides from disk." ); }
+      MaybeSpecified::Specified ( vec![ ID::new ("hide_1_on_disk") ]),
+      "Unspecified hides_from_its_subscriptions from client should be replaced with hides from disk." ); }
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . ids     = vec![ ID::new ("test_node") ];
-      user_node . hides_from_its_subscriptions = Some ( vec![] ); }
+      user_node . hides_from_its_subscriptions = MaybeSpecified::Specified ( vec![] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . hides_from_its_subscriptions,
-      Some ( vec![] ),
-      "Some ( [] ) hides_from_its_subscriptions from client should be preserved, not replaced by data from disk." ); }
+      MaybeSpecified::Specified ( vec![] ),
+      "Specified ( [] ) hides_from_its_subscriptions from client should be preserved, not replaced by data from disk." ); }
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . ids     = vec![ ID::new ("test_node") ];
-      user_node . hides_from_its_subscriptions = Some ( vec![ ID::new ("new_hide") ] ); }
+      user_node . hides_from_its_subscriptions = MaybeSpecified::Specified ( vec![ ID::new ("new_hide") ] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . hides_from_its_subscriptions,
-      Some ( vec![ ID::new ("new_hide") ] ),
+      MaybeSpecified::Specified ( vec![ ID::new ("new_hide") ] ),
       "hides_from_its_subscriptions from client should be preserved, not replaced by data from disk." ); }
 
   Ok (( )) }
@@ -211,39 +211,39 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . ids     = vec![ ID::new ("test_node") ];
-      user_node . overrides_view_of = None; }
+      user_node . overrides_view_of = MaybeSpecified::Unspecified; }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . overrides_view_of,
-      Some ( vec![ ID::new ("override_1_on_disk"),
+      MaybeSpecified::Specified ( vec![ ID::new ("override_1_on_disk"),
                    ID::new ("override_2_on_disk"),
                    ID::new ("override_3_on_disk") ]),
-      "None overrides_view_of from client should be replaced with overrides from disk." ); }
+      "Unspecified overrides_view_of from client should be replaced with overrides from disk." ); }
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . ids     = vec![ ID::new ("test_node") ];
-      user_node . overrides_view_of = Some ( vec![] ); }
+      user_node . overrides_view_of = MaybeSpecified::Specified ( vec![] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . overrides_view_of,
-      Some ( vec![] ),
-      "Some ( [] ) overrides_view_of from client should be preserved, not replaced by data from disk." ); }
+      MaybeSpecified::Specified ( vec![] ),
+      "Specified ( [] ) overrides_view_of from client should be preserved, not replaced by data from disk." ); }
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . ids     = vec![ ID::new ("test_node") ];
-      user_node . overrides_view_of = Some ( vec![ ID::new ("new_override") ] ); }
+      user_node . overrides_view_of = MaybeSpecified::Specified ( vec![ ID::new ("new_override") ] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . overrides_view_of,
-      Some ( vec![ ID::new ("new_override") ] ),
+      MaybeSpecified::Specified ( vec![ ID::new ("new_override") ] ),
       "overrides_view_of from client should be preserved, not replaced by data from disk." ); }
 
   Ok (( )) }

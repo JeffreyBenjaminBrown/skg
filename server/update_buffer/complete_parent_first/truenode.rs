@@ -122,9 +122,9 @@ pub fn complete_truenode_preorder (
   let skgnode : &SkgNode =
     skgnode_from_map_or_disk( &pid, &source, map, config ) ?;
   let content_ids : Vec<ID> =
-    skgnode . contains . clone() . unwrap_or_default();
+    skgnode . contains . clone();
   let subscribes_to : Vec<ID> =
-    skgnode . subscribes_to . clone() . unwrap_or_default();
+    skgnode . subscribes_to . or_default() . to_vec();
   let node_changes : Option<&NodeChanges> =
     node_changes_for_truenode( source_diffs, &pid, &source );
   let is_sub : bool = is_subscribee( tree, node ) ?;
@@ -190,7 +190,7 @@ fn content_goal_list (
           skgnode_from_map_or_disk(
             &grandparent_pid, &grandparent_source, map, config ) ?;
         grandparent_skgnode . hides_from_its_subscriptions
-          . clone() . unwrap_or_default() };
+          . or_default() . to_vec() };
     let apparent_content_ids : Vec<ID> =
       setlike_vector_subtraction (
         content_ids . to_vec(), &worktree_hidden );
@@ -203,7 +203,7 @@ fn content_goal_list (
             skgnode_from_git_head(
                 &grandparent_pid, &grandparent_source, config )
               . ok()
-              . and_then( |skg| skg . hides_from_its_subscriptions )
+              . map( |skg| skg . hides_from_its_subscriptions . into_vec() )
               . unwrap_or_default();
           let head_visible : Vec<ID> =
             setlike_vector_subtraction(

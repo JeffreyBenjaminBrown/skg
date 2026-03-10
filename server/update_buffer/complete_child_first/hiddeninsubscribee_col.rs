@@ -59,14 +59,14 @@ pub fn complete_hiddeninsubscribee_col (
   let subscribee_contains : Vec<ID> = {
     let subscribee_skgnode : &SkgNode =
       map . get (&subscribee_pid) . ok_or ("complete_hiddeninsubscribee_col: subscribee SkgNode not in map") ?;
-    subscribee_skgnode . contains . clone() . unwrap_or_default() };
+    subscribee_skgnode . contains . clone() };
   let subscriber_hides : Vec<ID> = {
     let subscriber_skgnode : &SkgNode =
       map . get (&subscriber_pid)
       . ok_or( "complete_hiddeninsubscribee_col: \
                subscriber SkgNode not in map" ) ?;
     subscriber_skgnode . hides_from_its_subscriptions
-      . clone() . unwrap_or_default() };
+      . or_default() . to_vec() };
   let worktree_content : Vec<ID> =
     { // Intersection of subscriber_hides and subscribee_contains,
       // preserving order from subscriber_hides.
@@ -171,7 +171,7 @@ fn goallist_and_removedids_for_hiddeninsubscribeecol_with_diff (
     skgnode_from_git_head(
         subscriber_pid, subscriber_source, config )
       . ok()
-      . and_then( |skg| skg . hides_from_its_subscriptions )
+      . map( |skg| skg . hides_from_its_subscriptions . into_vec() )
       . unwrap_or_default();
   let old_list : Vec<ID> =
     { let head_subscribee_contains_set : HashSet<ID> =

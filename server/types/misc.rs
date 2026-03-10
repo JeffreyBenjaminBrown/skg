@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize, Deserializer};
+use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;
@@ -11,13 +11,35 @@ use tantivy::schema::Field;
 // Type Definitions
 //
 
-/* Each node has a random ID. Skg does not check for collisions.
-So far the IDs are Version 4 UUIDs.
-.
-Collisions are astronomically unlikely but not impossible.
-If there are fewer than 3.3e15 v4 UUIDs --
-equivalent to 9 billion people with 415,000 nodes each --
-the collision probability is less than 1 in 1e6. */
+/// When the user saves a buffer, this type distinguishes
+/// "not specified" (so use whatever is already on disk) from
+/// "should be this value" (even if empty).
+///
+/// ELABORATION:
+/// When a user saves a TrueNode, its non-ignored TrueNode children
+/// always define its contents, so MaybeSpecified does not apply there.
+/// But other fields -- e.g. aliases --
+/// the user is likely not to mention (in particular,
+/// not asking for any changes). This type distinguishes the case
+/// where the user did not mention the field from the case
+/// where the user wants it empty.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum MaybeSpecified<T> {
+  Unspecified,
+  Specified (Vec<T>),
+}
+
+/// Each node has a random ID. Skg does not check for collisions.
+/// So far the IDs are Version 4 UUIDs.
+/// .
+/// Collisions are astronomically unlikely but not impossible.
+/// If UUIDs were perfectly uniformly distributed,
+/// and there are fewer than 3.3e15 v4 UUIDs --
+/// equivalent to 9 billion people with 415,000 nodes each --
+/// then the collision probability is less than 1 in 1e6.
+/// (In reality 6 bits of a v4 UUIDs are fixed:
+/// 4 for the version, and 2 for the variant indicator.
+/// So there's a little less headroom, but still enough.)
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub struct ID ( pub String );
 
@@ -102,6 +124,55 @@ fn default_initial_node_limit() -> usize {
 //
 // Implementations
 //
+
+impl<T> MaybeSpecified<T> {
+  pub fn is_unspecified (&self) -> bool {
+    matches! (self, MaybeSpecified::Unspecified) }
+  /// Returns the inner slice, or empty if Unspecified.
+  pub fn or_default (&self) -> &[T] {
+    match self {
+      MaybeSpecified::Unspecified  => &[],
+      MaybeSpecified::Specified (v) => v } }
+  /// Consumes self, returning the inner Vec or empty.
+  pub fn into_vec (self) -> Vec<T> {
+    match self {
+      MaybeSpecified::Unspecified  => vec![],
+      MaybeSpecified::Specified (v) => v } }
+  /// Ensures the value is Specified, defaulting to empty,
+  /// and returns a mutable reference to the inner Vec.
+  pub fn ensure_specified (&mut self) -> &mut Vec<T> {
+    if matches! (self, MaybeSpecified::Unspecified) {
+      *self = MaybeSpecified::Specified (Vec::new ()); }
+    match self {
+      MaybeSpecified::Specified (v) => v,
+      MaybeSpecified::Unspecified => unreachable! () } }
+  /// For serde skip_serializing_if.
+  /// Skips both Unspecified and Specified([]).
+  pub fn skip_serializing (&self) -> bool {
+    match self {
+      MaybeSpecified::Unspecified  => true,
+      MaybeSpecified::Specified (v) => v . is_empty () } } }
+
+impl<T> Default for MaybeSpecified<T> {
+  fn default () -> Self {
+    MaybeSpecified::Unspecified } }
+
+impl<T: Serialize> Serialize for MaybeSpecified<T> {
+  fn serialize<S: Serializer> (
+    &self, serializer : S
+  ) -> Result<S::Ok, S::Error> {
+    match self {
+      MaybeSpecified::Unspecified  =>
+        serializer . serialize_none (),
+      MaybeSpecified::Specified (v) =>
+        v . serialize (serializer) } } }
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for MaybeSpecified<T> {
+  fn deserialize<D: Deserializer<'de>> (
+    deserializer : D
+  ) -> Result<Self, D::Error> {
+    Vec::<T>::deserialize (deserializer)
+      . map (MaybeSpecified::Specified) } }
 
 impl ID {
   pub fn new <S : Into<String>> (s: S) -> Self {

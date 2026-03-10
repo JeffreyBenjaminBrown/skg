@@ -1,4 +1,4 @@
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, MaybeSpecified, SourceName};
 use crate::types::skgnode::{FileProperty, SkgNode};
 
 use std::path::Path;
@@ -184,20 +184,20 @@ fn skgnode_from_section_tree (
       . unwrap_or (tree . extent_end);
   let body : Option<String> =
     collect_body (lines, tree . section . body_start, body_end);
-  let aliases : Option<Vec<String>> =
-    tree . section . roam_aliases . clone();
+  let aliases : MaybeSpecified<String> =
+    match tree . section . roam_aliases . clone() {
+      None    => MaybeSpecified::Unspecified,
+      Some(v) => MaybeSpecified::Specified(v) };
   SkgNode {
     title    : tree . section . headline . clone(),
     aliases,
     source   : SourceName::default(),
     ids      : vec![ ID::new (id_str) ],
     body,
-    contains :
-      if contained_ids . is_empty() { None }
-      else { Some (contained_ids) },
-    subscribes_to                : None,
-    hides_from_its_subscriptions : None,
-    overrides_view_of            : None,
+    contains : contained_ids,
+    subscribes_to                : MaybeSpecified::Unspecified,
+    hides_from_its_subscriptions : MaybeSpecified::Unspecified,
+    overrides_view_of            : MaybeSpecified::Unspecified,
     misc :
       if tree . section . had_id {
         vec![FileProperty::Had_ID_Before_Import] }

@@ -69,15 +69,15 @@ pub fn complete_hiddenoutsideofsubscribeecol (
              subscriber SkgNode not in map" ) ?;
   let wt_subscriber_hides : Vec<ID> =
     wt_subscriber_skgnode . hides_from_its_subscriptions
-      . clone() . unwrap_or_default();
+      . or_default() . to_vec();
   let wt_subscribees : Vec<ID> =
     wt_subscriber_skgnode . subscribes_to
-      . clone() . unwrap_or_default();
+      . or_default() . to_vec();
   let wt_all_subscribee_content : HashSet<ID> =
     // everything contained by any subscribee
     wt_subscribees . iter()
       . filter_map( |pid| map . get (pid) )
-      . flat_map( |skg| skg . contains . clone() . unwrap_or_default() )
+      . flat_map( |skg| skg . contains . iter() . cloned() )
       . collect();
   let wt_content : Vec<ID> =
     // what the subscriber hides that no subscribee contains
@@ -95,9 +95,9 @@ pub fn complete_hiddenoutsideofsubscribeecol (
                 &subscriber_pid, &subscriber_source, config )
               . ok()
               . map( |skg| (skg . hides_from_its_subscriptions
-                              . unwrap_or_default(),
+                              . into_vec(),
                            skg . subscribes_to
-                              . unwrap_or_default() ))
+                              . into_vec() ))
               . unwrap_or_default();
         let head_all_subscribee_content : HashSet<ID> =
           head_subscribee_contains_from_map_and_diffs(
@@ -196,7 +196,7 @@ fn head_subscribee_contains_from_map_and_diffs (
             Diff_Item::New (_) => {} } } },
       None => {
         if let Some (skg) = map . get (pid) {
-          for id in skg . contains . clone() . unwrap_or_default() {
+          for id in skg . contains . iter() . cloned() {
             result . insert (id); } } } } }
   result }
 

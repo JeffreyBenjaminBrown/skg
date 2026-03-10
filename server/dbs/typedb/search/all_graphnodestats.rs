@@ -60,8 +60,7 @@ pub fn graphnodestats_for_pid (
 ) -> GraphNodeStats {
   let aliasing : bool =
     skgnode
-    . and_then ( |n| n . aliases . as_ref () )
-    . map ( |a| ! a . is_empty () )
+    . map ( |n| ! n . aliases . or_default () . is_empty () )
     . unwrap_or (false);
   let extra_ids : bool =
     skgnode

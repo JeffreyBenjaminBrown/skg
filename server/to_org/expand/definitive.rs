@@ -176,9 +176,11 @@ fn get_hidden_ids_if_subscribee (
     let subscriber_id : ID =
       get_id_from_treenode ( tree, subscriber . id() ) ?;
     let hidden_ids : HashSet < ID > =
-      map . get (&subscriber_id) . and_then (
-        |skgnode| skgnode . hides_from_its_subscriptions . clone ( ))
-      . unwrap_or_default () . into_iter () . collect ();
+      map . get (&subscriber_id)
+      . map ( |skgnode| skgnode . hides_from_its_subscriptions
+                . or_default () )
+      . unwrap_or (&[])
+      . iter () . cloned () . collect ();
     Ok (hidden_ids) }}
 
 /// Does two things:
@@ -335,7 +337,7 @@ async fn extendDefinitiveSubtree_fromGit (
     { let skgnode : SkgNode =
         skgnode_from_git_head ( &pid, &src, config ) ?;
       let contents : Vec<ID> =
-        skgnode . contains . unwrap_or_default();
+        skgnode . contains;
       let not_hidden : BTreeSet<String> =
         contents . iter()
         . filter ( |id| ! hidden_ids . contains (id) )

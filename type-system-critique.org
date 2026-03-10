@@ -45,7 +45,7 @@ These should instead take ~&mut TrueNode~ directly, pushing the
 check to the caller (who is already in a ~match~ arm). This
 converts a runtime panic into a compile-time guarantee.
 
-* TODO Option<Vec<T>>: conflating "unknown" and "empty"
+* DONE Option<Vec<T>>: conflating "unknown" and "empty"
 
 ~SkgNode~ uses ~Option<Vec<ID>>~ for ~contains~,
 ~subscribes_to~, ~hides_from_its_subscriptions~, and

@@ -1,7 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-use crate::util::option_vec_is_empty_or_none;
-use super::misc::{ID, SourceName};
+use super::misc::{ID, MaybeSpecified, SourceName};
 
 /// This could be extended.
 /// A .skg file can have any number of associated FileProperties.
@@ -22,8 +21,8 @@ pub struct SkgNode {
 
   pub title: String,
 
-  #[serde(default, skip_serializing_if = "option_vec_is_empty_or_none")]
-  pub aliases: Option<Vec<String>>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.)
+  #[serde(default, skip_serializing_if = "MaybeSpecified::skip_serializing")]
+  pub aliases: MaybeSpecified<String>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.)
 
   #[serde(skip_serializing, skip_deserializing)]
   pub source: SourceName, // source nickname, inferred from file location and SkgConfig
@@ -34,17 +33,17 @@ pub struct SkgNode {
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub body: Option<String>, // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding org headline, to which it belongs, and the next (if there is a next).
 
-  #[serde(default, skip_serializing_if = "option_vec_is_empty_or_none")]
-  pub contains: Option<Vec<ID>>, // See schema.tql.
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub contains: Vec<ID>, // See schema.tql.
 
-  #[serde(default, skip_serializing_if = "option_vec_is_empty_or_none")]
-  pub subscribes_to: Option<Vec<ID>>, // See schema.tql.
+  #[serde(default, skip_serializing_if = "MaybeSpecified::skip_serializing")]
+  pub subscribes_to: MaybeSpecified<ID>, // See schema.tql.
 
-  #[serde(default, skip_serializing_if = "option_vec_is_empty_or_none")]
-  pub hides_from_its_subscriptions: Option<Vec<ID>>, // See schema.tql.
+  #[serde(default, skip_serializing_if = "MaybeSpecified::skip_serializing")]
+  pub hides_from_its_subscriptions: MaybeSpecified<ID>, // See schema.tql.
 
-  #[serde(default, skip_serializing_if = "option_vec_is_empty_or_none")]
-  pub overrides_view_of: Option<Vec<ID>>, // See schema.tql.
+  #[serde(default, skip_serializing_if = "MaybeSpecified::skip_serializing")]
+  pub overrides_view_of: MaybeSpecified<ID>, // See schema.tql.
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub misc: Vec<FileProperty>,
@@ -65,13 +64,13 @@ impl SkgNode {
 pub fn empty_skgnode () -> SkgNode {
   SkgNode {
     title                        : String::new (),
-    aliases                      : None,
+    aliases                      : MaybeSpecified::Unspecified,
     source                       : SourceName::from ("main"),
     ids                          : vec![],
     body                         : None,
-    contains                     : None,
-    subscribes_to                : None,
-    hides_from_its_subscriptions : None,
-    overrides_view_of            : None,
+    contains                     : Vec::new(),
+    subscribes_to                : MaybeSpecified::Unspecified,
+    hides_from_its_subscriptions : MaybeSpecified::Unspecified,
+    overrides_view_of            : MaybeSpecified::Unspecified,
     misc                         : Vec::new (),
   }}

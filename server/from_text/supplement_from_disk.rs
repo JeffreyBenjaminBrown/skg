@@ -51,14 +51,14 @@ pub async fn supplement_none_fields_from_disk_if_save (
           pid . clone(),
           disk_node . source . clone(),
           from_buffer . source . clone() )) ); }
-    if from_buffer . aliases . is_none() {
+    if from_buffer . aliases . is_unspecified() {
       from_buffer . aliases = disk_node . aliases; }
-    if from_buffer . subscribes_to . is_none() {
+    if from_buffer . subscribes_to . is_unspecified() {
       from_buffer . subscribes_to = disk_node . subscribes_to; }
-    if from_buffer . hides_from_its_subscriptions . is_none() {
+    if from_buffer . hides_from_its_subscriptions . is_unspecified() {
       from_buffer . hides_from_its_subscriptions =
         disk_node . hides_from_its_subscriptions; }
-    if from_buffer . overrides_view_of . is_none() {
+    if from_buffer . overrides_view_of . is_unspecified() {
       from_buffer . overrides_view_of =
         disk_node . overrides_view_of; }
     if from_buffer . misc . is_empty() {

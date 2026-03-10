@@ -104,13 +104,10 @@ fn merge_into_existing (
 ) {
   if ! existing . misc . contains (&FileProperty::Was_Overloaded) {
     existing . misc . push (FileProperty::Was_Overloaded); }
-  if let Some (new_children) = &newcomer . contains {
-    // Merge contents.
-    let merged : &mut Vec<ID> =
-      existing . contains . get_or_insert_with (Vec::new);
-    for child in new_children {
-      if ! merged . contains (child) {
-        merged . push (child . clone()); }} }
+  { // Merge contents.
+    for child in &newcomer . contains {
+      if ! existing . contains . contains (child) {
+        existing . contains . push (child . clone()); }} }
   { // Append the newcomer's title and body into the existing body,
     // separated by an informative marker.
     let separator : &str =
@@ -123,13 +120,14 @@ fn merge_into_existing (
     let body : &mut String =
       existing . body . get_or_insert_with (String::new);
     body . push_str (&appendage); }
-  if let Some (new_aliases) = &newcomer . aliases {
-    // Merge aliases.
-    let merged : &mut Vec<String> =
-      existing . aliases . get_or_insert_with (Vec::new);
-    for alias in new_aliases {
-      if ! merged . contains (alias) {
-        merged . push (alias . clone()); }}}
+  { // Merge aliases.
+    let new_aliases : &[String] = newcomer . aliases . or_default();
+    if ! new_aliases . is_empty() {
+      let merged : &mut Vec<String> =
+        existing . aliases . ensure_specified();
+      for alias in new_aliases {
+        if ! merged . contains (alias) {
+          merged . push (alias . clone()); }} } }
   if newcomer . misc . contains (&FileProperty::Had_ID_Before_Import)
     && ! existing . misc . contains (&FileProperty::Had_ID_Before_Import)
     { // Preserve Had_ID_Before_Import from either side.

@@ -2,7 +2,7 @@ use indoc::indoc;
 use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_viewnode_forest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
-use skg::types::misc::{ID, SourceName};
+use skg::types::misc::{ID, MaybeSpecified, SourceName};
 use skg::types::save::SaveNode;
 use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
 use std::error::Error;
@@ -51,19 +51,19 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
         matches!(&merge . acquiree_text_preserver,
              SaveNode (_)),
         "acquiree_text_preserver should be SaveNode");
-       assert_eq!(acquiree_text_preserver . contains . as_ref() . unwrap() . len(),
+       assert_eq!(acquiree_text_preserver . contains . len(),
              0, "acquiree_text_preserver should have no contents");
         assert_eq!(
           acquiree_text_preserver . subscribes_to,
-          Some(vec![]),
+          MaybeSpecified::Specified(vec![]),
           "acquiree_text_preserver should have empty subscriptions" );
         assert_eq!(
           acquiree_text_preserver . hides_from_its_subscriptions,
-          Some(vec![]),
+          MaybeSpecified::Specified(vec![]),
           "acquiree_text_preserver should have empty hides" );
         assert_eq!(
           acquiree_text_preserver . overrides_view_of,
-          Some(vec![]),
+          MaybeSpecified::Specified(vec![]),
           "acquiree_text_preserver should have empty overrides" );
 
         // Verify node 1 (acquirer) properties
@@ -89,12 +89,12 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
         // In this case: [acquiree_text_preserver ID] (since both started with empty contents)
         let acquiree_text_preserver_id = &acquiree_text_preserver . ids[0];
         assert_eq!(
-          node1 . contains . as_ref() . unwrap() . len(),
+          node1 . contains . len(),
           1,
           "Node 1 should contain exactly the acquiree_text_preserver"
         );
         assert_eq!(
-          &node1 . contains . as_ref() . unwrap()[0], acquiree_text_preserver_id,
+          &node1 . contains[0], acquiree_text_preserver_id,
           "Node 1's first content should be the acquiree_text_preserver"
         );
 

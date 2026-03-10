@@ -75,7 +75,7 @@ fn test_deletions_excluded (
       assert_eq!(
         // id 1 should contain 3 and not 2 (which is being deleted)
         extract_skgnode_if_save_else_error (id1_instruction) . contains,
-        Some(vec![ID::from ("3")]));
+        vec![ID::from ("3")]);
       Ok (( )) } ) ) }
 
 #[test]
@@ -110,7 +110,7 @@ fn test_defining_node_defines (
                    None); }
       { // Only definer's contents are used
         assert_eq!(extract_skgnode_if_save_else_error (id1_instruction) . contains,
-                   Some(vec![ID::from ("3")])); }
+                   vec![ID::from ("3")]); }
       Ok (( )) } )) }
 
 #[test]
@@ -154,6 +154,6 @@ fn test_adding_without_definer (
         assert_eq!( // Contains should only have what the definitive specified, and no data from the indefinitive
           extract_skgnode_if_save_else_error (id4_instruction) . title, "4");
         assert_eq!(extract_skgnode_if_save_else_error (id4_instruction) . contains,
-                   Some( vec![] )); }
+                   Vec::<ID>::new()); }
 
       Ok (( )) } )) }

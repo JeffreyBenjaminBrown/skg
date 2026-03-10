@@ -77,7 +77,7 @@ pub async fn complete_subscribee_col_preorder (
     . ok_or ("complete_subscribee_col_preorder: parent is not a TrueNode") ?;
   let worktree_subscribees : Vec<ID> =
     map . get (&parent_skgid)
-      . map( |skg| skg . subscribes_to . clone() . unwrap_or_default() )
+      . map( |skg| skg . subscribes_to . or_default() . to_vec() )
       . unwrap_or_default();
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
     diff_aware_goal_list(
@@ -161,10 +161,13 @@ fn diff_aware_goal_list (
       . and_then( |diffs| diffs . get (parent_source) )
       . filter( |sd| sd . is_git_repo )
       . and_then(
-         |_| skgnode_from_git_head(
-               parent_skgid, parent_source, config )
-             . ok()
-             . and_then( |skg| skg . subscribes_to ) );
+         |_| { let skg : SkgNode =
+                 skgnode_from_git_head(
+                   parent_skgid, parent_source, config )
+                 . ok() ?;
+               if skg . subscribes_to . is_unspecified() { None }
+               else { Some (
+                 skg . subscribes_to . into_vec() ) }} );
   match head_subscribees {
     None =>
       (worktree_subscribees . to_vec(), HashSet::new()),

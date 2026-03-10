@@ -231,15 +231,13 @@ fn create_documents_from_node (
   tantivy_index: &TantivyIndex,
 ) -> Result < Vec < Document >,
               Box < dyn Error >> {
-
   let primary_id : &ID = node . primary_id()?;
   let mut documents: Vec<Document> =
     Vec::new();
   let mut titles_and_aliases: Vec<String> =
     vec![node . title . clone()];
-  if let Some (aliases) = &node . aliases {
-    titles_and_aliases . extend(
-      aliases . clone () ); }
+  titles_and_aliases . extend_from_slice (
+    node . aliases . or_default () );
   for (i, title_or_alias) in
     titles_and_aliases . iter() . enumerate()
   { let is_title : &str =
