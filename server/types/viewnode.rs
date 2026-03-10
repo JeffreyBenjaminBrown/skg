@@ -43,13 +43,17 @@ pub struct DeletedNode {
   pub body   : Option < String >,
 }
 
-/// An ViewNode that corresponds to a SkgNode.
+pub type TrueNode          = TrueNode_Generic < ID, SourceName >;
+pub type UncheckedTrueNode = TrueNode_Generic < Option < ID >,
+                                                Option < SourceName >>;
+
+/// A ViewNode that corresponds to a SkgNode.
 #[derive( Debug, Clone, PartialEq )]
-pub struct TrueNode {
+pub struct TrueNode_Generic < Id, Src > {
   pub title          : String,
   pub body           : Option < String >,
-  pub id             : ID,
-  pub source         : SourceName,
+  pub id             : Id,
+  pub source         : Src,
   pub parent_ignores : bool, // When true, if the buffer is saved, this node has no effect on its parent. It is effectively a new tree root, but it does not have to be located at the top of the buffer tree with the other roots.
   // PITFALL : Don't move parent_ignores to ViewNodeStats. Doing so might seem tidy, because parent_ignores describes another relationship between the node and its view-ancestry. But parent_ignores is different because the user can in some cases reasonably change its value. That is, parent_ignores is not dictated solely by the view, but instead by some combination of the view and the user's intentions.
 
@@ -162,7 +166,7 @@ pub enum ViewRequest {
 // Implementations
 //
 
-impl TrueNode {
+impl < Id, Src > TrueNode_Generic < Id, Src > {
   /// A phantom is a display-only placeholder for a removed node
   /// in git diff view. Identified by Removed or RemovedHere status.
   pub fn is_phantom (

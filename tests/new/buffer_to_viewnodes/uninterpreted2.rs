@@ -131,7 +131,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
     _ => panic!("expected TrueNode") };
   assert_eq!(first_node . title(), "simple node");
   assert_eq!(first_node . body(), Some(&"Simple body" . to_string()));
-  assert_eq!(first_t . id_opt . as_ref(), None);
+  assert_eq!(first_t . id . as_ref(), None);
   assert_eq!(first_t . viewStats . cycle, false);
   assert_eq!(first_t . parent_ignores, false);
   assert_eq!(first_node . focused, false);

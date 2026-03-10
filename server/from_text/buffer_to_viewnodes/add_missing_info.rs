@@ -78,17 +78,17 @@ fn inherit_parent_source_if_possible(
 ) -> Result<(), String> {
   let needs_source : bool =
     match &node . value() . kind {
-      UncheckedViewNodeKind::True (t) => t . source_opt . is_none(),
+      UncheckedViewNodeKind::True (t) => t . source . is_none(),
       _ => false, };
   if needs_source {
     let parent_source : Option<SourceName> =
       node . parent() . and_then(|mut p| {
         match &p . value() . kind {
-          UncheckedViewNodeKind::True (pt) => pt . source_opt . clone(),
+          UncheckedViewNodeKind::True (pt) => pt . source . clone(),
           _ => None, }} );
     if let Some (source) = parent_source {
       if let UncheckedViewNodeKind::True (t) = &mut node . value() . kind {
-        t . source_opt = Some (source); }} }
+        t . source = Some (source); }} }
   Ok (( )) }
 
 /// Assign a new UUID to a TrueNode if it doesn't have an ID.
@@ -96,7 +96,7 @@ fn assign_new_id_if_absent(
   node: &mut NodeMut<UncheckedViewNode>
 ) -> Result<(), String> {
   if let UncheckedViewNodeKind::True (t) = &mut node . value() . kind {
-    if t . id_opt . is_none() {
+    if t . id . is_none() {
       let new_id : String = Uuid::new_v4() . to_string();
-      t . id_opt = Some(ID (new_id)); }}
+      t . id = Some(ID (new_id)); }}
   Ok (( )) }

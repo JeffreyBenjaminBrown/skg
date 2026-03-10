@@ -1,16 +1,15 @@
-/// See ./viewnode.rs for what all fields mean.
-/// This file defines unchecked variants of some of the types
-/// from ./viewnode.rs, where 'unchecked' means
-/// they might not have an ID or a source field.
-/// They are only needed for a little while after reading in
-/// a buffer from the client. After validation, they are converted
-/// to the usual checked type.
+/// Unchecked variants of ViewNode and ViewNodeKind,
+/// plus conversions between checked and unchecked trees.
+/// 'Unchecked' means id and source might be absent.
+/// Only needed briefly after parsing a buffer from the client;
+/// after validation, converted to checked types.
 
-use super::git::NodeDiffStatus;
-use super::misc::{ID, SourceName};
+use super::misc::ID;
+pub use super::viewnode::UncheckedTrueNode;
 use super::viewnode::{
-  ViewNode, ViewNodeKind, TrueNode, Scaffold, ScaffoldKind, DeletedNode,
-  GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest,
+  ViewNode, ViewNodeKind, TrueNode,
+  Scaffold, ScaffoldKind, DeletedNode,
+  GraphNodeStats, ViewNodeStats,
 };
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use ego_tree::{Tree, NodeId, NodeMut};
@@ -28,28 +27,14 @@ pub struct UncheckedViewNode {
   pub kind    : UncheckedViewNodeKind,
 }
 
+// UncheckedTrueNode is defined in viewnode.rs.
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum UncheckedViewNodeKind {
   True         (UncheckedTrueNode),
   Scaff        (Scaffold),  // Scaffold is shared - scaffolds never have IDs
   Deleted      (DeletedNode),
   DeletedScaff (ScaffoldKind),
-}
-
-/// Unchecked version of TrueNode - id and source are optional.
-#[derive(Debug, Clone, PartialEq)]
-pub struct UncheckedTrueNode {
-  pub title          : String,
-  pub body           : Option<String>,
-  pub id_opt         : Option<ID>,
-  pub source_opt     : Option<SourceName>,
-  pub parent_ignores : bool,
-  pub indefinitive   : bool,
-  pub graphStats     : GraphNodeStats,
-  pub viewStats      : ViewNodeStats,
-  pub edit_request   : Option<EditRequest>,
-  pub view_requests  : HashSet<ViewRequest>,
-  pub diff           : Option<NodeDiffStatus>,
 }
 
 //
@@ -60,9 +45,9 @@ impl TryFrom<UncheckedTrueNode> for TrueNode {
   type Error = String;
 
   fn try_from(u: UncheckedTrueNode) -> Result<Self, Self::Error> {
-    let id = u . id_opt . ok_or_else(
+    let id = u . id . ok_or_else(
       || format!("Node '{}' has no ID", u . title))?;
-    let source = u . source_opt . ok_or_else(
+    let source = u . source . ok_or_else(
       || format!("Node '{}' has no source", u . title))?;
     Ok(TrueNode {
       title          : u . title,
@@ -114,8 +99,8 @@ impl From<TrueNode> for UncheckedTrueNode {
     UncheckedTrueNode {
       title          : t . title,
       body           : t . body,
-      id_opt         : Some(t . id),
-      source_opt     : Some(t . source),
+      id             : Some(t . id),
+      source         : Some(t . source),
       parent_ignores : t . parent_ignores,
       indefinitive   : t . indefinitive,
       graphStats     : t . graphStats,
@@ -261,8 +246,8 @@ impl Default for UncheckedTrueNode {
     UncheckedTrueNode {
       title          : String::new(),
       body           : None,
-      id_opt         : None,
-      source_opt     : None,
+      id             : None,
+      source         : None,
       parent_ignores : false,
       indefinitive   : false,
       graphStats     : GraphNodeStats::default(),
@@ -319,7 +304,7 @@ impl UncheckedViewNode {
   /// PITFALL: Don't let this convince you a Scaff can have an ID.
   pub fn id_opt (&self) -> Option<&ID> {
     match &self . kind {
-      UncheckedViewNodeKind::True (t)    => t . id_opt . as_ref(),
+      UncheckedViewNodeKind::True (t)    => t . id . as_ref(),
       UncheckedViewNodeKind::Scaff (_)   => None,
       UncheckedViewNodeKind::Deleted (d) => Some(&d . id),
       UncheckedViewNodeKind::DeletedScaff (_) => None, }}

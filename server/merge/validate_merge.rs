@@ -41,7 +41,7 @@ pub async fn validate_merge_requests(
           "Acquirer node cannot be a Scaffold: {:?}", s));
         continue; }
       _ => continue };
-    let acquirer_id : &ID = match &t . id_opt {
+    let acquirer_id : &ID = match &t . id {
       Some (id) => id,
       None => { errors . push(format!(
                   "Acquirer node '{}' must have an ID", t . title));
@@ -72,7 +72,7 @@ fn collect_merge_validation_data<'a>(
     if let ego_tree::iter::Edge::Open (node_ref) = edge {
       let viewnode : &UncheckedViewNode = node_ref . value();
       if let UncheckedViewNodeKind::True (t) = &viewnode . kind {
-        if let Some (id) = &t . id_opt {
+        if let Some (id) = &t . id {
           if matches!(&t . edit_request, Some (EditRequest::Delete)) {
             to_delete_ids . insert(id . clone()); } // mutate!
           if let Some(EditRequest::Merge (acquiree_id))

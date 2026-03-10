@@ -309,7 +309,7 @@ fn compare_two_viewnode_branches_recursively_modulo_id (
       let mut n1_copy : UncheckedViewNode =
         n1 . clone();
       if let UncheckedViewNodeKind::True (t) = &mut n1_copy . kind {
-        t . id_opt = t2 . id_opt . clone(); }
+        t . id = t2 . id . clone(); }
       if n1_copy != *n2 { return false; }}
     ( UncheckedViewNodeKind::Scaff (_),
       UncheckedViewNodeKind::Scaff (_)) =>

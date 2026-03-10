@@ -63,7 +63,7 @@ pub fn id_from_self_or_nearest_ancestor (
     . ok_or ("id_from_self_or_nearest_ancestor: node not found")?;
   loop {
     if let UncheckedViewNodeKind::True (t) = &node . value() . kind {
-      if let Some (id) = &t . id_opt {
+      if let Some (id) = &t . id {
         return Ok(id . clone()); }}
     node = node . parent()
       . ok_or ("id_from_self_or_nearest_ancestor: reached root without finding ID")?; }}

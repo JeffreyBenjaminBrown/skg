@@ -81,7 +81,7 @@ fn collect_instructions(
   ) {
     let viewnode : &UncheckedViewNode = node_ref . value();
     if let UncheckedViewNodeKind::True (t) = &viewnode . kind {
-      if let Some (id) = &t . id_opt {
+      if let Some (id) = &t . id {
         let delete_instruction : WhetherToDelete =
           if matches!(t . edit_request, Some (EditRequest::Delete)) {
             WhetherToDelete::Delete
@@ -94,7 +94,7 @@ fn collect_instructions(
           // Increment the count for this defining container
           *id_defining_count . entry(id . clone())
             . or_insert (0) += 1; }
-        if let Some (source_str) = &t . source_opt {
+        if let Some (source_str) = &t . source {
           // Collect source for this ID
           let source : SourceName =
             SourceName::from(source_str . as_str());

@@ -94,7 +94,7 @@ fn validate_definitive_view_requests (
         node_ref . value();
       if let UncheckedViewNodeKind::True (t) = &viewnode . kind
       { if t . view_requests . contains (&ViewRequest::Definitive)
-        { if let Some (id) = &t . id_opt {
+        { if let Some (id) = &t . id {
           { // Error: must be indefinitive
             if ! t . indefinitive
             { errors . push( BufferValidationError::DefinitiveRequestOnDefinitiveNode( id . clone() )); }}

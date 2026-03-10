@@ -132,8 +132,8 @@ pub fn viewnode_from_metadata (
       ( UncheckedViewNodeKind::True ( UncheckedTrueNode {
           title,
           body,
-          id_opt           : metadata . id . clone (),
-          source_opt       : metadata . source . clone (),
+          id               : metadata . id . clone (),
+          source           : metadata . source . clone (),
           parent_ignores   : metadata . parent_ignores,
           indefinitive     : metadata . indefinitive,
           graphStats       : metadata . graphStats . clone (),

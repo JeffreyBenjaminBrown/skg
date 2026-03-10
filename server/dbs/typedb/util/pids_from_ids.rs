@@ -53,7 +53,7 @@ pub fn collect_ids_in_tree (
 ) {
   if let UncheckedViewNodeKind::True (t) =
     &node_ref . value () . kind
-  { if let Some (id) = &t . id_opt
+  { if let Some (id) = &t . id
     { ids_to_lookup . push ( id . clone () ); }}
   for child in node_ref . children () { // Recurse
     collect_ids_in_tree (
@@ -66,11 +66,11 @@ pub fn assign_pids_throughout_tree_from_map (
 ) {
   if let UncheckedViewNodeKind::True (t)
     = &mut node_ref . value() . kind
-    { let pid_opt : Option < ID > = t . id_opt . as_ref ()
+    { let pid_opt : Option < ID > = t . id . as_ref ()
         . and_then ( |id| pid_map . get (id) )
         . and_then ( |opt| opt . clone () );
       if let Some (pid) = pid_opt {
-        t . id_opt = Some (pid); }}
+        t . id = Some (pid); }}
   { // Recurse into children
     for child_treeid in {
       let treeid : NodeId = node_ref . id ();

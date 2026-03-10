@@ -247,14 +247,14 @@ fn validate_truenode (
 
 /// Check if an UncheckedTrueNode has an ID.
 pub fn has_id ( t : &UncheckedTrueNode ) -> bool {
-  t . id_opt . is_some() }
+  t . id . is_some() }
 
 /// Check if an UncheckedTrueNode has a source and it exists in the config.
 pub fn has_valid_source (
   t      : &UncheckedTrueNode,
   config : &SkgConfig,
 ) -> bool {
-  t . source_opt . as_ref()
+  t . source . as_ref()
     . is_some_and( |s| config . sources . contains_key (s) ) }
 
 /// Check that all non-ignored TrueNode children have distinct IDs.
@@ -271,7 +271,7 @@ pub fn nonignored_children_have_distinct_ids (
   for child in node_ref . children() {
     if let UncheckedViewNodeKind::True (t) = &child . value() . kind {
       if !t . parent_ignores {
-        if let Some (id) = &t . id_opt {
+        if let Some (id) = &t . id {
           if !seen . insert(id . clone()) {
             return false; }} }} }
   true }
