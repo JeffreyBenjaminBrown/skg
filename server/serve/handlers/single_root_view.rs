@@ -1,5 +1,6 @@
 use crate::serve::ConnectionState;
 use crate::to_org::render::content_view::single_root_view;
+use crate::serve::protocol::ResponseType;
 use crate::serve::util::{
   view_uri_from_request,
   send_response_with_length_prefix,
@@ -45,7 +46,7 @@ pub fn handle_single_root_view_request (
         send_response_with_length_prefix (
           stream,
           & tag_sexp_response (
-            "content-view", &switch_sexp ));
+            ResponseType::ContentView, &switch_sexp ));
         return; }
       let response_sexp : String =
       { let _span : tracing::span::EnteredSpan =
@@ -77,7 +78,7 @@ pub fn handle_single_root_view_request (
       send_response_with_length_prefix (
         stream,
         & tag_sexp_response (
-          "content-view", &response_sexp )); },
+          ResponseType::ContentView, &response_sexp )); },
     Err (err) => {
       let error_msg : String = format!(
         "Error extracting node ID: {}", err);
@@ -85,7 +86,7 @@ pub fn handle_single_root_view_request (
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
-          "content-view", &error_msg )); } } }
+          ResponseType::ContentView, &error_msg )); } } }
 
 pub fn node_id_from_single_root_view_request (
   request : &str

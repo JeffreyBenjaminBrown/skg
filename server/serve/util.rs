@@ -1,3 +1,4 @@
+use crate::serve::protocol::{RequestType, ResponseType};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::memory::ViewUri;
 
@@ -10,26 +11,28 @@ use std::net::TcpStream;
 /// Input:  "((content "...") (errors (...)))"
 /// Output: "(("response-type" "TYPE") (content "...") (errors (...)))"
 pub fn tag_sexp_response (
-  response_type : &str,
+  response_type : ResponseType,
   sexp_payload  : &str,
 ) -> String {
   let tag : String =
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "response-type" . to_string () )),
-      Sexp::Atom ( Atom::S ( response_type   . to_string () )),
+      Sexp::Atom ( Atom::S ( response_type . repr_in_client ()
+                             . to_string () )),
     ] ) . to_string ();
   format! ( "({} {}", tag, &sexp_payload [ 1.. ] ) }
 
 /// Wrap plain text in a tagged s-exp for LP delivery.
 /// Output: (("response-type" "TYPE") ("content" "TEXT"))
 pub fn tag_text_response (
-  response_type : &str,
+  response_type : ResponseType,
   text          : &str,
 ) -> String {
   Sexp::List ( vec! [
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "response-type" . to_string () )),
-      Sexp::Atom ( Atom::S ( response_type   . to_string () )), ] ),
+      Sexp::Atom ( Atom::S ( response_type . repr_in_client ()
+                             . to_string () )), ] ),
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "content"       . to_string () )),
       Sexp::Atom ( Atom::S ( text            . to_string () )), ] ),
@@ -67,12 +70,14 @@ pub fn send_response_with_length_prefix (
 
 pub fn request_type_from_request (
   request : &str
-) -> Result<String, String> {
+) -> Result<RequestType, String> {
   let sexp : Sexp =
     sexp::parse (request)
     . map_err ( |e| format! (
       "Failed to parse S-expression: {}", e ) ) ?;
-  extract_v_from_kv_pair_in_sexp ( &sexp, "request" ) }
+  let request_value : String =
+    extract_v_from_kv_pair_in_sexp ( &sexp, "request" ) ?;
+  RequestType::from_client_string (&request_value) }
 
 pub fn view_uri_from_request (
   request : &str,

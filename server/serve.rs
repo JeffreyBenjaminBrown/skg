@@ -8,6 +8,7 @@
 
 pub mod handlers;
 pub mod parse_metadata_sexp;
+pub mod protocol;
 pub mod util;
 
 use crate::dbs::typedb::util::delete_database;
@@ -20,6 +21,7 @@ use crate::serve::handlers::title_matches::{
   SearchEnrichmentPayload,
   mk_search_enrichment_sexp};
 use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
+use crate::serve::protocol::{RequestType, ResponseType};
 use crate::serve::util::{
   request_type_from_request,
   send_response_with_length_prefix,
@@ -114,72 +116,62 @@ fn handle_emacs (
         tracing::info! ( request = request_header . trim_end (), "Received request" );
         match request_type_from_request (&request_header) {
           // For most types of requests, the header is the entire request, and the reader is no longer needed. For saving, though, the reader still contains the buffer content, so it is passed along.
-          Ok (request_type) => {
-            if request_type == "single root content view" {
-              handle_single_root_view_request (
-                &mut stream,
-                &request_header,
-                &typedb_driver,
-                config,
-                &mut conn_state );
-            } else if request_type == "save buffer" {
-              // PITFALL: Uses the same BufReader that read the request,
-              // so that any already-buffered header/payload are visible.
-              handle_save_buffer_request (
-                &mut reader,
-                &mut stream,
-                &request_header,
-                &typedb_driver,
-                config,
-                &mut tantivy_index,
-                &mut conn_state );
-            } else if request_type == "close view" {
-              handle_close_view_request (
-                &mut stream,
-                &request_header,
-                &mut conn_state );
-            } else if request_type == "title matches" {
-              // Cancel any in-flight background search
-              search_cancelled . store (true, Ordering::SeqCst);
-              handle_title_matches_request (
-                &mut stream,
-                &request_header,
-                &tantivy_index,
-                &typedb_driver,
-                config,
-                &enrichment_slot,
-                &search_cancelled,
-                &mut conn_state );
-            } else if request_type == "verify connection" {
-              handle_verify_connection_request(
-                &mut stream);
-            } else if request_type == "shutdown" {
-              handle_shutdown_request( &mut stream,
-                                       &typedb_driver,
-                                       config);
-              // Never returns - exits process
-            } else if request_type == "get file path" {
-              handle_get_file_path_request( &mut stream,
-                                            &request_header,
-                                            config);
-            } else if request_type == "git diff mode toggle" {
-              handle_git_diff_mode_request( &mut stream,
-                                            &mut conn_state );
-            } else {
-              let error_msg : String =
-                format! ( "Unsupported request type: {}",
-                           request_type );
-              tracing::warn!(msg = %error_msg, "Unsupported request type");
-              send_response_with_length_prefix (
-                &mut stream,
-                & tag_text_response (
-                  "error", &error_msg )); }}
+          Ok (RequestType::SingleRootContentView) =>
+            handle_single_root_view_request (
+              &mut stream,
+              &request_header,
+              &typedb_driver,
+              config,
+              &mut conn_state ),
+          Ok (RequestType::SaveBuffer) =>
+            // PITFALL: Uses the same BufReader that read the request,
+            // so that any already-buffered header/payload are visible.
+            handle_save_buffer_request (
+              &mut reader,
+              &mut stream,
+              &request_header,
+              &typedb_driver,
+              config,
+              &mut tantivy_index,
+              &mut conn_state ),
+          Ok (RequestType::CloseView) =>
+            handle_close_view_request (
+              &mut stream,
+              &request_header,
+              &mut conn_state ),
+          Ok (RequestType::TitleMatches) => {
+            // Cancel any in-flight background search
+            search_cancelled . store (true, Ordering::SeqCst);
+            handle_title_matches_request (
+              &mut stream,
+              &request_header,
+              &tantivy_index,
+              &typedb_driver,
+              config,
+              &enrichment_slot,
+              &search_cancelled,
+              &mut conn_state ); }
+          Ok (RequestType::VerifyConnection) =>
+            handle_verify_connection_request (
+              &mut stream ),
+          Ok (RequestType::Shutdown) =>
+            // Never returns - exits process
+            handle_shutdown_request ( &mut stream,
+                                      &typedb_driver,
+                                      config ),
+          Ok (RequestType::GetFilePath) =>
+            handle_get_file_path_request ( &mut stream,
+                                           &request_header,
+                                           config ),
+          Ok (RequestType::GitDiffModeToggle) =>
+            handle_git_diff_mode_request ( &mut stream,
+                                           &mut conn_state ),
           Err (err) => {
             tracing::error!(error = %err, "Error determining request type");
             send_response_with_length_prefix (
               &mut stream,
               & tag_text_response (
-                "error",
+                ResponseType::Error,
                 & format! (
                   "Error determining request type: {}",
                   err ))); } };
@@ -240,14 +232,14 @@ fn handle_git_diff_mode_request (
   tracing::info! ( msg = msg, "Git diff mode toggled" );
   send_response_with_length_prefix (
     stream,
-    & tag_text_response ( "git-diff-mode", msg )); }
+    & tag_text_response ( ResponseType::GitDiffMode, msg )); }
 
 fn handle_verify_connection_request (
   stream: &mut std::net::TcpStream) {
   send_response_with_length_prefix (
     stream,
     & tag_text_response (
-      "verify-connection",
+      ResponseType::VerifyConnection,
       "This is the skg server verifying the connection." )); }
 
 fn handle_shutdown_request (
@@ -258,7 +250,7 @@ fn handle_shutdown_request (
   send_response_with_length_prefix (
     stream,
     & tag_text_response (
-      "shutdown", "Server shutting down..." ));
+      ResponseType::Shutdown, "Server shutting down..." ));
   cleanup_and_shutdown (
     typedb_driver, config ); }
 

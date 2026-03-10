@@ -65,7 +65,7 @@ pub enum MSV<T> {
 }
 #+end_src
 
-* TODO Request/response types: stringly typed protocol
+* DONE Request/response types: stringly typed protocol
 
 Request types ("save-buffer", "search", "kill-buffer", ...)
 and response tags ("search-results", "save-lock", ...) are bare

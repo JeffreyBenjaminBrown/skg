@@ -14,6 +14,7 @@ use crate::dbs::typedb::paths::PathToFirstNonlinearity;
 use crate::dbs::typedb::search::all_graphnodestats::{ AllGraphNodeStats, fetch_all_graphnodestats};
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::serve::ConnectionState;
+use crate::serve::protocol::ResponseType;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
 use crate::types::memory::skgnode_from_map_or_disk;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
@@ -81,7 +82,7 @@ pub fn handle_title_matches_request (
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
-          "search-results", &err ));
+          ResponseType::SearchResults, &err ));
       return; } };
   let search_terms : Result < String, String > =
     extract_v_from_kv_pair_in_sexp ( &sexp, "terms" );
@@ -101,7 +102,7 @@ pub fn handle_title_matches_request (
             send_response_with_length_prefix (
               stream,
               & tag_text_response (
-                "search-results",
+                ResponseType::SearchResults,
                 "No matches found." ));
             return; }
           let matches_by_id : MatchGroups =
@@ -132,7 +133,7 @@ pub fn handle_title_matches_request (
             // phase 1 (unenriched) tagged LP response
             stream,
             & tag_text_response (
-              "search-results", &rendered ));
+              ResponseType::SearchResults, &rendered ));
           spawn_enrichment_thread (
             // phase 2 (enriched) search results, backgrounded
             enrichment_slot, search_cancelled,
@@ -142,8 +143,8 @@ pub fn handle_title_matches_request (
           send_response_with_length_prefix (
             stream,
             & tag_text_response (
-              "search-results",
-              & format! ("Error searching index: {}", e) )); } } },
+              ResponseType::SearchResults,
+              & format! ("Error searching index: {}", e) )); }} },
     Err (err) => {
       let error_msg : String =
         format! (
@@ -152,7 +153,7 @@ pub fn handle_title_matches_request (
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
-          "search-results", &error_msg )); } } }
+          ResponseType::SearchResults, &error_msg )); }} }
 
 /// Spawn a background thread to compute containerward paths
 /// and graphnodestats, then write the structured payload
@@ -241,7 +242,8 @@ pub fn mk_search_enrichment_sexp (
   Sexp::List ( vec! [
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "response-type" . to_string () )),
-      Sexp::Atom ( Atom::S ( "search-enrichment" . to_string () )), ] ),
+      Sexp::Atom ( Atom::S ( ResponseType::SearchEnrichment
+                             . repr_in_client () . to_string () )), ] ),
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "terms"   . to_string () )),
       Sexp::Atom ( Atom::S ( terms     . to_string () )), ] ),

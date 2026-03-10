@@ -1,4 +1,5 @@
 use crate::serve::ConnectionState;
+use crate::serve::protocol::ResponseType;
 use crate::serve::util::{
   view_uri_from_request,
   send_response_with_length_prefix,
@@ -17,9 +18,9 @@ pub fn handle_close_view_request (
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
-          "close-view", "view closed" )); },
+          ResponseType::CloseView, "view closed" )); },
     Err (_) => {
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
-          "close-view", "Error: missing view-uri" )); } } }
+          ResponseType::CloseView, "Error: missing view-uri" )); } } }

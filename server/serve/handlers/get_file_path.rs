@@ -1,3 +1,4 @@
+use crate::serve::protocol::ResponseType;
 use crate::serve::util::{
   value_from_request_sexp,
   send_response_with_length_prefix,
@@ -23,7 +24,7 @@ pub fn handle_get_file_path_request (
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
-          "get-file-path",
+          ResponseType::GetFilePath,
           &format! ( "Error: {}", e ) ));
       return; } };
   let source : String = match value_from_request_sexp (
@@ -33,7 +34,7 @@ pub fn handle_get_file_path_request (
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
-          "get-file-path",
+          ResponseType::GetFilePath,
           &format! ( "Error: {}", e ) ));
       return; } };
   let raw_path : String = path_from_pid_and_source (
@@ -46,7 +47,7 @@ pub fn handle_get_file_path_request (
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
-          "get-file-path",
+          ResponseType::GetFilePath,
           & format! ( "File not found: {}", raw_path ) ));
       return; } };
   let data_root : PathBuf = // Canonicalize to match abs_path
@@ -62,4 +63,4 @@ pub fn handle_get_file_path_request (
   send_response_with_length_prefix (
     stream,
     & tag_text_response (
-      "get-file-path", &rel_path )); }
+      ResponseType::GetFilePath, &rel_path )); }
