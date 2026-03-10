@@ -25,13 +25,13 @@ fn test_delete_id_col_scaffold_respawns()
 
       // DISK: 1.skg should still have the worktree ids
       let node_1 = read_skgnode(repo_path, "1")?;
-      assert!(node_1 . ids . contains(&ID("1" . to_string())),
+      assert!(node_1 . all_ids () . any(|id| id == &ID("1" . to_string())),
         "1.skg should still have id '1'");
-      assert!(node_1 . ids . contains(&ID("2'" . to_string())),
+      assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
         "1.skg should still have id '2''");
-      assert!(node_1 . ids . contains(&ID("3" . to_string())),
+      assert!(node_1 . all_ids () . any(|id| id == &ID("3" . to_string())),
         "1.skg should still have id '3'");
-      assert!(!node_1 . ids . contains(&ID("2" . to_string())),
+      assert!(!node_1 . all_ids () . any(|id| id == &ID("2" . to_string())),
         "1.skg should not have id '2'");
 
       // BUFFER: idCol scaffold should respawn
@@ -62,7 +62,7 @@ fn test_delete_id_scaffolds_respawns()
 
       // DISK: 1.skg should still have the worktree ids
       let node_1 = read_skgnode(repo_path, "1")?;
-      assert!(node_1 . ids . contains(&ID("2'" . to_string())),
+      assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
         "1.skg should still have id '2''");
 
       // BUFFER: id scaffolds should respawn
@@ -93,9 +93,9 @@ fn test_edit_id_scaffold_respawns()
 
       // DISK: 1.skg should still have the original worktree ids
       let node_1 = read_skgnode(repo_path, "1")?;
-      assert!(node_1 . ids . contains(&ID("2'" . to_string())),
+      assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
         "1.skg should still have id '2''");
-      assert!(!node_1 . ids . contains(&ID("2-modified" . to_string())),
+      assert!(!node_1 . all_ids () . any(|id| id == &ID("2-modified" . to_string())),
         "1.skg should not have the modified id");
 
       // BUFFER: id scaffolds should respawn with original values
@@ -133,14 +133,14 @@ fn test_move_id_scaffolds_to_child_respawns()
 
       // DISK: child.skg should not have any new ids
       let node_child = read_skgnode(repo_path, "child")?;
-      assert_eq!(node_child . ids . len(), 1,
+      assert_eq!(1 + node_child . extra_ids . len(), 1,
         "child.skg should still only have its original id");
-      assert!(node_child . ids . contains(&ID("child" . to_string())),
+      assert_eq!(&node_child . pid, &ID("child" . to_string()),
         "child.skg should still have id 'child'");
 
       // DISK: 1.skg should still have its ids
       let node_1 = read_skgnode(repo_path, "1")?;
-      assert!(node_1 . ids . contains(&ID("2'" . to_string())),
+      assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
         "1.skg should still have id '2''");
 
       // BUFFER: id scaffolds should respawn under node 1

@@ -277,11 +277,11 @@ async fn test_create_only_nodes_with_no_ids_present (
   // Keep other fields minimal/empty as requested.
   let mut fn_a : SkgNode = empty_skgnode ();
   { fn_a . title = "ignore this string" . to_string ();
-    fn_a . ids   = vec![ ID::from ("a") ]; }
+    fn_a . pid   = ID::from ("a"); }
 
   let mut fn_new : SkgNode = empty_skgnode ();
   { fn_new . title = "ignore this string" . to_string ();
-    fn_new . ids   = vec![ ID::from ("new") ]; }
+    fn_new . pid   = ID::from ("new"); }
 
   // Attempt to create only unknown nodes among { "a", "new" }.
   // Expect exactly 1 creation (the id "new").

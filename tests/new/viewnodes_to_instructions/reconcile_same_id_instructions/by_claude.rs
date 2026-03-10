@@ -22,7 +22,8 @@ fn create_test_node(
           None => MSV::Unspecified,
           Some (v) => MSV::Specified (v) },
         source: SourceName::from ("main"),
-        ids: vec![ID::from (id)],
+        pid: ID::from (id),
+        extra_ids: vec![],
         body,
         contains,
         subscribes_to: MSV::Unspecified,
@@ -39,7 +40,7 @@ fn create_instruction(
 ) -> DefineNode {
   if to_delete {
     DefineNode::Delete(DeleteNode {
-      id: node . ids . first() . unwrap() . clone(),
+      id: node . pid . clone(),
       source: node . source . clone() })
   } else {
     DefineNode::Save(SaveNode (node)) }}

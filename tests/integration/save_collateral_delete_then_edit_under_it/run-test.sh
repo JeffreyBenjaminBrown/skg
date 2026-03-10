@@ -52,8 +52,7 @@ backup_and_reset_test_data() {
     # Reset 1.skg
     cat > "$TEST_DIR/data/skg-data/1.skg" << 'EOF'
 title: "1"
-ids:
-  - "1"
+pid: "1"
 contains:
   - "11"
 EOF
@@ -61,8 +60,7 @@ EOF
     # Reset 11.skg
     cat > "$TEST_DIR/data/skg-data/11.skg" << 'EOF'
 title: "11"
-ids:
-  - "11"
+pid: "11"
 aliases:
   - eleven
 subscribes_to:
@@ -75,8 +73,7 @@ EOF
     # Reset subee.skg
     cat > "$TEST_DIR/data/skg-data/subee.skg" << 'EOF'
 title: subee
-ids:
-  - subee
+pid: subee
 contains:
   - subee-1
 EOF
@@ -84,15 +81,13 @@ EOF
     # Reset subee-1.skg
     cat > "$TEST_DIR/data/skg-data/subee-1.skg" << 'EOF'
 title: subee-1
-ids:
-  - subee-1
+pid: subee-1
 EOF
 
     # Reset also-hidden.skg
     cat > "$TEST_DIR/data/skg-data/also-hidden.skg" << 'EOF'
 title: also-hidden
-ids:
-  - also-hidden
+pid: also-hidden
 EOF
 
     echo "✓ Reset all fixture files to clean state"

@@ -1,5 +1,5 @@
-ids:
-- root-pid
+pid: root-pid
+extra_ids:
 - root
 title: root
 contains:

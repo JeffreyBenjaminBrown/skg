@@ -1,5 +1,4 @@
-ids:
-- node_with_aliases
+pid: node_with_aliases
 title: Node with aliases
 aliases:
 - first alias

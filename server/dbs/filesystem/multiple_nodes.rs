@@ -29,7 +29,7 @@ pub fn read_all_skg_files_from_sources (
     match read_skg_files_from_folder (nickname, config) {
       Ok (mut nodes) => {
         for node in &nodes {
-          for id in &node . ids {
+          for id in node . all_ids() {
             // Track which sources contain each ID
             let id_str: String = id . as_str() . to_string();
             seen_ids . entry (id_str)
@@ -129,9 +129,7 @@ pub fn read_modified_skg_files_from_sources (
         read_skgnode (&path) ?;
       validate_pid_matches_filename (&skgnode, &path) ?;
       let pid_str : String =
-        skgnode . primary_id()
-        . map_err ( |e| io::Error::new (
-          io::ErrorKind::InvalidData, e )) ?
+        skgnode . pid
         . to_string();
       if ! seen_ids . insert (pid_str . clone()) {
         return Err ( io::Error::new (
@@ -241,12 +239,7 @@ pub fn write_all_nodes_to_fs (
 
   let mut written : usize = 0;
   for node in nodes {
-    let pid : ID = node . ids . get (0)
-      . ok_or_else (
-         || io::Error::new (
-           io::ErrorKind::InvalidInput,
-           "SkgNode has no IDs" ))?
-      . clone ();
+    let pid : ID = node . pid . clone ();
     write_skgnode (
       & node,
       & Path::new (

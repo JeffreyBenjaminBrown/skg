@@ -1,4 +1,3 @@
 title: "Src has a [[id:dest][link to dest]]."
-ids:
-  - "src"
+pid: src
 contains: []

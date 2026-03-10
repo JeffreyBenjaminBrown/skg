@@ -65,22 +65,15 @@ pub fn import_org_roam_directory (
       parse::parse_org_file (path);
     for mut node in nodes {
       node . source = source . clone();
-      match node . primary_id() {
-        Ok (pid) => {
-          let pid : ID = pid . clone();
-          if let Some (existing) = node_map . get_mut (&pid) {
-            merge_into_existing (existing, &node);
-            tracing::warn! (
-              id = %pid,
-              "Overloaded ID — multiple org-roam nodes use this ID. \
-               Merging their content."); }
-          else {
-            node_map . insert (pid, node); }}
-        Err (e) => {
-          let msg : String = format! (
-            "Error: node '{}' from {:?}: {}",
-            node . title, path, e);
-          stats . errors . push (msg); }}}}
+      { let pid : ID = node . pid . clone();
+        if let Some (existing) = node_map . get_mut (&pid) {
+          merge_into_existing (existing, &node);
+          tracing::warn! (
+            id = %pid,
+            "Overloaded ID — multiple org-roam nodes use this ID. \
+             Merging their content."); }
+        else {
+          node_map . insert (pid, node); }} }}
   for (_pid, node) in &node_map {
     match write_skgnode_to_dir (node, output_dir) {
       Ok (()) => { stats . nodes_written += 1; }
@@ -88,7 +81,7 @@ pub fn import_org_roam_directory (
         let msg : String = format! (
           "Error writing node '{}': {}",
           node . title, e);
-        stats . errors . push (msg); }}}
+        stats . errors . push (msg); }} }
   Ok (stats) }
 
 //
@@ -137,8 +130,7 @@ fn write_skgnode_to_dir (
   node       : &SkgNode,
   output_dir : &Path,
 ) -> Result<(), Box<dyn Error>> {
-  let pid : &ID = node . primary_id()
-    . map_err (|e| -> Box<dyn Error> { e . into() })?;
+  let pid : &ID = &node . pid;
   let filename : String =
     format! ("{}.skg", &pid . 0);
   let path : std::path::PathBuf =

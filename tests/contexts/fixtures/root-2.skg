@@ -1,5 +1,4 @@
-ids:
-- root-2
+pid: root-2
 title: root-2
 contains:
 - shared

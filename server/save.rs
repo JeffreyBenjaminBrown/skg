@@ -146,10 +146,7 @@ pub async fn update_typedb_from_saveinstructions (
       . collect ();
     let to_write_pids : Vec<ID> =
       to_write_skgnodes . iter ()
-      . filter_map ( |n|
-                      n . ids
-                      . get (0)
-                      . cloned() )
+      . map ( |n| n . pid . clone() )
       . collect ();
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "create_only_nodes_with_no_ids_present") . entered ();
@@ -219,8 +216,8 @@ pub(super) fn update_tantivy_from_saveinstructions (
     // Delete all IDs, be they from Saves or Deletes.
     // (The entry for each Save is then recreated.)
     instructions . iter() . map(|instr| match instr {
-      DefineNode::Save(SaveNode (node)) => node . primary_id(),
-      DefineNode::Delete(DeleteNode { id, .. }) => Ok (id) }),
+      DefineNode::Save(SaveNode (node)) => &node . pid,
+      DefineNode::Delete(DeleteNode { id, .. }) => id }),
     &mut writer,
     tantivy_index)?;
   let processed_count: usize =

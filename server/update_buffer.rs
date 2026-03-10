@@ -144,7 +144,7 @@ fn find_collateral_view_uris (
     save_instructions . iter ()
     . filter_map ( |instr| match instr {
       DefineNode::Save ( SaveNode (n)) =>
-        n . ids . first () . cloned (),
+        Some ( n . pid . clone () ),
       DefineNode::Delete (dn) =>
         Some ( dn . id . clone () ) } )
     . collect ();

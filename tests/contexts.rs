@@ -43,10 +43,10 @@ fn test_had_id_set_from_nodes_empty () {
 #[test]
 fn test_had_id_set_from_nodes_mixed () {
   let mut node_with : SkgNode = empty_skgnode ();
-  node_with . ids = vec![ID::new ("has-id")];
+  node_with . pid = ID::new ("has-id");
   node_with . misc = vec![FileProperty::Had_ID_Before_Import];
   let mut node_without : SkgNode = empty_skgnode ();
-  node_without . ids = vec![ID::new ("no-id")];
+  node_without . pid = ID::new ("no-id");
   let nodes : Vec<SkgNode> = vec![node_with, node_without];
   let result : HashSet<ID> = had_id_set_from_nodes (&nodes);
   assert_eq! (result . len (), 1);
@@ -55,13 +55,13 @@ fn test_had_id_set_from_nodes_mixed () {
 #[test]
 fn test_link_targets_from_nodes () {
   let mut node1 : SkgNode = empty_skgnode ();
-  node1 . ids = vec![ID::new ("src")];
+  node1 . pid = ID::new ("src");
   node1 . title =
     "see [[id:tgt1][target one]]" . to_string ();
   node1 . body = Some (
     "also [[id:tgt2][target two]]" . to_string () );
   let mut node2 : SkgNode = empty_skgnode ();
-  node2 . ids = vec![ID::new ("other")];
+  node2 . pid = ID::new ("other");
   node2 . title = "no links here" . to_string ();
   let nodes : Vec<SkgNode> = vec![node1, node2];
   let targets : HashSet<ID> =
@@ -245,7 +245,7 @@ fn test_full_context_pipeline () {
     had_id_set_from_nodes (&nodes);
   let all_node_ids : HashSet<ID> =
     nodes . iter ()
-    . filter_map ( |n| n . primary_id () . ok () . cloned () )
+    . map ( |n| n . pid . clone () )
     . collect ();
   assert_eq! (all_node_ids . len (), 15);
   assert_eq! (link_targets . len (), 1);

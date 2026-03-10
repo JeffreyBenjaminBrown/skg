@@ -300,7 +300,7 @@ pub fn contains_maps_from_nodes (
   let mut forward : MapToContent = HashMap::new ();
   let mut reverse : MapToContainers = HashMap::new ();
   for node in nodes {
-    if let Ok (pid) = node . primary_id () {
+    { let pid : &ID = &node . pid;
       for child_id in &node . contains {
         forward . entry (pid . clone ())
           . or_insert_with (Vec::new)
@@ -331,6 +331,5 @@ pub fn had_id_set_from_nodes (
   nodes . iter ()
   . filter ( |n|
     n . misc . contains (&FileProperty::Had_ID_Before_Import) )
-  . filter_map ( |n|
-                  n . primary_id () . ok () . cloned () )
+  . map ( |n| n . pid . clone () )
   . collect () }

@@ -85,7 +85,7 @@ fn test_many_tantivy_things (
   let mut new_node : SkgNode =
     empty_skgnode ();
   { new_node . title = "This is one big tuna." . to_string();
-    new_node . ids = vec![ID::new ("6")]; }
+    new_node . pid = ID::new ("6"); }
 
   // Update the index with the new node
   let update_count: usize =
@@ -171,17 +171,17 @@ pub fn print_search_results(
 fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let empty_node : SkgNode = empty_skgnode ();
   let mut apple  = empty_node . clone();
-  { apple . ids      = vec![ID::new ("apple")];
+  { apple . pid      = ID::new ("apple");
     apple . title    =               "eat apple" . to_string();
     apple . aliases  = MSV::Specified(vec![    "munch apple" . to_string(),
                                     "chomp apple" . to_string() ]); }
   let mut banana = empty_node . clone();
-  { banana . ids     = vec![ID::new ("banana")];
+  { banana . pid     = ID::new ("banana");
     banana . title   =               "eat banana" . to_string();
     banana . aliases = MSV::Specified(vec![    "chomp banana" . to_string(),
                                     "throw banana" . to_string()]); }
   let mut kiwi   = empty_node . clone();
-  { kiwi . ids       = vec![ID::new ("kiwi")];
+  { kiwi . pid       = ID::new ("kiwi");
     kiwi . title     =               "eat kiwi" . to_string();
     kiwi . aliases   = MSV::Specified(vec![    "munch kiwi" . to_string()]); }
   let nodes = vec![apple, banana, kiwi];
@@ -263,7 +263,7 @@ fn test_title_by_id_returns_title_not_alias (
 ) -> Result<(), Box<dyn std::error::Error>> {
   let empty_node : SkgNode = empty_skgnode ();
   let mut node = empty_node . clone ();
-  { node . ids     = vec![ID::new ("node-with-aliases")];
+  { node . pid     = ID::new ("node-with-aliases");
     node . title   =               "The Real Title" . to_string ();
     node . aliases = MSV::Specified (vec![   "Alias One" . to_string (),
                                    "Alias Two" . to_string () ]); }

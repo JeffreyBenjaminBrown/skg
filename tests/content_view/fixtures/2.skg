@@ -1,5 +1,4 @@
-ids:
-- 2
+pid: 2
 title: a second-level title
 body: |-
   More text here.

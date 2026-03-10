@@ -1,5 +1,4 @@
-ids:
-- '2'
+pid: '2'
 is_comment: false
 title: This is a second test file.
 body: this one string could span pages

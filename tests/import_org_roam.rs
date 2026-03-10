@@ -37,7 +37,7 @@ fn test_minimal_file () {
     parse_org_file (f . path());
   assert_eq! (nodes . len(), 1);
   assert_eq! (nodes[0] . title, "My Node");
-  assert_eq! (nodes[0] . ids, vec![ ID::new ("abc-123") ]);
+  assert_eq! (nodes[0] . pid, ID::new ("abc-123"));
   assert! (nodes[0] . body . is_none());
   assert! (nodes[0] . contains . is_empty()); }
 
@@ -84,7 +84,7 @@ fn test_nested_id_headlines () {
   assert_eq! (nodes . len(), 3);
   // File-level node
   assert_eq! (nodes[0] . title, "Parent");
-  assert_eq! (nodes[0] . ids, vec![ ID::new ("file-id") ]);
+  assert_eq! (nodes[0] . pid, ID::new ("file-id"));
   let contained : &[ID] =
     &nodes[0] . contains;
   assert_eq! (contained . len(), 2);
@@ -118,7 +118,7 @@ fn test_non_id_headline_becomes_node () {
   // 3 nodes: file + headline + sub-headline
   assert_eq! (nodes . len(), 3);
   assert_eq! (nodes[0] . title, "Parent");
-  assert_eq! (nodes[0] . ids, vec![ ID::new ("file-id") ]);
+  assert_eq! (nodes[0] . pid, ID::new ("file-id"));
   let contained : &[ID] =
     &nodes[0] . contains;
   assert_eq! (contained . len(), 1);
@@ -169,7 +169,7 @@ fn test_id_headline_under_non_id_headline () {
   assert_eq! (mid_contained[0], ID::new ("deep-child"));
   // Deep child
   assert_eq! (nodes[2] . title, "actual child");
-  assert_eq! (nodes[2] . ids, vec![ ID::new ("deep-child") ]);
+  assert_eq! (nodes[2] . pid, ID::new ("deep-child"));
   assert_eq! (nodes[2] . body . as_deref(),
               Some ("   Deep child body.") ); }
 
@@ -308,8 +308,8 @@ fn test_power_org_structure () {
   assert! (nodes[1] . contains . is_empty());
   // "the feeling of forcing it" — has :ID: and 2 sub-headlines
   assert_eq! (nodes[2] . title, "the feeling of forcing it");
-  assert_eq! (nodes[2] . ids,
-              vec![ ID::new ("1cd8051b-95ee-4f73-a05e-624200b52c90") ]);
+  assert_eq! (nodes[2] . pid,
+              ID::new ("1cd8051b-95ee-4f73-a05e-624200b52c90"));
   let forcing_contained : &[ID] =
     &nodes[2] . contains;
   assert_eq! (forcing_contained . len(), 2);
@@ -343,7 +343,7 @@ fn test_music_and_consciousness () {
   assert_eq! (nodes . len(), 3);
   // File node
   assert_eq! (nodes[0] . title, "music & consciousness");
-  assert_eq! (nodes[0] . ids, vec![ ID::new ("01104862") ]);
+  assert_eq! (nodes[0] . pid, ID::new ("01104862"));
   assert_eq! (nodes[0] . body . as_deref(),
               Some ("= things about consciousness that music highlights") );
   let contained : &[ID] =

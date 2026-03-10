@@ -38,15 +38,14 @@ fn test_node_io() {
 
   // Read that file, reverse its lists, write to another file
   let read_node : SkgNode = skgnode_from_pid_and_source (
-    &config, example . ids[0] . clone(), &SourceName::from ("output") ) . unwrap ();
+    &config, example . pid . clone(), &SourceName::from ("output") ) . unwrap ();
   let mut reversed = reverse_some_of_node (&read_node);
   reversed . source = SourceName::from ("output");
-  reversed . ids = // match pid to filename
-    vec![ ID::new ("reversed") ];
+  reversed . pid = ID::new ("reversed");
 
   write_skgnode_to_source(&reversed, &config) . unwrap();
   let out_filename: PathBuf =
-    test_dir . join(&example . ids[0] . 0) . with_extension ("skg");
+    test_dir . join(&example . pid . 0) . with_extension ("skg");
   let reversed_filename : &str =
     "/tmp/file_io_test/reversed.skg";
 
@@ -94,7 +93,7 @@ fn verify_body_not_needed() {
     &config, ID::new ("example"), &SourceName::from ("fixtures") ) . unwrap();
   node . source = SourceName::from ("output");
   node . body = None; // mutate it
-  node . ids = vec![ID::new ("no_unindexed")]; // match pid to filename
+  node . pid = ID::new ("no_unindexed"); // match pid to filename
   write_skgnode_to_source(
     &node, &config ) . unwrap();
   // Parse both files as YAML for semantic comparison
@@ -137,7 +136,8 @@ pub fn reverse_some_of_node(node: &SkgNode) -> SkgNode {
     title             : node . title             . clone(),
     aliases           : node . aliases           . clone(),
     source            : node . source            . clone(),
-    ids               : node . ids               . clone(),
+    pid               : node . pid               . clone(),
+    extra_ids         : node . extra_ids         . clone(),
     body              : node . body              . clone(),
     hides_from_its_subscriptions :
       node . hides_from_its_subscriptions        . clone(),
@@ -168,7 +168,7 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
       . to_string();
     test_node . aliases = MSV::Specified(vec![ "alias 1" . to_string(),
                                     "alias 2" . to_string() ]);
-    test_node . ids = vec![ID::new ("test123")];
+    test_node . pid = ID::new ("test123");
     test_node . source = SourceName::from ("temp");
     test_node . body = Some("Some text with a link [[(id textlink3][Third) TextLink]] and another [[(id textlink4][Fourth) TextLink]]" . to_string()); }
 

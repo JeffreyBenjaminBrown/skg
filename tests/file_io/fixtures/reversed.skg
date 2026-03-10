@@ -1,6 +1,5 @@
 title: This text gets indexed.
-ids:
-- 'reversed'
+pid: reversed
 body: |-
   This one string could span pages.
   It better be okay with newlines.

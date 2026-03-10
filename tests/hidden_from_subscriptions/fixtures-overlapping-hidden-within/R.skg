@@ -1,6 +1,5 @@
 title: R
-ids:
-- R
+pid: R
 contains:
 - R1
 subscribes_to:

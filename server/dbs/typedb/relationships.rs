@@ -51,7 +51,7 @@ async fn create_relationships_for_one_node (
   node    : &SkgNode,
 ) -> Result < (), Box<dyn Error> > {
   if count_relationships (node) == 0 { return Ok (()); }
-  let primary_id : &ID = node . primary_id ()?;
+  let primary_id : &ID = &node . pid;
   let options : TransactionOptions =
     TransactionOptions::new() . transaction_timeout (
       Duration::from_secs (
@@ -77,7 +77,7 @@ pub async fn create_relationships_from_node (
   tx   : &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 
-  let primary_id : &ID = node . primary_id()?;
+  let primary_id : &ID = &node . pid;
   insert_relationship_from_list (
     primary_id . as_str (),
     &node . contains,

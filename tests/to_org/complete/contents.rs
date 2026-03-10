@@ -15,7 +15,7 @@ async fn test_add_v_to_map_if_absent_already_present() {
     SkgNode =
     SkgNode {
       title : "Cached Node" . to_string(),
-      ids : vec![id . clone()],
+      pid : id . clone(),
       .. empty_skgnode()
     };
 

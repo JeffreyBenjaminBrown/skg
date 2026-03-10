@@ -1,5 +1,4 @@
-ids:
-- '3'
+pid: '3'
 is_comment: false
 title: This includes a link to a file about [[idblabla][bears]].
 body: this one string could span pages

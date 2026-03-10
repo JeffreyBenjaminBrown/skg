@@ -1,5 +1,5 @@
-ids:
-- '3'
+pid: '3'
+extra_ids:
 - '33'
 title: title 3
 contains:

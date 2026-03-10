@@ -441,7 +441,8 @@ pub fn skgnode_example () -> SkgNode {
     title: "This text gets indexed." . to_string(),
     aliases: MSV::Unspecified,
     source: SourceName::from ("main"),
-    ids: vec![ ID::new ("example") ],
+    pid: ID::new ("example"),
+    extra_ids: vec![],
     body: Some( r#"This one string could span pages.
 It better be okay with newlines."# . to_string() ),
     contains: vec![ ID::new ("1"),

@@ -162,10 +162,8 @@ fn incremental_init (
     let t1 : Instant = Instant::now();
     let pids : Vec<crate::types::misc::ID> =
       nodes . iter()
-      . map ( |n| n . primary_id()
-              . map ( |id| id . clone() ) )
-      . collect::<Result<Vec<_>, _>>()
-      . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+      . map ( |n| n . pid . clone() )
+      . collect();
     delete_all_outbound_relationships (
       &config . db_name, driver, &pids ) . await ?;
     tracing::info! (elapsed_s = ?t1 . elapsed(),
@@ -192,7 +190,7 @@ fn init_data_from_nodes (
     had_id_set_from_nodes (&nodes);
   let all_node_ids : HashSet<ID> =
     nodes . iter ()
-    . filter_map ( |n| n . primary_id () . ok () . cloned () )
+    . map ( |n| n . pid . clone () )
     . collect ();
   let link_targets : HashSet<ID> =
     link_targets_from_nodes (&nodes);

@@ -1,4 +1,4 @@
-ids:
-- '4'
+pid: '4'
+extra_ids:
 - '44'
 title: title 4

@@ -1,5 +1,4 @@
-ids:
-- '4'
+pid: '4'
 is_comment: false
 title: This is a [[id:shgulasdghu][test]] of a second kind.
 body: this one string could span pages

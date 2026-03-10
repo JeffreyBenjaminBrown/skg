@@ -177,10 +177,10 @@ fn verify_filesystem_after_merge_2_into_1(
   // Node 1's file should be updated
   let node_1: SkgNode = skgnode_from_pid_and_source(
     config, ID::from ("1"), &SourceName::from ("main") )?;
-  assert_eq!(node_1 . ids . len(), 3, "Node 1 should have 3 ids");
-  assert_eq!(&node_1 . ids[0], &ID::from ("1"));
-  assert_eq!(&node_1 . ids[1], &ID::from ("2"));
-  assert_eq!(&node_1 . ids[2], &ID::from ("2-extra-id"));
+  assert_eq!(&node_1 . pid, &ID::from ("1"));
+  assert_eq!(node_1 . extra_ids . len(), 2, "Node 1 should have 2 extra_ids");
+  assert_eq!(&node_1 . extra_ids[0], &ID::from ("2"));
+  assert_eq!(&node_1 . extra_ids[1], &ID::from ("2-extra-id"));
 
   // Should have [acquiree_text_preserver_id, 11, 12, overlap, 21, 22, hidden-from-subscriptions-of-1-but-in-content-of-2]
   // Note: "overlap" should appear only once (deduplicated) even though it was in both nodes
@@ -188,7 +188,7 @@ fn verify_filesystem_after_merge_2_into_1(
               "Node 1 should contain 7 items (with overlap deduplicated)");
 
   let acquiree_text_preserver_id: &ID =
-    &merge_instructions[0] . targets_from_merge() . 0 . ids[0];
+    &merge_instructions[0] . targets_from_merge() . 0 . pid;
   assert_eq!(&node_1 . contains[0], acquiree_text_preserver_id,
              "First content should be acquiree_text_preserver");
   assert_eq!(&node_1 . contains[1], &ID::from ("11"));
@@ -279,7 +279,7 @@ fn verify_tantivy_after_merge_2_into_1(
 
   // Search for acquiree_text_preserver - SHOULD find it
   let acquiree_text_preserver_id: &ID =
-    &merge_instructions[0] . targets_from_merge() . 0 . ids[0];
+    &merge_instructions[0] . targets_from_merge() . 0 . pid;
   let found_acquiree_text_preserver: bool =
     tantivy_contains_id(tantivy_index, "\"MERGED: 2\"", &acquiree_text_preserver_id . 0)?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");
@@ -416,7 +416,7 @@ async fn verify_typedb_after_merge_1_into_2 (
   // The old link from 1 to 1-links-to should now be from acquiree_text_preserver,
   // because acquiree_text_preserver has what was node 1's body text.
   let acquiree_text_preserver_id: &ID =
-    &merge_instructions[0] . targets_from_merge() . 0 . ids[0];
+    &merge_instructions[0] . targets_from_merge() . 0 . pid;
   let acquiree_text_preserver_textlink_dests: HashSet<ID> =
     find_related_nodes(
       db_name, driver, & [ acquiree_text_preserver_id . clone () ],
@@ -516,18 +516,18 @@ fn verify_filesystem_after_merge_1_into_2(
   let node_2: SkgNode = skgnode_from_pid_and_source(
     config, ID::from ("2"), &SourceName::from ("main") )?;
 
-  // Should have 3 ids: [2, 2-extra-id, 1]
-  assert_eq!(node_2 . ids . len(), 3, "Node 2 should have 3 ids");
-  assert_eq!(&node_2 . ids[0], &ID::from ("2"));
-  assert_eq!(&node_2 . ids[1], &ID::from ("2-extra-id"));
-  assert_eq!(&node_2 . ids[2], &ID::from ("1"));
+  // Should have pid=2, extra_ids=[2-extra-id, 1]
+  assert_eq!(&node_2 . pid, &ID::from ("2"));
+  assert_eq!(node_2 . extra_ids . len(), 2, "Node 2 should have 2 extra_ids");
+  assert_eq!(&node_2 . extra_ids[0], &ID::from ("2-extra-id"));
+  assert_eq!(&node_2 . extra_ids[1], &ID::from ("1"));
 
   // Should have [acquiree_text_preserver_id, 21, 22, hidden-from-subscriptions-of-1-but-in-content-of-2, overlap, 11, 12]
   // Note: "overlap" should appear only once (deduplicated) even though it was in both nodes
   assert_eq!( node_2 . contains . len(), 7,
               "Node 2 should contain 7 items (with overlap deduplicated)");
   let acquiree_text_preserver_id: &ID =
-    &merge_instructions[0] . targets_from_merge() . 0 . ids[0];
+    &merge_instructions[0] . targets_from_merge() . 0 . pid;
   assert_eq!(&node_2 . contains[0], acquiree_text_preserver_id,
              "First content should be acquiree_text_preserver");
   assert_eq!(&node_2 . contains[1], &ID::from ("21"));
@@ -621,7 +621,7 @@ fn verify_tantivy_after_merge_1_into_2(
 
   // Search for acquiree_text_preserver - SHOULD find it
   let acquiree_text_preserver_id: &ID =
-    &merge_instructions[0] . targets_from_merge() . 0 . ids[0];
+    &merge_instructions[0] . targets_from_merge() . 0 . pid;
   let found_acquiree_text_preserver: bool = tantivy_contains_id(
     tantivy_index, "\"MERGED: 1\"", &acquiree_text_preserver_id . 0 )?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");

@@ -45,8 +45,7 @@ pub fn collect_dup_instructions(
   for instr in instructions {
     let primary_id : ID = match &instr {
       DefineNode::Save(SaveNode (node)) =>
-        node . ids . first()
-        . ok_or ("DefineNode::Save has no ID")? . clone(),
+        node . pid . clone(),
       DefineNode::Delete(DeleteNode { id, .. }) =>
         id . clone() };
     grouped

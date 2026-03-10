@@ -45,8 +45,8 @@ async fn merge_one_node_in_typedb(
   updated_acquirer        : &SkgNode,
   acquiree_id             : &ID,
 ) -> Result<(), Box<dyn Error>> {
-  let acquirer_id  : &ID = updated_acquirer        . primary_id()?;
-  let preserver_id : &ID = acquiree_text_preserver . primary_id()?;
+  let acquirer_id  : &ID = &updated_acquirer        . pid;
+  let preserver_id : &ID = &acquiree_text_preserver . pid;
   create_node( // Create the text preserver node before using it.
     // PITFALL: Rerouting to a nonexistent node fails silently.
     acquiree_text_preserver, tx) . await?;

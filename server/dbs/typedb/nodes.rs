@@ -49,7 +49,7 @@ pub async fn create_only_nodes_with_no_ids_present (
     BTreeSet::new ();
   for node in nodes {
     all_pids . insert (
-      node . primary_id()? . to_string() ); }
+      node . pid . to_string() ); }
   let known_ids : HashSet < String > =
     which_ids_exist (
       db_name,
@@ -58,10 +58,9 @@ pub async fn create_only_nodes_with_no_ids_present (
     ) . await ?;
   let to_create : Vec < &SkgNode > =
     nodes . iter ()
-    . filter ( |node|
-      node . primary_id ()
-        . map ( |pid| ! known_ids . contains (pid . as_str ()) )
-        . unwrap_or (false) )
+    . filter ( |node| {
+      let pid : &ID = &node . pid;
+      ! known_ids . contains (pid . as_str ()) } )
     . collect ();
   tracing::info! ( "Creating {} new nodes ...",
               to_create . len () );
@@ -141,7 +140,7 @@ pub async fn create_node (
   tx: &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 
-  let primary_id : &ID = node . primary_id()?;
+  let primary_id : &ID = &node . pid;
   tx . query ( {
     let insert_node_query : String = format! (
       r#"insert $n isa node,
@@ -158,11 +157,9 @@ async fn insert_extra_ids (
   tx   : &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 
-  if node . ids . len () > 1 {
-    let primary_id : &ID = node . primary_id()?;
-    for extra_id in { let extra_ids: Vec < &ID > =
-                        node . ids . iter() . skip (1) . collect();
-                      extra_ids } {
+  if ! node . extra_ids . is_empty () {
+    let primary_id : &ID = &node . pid;
+    for extra_id in &node . extra_ids {
       tx . query (
         format! ( r#"
                     match

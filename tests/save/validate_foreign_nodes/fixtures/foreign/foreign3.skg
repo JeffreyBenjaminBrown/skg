@@ -1,6 +1,5 @@
 title: Foreign indefinitive node
-ids:
-  - foreign3
+pid: foreign3
 contains:
   - item1
   - item2

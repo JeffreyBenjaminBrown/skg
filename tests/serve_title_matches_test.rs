@@ -32,8 +32,8 @@ fn test_title_matches_org_format (
       // Create test nodes with overlapping titles/aliases
       let mut node1 : SkgNode = // the best match
         empty_skgnode ();
-      node1 . ids =
-        vec! [ ID::new ("id_1") ];
+      node1 . pid =
+        ID::new ("id_1");
       node1 . title =
         "the bear eats cheese" . to_string ();
       node1 . aliases =
@@ -44,15 +44,15 @@ fn test_title_matches_org_format (
 
       let mut node2 : SkgNode = // matches, but less well
         empty_skgnode ();
-      node2 . ids =
-        vec! [ ID::new ("id_2") ];
+      node2 . pid =
+        ID::new ("id_2");
       node2 . title =
         "cheese makes me happy" . to_string ();
 
       let mut node3 : SkgNode = // will not match
         empty_skgnode ();
-      node3 . ids =
-        vec! [ ID::new ("id_3") ];
+      node3 . pid =
+        ID::new ("id_3");
       node3 . title =
         "aliens evade silently" . to_string ();
 

@@ -1,5 +1,4 @@
-ids:
-- cycle-2
+pid: cycle-2
 title: cycle-2
 contains:
 - cycle-1

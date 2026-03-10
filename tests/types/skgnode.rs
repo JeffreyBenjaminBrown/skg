@@ -20,7 +20,7 @@ fn test_skgnode_for_viewnode_with_id_in_map() {
   let skgnode : SkgNode =
     SkgNode {
       title : "Test Node" . to_string(),
-      ids : vec![id . clone()],
+      pid : id . clone(),
       source : SourceName::from ("main"),
       .. empty_skgnode()
     };
@@ -102,7 +102,7 @@ fn test_skgnode_for_viewnode_scaffold() {
     SkgNode =
     SkgNode {
       title : "Test Node" . to_string(),
-      ids : vec![ID::new ("test-id-789")],
+      pid : ID::new ("test-id-789"),
       .. empty_skgnode()
     };
 
@@ -153,7 +153,7 @@ fn test_skgnode_map_from_save_instructions() {
     SkgNode =
     SkgNode {
       title : "Node 1" . to_string(),
-      ids : vec![id1 . clone()],
+      pid : id1 . clone(),
       .. empty_skgnode()
     };
 
@@ -161,7 +161,8 @@ fn test_skgnode_map_from_save_instructions() {
     SkgNode =
     SkgNode {
       title : "Node 2" . to_string(),
-      ids : vec![id2 . clone(), ID::new ("extra-id")], // multiple IDs, should use first
+      pid : id2 . clone(),
+      extra_ids : vec![ID::new ("extra-id")],
       .. empty_skgnode()
     };
 

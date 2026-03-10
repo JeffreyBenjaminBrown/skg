@@ -1,6 +1,6 @@
 title: ext-1
-ids:
-  - ext-1
-  - ext-1-alias
+pid: ext-1
+extra_ids:
+- ext-1-alias
 body: ext-1
 contains: []

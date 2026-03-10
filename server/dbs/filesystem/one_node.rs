@@ -89,10 +89,7 @@ pub fn write_skgnode_to_source (
   skgnode : &SkgNode,
   config  : &SkgConfig,
 ) -> io::Result<()> {
-  let pid : &ID = skgnode . primary_id()
-    . map_err(
-      |e| io::Error::new(
-        io::ErrorKind::InvalidInput, e))?;
+  let pid : &ID = &skgnode . pid;
   write_skgnode (
     skgnode,
     & path_from_pid_and_source(
@@ -106,9 +103,7 @@ pub(super) fn validate_pid_matches_filename (
   node : &SkgNode,
   path : &Path,
 ) -> io::Result<()> {
-  let pid : &ID = node . primary_id()
-    . map_err ( |e| io::Error::new (
-      io::ErrorKind::InvalidData, e )) ?;
+  let pid : &ID = &node . pid;
   let stem : &str = path . file_stem()
     . and_then ( |s| s . to_str() )
     . ok_or_else ( || io::Error::new (
@@ -142,7 +137,7 @@ pub(super) fn read_skgnode
       io::ErrorKind::InvalidData,
       format!("SkgNode at {:?} has an empty title", file_path),
     )); }
-  if skgnode . ids . is_empty() {
+  if skgnode . pid . as_str() . is_empty() {
     return Err(io::Error::new(
       io::ErrorKind::InvalidData,
       format!(".skg file at {:?} has no IDs", file_path),

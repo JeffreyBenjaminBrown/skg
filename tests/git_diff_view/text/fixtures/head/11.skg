@@ -1,4 +1,3 @@
-ids:
-  - "11"
+pid: '11'
 title: "11"
 body: "11 has a body."

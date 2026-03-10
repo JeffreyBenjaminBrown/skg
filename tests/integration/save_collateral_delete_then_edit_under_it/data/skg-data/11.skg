@@ -1,6 +1,5 @@
 title: "11"
-ids:
-  - "11"
+pid: '11'
 aliases:
   - eleven
 subscribes_to:

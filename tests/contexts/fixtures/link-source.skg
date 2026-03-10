@@ -1,3 +1,2 @@
-ids:
-- link-source
+pid: link-source
 title: '[[id:link-target][the link]]'

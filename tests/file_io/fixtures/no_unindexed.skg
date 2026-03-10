@@ -1,6 +1,5 @@
 title: This text gets indexed.
-ids:
-- 'no_unindexed'
+pid: no_unindexed
 contains:
 - '1'
 - '2'

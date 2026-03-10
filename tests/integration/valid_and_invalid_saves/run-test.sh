@@ -38,8 +38,7 @@ backup_and_reset_test_data() {
     # Reset 1.skg to clean state
     cat > "$TEST_DIR/data/skg/1.skg" << 'EOF'
 title: "1"
-ids:
-  - "1"
+pid: "1"
 EOF
     echo "✓ Reset 1.skg to clean state"
 }

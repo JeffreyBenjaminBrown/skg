@@ -42,8 +42,7 @@ backup_and_reset_test_data() {
     # Reset a.skg to clean state
     cat > "$TEST_DIR/data/skg-data/a.skg" << 'EOF'
 title: a
-ids:
-  - a
+pid: a
 contains:
   - b
 EOF
@@ -52,8 +51,7 @@ EOF
     # Reset b.skg to clean state
     cat > "$TEST_DIR/data/skg-data/b.skg" << 'EOF'
 title: b
-ids:
-  - b
+pid: b
 contains:
   - a
 EOF

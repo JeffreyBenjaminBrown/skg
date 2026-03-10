@@ -1,4 +1,3 @@
-ids:
-  - "b"
+pid: b
 title: "b"
 body: "new body"

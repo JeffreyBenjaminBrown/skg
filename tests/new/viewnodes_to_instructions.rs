@@ -41,7 +41,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_basic() {
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(root1_skg . title, "root node 1");
   assert_eq!(root1_skg . body, Some("Root body content" . to_string()));
-  assert_eq!(root1_skg . ids, vec![ID::from ("root1")]);
+  assert_eq!(root1_skg . pid, ID::from ("root1"));
   assert_eq!(root1_skg . contains, vec![ID::from ("child1")]);
   assert!(matches!(&instructions[0],
                    DefineNode::Save (_)));
@@ -52,7 +52,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_basic() {
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(child1_skg . title, "child 1");
   assert_eq!(child1_skg . body, Some("Child body" . to_string()));
-  assert_eq!(child1_skg . ids, vec![ID::from ("child1")]);
+  assert_eq!(child1_skg . pid, ID::from ("child1"));
   assert_eq!(child1_skg . contains, vec![]); // No children
   assert!(matches!(&instructions[1],
                    DefineNode::Save (_)));
@@ -95,7 +95,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_with_aliases() {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(main_skg . title, "main node");
-  assert_eq!(main_skg . ids, vec![ID::from ("main")]);
+  assert_eq!(main_skg . pid, ID::from ("main"));
   assert_eq!(main_skg . contains, vec![ID::from ("content_child")]);
 
   // Test aliases collection
@@ -106,7 +106,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_with_aliases() {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(content_skg . title, "content child");
-  assert_eq!(content_skg . ids, vec![ID::from ("content_child")]);
+  assert_eq!(content_skg . pid, ID::from ("content_child"));
   assert_eq!(content_skg . aliases, MSV::Unspecified); // No aliases
 }
 

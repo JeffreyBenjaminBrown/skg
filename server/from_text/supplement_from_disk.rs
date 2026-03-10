@@ -29,8 +29,7 @@ pub async fn supplement_none_fields_from_disk_if_save (
     DefineNode::Delete (_) => return Ok (instruction),
     DefineNode::Save(SaveNode (sn)) => sn };
   let pid: ID =
-    from_buffer . ids . first()
-    . ok_or ("No primary ID found")? . clone();
+    from_buffer . pid . clone();
   let from_disk : Option<SkgNode> =
     if let Some (from_pool) = pool . get (&pid)
       { Some ( from_pool . clone () ) }
@@ -39,12 +38,13 @@ pub async fn supplement_none_fields_from_disk_if_save (
   if let Some (disk_node) = from_disk {
     { // Replace buffer's (singleton) ids
       // with disk's (possibly multiple) ids.
-      for buffer_id in &from_buffer . ids {
-        if ! disk_node . ids . contains (buffer_id) {
+      for buffer_id in from_buffer . all_ids() {
+        if ! disk_node . all_ids() . any ( |id| id == buffer_id ) {
           return Err(format!(
             "ID '{}' from buffer not found in IDs form disk.",
             buffer_id ) . into() ); }}
-      from_buffer . ids = disk_node . ids; }
+      from_buffer . pid = disk_node . pid;
+      from_buffer . extra_ids = disk_node . extra_ids; }
     if from_buffer . source != disk_node . source {
       return Err(Box::new(
         BufferValidationError::DiskSourceBufferSourceConflict(

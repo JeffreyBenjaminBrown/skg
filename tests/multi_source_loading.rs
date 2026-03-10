@@ -35,7 +35,7 @@ fn test_load_from_single_source() {
 
   // Create a test node
   let mut node : SkgNode = empty_skgnode();
-  node . ids = vec![ID::new ("test1")];
+  node . pid = ID::new ("test1");
   node . title = "Test Node 1" . to_string();
   node . source = SourceName::from ("main");
   write_skgnode_to_source(&node, &config) . unwrap();
@@ -79,20 +79,20 @@ fn test_load_from_multiple_sources() {
 
   // Create nodes in main source
   let mut node1 : SkgNode = empty_skgnode();
-  node1 . ids = vec![ID::new ("main1")];
+  node1 . pid = ID::new ("main1");
   node1 . title = "Main Node 1" . to_string();
   node1 . source = SourceName::from ("main");
   write_skgnode_to_source(&node1, &config) . unwrap();
 
   let mut node2 : SkgNode = empty_skgnode();
-  node2 . ids = vec![ID::new ("main2")];
+  node2 . pid = ID::new ("main2");
   node2 . title = "Main Node 2" . to_string();
   node2 . source = SourceName::from ("main");
   write_skgnode_to_source(&node2, &config) . unwrap();
 
   // Create nodes in shared source
   let mut node3 : SkgNode = empty_skgnode();
-  node3 . ids = vec![ID::new ("shared1")];
+  node3 . pid = ID::new ("shared1");
   node3 . title = "Shared Node 1" . to_string();
   node3 . source = SourceName::from ("shared");
   write_skgnode_to_source(&node3, &config) . unwrap();
@@ -145,13 +145,13 @@ fn test_duplicate_id_detection_across_sources() {
 
   // Create node with same ID in both sources
   let mut node1 : SkgNode = empty_skgnode();
-  node1 . ids = vec![ID::new ("duplicate_id")];
+  node1 . pid = ID::new ("duplicate_id");
   node1 . title = "Node in Main" . to_string();
   node1 . source = SourceName::from ("main");
   write_skgnode_to_source(&node1, &config) . unwrap();
 
   let mut node2 : SkgNode = empty_skgnode();
-  node2 . ids = vec![ID::new ("duplicate_id")];
+  node2 . pid = ID::new ("duplicate_id");
   node2 . title = "Node in Shared" . to_string();
   node2 . source = SourceName::from ("shared");
   write_skgnode_to_source(&node2, &config) . unwrap();
@@ -196,14 +196,16 @@ fn test_node_with_multiple_ids_duplicate_detection() {
 
   // Create node in main with multiple IDs
   let mut node1 : SkgNode = empty_skgnode();
-  node1 . ids = vec![ID::new ("id1"), ID::new ("id2")];
+  node1 . pid = ID::new ("id1");
+  node1 . extra_ids = vec![ID::new ("id2")];
   node1 . title = "Node with Multiple IDs" . to_string();
   node1 . source = SourceName::from ("main");
   write_skgnode_to_source(&node1, &config) . unwrap();
 
   // Create node in shared that has one overlapping ID
   let mut node2 : SkgNode = empty_skgnode();
-  node2 . ids = vec![ID::new ("id2"), ID::new ("id3")];
+  node2 . pid = ID::new ("id2");
+  node2 . extra_ids = vec![ID::new ("id3")];
   node2 . title = "Another Node" . to_string();
   node2 . source = SourceName::from ("shared");
   write_skgnode_to_source(&node2, &config) . unwrap();
@@ -267,13 +269,13 @@ fn test_source_field_set_correctly() {
 
   // Create nodes
   let mut node_a : SkgNode = empty_skgnode();
-  node_a . ids = vec![ID::new ("node_a")];
+  node_a . pid = ID::new ("node_a");
   node_a . title = "Node A" . to_string();
   node_a . source = SourceName::from ("source_a");
   write_skgnode_to_source(&node_a, &config) . unwrap();
 
   let mut node_b : SkgNode = empty_skgnode();
-  node_b . ids = vec![ID::new ("node_b")];
+  node_b . pid = ID::new ("node_b");
   node_b . title = "Node B" . to_string();
   node_b . source = SourceName::from ("source_b");
   write_skgnode_to_source(&node_b, &config) . unwrap();
@@ -287,9 +289,9 @@ fn test_source_field_set_correctly() {
 
   // Find each node and verify source
   let node_a_result : Option<&SkgNode> =
-    nodes . iter() . find(|n| n . ids[0] . as_str() == "node_a");
+    nodes . iter() . find(|n| n . pid . as_str() == "node_a");
   let node_b_result : Option<&SkgNode> =
-    nodes . iter() . find(|n| n . ids[0] . as_str() == "node_b");
+    nodes . iter() . find(|n| n . pid . as_str() == "node_b");
 
   assert!(node_a_result . is_some());
   assert!(node_b_result . is_some());
@@ -331,8 +333,8 @@ fn test_many_duplicate_ids_creates_org_file() {
     let id : String = format!("dup_id_{}", i);
     let mut node_a : SkgNode = empty_skgnode();
     let mut node_b : SkgNode = empty_skgnode();
-    node_a . ids = vec![ID::new (&id)];
-    node_b . ids = vec![ID::new (&id)];
+    node_a . pid = ID::new (&id);
+    node_b . pid = ID::new (&id);
     node_a . title = format!("Node A {}", i);
     node_b . title = format!("Node B {}", i);
     node_a . source = SourceName::from ("source_a");
@@ -405,7 +407,7 @@ fn test_unreadable_files_creates_org_file() {
 
   // Create a valid node in the good source
   let mut node : SkgNode = empty_skgnode();
-  node . ids = vec![ID::new ("test1")];
+  node . pid = ID::new ("test1");
   node . title = "Test Node" . to_string();
   node . source = SourceName::from ("source_good");
   write_skgnode_to_source(&node, &write_config) . unwrap();

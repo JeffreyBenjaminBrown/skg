@@ -38,11 +38,7 @@ pub async fn validate_and_filter_foreign_instructions(
         if !is_foreign { // nothing to worry about; move on
           filtered . push (instr);
           continue; }
-        let primary_id : &ID = match node . primary_id() {
-          Ok (id) => id,
-          Err (e) => {
-            errors . push(BufferValidationError::Other (e));
-            continue; }};
+        let primary_id : &ID = &node . pid;
         match optskgnode_from_id(
           config, driver, primary_id
         ) . await {
@@ -82,13 +78,11 @@ pub(super) fn validate_merges_involve_only_owned_nodes(
              . map(|s| !s . user_owns_it)
              . unwrap_or (false);
            acquirer_is_foreign }
-      { match merge . acquirer_id()
-        { Ok (id) => errors . push(
-            BufferValidationError::ModifiedForeignNode(
-                id . clone(),
-                acquirer_source . clone() )),
-          Err (e) => errors . push(
-            BufferValidationError::Other (e)), }; }}
+      { let id : &ID = merge . acquirer_id();
+        errors . push(
+          BufferValidationError::ModifiedForeignNode(
+            id . clone(),
+            acquirer_source . clone() )); }}
     { // Check if acquiree is from foreign source
       let acquiree_source: &SourceName =
         &merge . acquiree_to_delete . source;

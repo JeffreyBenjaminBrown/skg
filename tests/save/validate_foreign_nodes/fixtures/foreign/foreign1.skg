@@ -1,4 +1,3 @@
 title: Foreign node unchanged
-ids:
-  - foreign1
+pid: foreign1
 body: This is a foreign node

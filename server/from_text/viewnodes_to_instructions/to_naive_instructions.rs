@@ -95,7 +95,8 @@ fn maybe_instruction_from_treenode (
     aliases: collect_grandchild_aliases_for_viewnode(
       tree, node_id)?,
     source:  t . source . clone(),
-    ids:     vec![t . id . clone()],
+    pid:     t . id . clone(),
+    extra_ids: vec![],
     body:    t . body . clone(),
     contains:
       collect_contents_to_save_from_children (&node_ref),

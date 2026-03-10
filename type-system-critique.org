@@ -72,7 +72,7 @@ and response tags ("search-results", "save-lock", ...) are bare
 strings throughout the serve layer. An enum for each would catch
 typos at compile time and make the protocol self-documenting.
 
-* TODO SkgNode.ids: Vec allows empty
+* DONE SkgNode.ids: Vec allows empty
 
 The ~ids~ field is ~Vec<ID>~ with a comment "Must be nonempty."
 There is a TODO in the source suggesting a nonempty list type.

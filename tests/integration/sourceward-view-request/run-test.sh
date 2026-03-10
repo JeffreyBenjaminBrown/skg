@@ -31,8 +31,7 @@ backup_and_reset_test_data() {
 
     cat > "$TEST_DIR/data/skg-data/1.skg" <<'DATA'
 title: '1'
-ids:
-- '1'
+pid: '1'
 contains:
 - '11'
 - '12'
@@ -40,22 +39,19 @@ DATA
 
     cat > "$TEST_DIR/data/skg-data/11.skg" <<'DATA'
 title: '11'
-ids:
-- '11'
+pid: '11'
 contains: []
 DATA
 
     cat > "$TEST_DIR/data/skg-data/12.skg" <<'DATA'
 title: '12'
-ids:
-- '12'
+pid: '12'
 contains: []
 DATA
 
     cat > "$TEST_DIR/data/skg-data/l-11.skg" <<'DATA'
 title: '[[id:11][a link to 11]]'
-ids:
-- 'l-11'
+pid: 'l-11'
 contains: []
 DATA
 

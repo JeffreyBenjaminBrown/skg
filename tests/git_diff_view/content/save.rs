@@ -139,7 +139,7 @@ fn test_add_new_child_creates_on_disk()
       assert!(repo_path . join ("newer.skg") . exists(),
         "newer.skg should be created");
       let node_newer = read_skgnode(repo_path, "newer")?;
-      assert!(node_newer . ids . contains(&ID("newer" . to_string())),
+      assert_eq!(&node_newer . pid, &ID("newer" . to_string()),
         "newer.skg should have id 'newer'");
       assert_eq!(node_newer . title, "newer",
         "newer.skg should have title 'newer'");

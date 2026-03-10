@@ -17,7 +17,7 @@ use std::error::Error;
 /// Get the primary ID from any DefineNode variant.
 fn get_id(instr: &DefineNode) -> &ID {
   match instr {
-    DefineNode::Save(SaveNode (node)) => &node . ids[0],
+    DefineNode::Save(SaveNode (node)) => &node . pid,
     DefineNode::Delete(DeleteNode { id, .. }) => id }}
 
 #[test]

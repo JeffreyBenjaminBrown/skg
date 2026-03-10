@@ -1,7 +1,7 @@
 pub mod to_naive_instructions;
 pub mod reconcile_same_id_instructions;
 
-use crate::types::misc::SkgConfig;
+use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::memory::SkgNodeMap;
 use crate::types::viewnode::ViewNode;
@@ -54,12 +54,11 @@ fn filter_unchanged_save_instructions (
     . into_iter()
     . filter(|instr| match instr {
       DefineNode::Save(SaveNode (node)) => {
-        match node . primary_id() {
-          Ok (id) => match pool . get (id) {
-            Some (pool_node) =>
-              buffernode_differs_from_disknode (node, pool_node),
-            None => true, },
-          Err (_) => true, }}
+        let id : &ID = &node . pid;
+        match pool . get (id) {
+          Some (pool_node) =>
+            buffernode_differs_from_disknode (node, pool_node),
+          None => true, }}
       DefineNode::Delete (_) => true, })
     . collect();
   let removed_count : usize = initial_count - filtered . len();

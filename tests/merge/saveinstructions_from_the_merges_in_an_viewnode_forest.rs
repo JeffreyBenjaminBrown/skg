@@ -67,18 +67,18 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
           "acquiree_text_preserver should have empty overrides" );
 
         // Verify node 1 (acquirer) properties
-        assert!(
-          node1 . ids . contains(&ID::from ("1")),
-          "Node 1 should have ID '1'"
-        );
-        assert!(
-          node1 . ids . contains(&ID::from ("2")),
-          "Node 1 should have acquired ID '2'"
+        assert_eq!(
+          &node1 . pid, &ID::from ("1"),
+          "Node 1 should have PID '1'"
         );
         assert_eq!(
-          node1 . ids . len(),
-          2,
-          "Node 1 should have exactly 2 IDs: [1, 2]"
+          node1 . extra_ids . len(),
+          1,
+          "Node 1 should have exactly 1 extra_id"
+        );
+        assert!(
+          node1 . extra_ids . contains(&ID::from ("2")),
+          "Node 1 should have acquired extra_id '2'"
         );
        assert!(
         matches!(&merge . updated_acquirer,
@@ -87,7 +87,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
 
         // Verify node 1's contents: [acquiree_text_preserver ID, original node 1 contents, node 2 contents]
         // In this case: [acquiree_text_preserver ID] (since both started with empty contents)
-        let acquiree_text_preserver_id = &acquiree_text_preserver . ids[0];
+        let acquiree_text_preserver_id = &acquiree_text_preserver . pid;
         assert_eq!(
           node1 . contains . len(),
           1,

@@ -117,7 +117,7 @@ fn test_textlinks_from_node() {
   let mut test_node : SkgNode =
     empty_skgnode ();
   { test_node . title = "Title with two textlinks: [[id:textlink1][First TextLink]] and [[id:textlink2][Second TextLink]]" . to_string();
-    test_node . ids = vec![ID::new ("id")];
+    test_node . pid = ID::new ("id");
     test_node . body = Some("Some text with a link [[id:textlink3][Third TextLink]] and another [[id:textlink4][Fourth TextLink]]" . to_string()); }
   let textlinks : Vec < TextLink > =
     textlinks_from_node (&test_node);

@@ -1,5 +1,4 @@
-ids:
-  - E1
+pid: E1
 title: subscribee-1
 contains:
   - hidden-in-E1

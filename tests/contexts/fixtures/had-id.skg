@@ -1,5 +1,4 @@
-ids:
-- had-id
+pid: had-id
 title: had-id
 misc:
 - Had_ID_Before_Import

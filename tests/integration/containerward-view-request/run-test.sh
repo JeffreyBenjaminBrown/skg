@@ -34,8 +34,7 @@ backup_and_reset_test_data() {
         # Reset to clean state (no containment)
         cat > "$TEST_DIR/data/skg-data/$file.skg" << EOF
 title: '$file'
-ids:
-- '$file'
+pid: '$file'
 contains: []
 EOF
         echo "✓ Reset $file.skg to clean state"

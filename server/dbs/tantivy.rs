@@ -134,8 +134,7 @@ pub fn delete_nodes_from_index<'a, I>(
 ) -> Result<(), Box<dyn Error>>
 where I: Iterator<Item = &'a SkgNode>, {
   for node in nodes_iter {
-    if !node . ids . is_empty() {
-      let primary_id : &ID = node . primary_id()?;
+    { let primary_id : &ID = &node . pid;
       writer . delete_term (
         Term::from_field_text( tantivy_index . id_field,
                                primary_id . as_str() ) ); }}
@@ -146,9 +145,8 @@ pub fn delete_nodes_by_id_from_index<'a, I>(
   writer: &mut IndexWriter,
   tantivy_index: &TantivyIndex,
 ) -> Result<(), Box<dyn Error>>
-where I: Iterator<Item = Result<&'a ID, String>>, {
-  for id_result in ids_iter {
-    let id : &ID = id_result?;
+where I: Iterator<Item = &'a ID>, {
+  for id in ids_iter {
     writer . delete_term (
       Term::from_field_text( tantivy_index . id_field,
                              id . as_str() ) ); }
@@ -231,7 +229,7 @@ fn create_documents_from_node (
   tantivy_index: &TantivyIndex,
 ) -> Result < Vec < Document >,
               Box < dyn Error >> {
-  let primary_id : &ID = node . primary_id()?;
+  let primary_id : &ID = &node . pid;
   let mut documents: Vec<Document> =
     Vec::new();
   let mut titles_and_aliases: Vec<String> =

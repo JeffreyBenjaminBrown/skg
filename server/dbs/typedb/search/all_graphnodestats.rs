@@ -10,9 +10,7 @@
 /// This is always true for the graphnodestats path, which collects
 /// PIDs from the already-built viewnode tree.
 
-use crate::dbs::typedb::util::concept_document::{
-  extract_id_from_node,
-  extract_id_from_map};
+use crate::dbs::typedb::util::concept_document::extract_id_from_map;
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 use crate::types::viewnode::GraphNodeStats;
@@ -64,7 +62,7 @@ pub fn graphnodestats_for_pid (
     . unwrap_or (false);
   let extra_ids : bool =
     skgnode
-    . map ( |n| n . ids . len () > 1 )
+    . map ( |n| ! n . extra_ids . is_empty () )
     . unwrap_or (false);
   GraphNodeStats {
     aliasing,

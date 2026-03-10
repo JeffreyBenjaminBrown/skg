@@ -1,5 +1,4 @@
-ids:
-- 1
+pid: 1
 title: 1
 contains:
 - 2

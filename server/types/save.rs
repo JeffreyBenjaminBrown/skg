@@ -178,8 +178,8 @@ impl Merge {
 
   pub fn acquirer_id (
     &self
-  ) -> Result<&ID, String> {
-    self . updated_acquirer . 0 . primary_id()
+  ) -> &ID {
+    &self . updated_acquirer . 0 . pid
   }
 
   pub fn acquiree_id (

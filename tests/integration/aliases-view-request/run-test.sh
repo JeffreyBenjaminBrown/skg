@@ -37,8 +37,7 @@ backup_and_reset_test_data() {
         # Create a test node with aliases
         cat > "$TEST_DIR/data/skg-data/$file.skg" << EOF
 title: 'Test Node'
-ids:
-- '$file'
+pid: '$file'
 aliases:
 - 'first alias'
 - 'second alias'

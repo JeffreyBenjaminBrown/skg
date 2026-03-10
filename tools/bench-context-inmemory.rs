@@ -54,7 +54,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
   let t2 : Instant = Instant::now ();
   let all_node_ids : HashSet<ID> =
     nodes . iter ()
-    . filter_map ( |n| n . primary_id () . ok () . cloned () )
+    . map ( |n| n . pid . clone () )
     . collect ();
   let ids_time : f64 = t2 . elapsed () . as_secs_f64 ();
   println! ("2b. all_node_ids ({} nodes): {:.6}s",

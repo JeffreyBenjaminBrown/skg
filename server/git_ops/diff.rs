@@ -72,7 +72,7 @@ fn collect_deleted_nodes (
   for skgnode_diff in skgnode_diffs . values() {
     if skgnode_diff . status == GitDiffStatus::Deleted {
       if let Some ( ref head_node ) = skgnode_diff . head_node {
-        if let Some (pid) = head_node . ids . first() {
+        { let pid : &ID = &head_node . pid;
           result . insert ( pid . clone(), head_node . clone() ); }} }}
   result }
 
@@ -89,7 +89,9 @@ fn compare_skgnodes (
       old . aliases . or_default(),
       new . aliases . or_default() );
   let ids_diff : Vec<Diff_Item<ID>> =
-    compute_interleaved_diff ( & old . ids, & new . ids );
+    compute_interleaved_diff (
+      & old . all_ids() . cloned() . collect::<Vec<ID>>(),
+      & new . all_ids() . cloned() . collect::<Vec<ID>>() );
   let contains_diff : Vec<Diff_Item<ID>> =
     compute_interleaved_diff (
       &old . contains,

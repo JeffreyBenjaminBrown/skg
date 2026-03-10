@@ -1,5 +1,4 @@
 title: 'container alpha'
-ids:
-- 'container-a'
+pid: container-a
 contains:
 - 'leaf-b'

@@ -48,7 +48,7 @@ pub fn completeIDCol (
     = match node_changes {
       None => { // No git diff view: Easy.
         let goals : Vec<ID> =
-          parent_skgnode . ids . iter()
+          parent_skgnode . all_ids()
             . cloned()
             . collect();
         ( goals, HashMap::new() ) }

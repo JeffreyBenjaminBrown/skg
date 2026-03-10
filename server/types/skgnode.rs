@@ -27,8 +27,10 @@ pub struct SkgNode {
   #[serde(skip_serializing, skip_deserializing)]
   pub source: SourceName, // source nickname, inferred from file location and SkgConfig
 
-  pub ids: Vec<ID>, // Must be nonempty. Can have length > 1 because nodes might be merged, but will usually have length = 1.
-  // TODO: Use a nonempty list type (e.g. the "nonempty" crate), or else separate fields pid : String and extra_ids : Vec<String>. I'm leaning toward the latter, as the pid is special among those ids.
+  pub pid: ID, // Primary ID. Determines filename, TypeDB identity, Tantivy key, map key. Never changes.
+
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub extra_ids: Vec<ID>, // Extra IDs accumulated through merges. Usually empty.
 
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub body: Option<String>, // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding org headline, to which it belongs, and the next (if there is a next).
@@ -50,10 +52,9 @@ pub struct SkgNode {
 }
 
 impl SkgNode {
-  /// Returns the primary ID, or an error if ids is empty.
-  pub fn primary_id (&self) -> Result<&ID, String> {
-    self . ids . get (0) . ok_or_else(||
-      format!("SkgNode '{}' has no IDs", self . title)) }
+  pub fn all_ids (&self) -> impl Iterator<Item = &ID> {
+    std::iter::once (&self . pid)
+      . chain (self . extra_ids . iter()) }
 }
 
 //
@@ -66,7 +67,8 @@ pub fn empty_skgnode () -> SkgNode {
     title                        : String::new (),
     aliases                      : MSV::Unspecified,
     source                       : SourceName::from ("main"),
-    ids                          : vec![],
+    pid                          : ID::new (""),
+    extra_ids                    : Vec::new (),
     body                         : None,
     contains                     : Vec::new(),
     subscribes_to                : MSV::Unspecified,

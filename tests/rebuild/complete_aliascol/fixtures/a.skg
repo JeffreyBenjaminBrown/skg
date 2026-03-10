@@ -1,5 +1,4 @@
-ids:
-- a
+pid: a
 title: a
 aliases:
 - b

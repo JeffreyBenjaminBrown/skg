@@ -1,5 +1,5 @@
-ids:
-- 11
+pid: 11
+extra_ids:
 - 11-extra-id
 title: 11
 contains:

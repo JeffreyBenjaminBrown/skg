@@ -1,5 +1,4 @@
-ids:
-- test_node
+pid: test_node
 title: Title from disk
 aliases:
 - alias 1 on disk

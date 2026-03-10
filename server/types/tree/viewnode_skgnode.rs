@@ -105,7 +105,7 @@ pub fn pids_for_subscriber_and_its_subscribees (
   let pid : ID = get_id_from_treenode ( tree, node_id ) ?;
   let skgnode : &SkgNode =
     map . get (&pid) . ok_or ("pids_for_subscriber_and_its_subscribees: SkgNode should exist in map") ?;
-  Ok (( skgnode . ids [0] . clone (),
+  Ok (( skgnode . pid . clone (),
         skgnode . subscribes_to . or_default() . to_vec() )) }
 
 /// Extract PIDs for a Subscribee and its grandparent (the subscriber).
@@ -135,7 +135,7 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
     map . get (&subscriber_id)
     . ok_or ("Subscriber SkgNode not in map") ?;
   Ok (( subscribee_pid,
-        skgnode . ids[0] . clone() )) }
+        skgnode . pid . clone() )) }
 
 pub fn insert_scaffold_as_child (
   tree          : &mut Tree<ViewNode>,

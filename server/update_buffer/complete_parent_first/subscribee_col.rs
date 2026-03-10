@@ -102,7 +102,7 @@ pub async fn complete_subscribee_col_preorder (
       let fetched_missing : Vec<SkgNode> =
         skgnodes_from_ids( config, driver, &missing ) . await ?;
       for skg in fetched_missing {
-        if let Some (id) = skg . ids . first() {
+        { let id : &ID = &skg . pid;
           map . insert( id . clone(), skg ); } } }
     let child_data : HashMap<ID, SubscribeeChildData> =
       // Pre-compute child creation data so that the create_child closure argument to complete_relevant_children_in_viewnodetree captures only owned data and does not conflict with the &mut Tree borrow in complete_relevant_children_in_viewnodetree.

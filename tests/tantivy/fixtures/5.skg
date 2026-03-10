@@ -1,5 +1,4 @@
-ids:
-- '5'
+pid: '5'
 is_comment: false
 title: perfect match test second
 body: this one string could span pages

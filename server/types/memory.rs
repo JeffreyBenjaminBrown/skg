@@ -186,7 +186,7 @@ fn root_ids_from_forest (
     if let ViewNodeKind::True (t) = &child . value () . kind {
       ids . insert ( t . id . clone () );
       if let Some (skgnode) = pool . get ( &t . id ) {
-        for extra_id in &skgnode . ids {
+        for extra_id in skgnode . all_ids() {
           ids . insert ( extra_id . clone () ); }}}}
   ids }
 
@@ -219,9 +219,8 @@ pub fn skgnode_map_from_save_instructions (
 { instructions . iter()
     . filter_map( |instr| match instr {
         DefineNode::Save(SaveNode (skgnode)) =>
-          skgnode . ids . first()
-            . map( |id : &ID| (id . clone(),
-                               skgnode . clone() )),
+          Some (( skgnode . pid . clone(),
+                  skgnode . clone() )),
         DefineNode::Delete (_) => None } )
     . collect() }
 
@@ -238,8 +237,8 @@ pub async fn skgnode_map_from_forest (
     config, driver, &all_tree_ids ) . await ?;
   let mut map : SkgNodeMap = SkgNodeMap::new ();
   for node in nodes {
-    if let Some (id) = node . ids . first () {
-    map . insert ( id . clone (), node ); }}
+    { let id : &ID = &node . pid;
+      map . insert ( id . clone (), node ); }}
   Ok (map) }
 
 /// Get a SkgNode from the map, or from disk if it's not there.

@@ -1,5 +1,5 @@
-ids:
-- '5'
+pid: '5'
+extra_ids:
 - '55'
 title: this title includes a [[id:22][textlink to another file]]
 body: |-

@@ -43,7 +43,7 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
-      user_node . ids     = vec![ ID::new ("test_node") ];
+      user_node . pid     = ID::new ("test_node");
       user_node . aliases = MSV::Unspecified; }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
@@ -56,7 +56,7 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
-      user_node . ids     = vec![ ID::new ("test_node") ];
+      user_node . pid     = ID::new ("test_node");
       user_node . aliases = MSV::Specified ( vec![] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
@@ -68,7 +68,7 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
-      user_node . ids     = vec![ ID::new ("test_node") ];
+      user_node . pid     = ID::new ("test_node");
       user_node . aliases = MSV::Specified ( vec![ "new alias" . to_string () ] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
@@ -99,7 +99,7 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
-      user_node . ids     = vec![ ID::new ("test_node") ];
+      user_node . pid     = ID::new ("test_node");
       user_node . subscribes_to = MSV::Unspecified; }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
@@ -112,7 +112,7 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
-      user_node . ids     = vec![ ID::new ("test_node") ];
+      user_node . pid     = ID::new ("test_node");
       user_node . subscribes_to = MSV::Specified ( vec![] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
@@ -124,7 +124,7 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
-      user_node . ids     = vec![ ID::new ("test_node") ];
+      user_node . pid     = ID::new ("test_node");
       user_node . subscribes_to = MSV::Specified ( vec![ ID::new ("new_sub") ] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
@@ -155,7 +155,7 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
-      user_node . ids     = vec![ ID::new ("test_node") ];
+      user_node . pid     = ID::new ("test_node");
       user_node . hides_from_its_subscriptions = MSV::Unspecified; }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
@@ -167,7 +167,7 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
-      user_node . ids     = vec![ ID::new ("test_node") ];
+      user_node . pid     = ID::new ("test_node");
       user_node . hides_from_its_subscriptions = MSV::Specified ( vec![] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
@@ -179,7 +179,7 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
-      user_node . ids     = vec![ ID::new ("test_node") ];
+      user_node . pid     = ID::new ("test_node");
       user_node . hides_from_its_subscriptions = MSV::Specified ( vec![ ID::new ("new_hide") ] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
@@ -210,7 +210,7 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
-      user_node . ids     = vec![ ID::new ("test_node") ];
+      user_node . pid     = ID::new ("test_node");
       user_node . overrides_view_of = MSV::Unspecified; }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
@@ -224,7 +224,7 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
-      user_node . ids     = vec![ ID::new ("test_node") ];
+      user_node . pid     = ID::new ("test_node");
       user_node . overrides_view_of = MSV::Specified ( vec![] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
@@ -236,7 +236,7 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
 
   { let mut user_node : SkgNode = empty_skgnode ();
     { user_node . title   = "Title from user" . to_string ();
-      user_node . ids     = vec![ ID::new ("test_node") ];
+      user_node . pid     = ID::new ("test_node");
       user_node . overrides_view_of = MSV::Specified ( vec![ ID::new ("new_override") ] ); }
     let result : SkgNode =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (

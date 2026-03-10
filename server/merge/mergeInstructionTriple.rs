@@ -6,6 +6,7 @@ use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode};
 use crate::types::skgnode::SkgNode;
 use crate::types::list::dedup_vector;
 use crate::util::setlike_vector_subtraction;
+
 use ego_tree::Tree;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -85,18 +86,19 @@ fn three_merged_skgnodes(
 ) -> Result<SkgNode, String> {
   let mut updated_acquirer: SkgNode =
     acquirer_from_disk . clone();
-  { // Append acquiree's IDs to acquirer's.
-    let mut combined_ids : Vec<ID> =
-      acquirer_from_disk . ids . clone();
-    combined_ids . extend(
-      acquiree_from_disk . ids . clone() );
-    updated_acquirer . ids = (
-      // this dedup is kind of absurdly defensive, but cheap
-      dedup_vector (combined_ids) ); }
+  { // Append acquiree's IDs (esp. its PID) to acquirer's extra_ids.
+    let mut combined_extra_ids : Vec<ID> =
+      acquirer_from_disk . extra_ids . clone();
+    combined_extra_ids . push(
+      acquiree_from_disk . pid . clone() );
+    combined_extra_ids . extend(
+      acquiree_from_disk . extra_ids . clone() );
+    updated_acquirer . extra_ids =
+      dedup_vector (combined_extra_ids); }
   let new_contains : Vec<ID> = {
     // [preserver] + acquirer's old content + acquiree's old content
     let mut combined : Vec<ID> =
-      vec![ acquiree_text_preserver . primary_id()? . clone() ];
+      vec![ acquiree_text_preserver . pid . clone() ];
     combined . extend_from_slice(
       &acquirer_from_disk . contains );
     combined . extend_from_slice(
@@ -144,7 +146,8 @@ fn create_acquiree_text_preserver(acquiree: &SkgNode) -> SkgNode {
     title: format!("MERGED: {}", acquiree . title),
     aliases: MSV::Unspecified,
     source: acquiree . source . clone(),
-    ids: vec![ID(uuid::Uuid::new_v4() . to_string())],
+    pid: ID(uuid::Uuid::new_v4() . to_string()),
+    extra_ids: vec![],
     body: acquiree . body . clone(),
     contains                     : vec![],
     subscribes_to                : MSV::Specified(vec![]),

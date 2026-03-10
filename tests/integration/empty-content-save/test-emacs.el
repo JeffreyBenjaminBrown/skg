@@ -51,9 +51,9 @@
     (unless (string-match-p "title:[[:space:]]*['\"]1['\"]" file-contents)
       (message "File contents:\n%s" file-contents)
       (fail-test "title field does not match expected value"))
-    (unless (string-match-p "ids:[[:space:]]*\n-[[:space:]]*['\"]1['\"]" file-contents)
+    (unless (string-match-p "pid:[[:space:]]*['\"]1['\"]" file-contents)
       (message "File contents:\n%s" file-contents)
-      (fail-test "ids field does not list \"1\"")))
+      (fail-test "pid field does not contain \"1\"")))
 
   (setq integration-test-phase "success")
   (message "✓ PASS: Empty buffer save produced 1.skg with expected content")
