@@ -3,7 +3,7 @@
 use skg::context::ContextOriginType;
 use skg::dbs::tantivy::{search_index, update_context_origin_types};
 use skg::org_to_text::viewnode_forest_to_string;
-use skg::types::misc::{ID, MaybeSpecified, TantivyIndex};
+use skg::types::misc::{ID, MSV, TantivyIndex};
 use skg::types::skgnode::{SkgNode, empty_skgnode};
 use skg::dbs::init::in_fs_wipe_index_then_create_it;
 use skg::serve::handlers::title_matches::{
@@ -37,7 +37,7 @@ fn test_title_matches_org_format (
       node1 . title =
         "the bear eats cheese" . to_string ();
       node1 . aliases =
-        MaybeSpecified::Specified ( vec! [
+        MSV::Specified ( vec! [
           "bear cheese" . to_string (),
           "the cheese" . to_string ()
         ] );

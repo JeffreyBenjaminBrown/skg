@@ -59,7 +59,7 @@ This is a meaningful distinction (see
 fragile. A dedicated type makes the intent explicit:
 
 #+begin_src rust
-pub enum MaybeSpecified<T> {
+pub enum MSV<T> {
   Unspecified,       // was None: inherit from disk
   Specified(Vec<T>), // was Some: use this value (even if empty)
 }

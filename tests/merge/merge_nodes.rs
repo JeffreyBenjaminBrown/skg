@@ -3,7 +3,7 @@
 use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_viewnode_forest;
 use skg::merge::merge_nodes;
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
-use skg::types::misc::{ID, MaybeSpecified, SkgConfig, TantivyIndex, SourceName};
+use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SourceName};
 use skg::types::viewnode::{EditRequest, ViewNode, ViewNodeKind, TrueNode, forest_root_viewnode, default_truenode};
 use skg::types::skgnode::SkgNode;
 use skg::types::save::Merge;
@@ -251,11 +251,11 @@ fn verify_filesystem_after_merge_2_into_1(
 
   // acquiree_text_preserver should have Unspecified for relationship fields
   // (when read from disk, missing fields are Unspecified)
-  assert_eq!(acquiree_text_preserver . subscribes_to, MaybeSpecified::Unspecified,
+  assert_eq!(acquiree_text_preserver . subscribes_to, MSV::Unspecified,
              "acquiree_text_preserver should have Unspecified for subscribes_to");
-  assert_eq!(acquiree_text_preserver . hides_from_its_subscriptions, MaybeSpecified::Unspecified,
+  assert_eq!(acquiree_text_preserver . hides_from_its_subscriptions, MSV::Unspecified,
              "acquiree_text_preserver should have Unspecified for hides_from_its_subscriptions");
-  assert_eq!(acquiree_text_preserver . overrides_view_of, MaybeSpecified::Unspecified,
+  assert_eq!(acquiree_text_preserver . overrides_view_of, MSV::Unspecified,
              "acquiree_text_preserver should have Unspecified for overrides_view_of");
 
   Ok(( )) }
@@ -593,11 +593,11 @@ fn verify_filesystem_after_merge_1_into_2(
   // acquiree_text_preserver should have Unspecified for relationship fields
   // (when read from disk, missing fields are Unspecified)
   // (these relationships stay with the acquirer, not the acquiree_text_preserver)
-  assert_eq!(acquiree_text_preserver . subscribes_to, MaybeSpecified::Unspecified,
+  assert_eq!(acquiree_text_preserver . subscribes_to, MSV::Unspecified,
              "acquiree_text_preserver should have Unspecified for subscribes_to");
-  assert_eq!(acquiree_text_preserver . hides_from_its_subscriptions, MaybeSpecified::Unspecified,
+  assert_eq!(acquiree_text_preserver . hides_from_its_subscriptions, MSV::Unspecified,
              "acquiree_text_preserver should have Unspecified for hides_from_its_subscriptions");
-  assert_eq!(acquiree_text_preserver . overrides_view_of, MaybeSpecified::Unspecified,
+  assert_eq!(acquiree_text_preserver . overrides_view_of, MSV::Unspecified,
              "acquiree_text_preserver should have Unspecified for overrides_view_of");
 
   Ok(( )) }

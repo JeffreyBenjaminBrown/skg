@@ -1,4 +1,4 @@
-use crate::types::misc::{ID, MaybeSpecified, SourceName};
+use crate::types::misc::{ID, MSV, SourceName};
 use crate::types::skgnode::{FileProperty, SkgNode};
 
 use std::path::Path;
@@ -184,10 +184,10 @@ fn skgnode_from_section_tree (
       . unwrap_or (tree . extent_end);
   let body : Option<String> =
     collect_body (lines, tree . section . body_start, body_end);
-  let aliases : MaybeSpecified<String> =
+  let aliases : MSV<String> =
     match tree . section . roam_aliases . clone() {
-      None    => MaybeSpecified::Unspecified,
-      Some(v) => MaybeSpecified::Specified(v) };
+      None    => MSV::Unspecified,
+      Some(v) => MSV::Specified(v) };
   SkgNode {
     title    : tree . section . headline . clone(),
     aliases,
@@ -195,9 +195,9 @@ fn skgnode_from_section_tree (
     ids      : vec![ ID::new (id_str) ],
     body,
     contains : contained_ids,
-    subscribes_to                : MaybeSpecified::Unspecified,
-    hides_from_its_subscriptions : MaybeSpecified::Unspecified,
-    overrides_view_of            : MaybeSpecified::Unspecified,
+    subscribes_to                : MSV::Unspecified,
+    hides_from_its_subscriptions : MSV::Unspecified,
+    overrides_view_of            : MSV::Unspecified,
     misc :
       if tree . section . had_id {
         vec![FileProperty::Had_ID_Before_Import] }
@@ -343,4 +343,3 @@ fn find_title (
     . map (|s| s . to_string_lossy() . to_string() )
     . unwrap_or_else (|| "untitled" . to_string() );
   (stem, props_end) }
-

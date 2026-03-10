@@ -11,20 +11,21 @@ use tantivy::schema::Field;
 // Type Definitions
 //
 
+/// MSV = 'Maybe-Specified Vector'.
 /// When the user saves a buffer, this type distinguishes
 /// "not specified" (so use whatever is already on disk) from
 /// "should be this value" (even if empty).
 ///
 /// ELABORATION:
 /// When a user saves a TrueNode, its non-ignored TrueNode children
-/// always define its contents, so MaybeSpecified does not apply there.
+/// always define its contents, so MSV does not apply there.
 /// But other fields -- e.g. aliases --
 /// the user is likely not to mention (in particular,
 /// not asking for any changes). This type distinguishes the case
 /// where the user did not mention the field from the case
 /// where the user wants it empty.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum MaybeSpecified<T> {
+pub enum MSV<T> {
   Unspecified,
   Specified (Vec<T>),
 }
@@ -125,54 +126,54 @@ fn default_initial_node_limit() -> usize {
 // Implementations
 //
 
-impl<T> MaybeSpecified<T> {
+impl<T> MSV<T> {
   pub fn is_unspecified (&self) -> bool {
-    matches! (self, MaybeSpecified::Unspecified) }
+    matches! (self, MSV::Unspecified) }
   /// Returns the inner slice, or empty if Unspecified.
   pub fn or_default (&self) -> &[T] {
     match self {
-      MaybeSpecified::Unspecified  => &[],
-      MaybeSpecified::Specified (v) => v } }
+      MSV::Unspecified  => &[],
+      MSV::Specified (v) => v } }
   /// Consumes self, returning the inner Vec or empty.
   pub fn into_vec (self) -> Vec<T> {
     match self {
-      MaybeSpecified::Unspecified  => vec![],
-      MaybeSpecified::Specified (v) => v } }
+      MSV::Unspecified  => vec![],
+      MSV::Specified (v) => v } }
   /// Ensures the value is Specified, defaulting to empty,
   /// and returns a mutable reference to the inner Vec.
   pub fn ensure_specified (&mut self) -> &mut Vec<T> {
-    if matches! (self, MaybeSpecified::Unspecified) {
-      *self = MaybeSpecified::Specified (Vec::new ()); }
+    if matches! (self, MSV::Unspecified) {
+      *self = MSV::Specified (Vec::new ()); }
     match self {
-      MaybeSpecified::Specified (v) => v,
-      MaybeSpecified::Unspecified => unreachable! () } }
+      MSV::Specified (v) => v,
+      MSV::Unspecified => unreachable! () } }
   /// For serde skip_serializing_if.
   /// Skips both Unspecified and Specified([]).
   pub fn skip_serializing (&self) -> bool {
     match self {
-      MaybeSpecified::Unspecified  => true,
-      MaybeSpecified::Specified (v) => v . is_empty () } } }
+      MSV::Unspecified  => true,
+      MSV::Specified (v) => v . is_empty () } } }
 
-impl<T> Default for MaybeSpecified<T> {
+impl<T> Default for MSV<T> {
   fn default () -> Self {
-    MaybeSpecified::Unspecified } }
+    MSV::Unspecified } }
 
-impl<T: Serialize> Serialize for MaybeSpecified<T> {
+impl<T: Serialize> Serialize for MSV<T> {
   fn serialize<S: Serializer> (
     &self, serializer : S
   ) -> Result<S::Ok, S::Error> {
     match self {
-      MaybeSpecified::Unspecified  =>
+      MSV::Unspecified  =>
         serializer . serialize_none (),
-      MaybeSpecified::Specified (v) =>
+      MSV::Specified (v) =>
         v . serialize (serializer) } } }
 
-impl<'de, T: Deserialize<'de>> Deserialize<'de> for MaybeSpecified<T> {
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for MSV<T> {
   fn deserialize<D: Deserializer<'de>> (
     deserializer : D
   ) -> Result<Self, D::Error> {
     Vec::<T>::deserialize (deserializer)
-      . map (MaybeSpecified::Specified) } }
+      . map (MSV::Specified) } }
 
 impl ID {
   pub fn new <S : Into<String>> (s: S) -> Self {

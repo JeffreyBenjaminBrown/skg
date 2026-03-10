@@ -2,7 +2,7 @@ use indoc::indoc;
 use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_viewnode_forest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
-use skg::types::misc::{ID, MaybeSpecified, SourceName};
+use skg::types::misc::{ID, MSV, SourceName};
 use skg::types::save::SaveNode;
 use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
 use std::error::Error;
@@ -55,15 +55,15 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
              0, "acquiree_text_preserver should have no contents");
         assert_eq!(
           acquiree_text_preserver . subscribes_to,
-          MaybeSpecified::Specified(vec![]),
+          MSV::Specified(vec![]),
           "acquiree_text_preserver should have empty subscriptions" );
         assert_eq!(
           acquiree_text_preserver . hides_from_its_subscriptions,
-          MaybeSpecified::Specified(vec![]),
+          MSV::Specified(vec![]),
           "acquiree_text_preserver should have empty hides" );
         assert_eq!(
           acquiree_text_preserver . overrides_view_of,
-          MaybeSpecified::Specified(vec![]),
+          MSV::Specified(vec![]),
           "acquiree_text_preserver should have empty overrides" );
 
         // Verify node 1 (acquirer) properties

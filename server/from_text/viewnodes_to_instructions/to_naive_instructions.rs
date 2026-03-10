@@ -1,7 +1,7 @@
 use crate::types::git::NodeDiffStatus;
 use crate::types::viewnode::EditRequest;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, TrueNode};
-use crate::types::misc::{ID, MaybeSpecified};
+use crate::types::misc::{ID, MSV};
 use crate::types::skgnode::SkgNode;
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 use crate::types::tree::generic::read_at_node_in_tree;
@@ -101,8 +101,8 @@ fn maybe_instruction_from_treenode (
       collect_contents_to_save_from_children (&node_ref),
     subscribes_to:
       collect_subscribees( tree, node_id )?,
-    hides_from_its_subscriptions: MaybeSpecified::Unspecified,
-    overrides_view_of: MaybeSpecified::Unspecified,
+    hides_from_its_subscriptions: MSV::Unspecified,
+    overrides_view_of: MSV::Unspecified,
     misc: Vec::new () } )) )) }
 
 /// Treats the input tree as the source of truth; does not read dbs.
@@ -114,13 +114,13 @@ fn maybe_instruction_from_treenode (
 fn collect_subscribees (
   tree: &Tree<ViewNode>,
   node_id: NodeId,
-) -> Result<MaybeSpecified<ID>, String> {
+) -> Result<MSV<ID>, String> {
   let subscribee_col_id : Option<NodeId> =
     unique_scaffold_child (
       tree, node_id, &Scaffold::SubscribeeCol )
     . map_err ( |e| e . to_string() ) ?;
   match subscribee_col_id {
-    None => Ok (MaybeSpecified::Unspecified),
+    None => Ok (MSV::Unspecified),
     Some (col_id) => {
       let subscribees : Vec<ID> = {
         let col_ref : NodeRef<ViewNode> = tree . get (col_id) . expect(
@@ -139,7 +139,7 @@ fn collect_subscribees (
               continue, // inert in a deleted context
             ViewNodeKind::Scaff (s) => return Err(format!( "SubscribeeCol has unexpected Scaffold child: {:?}", s)), }}
         subscribees };
-      Ok( MaybeSpecified::Specified(dedup_vector (subscribees)) ) }} }
+      Ok( MSV::Specified(dedup_vector (subscribees)) ) }} }
 
 /// The following kinds of TrueNode children
 /// should be excluded from their parent's content:

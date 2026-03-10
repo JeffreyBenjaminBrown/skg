@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use skg::from_text::viewnodes_to_instructions::reconcile_same_id_instructions::collect_dup_instructions;
 use skg::test_utils::extract_skgnode_if_save_else_error;
-use skg::types::misc::{ID, MaybeSpecified, SourceName};
+use skg::types::misc::{ID, MSV, SourceName};
 use skg::types::skgnode::SkgNode;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 
@@ -19,15 +19,15 @@ fn create_test_node(
     SkgNode {
         title: title . to_string(),
         aliases: match aliases {
-          None => MaybeSpecified::Unspecified,
-          Some (v) => MaybeSpecified::Specified (v) },
+          None => MSV::Unspecified,
+          Some (v) => MSV::Specified (v) },
         source: SourceName::from ("main"),
         ids: vec![ID::from (id)],
         body,
         contains,
-        subscribes_to: MaybeSpecified::Unspecified,
-        hides_from_its_subscriptions: MaybeSpecified::Unspecified,
-        overrides_view_of: MaybeSpecified::Unspecified,
+        subscribes_to: MSV::Unspecified,
+        hides_from_its_subscriptions: MSV::Unspecified,
+        overrides_view_of: MSV::Unspecified,
         misc: Vec::new (),
     }
 }
@@ -190,7 +190,7 @@ fn test_alias_collection_and_deduplication() {
     // Collect all aliases
     let mut all_aliases : Vec<String> = vec![];
     for instr in &instructions {
-      if let MaybeSpecified::Specified (aliases)
+      if let MSV::Specified (aliases)
         = &extract_skgnode_if_save_else_error (instr) . aliases
         { all_aliases . extend( aliases . iter() . cloned() ); }}
 

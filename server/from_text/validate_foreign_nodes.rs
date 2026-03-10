@@ -1,6 +1,6 @@
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, MaybeSpecified, SkgConfig, SourceName};
+use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode, Merge};
 use crate::types::skgnode::SkgNode;
 
@@ -119,8 +119,8 @@ pub(crate) fn buffernode_differs_from_disknode(
   disk_node: &SkgNode,
 ) -> bool {
   fn fields_match<T: Clone + PartialEq>(
-    buffer: &MaybeSpecified<T>,
-    disk: &MaybeSpecified<T>,
+    buffer: &MSV<T>,
+    disk: &MSV<T>,
   ) -> bool { buffer . is_unspecified()
               || flatten_ms (buffer) == flatten_ms (disk)
             }
@@ -143,9 +143,9 @@ pub(crate) fn buffernode_differs_from_disknode(
 
 /// Lets us treat Specified([]) and Unspecified as equivalent.
 pub(crate) fn flatten_ms<T: Clone>(
-  v: &MaybeSpecified<T>
-) -> MaybeSpecified<T> {
+  v: &MSV<T>
+) -> MSV<T> {
   match v {
-    MaybeSpecified::Specified (vec) if vec . is_empty() =>
-      MaybeSpecified::Unspecified,
+    MSV::Specified (vec) if vec . is_empty() =>
+      MSV::Unspecified,
     other => other . clone() }}

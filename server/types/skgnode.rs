@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-use super::misc::{ID, MaybeSpecified, SourceName};
+use super::misc::{ID, MSV, SourceName};
 
 /// This could be extended.
 /// A .skg file can have any number of associated FileProperties.
@@ -21,8 +21,8 @@ pub struct SkgNode {
 
   pub title: String,
 
-  #[serde(default, skip_serializing_if = "MaybeSpecified::skip_serializing")]
-  pub aliases: MaybeSpecified<String>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.)
+  #[serde(default, skip_serializing_if = "MSV::skip_serializing")]
+  pub aliases: MSV<String>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.)
 
   #[serde(skip_serializing, skip_deserializing)]
   pub source: SourceName, // source nickname, inferred from file location and SkgConfig
@@ -36,14 +36,14 @@ pub struct SkgNode {
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub contains: Vec<ID>, // See schema.tql.
 
-  #[serde(default, skip_serializing_if = "MaybeSpecified::skip_serializing")]
-  pub subscribes_to: MaybeSpecified<ID>, // See schema.tql.
+  #[serde(default, skip_serializing_if = "MSV::skip_serializing")]
+  pub subscribes_to: MSV<ID>, // See schema.tql.
 
-  #[serde(default, skip_serializing_if = "MaybeSpecified::skip_serializing")]
-  pub hides_from_its_subscriptions: MaybeSpecified<ID>, // See schema.tql.
+  #[serde(default, skip_serializing_if = "MSV::skip_serializing")]
+  pub hides_from_its_subscriptions: MSV<ID>, // See schema.tql.
 
-  #[serde(default, skip_serializing_if = "MaybeSpecified::skip_serializing")]
-  pub overrides_view_of: MaybeSpecified<ID>, // See schema.tql.
+  #[serde(default, skip_serializing_if = "MSV::skip_serializing")]
+  pub overrides_view_of: MSV<ID>, // See schema.tql.
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub misc: Vec<FileProperty>,
@@ -64,13 +64,13 @@ impl SkgNode {
 pub fn empty_skgnode () -> SkgNode {
   SkgNode {
     title                        : String::new (),
-    aliases                      : MaybeSpecified::Unspecified,
+    aliases                      : MSV::Unspecified,
     source                       : SourceName::from ("main"),
     ids                          : vec![],
     body                         : None,
     contains                     : Vec::new(),
-    subscribes_to                : MaybeSpecified::Unspecified,
-    hides_from_its_subscriptions : MaybeSpecified::Unspecified,
-    overrides_view_of            : MaybeSpecified::Unspecified,
+    subscribes_to                : MSV::Unspecified,
+    hides_from_its_subscriptions : MSV::Unspecified,
+    overrides_view_of            : MSV::Unspecified,
     misc                         : Vec::new (),
   }}

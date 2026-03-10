@@ -1,7 +1,7 @@
 /// Node access utilities for ego_tree::Tree<ViewNode> and Tree<UncheckedViewNode>
 
 use crate::to_org::util::{skgnode_and_viewnode_from_id, get_id_from_treenode};
-use crate::types::misc::{ID, MaybeSpecified, SkgConfig, SourceName};
+use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, TrueNode, Scaffold,
     mk_indefinitive_from_viewnode,
@@ -213,13 +213,13 @@ pub(crate) fn collect_child_aliases_at_aliascol (
 pub fn collect_grandchild_aliases_for_viewnode (
   tree: &Tree<ViewNode>,
   node_id: NodeId,
-) -> Result<MaybeSpecified<String>, String> {
+) -> Result<MSV<String>, String> {
   let alias_col_id : Option<NodeId> =
     unique_scaffold_child (
       tree, node_id, &Scaffold::AliasCol )
     . map_err ( |e| e . to_string() ) ?;
   match alias_col_id {
-    None => Ok (MaybeSpecified::Unspecified),
+    None => Ok (MSV::Unspecified),
     Some (col_id) => {
       let aliases : Vec<String> = {
         let col_ref : NodeRef<ViewNode> = tree . get (col_id) . expect ("collect_grandchild_aliases_for_viewnode: AliasCol not found");
@@ -234,7 +234,7 @@ pub fn collect_grandchild_aliases_for_viewnode (
           aliases . push(
             alias_child . value() . title() . to_string() ); }
         aliases };
-      Ok( MaybeSpecified::Specified(dedup_vector (aliases)) ) }} }
+      Ok( MSV::Specified(dedup_vector (aliases)) ) }} }
 
 /// Find a child node by its ID.
 /// Returns the NodeId of the child if found, None otherwise.

@@ -1,6 +1,6 @@
 use crate::dbs::filesystem::one_node::skgnode_from_id;
 use crate::types::save::{Merge, SaveNode, DeleteNode};
-use crate::types::misc::{MaybeSpecified, SkgConfig, ID};
+use crate::types::misc::{MSV, SkgConfig, ID};
 use crate::types::viewnode::EditRequest;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode};
 use crate::types::skgnode::SkgNode;
@@ -110,7 +110,7 @@ fn three_merged_skgnodes(
     combined . extend_from_slice(
       acquiree_from_disk . subscribes_to . or_default() );
     updated_acquirer . subscribes_to =
-      MaybeSpecified::Specified(dedup_vector (combined)); }
+      MSV::Specified(dedup_vector (combined)); }
   { // Combine hides_from_its_subscriptions,
     // filtering to hide nothing that the acquirer contains.
     let mut combined : Vec<ID> =
@@ -120,7 +120,7 @@ fn three_merged_skgnodes(
       acquiree_from_disk . hides_from_its_subscriptions
         . or_default() );
     updated_acquirer . hides_from_its_subscriptions =
-      MaybeSpecified::Specified(
+      MSV::Specified(
         { let deduped_and_filtered : Vec<ID> =
             // if it's in 'new_contains', then it's not here
             setlike_vector_subtraction(
@@ -135,20 +135,20 @@ fn three_merged_skgnodes(
       acquiree_from_disk . overrides_view_of
         . or_default() );
     updated_acquirer . overrides_view_of =
-      MaybeSpecified::Specified(dedup_vector (combined)); }
+      MSV::Specified(dedup_vector (combined)); }
   Ok (updated_acquirer) }
 
 /// Create an acquiree_text_preserver from the acquiree's data
 fn create_acquiree_text_preserver(acquiree: &SkgNode) -> SkgNode {
   SkgNode {
     title: format!("MERGED: {}", acquiree . title),
-    aliases: MaybeSpecified::Unspecified,
+    aliases: MSV::Unspecified,
     source: acquiree . source . clone(),
     ids: vec![ID(uuid::Uuid::new_v4() . to_string())],
     body: acquiree . body . clone(),
     contains                     : vec![],
-    subscribes_to                : MaybeSpecified::Specified(vec![]),
-    hides_from_its_subscriptions : MaybeSpecified::Specified(vec![]),
-    overrides_view_of            : MaybeSpecified::Specified(vec![]),
+    subscribes_to                : MSV::Specified(vec![]),
+    hides_from_its_subscriptions : MSV::Specified(vec![]),
+    overrides_view_of            : MSV::Specified(vec![]),
     misc                         : Vec::new (),
   }}

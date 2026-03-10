@@ -10,7 +10,7 @@ use skg::dbs::filesystem::one_node::{
   skgnode_from_pid_and_source, write_skgnode_to_source};
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::types::skgnode::{SkgNode, empty_skgnode};
-use skg::types::misc::{ID, MaybeSpecified, SkgConfig, SourceName};
+use skg::types::misc::{ID, MSV, SkgConfig, SourceName};
 use skg::test_utils::{run_with_test_db, skgnode_example};
 
 const CONFIG_PATH: &str = "tests/file_io/fixtures/skgconfig.toml";
@@ -126,10 +126,10 @@ pub fn reverse_some_of_node(node: &SkgNode) -> SkgNode {
     v . reverse();
     v };
   let reversed_subscribes_to = match node . subscribes_to . clone() {
-    MaybeSpecified::Unspecified => MaybeSpecified::Unspecified,
-    MaybeSpecified::Specified (mut v) => {
+    MSV::Unspecified => MSV::Unspecified,
+    MSV::Specified (mut v) => {
       v . reverse();
-      MaybeSpecified::Specified (v) } };
+      MSV::Specified (v) } };
   SkgNode {
     contains          : reversed_contains,
     subscribes_to     : reversed_subscribes_to,
@@ -166,7 +166,7 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
   let mut test_node : SkgNode = empty_skgnode ();
   { test_node . title = "Title with two textlinks: [[(id textlink1][First) TextLink]] and [[(id textlink2][Second) TextLink]]"
       . to_string();
-    test_node . aliases = MaybeSpecified::Specified(vec![ "alias 1" . to_string(),
+    test_node . aliases = MSV::Specified(vec![ "alias 1" . to_string(),
                                     "alias 2" . to_string() ]);
     test_node . ids = vec![ID::new ("test123")];
     test_node . source = SourceName::from ("temp");

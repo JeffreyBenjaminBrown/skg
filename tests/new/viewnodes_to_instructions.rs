@@ -9,7 +9,7 @@ use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tre
 use skg::from_text::viewnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_tree;
 use skg::test_utils::extract_skgnode_if_save_else_error;
 use skg::types::viewnode::{ViewNode, forest_root_viewnode};
-use skg::types::misc::{ID, MaybeSpecified};
+use skg::types::misc::{ID, MSV};
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::skgnode::SkgNode;
 use ego_tree::Tree;
@@ -99,7 +99,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_with_aliases() {
   assert_eq!(main_skg . contains, vec![ID::from ("content_child")]);
 
   // Test aliases collection
-  assert_eq!(main_skg . aliases, MaybeSpecified::Specified(vec!["first alias" . to_string(), "second alias" . to_string()]));
+  assert_eq!(main_skg . aliases, MSV::Specified(vec!["first alias" . to_string(), "second alias" . to_string()]));
 
   // Test content child
   let content_skg : &SkgNode = match &instructions[1] {
@@ -107,7 +107,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_with_aliases() {
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(content_skg . title, "content child");
   assert_eq!(content_skg . ids, vec![ID::from ("content_child")]);
-  assert_eq!(content_skg . aliases, MaybeSpecified::Unspecified); // No aliases
+  assert_eq!(content_skg . aliases, MSV::Unspecified); // No aliases
 }
 
 #[test]
@@ -132,7 +132,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_no_aliases() {
   let node1_skg : &SkgNode = match &instructions[0] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
-  assert_eq!(node1_skg . aliases, MaybeSpecified::Unspecified, "Should have no aliases");
+  assert_eq!(node1_skg . aliases, MSV::Unspecified, "Should have no aliases");
   assert_eq!(node1_skg . contains, vec![ID::from ("child1")]);
 }
 
@@ -190,7 +190,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_mixed_relations() {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(root_skg . title, "root node");
-  assert_eq!(root_skg . aliases, MaybeSpecified::Specified(vec!["my alias" . to_string()]));
+  assert_eq!(root_skg . aliases, MSV::Specified(vec!["my alias" . to_string()]));
   assert_eq!(root_skg . contains, vec![ID::from ("content1"), ID::from ("content2")]); // Only Content relations
 }
 
@@ -287,7 +287,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_only_aliases() {
   let main_skg : &SkgNode = match &instructions[0] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
-  assert_eq!(main_skg . aliases, MaybeSpecified::Specified(vec!["alias one" . to_string(), "alias two" . to_string()]));
+  assert_eq!(main_skg . aliases, MSV::Specified(vec!["alias one" . to_string(), "alias two" . to_string()]));
   assert_eq!(main_skg . contains, vec![]); // No content children
 }
 
@@ -323,7 +323,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_complex_scenario() {
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(doc1_skg . title, "Document 1");
   assert_eq!(doc1_skg . aliases,
-             MaybeSpecified::Specified(vec!["First Document" . to_string(),
+             MSV::Specified(vec!["First Document" . to_string(),
                        "Primary Doc" . to_string()]));
   assert_eq!(doc1_skg . contains,
              vec![ID::from ("section1"),
