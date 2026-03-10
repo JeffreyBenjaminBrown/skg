@@ -105,7 +105,18 @@ The two-struct approach adds boilerplate for 11 fields when only
 generic over its ID/source representation, or use a builder
 pattern.
 
-* TODO indefinitive: boolean with shadow invariants
+* TODO path_from_pid_and_source: panics on invalid source
+
+This function uses ~.expect()~ and crashes the server if passed
+a source name not in the config. It should return ~Result~.
+The same pattern appears in a few other places (e.g. some
+~.unwrap()~ calls on map lookups in hot paths).
+
+Every ~.expect()~ that can fire on user-influenced data is a
+latent server crash. A type-level audit of "which functions can
+panic on bad input?" would be worthwhile.
+
+* AWAITS indefinitive: boolean with shadow invariants
 
 When ~indefinitive = true~:
 - ~body~ must be ~None~
@@ -198,17 +209,6 @@ These rules exist only as runtime predicates. A typed tree
 would prevent illegal structures at construction time. This is
 hard to do with ~ego_tree~ (it's homogeneous), but worth noting
 as a long-term aspiration.
-
-* AWAITS path_from_pid_and_source: panics on invalid source
-
-This function uses ~.expect()~ and crashes the server if passed
-a source name not in the config. It should return ~Result~.
-The same pattern appears in a few other places (e.g. some
-~.unwrap()~ calls on map lookups in hot paths).
-
-Every ~.expect()~ that can fire on user-influenced data is a
-latent server crash. A type-level audit of "which functions can
-panic on bad input?" would be worthwhile.
 
 * AWAITS ? EditRequest + ViewRequest: no constraint on combinations
 

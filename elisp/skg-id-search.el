@@ -57,10 +57,13 @@ If point is not on a link, print a message and do nothing."
       (message "Point not on a link")) ))
 
 (defun skg-view-from-node ()
-  "If point is on metadata or a link, open a content view for that ID."
+  "If point is on metadata, a link, a UUID, or a .skg filename,
+open a content view for that ID."
   (interactive)
   (let (( result (or (skg--point-in-metadata-p)
-                     (skg--point-in-link-p)) ))
+                     (skg--point-in-link-p)
+                     (skg--point-on-skg-filename-p)
+                     (skg--point-on-uuid-v4-p)) ))
     (if result
         (let (( id (car result) ))
           (message "Visiting node: %s" id)
@@ -213,6 +216,48 @@ Returns the source as a string, or nil if not found."
                    (< pos (match-end 0)) )
           (setq result (cons (match-string 1)
                              (match-string 2) )) )) )
+    result ))
+
+(defconst skg--uuid-v4-regex
+  "[0-9a-f]\\{8\\}-[0-9a-f]\\{4\\}-4[0-9a-f]\\{3\\}-[89ab][0-9a-f]\\{3\\}-[0-9a-f]\\{12\\}"
+  "Regex matching a UUID v4 (lowercase hex).")
+
+(defun skg--point-on-uuid-v4-p ()
+  "If point is on a UUID v4 string, return (uuid . uuid). Otherwise nil."
+  (let (( case-fold-search t )
+        ( line-start (line-beginning-position) )
+        ( line-end (line-end-position) )
+        ( pos (point) )
+        ( result nil ))
+    (save-excursion
+      (goto-char line-start)
+      (while (and (not result)
+                  (re-search-forward skg--uuid-v4-regex line-end t) )
+        (when (and (>= pos (match-beginning 0))
+                   (<= pos (match-end 0)) )
+          (setq result (cons (match-string-no-properties 0)
+                             (match-string-no-properties 0) )) )) )
+    result ))
+
+(defun skg--point-on-skg-filename-p ()
+  "If point is on a .skg filename, return (basename . filename).
+The basename (filename without .skg extension) is the ID.
+A .skg filename is a word-boundary-delimited string ending in .skg,
+e.g. \"557a869b-02ba-4c59-a5d3-5fb469a12353.skg\" or \"a.skg\"."
+  (let (( line-start (line-beginning-position) )
+        ( line-end (line-end-position) )
+        ( pos (point) )
+        ;; Match non-whitespace ending in .skg
+        ( skg-file-regex "\\([^ \t\n\"'()]+\\)\\.skg\\b" )
+        ( result nil ))
+    (save-excursion
+      (goto-char line-start)
+      (while (and (not result)
+                  (re-search-forward skg-file-regex line-end t) )
+        (when (and (>= pos (match-beginning 0))
+                   (<= pos (match-end 0)) )
+          (setq result (cons (match-string-no-properties 1)
+                             (match-string-no-properties 0) )) )) )
     result ))
 
 (defun skg--truncate-id
