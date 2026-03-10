@@ -240,11 +240,12 @@ pub fn write_all_nodes_to_fs (
   let mut written : usize = 0;
   for node in nodes {
     let pid : ID = node . pid . clone ();
-    write_skgnode (
-      & node,
-      & Path::new (
-        & path_from_pid_and_source (
-          & config, & node . source, pid )) ) ?;
+    let path : String =
+      path_from_pid_and_source (
+        & config, & node . source, pid )
+      . map_err ( |e| io::Error::new (
+        io::ErrorKind::NotFound, e) ) ?;
+    write_skgnode ( & node, & Path::new ( &path )) ?;
     written += 1; }
   Ok (written) }
 
@@ -255,9 +256,12 @@ pub fn delete_all_nodes_from_fs (
 
   let mut deleted : usize = 0;
   for (pid, source) in delete_targets {
-    match fs::remove_file ( & {
+    let path : String =
       path_from_pid_and_source (
-        & config, & source, pid ) } )
+        & config, & source, pid )
+      . map_err ( |e| io::Error::new (
+        io::ErrorKind::NotFound, e) ) ?;
+    match fs::remove_file ( &path )
     {
       Ok ( () ) => {
         deleted += 1; },

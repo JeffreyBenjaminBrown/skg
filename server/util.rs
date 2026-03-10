@@ -7,17 +7,17 @@ pub fn path_from_pid_and_source (
   config : &SkgConfig,
   source : &SourceName,
   pid    : ID,
-) -> String {
+) -> Result < String, String > {
   let source_config : &SkgfileSource =
     config . sources . get (source)
-    . expect ( &format!("Source '{}' not found in config",
-                        source) );
+    . ok_or_else ( || format! ("Source '{}' not found in config",
+                               source) ) ?;
   let f : PathBuf = source_config . path . clone() ;
   let s: String = pid . 0;
-  f . join (s)
-    . with_extension ("skg")
-    . to_string_lossy ()
-    . into_owned ()
+  Ok ( f . join (s)
+       . with_extension ("skg")
+       . to_string_lossy ()
+       . into_owned () )
 }
 
 /// Removes from 'subtracting_from' anything in 'subtracting'.

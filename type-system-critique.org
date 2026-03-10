@@ -105,7 +105,7 @@ The two-struct approach adds boilerplate for 11 fields when only
 generic over its ID/source representation, or use a builder
 pattern.
 
-* TODO path_from_pid_and_source: panics on invalid source
+* DONE path_from_pid_and_source: panics on invalid source
 
 This function uses ~.expect()~ and crashes the server if passed
 a source name not in the config. It should return ~Result~.
@@ -196,7 +196,7 @@ pub enum PhantomReason  { Removed, RemovedHere }
 This would let code that should never touch phantoms take
 ~Live~ directly instead of checking ~is_phantom()~ at runtime.
 
-* AWAITS Scaffold parent-child rules: not typed
+* AWAITS ? Scaffold parent-child rules: not typed
 
 The local validator (~validate_local_structure~) checks that:
 - Alias is under AliasCol
@@ -210,7 +210,7 @@ would prevent illegal structures at construction time. This is
 hard to do with ~ego_tree~ (it's homogeneous), but worth noting
 as a long-term aspiration.
 
-* AWAITS ? EditRequest + ViewRequest: no constraint on combinations
+* DONE ? EditRequest + ViewRequest: no constraint on combinations
 
 ~edit_request: Option<EditRequest>~ allows at most one edit
 request. ~view_requests: HashSet<ViewRequest>~ allows many view
@@ -224,7 +224,7 @@ These are validated at runtime, not prevented by types. A
 state-machine encoding would make illegal combinations
 unrepresentable.
 
-* AWAITS ? GraphNodeStats defaults: possibly misleading
+* DONE ? GraphNodeStats defaults: possibly misleading
 
 #+begin_src rust
 impl Default for GraphNodeStats {

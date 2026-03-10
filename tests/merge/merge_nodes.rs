@@ -170,7 +170,7 @@ fn verify_filesystem_after_merge_2_into_1(
   let node_2_path: String =
     path_from_pid_and_source ( config,
                                &SourceName::from ("main"),
-                               ID::from ("2"));
+                               ID::from ("2")) ?;
   assert!( !Path::new (&node_2_path) . exists(),
             "2.skg should be deleted" );
 
@@ -235,7 +235,7 @@ fn verify_filesystem_after_merge_2_into_1(
   let acquiree_text_preserver_path: String =
     path_from_pid_and_source ( config,
                                &SourceName::from ("main"),
-                               acquiree_text_preserver_id . clone() );
+                               acquiree_text_preserver_id . clone() ) ?;
   assert!( Path::new (&acquiree_text_preserver_path) . exists(),
            "acquiree_text_preserver file should exist" );
 
@@ -508,7 +508,7 @@ fn verify_filesystem_after_merge_1_into_2(
   let node_1_path: String =
     path_from_pid_and_source ( config,
                                &SourceName::from ("main"),
-                               ID::from ("1"));
+                               ID::from ("1")) ?;
   assert!( !Path::new (&node_1_path) . exists(),
             "1.skg should be deleted" );
 
@@ -574,7 +574,7 @@ fn verify_filesystem_after_merge_1_into_2(
   let acquiree_text_preserver_path: String =
     path_from_pid_and_source( config,
                               &SourceName::from ("main"),
-                              acquiree_text_preserver_id . clone() );
+                              acquiree_text_preserver_id . clone() ) ?;
   assert!( Path::new (&acquiree_text_preserver_path) . exists(),
            "acquiree_text_preserver file should exist" );
 

@@ -44,7 +44,9 @@ pub fn skgnode_from_pid_and_source (
 ) -> io::Result<SkgNode> {
   let mut skgnode : SkgNode = {
     let path : String =
-      path_from_pid_and_source( config, source, pid );
+      path_from_pid_and_source( config, source, pid )
+      . map_err ( |e| io::Error::new (
+        io::ErrorKind::NotFound, e) ) ?;
     read_skgnode (path)? };
   skgnode . source = // needed because it's not serialized
     source . clone();
@@ -90,10 +92,12 @@ pub fn write_skgnode_to_source (
   config  : &SkgConfig,
 ) -> io::Result<()> {
   let pid : &ID = &skgnode . pid;
-  write_skgnode (
-    skgnode,
-    & path_from_pid_and_source(
-        config, &skgnode . source, pid . clone() ) ) }
+  let path : String =
+    path_from_pid_and_source(
+      config, &skgnode . source, pid . clone() )
+    . map_err ( |e| io::Error::new (
+      io::ErrorKind::NotFound, e) ) ?;
+  write_skgnode ( skgnode, &path ) }
 
 
 /// Checks that a node's primary ID matches the filename stem.

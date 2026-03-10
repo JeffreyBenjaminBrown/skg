@@ -31,7 +31,7 @@ pub(super) fn merge_nodes_in_fs (
       let acquiree_path : String =
         path_from_pid_and_source (&config,
                        acquiree_source,
-                       acquiree_id . clone() );
+                       acquiree_id . clone() ) ?;
       std::fs::remove_file (&acquiree_path)
         . map_err(|e| format!(
           "Failed to delete acquiree file '{}': {}",

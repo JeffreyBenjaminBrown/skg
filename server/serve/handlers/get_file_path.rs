@@ -37,10 +37,18 @@ pub fn handle_get_file_path_request (
           ResponseType::GetFilePath,
           &format! ( "Error: {}", e ) ));
       return; } };
-  let raw_path : String = path_from_pid_and_source (
+  let raw_path : String = match path_from_pid_and_source (
     config,
     & SourceName (source),
-    ID (id) );
+    ID (id) ) {
+    Ok  (p) => p,
+    Err (e) => {
+      send_response_with_length_prefix (
+        stream,
+        & tag_text_response (
+          ResponseType::GetFilePath,
+          &format! ( "Error: {}", e ) ));
+      return; } };
   let abs_path : PathBuf = match fs::canonicalize (&raw_path) {
     Ok  (p) => p,
     Err (_) => {
