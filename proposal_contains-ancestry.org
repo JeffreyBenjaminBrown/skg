@@ -1,0 +1,25 @@
+* proposal: fetch full containerward ancestry for node
+
+  We currently have code to compute a node's containerward ancestry
+  until the first nonlinearity: a root, fork or cycle.
+  That code was conservative, in the sense that I imagined
+  a person's graph might be so full of cycles
+  that the complete ancestry could be computationally intense.
+
+  And indeed it could be, so we'll leave that in place.
+  But I would *also* like a function that computes the full ancestry.
+  This is tricky because cycles are possible.
+
+  The algorithm I have in mind is this:
+  - Create:
+    - a tree on three kinds of nodes: Open (ID), Root (ID) and
+      Cycle(ID), which starts as the singleton { Open(origin) }.
+    - a 'visited' pool of IDs that starts as the singleton { origin }
+  - DFS loop:
+    - The loop only proceeds from Open nodes.
+      So we are at a leaf. Call it Open(id).
+    - Find its containers.
+    - If it has none, convert it to Root(id).
+    - Otherwise, make each of its containers one of its children.
+      - If the container is in the pool, the new child is a Cycle.
+      - Otherwise the new child is an Open.

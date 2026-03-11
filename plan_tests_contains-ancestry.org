@@ -1,0 +1,134 @@
+* test for the 'complete contains-ancestry' functions
+** how to read these specs
+*** graph direction
+    Some graphs are 'contentward', and others are 'containerward'.
+    For instance, the following 'contentward' graph:
+    ```
+    * a
+    ** b
+    ** c
+    ```
+    corresponds to the following 'containerward' graph:
+    ```
+    * b
+    ** a
+    * c
+    ** a
+    ```
+    Both depict the same situation: 'a' contains 'b' and 'c'.
+*** order of children could be inaccurate
+    In everything I draw,
+    the *set* of any node's children
+    (content or containers, depending on the direction of the diagram)
+    will I hope be correct,
+    but the order of those children might differ.
+    Therefore we should just test for membership,
+    irrespective of order.
+** how to implement these specs
+   Each test should have its own fixtures folder,
+   like what some of the tests currently have,
+   with dedicated .skg files for that particular test.
+   Each fixtures folder should contain, in addition to the .skg files,
+   a README with the spec (copied from this document).
+
+   The test itself should just read the input .skg files,
+   so it does not need to represent the input graph in code.
+   For the output graph, to make the test readable,
+   we should use the same org-mode representation
+   used in this spec. That is, rather than lots of
+   hard-coded statements like 'a should contain b and c',
+   the reader should just see an org-mode representation
+   of the expectation. Appropriate helper functions should test
+   the realized structure against that expectation,
+   ignoring the order of a node's children.
+** an island
+   Contentward:
+   ```
+   * a
+   ```
+   Containerward expectation:
+   ```
+   * a
+   ```
+** a fork
+   Contentward input:
+   ```
+   * a
+   ** x
+   * c
+   ** b
+   *** x
+   ```
+   Containerward ancestry to expect when running the function:
+   ```
+   * x
+   ** a
+   ** b
+   *** c
+   ```
+** a 2-cycle
+   Contentward:
+   ```
+   * a
+   ** b
+   *** a
+   ```
+   Containerward expectation:
+   ```
+   * a
+   ** b
+   *** a
+   ```
+** a 3-cycle
+   Contentward:
+   ```
+   * a
+   ** b
+   *** c
+   **** a
+   ```
+   Containerward expectation:
+   ```
+   * a
+   ** c
+   *** b
+   **** a
+   ```
+** a diamond
+   Contentward:
+   ```
+   * a
+   ** b
+   *** x
+   ** c
+   *** x
+   ```
+   Containerward expectation:
+   ```
+   * x
+   ** b
+   *** a
+   ** c
+   *** a
+   ```
+** a fork-diamond-cycle
+   Contentward:
+   ```
+   * root
+   ** a
+   *** a'
+   **** origin
+   ***** a
+   ** b
+   *** origin
+
+   Containerward (calling the function from origin):
+   ```
+   * origin
+   ** a'
+   *** a
+   **** origin
+   **** root
+   ** b
+   *** root
+   ```
