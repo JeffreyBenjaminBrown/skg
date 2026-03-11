@@ -23,7 +23,8 @@
     regardless of graph role — including multi-contained
     and otherwise unremarkable nodes.
 *** skg-view-from-node
-    Calling this when the cursor is on a link or a node's metadata
+    Calling this when the cursor is on a link, a node's metadata,
+    a bare UUID, or a .skg filename
     will open a new view from the ID it finds there,
     or go to the view of it that was already open if that exists.
 
@@ -77,6 +78,11 @@
     from a place where it is currently shown in an indefinitive form,
     call this function. It will make the current definitive view
     (if it exists) indefinitive, and then draw a definitive view here.
+*** skg-request-containerward-stats
+    Computes the containerward path stats for a node
+    (path length, fork count, whether it cycles)
+    and saves. The stats then appear in the node's metadata
+    and in the heralds view.
 ** metadata edits
 *** skg-set-metadata-indefinitive
     This marks a node as 'indefinitiive',
@@ -141,5 +147,15 @@
     this brings you to a new view showing only that ancestry.
     This actually works in org-mode outside of skg.
     (skg uses org-mode, but org-mode can be used without skg.)
-** undocumented, maybe uninteresting
-*** skg-request-containerward-stats
+** connection and reload
+   Unless you're coding, you probably don't need these.
+*** skg-verify-connection
+    Sends a ping to the Rust server
+    to check if the connection is working.
+    Displays the result in the minibuffer.
+*** skg-disconnect
+    Closes the TCP connection to the Rust server.
+*** skg-reload
+    Unloads all skg elisp modules and reloads them from disk.
+    Useful when you've changed elisp code
+    and want to pick up the changes without restarting Emacs.
