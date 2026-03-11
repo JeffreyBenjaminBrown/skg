@@ -10,6 +10,10 @@
 ;; No requires here — the underlying functions are loaded by skg-client.el,
 ;; which also requires this file. Adding requires here would create a cycle.
 
+(setq ;; By default M-x shows every interactive command, ignoring `completion-predicate'. This passage makes Emacs actually consult each command's `completion-predicate' property — thus letting `skg-alias' hides internal names. This setting is global (not skg-specific), and it enables Emacs's own mode-aware filtering for built-in commands.
+ read-extended-command-predicate
+ #'command-completion-default-include-p)
+
 (defmacro skg-alias (alias internal)
   "Define ALIAS as a user-facing name for INTERNAL,
 and hide INTERNAL from M-x completion."

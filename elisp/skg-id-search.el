@@ -57,18 +57,18 @@ If point is not on a link, print a message and do nothing."
       (message "Point not on a link")) ))
 
 (defun skg-view-from-node ()
-  "If point is on metadata, a link, a UUID, or a .skg filename,
+  "If point is on a UUID, metadata, a link, or a .skg filename,
 open a content view for that ID."
   (interactive)
-  (let (( result (or (skg--point-in-metadata-p)
+  (let (( result (or (skg--point-on-uuid-v4-p)
+                     (skg--point-in-metadata-p)
                      (skg--point-in-link-p)
-                     (skg--point-on-skg-filename-p)
-                     (skg--point-on-uuid-v4-p)) ))
+                     (skg--point-on-skg-filename-p)) ))
     (if result
         (let (( id (car result) ))
           (message "Visiting node: %s" id)
           (skg-request-single-root-content-view-from-id id))
-      (message "No ID found at point") )))
+      (message "No ID found at point")) ))
 
 (defun skg-view-from-id (id)
   "Open a content view for ID, prompting when called interactively. (skg-view-from-node is usually more convenient.)"
@@ -247,8 +247,8 @@ e.g. \"557a869b-02ba-4c59-a5d3-5fb469a12353.skg\" or \"a.skg\"."
   (let (( line-start (line-beginning-position) )
         ( line-end (line-end-position) )
         ( pos (point) )
-        ;; Match non-whitespace ending in .skg
-        ( skg-file-regex "\\([^ \t\n\"'()]+\\)\\.skg\\b" )
+        ;; Match valid ID characters (alphanum, dash, underscore) ending in .skg
+        ( skg-file-regex "\\([a-zA-Z0-9_-]+\\)\\.skg\\b" )
         ( result nil ))
     (save-excursion
       (goto-char line-start)
