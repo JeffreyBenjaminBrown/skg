@@ -1,0 +1,408 @@
+* Plan: full containerward ancestry tree
+
+** What already exists
+
+   The existing code computes a /path/ containerward to the first
+   nonlinearity (root, fork, or cycle). See:
+
+   - [[./server/dbs/typedb/paths.rs][paths.rs]]: 'path_to_first_nonlinearity',
+     'path_containerward_to_first_nonlinearity', 'paths_to_first_nonlinearities'
+   - [[./server/to_org/expand/backpath.rs][backpath.rs]]:
+     'build_and_integrate_containerward_path' (integrates one such path into
+     a ViewNode tree)
+   - [[./server/context.rs][context.rs]]: 'climb_containerward_to_cycle' (in-memory,
+     single-container only), 'contains_maps_from_nodes' (builds
+     MapToContainers / MapToContent from SkgNodes)
+
+   The PathToFirstNonlinearity struct records:
+   - path: Vec<ID> (linear chain, not including origin)
+   - branches: HashSet<ID> (fork endpoints, if any)
+   - cycle_nodes: HashSet<ID> (revisited nodes, if any)
+
+   The existing containerward /view/ stops at the first nonlinearity.
+   Everything past a fork or cycle is unexplored.
+
+** What the proposal asks for
+
+   A function that computes the /full/ containerward ancestry as a tree,
+   handling forks by continuing exploration at every branch, and handling
+   revisited nodes (whether from true cycles or DAG reconvergence) by
+   marking them as Repeated leaves. The algorithm is:
+
+   1. Seed a frontier with [origin]; seed a visited pool with {origin}.
+   2. BFS loop (level by level):
+      - For all IDs in frontier, query their containers in parallel.
+      - For each result, classify each container c:
+        - No containers → Root(id)
+        - c ∈ visited → Repeated(c) (leaf; not explored further)
+        - c ∉ visited → Open(c) (add to next frontier + visited)
+      - If current depth ≥ max_ancestry_depth → DepthTruncated(id)
+   3. Repeat until frontier is empty or depth limit reached.
+
+** Proposed implementation
+
+*** New types
+
+    In a new file [[./server/dbs/typedb/ancestry.rs][ancestry.rs]]
+    (sibling of [[./server/dbs/typedb/paths.rs][paths.rs]]):
+
+    #+begin_src rust
+    /// A node in the full containerward ancestry tree.
+    /// "Repeated" means the node was already visited via another
+    /// branch — it might be a true graph cycle, or DAG
+    /// reconvergence (diamond). The user deduces the geometry.
+    pub enum AncestryNode {
+      Root           (ID),
+      Repeated       (ID),
+      DepthTruncated (ID),
+      Inner          (ID, Vec<AncestryNode>), }
+    #+end_src
+
+    No need for Open at runtime: the BFS loop consumes all Open nodes
+    before returning. Open is only the loop's internal state, not in
+    the output.
+
+**** TODO We're rolling our own tree. Is this better than using ego_tree?
+
+***** AncestryNode enum (custom tree)
+
+      Pros:
+      - The variant tag (Root / Repeated / DepthTruncated / Inner)
+        is part of the type itself. Pattern matching tells you what
+        kind of leaf you have. No separate "kind" field or side map.
+      - Immutable once built — BFS constructs it bottom-up
+        (children before parent), then returns a frozen value.
+        No need for mutable node handles.
+      - Self-contained: no library dependency, no NodeId indirection.
+        Straightforward to serialize, log, or test with assert_eq!
+        (just derive PartialEq).
+      - Lightweight: no arena allocation, no orphan-node bookkeeping.
+
+      Cons:
+      - Owned children (Vec<AncestryNode>) mean the tree must be
+        built bottom-up or assembled via temporary Vecs during BFS.
+        This is doable but slightly more bookkeeping than ego_tree's
+        mutable append.
+      - If we later need to mutate the ancestry tree (e.g. prune
+        branches, annotate nodes after construction), the recursive
+        owned structure is awkward to modify in place.
+
+***** ego_tree::Tree<AncestryPayload>
+
+      Pros:
+      - Already used everywhere in the codebase for ViewNode trees.
+        Familiar API, same patterns for traversal and mutation.
+      - Arena-allocated: NodeId handles make mutation easy (append
+        children during BFS without ownership gymnastics).
+      - If the ancestry tree is later integrated into an existing
+        ViewNode tree (e.g. via 'integrate_path_that_might_fork_or_cycle'),
+        both are already ego_trees, simplifying grafting.
+
+      Cons:
+      - ego_tree nodes are homogeneous — every node is the same type.
+        You'd need an AncestryPayload enum anyway to distinguish
+        Root / Repeated / DepthTruncated / Inner, losing the main
+        advantage of ego_tree (uniform traversal of uniform nodes).
+      - ego_tree carries overhead that isn't needed here: orphan
+        tracking, mutable node references, detach/append operations.
+        The ancestry tree is built once and then read.
+      - ego_tree has no built-in derive for PartialEq on trees,
+        making test assertions harder (must compare rendered output
+        or walk both trees manually).
+
+***** Recommendation
+
+      The custom enum is the better fit here. The ancestry tree is
+      a tagged, immutable, build-once-read-many structure — exactly
+      what a recursive enum is for. ego_tree's strengths (mutability,
+      NodeId indirection) aren't needed, and its weakness (no variant
+      tags) would force an inner enum anyway, giving the worst of both.
+
+      If the ancestry tree later needs to be grafted into a ViewNode
+      ego_tree, a small conversion function (walk AncestryNode, call
+      'prepend_indefinitive_child_with_parent_ignores' per node) is
+      straightforward — and is already planned in the "Integration
+      into ViewNode tree" section above.
+
+*** SkgConfig: max_ancestry_depth
+
+    Add a new field to SkgConfig in [[./server/types/misc.rs][misc.rs]]:
+
+    #+begin_src rust
+    #[serde(default = "default_max_ancestry_depth")]
+    pub max_ancestry_depth : usize,
+    #+end_src
+
+    With a default of 20:
+
+    #+begin_src rust
+    fn default_max_ancestry_depth () -> usize { 20 }
+    #+end_src
+
+    Also add it to 'dummyFromSources' and 'fromSourcesAndDbName'
+    (the test constructors). The TOML key is ~max_ancestry_depth~.
+
+*** Core function
+
+    #+begin_src rust
+    pub async fn full_containerward_ancestry (
+      db_name   : &str,
+      driver    : &TypeDBDriver,
+      origin    : &ID,
+      max_depth : usize,
+    ) -> Result < AncestryNode, Box<dyn Error> >
+    #+end_src
+
+    BFS, level by level. Each round issues container queries for
+    all frontier nodes in parallel (join_all, bounded by
+    TYPEDB_CONCURRENT_TRANSACTIONS). This mirrors the pattern in
+    'containerward_path_stats_bulk'.
+
+    Internally maintains:
+    - frontier: Vec<(index-into-tree, ID)> — the Open nodes at the
+      current depth
+    - visited: HashSet<ID> — globally shared across all branches
+    - depth: usize — current BFS level
+    - The AncestryNode tree is built as the BFS proceeds: each
+      frontier node's containers become children of its AncestryNode.
+      Roots, Repeated and DepthTruncated are leaves.
+
+    When depth reaches max_depth, all remaining frontier nodes are
+    converted to DepthTruncated leaves instead of being expanded.
+
+*** TypeDB query strategy
+
+    One query per frontier node per round, via 'find_container_ids_of_pid'.
+    All queries at the same depth run in parallel.
+
+    This is O(max_depth) rounds of parallel queries. For a graph with
+    100 ancestors spread across 10 levels, that is 10 parallel rounds
+    rather than 100 sequential queries (as DFS would require).
+
+*** ViewRequest integration
+
+    Add a new variant to ViewRequest in [[./server/types/viewnode.rs][viewnode.rs]]:
+
+    #+begin_src rust
+    pub enum ViewRequest {
+      Aliases,
+      Containerward,
+      ContainerwardStats,
+      FullContainerward,    // <-- new
+      Sourceward,
+      Definitive,
+    }
+    #+end_src
+
+    Add its client string mapping:
+
+    #+begin_src rust
+    ("fullContainerwardView", ViewRequest::FullContainerward),
+    #+end_src
+
+    Add a dispatch arm in 'execute_view_requests' in
+    [[./server/to_org/expand/definitive.rs][definitive.rs]]:
+
+    #+begin_src rust
+    ViewRequest::FullContainerward => {
+      build_and_integrate_full_ancestry_then_drop_request (
+        forest, map, node_id, config, typedb_driver, errors )
+        . await ?; },
+    #+end_src
+
+*** Integration into ViewNode tree
+
+    New function in [[./server/to_org/expand/backpath.rs][backpath.rs]]
+    (or a new sibling file):
+
+    'build_and_integrate_full_ancestry_then_drop_request' calls
+    'full_containerward_ancestry', then walks the AncestryNode tree
+    and calls 'prepend_indefinitive_child_with_parent_ignores' for
+    each Inner and Root node — the same function backpath.rs already
+    uses.
+
+    Repeated nodes are also inserted as indefinitive children (so the
+    user can see the ID), but are not expanded further. They could
+    optionally carry a viewStats annotation to distinguish them
+    visually. DepthTruncated nodes are likewise inserted as
+    indefinitive children.
+
+*** Elisp: user-facing command and herald rules
+
+    In [[./elisp/skg-request-views.el][skg-request-views.el]], add:
+
+    #+begin_src elisp
+    (defun skg-request-full-containerward-view ()
+      "Edit metadata to request a full containerward ancestry view."
+      (interactive)
+      (skg--request-view 'fullContainerwardView))
+    #+end_src
+
+    In [[./elisp/skg-user-facing-aliases.el][skg-user-facing-aliases.el]], add an alias:
+
+    #+begin_src elisp
+    (skg-alias skg-full-ancestry skg-request-full-containerward-view)
+    #+end_src
+
+    Herald rules in [[./elisp/heralds-minor-mode.el][heralds-minor-mode.el]] should already
+    handle the new nodes (they're standard indefinitive TrueNodes).
+    Add ~fullContainerwardView~ to the viewRequests herald rule:
+
+    #+begin_src elisp
+    (definitiveView "req:definitive")
+    (fullContainerwardView "req:full-cw")   ;; <-- new
+    #+end_src
+
+*** Test strategy
+
+    Add tests in a new file (e.g. [[./tests/typedb/ancestry.rs][ancestry.rs]])
+    covering:
+    - Single linear chain to root
+    - Simple cycle (a → b → c → a) — a becomes Repeated
+    - Fork (a has two containers)
+    - Fork with one branch cycling
+    - Diamond (a → b, a → c, b → d, c → d) — d appears once as
+      Inner, once as Repeated
+    - Isolated node (no containers → Root immediately)
+    - Depth limit (chain longer than max_depth → DepthTruncated)
+
+    Use the same 'run_with_test_db' + fixture pattern as the existing
+    [[./tests/typedb/paths.rs][path tests]].
+
+** Problems
+
+*** DONE Visited pool is global, not per-branch — is that intended?
+
+    The proposal says: "If the container is in the pool, the new child
+    is a Cycle." The pool is shared across the entire tree, not
+    per-branch. This means if node X appears via branch A, then X
+    under branch B is marked Cycle even though branch B never visited X.
+
+    This is a design choice, not a bug — it prevents the same subtree
+    from being explored twice, which is exactly the exponential blowup
+    you want to avoid. But it means the "ancestry tree" is a
+    /spanning tree/ of the ancestry DAG: each ancestor appears exactly
+    once. Cycles are reported for the second encounter, wherever it
+    happens, not only for true graph cycles.
+
+    Is that the intended semantics? If so, "Cycle" is slightly
+    misleading — it also covers DAG reconvergence (diamonds). A name
+    like "AlreadyVisited" would be more precise. Or just keep "Cycle"
+    if you prefer brevity over precision.
+
+**** DONE excellent point
+     It's not a cycle, then, just repeated.
+     We should change the terminology accordingly --
+     the tree has Open, Root and Repeated nodes.
+     The user will have to deduce the geometry of a repeated node.
+
+***** Resolution
+      Plan rewritten to use Root, Repeated, DepthTruncated, Inner.
+      "Cycle" is gone from the output type.
+
+*** DONE Termination guarantee depends on "visited" being checked correctly
+
+    The algorithm terminates because each node is only opened once
+    (re-encounters become Cycle leaves). This is correct as written.
+    But worth noting: if a bug ever lets the same node be marked Open
+    twice, it loops forever. No timeout or depth limit is mentioned.
+
+    Consider adding a max-depth or max-node safety bound, especially
+    since this runs against a live TypeDB. A graph with 10,000
+    ancestors and branching factor 2 could generate 10,000 queries.
+    The existing code chose to stop at the first nonlinearity precisely
+    to avoid this.
+
+    A configurable limit (defaulting to, say, 500 nodes or 50 levels)
+    that truncates further exploration and labels remaining Open nodes
+    as "Truncated" would provide a safety net without losing generality.
+
+**** DONE good idea
+     Let's impose a user-configurable
+     (extend the SkgConfig syntax for that)
+     max depth that defaults to 20,
+     and introduce a fourth kind of node: DepthTruncated.
+
+***** Resolution
+      Plan adds max_ancestry_depth to SkgConfig (default 20),
+      and DepthTruncated variant to AncestryNode.
+
+*** DONE DFS vs BFS: the proposal says DFS, but BFS is more efficient
+
+    The proposal specifies DFS. DFS issues one query at a time (each
+    Open node is expanded sequentially). BFS issues queries for all
+    Open nodes at the same depth in parallel, which is O(max_depth)
+    rounds instead of O(total_nodes) sequential queries.
+
+    The existing 'containerward_path_stats_bulk' already uses the BFS
+    level-by-level pattern for exactly this reason. If the proposal
+    has a reason to prefer DFS (e.g. early abort, streaming results),
+    please say so; otherwise BFS seems strictly better for the same
+    result.
+
+**** DONE you're right!
+
+***** Resolution
+      Plan rewritten to use BFS throughout.
+
+*** "Full ancestry" may be very large
+
+    In a densely connected graph (lots of multi-containment), the
+    ancestry tree can grow combinatorially. The global visited pool
+    limits this to O(total nodes in graph), but that might still be
+    thousands. For rendering in an org buffer, this could produce an
+    unreadably deep or wide tree.
+
+    Some options:
+    - A depth limit (mentioned above)
+    - A node count limit
+    - Rendering only a summary (e.g. "47 more ancestors truncated")
+    - Making it a background/enrichment operation like search Phase 2
+
+    The proposal says "we'll leave [the conservative code] in place,"
+    so the full ancestry is opt-in. But the UI should probably signal
+    when results are large.
+
+**** TODO we can cross that bridge later
+
+*** DONE The proposal does not specify how this is exposed to the user
+
+    Is it a new ViewRequest? A new M-x command? A new TCP request
+    type? The rendering, wire protocol, and Elisp integration all
+    depend on this. I've outlined two options above (new ViewRequest
+    vs standalone handler). Which do you prefer?
+
+**** DONE Right! New ViewRequest!
+
+***** Resolution
+      Plan specifies ViewRequest::FullContainerward with client string
+      "fullContainerwardView", dispatch in 'execute_view_requests',
+      and Elisp alias skg-full-ancestry.
+
+*** DONE In-memory vs TypeDB
+
+    'contains_maps_from_nodes' already builds a complete in-memory
+    MapToContainers at init time. The full ancestry traversal could
+    run entirely in-memory against that map — no TypeDB queries at all —
+    the same way 'climb_containerward_to_cycle' does in
+    [[./server/context.rs][context.rs]].
+
+    This would be dramatically faster (microseconds vs seconds), but
+    only works if the in-memory maps are available at the call site.
+    During view completion, the SkgNodeMap and the init-time contains
+    maps may or may not be in scope. If they are, an in-memory variant
+    would be worth adding alongside the TypeDB variant.
+
+    Is the TypeDB path important for correctness (e.g. picking up
+    relationships that aren't on disk yet), or would in-memory suffice?
+
+**** DONE please write that in a comment somewhere appropriate
+
+     You're right that it would be faster,
+     but it would be a cognitive burden to coders,
+     and I don't yet have reason to believe we need the optimization.
+
+***** Resolution
+      Added a PERF NOTE comment at the top of
+      [[./server/dbs/typedb/paths.rs][paths.rs]] documenting the
+      in-memory alternative and why TypeDB is used for now.
