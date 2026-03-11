@@ -1,0 +1,16 @@
+* 2-cycle
+  Origin: a. a contains b, b contains a.
+
+  Contentward:
+  #+begin_example
+  * a
+  ** b
+  *** a
+  #+end_example
+
+  Containerward expectation:
+  #+begin_example
+  * a
+  ** b
+  *** a
+  #+end_example

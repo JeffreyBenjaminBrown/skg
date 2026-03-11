@@ -1,0 +1,16 @@
+* 1-cycle
+  Origin: a. a contains itself.
+
+  Contentward:
+  #+begin_example
+  * a
+  ** a
+  #+end_example
+
+  Containerward expectation:
+  #+begin_example
+  * a
+  ** a
+  #+end_example
+
+  The second 'a' is a Repeated leaf (already visited as the origin).

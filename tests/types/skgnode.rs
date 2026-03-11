@@ -42,6 +42,7 @@ fn test_skgnode_for_viewnode_with_id_in_map() {
     initial_node_limit : 100,
     delete_on_quit     : false,
     timing_log         : false,
+    max_ancestry_depth : 20,
   };
 
   let result :
@@ -88,6 +89,7 @@ fn test_skgnode_for_viewnode_with_id_not_in_map() {
     initial_node_limit : 100,
     delete_on_quit     : false,
     timing_log         : false,
+    max_ancestry_depth : 20,
   };
   let result : Result<Option<&SkgNode>, Box<dyn Error>> =
     // Should error because the file doesn't exist on disk
@@ -128,6 +130,7 @@ fn test_skgnode_for_viewnode_scaffold() {
     initial_node_limit : 100,
     delete_on_quit     : false,
     timing_log         : false,
+    max_ancestry_depth : 20,
   };
 
   let result :

@@ -1,0 +1,22 @@
+* depth-limit
+  Origin: e. Linear chain a->b->c->d->e with max_ancestry_depth=3.
+
+  Contentward:
+  #+begin_example
+  * a
+  ** b
+  *** c
+  **** d
+  ***** e
+  #+end_example
+
+  Containerward expectation (depth limit 3):
+  #+begin_example
+  * e
+  ** d
+  *** c
+  #+end_example
+
+  The chain continues to b and a, but with max_ancestry_depth=3
+  the tree is truncated at depth 3 (node c). Node c becomes a
+  DepthTruncated leaf.

@@ -1,0 +1,29 @@
+* fork-diamond-cycle
+  Origin: origin. root contains a and b; a contains aa;
+  aa contains origin; origin contains a (cycle); b contains origin (diamond).
+
+  Contentward:
+  #+begin_example
+  * root
+  ** a
+  *** aa
+  **** origin
+  ***** a
+  ** b
+  *** origin
+  #+end_example
+
+  Containerward expectation (from origin):
+  #+begin_example
+  * origin
+  ** aa
+  *** a
+  **** origin
+  **** root
+  ** b
+  *** root
+  #+end_example
+
+  Note: 'origin' reappears as a Repeated leaf under the a branch
+  (cycle detected). 'root' appears as a genuine Root under both
+  the a and b branches. BFS sibling order is nondeterministic.

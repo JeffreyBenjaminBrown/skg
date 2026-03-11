@@ -1,0 +1,12 @@
+* island
+  Origin: a. Node a has no containers.
+
+  Contentward:
+  #+begin_example
+  * a
+  #+end_example
+
+  Containerward expectation:
+  #+begin_example
+  * a
+  #+end_example

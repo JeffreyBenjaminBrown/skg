@@ -1,6 +1,7 @@
 // cargo test --test typedb -- --nocapture
 
 mod typedb {
+  pub mod ancestry;
   pub mod paths;
   pub mod search;
   pub mod delete_nodes;

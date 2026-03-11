@@ -72,6 +72,9 @@ pub struct SkgConfig {
 
   #[serde (default)] // defaults to false
   pub timing_log     : bool, // Write JSON log to <data_root>/logs/server.jsonl.
+
+  #[serde(default = "default_max_ancestry_depth")]
+  pub max_ancestry_depth : usize, // Max BFS depth for full containerward ancestry.
 }
 
 impl SkgConfig {
@@ -120,6 +123,9 @@ fn default_port() -> u16 {
 
 fn default_initial_node_limit() -> usize {
   crate::consts::DEFAULT_INITIAL_NODE_LIMIT }
+
+fn default_max_ancestry_depth() -> usize {
+  20 }
 
 
 //
@@ -245,7 +251,8 @@ impl SkgConfig {
       port               : 0,
       initial_node_limit : 100,
       delete_on_quit     : false,
-      timing_log         : false, }}
+      timing_log         : false,
+      max_ancestry_depth : default_max_ancestry_depth(), }}
 
   /// Creates a SkgConfig with test-appropriate values for db_name and tantivy_folder.
   /// Useful for tests that actually connect to TypeDB and create Tantivy indices.
@@ -262,7 +269,8 @@ impl SkgConfig {
       port               : crate::consts::DEFAULT_PORT,
       initial_node_limit : crate::consts::DEFAULT_INITIAL_NODE_LIMIT,
       delete_on_quit     : false,
-      timing_log         : false, }}
+      timing_log         : false,
+      max_ancestry_depth : default_max_ancestry_depth(), }}
 
   pub fn user_owns_source (
     &self,

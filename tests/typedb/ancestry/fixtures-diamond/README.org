@@ -1,0 +1,25 @@
+* diamond
+  Origin: x. a contains both b and c; b and c both contain x.
+
+  Contentward:
+  #+begin_example
+  * a
+  ** b
+  *** x
+  ** c
+  *** x
+  #+end_example
+
+  Containerward expectation:
+  #+begin_example
+  * x
+  ** b
+  *** a
+  ** c
+  *** a
+  #+end_example
+
+  Note: one 'a' is a genuine root; the other is a Repeated leaf
+  (already visited via the sibling branch). BFS order is
+  nondeterministic, so we test only that both branches lead to 'a'
+  and that 'a' is a leaf in both cases.

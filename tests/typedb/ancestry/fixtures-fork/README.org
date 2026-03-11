@@ -1,0 +1,19 @@
+* fork
+  Origin: x. Node x has two containers: a and b.
+
+  Contentward:
+  #+begin_example
+  * a
+  ** x
+  * c
+  ** b
+  *** x
+  #+end_example
+
+  Containerward expectation:
+  #+begin_example
+  * x
+  ** a
+  ** b
+  *** c
+  #+end_example

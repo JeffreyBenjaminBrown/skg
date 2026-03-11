@@ -1,3 +1,4 @@
+pub mod ancestry;
 pub mod nodes;
 pub mod paths;
 pub mod relationships;

@@ -1,0 +1,18 @@
+* 3-cycle
+  Origin: a. a contains b, b contains c, c contains a.
+
+  Contentward:
+  #+begin_example
+  * a
+  ** b
+  *** c
+  **** a
+  #+end_example
+
+  Containerward expectation:
+  #+begin_example
+  * a
+  ** c
+  *** b
+  **** a
+  #+end_example
