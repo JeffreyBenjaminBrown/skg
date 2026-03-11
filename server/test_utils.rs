@@ -2,6 +2,7 @@ mod guard;
 pub use guard::TestDbGuard;
 
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
 use crate::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
 use crate::dbs::tantivy::search_index;
 use crate::dbs::typedb::nodes::create_all_nodes;
@@ -69,47 +70,94 @@ where
          -> Pin<Box<dyn Future<Output = Result
                                <(), Box<dyn Error>>> + 'a>>,
 {
-  // Copy fixtures to temp so saves don't corrupt originals
-  let temp_fixtures : PathBuf = PathBuf::from(format!("/tmp/{}-fixtures", db_name));
+  let temp_fixtures : PathBuf =
+    // Copy fixtures to temp so saves don't corrupt originals
+    PathBuf::from(format!("/tmp/{}-fixtures", db_name));
   if temp_fixtures . exists() {
     fs::remove_dir_all (&temp_fixtures)?;
   }
   copy_dir_all(
     &PathBuf::from (fixtures_folder),
     &temp_fixtures)?;
-
   let result : Result<(), Box<dyn Error>> = block_on(async {
-    let (config, driver, mut tantivy): (SkgConfig, TypeDBDriver, TantivyIndex) =
-      setup_test_tantivy_and_typedb_dbs(
-        db_name,
-        temp_fixtures . to_str() . unwrap(),
-        tantivy_folder ) . await?;
-    let mut guard: TestDbGuard = TestDbGuard::new(
-      db_name, Some(config . tantivy_folder . clone()));
-    let test_result: Result<Result<(), Box<dyn Error>>, _> =
-      AssertUnwindSafe(test_fn(&config, &driver, &mut tantivy))
-      . catch_unwind() . await;
-    let cleanup_result: Result<(), Box<dyn Error>> =
-      cleanup_test_tantivy_and_typedb_dbs(
-        db_name,
-        &driver,
-        Some(config . tantivy_folder . as_path()),
-      ) . await;
-    guard . disarm();
-    match test_result {
-      Ok (inner) => { cleanup_result?; inner },
-      Err (panic_payload) => {
-        if let Err (e) = cleanup_result {
-          tracing::error!("Cleanup error after test panic: {}", e); }
-        std::panic::resume_unwind(panic_payload) }, }
-  });
-
-  // Clean up temp fixtures
-  if temp_fixtures . exists() {
-    fs::remove_dir_all (&temp_fixtures)?;
-  }
-
+    let (config, driver, mut tantivy)
+      : (SkgConfig, TypeDBDriver, TantivyIndex)
+      = setup_test_tantivy_and_typedb_dbs(
+          db_name,
+          temp_fixtures . to_str() . unwrap(),
+          tantivy_folder ). await?;
+    guarded_test_then_cleanup(
+      db_name, &config, &driver,
+      Some(config . tantivy_folder . clone()),
+      test_fn(&config, &driver, &mut tantivy),
+    ). await
+  } );
+  if temp_fixtures . exists() { // more cleanup
+    fs::remove_dir_all (&temp_fixtures)?; }
   result
+}
+
+/// Like run_with_test_db, but loads config from a TOML file
+/// (supporting multi-source setups) and skips Tantivy.
+pub fn run_with_test_db_from_config<F>(
+  db_name: &str,
+  config_path: &str,
+  test_fn: F,
+) -> Result<(), Box<dyn Error>>
+where
+  F: for<'a>
+  FnOnce(&'a SkgConfig, &'a TypeDBDriver)
+         -> Pin<Box<dyn Future<Output = Result
+                               <(), Box<dyn Error>>> + 'a>>,
+{
+  block_on(async {
+    let config: SkgConfig =
+      load_config_with_overrides(config_path, Some (db_name), &[])?;
+    let driver: TypeDBDriver = TypeDBDriver::new(
+        crate::consts::TYPEDB_ADDRESS,
+        Credentials::new("admin", "password"),
+        DriverOptions::new(false, None)?,
+      ). await?;
+    let nodes: Vec<SkgNode> =
+      read_all_skg_files_from_sources (&config)?;
+    overwrite_new_empty_db(db_name, &driver) . await?;
+    define_schema(db_name, &driver) . await?;
+    create_all_nodes(db_name, &driver, &nodes) . await?;
+    create_all_relationships(db_name, &driver, &nodes) . await?;
+    guarded_test_then_cleanup(
+      db_name, &config, &driver, None,
+      test_fn(&config, &driver),
+    ) . await
+  } )
+}
+
+/// Run a test future with a TestDbGuard safety net, then clean up.
+/// Catches panics so cleanup runs even if the test fails.
+async fn guarded_test_then_cleanup(
+  db_name: &str,
+  config: &SkgConfig,
+  driver: &TypeDBDriver,
+  tantivy_folder: Option<PathBuf>,
+  test_future: Pin<Box<dyn Future<Output = Result
+                                  <(), Box<dyn Error>>> + '_>>,
+) -> Result<(), Box<dyn Error>> {
+  let mut guard: TestDbGuard = TestDbGuard::new(
+    db_name, tantivy_folder.clone());
+  let test_result: Result<Result<(), Box<dyn Error>>, _> =
+    AssertUnwindSafe(test_future)
+    . catch_unwind() . await;
+  let cleanup_result: Result<(), Box<dyn Error>> =
+    cleanup_test_tantivy_and_typedb_dbs(
+      db_name, driver,
+      tantivy_folder . as_deref(),
+    ) . await;
+  guard . disarm();
+  match test_result {
+    Ok (inner) => { cleanup_result?; inner },
+    Err (panic_payload) => {
+      if let Err (e) = cleanup_result {
+        tracing::error!("Cleanup error after test panic: {}", e); }
+      std::panic::resume_unwind(panic_payload) }, }
 }
 
 /// Recursively copy a directory and its contents.
