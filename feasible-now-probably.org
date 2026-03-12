@@ -9,6 +9,27 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
+* improve search
+  Should not be readonly except for a near-instant.
+  Need not use special search result nodes;
+  ordinary indef nodes will do.
+  Don't need the SearchResultCol either;
+  just make all the search results indefinitive truenode roots
+  (i.e. first-level children of the invisible buffer root node).
+  This means scores are not shown --
+  but the search results are still sorted that way.
+
+  Containerward ancestries are computed in background for all hits.
+  When those are ready, Rust asks Emacs for a snapshot of the buffer.
+  Emacs returns it -- including any unsaved changes by the user --
+  and then begins a near-instant of readonly.
+  Rust integrates the ancestries into the snapshot,
+  discarding any ancestry rooted at a node that
+  the user's edits discarded.
+  If inserting into a node with other children,
+  insert first among those children.
+  Rust returns the modified view tree to Emacs,
+  Emacs displays it, and readonly ends.
 * DONE rename user-facing commands
 These are new names that I want to use for some (most) functions in docs/COMMANDS.org.
 ** Explain in header comment

@@ -1,6 +1,13 @@
-* visit a node from its URI or filename
-  e.g. with cursor on the filename in
-  557a869b-02ba-4c59-a5d3-5fb469a12353.skg
+* promote and demote in backlinks
+  Whichever means explicitly labeling fewer link sources.
+  e.g. relationship nodes like 'instances'
+  should promote a few nodes that are actually about the node
+  'instances'
+  vs. a lot that use it as a relationship label
+* What does skg-show-stats do?
+* TODO Warn user if they create a containment cycle.
+* TODO get containerward view within link sourceward view
+  for every link that is not a root
 * The buffer ought to indicate that it is waiting for the server to update it.
 * present view of node's root(like) containerward ancestors
 ** Hopefully a root, otherwise a cycle; links are ignored.
@@ -12,6 +19,10 @@
 * (skg focused) should not appear in the buffer
   just in what is sent to the server
 * dogfooding
+** things to try
+*** look at my import collisions
+    rg Was_Overloaded
+*** git diff view
 ** I may have damaged my data.
    I think I did. Searching for 'motivation' used,
    I'm sure, to return a hit with exactly that title.
@@ -45,7 +56,7 @@ What's going on?
   skg-request-save-buffer
   skg-validate-id-stack-buffer
   skg-edit-sexp-at-or-after-point
-  skg-set-metadata-indefinitive
+  skg-show-indefinitive
   heralds-minor-mode
 * review, comment the new context-generation code
 * to reload skg in Emacs
