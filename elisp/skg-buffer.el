@@ -62,7 +62,7 @@ and truncates to a reasonable length."
       trimmed)))
 
 ;; Retaining for tests. Not user-facing;
-;; dominated by 'skg-new-empty-view'.
+;; dominated by 'skg-view-new-empty'.
 (defun skg-open-empty-content-view ()
   "Open a new, empty skg content view buffer."
   (skg-open-org-buffer-from-text

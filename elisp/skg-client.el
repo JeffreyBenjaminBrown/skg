@@ -3,7 +3,7 @@
 ;;; For instructions see USAGE.md, in this same folder.
 ;;;
 ;;; USER-FACING FUNCTIONS
-;;;   skg-disconnect
+;;;   skg-connection-end
 
 (require 'cl-lib)
 
@@ -11,7 +11,7 @@
 (require 'skg-length-prefix)
 (require 'skg-lock-buffers)
 (require 'skg-metadata)
-(require 'skg-new-empty-view)
+(require 'skg-view-new-empty)
 (require 'skg-request-file-path)
 (require 'skg-request-git-diff-mode)
 (require 'skg-request-save)
@@ -25,7 +25,7 @@
   (defvar skg-port (skg-port-from-toml file))
   (setq skg-config-dir (file-name-directory (expand-file-name file)))
   (skg-tcp-connect-to-rust)
-  (skg-verify-connection))
+  (skg-connection-verify))
 
 (defun skg-port-from-toml (file)
   "Return the integer value of `port = ...` from FILE (a TOML config)."
@@ -82,7 +82,7 @@ Prevents permanently locked buffers if the server crashes mid-save."
   (when (not (string-prefix-p "open" event))
     (skg--unlock-all-save-locked)) )
 
-(defun skg-disconnect ()
+(defun skg-connection-end ()
   "Manually close the connection to the Rust server."
   (interactive)
   (when (process-live-p skg-rust-tcp-proc)

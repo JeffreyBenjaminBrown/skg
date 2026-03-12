@@ -8,16 +8,16 @@ against the entries in COMMANDS.org.
 
 ** Commands missing from COMMANDS.org
 
-*** skg-disconnect
+*** skg-connection-end
     Defined in [[./elisp/skg-client.el][skg-client.el]].
     Closes the TCP connection to the server.
     Belongs under a new "connection management" section,
     or under "not important but cool".
 
-*** skg-verify-connection
+*** skg-connection-verify
     Defined in [[./elisp/skg-request-verify-connection.el][skg-request-verify-connection.el]].
     Sends a ping to the server and reports whether it responds.
-    Same section as skg-disconnect.
+    Same section as skg-connection-end.
 
 *** skg-visit-file-diff
     Defined in [[./elisp/skg-request-file-path.el][skg-request-file-path.el]].
@@ -38,11 +38,11 @@ Add a section "** connection management" before "** not important but cool":
 
 #+begin_src org
   ** connection management
-  *** skg-disconnect
+  *** skg-connection-end
       Closes the connection to the skg server.
       The connection will be re-established automatically
       on the next command that needs it.
-  *** skg-verify-connection
+  *** skg-connection-verify
       Sends a ping to the server and reports whether it responds.
       Useful for debugging connection issues.
 #+end_src

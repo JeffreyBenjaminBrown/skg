@@ -10,7 +10,7 @@
           "* (skg (node (id 1))) 1 has a [[id:2][link to 2]]\n"
           "* (skg (node (id 2))) 2\n"
           "* no id\n")
-  "Test buffer for skg-next-id and skg-previous-id tests.")
+  "Test buffer for skg-id-next and skg-id-prev tests.")
 
 (defconst test-skg-id-navigation-line2-paren
   (with-temp-buffer
@@ -39,38 +39,38 @@
     (1- (point)))
   "Position of first paren on line 3 of test-skg-id-navigation-buffer.")
 
-(ert-deftest test-skg-next-id ()
+(ert-deftest test-skg-id-next ()
   "Test forward navigation between ID occurrences."
   (with-temp-buffer
     (insert test-skg-id-navigation-buffer)
     (goto-char (point-min))
-    (skg-next-id)
+    (skg-id-next)
     (should (equal (point) test-skg-id-navigation-line2-paren))
-    (skg-next-id)
+    (skg-id-next)
     (should (equal (point) test-skg-id-navigation-line2-bracket))
-    (skg-next-id)
+    (skg-id-next)
     (should (equal (point) test-skg-id-navigation-line3-paren))
     (let (( pos-before (point) ))
-      (skg-next-id)
+      (skg-id-next)
       (should (equal (point) pos-before)) )))
 
-(ert-deftest test-skg-previous-id ()
+(ert-deftest test-skg-id-prev ()
   "Test backward navigation between ID occurrences."
   (with-temp-buffer
     (insert test-skg-id-navigation-buffer)
     (goto-char (point-max))
-    (skg-previous-id)
+    (skg-id-prev)
     (should (equal (point) test-skg-id-navigation-line3-paren))
-    (skg-previous-id)
+    (skg-id-prev)
     (should (equal (point) test-skg-id-navigation-line2-bracket))
-    (skg-previous-id)
+    (skg-id-prev)
     (should (equal (point) test-skg-id-navigation-line2-paren))
     (let (( pos-before (point) ))
-      (skg-previous-id)
+      (skg-id-prev)
       (should (equal (point) pos-before)) )))
 
-(ert-deftest test-skg-push-to-linkstack ()
-  "Test that skg-push-to-linkstack extracts id and label from links and metadata."
+(ert-deftest test-skg-id-push-to-stack ()
+  "Test that skg-id-push-to-stack extracts id and label from links and metadata."
   (setq skg-id-stack nil)
   (with-temp-buffer
     (insert "* (skg (node (id 1))) [[id:2][link to 2]]\n")
@@ -96,13 +96,13 @@
       (dotimes (_ 3) ;; Test 3 random positions in link
         (let (( len-before (length skg-id-stack) ))
           (goto-char (+ link-start (random (- link-end link-start))))
-          (skg-push-to-linkstack)
+          (skg-id-push-to-stack)
           (should (equal (length skg-id-stack) (1+ len-before)))
           (should (equal (car skg-id-stack) '("2" "link to 2"))) ))
       (dotimes (_ 3) ;; Test 3 random positions in metadata
         (let (( len-before (length skg-id-stack) ))
           (goto-char (+ metadata-start (random (- metadata-end metadata-start))))
-          (skg-push-to-linkstack)
+          (skg-id-push-to-stack)
           (should (equal (length skg-id-stack) (1+ len-before)))
           (should (equal (car skg-id-stack) '("6" "just a title"))) ))
       (let (( len-before (length skg-id-stack) )) ;; Test positions that should NOT push
@@ -110,18 +110,18 @@
           ;; First whitespace after )) on each line
           (goto-char (point-min))
           (search-forward (format "(skg (node (id %s)))" id))
-          (skg-push-to-linkstack)
+          (skg-id-push-to-stack)
           (should (equal (length skg-id-stack) len-before)) )
         (progn (goto-char (point-min)) ;; The 'h' in "hello"
                (search-forward "hello")
                (backward-char 5)
                (should (equal (char-after) ?h))
-               (skg-push-to-linkstack)
+               (skg-id-push-to-stack)
                (should (equal (length skg-id-stack) len-before)))
         (dotimes (_ 3) ;; 3 random positions on line 3
           (goto-char (+ line3-start
                         (random (- line3-end line3-start))))
-          (skg-push-to-linkstack)
+          (skg-id-push-to-stack)
           (should (equal (length skg-id-stack) len-before)) )) )))
 
 (ert-deftest test-skg-validate-id-stack-buffer_valid-input ()
@@ -213,10 +213,10 @@
     (should (equal (skg--format-id-stack-as-org)
                    "* second\nid-2\n* first\nid-1")) ))
 
-(ert-deftest test-skg-linkstack-view ()
-  "Test that skg-linkstack-view creates buffer with correct content."
+(ert-deftest test-skg-view-stack ()
+  "Test that skg-view-stack creates buffer with correct content."
   (let (( skg-id-stack '(("uuid-123" "My Node")) ))
-    (skg-linkstack-view)
+    (skg-view-stack)
     (should (equal (buffer-name) "*skg-id-stack*"))
     (should (equal (buffer-string) "* My Node\nuuid-123"))
     (should skg-id-stack-mode)
@@ -225,7 +225,7 @@
 (ert-deftest test-skg--save-id-stack-buffer ()
   "Test that saving the id-stack buffer updates skg-id-stack."
   (let (( skg-id-stack '(("old-id" "old label")) ))
-    (skg-linkstack-view)
+    (skg-view-stack)
     (erase-buffer)
     (insert "* new label\nnew-id\n* another\nanother-id\n")
     (skg--save-id-stack-buffer)

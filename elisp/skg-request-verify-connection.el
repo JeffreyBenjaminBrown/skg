@@ -1,13 +1,13 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; USER-FACING FUNCTIONS
-;;;   skg-verify-connection
+;;;   skg-connection-verify
 ;;;
 ;;; DATA USED/ASSUMED: See /api.md.
 
 (require 'skg-length-prefix)
 
-(defun skg-verify-connection ()
+(defun skg-connection-verify ()
   "Verify connection to the Rust server,
 by sending a simple ping to the Rust server
 to verify the connection is working. The server responds with a

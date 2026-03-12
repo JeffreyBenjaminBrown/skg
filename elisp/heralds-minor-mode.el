@@ -46,7 +46,7 @@
         (BLUE overriding "O")
         (BLUE subscribing "S")
         (BLUE containerwardPath (ANY IT))))
-    (BLUE textChanged "<< Text changed. M-x skg-visit-file-diff to see. >>")
+    (BLUE textChanged "<< Text changed. M-x skg-show-magit to see. >>")
     (RED deletedScaffold (ANY "DELETED" IT))
     (RED deleted "DELETED"
       (id (ANY IT))

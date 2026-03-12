@@ -1,7 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; USER-FACING FUNCTIONS
-;;;   skg-new-empty-view
+;;;   skg-view-new-empty
 
 (require 'skg-buffer)
 (require 'skg-state)
@@ -34,7 +34,7 @@
         (forward-line 1))
       (nreverse sources))))
 
-(defun skg-new-empty-view ()
+(defun skg-view-new-empty ()
   "Open a new skg content view for a new node.
 Prompts to choose an owned source, then opens a buffer
 with an indefinitive TrueNode (no ID yet) and a placeholder title."
@@ -54,4 +54,4 @@ with an indefinitive TrueNode (no ID yet) and a placeholder title."
     (skg-open-org-buffer-from-text
      nil org-text (skg-content-view-buffer-name org-text))))
 
-(provide 'skg-new-empty-view)
+(provide 'skg-view-new-empty)

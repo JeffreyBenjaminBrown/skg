@@ -64,14 +64,14 @@ Returns the parsed s-expression or nil if not found."
         (when end-pos
           (read (substring text 0 end-pos)))))))
 
-(ert-deftest test-skg-set-metadata-indefinitive ()
-  "Test skg-set-metadata-indefinitive adds indefinitive to node section."
+(ert-deftest test-skg-show-indefinitive ()
+  "Test skg-show-indefinitive adds indefinitive to node section."
   ;; Test adding indefinitive to headline with id
   (with-temp-buffer
     (org-mode)
     (insert "* (skg (node (id 1))) title")
     (goto-char (point-min))
-    (skg-set-metadata-indefinitive)
+    (skg-show-indefinitive)
     (let ((result (test-skg--extract-metadata-sexp)))
       ;; Verify indefinitive is in node section
       (should (skg-sexp-subtree-p result '(skg (node indefinitive))))
@@ -83,7 +83,7 @@ Returns the parsed s-expression or nil if not found."
     (org-mode)
     (insert "* (skg (node (id 2))) title")
     (goto-char (point-min))
-    (skg-set-metadata-indefinitive)
+    (skg-show-indefinitive)
     (let ((result (test-skg--extract-metadata-sexp)))
       ;; Verify indefinitive is in node section
       (should (skg-sexp-subtree-p result '(skg (node indefinitive))))
@@ -95,7 +95,7 @@ Returns the parsed s-expression or nil if not found."
     (org-mode)
     (insert "* plain title")
     (goto-char (point-min))
-    (skg-set-metadata-indefinitive)
+    (skg-show-indefinitive)
     (let ((result (test-skg--extract-metadata-sexp)))
       ;; Verify indefinitive is in node section
       (should (skg-sexp-subtree-p result '(skg (node indefinitive)))))))

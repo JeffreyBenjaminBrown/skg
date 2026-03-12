@@ -19,7 +19,7 @@
       (message "Using test port: %d" skg-port)))
 
   ;; Send the request using the standard function
-  (skg-verify-connection)
+  (skg-connection-verify)
   (message "Sent verify connection request...")
 
   ;; Wait for response

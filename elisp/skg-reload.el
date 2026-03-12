@@ -19,7 +19,7 @@
             skg-lens
             skg-lock-buffers
             skg-metadata
-            skg-new-empty-view
+            skg-view-new-empty
             skg-org-fold
             skg-request-file-path
             skg-request-git-diff-mode

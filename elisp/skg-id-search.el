@@ -3,12 +3,12 @@
 ;;; PURPOSE: Extract, search for, and visit (in a new view) IDs.
 ;;;
 ;;; USER-FACING FUNCTIONS
-;;;   skg-next-id
-;;;   skg-previous-id
-;;;   skg-view-from-node
-;;;   skg-push-to-linkstack (alias: skg-id-copy)
+;;;   skg-id-next
+;;;   skg-id-prev
+;;;   skg-id-push-to-stack
 ;;;   skg-validate-id-stack-buffer
-;;;   skg-linkstack-view
+;;;   skg-view
+;;;   skg-view-stack
 
 ;; todo ? speed : This could be more efficient.
 ;; It re-reads the same text a few times.
@@ -56,7 +56,7 @@ If point is not on a link, print a message and do nothing."
           (skg-request-single-root-content-view-from-id link-id))
       (message "Point not on a link")) ))
 
-(defun skg-view-from-node ()
+(defun skg-view ()
   "If point is on a UUID, metadata, a link, or a .skg filename,
 open a content view for that ID."
   (interactive)
@@ -70,13 +70,13 @@ open a content view for that ID."
           (skg-request-single-root-content-view-from-id id))
       (message "No ID found at point")) ))
 
-(defun skg-view-from-id (id)
-  "Open a content view for ID, prompting when called interactively. (skg-view-from-node is usually more convenient.)"
+(defun skg-view-id (id)
+  "Open a content view for ID, prompting when called interactively. (skg-view is usually more convenient.)"
   (interactive "sNode ID: ")
   (message "Visiting node: %s" id)
   (skg-request-single-root-content-view-from-id id))
 
-(defun skg-next-id ()
+(defun skg-id-next ()
   "Move point to the next ID occurrence.
 An ID can appear in metadata like (skg (node (id X)) ...),
   in which case point moves to the opening paren of (skg ...),
@@ -101,7 +101,7 @@ or in a link like [[id:X][label]],
       (when candidates
         (goto-char (apply #'min candidates)) )) ))
 
-(defun skg-previous-id ()
+(defun skg-id-prev ()
   "Move point to the previous ID occurrence.
 An ID can appear in metadata like (skg (node (id X)) ...),
   in which case point moves to the opening paren of (skg ...),
@@ -141,7 +141,7 @@ Otherwise return nil."
                 skg-start ))
           (error nil) )) )))
 
-(defun skg-push-to-linkstack ()
+(defun skg-id-push-to-stack ()
   "Push (id label) pair to `skg-id-stack' if point is on metadata or a link.
 For metadata, id comes from (id X) and label is the headline title.
 For links, id and label come from [[id:X][label]].
@@ -356,7 +356,7 @@ Returns (error MESSAGE) if validation fails."
     map )
   "Keymap for `skg-id-stack-mode'.")
 
-(defun skg-linkstack-view ()
+(defun skg-view-stack ()
   "Open a buffer to edit `skg-id-stack'.
 The buffer displays the stack in org format
 (label headlines and ID bodies).
@@ -392,7 +392,7 @@ Overrides save to update `skg-id-stack' instead of writing to a file."
   :keymap skg-id-stack-mode-map)
 
 ;; Hide from M-x: this mode is only activated
-;; programmatically by 'skg-linkstack-view'.
+;; programmatically by 'skg-view-stack'.
 (put 'skg-id-stack-mode 'completion-predicate #'ignore)
 
 (provide 'skg-id-search)

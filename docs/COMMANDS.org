@@ -1,28 +1,29 @@
 * user-facing skg commands
-** summoning views of the graph
-   There are other kinds of views too,
-   but most time will be spent in this kind.
-*** skg-new-empty-view
-    Asks you to pick a data source,
-    and then provides a root node with that source.
-**** why
-     Every node needs a source.
-     Children can inherit from their parents,
-     but to make a root (which has no parents)
-     you need to choose its source explicitly.
+** skg-save
+   Each time you save, your view is rebuilt.
+   This is because you can put 'requests' into your view,
+   in which you request more data,
+   such as a node's ancestors, or the nodes that link to it.
+   Since views can overlap,
+   saving one open view can change another.
+   For this reason the client will warn you
+   if you have unsaved edits in one view
+   and beegin to edit another one.
+   It won't stop you, but the results could be bad.
+** changing the whole view
 *** skg-search-titles
     Searches titles and aliases, but only shows "interesting" nodes:
     roots, cycle members, link targets, and nodes that had an
     org-roam ID before import. This filters out multi-contained
     nodes and nodes with no special graph role.
-    Run 'skg-view-from-node' (below)
+    Run 'skg-view' (below)
     from one of the links in the search results
     to go to the view from that node.
 *** skg-search-titles-everywhere
     Like skg-search-titles, but shows all matches
     regardless of graph role — including multi-contained
     and otherwise unremarkable nodes.
-*** skg-view-from-node
+*** skg-view
     Calling this when the cursor is on a link, a node's metadata,
     a bare UUID, or a .skg filename
     will open a new view from the ID it finds there,
@@ -30,42 +31,40 @@
 
     If you're not sure whether the cursor is on something visitable
     (a link or a node's metadata),
-    use skg-next-id and skg-previous-id
+    use skg-id-next and skg-id-prev
     to identify where those are.
-*** skg-view-from-id
+*** skg-view-id
+    'skg-view' is usually more convenient.
+
     This requires a literal v4 UUID string, like
     3861db2c-7f16-4814-b403-52b5e05d5e0a
-    Can be useful going from git to skg.
-*** skg-save
-    Each time you save, your view is rebuilt.
-    This is because you can put 'requests' into your view,
-    in which you request more data,
-    such as a node's ancestors, or the nodes that link to it.
-    Since views can overlap,
-    saving one open view can change another.
-    For this reason the client will warn you
-    if you have unsaved edits in one view
-    and beegin to edit another one.
-    It won't stop you, but the results could be bad.
-** changing how views look
-*** skg-heralds-view
+    It can be useful going from git to skg.
+*** skg-view-new-empty
+    Asks you to pick a data source,
+    and then provides a root node with that source.
+**** why
+     Every node needs a source.
+     Children can inherit from their parents,
+     but to make a root (which has no parents)
+     you need to choose its source explicitly.
+*** skg-view-heralds-mode
     This command toggles it.
     This toggles whether, at the start of every node,
     metadata is shown in its full plain-text glory,
     or is instead summarized via brief 'heralds'.
     It is turned on at every view by default.
-*** skg-diff-view
+*** skg-view-diff-mode
     If you use git to manage your data,
     enable this view to see what you've changed since your last commit,
     i.e. how your worktree differs from HEAD.
 ** requesting changes to views
-*** skg-branch-aliases
+*** skg-show-aliases
     See what other text you could search for to find this node.
     You can always search for its title.
     Most nodes have a title and no aliases.
-*** skg-branch-containerward
-*** skg-branch-sourceward
-*** skg-definitive-view
+*** skg-show-containerward
+*** skg-show-sourceward
+*** skg-show-definitive
     A view of a node can be definitive or indefinitive.
     Typically the first place in the buffer that depicts a node
     is the definitive view of it. So that other views of that node
@@ -78,13 +77,13 @@
     from a place where it is currently shown in an indefinitive form,
     call this function. It will make the current definitive view
     (if it exists) indefinitive, and then draw a definitive view here.
-*** skg-request-containerward-stats
+*** skg-show-stats
     Computes the containerward path stats for a node
     (path length, fork count, whether it cycles)
     and saves. The stats then appear in the node's metadata
     and in the heralds view.
 ** metadata edits
-*** skg-set-metadata-indefinitive
+*** skg-show-indefinitive
     This marks a node as 'indefinitiive',
     as described above.
     In brief, it means edits to its title, body or
@@ -92,11 +91,11 @@
     will not affect it
       (although edits to its children will affect those children,
       unless they are also indefinitive).
-*** skg-set-metadata-delete
+*** skg-delete
     This marks a node for deletion from the graph.
     Upon saving the view, it will vanish not just from this view,
     but from the graph itself.
-*** skg-metadata-view
+*** skg-view-metadata
     When called from a node in a view of the graph,
     this switches to a view of the metadata of that node,
     with one item per line.
@@ -109,7 +108,7 @@
 *** some background
 **** IDs are mostly invisible, but good to know about.
      Every node has an ID,
-     which you can see if you disable skg-heralds-view.
+     which you can see if you disable skg-view-heralds-mode.
      Every link also has an ID and a label,
      but all you see when you look at the ID is the label,
      unless you disable org-mode (say, by switching to text-mode).
@@ -123,23 +122,23 @@
      But you can also jump to a view of your entire stack,
      using (copying, pasting, deleting) it
      without any restrictions on order.
-*** skg-view-from-node
+*** skg-view
     Visits anything with an ID.
     Defined in more detail earlier in this document.
-*** skg-next-id
+*** skg-id-next
     Makes the cursor hop among two kinds of IDs:
     The ID associated with a node in the view,
     and the ID associated with a link in a node's title.
     Every node has an ID,
     but a title can include multiple or no links.
-*** skg-previous-id
-    See skg-next-id, above.
-*** skg-push-to-linkstack
+*** skg-id-prev
+    See skg-id-next, above.
+*** skg-id-push-to-stack
     Use this to store a link to the ID the cursor is at.
-*** skg-linkstack-view
+*** skg-view-stack
     View and maybe edit the set of links you've stored.
 ** not skg but useful
-*** skg-visit-file-diff
+*** skg-show-magit
     Opens a magit view of the changes to the file.
 *** org-ancestry
     If you're at a headline so deep in the tree
@@ -149,11 +148,11 @@
     (skg uses org-mode, but org-mode can be used without skg.)
 ** connection and reload
    Unless you're coding, you probably don't need these.
-*** skg-verify-connection
+*** skg-connection-verify
     Sends a ping to the Rust server
     to check if the connection is working.
     Displays the result in the minibuffer.
-*** skg-disconnect
+*** skg-connection-end
     Closes the TCP connection to the Rust server.
 *** skg-reload
     Unloads all skg elisp modules and reloads them from disk.

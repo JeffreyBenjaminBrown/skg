@@ -9,6 +9,34 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
+* DONE rename user-facing commands
+These are new names that I want to use for some (most) functions in docs/COMMANDS.org.
+** Explain in header comment
+   'show' makes local changes; 'view' changes (potentially) the entire view
+** what to do for each command
+   Each of these is a rename instruction,
+   and some have further instructions in the body
+*** skg-id-next <- skg-next-id
+*** skg-id-prev <- skg-previous-id
+*** skg-id-push-to-stack <- skg-push-to-linkstack
+*** skg-delete <- skg-set-metadata-delete
+    Let's also modify this function to explain to the user at the end, 'this change will only be applied when you save the buffer'.
+*** skg-show-indefinitive <- skg-set-metadata-indefinitive
+*** skg-show-definitive <- skg-definitive-view
+*** skg-show-aliases <- skg-branch-aliases
+*** skg-show-containerward <- skg-branch-containerward
+*** skg-show-stats <- skg-request-containerward-stats
+*** skg-show-link-sourceward <- skg-branch-sourceward
+    Add this comment:
+      In case someone forgets the word "source" but remembers "link".
+*** skg-show-sourceward <- skg-branch-sourceward
+*** skg-show-magit <- skg-visit-file-diff
+*** skg-view <- skg-view-from-node
+*** skg-view-diff-mode <- skg-diff-view
+*** skg-view-heralds-mode <- skg-heralds-view
+*** skg-view-id <- skg-view-from-id
+*** skg-view-metadata <- skg-metadata-view
+*** skg-view-stack <- skg-linkstack-view
 * DONE Bug: C-c C-c not saving metadata in skg-metadata-view
   The top of the metadata buffer says
     "Press 'C-c C-c' to save changes, or 'C-x k' to cancel."

@@ -3,20 +3,21 @@
 ;;; PURPOSE: Utilities to parse and edit skg headline metadata.
 ;;;
 ;;; USER-FACING FUNCTIONS
-;;;   skg-set-metadata-delete
-;;;   skg-set-metadata-indefinitive
+;;;   skg-delete
+;;;   skg-show-indefinitive
 
 (require 'org)
 (require 'skg-sexpr-search)
 
-(defun skg-set-metadata-delete ()
+(defun skg-delete ()
   "Mark the headline at point for deletion.
 Edits the metadata to include `delete` in the `editRequest` section.
 Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive)
-  (skg-edit-metadata-at-point '(skg (node (editRequest delete)))))
+  (skg-edit-metadata-at-point '(skg (node (editRequest delete))))
+  (message "This change will only be applied when you save the buffer."))
 
-(defun skg-set-metadata-indefinitive ()
+(defun skg-show-indefinitive ()
   "Mark the headline at point as indefinitive.
 Edits the metadata to include `indefinitive` in the `node` section.
 Does NOT save; call `skg-request-save-buffer' afterward."

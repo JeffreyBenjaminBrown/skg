@@ -8,10 +8,9 @@
 ;;; USER-FACING FUNCTIONS
 ;;;   skg-request-aliases-view ()
 ;;;   skg-request-containerward-view ()
-;;;   skg-request-containerward-stats ()
-;;;   skg-request-sourceward-view ()
 ;;;   skg-request-definitive-view ()
-
+;;;   skg-request-sourceward-view ()
+;;;   skg-show-stats ()
 
 (require 'skg-metadata)
 (require 'skg-request-save)
@@ -28,7 +27,7 @@
   (interactive)
   (skg--request-view-and-save 'containerwardView))
 
-(defun skg-request-containerward-stats ()
+(defun skg-show-stats ()
   "Request containerward path stats and save."
   (interactive)
   (skg--request-view-and-save 'containerwardStats))

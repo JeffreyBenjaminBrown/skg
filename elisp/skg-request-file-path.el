@@ -4,7 +4,7 @@
 ;;; and open a magit diff of that file.
 ;;;
 ;;; USER-FACING FUNCTIONS
-;;;   skg-visit-file-diff
+;;;   skg-show-magit
 ;;;
 ;;; NOTE: The path-extraction logic (getting id and source from the
 ;;; current line's metadata) could be reused for other commands,
@@ -14,7 +14,7 @@
 (require 'skg-state)
 (require 'skg-length-prefix)
 
-(defun skg-visit-file-diff ()
+(defun skg-show-magit ()
   "Open a magit diff for the .skg file of the node at point.
 Reads the (skg ...) metadata from the current line, extracts
 the id and source, asks the server to resolve the file path,
