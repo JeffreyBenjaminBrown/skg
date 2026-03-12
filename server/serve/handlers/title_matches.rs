@@ -1,5 +1,4 @@
 pub mod render_enriched_search_buffer;
-use render_enriched_search_buffer::compute_containerward_paths_using_parallel_frontier;
 
 /// PITFALL: Uses two layers of truncation.
 /// Tantivy truncates its search after (unimaginable) 1e5 results.
@@ -10,7 +9,7 @@ use render_enriched_search_buffer::compute_containerward_paths_using_parallel_fr
 use crate::consts::SEARCH_DISPLAY_LIMIT;
 use crate::context::ContextOriginType;
 use crate::dbs::tantivy::search_index;
-use crate::dbs::typedb::paths::PathToFirstNonlinearity;
+use crate::dbs::typedb::ancestry::{AncestryNode, full_containerward_ancestry};
 use crate::dbs::typedb::search::all_graphnodestats::{ AllGraphNodeStats, fetch_all_graphnodestats};
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::serve::ConnectionState;
@@ -53,7 +52,7 @@ pub type MatchGroups =
 pub struct SearchEnrichmentPayload {
   pub terms          : String,
   pub result_ids     : Vec<ID>,
-  pub paths_by_id    : HashMap<ID, Vec<PathToFirstNonlinearity>>,
+  pub ancestry_by_id : HashMap<ID, AncestryNode>,
   pub graphnodestats : AllGraphNodeStats,
 }
 
@@ -155,7 +154,7 @@ pub fn handle_title_matches_request (
         & tag_text_response (
           ResponseType::SearchResults, &error_msg )); }} }
 
-/// Spawn a background thread to compute containerward paths
+/// Spawn a background thread to compute containerward acnestries
 /// and graphnodestats, then write the structured payload
 /// to the shared slot. Clears any stale enrichment and resets
 /// the cancellation flag before spawning.
@@ -175,39 +174,31 @@ fn spawn_enrichment_thread (
   search_cancelled . store (false, Ordering::SeqCst);
   let slot_clone    : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::clone (enrichment_slot);
-  let cancel_clone  : Arc<AtomicBool> = Arc::clone (search_cancelled);
+  let cancel_clone  : Arc<AtomicBool>   = Arc::clone (search_cancelled);
   let driver_clone  : Arc<TypeDBDriver> = Arc::clone (typedb_driver);
-  let config_clone  : SkgConfig = config . clone ();
-  let terms_clone   : String = search_terms . to_string ();
-  let ids_clone     : Vec<ID> = result_ids . to_vec ();
+  let config_clone  : SkgConfig         = config . clone ();
+  let terms_clone   : String            = search_terms . to_string ();
+  let ids_clone     : Vec<ID>           = result_ids . to_vec ();
+  let max_depth : usize = config . max_ancestry_depth;
   std::thread::spawn ( move || {
     tracing::info! ("search enrichment: thread started for {} IDs",
               ids_clone . len ());
-    let paths_by_id
-      : HashMap < ID, Vec < PathToFirstNonlinearity > > =
-      futures::executor::block_on (
-        compute_containerward_paths_using_parallel_frontier (
-          &ids_clone, &config_clone . db_name,
-          &driver_clone ) );
-    tracing::info! ("search enrichment: paths computed ({} entries)",
-              paths_by_id . len ());
+    let ancestry_by_id : HashMap<ID, AncestryNode> =
+      ancestry_by_id_from_ids (
+        &ids_clone, &config_clone . db_name,
+        &driver_clone, max_depth );
+    tracing::info! ("search enrichment: ancestry computed ({} entries)",
+              ancestry_by_id . len ());
     if cancel_clone . load (Ordering::SeqCst) {
-      tracing::info! ("search enrichment: cancelled after paths");
+      tracing::info! ("search enrichment: cancelled after ancestry");
       return; }
     let all_enriched_ids : Vec<ID> = {
-      // Collect all IDs that will appear in the enriched forest:
-      // result IDs + every ID from containerward paths.
+      // Collect result IDs + every ID from ancestry trees.
       let mut id_set : HashSet<ID> = HashSet::new ();
       for id in &ids_clone {
         id_set . insert ( id . clone () ); }
-      for paths in paths_by_id . values () {
-        for path in paths {
-          for node_id in &path . path {
-            id_set . insert ( node_id . clone () ); }
-          for b in &path . branches {
-            id_set . insert ( b . clone () ); }
-          for c in &path . cycle_nodes {
-            id_set . insert ( c . clone () ); }} }
+      for tree in ancestry_by_id . values () {
+        collect_ids_from_ancestry_node ( tree, &mut id_set ); }
       id_set . into_iter () . collect () };
     let graphnodestats : AllGraphNodeStats =
       futures::executor::block_on (
@@ -229,8 +220,46 @@ fn spawn_enrichment_thread (
     *guard = Some ( SearchEnrichmentPayload {
       terms          : terms_clone,
       result_ids     : ids_clone,
-      paths_by_id,
+      ancestry_by_id,
       graphnodestats } ); } ); }
+
+/// Compute full containerward ancestry for each ID in parallel.
+/// IDs whose ancestry lookup fails are logged and omitted.
+fn ancestry_by_id_from_ids (
+  ids       : &[ID],
+  db_name   : &str,
+  driver    : &TypeDBDriver,
+  max_depth : usize,
+) -> HashMap<ID, AncestryNode> {
+  let futures : Vec<_> =
+    ids . iter ()
+    . map ( |id|
+      full_containerward_ancestry (
+        db_name, driver, id, max_depth ) )
+    . collect ();
+  let results : Vec<Result<AncestryNode, Box<dyn std::error::Error>>> =
+    futures::executor::block_on (
+      futures::future::join_all (futures) );
+  let mut map : HashMap<ID, AncestryNode> =
+    HashMap::new ();
+  for ( id, result ) in ids . iter ()
+                        . zip ( results )
+  { match result {
+      Ok (tree) => { map . insert ( id . clone (), tree ); },
+      Err (e) => {
+        tracing::warn! (
+          "search enrichment: ancestry for {} failed: {}",
+          id, e ); } } }
+  map }
+
+fn collect_ids_from_ancestry_node(
+  node   : &AncestryNode,
+  id_set : &mut HashSet<ID>,
+) {
+  id_set . insert ( node . id () . clone () );
+  if let AncestryNode::Inner ( _, children ) = node {
+    for child in children {
+      collect_ids_from_ancestry_node ( child, id_set ); } } }
 
 /// Build the tagged s-exp for a search enrichment payload.
 /// Format: (("response-type" "search-enrichment")

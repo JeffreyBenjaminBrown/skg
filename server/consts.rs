@@ -6,7 +6,7 @@
 pub const TANTIVY_SEARCH_LIMIT : usize = 100_000;
 
 /// How many unique-ID search results to show the user.
-pub const SEARCH_DISPLAY_LIMIT : usize = 10;
+pub const SEARCH_DISPLAY_LIMIT : usize = 1000;
 
 /// Tantivy IndexWriter heap buffer size in bytes.
 pub const TANTIVY_WRITER_BUFFER_BYTES : usize = 50_000_000;
