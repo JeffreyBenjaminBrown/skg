@@ -5,7 +5,7 @@
 // with dedicated .skg files and a README.org spec.
 
 use skg::dbs::typedb::ancestry::{
-  AncestryNode,
+  AncestryTree,
   full_containerward_ancestry};
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::ID;
@@ -17,21 +17,21 @@ use typedb_driver::TypeDBDriver;
 // Helpers
 //
 
-/// Render an AncestryNode tree to org-mode text.
+/// Render an AncestryTree tree to org-mode text.
 /// Each node becomes a headline at the given depth,
 /// using just its ID as the title (no skg metadata).
 fn ancestry_node_to_org(
-  node  : &AncestryNode,
+  node  : &AncestryTree,
   depth : usize,
 ) -> String {
   let stars : String = "*" . repeat (depth);
   let id : &ID = node . id ();
   match node {
-    AncestryNode::Root (_) |
-    AncestryNode::Repeated (_) |
-    AncestryNode::DepthTruncated (_) =>
+    AncestryTree::Root (_) |
+    AncestryTree::Repeated (_) |
+    AncestryTree::DepthTruncated (_) =>
       format! ("{} {}\n", stars, id),
-    AncestryNode::Inner (_, children) => {
+    AncestryTree::Inner (_, children) => {
       let mut out : String =
         format! ("{} {}\n", stars, id);
       for child in children {
@@ -123,10 +123,10 @@ fn trees_match_unordered(
     if ! found { return false; } }
   true }
 
-/// Assert that the actual AncestryNode tree matches
+/// Assert that the actual AncestryTree tree matches
 /// the expected org-mode text, ignoring child order.
 fn assert_ancestry_matches_org(
-  actual       : &AncestryNode,
+  actual       : &AncestryTree,
   expected_org : &str,
 ) {
   let actual_org : String =
@@ -145,7 +145,7 @@ fn assert_ancestry_matches_org(
 /// Assert that every leaf in the expected org
 /// is also a leaf (no children) in the actual tree.
 fn assert_leaves_are_leaves(
-  actual : &AncestryNode,
+  actual : &AncestryTree,
   expected_org : &str,
 ) {
   let expected_trees : Vec<OrgTree> =
@@ -198,7 +198,7 @@ fn test_ancestry_island(
     db_name : &str,
     driver  : &TypeDBDriver,
   ) -> Result<(), Box<dyn Error>> {
-    let result : AncestryNode =
+    let result : AncestryTree =
       full_containerward_ancestry (
         db_name, driver, &ID::from("a"), 20
       ) . await ?;
@@ -209,7 +209,7 @@ fn test_ancestry_island(
     assert_leaves_are_leaves (& result, expected);
     // Island should be a Root node.
     assert! (
-      matches! (result, AncestryNode::Root (_)),
+      matches! (result, AncestryTree::Root (_)),
       "Island node should be Root, got {:?}", result );
     Ok(()) }
   run_with_test_db(
@@ -227,7 +227,7 @@ fn test_ancestry_fork(
     db_name : &str,
     driver  : &TypeDBDriver,
   ) -> Result<(), Box<dyn Error>> {
-    let result : AncestryNode =
+    let result : AncestryTree =
       full_containerward_ancestry (
         db_name, driver, &ID::from("x"), 20
       ) . await ?;
@@ -255,7 +255,7 @@ fn test_ancestry_1cycle(
     db_name : &str,
     driver  : &TypeDBDriver,
   ) -> Result<(), Box<dyn Error>> {
-    let result : AncestryNode =
+    let result : AncestryTree =
       full_containerward_ancestry (
         db_name, driver, &ID::from("a"), 20
       ) . await ?;
@@ -281,7 +281,7 @@ fn test_ancestry_2cycle(
     db_name : &str,
     driver  : &TypeDBDriver,
   ) -> Result<(), Box<dyn Error>> {
-    let result : AncestryNode =
+    let result : AncestryTree =
       full_containerward_ancestry (
         db_name, driver, &ID::from("a"), 20
       ) . await ?;
@@ -308,7 +308,7 @@ fn test_ancestry_3cycle(
     db_name : &str,
     driver  : &TypeDBDriver,
   ) -> Result<(), Box<dyn Error>> {
-    let result : AncestryNode =
+    let result : AncestryTree =
       full_containerward_ancestry (
         db_name, driver, &ID::from("a"), 20
       ) . await ?;
@@ -336,7 +336,7 @@ fn test_ancestry_diamond(
     db_name : &str,
     driver  : &TypeDBDriver,
   ) -> Result<(), Box<dyn Error>> {
-    let result : AncestryNode =
+    let result : AncestryTree =
       full_containerward_ancestry (
         db_name, driver, &ID::from("x"), 20
       ) . await ?;
@@ -368,7 +368,7 @@ fn test_ancestry_fork_diamond_cycle(
     db_name : &str,
     driver  : &TypeDBDriver,
   ) -> Result<(), Box<dyn Error>> {
-    let result : AncestryNode =
+    let result : AncestryTree =
       full_containerward_ancestry (
         db_name, driver, &ID::from("origin"), 20
       ) . await ?;
@@ -400,7 +400,7 @@ fn test_ancestry_depth_limit(
     driver  : &TypeDBDriver,
   ) -> Result<(), Box<dyn Error>> {
     // max_depth=3 truncates the chain e→d→c→b→a at depth 3.
-    let result : AncestryNode =
+    let result : AncestryTree =
       full_containerward_ancestry (
         db_name, driver, &ID::from("e"), 3
       ) . await ?;

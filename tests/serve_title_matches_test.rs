@@ -2,9 +2,11 @@
 
 use skg::context::ContextOriginType;
 use skg::dbs::tantivy::{search_index, update_context_origin_types};
+use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
 use skg::org_to_text::viewnode_forest_to_string;
 use skg::types::misc::{ID, MSV, TantivyIndex};
 use skg::types::skgnode::{SkgNode, empty_skgnode};
+use skg::types::viewnode::Scaffold;
 use skg::dbs::init::in_fs_wipe_index_then_create_it;
 use skg::serve::handlers::title_matches::{
   group_matches_by_id, build_search_forest, SearchScope};
@@ -71,7 +73,7 @@ fn test_title_matches_org_format (
         group_matches_by_id (
           best_matches, searcher, &tantivy_index,
           &SearchScope::Everything );
-      let (forest, _result_ids) =
+      let (forest, _search_results) =
         build_search_forest (
           search_terms,
           &matches_by_id );
@@ -81,30 +83,9 @@ fn test_title_matches_org_format (
       let lines : Vec < &str > =
         result . lines () . collect ();
 
-      // Extract just the links from each line
-      fn extract_link ( line: &str
-      ) -> Option < (String, String) > {
-        if let Some (start) = line . find ("[[id:") {
-          let link_part : &str =
-            &line [ start.. ];
-          if let Some (id_end) = link_part . find ("][") {
-            let id : String =
-              link_part [ 5..id_end ] . to_string ();
-            if let Some (title_end) = link_part . find ("]]") {
-              let title : String =
-                link_part [ id_end + 2..title_end ] . to_string ();
-              return Some ( (id, title) ); }} }
-        None }
-
-      // Extract alias lines (level-4 "skg alias" entries)
-      fn extract_alias ( line: &str ) -> Option < String > {
-        if line . starts_with ("**** (skg alias) ") {
-          Some ( line [ "**** (skg alias) " . len () ..  ]
-                 . to_string () )
-        } else { None } }
-
-      // Find level-2 headlines (start with "** ")
-      let mut level2_headlines : Vec < (String, String) > =
+      // Parse each line with headline_to_triple.
+      // Collect level-1 TrueNode headlines and alias groups.
+      let mut level1_headlines : Vec < (String, String) > =
         Vec::new ();
       let mut aliases_under_current : Vec < String > =
         Vec::new ();
@@ -112,45 +93,49 @@ fn test_title_matches_org_format (
         Vec::new ();
 
       for line in &lines {
-        if line . starts_with ("** ") {
-          if ! aliases_under_current . is_empty () {
-            // Save any accumulated aliases
-            all_alias_groups . push (
-              aliases_under_current . clone () );
-            aliases_under_current . clear (); }
-          if let Some (link) = extract_link (line) {
-            // Extract this level-2 headline
-            level2_headlines . push (link); }
-        } else if let Some (alias) = extract_alias (line) {
-          // Extract alias
-          aliases_under_current . push (alias); } }
+        if let Ok (( level, metadata, title ))
+          = headline_to_triple (line)
+        { match level {
+            1 => {
+              if ! aliases_under_current . is_empty () {
+                all_alias_groups . push (
+                  aliases_under_current . clone () );
+                aliases_under_current . clear (); }
+              if let Some (md) = metadata {
+                if let Some (id) = md . id {
+                  level1_headlines . push (
+                    ( id . to_string (), title ) ); }} },
+            _ => {
+              if let Some (md) = metadata {
+                if let Some ( Scaffold::Alias { .. } )
+                  = md . scaffold
+                  { aliases_under_current . push (title); }} }, }} }
       if ! aliases_under_current . is_empty () {
-        // Don't forget the last group
         all_alias_groups . push (aliases_under_current); }
 
       // Verify the structure
-      assert_eq! ( level2_headlines . len (), 2,
-                   "Should have exactly 2 level-2 headlines" );
+      assert_eq! ( level1_headlines . len (), 2,
+                   "Should have exactly 2 level-1 headlines" );
 
-      // First level-2 should be "the bear eats cheese" with id_1
-      assert_eq! ( level2_headlines [ 0 ] . 0, "id_1",
-                   "First level-2 should have id_1" );
-      assert_eq! ( level2_headlines [ 0 ] . 1, "the bear eats cheese",
-                   "First level-2 should be 'the bear eats cheese'" );
+      // First level-1 should be "the bear eats cheese" with id_1
+      assert_eq! ( level1_headlines [ 0 ] . 0, "id_1",
+                   "First level-1 should have id_1" );
+      assert_eq! ( level1_headlines [ 0 ] . 1, "the bear eats cheese",
+                   "First level-1 should be 'the bear eats cheese'" );
 
-      // Second level-2 should be "cheese makes me happy" with id_2
-      assert_eq! ( level2_headlines [ 1 ] . 0, "id_2",
-                   "Second level-2 should have id_2" );
-      assert_eq! ( level2_headlines [ 1 ] . 1, "cheese makes me happy",
-                   "Second level-2 should be 'cheese makes me happy'" );
+      // Second level-1 should be "cheese makes me happy" with id_2
+      assert_eq! ( level1_headlines [ 1 ] . 0, "id_2",
+                   "Second level-1 should have id_2" );
+      assert_eq! ( level1_headlines [ 1 ] . 1, "cheese makes me happy",
+                   "Second level-1 should be 'cheese makes me happy'" );
 
-      // First level-2 should have 2 alias children
+      // First level-1 should have 2 alias children
       assert_eq! ( all_alias_groups . len (), 1,
-                   "Should have exactly 1 group of aliases (second level-2 should have none)" );
+                   "Should have exactly 1 group of aliases (second level-1 should have none)" );
       assert_eq! ( all_alias_groups [ 0 ] . len (), 2,
-                   "First level-2 should have exactly 2 alias children" );
+                   "First level-1 should have exactly 2 alias children" );
 
-      // Verify the alias texts under first level-2
+      // Verify the alias texts under first level-1
       assert! ( all_alias_groups [ 0 ] . contains (
                   &"bear cheese" . to_string () ),
                 "Should have 'bear cheese' as an alias" );

@@ -9,7 +9,7 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
-* improve search
+* DONE improve search
   Should not be readonly except for a near-instant.
   Need not use special search result nodes;
   ordinary indef nodes will do.

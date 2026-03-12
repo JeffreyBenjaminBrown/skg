@@ -6,7 +6,7 @@ use crate::to_org::util::collect_ids_from_tree;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::skgnode::SkgNode;
-use crate::types::viewnode::{GraphNodeStats, Scaffold, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{GraphNodeStats, ViewNode, ViewNodeKind};
 
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
@@ -63,28 +63,13 @@ pub fn set_metadata_relationships_in_node_recursive (
             ). ok ();
           Some ( graphnodestats_for_pid (
             &t . id, stats, skgnode_opt )) },
-        ViewNodeKind::Scaff (
-          Scaffold::SearchResult { id, source, .. }
-        ) => {
-          let skgnode_opt : Option<&SkgNode> =
-            if map . contains_key (id)
-               || config . sources . contains_key (source)
-              { skgnode_from_map_or_disk (
-                  id, source, map, config
-                ). ok ()
-              } else { None };
-          Some ( graphnodestats_for_pid (
-            id, stats, skgnode_opt )) },
-        _ => None } // Other Scaff, Deleted, DeletedScaff
+        _ => None } // Scaff, Deleted, DeletedScaff
     };
   match new_stats {
     Some (gs) => match &mut tree . get_mut (treeid)
                          . unwrap () . value () . kind {
       ViewNodeKind::True (t) =>
         { t . graphStats = gs; },
-      ViewNodeKind::Scaff (
-        Scaffold::SearchResult { graphStats, .. }
-      ) => { *graphStats = gs; },
       _ => {} },
     None => {} }
   let child_treeids : Vec < NodeId > =

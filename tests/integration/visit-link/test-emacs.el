@@ -76,8 +76,7 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
   (skg-search-titles-everywhere "has")
   (message "Sent title-matches request")
 
-  ;; Wait for search results buffer to contain the expected link
-  (unless (wait-for-buffer (skg-search-buffer-name "has") "\\[\\[id:src\\]" 5)
+  (unless (wait-for-buffer (skg-search-buffer-name "has") "(id src)" 5)
     (test-fail "Timeout waiting for search results")))
 
 (defun phase-1-visit-src ()
@@ -91,35 +90,28 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
             (message "Search results: %s" content)
 
             ;; Verify search found src
-            (unless (string-match-p "\\[\\[id:src\\]" content)
-              (test-fail "Expected src link in search results, got: %s" content))
+            (unless (string-match-p "(id src)" content)
+              (test-fail "Expected src node in search results, got: %s" content))
 
             (test-pass "Found src in search results")
 
-            ;; Unfold headline (TAB in org-mode cycles visibility)
+            ;; Position cursor on the src metadata
+            ;; so skg-view can extract the id.
             (goto-char (point-min))
-            (when (re-search-forward "^\\*" nil t)
-              (org-cycle))
-
-            ;; Find and position on the src link
-            (goto-char (point-min))
-            (if (search-forward "[[id:src]" nil t)
+            (if (search-forward "(id src)" nil t)
                 (progn
                   (goto-char (match-beginning 0))
-                  ;; Now find '][' and position there
-                  (if (goto-link-center)
-                      (progn
-                        (message "Line: %s"
-                                 (buffer-substring-no-properties
-                                  (line-beginning-position) (line-end-position)))
-                        (message "Positioned on src link, calling skg-visit-link...")
-                        (skg-visit-link)
+                  (message "Line: %s"
+                           (buffer-substring-no-properties
+                            (line-beginning-position) (line-end-position)))
+                  (message "Positioned on src metadata, calling skg-view...")
+                  (skg-view)
 
-                        ;; Wait for content view buffer to show src's content
-                        (unless (wait-for-content-view "\\[\\[id:dest\\]" 5)
-                          (test-fail "Timeout waiting for src content view")))
-                    (test-fail "Could not find '][' in src link")))
-              (test-fail "Could not find [[id:src] link"))))
+                  ;; Wait for content view buffer to show src's content
+                  ;; (src's title contains a [[id:dest][...]] link)
+                  (unless (wait-for-content-view "\\[\\[id:dest\\]" 5)
+                    (test-fail "Timeout waiting for src content view")))
+              (test-fail "Could not find (id src) in search results"))))
       (test-fail "Search buffer not found"))))
 
 (defun phase-2-visit-dest ()
@@ -132,13 +124,14 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
           (let ((content (buffer-substring-no-properties (point-min) (point-max))))
             (message "Src content view: %s" content)
 
-            ;; Verify we're at src
+            ;; Verify we're at src (title contains link to dest)
             (unless (string-match-p "\\[\\[id:dest\\]" content)
               (test-fail "Expected src with link to dest, got: %s" content))
 
             (test-pass "At src content view with link to dest")
 
-            ;; Find and position on the dest link
+            ;; Find and position on the dest link (this is a real
+            ;; org link in the title, so skg-visit-link works here)
             (goto-char (point-min))
             (if (search-forward "[[id:dest]" nil t)
                 (progn

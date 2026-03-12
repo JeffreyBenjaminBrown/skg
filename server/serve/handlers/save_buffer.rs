@@ -4,7 +4,7 @@ use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
 use crate::merge::merge_nodes;
 use crate::save::update_graph_minus_merges;
 use crate::serve::ConnectionState;
-use crate::serve::protocol::ResponseType;
+use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   view_uri_from_request,
   format_buffer_response_sexp_with_updates,
@@ -91,7 +91,7 @@ pub fn handle_save_buffer_request (
           format_collateral_uris_sexp ( &uris_to_lock );
         send_response_with_length_prefix (
           stream,
-          & tag_sexp_response ( ResponseType::SaveLock, &lock_sexp )); }
+          & tag_sexp_response ( TcpToClient::SaveLock, &lock_sexp )); }
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "update_from_and_rerender_buffer" ). entered();
         match block_on(
@@ -106,7 +106,7 @@ pub fn handle_save_buffer_request (
             send_response_with_length_prefix (
               stream,
               & tag_sexp_response (
-                ResponseType::SaveResult,
+                TcpToClient::SaveResult,
                 & save_response . to_sexp_string () )); }
           Err (err) => { // Check if this is a SaveError that should be formatted for the client
             if let Some (save_error) = err . downcast_ref::<SaveError>() {
@@ -117,7 +117,7 @@ pub fn handle_save_buffer_request (
               send_response_with_length_prefix (
                 stream,
                 & tag_sexp_response (
-                  ResponseType::SaveResult, & response_sexp ));
+                  TcpToClient::SaveResult, & response_sexp ));
             } else {
               let error_msg : String =
                 format!("Error processing buffer content: {}", err);
@@ -125,7 +125,7 @@ pub fn handle_save_buffer_request (
               send_response_with_length_prefix (
                 stream,
                 & tag_text_response (
-                  ResponseType::SaveResult, &error_msg )); }} }}; }
+                  TcpToClient::SaveResult, &error_msg )); }} }}; }
     Err (err) => {
       let error_msg : String =
         format! ("Error reading buffer content: {}", err );
@@ -133,7 +133,7 @@ pub fn handle_save_buffer_request (
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
-          ResponseType::SaveResult, &error_msg )); }} }
+          TcpToClient::SaveResult, &error_msg )); }} }
 
 /// Create an s-expression with nil content and an error message.
 fn empty_response_sexp (
@@ -294,6 +294,5 @@ fn uris_of_views_to_lock (
   for pid in &pids {
     for uri in conn_state . memory . views_containing (pid) {
       if &uri != saved_uri
-        && ! uri . is_search ()
       { collateral_views . insert (uri); } } }
   collateral_views . into_iter () . collect () }

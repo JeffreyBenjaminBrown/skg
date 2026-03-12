@@ -1,57 +1,53 @@
-/// TODO ? Maybe this module could be simpler,
-/// by reusing the existing code for executing a
-/// containerward view request.
-
 use crate::dbs::tantivy::title_and_source_by_id;
-use crate::dbs::typedb::ancestry::AncestryNode;
+use crate::dbs::typedb::ancestry::AncestryTree;
 use crate::types::memory::skgnode_from_map_or_disk;
-use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
+use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::skgnode::SkgNode;
-use crate::types::viewnode::{
-  ViewNode, ViewNodeKind, Scaffold, GraphNodeStats};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, mk_indefinitive_viewnode};
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::HashMap;
 
 /// Insert full containerward ancestry trees into the search forest,
-/// under each level-2 result node.
+/// under each level-1 result TrueNode.
+/// Ancestry children are prepended (inserted first among siblings).
 /// Also populates the pool with SkgNodes for each ancestor node.
 pub(crate) fn insert_ancestry_into_search_view (
   forest         : &mut Tree<ViewNode>,
-  result_ids     : &[ID],
-  ancestry_by_id : &HashMap<ID, AncestryNode>,
+  search_results     : &[ID],
+  ancestry_by_id : &HashMap<ID, AncestryTree>,
   tantivy_index  : &TantivyIndex,
   pool           : &mut HashMap<ID, SkgNode>,
   config         : &SkgConfig,
 ) {
-  let level1_id : NodeId = { // the unique level-1 headline
-    let root_ref : NodeRef<ViewNode> =
-      forest . root ();
-    match root_ref . children () . next () {
-      Some (child) => child . id (),
-      None => return } };
-  let level2_ids : Vec<NodeId> = // the matches
-    forest . get (level1_id) . unwrap ()
-    . children ()
-    . map ( |c| c . id () )
-    . collect ();
-  for (block_idx, &level2_nid)
-    in level2_ids . iter () . enumerate ()
-  { if block_idx >= result_ids . len () { break; }
-    let id : &ID = &result_ids [block_idx];
-    if let Some (ancestry) = ancestry_by_id . get (id) {
+  // Search results ("hits") are level-1 BufferRoot children.
+  // Match them by ID from search_results.
+  let level1_ids : Vec<(NodeId, ID)> = {
+    let root_ref : NodeRef<ViewNode> = forest . root ();
+    root_ref . children ()
+    . filter_map ( |c| match &c . value () . kind {
+      ViewNodeKind::True (t) =>
+        Some (( c . id (), t . id . clone () )),
+      _ => None } )
+    . collect () };
+  for (node_nid, node_id) in &level1_ids {
+    if ! search_results . contains (node_id) { continue; }
+    if let Some (ancestry) = ancestry_by_id . get (node_id) {
       // The ancestry root is the result node itself;
-      // its children (containers) go under the level-2 node.
-      if let AncestryNode::Inner ( _, children ) = ancestry {
-        for child in children {
+      // its children (containers) go under the level-1 node.
+      if let AncestryTree::Inner ( _, children ) = ancestry {
+        for child in children . iter () . rev () {
+          // Insert in reverse so the first child in
+          // the ancestry ends up first among siblings.
           insert_ancestry_node_recursive (
-            child, level2_nid,
+            child, *node_nid,
             forest, tantivy_index, pool, config ); } } } } }
 
-/// Recursively insert an AncestryNode and its children
-/// as SearchResult scaffold children under the given parent.
+/// Recursively insert an AncestryTree and its children
+/// as indefinitive parent_ignores TrueNode children
+/// under the given parent. Ancestry nodes are prepended.
 fn insert_ancestry_node_recursive(
-  node          : &AncestryNode,
+  node          : &AncestryTree,
   parent_nid    : NodeId,
   forest        : &mut Tree<ViewNode>,
   tantivy_index : &TantivyIndex,
@@ -59,10 +55,10 @@ fn insert_ancestry_node_recursive(
   config        : &SkgConfig,
 ) {
   let child_nid : NodeId =
-    append_search_result_child_from_tantivy (
+    prepend_truenode_child_from_tantivy (
       node . id (), parent_nid,
       forest, tantivy_index, pool, config );
-  if let AncestryNode::Inner ( _, children ) = node {
+  if let AncestryTree::Inner ( _, children ) = node {
     for child in children {
       insert_ancestry_node_recursive (
         child, child_nid,
@@ -70,11 +66,12 @@ fn insert_ancestry_node_recursive(
 
 /// Looks up a node's title and source from Tantivy,
 /// populates the SkgNode pool, and
-/// appends a SearchResult scaffold child under the given parent.
+/// prepends an indefinitive parent_ignores TrueNode child
+/// under the given parent.
 /// Returns the new child's NodeId.
-fn append_search_result_child_from_tantivy (
-  node_id       : &ID,
-  parent_nid    : NodeId,
+fn prepend_truenode_child_from_tantivy (
+  node_id       : &ID, // what to prepend
+  parent_treeid : NodeId, // where to prepend
   forest        : &mut Tree<ViewNode>,
   tantivy_index : &TantivyIndex,
   pool          : &mut HashMap<ID, SkgNode>,
@@ -85,17 +82,12 @@ fn append_search_result_child_from_tantivy (
     . unwrap_or_else ( ||
       ( node_id . as_str () . to_string (),
         SourceName::from ("search") ) );
-  let _ = skgnode_from_map_or_disk (
+  let _ = skgnode_from_map_or_disk ( // updates the map
     node_id, &source, pool, config );
+  let viewnode : ViewNode =
+    mk_indefinitive_viewnode ( node_id . clone (), source, title,
+                               true ); // parent_ignores
   let mut parent_mut : NodeMut<ViewNode> =
-    forest . get_mut (parent_nid) . unwrap ();
-  parent_mut . append ( ViewNode {
-    focused : false,
-    folded  : false,
-    kind    : ViewNodeKind::Scaff (
-      Scaffold::SearchResult {
-        id         : node_id . clone (),
-        source,
-        title,
-        graphStats : GraphNodeStats::default () } ) } )
-  . id () }
+    forest . get_mut (parent_treeid) . unwrap ();
+  parent_mut . prepend (viewnode)
+    . id () }

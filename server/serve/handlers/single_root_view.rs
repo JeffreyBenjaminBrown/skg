@@ -1,6 +1,6 @@
 use crate::serve::ConnectionState;
 use crate::to_org::render::content_view::single_root_view;
-use crate::serve::protocol::ResponseType;
+use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   view_uri_from_request,
   send_response_with_length_prefix,
@@ -34,20 +34,21 @@ pub fn handle_single_root_view_request (
   match node_id_from_single_root_view_request (request) {
     Ok (node_id) => {
       if let Some (existing_uri)
-        = conn_state . memory . view_uri_for_root_id ( &node_id )
-      { let switch_sexp : String =
-          Sexp::List ( vec! [
+        = conn_state . memory
+          . content_view_uri_for_root_id ( &node_id )
+        { let switch_sexp : String =
             Sexp::List ( vec! [
-              Sexp::Atom ( Atom::S (
-                "switch-to-view" . to_string () )),
-              Sexp::Atom ( Atom::S (
-                existing_uri . repr_in_client () )) ] ) ] )
-          . to_string ();
-        send_response_with_length_prefix (
-          stream,
-          & tag_sexp_response (
-            ResponseType::ContentView, &switch_sexp ));
-        return; }
+              Sexp::List ( vec! [
+                Sexp::Atom ( Atom::S (
+                  "switch-to-view" . to_string () )),
+                Sexp::Atom ( Atom::S (
+                  existing_uri . repr_in_client () )) ] ) ] )
+            . to_string ();
+          send_response_with_length_prefix (
+            stream,
+            & tag_sexp_response (
+              TcpToClient::ContentView, &switch_sexp ));
+          return; }
       let response_sexp : String =
       { let _span : tracing::span::EnteredSpan =
           tracing::info_span!( "single_root_view" ). entered();
@@ -78,7 +79,7 @@ pub fn handle_single_root_view_request (
       send_response_with_length_prefix (
         stream,
         & tag_sexp_response (
-          ResponseType::ContentView, &response_sexp )); },
+          TcpToClient::ContentView, &response_sexp )); },
     Err (err) => {
       let error_msg : String = format!(
         "Error extracting node ID: {}", err);
@@ -86,7 +87,7 @@ pub fn handle_single_root_view_request (
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
-          ResponseType::ContentView, &error_msg )); } } }
+          TcpToClient::ContentView, &error_msg )); } } }
 
 pub fn node_id_from_single_root_view_request (
   request : &str

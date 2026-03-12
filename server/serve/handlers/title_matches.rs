@@ -9,17 +9,17 @@ pub mod render_enriched_search_buffer;
 use crate::consts::SEARCH_DISPLAY_LIMIT;
 use crate::context::ContextOriginType;
 use crate::dbs::tantivy::search_index;
-use crate::dbs::typedb::ancestry::{AncestryNode, full_containerward_ancestry};
+use crate::dbs::typedb::ancestry::{AncestryTree, full_containerward_ancestry};
 use crate::dbs::typedb::search::all_graphnodestats::{ AllGraphNodeStats, fetch_all_graphnodestats};
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::serve::ConnectionState;
-use crate::serve::protocol::ResponseType;
+use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
 use crate::types::memory::skgnode_from_map_or_disk;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::memory::ViewUri;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, GraphNodeStats, forest_root_viewnode};
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, forest_root_viewnode, mk_indefinitive_viewnode};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use sexp::{Sexp, Atom};
@@ -51,8 +51,8 @@ pub type MatchGroups =
 /// replacing the raw rendered String.
 pub struct SearchEnrichmentPayload {
   pub terms          : String,
-  pub result_ids     : Vec<ID>,
-  pub ancestry_by_id : HashMap<ID, AncestryNode>,
+  pub search_results : Vec<ID>,
+  pub ancestry_by_id : HashMap<ID, AncestryTree>,
   pub graphnodestats : AllGraphNodeStats,
 }
 
@@ -81,7 +81,7 @@ pub fn handle_title_matches_request (
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
-          ResponseType::SearchResults, &err ));
+          TcpToClient::SearchResults, &err ));
       return; } };
   let search_terms : Result < String, String > =
     extract_v_from_kv_pair_in_sexp ( &sexp, "terms" );
@@ -101,7 +101,7 @@ pub fn handle_title_matches_request (
             send_response_with_length_prefix (
               stream,
               & tag_text_response (
-                ResponseType::SearchResults,
+                TcpToClient::SearchResults,
                 "No matches found." ));
             return; }
           let matches_by_id : MatchGroups =
@@ -110,7 +110,7 @@ pub fn handle_title_matches_request (
               searcher,
               tantivy_index,
               &scope );
-          let (forest, result_ids) : (Tree<ViewNode>, Vec<ID>) =
+          let (forest, search_results) : (Tree<ViewNode>, Vec<ID>) =
             build_search_forest (
               &search_terms,
               &matches_by_id );
@@ -125,24 +125,27 @@ pub fn handle_title_matches_request (
               &mut conn_state . memory . pool, config ); }
           let uri : ViewUri =
             ViewUri::SearchView ( search_terms . clone () );
+          if conn_state . memory . views . contains_key (&uri) {
+            // A previous search with the same terms exists.
+            // Clean up its pool entries before overwriting.
+            conn_state . memory . unregister_view (&uri); }
           conn_state . memory . register_view (
-            // Register the search view.
-            uri, forest, &result_ids );
+            uri, forest, &search_results );
           send_response_with_length_prefix (
             // phase 1 (unenriched) tagged LP response
             stream,
             & tag_text_response (
-              ResponseType::SearchResults, &rendered ));
+              TcpToClient::SearchResults, &rendered ));
           spawn_enrichment_thread (
             // phase 2 (enriched) search results, backgrounded
             enrichment_slot, search_cancelled,
             typedb_driver, config,
-            &search_terms, &result_ids ); },
+            &search_terms, &search_results ); },
         Err (e) => {
           send_response_with_length_prefix (
             stream,
             & tag_text_response (
-              ResponseType::SearchResults,
+              TcpToClient::SearchResults,
               & format! ("Error searching index: {}", e) )); }} },
     Err (err) => {
       let error_msg : String =
@@ -152,7 +155,7 @@ pub fn handle_title_matches_request (
       send_response_with_length_prefix (
         stream,
         & tag_text_response (
-          ResponseType::SearchResults, &error_msg )); }} }
+          TcpToClient::SearchResults, &error_msg )); }} }
 
 /// Spawn a background thread to compute containerward acnestries
 /// and graphnodestats, then write the structured payload
@@ -164,7 +167,7 @@ fn spawn_enrichment_thread (
   typedb_driver    : &Arc<TypeDBDriver>,
   config           : &SkgConfig,
   search_terms     : &str,
-  result_ids       : &[ID],
+  search_results   : &[ID],
 ) {
   { // Clear stale enrichment before spawning.
     // todo ? Instead, permit multiple enrichments for different search result buffers to coexist.
@@ -178,12 +181,12 @@ fn spawn_enrichment_thread (
   let driver_clone  : Arc<TypeDBDriver> = Arc::clone (typedb_driver);
   let config_clone  : SkgConfig         = config . clone ();
   let terms_clone   : String            = search_terms . to_string ();
-  let ids_clone     : Vec<ID>           = result_ids . to_vec ();
+  let ids_clone     : Vec<ID>           = search_results . to_vec ();
   let max_depth : usize = config . max_ancestry_depth;
   std::thread::spawn ( move || {
     tracing::info! ("search enrichment: thread started for {} IDs",
               ids_clone . len ());
-    let ancestry_by_id : HashMap<ID, AncestryNode> =
+    let ancestry_by_id : HashMap<ID, AncestryTree> =
       ancestry_by_id_from_ids (
         &ids_clone, &config_clone . db_name,
         &driver_clone, max_depth );
@@ -219,7 +222,7 @@ fn spawn_enrichment_thread (
       slot_clone . lock () . unwrap ();
     *guard = Some ( SearchEnrichmentPayload {
       terms          : terms_clone,
-      result_ids     : ids_clone,
+      search_results     : ids_clone,
       ancestry_by_id,
       graphnodestats } ); } ); }
 
@@ -230,17 +233,18 @@ fn ancestry_by_id_from_ids (
   db_name   : &str,
   driver    : &TypeDBDriver,
   max_depth : usize,
-) -> HashMap<ID, AncestryNode> {
+) -> HashMap<ID, AncestryTree> {
   let futures : Vec<_> =
     ids . iter ()
     . map ( |id|
       full_containerward_ancestry (
         db_name, driver, id, max_depth ) )
     . collect ();
-  let results : Vec<Result<AncestryNode, Box<dyn std::error::Error>>> =
+  let results : Vec<Result<AncestryTree,
+                           Box<dyn std::error::Error>>> =
     futures::executor::block_on (
       futures::future::join_all (futures) );
-  let mut map : HashMap<ID, AncestryNode> =
+  let mut map : HashMap<ID, AncestryTree> =
     HashMap::new ();
   for ( id, result ) in ids . iter ()
                         . zip ( results )
@@ -253,11 +257,11 @@ fn ancestry_by_id_from_ids (
   map }
 
 fn collect_ids_from_ancestry_node(
-  node   : &AncestryNode,
+  node   : &AncestryTree,
   id_set : &mut HashSet<ID>,
 ) {
   id_set . insert ( node . id () . clone () );
-  if let AncestryNode::Inner ( _, children ) = node {
+  if let AncestryTree::Inner ( _, children ) = node {
     for child in children {
       collect_ids_from_ancestry_node ( child, id_set ); } } }
 
@@ -271,7 +275,7 @@ pub fn mk_search_enrichment_sexp (
   Sexp::List ( vec! [
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "response-type" . to_string () )),
-      Sexp::Atom ( Atom::S ( ResponseType::SearchEnrichment
+      Sexp::Atom ( Atom::S ( TcpToClient::SearchEnrichment
                              . repr_in_client () . to_string () )), ] ),
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "terms"   . to_string () )),
@@ -342,27 +346,15 @@ pub fn group_matches_by_id (
 ///
 /// Tree structure:
 ///   BufferRoot
-///   └── TrueNode "search-results" (level 1, parentIgnores)
-///       ├── TrueNode per result (level 2, indefinitive)
-///       │   └── AliasCol + Alias children (if aliases matched)
-///       └── ...
+///   ├── TrueNode per result (level 1, indefinitive, parent_ignores)
+///   │   └── AliasCol + Alias children (if aliases matched)
+///   └── ...
 pub fn build_search_forest (
-  search_terms  : &str,
+  _search_terms : &str,
   matches_by_id : &MatchGroups,
 ) -> (Tree<ViewNode>, Vec<ID>) {
   let mut forest : Tree<ViewNode> =
     Tree::new ( forest_root_viewnode () );
-  let level1_treeid : NodeId = {
-    // The unique level-1 search-results heading
-    let mut root_mut : NodeMut<ViewNode> =
-      forest . root_mut ();
-    root_mut . append ( ViewNode {
-      focused : false,
-      folded  : false,
-      kind    : ViewNodeKind::Scaff (
-        Scaffold::SearchResultCol {
-          query : search_terms . to_string () } ) } )
-    . id () };
   let mut id_entries : Vec < ( &ID,
                                &SourceName,
                                &Vec < ( f32, String ) > ) > =
@@ -377,40 +369,35 @@ pub fn build_search_forest (
       b . 2 . first () . map ( |(s, _)| *s ) . unwrap_or (0.0);
     score_b . partial_cmp (& score_a)
     . unwrap_or (std::cmp::Ordering::Equal) } );
-  let mut result_ids : Vec < ID > = Vec::new ();
+  let mut search_results : Vec < ID > = Vec::new ();
   for (id, source, matches) in id_entries . iter ()
         . take (SEARCH_DISPLAY_LIMIT)
-    { result_ids . push ( (*id) . clone () );
+    { search_results . push ( (*id) . clone () );
       let mut sorted_matches : Vec < &(f32, String) > =
         // We borrow from matches_by_id.
         // Sort matches by score descending for display.
         matches . iter () . collect ();
       sorted_matches . sort_by ( |a, b|
         b . 0 . partial_cmp (&a . 0) . unwrap () );
-      let (score, title) : &(f32, String) = sorted_matches [0];
-      let level2_treeid : NodeId = {
-        // We make one of these for each ID found
-        let mut level1_mut : NodeMut<ViewNode> =
-          forest . get_mut (level1_treeid) . unwrap ();
-        level1_mut . append ( ViewNode {
-          focused : false,
-          folded  : false,
-          kind    : ViewNodeKind::Scaff (
-            Scaffold::SearchResult {
-              id         : (*id) . clone (),
-              source     : (*source) . clone (),
-              title      : format! ( "score: {:.2}, [[id:{}][{}]]",
-                                     score, id . as_str (), title ),
-              graphStats : GraphNodeStats::default () } ) } )
+      let (_score, title) : &(f32, String) = sorted_matches [0];
+      let result_treeid : NodeId = {
+        let mut root_mut : NodeMut<ViewNode> =
+          forest . root_mut ();
+        root_mut . append (
+          mk_indefinitive_viewnode (
+            (*id) . clone (),
+            (*source) . clone (),
+            title . clone (),
+            true ) ) // parent_ignores
         . id () };
       if sorted_matches . len () > 1 {
         // We bury all but the best match in an AliasCol.
         // PITFALL: The title might not be the best match,
         // in which case this makes it look like an alias.
         let aliascol_id : NodeId = {
-          let mut level2_mut : NodeMut<ViewNode> =
-            forest . get_mut (level2_treeid) . unwrap ();
-          level2_mut . append ( ViewNode {
+          let mut result_mut : NodeMut<ViewNode> =
+            forest . get_mut (result_treeid) . unwrap ();
+          result_mut . append ( ViewNode {
             focused : false,
             folded  : true,
             kind    : ViewNodeKind::Scaff (
@@ -426,4 +413,4 @@ pub fn build_search_forest (
               Scaffold::Alias {
                 text : title . clone (),
                 diff : None } ) } ); }} }
-  (forest, result_ids) }
+  (forest, search_results) }

@@ -92,12 +92,15 @@ impl SkgnodesInMemory {
     self . views . get (uri)
       . map ( |vs| &vs . forest ) }
 
-  pub fn view_uri_for_root_id (
+  /// Returns the first (if any exists) non-search buffer
+  /// for which the ID is a root (level-1 headline).
+  pub fn content_view_uri_for_root_id (
     &self,
     id : &ID,
   ) -> Option<&ViewUri> {
     self . root_ids . get_right (id)
-      . and_then ( |uris| uris . iter () . next () ) }
+      . and_then ( |uris| uris . iter ()
+                   . find ( |u| ! u . is_search () )) }
 
   pub fn register_view (
     &mut self,
@@ -175,8 +178,10 @@ impl SkgnodesInMemory {
 // Functions
 //
 
-/// Collect all IDs (primary + extras) for every root TrueNode in a forest.
-/// A root TrueNode is a direct child of the BufferRoot scaffold.
+/// Collect all IDs (primary + extras) for every root
+/// -- i.e. every level-1 headline -- in the view.
+/// (There can be graph roots at other levels, via parentIgnores;
+/// this does not return those.)
 fn root_ids_from_forest (
   forest : &Tree<ViewNode>,
   pool   : &HashMap<ID, SkgNode>,

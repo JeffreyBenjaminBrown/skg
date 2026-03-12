@@ -33,19 +33,6 @@
       (BLUE diff
         (GREEN new "diff:new")
         (RED removed "diff:removed")))
-    (BLUE searchResultCol "search")
-    (BLUE searchResult
-      (id (ANY "⦿"))
-      (source)
-      (BLUE graphStats
-        (containers (ANY IT "{"))
-        (contents (ANY "{" IT))
-        (linksIn (ANY IT "→"))
-        (BLUE aliasing "A")
-        (BLUE extraIDs "I")
-        (BLUE overriding "O")
-        (BLUE subscribing "S")
-        (BLUE containerwardPath (ANY IT))))
     (BLUE textChanged "<< Text changed. M-x skg-show-magit to see. >>")
     (RED deletedScaffold (ANY "DELETED" IT))
     (RED deleted "DELETED"

@@ -26,13 +26,13 @@
           (let ((content (buffer-substring-no-properties (point-min) (point-max))))
             (message "Search results received")
             (message "Content: %s" content)
-            (if (string-match-p "\\[\\[id:apples\\]" content)
+            (if (string-match-p "(id apples)" content)
                 (progn
-                  (message "✓ PASS: Found apples link in search results")
+                  (message "✓ PASS: Found apples node in search results")
                   (setq integration-test-phase "search-complete"))
               (progn
-                (message "✗ FAIL: Expected apples link not found in search results")
-                (message "Expected pattern: \\[\\[id:apples\\]")
+                (message "✗ FAIL: Expected apples node not found in search results")
+                (message "Expected pattern: (id apples)")
                 (message "Got: %s" content)
                 (kill-emacs 1)))))
       (progn
@@ -40,27 +40,28 @@
         (kill-emacs 1)))))
 
 (defun test-visit-link ()
-  "Visit the apples link from search results."
-  (message "=== PHASE 2: Testing link visit ===")
+  "Visit the apples node from search results."
+  (message "=== PHASE 2: Testing node visit ===")
 
   ;; Get the search results buffer
   (let ((search-buffer (get-buffer (skg-search-buffer-name "apples"))))
     (if search-buffer
         (with-current-buffer search-buffer
           (goto-char (point-min))
-          ;; Find the apples link and position cursor on it
-          (if (re-search-forward "\\[\\[id:apples\\]" nil t)
+          ;; Find the headline with (id apples) in metadata
+          ;; and position cursor on the metadata so skg-view can read it.
+          (if (re-search-forward "(id apples)" nil t)
               (progn
-                (message "✓ Found apples link, positioning cursor")
+                (message "✓ Found apples metadata, positioning cursor")
                 (goto-char (match-beginning 0))
                 (message "Line content: %s"
                          (buffer-substring-no-properties
                           (line-beginning-position)
                           (line-end-position)))
 
-                ;; Visit the link - this will set up its own handler
-                (message "Calling skg-visit-link...")
-                (skg-visit-link)
+                ;; Visit via skg-view (reads id from metadata)
+                (message "Calling skg-view...")
+                (skg-view)
 
                 ;; Wait for the content view buffer to be created
                 (skg-test-wait-for
@@ -84,7 +85,7 @@
                       (message "✗ FAIL: Content view buffer was not created")
                       (kill-emacs 1)))))
             (progn
-              (message "✗ FAIL: Could not find apples link in search buffer")
+              (message "✗ FAIL: Could not find apples metadata in search buffer")
               (message "Buffer content:")
               (message "%s" (buffer-substring-no-properties (point-min) (point-max)))
               (kill-emacs 1))))

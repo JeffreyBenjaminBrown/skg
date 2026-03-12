@@ -127,16 +127,6 @@ fn scaffold_metadata_to_string (
       parts . push ( "id" . to_string () );
       if let Some (d) = diff {
         parts . push ( format! ( "(diff {})", d . repr_in_client() ) ); }}
-    Scaffold::SearchResultCol { .. } =>
-      parts . push ( "searchResultCol" . to_string () ),
-    Scaffold::SearchResult { id, source, graphStats, .. } => {
-      let mut sr_parts : Vec < String > =
-        vec! [ "searchResult" . to_string () ];
-      sr_parts . push ( format! ( "(id {})", id . 0 ));
-      sr_parts . push ( format! ( "(source {})", source ));
-      if let Some (gs) = graphnodestats_to_sexp (graphStats) {
-        sr_parts . push (gs); }
-      parts . push ( format! ( "({})", sr_parts . join (" ") )); }
   }
   Ok ( parts . join (" ")) }
 

@@ -12,20 +12,20 @@ use crate::types::misc::ID;
 /// DepthTruncated: max_ancestry_depth reached; may have containers we didn't explore.
 /// Inner: has at least one container; children are its containers.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AncestryNode {
+pub enum AncestryTree {
   Root           ( ID ),
   Repeated       ( ID ),
   DepthTruncated ( ID ),
-  Inner          ( ID, Vec<AncestryNode> ),
+  Inner          ( ID, Vec<AncestryTree> ),
 }
 
-impl AncestryNode {
+impl AncestryTree {
   pub fn id ( &self ) -> &ID {
     match self {
-      AncestryNode::Root           ( id )    => id,
-      AncestryNode::Repeated       ( id )    => id,
-      AncestryNode::DepthTruncated ( id )    => id,
-      AncestryNode::Inner          ( id, _ ) => id, } } }
+      AncestryTree::Root           (id)      => id,
+      AncestryTree::Repeated       (id)      => id,
+      AncestryTree::DepthTruncated (id)      => id,
+      AncestryTree::Inner          ( id, _ ) => id, }} }
 
 /// Internal: tracks what will happen to a child node
 /// during the BFS in 'full_containerward_ancestry'.
@@ -40,13 +40,13 @@ enum NodeFate {
 /// (in parallel via join_all), then classifies each result as Root, Repeated,
 /// DepthTruncated, or Inner.
 ///
-/// Returns an AncestryNode rooted at the origin.
+/// Returns an AncestryTree rooted at the origin.
 pub async fn full_containerward_ancestry(
   db_name   : &str,
   driver    : &TypeDBDriver,
   origin    : &ID,
   max_depth : usize,
-) -> Result<AncestryNode, Box<dyn Error>> {
+) -> Result<AncestryTree, Box<dyn Error>> {
   // BFS state: for each node we've decided to expand,
   // record its containers (once queried). Leaves (Root,
   // Repeated, DepthTruncated) get no entry here.
@@ -173,33 +173,33 @@ fn classify_frontier_containers(
         *parent_key, node_children ); } }
   next_frontier }
 
-/// Recursively build an AncestryNode from the BFS maps.
+/// Recursively build an AncestryTree from the BFS maps.
 fn assemble(
   key                  : usize,
   id_of                : &HashMap<usize, ID>,
   children_of          : &HashMap<usize, Vec<(ID, NodeFate)>>,
   depth_truncated_keys : &HashSet<usize>,
-) -> AncestryNode {
+) -> AncestryTree {
   let id : ID =
     id_of . get (& key)
     . expect ("id_of should have every key")
     . clone ();
   if depth_truncated_keys . contains (& key) {
-    return AncestryNode::DepthTruncated ( id ); }
+    return AncestryTree::DepthTruncated (id); }
   match children_of . get (& key) {
     None =>
-      AncestryNode::Root ( id ),
+      AncestryTree::Root (id),
     Some ( child_entries ) if child_entries . is_empty () =>
-      AncestryNode::Root ( id ),
+      AncestryTree::Root (id),
     Some ( child_entries ) => {
-      let children : Vec<AncestryNode> =
+      let children : Vec<AncestryTree> =
         child_entries . iter ()
         . map ( |(child_id, fate)| match fate {
           NodeFate::Repeated =>
-            AncestryNode::Repeated ( child_id . clone () ),
+            AncestryTree::Repeated ( child_id . clone () ),
           NodeFate::Open ( child_key ) =>
             assemble (
               *child_key, id_of, children_of,
               depth_truncated_keys ), } )
         . collect ();
-      AncestryNode::Inner ( id, children ) }, } }
+      AncestryTree::Inner ( id, children ) }, } }

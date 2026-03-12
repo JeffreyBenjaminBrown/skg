@@ -46,6 +46,13 @@ SCOPE is \"rooty\" (filtered) or \"everywhere\" (unfiltered)."
      (lambda (_tcp-proc payload)
        (skg--display-search-enrichment payload))
      t)
+    (skg-register-response-handler
+     ;; Rust asks for a snapshot of the search buffer so it can
+     ;; integrate ancestry without losing user edits.
+     'request-snapshot
+     (lambda (tcp-proc payload)
+       (skg--handle-snapshot-request tcp-proc payload))
+     nil) ;; persistent, not one-shot
     (skg-lp-reset)
     (process-send-string tcp-proc request-s-exp)))
 
@@ -65,8 +72,8 @@ kill-buffer-hook to send close-view to the server."
           (heralds-minor-mode)
           (goto-char (point-min)))
         (setq skg-view-uri view-uri)
+        (skg-content-view-mode 1)
         (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
-        (setq buffer-read-only t)
         (switch-to-buffer (current-buffer)) ))))
 
 (defun skg--as-string (value)
@@ -79,7 +86,8 @@ kill-buffer-hook to send close-view to the server."
 (defun skg--display-search-enrichment (payload)
   "Replace search buffer with results
 'enriched' with containerward paths and graphnodestats.
-PAYLOAD contains response-type, terms, and content."
+PAYLOAD contains response-type, terms, and content.
+Exits readonly after replacing content."
   (let* ((response (read payload))
          (terms   (skg--as-string (cadr (assoc 'terms   response))))
          (content (skg--as-string (cadr (assoc 'content response)))))
@@ -89,7 +97,38 @@ PAYLOAD contains response-type, terms, and content."
           (with-current-buffer buf
             (let ((old-point (point)))
               (skg--replace-search-content content)
-              (goto-char (min old-point (point-max)))) )) ))))
+              (goto-char (min old-point (point-max))))
+            (setq buffer-read-only nil)
+            (message "Search results enriched.") )) ))))
+
+(defun skg--handle-snapshot-request (tcp-proc payload)
+  "Handle a request from the server for a snapshot of a search buffer.
+- Server sends the search terms.
+- Client looks up the corresponding search buffer by name.
+- Client makes that buffer readonly.
+- Client sends its text back to the server for 'enrichment'."
+  (let* ((response (read payload))
+         (terms (skg--as-string (cadr (assoc 'content response))))
+         (buf (when terms
+                (get-buffer (skg-search-buffer-name terms)))))
+    (when (and buf (buffer-live-p buf))
+      (with-current-buffer buf
+        (setq buffer-read-only t)
+        (message "Enriching search results...")
+        (let* ((buffer-contents (buffer-string))
+               (request-s-exp
+                (concat (prin1-to-string
+                         `((request . "snapshot response")
+                           (terms . ,terms)))
+                        "\n"))
+               (content-bytes
+                (encode-coding-string buffer-contents 'utf-8))
+               (content-length (length content-bytes))
+               (header (format "Content-Length: %d\r\n\r\n"
+                               content-length)))
+          (process-send-string tcp-proc request-s-exp)
+          (process-send-string tcp-proc header)
+          (process-send-string tcp-proc buffer-contents))))))
 
 (defun skg--replace-search-content (content)
   "Replace current buffer text with CONTENT, trimmed, with trailing newline.

@@ -20,26 +20,35 @@ use crate::serve::handlers::title_matches::{
   handle_title_matches_request,
   SearchEnrichmentPayload,
   mk_search_enrichment_sexp};
+use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use crate::types::unchecked_viewnode::unchecked_to_checked_tree;
 use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
-use crate::serve::protocol::{RequestType, ResponseType};
+use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{
+  read_length_prefixed_content,
   request_type_from_request,
   send_response_with_length_prefix,
-  tag_text_response};
+  tag_text_response,
+  value_from_request_sexp};
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::serve::handlers::title_matches::render_enriched_search_buffer::insert_ancestry_into_search_view;
 use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::memory::ViewUri;
 use crate::types::memory::SkgnodesInMemory;
 
+use crate::types::errors::BufferValidationError;
+use crate::types::unchecked_viewnode::UncheckedViewNode;
+use crate::types::viewnode::ViewNode;
+
+use ego_tree::{NodeId, Tree};
 use std::io::{BufRead, BufReader};
 use std::net::SocketAddr;
 use std::net::TcpListener;
 use std::net::TcpStream; // handles two-way communication
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
+use std::time::Duration;
 use typedb_driver::TypeDBDriver;
 
 /// Per-connection ("global") state.
@@ -97,6 +106,7 @@ fn handle_emacs (
     Arc::new ( Mutex::new (None) );
   let search_cancelled : Arc<AtomicBool> =
     Arc::new ( AtomicBool::new (false) );
+  let mut snapshot_requested : bool = false;
 
   let peer : SocketAddr =
     stream . peer_addr() . unwrap();
@@ -139,9 +149,20 @@ fn handle_emacs (
               &mut stream,
               &request_header,
               &mut conn_state ),
+          Ok (RequestType::SnapshotResponse) => {
+            snapshot_requested = false;
+            handle_snapshot_response (
+              &mut reader,
+              &mut stream,
+              &request_header,
+              &enrichment_slot,
+              &tantivy_index,
+              config,
+              &mut conn_state ); }
           Ok (RequestType::TitleMatches) => {
             // Cancel any in-flight background search
             search_cancelled . store (true, Ordering::SeqCst);
+            snapshot_requested = false;
             handle_title_matches_request (
               &mut stream,
               &request_header,
@@ -171,7 +192,7 @@ fn handle_emacs (
             send_response_with_length_prefix (
               &mut stream,
               & tag_text_response (
-                ResponseType::Error,
+                TcpToClient::Error,
                 & format! (
                   "Error determining request type: {}",
                   err ))); } };
@@ -179,45 +200,100 @@ fn handle_emacs (
       Err (ref e)
         if e . kind () == std::io::ErrorKind::WouldBlock
         || e . kind () == std::io::ErrorKind::TimedOut =>
-      { // Idle timeout — drain enrichment slot if populated.
-        // RACE NOTE: A stale enrichment payload from a cancelled search
-        // could theoretically land here if the old background thread
-        // passed its cancellation check just before the new search
-        // cleared the slot. This is harmless: same terms + unchanged
-        // index = identical results, and a fresh enrichment will
-        // overwrite shortly after.
-        if let Ok (mut guard) = enrichment_slot . try_lock () {
-          if let Some (payload) = guard . take () {
-            let uri : ViewUri =
-              ViewUri::SearchView ( payload . terms . clone () );
-            // Remove the view temporarily so we can mutably borrow
-            // both its forest and the pool without conflicting borrows
-            // on conn_state.memory.
-            if let Some (mut vs) = conn_state . memory . views . remove (&uri) {
-              insert_ancestry_into_search_view (
-                &mut vs . forest, &payload . result_ids,
-                &payload . ancestry_by_id, &tantivy_index,
-                &mut conn_state . memory . pool, config );
-              { let root_treeid : ego_tree::NodeId =
-                  vs . forest . root () . id ();
-                set_metadata_relationships_in_node_recursive (
-                  &mut vs . forest, root_treeid,
-                  &payload . graphnodestats, // these graphnodestats were pre-fetched by the enrichment thread.
-                  &mut conn_state . memory . pool, config ); }
-              let enriched : String =
-                viewnode_forest_to_string ( &vs . forest )
-                . expect ("search forest rendering never fails");
-              let enriched_sexp : String =
-                mk_search_enrichment_sexp (
-                  &payload . terms, &enriched );
-              conn_state . memory . views . insert ( uri, vs );
-              tracing::debug! (bytes = enriched_sexp . len (),
-                               "slot drain: sending enrichment");
+      { // Idle timeout — if enrichment is ready, ask Emacs
+        // for a snapshot of the search buffer so we can integrate
+        // ancestry without losing user edits.
+        if ! snapshot_requested {
+          if let Ok (guard) = enrichment_slot . try_lock () {
+            if guard . is_some () {
+              // Peek at the terms without taking the payload yet.
+              // The payload stays in the slot until the snapshot arrives.
+              let terms : String =
+                guard . as_ref () . unwrap () . terms . clone ();
+              drop (guard); // release the lock
+              tracing::debug! ("slot drain: requesting snapshot for '{}'", terms);
               send_response_with_length_prefix (
-                &mut stream, &enriched_sexp ); }} }}
+                &mut stream,
+                & tag_text_response (
+                  TcpToClient::RequestSnapshot,
+                  &terms ));
+              snapshot_requested = true; }} }}
       Err (_) => break, // real error
-    } }
+    }}
   tracing::info!(peer = %peer, "Emacs disconnected"); }
+
+/// Handle the snapshot that Emacs sent back.
+/// Parses the buffer text, inserts ancestry, sets graphnodestats,
+/// and sends the enriched result to Emacs.
+/// Emacs to Rust message format:
+///   ((request . "snapshot response") (terms . "TERMS"))
+///   Content-Length: N\r\n\r\n<buffer text>
+fn handle_snapshot_response (
+  reader          : &mut BufReader<TcpStream>,
+  stream          : &mut TcpStream,
+  request         : &str,
+  enrichment_slot : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
+  tantivy_index   : &TantivyIndex,
+  config          : &SkgConfig,
+  conn_state      : &mut ConnectionState,
+) {
+  let terms : String
+    = match value_from_request_sexp ("terms", request)
+    { Ok (t) => t,
+      Err (e) => { tracing::error! ( "snapshot response: bad terms: {}", e);
+                   return; }};
+  let buffer_text : String
+    = match read_length_prefixed_content (reader)
+    { Ok (text) => text,
+      Err (e) => { tracing::error! ( "snapshot response: failed to read content: {}", e);
+                   return; }};
+  let payload : SearchEnrichmentPayload = {
+    let mut guard : MutexGuard<Option<SearchEnrichmentPayload>> =
+      enrichment_slot . lock () . unwrap ();
+    match guard . take () {
+      Some (p) => p,
+      None => { tracing::warn! (
+                  "snapshot response: no enrichment payload");
+                return; }} };
+  if payload . terms != terms {
+    tracing::warn! ("snapshot response: terms mismatch ('{}' vs '{}')",
+                    payload . terms, terms);
+    return; }
+  let parse_result : Result<(Tree<UncheckedViewNode>,
+                             Vec<BufferValidationError>), String>
+    = org_to_uninterpreted_nodes (&buffer_text);
+  let mut viewforest : Tree<ViewNode> = match parse_result {
+    Ok (( unchecked_forest, _errors )) =>
+      match unchecked_to_checked_tree (unchecked_forest) {
+        Ok (f) => f,
+        Err (e) => {
+          tracing::error! ("snapshot response: check failed: {}", e);
+          return; }},
+    Err (e) => {
+      tracing::error! ("snapshot response: parse failed: {}", e);
+      return; }};
+  insert_ancestry_into_search_view (
+    &mut viewforest, &payload . search_results,
+    &payload . ancestry_by_id, tantivy_index,
+    &mut conn_state . memory . pool, config );
+  { let root_treeid : NodeId =
+      viewforest . root () . id ();
+    set_metadata_relationships_in_node_recursive (
+      &mut viewforest, root_treeid,
+      &payload . graphnodestats,
+      &mut conn_state . memory . pool, config ); }
+  let enriched : String =
+    viewnode_forest_to_string ( &viewforest )
+    . expect ("search viewforest rendering never fails");
+  let enriched_sexp : String =
+    mk_search_enrichment_sexp ( &terms, &enriched );
+  { let uri : ViewUri = // update memory with enriched viewforest
+      ViewUri::SearchView ( terms . clone () );
+    conn_state . memory . update_view ( &uri, viewforest ); }
+  tracing::debug! (bytes = enriched_sexp . len (),
+                   "snapshot response: sending enrichment");
+  send_response_with_length_prefix (
+    stream, &enriched_sexp ); }
 
 /// Handle git diff mode toggle request.
 /// Request format: ((request . "git diff mode toggle"))
@@ -232,14 +308,14 @@ fn handle_git_diff_mode_request (
   tracing::info! ( msg = msg, "Git diff mode toggled" );
   send_response_with_length_prefix (
     stream,
-    & tag_text_response ( ResponseType::GitDiffMode, msg )); }
+    & tag_text_response ( TcpToClient::GitDiffMode, msg )); }
 
 fn handle_verify_connection_request (
   stream: &mut std::net::TcpStream) {
   send_response_with_length_prefix (
     stream,
     & tag_text_response (
-      ResponseType::VerifyConnection,
+      TcpToClient::VerifyConnection,
       "This is the skg server verifying the connection." )); }
 
 fn handle_shutdown_request (
@@ -250,7 +326,7 @@ fn handle_shutdown_request (
   send_response_with_length_prefix (
     stream,
     & tag_text_response (
-      ResponseType::Shutdown, "Server shutting down..." ));
+      TcpToClient::Shutdown, "Server shutting down..." ));
   cleanup_and_shutdown (
     typedb_driver, config ); }
 

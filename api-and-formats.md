@@ -6,24 +6,28 @@ Note: Port 1729 is used for Rust-TypeDB communication (the TypeDB server), not R
 
 So far there are these endpoints:
 
-- Verify connection
+## Verify connection
   - Request: ((request . "verify connection"))
   - Response: Plain text with newline termination: "This is the skg server verifying the connection."
 
-
-- Search in titles
+## Search in titles
   - Request: ((request . "title matches") (terms . "SEARCH_TERMS") (scope . "SCOPE"))
-  - `scope` is optional; defaults to "rooty".
-    - "rooty": only returns nodes with relationships suggesting they are especially rootlike -- so literal roots, but also cycle-roots, link targets, and things that had an ID when imported. Defined in the negative, 'rooty' excludes MultiContained and untyped nodes.
-    - "everywhere": returns all Tantivy matches regardless of origin type, including the humblest leaves.
-  - Response (phase 1, immediate): LP buffer content with response-type "search-results".
-  - Response (phase 2, background): LP buffer content with response-type "search-enrichment".
+    - `scope` is optional; defaults to "rooty".
+      - "rooty": only returns nodes with relationships suggesting they are especially rootlike -- so literal roots, but also cycle-roots, link targets, and things that had an ID when imported. Defined in the negative, 'rooty' excludes MultiContained and untyped nodes.
+      - "everywhere": returns all Tantivy matches regardless of origin type, including the humblest leaves.
 
-- Single root content tree view from ID
+  - Phase 1, immediate: Server sends LP buffer content with response-type "search-results". Results are ordinary indefinitive parent_ignores TrueNodes (not special scaffold types).
+
+  - Phase 2, enrichment: A three-message sequence:
+    1. Rust sends LP response-type "request-snapshot" with `(("content" "TERMS"))` — asking Emacs for a snapshot of the search buffer matching those terms.
+    2. Emacs replies with `((request . "snapshot response") (terms . "TERMS"))\n` followed by `Content-Length: N\r\n\r\n<buffer text>` — the current buffer contents, including any unsaved user edits. Emacs sets the buffer to readonly before sending.
+    3. Rust parses the snapshot, inserts containerward ancestry and graphnodestats, and sends LP response-type "search-enrichment" with `(("terms" "TERMS") ("content" "ORG"))`. Emacs replaces the buffer and exits readonly.
+
+## Single root content tree view from ID
   - Request: ((request . "single root content view") (id . "NODE_ID") (view-uri . "URI"))
   - Response: length-prefixed content, formatted `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` constitutes `LENGTH` bytes. PAYLOAD may contain quotation marks; hence the length prefix. The document structure is detailed below, under `Single root content tree view`.
 
-- Save buffer
+## Save buffer
   - Request: First `((request . "save buffer") (view-uri . "URI"))\n`, then `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` is the buffer content (`LENGTH` bytes).
   - Response: Two length-prefixed messages, sent sequentially:
     1. Early lock message (sent immediately, before the expensive pipeline):
@@ -34,13 +38,18 @@ So far there are these endpoints:
        `content` is the re-rendered saved buffer (nil on failure). `errors` is a list of error/warning strings (empty list if none). `other-views-to-update` contains re-rendered content for collateral views.
   - If the server errors before sending the early lock message (e.g. malformed request), only one message is sent: the error response in the full save response format.
 
-- Get file path
+## Snapshot response (part of search enrichment; see "Search in titles" above)
+  - Request: First `((request . "snapshot response") (terms . "TERMS"))\n`, then `Content-Length: N\r\n\r\n<buffer text>`.
+  - Initiated by the client in response to a "request-snapshot" message from the server.
+  - Response: LP response-type "search-enrichment" with enriched buffer content.
+
+## Get file path
   - Request: ((request . "get file path") (id . "THE_ID") (source . "THE_SOURCE"))
   - Response: Plain text with newline termination containing the file path relative to the skgconfig.toml directory, e.g. `skg/some-uuid.skg`.
   - Errors: If the file does not exist on disk, responds with "File not found: <path>".
   - Does not require TypeDB or Tantivy -- only the config.
 
-- Git diff mode toggle
+## Git diff mode toggle
   - Request: ((request . "git diff mode toggle"))
   - Response: Plain text with newline termination.
     "Git diff mode enabled" or "Git diff mode disabled".
@@ -49,14 +58,14 @@ So far there are these endpoints:
     responses include diff annotations showing changes
     between git HEAD and the worktree.
 
-- Shutdown server
+## Shutdown server
   - Request: ((request . "shutdown"))
   - Has the same effect as sending SIGINT (Ctrl+C) or SIGTERM (kill) to the server.
   - Response: "Server shutting down..."
   - Behavior: `delete_on_quit` might be `= true` in the server's config file. (It defaults to false, and need not be mentioned.) If it's true, then the TypeDB database will be deleted before the server exits. This is primarily for integration tests to prevent database accumulation.
   - TODO | PITFALL: Any client can shut down the server. If ever multiple users share a server, one could bother the other. The server exits immediately after sending the response, which interrupts any in-flight requests from other clients.
 
-- Busy signal (server initializing)
+## Busy signal (server initializing)
   - Triggered when Emacs connects while the server is still initializing TypeDB/Tantivy.
   - Response: ((busy . "human-readable status message"))
   - Emacs should display the message and retry the request (or let the user retry manually).
@@ -80,7 +89,7 @@ Any such string is valid metadata
 (although much of it might be ignored by Emacs),
 if and only if it adheres to the following:
 
-- parentheses
+## parentheses
   - The metadata starts with "(skg" and ends with ")".
   - Key-value pairs are wrapped in their own parens: "(key value)".
 - whitespace

@@ -58,10 +58,7 @@ pub fn validate_local_structure (
         Scaffold::IDCol =>
           validate_idcol(tree, node_id),
         Scaffold::ID { .. } =>
-          validate_idscaffold(tree, node_id),
-        Scaffold::SearchResultCol { .. } => // TODO ? If ever search result buffers become writeable, this arm should do something.
-          Vec::new(),
-        Scaffold::SearchResult { .. } => Vec::new(), },
+          validate_idscaffold(tree, node_id), },
       UncheckedViewNodeKind::Deleted (_) => Vec::new(),
       UncheckedViewNodeKind::DeletedScaff (_) => Vec::new() };
 
@@ -88,10 +85,8 @@ fn validate_buffer_root (
     tree, node_id, 1, false,
     |node| matches!(&node . kind,
                     UncheckedViewNodeKind::True (_) |
-                    UncheckedViewNodeKind::Deleted (_) |
-                    UncheckedViewNodeKind::Scaff (
-                      Scaffold::SearchResultCol { .. } ) ))
- { errors . push("BufferRoot's children must be TrueNodes or SearchResultCol."
+                    UncheckedViewNodeKind::Deleted (_) ))
+ { errors . push("BufferRoot's children must be TrueNodes."
                 . to_string() ); }
   errors }
 

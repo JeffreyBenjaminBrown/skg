@@ -8,6 +8,7 @@ pub enum RequestType {
   SaveBuffer,
   CloseView,
   TitleMatches,
+  SnapshotResponse,
   VerifyConnection,
   Shutdown,
   GetFilePath,
@@ -23,6 +24,7 @@ impl RequestType {
       "save buffer"              => Ok (RequestType::SaveBuffer),
       "close view"               => Ok (RequestType::CloseView),
       "title matches"            => Ok (RequestType::TitleMatches),
+      "snapshot response"        => Ok (RequestType::SnapshotResponse),
       "verify connection"        => Ok (RequestType::VerifyConnection),
       "shutdown"                 => Ok (RequestType::Shutdown),
       "get file path"            => Ok (RequestType::GetFilePath),
@@ -31,18 +33,19 @@ impl RequestType {
 
 /// IN DETAIL: See api-and-formats.md
 ///
-/// IN BRIEF: Enum of all response types the server sends.
+/// IN BRIEF: Enum of all message types the server sends to the client.
 /// The client format is a string in the s-exp
 /// (("response-type" "save-result") ...).
 /// Emacs dispatches on these strings.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ResponseType {
+pub enum TcpToClient {
   ContentView,
-  SaveLock,
+  SaveLock, // Sent before the expensive save pipeline. Lists collateral view URIs so Emacs can lock those buffers against edits while the save is in progress.
   SaveResult,
   CloseView,
-  SearchResults,
-  SearchEnrichment,
+  SearchResults, // computed fast
+  SearchEnrichment, // replaces SearchResults, once it's computed. Includes containerward ancestries and graphnodestats.
+  RequestSnapshot, // Asks Emacs for a snapshot of one buffer (the search buffer matching the given terms), so that Rust can integrate enrichment data into the user's current edits.
   GetFilePath,
   VerifyConnection,
   Shutdown,
@@ -50,19 +53,20 @@ pub enum ResponseType {
   Error,
 }
 
-impl ResponseType {
+impl TcpToClient {
   pub fn repr_in_client (
     &self,
   ) -> &'static str {
     match self {
-      ResponseType::ContentView      => "content-view",
-      ResponseType::SaveLock         => "save-lock",
-      ResponseType::SaveResult       => "save-result",
-      ResponseType::CloseView        => "close-view",
-      ResponseType::SearchResults    => "search-results",
-      ResponseType::SearchEnrichment => "search-enrichment",
-      ResponseType::GetFilePath      => "get-file-path",
-      ResponseType::VerifyConnection => "verify-connection",
-      ResponseType::Shutdown         => "shutdown",
-      ResponseType::GitDiffMode      => "git-diff-mode",
-      ResponseType::Error            => "error", }} }
+      TcpToClient::ContentView      => "content-view",
+      TcpToClient::SaveLock         => "save-lock",
+      TcpToClient::SaveResult       => "save-result",
+      TcpToClient::CloseView        => "close-view",
+      TcpToClient::SearchResults    => "search-results",
+      TcpToClient::SearchEnrichment => "search-enrichment",
+      TcpToClient::RequestSnapshot  => "request-snapshot",
+      TcpToClient::GetFilePath      => "get-file-path",
+      TcpToClient::VerifyConnection => "verify-connection",
+      TcpToClient::Shutdown         => "shutdown",
+      TcpToClient::GitDiffMode      => "git-diff-mode",
+      TcpToClient::Error            => "error", }} }

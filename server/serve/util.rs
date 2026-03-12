@@ -1,4 +1,4 @@
-use crate::serve::protocol::{RequestType, ResponseType};
+use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::memory::ViewUri;
 
@@ -11,7 +11,7 @@ use std::net::TcpStream;
 /// Input:  "((content "...") (errors (...)))"
 /// Output: "(("response-type" "TYPE") (content "...") (errors (...)))"
 pub fn tag_sexp_response (
-  response_type : ResponseType,
+  response_type : TcpToClient,
   sexp_payload  : &str,
 ) -> String {
   let tag : String =
@@ -25,7 +25,7 @@ pub fn tag_sexp_response (
 /// Wrap plain text in a tagged s-exp for LP delivery.
 /// Output: (("response-type" "TYPE") ("content" "TEXT"))
 pub fn tag_text_response (
-  response_type : ResponseType,
+  response_type : TcpToClient,
   text          : &str,
 ) -> String {
   Sexp::List ( vec! [

@@ -134,7 +134,8 @@ pub async fn update_views_after_save (
 
 /// Given the saved ViewUri and save instructions,
 /// return the URIs of other views whose forests
-/// contain any changed PID.
+/// contain any changed PID. Includes search views --
+/// they are just as editable as other kinds.
 fn find_collateral_view_uris (
   saved_uri         : &ViewUri,
   save_instructions : &[DefineNode],
@@ -156,7 +157,6 @@ fn find_collateral_view_uris (
     changed_pids . iter ()
     . flat_map ( |pid| conn_state . memory . views_containing (pid) )
     . filter ( |uri| uri != saved_uri )
-    . filter ( |uri| ! uri . is_search () ) // Search views don't need collateral updates: the search results are fixed until the user searches again.
     . collect ();
   uris . into_iter () . collect () }
 
