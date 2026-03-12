@@ -52,17 +52,17 @@
                   (message "✗ FAIL: Error buffer does not contain expected content")
                   (kill-emacs 1)))))
 
-          ;; Check that buffer has focused marker added (from point position)
+          ;; Check that buffer has no focused marker. Focus and fold information is sent to the server but not shown to the user.
           (if content-buffer
               (with-current-buffer content-buffer
                 (let ((content (buffer-substring-no-properties (point-min) (point-max))))
-                  (if (string= content "* (skg (node (id 1) (source main)) focused) 1\n** (skg (node (id 1))) 1")
+                  (if (string= content "* (skg (node (id 1) (source main))) 1\n** (skg (node (id 1))) 1")
                       (progn
-                        (message "✓ PASS: Buffer has focused marker as expected")
+                        (message "✓ PASS: Buffer content unchanged (no lingering markers)")
                         (setq integration-test-phase "invalid-save-complete"))
                     (progn
                       (message "✗ FAIL: Buffer content does not match expected")
-                      (message "Expected: %S" "* (skg (node (id 1) (source main)) focused) 1\n** (skg (node (id 1))) 1")
+                      (message "Expected: %S" "* (skg (node (id 1) (source main))) 1\n** (skg (node (id 1))) 1")
                       (message "Got: %S" content)
                       (kill-emacs 1)))))
             (progn

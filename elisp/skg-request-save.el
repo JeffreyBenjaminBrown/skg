@@ -20,55 +20,72 @@ The server sends two LP messages:
 All skg buffers are locked immediately; non-collateral buffers are
 unlocked when the early response arrives."
   (interactive)
-  ;; Add metadata markers before capturing buffer contents
-  (skg-add-folded-markers)
-  (skg-add-focused-marker)
-  (let* ((tcp-proc (skg-tcp-connect-to-rust))
-         (save-buffer (current-buffer))
-         (saved-uri skg-view-uri)
-         (buffer-contents (buffer-string))
-         (request-s-exp (concat (prin1-to-string
-                                 `((request . "save buffer")
-                                   (view-uri . ,skg-view-uri)))
-                                "\n"))
-         (content-bytes (encode-coding-string buffer-contents 'utf-8))
-         (content-length (length content-bytes))
-         (header (format "Content-Length: %d\r\n\r\n" content-length)))
+  (let ((focused-had-metadata ;; Whether the focused headline already has metadata. Storing this lets us clean up the bare (skg) that removal leaves behind.
+         (save-excursion
+           (org-back-to-heading t)
+           (looking-at "\\*+ (skg"))))
+    (skg-add-folded-markers)
+    (skg-add-focused-marker)
+    (let* ((tcp-proc (skg-tcp-connect-to-rust))
+           (save-buffer (current-buffer))
+           (saved-uri skg-view-uri)
+           (buffer-contents (buffer-string))
+           (request-s-exp (concat (prin1-to-string
+                                   `((request . "save buffer")
+                                     (view-uri . ,skg-view-uri)))
+                                  "\n"))
+           (content-bytes (encode-coding-string buffer-contents 'utf-8))
+           (content-length (length content-bytes))
+           (header (format "Content-Length: %d\r\n\r\n" content-length)))
+      (progn ;; Rust needs these markers, but the user doesn't.
+        (skg-remove-focused-marker)
+        (skg-remove-folded-markers))
+      (unless focused-had-metadata
+        (skg-strip-bare-skg-at-focused-headline))
 
-    (unless skg-view-uri
-      ;; Guard: refuse to save when skg-view-uri is nil.
-      ;; A nil view-uri causes an unfiltered save (all instructions
-      ;; sent to TypeDB even if unchanged) AND the server won't update
-      ;; its memory, so the work is both slow and wasted.
-      (error "Cannot save: skg-view-uri is nil in buffer '%s' (content-view-mode=%s). Re-open the view."
-             (buffer-name)
-             (if (bound-and-true-p skg-content-view-mode) "on" "off")))
+      (unless skg-view-uri
+        ;; Guard: refuse to save when skg-view-uri is nil.
+        ;; A nil view-uri causes an unfiltered save (all instructions
+        ;; sent to TypeDB even if unchanged) AND the server won't update
+        ;; its memory, so the work is both slow and wasted.
+        (error "Cannot save: skg-view-uri is nil in buffer '%s' (content-view-mode=%s). Re-open the view."
+               (buffer-name)
+               (if (bound-and-true-p skg-content-view-mode) "on" "off")))
 
-    ;; Lock ALL skg content-view buffers immediately, before sending.
-    ;; This eliminates the race window between the send and the
-    ;; server's early response.
-    (skg--lock-all-skg-buffers)
+      ;; Lock ALL skg content-view buffers immediately, before sending.
+      ;; This eliminates the race window between the send and the
+      ;; server's early response.
+      (skg--lock-all-skg-buffers)
 
-    ;; Register handlers in the dispatch map
-    (skg-register-response-handler
-     'save-lock
-     (lambda (_tcp-proc payload)
-       (skg--save-lock-handler saved-uri save-buffer payload))
-     t)
-    (skg-register-response-handler
-     'save-result
-     (lambda (_tcp-proc payload)
-       (skg--save-result-handler save-buffer payload))
-     t)
+      ;; Register handlers in the dispatch map
+      (skg-register-response-handler
+       'save-lock
+       (lambda (_tcp-proc payload)
+         (skg--save-lock-handler saved-uri save-buffer payload))
+       t)
+      (skg-register-response-handler
+       'save-result
+       (lambda (_tcp-proc payload)
+         (skg--save-result-handler save-buffer payload))
+       t)
 
-    (skg-lp-reset)
+      (skg-lp-reset)
 
-    ;; Send the request line first
-    (process-send-string tcp-proc request-s-exp)
+      ;; Send the request line first
+      (process-send-string tcp-proc request-s-exp)
 
-    ;; Send the length-prefixed buffer contents
-    (process-send-string tcp-proc header)
-    (process-send-string tcp-proc buffer-contents)))
+      ;; Send the length-prefixed buffer contents
+      (process-send-string tcp-proc header)
+      (process-send-string tcp-proc buffer-contents))))
+
+(defun skg-strip-bare-skg-at-focused-headline ()
+  "Remove bare (skg) from the current headline if that is its only metadata.
+Used after marker removal to clean up headlines that had no metadata
+before the add/remove cycle."
+  (save-excursion
+    (org-back-to-heading t)
+    (when (looking-at "\\(\\*+ \\)(skg) ")
+      (replace-match "\\1"))))
 
 (defun skg--save-lock-handler (saved-uri save-buffer payload)
   "Handle the save-lock LP message (tagged with response-type).

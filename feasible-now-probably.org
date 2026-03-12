@@ -9,6 +9,8 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
+* DONE (skg focused) etc. should not appear in the buffer
+  just in what is sent to the server
 * DONE improve search
   Should not be readonly except for a near-instant.
   Need not use special search result nodes;
