@@ -9,6 +9,22 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
+* DONE bug : things disappear from the index
+** the bug
+  If I search for a title and then manipulate it --
+  e.g. by adding a node to its content and saving --
+  it stops showing up in future searches for the same title.
+  This happens under both places I could manipulate it from:
+  - opening a new view onto that node (skg-view)
+  - manipulating the search buffer directly,
+    after requesting a definitive view of the node
+    (skg-show-definitive).
+  The node has not disappeared from TypeDB,
+  because I can still visit it.
+  So it seems to be a Tantivy problem.
+** the solution
+   Recompute context origin types on save,
+   and persist HadId information.
 * DONE (skg focused) etc. should not appear in the buffer
   just in what is sent to the server
 * DONE improve search

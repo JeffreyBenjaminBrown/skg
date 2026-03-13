@@ -6,13 +6,20 @@
 /// Origins (roots, link targets, multiply-contained nodes, cycle members,
 /// nodes with Had_ID_Before_Import) get score multipliers at search time.
 
-use crate::dbs::tantivy::update_context_origin_types;
+use crate::dbs::tantivy::{subset_with_hadid, update_context_origin_types};
+use crate::dbs::typedb::paths::containerward_path_stats_bulk;
+use crate::dbs::typedb::search::find_container_ids_of_pid;
+use crate::dbs::typedb::util::ConceptRowStream;
 use crate::types::misc::{ID, TantivyIndex};
+use crate::types::save::{DefineNode, SaveNode};
 use crate::types::skgnode::{FileProperty, SkgNode};
 use crate::types::textlinks::textlinks_from_node;
+use crate::types::viewnode::ContainerwardPathStats;
 
+use futures::stream::{self, StreamExt};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
+use typedb_driver as tdbd;
 
 //
 // Types
@@ -74,25 +81,25 @@ pub fn compute_and_store_context_types (
   had_id_set    : &HashSet<ID>,
   all_node_ids  : &HashSet<ID>,
   link_targets  : &HashSet<ID>,
-  contains_map  : &MapToContent,
-  reverse_map   : &MapToContainers,
+  map_to_content  : &MapToContent,
+  map_to_containers   : &MapToContainers,
 ) -> Result<HashMap<ID, String>, Box<dyn Error>> {
   tracing::info! ("Computing context origin types...");
   let edge_count : usize =
-    contains_map . values () . map ( |v| v . len () ) . sum ();
+    map_to_content . values () . map ( |v| v . len () ) . sum ();
   tracing::info! ("  {} nodes, {} edges, {} link targets.",
             all_node_ids . len (), edge_count, link_targets . len ());
   let mut origin_types : HashMap<ID, ContextOriginType> =
     identify_origins (
-      all_node_ids, reverse_map, link_targets, had_id_set );
+      all_node_ids, map_to_containers, link_targets, had_id_set );
   tracing::info! ("  {} origins identified.", origin_types . len ());
   let mut all_contexts : Vec<HashSet<ID>> =
-    grow_all_contexts (&origin_types, contains_map);
+    grow_all_contexts (&origin_types, map_to_content);
   tracing::info! ("  {} treelike contexts grown.", all_contexts . len ());
   extend_contexts_for_cycles (
     all_node_ids,
-    contains_map,
-    reverse_map,
+    map_to_content,
+    map_to_containers,
     &mut origin_types,
     &mut all_contexts );
   tracing::info! ("  {} total contexts after cycle detection.",
@@ -110,6 +117,137 @@ pub fn compute_and_store_context_types (
             updated);
   Ok (context_types_by_id) }
 
+/// Recompute context origin types
+/// (used to rank search results) for saved nodes,
+pub async fn update_context_types_for_saved_nodes (
+  tantivy_index : &TantivyIndex,
+  db_name       : &str,
+  driver        : &tdbd::TypeDBDriver,
+  instructions  : &[DefineNode],
+) -> Result<(), Box<dyn Error>> {
+  let saved_ids : HashSet<ID> =
+    instructions . iter ()
+    . filter_map ( |instr| match instr {
+      DefineNode::Save (SaveNode (node)) =>
+        Some (node . pid . clone ()),
+      DefineNode::Delete (_) => None } )
+    . collect ();
+  if saved_ids . is_empty () { return Ok (( )); }
+
+  // Build the inputs that `identify_origins` expects,
+  // using TypeDB for graph structure and Tantivy for had_id.
+  let map_to_containers : MapToContainers =
+    map_to_containers_from_typedb (
+      db_name, driver, &saved_ids ) . await ?;
+  let link_targets : HashSet<ID> =
+    link_targets_from_typedb (
+      db_name, driver, &saved_ids ) . await ?;
+  let hadid_set : HashSet<ID> =
+    subset_with_hadid (tantivy_index, &saved_ids);
+  let mut origin_types : HashMap<ID, ContextOriginType> =
+    identify_origins (
+      &saved_ids, &map_to_containers, &link_targets, &hadid_set );
+
+  { // identify_origins does not handle cycles. (The init path uses extend_contexts_for_cycles, which covers the whole graph and hence won't work here). For nodes that still have no origin type and are singly contained, check for cycles via the existing bulk BFS in paths.rs.
+    let ids_to_check : Vec<ID> =
+      saved_ids . iter ()
+      . filter ( |id| ! origin_types . contains_key (id) )
+      . cloned () . collect ();
+    let path_stats : HashMap<ID, ContainerwardPathStats> =
+      containerward_path_stats_bulk (
+        db_name, driver, &ids_to_check ) . await ?;
+    for (id, stats) in &path_stats {
+      if stats . cycles {
+        origin_types . insert (
+          id . clone (), ContextOriginType::CycleMember ); }} }
+  let origin_types_typedb_can_read : HashMap<ID, String> =
+    // convert each ContextOriginType to String
+    origin_types . iter ()
+    . map ( |(id, ct)| (id . clone (),
+                        ct . label () . to_string () ))
+    . collect ();
+  if ! origin_types_typedb_can_read . is_empty () {
+    update_context_origin_types (
+      tantivy_index, &origin_types_typedb_can_read ) ?; }
+  Ok (( )) }
+
+/// Build a content-to-containers map for a set of node IDs
+/// by querying TypeDB in parallel.
+async fn map_to_containers_from_typedb (
+  db_name : &str,
+  driver  : &tdbd::TypeDBDriver,
+  ids     : &HashSet<ID>,
+) -> Result<MapToContainers, Box<dyn Error>> {
+  let results : Vec<Result<(ID, HashSet<ID>),
+                           Box<dyn Error>>> =
+    stream::iter ( ids . iter () . map ( |id| {
+      let id : ID = id . clone ();
+      async move {
+        let containers : HashSet<ID> =
+          find_container_ids_of_pid (
+            db_name, driver, &id ) . await ?;
+        Ok ((id, containers)) }} ))
+    . buffer_unordered (
+      crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+    . collect () . await;
+  let mut map_to_containers : MapToContainers =
+    HashMap::new ();
+  for r in results {
+    let (id, containers) : (ID, HashSet<ID>) = r ?;
+    if ! containers . is_empty () {
+      map_to_containers . insert (
+        id, containers . into_iter () . collect () ); }}
+  Ok (map_to_containers) }
+
+/// Returns a subset of the input IDs
+/// that are textlink targets, querying TypeDB in parallel.
+async fn link_targets_from_typedb (
+  db_name : &str,
+  driver  : &tdbd::TypeDBDriver,
+  ids     : &HashSet<ID>,
+) -> Result<HashSet<ID>, Box<dyn Error>> {
+  let results : Vec<Result<(ID, bool),
+                           Box<dyn Error>>> =
+    stream::iter ( ids . iter () . map ( |id| {
+      let id : ID = id . clone ();
+      async move {
+        let hit : bool =
+          is_textlink_target (
+            db_name, driver, &id ) . await ?;
+        Ok ((id, hit)) }} ))
+    . buffer_unordered (
+      crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+    . collect () . await;
+  let mut targets : HashSet<ID> = HashSet::new ();
+  for r in results {
+    let (id, hit) : (ID, bool) = r ?;
+    if hit { targets . insert (id); }}
+  Ok (targets) }
+
+async fn is_textlink_target (
+  db_name : &str,
+  driver  : &tdbd::TypeDBDriver,
+  pid     : &ID,
+) -> Result<bool, Box<dyn Error>> {
+  use futures::StreamExt;
+  let tx : tdbd::Transaction =
+    driver . transaction (
+      db_name, tdbd::TransactionType::Read
+    ) . await ?;
+  let answer : tdbd::answer::QueryAnswer =
+    tx . query ( format! (
+      r#"match
+         $dest isa node, has id "{}";
+         $rel isa textlinks_to ( source: $src,
+                                 dest:   $dest );
+         select $rel; limit 1;"#,
+      pid ) ) . await ?;
+  let mut stream : ConceptRowStream =
+    answer . into_rows ();
+  let has_any : bool =
+    stream . next () . await . is_some ();
+  Ok (has_any) }
+
 //
 // Step 1: identify origins (in-memory)
 //
@@ -123,12 +261,12 @@ pub fn compute_and_store_context_types (
 /// and a Root cannot be a CycleMember.)
 fn identify_origins (
   all_node_ids : &HashSet<ID>,
-  reverse_map  : &MapToContainers,
+  map_to_containers  : &MapToContainers,
   targets      : &HashSet<ID>,
   had_id_set   : &HashSet<ID>,
 ) -> HashMap<ID, ContextOriginType> {
   let ( roots, multicontained ) : ( HashSet<ID>, HashSet<ID> ) =
-    find_roots_and_multiply_contained (all_node_ids, reverse_map);
+    find_roots_and_multiply_contained (all_node_ids, map_to_containers);
   let mut origin_types : HashMap<ID, ContextOriginType> =
     HashMap::new ();
   { // Important: Start at least priority, work up to highest.
@@ -151,12 +289,12 @@ fn identify_origins (
 /// Roots have none, multiply-contained have more than one.
 pub fn find_roots_and_multiply_contained (
   all_node_ids : &HashSet<ID>,
-  reverse_map  : &MapToContainers,
+  map_to_containers  : &MapToContainers,
 ) -> ( HashSet<ID>, HashSet<ID> ) {
   let mut roots : HashSet<ID> = HashSet::new();
   let mut multi : HashSet<ID> = HashSet::new();
   for id in all_node_ids {
-    match reverse_map . get (id) {
+    match map_to_containers . get (id) {
       None => { roots . insert (id . clone()); },
       Some (containers) => {
         let unique_containers : HashSet<&ID> =
@@ -172,13 +310,13 @@ pub fn find_roots_and_multiply_contained (
 /// Grow contexts from all origins using the in-memory map.
 fn grow_all_contexts (
   origin_types : &HashMap<ID, ContextOriginType>,
-  contains_map : &MapToContent,
+  map_to_content : &MapToContent,
 ) -> Vec<HashSet<ID>> {
   origin_types . keys ()
     . map ( |origin|
       { let mut ctx : HashSet<ID> = HashSet::new ();
         extend_context (
-          &mut ctx, origin, origin_types, contains_map );
+          &mut ctx, origin, origin_types, map_to_content );
         ctx } )
     . collect () }
 
@@ -237,14 +375,14 @@ pub fn extend_context (
   context      : &mut HashSet<ID>,
   grow_from    : &ID,
   origins      : &HashMap<ID, ContextOriginType>,
-  contains_map : &MapToContent,
+  map_to_content : &MapToContent,
 ) {
   context . insert (grow_from . clone ());
   let mut frontier : Vec<ID> = vec![grow_from . clone ()];
   while ! frontier . is_empty () {
     let mut next_frontier : Vec<ID> = Vec::new ();
     for pid in &frontier {
-      if let Some (children) = contains_map . get (pid) {
+      if let Some (children) = map_to_content . get (pid) {
         for child in children {
           if origins . contains_key (child) && child != grow_from { // The origin of a different context. Don't include it, and don't recurse into it.
             continue; }
@@ -292,23 +430,24 @@ fn climb_containerward_to_cycle (
 // Standalone public helpers (called from outside this module)
 //
 
-/// Build (forward, reverse) contains maps from loaded SkgNodes.
+/// Build (map-to-content, map-to-containers) maps
+/// from loaded SkgNodes.
 /// This avoids a ~22s TypeDB query on 28k-node datasets.
 pub fn contains_maps_from_nodes (
   nodes : &[SkgNode],
 ) -> (MapToContent, MapToContainers) {
-  let mut forward : MapToContent = HashMap::new ();
-  let mut reverse : MapToContainers = HashMap::new ();
+  let mut to_content    : MapToContent    = HashMap::new ();
+  let mut to_containers : MapToContainers = HashMap::new ();
   for node in nodes {
     { let pid : &ID = &node . pid;
       for child_id in &node . contains {
-        forward . entry (pid . clone ())
+        to_content . entry (pid . clone ())
           . or_insert_with (Vec::new)
           . push (child_id . clone ());
-        reverse . entry (child_id . clone ())
+        to_containers . entry (child_id . clone ())
           . or_insert_with (Vec::new)
           . push (pid . clone ()); } }}
-  ( forward, reverse ) }
+  ( to_content, to_containers ) }
 
 /// Collect all link target IDs from titles and bodies.
 /// (The previous implementation, which queried TypeDB,

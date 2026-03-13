@@ -40,8 +40,7 @@ pub async fn containerward_path_stats_bulk (
   struct TrackedPath {
     original : ID,
     depth    : usize,
-    visited  : HashSet<ID>,
-  }
+    visited  : HashSet<ID>, }
   let mut result : HashMap<ID, ContainerwardPathStats> =
     HashMap::new ();
   let mut frontier : Vec<(ID, TrackedPath)> =

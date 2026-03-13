@@ -6,13 +6,13 @@
 
 use crate::types::textlinks::replace_each_link_with_its_label;
 use crate::types::misc::{ID, SourceName, TantivyIndex};
-use crate::types::skgnode::SkgNode;
+use crate::types::skgnode::{FileProperty, SkgNode};
 
 use tantivy::{Index, IndexWriter, doc, Term, IndexReader, Searcher, Document};
 use tantivy::query::{QueryParser, Query};
 use tantivy::collector::TopDocs;
 use tantivy::schema;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::path::Path;
 use std::sync::Arc;
@@ -43,13 +43,17 @@ pub(crate) fn open_existing_tantivy_index (
   let is_title_field : schema::Field =
     schema . get_field ("is_title")
     . ok_or ("Schema missing 'is_title' field") ?;
+  let had_id_field : schema::Field =
+    schema . get_field ("had_id")
+    . ok_or ("Schema missing 'had_id' field") ?;
   Ok ( TantivyIndex {
     index              : Arc::new (index),
     id_field,
     title_or_alias_field,
     source_field,
     context_origin_type_field,
-    is_title_field, } ) }
+    is_title_field,
+    had_id_field, } ) }
 
 /// The only Tantivy schema used so far.
 /// It includes three fields:
@@ -69,6 +73,8 @@ pub(super) fn mk_tantivy_schema() -> schema::Schema {
     "context_origin_type", schema::STRING | schema::STORED);
   schema_builder . add_text_field(
     "is_title", schema::STRING | schema::STORED);
+  schema_builder . add_text_field(
+    "had_id", schema::STRING | schema::STORED);
   schema_builder . build() }
 
 /// Returns ALL matching Tantivy "Documents" (see glossary, above).
@@ -222,6 +228,39 @@ pub fn title_and_source_by_id (
     id );
   fallback }
 
+/// Return the subset of the input for which 'had_id' is true.
+pub fn subset_with_hadid (
+  tantivy_index : &TantivyIndex,
+  ids           : &HashSet<ID>,
+) -> HashSet<ID> {
+  let reader : IndexReader
+    = match tantivy_index . index . reader () {
+      Ok (r) => r,
+      Err (_) => return HashSet::new () };
+  let searcher : Searcher = reader . searcher ();
+  let mut result : HashSet<ID> = HashSet::new ();
+  for id in ids {
+    let query : Box < dyn Query > =
+      Box::new ( tantivy::query::TermQuery::new (
+        Term::from_field_text (
+          tantivy_index . id_field, id . as_str () ),
+        schema::IndexRecordOption::Basic ));
+    let hits : Vec < (f32, tantivy::DocAddress) > =
+      match searcher . search (
+        &query, &TopDocs::with_limit (1) )
+      { Ok (h) => h,
+        Err (_) => continue };
+    if let Some ( (_score, doc_address) ) = hits . first () {
+      if let Ok (doc) = searcher . doc (*doc_address) {
+        let had_id : bool =
+          doc . get_first ( tantivy_index . had_id_field )
+          . and_then ( |v| v . as_text () )
+          . map ( |s| s == "true" )
+          . unwrap_or (false);
+        if had_id {
+          result . insert (id . clone () ); }} }}
+  result }
+
 /* -------------------- Private helpers -------------------- */
 
 fn create_documents_from_node (
@@ -230,6 +269,10 @@ fn create_documents_from_node (
 ) -> Result < Vec < Document >,
               Box < dyn Error >> {
   let primary_id : &ID = &node . pid;
+  let had_id : &str =
+    if node . misc . contains (
+      &FileProperty::Had_ID_Before_Import )
+    { "true" } else { "false" };
   let mut documents: Vec<Document> =
     Vec::new();
   let mut titles_and_aliases: Vec<String> =
@@ -252,7 +295,9 @@ fn create_documents_from_node (
         tantivy_index . context_origin_type_field =>
           "",
         tantivy_index . is_title_field =>
-          is_title ) ); }
+          is_title,
+        tantivy_index . had_id_field =>
+          had_id ) ); }
   Ok (documents) }
 
 /// Updates context_origin_type for all documents matching each ID.
@@ -303,6 +348,11 @@ pub fn update_context_origin_types (
           . get_first ( tantivy_index . is_title_field )
           . and_then ( |v| v . as_text () )
           . unwrap_or ("false") . to_string ();
+      let had_id : String =
+        retrieved_doc
+          . get_first ( tantivy_index . had_id_field )
+          . and_then ( |v| v . as_text () )
+          . unwrap_or ("false") . to_string ();
       writer . add_document ( doc! (
         tantivy_index . id_field =>
           pid . as_str (),
@@ -313,7 +363,9 @@ pub fn update_context_origin_types (
         tantivy_index . context_origin_type_field =>
           context_type . as_str (),
         tantivy_index . is_title_field =>
-          is_title . as_str () )) ?;
+          is_title . as_str (),
+        tantivy_index . had_id_field =>
+          had_id . as_str () )) ?;
       updated_count += 1; } }
   commit_with_status (
     &mut writer, updated_count, "Context-updated") ?;

@@ -1,3 +1,4 @@
+use crate::context::update_context_types_for_saved_nodes;
 use crate::from_text::buffer_to_viewnode_forest_and_save_instructions;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
@@ -207,7 +208,14 @@ pub async fn update_from_and_rerender_buffer (
           tantivy_index,
           typedb_driver ) . await } ?;
     if let Some (new_index) = merge_replacement {
-      *tantivy_index = new_index; } }
+      *tantivy_index = new_index; }
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "update_context_types_for_saved_nodes" ). entered();
+      update_context_types_for_saved_nodes (
+        tantivy_index, &config . db_name,
+        typedb_driver, &save_instructions ) . await
+      . unwrap_or_else ( |e| tracing::warn! (
+        "context type recomputation failed: {}", e )); } }
 
   update_views_after_save (
     forest,
