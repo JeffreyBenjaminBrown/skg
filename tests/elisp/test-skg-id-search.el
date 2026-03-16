@@ -105,20 +105,31 @@
           (skg-id-push-to-stack)
           (should (equal (length skg-id-stack) (1+ len-before)))
           (should (equal (car skg-id-stack) '("6" "just a title"))) ))
-      (let (( len-before (length skg-id-stack) )) ;; Test positions that should NOT push
-        (dolist (id '("1" "3" "6" "7"))
-          ;; First whitespace after )) on each line
+      (progn ;; After metadata, nearest-id finds the nearby ID
+        (dolist (id '("1" "7"))
+          ;; After )) on lines with links, finds the link
+          (let (( len-before (length skg-id-stack) ))
+            (goto-char (point-min))
+            (search-forward (format "(skg (node (id %s)))" id))
+            (skg-id-push-to-stack)
+            (should (equal (length skg-id-stack) (1+ len-before))) )) )
+      (progn ;; After metadata on line with no link, finds the metadata
+        (let (( len-before (length skg-id-stack) ))
           (goto-char (point-min))
-          (search-forward (format "(skg (node (id %s)))" id))
+          (search-forward "(skg (node (id 6)))")
           (skg-id-push-to-stack)
-          (should (equal (length skg-id-stack) len-before)) )
-        (progn (goto-char (point-min)) ;; The 'h' in "hello"
-               (search-forward "hello")
-               (backward-char 5)
-               (should (equal (char-after) ?h))
-               (skg-id-push-to-stack)
-               (should (equal (length skg-id-stack) len-before)))
-        (dotimes (_ 3) ;; 3 random positions on line 3
+          (should (equal (length skg-id-stack) (1+ len-before)))
+          (should (equal (car skg-id-stack) '("6" "just a title"))) ))
+      (progn ;; The 'h' in "hello" — between two links, finds one
+        (let (( len-before (length skg-id-stack) ))
+          (goto-char (point-min))
+          (search-forward "hello")
+          (backward-char 5)
+          (should (equal (char-after) ?h))
+          (skg-id-push-to-stack)
+          (should (equal (length skg-id-stack) (1+ len-before))) ))
+      (let (( len-before (length skg-id-stack) )) ;; Line 3: fake metadata, no valid IDs — should NOT push
+        (dotimes (_ 3)
           (goto-char (+ line3-start
                         (random (- line3-end line3-start))))
           (skg-id-push-to-stack)

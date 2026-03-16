@@ -64,13 +64,12 @@ Otherwise nil."
       (skg--point-in-link-p)
       (skg--point-on-skg-filename-p)) )
 
-(defun skg-view ()
-  "Open a content view for the nearest ID on the current line.
+(defun skg-nearest-id ()
+  "Return (id . label) for the nearest ID on the current line, or nil.
 First checks whether point is directly on an ID.
 If not, tries skg-id-next (only if it stays on this line),
 then skg-id-prev (only if it stays on this line).
 Point is always restored."
-  (interactive)
   (let (( result (skg--id-at-point) ))
     (unless result
       (let (( start-pos (point) )
@@ -85,6 +84,12 @@ Point is always restored."
             (skg-id-prev)
             (when (= (line-number-at-pos) current-line)
               (setq result (skg--id-at-point)) )) )) )
+    result ))
+
+(defun skg-view ()
+  "Open a content view for the nearest ID on the current line."
+  (interactive)
+  (let (( result (skg-nearest-id) ))
     (if result
         (let (( id (car result) ))
           (message "Visiting node: %s" id)
@@ -163,23 +168,15 @@ Otherwise return nil."
           (error nil) )) )))
 
 (defun skg-id-push-to-stack ()
-  "Push (id label) pair to `skg-id-stack' if point is on metadata or a link.
-For metadata, id comes from (id X) and label is the headline title.
-For links, id and label come from [[id:X][label]].
-Does nothing if point is not within metadata or a link."
+  "Push the nearest ID on this line to `skg-id-stack'."
   (interactive)
-  (let ( ( md-result (skg--point-in-metadata-p) )
-         ( result nil ))
-    (if md-result
-        (setq result md-result)
-      (setq result (skg--point-in-link-p)) )
+  (let (( result (skg-nearest-id) ))
     (if result
-        (let ( ( id (car result) )
-               ( label (cdr result) ))
+        (let (( id (car result) )
+              ( label (cdr result) ))
           (push (list id label) skg-id-stack)
-          (message "pushed (%s, %s) to skg-id-stack"
-                   (skg--truncate-id id) label) )
-      (message "Nothing pushed to skg-id-stack; point on neither a link nor a metadata sexp.") )))
+          (message "pushed to stack: %s" label) )
+      (message "No ID found on this line") )))
 
 (defun skg--point-in-metadata-p ()
   "If point is within metadata, return (id . title). Otherwise nil."
