@@ -14,6 +14,7 @@
 ;; It re-reads the same text a few times.
 
 (require 'cl-lib)
+(require 'skg-metadata)
 (require 'skg-request-single-root-content-view)
 (require 'skg-sexpr-search)
 (require 'skg-state)
@@ -168,15 +169,33 @@ Otherwise return nil."
           (error nil) )) )))
 
 (defun skg-id-push-to-stack ()
-  "Push the nearest ID on this line to `skg-id-stack'."
+  "Push the metadata ID from the current line to `skg-id-stack'."
   (interactive)
-  (let (( result (skg-nearest-id) ))
-    (if result
-        (let (( id (car result) )
-              ( label (cdr result) ))
-          (push (list id label) skg-id-stack)
-          (message "pushed to stack: %s" label) )
-      (message "No ID found on this line") )))
+  (let* (( headline (skg-get-current-headline-text) )
+         ( split (skg-split-as-stars-metadata-title headline) )
+         ( metadata-sexp (when split (cadr split)) )
+         ( title (when split (caddr split)) ))
+    (if (and metadata-sexp
+             (not (string-empty-p metadata-sexp)) )
+        (let (( sexp (read metadata-sexp) ))
+          (if (skg--metadata-sexp-contains-id-p sexp)
+              (let (( id (skg--extract-id-from-metadata-sexp sexp) ))
+                (push (list id title) skg-id-stack)
+                (message "pushed to stack: %s" title) )
+            (message "No ID in metadata on this line") ))
+      (message "No metadata on this line") )))
+
+(defun skg-id-pop-from-stack ()
+  "Pop the top of `skg-id-stack' and insert an org link at point.
+Prompts for the link label, defaulting to the title from the stack."
+  (interactive)
+  (if (null skg-id-stack)
+      (message "ID stack is empty")
+    (let* (( entry (pop skg-id-stack) )
+           ( id (car entry) )
+           ( title (cadr entry) )
+           ( label (read-string "Link label: " title) ))
+      (insert (format "[[id:%s][%s]]" id label)) )))
 
 (defun skg--point-in-metadata-p ()
   "If point is within metadata, return (id . title). Otherwise nil."

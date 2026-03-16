@@ -135,7 +135,7 @@
     See skg-id-next, above.
 *** C-c i u : skg-push-id-to-stack
     Use this to store a link to the ID the cursor is at.
-*** C-c i o : skg-pop-id
+*** C-c i o : skg-id-pop-from-stack
 *** C-c v s : skg-view-stack
     View and maybe edit the set of links you've stored.
 ** adjacent to other modes

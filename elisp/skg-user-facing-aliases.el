@@ -50,7 +50,7 @@ and hide INTERNAL from M-x completion."
       (define-key map (kbd "C-c i n") #'skg-id-next)
       (define-key map (kbd "C-c i p") #'skg-id-prev)
       (define-key map (kbd "C-c i u") #'skg-id-push-to-stack)
-      (define-key map (kbd "C-c i o") #'skg-pop-id))
+      (define-key map (kbd "C-c i o") #'skg-id-pop-from-stack))
     map )
   "Keymap for `skg-content-view-mode'.")
 

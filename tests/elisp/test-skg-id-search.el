@@ -70,7 +70,7 @@
       (should (equal (point) pos-before)) )))
 
 (ert-deftest test-skg-id-push-to-stack ()
-  "Test that skg-id-push-to-stack extracts id and label from links and metadata."
+  "Test that skg-id-push-to-stack pushes the metadata ID from the current line."
   (setq skg-id-stack nil)
   (with-temp-buffer
     (insert "* (skg (node (id 1))) [[id:2][link to 2]]\n")
@@ -78,62 +78,53 @@
     (insert "* (skg (fake metadata]] [[id:fake-link)(]]\n")
     (insert "* (skg (node (id 6))) just a title\n")
     (insert "* (skg (node (id 7))) [[id:8][link to 8]]\n")
-    (let* ( ( link-start
-              (progn (goto-char (point-min))
-                     (search-forward "[[id:2][link to 2]]")
-                     (- (point) (length "[[id:2][link to 2]]")) ))
-            ( link-end (point) )
-            ( metadata-start
-              (progn (goto-char (point-min))
-                     (search-forward "(skg (node (id 6)))")
-                     (- (point) (length "(skg (node (id 6)))")) ))
-            ( metadata-end (point) )
-            ( line3-start
-              (progn (goto-char (point-min))
-                     (forward-line 2)
-                     (point) ))
-            ( line3-end (line-end-position) ))
-      (dotimes (_ 3) ;; Test 3 random positions in link
-        (let (( len-before (length skg-id-stack) ))
-          (goto-char (+ link-start (random (- link-end link-start))))
-          (skg-id-push-to-stack)
-          (should (equal (length skg-id-stack) (1+ len-before)))
-          (should (equal (car skg-id-stack) '("2" "link to 2"))) ))
-      (dotimes (_ 3) ;; Test 3 random positions in metadata
-        (let (( len-before (length skg-id-stack) ))
-          (goto-char (+ metadata-start (random (- metadata-end metadata-start))))
-          (skg-id-push-to-stack)
-          (should (equal (length skg-id-stack) (1+ len-before)))
-          (should (equal (car skg-id-stack) '("6" "just a title"))) ))
-      (progn ;; After metadata, nearest-id finds the nearby ID
-        (dolist (id '("1" "7"))
-          ;; After )) on lines with links, finds the link
+    (let* (( line3-start
+             (progn (goto-char (point-min))
+                    (forward-line 2)
+                    (point)) )
+           ( line3-end (line-end-position) ))
+      (progn ;; Anywhere on a metadata line pushes that line's metadata ID
+        (dolist (id '("1" "3" "6" "7"))
           (let (( len-before (length skg-id-stack) ))
             (goto-char (point-min))
             (search-forward (format "(skg (node (id %s)))" id))
             (skg-id-push-to-stack)
-            (should (equal (length skg-id-stack) (1+ len-before))) )) )
-      (progn ;; After metadata on line with no link, finds the metadata
+            (should (equal (length skg-id-stack) (1+ len-before)))
+            (should (equal (caar skg-id-stack) id)) )) )
+      (progn ;; From the title area, still finds metadata ID
         (let (( len-before (length skg-id-stack) ))
           (goto-char (point-min))
-          (search-forward "(skg (node (id 6)))")
+          (search-forward "just a title")
+          (backward-char 5)
           (skg-id-push-to-stack)
           (should (equal (length skg-id-stack) (1+ len-before)))
           (should (equal (car skg-id-stack) '("6" "just a title"))) ))
-      (progn ;; The 'h' in "hello" — between two links, finds one
-        (let (( len-before (length skg-id-stack) ))
-          (goto-char (point-min))
-          (search-forward "hello")
-          (backward-char 5)
-          (should (equal (char-after) ?h))
-          (skg-id-push-to-stack)
-          (should (equal (length skg-id-stack) (1+ len-before))) ))
-      (let (( len-before (length skg-id-stack) )) ;; Line 3: fake metadata, no valid IDs — should NOT push
+      (let (( len-before (length skg-id-stack) )) ;; Line 3: fake metadata — should NOT push
         (dotimes (_ 3)
           (goto-char (+ line3-start
                         (random (- line3-end line3-start))))
           (skg-id-push-to-stack)
           (should (equal (length skg-id-stack) len-before)) )) )))
+
+(ert-deftest test-skg-id-push-to-stack-and-view-stack ()
+  "Test pushing IDs from a buffer and viewing the stack."
+  (setq skg-id-stack nil)
+  (with-temp-buffer
+    (org-mode)
+    (insert "* (skg (node (id a))) a\n")
+    (insert "** (skg (node (id b))) b has a [[id:a][link to a]]\n")
+    (insert "* (skg (node (id c))) c\n")
+    (progn ;; Push from start of buffer (line 1, id=a)
+      (goto-char (point-min))
+      (skg-id-push-to-stack))
+    (progn ;; Push from last char of line 2 (id=b)
+      (goto-char (point-min))
+      (forward-line 1)
+      (end-of-line)
+      (skg-id-push-to-stack))
+    (should (equal (length skg-id-stack) 2))
+    (should (equal (car skg-id-stack) '("b" "b has a [[id:a][link to a]]")))
+    (should (equal (cadr skg-id-stack) '("a" "a"))) ))
 
 (ert-deftest test-skg-validate-id-stack-buffer_valid-input ()
   "Test skg-validate-id-stack-buffer with valid inputs."
