@@ -45,6 +45,19 @@ and opens a magit diff of just that file."
                               "\n")))
                 (process-send-string tcp-proc request-sexp)) )) )) )) )
 
+(defun skg--find-file-in-magit-section
+    (parent-ident ;; the section identity path that magit-get-section uses to find the parent section
+     filename)
+  "Find a file section with FILENAME under the magit section at PARENT-IDENT.
+Returns the section object, or nil."
+  (let (( parent (magit-get-section parent-ident) ))
+    (when parent
+      (cl-find-if
+       (lambda (child)
+         (and (eq (oref child type) 'file)
+              (equal (oref child value) filename)) )
+       (oref parent children)) )))
+
 (defun skg--file-diff-result (_tcp-proc payload)
   "Handle the server response for a get-file-path request,
 by opening magit-status and navigates to the file.
@@ -65,10 +78,13 @@ PAYLOAD is the tagged LP response from the server."
              ( repo-root (magit-toplevel default-directory) )
              ( rel-path (file-relative-name resolved-path repo-root) ))
         (magit-status-setup-buffer default-directory)
-        (let (( unstaged-section (magit-get-section
-                                  `((file . ,rel-path) (unstaged))) )
-              ( staged-section   (magit-get-section
-                                  `((file . ,rel-path) (staged))) ))
+        (magit-section-show-level-2-all)
+        (let (( unstaged-section
+               (skg--find-file-in-magit-section
+                '((unstaged) (status)) rel-path) )
+              ( staged-section
+               (skg--find-file-in-magit-section
+                '((staged) (status)) rel-path) ))
           (cond
            (unstaged-section
             (magit-section-goto unstaged-section)
