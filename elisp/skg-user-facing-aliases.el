@@ -38,7 +38,7 @@ and hide INTERNAL from M-x completion."
                   #'skg-view-metadata)
       (define-key map (kbd "C-c v o") #'skg-view-org-ancestry)
       (define-key map (kbd "C-c v m") #'skg-view-magit)
-      (define-key map (kbd "C-c v s") #'skg-view-stack))
+      (define-key map (kbd "C-c v s") #'skg-id-stack))
     (progn;; local changes to view (and possibly interpretation
       (define-key map (kbd "C-c l a") #'skg-local-aliases)
       (define-key map (kbd "C-c l c") #'skg-local-containerward)
@@ -49,8 +49,8 @@ and hide INTERNAL from M-x completion."
     (progn;; id navigation and stack
       (define-key map (kbd "C-c i n") #'skg-id-next)
       (define-key map (kbd "C-c i p") #'skg-id-prev)
-      (define-key map (kbd "C-c i u") #'skg-id-push-to-stack)
-      (define-key map (kbd "C-c i o") #'skg-id-pop-from-stack))
+      (define-key map (kbd "C-c i u") #'skg-id-push)
+      (define-key map (kbd "C-c i o") #'skg-id-pop))
     map )
   "Keymap for `skg-content-view-mode'.")
 

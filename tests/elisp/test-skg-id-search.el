@@ -69,8 +69,8 @@
       (skg-id-prev)
       (should (equal (point) pos-before)) )))
 
-(ert-deftest test-skg-id-push-to-stack ()
-  "Test that skg-id-push-to-stack pushes the metadata ID from the current line."
+(ert-deftest test-skg-id-push ()
+  "Test that skg-id-push pushes the metadata ID from the current line."
   (setq skg-id-stack nil)
   (with-temp-buffer
     (insert "* (skg (node (id 1))) [[id:2][link to 2]]\n")
@@ -88,7 +88,7 @@
           (let (( len-before (length skg-id-stack) ))
             (goto-char (point-min))
             (search-forward (format "(skg (node (id %s)))" id))
-            (skg-id-push-to-stack)
+            (skg-id-push)
             (should (equal (length skg-id-stack) (1+ len-before)))
             (should (equal (caar skg-id-stack) id)) )) )
       (progn ;; From the title area, still finds metadata ID
@@ -96,17 +96,17 @@
           (goto-char (point-min))
           (search-forward "just a title")
           (backward-char 5)
-          (skg-id-push-to-stack)
+          (skg-id-push)
           (should (equal (length skg-id-stack) (1+ len-before)))
           (should (equal (car skg-id-stack) '("6" "just a title"))) ))
       (let (( len-before (length skg-id-stack) )) ;; Line 3: fake metadata — should NOT push
         (dotimes (_ 3)
           (goto-char (+ line3-start
                         (random (- line3-end line3-start))))
-          (skg-id-push-to-stack)
+          (skg-id-push)
           (should (equal (length skg-id-stack) len-before)) )) )))
 
-(ert-deftest test-skg-id-push-to-stack-and-view-stack ()
+(ert-deftest test-skg-id-push-and-view-stack ()
   "Test pushing IDs from a buffer and viewing the stack."
   (setq skg-id-stack nil)
   (with-temp-buffer
@@ -116,12 +116,12 @@
     (insert "* (skg (node (id c))) c\n")
     (progn ;; Push from start of buffer (line 1, id=a)
       (goto-char (point-min))
-      (skg-id-push-to-stack))
+      (skg-id-push))
     (progn ;; Push from last char of line 2 (id=b)
       (goto-char (point-min))
       (forward-line 1)
       (end-of-line)
-      (skg-id-push-to-stack))
+      (skg-id-push))
     (should (equal (length skg-id-stack) 2))
     (should (equal (car skg-id-stack) '("b" "b has a [[id:a][link to a]]")))
     (should (equal (cadr skg-id-stack) '("a" "a"))) ))
@@ -215,10 +215,10 @@
     (should (equal (skg--format-id-stack-as-org)
                    "* second\nid-2\n* first\nid-1")) ))
 
-(ert-deftest test-skg-view-stack ()
-  "Test that skg-view-stack creates buffer with correct content."
+(ert-deftest test-skg-id-stack ()
+  "Test that skg-id-stack creates buffer with correct content."
   (let (( skg-id-stack '(("uuid-123" "My Node")) ))
-    (skg-view-stack)
+    (skg-id-stack)
     (should (equal (buffer-name) "*skg-id-stack*"))
     (should (equal (buffer-string) "* My Node\nuuid-123"))
     (should skg-id-stack-mode)
@@ -227,7 +227,7 @@
 (ert-deftest test-skg--save-id-stack-buffer ()
   "Test that saving the id-stack buffer updates skg-id-stack."
   (let (( skg-id-stack '(("old-id" "old label")) ))
-    (skg-view-stack)
+    (skg-id-stack)
     (erase-buffer)
     (insert "* new label\nnew-id\n* another\nanother-id\n")
     (skg--save-id-stack-buffer)

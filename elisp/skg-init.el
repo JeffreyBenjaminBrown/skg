@@ -27,10 +27,10 @@
 ;;;     skg-visit-link
 ;;;     skg-id-next
 ;;;     skg-id-prev
-;;;     skg-id-push-to-stack
+;;;     skg-id-push
 ;;;     skg-validate-id-stack-buffer
 ;;;     skg-replace-id-stack-from-buffer
-;;;     skg-view-stack
+;;;     skg-id-stack
 ;;;   elisp/skg-view-new-empty.el
 ;;;     skg-view-new-empty
 ;;;   elisp/skg-buffer.el

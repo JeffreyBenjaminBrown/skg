@@ -5,10 +5,10 @@
 ;;; USER-FACING FUNCTIONS
 ;;;   skg-id-next
 ;;;   skg-id-prev
-;;;   skg-id-push-to-stack
+;;;   skg-id-push
 ;;;   skg-validate-id-stack-buffer
 ;;;   skg-view
-;;;   skg-view-stack
+;;;   skg-id-stack
 
 ;; todo ? speed : This could be more efficient.
 ;; It re-reads the same text a few times.
@@ -168,7 +168,7 @@ Otherwise return nil."
                 skg-start ))
           (error nil) )) )))
 
-(defun skg-id-push-to-stack ()
+(defun skg-id-push ()
   "Push the metadata ID from the current line to `skg-id-stack'."
   (interactive)
   (let* (( headline (skg-get-current-headline-text) )
@@ -185,7 +185,7 @@ Otherwise return nil."
             (message "No ID in metadata on this line") ))
       (message "No metadata on this line") )))
 
-(defun skg-id-pop-from-stack ()
+(defun skg-id-pop ()
   "Pop the top of `skg-id-stack' and insert an org link at point.
 Prompts for the link label, defaulting to the title from the stack."
   (interactive)
@@ -393,7 +393,7 @@ Returns (error MESSAGE) if validation fails."
     map )
   "Keymap for `skg-id-stack-mode'.")
 
-(defun skg-view-stack ()
+(defun skg-id-stack ()
   "Open a buffer to edit `skg-id-stack'.
 The buffer displays the stack in org format
 (label headlines and ID bodies).
@@ -429,7 +429,7 @@ Overrides save to update `skg-id-stack' instead of writing to a file."
   :keymap skg-id-stack-mode-map)
 
 ;; Hide from M-x: this mode is only activated
-;; programmatically by 'skg-view-stack'.
+;; programmatically by 'skg-id-stack'.
 (put 'skg-id-stack-mode 'completion-predicate #'ignore)
 
 (provide 'skg-id-search)
