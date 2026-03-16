@@ -56,19 +56,40 @@ If point is not on a link, print a message and do nothing."
           (skg-request-single-root-content-view-from-id link-id))
       (message "Point not on a link")) ))
 
+(defun skg--id-at-point ()
+  "Return (id . label) if point is on a UUID, metadata, link, or .skg filename.
+Otherwise nil."
+  (or (skg--point-on-uuid-v4-p)
+      (skg--point-in-metadata-p)
+      (skg--point-in-link-p)
+      (skg--point-on-skg-filename-p)) )
+
 (defun skg-view ()
-  "If point is on a UUID, metadata, a link, or a .skg filename,
-open a content view for that ID."
+  "Open a content view for the nearest ID on the current line.
+First checks whether point is directly on an ID.
+If not, tries skg-id-next (only if it stays on this line),
+then skg-id-prev (only if it stays on this line).
+Point is always restored."
   (interactive)
-  (let (( result (or (skg--point-on-uuid-v4-p)
-                     (skg--point-in-metadata-p)
-                     (skg--point-in-link-p)
-                     (skg--point-on-skg-filename-p)) ))
+  (let (( result (skg--id-at-point) ))
+    (unless result
+      (let (( start-pos (point) )
+            ( current-line (line-number-at-pos) ))
+        (save-excursion ;; Is there an ID after point on this line?
+          (skg-id-next)
+          (when (and (/= (point) start-pos)
+                     (= (line-number-at-pos) current-line))
+            (setq result (skg--id-at-point)) ))
+        (unless result
+          (save-excursion ;; There's definitely an ID before point.
+            (skg-id-prev)
+            (when (= (line-number-at-pos) current-line)
+              (setq result (skg--id-at-point)) )) )) )
     (if result
         (let (( id (car result) ))
           (message "Visiting node: %s" id)
           (skg-request-single-root-content-view-from-id id))
-      (message "No ID found at point")) ))
+      (message "No ID found on this line")) ))
 
 (defun skg-view-id (id)
   "Open a content view for ID, prompting when called interactively. (skg-view is usually more convenient.)"
