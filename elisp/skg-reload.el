@@ -35,6 +35,7 @@
             skg-state
             skg-test-utils
             skg-user-facing-aliases
+            skg-view-org-ancestry
             heralds-minor-mode )))
     (dolist (feat skg-features)
       (when (featurep feat)

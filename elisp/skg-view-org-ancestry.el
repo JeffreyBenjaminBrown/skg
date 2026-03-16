@@ -1,4 +1,4 @@
-;;; org-ancestry.el --- Show ancestry of org headline -*- lexical-binding: t; -*-
+;;; skg-view-org-ancestry.el --- Show ancestry of org headline -*- lexical-binding: t; -*-
 
 ;;; PURPOSE:
 ;;; This is not skg-specific; it works in any org buffer.
@@ -18,7 +18,7 @@
 
 (require 'org)
 
-(defun org-ancestry ()
+(defun skg-view-org-ancestry ()
   "Create a new buffer showing only the ancestry of the headline at point.
 The new buffer will contain the current headline and all its ancestors,
 from the root down to the current position."
@@ -53,4 +53,4 @@ from the root down to the current position."
         (goto-char (point-min)))
       (switch-to-buffer buf))))
 
-(provide 'org-ancestry)
+(provide 'skg-view-org-ancestry)

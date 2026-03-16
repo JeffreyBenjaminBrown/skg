@@ -66,3 +66,4 @@
 (require 'skg-request-views)
 (require 'skg-sexpr-edit)
 (require 'skg-sexpr-search)
+(require 'skg-view-org-ancestry)

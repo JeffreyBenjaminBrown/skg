@@ -11,7 +11,7 @@
    and beegin to edit another one.
    It won't stop you, but the results could be bad.
 ** changing the whole view
-*** skg-search-titles
+*** C-c t t : skg-search-titles
     Searches titles and aliases, but only shows "interesting" nodes:
     roots, cycle members, link targets, and nodes that had an
     org-roam ID before import. This filters out multi-contained
@@ -19,11 +19,11 @@
     Run 'skg-view' (below)
     from one of the links in the search results
     to go to the view from that node.
-*** skg-search-titles-everywhere
+*** C-c t e : skg-search-titles-everywhere
     Like skg-search-titles, but shows all matches
     regardless of graph role — including multi-contained
     and otherwise unremarkable nodes.
-*** skg-view
+*** C-c v v : skg-view
     Calling this when the cursor is on a link, a node's metadata,
     a bare UUID, or a .skg filename
     will open a new view from the ID it finds there,
@@ -33,13 +33,13 @@
     (a link or a node's metadata),
     use skg-id-next and skg-id-prev
     to identify where those are.
-*** skg-view-id
+*** C-c v i : skg-view-id
     'skg-view' is usually more convenient.
 
     This requires a literal v4 UUID string, like
     3861db2c-7f16-4814-b403-52b5e05d5e0a
     It can be useful going from git to skg.
-*** skg-view-new-empty
+*** C-c v n : skg-view-new-empty
     Asks you to pick a data source,
     and then provides a root node with that source.
 **** why
@@ -47,24 +47,24 @@
      Children can inherit from their parents,
      but to make a root (which has no parents)
      you need to choose its source explicitly.
-*** skg-view-heralds-mode
+*** C-c v h : skg-view-heralds-mode
     This command toggles it.
     This toggles whether, at the start of every node,
     metadata is shown in its full plain-text glory,
     or is instead summarized via brief 'heralds'.
     It is turned on at every view by default.
-*** skg-view-diff-mode
+*** C-c v d : skg-view-diff-mode
     If you use git to manage your data,
     enable this view to see what you've changed since your last commit,
     i.e. how your worktree differs from HEAD.
 ** requesting changes to views
-*** skg-show-aliases
+*** C-c s a : skg-show-aliases
     See what other text you could search for to find this node.
     You can always search for its title.
     Most nodes have a title and no aliases.
-*** skg-show-containerward
-*** skg-show-sourceward
-*** skg-show-definitive
+*** C-c s c : skg-show-containerward
+*** C-c s s : skg-show-sourceward
+*** C-c s d : skg-show-definitive
     A view of a node can be definitive or indefinitive.
     Typically the first place in the buffer that depicts a node
     is the definitive view of it. So that other views of that node
@@ -83,7 +83,7 @@
     and saves. The stats then appear in the node's metadata
     and in the heralds view.
 ** metadata edits
-*** skg-show-indefinitive
+*** C-c s i : skg-show-indefinitive
     This marks a node as 'indefinitiive',
     as described above.
     In brief, it means edits to its title, body or
@@ -91,11 +91,11 @@
     will not affect it
       (although edits to its children will affect those children,
       unless they are also indefinitive).
-*** skg-delete
+*** C-c d : skg-delete
     This marks a node for deletion from the graph.
     Upon saving the view, it will vanish not just from this view,
     but from the graph itself.
-*** skg-view-metadata
+*** C-c v m : skg-view-metadata
     When called from a node in a view of the graph,
     this switches to a view of the metadata of that node,
     with one item per line.
@@ -122,23 +122,24 @@
      But you can also jump to a view of your entire stack,
      using (copying, pasting, deleting) it
      without any restrictions on order.
-*** skg-view
+*** C-c v v : skg-view
     Visits anything with an ID.
     Defined in more detail earlier in this document.
-*** skg-id-next
+*** C-c i n : skg-id-next
     Makes the cursor hop among two kinds of IDs:
     The ID associated with a node in the view,
     and the ID associated with a link in a node's title.
     Every node has an ID,
     but a title can include multiple or no links.
-*** skg-id-prev
+*** C-c i p : skg-id-prev
     See skg-id-next, above.
-*** skg-id-push-to-stack
+*** C-c i u : skg-push-id-to-stack
     Use this to store a link to the ID the cursor is at.
-*** skg-view-stack
+*** C-c i o : skg-pop-id
+*** C-c v s : skg-view-stack
     View and maybe edit the set of links you've stored.
-** not skg but useful
-*** skg-show-magit
+** adjacent to other modes
+*** C-c g m : skg-show-magit
     Opens a magit view of the changes to the file.
 *** org-ancestry
     If you're at a headline so deep in the tree
