@@ -64,6 +64,6 @@ and hide INTERNAL from M-x completion."
 (skg-alias skg-local-sourceward      skg-request-sourceward-view)
 (skg-alias skg-view-from-node-id     skg-request-single-root-content-view-from-id)
 (skg-alias skg-view-heralds-mode     heralds-minor-mode)
-(skg-alias skg-view-metadata         skg-edit-first-sexpr-on-line)
+(skg-alias skg-view-metadata         skg-edit-metadata)
 
 (provide 'skg-user-facing-aliases)

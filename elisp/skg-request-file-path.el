@@ -46,22 +46,40 @@ and opens a magit diff of just that file."
                 (process-send-string tcp-proc request-sexp)) )) )) )) )
 
 (defun skg--file-diff-result (_tcp-proc payload)
-  "Handle the server response for a get-file-path request.
-PAYLOAD is the tagged LP response."
-  (let* ((response (read payload))
-         (raw-content (cadr (assoc 'content response)))
-         (content (and raw-content (format "%s" raw-content)))
-         (path (and content (string-trim content))))
+  "Handle the server response for a get-file-path request,
+by opening magit-status and navigates to the file.
+PAYLOAD is the tagged LP response from the server."
+  (let* (( response (read payload) )
+         ( raw-content (cadr (assoc 'content response)) )
+         ( content (and raw-content (format "%s" raw-content)) )
+         ( path (and content (string-trim content)) ))
     (cond
      ((or (not path) (string-prefix-p "File not found" path))
       (message "%s" (or path "No path received")))
      ((string-prefix-p "Error" path)
       (message "%s" path))
      (t
-      (let ((resolved-path
-             (expand-file-name path skg-config-dir)))
-        (let ((default-directory ;; DANGER: magit reads this implicitly to find the git repo via magit-toplevel. The .skg source dir is its own repo, separate from the outer project repo.
-               (file-name-directory resolved-path)))
-          (magit-diff-range "HEAD" nil (list resolved-path)) )) ))))
+      (let* (( resolved-path (expand-file-name path skg-config-dir) )
+             ( default-directory ;; PITFALL: magit reads this implicitly to find the git repo via magit-toplevel. The .skg source dir is its own repo, separate from the outer project repo.
+               (file-name-directory resolved-path) )
+             ( repo-root (magit-toplevel default-directory) )
+             ( rel-path (file-relative-name resolved-path repo-root) ))
+        (magit-status-setup-buffer default-directory)
+        (let (( unstaged-section (magit-get-section
+                                  `((file . ,rel-path) (unstaged))) )
+              ( staged-section   (magit-get-section
+                                  `((file . ,rel-path) (staged))) ))
+          (cond
+           (unstaged-section
+            (magit-section-goto unstaged-section)
+            (if staged-section
+                (message "Point is on unstaged changes. Some changes are staged, too.")
+              (message "Point is on unstaged changes. No changes are staged.") ))
+           (staged-section
+            (magit-section-goto staged-section)
+            (message "Point is on staged changes. No changes are unstaged.") )
+           (t
+            (message "magit: %s has not changed."
+                     (file-name-nondirectory resolved-path)) )) )) )) ))
 
 (provide 'skg-request-file-path)

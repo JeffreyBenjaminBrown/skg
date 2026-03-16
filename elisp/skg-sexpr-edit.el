@@ -2,14 +2,15 @@
 ;;;
 ;;; PURPOSE: Interactive s-expression editing utilities.
 ;;; From a 'source buffer', the user can call skg-view-metadata
-;;; (or similar commands) to open a new 'sexp edit' buffer,
+;;; to open a new 'sexp edit' buffer,
 ;;; where the sexp is rendered as an org-tree.
 ;;;
 ;;; User-facing functions:
-;;;   skg-edit-first-sexpr-on-line
+;;;   skg-edit-metadata
 
+(require 'skg-metadata)
 (require 'skg-sexpr-org-bijection)
-(require 'skg-sexpr-search)
+
 
 ;;
 ;; Buffer-local variables for the edit buffer
@@ -66,44 +67,43 @@ Kill the buffer to cancel without saving."
   "Help text shown at the top of the edit buffer.")
 
 ;;
-;; User-facing functions
+;; User-facing function
 ;;
 
-(defun skg-edit-first-sexpr-on-line ()
-  "Edit the first sexp on the current line in an org buffer.
+(defun skg-edit-metadata ()
+  "Edit the metadata sexp on the current headline in an org buffer.
 Opens a temporary org buffer with the sexp converted to org headlines.
 Use C-c C-c to save changes back to the source buffer.
 Kill the buffer to cancel without saving."
   (interactive)
-  (skg-edit-sexp-with-finder #'skg-first-sexpr-on-line))
-
-(defun skg-edit-sexp-at-or-after-point ()
-  "Edit the sexp at or after point in an org buffer.
-Opens a temporary org buffer with the sexp converted to org headlines.
-Use C-c C-c to save changes back to the source buffer.
-Kill the buffer to cancel without saving."
-  (skg-edit-sexp-with-finder #'skg-sexp-at-or-after-point))
-
-(defun skg-edit-sexp-with-finder (finder-fn)
-  "Edit a sexp found by FINDER-FN in an org buffer.
-FINDER-FN should be a function that returns a sexp from the current
-buffer, leaving point at the end of the sexp."
-  (let* ((source-buffer (current-buffer))
-         (sexp (funcall finder-fn)))
-    (unless sexp
-      (error "No sexp found"))
-    (let* ((sexp-end (point))
-           (sexp-start (save-excursion (backward-sexp 1) (point)))
-           (org-text (sexp-to-org sexp))
-           (edit-buffer (generate-new-buffer "*skg-edit*")))
+  (unless (org-at-heading-p)
+    (user-error "Not on a headline"))
+  (let* (( headline (skg-get-current-headline-text) )
+         ( split (skg-split-as-stars-metadata-title headline) ))
+    (unless split
+      (user-error "Not on a headline"))
+    (let (( metadata-str (cadr split) ))
+      (when (string-empty-p metadata-str)
+        (user-error "No metadata on this headline"))
+      (let* (( source-buffer (current-buffer) )
+             ( sexp (read metadata-str) )
+             ( sexp-start (+ (line-beginning-position)
+                             (length (car split)) ))
+             ( sexp-end (+ sexp-start (length metadata-str)) )
+             ( org-text (sexp-to-org sexp) )
+             ( edit-buffer (generate-new-buffer "*skg-edit*") ))
       (switch-to-buffer edit-buffer)
       (insert skg-edit--help-text)
       (insert org-text)
-      (goto-char (point-min))
       (org-mode)
+      (org-fold-show-all)
+      (goto-char (point-min))
+      (progn ;; skip past help text and 'skg', land at viewnode kind
+        (outline-next-heading)
+        (outline-next-heading))
       (skg-sexp-edit-mode 1)
       (setq-local skg-sexp-edit--source-buffer source-buffer)
       (setq-local skg-sexp-edit--start sexp-start)
-      (setq-local skg-sexp-edit--end sexp-end))))
+      (setq-local skg-sexp-edit--end sexp-end)))))
 
 (provide 'skg-sexpr-edit)

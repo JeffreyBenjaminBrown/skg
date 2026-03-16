@@ -95,7 +95,7 @@
     This marks a node for deletion from the graph.
     Upon saving the view, it will vanish not just from this view,
     but from the graph itself.
-*** C-c v m : skg-view-metadata
+*** C-c v h : skg-view-metadata
     When called from a node in a view of the graph,
     this switches to a view of the metadata of that node,
     with one item per line.
@@ -139,7 +139,7 @@
 *** C-c v s : skg-view-stack
     View and maybe edit the set of links you've stored.
 ** adjacent to other modes
-*** C-c g m : skg-view-magit
+*** C-c v m : skg-view-magit
     Opens a magit view of the changes to the file.
 *** skg-view-org-ancestry
     If you're at a headline so deep in the tree
