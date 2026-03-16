@@ -65,11 +65,11 @@ These are new names that I want to use for some (most) functions in docs/COMMAND
 *** skg-show-aliases <- skg-branch-aliases
 *** skg-show-containerward <- skg-branch-containerward
 *** skg-show-stats <- skg-request-containerward-stats
-*** skg-show-link-sourceward <- skg-branch-sourceward
+*** skg-local-link-sourceward <- skg-branch-sourceward
     Add this comment:
       In case someone forgets the word "source" but remembers "link".
 *** skg-show-sourceward <- skg-branch-sourceward
-*** skg-show-magit <- skg-visit-file-diff
+*** skg-view-magit <- skg-visit-file-diff
 *** skg-view <- skg-view-from-node
 *** skg-view-diff-mode <- skg-diff-view
 *** skg-view-heralds-mode <- skg-heralds-view

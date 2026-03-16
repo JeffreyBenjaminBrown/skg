@@ -33,7 +33,7 @@
       (BLUE diff
         (GREEN new "diff:new")
         (RED removed "diff:removed")))
-    (BLUE textChanged "<< Text changed. M-x skg-show-magit to see. >>")
+    (BLUE textChanged "<< Text changed. M-x skg-view-magit to see. >>")
     (RED deletedScaffold (ANY "DELETED" IT))
     (RED deleted "DELETED"
       (id (ANY IT))

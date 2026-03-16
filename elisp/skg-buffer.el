@@ -7,14 +7,15 @@
 (require 'cl-lib)
 (require 'heralds-minor-mode)
 (require 'skg-sexpr-search)
+(require 'skg-user-facing-aliases)
+
 
 (define-minor-mode skg-content-view-mode
   "Minor mode for skg content view buffers.
-Rebinds C-x C-s to save via the skg server."
+Rebinds C-x C-s to save via the skg server,
+and provides C-c prefix keybindings for skg commands."
   :lighter nil
-  :keymap (let ((map (make-sparse-keymap)))
-            (define-key map (kbd "C-x C-s") #'skg-request-save-buffer)
-            map))
+  :keymap skg-content-view-mode-map)
 
 (defvar-local skg-view-uri nil
   "Unique view URI for this skg buffer.")

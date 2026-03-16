@@ -23,7 +23,7 @@
     Like skg-search-titles, but shows all matches
     regardless of graph role — including multi-contained
     and otherwise unremarkable nodes.
-*** C-c v v : skg-view
+*** C-c v v | C-c C-o : skg-view
     Calling this when the cursor is on a link, a node's metadata,
     a bare UUID, or a .skg filename
     will open a new view from the ID it finds there,
@@ -139,9 +139,9 @@
 *** C-c v s : skg-view-stack
     View and maybe edit the set of links you've stored.
 ** adjacent to other modes
-*** C-c g m : skg-show-magit
+*** C-c g m : skg-view-magit
     Opens a magit view of the changes to the file.
-*** org-ancestry
+*** skg-view-org-ancestry
     If you're at a headline so deep in the tree
     that you can't remember where it came from,
     this brings you to a new view showing only that ancestry.

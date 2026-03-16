@@ -10,11 +10,11 @@
 ;;;   elisp/skg-user-facing-aliases.el
 ;;;     skg-view-heralds-mode
 ;;;   elisp/skg-user-facing-aliases.el
-;;;     skg-show-aliases
+;;;     skg-local-aliases
 ;;;   elisp/skg-user-facing-aliases.el
-;;;     skg-show-containerward
-;;;     skg-show-sourceward
-;;;     skg-show-link-sourceward
+;;;     skg-local-containerward
+;;;     skg-local-sourceward
+;;;     skg-local-link-sourceward
 ;;;   elisp/skg-user-facing-aliases.el
 ;;;     skg-save
 ;;;   elisp/skg-user-facing-aliases.el
@@ -40,7 +40,7 @@
 ;;;   elisp/skg-user-facing-aliases.el
 ;;;     skg-search-titles
 ;;;   elisp/skg-user-facing-aliases.el
-;;;     skg-show-indefinitive
+;;;     skg-local-indefinitive
 
 (let ;; Add project directories to load-path
     ((project-root
