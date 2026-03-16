@@ -1,0 +1,4 @@
+Two nodes, x and y.
+x contains y.
+Both begin (in git HEAD) with id equal to title.
+x is modified by the test to have a longer title.
