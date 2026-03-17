@@ -4,12 +4,6 @@
   it becomes more likely to embark on structural chamges
   that would have been thought better of in the neighborhood's light.
 * priorities
-** ONGOING overhaul metadata view
-*** metadata view should show even fields absent in the metadata
-*** when making a new root, present with source options
-    Just do it in emacs.
-    Jump to metadata view, cycling through source options
-      with a shortcut for cycling explained at the top.
 ** validation should permit ghosts to have same-id siblings
 *** the error message
  ```

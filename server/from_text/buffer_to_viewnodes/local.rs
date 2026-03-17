@@ -3,6 +3,7 @@
 /// without requiring global context.
 
 use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind, UncheckedTrueNode};
+use crate::types::git::NodeDiffStatus;
 use crate::types::viewnode::Scaffold;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::viewnode_skgnode::{
@@ -250,8 +251,10 @@ pub fn has_valid_source (
   t . source . as_ref()
     . is_some_and( |s| config . sources . contains_key (s) ) }
 
-/// Check that all non-ignored TrueNode children have distinct IDs.
+/// Check that all non-ignored, non-phantom TrueNode children
+/// have distinct IDs.
 /// "Non-ignored" means parent_ignores == false.
+/// "Non-phantom" means diff is not Removed or RemovedHere.
 /// Returns true if all such children have distinct IDs,
 /// or if there are no such children.
 pub fn nonignored_children_have_distinct_ids (
@@ -263,7 +266,10 @@ pub fn nonignored_children_have_distinct_ids (
   let mut seen : HashSet<ID> = HashSet::new();
   for child in node_ref . children() {
     if let UncheckedViewNodeKind::True (t) = &child . value() . kind {
-      if !t . parent_ignores {
+      if ( !t . parent_ignores
+           && !matches!( t . diff,
+                       Some( NodeDiffStatus::Removed )
+                       | Some( NodeDiffStatus::RemovedHere ))) {
         if let Some (id) = &t . id {
           if !seen . insert(id . clone()) {
             return false; }} }} }

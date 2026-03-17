@@ -307,6 +307,42 @@ fn test_no_duplicated_content_error_when_different_ids() -> Result<(), Box<dyn E
 }
 
 #[test]
+fn test_no_duplicated_content_error_for_phantom_siblings(
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db(
+    "skg-test-validate-tree-phantom-dup",
+    "tests/merge/merge_nodes/fixtures",
+    "/tmp/tantivy-test-validate-tree-phantom-dup",
+    |config, driver, _tantivy| Box::pin(async move {
+      // A phantom sibling (diff removed) sharing an ID with
+      // a real sibling should not trigger a duplicate error.
+      let input: &str =
+        indoc! {"
+                * (skg (node (id root) (source main))) parent
+                ** (skg (node (id 1) (source main))) real child
+                ** (skg (node (id 1) (source main) (diff removed))) phantom child
+            "};
+
+      let forest: Tree<UncheckedViewNode> =
+        org_to_uninterpreted_nodes (input) . unwrap() . 0;
+      let errors: Vec<BufferValidationError> =
+        find_buffer_errors_for_saving(&forest, config, driver) . await?;
+
+      let dup_children_re =
+        Regex::new(r"(?i)non-ignored.*children.*must.*unique") . unwrap();
+      let duplicated_content_errors: Vec<&BufferValidationError> = errors . iter()
+        . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
+                             if dup_children_re . is_match (msg)))
+        . collect();
+
+      assert_eq!(duplicated_content_errors . len(), 0,
+                 "Phantom siblings should not trigger duplicate ID errors");
+      Ok(())
+    })
+  )
+}
+
+#[test]
 fn test_root_without_source_validation(
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db(
