@@ -91,11 +91,11 @@
     will not affect it
       (although edits to its children will affect those children,
       unless they are also indefinitive).
-*** C-c d : skg-delete
+*** C-c l <backspace> : skg-delete
     This marks a node for deletion from the graph.
     Upon saving the view, it will vanish not just from this view,
     but from the graph itself.
-*** C-c v h : skg-view-metadata
+*** C-c l m : skg-view-metadata
     When called from a node in a view of the graph,
     this switches to a view of the metadata of that node,
     with one item per line.

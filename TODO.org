@@ -1,3 +1,34 @@
+* [[./next.org]] might be in progress
+* why to do a complete patrol when dogfooding
+  If a neighborhood of implemented feature space is left unused|unexplored,
+  it becomes more likely to embark on structural chamges
+  that would have been thought better of in the neighborhood's light.
+* priorities
+** ONGOING overhaul metadata view
+*** metadata view should show even fields absent in the metadata
+*** when making a new root, present with source options
+    Just do it in emacs.
+    Jump to metadata view, cycling through source options
+      with a shortcut for cycling explained at the top.
+** validation should permit ghosts to have same-id siblings
+*** the error message
+ ```
+   Validation errors found in buffer.
+
+   ** Error 1
+   Local structure violation:
+   - ID: 5d06a355-657f-44c4-84be-cae4ed93a28a
+   - TrueNode's non-ignored TrueNode children must be unique (no two sharing the same ID).
+ ```
+*** how to fix the code
+    Currently, the part of the validation code that
+    prevents siblings from having duplicate IDs
+    excludes (I believe) 'parentIgnores' nodes,
+    but does not exclude phantom nodes ('removed' or 'removedHere').
+    It should exclude those, too.
+** move data to another source
+* TODO get containerward view within link sourceward view
+  for every link that is not a root
 * promote and demote in backlinks
   Whichever means explicitly labeling fewer link sources.
   e.g. relationship nodes like 'instances'
@@ -6,8 +37,6 @@
   vs. a lot that use it as a relationship label
 * What does skg-show-stats do?
 * TODO Warn user if they create a containment cycle.
-* TODO get containerward view within link sourceward view
-  for every link that is not a root
 * present view of node's root(like) containerward ancestors
 ** Hopefully a root, otherwise a cycle; links are ignored.
 ** Useful when checking changes
@@ -16,6 +45,22 @@
 * 'C-c C-o' ought to be the skg-visit-node shortcut.
   To match what it does (follow a link) in org-mode.
 * dogfooding
+** commands to probe better
+*** TODO C-c g m : skg-view-magit
+    Opens a magit view of the changes to the file.
+*** TODO C-c v d : skg-view-diff-mode
+    If you use git to manage your data,
+    enable this view to see what you've changed since your last commit,
+    i.e. how your worktree differs from HEAD.
+*** TODO C-c k a : skg-local-aliases
+    See what other text you could search for to find this node.
+    You can always search for its title.
+    Most nodes have a title and no aliases.
+*** TODO skg-show-stats
+    Computes the containerward path stats for a node
+    (path length, fork count, whether it cycles)
+    and saves. The stats then appear in the node's metadata
+    and in the heralds view.
 ** things to try
 *** look at my import collisions
     rg Was_Overloaded
@@ -24,8 +69,8 @@
    I think I did. Searching for 'motivation' used,
    I'm sure, to return a hit with exactly that title.
 ** I wanted immediately upon trying it.
-*** do until all of node's children
 *** delete in view-descendents all parent-ignores branches
+*** do until all of node's children
 ** Branching containerward is slow.
 * import org-roam
   cargo run --bin skg -- import-org-roam public/ data/public/ public

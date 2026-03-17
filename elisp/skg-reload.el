@@ -29,9 +29,11 @@
             skg-request-verify-connection
             skg-request-views
             skg-sexpr-dsl-for-edits
+            skg-sexpr-cycling
             skg-sexpr-edit
             skg-sexpr-org-bijection
             skg-sexpr-search
+            skg-truenode-defaults
             skg-state
             skg-test-utils
             skg-user-facing-aliases

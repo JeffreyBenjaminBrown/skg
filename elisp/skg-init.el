@@ -56,7 +56,10 @@
    (expand-file-name "elisp/skg-sexpr" project-root))
   (add-to-list
    'load-path
-   (expand-file-name "elisp/skg-request-save" project-root)) )
+   (expand-file-name "elisp/skg-request-save" project-root))
+  (add-to-list
+   'load-path
+   (expand-file-name "elisp/skg-sexpr-edit" project-root)) )
 
 (require 'skg-log)
 (require 'skg-buffer)
