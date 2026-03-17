@@ -3,24 +3,7 @@
   If a neighborhood of implemented feature space is left unused|unexplored,
   it becomes more likely to embark on structural chamges
   that would have been thought better of in the neighborhood's light.
-* priorities
-** validation should permit ghosts to have same-id siblings
-*** the error message
- ```
-   Validation errors found in buffer.
-
-   ** Error 1
-   Local structure violation:
-   - ID: 5d06a355-657f-44c4-84be-cae4ed93a28a
-   - TrueNode's non-ignored TrueNode children must be unique (no two sharing the same ID).
- ```
-*** how to fix the code
-    Currently, the part of the validation code that
-    prevents siblings from having duplicate IDs
-    excludes (I believe) 'parentIgnores' nodes,
-    but does not exclude phantom nodes ('removed' or 'removedHere').
-    It should exclude those, too.
-** move data to another source
+* move data to another source
 * TODO get containerward view within link sourceward view
   for every link that is not a root
 * promote and demote in backlinks
