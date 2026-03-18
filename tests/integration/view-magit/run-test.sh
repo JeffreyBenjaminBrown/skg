@@ -90,7 +90,7 @@ port = $AVAILABLE_PORT
 delete_on_quit = true
 
 [[sources]]
-nickname = "main"
+name = "main"
 path = "$SKG_DATA"
 user_owns_it = true
 EOF

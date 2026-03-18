@@ -229,7 +229,8 @@ fn test_full_context_pipeline () {
       HashMap::from ([(
         SourceName::from ("test"),
         SkgfileSource {
-          nickname     : SourceName::from ("test"),
+          name         : SourceName::from ("test"),
+          abbreviation : None,
           path         : PathBuf::from ("tests/contexts/fixtures"),
           user_owns_it : true } )]) );
   let nodes : Vec<SkgNode> =

@@ -25,7 +25,7 @@ pub struct SkgNode {
   pub aliases: MSV<String>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.)
 
   #[serde(skip_serializing, skip_deserializing)]
-  pub source: SourceName, // source nickname, inferred from file location and SkgConfig
+  pub source: SourceName, // source name, inferred from file location and SkgConfig
 
   pub pid: ID, // Primary ID. Determines filename, TypeDB identity, Tantivy key, map key. Never changes.
 

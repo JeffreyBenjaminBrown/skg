@@ -20,7 +20,8 @@ fn test_validate_existing_owned_source() {
   sources . insert(
     SourceName::from ("main"),
     SkgfileSource {
-      nickname: SourceName::from ("main"),
+      name: SourceName::from ("main"),
+        abbreviation: None,
       path: source_path . clone(),
       user_owns_it: true,
     }
@@ -45,7 +46,8 @@ fn test_validate_nonexistent_owned_source() {
   sources . insert(
     SourceName::from ("main"),
     SkgfileSource {
-      nickname: SourceName::from ("main"),
+      name: SourceName::from ("main"),
+        abbreviation: None,
       path: source_path . clone(),
       user_owns_it: true,
     }
@@ -69,7 +71,8 @@ fn test_validate_existing_foreign_source() {
   sources . insert(
     SourceName::from ("foreign"),
     SkgfileSource {
-      nickname: SourceName::from ("foreign"),
+      name: SourceName::from ("foreign"),
+        abbreviation: None,
       path: source_path . clone(),
       user_owns_it: false,
     }
@@ -93,7 +96,8 @@ fn test_validate_nonexistent_foreign_source() {
   sources . insert(
     SourceName::from ("foreign"),
     SkgfileSource {
-      nickname: SourceName::from ("foreign"),
+      name: SourceName::from ("foreign"),
+        abbreviation: None,
       path: source_path . clone(),
       user_owns_it: false,
     }
@@ -126,7 +130,8 @@ fn test_validate_multiple_sources() {
   sources . insert(
     SourceName::from ("existing"),
     SkgfileSource {
-      nickname: SourceName::from ("existing"),
+      name: SourceName::from ("existing"),
+        abbreviation: None,
       path: existing_path . clone(),
       user_owns_it: true,
     }
@@ -134,7 +139,8 @@ fn test_validate_multiple_sources() {
   sources . insert(
     SourceName::from ("new_owned"),
     SkgfileSource {
-      nickname: SourceName::from ("new_owned"),
+      name: SourceName::from ("new_owned"),
+        abbreviation: None,
       path: new_owned_path . clone(),
       user_owns_it: true,
     }
@@ -165,7 +171,8 @@ fn test_validate_multiple_sources_with_foreign_failure() {
   sources . insert(
     SourceName::from ("existing"),
     SkgfileSource {
-      nickname: SourceName::from ("existing"),
+      name: SourceName::from ("existing"),
+        abbreviation: None,
       path: existing_path . clone(),
       user_owns_it: true,
     }
@@ -173,7 +180,8 @@ fn test_validate_multiple_sources_with_foreign_failure() {
   sources . insert(
     SourceName::from ("foreign"),
     SkgfileSource {
-      nickname: SourceName::from ("foreign"),
+      name: SourceName::from ("foreign"),
+        abbreviation: None,
       path: nonexistent_foreign . clone(),
       user_owns_it: false,
     }

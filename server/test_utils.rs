@@ -188,7 +188,8 @@ pub async fn populate_test_db_from_fixtures (
     sources . insert(
       SourceName::from ("main"),
       SkgfileSource {
-        nickname: SourceName::from ("main"),
+        name: SourceName::from ("main"),
+        abbreviation: None,
         path: PathBuf::from (data_folder),
         user_owns_it: true, } );
     read_all_skg_files_from_sources(
@@ -225,7 +226,8 @@ pub async fn setup_test_tantivy_and_typedb_dbs (
     sources . insert (
       SourceName::from ("main"),
       SkgfileSource {
-        nickname     : SourceName::from ("main"),
+        name         : SourceName::from ("main"),
+        abbreviation : None,
         path         : PathBuf::from (fixtures_folder),
         user_owns_it : true, });
     SkgConfig::fromSourcesAndDbName (

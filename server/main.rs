@@ -3,7 +3,7 @@
 /// See api-and-formats.md § skgconfig.toml,
 /// or the example at data/skgconfig.toml.
 ///
-/// Subcommand: import-org-roam <org-dir> <skg-output-dir> <source-nickname>
+/// Subcommand: import-org-roam <org-dir> <skg-output-dir> <source-name>
 /// Converts org-roam .org files to .skg files.
 
 use skg::context::{compute_and_store_context_types, MapToContent, MapToContainers};
@@ -201,7 +201,7 @@ fn run_import (
   args : &[String],
 ) -> Result<(), Box<dyn Error>> {
   if args . len() < 5 {
-    tracing::error! ("Usage: cargo run -- import-org-roam <org-dir> <skg-output-dir> <source-nickname>");
+    tracing::error! ("Usage: cargo run -- import-org-roam <org-dir> <skg-output-dir> <source-name>");
     std::process::exit (1); }
   let org_dir    : &Path       = Path::new (&args[2]);
   let output_dir : &Path       = Path::new (&args[3]);

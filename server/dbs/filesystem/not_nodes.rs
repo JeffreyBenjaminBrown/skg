@@ -11,17 +11,17 @@ use std::path::{Path, PathBuf};
 pub fn validate_source_paths_creating_owned_ones_if_needed (
   sources: &HashMap<SourceName, SkgfileSource>
 ) -> io::Result<()> {
-  for (nickname, source) in sources . iter() {
+  for (source_name, source) in sources . iter() {
     if !source . path . exists() { // If it doesn't exist
       if source . user_owns_it { // and it's owned, create it
         fs::create_dir_all(&source . path)?;
         tracing::info!("Created directory for source '{}': {:?}",
-                  nickname, source . path);
+                  source_name, source . path);
       } else { // and it's foreign, fail
         return Err(io::Error::new(
           io::ErrorKind::NotFound,
           format!("Foreign source '{}' path does not exist: {:?}",
-                  nickname, source . path )) ); }} }
+                  source_name, source . path )) ); }} }
   Ok(( )) }
 
 pub fn load_config (
@@ -47,7 +47,7 @@ pub fn load_config (
 /// Load config from TOML file with optional overrides for testing.
 ///
 /// - If `db_name` is Some, overrides db_name and sets tantivy_folder to /tmp/tantivy-{db_name}
-/// - `source_overrides` replaces paths for the specified source nicknames
+/// - `source_overrides` replaces paths for the specified source names
 ///
 /// # Examples
 /// ```ignore
@@ -91,13 +91,13 @@ pub fn load_config_with_overrides (
     config . db_name = name . to_string();
     config . tantivy_folder =
       std::path::PathBuf::from(format!("/tmp/tantivy-{}", name)); }
-  for (nickname, new_path) in source_overrides {
-    let key : SourceName = SourceName::from (*nickname);
+  for (source_name, new_path) in source_overrides {
+    let key : SourceName = SourceName::from (*source_name);
     if let Some (source) = config . sources . get_mut (&key) {
       source . path = new_path . clone();
     } else {
       return Err(format!(
-        "Source '{}' not found in config", nickname) . into()); }}
+        "Source '{}' not found in config", source_name) . into()); }}
   validate_source_paths_creating_owned_ones_if_needed(
     &config . sources)?;
   Ok (config) }

@@ -3,6 +3,6 @@ tantivy_folder = ".index.tantivy"
 port = 1731
 
 [[sources]]
-nickname = "main"
+name = "main"
 path = "skg"
 user_owns_it = true

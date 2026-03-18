@@ -81,7 +81,7 @@ impl SkgConfig {
   pub fn logs_dir ( &self ) -> PathBuf {
     self . data_root . join ("logs") } }
 
-/// Each source has a unique nickname, defined in the SkgConfig,
+/// Each source has a unique name, defined in the SkgConfig,
 /// used in ViewNode metadata to track provenance.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SourceName ( pub String );
@@ -114,7 +114,7 @@ where
     HashMap::new ();
   for source in sources_vec {
     map . insert (
-      source . nickname . clone (),
+      source . name . clone (),
       source ); }
   Ok (map)
 }
@@ -275,9 +275,9 @@ impl SkgConfig {
 
   pub fn user_owns_source (
     &self,
-    nickname : &SourceName
+    source_name : &SourceName
   ) -> bool {
-    self . sources . get (nickname)
+    self . sources . get (source_name)
       . map ( |s| s . user_owns_it )
       . unwrap_or (false)
   }

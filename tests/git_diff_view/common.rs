@@ -78,7 +78,8 @@ pub async fn setup_test_dbs(
   let config : SkgConfig = {
     let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new();
     sources . insert(SourceName::from ("main"), SkgfileSource {
-      nickname: SourceName::from ("main"),
+      name: SourceName::from ("main"),
+        abbreviation: None,
       path: PathBuf::from (source_path),
       user_owns_it: true,
     });
@@ -95,7 +96,8 @@ pub async fn setup_test_dbs(
     let mut sources : HashMap<SourceName, SkgfileSource> =
       HashMap::new();
     sources . insert(SourceName::from ("main"),
-                   SkgfileSource { nickname: SourceName::from ("main"),
+                   SkgfileSource { name: SourceName::from ("main"),
+        abbreviation: None,
                                    path: PathBuf::from (source_path),
                                    user_owns_it: true, });
     read_all_skg_files_from_sources(

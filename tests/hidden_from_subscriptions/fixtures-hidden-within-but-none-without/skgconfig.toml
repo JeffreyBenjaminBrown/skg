@@ -3,6 +3,6 @@ tantivy_folder = "/tmp/placeholder"
 port = 1730
 
 [[sources]]
-nickname = "main"
+name = "main"
 path = "."
 user_owns_it = true

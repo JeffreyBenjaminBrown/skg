@@ -3,11 +3,11 @@ tantivy_folder = "/tmp/tantivy-test-foreign-validation"
 port = 3047
 
 [[sources]]
-nickname = "main"
+name = "main"
 path = "fixtures/main"
 user_owns_it = true
 
 [[sources]]
-nickname = "foreign"
+name = "foreign"
 path = "fixtures/foreign"
 user_owns_it = false

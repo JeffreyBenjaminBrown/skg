@@ -60,7 +60,7 @@ port = $AVAILABLE_PORT
 delete_on_quit = true
 
 [[sources]]
-nickname = "main"
+name = "main"
 path = "$TEST_DIR/data/skg-data"
 user_owns_it = true
 EOF

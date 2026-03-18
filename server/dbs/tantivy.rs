@@ -59,7 +59,7 @@ pub(crate) fn open_existing_tantivy_index (
 /// It includes three fields:
 /// - "id": STRING | STORED - the node's primary ID
 /// - "title_or_alias": TEXT | STORED - searchable titles and aliases
-/// - "source": STRING | STORED - the source nickname
+/// - "source": STRING | STORED - the source name
 pub(super) fn mk_tantivy_schema() -> schema::Schema {
   let mut schema_builder : schema::SchemaBuilder =
     schema::Schema::builder();

@@ -158,7 +158,8 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
   let config: SkgConfig = {
     let mut sources: HashMap<SourceName, SkgfileSource> = HashMap::new();
     sources . insert(SourceName::from ("temp"), SkgfileSource {
-      nickname: SourceName::from ("temp"),
+      name: SourceName::from ("temp"),
+        abbreviation: None,
       path: dir . path() . to_path_buf(),
       user_owns_it: true, });
     SkgConfig::dummyFromSources (sources) };

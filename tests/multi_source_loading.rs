@@ -28,7 +28,8 @@ fn test_load_from_single_source() {
     sources . insert(
       SourceName::from ("main"),
       SkgfileSource {
-        nickname: SourceName::from ("main"),
+        name: SourceName::from ("main"),
+        abbreviation: None,
         path: source_path . clone(),
         user_owns_it: true, } );
     test_config (sources) };
@@ -66,13 +67,15 @@ fn test_load_from_multiple_sources() {
     sources . insert(
       SourceName::from ("main"),
       SkgfileSource {
-        nickname: SourceName::from ("main"),
+        name: SourceName::from ("main"),
+        abbreviation: None,
         path: main_path,
         user_owns_it: true, } );
     sources . insert(
       SourceName::from ("shared"),
       SkgfileSource {
-        nickname: SourceName::from ("shared"),
+        name: SourceName::from ("shared"),
+        abbreviation: None,
         path: shared_path,
         user_owns_it: false, } );
     test_config (sources) };
@@ -132,13 +135,15 @@ fn test_duplicate_id_detection_across_sources() {
     sources . insert(
       SourceName::from ("main"),
       SkgfileSource {
-        nickname: SourceName::from ("main"),
+        name: SourceName::from ("main"),
+        abbreviation: None,
         path: main_path,
         user_owns_it: true, } );
     sources . insert(
       SourceName::from ("shared"),
       SkgfileSource {
-        nickname: SourceName::from ("shared"),
+        name: SourceName::from ("shared"),
+        abbreviation: None,
         path: shared_path,
         user_owns_it: false, } );
     test_config (sources) };
@@ -183,13 +188,15 @@ fn test_node_with_multiple_ids_duplicate_detection() {
     sources . insert(
       SourceName::from ("main"),
       SkgfileSource {
-        nickname: SourceName::from ("main"),
+        name: SourceName::from ("main"),
+        abbreviation: None,
         path: main_path,
         user_owns_it: true, } );
     sources . insert(
       SourceName::from ("shared"),
       SkgfileSource {
-        nickname: SourceName::from ("shared"),
+        name: SourceName::from ("shared"),
+        abbreviation: None,
         path: shared_path,
         user_owns_it: false, } );
     test_config (sources) };
@@ -231,7 +238,8 @@ fn test_load_from_empty_sources() {
     sources . insert(
       SourceName::from ("empty"),
       SkgfileSource {
-        nickname: SourceName::from ("empty"),
+        name: SourceName::from ("empty"),
+        abbreviation: None,
         path: source_path,
         user_owns_it: true, } );
     read_all_skg_files_from_sources(&test_config (sources)) };
@@ -256,13 +264,15 @@ fn test_source_field_set_correctly() {
     sources . insert(
       SourceName::from ("source_a"),
       SkgfileSource {
-        nickname: SourceName::from ("source_a"),
+        name: SourceName::from ("source_a"),
+        abbreviation: None,
         path: source_a,
         user_owns_it: true, } );
     sources . insert(
       SourceName::from ("source_b"),
       SkgfileSource {
-        nickname: SourceName::from ("source_b"),
+        name: SourceName::from ("source_b"),
+        abbreviation: None,
         path: source_b,
         user_owns_it: true, } );
     test_config (sources) };
@@ -315,13 +325,15 @@ fn test_many_duplicate_ids_creates_org_file() {
   sources . insert(
     SourceName::from ("source_a"),
     SkgfileSource {
-      nickname: SourceName::from ("source_a"),
+      name: SourceName::from ("source_a"),
+        abbreviation: None,
       path: source_a,
       user_owns_it: true, } );
   sources . insert(
     SourceName::from ("source_b"),
     SkgfileSource {
-      nickname: SourceName::from ("source_b"),
+      name: SourceName::from ("source_b"),
+        abbreviation: None,
       path: source_b,
       user_owns_it: true,
     }
@@ -400,7 +412,8 @@ fn test_unreadable_files_creates_org_file() {
   write_sources . insert(
     SourceName::from ("source_good"),
     SkgfileSource {
-      nickname: SourceName::from ("source_good"),
+      name: SourceName::from ("source_good"),
+        abbreviation: None,
       path: source_good . clone(),
       user_owns_it: true, } );
   let write_config : SkgConfig = test_config (write_sources);
@@ -418,13 +431,15 @@ fn test_unreadable_files_creates_org_file() {
   sources . insert(
     SourceName::from ("source_good"),
     SkgfileSource {
-      nickname: SourceName::from ("source_good"),
+      name: SourceName::from ("source_good"),
+        abbreviation: None,
       path: source_good,
       user_owns_it: true, } );
   sources . insert(
     SourceName::from ("source_bad"),
     SkgfileSource {
-      nickname: SourceName::from ("source_bad"),
+      name: SourceName::from ("source_bad"),
+        abbreviation: None,
       path: source_bad . clone(),
       user_owns_it: true, } );
 

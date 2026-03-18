@@ -3,16 +3,16 @@ tantivy_folder = "/tmp/tantivy-test-move-source"
 port = 1730
 
 [[sources]]
-nickname = "public"
+name = "public"
 path = "public"
 user_owns_it = true
 
 [[sources]]
-nickname = "private"
+name = "private"
 path = "private"
 user_owns_it = true
 
 [[sources]]
-nickname = "foreign"
+name = "foreign"
 path = "foreign"
 user_owns_it = false

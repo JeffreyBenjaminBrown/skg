@@ -27,7 +27,7 @@ pub enum BufferValidationError {
   AmbiguousDeletion              (ID),
   DuplicatedContent              (ID), // A node has multiple Content children with the same ID
   InconsistentSources            (ID, HashSet<SourceName>), // Multiple viewnodes with same ID have different sources
-  ModifiedForeignNode            (ID, SourceName), // Attempted to modify a node from a foreign (read-only) source - (node_id, source_nickname)
+  ModifiedForeignNode            (ID, SourceName), // Attempted to modify a node from a foreign (read-only) source - (node_id, source_name)
   CannotMoveToOrFromForeignSource (ID,
                                    SourceName, // disk source
                                    SourceName), // buffer source

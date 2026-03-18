@@ -3,11 +3,11 @@ tantivy_folder = "/tmp/unused"
 port = 0
 
 [[sources]]
-nickname = "fixtures"
+name = "fixtures"
 path = "."
 user_owns_it = true
 
 [[sources]]
-nickname = "output"
+name = "output"
 path = "/tmp/placeholder"  # overridden by tests
 user_owns_it = true

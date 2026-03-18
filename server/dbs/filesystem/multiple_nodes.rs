@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::fs::{self, DirEntry, ReadDir};
 
 /// Reads all .skg files from all configured sources.
-/// Sets each node's source field to the appropriate source nickname.
+/// Sets each node's source field to the appropriate source name.
 /// Detects duplicate IDs across sources and collects all errors.
 /// If errors are found, writes detailed error reports to org files.
 pub fn read_all_skg_files_from_sources (
@@ -17,16 +17,16 @@ pub fn read_all_skg_files_from_sources (
 ) -> io::Result<Vec<SkgNode>> {
   let mut all_nodes: Vec<SkgNode> = Vec::new();
   let mut seen_ids: HashMap < String,       // ID
-                              Vec<String> > // source nicknames
+                              Vec<String> > // source names
     // Maps each ID to all sources containing it
     = HashMap::new();
-  let mut load_errors: Vec<(String, // source nickname
+  let mut load_errors: Vec<(String, // source name
                             String, // filename
                             String)> // error message
     = Vec::new();
 
-  for (nickname, source) in config . sources . iter() {
-    match read_skg_files_from_folder (nickname, config) {
+  for (source_name, source) in config . sources . iter() {
+    match read_skg_files_from_folder (source_name, config) {
       Ok (mut nodes) => {
         for node in &nodes {
           for id in node . all_ids() {
@@ -34,11 +34,11 @@ pub fn read_all_skg_files_from_sources (
             let id_str: String = id . as_str() . to_string();
             seen_ids . entry (id_str)
               . or_insert_with (Vec::new)
-              . push(nickname . to_string()); }}
+              . push(source_name . to_string()); }}
         all_nodes . append (&mut nodes); }
       Err (e) => {
         load_errors . push((
-          nickname . to_string(),
+          source_name . to_string(),
           source . path . display() . to_string(),
           e . to_string()
         )); }} }
@@ -79,14 +79,14 @@ pub fn read_all_skg_files_from_sources (
   Ok (all_nodes) }
 
 fn read_skg_files_from_folder (
-  source_nickname : &SourceName,
-  config          : &SkgConfig,
+  source_name : &SourceName,
+  config      : &SkgConfig,
 ) -> io::Result < Vec<SkgNode> > {
   let source : &SkgfileSource =
-    config . sources . get (source_nickname)
+    config . sources . get (source_name)
     . ok_or_else(|| io::Error::new(
       io::ErrorKind::NotFound,
-      format!("Source '{}' not found in config", source_nickname)))?;
+      format!("Source '{}' not found in config", source_name)))?;
   let mut nodes : Vec<SkgNode> = Vec::new ();
   let entries : ReadDir = // an iterator
     fs::read_dir (&source . path) ?;
@@ -100,7 +100,7 @@ fn read_skg_files_from_folder (
       let mut skgnode: SkgNode =
         read_skgnode (&path) ?;
       validate_pid_matches_filename (&skgnode, &path) ?;
-      skgnode . source = source_nickname . clone();
+      skgnode . source = source_name . clone();
       nodes . push (skgnode); }}
   Ok (nodes) }
 
@@ -112,7 +112,7 @@ pub fn read_modified_skg_files_from_sources (
 ) -> io::Result<Vec<SkgNode>> {
   let mut all_nodes : Vec<SkgNode> = Vec::new();
   let mut seen_ids  : HashSet<String> = HashSet::new();
-  for (nickname, source) in config . sources . iter() {
+  for (source_name, source) in config . sources . iter() {
     let entries : ReadDir =
       fs::read_dir (&source . path) ?;
     for entry in entries {
@@ -136,7 +136,7 @@ pub fn read_modified_skg_files_from_sources (
           io::ErrorKind::InvalidData,
           format! ("Duplicate primary ID '{}' within batch",
                    pid_str )) ); }
-      skgnode . source = nickname . clone();
+      skgnode . source = source_name . clone();
       all_nodes . push (skgnode); }}
   Ok (all_nodes) }
 
