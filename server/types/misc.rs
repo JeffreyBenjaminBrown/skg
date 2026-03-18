@@ -46,10 +46,17 @@ pub struct ID ( pub String );
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 pub struct SkgfileSource {
-  pub nickname     : SourceName,
+  pub name         : SourceName,
+  #[serde(default)]
+  pub abbreviation : Option<String>,
   pub path         : PathBuf,
   pub user_owns_it : bool,
 }
+
+impl SkgfileSource {
+  pub fn herald_label (&self) -> &str {
+    self . abbreviation . as_deref ()
+      . unwrap_or ( &self . name ) }}
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct SkgConfig {

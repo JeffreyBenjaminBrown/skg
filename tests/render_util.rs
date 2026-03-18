@@ -5,7 +5,8 @@ use skg::types::viewnode::ViewNodeStats;
 use skg::types::viewnode::{
     ViewNode, ViewNodeKind, Scaffold, TrueNode, IndefOrDef,
     viewnode_from_scaffold, default_truenode };
-use skg::types::misc::{ID, SourceName};
+use skg::types::misc::{ID, SkgConfig, SourceName};
+use std::collections::HashMap;
 
 #[test]
 fn test_viewnode_to_text_no_metadata () {
@@ -17,7 +18,7 @@ fn test_viewnode_to_text_no_metadata () {
                          SourceName::from ("main"),
                          "Test Title" . to_string() )) };
   let result : String =
-    viewnode_to_text ( 1, &node )
+    viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("TrueNode rendering never fails");
   assert_eq! ( result, "* (skg (node (id test) (source main))) Test Title\n" ); }
 
@@ -35,7 +36,7 @@ fn test_viewnode_to_text_with_body () {
     folded  : false,
     kind    : ViewNodeKind::True (t), };
   let result : String =
-    viewnode_to_text ( 2, &node )
+    viewnode_to_text ( 2, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("TrueNode rendering never fails");
   assert_eq! ( result, "** (skg (node (id test) (source main))) Test Title\nTest body content\n" ); }
 
@@ -44,7 +45,7 @@ fn test_viewnode_to_text_with_metadata () {
   let mut node = viewnode_from_scaffold (Scaffold::AliasCol);
   node . folded = true;
   let result : String =
-    viewnode_to_text ( 1, &node )
+    viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("AliasCol rendering never fails");
   assert_eq! ( result, "* (skg folded aliasCol) its aliases\n" ); }
 
@@ -60,7 +61,7 @@ fn test_viewnode_to_text_with_id_metadata () {
     folded  : false,
     kind    : ViewNodeKind::True (t), };
   let result : String =
-    viewnode_to_text ( 3, &node )
+    viewnode_to_text ( 3, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("TrueNode rendering never fails");
   assert_eq! ( result, "*** (skg (node (id test123) (source main) indefinitive)) Test Title\n" ); }
 
@@ -79,6 +80,6 @@ fn test_metadata_ordering () {
     folded  : false,
     kind    : ViewNodeKind::True (t), };
   let result : String =
-    viewnode_to_text ( 1, &node )
+    viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("TrueNode rendering never fails");
   assert_eq! ( result, "* (skg (node (id xyz) (source main) (viewStats cycle notInParent))) Test\n" ); }

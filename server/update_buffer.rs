@@ -215,9 +215,10 @@ async fn rerender_view (
   set_viewnodestats_in_forest (
     forest,
     &container_to_contents,
-    &content_to_containers );
+    &content_to_containers,
+    config );
   let result : Result<String, Box<dyn Error>> =
-    viewnode_forest_to_string (forest);
+    viewnode_forest_to_string (forest, config);
   tracing::debug!("rerender_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
   result }

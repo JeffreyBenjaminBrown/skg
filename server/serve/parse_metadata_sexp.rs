@@ -421,7 +421,13 @@ fn parse_viewstats_sexp (
           _ => {
             return Err ( format! ( "Unknown viewStats value: {}",
                                     bare_value )); }} },
-      _ => { return Err ( "Unexpected element in viewStats (expected bare atoms)"
+      Sexp::List (kv_pair) if kv_pair . len () == 2 => {
+        let key : String = atom_to_string ( &kv_pair[0] ) ?;
+        match key . as_str () {
+          "sourceHerald" => {}, // output-only, silently discard
+          _ => { return Err ( format! (
+            "Unknown viewStats key: {}", key )); }} },
+      _ => { return Err ( "Unexpected element in viewStats"
                            . to_string () ); }} }
   Ok (( )) }
 

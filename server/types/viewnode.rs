@@ -128,6 +128,7 @@ pub struct ViewNodeStats {
   pub cycle             : bool,
   pub parentIsContainer : bool,
   pub parentIsContent   : bool,
+  pub sourceAtBoundary  : bool, // True if a root or if source differs from source of nearest truenode ancestor.
 }
 
 /// Scaffold nodes are display-only structures
@@ -462,6 +463,7 @@ impl Default for ViewNodeStats {
       cycle             : false,
       parentIsContainer : true,
       parentIsContent   : false,
+      sourceAtBoundary  : false,
     }} }
 
 //

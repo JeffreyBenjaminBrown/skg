@@ -12,19 +12,22 @@ use std::error::Error;
 /// ERRORS: if root is not a BufferRoot.
 pub fn viewnode_forest_to_string (
   forest : &Tree<ViewNode>,
+  config : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   fn render_node_subtree_to_org (
     node_ref : NodeRef < ViewNode >,
     level    : usize,
+    config   : &SkgConfig,
   ) -> Result < String, Box<dyn Error> > {
     let viewnode : &ViewNode = node_ref . value ();
     let mut out : String =
-      viewnode_to_text ( level, viewnode )?;
+      viewnode_to_text ( level, viewnode, config )?;
     for child in node_ref . children () {
       out . push_str (
         & render_node_subtree_to_org (
           child,
-          level + 1 )? ); }
+          level + 1,
+          config )? ); }
     Ok (out) }
   let root_ref : NodeRef<ViewNode> = forest . root ();
   let is_forest_root : bool =
@@ -38,7 +41,7 @@ pub fn viewnode_forest_to_string (
     String::new ();
   for child in root_ref . children () {
     result . push_str (
-      & render_node_subtree_to_org ( child, 1 )? ); }
+      & render_node_subtree_to_org ( child, 1, config )? ); }
   Ok (result) }
 
 /// Renders an ViewNode as org-mode formatted text.
@@ -46,10 +49,11 @@ pub fn viewnode_forest_to_string (
 /// ERRORS: If viewnode is a BufferRoot.
 pub fn viewnode_to_text (
   level    : usize,
-  viewnode : &ViewNode
+  viewnode : &ViewNode,
+  config   : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   let metadata_str : String =
-    viewnode_to_string (viewnode)?;
+    viewnode_to_string (viewnode, config)?;
   let title : &str = viewnode . title ();
   let body : Option < &String > = viewnode . body ();
   if metadata_str . is_empty () && title . is_empty () {
@@ -77,7 +81,8 @@ pub fn viewnode_to_text (
   Ok (result) }
 
 pub fn viewnode_to_string (
-  viewnode : &ViewNode
+  viewnode : &ViewNode,
+  config   : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   match &viewnode . kind {
     ViewNodeKind::Scaff (scaffold) =>
@@ -85,7 +90,7 @@ pub fn viewnode_to_string (
         viewnode . focused, viewnode . folded, scaffold ),
     ViewNodeKind::True (true_node) =>
       Ok ( true_node_metadata_to_string (
-        viewnode . focused, viewnode . folded, true_node )),
+        viewnode . focused, viewnode . folded, true_node, config )),
     ViewNodeKind::Deleted (deleted_node) =>
       Ok ( deleted_node_metadata_to_string (
         viewnode . focused, viewnode . folded, deleted_node )),
@@ -136,14 +141,19 @@ fn scaffold_metadata_to_string (
 fn true_node_metadata_to_string (
   focused   : bool,
   folded    : bool,
-  true_node : & TrueNode
+  true_node : & TrueNode,
+  config    : & SkgConfig,
 ) -> String {
-  fn node_sexp ( true_node : & TrueNode ) -> String {
-
+  fn node_sexp (
+    true_node : & TrueNode,
+    config    : & SkgConfig,
+  ) -> String {
     fn graph_stats ( true_node : & TrueNode ) -> Option < String > {
       graphnodestats_to_sexp ( & true_node . graphStats ) }
-
-    fn view_stats ( true_node : & TrueNode ) -> Option < String > {
+    fn view_stats (
+      true_node : & TrueNode,
+      config    : & SkgConfig,
+    ) -> Option < String > {
       let mut parts : Vec < String > = Vec::new ();
       if true_node . viewStats . cycle {
         parts . push ( "cycle" . to_string () ); }
@@ -151,10 +161,14 @@ fn true_node_metadata_to_string (
         parts . push ( "notInParent" . to_string () ); }
       if true_node . viewStats . parentIsContent {
         parts . push ( "containsParent" . to_string () ); }
+      if true_node . viewStats . sourceAtBoundary {
+        if let Some (src_config)
+        = config . sources . get ( &true_node . source )
+        { parts . push ( format! ("(sourceHerald ⌂:{})",
+                                  src_config . herald_label () )); }}
       if parts . is_empty () { None }
       else { Some ( format! (
                "(viewStats {})", parts . join (" ") )) }}
-
     fn edit_request ( true_node : & TrueNode
                     ) -> Option < String > {
       true_node . edit_request () . map ( | edit_req | {
@@ -185,7 +199,7 @@ fn true_node_metadata_to_string (
       parts . push ( "indefinitive" . to_string () ); }
     if let Some (s) = graph_stats (true_node)
     { parts . push (s); }
-    if let Some (s) = view_stats (true_node)
+    if let Some (s) = view_stats (true_node, config)
     { parts . push (s); }
     if let Some (s) = edit_request (true_node)
     { parts . push (s); }
@@ -197,7 +211,7 @@ fn true_node_metadata_to_string (
   let mut parts : Vec < String > = Vec::new ();
   if focused { parts . push ( "focused" . to_string () ); }
   if folded  { parts . push ( "folded" . to_string () ); }
-  parts . push ( node_sexp (true_node));
+  parts . push ( node_sexp (true_node, config));
   parts . join (" ") }
 
 /// Render metadata for a DeletedNode:

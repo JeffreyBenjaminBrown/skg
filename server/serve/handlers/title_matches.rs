@@ -116,7 +116,7 @@ pub fn handle_title_matches_request (
               &matches_by_id );
           let rendered : String =
             // Render first, before register_view moves the forest
-            viewnode_forest_to_string ( &forest )
+            viewnode_forest_to_string ( &forest, config )
             . expect ("search forest rendering never fails");
           for (id, (source, _)) in &matches_by_id {
             // Populate pool with SkgNodes for each result ID.

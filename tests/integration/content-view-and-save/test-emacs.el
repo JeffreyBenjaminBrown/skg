@@ -35,7 +35,7 @@
             (message "Content: %s" content)
 
             ;; Verify exact content: should include source metadata
-            (let ((expected-content "* (skg (node (id 1) (source main) (graphStats (containers 0)))) 1\n"))
+            (let ((expected-content "* (skg (node (id 1) (source main) (graphStats (containers 0) (containsHerald 0{)))) 1\n"))
               (if (string= content expected-content)
                   (progn
                     (message "✓ PASS: Buffer content exactly matches expected")

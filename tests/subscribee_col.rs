@@ -67,16 +67,16 @@ fn test_subscribee_col_appears_for_subscribers(
     // Each SubscribeeCol has Subscribee children showing what the node subscribes to.
     // Nodes 13 and 14 do not subscribe to anything, so no SubscribeeCol.
     let expected = indoc! {
-      "* (skg (node (id 1) (source home) (graphStats (containers 0) (contents 4)))) 1
-      ** (skg (node (id 11) (source home) (graphStats (contents 1) subscribing))) 11
+      "* (skg (node (id 1) (source home) (graphStats (containers 0) (contents 4) (containsHerald 0{4)) (viewStats (sourceHerald ⌂:home)))) 1
+      ** (skg (node (id 11) (source home) (graphStats (contents 1) (containsHerald {1) subscribing))) 11
       *** (skg subscribeeCol) it subscribes to these
-      **** (skg (node (id 11-sees) (source away) indefinitive (graphStats (containers 0) subscribing))) 11-sees
+      **** (skg (node (id 11-sees) (source away) indefinitive (graphStats (containers 0) (containsHerald 0{) subscribing) (viewStats (sourceHerald ⌂:away)))) 11-sees
       *** (skg (node (id 111) (source home))) 111
       ** (skg (node (id 12) (source home) (graphStats subscribing))) 12
       *** (skg subscribeeCol) it subscribes to these
-      **** (skg (node (id 12-sees) (source away) indefinitive (graphStats (containers 0) subscribing))) 12-sees
+      **** (skg (node (id 12-sees) (source away) indefinitive (graphStats (containers 0) (containsHerald 0{) subscribing) (viewStats (sourceHerald ⌂:away)))) 12-sees
       ** (skg (node (id 13) (source home))) 13
-      ** (skg (node (id 14) (source home) (graphStats (contents 1)))) 14
+      ** (skg (node (id 14) (source home) (graphStats (contents 1) (containsHerald {1)))) 14
       *** (skg (node (id 141) (source home))) 141
 "};
     assert_eq!(result, expected,

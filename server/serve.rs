@@ -283,7 +283,7 @@ fn handle_snapshot_response (
       &payload . graphnodestats,
       &mut conn_state . memory . pool, config ); }
   let enriched : String =
-    viewnode_forest_to_string ( &viewforest )
+    viewnode_forest_to_string ( &viewforest, config )
     . expect ("search viewforest rendering never fails");
   let enriched_sexp : String =
     mk_search_enrichment_sexp ( &terms, &enriched );

@@ -75,8 +75,9 @@ fn test_skgnode_for_viewnode_with_id_not_in_map() {
     s . insert(
       SourceName::from ("main"),
       SkgfileSource {
-        nickname : SourceName::from ("main"),
-        path     : PathBuf::from ("/tmp/nonexistent-skg-dir"),
+        name         : SourceName::from ("main"),
+        abbreviation : None,
+        path         : PathBuf::from ("/tmp/nonexistent-skg-dir"),
         user_owns_it : true,
       });
     s };

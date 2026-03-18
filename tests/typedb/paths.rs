@@ -86,9 +86,9 @@ async fn test_multi_cycle_fork_impl(
   let expected_trees: Tree<ViewNode> =
     unchecked_to_checked_tree (expected_unchecked)?;
   let actual_str : String =
-    viewnode_forest_to_string (&forest)?;
+    viewnode_forest_to_string (&forest, config)?;
   let expected_str : String =
-    viewnode_forest_to_string (&expected_trees)?;
+    viewnode_forest_to_string (&expected_trees, config)?;
   assert_eq!(
     actual_str, expected_str,
     "Multi-cycle fork: tree structure should match" );

@@ -4,7 +4,7 @@ use skg::context::ContextOriginType;
 use skg::dbs::tantivy::{search_index, update_context_origin_types};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
 use skg::org_to_text::viewnode_forest_to_string;
-use skg::types::misc::{ID, MSV, TantivyIndex};
+use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex};
 use skg::types::skgnode::{SkgNode, empty_skgnode};
 use skg::types::viewnode::Scaffold;
 use skg::dbs::init::in_fs_wipe_index_then_create_it;
@@ -77,8 +77,10 @@ fn test_title_matches_org_format (
         build_search_forest (
           search_terms,
           &matches_by_id );
+      let dummy_config : SkgConfig =
+        SkgConfig::dummyFromSources (HashMap::new ());
       let result : String =
-        viewnode_forest_to_string ( &forest )
+        viewnode_forest_to_string ( &forest, &dummy_config )
         . expect ("search forest rendering never fails");
       let lines : Vec < &str > =
         result . lines () . collect ();

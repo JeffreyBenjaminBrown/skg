@@ -66,7 +66,8 @@ pub async fn multi_root_view (
         &mut forest, &mut map,
         config, driver ) . await } ?;
   set_viewnodestats_in_forest (
-    &mut forest, &container_to_contents, &content_to_containers );
+    &mut forest, &container_to_contents, &content_to_containers,
+    config );
   let pids : Vec<ID> = {
     // Collect PIDs from forest before rendering to string.
     let mut ids : Vec<ID> = Vec::new ();
@@ -77,5 +78,5 @@ pub async fn multi_root_view (
   let buffer_content : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "viewnode_forest_to_string" ). entered();
-      viewnode_forest_to_string (& forest) } ?;
+      viewnode_forest_to_string (& forest, config) } ?;
   Ok ((buffer_content, map, pids, forest)) }

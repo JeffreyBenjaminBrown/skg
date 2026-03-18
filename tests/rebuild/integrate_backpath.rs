@@ -76,8 +76,8 @@ async fn test_path_with_cycle_impl(
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
   let expected_trees: Tree<ViewNode> = unchecked_to_checked_tree (expected_unchecked)?;
 
-  let actual_str = viewnode_forest_to_string (&forest)?;
-  let expected_str = viewnode_forest_to_string (&expected_trees)?;
+  let actual_str = viewnode_forest_to_string (&forest, config)?;
+  let expected_str = viewnode_forest_to_string (&expected_trees, config)?;
   assert_eq!(
     actual_str, expected_str,
     "Tree structure after integrating path with cycle should match expected"
@@ -156,8 +156,8 @@ async fn test_path_with_branches_no_cycle_impl(
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
   let expected_trees: Tree<ViewNode> = unchecked_to_checked_tree (expected_unchecked)?;
 
-  let actual_str = viewnode_forest_to_string (&forest)?;
-  let expected_str = viewnode_forest_to_string (&expected_trees)?;
+  let actual_str = viewnode_forest_to_string (&forest, config)?;
+  let expected_str = viewnode_forest_to_string (&expected_trees, config)?;
   assert_eq!(
     actual_str, expected_str,
     "Tree structure after integrating path with branches (no cycle) should match expected"
@@ -237,8 +237,8 @@ async fn test_path_with_branches_with_cycle_impl(
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
   let expected_trees: Tree<ViewNode> = unchecked_to_checked_tree (expected_unchecked)?;
 
-  let actual_str = viewnode_forest_to_string (&forest)?;
-  let expected_str = viewnode_forest_to_string (&expected_trees)?;
+  let actual_str = viewnode_forest_to_string (&forest, config)?;
+  let expected_str = viewnode_forest_to_string (&expected_trees, config)?;
   assert_eq!(
     actual_str, expected_str,
     "Tree structure after integrating path with branches (with cycle) should match expected"
@@ -296,9 +296,9 @@ async fn test_fork_expansion_at_origin_impl(
   let expected_trees: Tree<ViewNode> =
     unchecked_to_checked_tree (expected_unchecked)?;
   let actual_str : String =
-    viewnode_forest_to_string (&forest)?;
+    viewnode_forest_to_string (&forest, config)?;
   let expected_str : String =
-    viewnode_forest_to_string (&expected_trees)?;
+    viewnode_forest_to_string (&expected_trees, config)?;
   assert_eq!(
     actual_str, expected_str,
     "Fork expansion at origin should expand immediate branches" );
