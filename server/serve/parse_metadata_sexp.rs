@@ -357,10 +357,7 @@ fn parse_graphstats_sexp (
                 . map_err ( |_| format! (
                   "Invalid contents value: {}", value )) ? ); },
           "linksIn" => {
-            stats . numLinksIn = Some (
-              value . parse::<usize>()
-                . map_err ( |_| format! (
-                  "Invalid linksIn value: {}", value )) ? ); },
+            stats . linksInHerald = Some (value); },
           "containerwardPath" => {
             stats . containerwardPath =
               ContainerwardPathStats::from_display_atom (&value); },

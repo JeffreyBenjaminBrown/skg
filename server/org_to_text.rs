@@ -238,9 +238,8 @@ fn graphnodestats_to_sexp (
   if gs . numContents != Some (0) {
     if let Some (count) = gs . numContents {
       parts . push ( format! ( "(contents {})", count )); }}
-  if gs . numLinksIn != Some (0) {
-    if let Some (count) = gs . numLinksIn {
-      parts . push ( format! ( "(linksIn {})", count )); }}
+  if let Some (ref herald) = gs . linksInHerald {
+    parts . push ( format! ( "(linksIn {})", herald )); }
   if gs . aliasing {
     parts . push ( "aliasing" . to_string () ); }
   if gs . extraIDs {

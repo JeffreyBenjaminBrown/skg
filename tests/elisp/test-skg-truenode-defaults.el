@@ -390,7 +390,7 @@ preserves source and all fields."
                            (source public)
                            (graphStats (containers 0)
                                        (contents 5)
-                                       (linksIn 4)))))
+                                       (linksIn 4→)))))
          (org-text (sexp-to-org sexp))
          (expanded (skg-truenode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
@@ -404,5 +404,17 @@ preserves source and all fields."
     (should (cl-find "editRequest" headlines :key #'cdr :test #'string=))
     ;; graphStats must be preserved
     (should (cl-find "graphStats" headlines :key #'cdr :test #'string=))))
+
+(ert-deftest test-round-trip-with-links-in-herald ()
+  "Round-trip: expand then strip preserves linksIn herald string (e.g. 4→)."
+  (let* ((sexp '(skg (node (id abc) (source public)
+                           (graphStats (containers 0)
+                                       (contents 5)
+                                       (linksIn 3→1)))))
+         (org-text (sexp-to-org sexp))
+         (expanded (skg-truenode-expand-defaults-in-org org-text))
+         (stripped (skg-truenode-strip-defaults-from-org expanded))
+         (result (org-to-sexp stripped)))
+    (should (equal result sexp))))
 
 (provide 'test-skg-truenode-defaults)

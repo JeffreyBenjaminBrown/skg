@@ -110,3 +110,17 @@ There are three ways to test the code:
 * Recovery and source of truth
 
   The filesystem (.skg files) is the sole source of truth. TypeDB and Tantivy are derived caches. If either fails during a save, the server rebuilds them from disk ('rebuild_typedb_from_disk', 'rebuild_tantivy_from_disk'). This means any operation that correctly updates the filesystem is recoverable even if the DB updates crash.
+
+* TypeDB sub-fetch deduplication (v3.4)
+
+  When a fetch sub-query joins across a one-to-many relationship (e.g., matching a node and all its contents), the result list can contain duplicate entries for the "one" side.
+
+  Example: finding link sources that are nonempty containers requires joining =textlinks_to= with =contains=. If source A has 3 contents, the raw sub-fetch returns A three times.
+
+  Approaches tested (on skg-real, TypeDB driver 3.4.4):
+  - =select $sid= alone: does NOT deduplicate (still returns 2 rows for a 2-content source)
+  - =select $sid; distinct;= before =fetch=: DOES deduplicate (returns 1 row). This is the best available approach.
+  - =reduce $cnt = count; return first $cnt;= as a scalar sub-fetch: works, returns a =Node::Leaf(integer)= instead of a =Node::List=. Useful for pure counts but we have not used this pattern elsewhere yet.
+  - =limit 1= in a sub-fetch: works but truncates the entire list, not per-source. Not useful for per-row existence checks.
+  - =limit 1= in a nested sub-sub-fetch: parse error. TypeDB 3.4 does not support =limit= inside a fetch-within-a-fetch.
+  - True per-source early-exit (stop after first content hit) is not possible in TypeDB 3.4. =distinct= still does the full join internally.

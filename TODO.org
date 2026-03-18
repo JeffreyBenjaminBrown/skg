@@ -1,4 +1,16 @@
 * [[./next.org]] might be in progress
+* herald : links to this node with content
+** Those links should be drawn with their containerweard paths.
+** That is the same as
+   'places this node has been used as a connector'.
+** [[id:59e54472-f770-437d-bc36-323928dd3352][linked to in container]] herald :? hard problem
+* herald : source
+* private view
+* ? "any rel" ought to be what a single backward view shows
+  link sources, containers, subscribers
+    (but not overriders or hiders -- those should be more obscure)
+* eliminate some 'tracing' commands
+  Anything that's blazing fast can be safely removed.
 * if needed, convert to haskell
   If it becomes a mess, Haskell is easier to refactor.
   Rust could sit between TypeDB and Haskell.

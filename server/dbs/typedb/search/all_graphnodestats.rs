@@ -28,25 +28,27 @@ use typedb_driver::{
 
 /// Everything 'set_graphnodestats_in_forest' needs from TypeDB.
 pub struct AllGraphNodeStats {
-  pub num_containers : HashMap < ID, usize >,
-  pub num_contents   : HashMap < ID, usize >,
-  pub num_links_in   : HashMap < ID, usize >,
-  pub has_subscribes : HashSet < ID >,
-  pub has_overrides  : HashSet < ID >,
-  pub container_to_contents : HashMap < ID, HashSet < ID > >,
-  pub content_to_containers : HashMap < ID, HashSet < ID > >,
+  pub num_containers               : HashMap < ID, usize >,
+  pub num_contents                 : HashMap < ID, usize >,
+  pub num_links_in_from_containers : HashMap < ID, usize >,
+  pub num_links_in_from_leaves     : HashMap < ID, usize >,
+  pub has_subscribes               : HashSet < ID >,
+  pub has_overrides                : HashSet < ID >,
+  pub container_to_contents        : HashMap < ID, HashSet < ID > >,
+  pub content_to_containers        : HashMap < ID, HashSet < ID > >,
 }
 
 impl AllGraphNodeStats {
   pub fn empty () -> AllGraphNodeStats {
     AllGraphNodeStats {
-      num_containers        : HashMap::new (),
-      num_contents          : HashMap::new (),
-      num_links_in          : HashMap::new (),
-      has_subscribes        : HashSet::new (),
-      has_overrides         : HashSet::new (),
-      container_to_contents : HashMap::new (),
-      content_to_containers : HashMap::new (),
+      num_containers               : HashMap::new (),
+      num_contents                 : HashMap::new (),
+      num_links_in_from_containers : HashMap::new (),
+      num_links_in_from_leaves     : HashMap::new (),
+      has_subscribes               : HashSet::new (),
+      has_overrides                : HashSet::new (),
+      container_to_contents        : HashMap::new (),
+      content_to_containers        : HashMap::new (),
     } } }
 
 /// Extract GraphNodeStats for a single PID
@@ -64,6 +66,14 @@ pub fn graphnodestats_for_pid (
     skgnode
     . map ( |n| ! n . extra_ids . is_empty () )
     . unwrap_or (false);
+  let from_containers : usize =
+    stats . num_links_in_from_containers
+    . get (pid) . copied () . unwrap_or (0);
+  let from_leaves : usize =
+    stats . num_links_in_from_leaves
+    . get (pid) . copied () . unwrap_or (0);
+  let links_in_herald : Option<String> =
+    links_in_herald_from_counts (from_containers, from_leaves);
   GraphNodeStats {
     aliasing,
     extraIDs      : extra_ids,
@@ -71,20 +81,34 @@ pub fn graphnodestats_for_pid (
     subscribing   : stats . has_subscribes . contains (pid),
     numContainers : stats . num_containers . get (pid) . copied (),
     numContents   : stats . num_contents   . get (pid) . copied (),
-    numLinksIn    : stats . num_links_in   . get (pid) . copied (),
+    linksInHerald : links_in_herald,
     containerwardPath : None,
   } }
 
+/// Format the linksIn herald from two counts.
+/// Container sources show before →, leaf sources after.
+/// Zeros are omitted. Returns None if both counts are zero.
+fn links_in_herald_from_counts (
+  from_containers : usize,
+  from_leaves     : usize,
+) -> Option<String> {
+  match (from_containers, from_leaves) {
+    (0, 0) => None,
+    (c, 0) => Some ( format! ("{}→", c) ),
+    (0, l) => Some ( format! ("→{}", l) ),
+    (c, l) => Some ( format! ("{}→{}", c, l) ), } }
+
 /// Stats for a single PID, returned by 'fetch_one_pid_stats'.
 struct OnePidStats {
-  pid            : ID,
-  num_containers : usize,
-  num_contents   : usize,
-  num_links_in   : usize,
-  subscribes     : bool,
-  overrides      : bool,
-  container_ids  : Vec < ID >,
-  content_ids    : Vec < ID >,
+  pid                          : ID,
+  num_containers               : usize,
+  num_contents                 : usize,
+  num_links_in_from_containers : usize,
+  num_links_in_from_leaves     : usize,
+  subscribes                   : bool,
+  overrides                    : bool,
+  container_ids                : Vec < ID >,
+  content_ids                  : Vec < ID >,
 }
 
 pub async fn fetch_all_graphnodestats (
@@ -93,15 +117,7 @@ pub async fn fetch_all_graphnodestats (
   pids    : &[ID],
 ) -> Result < AllGraphNodeStats, Box<dyn Error> > {
   if pids . is_empty () {
-    return Ok ( AllGraphNodeStats {
-      num_containers : HashMap::new (),
-      num_contents   : HashMap::new (),
-      num_links_in   : HashMap::new (),
-      has_subscribes : HashSet::new (),
-      has_overrides  : HashSet::new (),
-      container_to_contents : HashMap::new (),
-      content_to_containers : HashMap::new (),
-    }); }
+    return Ok ( AllGraphNodeStats::empty() ); }
   let pid_set : HashSet < ID > =
     pids . iter () . cloned () . collect ();
   let futures : Vec < _ > =
@@ -112,7 +128,10 @@ pub async fn fetch_all_graphnodestats (
     futures::future::join_all (futures) . await;
   let mut num_containers : HashMap < ID, usize > = HashMap::new ();
   let mut num_contents   : HashMap < ID, usize > = HashMap::new ();
-  let mut num_links_in   : HashMap < ID, usize > = HashMap::new ();
+  let mut num_links_in_from_containers : HashMap < ID, usize > =
+    HashMap::new ();
+  let mut num_links_in_from_leaves : HashMap < ID, usize > =
+    HashMap::new ();
   let mut has_subscribes : HashSet < ID > = HashSet::new ();
   let mut has_overrides  : HashSet < ID > = HashSet::new ();
   let mut container_to_contents : HashMap < ID, HashSet < ID > > =
@@ -123,7 +142,10 @@ pub async fn fetch_all_graphnodestats (
     let s : OnePidStats = result ?;
     num_containers . insert ( s . pid . clone (), s . num_containers );
     num_contents   . insert ( s . pid . clone (), s . num_contents );
-    num_links_in   . insert ( s . pid . clone (), s . num_links_in );
+    num_links_in_from_containers . insert (
+      s . pid . clone (), s . num_links_in_from_containers );
+    num_links_in_from_leaves . insert (
+      s . pid . clone (), s . num_links_in_from_leaves );
     if s . subscribes {
       has_subscribes . insert ( s . pid . clone () ); }
     if s . overrides {
@@ -143,7 +165,8 @@ pub async fn fetch_all_graphnodestats (
   Ok ( AllGraphNodeStats {
     num_containers,
     num_contents,
-    num_links_in,
+    num_links_in_from_containers,
+    num_links_in_from_leaves,
     has_subscribes,
     has_overrides,
     container_to_contents,
@@ -159,6 +182,7 @@ async fn fetch_one_pid_stats (
     driver . transaction (
       db_name, TransactionType::Read
     ) . await ?;
+  // TODO for efficiency : container_link_sources joins textlinks_to with contains, producing one row per content of each source. We only need whether the source has *any* content. `select $sid; distinct;` collapses the duplicates, but TypeDB still does the full join internally — there is no per-row short-circuit (limit inside nested sub-fetches is a parse error in TypeDB 3.4). If a future TypeDB version adds per-source existence checks, replace that sub-fetch.
   let query : String =
     format! ( r#"match
         $node isa node, has id "{}";
@@ -184,6 +208,18 @@ async fn fetch_one_pid_stats (
                                        dest:   $node );
             fetch {{ "id": $sid }};
           ],
+          "container_link_sources": [
+            match
+              $s isa node, has id $sid;
+              $rel3 isa textlinks_to ( source: $s,
+                                       dest:   $node );
+              $sc isa node;
+              $screl isa contains ( container: $s,
+                                    contained: $sc );
+            select $sid;
+            distinct;
+            fetch {{ "id": $sid }};
+          ],
           "subscribes_related": [
             match
               $sub isa node, has id $subid;
@@ -206,13 +242,14 @@ async fn fetch_one_pid_stats (
       pid );
   let mut container_ids : Vec < ID > = Vec::new ();
   let mut content_ids   : Vec < ID > = Vec::new ();
-  let mut num_containers : usize = 0;
-  let mut num_contents   : usize = 0;
-  let mut num_links_in   : usize = 0;
-  let mut subscribes     : bool = false;
-  let mut overrides      : bool = false;
-  if let QueryAnswer::ConceptDocumentStream ( _, mut stream ) =
-    tx . query (query) . await ?
+  let mut num_containers               : usize = 0;
+  let mut num_contents                 : usize = 0;
+  let mut num_links_in_total           : usize = 0;
+  let mut num_links_in_from_containers : usize = 0;
+  let mut subscribes                   : bool = false;
+  let mut overrides                    : bool = false;
+  if let QueryAnswer::ConceptDocumentStream ( _, mut stream )
+    = tx . query (query) . await ?
   { while let Some (doc_result) = stream . next () . await {
       let doc : ConceptDocument = doc_result ?;
       if let Some ( Node::Map ( ref map ) ) = doc . root {
@@ -230,7 +267,10 @@ async fn fetch_one_pid_stats (
               content_ids . push (cid); }}}
         if let Some ( Node::List (list) ) =
           map . get ("link_sources")
-        { num_links_in = list . len (); }
+        { num_links_in_total = list . len (); }
+        if let Some ( Node::List (list) ) =
+          map . get ("container_link_sources")
+        { num_links_in_from_containers = list . len (); }
         if let Some ( Node::List (list) ) =
           map . get ("subscribes_related")
         { subscribes = ! list . is_empty (); }
@@ -241,7 +281,9 @@ async fn fetch_one_pid_stats (
     pid : pid . clone (),
     num_containers,
     num_contents,
-    num_links_in,
+    num_links_in_from_containers,
+    num_links_in_from_leaves
+      : num_links_in_total - num_links_in_from_containers,
     subscribes,
     overrides,
     container_ids,

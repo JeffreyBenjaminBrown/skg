@@ -101,7 +101,7 @@ pub struct GraphNodeStats {
   pub subscribing       : bool, // subscriber *or* subscribee, anywhere
   pub numContainers     : Option<usize>,
   pub numContents       : Option<usize>,
-  pub numLinksIn        : Option<usize>,
+  pub linksInHerald     : Option<String>,
   pub containerwardPath : Option<ContainerwardPathStats>,
 }
 
@@ -408,7 +408,7 @@ impl Default for GraphNodeStats {
       subscribing       : false,
       numContainers     : Some (1),
       numContents       : Some (0),
-      numLinksIn        : Some (0),
+      linksInHerald     : None,
       containerwardPath : None,
     }} }
 

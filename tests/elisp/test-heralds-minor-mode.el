@@ -8,7 +8,7 @@
   (with-temp-buffer
     (progn ;; Insert test text with herald markers
       (insert "Test line with (skg (node (id 123) (graphStats (contents 2)) (viewStats cycle))) herald\n")
-      (insert "Another line (skg (node (id 456) (graphStats (containers 1) (linksIn 3)) (editRequest delete))) more text\n")
+      (insert "Another line (skg (node (id 456) (graphStats (containers 1) (linksIn 3→)) (editRequest delete))) more text\n")
       (insert "Plain line without heralds\n"))
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
@@ -36,7 +36,7 @@
 (ert-deftest test-heralds-minor-mode-visual-check ()
   "Test that the display property is properly set and cleared."
   (with-temp-buffer
-    (insert "Line with (skg (node (id 123) (graphStats (containers 3) (linksIn 1)) (viewStats cycle notInParent) (editRequest delete))) text")
+    (insert "Line with (skg (node (id 123) (graphStats (containers 3) (linksIn →1)) (viewStats cycle notInParent) (editRequest delete))) text")
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
       (let* ;; Find the overlay covering our herald
@@ -56,7 +56,7 @@
           ( should ( string-match "⟳" display-text ))
           ( should ( string-match "!{" display-text ))
           ( should ( string-match "3{" display-text ))
-          ( should ( string-match "1→" display-text ))
+          ( should ( string-match "→1" display-text ))
           ( should ( string-match "delete" display-text )) )) )
     (progn ;; what happens upon disabling it
       (heralds-minor-mode -1) ;; disable

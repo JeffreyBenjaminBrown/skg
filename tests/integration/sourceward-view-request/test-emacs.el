@@ -72,15 +72,15 @@ LINE-NUMBER is zero-based."
 
   (let ((expected-line0
          (concat "* (skg (node (id 1) (source main) (graphStats (containers 0) (contents 2)))) 1\n"
-                 "** (skg (node (id 11) (source main) (graphStats (linksIn 1)))) 11\n"
+                 "** (skg (node (id 11) (source main) (graphStats (linksIn →1)))) 11\n"
                  "** (skg (node (id 12) (source main))) 12\n"))
         (expected-line2
          (concat "* (skg (node (id 1) (source main) (graphStats (containers 0) (contents 2)))) 1\n"
-                 "** (skg (node (id 11) (source main) (graphStats (linksIn 1)))) 11\n"
+                 "** (skg (node (id 11) (source main) (graphStats (linksIn →1)))) 11\n"
                  "** (skg (node (id 12) (source main))) 12\n"))
         (expected-changed
          (concat "* (skg (node (id 1) (source main) (graphStats (containers 0) (contents 2)))) 1\n"
-                 "** (skg (node (id 11) (source main) (graphStats (linksIn 1)))) 11\n"
+                 "** (skg (node (id 11) (source main) (graphStats (linksIn →1)))) 11\n"
                  "*** (skg (node (id l-11) (source main) parentIgnores indefinitive (graphStats (containers 0)) (viewStats notInParent))) [[id:11][a link to 11]]\n"
                  "** (skg (node (id 12) (source main))) 12\n"))
         (expected-no-link (concat "* 1\n** 11\n** 12\n"))

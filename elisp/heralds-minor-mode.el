@@ -50,7 +50,7 @@
       (BLUE graphStats
         (containers (ANY IT "{"))
         (contents (ANY "{" IT))
-        (linksIn (ANY IT "→"))
+        (linksIn (ANY IT))
         (BLUE aliasing "A")
         (BLUE extraIDs "I")
         (BLUE overriding "O")
