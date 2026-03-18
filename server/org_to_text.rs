@@ -232,14 +232,22 @@ fn graphnodestats_to_sexp (
   gs : &GraphNodeStats,
 ) -> Option < String > {
   let mut parts : Vec < String > = Vec::new ();
-  if gs . numContainers != Some (1) {
-    if let Some (count) = gs . numContainers {
-      parts . push ( format! ( "(containers {})", count )); }}
-  if gs . numContents != Some (0) {
-    if let Some (count) = gs . numContents {
-      parts . push ( format! ( "(contents {})", count )); }}
-  if let Some (ref herald) = gs . linksInHerald {
-    parts . push ( format! ( "(linksIn {})", herald )); }
+  if let Some (ref c) = gs . containRels {
+    if c . containers != 1 {
+      parts . push ( format! ("(containers {})", c . containers) ); }
+    if c . contents != 0 {
+      parts . push ( format! ("(contents {})", c . contents) ); }
+    if let Some (h) = c . herald() {
+      parts . push ( format! ("(containsHerald {})", h) ); }}
+  if let Some (ref l) = gs . linksourceRels {
+    if l . sources_with_content != 0 {
+      parts . push ( format! ("(linksInFromContainers {})",
+                              l . sources_with_content) ); }
+    if l . sources_without_content != 0 {
+      parts . push ( format! ("(linksInFromLeaves {})",
+                              l . sources_without_content) ); }
+    if let Some (h) = l . herald() {
+      parts . push ( format! ("(linksHerald {})", h) ); }}
   if gs . aliasing {
     parts . push ( "aliasing" . to_string () ); }
   if gs . extraIDs {

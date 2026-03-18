@@ -13,7 +13,7 @@
 use crate::dbs::typedb::util::concept_document::extract_id_from_map;
 use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
-use crate::types::viewnode::GraphNodeStats;
+use crate::types::viewnode::{GraphNodeStats, NodeContainRels, NodeLinksourceRels};
 
 use futures::StreamExt;
 use std::collections::{HashMap, HashSet};
@@ -66,37 +66,31 @@ pub fn graphnodestats_for_pid (
     skgnode
     . map ( |n| ! n . extra_ids . is_empty () )
     . unwrap_or (false);
+  let contain_rels : Option<NodeContainRels> =
+    stats . num_containers . get (pid) . copied ()
+    . map ( |containers| {
+      let contents : usize =
+        stats . num_contents . get (pid) . copied ()
+        . unwrap_or (0);
+      NodeContainRels { containers, contents }} );
   let from_containers : usize =
     stats . num_links_in_from_containers
     . get (pid) . copied () . unwrap_or (0);
   let from_leaves : usize =
     stats . num_links_in_from_leaves
     . get (pid) . copied () . unwrap_or (0);
-  let links_in_herald : Option<String> =
-    links_in_herald_from_counts (from_containers, from_leaves);
+  let linksource_rels : Option<NodeLinksourceRels> =
+    Some ( NodeLinksourceRels {
+      sources_with_content    : from_containers,
+      sources_without_content : from_leaves } );
   GraphNodeStats {
     aliasing,
-    extraIDs      : extra_ids,
-    overriding    : stats . has_overrides  . contains (pid),
-    subscribing   : stats . has_subscribes . contains (pid),
-    numContainers : stats . num_containers . get (pid) . copied (),
-    numContents   : stats . num_contents   . get (pid) . copied (),
-    linksInHerald : links_in_herald,
-    containerwardPath : None,
-  } }
-
-/// Format the linksIn herald from two counts.
-/// Container sources show before →, leaf sources after.
-/// Zeros are omitted. Returns None if both counts are zero.
-fn links_in_herald_from_counts (
-  from_containers : usize,
-  from_leaves     : usize,
-) -> Option<String> {
-  match (from_containers, from_leaves) {
-    (0, 0) => None,
-    (c, 0) => Some ( format! ("{}→", c) ),
-    (0, l) => Some ( format! ("→{}", l) ),
-    (c, l) => Some ( format! ("{}→{}", c, l) ), } }
+    extraIDs       : extra_ids,
+    overriding     : stats . has_overrides  . contains (pid),
+    subscribing    : stats . has_subscribes . contains (pid),
+    containRels    : contain_rels,
+    linksourceRels : linksource_rels,
+    containerwardPath : None, }}
 
 /// Stats for a single PID, returned by 'fetch_one_pid_stats'.
 struct OnePidStats {

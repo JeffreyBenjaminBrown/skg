@@ -357,7 +357,7 @@
 (ert-deftest test-expand-preserves-existing-source ()
   "Expanding a sexp that already has source preserves it."
   (let* ((sexp '(skg (node (id abc) (source public)
-                           (graphStats (containers 0) (contents 5)))))
+                           (graphStats (containers 0) (contents 5) (containsHerald 0{5)))))
          (org-text (sexp-to-org sexp))
          (expanded (skg-truenode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
@@ -376,7 +376,7 @@
   "Expanding then stripping a sexp with source + graphStats is identity
 for the editable fields (graphStats is readonly and preserved too)."
   (let* ((sexp '(skg (node (id abc) (source public)
-                           (graphStats (containers 0) (contents 5)))))
+                           (graphStats (containers 0) (contents 5) (containsHerald 0{5)))))
          (org-text (sexp-to-org sexp))
          (expanded (skg-truenode-expand-defaults-in-org org-text))
          (stripped (skg-truenode-strip-defaults-from-org expanded))
@@ -390,7 +390,9 @@ preserves source and all fields."
                            (source public)
                            (graphStats (containers 0)
                                        (contents 5)
-                                       (linksIn 4→)))))
+                                       (containsHerald 0{5)
+                                       (linksInFromContainers 4)
+                                       (linksHerald 4→)))))
          (org-text (sexp-to-org sexp))
          (expanded (skg-truenode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
@@ -406,11 +408,14 @@ preserves source and all fields."
     (should (cl-find "graphStats" headlines :key #'cdr :test #'string=))))
 
 (ert-deftest test-round-trip-with-links-in-herald ()
-  "Round-trip: expand then strip preserves linksIn herald string (e.g. 4→)."
+  "Round-trip: expand then strip preserves linksHerald string (e.g. 3→1)."
   (let* ((sexp '(skg (node (id abc) (source public)
                            (graphStats (containers 0)
                                        (contents 5)
-                                       (linksIn 3→1)))))
+                                       (containsHerald 0{5)
+                                       (linksInFromContainers 3)
+                                       (linksInFromLeaves 1)
+                                       (linksHerald 3→1)))))
          (org-text (sexp-to-org sexp))
          (expanded (skg-truenode-expand-defaults-in-org org-text))
          (stripped (skg-truenode-strip-defaults-from-org expanded))

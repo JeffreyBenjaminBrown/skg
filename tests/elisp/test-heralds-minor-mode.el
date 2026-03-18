@@ -7,8 +7,8 @@
   "Test that heralds-minor-mode properly adds and removes overlays."
   (with-temp-buffer
     (progn ;; Insert test text with herald markers
-      (insert "Test line with (skg (node (id 123) (graphStats (contents 2)) (viewStats cycle))) herald\n")
-      (insert "Another line (skg (node (id 456) (graphStats (containers 1) (linksIn 3→)) (editRequest delete))) more text\n")
+      (insert "Test line with (skg (node (id 123) (graphStats (contents 2) (containsHerald {2)) (viewStats cycle))) herald\n")
+      (insert "Another line (skg (node (id 456) (graphStats (linksInFromContainers 3) (linksHerald 3→)) (editRequest delete))) more text\n")
       (insert "Plain line without heralds\n"))
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
@@ -36,7 +36,7 @@
 (ert-deftest test-heralds-minor-mode-visual-check ()
   "Test that the display property is properly set and cleared."
   (with-temp-buffer
-    (insert "Line with (skg (node (id 123) (graphStats (containers 3) (linksIn →1)) (viewStats cycle notInParent) (editRequest delete))) text")
+    (insert "Line with (skg (node (id 123) (graphStats (containers 3) (containsHerald 3{) (linksInFromLeaves 1) (linksHerald →1)) (viewStats cycle notInParent) (editRequest delete))) text")
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
       (let* ;; Find the overlay covering our herald
@@ -159,7 +159,7 @@
   "After a major-mode switch orphans overlays, disabling heralds
 should still remove them."
   (with-temp-buffer
-    (insert "(skg (node (id 1) (source s) (graphStats (contents 2))))\n")
+    (insert "(skg (node (id 1) (source s) (graphStats (contents 2) (containsHerald {2))))\n")
     (heralds-minor-mode 1)
     ;; Overlays exist
     (should (cl-some (lambda (ov) (overlay-get ov 'heralds))

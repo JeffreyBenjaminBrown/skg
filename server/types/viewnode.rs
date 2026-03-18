@@ -90,6 +90,22 @@ pub struct ContainerwardPathStats {
   pub cycles : bool,
 }
 
+/// Two counts describing a node's containment relationships.
+/// herald() computes a terse display string on demand.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NodeContainRels {
+  pub containers : usize,
+  pub contents   : usize,
+}
+
+/// Two counts describing inbound textlink sources.
+/// herald() computes a terse display string on demand.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NodeLinksourceRels {
+  pub sources_with_content    : usize,
+  pub sources_without_content : usize,
+}
+
 /// Graph-level statistics about a node.
 /// These are derived from the graph database and are the same
 /// regardless of where/how the node appears in a view.
@@ -99,9 +115,8 @@ pub struct GraphNodeStats {
   pub extraIDs          : bool, // whether it has extra IDs (from merging)
   pub overriding        : bool, // overrides *or* overridden, anywhere
   pub subscribing       : bool, // subscriber *or* subscribee, anywhere
-  pub numContainers     : Option<usize>,
-  pub numContents       : Option<usize>,
-  pub linksInHerald     : Option<String>,
+  pub containRels       : Option<NodeContainRels>,
+  pub linksourceRels    : Option<NodeLinksourceRels>,
   pub containerwardPath : Option<ContainerwardPathStats>,
 }
 
@@ -197,6 +212,33 @@ impl < Id, Src > TrueNode_Generic < Id, Src > {
         edit_request . as_ref(),
       IndefOrDef::Indefinitive => None, }}
 }
+
+fn herald_from_pair (
+  left          : usize,
+  left_default  : usize,
+  right         : usize,
+  right_default : usize,
+  separator     : &str,
+) -> Option<String> {
+  if left == left_default && right == right_default { None }
+  else if right == right_default
+    { Some ( format! ("{}{}", left, separator )) }
+  else if left == left_default
+    { Some ( format! ("{}{}", separator, right )) }
+  else
+    { Some ( format! ("{}{}{}", left, separator, right )) }}
+
+impl NodeContainRels {
+  pub fn herald (&self) -> Option<String> {
+    herald_from_pair ( self . containers, 1,
+                       self . contents,   0,
+                       "{" ) } }
+
+impl NodeLinksourceRels {
+  pub fn herald (&self) -> Option<String> {
+    herald_from_pair ( self . sources_with_content,    0,
+                       self . sources_without_content, 0,
+                       "→" ) } }
 
 impl ContainerwardPathStats {
   pub fn to_display_atom (&self) -> String {
@@ -406,9 +448,11 @@ impl Default for GraphNodeStats {
       extraIDs          : false,
       overriding        : false,
       subscribing       : false,
-      numContainers     : Some (1),
-      numContents       : Some (0),
-      linksInHerald     : None,
+      containRels       : Some ( NodeContainRels {
+        containers : 1, contents : 0 } ),
+      linksourceRels    : Some ( NodeLinksourceRels {
+        sources_with_content    : 0,
+        sources_without_content : 0 } ),
       containerwardPath : None,
     }} }
 

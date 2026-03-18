@@ -48,9 +48,12 @@
       (RED parentIgnores "!{")
       (GREEN indefinitive "indef")
       (BLUE graphStats
-        (containers (ANY IT "{"))
-        (contents (ANY "{" IT))
-        (linksIn (ANY IT))
+        (containers)            ;; instead we show the containsHerald
+        (contents)              ;; instead we show the containsHerald
+        (containsHerald (ANY IT))
+        (linksInFromContainers) ;; instead we show the linksHerald
+        (linksInFromLeaves)     ;; instead we show the linksHerald
+        (linksHerald (ANY IT))
         (BLUE aliasing "A")
         (BLUE extraIDs "I")
         (BLUE overriding "O")

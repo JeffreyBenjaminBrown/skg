@@ -19,7 +19,7 @@ use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{NodeDiffStatus, FieldDiffStatus};
-use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode, ContainerwardPathStats, IndefOrDef};
+use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode, ContainerwardPathStats, IndefOrDef, NodeContainRels, NodeLinksourceRels};
 use crate::types::unchecked_viewnode::{
     UncheckedViewNode, UncheckedViewNodeKind, UncheckedTrueNode,
 };
@@ -324,11 +324,16 @@ fn parse_deleted_sexp (
 
 
 /// Parse the (graphStats ...) s-expression contents.
-/// Only handles key-value pairs (containers, contents, linksIn).
 fn parse_graphstats_sexp (
   items : &[Sexp],
   stats : &mut GraphNodeStats
 ) -> Result<(), String> {
+  // Accumulate containers/contents to build containRels.
+  let mut saw_containers : Option<usize> = None;
+  let mut saw_contents   : Option<usize> = None;
+  // Accumulate linksIn counts to build linksourceRels.
+  let mut saw_links_from_containers : Option<usize> = None;
+  let mut saw_links_from_leaves     : Option<usize> = None;
   for element in items {
     match element {
       Sexp::Atom (_) => {
@@ -347,17 +352,29 @@ fn parse_graphstats_sexp (
           atom_to_string ( &kv_pair[1] ) ?;
         match key . as_str () {
           "containers" => {
-            stats . numContainers = Some (
+            saw_containers = Some (
               value . parse::<usize>()
                 . map_err ( |_| format! (
                   "Invalid containers value: {}", value )) ? ); },
           "contents" => {
-            stats . numContents = Some (
+            saw_contents = Some (
               value . parse::<usize>()
                 . map_err ( |_| format! (
                   "Invalid contents value: {}", value )) ? ); },
-          "linksIn" => {
-            stats . linksInHerald = Some (value); },
+          "linksInFromContainers" => {
+            saw_links_from_containers = Some (
+              value . parse::<usize>()
+                . map_err ( |_| format! (
+                  "Invalid linksInFromContainers value: {}", value )) ? ); },
+          "linksInFromLeaves" => {
+            saw_links_from_leaves = Some (
+              value . parse::<usize>()
+                . map_err ( |_| format! (
+                  "Invalid linksInFromLeaves value: {}", value )) ? ); },
+          // Herald fields are output-only; silently discard on parse.
+          "containsHerald" | "linksHerald" => {},
+          // Legacy linksIn field: silently discard.
+          "linksIn" => {},
           "containerwardPath" => {
             stats . containerwardPath =
               ContainerwardPathStats::from_display_atom (&value); },
@@ -365,6 +382,25 @@ fn parse_graphstats_sexp (
                                          key )); }} },
       _ => { return Err ( "Unexpected element in graphStats"
                            . to_string () ); }} }
+  if saw_containers . is_some ()
+    || saw_contents . is_some () {
+    // Build containRels if either contain field was present.
+    let cr : &mut NodeContainRels =
+      stats . containRels . get_or_insert (
+        NodeContainRels { containers : 1, contents : 0 } );
+    if let Some (c) = saw_containers { cr . containers = c; }
+    if let Some (c) = saw_contents   { cr . contents   = c; }}
+  if saw_links_from_containers . is_some ()
+    || saw_links_from_leaves . is_some () {
+    // Build linksourceRels if either link field was present.
+    let lr : &mut NodeLinksourceRels =
+      stats . linksourceRels . get_or_insert (
+        NodeLinksourceRels { sources_with_content    : 0,
+                             sources_without_content : 0 } );
+    if let Some (c) = saw_links_from_containers
+      { lr . sources_with_content    = c; }
+    if let Some (c) = saw_links_from_leaves
+      { lr . sources_without_content = c; }}
   Ok (( )) }
 
 /// Parse the (viewStats ...) s-expression contents.
