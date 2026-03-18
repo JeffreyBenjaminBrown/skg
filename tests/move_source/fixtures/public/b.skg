@@ -1,0 +1,6 @@
+title: b
+pid: b
+extra_ids:
+- b-alias
+contains:
+- c

@@ -309,15 +309,16 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     create_all_nodes(&config . db_name, &driver, &nodes) . await?;
     create_all_relationships(&config . db_name, &driver, &nodes) . await?;
 
-    // Test 1: DiskSourceBufferSourceConflict
+    // Test 1: Source move between owned sources is now allowed
     // priv-1 exists on disk in "private" source, but buffer specifies "public"
+    // Both sources are owned, so this should succeed (producing a SourceMove).
     {
-      let buffer_with_conflict: &str = indoc! {"
+      let buffer_with_move: &str = indoc! {"
         * (skg (node (id priv-1) (source public))) priv-1  # disk has 'private', buffer says 'public'
       "};
 
       let buffer_text: String =
-        strip_org_comments (buffer_with_conflict);
+        strip_org_comments (buffer_with_move);
 
       let result = buffer_to_viewnode_forest_and_save_instructions(
         &buffer_text,
@@ -326,29 +327,16 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         &SkgNodeMap::new()
       ) . await;
 
-      assert!(result . is_err(), "Expected DiskSourceBufferSourceConflict error");
+      assert!(result . is_ok(),
+              "Source move between owned sources should succeed, got: {:?}",
+              result . err());
 
-      if let Err (e) = result {
-        println!("\n=== DiskSourceBufferSourceConflict test ===");
-        println!("Error: {:?}", e);
-
-        // Should be a BufferValidationError wrapped in SaveError
-        match e {
-          SaveError::BufferValidationErrors (errors) => {
-            let conflict_errors: Vec<&BufferValidationError> = errors . iter()
-              . filter(|e| matches!(e, BufferValidationError::DiskSourceBufferSourceConflict(_, _, _)))
-              . collect();
-            assert!(!conflict_errors . is_empty(),
-                    "Expected DiskSourceBufferSourceConflict error");
-            println!("Found {} DiskSourceBufferSourceConflict error(s)", conflict_errors . len());
-          }
-          SaveError::DatabaseError (_) => {
-            // Could also be wrapped in DatabaseError
-            println!("Got DatabaseError (may contain DiskSourceBufferSourceConflict)");
-          }
-          _ => panic!("Unexpected error type: {:?}", e),
-        }
-      }
+      let (_forest, _instructions, _merges, source_moves) = result?;
+      assert_eq!(source_moves . len(), 1,
+                 "Expected exactly 1 source move");
+      assert_eq!(source_moves[0] . pid . 0, "priv-1");
+      assert_eq!(source_moves[0] . old_source . as_str(), "private");
+      assert_eq!(source_moves[0] . new_source . as_str(), "public");
     }
 
     // Test 2: InconsistentSources

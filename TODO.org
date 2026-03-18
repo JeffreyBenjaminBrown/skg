@@ -1,4 +1,7 @@
 * [[./next.org]] might be in progress
+* if needed, convert to haskell
+  If it becomes a mess, Haskell is easier to refactor.
+  Rust could sit between TypeDB and Haskell.
 * why to do a complete patrol when dogfooding
   If a neighborhood of implemented feature space is left unused|unexplored,
   it becomes more likely to embark on structural chamges

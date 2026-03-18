@@ -1,0 +1,18 @@
+db_name = "skg-test-move-source"
+tantivy_folder = "/tmp/tantivy-test-move-source"
+port = 1730
+
+[[sources]]
+nickname = "public"
+path = "public"
+user_owns_it = true
+
+[[sources]]
+nickname = "private"
+path = "private"
+user_owns_it = true
+
+[[sources]]
+nickname = "foreign"
+path = "foreign"
+user_owns_it = false

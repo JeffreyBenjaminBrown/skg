@@ -3,6 +3,16 @@ use super::skgnode::SkgNode;
 use super::errors::{SaveError, BufferValidationError};
 
 
+/// When a user changes a node's source,
+/// one of these is generated (in addition to the usual DefineNode).
+#[derive(Debug)]
+pub struct SourceMove {
+  pub pid        : ID,
+  pub old_source : SourceName,
+  pub new_source : SourceName,
+}
+
+
 /////////////////
 /// Types
 /////////////////
@@ -123,9 +133,12 @@ fn format_buffer_validation_error (
     BufferValidationError::ModifiedForeignNode(id, source) => {
       format!("Cannot modify node from foreign (read-only) source:\n- ID: {}\n- Source: {}\n- Foreign sources can only be viewed, not modified.\n",
               id . 0, source) },
-    BufferValidationError::DiskSourceBufferSourceConflict(id, disk_source, buffer_source) => {
-      format!("Source mismatch for node:\n- ID: {}\n- Source on disk: {}\n- Source from buffer: {}\n- Nodes cannot be moved between sources.\n",
+    BufferValidationError::CannotMoveToOrFromForeignSource(id, disk_source, buffer_source) => {
+      format!("Cannot move node between sources:\n- ID: {}\n- Source on disk: {}\n- Source from buffer: {}\n- One or both sources are foreign (read-only).\n",
               id . 0, disk_source, buffer_source) },
+    BufferValidationError::CannotMoveAndMergeSimultaneously(id) => {
+      format!("Cannot move and merge a node simultaneously:\n- ID: {}\n- Please save the move and merge in separate operations.\n",
+              id . 0) },
     BufferValidationError::SourceNotInConfig(id, source) => {
       format!("Node references a source that does not exist in config:\n- ID: {}\n- Source: {}\n- Please check your config file and ensure this source is defined.\n",
               id . 0, source) },

@@ -15,7 +15,7 @@ async fn supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
   driver    : &typedb_driver::TypeDBDriver,
   user_node : SkgNode
 ) -> Result<SkgNode, Box<dyn Error>> {
-  let result : DefineNode =
+  let (result, _source_move) =
     supplement_none_fields_from_disk_if_save (
       config, driver, &SkgNodeMap::new(),
       DefineNode::Save(SaveNode (user_node)) ) . await ?;

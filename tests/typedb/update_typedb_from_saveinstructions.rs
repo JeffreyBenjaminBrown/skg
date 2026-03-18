@@ -53,7 +53,7 @@ fn test_update_nodes_and_relationships2 (
              inconsistent_sources );
 
     // Convert to instructions (adds missing info and reconciles)
-    let reconciled_instructions : Vec<DefineNode> =
+    let (reconciled_instructions, _source_moves) : (Vec<DefineNode>, _) =
       viewnode_forest_to_nonmerge_save_instructions (
         & forest, & config, & driver, & SkgNodeMap::new() ) . await ?;
 
@@ -61,7 +61,8 @@ fn test_update_nodes_and_relationships2 (
     update_typedb_from_saveinstructions (
       & config . db_name,
       & driver,
-      & reconciled_instructions ). await ?;
+      & reconciled_instructions,
+      &[] ). await ?;
 
     // Node 3 should not exist (deleted)
     let existing_node3_ids : HashSet<String> = which_ids_exist (

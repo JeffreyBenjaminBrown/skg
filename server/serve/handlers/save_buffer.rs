@@ -17,7 +17,7 @@ use crate::serve::util::{
 use crate::types::errors::SaveError;
 use crate::types::git::{SourceDiff, GitDiffStatus};
 use crate::types::misc::{ID, SourceName, SkgConfig, TantivyIndex};
-use crate::types::save::{DefineNode, Merge, format_save_error_as_org};
+use crate::types::save::{DefineNode, Merge, SourceMove, format_save_error_as_org};
 use crate::types::memory::SkgNodeMap;
 use crate::types::memory::ViewUri;
 use crate::types::viewnode::ViewNode;
@@ -174,8 +174,8 @@ pub async fn update_from_and_rerender_buffer (
     validate_no_merge_commits ( &sources, config )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
 
-  let (forest, save_instructions, merge_instructions)
-    : ( Tree<ViewNode>, Vec<DefineNode>, Vec<Merge> )
+  let (forest, save_instructions, merge_instructions, source_moves)
+    : ( Tree<ViewNode>, Vec<DefineNode>, Vec<Merge>, Vec<SourceMove> )
     = { let _span : tracing::span::EnteredSpan = tracing::info_span!(
             "buffer_to_viewnode_forest_and_save_instructions"
           ) . entered();
@@ -194,6 +194,7 @@ pub async fn update_from_and_rerender_buffer (
           "update_graph_minus_merges" ). entered();
         update_graph_minus_merges (
           save_instructions . clone(),
+          &source_moves,
           config . clone(),
           tantivy_index,
           typedb_driver ) . await } ?;

@@ -348,4 +348,61 @@
          (result (org-to-sexp stripped)))
     (should (equal result '(skg (node (source jeff)))))))
 
+;;
+;; Bug: skg-edit-metadata was passing hardcoded "* skg\n** node"
+;; instead of the actual sexp-to-org output, discarding all fields.
+;; These tests verify expand works correctly on real metadata sexps.
+;;
+
+(ert-deftest test-expand-preserves-existing-source ()
+  "Expanding a sexp that already has source preserves it."
+  (let* ((sexp '(skg (node (id abc) (source public)
+                           (graphStats (containers 0) (contents 5)))))
+         (org-text (sexp-to-org sexp))
+         (expanded (skg-truenode-expand-defaults-in-org org-text))
+         (lines (split-string expanded "\n"))
+         (headlines (org-to-sexp--extract-headlines lines)))
+    ;; Source field must be present
+    (should (cl-find "source" headlines :key #'cdr :test #'string=))
+    ;; Source value must be "public" (not missing)
+    (should (cl-find "public" headlines :key #'cdr :test #'string=))
+    ;; ID must be preserved
+    (should (cl-find "id" headlines :key #'cdr :test #'string=))
+    (should (cl-find "abc" headlines :key #'cdr :test #'string=))
+    ;; graphStats must be preserved (as non-canonical, appended at end)
+    (should (cl-find "graphStats" headlines :key #'cdr :test #'string=))))
+
+(ert-deftest test-expand-preserves-source-round-trip ()
+  "Expanding then stripping a sexp with source + graphStats is identity
+for the editable fields (graphStats is readonly and preserved too)."
+  (let* ((sexp '(skg (node (id abc) (source public)
+                           (graphStats (containers 0) (contents 5)))))
+         (org-text (sexp-to-org sexp))
+         (expanded (skg-truenode-expand-defaults-in-org org-text))
+         (stripped (skg-truenode-strip-defaults-from-org expanded))
+         (result (org-to-sexp stripped)))
+    (should (equal result sexp))))
+
+(ert-deftest test-expand-real-world-metadata ()
+  "Expanding a real-world metadata sexp (like from next.org bug report)
+preserves source and all fields."
+  (let* ((sexp '(skg (node (id 6972d099)
+                           (source public)
+                           (graphStats (containers 0)
+                                       (contents 5)
+                                       (linksIn 4)))))
+         (org-text (sexp-to-org sexp))
+         (expanded (skg-truenode-expand-defaults-in-org org-text))
+         (lines (split-string expanded "\n"))
+         (headlines (org-to-sexp--extract-headlines lines)))
+    ;; Source must be present
+    (should (cl-find "source" headlines :key #'cdr :test #'string=))
+    (should (cl-find "public" headlines :key #'cdr :test #'string=))
+    ;; All editable defaults must be present
+    (should (cl-find "indefinitive" headlines :key #'cdr :test #'string=))
+    (should (cl-find "parentIgnores" headlines :key #'cdr :test #'string=))
+    (should (cl-find "editRequest" headlines :key #'cdr :test #'string=))
+    ;; graphStats must be preserved
+    (should (cl-find "graphStats" headlines :key #'cdr :test #'string=))))
+
 (provide 'test-skg-truenode-defaults)

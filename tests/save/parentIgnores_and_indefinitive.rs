@@ -45,7 +45,7 @@ fn test_parentignores_and_indefinitive(
           ** (skg (node (id 2) (source main) parentIgnores indefinitive)) 2
           *** (skg (node (id 4) (source main))) 4
         "};
-        let (_viewnode_forest, save_instructions, _merge_instructions) =
+        let (_viewnode_forest, save_instructions, _merge_instructions, _source_moves) =
           buffer_to_viewnode_forest_and_save_instructions(
             org_text,
             config,
@@ -54,9 +54,11 @@ fn test_parentignores_and_indefinitive(
         update_typedb_from_saveinstructions(
           &config . db_name,
           driver,
-          &save_instructions, ). await?;
+          &save_instructions,
+          &[], ). await?;
         update_fs_from_saveinstructions(
           save_instructions,
+          &[],
           config . clone(), )?;
 
         { // verify indefinitive is treated correctly

@@ -28,9 +28,10 @@ pub enum BufferValidationError {
   DuplicatedContent              (ID), // A node has multiple Content children with the same ID
   InconsistentSources            (ID, HashSet<SourceName>), // Multiple viewnodes with same ID have different sources
   ModifiedForeignNode            (ID, SourceName), // Attempted to modify a node from a foreign (read-only) source - (node_id, source_nickname)
-  DiskSourceBufferSourceConflict (ID,
-                                  SourceName, // disk source
-                                  SourceName), // buffer source
+  CannotMoveToOrFromForeignSource (ID,
+                                   SourceName, // disk source
+                                   SourceName), // buffer source
+  CannotMoveAndMergeSimultaneously (ID),
   SourceNotInConfig              (ID, SourceName),
   DefinitiveRequestOnDefinitiveNode      (ID), // A definitive view request on a node that is already definitive
   DefinitiveRequestOnNodeWithChildren    (ID), // A definitive view request on a node that has children
@@ -80,8 +81,10 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Multiple viewnodes with ID {:?} have inconsistent sources: {:?}", id, source_list) },
       BufferValidationError::ModifiedForeignNode(id, source) =>
         write!(f, "Cannot modify node {:?} from foreign (read-only) source '{}'", id, source),
-      BufferValidationError::DiskSourceBufferSourceConflict(id, disk_source, buffer_source) =>
-        write!(f, "Source mismatch for node {:?}: disk has '{}', buffer specifies '{}'", id, disk_source, buffer_source),
+      BufferValidationError::CannotMoveToOrFromForeignSource(id, disk_source, buffer_source) =>
+        write!(f, "Cannot move node {:?} between sources '{}' and '{}': one or both are foreign (read-only)", id, disk_source, buffer_source),
+      BufferValidationError::CannotMoveAndMergeSimultaneously(id) =>
+        write!(f, "Cannot move and merge node {:?} in the same save", id),
       BufferValidationError::SourceNotInConfig(id, source) =>
         write!(f, "Node {:?} references source '{}' which does not exist in config", id, source),
       BufferValidationError::DefinitiveRequestOnDefinitiveNode (id) =>

@@ -3,11 +3,13 @@ use crate::dbs::init::{rebuild_typedb_from_disk, rebuild_tantivy_from_disk};
 use crate::dbs::tantivy::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::nodes::delete_nodes_from_pids;
+use crate::dbs::typedb::nodes::update_node_source;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_out_links;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
-use crate::types::save::{DefineNode, SaveNode, DeleteNode};
+use crate::types::save::{DefineNode, SaveNode, DeleteNode, SourceMove};
 use crate::types::skgnode::SkgNode;
+use crate::util::path_from_pid_and_source;
 
 use itertools::{Itertools, Either};
 use std::error::Error;
@@ -23,7 +25,8 @@ use typedb_driver::TypeDBDriver;
 /// Returns `None` when all three stores updated normally.
 /// Returns `Some(new_index)` when Tantivy had to be rebuilt.
 pub async fn update_graph_minus_merges (
-  instructions  : Vec<DefineNode>,
+  node_defs     : Vec<DefineNode>,
+  source_moves  : &[SourceMove],
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
   driver        : &TypeDBDriver,
@@ -34,19 +37,20 @@ pub async fn update_graph_minus_merges (
   { // Step 1: FS (source of truth)
     // TODO: Print per-source write information
     tracing::info!( "1) Writing {} instruction(s) to disk ...",
-               { let total_input : usize = instructions . len ();
+               { let total_input : usize = node_defs . len ();
                  total_input } );
     let (deleted_count, written_count) : (usize, usize) =
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-          "update_fs_from_saveinstructions") . entered ();
+          "update_fs_from_savenode_defs") . entered ();
         update_fs_from_saveinstructions (
-          instructions . clone (), config . clone () ) } ?;
+          node_defs . clone (), source_moves,
+          config . clone () ) } ?;
     tracing::info!( "   Deleted {} file(s), wrote {} file(s).",
               deleted_count, written_count ); }
 
   // Steps 2 & 3: TypeDB (async) and Tantivy (sync) in parallel.
   // Both are independent after the FS update.
-  let tantivy_instructions : Vec<DefineNode> = instructions . clone ();
+  let tantivy_instructions : Vec<DefineNode> = node_defs . clone ();
   let tantivy_idx : TantivyIndex = tantivy_index . clone ();
   let tantivy_handle : std::thread::JoinHandle<(Result<usize, String>, Duration)> =
     std::thread::spawn ( move || {
@@ -61,7 +65,7 @@ pub async fn update_graph_minus_merges (
     let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "update_typedb_from_saveinstructions") . entered ();
     update_typedb_from_saveinstructions (
-      db_name, driver, &instructions ) . await }
+      db_name, driver, &node_defs, source_moves ) . await }
     { tracing::error!(
         "TypeDB update failed: {}. Rebuilding from disk...", e);
       rebuild_typedb_from_disk (&config, driver) . await
@@ -107,9 +111,10 @@ pub async fn update_graph_minus_merges (
 /// 5) Recreate all relationships for those nodes, via
 ///      create_all_relationships
 pub async fn update_typedb_from_saveinstructions (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-  instructions : &Vec<DefineNode>,
+  db_name      : &str,
+  driver       : &TypeDBDriver,
+  node_defs    : &Vec<DefineNode>,
+  source_moves : &[SourceMove],
 ) -> Result<(), Box<dyn Error>> {
 
   // PITFALL: Below, each get(0) on an 'ids' field
@@ -119,7 +124,7 @@ pub async fn update_typedb_from_saveinstructions (
 
   let ( to_delete, to_save )
     : ( Vec<DeleteNode>, Vec<SaveNode> )
-    = instructions . iter() . cloned() . partition_map (
+    = node_defs . iter() . cloned() . partition_map (
       |instr| match instr {
         DefineNode::Delete (d) => Either::Left (d),
         DefineNode::Save (s)   => Either::Right (s) } );
@@ -167,15 +172,21 @@ pub async fn update_typedb_from_saveinstructions (
         db_name, driver, & to_write_skgnodes )
       . await } ?; }
 
+  for sm in source_moves { // TODO ? parallelize
+    update_node_source (
+      db_name, driver,
+      &sm . pid, &sm . new_source ) . await ?; }
+
   Ok (( )) }
 
 pub fn update_fs_from_saveinstructions (
-  instructions : Vec<DefineNode>,
+  node_defs : Vec<DefineNode>,
+  source_moves : &[SourceMove],
   config       : SkgConfig,
 ) -> io::Result<(usize, usize)> { // (deleted, written)
   let ( to_delete, to_save )
     : ( Vec<DeleteNode>, Vec<SaveNode> )
-    = instructions . into_iter() . partition_map(
+    = node_defs . into_iter() . partition_map(
       |instr| match instr {
         DefineNode::Delete (d) => Either::Left (d),
         DefineNode::Save (s)   => Either::Right (s) } );
@@ -195,8 +206,18 @@ pub fn update_fs_from_saveinstructions (
       . collect ();
     if ! nodes_to_write . is_empty () {
       write_all_nodes_to_fs (
-        nodes_to_write, config ) ?
+        nodes_to_write, config . clone() ) ?
     } else { 0 } };
+  for sm in source_moves {
+    // Write first, then delete: the new file is already written above.
+    let old_path : String =
+      path_from_pid_and_source (
+        &config, &sm . old_source, sm . pid . clone() )
+      . map_err (|e| io::Error::new (io::ErrorKind::Other, e)) ?;
+    match std::fs::remove_file (&old_path) {
+      Ok (()) => {},
+      Err (e) if e . kind() == io::ErrorKind::NotFound => {},
+      Err (e) => return Err (e) }; }
   Ok ( (deleted, written) ) }
 
 

@@ -36,7 +36,7 @@
 ;;;   elisp/skg-buffer.el
 ;;;     skg-open-empty-content-view
 ;;;   elisp/skg-user-facing-aliases.el
-;;;     skg-view-metadata
+;;;     skg-local-metadata
 ;;;   elisp/skg-user-facing-aliases.el
 ;;;     skg-search-titles
 ;;;   elisp/skg-user-facing-aliases.el

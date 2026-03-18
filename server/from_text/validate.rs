@@ -1,9 +1,10 @@
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
-use crate::types::save::{DefineNode, SaveNode, DeleteNode, Merge};
+use crate::types::save::{DefineNode, SaveNode, DeleteNode, Merge, SourceMove};
 use crate::types::skgnode::SkgNode;
 
+use std::collections::HashSet;
 use typedb_driver::TypeDBDriver;
 
 /// Validates that foreign (read-only) nodes are not being modified.
@@ -121,10 +122,12 @@ pub(crate) fn buffernode_differs_from_disknode(
 
   let title_matches: bool = buffer_node . title == disk_node . title;
   let body_matches: bool = buffer_node . body == disk_node . body;
+  let source_matches: bool = buffer_node . source == disk_node . source;
   let contains_matches: bool =
     buffer_node . contains == disk_node . contains;
   !( title_matches
      && body_matches
+     && source_matches
      && contains_matches
      && fields_match( &buffer_node . aliases,
                       &disk_node . aliases)
@@ -143,3 +146,25 @@ pub(crate) fn flatten_ms<T: Clone>(
     MSV::Specified (vec) if vec . is_empty() =>
       MSV::Unspecified,
     other => other . clone() }}
+
+/// Validates that no node is both moved and merged in the same save.
+pub(super) fn validate_no_simultaneous_move_and_merge (
+  source_moves       : &[SourceMove],
+  merge_instructions : &[Merge],
+) -> Result<(), Vec<BufferValidationError>> {
+  if source_moves . is_empty() || merge_instructions . is_empty() {
+    return Ok (()); }
+  let move_ids : HashSet<&ID> =
+    source_moves . iter() . map(|sm| &sm . pid) . collect();
+  let mut errors : Vec<BufferValidationError> = Vec::new();
+  for merge in merge_instructions {
+    if move_ids . contains (merge . acquirer_id()) {
+      errors . push (
+        BufferValidationError::CannotMoveAndMergeSimultaneously(
+          merge . acquirer_id() . clone() )); }
+    if move_ids . contains (merge . acquiree_id()) {
+      errors . push (
+        BufferValidationError::CannotMoveAndMergeSimultaneously(
+          merge . acquiree_id() . clone() )); }}
+  if errors . is_empty() { Ok (())
+  } else { Err (errors) }}

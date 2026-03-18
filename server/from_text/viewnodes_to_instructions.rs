@@ -2,13 +2,13 @@ pub mod to_naive_instructions;
 pub mod reconcile_same_id_instructions;
 
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::save::{DefineNode, SaveNode};
+use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use crate::types::memory::SkgNodeMap;
 use crate::types::viewnode::ViewNode;
 
 use to_naive_instructions::naive_saveinstructions_from_tree;
 use reconcile_same_id_instructions::reconcile_same_id_instructions;
-use super::validate_foreign_nodes::buffernode_differs_from_disknode;
+use super::validate::buffernode_differs_from_disknode;
 use super::supplement_from_disk::supplement_none_fields_from_disk_if_save;
 use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
@@ -24,7 +24,7 @@ pub async fn viewnode_forest_to_nonmerge_save_instructions (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   pool   : &SkgNodeMap
-) -> Result<Vec<DefineNode>, Box<dyn Error>> {
+) -> Result<(Vec<DefineNode>, Vec<SourceMove>), Box<dyn Error>> {
   let naive_instructions : Vec<DefineNode> =
     naive_saveinstructions_from_tree (
       forest . clone( )) ?;
@@ -35,12 +35,17 @@ pub async fn viewnode_forest_to_nonmerge_save_instructions (
       instructions_without_dups, pool );
   let mut result : Vec<DefineNode> = // Mapping supplement_none_fields_from_disk_if_save over changed_instructions would be simpler, but async functions can't be mapped.
     Vec::with_capacity ( changed_instructions . len() );
+  let mut source_moves : Vec<SourceMove> = Vec::new();
   for instr in changed_instructions {
-    result . push (
-      supplement_none_fields_from_disk_if_save (
-        config, driver, pool, instr
-      ) . await ? ); }
-  Ok (result) }
+    let (supplemented, maybe_move)
+      : (DefineNode, Option<SourceMove>)
+      = supplement_none_fields_from_disk_if_save (
+          config, driver, pool, instr
+        ) . await ?;
+    result . push (supplemented);
+    if let Some (sm) = maybe_move {
+      source_moves . push (sm); }}
+  Ok ((result, source_moves)) }
 
 /// Filters out Save instructions that would be no-ops,
 /// because they match the pre-save pool entry (nothing changed).

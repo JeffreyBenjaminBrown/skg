@@ -60,3 +60,53 @@ There are three ways to test the code:
    - Tests run in parallel with isolated configurations
    - Requires both `typedb server` and `cargo run` to be running
    - Individual tests located in `tests/integration/*/run-test.sh`
+
+* The save-buffer pipeline
+
+  The central pipeline. When Emacs saves a buffer, the server:
+
+  1. Parses buffer text -> ViewNode tree ('org_to_uninterpreted_nodes')
+  2. Enriches with missing IDs/sources ('add_missing_info_to_forest')
+     - New nodes get UUIDs; sourceless nodes inherit parent's source
+  3. Validates tree structure ('find_buffer_errors_for_saving')
+  4. Converts to checked types ('unchecked_to_checked_tree')
+  5. Generates save instructions ('viewnode_forest_to_nonmerge_save_instructions')
+     - Sub-steps: naive -> reconcile same-ID -> filter unchanged -> supplement from disk
+  6. Validates foreign nodes ('validate_and_filter_foreign_instructions')
+  7. Extracts merge instructions if any
+  8. Updates graph ('update_graph_minus_merges'):
+     FS first (source of truth), then TypeDB + Tantivy in parallel
+  9. Re-renders saved view and collateral views ('update_views_after_save')
+
+  Key entry point: 'handle_save_buffer_request' in server/serve/handlers/save_buffer.rs.
+  Key data flow: buffer text -> UncheckedViewNode -> ViewNode -> DefineNode (Save|Delete) -> FS/TypeDB/Tantivy.
+
+* Source (SourceName)
+
+  Source is a SourceName (String wrapper) identifying which configured directory holds a node's .skg file. It is:
+  - NOT serialized in .skg files — inferred from file location at load time
+  - Stored in TypeDB as a node attribute and in Tantivy as a search field
+  - Used by 'path_from_pid_and_source' to compute file paths: source.path / pid.skg
+  - Governed by user_owns_it flag: foreign sources are read-only
+
+  All graph relationships (contains, subscribes_to, etc.) reference nodes by ID, not by source. Source is purely about where the .skg file lives on disk.
+
+* Relationships and the view system
+
+  Graph relationships (all ID-based, source-independent):
+  - contains: parent -> child ordering (Vec<ID>, order matters)
+  - subscribes: subscriber -> subscribee (lensing into foreign data)
+  - hides_from_its_subscriptions: filtering within subscriptions
+  - overrides_view_of: replacing a node in views (not yet fully implemented)
+  - textlinks_to: org-roam style [[id:...]] hyperlinks
+
+  The view system is ephemeral scaffolding rebuilt every save:
+  - TrueNode: corresponds to an SkgNode, can be Definitive (editable) or Indefinitive (read-only)
+  - Scaffold: display-only nodes (AliasCol, IDCol, SubscribeeCol, HiddenInSubscribeeCol, etc.)
+  - 'complete_viewtree' does two DFS passes:
+    preorder (parent-first): reconcile children, add subscription scaffolds
+    postorder (child-first): expand aliases, IDs, hidden columns
+
+* Recovery and source of truth
+
+  The filesystem (.skg files) is the sole source of truth. TypeDB and Tantivy are derived caches. If either fails during a save, the server rebuilds them from disk ('rebuild_typedb_from_disk', 'rebuild_tantivy_from_disk'). This means any operation that correctly updates the filesystem is recoverable even if the DB updates crash.

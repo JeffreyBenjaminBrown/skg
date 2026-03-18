@@ -1,7 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; PURPOSE: Interactive s-expression editing utilities.
-;;; From a 'source buffer', the user can call skg-view-metadata
+;;; From a 'source buffer', the user can call skg-local-metadata
 ;;; to open a new 'sexp edit' buffer,
 ;;; where the sexp is rendered as an org-tree.
 ;;;
@@ -173,10 +173,11 @@ Kill the buffer to cancel without saving."
                          (+ sexp-start (length metadata-str))) )
              (default-source (when no-metadata
                                (skg-sexp-edit--default-source)) )
-             (org-text (if is-truenode
-                            (skg-truenode-expand-defaults-in-org
-                             "* skg\n** node" default-source)
-                          (sexp-to-org sexp)) ))
+             (org-text (let ((sexp-as-org (sexp-to-org sexp)))
+                          (if is-truenode
+                              (skg-truenode-expand-defaults-in-org
+                               sexp-as-org default-source)
+                            sexp-as-org)) ))
         (skg-sexp-edit--open-edit-buffer
          org-text source-buffer sexp-start sexp-end is-truenode)
         (when no-metadata

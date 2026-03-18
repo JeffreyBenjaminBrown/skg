@@ -1,0 +1,23 @@
+* Fixtures for move_source tests
+
+Three sources: public (owned), private (owned), foreign (read-only).
+
+** Containment graph
+```
+  public/a       extra_id: a-alias
+  └── public/b   extra_id: b-alias
+      └── public/c   extra_id: c-alias
+
+  public/stay    (island)
+
+  private/priv-node   (island)
+
+  foreign/foreign-node   (island)
+```
+
+** What the tests do
+- Move b (and sometimes c) from public to private.
+- Verify FS, TypeDB and Tantivy all reflect the new source.
+- Verify containment relationships survive the move.
+- Test error cases: move to/from foreign, move + merge, source-only change with populated pool.
+- Test that extra_ids are preserved and that nodes referenced by extra_id (not PID) still move correctly.

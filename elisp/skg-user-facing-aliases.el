@@ -43,7 +43,7 @@ and hide INTERNAL from M-x completion."
       (define-key map (kbd "C-c l s") #'skg-local-sourceward)
       (define-key map (kbd "C-c l d") #'skg-local-definitive)
       (define-key map (kbd "C-c l i") #'skg-local-indefinitive)
-      (define-key map (kbd "C-c l m") #'skg-view-metadata)
+      (define-key map (kbd "C-c l m") #'skg-local-metadata)
       (define-key map (kbd "C-c l <backspace>") #'skg-local-delete))
     (progn;; id navigation and stack
       (define-key map (kbd "C-c i n") #'skg-id-next)
@@ -63,6 +63,6 @@ and hide INTERNAL from M-x completion."
 (skg-alias skg-local-sourceward      skg-request-sourceward-view)
 (skg-alias skg-view-from-node-id     skg-request-single-root-content-view-from-id)
 (skg-alias skg-view-heralds-mode     heralds-minor-mode)
-(skg-alias skg-view-metadata         skg-edit-metadata)
+(skg-alias skg-local-metadata        skg-edit-metadata)
 
 (provide 'skg-user-facing-aliases)

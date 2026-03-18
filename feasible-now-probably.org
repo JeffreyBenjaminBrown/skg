@@ -74,7 +74,7 @@ These are new names that I want to use for some (most) functions in docs/COMMAND
 *** skg-view-diff-mode <- skg-diff-view
 *** skg-view-heralds-mode <- skg-heralds-view
 *** skg-view-id <- skg-view-from-id
-*** skg-view-metadata <- skg-metadata-view
+*** skg-local-metadata <- skg-metadata-view
 *** skg-id-stack <- skg-linkstack-view
 * DONE Bug: C-c C-c not saving metadata in skg-metadata-view
   The top of the metadata buffer says

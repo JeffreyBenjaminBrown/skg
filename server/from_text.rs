@@ -8,22 +8,21 @@
 pub mod buffer_to_viewnodes;
 pub mod viewnodes_to_instructions;
 pub mod supplement_from_disk;
-pub mod validate_foreign_nodes;
+pub mod validate;
 
 use crate::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_viewnode_forest;
 use crate::types::errors::{BufferValidationError, SaveError};
+use crate::types::memory::SkgNodeMap;
 use crate::types::misc::SkgConfig;
-use crate::types::viewnode::ViewNode;
+use crate::types::save::{Merge, DefineNode, SourceMove};
 use crate::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
-use crate::types::save::{Merge, DefineNode};
+use crate::types::viewnode::ViewNode;
 
 use buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use buffer_to_viewnodes::add_missing_info::add_missing_info_to_forest;
 use buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use viewnodes_to_instructions::viewnode_forest_to_nonmerge_save_instructions;
-use validate_foreign_nodes::{validate_and_filter_foreign_instructions, validate_merges_involve_only_owned_nodes};
-
-use crate::types::memory::SkgNodeMap;
+use validate::{validate_and_filter_foreign_instructions, validate_merges_involve_only_owned_nodes, validate_no_simultaneous_move_and_merge};
 
 use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
@@ -33,9 +32,10 @@ pub async fn buffer_to_viewnode_forest_and_save_instructions (
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
   pool        : &SkgNodeMap
-) -> Result< ( Tree<ViewNode>,
-               Vec<DefineNode>,
-               Vec<Merge> ),
+) -> Result< ( Tree<ViewNode>,    // the view
+               Vec<DefineNode>,   // instructions
+               Vec<Merge>,        // instructions
+               Vec<SourceMove> ), // instructions
              SaveError> {
   let ( mut unchecked_forest, parsing_errors )
     : ( Tree<UncheckedViewNode>, Vec<BufferValidationError> )
@@ -67,7 +67,8 @@ pub async fn buffer_to_viewnode_forest_and_save_instructions (
         "unchecked_to_checked_tree" ). entered();
       unchecked_to_checked_tree (unchecked_forest) }
         . map_err ( |e| SaveError::ParseError (e) ) ?;
-  let nonmerge_instructions : Vec<DefineNode> =
+  let (nonmerge_instructions, source_moves)
+    : (Vec<DefineNode>, Vec<SourceMove>) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "viewnode_forest_to_nonmerge_save_instructions" ). entered();
       viewnode_forest_to_nonmerge_save_instructions (
@@ -91,7 +92,11 @@ pub async fn buffer_to_viewnode_forest_and_save_instructions (
     validate_merges_involve_only_owned_nodes (
       & merge_instructions, config ) }
     . map_err (SaveError::BufferValidationErrors) ?;
+  validate_no_simultaneous_move_and_merge (
+    &source_moves, &merge_instructions )
+    . map_err (SaveError::BufferValidationErrors) ?;
 
   Ok ((viewnode_forest,
        nonmerge_instructions,
-       merge_instructions)) }
+       merge_instructions,
+       source_moves)) }

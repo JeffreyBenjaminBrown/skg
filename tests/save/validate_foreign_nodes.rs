@@ -26,7 +26,7 @@ fn test_unmodified_foreign_node_allowed() -> Result<(), Box<dyn Error>> {
       let result: Result<_, _> = buffer_to_viewnode_forest_and_save_instructions(
         org_text, config, driver, &SkgNodeMap::new() ) . await;
       assert!(result . is_ok(), "Unmodified foreign node should be allowed");
-      let (_viewnode_forest, instructions, _merge_instructions) = result?;
+      let (_viewnode_forest, instructions, _merge_instructions, _source_moves) = result?;
       // Foreign nodes should be filtered out (no need to write)
       assert_eq!(instructions . len(), 0,
                  "Unmodified foreign nodes should be filtered out");
@@ -100,7 +100,7 @@ fn test_indefinitive_foreign_node_filtered() -> Result<(), Box<dyn Error>> {
         org_text, config, driver, &SkgNodeMap::new()) . await;
       // Should succeed - indefinitive foreign nodes are allowed but filtered
       assert!(result . is_ok(), "Indefinitive foreign node should be allowed");
-      let (_viewnode_forest, instructions, _merge_instructions) = result?;
+      let (_viewnode_forest, instructions, _merge_instructions, _source_moves) = result?;
       // Indefinitive foreign nodes should be filtered out (no append)
       assert_eq!(instructions . len(), 0,
                  "Indefinitive foreign nodes should be filtered out");
@@ -124,7 +124,7 @@ fn test_owned_node_unchanged_behavior() -> Result<(), Box<dyn Error>> {
         org_text, config, driver, &SkgNodeMap::new() ) . await;
       // Should succeed - owned nodes can be modified
       assert!(result . is_ok(), "Owned node modification should be allowed");
-      let (_viewnode_forest, instructions, _merge_instructions) = result?;
+      let (_viewnode_forest, instructions, _merge_instructions, _source_moves) = result?;
       // Owned node should be included in instructions
       assert!(instructions . len() > 0,
               "Owned node should be included in save instructions");
@@ -200,7 +200,7 @@ fn test_mixed_owned_and_foreign_nodes() -> Result<(), Box<dyn Error>> {
         org_text, config, driver, &SkgNodeMap::new() ) . await;
       // Should succeed
       assert!(result . is_ok(), "Mixed owned and unmodified foreign should be allowed");
-      let (_viewnode_forest, instructions, _merge_instructions) = result?;
+      let (_viewnode_forest, instructions, _merge_instructions, _source_moves) = result?;
       // Only owned node should be in instructions (foreign filtered out)
       assert!(instructions . len() > 0, "Should have owned node instructions");
       // Verify no foreign nodes in instructions

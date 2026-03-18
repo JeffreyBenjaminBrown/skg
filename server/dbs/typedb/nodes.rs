@@ -1,4 +1,4 @@
-use crate::types::misc::ID;
+use crate::types::misc::{ID, SourceName};
 use crate::types::skgnode::SkgNode;
 
 use super::util::ConceptRowStream;
@@ -218,5 +218,29 @@ async fn delete_one_node_from_pid (
     r#"match $node isa node, has id "{}";
        delete $node;"#,
     id . as_str () ) ) . await ?;
+  tx . commit () . await ?;
+  Ok (()) }
+
+/// Updates the source attribute of a node in TypeDB.
+/// Deletes the old source and inserts the new one in a single transaction.
+pub async fn update_node_source (
+  db_name    : &str,
+  driver     : &TypeDBDriver,
+  pid        : &ID,
+  new_source : &SourceName,
+) -> Result<(), Box<dyn Error>> {
+  let tx : Transaction =
+    driver . transaction (
+      db_name, TransactionType::Write ) . await ?;
+  tx . query ( format! (
+    r#"match
+         $n isa node, has id "{}";
+         $n has source $old_src;
+       delete
+         $n has $old_src;
+       insert
+         $n has source "{}";"#,
+    pid . as_str(),
+    new_source ) ) . await ?;
   tx . commit () . await ?;
   Ok (()) }
