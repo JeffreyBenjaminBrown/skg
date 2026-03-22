@@ -166,7 +166,7 @@ moves point to focused headline, and removes focus marker."
               #'skg-warn-if-other-buffer-modified nil t)
     (message "Buffer updated with processed content from Rust")))
 
-(defun skg-show-save-feedback (buffer-name message-text content)
+(defun skg-big-nonfatal-message (buffer-name message-text content)
   "Display CONTENT in BUFFER-NAME and show MESSAGE-TEXT in minibuffer."
   (with-current-buffer (get-buffer-create buffer-name)
     (let ((inhibit-read-only t))
@@ -180,14 +180,14 @@ moves point to focused headline, and removes focus marker."
 
 (defun skg-show-save-errors (error-content)
   "Show save errors in a new buffer with org-mode."
-  (skg-show-save-feedback
+  (skg-big-nonfatal-message
    "*SKG Save Errors - Inconsistencies Found*"
    "Save failed - errors shown in *SKG Save Errors - Inconsistencies Found*"
    error-content))
 
 (defun skg-show-save-warnings (warning-content)
   "Show save warnings in a new buffer."
-  (skg-show-save-feedback
+  (skg-big-nonfatal-message
    "*SKG Save Warnings*"
    "Save succeeded with warnings - see *SKG Save Warnings*"
    warning-content))

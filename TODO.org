@@ -1,3 +1,20 @@
+* import org-roam
+** to run it
+cargo run --bin skg -- import-org-roam public/ data/public/ public
+** commit message
+begin
+
+  imported from public org-roam notes:
+  git@github.com:JeffreyBenjaminBrown/public-notes-in-org-roam-format
+* buffer updates for git diff view
+** should rerender on each save
+Saving seems to treat preexisting git diff view data as true.
+It might go stale -- e.g. the user could commit those changes.
+It should instead be recomputed on each save.
+** should vanish from all buffers when turned off
+When git diff view is toggled off, all diff-specific nodes
+(phantoms and 'textChanged') should be removed from the buffer,
+as well as any heralds indicating changes (NewHere, New, etc.)
 * [[./next.org]] might be in progress
 * ? "any rel" ought to be what a single backward view shows
   link sources, containers, subscribers
@@ -57,8 +74,6 @@
 *** delete in view-descendents all parent-ignores branches
 *** do until all of node's children
 ** Branching containerward is slow.
-* import org-roam
-  cargo run --bin skg -- import-org-roam public/ data/public/ public
 * magit bug!
 I just copoied this text from magit:
 

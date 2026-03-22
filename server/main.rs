@@ -211,6 +211,10 @@ fn run_import (
   tracing::info! ("{}", stats);
   for err in &stats . errors {
     tracing::warn! ("  {}", err); }
+  println! ( // reminder printed in yellow
+    "\x1b[1;33mRemember to commit the imported .skg files in {:?} to git, \
+     so that git-diff mode can detect changes.\x1b[0m",
+    output_dir );
   Ok (( )) }
 
 /// Set up where log output goes. Three destinations:

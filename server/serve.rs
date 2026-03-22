@@ -12,34 +12,24 @@ pub mod protocol;
 pub mod util;
 
 use crate::dbs::typedb::util::delete_database;
+use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use crate::git_ops::read_repo::open_repo;
+use crate::org_to_text::viewnode_forest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::get_file_path::handle_get_file_path_request;
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
-use crate::serve::handlers::title_matches::{
-  handle_title_matches_request,
-  SearchEnrichmentPayload,
-  mk_search_enrichment_sexp};
-use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use crate::types::unchecked_viewnode::unchecked_to_checked_tree;
-use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
-use crate::serve::protocol::{RequestType, TcpToClient};
-use crate::serve::util::{
-  read_length_prefixed_content,
-  request_type_from_request,
-  send_response_with_length_prefix,
-  tag_text_response,
-  value_from_request_sexp};
-use crate::org_to_text::viewnode_forest_to_string;
 use crate::serve::handlers::title_matches::render_enriched_search_buffer::insert_ancestry_into_search_view;
-use crate::types::misc::{SkgConfig, TantivyIndex};
-use crate::types::memory::ViewUri;
-use crate::types::memory::SkgnodesInMemory;
-
+use crate::serve::handlers::title_matches::{ handle_title_matches_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
+use crate::serve::protocol::{RequestType, TcpToClient};
+use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
 use crate::types::errors::BufferValidationError;
-use crate::types::unchecked_viewnode::UncheckedViewNode;
+use crate::types::memory::{SkgnodesInMemory, ViewUri};
+use crate::types::misc::{SkgConfig, TantivyIndex};
+use crate::types::unchecked_viewnode::{UncheckedViewNode,unchecked_to_checked_tree};
 use crate::types::viewnode::ViewNode;
+use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
 
 use ego_tree::{NodeId, Tree};
 use std::io::{BufRead, BufReader};
@@ -187,7 +177,8 @@ fn handle_emacs (
                                            config ),
           Ok (RequestType::GitDiffModeToggle) =>
             handle_git_diff_mode_request ( &mut stream,
-                                           &mut conn_state ),
+                                           &mut conn_state,
+                                           config ),
           Ok (RequestType::RebuildDbs) =>
             handle_rebuild_dbs_request ( &mut stream,
                                          &typedb_driver,
@@ -303,18 +294,49 @@ fn handle_snapshot_response (
 
 /// Handle git diff mode toggle request.
 /// Request format: ((request . "git diff mode toggle"))
+/// Warns user if any source is not tracked in git.
 fn handle_git_diff_mode_request (
   stream     : &mut TcpStream,
   conn_state : &mut ConnectionState,
+  config     : &SkgConfig,
 ) {
   conn_state . diff_mode_enabled = ! conn_state . diff_mode_enabled;
-  let msg = if conn_state . diff_mode_enabled
-    { "Git diff mode enabled" } else
-    { "Git diff mode disabled" };
-  tracing::info! ( msg = msg, "Git diff mode toggled" );
+  let mut msg : String =
+    if conn_state . diff_mode_enabled
+    { "Git diff mode enabled" . to_string () }
+    else { "Git diff mode disabled" . to_string () };
+  if conn_state . diff_mode_enabled {
+    let warnings : Vec<String> =
+      sources_not_tracked_in_git (config);
+    if ! warnings . is_empty () {
+      msg . push_str ("\n\nWarning: diff mode will be incomplete. \
+        These sources are not fully tracked in git:\n");
+      for w in &warnings {
+        msg . push_str (&format! ("  - {}\n", w)); } } }
+  tracing::info! ( msg = %msg, "Git diff mode toggled" );
   send_response_with_length_prefix (
     stream,
-    & tag_text_response ( TcpToClient::GitDiffMode, msg )); }
+    & tag_text_response ( TcpToClient::GitDiffMode, &msg )); }
+
+/// Check each configured source for git-readiness.
+/// Returns a list of human-readable warnings for sources
+/// that are not in a git repo or have no commits yet.
+fn sources_not_tracked_in_git (
+  config : &SkgConfig,
+) -> Vec<String> {
+  let mut warnings : Vec<String> = Vec::new ();
+  for (source_name, source_config) in &config . sources {
+    let source_path : &std::path::Path =
+      std::path::Path::new ( &source_config . path );
+    match open_repo (source_path) {
+      None => {
+        warnings . push ( format! (
+          "{}: not in a git repository", source_name )); },
+      Some (repo) => {
+        if repo . head () . is_err () {
+          warnings . push ( format! (
+            "{}: git repo has no commits yet", source_name )); } } } }
+  warnings }
 
 fn handle_verify_connection_request (
   stream: &mut std::net::TcpStream) {
