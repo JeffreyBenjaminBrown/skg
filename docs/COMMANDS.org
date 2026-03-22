@@ -149,14 +149,17 @@
     repeated here; described earlier in this doc
 *** C-c v v : skg-view
     repeated here; described earlier in this doc
-** connection and reload
-   Unless you're coding, you probably don't need these.
+** connection, reload, rebuild dbs
+   Unless you're coding or troubleshooting, you probably won't need these.
 *** skg-connection-verify
     Sends a ping to the Rust server
     to check if the connection is working.
     Displays the result in the minibuffer.
 *** skg-connection-end
     Closes the TCP connection to the Rust server.
+*** skg-rebuild-dbs
+Rebuilds TypeDB and Tantivy databases,
+using the .skg files on disk.
 *** skg-reload
     Unloads all skg elisp modules and reloads them from disk.
     Useful when you've changed elisp code

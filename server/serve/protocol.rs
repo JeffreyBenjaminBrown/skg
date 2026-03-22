@@ -13,6 +13,7 @@ pub enum RequestType {
   Shutdown,
   GetFilePath,
   GitDiffModeToggle,
+  RebuildDbs,
 }
 
 impl RequestType {
@@ -29,6 +30,7 @@ impl RequestType {
       "shutdown"                 => Ok (RequestType::Shutdown),
       "get file path"            => Ok (RequestType::GetFilePath),
       "git diff mode toggle"     => Ok (RequestType::GitDiffModeToggle),
+      "rebuild dbs"              => Ok (RequestType::RebuildDbs),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See api-and-formats.md
@@ -50,6 +52,7 @@ pub enum TcpToClient {
   VerifyConnection,
   Shutdown,
   GitDiffMode,
+  RebuildDbs,
   Error,
 }
 
@@ -69,4 +72,5 @@ impl TcpToClient {
       TcpToClient::VerifyConnection => "verify-connection",
       TcpToClient::Shutdown         => "shutdown",
       TcpToClient::GitDiffMode      => "git-diff-mode",
+      TcpToClient::RebuildDbs       => "rebuild-dbs",
       TcpToClient::Error            => "error", }} }

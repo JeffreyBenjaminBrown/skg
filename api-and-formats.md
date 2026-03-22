@@ -58,6 +58,13 @@ So far there are these endpoints:
     responses include diff annotations showing changes
     between git HEAD and the worktree.
 
+## Rebuild databases
+  - Request: ((request . "rebuild dbs"))
+  - Response: LP response-type "rebuild-dbs" with `((content "..."))`.
+    Content is "Databases rebuilt successfully." on success,
+    or "Rebuild failed: ..." on error.
+  - Behavior: Wipes and rebuilds both TypeDB and Tantivy from the .skg files on disk. Does not touch the filesystem. Also recomputes context rankings for search. Useful after importing new data or when the databases have stale metadata.
+
 ## Shutdown server
   - Request: ((request . "shutdown"))
   - Has the same effect as sending SIGINT (Ctrl+C) or SIGTERM (kill) to the server.
@@ -120,7 +127,7 @@ Each `[[sources]]` entry defines a directory of `.skg` files:
 
 | Field          | Required | Description |
 |----------------|----------|-------------|
-| `nickname`     | yes      | Unique name for this source (used in metadata, provenance). |
+| `name`         | yes      | Unique name for this source (used in metadata, provenance). |
 | `path`         | yes      | Directory containing `.skg` files. Relative to data root. |
 | `user_owns_it` | yes      | `true` if the user can create/edit nodes here; `false` for foreign (read-only) sources. |
 

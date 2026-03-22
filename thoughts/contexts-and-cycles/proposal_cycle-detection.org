@@ -1,0 +1,44 @@
+* Proposal: detect and report cycles, and change how contexts are made
+** detecting cycles at save-buffer
+   Each time a user saves a buffer, they might create a cycle.
+   We should therefore check the complete contains-ancestry
+   of each node that generates a SaveInstruction.
+
+   To do this naively would be expensive.
+
+** AWAITS later : detect cycles at context creation
+   When the server starts, it builds the dbs from .skg files.
+   Part of that process is the determination of 'contexts',
+   which detects cycles.
+   This detection is not sufficient for our purposes, currently,
+   because multicontained nodes and link targets
+   both truncate the containerward search, as if they were roots.
+
+   I've since thought better of that treatment.
+   I would like context creation to ignore such nodes --
+   and, very similar to link targets,
+   any nodes that had IDs when imported from org-roam
+   (they are marked 'HadId', I think).
+   So during context creation,
+   we don't stop building any containerward path
+   until we find a root or a cycle.
+   If the path forks, we follow all forks.
+
+   This means a node can be in multiple contexts.
+   Therefore the algorithm must change:
+   We can't assign a single context to any node.
+   Rather, we will map each node to a set of contexts,
+   where each context is identified by a root (one node)
+   or a cycle (every node in the cycle).
+
+   To detect the contexts for a single node, called the 'origin':
+   - Build a path containerward from the origin.
+   - If the path forks (which it might do immediately at the origin, if the origin is multicontained) then pursue both paths.
+   - For the collection of paths, keep a *single* pool of visited nodes. Initially seed it with only the origin.
+   - If any path cycles (reaches a node already in the pool),
+     [TODO : fill in details]
+
+   For the entire graph, the algorithm will look something like:
+   - Find all roots (a single typedb query).
+   - From the non-roots, selection a random batch of 64 nodes. For each, build
+   [TODO : fill in details]

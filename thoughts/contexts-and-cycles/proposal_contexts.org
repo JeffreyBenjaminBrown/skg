@@ -1,0 +1,56 @@
+I want to redo how we compute contexts.
+* contentward from roots and multicontent, with anything else flagged
+In brief:
+- Search containerward until finding a root, cycle or multicontained.
+- A root context will claim its recursive content,
+  but truncated at mutlicontained nodes.
+  Tha root context 'knows' about the multicontained node,
+  but not (directly) about that multicontaind node's content.
+- A context from a multicontained node will, similarly,
+  claim its recursive content,
+  truncated at other multicontained nodes.
+- When a cycle is detected, they all become 'cycle roots'.
+  Such a cyclic context has a set of roots, rather than one.
+  A cyclic context will claim all the
+
+Algorithm:
+- Find roots and multicontained nodes.
+- Start a context at each of them.
+- For each context (currently each is a singleton),
+  build a tree, contentward.
+  Whenever a multicontained node is encountered, include it,
+  but do not include its content.
+- If any node is not covered by those,
+  mark it 'Cyclic'. (Note that this might include nodes
+  that are not themselves parts of cycles. I don't care.
+  Cycles are bad and should not happen;
+  I just want the user to be confronted with them.)
+* containerward, forking contexts at multicontent
+There will be only two rootlike kinds of nodes: True roots and cycles.
+
+To grow each node into a containerward context would take forever, so we need to parallelize. The algorithm I'm thinking of is this:
+
+Define a "context" type, which is:
+- a 'head' ID
+- a 'visited' set of IDs.
+
+Pick a batch of 'origin' nodes (64, say).
+For each origin, start a context, with the origin as 'head'.
+
+Now loop:
+- For each context, look at its head.
+- If the head is already in some other context,
+
+- If the head is a root, the context is done being computed.
+  Keep it somewhere.
+- Otherwise, copy the head to the visited set,
+  and for each of its containers, start a new 'context'
+  with that container as 'head' and the same visited set
+  as in the original context. (A small optimization:
+  we really only need to start n-1 new containers,
+  because we can keep the first one, just changing its head.)
+
+for each container of the unprocessed node,
+  start a new context.
+
+If it's not, visit its containers. If it has only one,
