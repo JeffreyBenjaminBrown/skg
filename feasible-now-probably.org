@@ -9,8 +9,8 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
-* whitespace treatment in bodies
-** DONE when importing from org-roam
+* DONE whitespace treatment in bodies
+** when importing from org-roam
    Find the line in the body with the least leading whitespace.
    Subtract that much whitespace from every line of the body.
    If the result would have anything confusible with an org-bullet,
@@ -45,7 +45,7 @@ If anything blocks your progress that needs my attention, ping me.
      * false headline!
      * another!
    ```
-** TODO no body-shifting in skg views
+** no body-shifting in skg views
    Changing the indentation of headlines, even recursively,
    should not affect the indentation of their bodies.
    This is not the default org behavior -- by default,

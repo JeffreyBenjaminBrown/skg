@@ -172,7 +172,7 @@ moves point to focused headline, and removes focus marker."
     (let ((inhibit-read-only t))
       (erase-buffer)
       (insert content)
-      (org-mode)
+      (skg--org-mode-with-options)
       (set-buffer-modified-p nil)
       (goto-char (point-min)))
     (display-buffer buffer-name)

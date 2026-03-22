@@ -17,6 +17,7 @@
 ;;;   *** e
 
 (require 'org)
+(require 'skg-buffer)
 
 (defun skg-view-org-ancestry ()
   "Create a new buffer showing only the ancestry of the headline at point.
@@ -44,7 +45,7 @@ from the root down to the current position."
            (buf (generate-new-buffer
                  (format "*Ancestry: %s*" current-heading))))
       (with-current-buffer buf
-        (org-mode)
+        (skg--org-mode-with-options)
         (dolist (item ancestry)
           (insert (make-string (car item) ?*)
                   " "

@@ -14,6 +14,7 @@
 ;; It re-reads the same text a few times.
 
 (require 'cl-lib)
+(require 'skg-buffer)
 (require 'skg-metadata)
 (require 'skg-request-single-root-content-view)
 (require 'skg-sexpr-search)
@@ -405,7 +406,7 @@ without writing to disk."
     (erase-buffer)
     (insert (skg--format-id-stack-as-org))
     (goto-char (point-min))
-    (org-mode)
+    (skg--org-mode-with-options)
     (skg-id-stack-mode 1)
     (set-buffer-modified-p nil)
     (message "Edit ID stack. C-x C-s to save changes.") ))

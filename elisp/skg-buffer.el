@@ -10,6 +10,11 @@
 (require 'skg-user-facing-aliases)
 
 
+(defun skg--org-mode-with-options ()
+  "Activate org-mode with skg-appropriate buffer-local settings."
+  (org-mode)
+  (setq-local org-adapt-indentation nil))
+
 (define-minor-mode skg-content-view-mode
   "Minor mode for skg content view buffers.
 Rebinds C-x C-s to save via the skg server,
@@ -79,7 +84,7 @@ otherwise generate a new UUID."
       (let ((inhibit-read-only t))
         (erase-buffer)
         (insert org-text)
-        (org-mode)
+        (skg--org-mode-with-options)
         (heralds-minor-mode))
       (skg-content-view-mode 1)
       (setq skg-view-uri uri)

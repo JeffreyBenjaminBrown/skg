@@ -8,6 +8,7 @@
 ;;; User-facing functions:
 ;;;   skg-edit-metadata
 
+(require 'skg-buffer)
 (require 'skg-metadata)
 (require 'skg-sexpr-org-bijection)
 (require 'skg-truenode-defaults)
@@ -94,7 +95,7 @@ SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER."
     (switch-to-buffer edit-buffer)
     (insert skg-edit--help-text)
     (insert org-text)
-    (org-mode)
+    (skg--org-mode-with-options)
     (org-fold-show-all)
     (goto-char (point-min))
     (progn ;; skip past help text and 'skg', land at viewnode kind
