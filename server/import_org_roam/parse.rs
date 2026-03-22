@@ -216,7 +216,38 @@ fn collect_body (
   while body_lines . last() . map_or (false, |l| l . trim() . is_empty() ) {
     body_lines . pop(); }
   if body_lines . is_empty() { None }
-  else { Some (body_lines . join ("\n") ) }}
+  else { Some ( normalize_body_whitespace (&body_lines) ) }}
+
+/// Strip common leading whitespace from body lines,
+/// then left-pad with 2 spaces if any result line
+/// would be confusible with an org headline.
+fn normalize_body_whitespace (
+  body_lines : &[&str],
+) -> String {
+  let min_indent : usize =
+    body_lines . iter ()
+      . filter ( |l| ! l . trim () . is_empty () )
+      . map ( |l| l . chars ()
+               . take_while (|c| c . is_whitespace ())
+               . count () )
+      . min () . unwrap_or (0);
+  let stripped : Vec<&str> =
+    body_lines . iter ()
+      . map ( |l| {
+        if l . len () >= min_indent { &l[min_indent ..] }
+        else { "" }} ) // blank or shorter-than-indent lines
+      . collect ();
+  let has_false_headline : bool =
+    stripped . iter ()
+      . any ( |l| is_headline (l) );
+  if has_false_headline { // left-pad with 2 spaces
+    stripped . iter ()
+      . map ( |l| {
+        if l . is_empty () { l . to_string () }
+        else { format! ("  {}", l) }} )
+      . collect::<Vec<String>> ()
+      . join ("\n") }
+  else { stripped . join ("\n") }}
 
 //
 // Properties parsing

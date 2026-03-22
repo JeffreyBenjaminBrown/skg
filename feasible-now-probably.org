@@ -9,6 +9,48 @@ so that ranges in the git commit history do not needlessly mix topics.
 As you work, please accumulate a file, 'claude-science.org',
 where you accumulate questions, hypotheses, discoveries and methods.
 If anything blocks your progress that needs my attention, ping me.
+* whitespace treatment in bodies
+** DONE when importing from org-roam
+   Find the line in the body with the least leading whitespace.
+   Subtract that much whitespace from every line of the body.
+   If the result would have anything confusible with an org-bullet,
+   left-pad every line of the body with 2 spaces.
+
+   So for instance, this:
+   ```
+   * title
+     body
+       body
+     body
+   ```
+
+   would import as this:
+   ```
+   * title
+   body
+     body
+   body
+   ```
+
+   whereas this:
+   ```
+   * title
+        * false headline!
+        * another!
+   ```
+
+   would import as
+   ```
+   * title
+     * false headline!
+     * another!
+   ```
+** TODO no body-shifting in skg views
+   Changing the indentation of headlines, even recursively,
+   should not affect the indentation of their bodies.
+   This is not the default org behavior -- by default,
+   moving a headline left moves all bodies under it left by the same amount,
+   to the extent possible, and moving it right does similar (always possible).
 * DONE bug : things disappear from the index
 ** the bug
   If I search for a title and then manipulate it --

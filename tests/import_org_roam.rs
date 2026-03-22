@@ -94,10 +94,10 @@ fn test_nested_id_headlines () {
   // Child nodes
   assert_eq! (nodes[1] . title, "child one");
   assert_eq! (nodes[1] . body . as_deref(),
-              Some ("  Child one body.") );
+              Some ("Child one body.") );
   assert_eq! (nodes[2] . title, "child two");
   assert_eq! (nodes[2] . body . as_deref(),
-              Some ("  Child two body.") ); }
+              Some ("Child two body.") ); }
 
 #[test]
 fn test_non_id_headline_becomes_node () {
@@ -126,14 +126,14 @@ fn test_non_id_headline_becomes_node () {
   // Headline node (generated ID)
   assert_eq! (nodes[1] . title, "just a regular headline");
   assert_eq! (nodes[1] . body . as_deref(),
-              Some ("  Some text under it.") );
+              Some ("Some text under it.") );
   let hl_contained : &[ID] =
     &nodes[1] . contains;
   assert_eq! (hl_contained . len(), 1);
   // Sub-headline node
   assert_eq! (nodes[2] . title, "sub-headline");
   assert_eq! (nodes[2] . body . as_deref(),
-              Some ("   More text.") ); }
+              Some ("More text.") ); }
 
 #[test]
 fn test_id_headline_under_non_id_headline () {
@@ -171,7 +171,7 @@ fn test_id_headline_under_non_id_headline () {
   assert_eq! (nodes[2] . title, "actual child");
   assert_eq! (nodes[2] . pid, ID::new ("deep-child"));
   assert_eq! (nodes[2] . body . as_deref(),
-              Some ("   Deep child body.") ); }
+              Some ("Deep child body.") ); }
 
 #[test]
 fn test_roam_aliases () {
@@ -321,7 +321,7 @@ fn test_power_org_structure () {
   // "etymology" headline
   assert_eq! (nodes[5] . title, "etymology : sociology, physics");
   assert_eq! (nodes[5] . body . as_deref(),
-              Some ("  Power implies choice; energy, only possibility.") );
+              Some ("Power implies choice; energy, only possibility.") );
   assert! (nodes[5] . contains . is_empty()); }
 
 #[test]
@@ -389,3 +389,69 @@ fn test_had_id_before_import () {
               vec![FileProperty::Had_ID_Before_Import]);
   // Child without :ID: → empty misc.
   assert! (nodes[2] . misc . is_empty()); }
+
+#[test]
+fn test_body_whitespace_normalization () {
+  // Common indent (2 spaces) is stripped.
+  let content : &str = "\
+:PROPERTIES:
+:ID:       ws-test
+:END:
+#+title: Whitespace Test
+* child
+  :PROPERTIES:
+  :ID:       ws-child
+  :END:
+  line one
+    line two
+  line three
+";
+  let f : tempfile::NamedTempFile =
+    write_temp_org (content, "ws-norm");
+  let nodes : Vec<SkgNode> =
+    parse_org_file (f . path());
+  assert_eq! (nodes . len(), 2);
+  assert_eq! (nodes[1] . body . as_deref(),
+              Some ("line one\n  line two\nline three") ); }
+
+#[test]
+fn test_body_whitespace_false_headline_gets_padded () {
+  // After stripping 8 spaces of common indent,
+  // the body lines start with "* ", which looks like an org bullet.
+  // So every line gets left-padded with 2 spaces.
+  let content : &str = "\
+:PROPERTIES:
+:ID:       fh-test
+:END:
+#+title: False Headline Test
+        * looks like a headline
+        * another one
+";
+  let f : tempfile::NamedTempFile =
+    write_temp_org (content, "false-hl");
+  let nodes : Vec<SkgNode> =
+    parse_org_file (f . path());
+  assert_eq! (nodes . len(), 1);
+  assert_eq! (nodes[0] . body . as_deref(),
+              Some ("  * looks like a headline\n  * another one") ); }
+
+#[test]
+fn test_body_whitespace_mixed_indent_with_false_headline () {
+  // Common indent is 4 spaces. After stripping,
+  // one line starts with "* ", triggering 2-space padding on all lines.
+  let content : &str = "\
+:PROPERTIES:
+:ID:       mix-test
+:END:
+#+title: Mixed
+    some text
+      indented
+    * sneaky bullet
+";
+  let f : tempfile::NamedTempFile =
+    write_temp_org (content, "mixed-fh");
+  let nodes : Vec<SkgNode> =
+    parse_org_file (f . path());
+  assert_eq! (nodes . len(), 1);
+  assert_eq! (nodes[0] . body . as_deref(),
+              Some ("  some text\n    indented\n  * sneaky bullet") ); }
