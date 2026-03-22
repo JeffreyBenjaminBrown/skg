@@ -1,0 +1,6 @@
+title: b
+pid: b
+contains:
+  - c
+  - d
+  - e

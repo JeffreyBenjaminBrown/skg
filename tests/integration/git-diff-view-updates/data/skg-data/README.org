@@ -1,0 +1,22 @@
+* Fixtures for git-diff-view-updates integration test
+
+** Graph
+  a ──contains──▶ b
+  b ──contains──▶ c, d, e
+  f  (island, no containment)
+
+** What the test does
+1. Opens two views: one from =a=, one from =b=.
+2. In the view from =b=:
+   - Deletes =c= from the graph (editRequest delete).
+   - Removes =d= from =b='s children (but =d= stays in the graph).
+   - Renames =e= to "e, edited".
+   - Appends =f= as a new child of =b=, with =d= under =f=.
+3. Saves. Verifies =c= gone, structure correct.
+4. Toggles git diff mode ON.
+   Verifies diff markers (removed, removed-here, new-here, textChanged)
+   appear in both views.
+5. Commits =e.skg= to git. Re-saves.
+   Verifies textChanged gone (title change is now in HEAD).
+6. Toggles git diff mode OFF.
+   Verifies both views are clean (no diff markers or phantom nodes).
