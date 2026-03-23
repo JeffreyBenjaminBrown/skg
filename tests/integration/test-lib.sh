@@ -85,9 +85,25 @@ cleanup() {
     fi
   fi
 
-  # Do NOT manually delete test databases here - it causes TypeDB to crash
-  # when it tries to checkpoint deleted databases. The delete_on_quit flag
-  # in the test config handles cleanup during graceful shutdown (via SIGINT).
+  # Fallback: if the server's delete_on_quit failed (e.g. force-killed
+  # before the delete finished), clean up via TypeDB's HTTP API.
+  if [ -n "$DB_NAME" ]; then
+    sleep 0.2  # let TypeDB release locks from the dead server
+    local token
+    token=$(curl -s -X POST http://127.0.0.1:8000/v1/signin \
+      -H "Content-Type: application/json" \
+      -d '{"username":"admin","password":"password"}' 2>/dev/null \
+      | grep -oP '"token"\s*:\s*"\K[^"]+' 2>/dev/null) || true
+    if [ -n "$token" ]; then
+      local http_status
+      http_status=$(curl -s -o /dev/null -w "%{http_code}" \
+        -X DELETE "http://127.0.0.1:8000/v1/databases/$DB_NAME" \
+        -H "Authorization: Bearer $token" 2>/dev/null) || true
+      if [ "$http_status" = "200" ]; then
+        echo "Fallback: deleted leaked database $DB_NAME via HTTP API"
+      fi
+    fi
+  fi
 }
 
 # Function to find available port by trying random ports in range

@@ -83,6 +83,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         "initialize_dbs") . entered ();
       initialize_dbs (&config) };
 
+  *SHUTDOWN_DRIVER . lock () . unwrap () =
+    Some ( Arc::clone (&typedb_driver) );
+
   compute_context_rankings (
     &tantivy_index, had_id_set, all_node_ids,
     link_targets, map_to_content, map_to_containers );
@@ -146,7 +149,13 @@ fn busysignal_accept_loop (
 
 /// Installed BEFORE initialize_dbs,
 /// so that a kill during init still cleans up the database.
-/// Uses its own TypeDB connection (the main driver doesn't exist yet).
+/// During init the shared driver slot (SHUTDOWN_DRIVER) is empty,
+/// so the handler opens its own (slow) connection. After init,
+/// main() populates the slot, making the delete near-instant
+/// and avoiding the force-kill race in test cleanup.
+static SHUTDOWN_DRIVER : std::sync::Mutex<Option<Arc<TypeDBDriver>>> =
+  std::sync::Mutex::new (None);
+
 fn install_shutdown_signal_handler (
   config : &SkgConfig,
 ) {
@@ -158,7 +167,9 @@ fn install_shutdown_signal_handler (
       tracing::info! (
         db_name = %db_name_for_signal,
         "Deleting database before shutdown" );
-      let driver : TypeDBDriver = connect_to_typedb ();
+      let driver : Arc<TypeDBDriver> =
+        SHUTDOWN_DRIVER . lock () . unwrap () . clone ()
+        . unwrap_or_else ( || Arc::new ( connect_to_typedb () ));
       futures::executor::block_on ( async {
         if let Err (e) =
           delete_database (&driver, &db_name_for_signal)
