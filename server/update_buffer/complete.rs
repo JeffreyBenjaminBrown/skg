@@ -28,13 +28,15 @@ pub async fn complete_viewtree (
   errors             : &mut Vec<String>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   deleted_by_this_save_pids       : &HashSet<ID>,
+  is_saved_view                   : bool,
 ) -> Result<(), Box<dyn Error>> {
   let root_treeid : NodeId = forest . root () . id ();
   complete_preorder_recursive (
     forest, root_treeid,
     map, defmap, source_diffs, config, driver,
     deleted_since_head_pid_src_map,
-    deleted_by_this_save_pids ) . await ?;
+    deleted_by_this_save_pids,
+    is_saved_view ) . await ?;
   complete_postorder_recursive (
     forest, root_treeid,
     map, defmap, source_diffs, config, driver,
@@ -51,12 +53,14 @@ fn complete_preorder_recursive<'a> (
   driver             : &'a TypeDBDriver,
   deleted_since_head_pid_src_map : &'a HashMap<ID, SourceName>,
   deleted_by_this_save_pids      : &'a HashSet<ID>,
+  is_saved_view                   : bool,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
   // See the 'MANUAL RECURSION' comment at the top of this file.
   Box::pin ( async move {
     complete_preorder_with_limited_recursion (
       tree, treeid, map, defmap, source_diffs, config, driver,
-      deleted_since_head_pid_src_map, deleted_by_this_save_pids
+      deleted_since_head_pid_src_map, deleted_by_this_save_pids,
+      is_saved_view
     ) . await ?;
     let child_treeids : Vec<NodeId> =
       tree . get (treeid) . unwrap ()
@@ -65,7 +69,8 @@ fn complete_preorder_recursive<'a> (
       complete_preorder_recursive (
         tree, child_treeid,
         map, defmap, source_diffs, config, driver,
-        deleted_since_head_pid_src_map, deleted_by_this_save_pids
+        deleted_since_head_pid_src_map, deleted_by_this_save_pids,
+        is_saved_view
       ) . await ?; }
     Ok(( )) }) }
 
@@ -110,6 +115,7 @@ async fn complete_preorder_with_limited_recursion (
   driver             : &TypeDBDriver,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   deleted_by_this_save_pids      : &HashSet<ID>,
+  is_saved_view                   : bool,
 ) -> Result<(), Box<dyn Error>> {
   let kind : ViewNodeKind =
     tree . get (treeid) . unwrap () . value () . kind . clone ();
@@ -130,7 +136,8 @@ async fn complete_preorder_with_limited_recursion (
     super::complete_parent_first::truenode::
     complete_truenode_preorder (
       treeid, tree, map, defmap, source_diffs, config,
-      deleted_since_head_pid_src_map, deleted_by_this_save_pids ) ?;
+      deleted_since_head_pid_src_map, deleted_by_this_save_pids,
+      is_saved_view ) ?;
   } else if matches!( kind,
       ViewNodeKind::Scaff (Scaffold::SubscribeeCol) ) {
         super::complete_parent_first::subscribee_col::

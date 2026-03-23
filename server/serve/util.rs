@@ -52,7 +52,11 @@ pub fn send_response_with_length_prefix (
   stream   : &mut TcpStream,
   response : &str,
 ) { let payload : &[u8] = response . as_bytes ();
-    let preview_len : usize = payload . len () . min (200);
+    let preview_len : usize = { // Find a char-safe boundary near 200 bytes.
+      let target : usize = payload . len () . min (200);
+      let mut i : usize = target;
+      while i > 0 && !response . is_char_boundary (i) { i -= 1; }
+      i };
     let preview : &str = &response [..preview_len];
     tracing::debug!("Sending response ({} bytes): {}{}",
              payload . len (), preview,

@@ -1,0 +1,105 @@
+* buffer updates for git diff view
+** problems
+*** Saving buffer B should rerender B's git diff information.
+Saving seems to treat preexisting git diff view data as true.
+It might go stale -- e.g. the user could commit those changes.
+It should instead be recomputed on each save.
+*** Git diff info should vanish from all buffers when it is turned off.
+When git diff view is toggled off, all diff-specific nodes
+(phantoms and 'textChanged') should be removed from the buffer,
+as well as any metadata indicating changes (NewHere, New, etc.),
+should vanish.
+** architecture
+This updating should be part of the complete_viewtree process.
+complete_viewtree should discard and regenerate all diff-related info
+(phantom nodes and metadata) for all affected buffers
+(so the saved one plus any "collateral" ones).
+
+And toggling git diff mode should regenerate *every* buffer.
+* TODO Let's collaboratively plan this.
+First, please research the problem and describe our options at a high level.
+What signal flow and structures are already in place?
+What kind of approach would minimally change the codebase?
+What's tricky? What needs more detailed specification? Etc.
+
+Write your analysis in .org format (even if the file extension doesn't match).
+Wrap function names in single quotes rather than equals signs -- that way I can use M-. to go to the function's definition. Similarly, write files as org-mode links [[../../path/to/whatever.md][like this]], so I can follow them fast.
+Wherever (if at all) the plan includes example org-text passages,
+please insert two spaces to the left of every line of those passages.
+Otherwise Emacs, in which I will read the plan, gets very confused.
+* DONE a failing integration test
+The test should have a simple graph:
+```
+  * a
+  ** b
+  *** c
+  *** d
+  *** e
+  * f
+```
+('f' is an island.)
+
+We open two views onto the graph, one from a and one from b.
+In the view from 'b' we:
+- delete 'c' from the graph (with an editRequest)
+- delete 'd' from b's children but leave it in the graph
+- change the title of 'e' to "e, edited"
+- append 'f' as a new child after 'e'
+- make 'd' a child of 'f'
+
+So the result is:
+```
+  * b
+  ** (editRequest: delete) c
+  ** e, edited
+  ** f
+  *** d
+```
+
+Now we save. 'c' should vanish from the buffer; the rest should be unchanged.
+
+Now we turn on the git diff view. We should see this in the view from b:
+```
+  * b
+  ** (diff: removed) c
+  ** (diff: removedHere) d
+  ** e, edited
+  *** (textChanged)
+  ** (diff: newHere) f
+  *** (diff: newHere) d
+```
+
+and this in the view from a:
+```
+  * a
+  ** b
+  *** (diff: removed) c
+  *** (diff: removedHere) d
+  *** e, edited
+  **** (textChanged)
+  *** (indef, diff: newHere) f
+  **** (diff: newHere) d
+  * f
+  ** (indef, diff: newHere) d
+```
+
+Next we commit the change to the title of e.
+In both buffers, the 'textChanged' should vanish.
+
+Now we turn off git diff view. The two buffers should now look like:
+```
+  * b
+  ** e, edited
+  ** f
+  *** d
+```
+
+```
+  * a
+  ** b
+  *** e, edited
+  *** f
+  **** d
+  * f
+  ** (indef) d
+```

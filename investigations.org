@@ -1,0 +1,299 @@
+* Investigation: git diff view collateral bugs
+
+** Method
+
+Added tracing to [[./server/update_buffer.rs][update_buffer.rs]]
+and [[./server/update_buffer/complete_parent_first/truenode.rs][truenode.rs]]
+at the collateral processing loop and the preorder completion pass.
+Ran the integration test at
+[[./tests/integration/git-diff-view-updates][git-diff-view-updates]]
+and examined the server log after each run.
+
+** Finding 1: phase-5 save generates zero collateral updates
+
+The test performs two saves:
+1. Phase 3: edits view-b (delete c, rename e, add f→d), saves.
+2. Phase 5: toggles diff mode ON, Emacs saves view-b (unchanged).
+
+The phase-3 save produces save instructions (real graph mutations)
+and finds 1 collateral view (view-a). It processes view-a correctly,
+but =source_diffs = None= (diff mode not yet on).
+
+The phase-5 save (post-toggle) produces *zero* save instructions.
+The buffer matches disk exactly (it was just re-rendered by phase 3),
+so 'viewnode_forest_to_nonmerge_save_instructions' generates nothing.
+The server log confirms: =Writing 0 instruction(s) to disk=.
+With 0 save instructions, 'find_collateral_view_uris' finds no
+changed PIDs, so no collateral views are processed.
+
+*Root cause of bug 1*: the save-after-toggle pattern cannot
+propagate diff changes to collateral views because the buffer
+hasn't changed.
+
+** TODO Finding 2: collateral titles not updated for definitive nodes
+
+During the phase-3 collateral processing of view-a, the SkgNodeMap
+seeded from the pool correctly has =e= with title ="e, edited"=.
+However, the rendered collateral text shows =e= (old title).
+
+*** The nodes are all definitive
+
+View-a was opened as an initial content view from node =a=.
+In that view, =a= is the root (definitive), =b= is a definitive
+content child, and =c=, =d=, =e= are definitive children of =b=.
+
+When the collateral forest is re-rendered, 'complete_truenode_preorder'
+runs the FULL completion path (not 'clobberIndefinitiveViewnode')
+for all these nodes. Tracing confirmed: all 5 nodes in the
+collateral view (a, b, e, f, d) log "is definitive, full completion".
+
+*** The full completion path never updates a definitive node's title
+
+'complete_truenode_preorder' reads the SkgNode from map/disk
+(line 125-126 of [[./server/update_buffer/complete_parent_first/truenode.rs][truenode.rs]])
+and uses =skgnode.contains= for content reconciliation. But it does
+NOT write the SkgNode's title back to the TrueNode in the tree.
+
+Only 'clobberIndefinitiveViewnode' updates titles, and it only runs
+for indefinitive nodes.
+
+For the *saved* view this is correct: the user's in-buffer edits
+ARE the title, so they must not be overwritten. But for a
+*collateral* view, the user hasn't edited the tree — the title
+in the forest is stale from when the view was first opened.
+
+*** This is a pre-existing bug, not caused by the diff feature.
+
+It affects any collateral view where a node's title was changed
+by the saved view. The title in the collateral forest stays stale
+until the user manually re-opens the view.
+
+*** Possible fix
+
+'complete_truenode_preorder' could update the title for definitive
+nodes in collateral views. This requires knowing whether the current
+'rerender_view' call is for the saved view or a collateral view.
+One approach: pass a =is_collateral : bool= flag through the
+completion pipeline. When true, overwrite the title from disk.
+When false (saved view), preserve the user's in-buffer title.
+
+** Finding 3: the re-render-all-views approach would fix bug 1
+
+The save-after-toggle pattern fails because an unchanged buffer
+produces no save instructions, so no collateral is found.
+A dedicated re-render-all-views request (Option A from the plan)
+would bypass the save pipeline entirely and call 'rerender_view'
+on every open view, regardless of save instructions.
+
+** Summary
+
+| Issue | Root cause | Fix |
+|-------+------------+-----|
+| Collateral views lack diff markers after toggle | Phase-5 save has 0 instructions → 0 collateral found | Re-render-all-views request |
+| Collateral title not updated (=e= vs "e, edited") | 'complete_truenode_preorder' never overwrites definitive titles | Update titles for collateral views |
+| Views not cleaned when diff toggled off | Same as bug 1 (save-based toggle) | Re-render-all-views request |
+
+* Jeff can't visit a node.
+
+** Symptom
+
+Visiting a node (e.g. from a search result or indefinitive child)
+shows "Visiting node: UUID" but the view never appears. No freeze,
+no error. Emacs remains responsive.
+
+** hypotheses
+*** Hypothesis 1: regression from my changes
+
+My changes touched: protocol.rs (new request type), serve.rs
+(new dispatch), update_buffer.rs (is_saved_view param, pub
+rerender_view, remove_diff_only_scaffolds), complete.rs and
+truenode.rs (is_saved_view threading). None of these are in the
+content view initial render path (to_org/render/content_view.rs).
+
+The visit path is: skg-request-single-root-content-view-from-id
+→ server handle_single_root_view_request → single_root_view
+→ render_initial_forest_bfs. None of my code is on this path.
+
+So it might not be a regression from my code changes at all.
+Unless the Emacs-side LP state machine is in a bad state.
+
+*** Hypothesis 2: LP state machine stuck
+
+skg-request-rerender-all-views calls skg-lp-reset inside the
+git-diff-mode handler callback. If the LP state or pending count
+gets stuck, subsequent handlers might not fire.
+
+** plan
+*** DONE reproduce first
+
+1. visit-link integration test: PASS (visiting works normally)
+2. open view → toggle diff → visit node: PASS (repro-visit.el)
+   LP state after diff toggle is clean: pending=0, bytes-left=nil,
+   buf-len=0, handler-map=nil. Visit request succeeds.
+3. Next: try the switch-to-view path. If the visited node is
+   already a root of an open view, the server sends
+   ((switch-to-view "URI")) instead of a new view.
+   If skg-find-buffer-by-uri can't find that buffer, the
+   handler silently does nothing (just logs a warning).
+*** DONE try switch-to-view path — reproduced!
+
+Repro-visit2.el: open view-a, open view-b, then visit node a
+(which is already open as a root). Phase 3 fails: the handler
+fires (pending=0, handler-map=nil after) but current buffer
+stays at *skg: b*. No switch happens.
+
+This happens WITHOUT diff toggle — the bug is in the
+switch-to-view code path, not in my changes.
+
+*** ONGOING diagnose the switch-to-view path
+
+Server sends ((switch-to-view "URI")) where URI is the
+content_view_uri_for_root_id result (the existing view URI).
+Emacs handler (skg-handle-content-view-sexp) does:
+  (let ((buf (skg-find-buffer-by-uri switch-uri)))
+    (switch-to-buffer buf))
+
+skg-find-buffer-by-uri searches all buffers for one whose
+skg-view-uri matches. But 'switch-to-buffer' in --batch mode
+might not work the same as in interactive Emacs.
+
+Actually — more likely: the response payload includes the
+("response-type" "content-view") tag, which the dispatch code
+parses. The handler sees the full payload including the tag.
+The handler then does (read payload) and looks for
+(assoc 'switch-to-view response). But if the sexp reader
+parses it differently...
+
+Need to add logging to the handler to see what it receives.
+
+*** DONE add debug logging to handler
+
+Repro-visit2.el output with DEBUG logging shows:
+
+: DEBUG content-view handler: switch-uri=dcbf0c56... response=((response-type content-view) (switch-to-view dcbf0c56...))
+: DEBUG switch-to-view: uri=dcbf0c56... buf=#<buffer *skg: a*> current=#<buffer *skg: b*>
+
+The handler fires, finds the buffer, calls (switch-to-buffer buf).
+But the current buffer doesn't change.
+
+** Root cause: switch-to-buffer in process filter
+
+In Emacs, process filter functions run asynchronously. Calling
+=switch-to-buffer= inside a process filter does not reliably
+change the displayed buffer — Emacs restores the original buffer
+context after the filter returns.
+
+In interactive Emacs this *sometimes* works (it depends on timing
+and whether Emacs has a chance to redisplay), but it's unreliable.
+
+The initial content view doesn't have this problem because
+=skg-open-org-buffer-from-text= creates a *new* buffer
+(=get-buffer-create=), and the buffer appears even if
+=switch-to-buffer= doesn't fully take effect in the filter.
+
+The fix is to use =pop-to-buffer= or =display-buffer= instead
+of =switch-to-buffer= in the switch-to-view path.
+
+** Is this a pre-existing bug or a regression?
+
+This is NOT caused by my changes. The switch-to-view code in
+skg-handle-content-view-sexp has used =switch-to-buffer= since
+before my changes. My changes touched only the server-side
+(protocol, handler, update_buffer) and the diff-mode Emacs code
+— NOT skg-request-single-root-content-view.el.
+
+The user may not have hit this path before if they never tried
+to visit a node that was already open as a root in another view.
+
+** Confirmed reproduction (batch mode only so far)
+
+=repro-visit2.el= reproduces scenario A: open view-a, open view-b,
+visit node a again → switch-to-view fires, finds buffer, calls
+switch-to-buffer, but current buffer doesn't change.
+
+In batch mode, =switch-to-buffer= from a process filter doesn't
+take effect. In interactive mode it usually does. So this repro
+may not match the user's actual problem.
+
+However, the user hasn't confirmed which case they're in. Two
+scenarios:
+
+*Scenario A*: The node is already a root in an open content view.
+The server sends =switch-to-view=. Emacs calls =switch-to-buffer=
+from the process filter. In batch mode this fails silently. In
+interactive Emacs it should work but is fragile.
+
+*Scenario B*: The server never responds. Possible if
+=render_initial_forest_bfs= or =set_graphnodestats_in_forest=
+hangs (TypeDB query issue, or the node references something
+broken). The LP handler would never fire, and pending-count
+would stay at 1, but Emacs wouldn't freeze (non-blocking I/O).
+
+** Root cause found: UTF-8 panic in send_response_with_length_prefix
+
+=server/serve/util.rs:56=: the debug preview slices the response
+string at byte index 200, which lands inside a multi-byte UTF-8
+character (=⌂=, the sourceHerald icon, 3 bytes at positions
+198..201). Rust panics on non-char-boundary string slicing.
+
+The thread crashes, closing the TCP connection without sending
+any response. Emacs sees the connection close but receives no
+data; the LP handler never fires.
+
+This is NOT caused by the git-diff-view changes. It's a pre-
+existing bug in =send_response_with_length_prefix= that only
+manifests when a multi-byte character falls near byte 200 in
+the response. The =⌂= comes from =sourceHerald= rendering in
+viewnode stats.
+
+*** Why only guitar?
+
+Guitar's response has =sourceHerald ⌂:public= at exactly the
+right position for the =⌂= to straddle byte 200. Other nodes
+either don't have a sourceHerald, or the herald appears at a
+different byte offset.
+
+*** Fix
+
+Replace the byte-index slice with a char-boundary-safe slice.
+
+** Audit of all text slicing on client-server path
+
+*** Rust: string slicing with byte indices
+
+| Site | Pattern | Safe? | Why |
+|------+---------+-------+-----|
+| serve/util.rs:60 | =&response[..preview_len]= | FIXED | Was the bug. Now walks back to char boundary. |
+| serve/util.rs:23 | =&sexp_payload[1..]= | Safe | Input is =Sexp::to_string()= output, always starts with ASCII =(=. |
+| rerender_all_views.rs:153 | =&sexp_payload[1..]= | Safe | Same — =Sexp::to_string()= output starts with =(=. |
+| uninterpreted.rs:165 | =&remainder[..sexp_end]= | Safe | =sexp_end= from =find_sexp_end= which uses =char_indices()=. |
+| uninterpreted.rs:181 | =remainder[sexp_end..]= | Safe | Same source. |
+| textlinks.rs:58 | =&text[5..text.len()-2]= | Safe | Only reached after =starts_with("[[id:")= and =ends_with("]]")= checks — all ASCII boundaries. |
+| textlinks.rs:61-62 | =&interior[0..idx]= / =&interior[idx+2..]= | Safe | =idx= from =.find("][")= which returns a char boundary; =][= is ASCII. |
+| viewnode.rs:256 | =&s[..pos]= / =&s[pos + '⤊'.len_utf8()..]= | Safe | =pos= from =.find('⤊')=; offset computed with =len_utf8()=. Correct. |
+| viewnode.rs:258 | =&s[..pos]= / =&s[pos + '↻'.len_utf8()..]= | Safe | Same pattern with =↻=. |
+| import_org_roam/parse.rs:237 | =&l[min_indent..]= | UNSAFE | =min_indent= from =.count()= of =.chars().take_while(is_whitespace)=. If whitespace is all ASCII, safe. But multi-byte whitespace (U+3000 ideographic space, etc.) would make =count()= differ from byte offset. |
+| import_org_roam/parse.rs:354 | =line[stars..]= | Safe | =stars= counts ='*'= chars, which are ASCII (1 byte each). Byte offset = char count. |
+| test_utils.rs:483 | =line[..hash_pos]= | Safe | =hash_pos= from =.find('#')=; =#= is ASCII; =.find= returns byte position. |
+
+*** Emacs: substring operations
+
+Emacs Lisp =substring= operates on character indices, not byte
+indices. Multi-byte characters count as 1. The LP code operates
+on unibyte strings (raw bytes), where =substring= is byte-safe
+because the LP machine treats content as opaque bytes until
+decoding. No issues found.
+
+*** One problem: import_org_roam/parse.rs:237
+
+=min_indent= is computed via =.chars().take_while(is_whitespace).count()=
+which counts *characters*, but =&l[min_indent..]= treats it as a
+*byte* index. If the file contains multi-byte whitespace (e.g.
+ideographic space U+3000, 3 bytes), the count and byte offset
+diverge, causing a panic.
+
+In practice, org-roam files use ASCII spaces/tabs for indentation,
+so this hasn't triggered. But it's technically unsafe.
+
+** AWAITS once it's figured out
+Why did bash/all-tests.sh not catch it?

@@ -11,11 +11,12 @@ use crate::git_ops::read_repo::skgnode_from_git_head;
 use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, Scaffold, DeletedNode,
+    ViewNode, ViewNodeKind, Scaffold, DeletedNode, IndefOrDef,
     mk_definitive_viewnode};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_skgnode::{
     pid_and_source_from_treenode,
+    write_at_truenode_in_tree,
     unique_scaffold_child,
     insert_scaffold_as_child};
 use crate::update_buffer::util::{
@@ -69,6 +70,7 @@ pub fn complete_truenode_preorder (
   config             : &SkgConfig,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   deleted_by_this_save_pids       : &HashSet<ID>,
+  is_saved_view                   : bool,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
     tree, node, |vn : &ViewNode| matches!( &vn . kind,
@@ -119,6 +121,16 @@ pub fn complete_truenode_preorder (
           body, } ); }
     ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     return Ok(( )); }
+  let skgnode : &SkgNode =
+    skgnode_from_map_or_disk( &pid, &source, map, config ) ?;
+  if ! is_saved_view {
+    let disk_title : String = skgnode . title . clone ();
+    let disk_body  : Option<String> = skgnode . body . clone ();
+    write_at_truenode_in_tree ( tree, node, |t| {
+      t . title = disk_title;
+      if let IndefOrDef::Definitive { body, .. } = &mut t . indef_or_def {
+        *body = disk_body; } }
+    ) ?; }
   let skgnode : &SkgNode =
     skgnode_from_map_or_disk( &pid, &source, map, config ) ?;
   let content_ids : Vec<ID> =

@@ -84,7 +84,8 @@ pub async fn update_views_after_save (
         typedb_driver,
         &mut errors,
         &deleted_since_head_pid_src_map,
-        &deleted_by_this_save_pids ) . await } ?;
+        &deleted_by_this_save_pids,
+        true ) . await } ?;
   let mut collateral_views : Vec<(ViewUri, String)> = Vec::new ();
   if let Ok (uri) = viewuri_from_request_result {
     merge_skgnodemap_into_pool (&skgnode_map, conn_state);
@@ -120,7 +121,8 @@ pub async fn update_views_after_save (
           &mut forest, &mut map,
           &source_diffs, config, typedb_driver,
           &mut errors, &deleted_since_head_pid_src_map,
-          &deleted_by_this_save_pids ) . await }
+          &deleted_by_this_save_pids,
+          false ) . await }
       { Ok (text) => {
           merge_skgnodemap_into_pool (&map, conn_state);
           conn_state . memory . update_view (&curi, forest);
@@ -184,7 +186,7 @@ fn merge_skgnodemap_into_pool (
 
 /// Strip stale diff data, re-complete the viewtree,
 /// set graph/view stats, and render to string.
-async fn rerender_view (
+pub async fn rerender_view (
   forest                         : &mut Tree<ViewNode>,
   map                            : &mut SkgNodeMap,
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
@@ -193,10 +195,12 @@ async fn rerender_view (
   errors                         : &mut Vec<String>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   deleted_by_this_save_pids      : &HashSet<ID>,
+  is_saved_view                  : bool,
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : std::time::Instant = std::time::Instant::now ();
   tracing::debug!("rerender_view: starting");
   remove_branches_that_git_marked_removed (forest) ?;
+  remove_diff_only_scaffolds (forest) ?;
   clear_diff_metadata (forest) ?;
   let mut defmap : DefinitiveMap = DefinitiveMap::new ();
   tracing::debug!("rerender_view: starting complete_viewtree");
@@ -204,7 +208,8 @@ async fn rerender_view (
     forest, map, &mut defmap,
     source_diffs, config, typedb_driver,
     errors, deleted_since_head_pid_src_map,
-    deleted_by_this_save_pids ) . await ?;
+    deleted_by_this_save_pids,
+    is_saved_view ) . await ?;
   tracing::debug!("rerender_view: complete_viewtree done ({:.3}s), starting graphnodestats",
             t_rerender . elapsed () . as_secs_f64 ());
   let ( container_to_contents, content_to_containers ) =
@@ -260,9 +265,33 @@ pub fn remove_branches_that_git_marked_removed (
       } else { Ok (true) }} )? ; // recurse into children
   Ok (( )) }
 
+/// Remove scaffolds that exist only to display diff information:
+/// TextChanged, IDCol, AliasCol.
+/// These are regenerated from scratch by 'maybe_prepend_diff_view_scaffolds'
+/// and their postorder completers, so stale ones must be stripped first.
+pub fn remove_diff_only_scaffolds (
+  forest : &mut Tree<ViewNode>
+) -> Result<(), Box<dyn Error>> {
+  let forest_root_id : NodeId =
+    forest . root() . id();
+  do_everywhere_in_tree_dfs_prunable (
+    forest,
+    forest_root_id,
+    &mut |mut node : NodeMut<ViewNode>| -> Result<bool, String> {
+      let is_diff_scaffold : bool =
+        matches! ( &node . value() . kind,
+          ViewNodeKind::Scaff (Scaffold::TextChanged) |
+          ViewNodeKind::Scaff (Scaffold::IDCol) |
+          ViewNodeKind::Scaff (Scaffold::AliasCol) );
+      if is_diff_scaffold {
+        node . detach();
+        Ok (false) // pruned — don't recurse into detached children
+      } else { Ok (true) } } ) ?;
+  Ok (( )) }
+
 /// Clear diff metadata from all TrueNodes in the forest.
-/// Scaffolds with diff fields (Alias, ID) are already removed
-/// by remove_diff_only_scaffolds before this runs.
+/// Diff-only scaffolds (TextChanged, IDCol, AliasCol) are
+/// removed by 'remove_diff_only_scaffolds' before this runs.
 pub fn clear_diff_metadata (
   forest : &mut Tree<ViewNode>
 ) -> Result<(), Box<dyn Error>> {
@@ -272,8 +301,7 @@ pub fn clear_diff_metadata (
     forest,
     forest_root_id,
     &mut |mut node : NodeMut<ViewNode>| -> Result<(), String>
-      { // IGNORES scaffolds, even though some scaffolds *can* have diff data. Since all such kinds are regenerated from scratch, they don't need processing here. See remove_regenerable_scaffolds.
-        if let ViewNodeKind::True (t)
+      { if let ViewNodeKind::True (t)
           = &mut node . value() . kind
           { t . diff = None; }
         Ok (( )) } ) ?;

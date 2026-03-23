@@ -18,6 +18,7 @@ use crate::org_to_text::viewnode_forest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::get_file_path::handle_get_file_path_request;
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
+use crate::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::title_matches::render_enriched_search_buffer::insert_ancestry_into_search_view;
@@ -184,6 +185,12 @@ fn handle_emacs (
                                          &typedb_driver,
                                          config,
                                          &mut tantivy_index ),
+          Ok (RequestType::RerenderAllViews) =>
+            handle_rerender_all_views_request (
+              &mut stream,
+              &typedb_driver,
+              config,
+              &mut conn_state ),
           Err (err) => {
             tracing::error!(error = %err, "Error determining request type");
             send_response_with_length_prefix (
