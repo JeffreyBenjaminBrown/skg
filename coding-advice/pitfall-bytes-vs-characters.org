@@ -22,11 +22,11 @@ the decoder knows where characters start and end.
 A "char boundary" is a byte position where a character begins.
 In the string ="hi⌂ok"=:
 
-| Byte index | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
-|------------+---+---+---+---+---+---+---|
-| Content | h | i | ⌂ | ⌂ | ⌂ | o | k |
-| | | | (byte 1) | (byte 2) | (byte 3) | | |
-| Char boundary? | yes | yes | yes | NO | NO | yes | yes |
+| Byte index     | 0   | 1   | 2        | 3        | 4        | 5   | 6   |
+|----------------+-----+-----+----------+----------+----------+-----+-----|
+| Content        | h   | i   | ⌂        | ⌂        | ⌂        | o   | k   |
+|                |     |     | (byte 1) | (byte 2) | (byte 3) |     |     |
+| Char boundary? | yes | yes | yes      | NO       | NO       | yes | yes |
 
 Byte indices 3 and 4 are NOT char boundaries -- they land in the
 middle of =⌂=.
@@ -47,7 +47,7 @@ cannot happen in Emacs Lisp.
 is what the LP receiver uses. But those are treated as opaque
 byte buffers, not as text with characters.)
 
-** What happened with guitar
+** What happened with the 'guitar' skgnode
 
 The server renders a content view as an org-mode string, wraps it
 in a sexp, and sends it over TCP. Before sending, there's a debug

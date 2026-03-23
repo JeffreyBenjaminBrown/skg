@@ -16,29 +16,18 @@
  # generated each time by run-servers.sh
 /bash/shutdown-servers.sh
 
-/call-trees
-/claude-tries-skg
 /data
-/devel-handy/temp.org
 /example-data
-/plans-done
-/rust-indent/
 /target
 /tests/results
-/tests/**/generated/
 /tests/results
-/tests/tantivy/generated_aliases/
 Cargo.lock
 TAGS
 __pycache__
-emacs-ugly-copy/
-git-diff-view/stale
-off-topic/
 temp-*
 temp/
 thoughts/
 tools/introspect/call-graph/db/
-tools/introspect/call-graph/main.org
 tools/introspect/call-graph/output/
 tools/introspect/code-map/code-map.org
 tools/introspect/code-map/output/
