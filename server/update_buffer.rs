@@ -197,6 +197,7 @@ async fn rerender_view (
   let t_rerender : std::time::Instant = std::time::Instant::now ();
   tracing::debug!("rerender_view: starting");
   remove_branches_that_git_marked_removed (forest) ?;
+  remove_diff_only_scaffolds (forest) ?;
   clear_diff_metadata (forest) ?;
   let mut defmap : DefinitiveMap = DefinitiveMap::new ();
   tracing::debug!("rerender_view: starting complete_viewtree");
@@ -260,9 +261,37 @@ pub fn remove_branches_that_git_marked_removed (
       } else { Ok (true) }} )? ; // recurse into children
   Ok (( )) }
 
+/// Remove scaffolds that exist only to display diff information:
+/// TextChanged and IDCol.
+/// These are regenerated from scratch by 'maybe_prepend_diff_view_scaffolds'
+/// and their postorder completers, so stale ones must be stripped first.
+/// AliasCol is NOT removed: it may have been requested by the user
+/// (not just injected by diff mode), and tracking which case applies
+/// is not worth the complexity. Phantom Alias children (injected by
+/// diff mode) are cleaned up by completeAliasCol during the postorder
+/// pass: its goal list won't include them, so they are detached.
+pub fn remove_diff_only_scaffolds (
+  forest : &mut Tree<ViewNode>
+) -> Result<(), Box<dyn Error>> {
+  let forest_root_id : NodeId =
+    forest . root() . id();
+  do_everywhere_in_tree_dfs_prunable (
+    forest,
+    forest_root_id,
+    &mut |mut node : NodeMut<ViewNode>| -> Result<bool, String> {
+      let is_diff_scaffold : bool =
+        matches! ( &node . value() . kind,
+          ViewNodeKind::Scaff (Scaffold::TextChanged) |
+          ViewNodeKind::Scaff (Scaffold::IDCol) );
+      if is_diff_scaffold {
+        node . detach();
+        Ok (false) // pruned — don't recurse into detached children
+      } else { Ok (true) } } ) ?;
+  Ok (( )) }
+
 /// Clear diff metadata from all TrueNodes in the forest.
-/// Scaffolds with diff fields (Alias, ID) are already removed
-/// by remove_diff_only_scaffolds before this runs.
+/// Diff-only scaffolds (TextChanged, IDCol) are
+/// removed by 'remove_diff_only_scaffolds' before this runs.
 pub fn clear_diff_metadata (
   forest : &mut Tree<ViewNode>
 ) -> Result<(), Box<dyn Error>> {
@@ -272,7 +301,9 @@ pub fn clear_diff_metadata (
     forest,
     forest_root_id,
     &mut |mut node : NodeMut<ViewNode>| -> Result<(), String>
-      { // IGNORES scaffolds, even though some scaffolds *can* have diff data. Since all such kinds are regenerated from scratch, they don't need processing here. See remove_regenerable_scaffolds.
+      { // Ignores scaffolds: some (Alias, ID) carry diff data,
+        // but they are regenerated from scratch by their postorder
+        // completers, so clearing them here is unnecessary.
         if let ViewNodeKind::True (t)
           = &mut node . value() . kind
           { t . diff = None; }
