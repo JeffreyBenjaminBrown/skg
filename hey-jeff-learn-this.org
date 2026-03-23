@@ -1,0 +1,138 @@
+* UTF-8, byte indices, and the guitar bug
+
+** The two systems: bytes vs characters
+
+A character like =a= is one byte (0x61). A character like =⌂=
+is three bytes (0xE2 0x8C 0x82). Both are one character.
+
+UTF-8 is a variable-width encoding: ASCII characters (U+0000 to
+U+007F) use 1 byte; others use 2, 3, or 4 bytes. The number of
+bytes is determined by the leading bits of the first byte:
+
+| First byte pattern | Bytes | Range |
+|--------------------+-------+-------|
+| 0xxxxxxx | 1 | ASCII |
+| 110xxxxx | 2 | Latin, Greek, Cyrillic, ... |
+| 1110xxxx | 3 | CJK, most symbols, ⌂, ⤊, ↻ |
+| 11110xxx | 4 | Emoji, rare scripts |
+
+Continuation bytes always start with =10xxxxxx=. This is how
+the decoder knows where characters start and end.
+
+A "char boundary" is a byte position where a character begins.
+In the string ="hi⌂ok"=:
+
+| Byte index | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
+|------------+---+---+---+---+---+---+---|
+| Content | h | i | ⌂ | ⌂ | ⌂ | o | k |
+| | | | (byte 1) | (byte 2) | (byte 3) | | |
+| Char boundary? | yes | yes | yes | NO | NO | yes | yes |
+
+Byte indices 3 and 4 are NOT char boundaries -- they land in the
+middle of =⌂=.
+
+** What Rust does (and what Emacs Lisp doesn't)
+
+Rust strings (=&str=, =String=) are UTF-8 byte sequences. When
+you write =&s[0..5]=, those are BYTE indices. If byte 5 is in
+the middle of a multi-byte character, Rust panics rather than
+produce an invalid string.
+
+Emacs Lisp is different: =substring= takes CHARACTER indices.
+=(substring "hi⌂ok" 0 3)= returns ="hi⌂"=, not a panic. Emacs
+handles the byte arithmetic internally. So this class of bug
+cannot happen in Emacs Lisp.
+
+(Emacs does have unibyte strings for raw byte manipulation, which
+is what the LP receiver uses. But those are treated as opaque
+byte buffers, not as text with characters.)
+
+** What happened with guitar
+
+The server renders a content view as an org-mode string, wraps it
+in a sexp, and sends it over TCP. Before sending, there's a debug
+log that previews the first 200 bytes:
+
+#+begin_src rust
+  let preview_len : usize = payload . len () . min (200);
+  let preview : &str = &response [..preview_len];
+  tracing::debug!("Sending response ({} bytes): {}", payload.len(), preview);
+#+end_src
+
+For the guitar node, the rendered org text contained
+=sourceHerald ⌂:public=. The =⌂= character (3 bytes) happened
+to sit at byte positions 198-200. Slicing at byte 200 landed
+inside the character:
+
+: bytes: ... 0xE2 0x8C | 0x82 ...
+:                       ^
+:                 byte 200 -- not a char boundary -- PANIC
+
+The thread panicked, which closed the TCP connection. The
+response was never sent. Emacs received zero bytes, saw the
+connection close, and silently did nothing.
+
+For other nodes (like "microtonal guitar"), the =⌂= fell at a
+different offset, so byte 200 was a clean boundary and it worked
+fine.
+
+** The fix
+
+Walk backwards from byte 200 until we find a char boundary:
+
+#+begin_src rust
+  let preview_len : usize = {
+    let target : usize = payload . len () . min (200);
+    let mut i : usize = target;
+    while i > 0 && !response . is_char_boundary (i) { i -= 1; }
+    i };
+  let preview : &str = &response [..preview_len];
+#+end_src
+
+Rust's =str::is_char_boundary(i)= returns true when byte =i= is
+the start of a character (or the end of the string). This is O(1)
+and the loop runs at most 3 iterations (max UTF-8 char is 4 bytes).
+
+** The general rule
+
+In Rust, any time you compute a byte index and use it to slice a
+=&str=, you must ensure it's a char boundary. Common safe patterns:
+
+- =str::find()= / =str::char_indices()= -- return byte offsets
+  that are always char boundaries.
+- =char::len_utf8()= -- gives the byte width of a character, so
+  =pos + ch.len_utf8()= is the next char boundary after =pos=.
+- =str::is_char_boundary(i)= -- check before slicing.
+
+Common UNSAFE patterns:
+
+- Slicing at an arbitrary number like 200.
+- Slicing at a count of =.chars().count()= -- that's a character
+  count, not a byte offset. (This was the second bug, in
+  =import_org_roam/parse.rs=, where leading-whitespace character
+  count was used as a byte index.)
+- Slicing at =.len() - N= when the string might end with
+  multi-byte characters.
+
+** How this relates to TCP
+
+TCP is a byte stream. The server writes bytes, the client reads
+bytes. TCP knows nothing about character encoding -- it just
+delivers bytes in order.
+
+The bug had nothing to do with TCP itself. The server panicked
+while PREPARING the bytes to send (in the debug log line), before
+any bytes reached the wire. But it's worth understanding the full
+path:
+
+1. Server: Rust =String= (UTF-8 bytes in memory)
+2. Server: =stream.write_all(string.as_bytes())= -- writes raw bytes to TCP
+3. TCP: bytes travel over the wire (loopback in this case)
+4. Client: Emacs =process-filter= receives chunks of raw bytes
+5. Client: LP machine accumulates bytes until Content-Length is met
+6. Client: =decode-coding-string ... 'utf-8= converts bytes back to Emacs characters
+7. Client: =(read payload)= parses the sexp, which contains the org text
+
+The character encoding matters at steps 1 and 6. In between, it's
+just bytes. The bug was at step 1 -- the server panicked before
+even reaching step 2.

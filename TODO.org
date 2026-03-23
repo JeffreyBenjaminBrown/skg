@@ -1,3 +1,7 @@
+* Does the first visit take a lot longer?
+* Dogfood and develop in separate places on disk.
+That way I can keep investigating the latest usable commit
+while a new one is being developed.
 * import org-roam
 ** to run it
 cargo run --bin skg -- import-org-roam public/ data/public/ public
@@ -6,15 +10,11 @@ begin
 
   imported from public org-roam notes:
   git@github.com:JeffreyBenjaminBrown/public-notes-in-org-roam-format
-* buffer updates for git diff view
-** should rerender on each save
-Saving seems to treat preexisting git diff view data as true.
-It might go stale -- e.g. the user could commit those changes.
-It should instead be recomputed on each save.
-** should vanish from all buffers when turned off
-When git diff view is toggled off, all diff-specific nodes
-(phantoms and 'textChanged') should be removed from the buffer,
-as well as any heralds indicating changes (NewHere, New, etc.)
+* ONGOING buffer updates for git diff view
+git-diff-view-updates.org
+.claude/plans/cuddly-roaming-boole.md
+.claude/plans/cuddly-roaming-boole_bk.org
+investigating-git-diff-view.org
 * [[./next.org]] might be in progress
 * ? "any rel" ought to be what a single backward view shows
   link sources, containers, subscribers
