@@ -4,15 +4,24 @@
 ;;;   skg-view-diff-mode
 
 (require 'skg-length-prefix)
-(require 'skg-request-save) ; for skg-show-save-warnings
+(require 'skg-request-save) ; for skg-big-nonfatal-message
+(require 'skg-request-rerender-all-views)
 
 (defun skg-view-diff-mode ()
   "Toggle git diff mode on the server.
 When enabled, subsequent content views and saves show
 what changed between HEAD and the worktree."
   (interactive)
+  (let ((unsaved-buffers
+         (cl-remove-if-not
+          (lambda (buf)
+            (and (buffer-local-value 'skg-view-uri buf)
+                 (buffer-modified-p buf)))
+          (buffer-list))))
+    (when unsaved-buffers
+      (error "Cannot toggle diff mode: unsaved skg buffer(s): %s"
+             (mapconcat #'buffer-name unsaved-buffers ", "))))
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
-         (save-buffer (current-buffer))
          (request-sexp
           (concat (prin1-to-string
                    '((request . "git diff mode toggle")))
@@ -28,9 +37,7 @@ what changed between HEAD and the worktree."
               (car (split-string content "\n"))
               content)
            (message "%s" (or content "toggled")))
-         (with-current-buffer ;; Use with-current-buffer because the process filter runs in whatever buffer is current when the TCP response arrives — NOT the buffer the user called skg-view-diff-mode from.
-             save-buffer
-           (skg-request-save-buffer))))
+         (skg-request-rerender-all-views)))
      t)
     (skg-lp-reset)
     (process-send-string tcp-proc request-sexp)))
