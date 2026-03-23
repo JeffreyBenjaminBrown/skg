@@ -133,7 +133,7 @@ and the new child c."
                (buffer-substring-no-properties (point-min) (point-max))))
     (assert-headline-titles
      buf
-     '((1 . "a")
+     '((1 . "Node a was given this longer title")
        (2 . "b")
        (3 . "Node a was given this longer title")
        (2 . "c"))

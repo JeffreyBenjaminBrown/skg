@@ -84,7 +84,8 @@ pub async fn update_views_after_save (
         typedb_driver,
         &mut errors,
         &deleted_since_head_pid_src_map,
-        &deleted_by_this_save_pids ) . await } ?;
+        &deleted_by_this_save_pids,
+        true ) . await } ?;
   let mut collateral_views : Vec<(ViewUri, String)> = Vec::new ();
   if let Ok (uri) = viewuri_from_request_result {
     merge_skgnodemap_into_pool (&skgnode_map, conn_state);
@@ -120,7 +121,8 @@ pub async fn update_views_after_save (
           &mut forest, &mut map,
           &source_diffs, config, typedb_driver,
           &mut errors, &deleted_since_head_pid_src_map,
-          &deleted_by_this_save_pids ) . await }
+          &deleted_by_this_save_pids,
+          false ) . await }
       { Ok (text) => {
           merge_skgnodemap_into_pool (&map, conn_state);
           conn_state . memory . update_view (&curi, forest);
@@ -193,6 +195,7 @@ async fn rerender_view (
   errors                         : &mut Vec<String>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   deleted_by_this_save_pids      : &HashSet<ID>,
+  is_saved_view                  : bool,
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : std::time::Instant = std::time::Instant::now ();
   tracing::debug!("rerender_view: starting");
@@ -205,7 +208,8 @@ async fn rerender_view (
     forest, map, &mut defmap,
     source_diffs, config, typedb_driver,
     errors, deleted_since_head_pid_src_map,
-    deleted_by_this_save_pids ) . await ?;
+    deleted_by_this_save_pids,
+    is_saved_view ) . await ?;
   tracing::debug!("rerender_view: complete_viewtree done ({:.3}s), starting graphnodestats",
             t_rerender . elapsed () . as_secs_f64 ());
   let ( container_to_contents, content_to_containers ) =
