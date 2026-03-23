@@ -224,12 +224,14 @@ fn collect_body (
 fn normalize_body_whitespace (
   body_lines : &[&str],
 ) -> String {
-  let min_indent : usize =
+  let min_indent : usize = // minimum leading-whitespace byte width across non-blank lines
     body_lines . iter ()
       . filter ( |l| ! l . trim () . is_empty () )
       . map ( |l| l . chars ()
                . take_while (|c| c . is_whitespace ())
-               . count () )
+               . map (|c| c . len_utf8 ()) // sum bytes, not chars,
+               // because min_indent is used as a byte index below
+               . sum::<usize> () )
       . min () . unwrap_or (0);
   let stripped : Vec<&str> =
     body_lines . iter ()
