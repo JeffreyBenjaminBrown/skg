@@ -52,7 +52,10 @@ pub fn send_response_with_length_prefix (
   stream   : &mut TcpStream,
   response : &str,
 ) { let payload : &[u8] = response . as_bytes ();
-    let preview_len : usize = payload . len () . min (200);
+    let preview_len : usize = // PITFALL: floor_char_boundary is needed
+      // because UTF-8 uses multiple bytes for some characters,
+      // and slicing mid-character panics in Rust.
+      response . floor_char_boundary ( payload . len () . min (200) );
     let preview : &str = &response [..preview_len];
     tracing::debug!("Sending response ({} bytes): {}{}",
              payload . len (), preview,
