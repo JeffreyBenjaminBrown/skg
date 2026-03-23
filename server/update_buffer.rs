@@ -28,6 +28,7 @@ use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
+use std::time::Instant;
 use typedb_driver::TypeDBDriver;
 
 /// PURPOSE:
@@ -197,7 +198,7 @@ pub async fn rerender_view (
   deleted_by_this_save_pids      : &HashSet<ID>,
   is_saved_view                  : bool,
 ) -> Result<String, Box<dyn Error>> {
-  let t_rerender : std::time::Instant = std::time::Instant::now ();
+  let t_rerender : Instant = Instant::now ();
   tracing::debug!("rerender_view: starting");
   remove_branches_that_git_marked_removed (forest) ?;
   remove_diff_only_scaffolds (forest) ?;
