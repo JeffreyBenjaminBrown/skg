@@ -65,6 +65,18 @@ So far there are these endpoints:
     or "Rebuild failed: ..." on error.
   - Behavior: Wipes and rebuilds both TypeDB and Tantivy from the .skg files on disk. Does not touch the filesystem. Also recomputes context rankings for search. Useful after importing new data or when the databases have stale metadata.
 
+## Rerender all views
+  - Request: ((request . "rerender all views"))
+  - Response: LP response-type "rerender-all-views" with
+    `((views (("URI1" "CONTENT1") ("URI2" "CONTENT2") ...)) (errors ("..." ...)))`.
+    Each view entry contains the URI and re-rendered buffer content.
+    Errors are non-fatal per-view errors (the response still includes
+    successfully rendered views).
+  - Behavior: Re-renders every open view from server memory,
+    applying diff annotations if diff mode is enabled.
+    Does not save or modify the graph. Used after toggling
+    git diff mode to refresh all views without requiring a save.
+
 ## Shutdown server
   - Request: ((request . "shutdown"))
   - Has the same effect as sending SIGINT (Ctrl+C) or SIGTERM (kill) to the server.

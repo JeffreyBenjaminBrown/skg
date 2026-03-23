@@ -15,6 +15,7 @@
 (require 'skg-request-file-path)
 (require 'skg-request-git-diff-mode)
 (require 'skg-request-rebuild-dbs)
+(require 'skg-request-rerender-all-views)
 (require 'skg-request-save)
 (require 'skg-request-single-root-content-view)
 (require 'skg-request-verify-connection)

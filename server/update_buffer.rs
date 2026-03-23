@@ -164,7 +164,7 @@ fn find_collateral_view_uris (
 
 /// Build a SkgNodeMap for a view by pulling every PID
 /// in that view's forest from the pool.
-fn seed_skgnodemap_from_pool (
+pub fn seed_skgnodemap_from_pool (
   uri        : &ViewUri,
   conn_state : &ConnectionState,
 ) -> SkgNodeMap {
@@ -176,7 +176,7 @@ fn seed_skgnodemap_from_pool (
   it }
 
 /// Merge a completed SkgNodeMap into the pool.
-fn merge_skgnodemap_into_pool (
+pub fn merge_skgnodemap_into_pool (
   map        : &SkgNodeMap,
   conn_state : &mut ConnectionState,
 ) {
@@ -186,7 +186,7 @@ fn merge_skgnodemap_into_pool (
 
 /// Strip stale diff data, re-complete the viewtree,
 /// set graph/view stats, and render to string.
-async fn rerender_view (
+pub async fn rerender_view (
   forest                         : &mut Tree<ViewNode>,
   map                            : &mut SkgNodeMap,
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
