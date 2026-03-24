@@ -1,3 +1,70 @@
+* TODO bug: can't visit magit
+** with point on the first line
+** of this buffer
+  * (skg (node (id 90c32efc-92c8-490f-afb3-50342e6d616c) (source public) (graphStats (containers 0) (contents 9) (containsHerald 0{9) (linksInFromLeaves 3) (linksHerald →3)) (viewStats (sourceHerald ⌂:public)))) how to form a study group
+  ** (skg (node (id 4530e8f7-ad3f-4206-8262-476633a8b168) (source public))) SOURCE : Largely asking ChatGPT
+  to sum up the research.
+  ** (skg (node (id 5b4522d9-91f6-4673-8926-593801f1936f) (source public) (graphStats (contents 7) (containsHerald {7)))) Self-selected groups (tend to)
+  *** (skg (node (id 3f0c73fa-0639-4e54-87c7-cdad42081779) (source public))) enjoy the experience more.
+  *** (skg (node (id cf580964-78e3-4754-bd21-0b64b12327ac) (source public))) underperform the alternative.
+  "Instructor-assigned or algorithmic groups (mixed skill, random, or balanced by GPA, gender, etc.)"
+  The best-performing groups were "thoughtfully balanced", rather than random, but even random outperformed self-selection.
+  *** (skg (node (id 49832d0d-dc95-4929-8f0a-f845f6e2ad70) (source public))) early on, have more comfort, cohesion and communication.
+  *** (skg (node (id 70e30cca-b218-4380-ac50-a73320e9575d) (source public))) lower initial coordination cost.
+  *** (skg (node (id 18475cc2-db9d-44ca-a3de-3d0550a9e6be) (source public))) plateau earlier.
+  *** (skg (node (id 297df3a1-3c26-4b2d-8e6c-0db31e700f44) (source public))) have less diverse ideas and skills.
+  It wasn't clear that they meant only "friends or familiar peers"
+  or whether that was just an illustration.
+  *** (skg (node (id a25ca1dc-3643-4949-b020-30ba4d7de8d0) (source public))) avoid conflict and role differentiation.
+  ** (skg (node (id 2759a806-afd0-4631-82dd-cec8debe41ac) (source public))) "Explicit discussion of roles early on improves outcomes regardless of formation method."
+  ** (skg (node (id ce905ec2-8ad7-43f4-8a6c-fb93f0ec0a0a) (source public))) With time group cooperation improves.
+  ** (skg (node (id 77a2bda5-93e8-475e-ae4e-163d28214e85) (source public))) overlapping interests
+  ** (skg (node (id b0729ba1-6eb3-4172-9273-2ba35187ce91) (source public) (graphStats (contents 4) (containsHerald {4)))) specialization
+  *** (skg (node (id 50711408-599a-4002-9052-c4d2711803ae) (source public) (graphStats (contents 2) (containsHerald {2)))) kinds
+  **** (skg (node (id 52cfa1ef-f61f-4297-a4ea-05f27ac09402) (source public))) in subject area
+  **** (skg (node (id b4265b00-ccec-41cc-bffe-15c6b33f7039) (source public))) in role
+  alias: some roles
+
+  editor
+  explainer
+  investigator
+  manager
+  note-taker
+  organizer
+  question-generator
+  reconciler
+  recorder-reporter
+  reviewer
+  social integrator
+  strategy evaluator
+  summarizer
+  timekeeper
+  *** (skg (node (id c7e26515-6ad9-471b-881b-1001ee762ffb) (source public))) Roles are better at least someowhat fluid.
+  Indeed formally rotating roles can work well.
+  *** (skg (node (id 1d82985b-2e98-498f-be21-dc5ddba90c11) (source public))) It can emerge without being named.
+  *** (skg (node (id 8c3d5ecf-6f3d-4fee-ad3f-44e55c75692c) (source public))) Subject area expertise is more helpful if known.
+  If everyone knows you can ask X about T,
+    that makes T's specialization in X more useful.
+  ** (skg (node (id 4f359057-3de0-402b-b295-e09aef9a1a5f) (source public) (graphStats (contents 2) (containsHerald {2)))) problems
+  *** (skg (node (id 50dbce86-1334-4c06-9efe-d71b056406f0) (source public))) "diffusion of responsibility"
+  *** (skg (node (id 70052f0f-a043-456f-b20f-6b7184a1b02c) (source public))) "coordination overhead"
+  ** (skg (node (id 879e111d-0b67-463c-9427-e1b455dcb16d) (source public))) Some tasks have more potential for specialization.
+  complementarity
+  ** (skg (node (id 907528a5-7ab6-4bc1-a3d6-7dd8cfa805c1) (source public))) Over-specialization feels narrow-minded.
+** I get this error
+Debugger entered--Lisp error: (scan-error "Unbalanced parentheses" 3 3695)
+  forward-sexp-default-function(1)
+  forward-sexp(1)
+  (let ((start (point))) (forward-sexp 1) (if (> (point) line-end) (progn (error "Sexp does not end on this line"))) (read (buffer-substring-no-properties start (point))))
+  (progn (forward-char (- (or 1 1))) (let ((start (point))) (forward-sexp 1) (if (> (point) line-end) (progn (error "Sexp does not end on this line"))) (read (buffer-substring-no-properties start (point)))))
+  (if (search-forward "(" line-end t) (progn (forward-char (- (or 1 1))) (let ((start (point))) (forward-sexp 1) (if (> (point) line-end) (progn (error "Sexp does not end on this line"))) (read (buffer-substring-no-properties start (point))))))
+  (let ((line-end (line-end-position))) (if (search-forward "(" line-end t) (progn (forward-char (- (or 1 1))) (let ((start (point))) (forward-sexp 1) (if (> (point) line-end) (progn (error "Sexp does not end on this line"))) (read (buffer-substring-no-properties start (point)))))))
+  skg-first-sexpr-on-line()
+  (let ((sexp (skg-first-sexpr-on-line))) (if (not sexp) (message "No metadata sexp found on this line.") (if (not (skg--metadata-sexp-contains-id-p sexp)) (message "Not a truenode line (no id in metadata).") (let ((id (skg--extract-id-from-metadata-sexp sexp)) (source (skg--extract-source-from-metadata-sexp sexp))) (if (not (and id source)) (message "Could not extract id or source from metadata.") (skg-register-response-handler 'get-file-path #'skg--file-diff-result t) (skg-lp-reset) (let* ((tcp-proc ...) (request-sexp ...)) (process-send-string tcp-proc request-sexp)))))))
+  (save-excursion (beginning-of-line) (let ((sexp (skg-first-sexpr-on-line))) (if (not sexp) (message "No metadata sexp found on this line.") (if (not (skg--metadata-sexp-contains-id-p sexp)) (message "Not a truenode line (no id in metadata).") (let ((id (skg--extract-id-from-metadata-sexp sexp)) (source (skg--extract-source-from-metadata-sexp sexp))) (if (not (and id source)) (message "Could not extract id or source from metadata.") (skg-register-response-handler 'get-file-path #'skg--file-diff-result t) (skg-lp-reset) (let* (... ...) (process-send-string tcp-proc request-sexp))))))))
+  skg-view-magit()
+  funcall-interactively(skg-view-magit)
+  command-execute(skg-view-magit)
 * semi-permanent
 ** [[./next.org]] might be in progress
 ** import org-roam
