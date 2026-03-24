@@ -1,4 +1,4 @@
-* TODO bug: can't visit magit
+* DONE bug: can't visit magit
 ** with point on the first line
 ** of this buffer
   * (skg (node (id 90c32efc-92c8-490f-afb3-50342e6d616c) (source public) (graphStats (containers 0) (contents 9) (containsHerald 0{9) (linksInFromLeaves 3) (linksHerald →3)) (viewStats (sourceHerald ⌂:public)))) how to form a study group
@@ -65,20 +65,37 @@ Debugger entered--Lisp error: (scan-error "Unbalanced parentheses" 3 3695)
   skg-view-magit()
   funcall-interactively(skg-view-magit)
   command-execute(skg-view-magit)
+* TODO review commit 7dacceadcee6ea260ae19625bc8e7da1c77986d1
+which was to fix test db accumulation
+* Bug ? forward-sexp chokes on {
+skg-find-sexp-end (line 62 in this same file) counts only () and works fine.
+So Skg developers have to know to use Skg-specific sexp navigation.
+But maybe that's appropriate?
+* Bug ? server can't verify connection initially
+* Have Claude report bugs.
+* Report bugs about Claude.
+** whitespace for distinct org domains: illegible
+It doesn't understand nested one org passage quoted in another org document,
+if the quotation is represented as leading whitespace.
 * semi-permanent
 ** [[./next.org]] might be in progress
 ** import org-roam
 *** to run it
 cargo run --bin skg -- import-org-roam public/ data/public/ public
-*** commit message
+** commit message -- with blank to fill
 begin
 
   imported from public org-roam notes:
-  git@github.com:JeffreyBenjaminBrown/public-notes-in-org-roam-format
+    git@github.com:JeffreyBenjaminBrown/public-notes-in-org-roam-format
+  as of commit
+    [FILL IN THIS DETAIL]
 * Dogfood and develop in separate places on disk.
 That way I can keep investigating the latest usable commit
 while a new one is being developed.
 * Does the first visit take a lot longer?
+* ONGOING I am committing to it in my personal data,
+linking to things only skg has.
+* etags should ignore **/abandoned
 * ? "any rel" ought to be what a single backward view shows
   link sources, containers, subscribers
     (but not overriders or hiders -- those should be more obscure)

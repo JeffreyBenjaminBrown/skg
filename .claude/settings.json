@@ -1,22 +1,49 @@
-{ "hooks": {
-    "Stop": [ {
-      "matcher": "",
-      "hooks": [ { "type": "command",
-                   "command": "/home/sound/play-beep.sh"
-                 } ] } ],
-  "PreToolUse": [
-    { "matcher": "ExitPlanMode",
-      "hooks": [ { "type": "command",
-                   "command": "/home/sound/play-beep.sh"
-                 } ] },
-    { "matcher": "AskUserQuestion",
-      "hooks": [ { "type": "command",
-                   "command": "/home/sound/play-beep.sh"
-                 } ] },
-    { "matcher": "Bash",
-      "hooks": [ { "type": "command",
-                   "command": "/home/ubuntu/.claude/hooks/git-guard.sh"
-                 } ] } ] },
-  "alwaysThinkingEnabled": true,
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/sound/play-beep.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/sound/play-beep.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/sound/play-beep.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/ubuntu/.claude/hooks/git-guard.sh"
+          }
+        ]
+      }
+    ]
+  },
   "enabledPlugins": {
-    "rust-analyzer-lsp@claude-plugins-official": true }}
+    "rust-analyzer-lsp@claude-plugins-official": true
+  },
+  "alwaysThinkingEnabled": true,
+  "skipDangerousModePermissionPrompt": true
+}
