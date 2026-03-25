@@ -91,7 +91,7 @@ Kill the buffer to cancel without saving."
                                        sexp-start sexp-end is-truenode)
   "Open a sexp-edit buffer with ORG-TEXT from SOURCE-BUFFER.
 SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER."
-  (let (( edit-buffer (generate-new-buffer "*skg-edit*") ))
+  (let (( edit-buffer (generate-new-buffer "*skg-metadata-edit*") ))
     (switch-to-buffer edit-buffer)
     (insert skg-edit--help-text)
     (insert org-text)
