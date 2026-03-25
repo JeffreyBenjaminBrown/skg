@@ -211,7 +211,8 @@ async fn delete_one_node_from_pid (
          $node isa node, has id "{}";
          $e isa extra_id;
          $rel isa has_extra_id ( node: $node, extra_id: $e );
-       delete $rel, $e;"#,
+       delete $rel;
+       delete $e;"#,
     id . as_str () ) ) . await . ok (); // ok(): no-op if none exist
   // Delete the node.
   tx . query ( format! (
@@ -237,7 +238,7 @@ pub async fn update_node_source (
          $n isa node, has id "{}";
          $n has source $old_src;
        delete
-         $n has $old_src;
+         has $old_src of $n;
        insert
          $n has source "{}";"#,
     pid . as_str(),

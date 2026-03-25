@@ -23,8 +23,6 @@ begin
 **** DONE visit things
 **** DONE request view changes
 *** It is valid to dogfood even as only reading.
-* TODO bugs
-** Containerward stats are missing from link sources.
 * TODO slow things
 ** save took forever after changing a node from public to private.
 And this is repeatable,
