@@ -9,6 +9,7 @@
 ;;;   skg-edit-metadata
 
 (require 'skg-buffer)
+(require 'skg-config)
 (require 'skg-metadata)
 (require 'skg-sexpr-org-bijection)
 (require 'skg-truenode-defaults)
@@ -79,13 +80,6 @@ Kill the buffer to cancel without saving."
   "Press C-c C-c to save, C-x k to cancel, S-left/S-right to cycle values.\n\n"
   "Help text shown at the top of the edit buffer.")
 
-(defun skg-sexp-edit--default-source ()
-  "Return the default source name from config, or nil."
-  (when skg-config-dir
-    (let ((config-file
-           (expand-file-name "skgconfig.toml" skg-config-dir)))
-      (when (file-exists-p config-file)
-        (car (skg-owned-sources-from-toml config-file))))))
 
 (defun skg-sexp-edit--open-edit-buffer (org-text source-buffer
                                        sexp-start sexp-end is-truenode)
@@ -173,7 +167,7 @@ Kill the buffer to cancel without saving."
                            (cdr positions)
                          (+ sexp-start (length metadata-str))) )
              (default-source (when no-metadata
-                               (skg-sexp-edit--default-source)) )
+                               (skg--default-source)) )
              (org-text (let ((sexp-as-org (sexp-to-org sexp)))
                           (if is-truenode
                               (skg-truenode-expand-defaults-in-org

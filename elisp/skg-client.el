@@ -8,6 +8,7 @@
 (require 'cl-lib)
 
 (require 'heralds-minor-mode)
+(require 'skg-config)
 (require 'skg-length-prefix)
 (require 'skg-lock-buffers)
 (require 'skg-metadata)
@@ -29,16 +30,6 @@
   (skg-tcp-connect-to-rust)
   (skg-connection-verify))
 
-(defun skg-port-from-toml (file)
-  "Return the integer value of `port = ...` from FILE (a TOML config)."
-  (with-temp-buffer
-    (insert-file-contents file)
-    (goto-char (point-min))
-    (if (re-search-forward
-         "^[ \t]*port[ \t]*=[ \t]*\\([0-9]+\\)"
-         nil t)
-        (string-to-number (match-string 1))
-      (error "No port setting found in %s" file)) ))
 
 (defun skg-tcp-connect-to-rust ()
   "Connect, persistently, to the Rust TCP server."

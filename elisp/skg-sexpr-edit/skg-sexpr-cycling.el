@@ -8,6 +8,7 @@
 ;;;   skg-sexp-edit-cycle-right
 
 (require 'cl-lib)
+(require 'skg-config)
 (require 'skg-metadata)
 (require 'skg-state)
 
@@ -60,7 +61,7 @@ Returns nil if the field is not cycleable."
   "Return source names from config as a cycle list.
 If FIELD-VALUE has a ' (default)' suffix, prepend it so cycling
 starts there rather than jumping to a bare source name."
-  (let ((sources (skg-sexp-edit--sources-from-config)))
+  (let ((sources (skg--owned-sources)))
     (when sources
       (if (string-suffix-p " (default)" field-value)
           (cons field-value
@@ -69,28 +70,6 @@ starts there rather than jumping to a bare source name."
                                       (length " (default)")))
                         sources))
         sources))))
-
-(defun skg-sexp-edit--sources-from-config ()
-  "Return the list of all source nicknames from skgconfig.toml, or nil."
-  (when skg-config-dir
-    (let ((config-file
-           (expand-file-name "skgconfig.toml" skg-config-dir)))
-      (when (file-exists-p config-file)
-        (with-temp-buffer
-          (insert-file-contents config-file)
-          (goto-char (point-min))
-          (let ((sources '()))
-            (while (not (eobp))
-              (let ((line (string-trim
-                           (buffer-substring-no-properties
-                            (line-beginning-position)
-                            (line-end-position)))))
-                (when (string-match
-                       "^nickname[ \t]*=[ \t]*\"\\([^\"]+\\)\""
-                       line)
-                  (push (match-string 1 line) sources)))
-              (forward-line 1))
-            (nreverse sources)))))))
 
 ;;
 ;; Dispatch
