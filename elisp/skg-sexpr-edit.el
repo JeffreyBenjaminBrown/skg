@@ -108,18 +108,15 @@ SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER."
          (concat "^\\*+ " (regexp-quote field-name) "$") nil t)
     (outline-next-heading)))
 
-(defun skg-sexp-edit--insert-default-metadata ()
-  "Insert (skg node) metadata at the headline at point.
-Returns (SEXP-START . SEXP-END) for the inserted text.
-Uses (skg node) rather than (skg (node)) because the latter
-is not paren-terse (see skg-sexpr-org-bijection.el)
-so sexp-to-org would reject it."
-  (let (( sexp-text "(skg node) " ))
+(defun skg-edit-metadata--insert-new-node-metadata ()
+  "Prompt for source and insert new-node metadata at the headline at point.
+Uses minibuffer with S-left/S-right cycling through owned sources."
+  (let* ((source (skg--prompt-for-owned-source))
+         (sexp-text (format "(skg (node (source %s))) "
+                            source)))
     (beginning-of-line)
     (search-forward " " nil t) ;; past the stars + space
-    (insert sexp-text)
-    (cons (- (point) (length sexp-text))
-          (- (point) 1)))) ;; before the trailing space
+    (insert sexp-text)))
 
 ;;
 ;; Advice: after org-insert-heading-respect-content in skg buffers
@@ -143,7 +140,7 @@ Only acts in skg-content-view-mode buffers when a level-1 heading was created."
 (defun skg-edit-metadata ()
   "Edit the metadata sexp on the current headline in an org buffer.
 Opens a temporary org buffer with the sexp converted to org headlines.
-If the headline has no metadata, inserts (skg node) first.
+If the headline has no metadata, prompts for source and inserts new metadata.
 Use C-c C-c to save changes back to the source buffer.
 Kill the buffer to cancel without saving."
   (interactive)
@@ -154,32 +151,22 @@ Kill the buffer to cancel without saving."
     (unless split
       (user-error "Not on a headline"))
     (let* (( metadata-str (cadr split) )
-           ( no-metadata (string-empty-p metadata-str) )
-           ( positions (when no-metadata
-                         (skg-sexp-edit--insert-default-metadata)) )
-           ( source-buffer (current-buffer) ))
-      (when no-metadata
-        (setq metadata-str "(skg node)"))
-      (let* ((sexp (read metadata-str) )
-             (is-truenode (skg-truenode-sexp-p sexp) )
-             (sexp-start (if no-metadata
-                             (car positions)
-                           (+ (line-beginning-position)
-                              (length (car split)))) )
-             (sexp-end (if no-metadata
-                           (cdr positions)
-                         (+ sexp-start (length metadata-str))) )
-             (default-source (when no-metadata
-                               (skg--default-source)) )
-             (org-text (let ((sexp-as-org (sexp-to-org sexp)))
-                          (if is-truenode
-                              (skg-truenode-expand-defaults-in-org
-                               sexp-as-org default-source)
-                            sexp-as-org)) ))
-        (skg-sexp-edit--open-edit-buffer
-         org-text source-buffer sexp-start sexp-end is-truenode)
-        (when no-metadata
-          (skg-sexp-edit--goto-field-value "source")
-          (message "Choose a source."))))))
+           ( no-metadata (string-empty-p metadata-str) ))
+      (if no-metadata
+          (skg-edit-metadata--insert-new-node-metadata)
+        (let* (( source-buffer (current-buffer) )
+               (sexp (read metadata-str) )
+               (is-truenode (skg-truenode-sexp-p sexp) )
+               (sexp-start (+ (line-beginning-position)
+                              (length (car split))) )
+               (sexp-end (+ sexp-start (length metadata-str)) )
+               (org-text (let ((sexp-as-org (sexp-to-org sexp)))
+                           (if is-truenode
+                               (skg-truenode-expand-defaults-in-org
+                                sexp-as-org nil)
+                             sexp-as-org)) ))
+          (skg-sexp-edit--open-edit-buffer
+           org-text source-buffer sexp-start sexp-end is-truenode)
+          (skg-sexp-edit--goto-field-value "source"))))))
 
 (provide 'skg-sexpr-edit)

@@ -39,7 +39,8 @@ skg-config-dir is set and skg--owned-sources works."
   "Config text with two owned sources.")
 
 (ert-deftest test-insert-heading-at-root ()
-  "Test what C-return from a root headline does."
+  "C-return on a root headline prompts for source in the minibuffer
+and inserts metadata with the chosen source on the new headline."
   (test--with-skg-content-view
    "* (skg (node (id a) (source public))) a\n"
    test--config-two-owned-sources
@@ -50,41 +51,28 @@ skg-config-dir is set and skg--owned-sources works."
        (should (org-at-heading-p))
        (should (= (org-outline-level) 1))
 
-       ;; C-return: inserts a new heading and opens the edit buffer.
-       (org-insert-heading-respect-content)
+       ;; C-return: inserts a new heading and prompts for source.
+       (cl-letf (((symbol-function 'completing-read)
+                  (lambda (_prompt _coll &rest _) "private")))
+         (org-insert-heading-respect-content))
 
        ;; 1. The source buffer now has two level-1 headlines.
-       ;;    The original is untouched; the new one has (skg node).
        (with-current-buffer source-buffer
          (let ((content (buffer-substring-no-properties
                          (point-min) (point-max))))
+           ;; Original headline unchanged.
            (should (string-match-p
                     "^\\* (skg (node (id a) (source public))) a$"
                     content))
+           ;; New headline has metadata with chosen source.
            (should (string-match-p
-                    "^\\* (skg node) $"
+                    "^\\* (skg (node (source private))) $"
                     content))
            (should (= 2 (how-many "^\\* " (point-min) (point-max))))))
 
-       ;; 2. A sexp-edit buffer was opened.
-       (let ((edit-buf
-              (cl-find-if
-               (lambda (b)
-                 (buffer-local-value 'skg-sexp-edit--source-buffer b))
-               (buffer-list))))
-         (should edit-buf)
-
-         ;; 3. In the edit buffer, point is on the source value headline.
-         (with-current-buffer edit-buf
-           (should (org-at-heading-p))
-           (let ((parent (save-excursion
-                           (org-up-heading-safe)
-                           (string-trim (org-get-heading t t t t)))))
-             (should (equal parent "source")))
-
-           ;; 4. The source value is the default owned source.
-           (should (equal (string-trim (org-get-heading t t t t))
-                          "public (default)")))
-
-         ;; Clean up the edit buffer.
-         (kill-buffer edit-buf))))))
+       ;; 2. No sexp-edit buffer was opened.
+       (should-not
+        (cl-find-if
+         (lambda (b)
+           (buffer-local-value 'skg-sexp-edit--source-buffer b))
+         (buffer-list)))))))

@@ -13,6 +13,7 @@
          '( skg-buffer
             skg-client
             skg-compare-sexpr
+            skg-config
             skg-focus
             skg-id-search
             skg-length-prefix

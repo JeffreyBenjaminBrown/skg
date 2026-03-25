@@ -10,6 +10,29 @@
  ;; It is set once, by `skg-client-init'.
  'skg-state)
 
+(defun skg--prompt-for-owned-source ()
+  "Prompt the user to choose an owned source, with S-left/S-right cycling.
+If there is only one owned source, return it without prompting."
+  (let ((owned-sources (skg--owned-sources)))
+    (if (= (length owned-sources) 1)
+        (car owned-sources)
+      (let ((cycle (lambda (dir)
+                     (lambda ()
+                       (interactive)
+                       (let* ((cur (minibuffer-contents))
+                              (idx (or (cl-position cur owned-sources
+                                                    :test #'string=) 0))
+                              (new (nth (mod (+ idx dir)
+                                             (length owned-sources))
+                                        owned-sources)))
+                         (delete-minibuffer-contents)
+                         (insert new))))))
+        (minibuffer-with-setup-hook
+            (lambda ()
+              (local-set-key (kbd "S-<left>")  (funcall cycle -1))
+              (local-set-key (kbd "S-<right>") (funcall cycle  1)))
+          (completing-read "Source: " owned-sources nil t))))))
+
 (defun skg--owned-sources ()
   "Return the list of owned source names from skgconfig.toml, or nil."
   (when skg-config-dir

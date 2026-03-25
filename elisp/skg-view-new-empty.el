@@ -11,11 +11,7 @@
 Prompts to choose an owned source, then opens a buffer
 with an indefinitive TrueNode (no ID yet) and a placeholder title."
   (interactive)
-  (let* ((owned-sources (skg--owned-sources))
-         (source
-          (if (= (length owned-sources) 1)
-              (car owned-sources)
-            (completing-read "Source: " owned-sources nil t)))
+  (let* ((source (skg--prompt-for-owned-source))
          (org-text
           (format
            "* (skg (node (source %s) indefinitive)) life, the universe and everything\n"
