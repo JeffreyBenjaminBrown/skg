@@ -151,6 +151,9 @@ fn format_buffer_validation_error (
     BufferValidationError::MultipleDefinitiveRequestsForSameId (id) => {
       format!("Multiple definitive view requests for the same ID:\n- ID: {}\n- At most one definitive view request per ID is allowed.\n",
               id . 0) },
+    BufferValidationError::EmptyTitle(id) => {
+      format!("Node has an empty title:\n- ID: {}\n- Every definitive node must have a non-empty title.\n",
+              id . 0) },
     BufferValidationError::LocalStructureViolation(msg, id) => {
       format!("Local structure violation:\n- ID: {}\n- {}\n",
               id . 0, msg) },

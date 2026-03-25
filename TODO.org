@@ -1,3 +1,4 @@
+* add a space after the metadata when creating a new node with C-<return>
 * semi-permanent
 ** [[./next.org]] might be in progress
 ** import org-roam
@@ -23,26 +24,6 @@ begin
 **** DONE request view changes
 *** It is valid to dogfood even as only reading.
 * TODO bugs
-** C-<return> from a root gives an error message
-*** I want it to create a new root and prompt for source.
-*** I get this error message.
-Debugger entered--Lisp error: (error "sexp-to-org: input is not paren-terse: (skg (node))")
-  error("sexp-to-org: input is not paren-terse: %S" (skg (node)))
-  (if (sexp-paren-terse-p sexp) nil (error "sexp-to-org: input is not paren-terse: %S" sexp))
-  sexp-to-org((skg (node)))
-  (let ((sexp-as-org (sexp-to-org sexp))) (if is-truenode (skg-truenode-expand-defaults-in-org sexp-as-org default-source) sexp-as-org))
-  (let* ((sexp (read metadata-str)) (is-truenode (skg-truenode-sexp-p sexp)) (sexp-start (if no-metadata (car positions) (+ (line-beginning-position) (length (car split))))) (sexp-end (if no-metadata (cdr positions) (+ sexp-start (length metadata-str)))) (default-source (if no-metadata (progn (skg-sexp-edit--default-source)))) (org-text (let ((sexp-as-org (sexp-to-org sexp))) (if is-truenode (skg-truenode-expand-defaults-in-org sexp-as-org default-source) sexp-as-org)))) (skg-sexp-edit--open-edit-buffer org-text source-buffer sexp-start sexp-end is-truenode) (if no-metadata (progn (skg-sexp-edit--goto-field-value "source") (message "Choose a source."))))
-  (let* ((metadata-str (car (cdr split))) (no-metadata (string-empty-p metadata-str)) (positions (if no-metadata (progn (skg-sexp-edit--insert-default-metadata)))) (source-buffer (current-buffer))) (if no-metadata (progn (setq metadata-str "(skg (node))"))) (let* ((sexp (read metadata-str)) (is-truenode (skg-truenode-sexp-p sexp)) (sexp-start (if no-metadata (car positions) (+ (line-beginning-position) (length (car split))))) (sexp-end (if no-metadata (cdr positions) (+ sexp-start (length metadata-str)))) (default-source (if no-metadata (progn (skg-sexp-edit--default-source)))) (org-text (let ((sexp-as-org (sexp-to-org sexp))) (if is-truenode (skg-truenode-expand-defaults-in-org sexp-as-org default-source) sexp-as-org)))) (skg-sexp-edit--open-edit-buffer org-text source-buffer sexp-start sexp-end is-truenode) (if no-metadata (progn (skg-sexp-edit--goto-field-value "source") (message "Choose a source.")))))
-  (let* ((headline (skg-get-current-headline-text)) (split (skg-split-as-stars-metadata-title headline))) (if split nil (user-error "Not on a headline")) (let* ((metadata-str (car (cdr split))) (no-metadata (string-empty-p metadata-str)) (positions (if no-metadata (progn (skg-sexp-edit--insert-default-metadata)))) (source-buffer (current-buffer))) (if no-metadata (progn (setq metadata-str "(skg (node))"))) (let* ((sexp (read metadata-str)) (is-truenode (skg-truenode-sexp-p sexp)) (sexp-start (if no-metadata (car positions) (+ (line-beginning-position) (length ...)))) (sexp-end (if no-metadata (cdr positions) (+ sexp-start (length metadata-str)))) (default-source (if no-metadata (progn (skg-sexp-edit--default-source)))) (org-text (let ((sexp-as-org ...)) (if is-truenode (skg-truenode-expand-defaults-in-org sexp-as-org default-source) sexp-as-org)))) (skg-sexp-edit--open-edit-buffer org-text source-buffer sexp-start sexp-end is-truenode) (if no-metadata (progn (skg-sexp-edit--goto-field-value "source") (message "Choose a source."))))))
-  skg-edit-metadata()
-  (progn (skg-edit-metadata))
-  (if (and (and (boundp 'skg-content-view-mode) skg-content-view-mode) (org-at-heading-p) (= (org-outline-level) 1)) (progn (skg-edit-metadata)))
-  skg-sexp-edit--after-insert-heading()
-  apply(skg-sexp-edit--after-insert-heading nil)
-  org-insert-heading-respect-content()
-  funcall-interactively(org-insert-heading-respect-content)
-  command-execute(org-insert-heading-respect-content)
-*** and in the buffer I get a new top-level headline "* (skg (node))"
 ** Containerward stats are missing from link sources.
 * TODO slow things
 ** save took forever after changing a node from public to private.
@@ -96,6 +77,11 @@ This would permit stripping the leading "skg: " from buffer names.
 ** (Again?) Want link sources to show containerward ancestries.
 ** The number of contents herald is less interesting.
 ** server can't verify connection initially
+* TODO cleaner code
+** avoid redundant enum checks
+There are, I suspect, a lot of functions doing redundant checks for enums.
+An example is 'has_empty_title': It can only be called from a truenode,
+yet it still checks whether its input is a truenode.
 * DONE bug: can't visit magit
 These headlines form a story, somewhat sequentially.
 They don't make sense out of context of the others.

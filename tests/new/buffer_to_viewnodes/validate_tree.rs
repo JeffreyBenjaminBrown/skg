@@ -426,3 +426,69 @@ fn test_nonexistent_source_validation(
           assert!(found_root_error,
                   "Should find source error for root2"); }}
       Ok(( )) } )) }
+
+#[test]
+fn test_empty_title_rejected_for_definitive_node (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db(
+    "skg-test-empty-title",
+    "tests/merge/merge_nodes/fixtures",
+    "/tmp/tantivy-test-empty-title",
+    |config, driver, _tantivy| Box::pin(async move {
+      let input: &str =
+        indoc! {"
+                * (skg (node (id has-title) (source main))) has a title
+                * (skg (node (id no-title) (source main)))
+            "};
+      let forest: Tree<UncheckedViewNode> =
+        org_to_uninterpreted_nodes (input) . unwrap() . 0;
+      let errors: Vec<BufferValidationError> =
+        find_buffer_errors_for_saving(&forest, config, driver) . await?;
+
+      let empty_title_re =
+        Regex::new(r"(?i)empty.*title") . unwrap();
+      let empty_title_errors: Vec<&BufferValidationError> =
+        errors . iter()
+        . filter(
+          |e| matches!(e,
+                       BufferValidationError::LocalStructureViolation(msg, _)
+                       if empty_title_re . is_match (msg)))
+        . collect();
+      assert_eq!(empty_title_errors . len(), 1,
+                 "Should find 1 empty title error");
+      if let BufferValidationError::LocalStructureViolation(_, id)
+        = empty_title_errors[0]
+      { assert_eq!(id . 0, "no-title",
+                   "Empty title error should be for no-title"); }
+      Ok(( )) } )) }
+
+#[test]
+fn test_empty_title_allowed_for_indefinitive_and_delete (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db(
+    "skg-test-empty-title-exempt",
+    "tests/merge/merge_nodes/fixtures",
+    "/tmp/tantivy-test-empty-title-exempt",
+    |config, driver, _tantivy| Box::pin(async move {
+      let input: &str =
+        indoc! {"
+                * (skg (node (id indef) (source main) indefinitive))
+                * (skg (node (id deleting) (source main) (editRequest delete)))
+            "};
+      let forest: Tree<UncheckedViewNode> =
+        org_to_uninterpreted_nodes (input) . unwrap() . 0;
+      let errors: Vec<BufferValidationError> =
+        find_buffer_errors_for_saving(&forest, config, driver) . await?;
+
+      let empty_title_re =
+        Regex::new(r"(?i)empty.*title") . unwrap();
+      let empty_title_errors: Vec<&BufferValidationError> =
+        errors . iter()
+        . filter(
+          |e| matches!(e,
+                       BufferValidationError::LocalStructureViolation(msg, _)
+                       if empty_title_re . is_match (msg)))
+        . collect();
+      assert_eq!(empty_title_errors . len(), 0,
+                 "Indefinitive and delete-requested nodes should not trigger empty title errors");
+      Ok(( )) } )) }

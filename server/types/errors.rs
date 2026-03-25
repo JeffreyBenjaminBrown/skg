@@ -36,6 +36,7 @@ pub enum BufferValidationError {
   DefinitiveRequestOnDefinitiveNode      (ID), // A definitive view request on a node that is already definitive
   DefinitiveRequestOnNodeWithChildren    (ID), // A definitive view request on a node that has children
   MultipleDefinitiveRequestsForSameId    (ID), // Multiple definitive view requests for the same ID
+  EmptyTitle                             (ID),
   LocalStructureViolation        (String, ID), // (error message, nearest ancestor ID)
   Other                          (String),
 }
@@ -93,6 +94,8 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Definitive view request on a node with children (ID {:?}). The expansion would clobber those children. Save without the request first, then delete children and retry.", id),
       BufferValidationError::MultipleDefinitiveRequestsForSameId (id) =>
         write!(f, "Multiple definitive view requests for the same ID {:?}. At most one request per ID is allowed.", id),
+      BufferValidationError::EmptyTitle(id) =>
+        write!(f, "Node {:?} has an empty title. Every definitive node must have a non-empty title.", id),
       BufferValidationError::LocalStructureViolation(msg, id) =>
         write!(f, "Local structure violation at ID {:?}: {}", id, msg),
       BufferValidationError::Other (msg) =>

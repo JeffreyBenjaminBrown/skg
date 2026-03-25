@@ -4,7 +4,7 @@
 
 use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind, UncheckedTrueNode};
 use crate::types::git::NodeDiffStatus;
-use crate::types::viewnode::Scaffold;
+use crate::types::viewnode::{Scaffold, EditRequest, IndefOrDef};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::viewnode_skgnode::{
   generation_includes_only,
@@ -237,6 +237,8 @@ fn validate_truenode (
     errors . push("TrueNode's children must include only TrueNode, AliasCol, IDCol, SubscribeeCol, TextChanged, Deleted, or DeletedScaff" . to_string()); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
     errors . push("TrueNode's non-ignored TrueNode children must be unique (no two sharing the same ID)." . to_string()); }
+  if has_empty_title (t) {
+    errors . push("Definitive node has an empty title." . to_string()); }
   errors }
 
 /// Check if an UncheckedTrueNode has an ID.
@@ -250,6 +252,16 @@ pub fn has_valid_source (
 ) -> bool {
   t . source . as_ref()
     . is_some_and( |s| config . sources . contains_key (s) ) }
+
+/// A definitive node (not marked for deletion) must have a non-empty title.
+/// Nodes that are indefinitive or carry a delete request are exempt.
+fn has_empty_title ( t : &UncheckedTrueNode ) -> bool {
+  let is_definitive : bool =
+    matches! ( &t . indef_or_def, IndefOrDef::Definitive { .. } );
+  let is_delete : bool =
+    matches! ( t . edit_request (),
+               Some (&EditRequest::Delete) );
+  is_definitive && !is_delete && t . title . trim () . is_empty () }
 
 /// Check that all non-ignored, non-phantom TrueNode children
 /// have distinct IDs.
