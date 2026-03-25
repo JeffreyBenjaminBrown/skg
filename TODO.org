@@ -23,8 +23,6 @@ begin
 **** DONE request view changes
 *** It is valid to dogfood even as only reading.
 * TODO bugs
-** regression : can't shift-tab to change source
-in metadata edit buffer
 ** C-<return> from a root gives an error message
 *** I want it to create a new root and prompt for source.
 *** I get this error message.
@@ -45,8 +43,6 @@ Debugger entered--Lisp error: (error "sexp-to-org: input is not paren-terse: (sk
   funcall-interactively(org-insert-heading-respect-content)
   command-execute(org-insert-heading-respect-content)
 *** and in the buffer I get a new top-level headline "* (skg (node))"
-** BUG: skg-new-empty-view asks for a source, doesn't recognize
-I type 'public' and it responds [no match] on the same minibuffer line.
 ** Containerward stats are missing from link sources.
 * TODO slow things
 ** save took forever after changing a node from public to private.
@@ -73,6 +69,7 @@ Lock each separately to edits until updated.
 * TODO shortcuts
 ** C-c v v not working from magit
 * TODO new features
+** skg-new-empty-view should permit cycling
 ** should go to new nodes, not just modified nodes
 when switching to the magit view with C-c v m
 ** heralds
