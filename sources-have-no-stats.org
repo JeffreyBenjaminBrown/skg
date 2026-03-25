@@ -1,0 +1,62 @@
+* Stats missing from link source nodes
+
+** Symptom
+
+When requesting link sources (C-c l s / 'skg-request-sourceward-view'),
+the resulting path nodes show no 'graphStats' at all.
+By contrast, the root node (and nodes opened via 'skg-view')
+typically do show stats.
+
+** Experiment
+
+Setup: 'science' (id 6972d099...) has 4 inbound textlinks.
+Requesting sourceward view produces 4 source nodes. Example:
+
+: * ... (graphStats (containers 0) (contents 6) (containsHerald 0{6)
+:   (linksInFromLeaves 4) (linksHerald →4)) ...)) science
+: ** (skg (node (id ecf4f6ea...) ... parentIgnores indefinitive
+:     (viewStats notInParent))) [[id:6972d099...][science]]
+
+The root has rich graphStats. The source nodes have none.
+
+Confirmed with instrumented server: 'set_graphnodestats_in_forest'
+DOES compute stats for the source nodes. For ecf4f6ea:
+
+: containRels=Some(NodeContainRels { containers: 1, contents: 0 })
+: linksourceRels=Some(NodeLinksourceRels { sources_with_content: 0,
+:                                          sources_without_content: 0 })
+
+The stats exist — they're just all at default values.
+
+** Root cause
+
+'graphnodestats_to_sexp' in 'org_to_text.rs' suppresses fields
+whose values equal their defaults:
+
+- 'containers == 1' → suppressed (line 251: 'if c.containers != 1')
+- 'contents == 0' → suppressed (line 253: 'if c.contents != 0')
+- 'containsHerald' → suppressed when both values are defaults
+- 'linksInFromContainers == 0' → suppressed
+- 'linksInFromLeaves == 0' → suppressed
+- 'linksHerald' → suppressed when both values are 0
+
+When ALL fields are at defaults, 'parts' is empty (line 279)
+and the entire '(graphStats ...)' is omitted.
+
+This is not specific to link sources. ANY node whose stats are
+all at default values shows no 'graphStats'. Link source nodes
+are especially likely to hit this because they tend to be leaves
+(0 contents) with exactly 1 container and no inbound links.
+
+** The fix should be: always show containsHerald
+
+The 'containsHerald' is the most universally informative stat.
+A node with '(graphStats (containsHerald 1{))' communicates
+"1 container, 0 contents" — which IS useful information, and
+currently invisible.
+
+To implement: in 'graphnodestats_to_sexp', always emit
+'containsHerald' when 'containRels' is 'Some', even when
+both 'containers' and 'contents' are at their defaults.
+This ensures every node with TypeDB data shows at least
+'(graphStats (containsHerald 1{))'.

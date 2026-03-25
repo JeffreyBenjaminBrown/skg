@@ -1,33 +1,27 @@
-* Dear Claude,
-* Forever, please help me care for my data.
-My local copy of my public notes, I have moved into this repo.
-I hope to treat it as the primary one,
-and to keep it in decent sync with the master on github
-  (where decent = a time integral)
-I hope to use this, and not
-  org-roam where they are most recently from,
-to edit it.
 * To know about the project,
   These resources cover the space decently, with some redundacy.
-  Definitely not all relevant at all times.
-
 ** README.org
-** TODO.org
 ** api-and-formats.md
-** ai-agents.md and coding-advice/
+** the coding-advice/ folder
 ** schema.tql
 ** https://github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
+** TODO.org
 ** anything the above link to
-* Next, please read and act on [[./next.org]]
 * I find you easiest to read
-  in an org file on disk, rather than in this screen.
-  Anything longer than a couple paragraphs, please refer me there.
-* Please report problems.
-  We can keep a 'problems' file
-  (or folder, or skg subgraph, it might get huge,
-  but we'll use trees to counterwhelm the data).
+  in an org file on disk, rather than inside this CLI.
+  For anything longer than a couple paragraphs,
+  please refer me to a file.
+* Please report problems in the code.
+Whether or not my latest request takes such things into consideration,
+if you find any:
 
-  This includes problems with what I've asked,
-  with how we've been building, whatever.
+- bugs or deviations from spec
+- noteworthy inefficiencies
+- opportunities to improve the architecture
+
+please report them, in a top-level file 'problems.org'.
+If it doesn't exist, please create that.
+* Please report problems with my requests.
+For each of my requests, push back against anything vague or ill-specified, inefficient, unnecessary or overly complex.
 * Thanks,
   Jeff
