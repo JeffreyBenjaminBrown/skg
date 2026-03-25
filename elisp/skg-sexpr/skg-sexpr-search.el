@@ -20,11 +20,7 @@ Signals an error if a sexp is found but does not end on this line."
   (let ((line-end (line-end-position)))
     (when (search-forward "(" line-end t)
       (backward-char 1)
-      (let ((start (point)))
-        (forward-sexp 1)
-        (when (> (point) line-end)
-          (error "Sexp does not end on this line"))
-        (read (buffer-substring-no-properties start (point)))))))
+      (skg--read-sexp-at-point-on-line (point) line-end))))
 
 (defun skg-sexp-at-or-after-point ()
   "Return the sexp at point or the first sexp after point on this line.
@@ -54,10 +50,34 @@ Signals an error if:
         (error "No sexp found on this line at or after point")))
     (progn ;; Move to start and verify sexp ends on this line
       (goto-char found-start)
-      (forward-sexp 1)
-      (when (> (point) line-end)
-        (error "Sexp does not end on this line"))
-      (read (buffer-substring-no-properties found-start (point))))))
+      (skg--read-sexp-at-point-on-line found-start line-end))))
+
+(defun skg--read-sexp-at-point-on-line (start line-end)
+  "Parse the sexp starting at START, ensuring it ends before LINE-END.
+Uses skg-find-sexp-end for paren matching (immune to herald
+characters that confuse Emacs's forward-sexp), then strips
+herald fields before returning the parsed sexp.
+Moves point to the end of the sexp."
+  (let* ((line-text (buffer-substring-no-properties start line-end))
+         (sexp-end-in-text (skg-find-sexp-end line-text)))
+    (unless sexp-end-in-text
+      (error "Unbalanced parentheses"))
+    (goto-char (+ start sexp-end-in-text))
+    (when (> (point) line-end)
+      (error "Sexp does not end on this line"))
+    (skg-strip-heralds-from-sexp
+     (read (substring line-text 0 sexp-end-in-text)))))
+
+(defun skg-strip-heralds-from-sexp (sexp)
+  "Remove output-only herald fields from SEXP.
+Herald fields (containsHerald, linksHerald, sourceHerald) use
+characters like { that confuse Emacs sexp navigation.
+Rust discards them on parse anyway."
+  (skg-edit-nested-sexp
+   sexp
+   '(skg (node (graphStats (DELETE (containsHerald)
+                                   (linksHerald) ))
+               (viewStats  (DELETE (sourceHerald) )) )) ))
 
 (defun skg-find-sexp-end (text &optional start-pos)
   "Find the position after the closing paren of the first s-expression in TEXT.

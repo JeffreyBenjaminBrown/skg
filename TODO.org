@@ -1,56 +1,165 @@
+* semi-permanent
+** [[./next.org]] might be in progress
+** import org-roam
+*** to run it
+cargo run --bin skg -- import-org-roam public/ data/public/ public
+** commit message -- with blank to fill
+begin
+
+  imported from public org-roam notes:
+    git@github.com:JeffreyBenjaminBrown/public-notes-in-org-roam-format
+  as of commit
+    [FILL IN THIS DETAIL]
+** when dogfooding
+*** spots to patrol
+**** make edits
+***** move something to a different repo
+***** write
+***** move
+***** multi-contain
+**** commit to git
+**** ? read git history
+**** DONE visit things
+**** DONE request view changes
+*** It is valid to dogfood even as only reading.
+* TODO what is the *skg-doc-raw* buffer?
+* TODO bugs
+** regression : can't shift-tab to change source
+in metadata edit buffer
+** C-<return> from a root gives an error message
+*** I want it to create a new root and prompt for source.
+*** I get this error message.
+Debugger entered--Lisp error: (error "sexp-to-org: input is not paren-terse: (skg (node))")
+  error("sexp-to-org: input is not paren-terse: %S" (skg (node)))
+  (if (sexp-paren-terse-p sexp) nil (error "sexp-to-org: input is not paren-terse: %S" sexp))
+  sexp-to-org((skg (node)))
+  (let ((sexp-as-org (sexp-to-org sexp))) (if is-truenode (skg-truenode-expand-defaults-in-org sexp-as-org default-source) sexp-as-org))
+  (let* ((sexp (read metadata-str)) (is-truenode (skg-truenode-sexp-p sexp)) (sexp-start (if no-metadata (car positions) (+ (line-beginning-position) (length (car split))))) (sexp-end (if no-metadata (cdr positions) (+ sexp-start (length metadata-str)))) (default-source (if no-metadata (progn (skg-sexp-edit--default-source)))) (org-text (let ((sexp-as-org (sexp-to-org sexp))) (if is-truenode (skg-truenode-expand-defaults-in-org sexp-as-org default-source) sexp-as-org)))) (skg-sexp-edit--open-edit-buffer org-text source-buffer sexp-start sexp-end is-truenode) (if no-metadata (progn (skg-sexp-edit--goto-field-value "source") (message "Choose a source."))))
+  (let* ((metadata-str (car (cdr split))) (no-metadata (string-empty-p metadata-str)) (positions (if no-metadata (progn (skg-sexp-edit--insert-default-metadata)))) (source-buffer (current-buffer))) (if no-metadata (progn (setq metadata-str "(skg (node))"))) (let* ((sexp (read metadata-str)) (is-truenode (skg-truenode-sexp-p sexp)) (sexp-start (if no-metadata (car positions) (+ (line-beginning-position) (length (car split))))) (sexp-end (if no-metadata (cdr positions) (+ sexp-start (length metadata-str)))) (default-source (if no-metadata (progn (skg-sexp-edit--default-source)))) (org-text (let ((sexp-as-org (sexp-to-org sexp))) (if is-truenode (skg-truenode-expand-defaults-in-org sexp-as-org default-source) sexp-as-org)))) (skg-sexp-edit--open-edit-buffer org-text source-buffer sexp-start sexp-end is-truenode) (if no-metadata (progn (skg-sexp-edit--goto-field-value "source") (message "Choose a source.")))))
+  (let* ((headline (skg-get-current-headline-text)) (split (skg-split-as-stars-metadata-title headline))) (if split nil (user-error "Not on a headline")) (let* ((metadata-str (car (cdr split))) (no-metadata (string-empty-p metadata-str)) (positions (if no-metadata (progn (skg-sexp-edit--insert-default-metadata)))) (source-buffer (current-buffer))) (if no-metadata (progn (setq metadata-str "(skg (node))"))) (let* ((sexp (read metadata-str)) (is-truenode (skg-truenode-sexp-p sexp)) (sexp-start (if no-metadata (car positions) (+ (line-beginning-position) (length ...)))) (sexp-end (if no-metadata (cdr positions) (+ sexp-start (length metadata-str)))) (default-source (if no-metadata (progn (skg-sexp-edit--default-source)))) (org-text (let ((sexp-as-org ...)) (if is-truenode (skg-truenode-expand-defaults-in-org sexp-as-org default-source) sexp-as-org)))) (skg-sexp-edit--open-edit-buffer org-text source-buffer sexp-start sexp-end is-truenode) (if no-metadata (progn (skg-sexp-edit--goto-field-value "source") (message "Choose a source."))))))
+  skg-edit-metadata()
+  (progn (skg-edit-metadata))
+  (if (and (and (boundp 'skg-content-view-mode) skg-content-view-mode) (org-at-heading-p) (= (org-outline-level) 1)) (progn (skg-edit-metadata)))
+  skg-sexp-edit--after-insert-heading()
+  apply(skg-sexp-edit--after-insert-heading nil)
+  org-insert-heading-respect-content()
+  funcall-interactively(org-insert-heading-respect-content)
+  command-execute(org-insert-heading-respect-content)
+*** and in the buffer I get a new top-level headline "* (skg (node))"
+** BUG: skg-new-empty-view asks for a source, doesn't recognize
+I type 'public' and it responds [no match] on the same minibuffer line.
+** Containerward stats are missing from link sources.
+* TODO slow things
+** save took forever after changing a node from public to private.
+And this is repeatable,
+and happens in the reverse direction too,
+and regardless of git diff view on or off.
+** requesting metadata edit view took forever
+*** when it happened
+I was in diff view mode, and requested it for this id:
+
+  a4b10f33-94bb-4368-a011-577607b1e4c7
+
+from this buffer:
+
+  (I have replaced asterisks with hash marks, to distinguish this buffer from the org document it is quoted within.)
+
+  # (skg (node (id c71a2ad0-4a34-44d2-b344-a75c124b5111) (source public) (graphStats (contents 3) (containsHerald {3) (linksInFromLeaves 2) (linksHerald →2)) (viewStats (sourceHerald ⌂:public)))) power from nothingness / The list of things you don't have to worry about is impossibly too long to record, know.
+  ## (skg (node (id 0acfbfef-eea6-4ba9-9ccf-2515a460796c) (source public) (graphStats (linksInFromLeaves 1) (linksHerald →1)))) truth vs. lies
+  ## (skg (node (id 69664107-ffdb-470d-bc91-367d2dea29b4) (source public))) Neo dodging bullets, easy bad guys, hundred-hand slap.
+  ## (skg (node (id a4b10f33-94bb-4368-a011-577607b1e4c7) (source public) (diff new))) There is so much existence in the answer to what is impossible.
+*** the second time, it was fast
+** diff view updates should be backgrounded for the other buffers
+Lock each separately to edits until updated.
+* TODO shortcuts
+** C-c v v not working from magit
+* TODO new features
+** should go to new nodes, not just modified nodes
+when switching to the magit view with C-c v m
+** heralds
+*** if node is a top-level headline in the buffer, different herald rules
+We must see how many containers it has, even if only 1.
+*** New source should be first herald and a different color, as should relation to parent and reason for existence when unusual (e.g. containerward path).
+This information should be a different color from the graph stats.
+*** If heritable in the view tree, source does not have to be restated when something is unconnected to its parent.
+That is, if a is public, and ignores its child b which is public,
+b does not need to restate 'public'.
+** There should only be one definitive view across all buffers.
+And they should all be indexed for C-c v v to jump to,
+not just the roots.
+** Hide sources.
+*** Figure out the diff logic for insertions when some are hidden.
+I think I see how, just pin each thing to its last visible sibling.
+** buffer list
+*** need longer name field in buffer view
+*** Use novel characters as skg buffer prefixes.
+And|or make Skg a major mode,
+so Skg buffers are distinguishable in the buffer view.
+This would permit stripping the leading "skg: " from buffer names.
+**** maybe > and >? for normal and search buffers
+** (Again?) Want link sources to show containerward ancestries.
+** The number of contents herald is less interesting.
+** server can't verify connection initially
 * DONE bug: can't visit magit
+These headlines form a story, somewhat sequentially.
+They don't make sense out of context of the others.
+** When I run C-c v m
 ** with point on the first line
 ** of this buffer
-  * (skg (node (id 90c32efc-92c8-490f-afb3-50342e6d616c) (source public) (graphStats (containers 0) (contents 9) (containsHerald 0{9) (linksInFromLeaves 3) (linksHerald →3)) (viewStats (sourceHerald ⌂:public)))) how to form a study group
-  ** (skg (node (id 4530e8f7-ad3f-4206-8262-476633a8b168) (source public))) SOURCE : Largely asking ChatGPT
-  to sum up the research.
-  ** (skg (node (id 5b4522d9-91f6-4673-8926-593801f1936f) (source public) (graphStats (contents 7) (containsHerald {7)))) Self-selected groups (tend to)
-  *** (skg (node (id 3f0c73fa-0639-4e54-87c7-cdad42081779) (source public))) enjoy the experience more.
-  *** (skg (node (id cf580964-78e3-4754-bd21-0b64b12327ac) (source public))) underperform the alternative.
-  "Instructor-assigned or algorithmic groups (mixed skill, random, or balanced by GPA, gender, etc.)"
-  The best-performing groups were "thoughtfully balanced", rather than random, but even random outperformed self-selection.
-  *** (skg (node (id 49832d0d-dc95-4929-8f0a-f845f6e2ad70) (source public))) early on, have more comfort, cohesion and communication.
-  *** (skg (node (id 70e30cca-b218-4380-ac50-a73320e9575d) (source public))) lower initial coordination cost.
-  *** (skg (node (id 18475cc2-db9d-44ca-a3de-3d0550a9e6be) (source public))) plateau earlier.
-  *** (skg (node (id 297df3a1-3c26-4b2d-8e6c-0db31e700f44) (source public))) have less diverse ideas and skills.
-  It wasn't clear that they meant only "friends or familiar peers"
-  or whether that was just an illustration.
-  *** (skg (node (id a25ca1dc-3643-4949-b020-30ba4d7de8d0) (source public))) avoid conflict and role differentiation.
-  ** (skg (node (id 2759a806-afd0-4631-82dd-cec8debe41ac) (source public))) "Explicit discussion of roles early on improves outcomes regardless of formation method."
-  ** (skg (node (id ce905ec2-8ad7-43f4-8a6c-fb93f0ec0a0a) (source public))) With time group cooperation improves.
-  ** (skg (node (id 77a2bda5-93e8-475e-ae4e-163d28214e85) (source public))) overlapping interests
-  ** (skg (node (id b0729ba1-6eb3-4172-9273-2ba35187ce91) (source public) (graphStats (contents 4) (containsHerald {4)))) specialization
-  *** (skg (node (id 50711408-599a-4002-9052-c4d2711803ae) (source public) (graphStats (contents 2) (containsHerald {2)))) kinds
-  **** (skg (node (id 52cfa1ef-f61f-4297-a4ea-05f27ac09402) (source public))) in subject area
-  **** (skg (node (id b4265b00-ccec-41cc-bffe-15c6b33f7039) (source public))) in role
-  alias: some roles
+(The following is org-formatted, but have made the asterisks into hashes
+to distinguish it from the org document that contains it.
+That helped Claude read it.)
 
-  editor
-  explainer
-  investigator
-  manager
-  note-taker
-  organizer
-  question-generator
-  reconciler
-  recorder-reporter
-  reviewer
-  social integrator
-  strategy evaluator
-  summarizer
-  timekeeper
-  *** (skg (node (id c7e26515-6ad9-471b-881b-1001ee762ffb) (source public))) Roles are better at least someowhat fluid.
-  Indeed formally rotating roles can work well.
-  *** (skg (node (id 1d82985b-2e98-498f-be21-dc5ddba90c11) (source public))) It can emerge without being named.
-  *** (skg (node (id 8c3d5ecf-6f3d-4fee-ad3f-44e55c75692c) (source public))) Subject area expertise is more helpful if known.
-  If everyone knows you can ask X about T,
-    that makes T's specialization in X more useful.
-  ** (skg (node (id 4f359057-3de0-402b-b295-e09aef9a1a5f) (source public) (graphStats (contents 2) (containsHerald {2)))) problems
-  *** (skg (node (id 50dbce86-1334-4c06-9efe-d71b056406f0) (source public))) "diffusion of responsibility"
-  *** (skg (node (id 70052f0f-a043-456f-b20f-6b7184a1b02c) (source public))) "coordination overhead"
-  ** (skg (node (id 879e111d-0b67-463c-9427-e1b455dcb16d) (source public))) Some tasks have more potential for specialization.
-  complementarity
-  ** (skg (node (id 907528a5-7ab6-4bc1-a3d6-7dd8cfa805c1) (source public))) Over-specialization feels narrow-minded.
+    # (skg (node (id 90c32efc-92c8-490f-afb3-50342e6d616c) (source public) (graphStats (containers 0) (contents 9) (containsHerald 0{9) (linksInFromLeaves 3) (linksHerald →3)) (viewStats (sourceHerald ⌂:public)))) how to form a study group
+    ## (skg (node (id 4530e8f7-ad3f-4206-8262-476633a8b168) (source public))) SOURCE : Largely asking ChatGPT
+    to sum up the research.
+    ## (skg (node (id 5b4522d9-91f6-4673-8926-593801f1936f) (source public) (graphStats (contents 7) (containsHerald {7)))) Self-selected groups (tend to)
+    ### (skg (node (id 3f0c73fa-0639-4e54-87c7-cdad42081779) (source public))) enjoy the experience more.
+    ### (skg (node (id cf580964-78e3-4754-bd21-0b64b12327ac) (source public))) underperform the alternative.
+    "Instructor-assigned or algorithmic groups (mixed skill, random, or balanced by GPA, gender, etc.)"
+    The best-performing groups were "thoughtfully balanced", rather than random, but even random outperformed self-selection.
+    ### (skg (node (id 49832d0d-dc95-4929-8f0a-f845f6e2ad70) (source public))) early on, have more comfort, cohesion and communication.
+    ### (skg (node (id 70e30cca-b218-4380-ac50-a73320e9575d) (source public))) lower initial coordination cost.
+    ### (skg (node (id 18475cc2-db9d-44ca-a3de-3d0550a9e6be) (source public))) plateau earlier.
+    ### (skg (node (id 297df3a1-3c26-4b2d-8e6c-0db31e700f44) (source public))) have less diverse ideas and skills.
+    It wasn't clear that they meant only "friends or familiar peers"
+    or whether that was just an illustration.
+    ### (skg (node (id a25ca1dc-3643-4949-b020-30ba4d7de8d0) (source public))) avoid conflict and role differentiation.
+    ## (skg (node (id 2759a806-afd0-4631-82dd-cec8debe41ac) (source public))) "Explicit discussion of roles early on improves outcomes regardless of formation method."
+    ## (skg (node (id ce905ec2-8ad7-43f4-8a6c-fb93f0ec0a0a) (source public))) With time group cooperation improves.
+    ## (skg (node (id 77a2bda5-93e8-475e-ae4e-163d28214e85) (source public))) overlapping interests
+    ## (skg (node (id b0729ba1-6eb3-4172-9273-2ba35187ce91) (source public) (graphStats (contents 4) (containsHerald {4)))) specialization
+    ### (skg (node (id 50711408-599a-4002-9052-c4d2711803ae) (source public) (graphStats (contents 2) (containsHerald {2)))) kinds
+    #### (skg (node (id 52cfa1ef-f61f-4297-a4ea-05f27ac09402) (source public))) in subject area
+    #### (skg (node (id b4265b00-ccec-41cc-bffe-15c6b33f7039) (source public))) in role
+    alias: some roles
+
+    editor
+    explainer
+    investigator
+    manager
+    note-taker
+    organizer
+    question-generator
+    reconciler
+    recorder-reporter
+    reviewer
+    social integrator
+    strategy evaluator
+    summarizer
+    timekeeper
+    ### (skg (node (id c7e26515-6ad9-471b-881b-1001ee762ffb) (source public))) Roles are better at least someowhat fluid.
+    Indeed formally rotating roles can work well.
+    ### (skg (node (id 1d82985b-2e98-498f-be21-dc5ddba90c11) (source public))) It can emerge without being named.
+    ### (skg (node (id 8c3d5ecf-6f3d-4fee-ad3f-44e55c75692c) (source public))) Subject area expertise is more helpful if known.
+    If everyone knows you can ask X about T,
+      that makes T's specialization in X more useful.
+    ## (skg (node (id 4f359057-3de0-402b-b295-e09aef9a1a5f) (source public) (graphStats (contents 2) (containsHerald {2)))) problems
+    ### (skg (node (id 50dbce86-1334-4c06-9efe-d71b056406f0) (source public))) "diffusion of responsibility"
+    ### (skg (node (id 70052f0f-a043-456f-b20f-6b7184a1b02c) (source public))) "coordination overhead"
+    ## (skg (node (id 879e111d-0b67-463c-9427-e1b455dcb16d) (source public))) Some tasks have more potential for specialization.
+    complementarity
+    ## (skg (node (id 907528a5-7ab6-4bc1-a3d6-7dd8cfa805c1) (source public))) Over-specialization feels narrow-minded.
 ** I get this error
 Debugger entered--Lisp error: (scan-error "Unbalanced parentheses" 3 3695)
   forward-sexp-default-function(1)
@@ -65,30 +174,30 @@ Debugger entered--Lisp error: (scan-error "Unbalanced parentheses" 3 3695)
   skg-view-magit()
   funcall-interactively(skg-view-magit)
   command-execute(skg-view-magit)
+** If I instead try when point is on the second line, it works.
+** Third line: fails.
+** Fourth and fifth lines: works.
 * TODO review commit 7dacceadcee6ea260ae19625bc8e7da1c77986d1
 which was to fix test db accumulation
+* ? containerwardPathCol, sourceCol
+** ? distinguish those from the other 'skg-local-*' commands?
+** labels
+*** containerwardPathCol would say "is recursively contained in these descendents"
+*** sourceCol would say "is targeted by links from these children"
+**** discarding
+each of which is recursively contained in its descendents"
+*** two varieties of source children depicted
+- a root flag with source
+- a containerwardPathCol
 * Bug ? forward-sexp chokes on {
 skg-find-sexp-end (line 62 in this same file) counts only () and works fine.
 So Skg developers have to know to use Skg-specific sexp navigation.
 But maybe that's appropriate?
-* Bug ? server can't verify connection initially
 * Have Claude report bugs.
 * Report bugs about Claude.
 ** whitespace for distinct org domains: illegible
 It doesn't understand nested one org passage quoted in another org document,
 if the quotation is represented as leading whitespace.
-* semi-permanent
-** [[./next.org]] might be in progress
-** import org-roam
-*** to run it
-cargo run --bin skg -- import-org-roam public/ data/public/ public
-** commit message -- with blank to fill
-begin
-
-  imported from public org-roam notes:
-    git@github.com:JeffreyBenjaminBrown/public-notes-in-org-roam-format
-  as of commit
-    [FILL IN THIS DETAIL]
 * Dogfood and develop in separate places on disk.
 That way I can keep investigating the latest usable commit
 while a new one is being developed.
