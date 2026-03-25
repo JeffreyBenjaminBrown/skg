@@ -49,7 +49,7 @@
     (setq                  skg-rust-tcp-proc
           (make-network-process
            :name "skg-doc"
-           :buffer "*skg-doc-raw*"
+           :buffer nil
            :host "127.0.0.1"
            :service skg-port
            :filter ;; handles the response

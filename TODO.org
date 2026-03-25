@@ -22,7 +22,6 @@ begin
 **** DONE visit things
 **** DONE request view changes
 *** It is valid to dogfood even as only reading.
-* TODO what is the *skg-doc-raw* buffer?
 * TODO bugs
 ** regression : can't shift-tab to change source
 in metadata edit buffer

@@ -1,0 +1,36 @@
+* Can't use forward-sexp on skg metadata
+
+Emacs's =forward-sexp= (and by extension =backward-up-list=,
+=up-list=, etc.) chokes on skg metadata because herald fields
+contain characters that Emacs treats as unmatched delimiters.
+
+For example, =containsHerald= uses ={= without a closing =}=:
+
+: (graphStats (containers 0) (contents 9) (containsHerald 0{9))
+
+=forward-sexp= sees the ={= and either errors or jumps to the
+wrong position, because Emacs's syntax tables treat braces as
+paired delimiters.
+
+Similarly, =sourceHerald= uses =⌂:= and =linksHerald= uses =→=,
+which can confuse sexp navigation depending on syntax table
+settings.
+
+** What to use instead
+
+=skg-find-sexp-end= in =skg-sexpr/skg-sexpr-search.el= counts
+parentheses manually, ignoring all other characters. Use it (or
+=skg--read-sexp-at-point-on-line= which wraps it) instead of
+=forward-sexp= when navigating skg metadata.
+
+** Where this matters
+
+Any Emacs Lisp code that needs to find the extent of an =(skg ...)=
+sexp in a buffer or string. Currently:
+
+- =skg-first-sexpr-on-line= — returns the first sexp on the line
+- =skg-sexp-at-or-after-point= — returns the sexp at/after point
+- =skg-metadata.el= — splits headline into stars, metadata, title
+- =heralds-minor-mode.el= — finds metadata extent for overlays
+
+All of these use =skg-find-sexp-end= rather than =forward-sexp=.
