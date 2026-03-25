@@ -109,9 +109,12 @@ SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER."
     (outline-next-heading)))
 
 (defun skg-sexp-edit--insert-default-metadata ()
-  "Insert (skg (node)) metadata at the headline at point.
-Returns (SEXP-START . SEXP-END) for the inserted text."
-  (let (( sexp-text "(skg (node)) " ))
+  "Insert (skg node) metadata at the headline at point.
+Returns (SEXP-START . SEXP-END) for the inserted text.
+Uses (skg node) rather than (skg (node)) because the latter
+is not paren-terse (see skg-sexpr-org-bijection.el)
+so sexp-to-org would reject it."
+  (let (( sexp-text "(skg node) " ))
     (beginning-of-line)
     (search-forward " " nil t) ;; past the stars + space
     (insert sexp-text)
@@ -140,7 +143,7 @@ Only acts in skg-content-view-mode buffers when a level-1 heading was created."
 (defun skg-edit-metadata ()
   "Edit the metadata sexp on the current headline in an org buffer.
 Opens a temporary org buffer with the sexp converted to org headlines.
-If the headline has no metadata, inserts (skg (node)) first.
+If the headline has no metadata, inserts (skg node) first.
 Use C-c C-c to save changes back to the source buffer.
 Kill the buffer to cancel without saving."
   (interactive)
@@ -156,7 +159,7 @@ Kill the buffer to cancel without saving."
                          (skg-sexp-edit--insert-default-metadata)) )
            ( source-buffer (current-buffer) ))
       (when no-metadata
-        (setq metadata-str "(skg (node))"))
+        (setq metadata-str "(skg node)"))
       (let* ((sexp (read metadata-str) )
              (is-truenode (skg-truenode-sexp-p sexp) )
              (sexp-start (if no-metadata

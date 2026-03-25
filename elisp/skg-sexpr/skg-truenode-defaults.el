@@ -34,8 +34,9 @@
 ;;
 
 (defun skg-truenode-sexp-p (sexp)
-  "Return non-nil if SEXP is a TrueNode sexp: (skg (node ...) ...)."
-  (skg-sexp-subtree-p sexp '(skg (node))))
+  "Return non-nil if SEXP is a TrueNode sexp."
+  (or (skg-sexp-subtree-p sexp '(skg (node)))
+      (skg-sexp-subtree-p sexp '(skg node))))
 
 ;;
 ;; Headlines <-> org text
