@@ -94,7 +94,7 @@ async fn test_merge_2_into_1_impl(
              "Should have 1 Merge");
 
   merge_nodes(
-    merge_instructions . clone(),
+    &merge_instructions,
     config . clone(),
     tantivy,
     driver,
@@ -351,7 +351,7 @@ async fn test_merge_1_into_2_impl(
              "Should have 1 Merge");
 
   merge_nodes(
-    merge_instructions . clone(),
+    &merge_instructions,
     config . clone(),
     tantivy,
     driver,

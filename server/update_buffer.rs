@@ -17,8 +17,10 @@ use crate::serve::handlers::save_buffer::{
 use crate::to_org::util::DefinitiveMap;
 use crate::types::git::{SourceDiff, NodeDiffStatus};
 use crate::types::misc::{ID, SourceName, SkgConfig};
-use crate::types::save::{DefineNode, SaveNode};
+use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
+use crate::types::save::{DefineNode, Merge, SaveNode};
 use crate::types::memory::{SkgNodeMap, skgnode_map_from_save_instructions};
+use crate::types::skgnode::SkgNode;
 use crate::types::tree::generic::{
   do_everywhere_in_tree_dfs,
   do_everywhere_in_tree_dfs_prunable};
@@ -43,6 +45,7 @@ use typedb_driver::TypeDBDriver;
 pub async fn update_views_after_save (
   saved_view                  : Tree<ViewNode>,
   save_instructions           : Vec<DefineNode>,
+  merge_instructions          : &[Merge],
   saveview_skgnodes_pre_save  : SkgNodeMap,
   diff_mode_enabled           : bool,
   config                      : &SkgConfig,
@@ -57,6 +60,13 @@ pub async fn update_views_after_save (
       it . entry (pid) // The 'or_insert_with' means user edits from skgnode_map_from_save_instructions are given priority.
         . or_insert_with ( || skgnode ); }
     it };
+  for m in merge_instructions {
+    // Reload acquirers from disk so the map reflects the post-merge .skg files.
+    let pid    : &ID         = &m . updated_acquirer . 0 . pid;
+    let source : &SourceName = &m . updated_acquirer . 0 . source;
+    let skgnode : SkgNode = skgnode_from_pid_and_source (
+      config, pid . clone(), source ) ?;
+    skgnode_map . insert ( pid . clone(), skgnode ); }
   let source_diffs
     : Option<HashMap<SourceName, SourceDiff>>
     = if diff_mode_enabled
@@ -66,12 +76,16 @@ pub async fn update_views_after_save (
     source_diffs . as_ref()
     . map ( |d| deleted_ids_to_source (d))
     . unwrap_or_default();
-  let deleted_by_this_save_pids : HashSet<ID> = // PITFALL: Can overlap deleted_since_head_pid_src_map, but neither is necessarily a subset of the other. If you delete something that you added since head, it will only be here. And if you deleted something since head but not in this save, it will only be there.
+  let mut deleted_by_this_save_pids : HashSet<ID> =
+    // PITFALL: Can overlap deleted_since_head_pid_src_map, but neither is necessarily a subset of the other. If you delete something that you added since head, it will only be here. And if you deleted something since head but not in this save, it will only be there.
     save_instructions . iter()
     . filter_map( |instr| match instr {
       DefineNode::Delete (d) => Some( d . id . clone() ),
       _ => None })
     . collect();
+  for m in merge_instructions {
+    deleted_by_this_save_pids . insert (
+      m . acquiree_to_delete . id . clone() ); }
   let mut errors : Vec<String> = Vec::new ();
   let mut saved_view_mut : Tree<ViewNode> = saved_view;
   let saved_text : String =

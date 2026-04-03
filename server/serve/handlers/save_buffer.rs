@@ -204,7 +204,7 @@ pub async fn update_from_and_rerender_buffer (
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "merge_nodes" ). entered();
         merge_nodes (
-          merge_instructions,
+          &merge_instructions,
           config . clone(),
           tantivy_index,
           typedb_driver ) . await } ?;
@@ -221,6 +221,7 @@ pub async fn update_from_and_rerender_buffer (
   update_views_after_save (
     forest,
     save_instructions,
+    &merge_instructions,
     saveview_skgnodes_pre_save,
     diff_mode_enabled,
     config,

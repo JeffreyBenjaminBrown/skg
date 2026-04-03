@@ -18,7 +18,7 @@ use typedb_driver::TypeDBDriver;
 /// Returns `None` when all three stores updated normally.
 /// Returns `Some(new_index)` when Tantivy had to be rebuilt.
 pub async fn merge_nodes (
-  merge_instructions : Vec<Merge>,
+  merge_instructions : &[Merge],
   config             : SkgConfig,
   tantivy_index      : &TantivyIndex,
   driver             : &TypeDBDriver,

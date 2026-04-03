@@ -104,8 +104,10 @@ fn three_merged_skgnodes(
     combined . extend_from_slice(
       &acquiree_from_disk . contains );
     dedup_vector (combined) };
-  updated_acquirer . contains = // update 'contains'
-    new_contains . clone();
+  updated_acquirer . contains =
+    setlike_vector_subtraction ( // prevent acquirer from containing itself
+      new_contains . clone(),
+      &updated_acquirer . all_ids() . cloned() . collect::<Vec<_>>() );
   { // Combine subscribes_to
     let mut combined : Vec<ID> =
       acquirer_from_disk . subscribes_to . or_default() . to_vec();
