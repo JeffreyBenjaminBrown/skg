@@ -81,6 +81,7 @@ pub async fn buffer_to_viewnode_forest_and_save_instructions (
         nonmerge_instructions, config, driver )
       . await } . map_err (SaveError::BufferValidationErrors) ?;
   let merge_instructions : Vec<Merge> =
+    // PITFALL: The edit_requests consumed here remain in viewnode_forest until cleared by complete_truenode_preorder (during complete_viewtree). While it would be more natural to clear them immediately after consumption, that would require either walking the entire forest of views again, or keeping a map from ID to Set<NodeId>, both of which are more complex.
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "instructiontriples_from_the_merges_in_an_viewnode_forest"
         ). entered();

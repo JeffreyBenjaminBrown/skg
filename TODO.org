@@ -26,11 +26,6 @@ begin
 **** DONE visit things
 **** DONE request view changes
 *** It is valid to dogfood even as only reading.
-* clean
-** should edit requests be cleared by complete_viewnode?
-They currently are.
-But it seems more natural to clear them immediately upon execution.
-Also that would make complete_viewnode a little easier to understand.
 * add a space after the metadata when creating a new node with C-<return>
 * Links to links are currently annoying. Are they important?
 * TODO slow things
