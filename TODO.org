@@ -26,13 +26,11 @@ begin
 **** DONE visit things
 **** DONE request view changes
 *** It is valid to dogfood even as only reading.
-* add a space after the metadata when creating a new node with C-<return>
-* Links to links are currently annoying. Are they important?
+* TODO ?
+** Links to links are currently annoying. Are they important?
 * TODO slow things
 ** diff view updates should be backgrounded for the other buffers
 Lock each separately to edits until updated.
-* TODO shortcuts
-** C-c v v not working from magit
 * TODO new features
 ** should go to new nodes, not just modified nodes
 when switching to the magit view with C-c v m

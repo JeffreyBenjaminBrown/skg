@@ -28,8 +28,15 @@
   (defvar skg-port (skg-port-from-toml file))
   (setq skg-config-dir (file-name-directory (expand-file-name file)))
   (skg-tcp-connect-to-rust)
-  (skg-connection-verify))
+  (skg-connection-verify)
+  (skg--set-global-keybindings))
 
+(defun skg--set-global-keybindings ()
+  "Skg-related keybindings one is likely to use even outside of skg buffers."
+  (global-set-key (kbd "C-c t t") #'skg-search-titles)
+  (global-set-key (kbd "C-c t e") #'skg-search-titles-everywhere)
+  (global-set-key (kbd "C-c v v") #'skg-view)
+  (global-set-key (kbd "C-c v n") #'skg-view-new-empty))
 
 (defun skg-tcp-connect-to-rust ()
   "Connect, persistently, to the Rust TCP server."
