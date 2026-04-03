@@ -1,4 +1,26 @@
+* ONGOING fixing merges
 * add a space after the metadata when creating a new node with C-<return>
+* clean
+** extract the body of this if statement into a standalone function
+  // server/update_buffer/complete_parent_first/truenode.rs
+
+  if deleted_by_this_save_pids . contains (&pid) {
+    // Degrade this TrueNode to a DeletedNode.
+    let (title, body) : (String, Option<String>) =
+      read_at_node_in_tree ( tree, node,
+        |vn : &ViewNode| match &vn . kind {
+          ViewNodeKind::True (t) =>
+            ( t . title . clone(), t . body () . cloned() ),
+          _ => ( String::new(), None ) } ) ?;
+    write_at_node_in_tree ( tree, node,
+      |vn : &mut ViewNode| {
+        vn . kind = ViewNodeKind::Deleted ( DeletedNode {
+          id     : pid . clone(),
+          source : source . clone(),
+          title,
+          body, } ); }
+    ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+    return Ok(( )); }
 * semi-permanent
 ** [[./next.org]] might be in progress
 ** import org-roam

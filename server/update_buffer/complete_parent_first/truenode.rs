@@ -121,6 +121,11 @@ pub fn complete_truenode_preorder (
           body, } ); }
     ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     return Ok(( )); }
+  write_at_truenode_in_tree ( tree, node, |t| {
+    // Clear any edit_request present. (By now has been consumed.) Analogous to 'remove_completed_view_request' for view requests.
+    if let IndefOrDef::Definitive { edit_request, .. }
+      = &mut t . indef_or_def
+      { *edit_request = None; } } ) ?;
   let skgnode : &SkgNode =
     skgnode_from_map_or_disk( &pid, &source, map, config ) ?;
   if ! is_saved_view { // The saved (definitive) view of a node *defines* the title and body, but other views need those fields updated.
