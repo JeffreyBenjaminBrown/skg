@@ -105,21 +105,8 @@ pub fn complete_truenode_preorder (
       clobberIndefinitiveViewnode( tree, map, node, config ) ?;
       return Ok(( )); }}
   if deleted_by_this_save_pids . contains (&pid) {
-    // Degrade this TrueNode to a DeletedNode.
-    let (title, body) : (String, Option<String>) =
-      read_at_node_in_tree ( tree, node,
-        |vn : &ViewNode| match &vn . kind {
-          ViewNodeKind::True (t) =>
-            ( t . title . clone(), t . body () . cloned() ),
-          _ => ( String::new(), None ) } ) ?;
-    write_at_node_in_tree ( tree, node,
-      |vn : &mut ViewNode| {
-        vn . kind = ViewNodeKind::Deleted ( DeletedNode {
-          id     : pid . clone(),
-          source : source . clone(),
-          title,
-          body, } ); }
-    ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+    mutate_truenode_to_deletednode (
+      tree, node, &pid, &source ) ?;
     return Ok(( )); }
   write_at_truenode_in_tree ( tree, node, |t| {
     // Clear any edit_request present. (By now has been consumed.) Analogous to 'remove_completed_view_request' for view requests.
@@ -162,6 +149,27 @@ pub fn complete_truenode_preorder (
   maybe_prepend_diff_view_scaffolds(
     tree, node, node_changes ) ?;
   Ok(( )) }
+
+fn mutate_truenode_to_deletednode (
+  tree   : &mut Tree<ViewNode>,
+  node   : NodeId,
+  pid    : &ID,
+  source : &SourceName,
+) -> Result<(), Box<dyn Error>> {
+  let (title, body) : (String, Option<String>) =
+    read_at_node_in_tree ( tree, node,
+      |vn : &ViewNode| match &vn . kind {
+        ViewNodeKind::True (t) =>
+          ( t . title . clone(), t . body () . cloned() ),
+        _ => ( String::new(), None ) } ) ?;
+  write_at_node_in_tree ( tree, node,
+    |vn : &mut ViewNode| {
+      vn . kind = ViewNodeKind::Deleted ( DeletedNode {
+        id     : pid . clone(),
+        source : source . clone(),
+        title,
+        body, } ); }
+  ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) }
 
 /// Whether this is a non-ignored child of a SubscribeeCol.
 fn is_subscribee (

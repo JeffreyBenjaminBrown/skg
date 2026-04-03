@@ -1,10 +1,11 @@
-* ONGOING fixing merges
 * semi-permanent
 ** [[./next.org]] might be in progress
 ** import org-roam
 *** to run it
 cargo run --bin skg -- import-org-roam public/ data/public/ public
-** commit message -- with blank to fill
+** commit message for freshly imported data
+*** PITFALL: Fill in the blank.
+*** it
 begin
 
   imported from public org-roam notes:
@@ -26,26 +27,6 @@ begin
 **** DONE request view changes
 *** It is valid to dogfood even as only reading.
 * clean
-** extract the body of this if statement into a standalone function
-  // server/update_buffer/complete_parent_first/truenode.rs
-
-  if deleted_by_this_save_pids . contains (&pid) {
-    // Degrade this TrueNode to a DeletedNode.
-    let (title, body) : (String, Option<String>) =
-      read_at_node_in_tree ( tree, node,
-        |vn : &ViewNode| match &vn . kind {
-          ViewNodeKind::True (t) =>
-            ( t . title . clone(), t . body () . cloned() ),
-          _ => ( String::new(), None ) } ) ?;
-    write_at_node_in_tree ( tree, node,
-      |vn : &mut ViewNode| {
-        vn . kind = ViewNodeKind::Deleted ( DeletedNode {
-          id     : pid . clone(),
-          source : source . clone(),
-          title,
-          body, } ); }
-    ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-    return Ok(( )); }
 ** should edit requests be cleared by complete_viewnode?
 They currently are.
 But it seems more natural to clear them immediately upon execution.
