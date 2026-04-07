@@ -4,6 +4,7 @@ pub use git2::Repository;
 pub use std::collections::HashMap;
 pub use std::error::Error;
 pub use std::fs;
+pub use std::net::TcpStream;
 pub use std::path::{Path, PathBuf};
 pub use std::sync::Arc;
 pub use tempfile::TempDir;
@@ -243,6 +244,22 @@ pub fn without_lines_containing(buffer: &str, substring: &str) -> String {
     . collect::<Vec<_>>()
     . join ("\n") + "\n"
 }
+
+/// Create a connected TCP stream pair for testing.
+/// Returns (write_end, read_end). The write_end is passed
+/// to 'update_from_and_rerender_buffer'; the read_end can
+/// be used to read streamed collateral-view messages.
+pub fn mk_test_tcp_stream_pair ()
+  -> (TcpStream, TcpStream)
+{ let listener : std::net::TcpListener =
+    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
+  let addr : std::net::SocketAddr =
+    listener . local_addr () . unwrap ();
+  let write_end : TcpStream =
+    TcpStream::connect (addr) . unwrap ();
+  let (read_end, _) =
+    listener . accept () . unwrap ();
+  (write_end, read_end) }
 
 /// Insert a line after the line containing the given substring.
 pub fn insert_after(buffer: &str, after_substring: &str, new_line: &str) -> String {

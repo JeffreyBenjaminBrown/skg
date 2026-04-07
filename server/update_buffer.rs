@@ -9,22 +9,20 @@ pub use complete::complete_viewtree;
 pub use graphnodestats::set_graphnodestats_in_forest;
 pub use viewnodestats::set_viewnodestats_in_forest;
 
+use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::serve::ConnectionState;
-use crate::serve::handlers::save_buffer::{
-  SaveResponse,
-  compute_diff_for_every_source, deleted_ids_to_source};
+use crate::serve::handlers::save_buffer::{ SaveResponse, compute_diff_for_every_source, deleted_ids_to_source};
+use crate::serve::protocol::TcpToClient;
+use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::to_org::util::DefinitiveMap;
 use crate::types::git::{SourceDiff, NodeDiffStatus};
-use crate::types::misc::{ID, SourceName, SkgConfig};
-use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
-use crate::types::save::{DefineNode, Merge, SaveNode};
-use crate::types::memory::{SkgNodeMap, skgnode_map_from_save_instructions};
-use crate::types::skgnode::SkgNode;
-use crate::types::tree::generic::{
-  do_everywhere_in_tree_dfs,
-  do_everywhere_in_tree_dfs_prunable};
 use crate::types::memory::ViewUri;
+use crate::types::memory::{SkgNodeMap, skgnode_map_from_save_instructions};
+use crate::types::misc::{ID, SourceName, SkgConfig};
+use crate::types::save::{DefineNode, Merge, SaveNode};
+use crate::types::skgnode::SkgNode;
+use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
 
 use ego_tree::{Tree, NodeId, NodeMut};
@@ -43,6 +41,7 @@ use typedb_driver::TypeDBDriver;
 /// the graph was already updated.
 /// Updating views before updating the graph would be bad.
 pub async fn update_views_after_save (
+  stream                      : &mut std::net::TcpStream,
   saved_view                  : Tree<ViewNode>,
   save_instructions           : Vec<DefineNode>,
   merge_instructions          : &[Merge],
@@ -101,7 +100,6 @@ pub async fn update_views_after_save (
         &deleted_since_head_pid_src_map,
         &deleted_by_this_save_pids,
         true ) . await } ?;
-  let mut collateral_views : Vec<(ViewUri, String)> = Vec::new ();
   if let Ok (uri) = viewuri_from_request_result {
     merge_skgnodemap_into_pool (&skgnode_map, conn_state);
     conn_state . memory . update_view (
@@ -118,7 +116,7 @@ pub async fn update_views_after_save (
         collateral_uris . iter ()
           . map ( |u| u . repr_in_client () )
           . collect::<Vec<_>> ()); }
-    for curi in collateral_uris { // Identical pipeline, with each view building on the pool enriched by prior views.
+    for curi in collateral_uris { // Same rerender_view pipeline as the saved view, but with is_saved_view=false. Each view builds on the pool enriched by prior views, and is streamed to Emacs immediately.
       let mut forest : Tree<ViewNode> = match
         conn_state . memory . viewuri_to_view (&curi) {
           Some (f) => f . clone (),
@@ -141,13 +139,17 @@ pub async fn update_views_after_save (
       { Ok (text) => {
           merge_skgnodemap_into_pool (&map, conn_state);
           conn_state . memory . update_view (&curi, forest);
-          collateral_views . push (( curi, text )); },
+          send_response_with_length_prefix (
+            stream,
+            & tag_sexp_response (
+              TcpToClient::CollateralView,
+              & format_single_view_sexp (&curi, &text) )); },
         Err (e) => {
           errors . push ( format! (
             "Collateral view {}: {}",
-            curi . repr_in_client (), e )); } } } }
+            curi . repr_in_client (), e )); }} }}
   Ok ( SaveResponse { saved_view : saved_text,
-                       errors, collateral_views } ) }
+                       errors } ) }
 
 /// Given the saved ViewUri and save instructions,
 /// return the URIs of other views whose forests

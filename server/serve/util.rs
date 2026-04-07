@@ -121,40 +121,26 @@ pub(super) fn format_buffer_response_sexp (
           . collect () ) ] ) ] )
     . to_string () }
 
-/// Format buffer content, errors, and other-views-to-update as an s-expression.
-/// Format: ((content "...") (errors ("e1" ...)) (other-views-to-update (("URI1" "c1") ...)))
-pub(super) fn format_buffer_response_sexp_with_updates (
-  buffer_content   : &str,
-  errors           : &[String],
-  collateral_views : &[(ViewUri, String)],
+/// Format a single view update as an s-expression.
+/// Format: ((view-uri "URI") (content "CONTENT"))
+/// Used for any streamed per-view message (collateral-view,
+/// rerender-view, etc.). The caller tags it with the appropriate
+/// TcpToClient variant.
+pub(crate) fn format_single_view_sexp (
+  uri     : &ViewUri,
+  content : &str,
 ) -> String {
-  let collateral_views_sexp : Sexp =
-    Sexp::List ( vec! [
-      Sexp::Atom ( Atom::S ( "other-views-to-update" . to_string () )),
-      Sexp::List (
-        collateral_views
-          . iter ()
-          . map ( |(uri, content)| Sexp::List ( vec! [
-            Sexp::Atom ( Atom::S ( uri . repr_in_client () )),
-            Sexp::Atom ( Atom::S ( content . clone () )) ] ) )
-          . collect () ) ] );
   Sexp::List ( vec! [
     Sexp::List ( vec! [
-      Sexp::Atom ( Atom::S ( "content" . to_string () )),
-      Sexp::Atom ( Atom::S ( buffer_content . to_string () )) ] ),
+      Sexp::Atom ( Atom::S ( "view-uri" . to_string () )),
+      Sexp::Atom ( Atom::S ( uri . repr_in_client () )) ] ),
     Sexp::List ( vec! [
-      Sexp::Atom ( Atom::S ( "errors" . to_string () )),
-      Sexp::List (
-        errors
-          . iter ()
-          . map ( |e| Sexp::Atom (
-            Atom::S ( e . clone () )) )
-          . collect () ) ] ),
-    collateral_views_sexp ] )
+      Sexp::Atom ( Atom::S ( "content" . to_string () )),
+      Sexp::Atom ( Atom::S ( content . to_string () )) ] ) ] )
     . to_string () }
 
-/// Format: ((lock-collateral-views ("URI1" "URI2" ...)))
-pub(super) fn format_collateral_uris_sexp (
+/// Format: ((lock-views ("URI1" "URI2" ...)))
+pub(super) fn format_lock_views_sexp (
   uris : &[ViewUri],
 ) -> String {
   let uri_sexps : Vec<Sexp> =
@@ -163,7 +149,7 @@ pub(super) fn format_collateral_uris_sexp (
     . collect ();
   Sexp::List ( vec! [
     Sexp::List ( vec! [
-      Sexp::Atom ( Atom::S ( "lock-collateral-views" . to_string () )),
+      Sexp::Atom ( Atom::S ( "lock-views" . to_string () )),
       Sexp::List ( uri_sexps ) ] ) ] )
     . to_string () }
 

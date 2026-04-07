@@ -8,8 +8,8 @@ use crate::serve::ConnectionState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   view_uri_from_request,
-  format_buffer_response_sexp_with_updates,
-  format_collateral_uris_sexp,
+  format_buffer_response_sexp,
+  format_lock_views_sexp,
   read_length_prefixed_content,
   send_response_with_length_prefix,
   tag_sexp_response,
@@ -33,23 +33,22 @@ use std::net::TcpStream;
 use std::path::Path;
 use typedb_driver::TypeDBDriver;
 
-/// Rust's response to Emacs for a save operation.
-/// Contains the regenerated buffer content and any warnings/errors.
-/// 'Collateral views' are other views that need updating
-/// as a result of the save.
+/// The terminal message in the save protocol.
+/// Sent after collateral-view updates (if there are any).
+/// Contains the re-rendered saved buffer and any warnings/errors.
+/// See <api-and-formats.md § Save buffer> for the full sequence:
+///   save-lock → collateral-view* → save-result.
 pub struct SaveResponse {
-  pub saved_view       : String,
-  pub errors           : Vec < String >,
-  pub collateral_views : Vec<(ViewUri, String)>,
+  pub saved_view : String,
+  pub errors     : Vec<String>,
 }
 
 impl SaveResponse {
-  /// Format: ((content "...") (errors (...)) (other-views-to-update (("URI1" "c1") ...)))
+  /// Format: ((content "...") (errors (...)))
   fn to_sexp_string (&self) -> String {
-    format_buffer_response_sexp_with_updates (
+    format_buffer_response_sexp (
       & self . saved_view,
-      & self . errors,
-      & self . collateral_views ) }}
+      & self . errors ) }}
 
 /// Handles save buffer requests from Emacs.
 /// - Reads the buffer content (with length prefix).
@@ -89,7 +88,7 @@ pub fn handle_save_buffer_request (
           uris_of_views_to_lock (
             &viewuri_from_request_result, conn_state );
         let lock_sexp : String =
-          format_collateral_uris_sexp ( &uris_to_lock );
+          format_lock_views_sexp ( &uris_to_lock );
         send_response_with_length_prefix (
           stream,
           & tag_sexp_response ( TcpToClient::SaveLock, &lock_sexp )); }
@@ -97,6 +96,7 @@ pub fn handle_save_buffer_request (
           "update_from_and_rerender_buffer" ). entered();
         match block_on(
           update_from_and_rerender_buffer (
+            stream,
             & initial_buffer_content,
             typedb_driver, config, tantivy_index,
             conn_state . diff_mode_enabled,
@@ -159,6 +159,7 @@ fn empty_response_sexp (
 /// - Merges must follow the execution of other save instructions, because the user may have updated one of the nodes to be merged.
 /// - complete_viewtree is complex: it runs a preorder pass (completing and reconciling each node) followed by a postorder pass (populating scaffolds like IDCol, AliasCol, etc.).
 pub async fn update_from_and_rerender_buffer (
+  stream                      : &mut TcpStream,
   org_buffer_text             : &str,
   typedb_driver               : &TypeDBDriver,
   config                      : &SkgConfig,
@@ -219,6 +220,7 @@ pub async fn update_from_and_rerender_buffer (
         "context type recomputation failed: {}", e )); } }
 
   update_views_after_save (
+    stream,
     forest,
     save_instructions,
     &merge_instructions,

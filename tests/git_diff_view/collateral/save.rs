@@ -5,6 +5,8 @@
 
 use super::common::*;
 
+use std::io::BufReader;
+
 /// After saving buffer 1 with a new child, collateral buffer 2
 /// should still show textChanged on b and new-here on the new child.
 #[test]
@@ -18,10 +20,10 @@ fn test_collateral_view_preserves_diff_annotations()
   let repo_path : &Path = temp_dir . path();
   setup_git_repo_with_fixtures (repo_path)?;
 
-  let (_config, driver, _tantivy, save_response, initial_buffer,
-       uri_2)
+  let (_config, driver, _tantivy, _save_response, _initial_buffer,
+       uri_2, read_end)
     : (SkgConfig, TypeDBDriver, TantivyIndex, SaveResponse,
-       String, ViewUri) =
+       String, ViewUri, TcpStream) =
     block_on ( async {
       let (config, driver, mut tantivy)
         : (SkgConfig, TypeDBDriver, TantivyIndex) =
@@ -61,8 +63,10 @@ fn test_collateral_view_preserves_diff_annotations()
       let save_input : String = insert_after (
         &initial_buffer, "(id a)",
         "** (skg (node (id c))) c" );
+      let (mut stream, read_end) = mk_test_tcp_stream_pair ();
       let save_response : SaveResponse =
         update_from_and_rerender_buffer (
+          &mut stream,
           &save_input, &driver, &config, &mut tantivy,
           true, map,
           &Ok ( uri_1 . clone () ),
@@ -70,33 +74,35 @@ fn test_collateral_view_preserves_diff_annotations()
 
       Result::<_, Box<dyn Error>>::Ok ((
         config, driver, tantivy, save_response,
-        initial_buffer, uri_2 )) } ) ?;
+        initial_buffer, uri_2, read_end )) } ) ?;
 
-  // 5. There should be exactly one collateral update (buffer 2).
-  let collateral_updates : &Vec<(ViewUri, String)> =
-    &save_response . collateral_views;
-  assert_eq!( collateral_updates . len (), 1,
-    "Expected one collateral update (buffer 2), got {}.\n\
-     Initial buffer:\n{}\n\
-     Saved view:\n{}",
-    collateral_updates . len (),
-    initial_buffer,
-    save_response . saved_view );
-  let (ref collateral_uri, ref collateral_buffer)
-    : (ViewUri, String) = collateral_updates[0];
-  assert_eq!( collateral_uri, &uri_2,
-    "Collateral update should be for buffer 2" );
+  // 5. Read streamed collateral views from the TCP stream.
+  //    There should be exactly one, for buffer 2.
+  let mut reader : BufReader<TcpStream> =
+    BufReader::new (read_end);
+  let collateral_msgs : Vec<String> =
+    skg::test_utils::read_all_lp_messages (&mut reader);
+  assert_eq! ( collateral_msgs . len (), 1,
+    "Expected 1 collateral view, got {}", collateral_msgs . len () );
+  let body : &str = &collateral_msgs[0];
+  assert! ( body . contains ("collateral-view"),
+    "Expected collateral-view response, got: {}", body );
+  assert! ( body . contains (&uri_2 . repr_in_client ()),
+    "Collateral update should be for buffer 2, got: {}", body );
+  let collateral_buffer : String =
+    skg::test_utils::extract_string_field_from_sexp (body, "content")
+    . expect ("content field not found in collateral-view sexp");
 
   // 7. Verify diff annotations in the collateral buffer.
 
   // b should still have textChanged.
-  assert_buffer_contains ( collateral_buffer,
+  assert_buffer_contains ( &collateral_buffer,
     "** (skg (node (id b) (source main))) b\n\
      *** (skg textChanged)" );
 
   // c should appear with diff new
   // (its .skg file didn't exist at HEAD).
-  assert_buffer_contains ( collateral_buffer,
+  assert_buffer_contains ( &collateral_buffer,
     "** (skg (node (id c) (diff new))) c" );
 
   // DISK: c.skg should exist (created by the save).

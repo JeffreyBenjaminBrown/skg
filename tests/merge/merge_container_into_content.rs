@@ -14,6 +14,7 @@
 
 use indoc::indoc;
 use std::error::Error;
+use std::net::TcpStream;
 use std::path::Path;
 
 use skg::dbs::filesystem::one_node::skgnode_from_pid_and_source;
@@ -56,7 +57,12 @@ async fn merge_container_into_content_impl (
   let mut conn_state : ConnectionState = ConnectionState {
     diff_mode_enabled : false,
     memory            : SkgnodesInMemory::new () };
+  let listener : std::net::TcpListener =
+    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
+  let mut stream : TcpStream =
+    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let response = update_from_and_rerender_buffer (
+    &mut stream,
     input_org_text, driver, config, tantivy, false,
     SkgNodeMap::new(),
     &Err ( String::new () ), &mut conn_state ) . await ?;

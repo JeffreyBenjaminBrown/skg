@@ -20,7 +20,18 @@ use skg::serve::ConnectionState;
 use skg::types::memory::SkgnodesInMemory;
 use futures::executor::block_on;
 use std::error::Error;
+use std::net::TcpStream;
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
+
+fn mk_test_tcp_stream ()
+  -> TcpStream
+{ let listener : std::net::TcpListener =
+    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
+  let addr : std::net::SocketAddr =
+    listener . local_addr () . unwrap ();
+  let write_end : TcpStream =
+    TcpStream::connect (addr) . unwrap ();
+  write_end }
 
 async fn setup_test(
   db_name: &str,
@@ -132,7 +143,9 @@ fn test_every_kind_of_col(
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
         memory            : SkgnodesInMemory::new () };
+      let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
+          &mut stream,
           &modified_view, &driver, &config, &mut tantivy, false,
           SkgNodeMap::new(),
           &Err ( String::new () ), &mut conn_state
@@ -205,7 +218,9 @@ fn test_hidden_within_but_none_without(
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
         memory            : SkgnodesInMemory::new () };
+      let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
+          &mut stream,
           &modified_view, &driver, &config, &mut tantivy, false,
           SkgNodeMap::new(),
           &Err ( String::new () ), &mut conn_state
@@ -279,7 +294,9 @@ fn test_hidden_without_but_none_within(
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
         memory            : SkgnodesInMemory::new () };
+      let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
+        &mut stream,
         &modified_view, &driver, &config, &mut tantivy, false,
         SkgNodeMap::new(),
         &Err ( String::new () ), &mut conn_state ) . await ?;
@@ -349,7 +366,9 @@ fn test_overlapping_hidden_within(
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
         memory            : SkgnodesInMemory::new () };
+      let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
+        &mut stream,
         &modified_view, &driver, &config, &mut tantivy, false,
         SkgNodeMap::new(),
         &Err ( String::new () ), &mut conn_state ) . await ?;

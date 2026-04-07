@@ -512,3 +512,69 @@ pub fn extract_skgnode_if_save_else_error(
   match instr {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") }}
+
+/// Read one length-prefixed message from a TCP stream.
+/// Returns the body as a String.
+/// Format: "Content-Length: N\r\n\r\n<N bytes>"
+pub fn read_lp_message (
+  reader : &mut std::io::BufReader<std::net::TcpStream>,
+) -> Result<String, Box<dyn std::error::Error>> {
+  use std::io::{BufRead, Read};
+  let mut header_line : String = String::new ();
+  reader . read_line (&mut header_line) ?;
+  let mut blank : String = String::new ();
+  reader . read_line (&mut blank) ?;
+  let content_length : usize =
+    header_line . trim ()
+    . strip_prefix ("Content-Length: ")
+    . ok_or ("missing Content-Length header") ?
+    . parse () ?;
+  let mut body_bytes : Vec<u8> = vec![0u8; content_length];
+  reader . read_exact (&mut body_bytes) ?;
+  Ok ( String::from_utf8 (body_bytes) ? ) }
+
+/// Read all LP messages from a stream until one contains the
+/// given terminal response type (e.g. "save-result").
+/// Returns (non_terminal_messages, terminal_message).
+pub fn read_lp_messages_until (
+  reader        : &mut std::io::BufReader<std::net::TcpStream>,
+  terminal_type : &str,
+) -> Result<(Vec<String>, String),
+            Box<dyn std::error::Error>> {
+  let mut collected : Vec<String> = Vec::new ();
+  loop {
+    let msg : String = read_lp_message (reader) ?;
+    if msg . contains (terminal_type) {
+      return Ok (( collected, msg )); }
+    collected . push (msg); } }
+
+/// Read all LP messages from a stream until EOF.
+/// Useful for tests that call pipeline functions directly
+/// (without the full handler that sends a terminal message).
+pub fn read_all_lp_messages (
+  reader : &mut std::io::BufReader<std::net::TcpStream>,
+) -> Vec<String> {
+  let mut messages : Vec<String> = Vec::new ();
+  while let Ok (msg) = read_lp_message (reader) {
+    messages . push (msg); }
+  messages }
+
+/// Extract a string field from a tagged sexp like
+/// ((response-type X) (view-uri "URI") (content "...")).
+/// Returns None if the key is not found.
+pub fn extract_string_field_from_sexp (
+  sexp_str : &str,
+  key      : &str,
+) -> Option<String> {
+  let parsed : sexp::Sexp = sexp::parse (sexp_str) . ok () ?;
+  match &parsed {
+    sexp::Sexp::List (items) =>
+      items . iter () . find_map ( |item| match item {
+        sexp::Sexp::List (pair) if pair . len () == 2 =>
+          match (&pair[0], &pair[1]) {
+            ( sexp::Sexp::Atom (sexp::Atom::S (k)),
+              sexp::Sexp::Atom (sexp::Atom::S (v)) )
+              if k == key => Some (v . clone ()),
+            _ => None },
+        _ => None } ),
+    _ => None } }

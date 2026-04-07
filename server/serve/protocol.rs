@@ -46,6 +46,7 @@ pub enum TcpToClient {
   ContentView,
   SaveLock, // Sent before the expensive save pipeline. Lists collateral view URIs so Emacs can lock those buffers against edits while the save is in progress.
   SaveResult,
+  CollateralView, // One streamed collateral-view update during save. Sent per-view between SaveLock and SaveResult.
   CloseView,
   SearchResults, // computed fast
   SearchEnrichment, // replaces SearchResults, once it's computed. Includes containerward ancestries and graphnodestats.
@@ -67,6 +68,7 @@ impl TcpToClient {
       TcpToClient::ContentView      => "content-view",
       TcpToClient::SaveLock         => "save-lock",
       TcpToClient::SaveResult       => "save-result",
+      TcpToClient::CollateralView   => "collateral-view",
       TcpToClient::CloseView        => "close-view",
       TcpToClient::SearchResults    => "search-results",
       TcpToClient::SearchEnrichment => "search-enrichment",

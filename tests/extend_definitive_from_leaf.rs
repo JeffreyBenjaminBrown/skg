@@ -6,12 +6,21 @@
 
 use indoc::indoc;
 use std::error::Error;
+use std::net::TcpStream;
 
 use skg::test_utils::run_with_test_db;
 use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
 use skg::serve::ConnectionState;
 use skg::types::memory::SkgnodesInMemory;
 use skg::types::memory::SkgNodeMap;
+
+fn mk_test_tcp_stream ()
+  -> TcpStream
+{ let listener : std::net::TcpListener =
+    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
+  let addr : std::net::SocketAddr =
+    listener . local_addr () . unwrap ();
+  TcpStream::connect (addr) . unwrap () }
 
 // ===================================================
 // Test: Definitive view with limit=10
@@ -39,7 +48,9 @@ fn test_definitive_view_limit_10
         let mut conn_state : ConnectionState = ConnectionState {
           diff_mode_enabled : false,
           memory            : SkgnodesInMemory::new () };
+        let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
+          &mut stream,
           input_org_text, driver, &config, tantivy, false,
           SkgNodeMap::new(),
           &Err ( String::new () ), &mut conn_state ) . await ?;
@@ -105,7 +116,9 @@ fn test_definitive_view_limit_5_or_6
         let mut conn_state : ConnectionState = ConnectionState {
           diff_mode_enabled : false,
           memory            : SkgnodesInMemory::new () };
+        let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_5 = update_from_and_rerender_buffer (
+          &mut stream,
           input_org_text, driver, &config5, tantivy, false,
           SkgNodeMap::new(),
           &Err ( String::new () ), &mut conn_state ) . await ?;
@@ -116,7 +129,9 @@ fn test_definitive_view_limit_5_or_6
         let mut conn_state : ConnectionState = ConnectionState {
           diff_mode_enabled : false,
           memory            : SkgnodesInMemory::new () };
+        let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_6 = update_from_and_rerender_buffer (
+          &mut stream,
           input_org_text, driver, &config6, tantivy, false,
           SkgNodeMap::new(),
           &Err ( String::new () ), &mut conn_state ) . await ?;
@@ -185,7 +200,9 @@ fn test_definitive_view_limit_1_to_4
         let mut conn_state : ConnectionState = ConnectionState {
           diff_mode_enabled : false,
           memory            : SkgnodesInMemory::new () };
+        let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_1 = update_from_and_rerender_buffer (
+          &mut stream,
           input_org_text, driver, &config1, tantivy, false, SkgNodeMap::new(),
           &Err ( String::new () ), &mut conn_state ) . await ?;
         response_1 . saved_view };
@@ -195,7 +212,9 @@ fn test_definitive_view_limit_1_to_4
         let mut conn_state : ConnectionState = ConnectionState {
           diff_mode_enabled : false,
           memory            : SkgnodesInMemory::new () };
+        let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_4 = update_from_and_rerender_buffer (
+          &mut stream,
           input_org_text, driver, &config4, tantivy, false, SkgNodeMap::new(),
           &Err ( String::new () ), &mut conn_state ) . await ?;
         response_4 . saved_view };
@@ -258,7 +277,9 @@ fn test_definitive_view_conflicting
         let mut conn_state : ConnectionState = ConnectionState {
           diff_mode_enabled : false,
           memory            : SkgnodesInMemory::new () };
+        let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
+          &mut stream,
           input_org_text, driver, &config, tantivy, false, SkgNodeMap::new(),
           &Err ( String::new () ), &mut conn_state ) . await ?;
         response . saved_view };
@@ -310,7 +331,9 @@ fn test_definitive_view_with_cycle
         let mut conn_state : ConnectionState = ConnectionState {
           diff_mode_enabled : false,
           memory            : SkgnodesInMemory::new () };
+        let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
+          &mut stream,
           input_org_text, driver, &config, tantivy, false, SkgNodeMap::new(),
           &Err ( String::new () ), &mut conn_state ) . await ?;
         response . saved_view };
@@ -356,7 +379,9 @@ fn test_definitive_view_with_repeat
         let mut conn_state : ConnectionState = ConnectionState {
           diff_mode_enabled : false,
           memory            : SkgnodesInMemory::new () };
+        let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
+          &mut stream,
           input_org_text, driver, &config, tantivy, false, SkgNodeMap::new(),
           &Err ( String::new () ), &mut conn_state ) . await ?;
         response . saved_view };
@@ -409,7 +434,9 @@ fn test_definitive_view_request_cleared
         let mut conn_state : ConnectionState = ConnectionState {
           diff_mode_enabled : false,
           memory            : SkgnodesInMemory::new () };
+        let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
+          &mut stream,
           input_org_text, driver, &config, tantivy, false, SkgNodeMap::new(),
           &Err ( String::new () ), &mut conn_state ) . await ?;
         response . saved_view };

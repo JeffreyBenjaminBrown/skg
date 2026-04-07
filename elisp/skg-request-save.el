@@ -64,6 +64,11 @@ unlocked when the early response arrives."
          (skg--save-lock-handler saved-uri save-buffer payload))
        t)
       (skg-register-response-handler
+       'collateral-view
+       (lambda (_tcp-proc payload)
+         (skg--collateral-view-handler payload))
+       nil) ;; non-one-shot: fires for each streamed collateral view
+      (skg-register-response-handler
        'save-result
        (lambda (_tcp-proc payload)
          (skg--save-result-handler save-buffer payload))
@@ -92,21 +97,39 @@ before the add/remove cycle."
 Unlocks non-collateral buffers."
   (condition-case err
       (let* ((response (read payload))
-             (collateral-entry (assoc 'lock-collateral-views response)))
-        (when collateral-entry
-          (let ((collateral-uris (cadr collateral-entry)))
+             (lock-entry (assoc 'lock-views response)))
+        (when lock-entry
+          (let ((collateral-uris (cadr lock-entry)))
             (skg--unlock-non-collateral-buffers
              saved-uri collateral-uris))))
     (error
      (skg--unlock-all-save-locked)
      (skg-log 'error 'save "save-lock handler error: %S" err)) ))
 
+(defun skg--collateral-view-handler (payload)
+  "Handle one streamed collateral-view update.
+Unlocks and updates the buffer for the given view URI."
+  (condition-case err
+      (let* ((response (read payload))
+             (uri (cadr (assoc 'view-uri response)))
+             (content (cadr (assoc 'content response)))
+             (buf (skg-find-buffer-by-uri uri)))
+        (when buf
+          (with-current-buffer buf
+            (skg--unlock-after-save)
+            (skg-replace-buffer-with-new-content nil content))))
+    (error (skg-log 'error 'save
+                    "collateral-view handler error: %S" err))))
+
 (defun skg--save-result-handler (save-buffer payload)
   "Handle the full save-result LP message (tagged with response-type).
-Unlocks all save-locked buffers, then processes the save response.
-Unlock MUST happen before `skg-handle-save-sexp' because
+Removes the collateral-view handler, unlocks all save-locked buffers,
+then processes the save response.
+Unlock must happen BEFORE `skg-handle-save-sexp' because
 `skg-replace-buffer-with-new-content' calls erase-buffer + insert,
 which would trigger overlay modification-hooks if still present."
+  (setq skg-response-handler-map
+        (assoc-delete-all 'collateral-view skg-response-handler-map))
   (unwind-protect
       (progn
         (skg--unlock-all-save-locked)
@@ -115,25 +138,14 @@ which would trigger overlay modification-hooks if still present."
     (skg--unlock-all-save-locked)) )
 
 (defun skg-handle-save-sexp (sexp-string)
-  "Parse and handle save response s-exp: ((content ...) (errors (...)) (other-views-to-update ((URI_1 CONTENT_1) ...)))."
+  "Parse and handle save response s-exp: ((content ...) (errors (...)))."
   (condition-case err
       (let* ((response (read sexp-string))
-             (content-value         (cadr (assoc 'content response)))
-             (errors-list           (cadr (assoc 'errors response)))
-             (other-views-to-update (cadr (assoc 'other-views-to-update response))))
-        (when ;; If content is not nil, update the saved buffer
-            content-value
+             (content-value (cadr (assoc 'content response)))
+             (errors-list   (cadr (assoc 'errors response))))
+        (when content-value
           (skg-replace-buffer-with-new-content nil content-value))
-        (when other-views-to-update ;; Maybe update other views too
-          (dolist (entry other-views-to-update)
-            (let* ((uri (car entry))
-                   (new-content (cadr entry))
-                   (buf (skg-find-buffer-by-uri uri)))
-              (when buf
-                (with-current-buffer buf
-                  (skg-replace-buffer-with-new-content
-                   nil new-content)) )) ))
-        (when errors-list ;; If there are errors, show them
+        (when errors-list
           (let ((errors-text
                  (if (listp errors-list)
                      (mapconcat 'identity errors-list "\n\n")

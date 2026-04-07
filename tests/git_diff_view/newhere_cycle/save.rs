@@ -30,7 +30,9 @@ fn test_newhere_cycle_survives_save()
     let mut conn_state : ConnectionState = ConnectionState {
       diff_mode_enabled : true,
       memory            : SkgnodesInMemory::new () };
+    let (mut stream, _) = mk_test_tcp_stream_pair ();
     let response = update_from_and_rerender_buffer(
+      &mut stream,
       &initial_view, &driver, &config, &mut tantivy, true, SkgNodeMap::new(),
       &Err ( String::new () ), &mut conn_state ) . await?;
 

@@ -29,14 +29,17 @@ So far there are these endpoints:
 
 ## Save buffer
   - Request: First `((request . "save buffer") (view-uri . "URI"))\n`, then `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` is the buffer content (`LENGTH` bytes).
-  - Response: Two length-prefixed messages, sent sequentially:
+  - Response: Multiple length-prefixed messages, sent sequentially:
     1. Early lock message (sent immediately, before the expensive pipeline):
-       `Content-Length: N\r\n\r\n((lock-collateral-views ("URI1" "URI2" ...)))`
+       `Content-Length: N\r\n\r\n((response-type save-lock) (lock-views ("URI1" "URI2" ...)))`
        The URI list contains every other open view sharing at least one node with the saved view. Over-approximates: may include views that won't actually change. Emacs uses this to lock collateral buffers against edits.
-    2. Full save response:
-       `Content-Length: N\r\n\r\n((content "...") (errors ("..." ...)) (other-views-to-update (("URI1" "CONTENT1") ...)))`
-       `content` is the re-rendered saved buffer (nil on failure). `errors` is a list of error/warning strings (empty list if none). `other-views-to-update` contains re-rendered content for collateral views.
-  - If the server errors before sending the early lock message (e.g. malformed request), only one message is sent: the error response in the full save response format.
+    2. Zero or more collateral-view messages (one per affected view, streamed as each finishes):
+       `Content-Length: N\r\n\r\n((response-type collateral-view) (view-uri "URI") (content "..."))`
+       Emacs unlocks and updates each buffer as it arrives.
+    3. Final save response:
+       `Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)))`
+       `content` is the re-rendered saved buffer (nil on failure). `errors` is a list of error/warning strings (empty list if none).
+  - If the server errors before sending the early lock message (e.g. malformed request), only one message is sent: the error response in the save-result format.
 
 ## Snapshot response (part of search enrichment; see "Search in titles" above)
   - Request: First `((request . "snapshot response") (terms . "TERMS"))\n`, then `Content-Length: N\r\n\r\n<buffer text>`.
