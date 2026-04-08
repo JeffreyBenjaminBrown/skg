@@ -20,8 +20,7 @@ skg-config-dir is set and skg--owned-sources works."
     (unwind-protect
         (with-temp-buffer
           (insert org-text)
-          (org-mode)
-          (skg-content-view-mode 1)
+          (skg-content-view-mode)
           (goto-char (point-min))
           (funcall body-fn))
       (delete-file config-file)

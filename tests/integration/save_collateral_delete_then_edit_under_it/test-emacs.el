@@ -49,15 +49,15 @@ Uses headline-titles style parsing. Returns t if found, nil otherwise."
   (message "=== PHASE 1: Open buffer 1 (content view of node 1) ===")
   (setq integration-test-phase "phase-1-open-buffer-1")
   (skg-request-single-root-content-view-from-id "1")
-  (skg-test-wait-for-buffer "*skg: 1*")
-  (let ((buf (get-buffer "*skg: 1*")))
+  (skg-test-wait-for-buffer "*1*")
+  (let ((buf (get-buffer "*1*")))
     (unless buf
-      (message "✗ FAIL [phase 1]: Buffer *skg: 1* was not created")
+      (message "✗ FAIL [phase 1]: Buffer *1* was not created")
       (kill-emacs 1))
     (message "Buffer 1 initial content:\n%s"
              (with-current-buffer buf
                (buffer-substring-no-properties (point-min) (point-max))))
-    (message "✓ PASS [phase 1]: Buffer *skg: 1* created successfully")))
+    (message "✓ PASS [phase 1]: Buffer *1* created successfully")))
 
 (defun phase-2-extend-buffer-1-with-second-root-and-alias ()
   "Add an aliases view request to node 11, append a standalone
@@ -68,7 +68,7 @@ for it. Without subee-1 in the buffer, that instruction would set
 contains to [], overwriting subee.skg on disk."
   (message "=== PHASE 2: Extend buffer 1 with second root and alias ===")
   (setq integration-test-phase "phase-2-extend-buffer-1")
-  (with-current-buffer "*skg: 1*"
+  (with-current-buffer "*1*"
     ;; Add aliases view request to node 11.
     (goto-nth-headline-with-title "11" 1)
     (skg-edit-metadata-at-point
@@ -80,7 +80,7 @@ contains to [], overwriting subee.skg on disk."
     (insert "** (skg (node (id subee-1) (source main))) subee-1")
     (skg-request-save-buffer))
   (skg-test-wait-for-response)
-  (let ((buf (get-buffer "*skg: 1*")))
+  (let ((buf (get-buffer "*1*")))
     (message "Buffer 1 after multi-root save:\n%s"
              (with-current-buffer buf
                (buffer-substring-no-properties (point-min) (point-max))))
@@ -161,7 +161,7 @@ takes priority over subee.skg on disk."
 
   ;; Verify buffer 1 (collateral): 11 → DeletedNode,
   ;; its scaffolds → DeletedScaff, standalone subee unaffected.
-  (let ((buf1 (get-buffer "*skg: 1*")))
+  (let ((buf1 (get-buffer "*1*")))
     (unless buf1
       (message "✗ FAIL [phase 5]: Buffer 1 no longer exists")
       (kill-emacs 1))
@@ -184,7 +184,7 @@ takes priority over subee.skg on disk."
   "Add subee-2 as a child of the standalone subee root in buffer 1 and save."
   (message "=== PHASE 6: Add subee-2 in buffer 1 ===")
   (setq integration-test-phase "phase-6-add-subee-2")
-  (with-current-buffer "*skg: 1*"
+  (with-current-buffer "*1*"
     ;; Find the SECOND subee headline (the standalone root, which is
     ;; definitive). The first subee is indefinitive under the deleted
     ;; scaffold and won't update subee.skg's contains.
@@ -218,7 +218,7 @@ takes priority over subee.skg on disk."
   (setq integration-test-phase "phase-7-verify-after-add")
 
   ;; Verify buffer 1: subee-2 appears under the standalone subee root
-  (let ((buf1 (get-buffer "*skg: 1*")))
+  (let ((buf1 (get-buffer "*1*")))
     (unless buf1
       (message "✗ FAIL [phase 7]: Buffer 1 no longer exists")
       (kill-emacs 1))
@@ -262,7 +262,7 @@ and creating a new node under a DeletedScaff. Source metadata is
 required because the parent (DeletedScaff) has no source to inherit."
   (message "=== PHASE 8: Add new-root under deletedScaff in buffer 1 ===")
   (setq integration-test-phase "phase-8-add-new-root")
-  (with-current-buffer "*skg: 1*"
+  (with-current-buffer "*1*"
     (when (goto-nth-headline-with-title "subee" 1)
       (let ((subee-depth
              (let* ((line (buffer-substring-no-properties
@@ -295,7 +295,7 @@ required because the parent (DeletedScaff) has no source to inherit."
 
   ;; Verify buffer 1: new-root appears at depth 4 under deletedScaff,
   ;; everything else unchanged from phase 7.
-  (let ((buf1 (get-buffer "*skg: 1*")))
+  (let ((buf1 (get-buffer "*1*")))
     (unless buf1
       (message "✗ FAIL [phase 9]: Buffer 1 no longer exists")
       (kill-emacs 1))

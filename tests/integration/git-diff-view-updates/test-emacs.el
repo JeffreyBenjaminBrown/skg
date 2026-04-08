@@ -14,10 +14,10 @@
   (message "=== PHASE 1: Open view from a ===")
   (setq integration-test-phase "phase-1")
   (skg-request-single-root-content-view-from-id "a")
-  (skg-test-wait-for-buffer "*skg: a*")
-  (let ((buf (get-buffer "*skg: a*")))
+  (skg-test-wait-for-buffer "*a*")
+  (let ((buf (get-buffer "*a*")))
     (unless buf
-      (message "✗ FAIL [phase 1]: buffer *skg: a* not created")
+      (message "✗ FAIL [phase 1]: buffer *a* not created")
       (kill-emacs 1))
     (assert-headline-titles
      buf
@@ -30,10 +30,10 @@
   (message "=== PHASE 2: Open view from b ===")
   (setq integration-test-phase "phase-2")
   (skg-request-single-root-content-view-from-id "b")
-  (skg-test-wait-for-buffer "*skg: b*")
-  (let ((buf (get-buffer "*skg: b*")))
+  (skg-test-wait-for-buffer "*b*")
+  (let ((buf (get-buffer "*b*")))
     (unless buf
-      (message "✗ FAIL [phase 2]: buffer *skg: b* not created")
+      (message "✗ FAIL [phase 2]: buffer *b* not created")
       (kill-emacs 1))
     (assert-headline-titles
      buf
@@ -45,7 +45,7 @@
 (defun phase-3-edit-and-save ()
   (message "=== PHASE 3: Edit view-b and save ===")
   (setq integration-test-phase "phase-3")
-  (let ((buf (get-buffer "*skg: b*")))
+  (let ((buf (get-buffer "*b*")))
     (with-current-buffer buf
       (let ((inhibit-read-only t)
             content)
@@ -69,7 +69,7 @@
 (defun phase-4-verify-after-save ()
   (message "=== PHASE 4: Verify view-b after save ===")
   (setq integration-test-phase "phase-4")
-  (let ((buf (get-buffer "*skg: b*")))
+  (let ((buf (get-buffer "*b*")))
     (message "Buffer-b after save: %S"
              (with-current-buffer buf
                (buffer-substring-no-properties (point-min) (point-max))))
@@ -86,7 +86,7 @@
   (setq integration-test-phase "phase-5")
   ;; skg-view-diff-mode triggers a save which re-renders.
   ;; We need to be in a content-view buffer for the save to work.
-  (switch-to-buffer "*skg: b*")
+  (switch-to-buffer "*b*")
   (skg-view-diff-mode)
   (skg-test-wait-for-response 20))
 
@@ -95,7 +95,7 @@
 (defun phase-6-verify-diff-view-b ()
   (message "=== PHASE 6: Verify diff markers in view-b ===")
   (setq integration-test-phase "phase-6")
-  (let* ((buf (get-buffer "*skg: b*"))
+  (let* ((buf (get-buffer "*b*"))
          (content (with-current-buffer buf
                     (buffer-substring-no-properties
                      (point-min) (point-max)))))
@@ -117,7 +117,7 @@
 (defun phase-7-verify-diff-view-a ()
   (message "=== PHASE 7: Verify diff markers in view-a ===")
   (setq integration-test-phase "phase-7")
-  (let* ((buf (get-buffer "*skg: a*"))
+  (let* ((buf (get-buffer "*a*"))
          (content (with-current-buffer buf
                     (buffer-substring-no-properties
                      (point-min) (point-max)))))
@@ -145,7 +145,7 @@
     (message "Committing e.skg in %s" default-directory)
     (shell-command "git add e.skg && git commit -q -m 'update e title'"))
   ;; Re-save to trigger diff recomputation
-  (with-current-buffer "*skg: b*"
+  (with-current-buffer "*b*"
     (skg-request-save-buffer))
   (skg-test-wait-for-response 20))
 
@@ -154,7 +154,7 @@
 (defun phase-9-verify-no-text-changed ()
   (message "=== PHASE 9: Verify textChanged gone after commit ===")
   (setq integration-test-phase "phase-9")
-  (let* ((buf (get-buffer "*skg: b*"))
+  (let* ((buf (get-buffer "*b*"))
          (content (with-current-buffer buf
                     (buffer-substring-no-properties
                      (point-min) (point-max)))))
@@ -169,7 +169,7 @@
 (defun phase-10-toggle-diff-off ()
   (message "=== PHASE 10: Toggle git diff mode OFF ===")
   (setq integration-test-phase "phase-10")
-  (switch-to-buffer "*skg: b*")
+  (switch-to-buffer "*b*")
   (skg-view-diff-mode)
   (skg-test-wait-for-response 20))
 
@@ -179,13 +179,13 @@
   (message "=== PHASE 11: Verify views are clean (no diff markers) ===")
   (setq integration-test-phase "phase-11")
   ;; view-b should have no diff/phantom nodes
-  (let ((buf-b (get-buffer "*skg: b*")))
+  (let ((buf-b (get-buffer "*b*")))
     (assert-headline-titles
      buf-b
      '((1 . "b") (2 . "e, edited") (2 . "f") (3 . "d"))
      "phase 11: view-b clean"))
   ;; view-a should have no diff/phantom nodes
-  (let* ((buf-a (get-buffer "*skg: a*"))
+  (let* ((buf-a (get-buffer "*a*"))
          (titles (headline-titles buf-a)))
     (message "Buffer-a titles after diff-off: %S" titles)
     ;; a should contain b, b should contain e,f; f contains d.

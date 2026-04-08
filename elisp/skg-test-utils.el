@@ -19,12 +19,12 @@
     (add-to-list 'load-path (expand-file-name "skg-request-save" elisp-dir))))
 
 (defun find-skg-content-buffer ()
-  "Find a *skg:* buffer that's not a search buffer."
+  "Find a skg content view buffer that's not a search buffer."
   (car (cl-remove-if-not
         (lambda (b)
-          (let ((name (buffer-name b)))
-            (and (string-prefix-p "*skg:" name)
-                 (not (string-match-p "search:" name)))))
+          (and (with-current-buffer b
+                 (derived-mode-p 'skg-content-view-mode))
+               (not (string-prefix-p "*?" (buffer-name b)))))
         (buffer-list))))
 
 (provide 'skg-test-utils)

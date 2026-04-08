@@ -9,7 +9,7 @@
   "Phase 2: Rotate all headline titles in the buffer."
   (message "=== PHASE 2: Editing buffer (rotating titles) ===")
   (let ((t3 (current-time)))
-    (with-current-buffer "*skg: 0*"
+    (with-current-buffer "*0*"
       ;; Collect all headline positions and their titles
       ;; Collect headlines top-to-bottom.
       (let ((headlines '()))

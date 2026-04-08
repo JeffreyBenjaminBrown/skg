@@ -68,11 +68,10 @@ kill-buffer-hook to send close-view to the server."
           (get-buffer-create (skg-search-buffer-name search-terms))
         (let ((inhibit-read-only t))
           (skg--replace-search-content content)
-          (skg--org-mode-with-options)
+          (skg-content-view-mode)
           (heralds-minor-mode)
           (goto-char (point-min)))
         (setq skg-view-uri view-uri)
-        (skg-content-view-mode 1)
         (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
         (switch-to-buffer (current-buffer)) ))))
 

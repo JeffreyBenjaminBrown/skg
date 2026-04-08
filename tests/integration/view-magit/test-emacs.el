@@ -34,7 +34,8 @@
            (lambda ()
              (let (( buf (cl-find-if
                           (lambda (b)
-                            (string-match-p "\\*skg:" (buffer-name b)))
+                            (with-current-buffer b
+                            (derived-mode-p 'skg-content-view-mode)))
                           (buffer-list)) ))
                (when buf
                  (with-current-buffer buf
@@ -49,7 +50,8 @@
   (setq integration-test-phase "magit-from-x")
   (message "=== PHASE 1: skg-view-magit from x (modified file) ===")
   (let (( buf (cl-find-if
-               (lambda (b) (string-match-p "\\*skg:" (buffer-name b)))
+               (lambda (b) (with-current-buffer b
+                            (derived-mode-p 'skg-content-view-mode)))
                (buffer-list)) ))
     (switch-to-buffer buf)
     (goto-char (point-min))
@@ -85,7 +87,8 @@
   (message "=== PHASE 2: skg-view-magit from y (unchanged file) ===")
   ;; Switch back to the skg content view
   (let (( buf (cl-find-if
-               (lambda (b) (string-match-p "\\*skg:" (buffer-name b)))
+               (lambda (b) (with-current-buffer b
+                            (derived-mode-p 'skg-content-view-mode)))
                (buffer-list)) ))
     (switch-to-buffer buf)
     ;; Go to line 2 (node y)

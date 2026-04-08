@@ -31,14 +31,16 @@
    (lambda ()
      (cl-find-if
       (lambda (b)
-        (and (string-match-p "\\*skg:" (buffer-name b))
+        (and (with-current-buffer b
+                            (derived-mode-p 'skg-content-view-mode))
              (with-current-buffer b
                (string-match-p "(id x)"
                  (buffer-substring-no-properties
                   (point-min) (point-max))))))
       (buffer-list))))
   (let ((buf (cl-find-if
-              (lambda (b) (string-match-p "\\*skg:" (buffer-name b)))
+              (lambda (b) (with-current-buffer b
+                            (derived-mode-p 'skg-content-view-mode)))
               (buffer-list))))
     (unless buf (test-fail "Content view not created"))
     (switch-to-buffer buf)

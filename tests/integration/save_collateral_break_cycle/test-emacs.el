@@ -22,10 +22,10 @@
   (message "=== PHASE 1: Open buffer A ===")
   (setq integration-test-phase "phase-1-open-buffer-a")
   (skg-request-single-root-content-view-from-id "a")
-  (skg-test-wait-for-buffer "*skg: a*")
-  (let ((buf (get-buffer "*skg: a*")))
+  (skg-test-wait-for-buffer "*a*")
+  (let ((buf (get-buffer "*a*")))
     (unless buf
-      (message "✗ FAIL [phase 1]: Buffer *skg: a* was not created")
+      (message "✗ FAIL [phase 1]: Buffer *a* was not created")
       (kill-emacs 1))
     (assert-headline-structure
      buf
@@ -37,10 +37,10 @@
   (message "=== PHASE 2: Open buffer B ===")
   (setq integration-test-phase "phase-2-open-buffer-b")
   (skg-request-single-root-content-view-from-id "b")
-  (skg-test-wait-for-buffer "*skg: b*")
-  (let ((buf (get-buffer "*skg: b*")))
+  (skg-test-wait-for-buffer "*b*")
+  (let ((buf (get-buffer "*b*")))
     (unless buf
-      (message "✗ FAIL [phase 2]: Buffer *skg: b* was not created")
+      (message "✗ FAIL [phase 2]: Buffer *b* was not created")
       (kill-emacs 1))
     (assert-headline-structure
      buf
@@ -51,7 +51,7 @@
   "Remove 'a' from b's children and save buffer B."
   (message "=== PHASE 3: Remove a from b's children, save ===")
   (setq integration-test-phase "phase-3-remove-and-save")
-  (with-current-buffer "*skg: b*"
+  (with-current-buffer "*b*"
     (goto-char (point-min))
     (forward-line 1)
     (delete-region (point) (point-max))
@@ -64,9 +64,9 @@
   "Verify that collateral buffer A was updated."
   (message "=== PHASE 4: Verify collateral buffer A ===")
   (setq integration-test-phase "phase-4-verify-collateral")
-  (let ((buf (get-buffer "*skg: a*")))
+  (let ((buf (get-buffer "*a*")))
     (unless buf
-      (message "✗ FAIL [phase 4]: Buffer *skg: a* no longer exists")
+      (message "✗ FAIL [phase 4]: Buffer *a* no longer exists")
       (kill-emacs 1))
     (message "Buffer A content after collateral update: %S"
              (with-current-buffer buf

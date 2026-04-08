@@ -17,7 +17,7 @@
   (message "Request sent. Waiting for response...")
 
   ;; Wait up to 120s for the buffer to appear
-  (let ((buf (skg-test-wait-for-buffer "*skg: kindness*" 120)))
+  (let ((buf (skg-test-wait-for-buffer "*kindness*" 120)))
     (if buf
         (progn
           (message "=== Response received in %.3f seconds ==="

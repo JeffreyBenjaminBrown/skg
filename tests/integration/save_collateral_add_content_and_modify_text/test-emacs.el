@@ -24,10 +24,10 @@
   (message "=== PHASE 1: Open buffer A ===")
   (setq integration-test-phase "phase-1-open-buffer-a")
   (skg-request-single-root-content-view-from-id "a")
-  (skg-test-wait-for-buffer "*skg: a*")
-  (let ((buf (get-buffer "*skg: a*")))
+  (skg-test-wait-for-buffer "*a*")
+  (let ((buf (get-buffer "*a*")))
     (unless buf
-      (message "✗ FAIL [phase 1]: Buffer *skg: a* was not created")
+      (message "✗ FAIL [phase 1]: Buffer *a* was not created")
       (kill-emacs 1))
     (assert-headline-structure
      buf
@@ -39,10 +39,10 @@
   (message "=== PHASE 2: Open buffer B ===")
   (setq integration-test-phase "phase-2-open-buffer-b")
   (skg-request-single-root-content-view-from-id "b")
-  (skg-test-wait-for-buffer "*skg: b*")
-  (let ((buf (get-buffer "*skg: b*")))
+  (skg-test-wait-for-buffer "*b*")
+  (let ((buf (get-buffer "*b*")))
     (unless buf
-      (message "✗ FAIL [phase 2]: Buffer *skg: b* was not created")
+      (message "✗ FAIL [phase 2]: Buffer *b* was not created")
       (kill-emacs 1))
     (assert-headline-structure
      buf
@@ -53,7 +53,7 @@
   "Edit a's title, add child c under a, and save buffer B."
   (message "=== PHASE 3: Edit a's title, add child c, save ===")
   (setq integration-test-phase "phase-3-edit-and-save")
-  (let ((buf (get-buffer "*skg: b*")))
+  (let ((buf (get-buffer "*b*")))
     ;; Verify pre-edit structure
     (assert-headline-titles
      buf
@@ -86,9 +86,9 @@
   "Verify that buffer B's save response reflects the edits."
   (message "=== PHASE 4: Verify buffer B after save ===")
   (setq integration-test-phase "phase-4-verify-saved-buffer")
-  (let ((buf (get-buffer "*skg: b*")))
+  (let ((buf (get-buffer "*b*")))
     (unless buf
-      (message "✗ FAIL [phase 4]: Buffer *skg: b* no longer exists")
+      (message "✗ FAIL [phase 4]: Buffer *b* no longer exists")
       (kill-emacs 1))
     (assert-headline-titles
      buf
@@ -124,9 +124,9 @@ The collateral update succeeds: buffer A picks up the title change
 and the new child c."
   (message "=== PHASE 5: Verify collateral buffer A ===")
   (setq integration-test-phase "phase-5-verify-collateral")
-  (let ((buf (get-buffer "*skg: a*")))
+  (let ((buf (get-buffer "*a*")))
     (unless buf
-      (message "✗ FAIL [phase 5]: Buffer *skg: a* no longer exists")
+      (message "✗ FAIL [phase 5]: Buffer *a* no longer exists")
       (kill-emacs 1))
     (message "Buffer A content: %S"
              (with-current-buffer buf

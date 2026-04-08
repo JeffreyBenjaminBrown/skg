@@ -56,14 +56,14 @@ Returns t if predicate became true, nil on timeout."
                 (benchmark-format-time t1 t2))
           (message "emacs_request_to_response: %ss" benchmark-view-time)
           ;; Verify buffer exists
-          (let ((buf (get-buffer "*skg: 0*")))
+          (let ((buf (get-buffer "*0*")))
             (if buf
                 (progn
                   (message "View buffer created with %d characters"
                            (with-current-buffer buf (buffer-size)))
                   (benchmark-phase-edit))
               (progn
-                (message "FAIL: View buffer *skg: 0* not created")
+                (message "FAIL: View buffer *0* not created")
                 (kill-emacs 1)))))
       (progn
         (message "TIMEOUT: View response not received within 120s")
@@ -73,7 +73,7 @@ Returns t if predicate became true, nil on timeout."
   "Phase 3: Save buffer and time the round-trip."
   (message "=== PHASE 3: Saving buffer ===")
   (setq benchmark-save-response-arrived nil)
-  (with-current-buffer "*skg: 0*"
+  (with-current-buffer "*0*"
     (let ((t5 (current-time)))
       (skg-request-save-buffer)
       ;; Poll until save response arrives (up to 300s for large dataset)

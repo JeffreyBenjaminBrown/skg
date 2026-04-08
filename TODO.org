@@ -29,15 +29,6 @@ begin
 * TODO ?
 ** Links to links are currently annoying. Are they important?
 * TODO new features
-** buffer list
-*** make 'skg' a major mode
-just so it shows up in the buffer view
-*** need longer name field in buffer view
-*** Use novel characters as skg buffer prefixes.
-And|or make Skg a major mode,
-so Skg buffers are distinguishable in the buffer view.
-This would permit stripping the leading "skg: " from buffer names.
-**** maybe > and >? for normal and search buffers
 ** heralds
 *** if node is a top-level headline in the buffer, different herald rules
 We must see how many containers it has, even if only 1.
@@ -46,14 +37,18 @@ This information should be a different color from the graph stats.
 *** If heritable in the view tree, source does not have to be restated when something is unconnected to its parent.
 That is, if a is public, and ignores its child b which is public,
 b does not need to restate 'public'.
+*** The number of contents herald is less interesting.
+It would be nice if the user could customize which heralds are shown,
+and if this affected how Rust computes the metadata,
+not just how Emacs shows it.
 ** There should only be one definitive view across all buffers.
 And they should all be indexed for C-c v v to jump to,
 not just the roots.
-** Privacy: Hide certain sources from view.
+** Privacy: Permit user to hide certain sources from view.
 *** Figure out the diff logic for insertions when some are hidden.
 I think I see how: Just pin each thing to its last visible sibling.
-** (Again?) Want link sources to show containerward ancestries.
-** The number of contents herald is less interesting.
+** importing org-roam should be possible while server is running
+and automatically update the other dbs (not just disk as now)
 ** server can't verify connection initially
 * TODO cleaner code
 ** avoid redundant enum checks

@@ -50,7 +50,7 @@ unlocked when the early response arrives."
         ;; its memory, so the work is both slow and wasted.
         (error "Cannot save: skg-view-uri is nil in buffer '%s' (content-view-mode=%s). Re-open the view."
                (buffer-name)
-               (if (bound-and-true-p skg-content-view-mode) "on" "off")))
+               (if (derived-mode-p 'skg-content-view-mode) "on" "off")))
 
       (skg--begin-stream "save")
 

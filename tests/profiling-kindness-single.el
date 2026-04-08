@@ -16,7 +16,8 @@
   (let ((buf (skg-test-wait-for
               (lambda ()
                 (cl-find-if
-                 (lambda (b) (string-prefix-p "*skg:" (buffer-name b)))
+                 (lambda (b) (with-current-buffer b
+                 (derived-mode-p 'skg-content-view-mode)))
                  (buffer-list)))
               60)))
     (if buf

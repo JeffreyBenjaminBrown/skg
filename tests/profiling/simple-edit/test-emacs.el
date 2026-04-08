@@ -9,7 +9,7 @@
   "Phase 2: Change the title of headline '1' to '1-edited'."
   (message "=== PHASE 2: Editing buffer (single title change) ===")
   (let ((t3 (current-time)))
-    (with-current-buffer "*skg: 0*"
+    (with-current-buffer "*0*"
       (goto-char (point-min))
       (if (re-search-forward
            "^\\(\\*+\\) (skg .+))) \\(1\\)$" nil t)

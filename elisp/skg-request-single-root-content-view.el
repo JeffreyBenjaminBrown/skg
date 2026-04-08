@@ -56,16 +56,17 @@ VIEW-URI is the pre-generated UUID to assign to the new buffer."
           (let ((content-value (cadr (assoc 'content response)))
                 (errors-list (cadr (assoc 'errors response))))
             (when content-value
-              (skg-open-org-buffer-from-text
-               tcp-proc content-value (skg-content-view-buffer-name
-                                       content-value)
-               view-uri))
+              (let ((buf-name (skg-content-view-buffer-name
+                               content-value)))
+                (skg-open-org-buffer-from-text
+                 tcp-proc content-value buf-name view-uri)))
             (when (and errors-list (not (equal errors-list nil)))
               (let ((errors-text (if (listp errors-list)
                                      (mapconcat 'identity errors-list "\n\n")
                                    errors-list)))
                 (skg-show-save-warnings errors-text)) ))))
     (error
+     (message "skg content view error: %S" err)
      (skg-log 'error 'view "parsing content view response: %S" err)
      (skg-log 'error 'view "sexp string was: %S" sexp-string))))
 

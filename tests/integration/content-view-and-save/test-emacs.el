@@ -23,11 +23,11 @@
   (message "Called skg-request-single-root-content-view-from-id")
 
   ;; Wait for the buffer to be created
-  (skg-test-wait-for-buffer "*skg: 1*")
+  (skg-test-wait-for-buffer "*1*")
 
   ;; Check if the content view buffer was created with expected content
-  (let ((content-buffer ;; The buffer name is based on the extracted title, so it will be "*skg: 1*"
-         (get-buffer "*skg: 1*")))
+  (let ((content-buffer ;; The buffer name is based on the extracted title, so it will be "*1*"
+         (get-buffer "*1*")))
     (if content-buffer
         (with-current-buffer content-buffer
           (let ((content (buffer-substring-no-properties (point-min) (point-max))))
@@ -56,7 +56,7 @@
   (message "=== PHASE 2: Testing save buffer ===")
 
   ;; Get the content view buffer
-  (let ((content-buffer (get-buffer "*skg: 1*")))
+  (let ((content-buffer (get-buffer "*1*")))
     (if content-buffer
         (with-current-buffer content-buffer
           ;; Save buffer state after fetch but before editing

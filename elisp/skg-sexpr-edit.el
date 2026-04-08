@@ -119,7 +119,7 @@ Uses minibuffer with S-left/S-right cycling through owned sources."
 (defun skg-sexp-edit--after-insert-heading (&rest _)
   "After `org-insert-heading-respect-content', open metadata editor for new roots.
 Only acts in skg-content-view-mode buffers when a level-1 heading was created."
-  (when (and (bound-and-true-p skg-content-view-mode)
+  (when (and (derived-mode-p 'skg-content-view-mode)
              (org-at-heading-p)
              (= (org-outline-level) 1))
     (skg-edit-metadata)))

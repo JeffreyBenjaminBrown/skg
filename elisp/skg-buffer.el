@@ -15,12 +15,11 @@
   (org-mode)
   (setq-local org-adapt-indentation nil))
 
-(define-minor-mode skg-content-view-mode
-  "Minor mode for skg content view buffers.
+(define-derived-mode skg-content-view-mode org-mode "SKG"
+  "Major mode for skg content view buffers, derived from org-mode.
 Rebinds C-x C-s to save via the skg server,
 and provides C-c prefix keybindings for skg commands."
-  :lighter nil
-  :keymap skg-content-view-mode-map)
+  (setq-local org-adapt-indentation nil))
 
 (defvar-local skg-view-uri nil
   "Unique view URI for this skg buffer.")
@@ -28,19 +27,17 @@ and provides C-c prefix keybindings for skg commands."
      'permanent-local ; to survive major-mode changes
      t)
 
-(defconst skg-fallback-buffer-name
-  "*skg*")
-
 (defun skg-content-view-buffer-name (org-text)
   "Generate buffer name for content view from ORG-TEXT."
   (let ((title (skg-extract-top-headline-title org-text)))
     (if title
-        (concat "*skg: " (skg-sanitize-buffer-name title) "*")
-      skg-fallback-buffer-name)))
+        (concat "*" (skg-sanitize-buffer-name title) "*")
+      (error "skg: content view has no headline (first 200 chars: %s)"
+             (substring (or org-text "") 0 (min 200 (length (or org-text ""))))))))
 
 (defun skg-search-buffer-name (search-terms)
   "Generate buffer name for title search with SEARCH-TERMS."
-  (concat "*skg: search: " (skg-sanitize-buffer-name search-terms) "*"))
+  (concat "*?" (skg-sanitize-buffer-name search-terms) "*"))
 
 (defun skg-extract-top-headline-title (org-text)
   "Extract the title from the first headline in ORG-TEXT.
@@ -72,7 +69,7 @@ and truncates to a reasonable length."
 (defun skg-open-empty-content-view ()
   "Open a new, empty skg content view buffer."
   (skg-open-org-buffer-from-text
-   nil "" skg-fallback-buffer-name))
+   nil "" "*skg-empty*"))
 
 (defun skg-open-org-buffer-from-text (_tcp-proc org-text buffer-name &optional view-uri)
   "Open a new buffer and insert ORG-TEXT, enabling org-mode.
@@ -84,9 +81,8 @@ otherwise generate a new UUID."
       (let ((inhibit-read-only t))
         (erase-buffer)
         (insert org-text)
-        (skg--org-mode-with-options)
+        (skg-content-view-mode)
         (heralds-minor-mode))
-      (skg-content-view-mode 1)
       (setq skg-view-uri uri)
       (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
       (add-hook 'first-change-hook

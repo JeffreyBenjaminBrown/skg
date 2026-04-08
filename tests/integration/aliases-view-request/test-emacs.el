@@ -34,9 +34,9 @@ LINE-NUMBER is zero-based."
   ;; Load the node from server using single-root-content-view
   (message "Loading node from server...")
   (skg-request-single-root-content-view-from-id "test-node")
-  (skg-test-wait-for-buffer "*skg: Test Node*")
+  (skg-test-wait-for-buffer "*Test Node*")
 
-  (let ((buffer (get-buffer "*skg: Test Node*")))
+  (let ((buffer (get-buffer "*Test Node*")))
     (unless buffer
       (error "Content buffer not created"))
     (with-current-buffer buffer
