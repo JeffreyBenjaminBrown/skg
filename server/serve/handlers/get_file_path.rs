@@ -49,24 +49,24 @@ pub fn handle_get_file_path_request (
           TcpToClient::GetFilePath,
           &format! ( "Error: {}", e ) ));
       return; } };
-  let abs_path : PathBuf = match fs::canonicalize (&raw_path) {
-    Ok  (p) => p,
-    Err (_) => {
-      send_response_with_length_prefix (
-        stream,
-        & tag_text_response (
-          TcpToClient::GetFilePath,
-          & format! ( "File not found: {}", raw_path ) ));
-      return; } };
-  let data_root : PathBuf = // Canonicalize to match abs_path
-    // (both must be absolute for strip_prefix to work).
+  // We need both paths canonicalized so that strip_prefix works
+  // (e.g. resolving symlinks and ".." segments to get matching
+  // prefixes).  But canonicalize fails if the file doesn't exist,
+  // so we fall back to the un-canonicalized path, which keeps
+  // deleted nodes working (the client needs the path to navigate
+  // to the deletion in magit).
+  let raw_pathbuf : PathBuf = PathBuf::from (&raw_path);
+  let data_root : PathBuf =
     fs::canonicalize ( & config . data_root )
     . unwrap_or ( config . data_root . clone () );
+  let canonical_raw : PathBuf =
+    fs::canonicalize (&raw_pathbuf)
+    . unwrap_or (raw_pathbuf);
   let rel_path : String =
-    abs_path
+    canonical_raw
     . strip_prefix (&data_root)
     . map ( |p| p . to_string_lossy () . into_owned () )
-    . unwrap_or_else ( |_| abs_path . to_string_lossy ()
+    . unwrap_or_else ( |_| canonical_raw . to_string_lossy ()
                        . into_owned () );
   send_response_with_length_prefix (
     stream,

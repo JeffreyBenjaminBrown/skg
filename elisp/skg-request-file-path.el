@@ -67,8 +67,8 @@ PAYLOAD is the tagged LP response from the server."
          ( content (and raw-content (format "%s" raw-content)) )
          ( path (and content (string-trim content)) ))
     (cond
-     ((or (not path) (string-prefix-p "File not found" path))
-      (message "%s" (or path "No path received")))
+     ((not path)
+      (message "No path received"))
      ((string-prefix-p "Error" path)
       (message "%s" path))
      (t
@@ -84,7 +84,10 @@ PAYLOAD is the tagged LP response from the server."
                 '((unstaged) (status)) rel-path) )
               ( staged-section
                (skg--find-file-in-magit-section
-                '((staged) (status)) rel-path) ))
+                '((staged) (status)) rel-path) )
+              ( untracked-section
+               (skg--find-file-in-magit-section
+                '((untracked) (status)) rel-path) ))
           (cond
            (unstaged-section
             (magit-section-goto unstaged-section)
@@ -94,6 +97,9 @@ PAYLOAD is the tagged LP response from the server."
            (staged-section
             (magit-section-goto staged-section)
             (message "Point is on staged changes. No changes are unstaged.") )
+           (untracked-section
+            (magit-section-goto untracked-section)
+            (message "Point is on untracked (new) file.") )
            (t
             (message "magit: %s has not changed."
                      (file-name-nondirectory resolved-path)) )) )) )) ))

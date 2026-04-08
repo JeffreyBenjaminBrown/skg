@@ -24,6 +24,7 @@
             skg-org-fold
             skg-request-file-path
             skg-request-git-diff-mode
+            skg-request-rerender-all-views
             skg-request-save
             skg-request-single-root-content-view
             skg-request-title-matches
