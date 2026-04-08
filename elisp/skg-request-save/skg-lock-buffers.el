@@ -9,6 +9,17 @@
 ;;;   does NOT suppress overlay hooks, so we must explicitly remove
 ;;;   overlays before updating buffer content -- which is what we want.
 
+(defvar skg--stream-in-progress nil
+  "Client-side bookkeeping: non-nil while a streaming request
+\(save, rerender, diff-toggle) is in flight.  The server handles
+requests sequentially, so responses never interleave -- but Emacs
+can send a second request before the first finishes.  This guard
+prevents that, because overlapping operations would corrupt each
+other's lock/unlock state.  Value is nil or a label string
+describing the operation (shown in the error message).
+Cleared by terminal handlers (save-result, rerender-done),
+the TCP sentinel, and the busy-initializing handler.")
+
 (defvar-local skg--save-lock-overlay nil
   "Overlay that blocks edits while a save is in progress.")
 
@@ -57,5 +68,29 @@
                     (member uri collateral-uris))
           (with-current-buffer buf
             (skg--unlock-after-save)) )) )) )
+
+(defun skg--unlock-buffers-not-in-uri-list (uri-list)
+  "Unlock skg buffers whose URI is NOT in URI-LIST."
+  (dolist (buf (buffer-list))
+    (when (and (buffer-live-p buf)
+               (buffer-local-value 'skg-view-uri buf)
+               (buffer-local-value 'skg--save-lock-overlay buf))
+      (let ((uri (buffer-local-value 'skg-view-uri buf)))
+        (unless (member uri uri-list)
+          (with-current-buffer buf
+            (skg--unlock-after-save)) )) )) )
+
+(defun skg--begin-stream (label)
+  "Mark a streaming operation as in progress.
+LABEL is a string describing the operation (for the error message).
+Signals an error if another stream is already in flight."
+  (when skg--stream-in-progress
+    (error "skg: %s blocked -- %s already in progress"
+           label skg--stream-in-progress))
+  (setq skg--stream-in-progress label))
+
+(defun skg--end-stream ()
+  "Clear the streaming-in-progress guard."
+  (setq skg--stream-in-progress nil))
 
 (provide 'skg-lock-buffers)

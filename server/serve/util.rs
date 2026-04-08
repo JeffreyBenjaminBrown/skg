@@ -153,6 +153,19 @@ pub(super) fn format_lock_views_sexp (
       Sexp::List ( uri_sexps ) ] ) ] )
     . to_string () }
 
+/// Format: ((errors ("e1" "e2" ...)))
+pub(super) fn format_errors_sexp (
+  errors : &[String],
+) -> String {
+  Sexp::List ( vec! [
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "errors" . to_string () )),
+      Sexp::List (
+        errors . iter ()
+          . map ( |e| Sexp::Atom ( Atom::S ( e . clone () )) )
+          . collect () ) ] ) ] )
+    . to_string () }
+
 /// Reads length-prefixed content from the stream.
 /// Expected format:
 ///   "Content-Length: N\r\n\r\n" followed by N bytes of content.

@@ -64,12 +64,13 @@
 (defun skg-handle-rust-response (tcp-proc string)
   "Route the response from Rust to the LP handler.
 All server responses are length-prefixed with response-type tags.
-The client's LP machine reassembles each message and dispatches by type
-via `skg-response-handler-map'."
+The client's LP machine reassembles each message
+and dispatches by type via `skg-response-handler-map'."
   (let ((trimmed (string-trim-left string)))
-    (if (string-prefix-p "((busy" trimmed) ;; the busy signal
+    (if (string-prefix-p "((busy-initializing" trimmed)
         (let ((parsed (car (read-from-string trimmed))))
-          (message "%s" (cdr (assq 'busy parsed)))
+          (message "%s" (cdr (assq 'busy-initializing parsed)))
+          (skg--end-stream)
           (skg--unlock-all-save-locked)
           (setq skg-response-handler-map nil
                 skg-lp--pending-count     0)
@@ -77,10 +78,15 @@ via `skg-response-handler-map'."
       (skg-lp-handle-generic-chunk tcp-proc string) )) )
 
 (defun skg--tcp-sentinel (_proc event)
-  "Unlock all save-locked buffers when the TCP connection closes.
-Prevents permanently locked buffers if the server crashes mid-save."
+  "Clean up when the TCP connection closes.
+Unlocks all save-locked buffers and clears the handler map
+to prevent stale non-one-shot handlers (like collateral-view
+or rerender-view) from lingering after a server crash."
   (when (not (string-prefix-p "open" event))
-    (skg--unlock-all-save-locked)) )
+    (skg--end-stream)
+    (skg--unlock-all-save-locked)
+    (setq skg-response-handler-map nil
+          skg-lp--pending-count     0)) )
 
 (defun skg-connection-end ()
   "Manually close the connection to the Rust server."

@@ -3,13 +3,10 @@
 # Common library for skg integration tests
 # This file should be sourced by individual test runners
 
-# Function to check if TypeDB server is running
+# Uses the HTTP health endpoint rather than pgrep, because TypeDB
+# may run in a different PID namespace (e.g. systemd sandbox).
 is_typedb_running() {
-  if pgrep -f 'typedb_server_bin' >/dev/null 2>&1; then
-    return 0
-  else
-    return 1
-  fi
+  curl -sf http://localhost:8000/v1/version >/dev/null 2>&1
 }
 
 # Function to verify TypeDB server is running and exit if not

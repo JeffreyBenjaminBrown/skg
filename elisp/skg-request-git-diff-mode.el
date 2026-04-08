@@ -4,13 +4,17 @@
 ;;;   skg-view-diff-mode
 
 (require 'skg-length-prefix)
+(require 'skg-lock-buffers)
 (require 'skg-request-save) ; for skg-big-nonfatal-message
 (require 'skg-request-rerender-all-views)
 
 (defun skg-view-diff-mode ()
-  "Toggle git diff mode on the server.
+  "Toggle git diff mode on the server and rerender all views.
 When enabled, subsequent content views and saves show
-what changed between HEAD and the worktree."
+what changed between HEAD and the worktree.
+Sends a single combined request; the server responds with
+git-diff-mode, then streams rerender-lock, rerender-view*,
+rerender-done."
   (interactive)
   (let ((unsaved-buffers
          (cl-remove-if-not
@@ -21,11 +25,9 @@ what changed between HEAD and the worktree."
     (when unsaved-buffers
       (error "Cannot toggle diff mode: unsaved skg buffer(s): %s"
              (mapconcat #'buffer-name unsaved-buffers ", "))))
-  (let* ((tcp-proc (skg-tcp-connect-to-rust))
-         (request-sexp
-          (concat (prin1-to-string
-                   '((request . "git diff mode toggle")))
-                  "\n")))
+  (let ((tcp-proc (skg-tcp-connect-to-rust)))
+    (skg--begin-stream "diff-mode toggle")
+    (skg--lock-all-skg-buffers)
     (skg-register-response-handler
      'git-diff-mode
      (lambda (_tcp-proc payload)
@@ -36,10 +38,14 @@ what changed between HEAD and the worktree."
               "*skg diff-mode warnings*"
               (car (split-string content "\n"))
               content)
-           (message "%s" (or content "toggled")))
-         (skg-request-rerender-all-views)))
+           (message "%s" (or content "toggled")))))
      t)
+    (skg--register-rerender-stream-handlers)
     (skg-lp-reset)
-    (process-send-string tcp-proc request-sexp)))
+    (process-send-string
+     tcp-proc
+     (concat (prin1-to-string
+              '((request . "git diff mode toggle and rerender")))
+             "\n"))))
 
 (provide 'skg-request-git-diff-mode)

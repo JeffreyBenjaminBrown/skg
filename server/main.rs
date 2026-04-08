@@ -109,7 +109,7 @@ fn busysignal_accept_loop (
   logs_dir  : &str,
 ) {
   let init_msg : String = format! (
-    "((busy . \"Server is initializing, please wait. \
+    "((busy-initializing . \"Server is initializing, please wait. \
      See {}/server-to-user.log for progress.\"))\n",
     logs_dir );
   while ! init_done . load (Ordering::Acquire) {

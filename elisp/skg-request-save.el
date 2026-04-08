@@ -52,6 +52,8 @@ unlocked when the early response arrives."
                (buffer-name)
                (if (bound-and-true-p skg-content-view-mode) "on" "off")))
 
+      (skg--begin-stream "save")
+
       ;; Lock ALL skg content-view buffers immediately, before sending.
       ;; This eliminates the race window between the send and the
       ;; server's early response.
@@ -130,6 +132,7 @@ Unlock must happen BEFORE `skg-handle-save-sexp' because
 which would trigger overlay modification-hooks if still present."
   (setq skg-response-handler-map
         (assoc-delete-all 'collateral-view skg-response-handler-map))
+  (skg--end-stream)
   (unwind-protect
       (progn
         (skg--unlock-all-save-locked)

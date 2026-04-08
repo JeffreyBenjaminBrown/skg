@@ -61,6 +61,15 @@ So far there are these endpoints:
     responses include diff annotations showing changes
     between git HEAD and the worktree.
 
+## Git diff mode toggle and rerender
+  - Request: ((request . "git diff mode toggle and rerender"))
+  - Response: Multiple length-prefixed messages, sent sequentially:
+    1. Git diff mode response (same as standalone toggle):
+       `Content-Length: N\r\n\r\n(("response-type" "git-diff-mode") ("content" "Git diff mode enabled"))`
+    2. Rerender lock, per-view, and done messages (same as "rerender all views"):
+       rerender-lock → rerender-view* → rerender-done.
+  - Behavior: Combines "git diff mode toggle" and "rerender all views" into a single request. Toggles diff mode, sends the mode-change message (with warnings if any sources are not git-tracked), then streams re-rendered views.
+
 ## Rebuild databases
   - Request: ((request . "rebuild dbs"))
   - Response: LP response-type "rebuild-dbs" with `((content "..."))`.
@@ -70,11 +79,16 @@ So far there are these endpoints:
 
 ## Rerender all views
   - Request: ((request . "rerender all views"))
-  - Response: LP response-type "rerender-all-views" with
-    `((views (("URI1" "CONTENT1") ("URI2" "CONTENT2") ...)) (errors ("..." ...)))`.
-    Each view entry contains the URI and re-rendered buffer content.
-    Errors are non-fatal per-view errors (the response still includes
-    successfully rendered views).
+  - Response: Multiple length-prefixed messages, sent sequentially:
+    1. Lock message:
+       `Content-Length: N\r\n\r\n((response-type rerender-lock) (lock-views ("URI1" "URI2" ...)))`
+       Lists all view URIs that will be re-rendered. Emacs locks those buffers.
+    2. Zero or more per-view messages (one per view, streamed as each finishes):
+       `Content-Length: N\r\n\r\n((response-type rerender-view) (view-uri "URI") (content "..."))`
+       Emacs unlocks and updates each buffer as it arrives.
+    3. Done message:
+       `Content-Length: N\r\n\r\n((response-type rerender-done) (errors ("..." ...)))`
+       Emacs removes the rerender-view handler and unlocks any remaining buffers.
   - Behavior: Re-renders every open view from server memory,
     applying diff annotations if diff mode is enabled.
     Does not save or modify the graph. Used after toggling
@@ -87,9 +101,9 @@ So far there are these endpoints:
   - Behavior: `delete_on_quit` might be `= true` in the server's config file. (It defaults to false, and need not be mentioned.) If it's true, then the TypeDB database will be deleted before the server exits. This is primarily for integration tests to prevent database accumulation.
   - TODO | PITFALL: Any client can shut down the server. If ever multiple users share a server, one could bother the other. The server exits immediately after sending the response, which interrupts any in-flight requests from other clients.
 
-## Busy signal (server initializing)
+## Busy-initializing signal
   - Triggered when Emacs connects while the server is still initializing TypeDB/Tantivy.
-  - Response: ((busy . "human-readable status message"))
+  - Response: ((busy-initializing . "human-readable status message"))
   - Emacs should display the message and retry the request (or let the user retry manually).
   - No request triggers this specifically; any request sent during initialization may receive it.
 

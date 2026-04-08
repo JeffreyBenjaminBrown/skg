@@ -15,6 +15,7 @@ pub enum RequestType {
   GitDiffModeToggle,
   RebuildDbs,
   RerenderAllViews,
+  GitDiffModeToggleAndRerender,
 }
 
 impl RequestType {
@@ -33,6 +34,8 @@ impl RequestType {
       "git diff mode toggle"     => Ok (RequestType::GitDiffModeToggle),
       "rebuild dbs"              => Ok (RequestType::RebuildDbs),
       "rerender all views"       => Ok (RequestType::RerenderAllViews),
+      "git diff mode toggle and rerender"
+        => Ok (RequestType::GitDiffModeToggleAndRerender),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See api-and-formats.md
@@ -56,7 +59,9 @@ pub enum TcpToClient {
   Shutdown,
   GitDiffMode,
   RebuildDbs,
-  RerenderAllViews,
+  RerenderLock,
+  RerenderView,
+  RerenderDone,
   Error,
 }
 
@@ -78,5 +83,7 @@ impl TcpToClient {
       TcpToClient::Shutdown         => "shutdown",
       TcpToClient::GitDiffMode      => "git-diff-mode",
       TcpToClient::RebuildDbs       => "rebuild-dbs",
-      TcpToClient::RerenderAllViews => "rerender-all-views",
+      TcpToClient::RerenderLock     => "rerender-lock",
+      TcpToClient::RerenderView     => "rerender-view",
+      TcpToClient::RerenderDone     => "rerender-done",
       TcpToClient::Error            => "error", }} }
