@@ -26,7 +26,6 @@ begin
 **** DONE visit things
 **** DONE request view changes
 *** It is valid to dogfood even as only reading.
-* Tests should run 'nice'ly.
 * TODO ?
 ** Links to links are currently annoying. Are they important?
 * TODO new features

@@ -74,13 +74,22 @@ run_single_test() {
 echo ""
 echo "Running ${#TEST_DIRS[@]} tests in parallel..."
 
-# Start all tests in parallel
+# Max parallel tests. Each test spins up a server (TypeDB + Tantivy init),
+# so too many at once can starve the system — especially under an RT kernel.
+MAX_PARALLEL=${SKG_TEST_PARALLEL:-4}
+
+# Start tests in batches, with nice/ionice to reduce system impact.
 declare -a pids=()
 declare -a test_results=()
 
 for test_dir in "${TEST_DIRS[@]}"; do
-  run_single_test "$test_dir" &
+  nice -n 15 ionice -c 3 bash -c "$(declare -f run_single_test); INTEGRATION_DIR='$INTEGRATION_DIR' run_single_test '$test_dir'" &
   pids+=($!)
+
+  # Throttle: when we hit MAX_PARALLEL, wait for one to finish.
+  while [ "$(jobs -rp | wc -l)" -ge "$MAX_PARALLEL" ]; do
+    sleep 0.2
+  done
 done
 
 # Wait for all tests to complete and collect results
@@ -160,9 +169,27 @@ fi
 echo ""
 echo "Complete results available in: $TESTS_LOG"
 
-# PITFALL: Manual DB deletion here# would cause TypeDB to crash
+# PITFALL: Manual DB deletion here would cause TypeDB to crash
 # (when it tries to checkpoint deleted databases).
 # But test DBs *should* be cleaned up by each test server,
 # due to delete_on_quit = true in their configs.
+
+# Report any straggler test databases that leaked.
+token=$(curl -s -X POST http://127.0.0.1:8000/v1/signin \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"password"}' 2>/dev/null \
+  | grep -oP '"token"\s*:\s*"\K[^"]+' 2>/dev/null) || true
+if [ -n "$token" ]; then
+  stragglers=$(curl -s http://127.0.0.1:8000/v1/databases \
+    -H "Authorization: Bearer $token" 2>/dev/null \
+    | grep -oP '"name"\s*:\s*"\Kskg-test[^"]*' 2>/dev/null) || true
+  if [ -n "$stragglers" ]; then
+    count=$(echo "$stragglers" | wc -l)
+    echo ""
+    echo "⚠  $count straggler test database(s) leaked:"
+    echo "$stragglers" | sed 's/^/  - /'
+    echo "  Run: ./target/debug/cleanup-test-dbs"
+  fi
+fi
 
 exit $overall_result
