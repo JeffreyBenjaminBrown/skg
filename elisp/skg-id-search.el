@@ -388,11 +388,7 @@ Returns (error MESSAGE) if validation fails."
         ;; nreverse so first headline in buffer = head of stack
         (list 'success (nreverse result)) )) ))
 
-(defvar skg-id-stack-mode-map
-  (let (( map (make-sparse-keymap) ))
-    (define-key map (kbd "C-x C-s") #'skg--save-id-stack-buffer)
-    map )
-  "Keymap for `skg-id-stack-mode'.")
+;; skg-id-stack-mode-map is defined in skg-keymaps-and-aliases.el.
 
 (defun skg-id-stack ()
   "Open a buffer to edit `skg-id-stack'.

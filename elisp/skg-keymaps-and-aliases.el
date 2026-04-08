@@ -1,11 +1,13 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: User-facing command aliases.
-;;; Some internal function names reflect implementation details,
-;;; yet are user-facing. This file provides short,
-;;; memorable user-facing names for those functions.
-;;; (Not every user-facing command is involved in this file --
-;;; only the ones that need aliases.)
+;;; PURPOSE: All skg keybindings and user-facing command aliases.
+;;;
+;;; Keymaps gathered here:
+;;;   skg-content-view-mode-map  (for skg content view buffers)
+;;;   skg-id-stack-mode-map      (for the id-stack edit buffer)
+;;;   skg-sexp-edit-mode-map     (for the sexp-edit buffer)
+;;;   global C-c t t             (skg-search-titles, available everywhere)
+;;;   magit C-c v v              (skg-view, available in magit buffers)
 
 ;; No requires here — the underlying functions are loaded by skg-client.el,
 ;; which also requires this file. Adding requires here would create a cycle.
@@ -21,7 +23,33 @@ and hide INTERNAL from M-x completion."
      (defalias ',alias ',internal)
      (put ',internal 'completion-predicate #'ignore)) )
 
-(defvar skg-content-view-mode-map
+;;
+;; Aliases
+;;
+
+(skg-alias skg-save skg-request-save-buffer)
+(skg-alias skg-local-aliases         skg-request-aliases-view)
+(skg-alias skg-local-containerward   skg-request-containerward-view)
+(skg-alias skg-local-definitive      skg-request-definitive-view)
+(skg-alias skg-local-link-sourceward
+           ;; For if someone forgets "source" but remembers "link".
+           skg-request-sourceward-view)
+(skg-alias skg-local-sourceward      skg-request-sourceward-view)
+(skg-alias skg-view-from-node-id     skg-request-single-root-content-view-from-id)
+(skg-alias skg-view-heralds-mode     heralds-minor-mode)
+(skg-alias skg-local-metadata        skg-edit-metadata)
+
+;;
+;; Keymaps
+;;
+
+(global-set-key ;; Global
+ (kbd "C-c t t") #'skg-search-titles)
+
+(with-eval-after-load 'magit ;; Magit
+  (define-key magit-mode-map (kbd "C-c v v") #'skg-view))
+
+(defvar skg-content-view-mode-map ;; Content view keymap
   (let (( map (make-sparse-keymap) ))
     (progn;; save
       (define-key map (kbd "C-x C-s") #'skg-request-save-buffer))
@@ -53,16 +81,18 @@ and hide INTERNAL from M-x completion."
     map )
   "Keymap for `skg-content-view-mode'.")
 
-(skg-alias skg-save skg-request-save-buffer)
-(skg-alias skg-local-aliases         skg-request-aliases-view)
-(skg-alias skg-local-containerward   skg-request-containerward-view)
-(skg-alias skg-local-definitive      skg-request-definitive-view)
-(skg-alias skg-local-link-sourceward
-           ;; For if someone forgets "source" but remembers "link".
-           skg-request-sourceward-view)
-(skg-alias skg-local-sourceward      skg-request-sourceward-view)
-(skg-alias skg-view-from-node-id     skg-request-single-root-content-view-from-id)
-(skg-alias skg-view-heralds-mode     heralds-minor-mode)
-(skg-alias skg-local-metadata        skg-edit-metadata)
+(defvar skg-id-stack-mode-map ;; ID stack keymap
+  (let (( map (make-sparse-keymap) ))
+    (define-key map (kbd "C-x C-s") #'skg--save-id-stack-buffer)
+    map )
+  "Keymap for `skg-id-stack-mode'.")
 
-(provide 'skg-user-facing-aliases)
+(defvar skg-sexp-edit-mode-map ;; Sexp edit keymap
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-c C-c") #'skg-sexp-edit--commit)
+    (define-key map (kbd "S-<left>") #'skg-sexp-edit-cycle-left)
+    (define-key map (kbd "S-<right>") #'skg-sexp-edit-cycle-right)
+    map)
+  "Keymap for skg-sexp-edit-mode.")
+
+(provide 'skg-keymaps-and-aliases)

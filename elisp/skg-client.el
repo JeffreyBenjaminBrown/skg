@@ -22,14 +22,14 @@
 (require 'skg-request-verify-connection)
 (require 'skg-request-views)
 (require 'skg-state)
-(require 'skg-user-facing-aliases)
+(require 'skg-keymaps-and-aliases)
 
 (defun skg-client-init (file)
   (defvar skg-port (skg-port-from-toml file))
   (setq skg-config-dir (file-name-directory (expand-file-name file)))
   (skg-tcp-connect-to-rust)
   (skg-connection-verify))
-
+  ;; Skg, magit and global keybindings are in skg-keymaps-and-aliases.el.
 
 (defun skg-tcp-connect-to-rust ()
   "Connect, persistently, to the Rust TCP server."

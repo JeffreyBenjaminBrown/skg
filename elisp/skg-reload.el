@@ -37,7 +37,7 @@
             skg-truenode-defaults
             skg-state
             skg-test-utils
-            skg-user-facing-aliases
+            skg-keymaps-and-aliases
             skg-view-org-ancestry
             heralds-minor-mode )))
     (dolist (feat skg-features)
