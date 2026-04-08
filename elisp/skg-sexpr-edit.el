@@ -37,13 +37,7 @@
 ;; Minor mode for the edit buffer
 ;;
 
-(defvar skg-sexp-edit-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-c") #'skg-sexp-edit--commit)
-    (define-key map (kbd "S-<left>") #'skg-sexp-edit-cycle-left)
-    (define-key map (kbd "S-<right>") #'skg-sexp-edit-cycle-right)
-    map)
-  "Keymap for skg-sexp-edit-mode.")
+;; skg-sexp-edit-mode-map is defined in skg-keymaps-and-aliases.el.
 
 (define-minor-mode skg-sexp-edit-mode
   "Minor mode for editing sexps as org text.

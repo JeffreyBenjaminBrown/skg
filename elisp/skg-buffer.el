@@ -7,7 +7,7 @@
 (require 'cl-lib)
 (require 'heralds-minor-mode)
 (require 'skg-sexpr-search)
-(require 'skg-user-facing-aliases)
+(require 'skg-keymaps-and-aliases)
 
 
 (defun skg--org-mode-with-options ()
