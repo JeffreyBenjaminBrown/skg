@@ -54,21 +54,16 @@ So far there are these endpoints:
 
 ## Git diff mode toggle
   - Request: ((request . "git diff mode toggle"))
-  - Response: Plain text with newline termination.
-    "Git diff mode enabled" or "Git diff mode disabled".
-  - Behavior: Toggles per-connection state. When enabled,
-    subsequent `single root content view` and `save buffer`
-    responses include diff annotations showing changes
-    between git HEAD and the worktree.
-
-## Git diff mode toggle and rerender
-  - Request: ((request . "git diff mode toggle and rerender"))
   - Response: Multiple length-prefixed messages, sent sequentially:
-    1. Git diff mode response (same as standalone toggle):
+    1. Git diff mode response:
        `Content-Length: N\r\n\r\n(("response-type" "git-diff-mode") ("content" "Git diff mode enabled"))`
+       Includes warnings if any sources are not git-tracked.
     2. Rerender lock, per-view, and done messages (same as "rerender all views"):
        rerender-lock → rerender-view* → rerender-done.
-  - Behavior: Combines "git diff mode toggle" and "rerender all views" into a single request. Toggles diff mode, sends the mode-change message (with warnings if any sources are not git-tracked), then streams re-rendered views.
+  - Behavior: Toggles per-connection diff mode and re-renders all open views.
+    When enabled, subsequent `single root content view` and `save buffer`
+    responses include diff annotations showing changes
+    between git HEAD and the worktree.
 
 ## Rebuild databases
   - Request: ((request . "rebuild dbs"))

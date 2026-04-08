@@ -18,7 +18,7 @@ use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::get_file_path::handle_get_file_path_request;
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
 use crate::serve::handlers::rerender_all_views::{
-  handle_git_diff_mode_request, handle_git_diff_toggle_and_rerender,
+  handle_git_diff_toggle_and_rerender,
   handle_rerender_all_views_request};
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
@@ -178,9 +178,11 @@ fn handle_emacs (
                                            &request_header,
                                            config ),
           Ok (RequestType::GitDiffModeToggle) =>
-            handle_git_diff_mode_request ( &mut stream,
-                                           &mut conn_state,
-                                           config ),
+            handle_git_diff_toggle_and_rerender (
+              &mut stream,
+              &typedb_driver,
+              config,
+              &mut conn_state ),
           Ok (RequestType::RebuildDbs) =>
             handle_rebuild_dbs_request ( &mut stream,
                                          &typedb_driver,
@@ -188,12 +190,6 @@ fn handle_emacs (
                                          &mut tantivy_index ),
           Ok (RequestType::RerenderAllViews) =>
             handle_rerender_all_views_request (
-              &mut stream,
-              &typedb_driver,
-              config,
-              &mut conn_state ),
-          Ok (RequestType::GitDiffModeToggleAndRerender) =>
-            handle_git_diff_toggle_and_rerender (
               &mut stream,
               &typedb_driver,
               config,

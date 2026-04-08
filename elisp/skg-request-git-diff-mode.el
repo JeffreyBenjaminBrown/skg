@@ -45,7 +45,7 @@ rerender-done."
     (process-send-string
      tcp-proc
      (concat (prin1-to-string
-              '((request . "git diff mode toggle and rerender")))
+              '((request . "git diff mode toggle")))
              "\n"))))
 
 (provide 'skg-request-git-diff-mode)

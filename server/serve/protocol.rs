@@ -15,7 +15,6 @@ pub enum RequestType {
   GitDiffModeToggle,
   RebuildDbs,
   RerenderAllViews,
-  GitDiffModeToggleAndRerender,
 }
 
 impl RequestType {
@@ -34,8 +33,6 @@ impl RequestType {
       "git diff mode toggle"     => Ok (RequestType::GitDiffModeToggle),
       "rebuild dbs"              => Ok (RequestType::RebuildDbs),
       "rerender all views"       => Ok (RequestType::RerenderAllViews),
-      "git diff mode toggle and rerender"
-        => Ok (RequestType::GitDiffModeToggleAndRerender),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See api-and-formats.md

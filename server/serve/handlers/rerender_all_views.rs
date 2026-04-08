@@ -101,7 +101,7 @@ pub fn stream_rerender_views (
       TcpToClient::RerenderDone,
       & format_errors_sexp (&errors) )); }
 
-/// Handle "git diff mode toggle and rerender" request.
+/// Handle "git diff mode toggle" request.
 /// Toggles diff mode, sends the GitDiffMode response with warnings,
 /// then streams re-rendered views.
 pub fn handle_git_diff_toggle_and_rerender (
@@ -119,20 +119,6 @@ pub fn handle_git_diff_toggle_and_rerender (
     & tag_text_response ( TcpToClient::GitDiffMode, &msg ));
   stream_rerender_views (
     stream, typedb_driver, config, conn_state ); }
-
-/// Handle "git diff mode toggle" request (standalone, no rerender).
-pub fn handle_git_diff_mode_request (
-  stream     : &mut TcpStream,
-  conn_state : &mut ConnectionState,
-  config     : &SkgConfig,
-) {
-  conn_state . diff_mode_enabled = ! conn_state . diff_mode_enabled;
-  let msg : String =
-    git_diff_mode_message (conn_state . diff_mode_enabled, config);
-  tracing::info! ( msg = %msg, "Git diff mode toggled" );
-  send_response_with_length_prefix (
-    stream,
-    & tag_text_response ( TcpToClient::GitDiffMode, &msg )); }
 
 /// Build the human-readable message for a diff-mode toggle,
 /// including warnings for sources not tracked in git.
