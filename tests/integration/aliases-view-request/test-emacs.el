@@ -73,7 +73,7 @@ LINE-NUMBER is zero-based."
       (setq skg-port (string-to-number test-port))))
 
   (let ((expected-with-aliases
-         (concat "* (skg (node (id test-node) (source main) (graphStats (containers 0) (containsHerald 0{) aliasing))) Test Node\n"
+         (concat "* (skg (node (id test-node) (source main) (birth independent) (graphStats (containers 0) (containsHerald 0{) aliasing))) Test Node\n"
                  "** (skg aliasCol) its aliases\n"
                  "*** (skg alias) first alias\n"
                  "*** (skg alias) second alias\n"))
