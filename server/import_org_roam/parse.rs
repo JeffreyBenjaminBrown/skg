@@ -1,3 +1,39 @@
+/// Parse an org-roam `.org` file into a flat Vec of SkgNodes.
+///
+/// # Strategy
+///
+/// 1. **Extract OrgSections.** Scan the file line by line. Each org
+///    headline (`*`, `**`, …) becomes an `OrgSection`; the file-level
+///    preamble (`:PROPERTIES:` block + `#+title:`) becomes a level-0
+///    section. An `OrgSection` records the headline text, its nesting
+///    level, any `:ID:` and `:ROAM_ALIASES:` from its property drawer,
+///    and the line range of its body text.
+///
+/// 2. **Build a section forest.** Push sections onto a stack, popping
+///    whenever a same-or-shallower headline arrives, to produce a tree
+///    of `SectionTree` nodes that mirrors the org outline.
+///
+/// 3. **Insert super-indentation groups.**
+///    (The test 'test_super_indentation_creates_grouping_nodes'
+///    is probably clearer than this explanatino.)
+///    Org-roam allows "super-indentation": a headline like `*** c` directly under
+///    `* a`, skipping level 2. When a node's direct children span
+///    more than one headline level, we wrap them in **synthetic
+///    grouping nodes** — `SectionTree` nodes that do not correspond
+///    to any line in the file. They carry an `override_body` instead
+///    of a line range, and their `:ID:` is filled in later by
+///    `assign_missing_ids`. The two groups are:
+///      - "These are special!" — the most-indented children.
+///      - "These are normal." — the rest (recursively grouped if
+///        they still span multiple levels).
+///
+/// 4. **Assign missing IDs.** Any section (original or synthetic)
+///    that lacks an `:ID:` gets a fresh UUID.
+///
+/// 5. **Emit SkgNodes.** Walk the forest depth-first, converting each
+///    `SectionTree` into a flat `SkgNode` whose `contains` field lists
+///    its direct children by ID.
+
 use crate::types::misc::{ID, MSV, SourceName};
 use crate::types::skgnode::{FileProperty, SkgNode};
 
@@ -16,6 +52,7 @@ struct OrgSection {
   had_id        : bool,           // true if section already had an :ID: property
   roam_aliases  : Option<Vec<String>>,
   body_start    : usize,          // first line of body (after headline + props)
+  override_body : Option<String>, // synthetic nodes (like "This is special!", described in the header comment) can't derive body from file lines
 }
 
 struct SectionTree {
@@ -45,6 +82,7 @@ pub fn parse_org_file (
   let mut forest : Vec<SectionTree> =
     build_section_forest (sections, lines . len());
   for st in &mut forest {
+    insert_super_indentation_groups (st);
     assign_missing_ids (st); }
   let mut nodes : Vec<SkgNode> = Vec::new();
   for st in &forest {
@@ -75,7 +113,8 @@ fn extract_sections (
     id            : file_id,
     had_id        : file_had_id,
     roam_aliases  : file_aliases,
-    body_start    : title_line_end, });
+    body_start    : title_line_end,
+    override_body : None, });
   // Headline sections
   for (i, line) in lines . iter() . enumerate() {
     if ! is_headline (line) { continue; }
@@ -95,7 +134,8 @@ fn extract_sections (
       id            : hl_id,
       had_id        : hl_had_id,
       roam_aliases  : hl_aliases,
-      body_start, }); }
+      body_start,
+      override_body : None, }); }
   sections }
 
 //
@@ -143,6 +183,77 @@ fn build_section_forest (
   forest }
 
 //
+// Super-indentation grouping
+//
+
+/// Walk a SectionTree bottom-up, inserting synthetic grouping nodes
+/// wherever a node's direct children span more than one headline level.
+fn insert_super_indentation_groups (
+  tree : &mut SectionTree,
+) {
+  // Recurse into children first (bottom-up).
+  for child in &mut tree . children {
+    insert_super_indentation_groups (child); }
+  // Collect distinct levels of direct children.
+  let mut levels : Vec<usize> = tree . children . iter()
+    . map (|c| c . section . level)
+    . collect::<Vec<_>>();
+  levels . sort();
+  levels . dedup();
+  if levels . len() <= 1 { return; }
+  // More than one distinct level → group.
+  tree . children =
+    group_children_by_level (tree . children . drain (..) . collect()); }
+
+/// Partition children into at most two synthetic group nodes:
+/// one for the highest (most-indented) level ("special"),
+/// one for the rest ("normal"). Recurse on "rest" if it still
+/// spans multiple levels.
+fn group_children_by_level (
+  children : Vec<SectionTree>,
+) -> Vec<SectionTree> {
+  let mut levels : Vec<usize> = children . iter()
+    . map (|c| c . section . level)
+    . collect::<Vec<_>>();
+  levels . sort();
+  levels . dedup();
+  if levels . len() <= 1 { return children; }
+  let highest_level : usize = *levels . last() . unwrap();
+  let (special, rest) : (Vec<SectionTree>, Vec<SectionTree>) =
+    children . into_iter()
+      . partition (|c| c . section . level == highest_level);
+  let special_node : SectionTree = SectionTree {
+    section : OrgSection {
+      level         : 0,
+      headline_line : 0,
+      headline      : "These are special!" . to_string(),
+      id            : None,
+      had_id        : false,
+      roam_aliases  : None,
+      body_start    : 0,
+      override_body : Some (
+        "They were super-indented in org-roam." . to_string() ), },
+    extent_end : 0,
+    children   : special, };
+  let normal_children : Vec<SectionTree> =
+    group_children_by_level (rest);
+  let normal_node : SectionTree = SectionTree {
+    section : OrgSection {
+      level         : 0,
+      headline_line : 0,
+      headline      : "These are normal." . to_string(),
+      id            : None,
+      had_id        : false,
+      roam_aliases  : None,
+      body_start    : 0,
+      override_body : Some (
+        "They have been buried to encourage reading the node(s)\n\
+         that were super-indented in org-roam." . to_string() ), },
+    extent_end : 0,
+    children   : normal_children, };
+  vec![ special_node, normal_node ] }
+
+//
 // SkgNode collection
 //
 
@@ -183,7 +294,8 @@ fn skgnode_from_section_tree (
       . map (|c| c . section . headline_line)
       . unwrap_or (tree . extent_end);
   let body : Option<String> =
-    collect_body (lines, tree . section . body_start, body_end);
+    tree . section . override_body . clone()
+      . or_else (|| collect_body (lines, tree . section . body_start, body_end));
   let aliases : MSV<String> =
     match tree . section . roam_aliases . clone() {
       None    => MSV::Unspecified,

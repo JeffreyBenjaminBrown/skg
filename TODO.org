@@ -12,7 +12,6 @@ But maybe 'anAncestorContains' would be more useful.
 ** [[./next.org]] might be in progress
 ** For minimalism, remember [[id:b6747d36-711b-42e7-aa80-b9b2be53fe6c][my Skg priorities]].
 ** import org-roam
-*** to run it
 cargo run --bin skg -- import-org-roam public/ data/public/ public
 ** commit message for freshly imported data
 *** PITFALL: Fill in the blank.
