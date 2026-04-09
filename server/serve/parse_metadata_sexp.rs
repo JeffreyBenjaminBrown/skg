@@ -4,11 +4,10 @@
 ///   Scaffolds: (skg [focused] [folded] scaffoldKind)
 ///   TrueNodes: (skg [focused] [folded] (node [(id ID)]
 ///                                            [(source SOURCE)]
-///                                            [parentIgnores]
+///                                            [(birth independent|containerOf|linksTo)]
 ///                                            [indefinitive]
 ///                                            [cycle]
-///                                            [(stats [notInParent]
-///                                                    [containsParent]
+///                                            [(stats [containsParent]
 ///                                                    [(containers N)]
 ///                                                    [(contents N)]
 ///                                                    [(linksIn N)])]
@@ -19,7 +18,7 @@ use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{NodeDiffStatus, FieldDiffStatus};
-use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode, ContainerwardPathStats, IndefOrDef, NodeContainRels, NodeLinksourceRels};
+use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode, ContainerwardPathStats, IndefOrDef, NodeContainRels, NodeLinksourceRels, Birth};
 use crate::types::unchecked_viewnode::{
     UncheckedViewNode, UncheckedViewNodeKind, UncheckedTrueNode,
 };
@@ -42,7 +41,7 @@ pub struct ViewnodeMetadata {
   // TrueNode fields (ignored if scaffold is Some)
   pub id: Option<ID>,
   pub source: Option<SourceName>,
-  pub parent_ignores: bool,
+  pub birth: Birth,
   pub indefinitive: bool,
   pub graphStats: GraphNodeStats,
   pub viewStats: ViewNodeStats,
@@ -63,7 +62,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     scaffold: None,
     id: None,
     source: None,
-    parent_ignores: false,
+    birth: Birth::ContentOf,
     indefinitive: false,
     graphStats: GraphNodeStats::default(),
     viewStats: ViewNodeStats::default(),
@@ -125,7 +124,7 @@ pub fn viewnode_from_metadata (
             title,
             id               : metadata . id . clone (),
             source           : metadata . source . clone (),
-            parent_ignores   : metadata . parent_ignores,
+            birth            : metadata . birth,
             graphStats       : metadata . graphStats . clone (),
             viewStats        : metadata . viewStats . clone (),
             view_requests    : metadata . view_requests . clone (),
@@ -270,6 +269,18 @@ fn parse_node_sexp (
           "viewRequests" => {
             parse_viewrequests_sexp (
               &subitems[1..], &mut metadata . view_requests ) ?; },
+          "birth" => {
+            if subitems . len () != 2 {
+              return Err ( "birth requires exactly one value" . to_string () ); }
+            let value : String =
+              atom_to_string ( &subitems[1] ) ?;
+            metadata . birth = match value . as_str () {
+              "independent" => Birth::Independent,
+              "containerOf" => Birth::ContainerOf,
+              "linksTo"     => Birth::LinksTo,
+              "contentOf"   => Birth::ContentOf,
+              _ => return Err ( format! (
+                "Invalid birth value: {}", value )), }; },
           "diff" => {
             if subitems . len () != 2 {
               return Err ( "diff requires exactly one value" . to_string () ); }
@@ -284,7 +295,6 @@ fn parse_node_sexp (
         let bare_value : String =
           atom_to_string (element) ?;
         match bare_value . as_str () {
-          "parentIgnores" => metadata . parent_ignores = true,
           "indefinitive"  => metadata . indefinitive = true,
           _ => {
             return Err ( format! ( "Unknown node value: {}",
@@ -404,7 +414,7 @@ fn parse_graphstats_sexp (
   Ok (( )) }
 
 /// Parse the (viewStats ...) s-expression contents.
-/// Only handles bare atoms (cycle, notInParent, containsParent).
+/// Only handles bare atoms (cycle, containsParent).
 fn parse_viewstats_sexp (
   items : &[Sexp],
   stats : &mut ViewNodeStats
@@ -416,7 +426,6 @@ fn parse_viewstats_sexp (
           atom_to_string (element) ?;
         match bare_value . as_str () {
           "cycle"          => stats . cycle = true,
-          "notInParent"    => stats . parentIsContainer = false,
           "containsParent" => stats . parentIsContent   = true,
           _ => {
             return Err ( format! ( "Unknown viewStats value: {}",

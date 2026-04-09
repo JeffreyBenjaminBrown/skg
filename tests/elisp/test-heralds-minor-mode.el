@@ -36,7 +36,7 @@
 (ert-deftest test-heralds-minor-mode-visual-check ()
   "Test that the display property is properly set and cleared."
   (with-temp-buffer
-    (insert "Line with (skg (node (id 123) (graphStats (containers 3) (containsHerald 3{) (linksInFromLeaves 1) (linksHerald →1)) (viewStats cycle notInParent) (editRequest delete))) text")
+    (insert "Line with (skg (node (id 123) (birth linksTo) (graphStats (containers 3) (containsHerald 3{) (linksInFromLeaves 1) (linksHerald →1)) (viewStats cycle) (editRequest delete))) text")
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
       (let* ;; Find the overlay covering our herald
@@ -53,8 +53,8 @@
         (should ( stringp ( overlay-get display-overlay 'display )) )
         (let ;; The display should contain our herald symbols
             ( ( display-text ( overlay-get display-overlay 'display )) )
+          ( should ( string-match "←" display-text ))
           ( should ( string-match "⟳" display-text ))
-          ( should ( string-match "!{" display-text ))
           ( should ( string-match "3{" display-text ))
           ( should ( string-match "→1" display-text ))
           ( should ( string-match "delete" display-text )) )) )

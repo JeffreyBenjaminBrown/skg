@@ -8,7 +8,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nod
 use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
-use skg::types::viewnode::{ViewNode, ViewNodeKind};
+use skg::types::viewnode::{ViewNode, ViewNodeKind, Birth};
 use skg::types::memory::SkgNodeMap;
 use skg::org_to_text::viewnode_forest_to_string;
 
@@ -62,14 +62,15 @@ async fn test_path_with_cycle_impl(
   let mut map : SkgNodeMap = SkgNodeMap::new();
   integrate_path_that_might_fork_or_cycle(
     &mut forest, &mut map, root_id, path, branches,
-    cycle_nodes, &config, driver, ) . await?;
+    cycle_nodes, &config, driver, Birth::ContainerOf
+  ). await?;
 
   let expected: &str = indoc! {"
     * (skg (node (id 1) (source main))) 1
     ** (skg folded (node (id 2) (source main))) 2
-    *** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
-    **** (skg (node (id 4) (source main) parentIgnores indefinitive)) 4
-    ***** (skg (node (id 1) (source main) parentIgnores indefinitive)) 1
+    *** (skg (node (id 3) (source main) (birth containerOf) indefinitive)) 3
+    **** (skg (node (id 4) (source main) (birth containerOf) indefinitive)) 4
+    ***** (skg (node (id 1) (source main) (birth containerOf) indefinitive)) 1
     *** (skg (node (id off-path) (source main))) off-path
   "};
 
@@ -140,16 +141,17 @@ async fn test_path_with_branches_no_cycle_impl(
   let mut map : SkgNodeMap = SkgNodeMap::new();
   integrate_path_that_might_fork_or_cycle(
     &mut forest, &mut map, node_1_id, path, branches,
-    cycle_nodes, &config, driver ) . await?;
+    cycle_nodes, &config, driver, Birth::ContainerOf
+  ). await?;
 
   let expected: &str = indoc! {"
     * (skg (node (id 0) (source main))) 0
     ** (skg (node (id 1) (source main))) 1
     *** (skg folded (node (id 2) (source main))) 2
-    **** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
-    ***** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
-    ***** (skg (node (id 2) (source main) parentIgnores indefinitive)) 2
-    ***** (skg (node (id 1) (source main) parentIgnores indefinitive)) 1
+    **** (skg (node (id 3) (source main) (birth containerOf) indefinitive)) 3
+    ***** (skg (node (id 3) (source main) (birth containerOf) indefinitive)) 3
+    ***** (skg (node (id 2) (source main) (birth containerOf) indefinitive)) 2
+    ***** (skg (node (id 1) (source main) (birth containerOf) indefinitive)) 1
     **** (skg (node (id off-path) (source main))) off-path
   "};
 
@@ -221,16 +223,17 @@ async fn test_path_with_branches_with_cycle_impl(
   let mut map : SkgNodeMap = SkgNodeMap::new();
   integrate_path_that_might_fork_or_cycle(
     &mut forest, &mut map, node_1_id, path, branches,
-    cycle_nodes, &config, driver ) . await?;
+    cycle_nodes, &config, driver, Birth::ContainerOf
+  ). await?;
 
   let expected: &str = indoc! {"
     * (skg (node (id 0) (source main))) 0
     ** (skg (node (id 1) (source main))) 1
     *** (skg folded (node (id 2) (source main))) 2
-    **** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
-    ***** (skg (node (id 3) (source main) parentIgnores indefinitive)) 3
-    ***** (skg (node (id 2) (source main) parentIgnores indefinitive)) 2
-    ***** (skg (node (id 1) (source main) parentIgnores indefinitive)) 1
+    **** (skg (node (id 3) (source main) (birth containerOf) indefinitive)) 3
+    ***** (skg (node (id 3) (source main) (birth containerOf) indefinitive)) 3
+    ***** (skg (node (id 2) (source main) (birth containerOf) indefinitive)) 2
+    ***** (skg (node (id 1) (source main) (birth containerOf) indefinitive)) 1
     **** (skg (node (id off-path) (source main))) off-path
   "};
 
@@ -285,12 +288,12 @@ async fn test_fork_expansion_at_origin_impl(
   // sub-branches similarly reversed.
   let expected: &str = indoc! {"
     * (skg (node (id a11) (source main))) a11
-    ** (skg (node (id a2) (source main) parentIgnores indefinitive)) a2
-    *** (skg (node (id b) (source main) parentIgnores indefinitive)) b
-    *** (skg (node (id a) (source main) parentIgnores indefinitive)) a
-    ** (skg (node (id a1) (source main) parentIgnores indefinitive)) a1
-    *** (skg (node (id a1) (source main) parentIgnores indefinitive)) a1
-    *** (skg (node (id a) (source main) parentIgnores indefinitive)) a
+    ** (skg (node (id a2) (source main) (birth containerOf) indefinitive)) a2
+    *** (skg (node (id b) (source main) (birth containerOf) indefinitive)) b
+    *** (skg (node (id a) (source main) (birth containerOf) indefinitive)) a
+    ** (skg (node (id a1) (source main) (birth containerOf) indefinitive)) a1
+    *** (skg (node (id a1) (source main) (birth containerOf) indefinitive)) a1
+    *** (skg (node (id a) (source main) (birth containerOf) indefinitive)) a
   "};
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
   let expected_trees: Tree<ViewNode> =

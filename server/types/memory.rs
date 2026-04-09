@@ -180,7 +180,7 @@ impl SkgnodesInMemory {
 
 /// Collect all IDs (primary + extras) for every root
 /// -- i.e. every level-1 headline -- in the view.
-/// (There can be graph roots at other levels, via parentIgnores;
+/// (There can be graph roots at other levels, via non-Content birth;
 /// this does not return those.)
 fn root_ids_from_forest (
   forest : &Tree<ViewNode>,

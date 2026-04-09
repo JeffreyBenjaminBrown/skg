@@ -46,8 +46,10 @@ Returns the new value. If FIELD-VALUE is not in VALUES, starts at index 0."
 FIELD-VALUE is the current headline text, needed for source defaulting.
 Returns nil if the field is not cycleable."
   (cond
-   ((member field-name '("indefinitive" "parentIgnores"))
+   ((string= field-name "indefinitive")
     '("false (default)" "true"))
+   ((string= field-name "birth")
+    '("contentOf (default)" "independent" "containerOf" "linksTo"))
    ((string= field-name "editRequest")
     '("none (default)" "delete" "merge"))
    ((string= field-name "source") ;; from the config

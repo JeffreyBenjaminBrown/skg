@@ -3,7 +3,7 @@ use crate::dbs::typedb::ancestry::AncestryTree;
 use crate::types::memory::skgnode_from_map_or_disk;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::skgnode::SkgNode;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, mk_indefinitive_viewnode};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Birth, mk_indefinitive_viewnode};
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::HashMap;
@@ -44,7 +44,7 @@ pub(crate) fn insert_ancestry_into_search_view (
             forest, tantivy_index, pool, config ); } } } } }
 
 /// Recursively insert an AncestryTree and its children
-/// as indefinitive parent_ignores TrueNode children
+/// as indefinitive non-content TrueNode children
 /// under the given parent. Ancestry nodes are prepended.
 fn insert_ancestry_node_recursive(
   node          : &AncestryTree,
@@ -66,7 +66,7 @@ fn insert_ancestry_node_recursive(
 
 /// Looks up a node's title and source from Tantivy,
 /// populates the SkgNode pool, and
-/// prepends an indefinitive parent_ignores TrueNode child
+/// prepends an indefinitive independent TrueNode child
 /// under the given parent.
 /// Returns the new child's NodeId.
 fn prepend_truenode_child_from_tantivy (
@@ -86,7 +86,7 @@ fn prepend_truenode_child_from_tantivy (
     node_id, &source, pool, config );
   let viewnode : ViewNode =
     mk_indefinitive_viewnode ( node_id . clone (), source, title,
-                               true ); // parent_ignores
+                               Birth::Independent );
   let mut parent_mut : NodeMut<ViewNode> =
     forest . get_mut (parent_treeid) . unwrap ();
   parent_mut . prepend (viewnode)

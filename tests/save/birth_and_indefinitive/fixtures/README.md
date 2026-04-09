@@ -1,6 +1,6 @@
-# Test Fixtures for parentIgnores and indefinitive
+# Test Fixtures for birth=Independent and indefinitive
 
-These fixtures test the interaction between `treatment=parentIgnores` and `indefinitive` metadata flags during buffer saves.
+These fixtures test the interaction between `birth=Independent` and `indefinitive` metadata flags during buffer saves.
 
 ## Initial State
 
@@ -20,9 +20,9 @@ The `contains` relationship forms a simple structure:
 The test simulates saving this buffer:
 
 ```org
-* (skg (id 1)) 1
-** (skg (id 2) (treatment parentIgnores) indefinitive) 2
-*** (skg (id 4)) 4
+* (skg (node (id 1) (source main))) 1
+** (skg (node (id 2) (source main) (birth independent) indefinitive)) 2
+*** (skg (node (id 4) (source main))) 4
 ```
 
 ## Expected Behavior
@@ -35,9 +35,9 @@ After save:
 
 2. **Node 1** should have `contains = []`
    - Remains empty despite having node 2 as an org-child
-   - Node 2 does not affect its parent due to `treatment=parentIgnores`
+   - Node 2 does not affect its parent due to `birth=Independent`
 
 This verifies that:
-- `parentIgnores` prevents a child from updating its parent's contents
+- `birth=Independent` prevents a child from updating its parent's contents
 - `indefinitive` allows appending to existing contents rather than replacing them
 - Both flags work correctly together through the full save pipeline

@@ -30,7 +30,7 @@ But if the node is a root in the view
 then we should show the container count regardless of its value.
 *** Relation to parent and reason for existence when unusual (e.g. containerward path) should be among the first heralds.
 Currently, if a node ignores its child
-(see 'parentIgnores' in elisp/, or the TrueNode typedef in rust/)
+(see 'parentIgnores' in elisp/, or the TrueNode typedef in server/)
 the "!{" herald indicates that,
 and nothing more. But there's often an important relationship between them,
 just not a containment one. For instance,

@@ -16,7 +16,7 @@ So far there are these endpoints:
       - "rooty": only returns nodes with relationships suggesting they are especially rootlike -- so literal roots, but also cycle-roots, link targets, and things that had an ID when imported. Defined in the negative, 'rooty' excludes MultiContained and untyped nodes.
       - "everywhere": returns all Tantivy matches regardless of origin type, including the humblest leaves.
 
-  - Phase 1, immediate: Server sends LP buffer content with response-type "search-results". Results are ordinary indefinitive parent_ignores TrueNodes (not special scaffold types).
+  - Phase 1, immediate: Server sends LP buffer content with response-type "search-results". Results are ordinary indefinitive non-content TrueNodes (not special scaffold types).
 
   - Phase 2, enrichment: A three-message sequence:
     1. Rust sends LP response-type "request-snapshot" with `(("content" "TERMS"))` — asking Emacs for a snapshot of the search buffer matching those terms.

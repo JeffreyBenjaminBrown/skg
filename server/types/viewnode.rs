@@ -11,6 +11,20 @@ use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
 
+/// Why a node was brought into existence in the view tree.
+/// Most nodes are born as content of the parent node,
+/// but there can be other reasons -- e.g. the user asked to see backlinks.
+///
+/// PITFALL: There might be multiple relationships between parent and child --
+/// e.g. cyclic containment. This does not encode all of them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Birth {
+  ContentOf,   // the default: node is content of its parent, and was rendered for that reason
+  Independent, // this view of this node is not due to any relationship to its parent (although there might be such a relationship)
+  ContainerOf, // containerward backpath: this node contains its parent, and was rendered for that reason
+  LinksTo,     // sourceward backpath: this node links to its parent, and was rendered for that reason
+}
+
 //
 // Type declarations
 //
@@ -53,17 +67,15 @@ pub struct TrueNode_Generic < Id, Src > {
   pub title          : String,
   pub id             : Id,
   pub source         : Src,
-  pub parent_ignores : bool, // When true, if the buffer is saved, this node has no effect on its parent. It is effectively a new tree root, but it does not have to be located at the top of the buffer tree with the other roots.
-  // PITFALL : Don't move parent_ignores to ViewNodeStats. Doing so might seem tidy, because parent_ignores describes another relationship between the node and its view-ancestry. But parent_ignores is different because the user can in some cases reasonably change its value. That is, parent_ignores is not dictated solely by the view, but instead by some combination of the view and the user's intentions.
+  pub birth          : Birth, // When not Content, this node has no effect on its parent if the buffer is saved. It is effectively a new tree root, but does not have to be at the top of the buffer tree.
+  // PITFALL: Don't move birth to ViewNodeStats. It describes the node-to-parent relationship, but unlike viewStats fields it can be meaningfully changed by the user. It is not dictated solely by the view, but by some combination of the view and the user's intentions.
 
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
   pub graphStats    : GraphNodeStats,
   pub viewStats     : ViewNodeStats,
 
   pub view_requests : HashSet < ViewRequest >,
-
   pub diff          : Option < NodeDiffStatus >,
-
   pub indef_or_def  : IndefOrDef,
 }
 
@@ -188,6 +200,9 @@ pub enum ViewRequest {
 //
 
 impl < Id, Src > TrueNode_Generic < Id, Src > {
+  pub fn parent_ignores_it (&self) -> bool {
+    self . birth != Birth::ContentOf }
+
   /// A phantom is a display-only placeholder for a removed node
   /// in git diff view. Identified by Removed or RemovedHere status.
   pub fn is_phantom (
@@ -481,7 +496,7 @@ pub fn default_truenode (
     title,
     id,
     source,
-    parent_ignores : false,
+    birth          : Birth::ContentOf,
     graphStats     : GraphNodeStats::default(),
     viewStats      : ViewNodeStats::default(),
     view_requests  : HashSet::new(),
@@ -499,7 +514,7 @@ pub fn mk_phantom_viewnode (
   diff   : NodeDiffStatus,
 ) -> ViewNode {
   let mut viewnode : ViewNode =
-    mk_indefinitive_viewnode ( id, source, title, false );
+    mk_indefinitive_viewnode ( id, source, title, Birth::ContentOf );
   if let ViewNodeKind::True ( ref mut t ) = viewnode . kind
     { t . diff = Some (diff); }
   viewnode }
@@ -512,7 +527,7 @@ pub fn mk_definitive_viewnode (
 ) -> ViewNode { mk_viewnode ( id,
                             source,
                             title,
-                            false,              // parent_ignores
+                            Birth::ContentOf,
                             IndefOrDef::Definitive {
                               body,
                               edit_request : None },
@@ -521,14 +536,14 @@ pub fn mk_definitive_viewnode (
 /// Create an indefinitive ViewNode from disk data.
 /// Body is always None since indefinitive nodes don't have editable content.
 pub fn mk_indefinitive_viewnode (
-  id             : ID,
-  source         : SourceName,
-  title          : String,
-  parent_ignores : bool,
+  id     : ID,
+  source : SourceName,
+  title  : String,
+  birth  : Birth,
 ) -> ViewNode { mk_viewnode ( id,
                             source,
                             title,
-                            parent_ignores,
+                            birth,
                             IndefOrDef::Indefinitive,
                             HashSet::new ( )) } // view_requests
 
@@ -536,8 +551,8 @@ pub fn mk_indefinitive_viewnode (
 /// Discards body and edit_request.
 /// Errors if the input is not a TrueNode.
 pub fn mk_indefinitive_from_viewnode (
-  viewnode       : ViewNode,
-  parent_ignores : bool,
+  viewnode : ViewNode,
+  birth    : Birth,
 ) -> Result < ViewNode, String > {
   let ViewNodeKind::True (t) = viewnode . kind
     else { return Err (
@@ -546,24 +561,24 @@ pub fn mk_indefinitive_from_viewnode (
   Ok ( mk_indefinitive_viewnode ( t . id,
                                   t . source,
                                   t . title,
-                                  parent_ignores )) }
+                                  birth )) }
 
 /// Create a ViewNode with *nearly* full metadata control.
 /// The exception is that the 'GraphNodeStats' and 'ViewNodeStats' are intentionally omitted,
 /// because it would be difficult and dangerous to set that in isolation,
 /// without considering the rest of the ViewNode tree.
 pub fn mk_viewnode (
-  id             : ID,
-  source         : SourceName,
-  title          : String,
-  parent_ignores : bool,
-  indef_or_def   : IndefOrDef,
-  view_requests  : HashSet < ViewRequest >,
+  id            : ID,
+  source        : SourceName,
+  title         : String,
+  birth         : Birth,
+  indef_or_def  : IndefOrDef,
+  view_requests : HashSet < ViewRequest >,
 ) -> ViewNode {
   ViewNode { focused : false,
              folded  : false,
              kind    : ViewNodeKind::True (
-               TrueNode { parent_ignores,
+               TrueNode { birth,
                           view_requests,
                           indef_or_def,
                           .. default_truenode (

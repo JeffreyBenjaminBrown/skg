@@ -9,7 +9,7 @@ use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_t
 use crate::to_org::util::{ DefinitiveMap, build_node_branch_minus_content, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
 use crate::types::git::NodeDiffStatus;
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ContainerwardPathStats, IndefOrDef, mk_indefinitive_viewnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ContainerwardPathStats, IndefOrDef, Birth, mk_indefinitive_viewnode };
 use crate::types::skgnode::SkgNode;
 use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::tree::generic::read_at_node_in_tree;
@@ -210,7 +210,7 @@ fn indefinitize_content_subtree (
         node_ref . children ()
         . filter ( |c| matches! ( &c . value() . kind,
                                   ViewNodeKind::True (t)
-                                  if !t . parent_ignores ))
+                                  if !t . parent_ignores_it() ))
         . map ( |c| c . id () )
         . collect ();
       (node_pid, content_child_treeids) };
@@ -405,7 +405,7 @@ async fn mk_removed_child_viewnode (
       child_id . clone(),
       child_skgnode . source . clone(),
       child_skgnode . title . clone(),
-      false );                // parent_ignores
+      Birth::ContentOf );
   if let ViewNodeKind::True ( ref mut t ) = child_viewnode . kind {
     if let Some (source) = child_source {
       t . source = source; }

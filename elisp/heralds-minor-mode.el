@@ -45,7 +45,10 @@
       (ANY "◌") ;; For nodes with no ID. heralds--post-process-text removes it if there's an ID.
       (id (ANY "⦿")) ;; For nodes with an ID. heralds--post-process-text removes it if there are non-default stats.
       (source) ;; ignored
-      (RED parentIgnores "!{")
+      (RED birth
+        (independent "!{")
+        (containerOf "}")
+        (linksTo "←"))
       (GREEN indefinitive "indef")
       (BLUE graphStats
         (containers)            ;; instead we show the containsHerald
@@ -61,7 +64,6 @@
         (BLUE containerwardPath (ANY IT)))
       (BLUE viewStats
         (BLUE cycle "⟳")
-        (RED notInParent "!{")
         (containsParent "}")
         (BLUE sourceHerald (ANY IT)))
       (editRequest
@@ -246,8 +248,7 @@ Returns nil if parsing fails."
     (herald-string sexp)
   "Some post-processing rules for heralds:
 - Remove ◌ if id present in SEXP
-- Remove ⦿ if graphStats or viewStats present in SEXP
-- Remove duplicate '!{' symbol if it appears twice"
+- Remove ⦿ if graphStats or viewStats present in SEXP"
   (when herald-string
     (let* ((heralds (split-string herald-string " " t))
            (heralds (heralds--remove-token-if-sexp-matches-structure
@@ -255,16 +256,8 @@ Returns nil if parsing fails."
            (heralds (heralds--remove-token-if-sexp-matches-structure
                    "⦿" heralds sexp '(skg (node (graphStats)) )) )
            (heralds (heralds--remove-token-if-sexp-matches-structure
-                   "⦿" heralds sexp '(skg (node (viewStats)) )) )
-           (joined (mapconcat #'identity heralds " "))
-           (first-brace-pos (string-match "!{" joined))
-           (second-brace-pos
-            (when first-brace-pos
-              (string-match "!{" joined (+ first-brace-pos 2)))))
-      (if second-brace-pos
-          (concat (substring joined 0 second-brace-pos)
-                  (substring joined (+ second-brace-pos 2)))
-        joined))))
+                   "⦿" heralds sexp '(skg (node (viewStats)) )) ))
+      (mapconcat #'identity heralds " "))))
 
 (defun heralds--remove-token-if-sexp-matches-structure
     (token tokens sexp structure)

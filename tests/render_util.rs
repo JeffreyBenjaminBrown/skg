@@ -82,4 +82,4 @@ fn test_metadata_ordering () {
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("TrueNode rendering never fails");
-  assert_eq! ( result, "* (skg (node (id xyz) (source main) (viewStats cycle notInParent))) Test\n" ); }
+  assert_eq! ( result, "* (skg (node (id xyz) (source main) (viewStats cycle))) Test\n" ); }

@@ -5,7 +5,7 @@
 // even if the parent ignores it.
 
 use skg::types::misc::{ ID, SourceName, SkgConfig, SkgfileSource };
-use skg::types::viewnode::{ ViewNode, ViewNodeKind, forest_root_viewnode, mk_definitive_viewnode, mk_indefinitive_viewnode };
+use skg::types::viewnode::{ Birth, ViewNode, ViewNodeKind, forest_root_viewnode, mk_definitive_viewnode, mk_indefinitive_viewnode };
 use skg::update_buffer::viewnodestats::set_viewnodestats_in_forest;
 
 use ego_tree::Tree;
@@ -31,11 +31,11 @@ fn two_source_config () -> SkgConfig {
       user_owns_it : true } );
   SkgConfig::dummyFromSources (sources) }
 
-/// When a parent_ignores child has the same source
-/// as its nearest truenode ancestor,
+/// When a node N has the same source as its nearest truenode ancestor,
+/// even if N is marked birth=Independent,
 /// sourceAtBoundary should be false.
 #[test]
-fn source_inheritance_across_parent_ignores_same_source () {
+fn source_inheritance_across_non_content_same_source () {
   let config : SkgConfig = two_source_config ();
   let container_to_contents : HashMap<ID, _> = HashMap::new ();
   let content_to_containers : HashMap<ID, _> = HashMap::new ();
@@ -52,7 +52,7 @@ fn source_inheritance_across_parent_ignores_same_source () {
       ID::from ("b"),
       SourceName::from ("pub"),
       "node B" . to_string (),
-      true ); // parent_ignores
+      Birth::Independent );
     forest . get_mut (a_id) . unwrap () . append (vn); }
   set_viewnodestats_in_forest (
     &mut forest,
@@ -60,21 +60,21 @@ fn source_inheritance_across_parent_ignores_same_source () {
     &content_to_containers,
     &config );
   // B has same source as A, so sourceAtBoundary should be false,
-  // even though B has parent_ignores=true.
+  // even though B has birth != ContentOf.
   let b_ref =
     forest . get (a_id) . unwrap ()
     . first_child () . unwrap ();
   let ViewNodeKind::True (t) = & b_ref . value () . kind
     else { panic! ("expected TrueNode") };
   assert! ( ! t . viewStats . sourceAtBoundary,
-            "Same source across parent_ignores boundary \
+            "Same source across non-content boundary \
              should NOT be at boundary" ); }
 
-/// When a parent_ignores child has a different source
+/// When a non-content child (birth != ContentOf) has a different source
 /// from its nearest truenode ancestor,
 /// sourceAtBoundary should be true.
 #[test]
-fn source_inheritance_across_parent_ignores_different_source () {
+fn source_inheritance_across_non_content_different_source () {
   let config : SkgConfig = two_source_config ();
   let container_to_contents : HashMap<ID, _> = HashMap::new ();
   let content_to_containers : HashMap<ID, _> = HashMap::new ();
@@ -91,7 +91,7 @@ fn source_inheritance_across_parent_ignores_different_source () {
       ID::from ("b"),
       SourceName::from ("priv"),
       "node B" . to_string (),
-      true ); // parent_ignores
+      Birth::Independent );
     forest . get_mut (a_id) . unwrap () . append (vn); }
   set_viewnodestats_in_forest (
     &mut forest,
@@ -104,5 +104,5 @@ fn source_inheritance_across_parent_ignores_different_source () {
   let ViewNodeKind::True (t) = & b_ref . value () . kind
     else { panic! ("expected TrueNode") };
   assert! ( t . viewStats . sourceAtBoundary,
-            "Different source across parent_ignores boundary \
+            "Different source across non-content boundary \
              should be at boundary" ); }

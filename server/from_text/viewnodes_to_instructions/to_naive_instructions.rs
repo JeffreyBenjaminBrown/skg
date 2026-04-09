@@ -133,7 +133,7 @@ fn collect_subscribees (
           let child_node : &ViewNode = subscribeecol_child . value();
           match &child_node . kind {
             ViewNodeKind::True (t) => {
-              if !t . parent_ignores {
+              if !t . parent_ignores_it() {
                 subscribees . push(t . id . clone()); }},
             ViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol) =>
               continue, // valid child of SubscribeeCol, but not a subscribee
@@ -146,7 +146,7 @@ fn collect_subscribees (
 
 /// The following kinds of TrueNode children
 /// should be excluded from their parent's content:
-/// - anything marked parentIgnores
+/// - anything with birth != ContentOf (i.e. parent_ignores_it)
 /// - any phantom content ('Removed' or 'RemovedHere')
 /// - anything about to be deleted
 fn collect_contents_to_save_from_children<'a> (
@@ -163,7 +163,7 @@ fn collect_contents_to_save_from_children<'a> (
           matches!( t . diff,
                     Some (NodeDiffStatus::Removed) |
                     Some (NodeDiffStatus::RemovedHere) );
-        if ! t . parent_ignores
+        if ! t . parent_ignores_it()
            && ! is_phantom
            && ! matches!( t . edit_request (),
                           Some (&EditRequest::Delete))

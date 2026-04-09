@@ -14,7 +14,7 @@ Requesting sourceward view produces 4 source nodes. Example:
 
 : * ... (graphStats (containers 0) (contents 6) (containsHerald 0{6)
 :   (linksInFromLeaves 4) (linksHerald →4)) ...)) science
-: ** (skg (node (id ecf4f6ea...) ... parentIgnores indefinitive
+: ** (skg (node (id ecf4f6ea...) ... (birth independent) indefinitive
 :     (viewStats notInParent))) [[id:6972d099...][science]]
 
 The root has rich graphStats. The source nodes have none.

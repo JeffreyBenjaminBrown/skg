@@ -4,14 +4,11 @@
 /// Only needed briefly after parsing a buffer from the client;
 /// after validation, converted to checked types.
 
-use super::misc::ID;
 pub use super::viewnode::UncheckedTrueNode;
-use super::viewnode::{
-  ViewNode, ViewNodeKind, TrueNode,
-  Scaffold, ScaffoldKind, DeletedNode,
-  GraphNodeStats, ViewNodeStats, IndefOrDef,
-};
+use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
+use super::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Scaffold, ScaffoldKind, DeletedNode, GraphNodeStats, ViewNodeStats, IndefOrDef, Birth, };
+
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
 
@@ -53,7 +50,7 @@ impl TryFrom<UncheckedTrueNode> for TrueNode {
       title          : u . title,
       id,
       source,
-      parent_ignores : u . parent_ignores,
+      birth          : u . birth,
       graphStats     : u . graphStats,
       viewStats      : u . viewStats,
       view_requests  : u . view_requests,
@@ -98,7 +95,7 @@ impl From<TrueNode> for UncheckedTrueNode {
       title          : t . title,
       id             : Some(t . id),
       source         : Some(t . source),
-      parent_ignores : t . parent_ignores,
+      birth          : t . birth,
       graphStats     : t . graphStats,
       viewStats      : t . viewStats,
       view_requests  : t . view_requests,
@@ -243,7 +240,7 @@ impl Default for UncheckedTrueNode {
       title          : String::new(),
       id             : None,
       source         : None,
-      parent_ignores : false,
+      birth          : Birth::ContentOf,
       graphStats     : GraphNodeStats::default(),
       viewStats      : ViewNodeStats::default(),
       view_requests  : HashSet::new(),

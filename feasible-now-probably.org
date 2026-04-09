@@ -146,7 +146,7 @@ These are new names that I want to use for some (most) functions in docs/COMMAND
     ** (skg (node (id 47cc3148-d9f8-4843-9cc3-905b2f9e9259) (source public))) [[id:1cd8051b-95ee-4f73-a05e-624200b52c90][the feeling of forcing it]]
     ** (skg (node (id 5020e623-f323-42b9-86ec-a26fd463e3c2) (source public) (graphStats (linksIn 1)))) Is silence motivating?
       Turning off {music, podcasts, recorded content from others} really makes me want to work. Perhaps by undistracting me from discomfort.
-    *** (skg (node (id 7b52eb18-91c5-4f83-be4f-40ff8a918541) (source public) parentIgnores indefinitive (graphStats (containers 0) (contents 54) (linksIn 18) aliasing) (viewStats cycle notInParent containsParent))) motivation | ambition | voluntarity | intention | purpose
+    *** (skg (node (id 7b52eb18-91c5-4f83-be4f-40ff8a918541) (source public) (birth independent) indefinitive (graphStats (containers 0) (contents 54) (linksIn 18) aliasing) (viewStats cycle notInParent containsParent))) motivation | ambition | voluntarity | intention | purpose
   When I put point at the start of the last of those lines
     (the one with id 7b52eb18-91c5-4f83-be4f-40ff8a918541)
   invoke skg-next-id, and then invoke skg-view-from-node,

@@ -1,0 +1,67 @@
+* Rename RelToParent → Birth
+
+** Context
+   Jeff wants to rename RelToParent to Birth, clarifying that
+   the field encodes how a node was *born* into its position,
+   not every possible relationship with its parent.
+
+   Variant renames:
+   | Old             | New          |
+   |-----------------+--------------|
+   | RelToParent     | Birth        |
+   | Content         | ContentOf    |
+   | Unrelated       | Independent  |
+   | ContainerOf     | (unchanged)  |
+   | LinksTo         | (unchanged)  |
+
+   Field/variable renames:
+   | Old             | New          |
+   |-----------------+--------------|
+   | rel_to_parent   | birth        |
+   | relToParent     | birth        |
+
+** Scope: 151 occurrences across 31 files
+
+*** Rust: enum + field (server/)
+    All files that import/use RelToParent.
+    16 server files + 7 test files.
+
+*** Elisp + Elisp tests
+    - elisp/skg-sexpr/skg-truenode-defaults.el
+    - elisp/skg-sexpr-edit/skg-sexpr-cycling.el
+    - elisp/heralds-minor-mode.el
+    - tests/elisp/test-skg-truenode-defaults.el
+    - tests/integration/containerward-view-request/test-emacs.el
+    - tests/integration/sourceward-view-request/test-emacs.el
+
+** Approach
+   Mechanical find-and-replace, ordered to avoid partial matches:
+
+   1. 'RelToParent::Content'     → 'Birth::ContentOf'
+   2. 'RelToParent::Unrelated'   → 'Birth::Independent'
+   3. 'RelToParent::ContainerOf' → 'Birth::ContainerOf'
+   4. 'RelToParent::LinksTo'     → 'Birth::LinksTo'
+   5. 'RelToParent'              → 'Birth'  (type name in sigs, imports, enum def)
+   6. 'rel_to_parent'            → 'birth'  (Rust field/variable names)
+
+   S-exp strings (in .rs rendering + parsing, and .el):
+   7.  "(relToParent unrelated)"   → "(birth independent)"
+   8.  "(relToParent containerOf)" → "(birth containerOf)"
+   9.  "(relToParent linksTo)"     → "(birth linksTo)"
+   10. '"relToParent"' in Elisp   → '"birth"'
+   11. '"content"' parse match    → '"contentOf"'
+   12. '"unrelated"' parse match  → '"independent"'
+   13. Elisp cycling values:
+       "content (default)" → "contentOf (default)"
+       "unrelated"         → "independent"
+   14. Elisp defaults alist:
+       default-content-p checks: "content (default)" → "contentOf (default)"
+                                 "content"           → "contentOf"
+
+   PITFALL: 'Content' alone is too common (Content-Length, DuplicatedContent).
+   Only replace fully-qualified 'RelToParent::Content', never bare 'Content'.
+
+** Verification
+   - cargo build --tests
+   - cargo nextest run (263 tests)
+   - bash/emacs-tests.sh (136 tests)

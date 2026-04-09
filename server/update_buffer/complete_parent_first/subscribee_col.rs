@@ -1,30 +1,17 @@
 use crate::dbs::filesystem::one_node::skgnodes_from_ids;
 use crate::git_ops::read_repo::skgnode_from_git_head;
-use crate::types::viewnode::mk_phantom_viewnode;
 use crate::types::git::{SourceDiff, NodeDiffStatus};
-use crate::types::list::{compute_interleaved_diff,
-                          itemlist_and_removedset_from_diff,
-                          Diff_Item};
+use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
+use crate::types::memory::SkgNodeMap;
+use crate::types::memory::find_source_many_ways;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_diff_status};
-use crate::types::memory::find_source_many_ways;
 use crate::types::skgnode::SkgNode;
-use crate::types::memory::SkgNodeMap;
-use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, Scaffold,
-    mk_indefinitive_viewnode};
-use crate::types::tree::generic::{
-    error_unless_node_satisfies,
-    read_at_ancestor_in_tree,
-    write_at_ancestor_in_tree,
-    with_node_mut};
-use crate::types::tree::viewnode_skgnode::{
-    unique_scaffold_child,
-    insert_scaffold_as_child};
-use crate::update_buffer::util::{
-    move_child_to_end,
-    subtree_satisfies,
-    complete_relevant_children_in_viewnodetree};
+use crate::types::tree::generic::{ error_unless_node_satisfies, read_at_ancestor_in_tree, write_at_ancestor_in_tree, with_node_mut};
+use crate::types::tree::viewnode_skgnode::{ unique_scaffold_child, insert_scaffold_as_child};
+use crate::types::viewnode::mk_phantom_viewnode;
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, Birth, mk_indefinitive_viewnode};
+use crate::update_buffer::util::{ move_child_to_end, subtree_satisfies, complete_relevant_children_in_viewnodetree};
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -115,7 +102,7 @@ pub async fn complete_subscribee_col_preorder (
       tree, node,
       |vn : &ViewNode| matches!( &vn . kind,
                                  ViewNodeKind::True (t)
-                                 if !t . parent_ignores ),
+                                 if !t . parent_ignores_it() ),
       |vn : &ViewNode| match &vn . kind {
         ViewNodeKind::True (t) => t . id . clone(),
         _ => panic!( "complete_subscribee_col_preorder: \
@@ -129,7 +116,7 @@ pub async fn complete_subscribee_col_preorder (
           None =>
             mk_indefinitive_viewnode(
               id . clone(), d . source . clone(),
-              d . title . clone(), false ),
+              d . title . clone(), Birth::ContentOf ),
           Some (diff_status) =>
             mk_phantom_viewnode(
               id . clone(), d . source . clone(),

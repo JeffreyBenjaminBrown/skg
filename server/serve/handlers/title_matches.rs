@@ -19,7 +19,7 @@ use crate::types::memory::skgnode_from_map_or_disk;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::memory::ViewUri;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, forest_root_viewnode, mk_indefinitive_viewnode};
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, Birth, forest_root_viewnode, mk_indefinitive_viewnode};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use sexp::{Sexp, Atom};
@@ -346,7 +346,7 @@ pub fn group_matches_by_id (
 ///
 /// Tree structure:
 ///   BufferRoot
-///   ├── TrueNode per result (level 1, indefinitive, parent_ignores)
+///   ├── TrueNode per result (level 1, indefinitive, non-content)
 ///   │   └── AliasCol + Alias children (if aliases matched)
 ///   └── ...
 pub fn build_search_forest (
@@ -388,7 +388,7 @@ pub fn build_search_forest (
             (*id) . clone (),
             (*source) . clone (),
             title . clone (),
-            true ) ) // parent_ignores
+            Birth::Independent ) )
         . id () };
       if sorted_matches . len () > 1 {
         // We bury all but the best match in an AliasCol.

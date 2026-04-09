@@ -3,7 +3,7 @@ use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SourceName};
 use crate::types::skgnode::SkgNode;
 use crate::types::memory::SkgNodeMap;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth};
 use crate::types::tree::generic::{pid_and_source_from_ancestor, read_at_ancestor_in_tree};
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, treat_certain_children};
 use ego_tree::{NodeId, Tree};
@@ -19,7 +19,7 @@ use std::error::Error;
 /// - Fetch the corresponding SkgNode from the map
 /// - Read its aliases into 'aliases'
 /// - Partition the AliasCol's children into:
-///   - TrueNodes with parent_ignores=true
+///   - TrueNodes with birth != ContentOf
 ///   - Alias scaffold nodes
 ///   (Error if any child does not fit these categories.)
 /// - Reorder children: ignored TrueNodes first, then Alias nodes
@@ -103,6 +103,6 @@ pub fn completeAliasCol (
       |vn : &ViewNode| matches!( &vn . kind, ViewNodeKind::True (_)),
       |vn : &mut ViewNode| {
         if let ViewNodeKind::True( ref mut t ) = vn . kind {
-          t . parent_ignores = true; }},
+          t . birth = Birth::Independent; }},
     ) . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   Ok( () ) }

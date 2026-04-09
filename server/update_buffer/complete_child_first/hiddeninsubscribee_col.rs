@@ -8,7 +8,7 @@ use crate::types::memory::find_source_many_ways;
 use crate::types::skgnode::SkgNode;
 use crate::types::memory::SkgNodeMap;
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, write_at_ancestor_in_tree, with_node_mut};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, mk_indefinitive_viewnode};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth, mk_indefinitive_viewnode};
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, treat_certain_children, subtree_satisfies};
 
 use ego_tree::{NodeId, Tree};
@@ -92,7 +92,7 @@ pub fn complete_hiddeninsubscribee_col (
     tree, node,
     |vn : &ViewNode| matches!( &vn . kind,
                                ViewNodeKind::True (t)
-                               if !t . parent_ignores ),
+                               if !t . parent_ignores_it() ),
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::True (t) => t . id . clone(),
       _ => panic!( "complete_hiddeninsubscribee_col: \
@@ -106,24 +106,24 @@ pub fn complete_hiddeninsubscribee_col (
       match d . phantom {
         None => mk_indefinitive_viewnode(
           id . clone(), d . source . clone(),
-          d . title . clone(), false ),
+          d . title . clone(), Birth::ContentOf ),
         Some (diff_status) => mk_phantom_viewnode(
           id . clone(), d . source . clone(),
           d . title . clone(), diff_status ) }}, ) ?;
-  { // Mark erroneous content children as parentIgnores. "Erroneous content" are non-parentIgnores non-phantom TrueNode children that are not part of its content.
+  { // Change birth of erroneous content children to Independent. "Erroneous content" are TrueNode children marked birth=ContentOf that are not part of its content.
     let subscribee_contains_set : HashSet<ID> =
       subscribee_contains . iter() . cloned() . collect();
     treat_certain_children(
       tree, node,
       |vn : &ViewNode| match &vn . kind {
         ViewNodeKind::True (t) =>
-          ! t . parent_ignores
+          ! t . parent_ignores_it()
           && ! subscribee_contains_set . contains( &t . id )
           && ! t . is_phantom(),
         _ => false },
       |vn : &mut ViewNode| {
         if let ViewNodeKind::True( ref mut t ) = vn . kind {
-          t . parent_ignores = true; } },
+          t . birth = Birth::Independent; } },
     ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?; }
   { // Remove if empty.
     let has_children : bool =

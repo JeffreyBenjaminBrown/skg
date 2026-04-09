@@ -167,12 +167,12 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_mixed_relations() {
   let input: &str =
     indoc! {"
             * (skg (node (id root) (source main))) root node
-            ** (skg (node (id parentIgnores) (source main) parentIgnores)) parentIgnores child
+            ** (skg (node (id unrelated1) (source main) (birth independent))) unrelated child
             ** (skg (node (id content1) (source main))) content child 1
             ** (skg aliasCol) aliases
             *** (skg alias) my alias
             ** (skg (node (id content2) (source main))) content child 2
-            ** (skg (node (id none_rel) (source main) parentIgnores)) parentIgnores relation child
+            ** (skg (node (id unrelated2) (source main) (birth independent))) another unrelated child
         "};
 
   let unchecked_forest : Tree<UncheckedViewNode> =
@@ -182,7 +182,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_mixed_relations() {
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_tree (forest) . unwrap();
 
-  // Should have instructions for: root, parentIgnores, content1, content2, none_rel
+  // Should have instructions for: root, unrelated1, content1, content2, unrelated2
   // AliasCol and Alias should be skipped
   assert_eq!(instructions . len(), 5);
 
@@ -306,7 +306,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_complex_scenario() {
             ** (skg (node (id section2) (source main) (editRequest delete))) Section 2
             ** (skg (node (id section3) (source main))) Section 3
             * (skg (node (id doc2) (source main))) Document 2
-            ** (skg (node (id ref_section) (source main) parentIgnores)) Reference Section
+            ** (skg (node (id ref_section) (source main) (birth independent))) Reference Section
         "};
   let unchecked_forest : Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;

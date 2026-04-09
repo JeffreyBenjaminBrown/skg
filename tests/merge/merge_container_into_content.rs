@@ -121,7 +121,19 @@ async fn merge_container_into_content_impl (
     if preserver_skgnode . title != "MERGED: a" {
       failures . push ( format!(
         "Text preserver title should be 'MERGED: a', got '{}'",
-        preserver_skgnode . title )); } }
+        preserver_skgnode . title )); }
+    if preserver_skgnode . source != SourceName::from ("main") {
+      failures . push ( format!(
+        "Text preserver source should be 'main', got '{:?}'",
+        preserver_skgnode . source )); }
+    if !preserver_skgnode . contains . is_empty() {
+      failures . push ( format!(
+        "Text preserver should have no contents, got {:?}",
+        preserver_skgnode . contains )); }
+    if !preserver_skgnode . extra_ids . is_empty() {
+      failures . push ( format!(
+        "Text preserver should have no extra_ids, got {:?}",
+        preserver_skgnode . extra_ids )); } }
 
   // aa must NOT contain itself.
   if aa_skgnode . contains . contains (&ID::from ("aa")) {
@@ -143,7 +155,7 @@ async fn merge_container_into_content_impl (
       "KNOWN BUG 3: acquiree 'a' not rendered as DeletedNode"
       . to_string() ); }
 
-  // b and c under aa should NOT be parentIgnores.
+  // b and c under aa should have birth = ContentOf.
   let lines : Vec<&str> = view . lines() . collect();
   let aa_line_idx : Option<usize> =
     lines . iter() . position (
@@ -172,17 +184,17 @@ async fn merge_container_into_content_impl (
       failures . push (
         "KNOWN BUG 2: b does not appear as a child of aa"
         . to_string() );
-    } else if b_under_aa . unwrap() . contains ("parentIgnores") {
+    } else if b_under_aa . unwrap() . contains ("birth") {
       failures . push (
-        "KNOWN BUG 2: b under aa is marked parentIgnores"
+        "KNOWN BUG 2: b under aa is marked birth=Independent"
         . to_string() ); }
     if c_under_aa . is_none() {
       failures . push (
         "KNOWN BUG 2: c does not appear as a child of aa"
         . to_string() );
-    } else if c_under_aa . unwrap() . contains ("parentIgnores") {
+    } else if c_under_aa . unwrap() . contains ("birth") {
       failures . push (
-        "KNOWN BUG 2: c under aa is marked parentIgnores"
+        "KNOWN BUG 2: c under aa is marked birth=Independent"
         . to_string() ); }
 
     // Text preserver should appear under aa.

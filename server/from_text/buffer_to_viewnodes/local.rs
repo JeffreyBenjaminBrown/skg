@@ -265,7 +265,7 @@ fn has_empty_title ( t : &UncheckedTrueNode ) -> bool {
 
 /// Check that all non-ignored, non-phantom TrueNode children
 /// have distinct IDs.
-/// "Non-ignored" means parent_ignores == false.
+/// "Non-ignored" means birth == ContentOf.
 /// "Non-phantom" means diff is not Removed or RemovedHere.
 /// Returns true if all such children have distinct IDs,
 /// or if there are no such children.
@@ -278,7 +278,7 @@ pub fn nonignored_children_have_distinct_ids (
   let mut seen : HashSet<ID> = HashSet::new();
   for child in node_ref . children() {
     if let UncheckedViewNodeKind::True (t) = &child . value() . kind {
-      if ( !t . parent_ignores
+      if ( !t . parent_ignores_it()
            && !matches!( t . diff,
                        Some( NodeDiffStatus::Removed )
                        | Some( NodeDiffStatus::RemovedHere ))) {

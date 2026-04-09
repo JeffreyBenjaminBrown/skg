@@ -19,12 +19,12 @@
 
 (defconst skg-truenode--canonical-field-order
   '("id" "source"
-    "indefinitive" "parentIgnores" "editRequest" "viewRequests")
+    "indefinitive" "birth" "editRequest" "viewRequests")
   "Canonical order for node fields. Fields not in this list go last.")
 
 (defconst skg-truenode--editable-defaults
   '(("indefinitive"  . "false (default)")
-    ("parentIgnores" . "false (default)")
+    ("birth"         . "contentOf (default)")
     ("editRequest"   . "none (default)")
     ("viewRequests"  . "none (default)"))
   "Alist of editable field names to their default value text.")
@@ -191,7 +191,7 @@ Returns the group, possibly with a value child added or modified."
   (cond
    ;; Bare boolean atom: expand to have 'true' child
    ((and (= (length group) 1)
-         (member field-name '("indefinitive" "parentIgnores")))
+         (string= field-name "indefinitive"))
     (list (car group)
           (cons (1+ child-level) "true")))
    ;; Source field: mark with (default) if it matches
@@ -251,8 +251,7 @@ CHILD-LEVEL is the level of the field headline."
          (when (> (length group) 1)
            (string-trim (cdr (nth 1 group))))))
     (cond
-     ((member field-name
-              '("indefinitive" "parentIgnores")) ;; Boolean fields
+     ((string= field-name "indefinitive") ;; Boolean field
       (cond
        ((or (null value-text)
             (skg-truenode--default-false-p value-text))
@@ -260,6 +259,12 @@ CHILD-LEVEL is the level of the field headline."
        ((string= value-text "true")
         ;; Collapse to bare atom (no children)
         (list (cons child-level field-name)))
+       (t group)))
+     ((string= field-name "birth")
+      (cond
+       ((or (null value-text)
+            (skg-truenode--default-content-p value-text))
+        nil) ;; remove: at default (content)
        (t group)))
      ((string= field-name "editRequest")
       (cond
@@ -310,6 +315,12 @@ CHILD-LEVEL is the level of the field headline."
   (let ((trimmed (string-trim text)))
     (or (string= trimmed "false (default)")
         (string= trimmed "false"))))
+
+(defun skg-truenode--default-content-p (text)
+  "Return non-nil if TEXT represents the default content value."
+  (let ((trimmed (string-trim text)))
+    (or (string= trimmed "contentOf (default)")
+        (string= trimmed "contentOf"))))
 
 (defun skg-truenode--default-none-p (text)
   "Return non-nil if TEXT represents the default none value."

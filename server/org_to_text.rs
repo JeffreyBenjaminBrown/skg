@@ -1,5 +1,5 @@
 use crate::types::misc::{SkgConfig, SkgfileSource};
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, EditRequest, GraphNodeStats };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, EditRequest, GraphNodeStats, Birth };
 
 use ego_tree::{NodeRef, Tree};
 use std::error::Error;
@@ -157,8 +157,6 @@ fn true_node_metadata_to_string (
       let mut parts : Vec < String > = Vec::new ();
       if true_node . viewStats . cycle {
         parts . push ( "cycle" . to_string () ); }
-      if ! true_node . viewStats . parentIsContainer {
-        parts . push ( "notInParent" . to_string () ); }
       if true_node . viewStats . parentIsContent {
         parts . push ( "containsParent" . to_string () ); }
       if true_node . viewStats . sourceAtBoundary {
@@ -193,8 +191,14 @@ fn true_node_metadata_to_string (
       vec! [ "node" . to_string () ];
     parts . push ( format! ( "(id {})", true_node . id . 0 ));
     parts . push ( format! ( "(source {})", true_node . source ));
-    if true_node . parent_ignores {
-      parts . push ( "parentIgnores" . to_string () ); }
+    match true_node . birth {
+      Birth::ContentOf => {},
+      Birth::Independent =>
+        parts . push ( "(birth independent)" . to_string () ),
+      Birth::ContainerOf =>
+        parts . push ( "(birth containerOf)" . to_string () ),
+      Birth::LinksTo =>
+        parts . push ( "(birth linksTo)" . to_string () ) }
     if true_node . is_indefinitive () {
       parts . push ( "indefinitive" . to_string () ); }
     if let Some (s) = graph_stats (true_node)

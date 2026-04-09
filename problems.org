@@ -1,0 +1,18 @@
+* Problems found during herald overhaul research
+** 'mk_indefinitive_from_viewnode' silently drops fields
+   server/types/viewnode.rs line 538.
+   It rebuilds a fresh viewnode via 'mk_indefinitive_viewnode',
+   losing 'view_requests', 'diff', 'graphStats', 'viewStats',
+   and any future fields added to TrueNode.
+
+   Any new field (like 'parent_relation' if added)
+   must be manually preserved here, which is easy to forget.
+
+   Consider refactoring to mutate in place:
+   clear body, set indef_or_def to Indefinitive,
+   update birth — but keep everything else.
+
+** 'path_from_pid_and_source' uses .expect() and can panic
+   server/util.rs. Already noted in MEMORY.md.
+   If an invalid source reaches this function (e.g. from a search view),
+   the server crashes. Should return Result.

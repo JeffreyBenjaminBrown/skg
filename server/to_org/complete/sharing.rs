@@ -3,7 +3,7 @@ use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   what_node_hides,
   what_nodes_contain };
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth};
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
 use crate::types::tree::viewnode_skgnode::{
   append_indefinitive_from_disk_as_child,
@@ -101,12 +101,12 @@ pub async fn maybe_add_subscribeeCol_branch (
       for hidden_id in hidden_outside_content {
         append_indefinitive_from_disk_as_child (
           tree, map, hidden_outside_col_nid, & hidden_id,
-          false, config, driver
+          Birth::ContentOf, config, driver
         ) . await ?; }}
     for subscribee_id in subscribee_ids {
       append_indefinitive_from_disk_as_child (
         tree, map, subscribee_col_nid, & subscribee_id,
-        false, config, driver
+        Birth::ContentOf, config, driver
       ) . await ?; }}
   Ok (( )) }
 
@@ -148,5 +148,5 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
     // populate the collection
     append_indefinitive_from_disk_as_child (
       tree, map, hidden_col_nid, & hidden_id,
-      false, config, driver ) . await ?; }
+      Birth::ContentOf, config, driver ) . await ?; }
   Ok (( )) }

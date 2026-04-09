@@ -1,0 +1,36 @@
+* BUG: self-containment in TypeDB after merging container into content
+
+** Summary
+When merging a container into one of its own content nodes,
+the acquirer ends up containing itself in TypeDB.
+The filesystem is correct — the bug is only in TypeDB.
+
+** Reproduction
+Test: cargo test --test merge merge_container_into_content -- --nocapture
+
+Fixture graph:
+  a contains [aa, b, c]
+  aa contains [x]
+
+Buffer merges a into aa (editRequest (merge a) on aa).
+
+After merge:
+- Filesystem: aa.contains = [preserver, x, b, c] (correct, 4 items)
+- TypeDB: aa contains {aa} (self-containment!)
+
+The old a→aa containment relationship wasn't cleaned up;
+it got reassigned to aa (via extra_id inheritance from a).
+
+** Symptom
+The rendered buffer shows (contents 5) in aa's graphStats,
+but aa only has 4 actual content children.
+The 5th is aa itself, counted from the TypeDB self-containment.
+
+** Where to look
+The merge logic is in the save pipeline.
+The TypeDB update presumably needs to remove the contains relationship
+from the acquiree to the acquirer before reassigning extra_ids.
+
+** also to do
+The 'KNOWN BUG' comments in tests/merge/merge_container_into_content.rs will,
+after these changes, hopefully all be stale, and will need rewriting.

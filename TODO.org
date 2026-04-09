@@ -1,5 +1,16 @@
+* DONE ? ignorable : parentContains does seem like valid graph data
+** Neither seems critical.
+** History
+It was part of the graphnodestats, until just after commit
+2e02c90013f17459f8251f32d1564b69ca36bda2
+** debate
+and interesting enough to be heralded,
+and reasonably separate from 'birth'
+(although birth might imply it sometimes).
+But maybe 'anAncestorContains' would be more useful.
 * semi-permanent
 ** [[./next.org]] might be in progress
+** For minimalism, remember [[id:b6747d36-711b-42e7-aa80-b9b2be53fe6c][my Skg priorities]].
 ** import org-roam
 *** to run it
 cargo run --bin skg -- import-org-roam public/ data/public/ public
@@ -28,7 +39,7 @@ begin
 *** It is valid to dogfood even as only reading.
 * TODO ?
 ** Links to links are currently annoying. Are they important?
-* TODO new features
+* TODO really want but can wait
 ** There should only be one definitive view across all buffers.
 And they should all be indexed for C-c v v to jump to,
 not just the roots.
@@ -255,9 +266,9 @@ What's going on?
    server/to_org/initial_view_bfs.rs
 ** Appending from indef nodes moght be a misfeature.
 ** completeContents seems too long
-** RelToParent could be generalized as RelToAncestor.
+** Birth could be generalized as RelToAncestor.
    It would need both a relation and a number of levels.
-   (RelToParent would translate to 1 level; to grandparent, 2; etc.)
+   (Birth would translate to 1 level; to grandparent, 2; etc.)
 ** nah
 *** 'merge' should be encodeable in NodeSaveAction
     Then I wouldn't need to parse the action twice,

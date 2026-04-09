@@ -12,7 +12,7 @@ use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, Scaffold, DeletedNode, IndefOrDef,
-    mk_definitive_viewnode};
+    Birth, mk_definitive_viewnode};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_skgnode::{
     pid_and_source_from_treenode,
@@ -57,7 +57,7 @@ struct ChildData {
 ///   - clobberIndefinitiveViewnode
 /// - If it's definitive, run (in order):
 ///   - complete_content_children
-///   - mark_erroneous_content_children_as_parent_ignores
+///   - mark_erroneous_content_children_as_indep
 ///   - order_children_as_scaffolds_then_ignored_then_content
 ///   - maybe_prepend_subscribee_col
 ///   - maybe_prepend_diff_view_scaffolds
@@ -140,7 +140,7 @@ pub fn complete_truenode_preorder (
     complete_content_children(
       tree, node, &goal_list, &removed_ids,
       source_diffs, map, config, deleted_since_head_pid_src_map ) ?;
-    mark_erroneous_content_children_as_parent_ignores(
+    mark_erroneous_content_children_as_indep(
       tree, node, &apparent_content_ids ) ?; }
   order_children_as_scaffolds_then_ignored_then_content(
     tree, node ) ?;
@@ -176,17 +176,17 @@ fn is_subscribee (
   tree : &Tree<ViewNode>,
   node : NodeId,
 ) -> Result<bool, Box<dyn Error>> {
-  let not_parent_ignores : bool =
+  let is_content_of_parent : bool =
     read_at_node_in_tree( tree, node,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::True (t) => !t . parent_ignores,
+        ViewNodeKind::True (t) => !t . parent_ignores_it(),
         _ => false } ) ?;
   let parent_is_subscribee_col : bool =
     read_at_ancestor_in_tree( tree, node, 1,
       |vn : &ViewNode| matches!( &vn . kind,
         ViewNodeKind::Scaff (Scaffold::SubscribeeCol)))
     . unwrap_or (false);
-  Ok( not_parent_ignores && parent_is_subscribee_col ) }
+  Ok( is_content_of_parent && parent_is_subscribee_col ) }
 
 fn content_goal_list (
   tree          : &Tree<ViewNode>,
@@ -268,7 +268,7 @@ fn complete_content_children (
     tree, node,
     |vn : &ViewNode| matches!( &vn . kind,
                                ViewNodeKind::True (t)
-                               if !t . parent_ignores ),
+                               if !t . parent_ignores_it() ),
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::True (t) => t . id . clone(),
       _ => panic!(
@@ -294,11 +294,11 @@ fn complete_content_children (
 
 /// 'erroneous content children' are children that look like content,
 /// but that are not actually content.
-/// This marks them parentIgnores.
+/// This marks them birth=Independent.
 /// (Note that phantom nodes are not content in the worktree,
 /// but they are content in HEAD.
-/// This does not mark such phantoms parentIgnores.)
-fn mark_erroneous_content_children_as_parent_ignores (
+/// This does not mark such phantoms as Independent.)
+fn mark_erroneous_content_children_as_indep (
   tree        : &mut Tree<ViewNode>,
   node        : NodeId,
   content_ids : &[ID],
@@ -309,13 +309,13 @@ fn mark_erroneous_content_children_as_parent_ignores (
     tree, node,
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::True (t) =>
-        !t . parent_ignores
+        !t . parent_ignores_it()
         && !content_id_set . contains( &t . id )
         && !t . is_phantom(), // phantoms, though not content in the worktree, are content in HEAD, and should not be parent-ignored
       _ => false },
     |vn : &mut ViewNode| {
       if let ViewNodeKind::True( ref mut t ) = vn . kind {
-        t . parent_ignores = true; }},
+        t . birth = Birth::Independent; }},
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
 
 /// Reorder children into three groups:
@@ -330,11 +330,11 @@ fn order_children_as_scaffolds_then_ignored_then_content (
   let groups : HashMap<i32, Vec<NodeId>> =
     partition_children( tree, node,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Scaff (_)                      => 0,
-        ViewNodeKind::DeletedScaff (_)               => 0,
-        ViewNodeKind::True (t) if t . parent_ignores => 1,
-        ViewNodeKind::True (_)                       => 2,
-        ViewNodeKind::Deleted (_)                    => 2,
+        ViewNodeKind::Scaff (_)                           => 0,
+        ViewNodeKind::DeletedScaff (_)                    => 0,
+        ViewNodeKind::True (t) if t . parent_ignores_it() => 1,
+        ViewNodeKind::True (_)                            => 2,
+        ViewNodeKind::Deleted (_)                         => 2,
       } ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
   let empty : Vec<NodeId> = Vec::new();
   for &cid in groups . get( &0 ) . unwrap_or (&empty) . iter()
@@ -511,12 +511,12 @@ fn maybe_change_node_diff_status (
         } }}
   { // NewHere: Node was added to its parent's contains list,
     // but the file already existed (Added would have returned above).
-    let is_parent_ignores : bool =
+    let is_non_content : bool =
       read_at_node_in_tree( tree, node,
         |vn : &ViewNode| match &vn . kind {
-          ViewNodeKind::True (t) => t . parent_ignores,
+          ViewNodeKind::True (t) => t . parent_ignores_it(),
           _ => true } ) ?;
-    if is_parent_ignores { return Ok(( )); }
+    if is_non_content { return Ok(( )); }
     let (parent_pid, parent_source) : (ID, SourceName) =
       match read_at_ancestor_in_tree( tree, node, 1,
         |vn : &ViewNode| match &vn . kind {

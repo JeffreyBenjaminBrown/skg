@@ -249,7 +249,7 @@ pub async fn rerender_view (
 ///   is marked as removed or removed-here.
 /// Exception: Does not strip:
 ///   - top-level branches (children of BufferRoot)
-///   - parent_ignores nodes
+///   - non-content nodes (birth != ContentOf)
 /// Uses single-pass DFS: removes branch roots as encountered,
 /// skipping recursion into removed branches.
 pub fn remove_branches_that_git_marked_removed (
@@ -274,7 +274,7 @@ pub fn remove_branches_that_git_marked_removed (
                        Some (NodeDiffStatus::Removed) |
                        Some (NodeDiffStatus::RemovedHere))
             && ! is_forest_root_child
-            && ! t . parent_ignores },
+            && ! t . parent_ignores_it() },
           _ => false };
       if should_remove {
         node . detach();

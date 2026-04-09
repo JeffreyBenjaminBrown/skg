@@ -110,7 +110,7 @@ where Relevant : Fn (&ViewNode) -> bool,
     problem_discard,
     problem_discard_response ) }
 
-/// TODO ? Marking parentIgnores might be than deletion.
+/// TODO ? Marking birth=Independent might be better than deletion.
 /// (Or, keeping it abstract, replacing deletion with a caller-supplied lambda.)
 /// .
 /// PURPOSE:

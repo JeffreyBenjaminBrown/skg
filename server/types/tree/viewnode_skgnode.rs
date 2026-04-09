@@ -4,7 +4,7 @@ use crate::to_org::util::{skgnode_and_viewnode_from_id, get_id_from_treenode};
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, TrueNode, Scaffold,
-    mk_indefinitive_from_viewnode,
+    Birth, mk_indefinitive_from_viewnode,
     viewnode_from_scaffold };
 use crate::types::unchecked_viewnode::{
     UncheckedViewNode, UncheckedViewNodeKind };
@@ -156,20 +156,20 @@ pub fn insert_scaffold_as_child (
 /// Fetch a node from disk and append it as an indefinitive child.
 /// Also adds the SkgNode to the map.
 pub async fn append_indefinitive_from_disk_as_child (
-  tree           : &mut Tree<ViewNode>,
-  map            : &mut SkgNodeMap,
-  parent_id      : NodeId,
-  node_id        : &ID,
-  parent_ignores : bool,
-  config         : &SkgConfig,
-  driver         : &TypeDBDriver,
+  tree      : &mut Tree<ViewNode>,
+  map       : &mut SkgNodeMap,
+  parent_id : NodeId,
+  node_id   : &ID,
+  birth     : Birth,
+  config    : &SkgConfig,
+  driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
   let ( _skgnode, content_viewnode ) : ( SkgNode, ViewNode ) =
     skgnode_and_viewnode_from_id (
       config, driver, node_id, map ) . await ?;
   let viewnode : ViewNode =
     mk_indefinitive_from_viewnode (
-      content_viewnode, parent_ignores )
+      content_viewnode, birth )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   with_node_mut (
     tree, parent_id,
@@ -271,33 +271,33 @@ pub fn find_children_by_ids (
 /// Check if all nodes at the specified generation satisfy the predicate.
 /// Returns true if the generation is empty (vacuously true).
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_parent_ignores, excludes TrueNodes with parent_ignores=true.
+/// If skip_non_content, excludes TrueNodes with birth != ContentOf.
 pub fn generation_includes_only<F> (
   tree                : &Tree<UncheckedViewNode>,
   node_id             : NodeId,
   generation          : i32,
-  skip_parent_ignores : bool,
+  skip_non_content    : bool,
   predicate           : F,
 ) -> bool
 where F: Fn (&UncheckedViewNode) -> bool
-{ collect_generation( tree, node_id, generation, skip_parent_ignores )
+{ collect_generation( tree, node_id, generation, skip_non_content )
     . iter()
     . all ( |&id| predicate(
       tree . get (id) . unwrap() . value() )) }
 
 /// Check if the generation is nonempty and all nodes satisfy the predicate.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_parent_ignores, excludes TrueNodes with parent_ignores=true.
+/// If skip_non_content, excludes TrueNodes with birth != ContentOf.
 pub fn generation_exists_and_includes<F> (
   tree                : &Tree<UncheckedViewNode>,
   node_id             : NodeId,
   generation          : i32,
-  skip_parent_ignores : bool,
+  skip_non_content    : bool,
   predicate           : F,
 ) -> bool
 where F: Fn (&UncheckedViewNode) -> bool
 { let nodes = collect_generation(
-    tree, node_id, generation, skip_parent_ignores);
+    tree, node_id, generation, skip_non_content);
   !nodes . is_empty() &&
     nodes . iter() . all(
       |&id| predicate(
@@ -305,27 +305,27 @@ where F: Fn (&UncheckedViewNode) -> bool
 
 /// Check if the specified generation is empty.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_parent_ignores, excludes TrueNodes with parent_ignores=true.
+/// If skip_non_content, excludes TrueNodes with birth != ContentOf.
 pub fn generation_does_not_exist (
   tree                : &Tree<UncheckedViewNode>,
   node_id             : NodeId,
   generation          : i32,
-  skip_parent_ignores : bool,
+  skip_non_content    : bool,
 ) -> bool {
-  collect_generation( tree, node_id, generation, skip_parent_ignores
+  collect_generation( tree, node_id, generation, skip_non_content
                     ) . is_empty() }
 
 /// Collect NodeIds at a specified generation relative to the given node.
 /// Negative generation = ancestors (-1 = parent, -2 = grandparent, etc.)
 /// Positive generation = descendants (1 = children, 2 = grandchildren, etc.)
 /// Generation 0 returns just the node itself.
-/// If 'skip_parent_ignores' is true and generation > 0,
-///   then we exclude TrueNodes with parent_ignores=true.
+/// If 'skip_non_content' is true and generation > 0,
+///   then we exclude TrueNodes with birth != ContentOf.
 fn collect_generation (
   tree               : &Tree<UncheckedViewNode>,
   node_id            : NodeId,
   generation         : i32,
-  skip_parent_ignores : bool,
+  skip_non_content   : bool,
 ) -> Vec<NodeId> {
   if generation == 0 {
     return vec![node_id]; }
@@ -349,10 +349,10 @@ fn collect_generation (
         if let Some (n) = tree . get (id) {
           next_gen . extend(
             n . children()
-              . filter(|c| !skip_parent_ignores ||
+              . filter(|c| !skip_non_content ||
                           !matches!(&c . value() . kind,
                                     UncheckedViewNodeKind::True (t)
-                                    if t . parent_ignores))
+                                    if t . parent_ignores_it() ))
               . map(|c| c . id()) ); }}
       current_gen = next_gen; }
     current_gen } }
