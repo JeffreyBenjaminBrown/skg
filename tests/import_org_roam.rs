@@ -8,6 +8,7 @@ use skg::import_org_roam::parse::{
 use skg::types::misc::ID;
 use skg::types::skgnode::{FileProperty, SkgNode};
 
+use std::collections::HashMap;
 use std::io::Write;
 
 fn write_temp_org (
@@ -455,3 +456,84 @@ fn test_body_whitespace_mixed_indent_with_false_headline () {
   assert_eq! (nodes . len(), 1);
   assert_eq! (nodes[0] . body . as_deref(),
               Some ("  some text\n    indented\n  * sneaky bullet") ); }
+
+/// Render a tree of SkgNodes as org text (no metadata),
+/// starting from the given root ID, for test comparison.
+fn render_skgnodes_as_org (
+  nodes   : &[SkgNode],
+  root_id : &ID,
+) -> String {
+  let by_id : HashMap<&ID, &SkgNode> =
+    nodes . iter() . map (|n| (&n . pid, n)) . collect();
+  let mut out : String = String::new();
+  if let Some (root) = by_id . get (root_id) {
+    render_node_recursive (&by_id, root, 1, &mut out); }
+  out . trim_end() . to_string() }
+
+fn render_node_recursive (
+  by_id : &HashMap<&ID, &SkgNode>,
+  node  : &SkgNode,
+  level : usize,
+  out   : &mut String,
+) {
+  for _ in 0 .. level { out . push ('*'); }
+  out . push (' ');
+  out . push_str (&node . title);
+  out . push ('\n');
+  if let Some (ref body) = node . body {
+    out . push_str (body);
+    out . push ('\n'); }
+  for child_id in &node . contains {
+    if let Some (child) = by_id . get (child_id) {
+      render_node_recursive (by_id, child, level + 1, out); } } }
+
+#[test]
+fn test_super_indentation_creates_grouping_nodes () {
+  // Input: org-roam file with super-indented children of `a`.
+  // `a` has children at three distinct levels:
+  //   level 4: b, c       (super-duper indented)
+  //   level 3: d, e       (super-indented)
+  //   level 2: f, g       (least indented)
+  // Nodes c and d each have only one child layer
+  // (c->c' and d->d'), so those need no grouping.
+  let input : &str = "\
+:PROPERTIES:
+:ID:       a-id
+:END:
+#+title: a
+*** b
+*** c
+**** c'
+** d
+******** d'
+** e
+* f
+* g
+";
+  let f : tempfile::NamedTempFile =
+    write_temp_org (input, "super-indent");
+  let nodes : Vec<SkgNode> =
+    parse_org_file (f . path());
+  let rendered : String =
+    render_skgnodes_as_org (&nodes, &ID::new ("a-id"));
+  let expected : &str = "\
+* a
+** These are special!
+They were super-indented in org-roam.
+*** b
+*** c
+**** c'
+** These are normal.
+They have been buried to encourage reading the node(s)
+that were super-indented in org-roam.
+*** These are special!
+They were super-indented in org-roam.
+**** d
+***** d'
+**** e
+*** These are normal.
+They have been buried to encourage reading the node(s)
+that were super-indented in org-roam.
+**** f
+**** g";
+  assert_eq! (rendered, expected); }

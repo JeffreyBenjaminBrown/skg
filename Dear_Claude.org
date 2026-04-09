@@ -1,3 +1,6 @@
+* Welcome!
+My name's Jeff. It's been a pleasure working with your clones,
+so I look forward to working with you.
 * To know about the project,
   These resources cover the space decently, with some redundacy.
 ** README.org

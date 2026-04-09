@@ -1,0 +1,91 @@
+* handle super-indentation in org-roam import
+** the current behavior and problem
+Data like this:
+```
+  * a
+  **** b
+  *** c
+  ** d
+```
+when imported into skg from org-roam, are rendered like this:
+```
+  * a
+  ** b
+  ** c
+  ** d
+```
+That is, org-roam super-indentation information is lost when importing into skg.
+** the general principle and desired behavior
+Each headline might have any number of 'child layers'.
+It's only *supposed* to have one, but people can super-indent many nodes,
+at many different levels. For instance, in this:
+```
+  * a
+  **** b
+  **** c
+  ***** c'
+  *** d
+  ********* d'
+  *** e
+  ** f
+  ** g
+```
+d and c both have only one child layer --
+there's no conceptual difference between them,
+even though one uses way more asterisks.
+
+But a has *three* child layers: b and c are in one ("super-duper indented"),
+d and e are in another (super-indented),
+and f and g are in the third.
+
+The purpose of a super-indented passage is to draw attention to it --
+encouraging the user to read it before (if at all) the others.
+Skg only has one containment layer in each node (the node's content),
+but it can achieve the same effect by imposing new 'grouping' nodes.
+So the above example would render in Skg as, effectively:
+```
+  * a
+  ** These are special!
+  *** b
+  *** c
+  **** c'
+  ** These are normal.
+  *** These are special!
+  **** d
+  ***** d' // despite all the asterisks, nothing special about this
+  **** e
+  *** These are normal.
+  **** f
+  **** g
+```
+
+Actually yeah -- that's what the intermediating nodes should look like.
+The title will be terse and the body will explain in more detail:
+
+  * These are special!
+  They were super-indented in org-roam.
+
+  * These are normal.
+  They have been buried to encourage reading the node(s)
+  that were super-indented in org-roam.
+** request
+Please write a failing test.
+It should use the data described in 'the general principle and desired behavior'
+above. (But think through that data, andy if I got any of it wrong,
+push back instead of implementing.)
+
+It should be maximally readable.
+The input can be the org text I described above, verbatim if I got it right,
+except with no leading whitespace.
+The output graph should then be compared to it,
+by rendering a recursive content view from 'a',
+stripping the metadata,
+and comparing to the text I specified for the output
+(again, if I got that text right --
+and I know I failed to include the bodies of the 'These are special!'
+and 'These are normal.' nodes).
+
+That is, a casual reader should be able to eyeball the input text
+and the output text to see how they correspond,
+rather than tediously following a lot of comparisons of different points in a tree
+accomplished in code.
