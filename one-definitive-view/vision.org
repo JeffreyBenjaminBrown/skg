@@ -1,0 +1,44 @@
+* Proposal: Only one definitive view for each node across all buffers.
+** currently
+There can be a definitive view of a node in any number of buffers.
+For each buffer there can be at most one,
+but there can be multiple buffers with definitive views of the same node.
+
+'skg-view' will take the user to the registered location of a node,
+if it is already the root of a buffer.
+In this sense roots are special.
+(Maybe it's even a subset of roots, limited to only those roots
+that were initially roots of the buffer,
+or maybe it includes new roots a user added; I don't know.)
+In a view-tree with many levels, most nodes are probably not registered
+for such lookup.
+** desired
+Rather than only register roots for lookup via skg-view
+(actually maybe there are other functions that can look it up too)
+we should register the definitive view for every node.
+There should only be one definitive view of any node across all buffers.
+If a user tries to change the metadata manually to make something definitive,
+that save should be rejected; the only way to make a node definitive
+is to formally request it
+(see C-c l d : skg-local-definitive and
+     C-c l i : skg-local-indefinitive
+in docs/COMMANDS.org).
+A definitive view request should not just make indefinitive
+any prior definitive appearance of the node in *that* buffer,
+but also in all the other buffers.
+** request
+Please analyze my options and describe them.
+You don't have to pick a single implementation plan;
+just describe the possibility space.
+
+Write this analysis in .org format (even if the file extension doesn't match). End it with a section called 'problems' that describes anything that will be tricky, and where you push back against anything vague or ill-specified, inefficient, unnecessary or overly complex. Don't ask me questions in this chat window; just include them at the end of the report. I'll read it and respond inline.
+
+Wrap function names in single quotes, not equals signs or tildes. That way I can use M-. to go to the function's definition. Similarly, write files as org-mode links [[../../path/to/whatever.md][like this]], so I can follow them fast.
+
+If, in researching this, you find any:
+
+- bugs or deviations from spec
+- noteworthy inefficiencies
+- opportunities to improve the architecture
+
+please report them in a separate section called 'preexisting problems'.

@@ -1,0 +1,277 @@
+* One definitive view per node across all buffers: Analysis
+** The current system
+*** DefinitiveMap is per-view, not global
+The central gap. Each call to 'rerender_view' ([[../../server/update_buffer.rs][update_buffer.rs]] line 222) creates a fresh 'DefinitiveMap':
+
+#+begin_src rust
+let mut defmap : DefinitiveMap = DefinitiveMap::new ();
+complete_viewtree (
+  forest, map, &mut defmap, ... ) . await ?;
+#+end_src
+
+This map is passed through 'complete_viewtree' -> 'complete_truenode_preorder' -> 'make_indef_if_repeat_then_extend_defmap', where it prevents the same node from being definitive twice /within a single buffer/. But it's discarded after each view render — no cross-buffer memory.
+
+Consequence: the same node can be definitive in multiple buffers simultaneously, each unaware of the others.
+
+*** What cross-buffer infrastructure already exists
+'SkgnodesInMemory' ([[../../server/types/memory.rs][memory.rs]]) already tracks state across views:
+
+- ~views: HashMap<ViewUri, ViewState>~ — every open view's forest and PID set
+- ~pool: HashMap<ID, SkgNode>~ — shared SkgNode cache
+- ~root_ids: ManyToMany<ID, ViewUri>~ — maps root IDs to their view URIs (many-to-many)
+- 'views_containing(pid)' — returns all ViewUris whose forest contains a given PID
+- 'content_view_uri_for_root_id(id)' — returns the ViewUri where an ID is a root (used by 'skg-view' to jump to existing views instead of opening duplicates)
+
+This is the foundation to build on. It already knows which nodes appear in which views.
+
+*** How skg-view works today
+'skg-view' ([[../../elisp/skg-id-search.el][skg-id-search.el]] line 91) calls 'skg-request-single-root-content-view-from-id'. The server ([[../../server/serve/handlers/single_root_view.rs][single_root_view.rs]]) checks 'content_view_uri_for_root_id': if the node is already a root in an open buffer, it returns ~((switch-to-view URI))~ and Emacs switches to that buffer. Otherwise it renders a new view.
+
+Only roots get this switch-to-existing-view behavior. Non-root definitive nodes are invisible to this lookup.
+
+*** How definitive-view requests work today
+'skg-request-definitive-view' ([[../../elisp/skg-request-views.el][skg-request-views.el]] line 40) adds ~(viewRequests definitiveView)~ to the metadata. On save, 'execute_definitive_view_request' ([[../../server/to_org/expand/definitive.rs][definitive.rs]] line 95) processes it:
+1. Checks the (per-view) 'DefinitiveMap' for a preexisting definitive view of this node
+2. If found (in this buffer), indefinitizes the old subtree
+3. Marks the requesting node definitive and expands its children via BFS
+
+Cross-buffer conflicts are not detected.
+
+** The option space
+There are three mostly-independent design axes.
+
+*** Axis 1: Global definitive registry
+Where to track "node X is definitively shown in view Y"?
+
+Agreed approach: Replace 'root_ids' with a new ~definitive_ids: HashMap<ID, ViewUri>~ in 'SkgnodesInMemory'. This maps each definitively-shown node to the view it appears in. A plain HashMap (not ManyToMany) enforces the one-view-per-node invariant by construction. For view cleanup on close, we scan the map (cheap with < 10 views, < 1000 entries).
+
+'skg-view' lookup becomes: check definitive_ids first.
+
+**** On scanning vs. storing NodeIds
+We'd only scan within one buffer at a time — specifically, when 'register_view' or 'update_view' is called, we walk that one buffer's forest to extract its definitive IDs. This is O(nodes in that buffer), not O(all nodes across all views).
+
+NodeId (ego_tree::NodeId) should not be stored in the registry: NodeIds don't survive a rerender. Each call to 'rerender_view' rebuilds the tree structure, and NodeIds are integer handles into ego_tree's internal arena — when children are added, removed, or reordered, existing NodeIds can become stale or point to different nodes. Storing them in a persistent registry would require updating after every rerender, negating the benefit.
+
+Better to store ID -> ViewUri and accept a per-buffer scan when you need to find the node's position within the view. That scan is cheap — the buffer is already in memory, and you're just walking a tree looking for a matching ID.
+
+*** Axis 2: Cross-buffer indefinitization
+When a definitive view is requested for node X in buffer A, how do you indefinitize the prior definitive view of X in buffer B?
+
+Agreed approach: At save time in 'update_views_after_save'. The collateral-view pipeline already handles "other views changed by this save."
+
+**** How it works in detail
+Suppose buffer A saves and contains ~(viewRequests definitiveView)~ for node X. X is currently definitive in buffer B.
+
+1. 'execute_definitive_view_request' runs for buffer A. It checks the global 'definitive_ids' registry: X -> ViewUri(B).
+
+2. We need to indefinitize X in B's forest. B's forest is in 'conn_state.memory.views'. We extract it, mutate it, and reinsert it: call 'indefinitize_content_subtree' on B's forest at the node where X is definitive. (To find that node, walk B's forest for the TrueNode with id == X and indef_or_def == Definitive.) Then reinsert B's forest.
+
+3. Update the global registry: remove X -> ViewUri(B), insert X -> ViewUri(A).
+
+4. Proceed with normal within-view processing: mark X definitive in A, expand its children via BFS.
+
+5. Later in 'update_views_after_save', B is identified as a collateral view (because it contains X). B gets rerendered via the normal collateral pipeline. Its forest already reflects the indefinitization from step 2, so the rerender produces a correct result with X shown indefinitively.
+
+**** Elaboration on why a pre-pass is needed
+The problem: when buffer B is rerendered as a collateral view, 'rerender_view' creates a fresh 'DefinitiveMap'. Then 'make_indef_if_repeat_then_extend_defmap' runs for each TrueNode during the preorder pass. But X only appears /once/ in buffer B. So the repeat-detection logic sees X for the first time, sees the defmap is empty, and happily marks X as definitive — undoing the indefinitization we need.
+
+That's why we can't rely on the normal rerender to do the indefinitization. We must explicitly patch B's forest /before/ the rerender, so that when 'make_indef_if_repeat_then_extend_defmap' encounters X, it's already indefinitive and stays that way.
+
+*** Axis 3: Extending skg-view to find any definitive node
+Agreed approach: The server extends its existing switch-to-view check from roots to all definitive nodes. The response includes the ID so Emacs can search for it. The response becomes ~((switch-to-view URI) (scroll-to-id ID))~.
+
+On the Emacs side, 'skg-handle-content-view-sexp' handles the new ~scroll-to-id~ field: switches to buffer B, then searches for a metadata line containing the ID but not containing ~indefinitive~. Then uses 'org-show-context' or 'org-reveal' to unfold and navigate to it.
+
+*** Axis 4: Preventing accidental definitiveness toggling
+Agreed approach: Remove ~"indefinitive"~ from the cycleable fields list in [[../../elisp/skg-sexpr-edit/skg-sexpr-cycling.el][skg-sexpr-cycling.el]] line 49. The user can still mark something indefinitive via C-c l i ('skg-local-indefinitive'), and request definitiveness via C-c l d ('skg-request-definitive-view'). The sexp-edit buffer simply can't toggle it in either direction.
+
+This is much simpler than server-side validation, which would be brittle when users copy-paste nodes. Direct text editing of metadata to add/remove ~indefinitive~ is unlikely to happen accidentally.
+
+** The deep PITFALL: recursive content indefinitization
+*** The problem restated
+When we definitize node O, we expand its entire recursive content tree. Every node in that tree becomes definitive in buffer A. But some of those descendant nodes may already have definitive views in other buffers. If we don't indefinitize those, we violate the "one definitive view per node" invariant.
+
+*** The algorithm
+Suppose O (the origin) is requested definitive in buffer A.
+
+1. Build O's content tree (this already happens via 'extendDefinitiveSubtreeFromLeaf' / BFS expansion).
+
+2. After expansion, DFS preorder through the newly-definitive subtree rooted at O. For each node N encountered:
+   a. Check the global 'definitive_ids' registry: is N definitive in another view?
+   b. If yes (in view B at some location), indefinitize N's subtree in B's forest, and update the registry (N -> ViewUri(A)).
+   c. If no, just register N -> ViewUri(A).
+
+3. Preorder matters (as you noted): if definitive N in buffer B has a definitive child M under it, and we indefinitize N first (which recurses into its subtree via 'indefinitize_content_subtree'), M is already handled — it gets indefinitized as part of N's subtree collapse. If we did postorder, we'd redundantly process M's subtree first, then process N's subtree which includes M again.
+
+*** Where this fits in the code
+This is an extension of 'execute_definitive_view_request' in [[../../server/to_org/expand/definitive.rs][definitive.rs]]. After expanding O's subtree (step 1), a second pass (step 2) checks the /global/ registry for every newly-definitive node and indefinitizes cross-buffer conflicts. This second pass is a separate function called immediately after expansion.
+
+*** Complication: interaction with BFS node limit
+If O's expansion hits the node limit, some deep descendants are truncated (made indefinitive at the fringe). Those truncated nodes never become definitive in A, so they shouldn't evict definitive views in other buffers. Only the nodes that actually ended up definitive in A need cross-buffer indefinitization. This is naturally handled if we scan the expanded subtree and only process definitive nodes.
+
+** Problems
+*** Cross-buffer indefinitization requires mutating other views' forests
+When buffer A claims definitiveness for node X, and X was definitive in buffer B, B's forest must be modified. The forests live in 'conn_state.memory.views'. During A's save, you already have &mut conn_state. But the borrow checker requires careful staging: you can't hold &mut references to two views simultaneously without indexing tricks. The simplest approach: remove B's forest from the map, mutate it, reinsert it.
+
+*** Node limit and truncation interactions
+When a definitive view is indefinitized, its entire content subtree collapses. 'indefinitize_content_subtree' handles this. But if that subtree was near the node limit, and the new definitive view elsewhere also hits the limit, the total number of definitive nodes in the system could fluctuate in surprising ways. This is cosmetic, not a correctness issue.
+
+*** skg-view navigation precision
+When 'skg-view' switches to a buffer containing a non-root definitive node, it needs to navigate to that node. The node could be deeply nested and folded. Emacs will need to:
+1. Search for the metadata containing the ID
+2. Find the definitive (not indefinitive) occurrence
+3. Unfold the org tree to reveal it
+4. Move point there
+
+This is doable but fiddly. org-mode's 'org-show-context' or 'org-reveal' can handle unfolding.
+
+*** Initial render must consult the global registry
+On first render ('render_initial_forest_bfs'), nodes are marked definitive as they're first encountered in BFS order. If a node is already definitive in another view (per the global registry), it must be rendered indefinitive in the new view. Its children should still be drawn (they're already in the tree), but each child must also be checked against the registry. This is a change to 'build_node_branch_minus_content' or the BFS loop ([[../../server/to_org/render/initial_bfs.rs][initial_bfs.rs]]), adding a registry check at each step.
+
+Because skg-view switches to the existing view when a node is already in the registry, we only reach initial render when the root node is NOT in the registry. So the root is new and definitive. But its descendants may already be definitive elsewhere — those must be marked indefinitive during the BFS.
+
+*** No definitive view exists for a node
+If the user calls C-c l i on the only definitive view of a node, it has no definitive view anywhere. This is valid. The global registry (HashMap<ID, ViewUri>) simply won't contain an entry for that ID. A subsequent 'skg-view' on that node will open a new buffer (since there's nothing to switch to).
+
+** Preexisting problems
+*** 'views_containing' is O(views * pids_per_view)
+Already noted in the code comments. For large numbers of views, this linear scan would become a bottleneck. The suggested fix (a reverse index) hasn't been implemented yet. Adding a global definitive registry would add more queries against this infrastructure.
+
+*** skg-view only works for root nodes
+This is the TODO item from [[../../TODO.org][TODO.org]] line 44: "There should only be one definitive view across all buffers. And they should all be indexed for C-c v v to jump to, not just the roots." The current analysis directly addresses this.
+
+** Summary of agreed approach
+1. Replace 'root_ids' with 'definitive_ids' (HashMap<ID, ViewUri>) covering all definitive nodes, not just roots. ID -> ViewUri only, no NodeId storage.
+2. At save time, cross-buffer indefinitization via explicit pre-pass before collateral rerenders. After expanding a new definitive subtree, scan it and indefinitize every cross-buffer conflict using the global registry.
+3. Recursive content indefinitization: the DFS preorder scan of the newly-definitive subtree catches all descendants, not just the origin node.
+4. Extend 'skg-view' to find any definitive node via the global registry, with ~scroll-to-id~ in the response for Emacs-side navigation.
+5. Initial render: check the global registry during BFS. Nodes already definitive elsewhere are rendered indefinitive (but still depicted with children).
+6. Client-side guard: remove ~"indefinitive"~ from the cycleable fields in 'skg-sexp-edit--cycle-values-for-field'.
+
+* Criticisms of the plan
+** DONE Unifying root_ids and definitive_ids conflates two distinct concerns
+'root_ids' answers "is this ID a root of an open buffer?" (for switch-to-view navigation). 'definitive_ids' answers "is this ID shown definitively anywhere?" (for edit-authority). These can diverge: a root can become indefinitive (user calls C-c l i on it), and a definitive node is usually not a root (it's nested somewhere in a tree).
+
+If we replace 'root_ids' with 'definitive_ids', an indefinitive root won't be found by 'skg-view', which changes existing behavior. You said this is fine, but it means a user who marks their root indefinitive can no longer skg-view back to it — they'd get a brand new buffer instead.
+
+*** DONE (Jeff) how are they *used*, though?
+Is root-ids ever used for anything but finding a definitive view?
+**** Response
+Yes, 'root_ids' is used exclusively for the switch-to-view navigation logic. The only consumer of 'content_view_uri_for_root_id' is 'handle_single_root_view_request' in [[../../server/serve/handlers/single_root_view.rs][single_root_view.rs]] line 38. It checks if the requested ID is already a root of an open view, and if so, sends ~((switch-to-view URI))~ instead of rendering a new view. That's it — no other code reads 'root_ids'.
+
+So replacing 'root_ids' with 'definitive_ids' is a clean swap: the switch-to-view check just queries a different map with a broader scope. The plan has been updated accordingly — 'root_ids' is removed entirely, replaced by 'definitive_ids'.
+
+** DONE Rerender-all-views creates a non-deterministic definitiveness shuffle
+'stream_rerender_views' ([[../../server/serve/handlers/rerender_all_views.rs][rerender_all_views.rs]]) iterates over ~conn_state.memory.views.keys()~ and rerenders each view independently. Each call to 'rerender_view' creates a fresh 'DefinitiveMap'.
+
+With the global registry, there's a problem: rerender-all rebuilds all views from scratch, but in what order? The first view processed gets its nodes registered as definitive. When the second view is processed, some of its nodes may conflict. Without coordination, the iteration order of ~HashMap::keys()~ (which is non-deterministic) determines which buffer "wins" each node.
+
+*** DONE (Jeff) Are you sure?
+When we rerender a view with an indefinitive node, we don't change it to definitive.
+**** Response
+You're right — I was wrong. Looking at 'make_indef_if_repeat_then_extend_defmap' ([[../../server/to_org/util.rs][util.rs]] line 129): if a node is already indefinitive in the forest, it stays indefinitive regardless of the fresh defmap. The function checks ~t.is_indefinitive()~ and only inserts into the defmap if the node is definitive. So rerendering a view preserves its existing definitiveness assignments. The non-determinism concern doesn't apply.
+
+The only case where rerender could change definitiveness is if 'complete_content_children' creates a /new/ child (one that wasn't in the tree before). New children are created via ~mk_definitive_viewnode~, which marks them definitive. But during rerender-all, the underlying data hasn't changed, so no new children appear.
+
+This criticism is retracted.
+
+*** DONE (Jeff) that does raise a concern for me, though.
+When *initially* rendering a new view -- not rerendering --
+if any node in the new view has a definitive counterpart
+in an existing view, that node should be rendered indefinitive.
+It should still be recursed into, though,
+to draw its recursive content.
+**** Response
+Agreed. The initial render BFS ('render_initial_forest_bfs') must check the global registry. Nodes already registered elsewhere are rendered as indefinitive. Their children are still created by the BFS and still appear in the tree — 'clobberIndefinitiveViewnode' only refreshes the title and source, it doesn't detach children. And 'complete_preorder_recursive' still recurses into children of indefinitive nodes (lines 65-74 of [[../../server/update_buffer/complete.rs][complete.rs]]). So they'll be depicted with their content, but each child is independently checked against the registry too.
+
+The plan summary has been updated to include this (item 5).
+
+** DONE Initial render of a new view doesn't consult the global registry
+'render_initial_forest_bfs' ([[../../server/to_org/render/initial_bfs.rs][initial_bfs.rs]] line 34) creates a fresh 'DefinitiveMap' and marks nodes definitive as they're first encountered in BFS order. It doesn't check whether those nodes are already definitive in other views.
+
+The fix: during initial render, check the global registry for each node before marking it definitive. If a node is already registered, render it as indefinitive in the new view. Its children are still created by the BFS.
+
+*** DONE (Jeff) We came to the same conclusion
+about consulting the global registry when drawing a new view. Cool.
+**** Response
+Yes, incorporated into the plan summary as item 5.
+
+*** DONE (Jeff) I think a new view should defer to existing definitive views.
+If we tried to create an entirely new view rooted at a node
+that already has a definitive representation,
+we will be brought to that representation instead.
+
+If we do manage to start a new view, then,
+it's either a new view (which we populate with a root by hand)
+or a view rooted at a node without a definitive representation.
+In the first case I see nothing to worry about.
+In the second case, the recursive content might include nodes
+that have definitive representations in other buffers.
+If it does, then those nodes should still be depicted,
+as well as their recursive content,
+but each should be marked indefinitive
+if already registered elsewhere.
+**** Response
+Agreed on all points. This is exactly how the plan works:
+
+1. 'skg-view' on a node with an existing definitive view → server sends switch-to-view, Emacs switches to that buffer. No new view created.
+
+2. New empty view (manually populated) → no conflict; user adds a root, which gets checked on save.
+
+3. New view rooted at a node without a definitive representation → the root becomes definitive here. BFS expands its children. Each child is checked against the global registry. If a child is registered elsewhere, it's created as indefinitive but still depicted (the BFS still creates its children, which are also individually checked). Result: the new view shows the full tree, with cross-view-definitive nodes marked indefinitive.
+
+The plan already captures this; no changes needed.
+
+** DONE ManyToMany allows invariant violations silently
+ManyToMany permits inserting the same ID with multiple ViewUris. The invariant (each ID definitive in at most one view) must be enforced by the caller.
+
+A HashMap<ID, ViewUri> makes this impossible by construction. The reverse lookup (ViewUri -> set of IDs) that 'remove_right' provides can be done by scanning the map on view closure — since there are typically < 10 views, this is cheap.
+*** DONE (Jeff) sounds good!
+**** Response
+Updated the plan to use HashMap<ID, ViewUri> instead of ManyToMany.
+
+** DONE The cycling guard only covers the sexp-edit buffer
+Looking at [[../../elisp/skg-sexpr-edit/skg-sexpr-cycling.el][skg-sexpr-cycling.el]] line 49, the cycling logic handles the ~indefinitive~ field:
+
+#+begin_src elisp
+((member field-name '("indefinitive" "parentIgnores"))
+ '("false (default)" "true"))
+#+end_src
+
+This only applies in the sexp-edit buffer (the metadata editing view opened by C-c l m). In the main org buffer, the user doesn't cycle values — they'd have to manually type ~indefinitive~ or remove it from the metadata s-expression. That's an unlikely accident vector, so the guard is probably sufficient.
+
+'skg-local-indefinitive' ([[../../elisp/skg-metadata.el][skg-metadata.el]] line 20) works in the main buffer, not the sexp-edit buffer. It calls 'skg-edit-metadata-at-point'. There's no corresponding 'skg-local-definitive-remove' — the only way to become definitive is via 'skg-request-definitive-view' (which adds a ViewRequest). So the asymmetry is already built into the design: you can become indefinitive locally (metadata edit), but becoming definitive requires a server round-trip (save with ViewRequest). The guard removes ~"indefinitive"~ from the cycleable fields list at line 49, preventing any cycling on this field.
+
+*** DONE (Jeff) Brilliant.
+But let me make sure I understand: The user will, from the metadata edit buffer, be able to cycle from definitive to indefinitive, but can't cycle back. That seems perfect.
+
+(Please respond in a child of this headline.)
+**** Response
+Almost — the plan is actually slightly different. By removing ~"indefinitive"~ from the cycleable fields entirely (line 49 of [[../../elisp/skg-sexpr-edit/skg-sexpr-cycling.el][skg-sexpr-cycling.el]]), cycling is disabled in BOTH directions for this field. The user gets "Field 'indefinitive' is not cycleable" when they try shift-left/right on it.
+
+This is because the cycling UI toggles between "false (default)" and "true" — it's inherently bidirectional. Making it one-way (definitive → indefinitive only) would require adding special-case logic to the cycling function, checking the current value and rejecting the disallowed direction. That's more complexity for a minor convenience.
+
+Instead, the user's workflow is:
+- To make something indefinitive: use C-c l i ('skg-local-indefinitive') in the main buffer. Works immediately (no save needed, but the change is only applied on save).
+- To make something definitive: use C-c l d ('skg-request-definitive-view') in the main buffer. This adds a ViewRequest; on save, the server processes it.
+- The sexp-edit buffer simply can't touch this field at all.
+
+This is clean and consistent: definitiveness changes always go through the dedicated commands, never through the metadata editor.
+
+** DONE The pre-pass approach seemed like it might re-definitize nodes during collateral rerender ... but it doesn't.
+The plan says: "patch B's forest before the rerender, so that when 'make_indef_if_repeat_then_extend_defmap' encounters X, it's already indefinitive and stays that way."
+
+'make_indef_if_repeat_then_extend_defmap' checks ~t.is_indefinitive()~ — if the node was pre-patched to indefinitive, it returns true, so the node is NOT inserted into the per-view defmap. It stays indefinitive. Then 'complete_truenode_preorder' sees it's indefinitive and calls 'clobberIndefinitiveViewnode' (refresh title from disk, hide body). So the pre-pass approach works correctly with the existing rerender pipeline.
+
+*** DONE (Jeff) Does this criticism stand?
+It sounds like the headline
+(The pre-pass approach might re-definitize nodes during collateral rerender)
+states that there is a problem,
+but then the body says there is none.
+
+If there is in fact a criticism here, I don't understand it.
+
+Please respond as a child of this headline.
+There's no need (yet) to modify any other part of this document.
+**** Response
+You're right — the headline is misleading. The body investigates a potential problem and concludes there is none. The pre-pass approach works correctly: a pre-patched indefinitive node stays indefinitive through the rerender, and 'clobberIndefinitiveViewnode' does the right thing afterward. This was a concern I had while writing, which I resolved in the same section but forgot to update the headline. There is no standing criticism here. The headline should read something like "The pre-pass approach works correctly with the existing rerender pipeline" — but since you asked me not to modify other parts of the document yet, I'll leave it for now.
