@@ -19,10 +19,10 @@ use std::str::FromStr;
 /// e.g. cyclic containment. This does not encode all of them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Birth {
-  ContentOf,   // the default: node is content of its parent, and was rendered for that reason
-  Independent, // this view of this node is not due to any relationship to its parent (although there might be such a relationship)
-  ContainerOf, // containerward backpath: this node contains its parent, and was rendered for that reason
-  LinksTo,     // sourceward backpath: this node links to its parent, and was rendered for that reason
+  ContentOf,   // the default: This node is content of its parent, and was rendered here for that reason.
+  Independent, // This view of this node is not due to any relationship to its parent. There might be such a relationship. There also might be no such parent (if this node is a view-root).
+  ContainerOf, // containerward backpath: This node contains its parent, and was rendered here for that reason.
+  LinksTo,     // sourceward backpath: This node links to its parent, and was rendered here for that reason.
 }
 
 //
@@ -245,10 +245,13 @@ fn herald_from_pair (
     { Some ( format! ("{}{}{}", left, separator, right )) }}
 
 impl NodeContainRels {
-  pub fn herald (&self) -> Option<String> {
+  pub fn herald_for_content (&self) -> Option<String> {
     herald_from_pair ( self . containers, 1,
                        self . contents,   0,
-                       "{" ) } }
+                       "{" ) }
+  pub fn herald_for_non_content (&self) -> String {
+    self . herald_for_content ()
+      . unwrap_or_else ( || format! ("{}{{", self . containers) ) } }
 
 impl NodeLinksourceRels {
   pub fn herald (&self) -> Option<String> {

@@ -149,7 +149,10 @@ fn true_node_metadata_to_string (
     config    : & SkgConfig,
   ) -> String {
     fn graph_stats ( true_node : & TrueNode ) -> Option < String > {
-      graphnodestats_to_sexp ( & true_node . graphStats ) }
+      let herald_should_be_rooty : bool =
+        true_node . birth != Birth::ContentOf;
+      graphnodestats_to_sexp (
+        & true_node . graphStats, herald_should_be_rooty ) }
     fn view_stats (
       true_node : & TrueNode,
       config    : & SkgConfig,
@@ -248,15 +251,19 @@ fn deleted_scaff_metadata_to_string (
   parts . join (" ") }
 
 fn graphnodestats_to_sexp (
-  gs : &GraphNodeStats,
+  gs                     : &GraphNodeStats,
+  herald_should_be_rooty : bool,
 ) -> Option < String > {
   let mut parts : Vec < String > = Vec::new ();
   if let Some (ref c) = gs . containRels {
-    if c . containers != 1 {
+    if herald_should_be_rooty || c . containers != 1 {
       parts . push ( format! ("(containers {})", c . containers) ); }
     if c . contents != 0 {
       parts . push ( format! ("(contents {})", c . contents) ); }
-    if let Some (h) = c . herald() {
+    let herald : Option<String> =
+      if herald_should_be_rooty { Some ( c . herald_for_non_content() ) }
+      else                      {        c . herald_for_content() };
+    if let Some (h) = herald {
       parts . push ( format! ("(containsHerald {})", h) ); }}
   if let Some (ref l) = gs . linksourceRels {
     if l . sources_with_content != 0 {
