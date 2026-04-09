@@ -135,24 +135,35 @@ async fn merge_container_into_content_impl (
         "Text preserver should have no extra_ids, got {:?}",
         preserver_skgnode . extra_ids )); } }
 
-  // aa must NOT contain itself.
+  // aa must not contain itself in the filesystem.
   if aa_skgnode . contains . contains (&ID::from ("aa")) {
     failures . push (
-      "KNOWN BUG: aa contains itself (self-containment after merge)"
+      "aa contains itself on filesystem (self-containment after merge)"
       . to_string() ); }
+
+  // aa must not contain itself in TypeDB.
+  { let ( container_to_contents, _ ) =
+      skg::dbs::typedb::search::contains_from_pids::contains_from_pids (
+        &config . db_name, driver,
+        &[ID::from ("aa")] ) . await ?;
+    if let Some (aa_contents) = container_to_contents . get (&ID::from ("aa")) {
+      if aa_contents . contains (&ID::from ("aa")) {
+        failures . push (
+          "aa contains itself in TypeDB (self-containment after merge)"
+          . to_string() ); } } }
 
   let view : &str = &response . saved_view;
 
   // editRequest should NOT persist in the rendered buffer.
   if view . contains ("editRequest") {
     failures . push (
-      "KNOWN BUG 1: editRequest persists after merge execution"
+      "editRequest persists after merge execution"
       . to_string() ); }
 
   // a should appear as a DeletedNode, not a normal TrueNode.
   if !view . contains ("(deleted") {
     failures . push (
-      "KNOWN BUG 3: acquiree 'a' not rendered as DeletedNode"
+      "acquiree 'a' not rendered as DeletedNode"
       . to_string() ); }
 
   // b and c under aa should have birth = ContentOf.
@@ -182,19 +193,19 @@ async fn merge_container_into_content_impl (
       . find ( |line| line . contains ("(id c)") );
     if b_under_aa . is_none() {
       failures . push (
-        "KNOWN BUG 2: b does not appear as a child of aa"
+        "b does not appear as a child of aa"
         . to_string() );
     } else if b_under_aa . unwrap() . contains ("birth") {
       failures . push (
-        "KNOWN BUG 2: b under aa is marked birth=Independent"
+        "b under aa is marked birth=Independent"
         . to_string() ); }
     if c_under_aa . is_none() {
       failures . push (
-        "KNOWN BUG 2: c does not appear as a child of aa"
+        "c does not appear as a child of aa"
         . to_string() );
     } else if c_under_aa . unwrap() . contains ("birth") {
       failures . push (
-        "KNOWN BUG 2: c under aa is marked birth=Independent"
+        "c under aa is marked birth=Independent"
         . to_string() ); }
 
     // Text preserver should appear under aa.
@@ -203,7 +214,7 @@ async fn merge_container_into_content_impl (
       . any ( |line| line . contains ("MERGED: a") );
     if !preserver_under_aa {
       failures . push (
-        "KNOWN BUG: text preserver 'MERGED: a' not under aa in buffer"
+        "text preserver 'MERGED: a' not under aa in buffer"
         . to_string() ); } }
 
   if !failures . is_empty() {
