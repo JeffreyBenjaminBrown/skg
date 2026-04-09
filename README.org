@@ -16,6 +16,6 @@ Some other reasonable jumping-off points include:
   - [[./server/types/viewnode.rs][viewnode.rs]] -- how nodes in the graph are represented on-screen
 - [[./server/main.rs][main]]
 - [[https://github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org][my org-roam notes about Skg online]]
-- [[./feasible-now-probably.org][how I implemented some recent features using Claude]]
+- [[./TODO/feasible-now-probably.org][how I implemented some recent features using Claude]]
 * to help
   Tell me you want to! I would work hard to bring you onboard.

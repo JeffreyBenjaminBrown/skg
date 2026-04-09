@@ -22,8 +22,8 @@ if you find any:
 - noteworthy inefficiencies
 - opportunities to improve the architecture
 
-please report them, in a top-level file 'problems.org'.
-If it doesn't exist, please create that.
+please report them, in 'TODO/problems.org'.
+If that file doesn't exist, please create it.
 * Please report problems with my requests.
 For each of my requests, push back against anything vague or ill-specified, inefficient, unnecessary or overly complex.
 * Thanks,
