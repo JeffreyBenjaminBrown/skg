@@ -1,0 +1,83 @@
+* Help me think about overhauling the herald system.
+** its purpose
+Each node in a skg buffer has some metadata before its title.
+It can be a lot, so I use 'heralds' to reduce the visual noise to a user.
+For instance, if a node is ignored by its parent,
+it starts with a red "!{" (just two characters).
+** its architecture
+The server sends metadata as an s-exp.
+Some of that metadata includes verbatime herald symbols.
+Other metadata does not, and is instead transformed by elisp
+(see heralds-minor-mode.el).
+Actually all of it is at least transformed to the extent that
+the color to show it in is encoded in Emacs.
+** things we could change
+Maybe Emacs only decides the color.
+Maybe Emacs decides nothing.
+I do like to minimize the complexity of the emacs client,
+because that will make future clients easier to write,
+and because Rust is easier to test.
+** some ambitions
+I want to do all of these things, and over time I'll probably want
+to make plenty of other changes to the herald system
+*** If node is a top-level headline in the buffer, different herald rules.
+By default, a node with exactly 1 container has its container herald omitted.
+(1 container is the default in a tree --
+the only node with a number of containers not equal to 1 is the root.)
+
+But if the node is a root in the view
+(that is, an immediate child of the BufferRoot)
+then we should show the container count regardless of its value.
+*** Relation to parent and reason for existence when unusual (e.g. containerward path) should be among the first heralds.
+Currently, if a node ignores its child
+(see 'parentIgnores' in elisp/, or the TrueNode typedef in rust/)
+the "!{" herald indicates that,
+and nothing more. But there's often an important relationship between them,
+just not a containment one. For instance,
+we might ask for the containerward ancestry (C-c l c; see docs/COMMANDS.org).
+If called from 'b' below, it might turn this view:
+```
+  * a
+  ** b // a contains b
+```
+into this view:
+```
+  * a
+  ** b
+  *** !{ a // a contains b
+  *** !{ c // c also contains b
+  **** !{ d // d contains c
+```
+(I'm using very stylized and incomplete metadata; the truth is messier.)
+
+The "!{" is thus not sufficiently informative.
+When the user asks for the containerward ancestry,
+each new node drawn should have as its first heraldd
+the reason the new node is being drawn --
+maybe "}", to indicate that it contains (and is ignored by) its parent.
+Similarly, if a node was drawn because it links to its parent
+(see skg-local-sourceward)
+it should carry an arrow pointing to the left as its first herald.
+
+In both of those cases, the "!{" seems unnecessary --
+as long as the node's razón d'etre is a first red symbol,
+it should be clear to the user what's going on.
+
+(That does not exhaust the possibility space. The user might, for example,
+consciously insert a parentIgnores child, in which case the "!{" herald
+would be appropriate. And there might even be other reasons
+parentIgnores children can appear; I don't know.)
+*** If heritable in the view tree, source does not have to be restated when something is unconnected to its parent.
+That is, if a is public, and its child b is public,
+then b does not need to restate 'public',
+*even if* b is 'parentIgnores'.
+*** The number of contents herald is uninteresting.
+I find myself wanting to hide it, but not delete the functionality.
+It would be nice if the user could customize which heralds are shown,
+and if this affected how Rust computes the metadata,
+not just how Emacs shows it.
+** the question
+In light of the changes I want to make,
+and with the additional aim of making the code
+as simple and reliable as possible,
+how should we change the herald system?
