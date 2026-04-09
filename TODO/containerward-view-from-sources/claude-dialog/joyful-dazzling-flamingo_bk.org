@@ -1,0 +1,288 @@
+* TODO Please rewrite this plan,
+  acting on my TODO comments.
+  If new problems arise, append them to 'problems'
+  (or 'problems, out of scope').
+  If your rewrite closes an issue in 'Problems', mark it DONE,
+  but don't otherwise rewrite 'Problems'.
+  If I have asked any questions,
+  please respond in a child of the headline that has the question,
+  again without modifying the question (because I might not remember).
+
+  (I responded to all the problems that needed a response,
+  and some of the implementation, but haven't read through the whole thing yet.)
+* context
+When a user requests a sourceward view ('skg-local-sourceward'),
+the link sources appear without context.
+If multiple nodes link to the same target
+they look literally identical -- just link labels with no hierarchy.
+
+The goal: after each source node is inserted into the sourceward view,
+also insert its containerward ancestry as children beneath it,
+so the user can see where each link source lives.
+
+The desired output example is in
+[[../../TODO/containerward-view-from-sources/vision.org][the vision document]].
+
+* approach overview
+After the sourceward backpaths are integrated
+(the existing 'build_and_integrate_backpaths' call),
+a new function walks the subtree to find every Birth::LinksTo node,
+computes their containerward ancestries in parallel,
+and inserts those ancestries beneath each source node.
+
+No new files. All new code goes in
+[[../../server/to_org/expand/backpath.rs][backpath.rs]].
+The integration test at
+[[../../tests/integration/sourceward-view-request/][sourceward-view-request/]]
+gets extended to cover the new behavior.
+
+* the stats pipeline needs no changes
+'rerender_view' (in [[../../server/update_buffer.rs][update_buffer.rs]] line 207)
+calls 'complete_viewtree' first
+(which executes view requests, including sourceward expansion),
+then 'set_graphnodestats_in_forest', then 'set_viewnodestats_in_forest'.
+Any ancestry nodes we insert during the sourceward expansion
+will automatically receive their stats in those later passes.
+
+* implementation
+** modify 'build_and_integrate_sourceward_path'
+File: [[../../server/to_org/expand/backpath.rs][backpath.rs]], line 82.
+
+Currently it calls 'build_and_integrate_backpaths' and returns.
+After that call, add a call to a new function
+'add_containerward_ancestry_to_source_nodes'.
+*** TODO (Jeff)
+In build_and_integrate_backpaths,
+it feels more natural to add the containerward ancestry
+before integrating into the (potentially huge) viewtree.
+Is there a good reason not to do it in that order?
+** new function: 'add_containerward_ancestry_to_source_nodes'
+File: [[../../server/to_org/expand/backpath.rs][backpath.rs]].
+
+Three phases, cleanly separating borrow constraints:
+
+*** phase 1 (collect, immutable borrow of tree)
+Walk the subtree under node_id.
+Collect every (NodeId, PID) pair where birth == Birth::LinksTo.
+Return early if empty.
+
+*** phase 2 (compute, no tree borrow)
+For each collected PID, call 'full_containerward_ancestry'
+(from [[../../server/dbs/typedb/ancestry.rs][ancestry.rs]], line 44).
+Run them all in parallel via futures::future::join_all.
+Collect results into a HashMap<ID, AncestryTree>.
+Log and skip any failures.
+
+This is the same pattern used by 'ancestry_by_id_from_ids'
+in [[../../server/serve/handlers/title_matches.rs][title_matches.rs]] line 231.
+It parallelizes safely because 'full_containerward_ancestry'
+only needs &TypeDBDriver (shared reference);
+each call creates its own read transactions internally.
+
+**** TODO (Jeff)
+Could we not simply use ancestry_by_id_from_ids here,
+instead of writing a separate, somewhat-duplicative function?
+
+*** phase 3 (insert, mutable borrow of tree)
+For each source node whose ancestry is an AncestryTree::Inner,
+iterate its children in reverse
+(reverse because 'prepend_indefinitive_child' prepends)
+and call 'insert_ancestry_tree_recursive' for each.
+
+If the ancestry is Root / Repeated / DepthTruncated
+(i.e. the source node itself is a root, or the BFS hit a cycle/limit
+before finding any containers), nothing is inserted.
+That's correct -- there's no ancestry to show.
+
+**** TODO (Jeff)
+I don't understand. You might be losing me with the term 'children'.
+In the graph there is no concept of child; there are only the relationships
+described in schema.tql. In a *view* of the graph, a node can have children,
+but the relationship(s) of each child to its parent can vary --
+as described (at least a little) in the comment for the Birth typedef.
+
+** new function: 'collect_links_to_nodes'
+File: [[../../server/to_org/expand/backpath.rs][backpath.rs]].
+
+Walks the subtree under a given NodeId with a recursive DFS.
+Returns Vec<(NodeId, ID)> of every TrueNode with birth == Birth::LinksTo.
+
+** new function: 'insert_ancestry_tree_recursive'
+File: [[../../server/to_org/expand/backpath.rs][backpath.rs]].
+
+Async recursive function (Pin<Box<dyn Future>> pattern,
+same as 'integrate_linear_portion_of_path' at line 156).
+For each AncestryTree node:
+- call the existing 'prepend_indefinitive_child' with Birth::ContainerOf
+- if Inner, recurse into children (in reverse, for prepend ordering)
+
+This reuses 'prepend_indefinitive_child' (backpath.rs line 238),
+which already handles fetching the SkgNode via TypeDB and
+creating an indefinitive ViewNode with the given Birth.
+
+** new imports in backpath.rs
+#+begin_example
+  use crate::dbs::typedb::ancestry::{
+    AncestryTree, full_containerward_ancestry};
+  use crate::types::viewnode::ViewNodeKind;
+#+end_example
+
+The futures crate is already a dependency
+(used in ancestry.rs and title_matches.rs).
+Pin, Future, HashMap, HashSet are already imported.
+
+* integration test changes
+** add test data: a container for l-11
+New file:
+[[../../tests/integration/sourceward-view-request/data/skg-data/][c-l-11.skg]]
+#+begin_example
+  title: 'container of l-11'
+  pid: 'c-l-11'
+  contains:
+  - 'l-11'
+#+end_example
+
+This makes the graph:
+#+begin_example
+  Containment:        Links:
+  1                   l-11 -> 11
+  +-- 11
+  +-- 12
+  c-l-11
+  +-- l-11
+#+end_example
+
+** update run-test.sh
+- Add c-l-11 to SKG_FILES array (line 18).
+- Add a cat block to write c-l-11.skg in 'backup_and_reset_test_data'.
+
+** update test-emacs.el
+The expected output for sourceward-on-line-1 gains a new child
+under the l-11 source node:
+#+begin_example
+  *** (skg (node (id l-11) ... (birth linksTo) indefinitive ...)) [[id:11][a link to 11]]
+  **** (skg (node (id c-l-11) ... (birth containerOf) indefinitive ...)) container of l-11
+#+end_example
+
+The stripped expected output changes from:
+  "* 1\n** 11\n*** [[id:11][a link to 11]]\n** 12\n"
+to:
+  "* 1\n** 11\n*** [[id:11][a link to 11]]\n**** container of l-11\n** 12\n"
+
+The exact graphStats metadata values will need tuning
+after a first test run, since l-11's container count changes
+from 0 to 1.
+
+* verification
+** run integration test
+#+begin_src sh
+  bash tests/integration/sourceward-view-request/run-test.sh
+#+end_src
+
+** run full test suite
+#+begin_src sh
+  cargo nextest run
+  cargo test --doc
+#+end_src
+
+** manual smoke test
+Open a content view in Emacs.
+Navigate to a node that has link sources.
+Run skg-local-sourceward (C-c v s).
+Verify each source node now shows its containerward ancestry as children.
+
+* ? 'insert_ancestry_node_recursive' in search enrichment
+(This was in 'out of scope' but I (Jeff) moved it here
+because it might need to be processed before the rest of the plan.)
+
+'insert_ancestry_node_recursive'
+uses Birth::Independent for ancestry nodes
+The search enrichment uses Birth::Independent for ancestry nodes
+(render_enriched_search_buffer.rs line 89).
+The standalone containerward view uses Birth::ContainerOf.
+These are semantically different choices and it's unclear
+which is "more correct" for search enrichment.
+Since the search enrichment already works and this plan
+doesn't touch it, I'm leaving this observation as a note.
+
+** TODO (Jeff) This sounds like it could be important.
+When we create a containerward view,
+each resulting new node that contains its parent should have Birth=ContainerOf.
+Similarly, in a sourceward view, sources should be marked Birth=LinksTo.
+Is that not happening?
+
+* problems
+** determinism of ancestry children order
+AncestryTree children come from a HashSet<ID> of container IDs
+(see 'classify_frontier_containers' in [[../../server/dbs/typedb/ancestry.rs][ancestry.rs]] line 134).
+Their order within the Vec may vary between runs.
+This could make integration test output non-deterministic.
+
+Mitigation: sort the children of each AncestryTree node by ID
+before insertion, or sort within 'insert_ancestry_tree_recursive'.
+This matches the pattern already used in 'integrate_branches_in_node'
+(backpath.rs line 205: branches_to_add.sort()).
+
+Question for Jeff: should we sort, or is nondeterministic order acceptable?
+*** TODO nondeterminism is fine
+Count children, make sure they're all there; job done, I think. Right?
+** the exact graphStats in the test will need adjustment
+Adding c-l-11 as a container of l-11 changes l-11's graphStats
+(containers goes from 0 to 1, herald changes).
+The precise expected-output strings in test-emacs.el
+will need updating after a first test run shows the actual values.
+This is a known iteration step, not a design problem.
+
+** is max_ancestry_depth the right bound?
+The existing config field 'max_ancestry_depth' (default 20)
+caps BFS depth for 'full_containerward_ancestry'.
+This plan reuses the same config field for sourceward ancestry depth.
+If the user ever wants a different limit for sourceward vs. search,
+a separate config field would be needed.
+For now, sharing the same config field seems right.
+
+*** TODO (Jeff) agreed
+
+** ancestry could be deep or wide for some nodes
+If a source node has a very deep or wide containment hierarchy,
+this feature will add many nodes to the view.
+The existing max_ancestry_depth bound (default 20) limits depth.
+Width is unbounded (a node could have many containers).
+This is the same tradeoff the search enrichment already makes.
+
+Question for Jeff: is the max_ancestry_depth cap sufficient,
+or should we also cap the number of ancestry nodes per source?
+
+*** TODO (Jeff)
+I can't imagine that being an issue. Things with tons of content do happen,
+but things with tons of containers would be strange.
+Links are an intermediate case but let's ignore the problem for now.
+
+* problems, out of scope
+** search enrichment duplicates the ancestry insertion pattern
+'insert_ancestry_node_recursive' in
+[[../../server/serve/handlers/title_matches/render_enriched_search_buffer.rs][render_enriched_search_buffer.rs]]
+does essentially the same thing as the new
+'insert_ancestry_tree_recursive' in backpath.rs,
+but synchronously, using Tantivy for title lookups
+and Birth::Independent instead of Birth::ContainerOf.
+
+A future refactor could unify these two functions.
+The differences (sync vs async, Tantivy vs TypeDB, Birth value)
+could be parameterized.
+Not worth doing now -- the duplication is small (< 15 lines each),
+and the contexts are different enough that forcing them together
+would obscure both.
+
+** the existing sourceward integration test has limited coverage
+The test data at
+[[../../tests/integration/sourceward-view-request/data/skg-data/][sourceward test data]]
+has only one link (l-11 -> 11).
+It doesn't test:
+- multiple sources linking to the same target
+- source chains (A links to B links to C)
+- sources with branching containerward paths (forks in containment)
+- sources at the end of a forked sourceward path
+
+These would be good additions in a follow-up,
+independent of this feature.

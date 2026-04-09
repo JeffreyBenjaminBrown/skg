@@ -1,0 +1,57 @@
+* problem
+When a user requests the sourceward view (skg-local-sourceward),
+the sources that appear are hard to interpret
+without their containerward ancestry.
+** example
+Here are the links to 'science' in data/public/ that I get
+when I request a sourceward view from it.
+(I have indented this org-text two spaces,
+and replaced asterisks with # marks,
+to distinguish it from the org text of this containing document.)
+```
+  # (skg (node (id 6972d099-7ff6-47ba-ac67-1898ef5fd549) (source public) (birth independent) (graphStats (containers 0) (contents 7) (containsHerald 0{7) (linksInFromLeaves 4) (linksHerald →4)) (viewStats (sourceHerald ⌂:public)))) science
+  ## (skg (node (id a14b9941-568d-4eea-b605-85f2735057df) (source public) (birth linksTo) indefinitive (graphStats (containers 1) (containsHerald 1{)))) [[id:6972d099-7ff6-47ba-ac67-1898ef5fd549][science]]
+  ## (skg (node (id 7d171a88-c3e3-439a-a151-275b8586b7f8) (source public) (birth linksTo) indefinitive (graphStats (containers 1) (containsHerald 1{)))) [[id:6972d099-7ff6-47ba-ac67-1898ef5fd549][science]]
+  ## (skg (node (id 7523d1dd-c50a-4b08-837a-7aabb12426a6) (source public) (birth linksTo) indefinitive (graphStats (containers 1) (containsHerald 1{)))) [[id:6972d099-7ff6-47ba-ac67-1898ef5fd549][science]]
+  ## (skg (node (id 670186e1-fea7-49ab-a615-9e9bdf09f0e7) (source public) (birth linksTo) indefinitive (graphStats (containers 1) (containsHerald 1{)))) [[id:6972d099-7ff6-47ba-ac67-1898ef5fd549][science]]
+```
+What are those nodes? To a user (for whom the metadata is compressed into heralds and links are shown without their IDs) they look literally identical.
+
+If each contained its containerward ancestry, they would instead be meaningful:
+```
+  # (skg (node (id 6972d099-7ff6-47ba-ac67-1898ef5fd549) (source public) (birth independent) (graphStats (containers 0) (contents 7) (containsHerald 0{7) (linksInFromLeaves 4) (linksHerald →4)) (viewStats (sourceHerald ⌂:public)))) science
+  ## (skg (node (id a14b9941-568d-4eea-b605-85f2735057df) (source public) (birth linksTo) indefinitive (graphStats (containers 1) (containsHerald 1{)))) [[id:6972d099-7ff6-47ba-ac67-1898ef5fd549][science]]
+  ### (skg (node (id 9e3b0ad3-76b1-46cb-aa18-5dcdf9fbe2c9) (source public) (birth containerOf) indefinitive (graphStats (containers 1) (contents 5) (containsHerald {5)) (viewStats containsParent))) interpersonal
+  #### (skg (node (id dea50354-cdfe-47c8-8f15-043c70d66da0) (source public) (birth containerOf) indefinitive (graphStats (containers 0) (contents 14) (containsHerald 0{14) (linksInFromLeaves 4) (linksHerald →4)) (viewStats containsParent))) everything
+  ## (skg (node (id 7d171a88-c3e3-439a-a151-275b8586b7f8) (source public) (birth linksTo) indefinitive (graphStats (containers 1) (containsHerald 1{)))) [[id:6972d099-7ff6-47ba-ac67-1898ef5fd549][science]]
+  ### (skg (node (id 9fc09f11-ef5b-475d-a885-f0fd0b667178) (source public) (birth containerOf) indefinitive (graphStats (containers 2) (contents 7) (containsHerald 2{7) (linksInFromLeaves 2) (linksHerald →2)) (viewStats containsParent))) ways to know
+  #### (skg (node (id cc3f38e2-b1cf-4a76-9abb-eb31daf514de) (source public) (birth containerOf) indefinitive (graphStats (containers 0) (contents 21) (containsHerald 0{21) (linksInFromContainers 2) (linksInFromLeaves 9) (linksHerald 2→9) aliasing) (viewStats containsParent))) self-awareness + self-consciousness
+  #### (skg (node (id 79287a5a-dd30-4de7-bce9-3d02fc6c858a) (source public) (birth containerOf) indefinitive (graphStats (containers 0) (contents 19) (containsHerald 0{19) (linksInFromLeaves 6) (linksHerald →6) aliasing) (viewStats containsParent))) learning, thinking, understanding
+  ## (skg (node (id 7523d1dd-c50a-4b08-837a-7aabb12426a6) (source public) (birth linksTo) indefinitive (graphStats (containers 1) (containsHerald 1{)))) [[id:6972d099-7ff6-47ba-ac67-1898ef5fd549][science]]
+  ### (skg (node (id d779aeab-0662-4142-ae65-2ddbf3cef5c5) (source public) (birth containerOf) indefinitive (graphStats (containers 0) (contents 3) (containsHerald 0{3) (linksInFromLeaves 1) (linksHerald →1)) (viewStats containsParent))) academia
+  ## (skg (node (id 670186e1-fea7-49ab-a615-9e9bdf09f0e7) (source public) (birth linksTo) indefinitive (graphStats (containers 1) (containsHerald 1{)))) [[id:6972d099-7ff6-47ba-ac67-1898ef5fd549][science]]
+  ### (skg (node (id 9fc09f11-ef5b-475d-a885-f0fd0b667178) (source public) (birth containerOf) indefinitive (graphStats (containers 2) (contents 7) (containsHerald 2{7) (linksInFromLeaves 2) (linksHerald →2)) (viewStats containsParent))) ways to know
+  #### (skg (node (id cc3f38e2-b1cf-4a76-9abb-eb31daf514de) (source public) (birth containerOf) indefinitive (graphStats (containers 0) (contents 21) (containsHerald 0{21) (linksInFromContainers 2) (linksInFromLeaves 9) (linksHerald 2→9) aliasing) (viewStats containsParent))) self-awareness + self-consciousness
+  #### (skg (node (id 79287a5a-dd30-4de7-bce9-3d02fc6c858a) (source public) (birth containerOf) indefinitive (graphStats (containers 0) (contents 19) (containsHerald 0{19) (linksInFromLeaves 6) (linksHerald →6) aliasing) (viewStats containsParent))) learning, thinking, understanding
+```
+* DONE question
+Containerward views are recursive. Are sourceward views?
+If so, that complicates (not terribly) the prospect of
+attaching the containerward view to each source.
+** answer : yes
+* goal
+The response to a request for link sources should include
+containerward paths for each source.
+* method
+First create the sourceward forest.
+There is no need to attach it as children of the origin node yet.
+Next, for every source in that tree
+(which I believe will be identifiable via Birth=LinksTo),
+create a containerward forest,
+and attach it as children of the node it describes.
+Finally attach the whole thing as children of the node from which
+the sourceward view was called.
+
+The order of attachment might not matter.
+But I'm quite sure it will be easier to first draw the entire sourceward forest,
+before drawing any containerward ones.

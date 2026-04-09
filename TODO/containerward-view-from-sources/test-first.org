@@ -1,0 +1,54 @@
+* test spec
+I'll first describe the desired efffect,
+and then try to reverse-engineer the data that would give it.
+** a note on notation
+I'm writing very stylized metadata for these nodes,
+only including what I think is important.
+Unlike most tests, some of these nodes have titles that are more complex
+than their ids. In those cases I have specified the id, once,
+but omitted it thereafter.
+
+I'm also writing the test inputs and outputs using "-" instead of "*",
+to avoid confusing their headlines with those of this containing document.
+** we hope
+that when a user has the following buffer open:
+```
+  - a
+  - bb
+  -- (id b) b links to [[id:a][a]]
+  - ccc
+  -- cc
+  --- (id c) c links to [[id:b][b]]
+  - (id d) d links to [[id:a][a]]
+  -- cc   // PITFALL: this is here to test multiple containment, and deviates from the otherwise-reasonably-simple naming conention
+```
+and they ask for a sourceward view from a,
+they see the following expansion under a
+(and everything outside of a is unchanged):
+```
+  - a
+  -- (birth:linksTo) b links to [[id:a][a]]
+  --- (birth:containerOf) bb
+  --- (birth:linksTo) c links to [[id:b][b]]
+  ---- (birth:containerOf) cc
+  ----- (birth:containerOf) ccc
+  ----- (birth:containerOf) d links to [[id:a][a]]
+  -- (birth:linksTo) d links to [[id:a][a]]
+  - bb
+  -- (id b) b links to [[id:a][a]]
+  - ccc
+  -- cc
+  --- (id c) c links to [[id:b][b]]
+  - (id d) d links to [[id:a][a]]
+  -- cc
+```
+** the requisite data
+falls out of the initial buffer:
+- a has no outlinks (i.e. w/r/t the relations in schema.tql, it is only ever the right member)
+- bb contains b
+- b links to a
+- ccc contains cc
+- cc contains c
+- c links to b
+- d links to a
+- d also contains cc
