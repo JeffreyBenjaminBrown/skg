@@ -67,7 +67,7 @@ fn test_subscribee_col_appears_for_subscribers(
     // Each SubscribeeCol has Subscribee children showing what the node subscribes to.
     // Nodes 13 and 14 do not subscribe to anything, so no SubscribeeCol.
     let expected = indoc! {
-      "* (skg (node (id 1) (source home) (graphStats (containers 0) (contents 4) (containsHerald 0{4)) (viewStats (sourceHerald ⌂:home)))) 1
+      "* (skg (node (id 1) (source home) (birth independent) (graphStats (containers 0) (contents 4) (containsHerald 0{4)) (viewStats (sourceHerald ⌂:home)))) 1
       ** (skg (node (id 11) (source home) (graphStats (contents 1) (containsHerald {1) subscribing))) 11
       *** (skg subscribeeCol) it subscribes to these
       **** (skg (node (id 11-sees) (source away) indefinitive (graphStats (containers 0) (containsHerald 0{) subscribing) (viewStats (sourceHerald ⌂:away)))) 11-sees

@@ -23,6 +23,7 @@ use crate::types::misc::{ID, SourceName, SkgConfig};
 use crate::types::save::{DefineNode, Merge, SaveNode};
 use crate::types::skgnode::SkgNode;
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
+use crate::to_org::util::mark_view_roots_independent;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
 
 use ego_tree::{Tree, NodeId, NodeMut};
@@ -227,6 +228,7 @@ pub async fn rerender_view (
     errors, deleted_since_head_pid_src_map,
     deleted_by_this_save_pids,
     is_saved_view ) . await ?;
+  mark_view_roots_independent (forest);
   tracing::debug!("rerender_view: complete_viewtree done ({:.3}s), starting graphnodestats",
             t_rerender . elapsed () . as_secs_f64 ());
   let ( container_to_contents, content_to_containers ) =

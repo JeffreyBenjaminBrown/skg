@@ -8,7 +8,7 @@ use crate::types::tree::generations::collect_generation_ids;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_skgnode::write_at_truenode_in_tree;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, forest_root_viewnode, mk_definitive_viewnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, Birth, forest_root_viewnode, mk_definitive_viewnode };
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use ego_tree::iter::Edge;
@@ -182,7 +182,25 @@ pub async fn stub_forest_from_root_ids (
       Some (&mut map),
       root_skgid, config, driver, visited
     ) . await ?; }
+  mark_view_roots_independent ( &mut forest );
   Ok ( (forest, map) ) }
+
+/// Mark direct TrueNode children of BufferRoot as birth=Independent.
+/// View roots are not rendered because of a parent relationship;
+/// they are the user's chosen entry points into the graph.
+pub fn mark_view_roots_independent (
+  forest : &mut Tree<ViewNode>,
+) {
+  let root_id : NodeId = forest . root () . id ();
+  let child_ids : Vec<NodeId> =
+    forest . get (root_id) . unwrap ()
+    . children () . map ( |c| c . id () ) . collect ();
+  for child_id in child_ids {
+    let mut node_mut : NodeMut<ViewNode> =
+      forest . get_mut (child_id) . unwrap ();
+    let vn : &mut ViewNode = node_mut . value ();
+    if let ViewNodeKind::True ( ref mut t ) = vn . kind {
+      t . birth = Birth::Independent; } } }
 
 pub fn collect_ids_from_tree (
   tree : &Tree<ViewNode>,

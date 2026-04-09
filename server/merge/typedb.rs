@@ -186,36 +186,37 @@ async fn drop_relationships_for_merge (
     query } ) . await ?;
   Ok (( )) }
 
-/// Given a 'relation_name' between 'old_id' playing 'old_role'
+/// Given a 'relation_name' between 'acquiree_id' playing 'acq_role'
 /// and 'other_id' playing 'other_role',
 /// deletes that relationship and makes a corresponding one
-/// substituting 'new_id' for 'old_id'.
+/// substituting 'acquirer_id' for 'acquiree_id'.
 async fn reroute_relationships_for_merge (
   tx            : &Transaction,
-  old_id        : &ID,
-  new_id        : &ID,
+  acquiree_id   : &ID,
+  acquirer_id   : &ID,
   relation_name : &str,
-  old_role      : &str,
-  other_role    : &str,
+  acq_role      : &str, // Before, acquiree played it. After, acquirer will.
+  other_role    : &str, // The role of the other member of the relationship.
 ) -> Result < (), Box<dyn Error> > {
   tx . query ( {
     let query : String =
       format! (
         r#"match
-             $old_node isa node, has id "{}";
-             $new_node isa node, has id "{}";
+             $acquiree isa node, has id "{}";
+             $acquirer isa node, has id "{}";
              $other isa node;
-             $old_rel isa {} ({}: $old_node, {}: $other);
+             not {{ $other is $acquirer; }};    # PITFALL: If the acquirer contained the acquiree, without this line, merger would create a containment cycle from the acquirer to itself
+             $old_rel isa {} ({}: $acquiree, {}: $other);
            delete $old_rel;
            insert
-             $new_rel isa {} ({}: $new_node, {}: $other);"#,
-        old_id . as_str (),
-        new_id . as_str (),
+             $new_rel isa {} ({}: $acquirer, {}: $other);"#,
+        acquiree_id . as_str (),
+        acquirer_id . as_str (),
         relation_name,
-        old_role,
+        acq_role,
         other_role,
         relation_name,
-        old_role,
+        acq_role,
         other_role );
     query } ) . await ?;
   Ok (( )) }

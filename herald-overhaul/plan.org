@@ -1,67 +1,185 @@
-* Rename RelToParent → Birth
+* Herald Overhaul: Architectural Refactor Plan
 
 ** Context
-   Jeff wants to rename RelToParent to Birth, clarifying that
-   the field encodes how a node was *born* into its position,
-   not every possible relationship with its parent.
+   The herald system reduces metadata noise in skg buffers.
+   Four ambitions are described in [[./vision.org][vision.org]].
 
-   Variant renames:
-   | Old             | New          |
-   |-----------------+--------------|
-   | RelToParent     | Birth        |
-   | Content         | ContentOf    |
-   | Unrelated       | Independent  |
-   | ContainerOf     | (unchanged)  |
-   | LinksTo         | (unchanged)  |
+   Our immediate goal is NOT to implement those ambitions,
+   but to refactor the architecture so they become natural.
+   The main refactor was replacing 'parent_ignores: bool'
+   with 'birth: Birth' (a 4-variant enum).
 
-   Field/variable renames:
-   | Old             | New          |
-   |-----------------+--------------|
-   | rel_to_parent   | birth        |
-   | relToParent     | birth        |
+   Key files:
+   - Types: [[../server/types/viewnode.rs][viewnode.rs]] — TrueNode, Birth enum, GraphNodeStats, ViewNodeStats
+   - Rendering: [[../server/org_to_text.rs][org_to_text.rs]] — 'true_node_metadata_to_string', 'graphnodestats_to_sexp'
+   - ViewStats: [[../server/update_buffer/viewnodestats.rs][viewnodestats.rs]] — 'set_viewnodestats_in_forest'
+   - Backpaths: [[../server/to_org/expand/backpath.rs][backpath.rs]] — 'prepend_indefinitive_child'
+   - Save pipeline: [[../server/from_text/viewnodes_to_instructions/to_naive_instructions.rs][to_naive_instructions.rs]]
+   - Tree completion: [[../server/update_buffer/complete_parent_first/truenode.rs][truenode.rs]]
+   - Elisp: [[../elisp/heralds-minor-mode.el][heralds-minor-mode.el]] — transform rules and overlay display
 
-** Scope: 151 occurrences across 31 files
+** DONE The Birth refactor (main work)
+   Commit 57762e38: "Replace parentIgnores with an enum"
 
-*** Rust: enum + field (server/)
-    All files that import/use RelToParent.
-    16 server files + 7 test files.
+*** Design
+    Replaced 'parent_ignores: bool' on TrueNode with 'birth: Birth'.
 
-*** Elisp + Elisp tests
-    - elisp/skg-sexpr/skg-truenode-defaults.el
-    - elisp/skg-sexpr-edit/skg-sexpr-cycling.el
-    - elisp/heralds-minor-mode.el
-    - tests/elisp/test-skg-truenode-defaults.el
-    - tests/integration/containerward-view-request/test-emacs.el
-    - tests/integration/sourceward-view-request/test-emacs.el
+    The enum (current names):
+      #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+      pub enum Birth {
+        ContentOf,   // the default: node is content of its parent
+        Independent, // node is not content of its parent
+        ContainerOf, // containerward backpath: this node contains its parent
+        LinksTo,     // sourceward backpath: this node links to its parent
+      }
 
-** Approach
-   Mechanical find-and-replace, ordered to avoid partial matches:
+    Semantic equivalences:
+    - Old 'parent_ignores == false' → 'Birth::ContentOf'
+    - Old 'parent_ignores == true'  → any of Independent, ContainerOf, LinksTo
 
-   1. 'RelToParent::Content'     → 'Birth::ContentOf'
-   2. 'RelToParent::Unrelated'   → 'Birth::Independent'
-   3. 'RelToParent::ContainerOf' → 'Birth::ContainerOf'
-   4. 'RelToParent::LinksTo'     → 'Birth::LinksTo'
-   5. 'RelToParent'              → 'Birth'  (type name in sigs, imports, enum def)
-   6. 'rel_to_parent'            → 'birth'  (Rust field/variable names)
+    Convenience method preserved:
+      pub fn parent_ignores_it(&self) -> bool {
+        self.birth != Birth::ContentOf
+      }
 
-   S-exp strings (in .rs rendering + parsing, and .el):
-   7.  "(relToParent unrelated)"   → "(birth independent)"
-   8.  "(relToParent containerOf)" → "(birth containerOf)"
-   9.  "(relToParent linksTo)"     → "(birth linksTo)"
-   10. '"relToParent"' in Elisp   → '"birth"'
-   11. '"content"' parse match    → '"contentOf"'
-   12. '"unrelated"' parse match  → '"independent"'
-   13. Elisp cycling values:
-       "content (default)" → "contentOf (default)"
-       "unrelated"         → "independent"
-   14. Elisp defaults alist:
-       default-content-p checks: "content (default)" → "contentOf (default)"
-                                 "content"           → "contentOf"
+*** Naming history
+    The enum and its variants were renamed in stages:
+    1. parent_ignores: bool → rel_to_parent: RelToParent
+       (with variants Content, Unrelated, ContainerOf, LinksTo)
+    2. RelToParent → Birth, Content → ContentOf, Unrelated → UnrelatedTo
+    3. UnrelatedTo → Independent
 
-   PITFALL: 'Content' alone is too common (Content-Length, DuplicatedContent).
-   Only replace fully-qualified 'RelToParent::Content', never bare 'Content'.
+    Wire format (sexp) evolved correspondingly:
+    - bare 'parentIgnores' atom → '(relToParent unrelated)' → '(birth independent)'
+
+*** What was done
+    - Added Birth enum, replaced bool field on TrueNode
+    - Updated s-exp rendering: '(birth independent)', '(birth containerOf)', '(birth linksTo)'
+    - Updated s-exp parsing to match
+    - Updated backpath.rs: derives Birth from relation type
+      ("contains" → ContainerOf, "textlinks_to" → LinksTo)
+    - Updated all tree completion code: assignments use Birth::Independent
+    - Updated all callers: bool checks → parent_ignores_it()
+    - Updated Elisp transform rules, cycling values, truenode defaults
+    - Purged 'parentIgnores' string from all code, comments, test data, org files
+    - Renamed parent_ignores variables/functions to non_content equivalents
+      (e.g. skip_parent_ignores → skip_non_content,
+       mark_erroneous_content_children_as_parent_ignores → mark_erroneous_content_children_as_non_content)
+    - Dropped 'notInParent' from viewStats s-exp rendering and parsing
+    - Dropped "!{" deduplication hack from Emacs
+
+** DONE Herald symbols per birth variant
+   Each birth variant now shows a distinct red herald:
+   - Independent: "!{"
+   - ContainerOf: "}"
+   - LinksTo:     "←"
+
+** DONE Source inheritance across non-content boundaries
+   Already worked — no code changes needed.
+   'nearest_truenode_ancestor_source' walks up through ALL ancestors
+   regardless of birth. Verification tests added:
+   - source_inheritance_across_non_content_same_source
+   - source_inheritance_across_non_content_different_source
+
+** DONE Change 1: View roots always show container count
+
+*** The problem
+    Currently, NodeContainRels::herald() (viewnode.rs:248)
+    returns None when containers==1 and contents==0 (the defaults).
+    This suppresses the containsHerald for most nodes, which is good —
+    showing "1{" on every leaf would be noise.
+
+    But view roots (immediate children of BufferRoot) should always
+    show their container count, because the user chose to view them
+    and wants to know their context. A view-root with 1 container
+    (hence not a graph-root) should show "1{";
+    a view-root with 0 containers should show "0{".
+
+*** How heralds work now (relevant background)
+    Rust computes containsHerald (e.g. "3{" or "2{5") and embeds it
+    in the sexp: (graphStats (containsHerald 3{)).
+    Emacs just displays whatever string Rust sends:
+      (containsHerald (ANY IT))
+    So Emacs is a pass-through for this particular herald.
+
+    Other heralds work differently — e.g. birth variants are mapped
+    to symbols entirely in Emacs transform rules.
+
+*** Approach A: Thread is_view_root through the Rust rendering chain
+    viewnode_forest_to_string already knows which nodes are view roots
+    (direct children of BufferRoot, rendered at level 1).
+    Pass is_view_root: bool down through:
+      render_node_subtree_to_org → viewnode_to_text → viewnode_to_string
+      → true_node_metadata_to_string → node_sexp → graph_stats
+      → graphnodestats_to_sexp
+    In graphnodestats_to_sexp, when is_view_root, force herald emission
+    even when containers==1 and contents==0.
+
+    Pro: Accurate, derived from actual tree position. No stale data.
+    Con: 7 nested function signatures gain a parameter.
+         viewnode_to_text is pub — 5 test callers in render_util.rs
+         must also pass the new parameter (as false).
+
+*** Approach B: Store is_view_root on ViewNodeStats
+    Add is_view_root: bool to ViewNodeStats (or GraphNodeStats).
+    Set it in set_viewnodestats_in_forest for direct BufferRoot children.
+    graphnodestats_to_sexp checks it and forces herald emission.
+
+    Pro: No signature threading. Data travels with the node.
+    Con: Field can theoretically contradict the tree (though in practice
+         viewnodestats runs right before rendering, so this is unlikely).
+         Adds a field to a struct that's serialized to the sexp —
+         we'd need to decide whether to emit it or keep it internal.
+
+*** Approach C: Rust always sends containsHerald; suppress in Emacs
+    Change NodeContainRels::herald() to always return Some(...),
+    removing the default suppression entirely. Every node gets
+    a containsHerald in the sexp.
+    Then Emacs suppresses it for non-root nodes.
+
+    Pro: Emacs already has the tree structure (org-mode levels)
+         and can trivially check "am I a level-1 headline?"
+         Keeps Rust rendering dumb and complete.
+    Con: More data in every sexp (even if Emacs hides it).
+         Moves display logic to Emacs, opposite of the general
+         direction of minimizing Emacs complexity.
+
+*** Approach D: Rust sends a viewRoot flag; Emacs uses it
+    Rust emits a new bare atom 'viewRoot' in the node sexp
+    for direct BufferRoot children (easy to set during rendering).
+    Emacs transform rules use this flag plus the raw (containers N)
+    data to decide whether to show the herald.
+
+    Pro: Clean separation — Rust says "this is a view root",
+         Emacs decides what that means for display.
+         viewRoot flag could be useful for other future herald logic.
+    Con: More protocol surface. Emacs needs new transform logic
+         to synthesize a herald from raw data + flag.
+         Currently Emacs doesn't synthesize heralds from raw counts —
+         it only passes through containsHerald strings from Rust.
+
+** TODO Change 4: Customizable herald visibility
+   A HeraldConfig struct in skgconfig.toml with a bool per herald category,
+   all defaulting to true. Used to gate which display heralds are emitted.
+   Raw data (containers count, etc.) always emitted for round-trip integrity.
+
+   Two levels:
+   1. *Static config* (skgconfig.toml): affects what Rust computes.
+   2. *Interactive toggle* (Emacs command): client-side suppression.
+      An Emacs variable 'skg-hidden-heralds' (list of symbols),
+      with a cycling command to toggle entries.
+
+   First candidate to hide: the content count herald.
+
+** Known bugs discovered during this work
+   - [[../BUG-self-containment.org][BUG-self-containment.org]]: After merging a container into its
+     own content node, the acquirer contains itself in TypeDB
+     (filesystem is correct). Causes inflated graphStats count.
 
 ** Verification
    - cargo build --tests
    - cargo nextest run (263 tests)
    - bash/emacs-tests.sh (136 tests)
+   - Integration tests in
+     [[../tests/integration/containerward-view-request/][containerward-view-request/]] and
+     [[../tests/integration/sourceward-view-request/][sourceward-view-request/]]
