@@ -22,7 +22,7 @@ use crate::serve::handlers::rerender_all_views::{
   handle_rerender_all_views_request};
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
-use crate::serve::handlers::title_matches::render_enriched_search_buffer::insert_ancestry_into_search_view;
+use crate::serve::handlers::title_matches::render_enriched_search_buffer::insert_containerward_ancestries_into_search_view;
 use crate::serve::handlers::title_matches::{ handle_title_matches_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
@@ -279,7 +279,7 @@ fn handle_snapshot_response (
     Err (e) => {
       tracing::error! ("snapshot response: parse failed: {}", e);
       return; }};
-  insert_ancestry_into_search_view (
+  insert_containerward_ancestries_into_search_view (
     &mut viewforest, &payload . search_results,
     &payload . ancestry_by_id, tantivy_index,
     &mut conn_state . memory . pool, config );

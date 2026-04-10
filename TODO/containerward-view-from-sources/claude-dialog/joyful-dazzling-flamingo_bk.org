@@ -191,11 +191,11 @@ Navigate to a node that has link sources.
 Run skg-local-sourceward (C-c v s).
 Verify each source node now shows its containerward ancestry as children.
 
-* ? 'insert_ancestry_node_recursive' in search enrichment
+* ? 'insert_containerward_ancestry_tree' in search enrichment
 (This was in 'out of scope' but I (Jeff) moved it here
 because it might need to be processed before the rest of the plan.)
 
-'insert_ancestry_node_recursive'
+'insert_containerward_ancestry_tree'
 uses Birth::Independent for ancestry nodes
 The search enrichment uses Birth::Independent for ancestry nodes
 (render_enriched_search_buffer.rs line 89).
@@ -260,7 +260,7 @@ Links are an intermediate case but let's ignore the problem for now.
 
 * problems, out of scope
 ** search enrichment duplicates the ancestry insertion pattern
-'insert_ancestry_node_recursive' in
+'insert_containerward_ancestry_tree' in
 [[../../server/serve/handlers/title_matches/render_enriched_search_buffer.rs][render_enriched_search_buffer.rs]]
 does essentially the same thing as the new
 'insert_ancestry_tree_recursive' in backpath.rs,

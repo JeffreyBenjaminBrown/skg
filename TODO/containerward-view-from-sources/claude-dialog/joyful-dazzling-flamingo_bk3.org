@@ -87,7 +87,7 @@ The standalone views are correct:
 - Sourceward view: Birth::LinksTo (backpath.rs line 92). Good.
 
 The issue is only in *search enrichment*:
-'insert_ancestry_node_recursive'
+'insert_containerward_ancestry_tree'
 (render_enriched_search_buffer.rs line 89)
 hardcodes Birth::Independent for ancestry nodes
 that are containers of the search result.

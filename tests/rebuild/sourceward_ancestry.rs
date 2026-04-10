@@ -129,7 +129,7 @@ async fn test_sourceward_ancestry_impl (
   // --- c should have 1 child: cc (ContainerOf) ---
   let node_c = find_child (&forest, node_b, "c")
     . expect ("b should have child c");
-  let c_kids = children_info (&forest, node_c);
+  let c_children = children_info (&forest, node_c);
   assert! ( c_children . contains (&("cc" . into (),
                                  Birth::ContainerOf)),
             "c should have ContainerOf child cc" );

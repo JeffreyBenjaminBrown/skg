@@ -12,9 +12,9 @@ use std::collections::HashMap;
 /// under each level-1 result TrueNode.
 /// Ancestry children are prepended (inserted first among siblings).
 /// Also populates the pool with SkgNodes for each ancestor node.
-pub(crate) fn insert_ancestry_into_search_view (
+pub(crate) fn insert_containerward_ancestries_into_search_view (
   forest         : &mut Tree<ViewNode>,
-  search_results     : &[ID],
+  search_results : &[ID],
   ancestry_by_id : &HashMap<ID, AncestryTree>,
   tantivy_index  : &TantivyIndex,
   pool           : &mut HashMap<ID, SkgNode>,
@@ -39,14 +39,14 @@ pub(crate) fn insert_ancestry_into_search_view (
         for child in children . iter () . rev () {
           // Insert in reverse so the first child in
           // the ancestry ends up first among siblings.
-          insert_ancestry_node_recursive (
+          insert_containerward_ancestry_tree (
             child, *node_nid,
             forest, tantivy_index, pool, config ); } } } } }
 
 /// Recursively insert an AncestryTree and its children
 /// as indefinitive non-content TrueNode children
 /// under the given parent. Ancestry nodes are prepended.
-fn insert_ancestry_node_recursive(
+fn insert_containerward_ancestry_tree(
   node          : &AncestryTree,
   parent_nid    : NodeId,
   forest        : &mut Tree<ViewNode>,
@@ -55,12 +55,12 @@ fn insert_ancestry_node_recursive(
   config        : &SkgConfig,
 ) {
   let child_nid : NodeId =
-    prepend_truenode_child_from_tantivy (
+    prepend_containing_child_from_tantivy (
       node . id (), parent_nid,
       forest, tantivy_index, pool, config );
   if let AncestryTree::Inner ( _, children ) = node {
     for child in children {
-      insert_ancestry_node_recursive (
+      insert_containerward_ancestry_tree (
         child, child_nid,
         forest, tantivy_index, pool, config ); } } }
 
@@ -69,7 +69,7 @@ fn insert_ancestry_node_recursive(
 /// prepends an indefinitive independent TrueNode child
 /// under the given parent.
 /// Returns the new child's NodeId.
-fn prepend_truenode_child_from_tantivy (
+fn prepend_containing_child_from_tantivy (
   node_id       : &ID, // what to prepend
   parent_treeid : NodeId, // where to prepend
   forest        : &mut Tree<ViewNode>,
@@ -86,7 +86,7 @@ fn prepend_truenode_child_from_tantivy (
     node_id, &source, pool, config );
   let viewnode : ViewNode =
     mk_indefinitive_viewnode ( node_id . clone (), source, title,
-                               Birth::Independent );
+                               Birth::ContainerOf );
   let mut parent_mut : NodeMut<ViewNode> =
     forest . get_mut (parent_treeid) . unwrap ();
   parent_mut . prepend (viewnode)
