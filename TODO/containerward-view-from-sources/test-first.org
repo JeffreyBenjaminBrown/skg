@@ -1,3 +1,7 @@
+* Don't read this, probably.
+The test it birthed, at
+tests/rebuild/sourceward_ancestry.rs,
+is more definitive, and its header comment is more concise..
 * test spec
 I'll first describe the desired efffect,
 and then try to reverse-engineer the data that would give it.

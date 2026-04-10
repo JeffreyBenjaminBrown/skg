@@ -1,0 +1,4 @@
+pid: d
+title: 'd links to [[id:a][a]]'
+contains:
+  - cc

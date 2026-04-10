@@ -1,0 +1,3 @@
+See the header comment at
+
+tests/rebuild/sourceward_ancestry.rs
