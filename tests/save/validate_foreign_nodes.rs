@@ -1,15 +1,12 @@
 // cargo test validate_foreign_nodes
 
-use futures::executor::block_on;
 use indoc::indoc;
 use skg::from_text::buffer_to_viewnode_forest_and_save_instructions;
 use skg::test_utils::run_with_test_db_from_config;
 use skg::types::errors::{SaveError, BufferValidationError};
 use skg::types::memory::SkgNodeMap;
-use skg::types::misc::SkgConfig;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 const CONFIG_PATH: &str = "tests/save/validate_foreign_nodes/skgconfig.toml";
 

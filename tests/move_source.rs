@@ -284,7 +284,7 @@ fn test_move_multiple_nodes (
 ) -> Result<(), Box<dyn Error>> {
   block_on ( async {
     let db_name : &str = "skg-test-move-source-3";
-    let (config, driver, mut tantivy_index, temp_fixtures)
+    let (config, driver, mut _tantivy_index, temp_fixtures)
       : (SkgConfig, TypeDBDriver, TantivyIndex, PathBuf)
       = setup (db_name, "move-source-3") . await?;
 
@@ -309,9 +309,9 @@ fn test_move_multiple_nodes (
     let replacement : Option<TantivyIndex> =
       update_graph_minus_merges (
         instructions, &source_moves,
-        config . clone(), &tantivy_index, &driver ) . await?;
+        config . clone(), &_tantivy_index, &driver ) . await?;
     if let Some (new_idx) = replacement {
-      tantivy_index = new_idx; }
+      _tantivy_index = new_idx; }
 
     { // FS
       assert!( ! temp_fixtures . join ("public/b.skg") . exists() );

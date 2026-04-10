@@ -135,7 +135,7 @@ where
 /// Catches panics so cleanup runs even if the test fails.
 async fn guarded_test_then_cleanup(
   db_name: &str,
-  config: &SkgConfig,
+  _config: &SkgConfig,
   driver: &TypeDBDriver,
   tantivy_folder: Option<PathBuf>,
   test_future: Pin<Box<dyn Future<Output = Result

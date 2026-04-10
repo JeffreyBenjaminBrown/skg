@@ -1,4 +1,4 @@
-use crate::types::misc::{SkgConfig, SkgfileSource};
+use crate::types::misc::SkgConfig;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, EditRequest, GraphNodeStats, Birth };
 
 use ego_tree::{NodeRef, Tree};

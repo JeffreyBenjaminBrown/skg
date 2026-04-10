@@ -63,6 +63,7 @@ pub type UncheckedTrueNode = TrueNode_Generic < Option < ID >,
 
 /// A ViewNode that corresponds to a SkgNode.
 #[derive( Debug, Clone, PartialEq )]
+#[allow (non_camel_case_types)]
 pub struct TrueNode_Generic < Id, Src > {
   pub title          : String,
   pub id             : Id,

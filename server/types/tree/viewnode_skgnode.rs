@@ -178,32 +178,6 @@ pub async fn append_indefinitive_from_disk_as_child (
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (( )) }
 
-/// Collect titles from Alias children of an AliasCol.
-/// Removes Duplicate (preserving order of first occurrence).
-/// Errors if any non-Alias children are found.
-pub(crate) fn collect_child_aliases_at_aliascol (
-  tree             : &Tree<ViewNode>,
-  aliascol_node_id : NodeId,
-) -> Result < Vec < String >, Box<dyn Error> > {
-  let mut aliases : Vec < String > =
-    Vec::new ();
-  let aliascol_ref : NodeRef < ViewNode > =
-    tree . get (aliascol_node_id)
-    . ok_or ("AliasCol node not found") ?;
-  for child_ref in aliascol_ref . children() {
-    let child : &ViewNode = child_ref . value();
-    if ! matches! ( &child . kind,
-                    ViewNodeKind::Scaff ( Scaffold::Alias { .. } )) {
-      return Err (
-        format! ( "AliasCol has non-Alias child with kind: {:?}",
-                  child . kind )
-        . into () ); }
-    aliases . push (
-      child . title () . to_string () ); }
-  Ok (aliases) }
-
-/// Reads from disk the SkgNode
-/// for a node or for one of its tree-ancestors.
 /// Collect aliases for a node:
 /// - find the unique AliasCol child (error if multiple)
 /// - for each Alias child of the AliasCol, collect its title
@@ -222,12 +196,13 @@ pub fn collect_grandchild_aliases_for_viewnode (
     None => Ok (MSV::Unspecified),
     Some (col_id) => {
       let aliases : Vec<String> = {
-        let col_ref : NodeRef<ViewNode> = tree . get (col_id) . expect ("collect_grandchild_aliases_for_viewnode: AliasCol not found");
+        let col_ref : NodeRef<ViewNode> =
+          tree . get (col_id) . expect ("collect_grandchild_aliases_for_viewnode: AliasCol not found");
         let mut aliases : Vec<String> = Vec::new();
         for alias_child in col_ref . children() {
           { // check for invalid state
             if ! matches!(&alias_child . value() . kind,
-                          ViewNodeKind::Scaff(Scaffold::Alias { .. })) {
+                          ViewNodeKind::Scaff(Scaffold::Alias { .. } )) {
               return Err ( format! (
                 "AliasCol has non-Alias child with kind: {:?}",
                 alias_child . value() . kind )); }}

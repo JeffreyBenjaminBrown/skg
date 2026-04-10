@@ -345,7 +345,7 @@ pub fn extend_contexts_for_cycles (
   while ! uncovered . is_empty () { // consume some of 'uncovered'
     let start : ID = // picks a random node
       uncovered . iter () . next () . unwrap () . clone ();
-    let ( path, cycle_members ) : ( Vec<ID>, HashSet<ID> ) =
+    let ( _path, cycle_members ) : ( Vec<ID>, HashSet<ID> ) =
       climb_containerward_to_cycle (&start, map_to_containers);
     for cm in &cycle_members {
       if origins . get (cm) != Some (&ContextOriginType::Root) {
