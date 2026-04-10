@@ -108,7 +108,7 @@ This parallelizes safely because 'full_containerward_ancestry'
 only needs &TypeDBDriver (shared reference);
 each call creates its own read transactions internally.
 
-** step 2: extract 'integrate_backpaths' from 'build_and_integrate_backpaths'
+** DONE step 2: extract 'integrate_backpaths' from 'build_and_integrate_backpaths'
 File: [[../../server/to_org/expand/backpath.rs][backpath.rs]].
 
 Extract the integration loop (lines 117-122 of 'build_and_integrate_backpaths')

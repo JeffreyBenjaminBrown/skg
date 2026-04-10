@@ -114,6 +114,20 @@ async fn build_and_integrate_backpaths (
       &config.db_name, driver, &terminus_pid,
       relation, input_role, output_role
     ) . await ?;
+  integrate_backpaths (
+    node_id, tree, paths, birth, map, config, driver
+  ) . await }
+
+/// At 'node_id' in 'tree', integrate 'paths' of homogenous birth 'birth'.
+async fn integrate_backpaths (
+  node_id : NodeId,
+  tree    : &mut Tree<ViewNode>,
+  paths   : Vec<PathToFirstNonlinearity>,
+  birth   : Birth,
+  map     : &mut SkgNodeMap,
+  config  : &SkgConfig,
+  driver  : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
   for p in paths {
     integrate_path_that_might_fork_or_cycle (
       tree, map, node_id,
