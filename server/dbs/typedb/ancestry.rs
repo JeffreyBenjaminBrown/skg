@@ -203,3 +203,32 @@ fn assemble(
               depth_truncated_keys ), } )
         . collect ();
       AncestryTree::Inner ( id, children ) }, } }
+
+/// Compute full containerward ancestry for each ID in parallel.
+/// IDs whose ancestry lookup fails are logged and omitted.
+pub async fn ancestry_by_id_from_ids_async (
+  ids       : &[ID],
+  db_name   : &str,
+  driver    : &TypeDBDriver,
+  max_depth : usize,
+) -> HashMap<ID, AncestryTree> {
+  let futures : Vec<_> =
+    ids . iter ()
+    . map ( |id|
+      full_containerward_ancestry (
+        db_name, driver, id, max_depth ) )
+    . collect ();
+  let results : Vec<Result<AncestryTree,
+                           Box<dyn Error>>> =
+    futures::future::join_all (futures) . await;
+  let mut map : HashMap<ID, AncestryTree> =
+    HashMap::new ();
+  for ( id, result ) in ids . iter ()
+                        . zip ( results )
+  { match result {
+      Ok (tree) => { map . insert ( id . clone (), tree ); },
+      Err (e) => {
+        tracing::warn! (
+          "ancestry_by_id_from_ids_async: {} failed: {}",
+          id, e ); }} }
+  map }

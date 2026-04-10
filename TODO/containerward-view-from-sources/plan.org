@@ -50,7 +50,7 @@ Any ancestry nodes we insert during the sourceward expansion
 will automatically receive their stats in those later passes.
 
 * implementation
-** step 0: fix Birth in search enrichment
+** DONE step 0: fix Birth in search enrichment
 File: [[../../server/serve/handlers/title_matches/render_enriched_search_buffer.rs][render_enriched_search_buffer.rs]], line 89.
 
 Change:
@@ -74,7 +74,7 @@ The standalone views were already correct:
 - Sourceward view: Birth::LinksTo (backpath.rs line 92).
 Only the search enrichment had the wrong value.
 
-** step 1: extract 'ancestry_by_id_from_ids_async' into ancestry.rs
+** DONE step 1: extract 'ancestry_by_id_from_ids_async' into ancestry.rs
 File: [[../../server/dbs/typedb/ancestry.rs][ancestry.rs]].
 
 New public async function:

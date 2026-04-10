@@ -9,16 +9,16 @@ pub mod render_enriched_search_buffer;
 use crate::consts::SEARCH_DISPLAY_LIMIT;
 use crate::context::ContextOriginType;
 use crate::dbs::tantivy::search_index;
-use crate::dbs::typedb::ancestry::{AncestryTree, full_containerward_ancestry};
+use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
 use crate::dbs::typedb::search::all_graphnodestats::{ AllGraphNodeStats, fetch_all_graphnodestats};
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::serve::ConnectionState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
+use crate::types::memory::ViewUri;
 use crate::types::memory::skgnode_from_map_or_disk;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
-use crate::types::memory::ViewUri;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, Birth, forest_root_viewnode, mk_indefinitive_viewnode};
 
 use ego_tree::{Tree, NodeId, NodeMut};
@@ -187,9 +187,10 @@ fn spawn_enrichment_thread (
     tracing::info! ("search enrichment: thread started for {} IDs",
               ids_clone . len ());
     let ancestry_by_id : HashMap<ID, AncestryTree> =
-      ancestry_by_id_from_ids (
-        &ids_clone, &config_clone . db_name,
-        &driver_clone, max_depth );
+      futures::executor::block_on (
+        ancestry_by_id_from_ids_async (
+          &ids_clone, &config_clone . db_name,
+          &driver_clone, max_depth ));
     tracing::info! ("search enrichment: ancestry computed ({} entries)",
               ancestry_by_id . len ());
     if cancel_clone . load (Ordering::SeqCst) {
@@ -226,35 +227,6 @@ fn spawn_enrichment_thread (
       ancestry_by_id,
       graphnodestats } ); } ); }
 
-/// Compute full containerward ancestry for each ID in parallel.
-/// IDs whose ancestry lookup fails are logged and omitted.
-fn ancestry_by_id_from_ids (
-  ids       : &[ID],
-  db_name   : &str,
-  driver    : &TypeDBDriver,
-  max_depth : usize,
-) -> HashMap<ID, AncestryTree> {
-  let futures : Vec<_> =
-    ids . iter ()
-    . map ( |id|
-      full_containerward_ancestry (
-        db_name, driver, id, max_depth ) )
-    . collect ();
-  let results : Vec<Result<AncestryTree,
-                           Box<dyn std::error::Error>>> =
-    futures::executor::block_on (
-      futures::future::join_all (futures) );
-  let mut map : HashMap<ID, AncestryTree> =
-    HashMap::new ();
-  for ( id, result ) in ids . iter ()
-                        . zip ( results )
-  { match result {
-      Ok (tree) => { map . insert ( id . clone (), tree ); },
-      Err (e) => {
-        tracing::warn! (
-          "search enrichment: ancestry for {} failed: {}",
-          id, e ); } } }
-  map }
 
 fn collect_ids_from_ancestry_node(
   node   : &AncestryTree,
