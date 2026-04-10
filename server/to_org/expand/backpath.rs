@@ -7,19 +7,14 @@
 /// - I say 'integrate' rather than 'insert' because some of the path,
 ///   maybe even all of it, might already be there.
 
-use crate::to_org::util::{
-  get_id_from_treenode, skgnode_and_viewnode_from_id,
-  remove_completed_view_request};
-use crate::dbs::typedb::paths::{
-  paths_to_first_nonlinearities,
-  PathToFirstNonlinearity};
-use crate::types::misc::{ID, SkgConfig};
-use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{
-    ViewNode, Birth, mk_indefinitive_from_viewnode };
+use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
+use crate::dbs::typedb::paths::{ paths_to_first_nonlinearities, PathToFirstNonlinearity};
+use crate::to_org::util::{ get_id_from_treenode, skgnode_and_viewnode_from_id, remove_completed_view_request};
 use crate::types::memory::SkgNodeMap;
-use crate::types::tree::viewnode_skgnode::{
-  find_child_by_id, find_children_by_ids};
+use crate::types::misc::{ID, SkgConfig};
+use crate::types::tree::viewnode_skgnode::{ find_child_by_id, find_children_by_ids};
+use crate::types::viewnode::ViewRequest;
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Birth, mk_indefinitive_from_viewnode };
 
 use ego_tree::{NodeId,Tree};
 use std::collections::{HashSet, HashMap};
@@ -78,7 +73,8 @@ pub async fn build_and_integrate_sourceward_view_then_drop_request (
     "Failed to integrate sourceward path",
     errors, result ) }
 
-/// Integrate a sourceward path into an ViewNode tree.
+/// Integrate sourceward paths into a ViewNode tree,
+/// then attach containerward ancestry beneath each source node.
 pub async fn build_and_integrate_sourceward_path (
   tree      : &mut Tree<ViewNode>,
   map       : &mut SkgNodeMap,
@@ -86,10 +82,29 @@ pub async fn build_and_integrate_sourceward_path (
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  build_and_integrate_backpaths (
-    tree, map, node_id, config, driver,
-    "textlinks_to", "dest", "source",
-    Birth::LinksTo
+
+  // --- data preparation (no tree mutation) ---
+  let terminus_pid : ID =
+    get_id_from_treenode ( tree, node_id ) ?;
+  let paths : Vec<PathToFirstNonlinearity> =
+    paths_to_first_nonlinearities (
+      &config.db_name, driver, &terminus_pid,
+      "textlinks_to", "dest", "source"
+    ) . await ?;
+  let source_pids : Vec<ID> =
+    extract_pids_from_paths ( &paths );
+  let ancestry_map : HashMap<ID, AncestryTree> =
+    ancestry_by_id_from_ids_async (
+      &source_pids, &config.db_name, driver,
+      config.max_ancestry_depth
+    ) . await;
+
+  // --- tree mutation ---
+  integrate_backpaths (
+    node_id, tree, paths, Birth::LinksTo, map, config, driver
+  ) . await ?;
+  attach_containerward_ancestries_to_link_sources (
+    tree, map, node_id, &ancestry_map, config, driver
   ) . await }
 
 /// Plural 'backpaths' because if the origin
@@ -248,6 +263,84 @@ async fn integrate_cycle_nodes (
       tree, map, node_id, &cycle_id, config, driver, birth
     ). await ?; }
   Ok (( )) }
+
+/// Extract every PID from a Vec<PathToFirstNonlinearity>,
+/// deduplicated.
+fn extract_pids_from_paths (
+  paths : &[PathToFirstNonlinearity],
+) -> Vec<ID> {
+  let mut seen : HashSet<ID> = HashSet::new ();
+  let mut result : Vec<ID> = Vec::new ();
+  for p in paths {
+    for id in &p.path {
+      if seen . insert ( id . clone () ) {
+        result . push ( id . clone () ); } }
+    for id in &p.branches {
+      if seen . insert ( id . clone () ) {
+        result . push ( id . clone () ); } }
+    for id in &p.cycle_nodes {
+      if seen . insert ( id . clone () ) {
+        result . push ( id . clone () ); } } }
+  result }
+
+/// Walk the subtree under node_id to find every Birth::LinksTo node.
+/// For each, insert its containerward ancestry as subheadlines
+/// with Birth::ContainerOf.
+async fn attach_containerward_ancestries_to_link_sources (
+  tree         : &mut Tree<ViewNode>,
+  map          : &mut SkgNodeMap,
+  node_id      : NodeId,
+  ancestry_map : &HashMap<ID, AncestryTree>,
+  config       : &SkgConfig,
+  driver       : &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
+  // Collect LinksTo nodes before mutating the tree.
+  let links_to_nodes : Vec<(NodeId, ID)> = {
+    let mut result : Vec<(NodeId, ID)> = Vec::new ();
+    for edge in tree . get (node_id) . unwrap () . traverse () {
+      if let ego_tree::iter::Edge::Open (node_ref) = edge {
+        if let ViewNodeKind::True (t) = &node_ref . value () . kind {
+          if t . birth == Birth::LinksTo {
+            result . push (
+              ( node_ref . id (),
+                t . id . clone () ) ); } } } }
+    result };
+  for ( link_node_id, pid ) in links_to_nodes {
+    if let Some (ancestry) = ancestry_map . get (&pid) {
+      if let AncestryTree::Inner ( _, children ) = ancestry {
+        for child in children . iter () . rev () {
+          insert_containerward_ancestry_tree_recursive (
+            child, link_node_id,
+            tree, map, config, driver
+          ) . await ?; } } } }
+  Ok (()) }
+
+/// Recursively insert an AncestryTree as indefinitive
+/// ContainerOf subheadlines under the given parent.
+/// Iterates children in reverse so that prepending
+/// preserves the original order.
+fn insert_containerward_ancestry_tree_recursive<'a> (
+  node       : &'a AncestryTree,
+  parent_nid : NodeId,
+  tree       : &'a mut Tree<ViewNode>,
+  map        : &'a mut SkgNodeMap,
+  config     : &'a SkgConfig,
+  driver     : &'a TypeDBDriver,
+) -> Pin<Box<dyn Future<Output = Result<(),
+                                        Box<dyn Error>>> + 'a>> {
+  Box::pin ( async move {
+    let child_nid : NodeId =
+      prepend_indefinitive_child (
+        tree, map, parent_nid, node . id (),
+        config, driver, Birth::ContainerOf
+      ) . await ?;
+    if let AncestryTree::Inner ( _, children ) = node {
+      for child in children . iter () . rev () {
+        insert_containerward_ancestry_tree_recursive (
+          child, child_nid,
+          tree, map, config, driver
+        ) . await ?; } }
+    Ok (()) } ) }
 
 async fn prepend_indefinitive_child (
   tree           : &mut Tree<ViewNode>,

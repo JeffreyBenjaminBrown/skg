@@ -87,7 +87,7 @@ instead of writing a separate, somewhat-duplicative function?
 For each source node whose ancestry is an AncestryTree::Inner,
 iterate its children in reverse
 (reverse because 'prepend_indefinitive_child' prepends)
-and call 'insert_ancestry_tree_recursive' for each.
+and call 'insert_containerward_ancestry_tree_recursive' for each.
 
 If the ancestry is Root / Repeated / DepthTruncated
 (i.e. the source node itself is a root, or the BFS hit a cycle/limit
@@ -107,7 +107,7 @@ File: [[../../server/to_org/expand/backpath.rs][backpath.rs]].
 Walks the subtree under a given NodeId with a recursive DFS.
 Returns Vec<(NodeId, ID)> of every TrueNode with birth == Birth::LinksTo.
 
-** new function: 'insert_ancestry_tree_recursive'
+** new function: 'insert_containerward_ancestry_tree_recursive'
 File: [[../../server/to_org/expand/backpath.rs][backpath.rs]].
 
 Async recursive function (Pin<Box<dyn Future>> pattern,
@@ -219,7 +219,7 @@ Their order within the Vec may vary between runs.
 This could make integration test output non-deterministic.
 
 Mitigation: sort the children of each AncestryTree node by ID
-before insertion, or sort within 'insert_ancestry_tree_recursive'.
+before insertion, or sort within 'insert_containerward_ancestry_tree_recursive'.
 This matches the pattern already used in 'integrate_branches_in_node'
 (backpath.rs line 205: branches_to_add.sort()).
 
@@ -263,7 +263,7 @@ Links are an intermediate case but let's ignore the problem for now.
 'insert_containerward_ancestry_tree' in
 [[../../server/serve/handlers/title_matches/render_enriched_search_buffer.rs][render_enriched_search_buffer.rs]]
 does essentially the same thing as the new
-'insert_ancestry_tree_recursive' in backpath.rs,
+'insert_containerward_ancestry_tree_recursive' in backpath.rs,
 but synchronously, using Tantivy for title lookups
 and Birth::Independent instead of Birth::ContainerOf.
 

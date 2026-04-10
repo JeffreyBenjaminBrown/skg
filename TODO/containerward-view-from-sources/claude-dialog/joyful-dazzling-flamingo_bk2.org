@@ -91,7 +91,7 @@ Rewrite it to inline the relevant logic and add ancestry:
     }
 
     // 5. Attach ancestry beneath each Birth::LinksTo node.
-    attach_ancestry_to_links_to_nodes(
+    attach_containerward_ancestries_to_link_sources(
       tree, map, node_id, &ancestry_map, config, driver
     ).await
   }
@@ -177,7 +177,7 @@ into a shared async function in ancestry.rs
 that both call sites use. Not worth doing now.
 ***** TODO I'd like to dedup as part of the plan.
 If we defer it I'll forget.
-** new function: 'attach_ancestry_to_links_to_nodes'
+** new function: 'attach_containerward_ancestries_to_link_sources'
 File: [[../../server/to_org/expand/backpath.rs][backpath.rs]].
 
 Walks the subtree under node_id to find every
@@ -232,10 +232,10 @@ I've rewritten the plan to say "view-children"
 and "org-subheadlines" when referring to the view tree,
 and "containers" when referring to graph relationships.
 
-** new function: 'insert_ancestry_tree_recursive'
+** new function: 'insert_containerward_ancestry_tree_recursive'
 File: [[../../server/to_org/expand/backpath.rs][backpath.rs]].
 
-Called by 'attach_ancestry_to_links_to_nodes' for each container.
+Called by 'attach_containerward_ancestries_to_link_sources' for each container.
 Async recursive function (Pin<Box<dyn Future>> pattern,
 same as 'integrate_linear_portion_of_path' at line 156).
 
@@ -383,7 +383,7 @@ Their order within the Vec may vary between runs.
 This could make integration test output non-deterministic.
 
 Mitigation: sort the children of each AncestryTree node by ID
-before insertion, or sort within 'insert_ancestry_tree_recursive'.
+before insertion, or sort within 'insert_containerward_ancestry_tree_recursive'.
 This matches the pattern already used in 'integrate_branches_in_node'
 (backpath.rs line 205: branches_to_add.sort()).
 
@@ -432,7 +432,7 @@ Links are an intermediate case but let's ignore the problem for now.
 'insert_containerward_ancestry_tree' in
 [[../../server/serve/handlers/title_matches/render_enriched_search_buffer.rs][render_enriched_search_buffer.rs]]
 does essentially the same thing as the new
-'insert_ancestry_tree_recursive' in backpath.rs,
+'insert_containerward_ancestry_tree_recursive' in backpath.rs,
 but synchronously, using Tantivy for title lookups
 and Birth::Independent instead of Birth::ContainerOf.
 

@@ -150,7 +150,7 @@ Then simplify 'build_and_integrate_backpaths' to:
 'build_and_integrate_containerward_path' is unchanged --
 it still calls 'build_and_integrate_backpaths'.
 
-** step 3: rewrite 'build_and_integrate_sourceward_path'
+** DONE step 3: rewrite 'build_and_integrate_sourceward_path'
 File: [[../../server/to_org/expand/backpath.rs][backpath.rs]], line 82.
 
 #+begin_example
@@ -182,7 +182,7 @@ File: [[../../server/to_org/expand/backpath.rs][backpath.rs]], line 82.
     ).await?;
 
     // 4. Attach ancestry beneath each Birth::LinksTo node.
-    attach_ancestry_to_links_to_nodes(
+    attach_containerward_ancestries_to_link_sources(
       tree, map, node_id, &ancestry_map, config, driver
     ).await
   }
@@ -191,7 +191,7 @@ File: [[../../server/to_org/expand/backpath.rs][backpath.rs]], line 82.
 Steps 1-2 are pure data preparation (queries to TypeDB,
 no tree mutation). Steps 3-4 are tree mutation.
 
-** step 3a: new function 'extract_pids_from_paths'
+*** step 3a: new function 'extract_pids_from_paths'
 File: [[../../server/to_org/expand/backpath.rs][backpath.rs]].
 
 Extracts every PID from a Vec<PathToFirstNonlinearity>.
@@ -203,7 +203,7 @@ that need containerward ancestry.
 
 Returns a deduplicated Vec<ID>.
 
-** step 3b: new function 'attach_ancestry_to_links_to_nodes'
+*** step 3b: new function 'attach_containerward_ancestries_to_link_sources'
 File: [[../../server/to_org/expand/backpath.rs][backpath.rs]].
 
 Walks the subtree under node_id to find every
@@ -224,10 +224,10 @@ Repeated (cycle), or DepthTruncated (BFS limit hit),
 there are no containers to insert -- the source node
 has no containment hierarchy to show.
 
-** step 3c: new function 'insert_ancestry_tree_recursive'
+*** step 3c: new function 'insert_containerward_ancestry_tree_recursive'
 File: [[../../server/to_org/expand/backpath.rs][backpath.rs]].
 
-Called by 'attach_ancestry_to_links_to_nodes' for each container.
+Called by 'attach_containerward_ancestries_to_link_sources' for each container.
 Async recursive function (Pin<Box<dyn Future>> pattern,
 same as 'integrate_linear_portion_of_path' at line 156).
 
@@ -245,7 +245,7 @@ Since 'prepend_indefinitive_child' prepends
 (inserts at the front of the sibling list),
 reversing the iteration preserves the original order.
 
-** new imports in backpath.rs
+*** new imports in backpath.rs
 #+begin_example
   use crate::dbs::typedb::ancestry::{
     AncestryTree, ancestry_by_id_from_ids_async};
@@ -255,7 +255,9 @@ reversing the iteration preserves the original order.
 The futures crate is already a dependency.
 Pin, Future, HashMap, HashSet are already imported.
 
-* integration test changes
+* DONE , ignored : integration test changes
+Redundant given the new test at
+tests/rebuild/sourceward_ancestry.rs.
 ** add test data: a container for l-11
 New file:
 [[../../tests/integration/sourceward-view-request/data/skg-data/][c-l-11.skg]]
@@ -303,6 +305,13 @@ The exact graphStats metadata values will need tuning
 after a first test run, since l-11's container count
 changes from 0 to 1.
 
+** the exact graphStats in the test will need adjustment
+Adding c-l-11 as a container of l-11 changes l-11's graphStats
+(containers goes from 0 to 1, herald changes).
+The precise expected-output strings in test-emacs.el
+will need updating after a first test run shows the actual values.
+This is a known iteration step, not a design problem.
+
 * verification
 ** run integration test
 #+begin_src sh
@@ -321,25 +330,3 @@ Navigate to a node that has link sources.
 Run skg-local-sourceward (C-c v s).
 Verify each source node now shows its containerward ancestry
 as org-subheadlines beneath it.
-
-* problems
-** the exact graphStats in the test will need adjustment
-Adding c-l-11 as a container of l-11 changes l-11's graphStats
-(containers goes from 0 to 1, herald changes).
-The precise expected-output strings in test-emacs.el
-will need updating after a first test run shows the actual values.
-This is a known iteration step, not a design problem.
-
-* problems, out of scope
-** the existing sourceward integration test has limited coverage
-The test data at
-[[../../tests/integration/sourceward-view-request/data/skg-data/][sourceward test data]]
-has only one link (l-11 -> 11).
-It doesn't test:
-- multiple sources linking to the same target
-- source chains (A links to B links to C)
-- sources with branching containerward paths (forks in containment)
-- sources at the end of a forked sourceward path
-
-These would be good additions in a follow-up,
-independent of this feature.

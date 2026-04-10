@@ -34,6 +34,27 @@ For repeated views of the same node (common during editing),
 cache the AllGraphNodeStats results. Invalidate on save.
 Would make subsequent views of the same node near-instant.
 
+** Deduplicate ancestry tree insertion logic
+
+'insert_containerward_ancestry_tree_recursive' in backpath.rs and
+'insert_containerward_ancestry_tree' in render_enriched_search_buffer.rs
+do the same thing: recursively walk an AncestryTree and prepend
+ContainerOf children, iterating in reverse to preserve order.
+
+Their callers ('attach_containerward_ancestries_to_link_sources' and
+'insert_containerward_ancestries_into_search_view') also share
+the same pattern: find target nodes, look up ancestry, recurse.
+
+The difference is the leaf operation:
+- backpath.rs: async, fetches node data from TypeDB
+  via 'prepend_indefinitive_child'.
+- render_enriched_search_buffer.rs: sync, fetches from Tantivy
+  via 'prepend_containing_child_from_tantivy'.
+
+Unifying would require abstracting over "prepend a node given
+its ID" (e.g. a closure or trait). Not hard, but not urgent
+since both copies are short and stable.
+
 ** Save pipeline
 
 *** Profile the save path
