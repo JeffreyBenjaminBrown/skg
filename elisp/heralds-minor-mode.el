@@ -49,7 +49,7 @@
         (independent "!{")
         (containerOf "}")
         (linksTo "←"))
-      (GREEN indefinitive "indef")
+      (GREEN indefinitive "∅")
       (BLUE graphStats
         (containers)            ;; instead we show the containsHerald
         (contents)              ;; instead we show the containsHerald

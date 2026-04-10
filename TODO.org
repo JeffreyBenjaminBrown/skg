@@ -1,13 +1,3 @@
-* DONE ? ignorable : parentContains does seem like valid graph data
-** Neither seems critical.
-** History
-It was part of the graphnodestats, until just after commit
-2e02c90013f17459f8251f32d1564b69ca36bda2
-** debate
-and interesting enough to be heralded,
-and reasonably separate from 'birth'
-(although birth might imply it sometimes).
-But maybe 'anAncestorContains' would be more useful.
 * semi-permanent
 ** [[./next.org]] might be in progress
 ** For minimalism, remember [[id:b6747d36-711b-42e7-aa80-b9b2be53fe6c][my Skg priorities]].
@@ -36,18 +26,28 @@ begin
 **** DONE visit things
 **** DONE request view changes
 *** It is valid to dogfood even as only reading.
-* TODO ?
-** Links to links are currently annoying. Are they important?
+* TODO Do search results show multiple containment correctly?
 * TODO really want but can wait
 ** There should only be one definitive view across all buffers.
-And they should all be indexed for C-c v v to jump to,
-not just the roots.
+See TODO/one-definitive-view/
 ** Privacy: Permit user to hide certain sources from view.
 *** Figure out the diff logic for insertions when some are hidden.
 I think I see how: Just pin each thing to its last visible sibling.
 ** importing org-roam should be possible while server is running
 and automatically update the other dbs (not just disk as now)
 ** server can't verify connection initially
+* TODO ?
+** Links to links are currently annoying. Are they important?
+** ignorable ? parentContains does seem like valid graph data
+*** Neither seems critical.
+*** History
+It was part of the graphnodestats, until just after commit
+2e02c90013f17459f8251f32d1564b69ca36bda2
+*** debate
+and interesting enough to be heralded,
+and reasonably separate from 'birth'
+(although birth might imply it sometimes).
+But maybe 'anAncestorContains' would be more useful.
 * TODO cleaner code
 ** avoid redundant enum checks
 There are, I suspect, a lot of functions doing redundant checks for enums.
