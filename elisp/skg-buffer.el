@@ -120,4 +120,20 @@ otherwise generate a new UUID."
                 (string= uri (buffer-local-value 'skg-view-uri buf)))
               (buffer-list)))
 
+(defun skg-close-all-skg-buffers ()
+  "Kill all buffers that have a non-nil `skg-view-uri'.
+Clears each buffer's modified flag first, since stale views
+are not worth saving. Each kill triggers `skg-send-close-view'
+via the buffer's `kill-buffer-hook'."
+  (interactive)
+  (let ((bufs (cl-remove-if-not
+               (lambda (buf)
+                 (buffer-local-value 'skg-view-uri buf))
+               (buffer-list))))
+    (dolist (buf bufs)
+      (with-current-buffer buf
+        (set-buffer-modified-p nil))
+      (kill-buffer buf))
+    (message "Closed %d skg buffer(s)." (length bufs))))
+
 (provide 'skg-buffer)

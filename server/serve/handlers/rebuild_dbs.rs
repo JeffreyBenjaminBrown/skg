@@ -4,6 +4,7 @@ use crate::context::{
   had_id_set_from_nodes,
   link_targets_from_nodes};
 use crate::dbs::init::{rebuild_typedb_from_disk, rebuild_tantivy_from_disk};
+use crate::serve::ConnectionState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_text_response};
 use crate::types::misc::{SkgConfig, TantivyIndex};
@@ -17,6 +18,7 @@ pub fn handle_rebuild_dbs_request (
   typedb_driver : &TypeDBDriver,
   config        : &SkgConfig,
   tantivy_index : &mut TantivyIndex,
+  conn_state    : &mut ConnectionState,
 ) {
   tracing::info!("Rebuilding databases from disk...");
   let result : Result<(), String> = (|| {
@@ -47,7 +49,9 @@ pub fn handle_rebuild_dbs_request (
     Ok (())
   })();
   let msg : String = match result {
-    Ok (()) => "Databases rebuilt successfully." . to_string (),
+    Ok (()) => {
+      conn_state . memory . clear ();
+      "Databases rebuilt successfully." . to_string () },
     Err (e) => {
       tracing::error!("Rebuild failed: {}", e);
       format! ("Rebuild failed: {}", e) } };

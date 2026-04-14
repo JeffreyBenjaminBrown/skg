@@ -77,6 +77,12 @@ impl SkgnodesInMemory {
       id_resolver : HashMap::new (),
       root_ids    : ManyToMany::new () }}
 
+  pub fn clear (&mut self) {
+    self . pool        . clear ();
+    self . views       . clear ();
+    self . id_resolver . clear ();
+    self . root_ids    = ManyToMany::new (); }
+
   pub fn viewuri_to_pids (
     &self,
     uri : &ViewUri,

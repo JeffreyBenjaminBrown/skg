@@ -1,17 +1,18 @@
+* ONGOING TODO/external-import-script.org
+* TODO saving opens all bodies of visible headlines
 * semi-permanent
 ** [[./next.org]] might be in progress
 ** For minimalism, remember [[id:b6747d36-711b-42e7-aa80-b9b2be53fe6c][my Skg priorities]].
-** import org-roam
-cargo run --bin skg -- import-org-roam public/ data/public/ public
-** commit message for freshly imported data
-*** PITFALL: Fill in the blank.
-*** it
-begin
-
-  imported from public org-roam notes:
-    git@github.com:JeffreyBenjaminBrown/public-notes-in-org-roam-format
-  as of commit
-    [FILL IN THIS DETAIL]
+** how to import from org-roam
+*** manually
+**** remove the .skg files and .git
+**** cargo run --bin skg -- import-org-roam public/ data/public/ public
+**** git init & initial commit
+initial import from org-roam
+**** restart the server
+so it has time to ingest the data
+*** automatically
+./bash/import-org-roam.sh public/ data/public/ public skg2
 ** when dogfooding
 *** spots to patrol
 **** make edits
@@ -26,6 +27,10 @@ begin
 **** DONE visit things
 **** DONE request view changes
 *** It is valid to dogfood even as only reading.
+* an important constraint on any graph serialization format
+Deleting a node file should make sense.
+* incremental init seems like garbage
+see TODO/what-affects-dbs.org
 * TODO Do search results show multiple containment correctly?
 * TODO really want but can wait
 ** There should only be one definitive view across all buffers.

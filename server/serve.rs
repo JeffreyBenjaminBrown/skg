@@ -187,7 +187,8 @@ fn handle_emacs (
             handle_rebuild_dbs_request ( &mut stream,
                                          &typedb_driver,
                                          config,
-                                         &mut tantivy_index ),
+                                         &mut tantivy_index,
+                                         &mut conn_state ),
           Ok (RequestType::RerenderAllViews) =>
             handle_rerender_all_views_request (
               &mut stream,

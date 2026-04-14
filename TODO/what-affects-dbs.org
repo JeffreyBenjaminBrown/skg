@@ -1,0 +1,131 @@
+* What affects the databases (TypeDB and Tantivy)
+  Four triggers. The first two do full rebuilds;
+  the third does partial updates; the fourth writes only to disk.
+
+** 1. Server startup (full or incremental)
+   Entry: server/main.rs ~line 75 -> dbs/init.rs
+
+*** Incremental init (the fast path)
+    Condition: all four of these hold
+    (checked by can_do_incremental_init in dbs/init.rs):
+    1. The TypeDB database exists (queried via the driver).
+    2. A marker file (.skg_init_marker in the data root) exists.
+       It is touched at the end of every successful init.
+    3. schema.tql's mtime <= the marker file's mtime
+       (i.e. the schema hasn't changed since last init).
+    4. The Tantivy index directory exists and is non-empty
+       (guards against someone manually deleting the index).
+    If any check fails, full init runs instead.
+
+    Steps:
+    - Reads only .skg files modified since the marker's mtime.
+    - For each modified file's node:
+      - Creates the node in TypeDB only if its ID is not
+        already present (create_only_nodes_with_no_ids_present).
+        This handles genuinely new nodes.
+      - Deletes all outbound relationships for that node's ID,
+        then recreates them from the current .skg data.
+        This is done for every modified node, not just new ones,
+        because an existing node's relationships may have changed
+        (e.g. its contains list was edited on disk).
+        Deleting first then recreating is simpler and safer
+        than diffing old vs. new relationships.
+    - Updates corresponding Tantivy documents
+      (delete old entries by ID, re-add from current data).
+    - Then recomputes context rankings (Tantivy-only).
+
+    PITFALL (documented in code): Deleted .skg files are not
+    detected by incremental init. Those nodes become orphans
+    in TypeDB. This doesn't matter during normal use (deletions
+    go through the save pipeline while the server is running),
+    but after manual file deletions you need a full rebuild.
+*** Full init (fallback)
+    Condition: either DB is missing or corrupt.
+    - Reads all .skg files.
+    - Wipes and recreates the TypeDB database
+      (delete DB, define schema, insert all nodes
+      and all five relationship types).
+    - Wipes and recreates the Tantivy index directory,
+      then populates it.
+    - Then recomputes context rankings.
+
+** 2. Rebuild-dbs API endpoint (always full)
+   Trigger: M-x skg-rebuild-dbs in Emacs,
+   or TCP request ((request . "rebuild dbs")).
+   Elisp: elisp/skg-request-rebuild-dbs.el
+   Rust:  server/serve/handlers/rebuild_dbs.rs
+
+   - Reads all .skg files.
+   - Full wipe + recreate of TypeDB
+     (same path as full init above).
+   - Full wipe + recreate of Tantivy.
+   - Recomputes context rankings.
+   - Does not touch the filesystem data (.skg files).
+
+** 3. Save buffer (partial update)
+   Trigger: user saves a buffer in Emacs (C-c C-s).
+   Elisp: elisp/skg-request-save.el
+   Rust:  server/serve/handlers/save_buffer.rs
+          -> server/save.rs (update_graph_minus_merges)
+
+*** Filesystem
+    - Writes new/changed .skg files.
+    - Deletes .skg files for removed nodes.
+
+*** TypeDB
+    - Deletes removed nodes (cascading relationship deletes).
+    - Creates new nodes with their extra_ids.
+    - Deletes and recreates relationships for changed nodes.
+    - Updates node source attribute if it changed.
+    - On error: falls back to full TypeDB rebuild from disk.
+
+*** Tantivy
+    - Deletes index entries for removed/changed nodes.
+    - Adds index entries for new/changed nodes.
+    - Updates context origin types for affected nodes.
+    - On error: falls back to full Tantivy rebuild from disk.
+
+*** Merges (if the save contains merge instructions)
+    server/merge.rs orchestrates:
+    - Filesystem: merges .skg files (acquiree absorbed into acquirer).
+    - TypeDB: reroutes all five relationship types
+      from acquiree to acquirer in a single transaction,
+      deletes acquiree, creates extra_id mappings.
+    - Tantivy: deletes acquiree entry, updates acquirer entry.
+
+** 4. Import from org-roam (filesystem only)
+   Trigger: cargo run --bin skg -- import-org-roam <src> <dest> <name>
+   Rust: server/import_org_roam.rs
+
+   - Reads .org files, converts to .skg, writes them to disk.
+   - Does NOT update TypeDB or Tantivy.
+   - User must restart the server or call rebuild-dbs afterward.
+
+* The five relationship types managed in TypeDB
+  All are created/deleted by the paths above.
+  1. contains          -- node containment hierarchy
+  2. textlinks_to      -- links parsed from node body text
+  3. subscribes        -- subscription relationships
+  4. hides_from_its_subscriptions -- visibility filtering
+  5. overrides_view_of -- view replacement
+
+  Plus an internal type:
+  6. has_extra_id      -- alternate IDs from merges
+
+* Key files
+  | File                                    | Role                          |
+  |-----------------------------------------+-------------------------------|
+  | server/main.rs                          | Entry, init, shutdown         |
+  | server/dbs/init.rs                      | Full & incremental init logic |
+  | server/dbs/typedb/nodes.rs              | Node CRUD in TypeDB           |
+  | server/dbs/typedb/relationships.rs      | Relationship CRUD in TypeDB   |
+  | server/dbs/tantivy.rs                   | All Tantivy index operations  |
+  | server/dbs/filesystem/multiple_nodes.rs | Batch .skg reads/writes       |
+  | server/save.rs                          | Save pipeline orchestration   |
+  | server/merge.rs                         | Merge orchestration           |
+  | server/context.rs                       | Context ranking computation   |
+  | server/serve/handlers/rebuild_dbs.rs    | Rebuild endpoint handler      |
+  | server/serve/handlers/save_buffer.rs    | Save endpoint handler         |
+  | server/import_org_roam.rs               | Org-roam importer             |
+  | elisp/skg-request-rebuild-dbs.el        | Emacs rebuild command         |
+  | elisp/skg-request-save.el               | Emacs save command            |

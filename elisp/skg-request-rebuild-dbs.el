@@ -17,8 +17,11 @@ Useful after importing new data or if the databases are stale."
      'rebuild-dbs
      (lambda (_tcp-proc payload)
        (let* ((response (read payload))
-              (content (cadr (assoc 'content response))))
-         (message "%s" (or content "Rebuild complete."))))
+              (content (cadr (assoc 'content response)))
+              (full-msg (concat (or content "Rebuild complete.")
+                                "\nExisting skg views are now invalid."
+                                " Run M-x skg-close-all-skg-buffers to close them.")))
+         (message "%s" full-msg)))
      t)
     (skg-lp-reset)
     (process-send-string tcp-proc request-sexp)))
