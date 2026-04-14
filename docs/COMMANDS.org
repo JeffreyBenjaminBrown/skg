@@ -65,7 +65,7 @@
     this brings you to a new view showing only that ancestry.
     This actually works in org-mode outside of skg.
     (skg uses org-mode, but org-mode can be used without skg.)
-*** C-c v s : skg-id-stack
+*** C-c i s : skg-id-stack
     View and maybe edit the set of links you've stored.
 ** making local changes
 *** C-c l <backspace> : skg-local-delete
@@ -145,7 +145,7 @@
 *** C-c i o : skg-id-pop
     Removes a node from the top of the id stack,
     and inserts a link to that node at the cursor.
-*** C-c v s : skg-id-stack
+*** C-c i s : skg-id-stack
     repeated here; described earlier in this doc
 *** C-c v v : skg-view
     repeated here; described earlier in this doc
