@@ -418,7 +418,7 @@ fn maybe_prepend_alias_col (
         tree, node, Scaffold::AliasCol, true ) ?; } }
   Ok(( )) }
 
-/// WHAT IT DOES: Maps each ID to a ChildData:
+/// WHAT IT DOES: Maps each child of 'node' to a ChildData:
 /// determines title, source, and phantom|normal status
 /// (where phantom = removed from this list of children,
 /// which only applies in the git diff view).
@@ -446,7 +446,8 @@ fn build_child_creation_data (
       let mut m : HashMap<ID, SourceName> = HashMap::new();
       for child_ref in node_ref . children() {
         if let ViewNodeKind::True (t) = &child_ref . value() . kind {
-          m . insert( t . id . clone(), t . source . clone()); }}
+          m . insert( t . id . clone(),
+                      t . source . clone()); }}
       m };
   let mut result : HashMap<ID, ChildData> = HashMap::new();
   for id in goal_list {
@@ -458,16 +459,16 @@ fn build_child_creation_data (
           id, &child_sources, deleted_since_head_pid_src_map, map, config )
         . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
       let kind : ChildKind =
-        match phantom_diff_status( id, &phantom_source, source_diffs . as_ref() ) {
-          NodeDiffStatus::Removed     => ChildKind::Removed,
-          NodeDiffStatus::RemovedHere => ChildKind::RemovedHere,
+        match phantom_diff_status( // can only return Removed or RemovedHere
+          id, &phantom_source, source_diffs . as_ref() )
+        { NodeDiffStatus::Removed     => ChildKind::Removed,
           _                           => ChildKind::RemovedHere };
-      let title : String =
-        title_for_phantom( id, &phantom_source, source_diffs . as_ref(), map, config );
+      let title : String = title_for_phantom(
+        id, &phantom_source, source_diffs . as_ref(), map, config );
       result . insert( id . clone(),
-                     ChildData { title,
-                                 source: phantom_source,
-                                 kind } );
+                       ChildData { title,
+                                   source: phantom_source,
+                                   kind } );
     } else {
       let child_source : SourceName =
         find_source_many_ways( id, &child_sources,

@@ -1,6 +1,14 @@
-Claude wrote this guide.
-Jeff edited it but has not fact-checked it.
+Claude wrote most of this guide.
+Jeff edited those parts but has not fact-checked them.
 
+* informal quick fix
+If this doesn't do it, read on.
+```
+  bash/shutdown-servers.sh
+  pkill -9 -f typedb_server_bin
+  rm -rf /opt/typedb/core/server/data/skg-test*
+  ./bash/run-servers.sh &
+```
 * First: Check If TypeDB Is Already Running
 
 Before trying to start TypeDB, always check if it's already running.
