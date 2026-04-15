@@ -228,6 +228,62 @@ pub fn title_and_source_by_id (
     id );
   fallback }
 
+/// Look up canonical titles for multiple IDs in a single searcher session.
+/// IDs not found in Tantivy are absent from the result.
+pub fn titles_by_ids (
+  tantivy_index : &TantivyIndex,
+  ids           : &[ID],
+) -> HashMap<ID, String> {
+  let mut result : HashMap<ID, String> = HashMap::new ();
+  let reader : IndexReader =
+    match tantivy_index . index . reader () {
+      Ok (r) => r,
+      Err (_) => return result };
+  let searcher : Searcher = reader . searcher ();
+  for id in ids {
+    let query : Box < dyn Query > =
+      Box::new ( tantivy::query::TermQuery::new (
+        Term::from_field_text (
+          tantivy_index . id_field, id . as_str () ),
+        schema::IndexRecordOption::Basic ));
+    let results : Vec < (f32, tantivy::DocAddress) > =
+      match searcher . search (
+        &query, &TopDocs::with_limit (
+          crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT ) )
+      { Ok (r) => r,
+        Err (_) => continue };
+    let mut fallback : Option<String> = None;
+    for (_score, doc_address) in &results {
+      let retrieved_doc : Document =
+        match searcher . doc (*doc_address) {
+          Ok (d) => d,
+          Err (_) => continue };
+      let is_title : bool =
+        retrieved_doc
+          . get_first ( tantivy_index . is_title_field )
+          . and_then ( |v| v . as_text () )
+          . map ( |s| s == "true" )
+          . unwrap_or (false);
+      let title_or_alias : Option<String> =
+        retrieved_doc
+          . get_first ( tantivy_index . title_or_alias_field )
+          . and_then ( |v| v . as_text () )
+          . map ( |s| s . to_string () );
+      if is_title {
+        if let Some (t) = title_or_alias {
+          result . insert ( id . clone (), t ); }
+        fallback = None; // signal: found title, skip fallback
+        break; }
+      if fallback . is_none () {
+        fallback = title_or_alias; } }
+    if let Some (fb) = fallback {
+      tracing::debug! (
+        "titles_by_ids: no is_title=\"true\" document \
+         found for ID {}. Falling back to first title_or_alias.",
+        id );
+      result . insert ( id . clone (), fb ); } }
+  result }
+
 /// Return the subset of the input for which 'had_id' is true.
 pub fn subset_with_hadid (
   tantivy_index : &TantivyIndex,

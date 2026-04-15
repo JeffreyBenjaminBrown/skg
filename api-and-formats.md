@@ -89,6 +89,12 @@ So far there are these endpoints:
     Does not save or modify the graph. Used after toggling
     git diff mode to refresh all views without requiring a save.
 
+## Titles by ids
+  - Request: ((request . "titles by ids") (ids "uuid1" "uuid2" ...))
+  - Response: LP response-type "titles-by-ids" with `((response-type "titles-by-ids") (content ((uuid1 . "title1") (uuid2 . "title2") ...)))`.
+  - IDs not found in Tantivy are simply absent from the response.
+  - Used by `skg-magit-titles-mode` to annotate UUIDs in magit buffers with their titles.
+
 ## Shutdown server
   - Request: ((request . "shutdown"))
   - Has the same effect as sending SIGINT (Ctrl+C) or SIGTERM (kill) to the server.

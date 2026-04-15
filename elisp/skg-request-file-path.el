@@ -11,6 +11,7 @@
 ;;; e.g. visiting the .skg file directly via `find-file'.
 
 (require 'skg-id-search)
+(require 'skg-magit-titles)
 (require 'skg-state)
 (require 'skg-length-prefix)
 
@@ -116,6 +117,7 @@ PAYLOAD is the tagged LP response from the server."
              ( repo-root (magit-toplevel default-directory) )
              ( rel-path (file-relative-name resolved-path repo-root) ))
         (magit-status-setup-buffer default-directory)
+        (skg-magit-titles-mode 1)
         (magit-section-show-level-2-all)
         (let (( unstaged-section
                (skg--find-file-in-magit-section
@@ -164,6 +166,7 @@ showing deletion of PHANTOM-ID."
              ( deletion-regex
                (concat "^-" (regexp-quote (concat "- " phantom-id)) "$") ))
         (magit-status-setup-buffer default-directory)
+        (skg-magit-titles-mode 1)
         (magit-section-show-level-2-all)
         (let (( unstaged-section
                (skg--find-file-in-magit-section

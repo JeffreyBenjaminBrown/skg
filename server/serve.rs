@@ -22,6 +22,7 @@ use crate::serve::handlers::rerender_all_views::{
   handle_rerender_all_views_request};
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
+use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request;
 use crate::serve::handlers::title_matches::render_enriched_search_buffer::insert_containerward_ancestries_into_search_view;
 use crate::serve::handlers::title_matches::{ handle_title_matches_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
 use crate::serve::protocol::{RequestType, TcpToClient};
@@ -177,6 +178,9 @@ fn handle_emacs (
             handle_get_file_path_request ( &mut stream,
                                            &request_header,
                                            config ),
+          Ok (RequestType::TitlesByIds) =>
+            handle_titles_by_ids_request (
+              &mut stream, &request_header, &tantivy_index ),
           Ok (RequestType::GitDiffModeToggle) =>
             handle_git_diff_toggle_and_rerender (
               &mut stream,

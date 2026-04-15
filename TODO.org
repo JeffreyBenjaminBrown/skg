@@ -1,7 +1,12 @@
+* very worth it
+** install magit in the Docker container
+** regex search
+** fix : metadata interferes with tags like TODO
+** C-c v v should work from .skg files, too
+** distinguish pop-link from pop-id
+and add paste-link and paste-id,
+which don't change the stack
 * TODO the first search froze Emacs again
-* TODO skg-view-magit from a removed-here node
-should go the line corresponding to that deleted node
-under the section corresponding to its parent
 * semi-permanent
 ** [[./next.org]] might be in progress
 ** For minimalism, remember [[id:b6747d36-711b-42e7-aa80-b9b2be53fe6c][my Skg priorities]].
@@ -34,10 +39,8 @@ Deleting a node file should make sense.
 * TODO incremental init seems like garbage
 see TODO/what-affects-dbs.org
 * TODO make it comfortable
+** save should work even when view is narrowed
 ** having to start and stop the server is annoying
-** importing from org roam should be one step
-with the server running
-*** permit re-reading config for more sources
 * TODO really want but can wait
 ** There should only be one definitive view across all buffers.
 See TODO/one-definitive-view/

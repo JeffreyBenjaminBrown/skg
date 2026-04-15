@@ -85,3 +85,29 @@ All of these use =skg-find-sexp-end= rather than =forward-sexp=.
 * Strip Emacs properties from text before sending them to the server.
 
 They are gibberish outside Emacs.
+
+* skg-magit-titles overlays break home/end navigation when lines are truncated
+
+=after-string= overlays (used to show titles after UUIDs) add
+invisible-to-git text that makes lines visually longer. When the
+total visual length exceeds the window width and =truncate-lines=
+is =t= (lines cut off at the window edge), =home= can fail to
+return point to column 0.
+
+** Mitigation in place
+
+- =skg-magit-titles-mode= sets =truncate-lines= to =nil=
+  (lines wrap to the next screen line). With wrapping enabled,
+  =home= works correctly.
+
+- The overlay uses =after-string= (not =display=), so it does
+  not alter the buffer text. Staging, committing, and other
+  git operations are unaffected.
+
+** What does NOT cause this
+
+- =field= text properties: overlays' =after-string= does not
+  create field boundaries.
+- =cursor-intangible=: magit only uses this on collapsed
+  (invisible) sections.
+- =front-advance= on the overlay: irrelevant to point movement.

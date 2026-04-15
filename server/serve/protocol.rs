@@ -1,3 +1,4 @@
+/// See api-and-formats.org for details.
 /// Enum of all request types the server recognizes.
 /// The client format is a string in the s-exp
 /// ((request . "single root content view") ...).
@@ -15,6 +16,7 @@ pub enum RequestType {
   GitDiffModeToggle,
   RebuildDbs,
   RerenderAllViews,
+  TitlesByIds,
 }
 
 impl RequestType {
@@ -33,6 +35,7 @@ impl RequestType {
       "git diff mode toggle"     => Ok (RequestType::GitDiffModeToggle),
       "rebuild dbs"              => Ok (RequestType::RebuildDbs),
       "rerender all views"       => Ok (RequestType::RerenderAllViews),
+      "titles by ids"            => Ok (RequestType::TitlesByIds),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See api-and-formats.md
@@ -59,6 +62,7 @@ pub enum TcpToClient {
   RerenderLock,
   RerenderView,
   RerenderDone,
+  TitlesByIds,
   Error,
 }
 
@@ -83,4 +87,5 @@ impl TcpToClient {
       TcpToClient::RerenderLock     => "rerender-lock",
       TcpToClient::RerenderView     => "rerender-view",
       TcpToClient::RerenderDone     => "rerender-done",
+      TcpToClient::TitlesByIds      => "titles-by-ids",
       TcpToClient::Error            => "error", }} }

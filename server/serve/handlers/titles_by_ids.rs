@@ -1,0 +1,86 @@
+use crate::dbs::tantivy::titles_by_ids;
+use crate::serve::protocol::TcpToClient;
+use crate::serve::util::send_response_with_length_prefix;
+use crate::types::misc::{ID, TantivyIndex};
+use crate::types::sexp::extract_string_list_from_sexp;
+
+use sexp::{Sexp, Atom};
+use std::collections::HashMap;
+use std::net::TcpStream;
+
+/// Handle a "titles by ids" request from Emacs.
+/// Parses the ID list, performs a bulk Tantivy lookup,
+/// and returns an alist of (id . title) pairs.
+pub fn handle_titles_by_ids_request (
+  stream        : &mut TcpStream,
+  request       : &str,
+  tantivy_index : &TantivyIndex,
+) {
+  let parsed : Sexp =
+    match sexp::parse (request) {
+      Ok (s) => s,
+      Err (e) => {
+        tracing::error! (
+          "titles_by_ids: failed to parse request: {}", e );
+        send_error_response (stream, &format! (
+          "Failed to parse request: {}", e ));
+        return; } };
+  let id_strings : Vec<String> =
+    match extract_string_list_from_sexp (&parsed, "ids") {
+      Ok (ids) => ids,
+      Err (e) => {
+        tracing::error! (
+          "titles_by_ids: failed to extract ids: {}", e );
+        send_error_response (stream, &format! (
+          "Failed to extract ids: {}", e ));
+        return; } };
+  let ids : Vec<ID> =
+    id_strings . into_iter ()
+    . map (ID)
+    . collect ();
+  let title_map : HashMap<ID, String> =
+    titles_by_ids (tantivy_index, &ids);
+  let content_pairs : Vec<Sexp> =
+    title_map . iter ()
+    . map ( |(id, title)|
+      Sexp::List ( vec! [
+        Sexp::Atom ( Atom::S ( id . as_str ()
+                               . to_string () )),
+        Sexp::Atom ( Atom::S ( "." . to_string () )),
+        Sexp::Atom ( Atom::S ( title . clone () )),
+      ] ) )
+    . collect ();
+  let response : String =
+    Sexp::List ( vec! [
+      Sexp::List ( vec! [
+        Sexp::Atom ( Atom::S (
+          "response-type" . to_string () )),
+        Sexp::Atom ( Atom::S (
+          TcpToClient::TitlesByIds
+          . repr_in_client () . to_string () )), ] ),
+      Sexp::List ( vec! [
+        Sexp::Atom ( Atom::S (
+          "content" . to_string () )),
+        Sexp::List ( content_pairs ), ] ),
+    ] ) . to_string ();
+  send_response_with_length_prefix (stream, &response); }
+
+fn send_error_response (
+  stream : &mut TcpStream,
+  msg    : &str,
+) {
+  let response : String =
+    Sexp::List ( vec! [
+      Sexp::List ( vec! [
+        Sexp::Atom ( Atom::S (
+          "response-type" . to_string () )),
+        Sexp::Atom ( Atom::S (
+          TcpToClient::Error
+          . repr_in_client () . to_string () )), ] ),
+      Sexp::List ( vec! [
+        Sexp::Atom ( Atom::S (
+          "content" . to_string () )),
+        Sexp::Atom ( Atom::S (
+          msg . to_string () )), ] ),
+    ] ) . to_string ();
+  send_response_with_length_prefix (stream, &response); }

@@ -39,6 +39,7 @@
             skg-state
             skg-test-utils
             skg-keymaps-and-aliases
+            skg-magit-titles
             skg-view-org-ancestry
             heralds-minor-mode )))
     (dolist (feat skg-features)

@@ -36,6 +36,33 @@ pub fn atom_to_string (
     _ => Err ( "Expected atom (string, integer, or float)"
                 . to_string () ), }}
 
+/// Extract strings from a list whose car is `key`.
+/// Expected format: (.. (key "val1" "val2" ...) ..)
+/// Returns the cdr elements as strings.
+pub fn extract_string_list_from_sexp (
+  sexp : &Sexp,
+  key  : &str,
+) -> Result<Vec<String>, String> {
+  match sexp {
+    Sexp::List (items) => {
+      for item in items {
+        if let Sexp::List (elems) = item {
+          if let Some ( Sexp::Atom ( Atom::S (k) ) )
+            = elems . first ()
+          { if k == key {
+            let mut result : Vec<String> = Vec::new ();
+            for elem in &elems [1..] {
+              match atom_to_string (elem) {
+                Ok (s) => result . push (s),
+                Err (e) => return Err (
+                  format! ( "Bad element in {} list: {}",
+                            key, e ) ), } }
+            return Ok (result); } } } }
+      Err ( format! (
+        "No {} list found in S-expression", key ) ) },
+    _ => Err ( "Expected list as top-level S-expression"
+                . to_string () ) } }
+
 /// Extract a string value from an S-expression key-value pair.
 /// Expected format: (.. (key . "value") ..)
 pub fn extract_v_from_kv_pair_in_sexp (
