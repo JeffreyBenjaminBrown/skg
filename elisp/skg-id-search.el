@@ -239,6 +239,12 @@ Returns the source as a string, or nil if not found."
   (let ((val (car (skg-sexp-cdr-at-path sexp '(skg node source)))))
     (when val (format "%s" val))))
 
+(defun skg--extract-diff-from-metadata-sexp (sexp)
+  "Extract the diff value from SEXP, a list like (skg (node ... (diff X))).
+Returns the diff status as a string, or nil if not found."
+  (let ((val (car (skg-sexp-cdr-at-path sexp '(skg node diff)))))
+    (when val (format "%s" val))))
+
 (defun skg--point-in-link-p ()
   "If point is within a link, return (id . label). Otherwise nil."
   (let ( ( pos (point) )
