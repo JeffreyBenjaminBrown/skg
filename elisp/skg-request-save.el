@@ -168,15 +168,31 @@ moves point to focused headline, and removes focus marker."
   (let ((inhibit-read-only t))
     (erase-buffer)
     (insert new-content)
-    ;; Process folding markers
-    (skg-fold-marked-headlines)
-    (skg-remove-folded-markers)
-    ;; Process focus marker
-    (skg-goto-focused-headline)
-    (skg-remove-focused-marker)
-    ;; Clear modified flag and re-register the one-shot hook
-    ;; AFTER all buffer modifications are done.
-    (set-buffer-modified-p nil)
+    (;; PITFALL: `erase-buffer' does NOT remove overlays — they collapse
+     ;; but persist at the buffer boundaries. Fold overlays left over
+     ;; from the previous save cycle will re-expand over freshly inserted
+     ;; text, making some headings already folded here. We MUST unfold
+     ;; before any metadata edit, or `skg-edit-metadata-at-point' will
+     ;; call `delete-region' on a folded heading line, and org-fold's
+     ;; `org-fold-core--fix-folded-region' will expand the deletion to
+     ;; cover the hidden subtree — clobbering the root.
+     org-fold-show-all)
+    (progn
+      ;; Process focus marker BEFORE fold markers, while the buffer is
+      ;; guaranteed unfolded by the `org-fold-show-all' above.
+      (skg-goto-focused-headline)
+      (skg-remove-focused-marker))
+    (save-excursion
+      ;; Process folding markers (now safe — all metadata edits done).
+      ;; Wrap in `save-excursion' because `skg-fold-marked-headlines'
+      ;; leaves point on the last parent it folded; we need point to
+      ;; stay on the focused headline set just above.
+      (skg-fold-marked-headlines)
+      (skg-remove-folded-markers))
+    (set-buffer-modified-p
+     ;; Clear modified flag and re-register the one-shot hook
+     ;; AFTER all buffer modifications are done.
+     nil)
     (add-hook 'first-change-hook
               #'skg-warn-if-other-buffer-modified nil t)
     (message "Buffer updated with processed content from Rust")))

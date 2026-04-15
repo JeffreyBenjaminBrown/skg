@@ -1,0 +1,5 @@
+title: "rfs-c2"
+pid: 'rfs-c2'
+body: "rfs-c2 body"
+contains:
+- rfs-g1

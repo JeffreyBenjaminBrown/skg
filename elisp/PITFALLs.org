@@ -1,3 +1,51 @@
+* Programmatic metadata edits must be performed ignoring fragility checks
+
+Naïvely replacing an org heading line via =delete-region= + =insert=
+crashes (or silently clobbers text) when the line's body or subtree
+is folded right beneath it.
+
+When =delete-region= touches a fold boundary, org-fold's fragility
+check (=org-fold-core--fix-folded-region= →
+=org-fold--reveal-outline-maybe=) fires and does one of two things:
+
+- signals =beginning-of-buffer=, which aborts the caller partway
+  through its work, or
+- expands the deletion to cover the entire hidden subtree,
+  clobbering its contents.
+
+Either way, the visible behavior is "the heading vanishes and the
+fold's text is destroyed." This is extra dangerous because the
+error can fire during the OUTBOUND save (=skg-add-focused-marker=
+editing the root before any TCP round-trip), leaving the buffer
+in a corrupted state that the user cannot recover from.
+
+** What to use instead
+
+Route every per-line heading rewrite through
+=skg-replace-current-line= in =skg-metadata.el=. It wraps the
+=delete-region= + =insert= in =org-fold-core-ignore-fragility-checks=,
+which tells org-fold "the caller is aware of the fold and is
+rewriting the line verbatim; skip the reveal-on-touch heuristic."
+Suppressing the check is safe there because the stars and title
+round-trip unchanged, only the metadata s-expr is updated, and the
+fold overlays around the line remain intact.
+
+Do NOT call =delete-region= + =insert= directly on a heading line
+whose fold state you do not control.
+
+** Where this matters
+
+Any code that rewrites a heading line in place while keeping the
+surrounding fold state. Currently, every such call site in the
+skg client goes through =skg-replace-current-line=:
+
+- =skg-edit-metadata-at-point= — merge or create metadata
+- =skg-delete-kv-pair-from-metadata-by-key= — remove a kv-pair
+- =skg-delete-value-from-metadata= — remove a bare value
+
+If you add another metadata-editing function, route it through
+=skg-replace-current-line= for the same reason.
+
 * Can't use forward-sexp on skg metadata
 
 Emacs's =forward-sexp= (and by extension =backward-up-list=,
@@ -34,3 +82,6 @@ sexp in a buffer or string. Currently:
 - =heralds-minor-mode.el= — finds metadata extent for overlays
 
 All of these use =skg-find-sexp-end= rather than =forward-sexp=.
+* Strip Emacs properties from text before sending them to the server.
+
+They are gibberish outside Emacs.

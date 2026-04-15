@@ -1,0 +1,7 @@
+title: "rfs-root"
+pid: 'rfs-root'
+body: "rfs-root body"
+contains:
+- rfs-c1
+- rfs-c2
+- rfs-c3

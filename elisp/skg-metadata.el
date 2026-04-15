@@ -7,6 +7,7 @@
 ;;;   skg-local-indefinitive
 
 (require 'org)
+(require 'org-fold-core)
 (require 'skg-sexpr-search)
 
 (defun skg-local-delete ()
@@ -44,7 +45,11 @@ METADATA-ALIST contains key-value pairs, BARE-VALUES-SET contains standalone val
 (defun skg-delete-kv-pair-from-metadata-by-key
     (key)
   "Delete all kv-pairs with KEY from the metadata of the headline at point.
-If the current line is not a headline, or has no metadata, no effect."
+If the current line is not a headline, or has no metadata, no effect.
+Routes the rewrite through `skg-replace-current-line' so that editing
+a folded heading does not fire org-fold's fragility check — see the
+\"Programmatic metadata edits must be performed ignoring fragility
+checks\" entry in PITFALLs.org."
   (when (org-at-heading-p)
     (let* ((headline-text (skg-get-current-headline-text))
            (match-result (skg-split-as-stars-metadata-title
@@ -63,15 +68,17 @@ If the current line is not a headline, or has no metadata, no effect."
                                 alist))
                (new-metadata-sexp (skg-reconstruct-metadata-sexp
                                    filtered-alist bare-values)))
-          (beginning-of-line)
-          (delete-region (line-beginning-position)
-                         (line-end-position))
-          (insert (skg-format-headline stars new-metadata-sexp title)))))))
+          (skg-replace-current-line
+           (skg-format-headline stars new-metadata-sexp title)))))))
 
 (defun skg-delete-value-from-metadata
     (value)
   "Delete all instances of VALUE from the metadata of the headline at point.
-If the current line is not a headline, or has no metadata, no effect."
+If the current line is not a headline, or has no metadata, no effect.
+Routes the rewrite through `skg-replace-current-line' so that editing
+a folded heading does not fire org-fold's fragility check — see the
+\"Programmatic metadata edits must be performed ignoring fragility
+checks\" entry in PITFALLs.org."
   (when (org-at-heading-p)
     (let* ((headline-text (skg-get-current-headline-text))
            (match-result (skg-split-as-stars-metadata-title
@@ -90,16 +97,18 @@ If the current line is not a headline, or has no metadata, no effect."
                             bare-values))
                (new-metadata-sexp (skg-reconstruct-metadata-sexp
                                    alist filtered-values)))
-          (beginning-of-line)
-          (delete-region (line-beginning-position)
-                         (line-end-position))
-          (insert (skg-format-headline stars new-metadata-sexp title)))))))
+          (skg-replace-current-line
+           (skg-format-headline stars new-metadata-sexp title)))))))
 
 (defun skg-edit-metadata-at-point (edits)
   "Use EDITS to edit the metadata of the headline at point.
 If there is metadata, merges it with existing metadata.
 If there is no metadata, creates new metadata from EDITS.
-If the current line is not a headline, no effect."
+If the current line is not a headline, no effect.
+Routes the rewrite through `skg-replace-current-line' so that editing
+a folded heading does not fire org-fold's fragility check — see the
+\"Programmatic metadata edits must be performed ignoring fragility
+checks\" entry in PITFALLs.org."
   (when (org-at-heading-p) ;; otherwise this does nothing
     (let* ((headline-text (skg-get-current-headline-text))
            (match-result ;; could be nil
@@ -128,11 +137,19 @@ If the current line is not a headline, no effect."
 
 (defun skg-replace-current-line (new-content)
   "Replace the current line with NEW-CONTENT.
-Moves to beginning of line, deletes the line, and inserts NEW-CONTENT."
+Moves to beginning of line, deletes the line, and inserts NEW-CONTENT.
+The `delete-region' + `insert' pair below runs inside
+`org-fold-core-ignore-fragility-checks' to protect against corrupting
+a folded subtree beneath the edited heading line — see the
+\"Programmatic metadata edits must be performed ignoring fragility
+checks\" entry in PITFALLs.org for the full explanation. Do not
+bypass this helper when rewriting a heading line in place; call it
+instead of raw `delete-region' + `insert'."
   (beginning-of-line)
-  (delete-region (line-beginning-position)
-                 (line-end-position))
-  (insert new-content))
+  (org-fold-core-ignore-fragility-checks
+    (delete-region (line-beginning-position)
+                   (line-end-position))
+    (insert new-content)))
 
 (defun skg-split-as-stars-metadata-title (headline-text)
   "Match HEADLINE-TEXT and extract stars, metadata sexp, and title.

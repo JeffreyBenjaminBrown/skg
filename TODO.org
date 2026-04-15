@@ -6,6 +6,8 @@ under the section corresponding to its parent
 ** [[./next.org]] might be in progress
 ** For minimalism, remember [[id:b6747d36-711b-42e7-aa80-b9b2be53fe6c][my Skg priorities]].
 ** how to import from org-roam
+*** automatically
+./bash/import-org-roam.sh public/ data/public/ public skg2
 *** manually
 **** remove the .skg files and .git
 **** cargo run --bin skg -- import-org-roam public/ data/public/ public
@@ -13,8 +15,6 @@ under the section corresponding to its parent
 initial import from org-roam
 **** restart the server
 so it has time to ingest the data
-*** automatically
-./bash/import-org-roam.sh public/ data/public/ public skg2
 ** when dogfooding
 *** spots to patrol
 **** make edits
@@ -31,9 +31,13 @@ so it has time to ingest the data
 *** It is valid to dogfood even as only reading.
 * an important constraint on any graph serialization format
 Deleting a node file should make sense.
-* incremental init seems like garbage
+* TODO incremental init seems like garbage
 see TODO/what-affects-dbs.org
-* TODO Do search results show multiple containment correctly?
+* TODO make it comfortable
+** having to start and stop the server is annoying
+** importing from org roam should be one step
+with the server running
+*** permit re-reading config for more sources
 * TODO really want but can wait
 ** There should only be one definitive view across all buffers.
 See TODO/one-definitive-view/
@@ -55,6 +59,11 @@ and interesting enough to be heralded,
 and reasonably separate from 'birth'
 (although birth might imply it sometimes).
 But maybe 'anAncestorContains' would be more useful.
+** theoretically faster : auto-stage some nodes for code
+*** not sure much of the user experience is here
+*** the idea
+**** or mark in a way that identifies node as probably stageable
+If a new or deleted node, it (is still in the graph and) has a parent.
 * TODO cleaner code
 ** avoid redundant enum checks
 There are, I suspect, a lot of functions doing redundant checks for enums.
