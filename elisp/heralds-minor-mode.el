@@ -65,7 +65,7 @@
       (BLUE viewStats
         (BLUE cycle "⟳")
         (containsParent "}")
-        (BLUE sourceHerald (ANY IT)))
+        (GREEN sourceHerald (ANY IT)))
       (editRequest
         (RED delete "delete")
         (RED merge (ANY "merge:" IT)))
