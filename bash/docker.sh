@@ -3,7 +3,6 @@
 SKG_CONFIG="${1:-data/skgconfig.toml}"
 SKG_PORT="$(grep -m1 '^[[:space:]]*port' "$SKG_CONFIG" \
   | sed 's/.*=[[:space:]]*//' | sed 's/[[:space:]]*#.*//')"
-
 CONTAINER_NAME=skg
 HOST=/home/rust/skg
 

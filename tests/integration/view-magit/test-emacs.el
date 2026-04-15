@@ -71,6 +71,16 @@
              5)
       (test-fail "No magit buffer appeared"))
     (test-pass "Magit buffer opened for x")
+    (let (( magit-buf (cl-find-if
+                       (lambda (b)
+                         (string-match-p "magit:" (buffer-name b)))
+                       (buffer-list)) ))
+      ;; Why this needs doing:
+      ;; In batch mode, `magit-status-setup-buffer' creates the magit
+      ;; buffer but does not make it current in the calling buffer's
+      ;; context (process filters restore the previous buffer). Switch
+      ;; to it explicitly before reading the line at point.
+      (switch-to-buffer magit-buf))
     ;; Verify point is on the x.skg line
     (let (( line (buffer-substring-no-properties
                   (line-beginning-position) (line-end-position)) ))

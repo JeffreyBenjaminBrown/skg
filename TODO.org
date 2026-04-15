@@ -1,7 +1,5 @@
 * very worth it
-** install magit in the Docker container
 ** regex search
-** fix : metadata interferes with tags like TODO
 ** C-c v v should work from .skg files, too
 ** distinguish pop-link from pop-id
 and add paste-link and paste-id,
