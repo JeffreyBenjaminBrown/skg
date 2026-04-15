@@ -64,3 +64,4 @@
 (require 'skg-sexpr-search)
 (require 'skg-view-org-ancestry)
 (require 'skg-magit-titles)
+(require 'skg-file-minor-mode)

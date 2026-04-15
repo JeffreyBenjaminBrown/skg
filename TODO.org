@@ -1,6 +1,5 @@
 * very worth it
 ** regex search
-** C-c v v should work from .skg files, too
 ** distinguish pop-link from pop-id
 and add paste-link and paste-id,
 which don't change the stack
