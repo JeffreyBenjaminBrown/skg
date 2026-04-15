@@ -1,5 +1,7 @@
-* ONGOING TODO/external-import-script.org
-* TODO saving opens all bodies of visible headlines
+* TODO the first search froze Emacs again
+* TODO skg-view-magit from a removed-here node
+should go the line corresponding to that deleted node
+under the section corresponding to its parent
 * semi-permanent
 ** [[./next.org]] might be in progress
 ** For minimalism, remember [[id:b6747d36-711b-42e7-aa80-b9b2be53fe6c][my Skg priorities]].

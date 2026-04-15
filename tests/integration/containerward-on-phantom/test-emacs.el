@@ -1,4 +1,4 @@
-;;; Integration test: containerward view request on a removed-here phantom.
+;;; Integration test: auto-inserted containerward ancestry on removed-here phantoms.
 ;;;
 ;;; Graph (at HEAD):  a contains [b, c],  b contains [c].
 ;;;
@@ -6,9 +6,9 @@
 ;;; Phase 2: Delete the indefinitive c from under b and save.
 ;;;          b.skg is updated (contains: []).
 ;;; Phase 3: Toggle diff mode on.
-;;;          Under b, c appears as a removed-here phantom.
-;;; Phase 4: Request containerward on the phantom c.
-;;; Phase 5: Verify that the containerward path (a) was integrated.
+;;;          Under b, c appears as a removed-here phantom
+;;;          with containerward ancestry auto-inserted.
+;;; Phase 4: Verify that the containerward path (a) was integrated.
 
 (load-file "../../../elisp/skg-init.el")
 (load-file "../save_collateral_break_cycle/test-helpers.el")
@@ -16,9 +16,7 @@
 
 (defvar integration-test-phase "starting")
 
-;; ─── Phase 1: Open view from a ──────────────────────────────
-
-(defun phase-1-open-view ()
+(defun phase-1-open-view-from-a ()
   (message "=== PHASE 1: Open view from a ===")
   (setq integration-test-phase "phase-1")
   (skg-request-single-root-content-view-from-id "a")
@@ -33,9 +31,7 @@
      '((1 . "a") (2 . "b") (3 . "c") (2 . "c"))
      "phase 1: initial view")))
 
-;; ─── Phase 2: Remove c from under b, save ───────────────────
-
-(defun phase-2-remove-c-from-b-and-save ()
+(defun phase-2-remove-c-from-under-b-and-save ()
   (message "=== PHASE 2: Remove c from under b and save ===")
   (setq integration-test-phase "phase-2")
   (with-current-buffer "*a*"
@@ -60,8 +56,6 @@
     (skg-test-wait-for-response)
     (message "✓ PASS [phase 2]: saved")))
 
-;; ─── Phase 3: Toggle diff mode on ───────────────────────────
-
 (defun phase-3-toggle-diff-on ()
   (message "=== PHASE 3: Toggle diff mode ON ===")
   (setq integration-test-phase "phase-3")
@@ -78,52 +72,22 @@
       (kill-emacs 1))
     (message "✓ PASS [phase 3]: removed-here phantom present")))
 
-;; ─── Phase 4: Request containerward on phantom c ─────────────
-
-(defun phase-4-request-containerward ()
-  (message "=== PHASE 4: Request containerward on phantom c ===")
+(defun phase-4-verify-containerward-path-was-inserted ()
+  (message "=== PHASE 4: Verify containerward path ===")
   (setq integration-test-phase "phase-4")
-  (with-current-buffer "*a*"
-    ;; Position on the removed-here phantom c (under b)
-    (goto-char (point-min))
-    (unless (re-search-forward "^\\*\\*\\* .*(skg.*removed-here" nil t)
-      (message "✗ FAIL [phase 4]: could not find removed-here phantom line")
-      (message "  Buffer: %S" (buffer-substring-no-properties
-                                (point-min) (point-max)))
-      (kill-emacs 1))
-    (beginning-of-line)
-    (message "  Positioned on: %s"
-             (buffer-substring-no-properties
-              (line-beginning-position) (line-end-position)))
-    ;; Request containerward view
-    (skg-request-containerward-view)
-    (skg-test-wait-for-response 20)
-    (message "✓ PASS [phase 4]: containerward request completed")))
-
-;; ─── Phase 5: Verify containerward path was integrated ───────
-
-(defun phase-5-verify-result ()
-  (message "=== PHASE 5: Verify containerward path ===")
-  (setq integration-test-phase "phase-5")
   (let* ((buf (get-buffer "*a*"))
          (content (with-current-buffer buf
                     (buffer-substring-no-properties
                      (point-min) (point-max)))))
     (message "  Final buffer: %S" content)
     ;; The containerward path for c should show a as container.
-    ;; Look for a level-4 node under the phantom c (level 3)
+    ;; Look for a node under the phantom c
     ;; that has "containerOf" in its metadata.
     (unless (string-match-p "containerOf" content)
-      (message "✗ FAIL [phase 5]: no containerOf node found in buffer")
-      (message "  Expected a containerward path under phantom c")
+      (message "✗ FAIL [phase 4]: no containerOf node found in buffer")
+      (message "  Expected containerward ancestry under phantom c")
       (kill-emacs 1))
-    ;; Also verify that viewRequests was consumed (not still in the metadata)
-    (when (string-match-p "viewRequests" content)
-      (message "✗ FAIL [phase 5]: viewRequests not consumed")
-      (kill-emacs 1))
-    (message "✓ PASS [phase 5]: containerward path integrated")))
-
-;; ─── Main ────────────────────────────────────────────────────
+    (message "✓ PASS [phase 4]: containerward ancestry auto-inserted")))
 
 (defun run-all-tests ()
   (message "=== SKG Containerward-on-Phantom Integration Test ===")
@@ -131,11 +95,10 @@
     (when test-port
       (setq skg-port (string-to-number test-port))))
 
-  (phase-1-open-view)
-  (phase-2-remove-c-from-b-and-save)
+  (phase-1-open-view-from-a)
+  (phase-2-remove-c-from-under-b-and-save)
   (phase-3-toggle-diff-on)
-  (phase-4-request-containerward)
-  (phase-5-verify-result)
+  (phase-4-verify-containerward-path-was-inserted)
 
   (message "✓ PASS: All phases completed!")
   (kill-emacs 0))

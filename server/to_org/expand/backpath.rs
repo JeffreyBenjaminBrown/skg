@@ -319,7 +319,7 @@ async fn attach_containerward_ancestries_to_link_sources (
 /// ContainerOf subheadlines under the given parent.
 /// Iterates children in reverse so that prepending
 /// preserves the original order.
-fn insert_containerward_ancestry_tree_recursive<'a> (
+pub fn insert_containerward_ancestry_tree_recursive<'a> (
   node       : &'a AncestryTree,
   parent_nid : NodeId,
   tree       : &'a mut Tree<ViewNode>,
@@ -342,7 +342,7 @@ fn insert_containerward_ancestry_tree_recursive<'a> (
         ) . await ?; } }
     Ok (()) } ) }
 
-async fn prepend_indefinitive_child (
+pub async fn prepend_indefinitive_child (
   tree           : &mut Tree<ViewNode>,
   map            : &mut SkgNodeMap,
   parent_treeid  : NodeId,

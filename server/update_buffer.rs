@@ -10,11 +10,13 @@ pub use graphnodestats::set_graphnodestats_in_forest;
 pub use viewnodestats::set_viewnodestats_in_forest;
 
 use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
+use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::serve::ConnectionState;
 use crate::serve::handlers::save_buffer::{ SaveResponse, compute_diff_for_every_source, deleted_ids_to_source};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
+use crate::to_org::expand::backpath::insert_containerward_ancestry_tree_recursive;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::git::{SourceDiff, NodeDiffStatus};
 use crate::types::memory::ViewUri;
@@ -229,6 +231,8 @@ pub async fn rerender_view (
     deleted_by_this_save_pids,
     is_saved_view ) . await ?;
   mark_view_roots_independent (forest);
+  attach_containerward_ancestries_to_removedhere_phantoms (
+    forest, map, config, typedb_driver ) . await ?;
   tracing::debug!("rerender_view: complete_viewtree done ({:.3}s), starting graphnodestats",
             t_rerender . elapsed () . as_secs_f64 ());
   let ( container_to_contents, content_to_containers ) =
@@ -254,6 +258,17 @@ pub async fn rerender_view (
 ///   - non-content nodes (birth != ContentOf)
 /// Uses single-pass DFS: removes branch roots as encountered,
 /// skipping recursion into removed branches.
+///
+/// PITFALL:
+/// Beware, ye who would preserve phantom nodes across save-buffer ops:
+/// Phantom nodes can go stale in many ways.
+/// Maybe it was RemovedHere and now it is entirely Removed, or vice-versa.
+/// Maybe it lies, because the user moved the phantom to a place it never was.
+/// Maybe it duplicates another phantom node here.
+/// Maybe it duplicates a non-phantom node here,
+/// in which case its Removed* label is again a lie
+/// -- it is no longer missing here.
+/// Etc. Much easier to just regenerate them at each save.
 pub fn remove_branches_that_git_marked_removed (
   forest : &mut Tree<ViewNode>
 ) -> Result<(), Box<dyn Error>> {
@@ -331,4 +346,44 @@ pub fn clear_diff_metadata (
           = &mut node . value() . kind
           { t . diff = None; }
         Ok (( )) } ) ?;
+  Ok (( )) }
+
+/// For every RemovedHere phantom in the forest,
+/// fetch its containerward ancestry from TypeDB
+/// and insert it as indefinitive ContainerOf children.
+/// Short-circuits when no RemovedHere phantoms exist.
+async fn attach_containerward_ancestries_to_removedhere_phantoms (
+  forest        : &mut Tree<ViewNode>,
+  map           : &mut SkgNodeMap,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
+  let phantom_nodes : Vec<(NodeId, ID)> = {
+    let mut result : Vec<(NodeId, ID)> = Vec::new ();
+    for edge in forest . root () . traverse () {
+      if let ego_tree::iter::Edge::Open (node_ref) = edge {
+        if let ViewNodeKind::True (t) = &node_ref . value () . kind {
+          if t . diff == Some (NodeDiffStatus::RemovedHere) {
+            result . push (
+              ( node_ref . id (),
+                t . id . clone () )); }} }}
+    result };
+  if phantom_nodes . is_empty () { return Ok (( )); }
+  let ids : Vec<ID> =
+    phantom_nodes . iter ()
+    . map ( |( _, id )| id . clone () )
+    . collect ();
+  let ancestry_map : HashMap<ID, AncestryTree> =
+    ancestry_by_id_from_ids_async (
+      &ids, &config.db_name, typedb_driver,
+      config.max_ancestry_depth
+    ) . await;
+  for ( phantom_nid, pid ) in phantom_nodes {
+    if let Some (ancestry) = ancestry_map . get (&pid) {
+      if let AncestryTree::Inner ( _, children ) = ancestry {
+        for child in children . iter () . rev () {
+          insert_containerward_ancestry_tree_recursive (
+            child, phantom_nid,
+            forest, map, config, typedb_driver
+          ) . await ?; }} }}
   Ok (( )) }
