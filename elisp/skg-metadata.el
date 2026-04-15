@@ -257,4 +257,43 @@ Handles empty metadata correctly."
       (format "%s(skg) %s" stars title)
     (format "%s%s %s" stars metadata-sexp title)))
 
+(defun skg--around-org-todo (orig-fn &rest args)
+  "Around advice for `org-todo'.
+Strip (skg ...) metadata before cycling, re-insert after."
+  (let* ((on-heading (org-at-heading-p))
+         (parts (when on-heading
+                  (save-excursion
+                    (beginning-of-line)
+                    (skg-split-as-stars-metadata-title
+                     (buffer-substring-no-properties
+                      (line-beginning-position)
+                      (line-end-position))))))
+         (has-metadata (and parts
+                            (not (string-empty-p (nth 1 parts))))))
+    (when has-metadata
+      ;; Remove metadata from the line so org sees a plain heading.
+      (save-excursion
+        (skg-replace-current-line
+         (concat (nth 0 parts) (nth 2 parts)))))
+    (apply orig-fn args)
+    (when has-metadata
+      ;; Re-insert metadata after stars (and any new TODO keyword).
+      (save-excursion
+        (beginning-of-line)
+        (let* ((new-line (buffer-substring-no-properties
+                          (line-beginning-position)
+                          (line-end-position)))
+               (new-parts (when (string-match
+                                 "^\\(\\*+\\s-+\\)\\(.*\\)" new-line)
+                            (list (match-string 1 new-line)
+                                  (match-string 2 new-line)))))
+          (when new-parts
+            (skg-replace-current-line
+             (concat (nth 0 new-parts)
+                     (nth 1 parts)
+                     " "
+                     (nth 1 new-parts)))))))))
+
+(advice-add 'org-todo :around #'skg--around-org-todo)
+
 (provide 'skg-metadata)
