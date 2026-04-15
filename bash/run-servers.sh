@@ -28,6 +28,20 @@ is_typedb_running() {
 }
 
 start_typedb() {
+  # PITFALL: we kill TypeDB before the rm -rf, because deleting database
+  # files out from under a running TypeDB would crash it — see
+  # docs/troubleshooting/typedb-will-not-start.org. The kill is usually
+  # a no-op (the caller already checked `is_typedb_running`), but doing
+  # it here too means this function is safe to call unconditionally,
+  # and recovers even when a stale or zombie typedb slipped past that check.
+  pkill -9 -f typedb_server_bin 2>/dev/null || true
+  echo ""
+  echo "Clearing leaked skg-test-* databases from previous runs..."
+  # If the previous run crashed mid-test, test databases accumulate on
+  # disk. TypeDB reopens every database at startup, so leaks compound
+  # across runs until TypeDB panics on "Too many open files". Clearing
+  # them here turns recovery into a no-op.
+  rm -rf /opt/typedb/core/server/data/skg-test* 2>/dev/null || true
   echo ""
   echo "Starting TypeDB server..."
   mkdir -p "$DATA_ROOT/logs"
