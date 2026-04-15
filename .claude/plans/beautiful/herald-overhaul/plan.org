@@ -158,7 +158,7 @@
          Currently Emacs doesn't synthesize heralds from raw counts —
          it only passes through containsHerald strings from Rust.
 
-** TODO Change 4: Customizable herald visibility
+** IGNORED : Change 4: Customizable herald visibility
    A HeraldConfig struct in skgconfig.toml with a bool per herald category,
    all defaulting to true. Used to gate which display heralds are emitted.
    Raw data (containers count, etc.) always emitted for round-trip integrity.
@@ -171,7 +171,7 @@
 
    First candidate to hide: the content count herald.
 
-** Known bugs discovered during this work
+** DONE fixed : bugs discovered during this work
    - [[../BUG-self-containment.org][BUG-self-containment.org]]: After merging a container into its
      own content node, the acquirer contains itself in TypeDB
      (filesystem is correct). Causes inflated graphStats count.
