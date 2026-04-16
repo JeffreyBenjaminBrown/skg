@@ -13,6 +13,44 @@ use std::str::FromStr;
 // Types
 //
 
+/// One step of change along a diff axis.
+/// '+' (Plus) means a transition from absent to present
+///   (file added, or membership added).
+/// '-' (Minus) means present to absent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Sign { Plus, Minus }
+
+/// Per-stage existence diff for a node's '.skg' file.
+/// 'staged'   compares HEAD  vs index.
+/// 'unstaged' compares index vs worktree.
+/// Both signs being identical within a single ExistenceAxes is impossible
+/// (it would require the file to be both present and absent in the index)
+/// but the type does not enforce that; consumers must.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ExistenceAxes {
+  pub staged   : Option<Sign>,
+  pub unstaged : Option<Sign>,
+}
+
+/// Per-stage membership diff for a node's appearance at a particular position
+/// in its parent's contains list. Same shape as ExistenceAxes but tracks a
+/// different fact (membership at this position rather than file existence).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct MembershipAxes {
+  pub staged   : Option<Sign>,
+  pub unstaged : Option<Sign>,
+}
+
+impl ExistenceAxes {
+  pub fn is_empty (&self) -> bool {
+    self . staged . is_none () && self . unstaged . is_none () }
+}
+
+impl MembershipAxes {
+  pub fn is_empty (&self) -> bool {
+    self . staged . is_none () && self . unstaged . is_none () }
+}
+
 /// Represents changes for an entire source directory.
 /// (I assume each source is a separate git repo,
 /// but the code might work even if some are part of the same repo.)
