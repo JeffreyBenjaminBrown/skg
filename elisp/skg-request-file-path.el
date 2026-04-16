@@ -31,10 +31,9 @@ and positions point on the deletion line for this node's ID."
           (message "No metadata sexp found on this line.")
         (if (not (skg--metadata-sexp-contains-id-p sexp))
             (message "Not a truenode line (no id in metadata).")
-          (let ((diff (skg--extract-diff-from-metadata-sexp sexp)))
-            (if (equal diff "removed-here")
-                (skg--view-magit-for-removed-here-phantom sexp)
-              (skg--view-magit-for-normal-node sexp))))))))
+          (if (skg--metadata-is-removed-here-phantom-p sexp)
+              (skg--view-magit-for-removed-here-phantom sexp)
+            (skg--view-magit-for-normal-node sexp)))))))
 
 (defun skg--view-magit-for-normal-node (sexp)
   "Request the file path for SEXP's node and open its magit diff."

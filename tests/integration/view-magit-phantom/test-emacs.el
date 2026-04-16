@@ -62,7 +62,7 @@
     (skg-test-wait-for-response 20)
     (let ((content (buffer-substring-no-properties
                     (point-min) (point-max))))
-      (unless (string-match-p "removed-here" content)
+      (unless (string-match-p "(unstaged removedM)" content)
         (test-fail "No removed-here phantom found. Buffer: %S" content))
       (test-pass "removed-here phantom b present"))))
 
@@ -74,7 +74,7 @@
                (buffer-list))))
     (switch-to-buffer buf)
     (goto-char (point-min))
-    (unless (re-search-forward "removed-here" nil t)
+    (unless (re-search-forward "(unstaged removedM)" nil t)
       (test-fail "Could not find removed-here line"))
     (beginning-of-line)
     (message "  Positioned on: %s"

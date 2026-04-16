@@ -66,7 +66,7 @@
   (let* ((content (with-current-buffer "*a*"
                     (buffer-substring-no-properties
                      (point-min) (point-max)))))
-    (unless (string-match-p "removed-here" content)
+    (unless (string-match-p "(unstaged removedM)" content)
       (message "✗ FAIL [phase 3]: no removed-here phantom found")
       (message "  Buffer: %S" content)
       (kill-emacs 1))

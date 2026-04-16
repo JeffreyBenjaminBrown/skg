@@ -280,11 +280,18 @@ Returns the source as a string, or nil if not found."
   (let ((val (car (skg-sexp-cdr-at-path sexp '(skg node source)))))
     (when val (format "%s" val))))
 
-(defun skg--extract-diff-from-metadata-sexp (sexp)
-  "Extract the diff value from SEXP, a list like (skg (node ... (diff X))).
-Returns the diff status as a string, or nil if not found."
-  (let ((val (car (skg-sexp-cdr-at-path sexp '(skg node diff)))))
-    (when val (format "%s" val))))
+(defun skg--metadata-is-removed-here-phantom-p (sexp)
+  "Return t if SEXP describes a 'removed-here' phantom: a node whose
+membership was removed in some stage but whose file existence is
+unchanged. SEXP is shaped like (skg (node ... (staged ATOMS) (unstaged ATOMS))).
+A removed-here phantom has at least one removedM atom under a stage
+form, and no removedX/newX atoms."
+  (let ((staged-atoms   (skg-sexp-cdr-at-path sexp '(skg node staged)))
+        (unstaged-atoms (skg-sexp-cdr-at-path sexp '(skg node unstaged))))
+    (let ((all-atoms (append staged-atoms unstaged-atoms)))
+      (and (memq 'removedM all-atoms)
+           (not (memq 'newX     all-atoms))
+           (not (memq 'removedX all-atoms))))))
 
 (defun skg--point-in-link-p ()
   "If point is within a link, return (id . label). Otherwise nil."
