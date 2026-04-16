@@ -6,6 +6,10 @@
 ;;;   skg-id-next
 ;;;   skg-id-prev
 ;;;   skg-id-push
+;;;   skg-paste-id
+;;;   skg-paste-link
+;;;   skg-pop-id
+;;;   skg-pop-link
 ;;;   skg-validate-id-stack-buffer
 ;;;   skg-view
 ;;;   skg-id-stack
@@ -186,17 +190,54 @@ Otherwise return nil."
             (message "No ID in metadata on this line") ))
       (message "No metadata on this line") )))
 
-(defun skg-id-pop ()
+(defun skg--id-stack-top-or-message ()
+  "If possible, return the top entry (id title) of `skg-id-stack'.
+Othewrise (because the stack is empty) print a message and return nil."
+  (if (null skg-id-stack)
+      (progn (message "ID stack is empty") nil)
+    (car skg-id-stack) ))
+
+(defun skg--insert-link-from-entry (entry)
+  "Insert an org link at point, using ENTRY, a (id title) pair.
+Prompts for the link label, defaulting to the title."
+  (let* (( id (car entry) )
+         ( title (cadr entry) )
+         ( label (read-string "Link label: " title) ))
+    (insert (format "[[id:%s][%s]]" id label)) ))
+
+(defun skg-paste-id ()
+  "Insert the ID at the top of `skg-id-stack' at point.
+Does not modify the stack."
+  (interactive)
+  (let (( entry (skg--id-stack-top-or-message) ))
+    (when entry
+      (insert (car entry)) )))
+
+(defun skg-paste-link ()
+  "Insert an org link at point, using the top of `skg-id-stack'.
+Does not modify the stack.
+Prompts for the link label, defaulting to the title from the stack."
+  (interactive)
+  (let (( entry (skg--id-stack-top-or-message) ))
+    (when entry
+      (skg--insert-link-from-entry entry) )))
+
+(defun skg-pop-id ()
+  "Pop the top of `skg-id-stack' and insert the ID at point."
+  (interactive)
+  (let (( entry (skg--id-stack-top-or-message) ))
+    (when entry
+      (pop skg-id-stack)
+      (insert (car entry)) )))
+
+(defun skg-pop-link ()
   "Pop the top of `skg-id-stack' and insert an org link at point.
 Prompts for the link label, defaulting to the title from the stack."
   (interactive)
-  (if (null skg-id-stack)
-      (message "ID stack is empty")
-    (let* (( entry (pop skg-id-stack) )
-           ( id (car entry) )
-           ( title (cadr entry) )
-           ( label (read-string "Link label: " title) ))
-      (insert (format "[[id:%s][%s]]" id label)) )))
+  (let (( entry (skg--id-stack-top-or-message) ))
+    (when entry
+      (pop skg-id-stack)
+      (skg--insert-link-from-entry entry) )))
 
 (defun skg--point-in-metadata-p ()
   "If point is within metadata, return (id . title). Otherwise nil."
