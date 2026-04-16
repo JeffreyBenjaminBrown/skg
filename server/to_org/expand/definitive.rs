@@ -1,7 +1,7 @@
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
 use crate::dbs::typedb::nodes::which_ids_exist;
 use crate::dbs::typedb::paths::containerward_path_stats_bulk;
-use crate::git_ops::read_repo::skgnode_from_git_head;
+use crate::git_ops::read_repo::skgnode_from_index_or_head;
 use crate::to_org::complete::sharing::{ maybe_add_hiddenInSubscribeeCol_branch, type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::backpath::{ build_and_integrate_containerward_view_then_drop_request, build_and_integrate_sourceward_view_then_drop_request};
@@ -340,7 +340,7 @@ async fn extendDefinitiveSubtree_fromGit (
   let (contents, contents_in_worktree)
     : (Vec<ID>, HashSet<String>) =
     { let skgnode : SkgNode =
-        skgnode_from_git_head ( &pid, &src, config ) ?;
+        skgnode_from_index_or_head ( &pid, &src, config ) ?;
       let contents : Vec<ID> =
         skgnode . contains;
       let not_hidden : BTreeSet<String> =
@@ -390,8 +390,8 @@ async fn mk_removed_child_viewnode (
             config, typedb_driver, child_id ) . await ? ) }
       else
       { ( NodeDiffStatus::Removed,
-          skgnode_from_git_head ( child_id, parent_src, config
-                                ) . ok() ) };
+          skgnode_from_index_or_head ( child_id, parent_src, config
+                                     ) . ok() ) };
   let child_skgnode : &SkgNode =
     child_opt_skgnode . as_ref()
     . ok_or_else ( || format! (
@@ -413,9 +413,10 @@ async fn mk_removed_child_viewnode (
     set_truenode_legacy_diff (t, child_diff); }
   Ok (child_viewnode) }
 
-/// Load title and body from git HEAD for a removed node.
-/// This is used when expanding a definitive view
-/// for a node that exists in HEAD but not on disk.
+/// Load title and body from index (preferred) or HEAD for a node
+/// that no longer exists on disk. This is used when expanding a
+/// definitive view for a node that exists in HEAD or the index but
+/// not in the worktree.
 fn from_git_replace_title_body (
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
@@ -425,7 +426,7 @@ fn from_git_replace_title_body (
     pid_and_source_from_treenode ( tree, node_id,
       "from_git_replace_title_body" ) ?;
   let skgnode : SkgNode =
-    skgnode_from_git_head ( &pid, &src, config ) ?;
+    skgnode_from_index_or_head ( &pid, &src, config ) ?;
   write_at_truenode_in_tree (
     tree, node_id, |t| {
       t . title = skgnode . title;

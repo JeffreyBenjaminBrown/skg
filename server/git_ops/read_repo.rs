@@ -40,6 +40,42 @@ pub fn skgnode_from_git_head (
                     pid . 0, e )) ?;
   Ok (skgnode) }
 
+/// Load a SkgNode for a node whose worktree file is gone, preferring
+/// the index version over HEAD when both exist (since the index is
+/// staged and therefore more recent).
+/// Returns Err if neither location has the file.
+pub fn skgnode_from_index_or_head (
+  pid    : &ID,
+  src    : &SourceName,
+  config : &SkgConfig,
+) -> Result<SkgNode, Box<dyn StdError>> {
+  let source_config : &SkgfileSource =
+    config . sources . get (src)
+    . ok_or_else ( || format! ( "Source '{}' not found in config",
+                                src )) ?;
+  let source_path : &Path =
+    Path::new ( &source_config . path );
+  let repo : git2::Repository =
+    open_repo (source_path) . ok_or_else ( || format! (
+      "Could not open git repo at {:?}", source_path )) ?;
+  let file_path : PathBuf =
+    PathBuf::from ( format! ( "{}.skg", pid . 0 ));
+  let rel_path : PathBuf =
+    path_relative_to_repo ( &repo, &source_path . join (&file_path) )
+    . unwrap_or (file_path . clone ());
+  // Index first.
+  if let Some (content) = get_file_content_at_index (&repo, &rel_path) ? {
+    return serde_yaml::from_str (&content) . map_err (
+      |e| format! ( "Failed to parse SkgNode for {} from index: {}",
+                    pid . 0, e ) . into ()); }
+  // HEAD fallback.
+  let content : String = get_file_content_at_head (&repo, &rel_path) ?
+    . ok_or_else ( || format! (
+      "File {:?} not found in index or HEAD", rel_path )) ?;
+  serde_yaml::from_str (&content) . map_err (
+    |e| format! ( "Failed to parse SkgNode for {} from HEAD: {}",
+                  pid . 0, e ) . into ()) }
+
 /// Get a list of changed .skg files between the working directory and HEAD.
 /// Returns files that are Added, Modified, or Deleted.
 /// Mixes staged and unstaged changes; prefer the per-stage helpers
