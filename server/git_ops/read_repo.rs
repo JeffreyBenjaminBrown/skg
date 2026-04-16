@@ -42,6 +42,8 @@ pub fn skgnode_from_git_head (
 
 /// Get a list of changed .skg files between the working directory and HEAD.
 /// Returns files that are Added, Modified, or Deleted.
+/// Mixes staged and unstaged changes; prefer the per-stage helpers
+/// 'get_staged_changed_skg_files' and 'get_unstaged_changed_skg_files'.
 pub fn get_changed_skg_files (
   repo : &Repository
 ) -> Result<Vec<PathDiffStatus>, Error> {
@@ -55,6 +57,43 @@ pub fn get_changed_skg_files (
     repo . diff_tree_to_workdir_with_index (
       Some (&head_tree),
       Some (&mut opts)) ?;
+  diff_to_entries (&diff) }
+
+/// Get the list of staged changes: files whose contents in the index
+/// differ from HEAD.
+pub fn get_staged_changed_skg_files (
+  repo : &Repository
+) -> Result<Vec<PathDiffStatus>, Error> {
+  let head_tree : git2::Tree =
+    repo . head() ? . peel_to_tree() ?;
+  let mut opts : DiffOptions =
+    DiffOptions::new();
+  opts . pathspec ("*.skg");
+  let diff : Diff =
+    repo . diff_tree_to_index (
+      Some (&head_tree),
+      None,
+      Some (&mut opts)) ?;
+  diff_to_entries (&diff) }
+
+/// Get the list of unstaged changes: files whose worktree contents
+/// differ from the index. Includes untracked files.
+pub fn get_unstaged_changed_skg_files (
+  repo : &Repository
+) -> Result<Vec<PathDiffStatus>, Error> {
+  let mut opts : DiffOptions =
+    DiffOptions::new();
+  opts . pathspec ("*.skg");
+  opts . include_untracked (true);
+  let diff : Diff =
+    repo . diff_index_to_workdir (
+      None,
+      Some (&mut opts)) ?;
+  diff_to_entries (&diff) }
+
+fn diff_to_entries (
+  diff : &Diff
+) -> Result<Vec<PathDiffStatus>, Error> {
   let mut entries : Vec<PathDiffStatus> =
     Vec::new();
   for delta in diff . deltas() {
@@ -96,6 +135,26 @@ pub fn get_file_content_at_head (
     Err (e) if e . code() == ErrorCode::NotFound => {
       Ok (None) },
     Err (e) => Err (e) }}
+
+/// Get the content of a file at the index (the staging area).
+/// Returns None if the file is not in the index.
+/// The path should be relative to the repository root.
+pub fn get_file_content_at_index (
+  repo     : &Repository,
+  rel_path : &Path
+) -> Result<Option<String>, Error> {
+  let index : git2::Index =
+    repo . index () ?;
+  match index . get_path ( rel_path, 0 ) {
+    Some (entry) => {
+      let blob : git2::Blob =
+        repo . find_blob ( entry . id ) ?;
+      let content : Option<String> =
+        from_utf8 ( blob . content () )
+          . map ( |s| s . to_string () )
+          . ok ();
+      Ok (content) },
+    None => Ok (None) }}
 
 /// Check if HEAD is a merge commit (has multiple parents).
 /// This is used to abort saves when the comparison baseline is ambiguous.
