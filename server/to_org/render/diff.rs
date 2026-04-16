@@ -1,25 +1,32 @@
 /// Diff application module for git diff view.
 /// Applies diff information to a forest of ViewNodes.
+///
+/// Each TrueNode and Scaffold is decorated with per-stage diff axes:
+///   X (existence) describes whether the node's '.skg' file changed
+///     between HEAD↔index (staged) or index↔worktree (unstaged).
+///   M (membership) describes whether the node's appearance at this
+///     position in its parent's contains list changed in each stage.
+/// Phantoms are inserted wherever some stage's parent.contains had the
+/// child but the worktree's parent.contains lacks it.
 
-use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff, SkgnodeDiff, GitDiffStatus, NodeDiffStatus, FieldDiffStatus, NodeChanges};
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, SkgnodeDiff, GitDiffStatus, NodeChanges};
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::phantom::{title_for_phantom, phantom_diff_status};
+use crate::types::phantom::title_for_phantom;
 use crate::types::memory::find_source_many_ways;
 use crate::types::skgnode::SkgNode;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Scaffold, viewnode_from_scaffold, mk_phantom_viewnode, legacy_phantom_axes, legacy_field_diff_to_membership, set_truenode_legacy_diff };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, viewnode_from_scaffold, mk_phantom_viewnode };
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::types::tree::viewnode_skgnode::pid_and_source_from_treenode;
 
 use ego_tree::{Tree, NodeMut, NodeRef, NodeId};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
 
 /// Apply diff information to a forest of ViewNodes.
-/// This modifies nodes in place to
-/// - add diff markers
-/// - insert removed ('phantom') nodes
+/// Modifies nodes in place to add per-stage diff axes
+/// and insert phantom nodes for positions missing from worktree.
 pub fn apply_diff_to_forest (
   forest             : &mut Tree<ViewNode>,
   source_diffs       : &HashMap<SourceName, SourceDiff>,
@@ -51,11 +58,8 @@ fn process_node_for_diff (
         config ),
     _ => Ok (()) }}
 
-/// Modifies the viewnode, and if its contents changed, those too.
-/// Cases: - not-in-git
-///        - added/deleted
-///        - preexisting but something changed:
-///          text, ids, and/or content
+/// Decorate a TrueNode (and its scaffold/phantom children) with the
+/// per-stage axes derived from staged and unstaged SkgnodeDiffs.
 fn process_truenode_diff (
   mut node_mut       : NodeMut<ViewNode>,
   source_diffs       : &HashMap<SourceName, SourceDiff>,
@@ -72,59 +76,127 @@ fn process_truenode_diff (
     match source_diffs . get (&source) {
       Some (d) => d,
       None => return Ok (( )) };
-  if ! source_diff . is_git_repo { // mark as not-in-git
+  if ! source_diff . is_git_repo {
     if let ViewNodeKind::True ( ref mut t )
       = node_mut . value() . kind
       { t . not_in_git = true; }
     return Ok (( )); }
-  let skgnode_diff : &SkgnodeDiff = {
-    let file_path : PathBuf =
-      PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-    match source_diff . unstaged . get (&file_path)
-            . or_else ( || source_diff . staged . get (&file_path) ) {
-      Some (d) => d,
-      None => return Ok (( )) }};
-  { let ViewNodeKind::True ( ref mut t )
-      = node_mut . value() . kind
-      else { return Ok (( )) }; // not a TrueNode, nothing to do
-    if maybe_mark_added_or_deleted ( t, skgnode_diff )
-      { return Ok (( )); }}
-  if let Some ( ref node_changes ) = skgnode_diff . node_changes {
-    if node_changes . text_changed { // changes to text
-      node_mut . prepend (
-        viewnode_from_scaffold (
-          Scaffold::TextChanged { staged: false, unstaged: true } )); }
-    if ! node_changes . ids_diff . iter() // changes to ids
-           . all ( |d| matches! ( d, Diff_Item::Unchanged (_) )) {
-      prepend_idcol_with_children (
-        &mut node_mut, node_changes ); }
-    process_truenode_contains_diff ( // changes to content
-      &mut node_mut, tree_node_id, node_changes,
-      source_diff, source_diffs, deleted_since_head_pid_src_map,
-      config ) ?; }
+  let file_path : PathBuf =
+    PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
+  let staged   : Option<&SkgnodeDiff> =
+    source_diff . staged   . get (&file_path);
+  let unstaged : Option<&SkgnodeDiff> =
+    source_diff . unstaged . get (&file_path);
+  if staged . is_none () && unstaged . is_none ()
+    { return Ok (( )); }
+  // Stamp the node's existence axes from the per-stage file statuses.
+  let staged_x   : Option<Sign> =
+    staged   . and_then ( |d| sign_from_status (&d . status));
+  let unstaged_x : Option<Sign> =
+    unstaged . and_then ( |d| sign_from_status (&d . status));
+  if let ViewNodeKind::True ( ref mut t ) = node_mut . value() . kind {
+    t . existence . staged   = staged_x;
+    t . existence . unstaged = unstaged_x; }
+  // For an Added or Deleted file we don't read node_changes
+  // (the comparison is degenerate). NewHere/RemovedHere on children
+  // and IDcol/textChanged scaffolds only apply to Modified files.
+  let staged_changes   : Option<&NodeChanges> =
+    staged   . and_then ( |d| match d . status {
+      GitDiffStatus::Modified => d . node_changes . as_ref (),
+      _                       => None });
+  let unstaged_changes : Option<&NodeChanges> =
+    unstaged . and_then ( |d| match d . status {
+      GitDiffStatus::Modified => d . node_changes . as_ref (),
+      _                       => None });
+  let staged_text   : bool = staged_changes
+    . map ( |c| c . text_changed ) . unwrap_or (false);
+  let unstaged_text : bool = unstaged_changes
+    . map ( |c| c . text_changed ) . unwrap_or (false);
+  if staged_text || unstaged_text {
+    node_mut . prepend (
+      viewnode_from_scaffold (
+        Scaffold::TextChanged { staged   : staged_text,
+                                unstaged : unstaged_text } )); }
+  let merged_ids : Vec<(ID, MembershipAxes)> =
+    merged_axes_from_per_stage (
+      staged_changes   . map ( |c| c . ids_diff . as_slice () ),
+      unstaged_changes . map ( |c| c . ids_diff . as_slice () ) );
+  if merged_ids . iter () . any ( |(_, m)| ! m . is_empty () ) {
+    prepend_idcol_with_children ( &mut node_mut, &merged_ids ); }
+  // Compute per-stage contains diff for the parent so we can decorate
+  // worktree children with M axes and insert phantoms.
+  let merged_contains : Vec<(ID, MembershipAxes)> =
+    merged_axes_from_per_stage (
+      staged_changes   . map ( |c| c . contains_diff . as_slice () ),
+      unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
+  mark_membership_on_existing_children (
+    &mut node_mut, tree_node_id, &merged_contains );
+  insert_phantoms_for_missing_contains (
+    &mut node_mut, &merged_contains,
+    source_diff, source_diffs,
+    deleted_since_head_pid_src_map, config ) ?;
   Ok (( )) }
 
-/// Mark a node, if appropriate, New or Removed.
-/// Returns true if it did that,
-/// false if it changed nothing (for Modified files).
-fn maybe_mark_added_or_deleted (
-  t            : &mut TrueNode,
-  skgnode_diff : &SkgnodeDiff,
-) -> bool {
-  match skgnode_diff . status {
-    GitDiffStatus::Added    => { set_truenode_legacy_diff (t, NodeDiffStatus::New);
-                                 true },
-    GitDiffStatus::Deleted  => { set_truenode_legacy_diff (t, NodeDiffStatus::Removed);
-                                 true },
-    GitDiffStatus::Modified => false }}
+/// Map a file-level git status to a sign on the existence axis.
+/// Modified files have no existence change.
+fn sign_from_status (status: &GitDiffStatus) -> Option<Sign> {
+  match status {
+    GitDiffStatus::Added    => Some (Sign::Plus),
+    GitDiffStatus::Deleted  => Some (Sign::Minus),
+    GitDiffStatus::Modified => None, } }
 
-/// Prepend an IDCol scaffold to the input's children,
-/// populated with ID scaffold grandchildren.
-/// (The DFS traversal won't visit nodes created mid-traversal,
-/// so we populate ahead of time with this.)
+/// Merge per-stage Diff_Item lists (over IDs or aliases) into a single
+/// list of (item, MembershipAxes), where each axis records the sign on
+/// that stage if the item was New (+) or Removed (-).
+/// Unchanged items are still included with empty axes (for IDs we want
+/// them rendered in the IDcol; for contains they pass through anyway).
+fn merged_axes_from_per_stage<T: Clone + Eq + std::hash::Hash> (
+  staged_diff   : Option<&[Diff_Item<T>]>,
+  unstaged_diff : Option<&[Diff_Item<T>]>,
+) -> Vec<(T, MembershipAxes)> {
+  let mut result : Vec<(T, MembershipAxes)> = Vec::new ();
+  let mut index : HashMap<T, usize> = HashMap::new ();
+  // 'Unchanged' baseline: collect from whichever stage we have first.
+  let baseline : &[Diff_Item<T>] = unstaged_diff
+    . or (staged_diff)
+    . unwrap_or (&[]);
+  for item in baseline {
+    let value : T = match item {
+      Diff_Item::Unchanged (v) | Diff_Item::New (v) | Diff_Item::Removed (v)
+        => v . clone (), };
+    if ! index . contains_key (&value) {
+      index . insert ( value . clone (), result . len () );
+      result . push ( ( value, MembershipAxes::default () )); } }
+  // Apply staged signs.
+  if let Some (slice) = staged_diff {
+    for item in slice {
+      let (value, sign) : (T, Option<Sign>) = match item {
+        Diff_Item::New      (v) => ( v . clone (), Some (Sign::Plus)),
+        Diff_Item::Removed  (v) => ( v . clone (), Some (Sign::Minus)),
+        Diff_Item::Unchanged (_) => continue, };
+      let i : usize = *index . entry (value . clone ())
+        . or_insert_with ( || {
+          result . push ( ( value . clone (), MembershipAxes::default () ));
+          result . len () - 1 });
+      result[i] . 1 . staged = sign; } }
+  // Apply unstaged signs.
+  if let Some (slice) = unstaged_diff {
+    for item in slice {
+      let (value, sign) : (T, Option<Sign>) = match item {
+        Diff_Item::New      (v) => ( v . clone (), Some (Sign::Plus)),
+        Diff_Item::Removed  (v) => ( v . clone (), Some (Sign::Minus)),
+        Diff_Item::Unchanged (_) => continue, };
+      let i : usize = *index . entry (value . clone ())
+        . or_insert_with ( || {
+          result . push ( ( value . clone (), MembershipAxes::default () ));
+          result . len () - 1 });
+      result[i] . 1 . unstaged = sign; } }
+  result }
+
+/// Prepend an IDCol scaffold populated with per-id ID scaffolds.
 fn prepend_idcol_with_children (
-  node_mut     : &mut NodeMut<ViewNode>,
-  node_changes : &NodeChanges,
+  node_mut   : &mut NodeMut<ViewNode>,
+  merged_ids : &[(ID, MembershipAxes)],
 ) {
   let idcol_node : ViewNode =
     viewnode_from_scaffold (Scaffold::IDCol);
@@ -132,53 +204,23 @@ fn prepend_idcol_with_children (
     node_mut . prepend (idcol_node) . id();
   let mut idcol_mut : NodeMut<ViewNode> =
     node_mut . tree() . get_mut (idcol_treeid) . unwrap();
-  for entry in &node_changes . ids_diff {
-    let (id_str, diff) : (String, Option<FieldDiffStatus>) =
-      match entry {
-        Diff_Item::Unchanged (id) =>
-          ( id . 0 . clone(), None ),
-        Diff_Item::New (id) =>
-          ( id . 0 . clone(), Some (FieldDiffStatus::New)),
-        Diff_Item::Removed (id) =>
-          ( id . 0 . clone(), Some (FieldDiffStatus::Removed)), };
+  for (id, membership) in merged_ids {
     let id_scaffold : Scaffold =
-      Scaffold::ID { id: id_str . into(),
-                     membership: legacy_field_diff_to_membership (diff) };
+      Scaffold::ID { id: id . clone (),
+                     membership: *membership };
     let id_viewnode : ViewNode =
       viewnode_from_scaffold (id_scaffold);
-    idcol_mut . append (id_viewnode); }}
+    idcol_mut . append (id_viewnode); } }
 
-/// Mark existing children as NewHere if added to contains,
-/// and insert phantom nodes for removed children.
-fn process_truenode_contains_diff (
-  node_mut           : &mut NodeMut<ViewNode>,
-  tree_node_id       : NodeId,
-  node_changes       : &NodeChanges,
-  source_diff        : &SourceDiff,
-  source_diffs       : &HashMap<SourceName, SourceDiff>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  config             : &SkgConfig,
-) -> Result<(), String> {
-  let added_ids : HashSet<&ID> =
-    node_changes . contains_diff . iter()
-      . filter_map ( |d| match d {
-          Diff_Item::New (id) => Some (id),
-          _ => None })
-      . collect();
-  mark_newhere_children (
-    node_mut, tree_node_id, &added_ids, source_diff );
-  insert_phantom_nodes_for_removed_children (
-    node_mut, node_changes,
-    source_diffs, deleted_since_head_pid_src_map, config ) }
-
-/// If a child corresponds to a file that already existed in HEAD
-/// but in HEAD it was not content here, mark it NewHere.
-fn mark_newhere_children (
-  node_mut     : &mut NodeMut<ViewNode>,
-  tree_node_id : NodeId,
-  added_ids    : &HashSet<&ID>,
-  source_diff  : &SourceDiff,
+/// For each existing child in the worktree's contains list, copy any
+/// per-stage M-axis values from the merged contains diff.
+fn mark_membership_on_existing_children (
+  node_mut       : &mut NodeMut<ViewNode>,
+  tree_node_id   : NodeId,
+  merged_contains: &[(ID, MembershipAxes)],
 ) {
+  let by_id : HashMap<&ID, &MembershipAxes> =
+    merged_contains . iter () . map ( |(id, m)| (id, m) ) . collect ();
   let child_ids : Vec<NodeId> = {
     let node_ref : NodeRef<ViewNode> =
       node_mut . tree() . get (tree_node_id) . unwrap();
@@ -187,51 +229,67 @@ fn mark_newhere_children (
     let mut child : NodeMut<ViewNode> =
       node_mut . tree() . get_mut (child_id) . unwrap();
     if let ViewNodeKind::True ( ref mut t ) = child . value() . kind {
-      if added_ids . contains ( &t . id ) {
-        let child_file_path : PathBuf =
-          PathBuf::from ( format! ( "{}.skg", t . id . 0 ));
-        let is_new_file : bool =
-          source_diff . unstaged . get (&child_file_path)
-            . or_else ( || source_diff . staged . get (&child_file_path) )
-            . map ( |fd| fd . status == GitDiffStatus::Added )
-            . unwrap_or (false);
-        if ! is_new_file {
-          set_truenode_legacy_diff (t, NodeDiffStatus::NewHere); }} } }}
+      if let Some (m) = by_id . get ( &t . id ) {
+        // Only Plus signs are meaningful here (the child appears in
+        // worktree.contains; if a stage shows '-' that would imply the
+        // child *was* there in some baseline but isn't in the worktree,
+        // which would make it a phantom -- handled separately).
+        if m . staged   == Some (Sign::Plus)
+          { t . membership . staged   = Some (Sign::Plus); }
+        if m . unstaged == Some (Sign::Plus)
+          { t . membership . unstaged = Some (Sign::Plus); } } } } }
 
-fn insert_phantom_nodes_for_removed_children (
+/// Insert phantoms for IDs that appear in the merged contains diff with
+/// any '-' (Removed) sign on any stage. These are positions missing
+/// from worktree.contains. Each phantom carries the appropriate M axes
+/// (and X axes if its file is also gone in some stage).
+fn insert_phantoms_for_missing_contains (
   node_mut           : &mut NodeMut<ViewNode>,
-  node_changes       : &NodeChanges,
+  merged_contains    : &[(ID, MembershipAxes)],
+  source_diff        : &SourceDiff,
   source_diffs       : &HashMap<SourceName, SourceDiff>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
 ) -> Result<(), String> {
   let empty_children : HashMap<ID, SourceName> = HashMap::new();
-  let mut empty_map : HashMap<ID, SkgNode> = HashMap::new();
-  let removed_ids : Vec<&ID> =
-    node_changes . contains_diff . iter()
-      . filter_map ( |d| match d {
-          Diff_Item::Removed (id) => Some (id),
-          _ => None })
-      . collect();
-  for removed_child_id in removed_ids {
+  let mut empty_map  : HashMap<ID, SkgNode>    = HashMap::new();
+  for (id, membership) in merged_contains {
+    let has_negative : bool =
+      membership . staged   == Some (Sign::Minus)
+      || membership . unstaged == Some (Sign::Minus);
+    if ! has_negative { continue; }
     let child_source : SourceName =
-      find_source_many_ways(
-        removed_child_id, &empty_children,
+      find_source_many_ways (
+        id, &empty_children,
         deleted_since_head_pid_src_map, &mut empty_map, config ) ?;
-    let child_diff_status : NodeDiffStatus =
-      phantom_diff_status(
-        removed_child_id, &child_source,
-        Some (source_diffs) );
+    let child_existence : ExistenceAxes =
+      existence_axes_for_phantom (id, &child_source, source_diff, source_diffs);
     let child_title : String =
-      title_for_phantom(
-        removed_child_id, &child_source,
+      title_for_phantom (
+        id, &child_source,
         Some (source_diffs), &empty_map, config );
-    let (ex, mem) : (ExistenceAxes, MembershipAxes) =
-      legacy_phantom_axes (child_diff_status);
     node_mut . prepend (
       mk_phantom_viewnode (
-        removed_child_id . clone(),
-        child_source,
-        child_title,
-        ex, mem )); }
-  Ok (()) }
+        id . clone (), child_source, child_title,
+        child_existence, *membership )); }
+  Ok (( )) }
+
+/// Compute existence axes for a phantom: derived from whether the
+/// child's '.skg' file shows up as Deleted in either stage.
+fn existence_axes_for_phantom (
+  id           : &ID,
+  source       : &SourceName,
+  source_diff  : &SourceDiff,
+  source_diffs : &HashMap<SourceName, SourceDiff>,
+) -> ExistenceAxes {
+  let file_path : PathBuf =
+    PathBuf::from ( format! ( "{}.skg", id . 0 ));
+  // Prefer the source_diff for the phantom's own source if available,
+  // otherwise fall back to the parent's source_diff.
+  let resolved : &SourceDiff =
+    source_diffs . get (source) . unwrap_or (source_diff);
+  let staged_x : Option<Sign> = resolved . staged   . get (&file_path)
+    . and_then ( |d| sign_from_status (&d . status));
+  let unstaged_x : Option<Sign> = resolved . unstaged . get (&file_path)
+    . and_then ( |d| sign_from_status (&d . status));
+  ExistenceAxes { staged: staged_x, unstaged: unstaged_x } }
