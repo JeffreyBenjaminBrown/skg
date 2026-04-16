@@ -1,9 +1,62 @@
 * very worth it
-** regex search
+** git|magit|diff commands
+*** show staged, unstaged or all changes
+rather than 'diff:' show 'staged:' and 'unstaged:'
+*** skg-magit-goto
+Go to the section corresponding to that file.
+*** skg-magit-goto-in-parent
+Warn the user if it appears twice
+in the diff *or* the corresponding .skg file.
+*** AWAITS skg-stage
+User hopefully has looked at its children before this,
+because it is mostly that.
+And also at its text in magit if there is a 'text changed' child.
+*** AWAITS stage-stage-in-parent
+Warn and exit if it appears twice
+in the corresponding magit section.
 ** distinguish pop-link from pop-id
 and add paste-link and paste-id,
-which don't change the stack
-* TODO the first search froze Emacs again
+which don't change the stack.
+What would be more emacs-ish names for them?
+** regex search
+Maybe a suite of seach commands.
+** new command shortcuts
+see TODO/change-command-names-and-aliases.org
+** when requesting containerward views
+warn the user that the buffer is updating
+* considering
+** There should only be one definitive view across all buffers.
+*** why
+When going from magit-view to a modified node,
+it's very nice if that one jump goes directly to
+the one big context where it and its brothers were made.
+*** how
+See TODO/one-definitive-view/
+* TODO SLOW : calling up containerward views.
+* bug ? Saw '0{' everywhere.
+Rebuilding the dbs made it go away.
+* bug ?? M-S <right> to indent subtree
+** worked but gave this warning
+⛔ Warning (org-element): org-element--cache: Unregistered buffer modifications detected (39030 != 36493). Resetting.
+If this warning appears regularly, please report the warning text to Org mode mailing list (M-x org-submit-bug-report).
+The buffer is: *using written knowledge*
+ Current command: org-shiftmetaright
+ Backtrace:
+"  backtrace-to-string(nil)
+  org-element--cache-sync(#<buffer *using written knowledge*> 1723)
+  org-element-at-point()
+  org-end-of-subtree(t)
+  org-demote-subtree()
+  funcall-interactively(org-demote-subtree)
+  org-shiftmetaright()
+  funcall-interactively(org-shiftmetaright)
+  command-execute(org-shiftmetaright)
+"
+* ongoing Claude instances
+** one doing elisp stuff lately
+claude --resume 5b200f10-0aff-4f10-bb1c-8c645369e866
+** a TypeDB expert
+claude --resume 29b4f070-12d2-4211-85da-a7f28929e08b
 * semi-permanent
 ** [[./next.org]] might be in progress
 ** For minimalism, remember [[id:b6747d36-711b-42e7-aa80-b9b2be53fe6c][my Skg priorities]].
@@ -33,14 +86,13 @@ so it has time to ingest the data
 *** It is valid to dogfood even as only reading.
 * an important constraint on any graph serialization format
 Deleting a node file should make sense.
+* TODO the first search froze Emacs again
 * TODO incremental init seems like garbage
 see TODO/what-affects-dbs.org
 * TODO make it comfortable
 ** save should work even when view is narrowed
 ** having to start and stop the server is annoying
 * TODO really want but can wait
-** There should only be one definitive view across all buffers.
-See TODO/one-definitive-view/
 ** Privacy: Permit user to hide certain sources from view.
 *** Figure out the diff logic for insertions when some are hidden.
 I think I see how: Just pin each thing to its last visible sibling.

@@ -1,0 +1,36 @@
+* new command shortcuts
+** C-c <backspace> :: delete
+skg-local-delete           ::     C-c <backspace>
+skg-local-delete-recursive :: C-u C-c <backspace>
+** C-c g :: goto
+skg-skg-view-new-empty -> skg-goto-nothing | skg-goto-new
+skg-view               -> skg-goto
+skg-view-id            -> skg-goto-by-id
+skg-view-magit         -> skg-goto-in-magit
+skg-local-metadata     -> skg-goto-metadata
+** C-c i :: insert (a local change)
+skg-view-org-ancestry
+skg-local-aliases       -> skg-insert-show-aliases
+skg-local-containerward -> skg-insert-show-containerward
+skg-local-sourceward    -> skg-insert-show-sourceward
+skg-show-stats          -> skg-insert-show-stats
+** C-c m :: mode
+skg-id-stack-mode
+** C-c p :: properties
+skg-local-definitive
+skg-local-indefinitive
+** C-c s :: search
+skg-search-titles (C-c t t)
+skg-search-titles-everywhere (C-c t e)
+** C-c v :: view
+skg-view-heralds-mode
+skg-view-diff-mode
+** C-c i :: IDs, except for popping|copying
+skg-id-next
+skg-id-prev
+skg-id-push
+** C-c o :: popping|copying IDs
+C-c o   l :: pop  link
+C-c o S-l :: copy link from top of stack, without changing stack
+C-c o   i :: pop  ID
+C-c o S-i :: copy ID   from top of stack, without changing stack
