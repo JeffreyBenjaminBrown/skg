@@ -122,38 +122,43 @@
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "aliases" result)))
 
-    ;; Test textChanged
+    ;; Test textChanged with both stages
     (erase-buffer)
-    (insert "(skg textChanged)")
+    (insert "(skg (textChanged staged unstaged))")
     (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "Text changed" result)))))
+      (should (string-match "T:s" result))
+      (should (string-match "T:u" result)))))
 
 (ert-deftest test-heralds-diff-display ()
-  "Test that diff statuses are displayed as diff:STATUS heralds."
+  "Test that staged/unstaged axes are displayed as staged:.../unstaged:... heralds."
   (with-temp-buffer
-    ;; TrueNode with (diff removed-here)
+    ;; TrueNode with unstaged membership removal (the v.1 'removed-here').
     (erase-buffer)
-    (insert "(skg (node (id 1) (source s) (diff removed-here)))")
+    (insert "(skg (node (id 1) (source s) (unstaged removedM)))")
     (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "diff:removed-here" result)))
+      (should (string-match "unstaged" result))
+      (should (string-match "M" result)))
 
-    ;; TrueNode with (diff new)
+    ;; TrueNode with unstaged file creation + membership add (the v.1 'new').
     (erase-buffer)
-    (insert "(skg (node (id 2) (source s) (diff new)))")
+    (insert "(skg (node (id 2) (source s) (unstaged newX newM)))")
     (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "diff:new" result)))
+      (should (string-match "unstaged" result))
+      (should (string-match "X" result))
+      (should (string-match "M" result)))
 
-    ;; Scaffold alias with (diff new)
+    ;; Scaffold alias with staged membership add.
     (erase-buffer)
-    (insert "(skg alias (diff new))")
+    (insert "(skg alias (staged newM))")
     (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "diff:new" result)))
+      (should (string-match "staged:M" result)))
 
-    ;; Scaffold alias with (diff removed)
+    ;; Scaffold alias with unstaged membership removal.
     (erase-buffer)
-    (insert "(skg alias (diff removed))")
+    (insert "(skg alias (unstaged removedM))")
     (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "diff:removed" result)))))
+      (should (string-match "unstaged" result))
+      (should (string-match "-M" result)))))
 
 (ert-deftest test-heralds-survive-major-mode-switch ()
   "After a major-mode switch orphans overlays, disabling heralds

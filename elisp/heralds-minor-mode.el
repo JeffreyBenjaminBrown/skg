@@ -30,17 +30,25 @@
     (GREEN subscribeeCol "subscribees")
     (GREEN idCol "IDs")
     (GREEN id "ID"
-      (BLUE diff
-        (GREEN new "diff:new")
-        (RED removed "diff:removed")))
-    (BLUE textChanged "<< Text changed. M-x skg-view-magit to see. >>")
+      (BLUE staged
+        (GREEN newM     "staged:M")
+        (RED   removedM "staged:-M"))
+      (BLUE unstaged
+        (GREEN newM     "unstaged:M")
+        (RED   removedM "unstaged:-M")))
+    (BLUE textChanged
+      (BLUE staged   "T:s")
+      (BLUE unstaged "T:u"))
     (RED deletedScaffold (ANY "DELETED" IT))
     (RED deleted "DELETED"
       (id (ANY IT))
       (source))
-    (BLUE diff
-      (GREEN new "diff:new")
-      (RED removed "diff:removed"))
+    (BLUE staged
+      (GREEN newM     "staged:M")
+      (RED   removedM "staged:-M"))
+    (BLUE unstaged
+      (GREEN newM     "unstaged:M")
+      (RED   removedM "unstaged:-M"))
     (BLUE node
       (ANY "◌") ;; For nodes with no ID. heralds--post-process-text removes it if there's an ID.
       (id (ANY "●")) ;; For nodes with an ID. heralds--post-process-text removes it if there are non-default stats.
@@ -75,20 +83,28 @@
         (containerwardStats "req:cw-stats")
         (sourcewardView "req:sources")
         (definitiveView "req:definitive"))
-      (BLUE diff
-        (GREEN new "diff:new")
-        (GREEN new-here "diff:new-here")
-        (RED removed "diff:removed")
-        (RED removed-here "diff:removed-here")
-        (not-in-git "diff:not-in-git"))))
+      (BLUE staged
+        (GREEN newX     "staged:X")
+        (RED   removedX "staged:-X")
+        (GREEN newM     "staged:M")
+        (RED   removedM "staged:-M"))
+      (BLUE unstaged
+        (GREEN newX     "unstaged:X")
+        (RED   removedX "unstaged:-X")
+        (GREEN newM     "unstaged:M")
+        (RED   removedM "unstaged:-M"))
+      (RED notInGit "diff:not-in-git")))
   "Rules to convert metadata sexps into herald tokens.")
 
 (defun heralds--tokens->text (tokens)
   "Convert list of TOKENS (propertized strings) to display string.
 Tokens are propertized strings created by skg-transform-sexp-flat.
-Colons between letters are preserved (like 'req:containers'),
-but structural colons added by the transform are removed (like '3:{' -> '3{').
-We detect this by checking if both sides of a colon are alphanumeric.
+Colons between letters are preserved (like 'req:containers').
+Colons followed by '-' or '+' are also preserved (e.g. 'staged:-M').
+Structural colons added by the transform are removed (like '3:{' -> '3{').
+We detect this by checking if both sides of a colon are alphanumeric --
+treating '-' and '+' as alphanumeric for this purpose since they often
+appear as label values (sign markers).
 Multiple tokens are separated by spaces.
 Hide ID if there are other tokens present."
   (when tokens
@@ -98,7 +114,7 @@ Hide ID if there are other tokens present."
                (let* ((s token)
                       (cleaned
                         (replace-regexp-in-string
-                          "\\([^[:alnum:]]\\):\\|:\\([^[:alnum:]]\\)"
+                          "\\([^[:alnum:]+-]\\):\\|:\\([^[:alnum:]+-]\\)"
                           "\\1\\2"
                           s))
                       (color (get-text-property 0 'skg-color token)))
@@ -109,6 +125,7 @@ Hide ID if there are other tokens present."
                      cleaned))
                  cleaned))
              tokens))
+           (token-strings (heralds--merge-stage-tokens token-strings))
            (non-id-tokens
             (cl-remove-if
              (lambda (s)
@@ -117,6 +134,63 @@ Hide ID if there are other tokens present."
       (mapconcat #'identity
                  (if non-id-tokens non-id-tokens token-strings)
                  " "))))
+
+(defun heralds--stage-prefix (s)
+  "If S starts with 'staged:' or 'unstaged:', return that prefix
+\(without the trailing colon, e.g. 'staged'). Otherwise nil."
+  (cond
+   ((string-prefix-p "staged:"   s) "staged")
+   ((string-prefix-p "unstaged:" s) "unstaged")
+   (t nil)))
+
+(defun heralds--merge-stage-tokens (tokens)
+  "Merge adjacent TOKENS that share a 'staged:' or 'unstaged:' prefix.
+Suffixes are concatenated (so 'staged:X' + 'staged:M' becomes
+'staged:XM' and 'staged:-X' + 'staged:-M' becomes 'staged:-X-M').
+Adjacent stage tokens with /different/ stage prefixes (e.g. 'staged:M'
+followed by 'unstaged:M') get glued together by ',' rather than the
+default ' ', producing 'staged:M,unstaged:M'.
+Color: if all merged suffixes within a stage have the same face, keep
+it; if mixed, the merged token uses heralds-yellow-face."
+  (let ((result nil)
+        (current nil)
+        (current-prefix nil)
+        (current-faces nil))
+    (cl-flet ((flush ()
+                (when current
+                  (let ((merged (mapconcat #'identity (nreverse current) "")))
+                    (when current-faces
+                      (let ((face (if (= 1 (length (delete-dups (copy-sequence current-faces))))
+                                       (car current-faces)
+                                     'heralds-yellow-face)))
+                        (put-text-property 0 (length merged) 'face face merged)))
+                    ;; If the previous result element is also a stage
+                    ;; token, glue this one onto it with ','.
+                    (let ((prev (car result)))
+                      (if (and prev (heralds--stage-prefix prev))
+                          (setcar result (concat prev "," merged))
+                        (push merged result))))
+                  (setq current nil current-prefix nil current-faces nil))))
+      (dolist (tok tokens)
+        (let ((p (heralds--stage-prefix tok)))
+          (cond
+           ;; Continuation of the current group: strip the prefix,
+           ;; keep just the suffix (the part after "staged:" / "unstaged:").
+           ((and p current-prefix (string= p current-prefix))
+            (push (substring tok (1+ (length p))) current)
+            (push (get-text-property 0 'face tok) current-faces))
+           ;; Start a new stage group.
+           (p
+            (flush)
+            (setq current (list tok)
+                  current-prefix p
+                  current-faces (list (get-text-property 0 'face tok))))
+           ;; Non-stage token: flush the group, then pass the token through.
+           (t
+            (flush)
+            (push tok result)))))
+      (flush))
+    (nreverse result)))
 
 (defun heralds--color-to-face
   (color-keyword)
