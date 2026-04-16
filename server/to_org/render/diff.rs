@@ -80,7 +80,8 @@ fn process_truenode_diff (
   let skgnode_diff : &SkgnodeDiff = {
     let file_path : PathBuf =
       PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-    match source_diff . skgnode_diffs . get (&file_path) {
+    match source_diff . unstaged . get (&file_path)
+            . or_else ( || source_diff . staged . get (&file_path) ) {
       Some (d) => d,
       None => return Ok (( )) }};
   { let ViewNodeKind::True ( ref mut t )
@@ -188,7 +189,8 @@ fn mark_newhere_children (
         let child_file_path : PathBuf =
           PathBuf::from ( format! ( "{}.skg", t . id . 0 ));
         let is_new_file : bool =
-          source_diff . skgnode_diffs . get (&child_file_path)
+          source_diff . unstaged . get (&child_file_path)
+            . or_else ( || source_diff . staged . get (&child_file_path) )
             . map ( |fd| fd . status == GitDiffStatus::Added )
             . unwrap_or (false);
         if ! is_new_file {

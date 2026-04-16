@@ -500,7 +500,8 @@ fn maybe_change_node_diff_status (
   let file_path : PathBuf =
     PathBuf::from(format!("{}.skg", pid . 0));
   if let Some (skgnode_diff)
-    = source_diff . skgnode_diffs . get (&file_path)
+    = source_diff . unstaged . get (&file_path)
+        . or_else ( || source_diff . staged . get (&file_path) )
     { match skgnode_diff . status {
         GitDiffStatus::Added =>
           return set_truenode_diff( tree, node,

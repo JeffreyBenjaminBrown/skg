@@ -54,12 +54,17 @@ impl MembershipAxes {
 /// Represents changes for an entire source directory.
 /// (I assume each source is a separate git repo,
 /// but the code might work even if some are part of the same repo.)
+/// Represents the per-stage diff for an entire source directory.
+/// 'staged'   maps each changed '.skg' file to its HEAD-vs-index diff.
+/// 'unstaged' maps each changed '.skg' file to its index-vs-worktree diff.
+/// A file may appear in either, both, or neither.
 #[derive(Debug, Clone)]
 pub struct SourceDiff {
   pub is_git_repo: bool,
-  pub skgnode_diffs: HashMap<PathBuf, SkgnodeDiff>,
+  pub staged   : HashMap<PathBuf, SkgnodeDiff>,
+  pub unstaged : HashMap<PathBuf, SkgnodeDiff>,
   /// Nodes that existed in HEAD but not in worktree (deleted files).
-  /// Loaded from git HEAD.
+  /// Loaded from git HEAD or from the index. Used for phantom titles.
   pub deleted_nodes: HashMap<ID, SkgNode>,
 }
 
@@ -121,17 +126,19 @@ pub enum FieldDiffStatus {
 impl SourceDiff {
   pub fn new_not_git_repo () -> Self {
     SourceDiff {
-      is_git_repo: false,
-      skgnode_diffs: HashMap::new(),
+      is_git_repo  : false,
+      staged       : HashMap::new(),
+      unstaged     : HashMap::new(),
       deleted_nodes: HashMap::new() }}
 
-  pub fn skgnode_diff_for_pid (
-    &self,
+  /// Look up the SkgnodeDiff for a pid in a specific stage's map.
+  pub fn skgnode_diff_for_pid_in (
+    map : &HashMap<PathBuf, SkgnodeDiff>,
     pid : &ID,
-  ) -> Option<&SkgnodeDiff> {
+  ) -> Option<SkgnodeDiff> {
     let file_path : PathBuf =
       PathBuf::from( format!( "{}.skg", pid . 0 ) );
-    self . skgnode_diffs . get (&file_path) }}
+    map . get (&file_path) . cloned () }}
 
 impl NodeDiffStatus {
   /// Single source of truth for NodeDiffStatus <-> client string bijection.
@@ -216,7 +223,9 @@ impl FromStr for FieldDiffStatus {
 
 /// Look up the NodeChanges for a TrueNode from source_diffs.
 /// Returns None if not in diff view, the source is not a git repo,
-/// or there are no recorded changes for this node's .skg file.
+/// or there are no recorded changes for this node's .skg file in
+/// either stage. If both stages have changes, the unstaged side is
+/// returned (transitional; see `apply_diff_to_forest` rewrite).
 pub fn node_changes_for_truenode<'a> (
   source_diffs : &'a Option<HashMap<SourceName, SourceDiff>>,
   pid          : &ID,
@@ -226,5 +235,8 @@ pub fn node_changes_for_truenode<'a> (
     |diffs| {
       let sourcediff : &SourceDiff = diffs . get (source) ?;
       if !sourcediff . is_git_repo { return None; }
-      sourcediff . skgnode_diff_for_pid (pid) ?
+      let file_path : PathBuf =
+        PathBuf::from( format!( "{}.skg", pid . 0 ) );
+      sourcediff . unstaged . get (&file_path)
+        . or_else( || sourcediff . staged . get (&file_path) ) ?
         . node_changes . as_ref() } ) }

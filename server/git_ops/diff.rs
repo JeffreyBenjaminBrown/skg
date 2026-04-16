@@ -12,6 +12,10 @@ use std::path::{Path, PathBuf};
 use std::fs;
 
 /// Compares the current state of .skg files with HEAD.
+/// TRANSITIONAL: This still uses the legacy worktree-vs-HEAD diff
+/// (which lumps staged and unstaged together) and stuffs the result
+/// into the 'unstaged' map. A subsequent commit will split this into
+/// two real per-stage diffs against HEAD↔index and index↔worktree.
 pub fn compute_diff_for_source (
   source_path : &Path
 ) -> Result<SourceDiff, Box<dyn StdError>> {
@@ -21,16 +25,17 @@ pub fn compute_diff_for_source (
       None => return Ok ( SourceDiff::new_not_git_repo() ) };
   let changed_files : Vec<PathDiffStatus> =
     get_changed_skg_files (&repo) ?;
-  let mut skgnode_diffs : HashMap<PathBuf, SkgnodeDiff> =
+  let mut unstaged : HashMap<PathBuf, SkgnodeDiff> =
     HashMap::new();
   for entry in changed_files {
     let skgnode_diff : SkgnodeDiff =
       compute_skgnode_diff ( source_path, &repo, &entry ) ?;
-    skgnode_diffs . insert ( entry . path . clone(), skgnode_diff ); }
+    unstaged . insert ( entry . path . clone(), skgnode_diff ); }
   let deleted_nodes : HashMap<ID, SkgNode> =
-    collect_deleted_nodes (&skgnode_diffs);
+    collect_deleted_nodes (&unstaged);
   Ok ( SourceDiff { is_git_repo: true,
-                    skgnode_diffs,
+                    staged: HashMap::new(),
+                    unstaged,
                     deleted_nodes }) }
 
 fn compute_skgnode_diff (
@@ -65,11 +70,11 @@ fn compute_skgnode_diff (
 
 /// Collect SkgNodes for deleted files (exist in HEAD but not worktree).
 fn collect_deleted_nodes (
-  skgnode_diffs : &HashMap<PathBuf, SkgnodeDiff>,
+  diffs : &HashMap<PathBuf, SkgnodeDiff>,
 ) -> HashMap<ID, SkgNode> {
   let mut result : HashMap<ID, SkgNode> =
     HashMap::new();
-  for skgnode_diff in skgnode_diffs . values() {
+  for skgnode_diff in diffs . values() {
     if skgnode_diff . status == GitDiffStatus::Deleted {
       if let Some ( ref head_node ) = skgnode_diff . head_node {
         { let pid : &ID = &head_node . pid;
