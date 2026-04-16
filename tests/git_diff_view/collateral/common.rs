@@ -13,7 +13,7 @@ pub const GIT_DIFF_VIEW: &str = "\
 * (skg (node (id a) (source main))) a
 ** (skg (node (id b) (source main))) b
 new body
-*** (skg textChanged)
+*** (skg (textChanged unstaged))
 ";
 
 /// Create a git repo with head->worktree transition from collateral fixtures.

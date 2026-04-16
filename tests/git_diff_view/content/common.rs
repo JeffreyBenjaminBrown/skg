@@ -7,10 +7,10 @@ pub use super::super::common::*;
 pub const GIT_DIFF_VIEW: &str = "\
 * (skg (node (id 1) (source main))) 1
 ** (skg (node (id 11) (source main))) 11
-*** (skg (node (id gets-removed) (source main) indefinitive (diff removed))) gets-removed
-*** (skg (node (id moves) (diff new-here))) moves
+*** (skg (node (id gets-removed) (source main) indefinitive (unstaged removedX removedM))) gets-removed
+*** (skg (node (id moves) (unstaged newM))) moves
 ** (skg (node (id 12) (source main))) 12
-*** (skg (node (id moves) (source main) indefinitive (diff removed-here))) moves
+*** (skg (node (id moves) (source main) indefinitive (unstaged removedM))) moves
 * (skg (node (id new) (source main))) new
 ";
 

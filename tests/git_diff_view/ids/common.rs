@@ -9,8 +9,8 @@ pub const GIT_DIFF_VIEW: &str = "\
 * (skg (node (id 1) (source main))) 1
 ** (skg idCol) its IDs
 *** (skg id) 1
-*** (skg id (diff removed)) 2
-*** (skg id (diff new)) 2'
+*** (skg id (unstaged removedM)) 2
+*** (skg id (unstaged newM)) 2'
 *** (skg id) 3
 ** (skg (node (id child) (source main))) child
 ";

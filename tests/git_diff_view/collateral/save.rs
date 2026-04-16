@@ -98,12 +98,12 @@ fn test_collateral_view_preserves_diff_annotations()
   // b should still have textChanged.
   assert_buffer_contains ( &collateral_buffer,
     "** (skg (node (id b) (source main))) b\n\
-     *** (skg textChanged)" );
+     *** (skg (textChanged unstaged))" );
 
   // c should appear with diff new
   // (its .skg file didn't exist at HEAD).
   assert_buffer_contains ( &collateral_buffer,
-    "** (skg (node (id c) (diff new))) c" );
+    "** (skg (node (id c) (unstaged newX newM))) c" );
 
   // DISK: c.skg should exist (created by the save).
   assert!( repo_path . join ("c.skg") . exists (),

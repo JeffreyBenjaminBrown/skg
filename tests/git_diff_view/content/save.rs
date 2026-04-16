@@ -52,7 +52,7 @@ fn test_delete_removed_here_node_respawns()
     Box::pin(async move {
       // User deletes the removed-here node under 12 (called 'moves')
       let input =
-        without_lines_containing(GIT_DIFF_VIEW, "removed-here");
+        without_lines_containing(GIT_DIFF_VIEW, "(unstaged removedM)");
 
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
@@ -88,7 +88,8 @@ fn test_delete_new_here_updates_disk()
   run_save_test("skg-test-save-del-new-here", |config, driver, tantivy, repo_path| {
     Box::pin(async move {
       // User deleted 'moves' under 11 (the new-here one)
-      let input = without_lines_containing(GIT_DIFF_VIEW, "new-here");
+      // The "moves under 11" line is the new-here phantom (membership added).
+      let input = without_lines_containing(GIT_DIFF_VIEW, "(unstaged newM)");
 
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
@@ -112,7 +113,7 @@ fn test_delete_new_here_updates_disk()
 
       // BUFFER: moves gone from 11, still under 12 as removed-here
       let expected = without_lines_containing(
-        GIT_DIFF_VIEW, "new-here");
+        GIT_DIFF_VIEW, "(unstaged newM)");
       assert_buffer_contains(&response . saved_view,
                              &expected);
       Ok(())
@@ -161,7 +162,7 @@ fn test_add_new_child_creates_on_disk()
       // BUFFER: 12 has moves (removed-here) and newer (new).
       // PITFALL: I'm not sure 12's children will be in this order.
       let expected = insert_after(GIT_DIFF_VIEW, "(id 12)",
-        "*** (skg (node (id newer) (diff new))) newer");
+        "*** (skg (node (id newer) (unstaged newX newM))) newer");
       assert_buffer_contains(&response . saved_view,
                              &expected);
       Ok(())

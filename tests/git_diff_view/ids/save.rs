@@ -86,7 +86,7 @@ fn test_edit_id_scaffold_respawns()
     |config, driver, tantivy, repo_path| { Box::pin(async move {
       // User tries to change an id value in the scaffold
       let input = GIT_DIFF_VIEW . replace(
-        "(diff new)) 2'", "(diff new)) 2-modified");
+        "(unstaged newM)) 2'", "(unstaged newM)) 2-modified");
 
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
@@ -125,8 +125,8 @@ fn test_move_id_scaffolds_to_child_respawns()
 ** (skg (node (id child) (source main))) child
 *** (skg idCol) its IDs
 **** (skg id) 1
-**** (skg id (diff removed)) 2
-**** (skg id (diff new)) 2'
+**** (skg id (unstaged removedM)) 2
+**** (skg id (unstaged newM)) 2'
 **** (skg id) 3
 ";
 

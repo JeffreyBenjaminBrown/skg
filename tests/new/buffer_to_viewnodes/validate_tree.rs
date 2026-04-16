@@ -314,13 +314,13 @@ fn test_no_duplicated_content_error_for_phantom_siblings(
     "tests/merge/merge_nodes/fixtures",
     "/tmp/tantivy-test-validate-tree-phantom-dup",
     |config, driver, _tantivy| Box::pin(async move {
-      // A phantom sibling (diff removed) sharing an ID with
-      // a real sibling should not trigger a duplicate error.
+      // A phantom sibling (unstaged removedX removedM) sharing an ID
+      // with a real sibling should not trigger a duplicate error.
       let input: &str =
         indoc! {"
                 * (skg (node (id root) (source main))) parent
                 ** (skg (node (id 1) (source main))) real child
-                ** (skg (node (id 1) (source main) (diff removed))) phantom child
+                ** (skg (node (id 1) (source main) (unstaged removedX removedM))) phantom child
             "};
 
       let forest: Tree<UncheckedViewNode> =

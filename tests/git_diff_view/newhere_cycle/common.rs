@@ -6,7 +6,7 @@ pub use super::super::common::*;
 /// Node 1 contains itself – the child occurrence should show (diff new-here).
 pub const GIT_DIFF_VIEW: &str = "\
 * (skg (node (id 1) (source main))) 1
-** (skg (node (id 1) (diff new-here))) 1
+** (skg (node (id 1) (unstaged newM))) 1
 ";
 
 /// Create a git repo with head->worktree transition from newhere_cycle fixtures.
