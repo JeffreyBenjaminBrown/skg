@@ -1,6 +1,6 @@
 use crate::git_ops::read_repo::skgnode_from_git_head;
-use crate::types::viewnode::mk_phantom_viewnode;
-use crate::types::git::{SourceDiff, NodeDiffStatus, NodeChanges, node_changes_for_truenode};
+use crate::types::viewnode::{mk_phantom_viewnode, legacy_phantom_axes};
+use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff, NodeDiffStatus, NodeChanges, node_changes_for_truenode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_diff_status};
@@ -132,9 +132,12 @@ pub fn complete_hiddenoutsideofsubscribeecol (
         None => mk_indefinitive_viewnode(
           id . clone(), d . source . clone(),
           d . title . clone(), Birth::ContentOf ),
-        Some (diff_status) => mk_phantom_viewnode(
-          id . clone(), d . source . clone(),
-          d . title . clone(), diff_status ) }}, ) ?;
+        Some (diff_status) => {
+          let (ex, mem) : (ExistenceAxes, MembershipAxes) =
+            legacy_phantom_axes (diff_status);
+          mk_phantom_viewnode(
+            id . clone(), d . source . clone(),
+            d . title . clone(), ex, mem ) } }}, ) ?;
   { // Mark erroneous content children birth=Independent. A child is erroneous if it is a non-phantom TrueNode marked birth=Content but not in the goal_list.
     let goal_set : HashSet<ID> =
       goal_list . iter() . cloned() . collect();

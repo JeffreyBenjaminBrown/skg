@@ -1,4 +1,5 @@
-use crate::types::git::{FieldDiffStatus, NodeChanges};
+use crate::types::git::{FieldDiffStatus, MembershipAxes, NodeChanges};
+use crate::types::viewnode::legacy_field_diff_to_membership;
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SourceName};
 use crate::types::skgnode::SkgNode;
@@ -79,8 +80,10 @@ pub fn completeIDCol (
   let create_id = |id: &ID| -> ViewNode {
     let diff : Option<FieldDiffStatus> =
       diff_map . get (id) . copied() . flatten();
+    let membership : MembershipAxes =
+      legacy_field_diff_to_membership (diff);
     viewnode_from_scaffold(
-      Scaffold::ID { id: id . clone(), diff } ) };
+      Scaffold::ID { id: id . clone(), membership } ) };
   complete_relevant_children_in_viewnodetree(
     tree,
     idcol_node_id,

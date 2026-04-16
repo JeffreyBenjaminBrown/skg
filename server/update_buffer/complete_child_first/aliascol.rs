@@ -1,4 +1,5 @@
-use crate::types::git::{FieldDiffStatus, NodeChanges, SourceDiff, node_changes_for_truenode};
+use crate::types::git::{FieldDiffStatus, MembershipAxes, NodeChanges, SourceDiff, node_changes_for_truenode};
+use crate::types::viewnode::legacy_field_diff_to_membership;
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SourceName};
 use crate::types::skgnode::SkgNode;
@@ -85,12 +86,14 @@ pub fn completeAliasCol (
   let create_alias = |text: &String| -> ViewNode {
     let diff : Option<FieldDiffStatus> =
       diff_map . get (text) . copied() . flatten();
+    let membership : MembershipAxes =
+      legacy_field_diff_to_membership (diff);
     ViewNode {
       focused : false,
       folded  : false,
       kind    : ViewNodeKind::Scaff(
         Scaffold::Alias { text : text . clone(),
-                          diff } ), } };
+                          membership } ), } };
   complete_relevant_children_in_viewnodetree(
     tree,
     aliascol_node_id,

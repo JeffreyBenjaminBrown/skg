@@ -1,4 +1,3 @@
-use crate::types::git::NodeDiffStatus;
 use crate::types::viewnode::EditRequest;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, TrueNode, IndefOrDef};
 use crate::types::misc::{ID, MSV};
@@ -158,13 +157,9 @@ fn collect_contents_to_save_from_children<'a> (
     let child : &ViewNode = child_ref . value();
     match &child . kind {
       ViewNodeKind::True (t) => {
-        let is_phantom : bool =
-          // In diff view, skip phantom (Removed/RemovedHere) nodes
-          matches!( t . diff,
-                    Some (NodeDiffStatus::Removed) |
-                    Some (NodeDiffStatus::RemovedHere) );
+        // In diff view, skip phantom nodes.
         if ! t . parent_ignores_it()
-           && ! is_phantom
+           && ! t . is_phantom ()
            && ! matches!( t . edit_request (),
                           Some (&EditRequest::Delete))
         { contents . push( t . id . clone() ); }},

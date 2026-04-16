@@ -5,7 +5,7 @@
 /// Some 'ViewNode's correspond to SkgNodes; these are 'TrueNode's.
 /// Others do not so correspond, but rather encode information about neighboring tree nodes. These are 'Scaffold' nodes.
 
-use super::git::{NodeDiffStatus, FieldDiffStatus};
+use super::git::{ExistenceAxes, FieldDiffStatus, MembershipAxes, NodeDiffStatus, Sign};
 use super::misc::{ID, SourceName};
 use std::collections::HashSet;
 use std::fmt;
@@ -76,7 +76,14 @@ pub struct TrueNode_Generic < Id, Src > {
   pub viewStats     : ViewNodeStats,
 
   pub view_requests : HashSet < ViewRequest >,
-  pub diff          : Option < NodeDiffStatus >,
+  /// Per-stage diff state for the node's '.skg' file existence.
+  pub existence     : ExistenceAxes,
+  /// Per-stage diff state for the node's membership at this position
+  /// in the parent's contains list.
+  pub membership    : MembershipAxes,
+  /// True iff the node's source is not a git repo (or has no commits).
+  /// A per-source fact, not an axis.
+  pub not_in_git    : bool,
   pub indef_or_def  : IndefOrDef,
 }
 
@@ -150,16 +157,19 @@ pub struct ViewNodeStats {
 #[derive( Debug, Clone, PartialEq )]
 pub enum Scaffold {
   Alias { text: String, // an alias for the node's grandparent
-          diff: Option<FieldDiffStatus> },
+          membership: MembershipAxes },
   AliasCol, // The node collects (as children) aliases for its parent.
   BufferRoot, // Not rendered. Makes forests easier to process. Its children are the level-1 headlines of the org buffer.
   HiddenInSubscribeeCol, // Child of a Subscribee. Collects nodes that the subscriber hides from its subscriptions, and that are top-level content of this subscribee.
   HiddenOutsideOfSubscribeeCol, // Child of SubscribeeCol. Collects nodes that the subscriber hides from its subscriptions, but that are not top-level content of any of its subscribees.
   ID { id: ID, // an ID of the node's grandparent.
-       diff: Option<FieldDiffStatus> },
+       membership: MembershipAxes },
   IDCol, // Collects (as children) Scaffold::IDs for its parent.
   SubscribeeCol, // Collects subscribees for its parent.
-  TextChanged, // Indicates title/body changed between disk and HEAD. Visible in 'git diff mode'.
+  /// Indicates title or body changed between stages. Visible in
+  /// 'git diff mode'. Per-stage bools mark whether the change is
+  /// staged (HEAD vs index) and/or unstaged (index vs worktree).
+  TextChanged { staged: bool, unstaged: bool },
 }
 
 /// A discriminant (i.e. some labels) for the Scaffold variants.
@@ -204,14 +214,18 @@ impl < Id, Src > TrueNode_Generic < Id, Src > {
   pub fn parent_ignores_it (&self) -> bool {
     self . birth != Birth::ContentOf }
 
-  /// A phantom is a display-only placeholder for a removed node
-  /// in git diff view. Identified by Removed or RemovedHere status.
+  /// A phantom is a display-only placeholder for a node that does not
+  /// exist as a real, editable entity in the worktree at this position.
+  /// Triggered by either:
+  /// - any membership axis being '-' (removed in some stage), or
+  /// - the worktree existence axis being '-' (file deleted), or
+  /// - the "moved twice" pattern: stagedM = +, unstagedM = -.
   pub fn is_phantom (
     &self,
   ) -> bool {
-    matches!( self . diff,
-              Some (NodeDiffStatus::Removed)
-            | Some (NodeDiffStatus::RemovedHere) ) }
+    self . membership . staged   == Some (Sign::Minus)
+    || self . membership . unstaged == Some (Sign::Minus)
+    || self . existence  . unstaged == Some (Sign::Minus) }
 
   pub fn is_indefinitive (&self) -> bool {
     matches! ( self . indef_or_def,
@@ -330,7 +344,7 @@ impl Scaffold {
       Scaffold::HiddenInSubscribeeCol        => ScaffoldKind::HiddenInSubscribeeCol,
       Scaffold::HiddenOutsideOfSubscribeeCol => ScaffoldKind::HiddenOutsideOfSubscribeeCol,
       Scaffold::SubscribeeCol                => ScaffoldKind::SubscribeeCol,
-      Scaffold::TextChanged                  => ScaffoldKind::TextChanged,
+      Scaffold::TextChanged { .. }           => ScaffoldKind::TextChanged,
       Scaffold::IDCol                        => ScaffoldKind::IDCol,
       Scaffold::ID { .. }                    => ScaffoldKind::ID,
     }}
@@ -504,24 +518,99 @@ pub fn default_truenode (
     graphStats     : GraphNodeStats::default(),
     viewStats      : ViewNodeStats::default(),
     view_requests  : HashSet::new(),
-    diff           : None,
+    existence      : ExistenceAxes::default(),
+    membership     : MembershipAxes::default(),
+    not_in_git     : false,
     indef_or_def   : IndefOrDef::Definitive {
       body         : None,
       edit_request : None },
   }}
 
-/// Create an indefinitive phantom ViewNode with a diff status.
+/// Create an indefinitive phantom ViewNode with the given diff axes.
+/// At least one membership axis or the unstaged-existence axis should be
+/// negative for this to be a real phantom; callers must ensure that.
 pub fn mk_phantom_viewnode (
-  id     : ID,
-  source : SourceName,
-  title  : String,
-  diff   : NodeDiffStatus,
+  id         : ID,
+  source     : SourceName,
+  title      : String,
+  existence  : ExistenceAxes,
+  membership : MembershipAxes,
 ) -> ViewNode {
   let mut viewnode : ViewNode =
     mk_indefinitive_viewnode ( id, source, title, Birth::ContentOf );
   if let ViewNodeKind::True ( ref mut t ) = viewnode . kind
-    { t . diff = Some (diff); }
+    { t . existence  = existence;
+      t . membership = membership; }
   viewnode }
+
+/// TRANSITIONAL: convert a legacy FieldDiffStatus to MembershipAxes.
+/// Maps onto the unstaged axis only.
+pub fn legacy_field_diff_to_membership (
+  diff : Option<FieldDiffStatus>,
+) -> MembershipAxes {
+  match diff {
+    None                            => MembershipAxes::default(),
+    Some (FieldDiffStatus::New)     => MembershipAxes {
+      staged: None, unstaged: Some (Sign::Plus) },
+    Some (FieldDiffStatus::Removed) => MembershipAxes {
+      staged: None, unstaged: Some (Sign::Minus) }, } }
+
+/// TRANSITIONAL: convert MembershipAxes back to legacy FieldDiffStatus.
+/// Returns Some only when exactly one axis is non-None and only one
+/// sign appears across both axes. Lossy.
+pub fn membership_to_legacy_field_diff (
+  m : &MembershipAxes,
+) -> Option<FieldDiffStatus> {
+  match (m . staged, m . unstaged) {
+    (None,                  None)                 => None,
+    (Some (Sign::Plus),     None)                 |
+    (None,                  Some (Sign::Plus))    |
+    (Some (Sign::Plus),     Some (Sign::Plus))    => Some (FieldDiffStatus::New),
+    (Some (Sign::Minus),    None)                 |
+    (None,                  Some (Sign::Minus))   |
+    (Some (Sign::Minus),    Some (Sign::Minus))   => Some (FieldDiffStatus::Removed),
+    _                                             => None, } }
+
+/// TRANSITIONAL: stamp legacy NodeDiffStatus onto a TrueNode's axes.
+/// Used by code that hasn't been migrated to set axes directly yet.
+pub fn set_truenode_legacy_diff (
+  t      : &mut TrueNode,
+  status : NodeDiffStatus,
+) {
+  match status {
+    NodeDiffStatus::NotInGit => { t . not_in_git = true; },
+    other => {
+      let (existence, membership) : (ExistenceAxes, MembershipAxes) =
+        legacy_phantom_axes (other);
+      t . existence  = existence;
+      t . membership = membership; }} }
+
+/// TRANSITIONAL: convert a legacy NodeDiffStatus to (existence,
+/// membership) axes for phantom construction. Maps the old four-variant
+/// status onto the unstaged side of each axis (matching today's
+/// "everything is unstaged" pipeline behavior). Will be removed once
+/// `apply_diff_to_forest` and the phantom pipeline produce real per-stage
+/// axes directly.
+pub fn legacy_phantom_axes (
+  status : NodeDiffStatus,
+) -> (ExistenceAxes, MembershipAxes) {
+  match status {
+    NodeDiffStatus::Removed => (
+      ExistenceAxes  { staged: None, unstaged: Some (Sign::Minus) },
+      MembershipAxes { staged: None, unstaged: Some (Sign::Minus) }, ),
+    NodeDiffStatus::RemovedHere => (
+      ExistenceAxes::default (),
+      MembershipAxes { staged: None, unstaged: Some (Sign::Minus) }, ),
+    NodeDiffStatus::New => (
+      ExistenceAxes  { staged: None, unstaged: Some (Sign::Plus) },
+      MembershipAxes { staged: None, unstaged: Some (Sign::Plus) }, ),
+    NodeDiffStatus::NewHere => (
+      ExistenceAxes::default (),
+      MembershipAxes { staged: None, unstaged: Some (Sign::Plus) }, ),
+    NodeDiffStatus::NotInGit => (
+      ExistenceAxes::default (),
+      MembershipAxes::default (), ),
+  }}
 
 pub fn mk_definitive_viewnode (
   id     : ID,

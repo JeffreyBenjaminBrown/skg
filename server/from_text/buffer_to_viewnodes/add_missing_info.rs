@@ -3,6 +3,7 @@
 /// - when treatment should be Alias, make it so
 /// - add missing IDs where treatment is Content
 
+use crate::types::git::MembershipAxes;
 use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind};
 use crate::types::viewnode::Scaffold;
 use crate::types::misc::{ID, SourceName};
@@ -67,7 +68,7 @@ fn make_alias_if_appropriate(
         else { unreachable!() };
       org . kind = UncheckedViewNodeKind::Scaff(
         Scaffold::Alias { text: t . title . clone(),
-                          diff: None } ); }}
+                          membership: MembershipAxes::default () } ); }}
   Ok (( )) }
 
 /// Inherit parent's source

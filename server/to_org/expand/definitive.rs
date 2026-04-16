@@ -7,9 +7,9 @@ use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_r
 use crate::to_org::expand::backpath::{ build_and_integrate_containerward_view_then_drop_request, build_and_integrate_sourceward_view_then_drop_request};
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
 use crate::to_org::util::{ DefinitiveMap, build_node_branch_minus_content, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
-use crate::types::git::NodeDiffStatus;
+use crate::types::git::{NodeDiffStatus, Sign};
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ContainerwardPathStats, IndefOrDef, Birth, mk_indefinitive_viewnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ContainerwardPathStats, IndefOrDef, Birth, mk_indefinitive_viewnode, set_truenode_legacy_diff };
 use crate::types::skgnode::SkgNode;
 use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::tree::generic::read_at_node_in_tree;
@@ -109,8 +109,9 @@ async fn execute_definitive_view_request (
       forest, node_id,
       |n| match &n . kind {
         ViewNodeKind::True (t) =>
-          matches! (t . diff,
-                    Some (NodeDiffStatus::Removed)),
+          // The truenode's '.skg' is gone in the worktree.
+          // Body must be loaded from index (preferred) or HEAD.
+          t . existence . unstaged == Some (Sign::Minus),
         _ => false } ) ?;
   let hidden_ids : HashSet < ID > =
     // If node is a subscribee, we may need to hide some content.
@@ -409,7 +410,7 @@ async fn mk_removed_child_viewnode (
   if let ViewNodeKind::True ( ref mut t ) = child_viewnode . kind {
     if let Some (source) = child_source {
       t . source = source; }
-    t . diff = Some (child_diff); }
+    set_truenode_legacy_diff (t, child_diff); }
   Ok (child_viewnode) }
 
 /// Load title and body from git HEAD for a removed node.

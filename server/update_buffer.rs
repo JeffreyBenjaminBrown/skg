@@ -18,7 +18,7 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::to_org::expand::backpath::insert_containerward_ancestry_tree_recursive;
 use crate::to_org::util::DefinitiveMap;
-use crate::types::git::{SourceDiff, NodeDiffStatus};
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff};
 use crate::types::memory::ViewUri;
 use crate::types::memory::{SkgNodeMap, skgnode_map_from_save_instructions};
 use crate::types::misc::{ID, SourceName, SkgConfig};
@@ -286,12 +286,10 @@ pub fn remove_branches_that_git_marked_removed (
           None => false } };
       let should_remove : bool =
         match &node . value() . kind {
-          ViewNodeKind::True (t) => {
-            matches! ( t . diff,
-                       Some (NodeDiffStatus::Removed) |
-                       Some (NodeDiffStatus::RemovedHere))
+          ViewNodeKind::True (t) =>
+            t . is_phantom ()
             && ! is_forest_root_child
-            && ! t . parent_ignores_it() },
+            && ! t . parent_ignores_it(),
           _ => false };
       if should_remove {
         node . detach();
@@ -319,7 +317,7 @@ pub fn remove_diff_only_scaffolds (
     &mut |mut node : NodeMut<ViewNode>| -> Result<bool, String> {
       let is_diff_scaffold : bool =
         matches! ( &node . value() . kind,
-          ViewNodeKind::Scaff (Scaffold::TextChanged) |
+          ViewNodeKind::Scaff (Scaffold::TextChanged { .. }) |
           ViewNodeKind::Scaff (Scaffold::IDCol) );
       if is_diff_scaffold {
         node . detach();
@@ -344,7 +342,9 @@ pub fn clear_diff_metadata (
         // completers, so clearing them here is unnecessary.
         if let ViewNodeKind::True (t)
           = &mut node . value() . kind
-          { t . diff = None; }
+          { t . existence  = ExistenceAxes::default ();
+            t . membership = MembershipAxes::default ();
+            t . not_in_git = false; }
         Ok (( )) } ) ?;
   Ok (( )) }
 
@@ -363,7 +363,11 @@ async fn attach_containerward_ancestries_to_removedhere_phantoms (
     for edge in forest . root () . traverse () {
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
         if let ViewNodeKind::True (t) = &node_ref . value () . kind {
-          if t . diff == Some (NodeDiffStatus::RemovedHere) {
+          // RemovedHere = membership removed but file still exists
+          // (existence axes empty). Today the legacy mapper only sets
+          // membership.unstaged = Minus for that case.
+          if t . membership . unstaged == Some (Sign::Minus)
+             && t . existence . is_empty () {
             result . push (
               ( node_ref . id (),
                 t . id . clone () )); }} }}

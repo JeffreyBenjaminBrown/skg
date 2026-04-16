@@ -1,13 +1,13 @@
 /// Diff application module for git diff view.
 /// Applies diff information to a forest of ViewNodes.
 
-use crate::types::git::{SourceDiff, SkgnodeDiff, GitDiffStatus, NodeDiffStatus, FieldDiffStatus, NodeChanges};
+use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff, SkgnodeDiff, GitDiffStatus, NodeDiffStatus, FieldDiffStatus, NodeChanges};
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_diff_status};
 use crate::types::memory::find_source_many_ways;
 use crate::types::skgnode::SkgNode;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Scaffold, viewnode_from_scaffold, mk_phantom_viewnode, };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Scaffold, viewnode_from_scaffold, mk_phantom_viewnode, legacy_phantom_axes, legacy_field_diff_to_membership, set_truenode_legacy_diff };
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::types::tree::viewnode_skgnode::pid_and_source_from_treenode;
 
@@ -75,7 +75,7 @@ fn process_truenode_diff (
   if ! source_diff . is_git_repo { // mark as not-in-git
     if let ViewNodeKind::True ( ref mut t )
       = node_mut . value() . kind
-      { t . diff = Some (NodeDiffStatus::NotInGit); }
+      { t . not_in_git = true; }
     return Ok (( )); }
   let skgnode_diff : &SkgnodeDiff = {
     let file_path : PathBuf =
@@ -92,7 +92,8 @@ fn process_truenode_diff (
   if let Some ( ref node_changes ) = skgnode_diff . node_changes {
     if node_changes . text_changed { // changes to text
       node_mut . prepend (
-        viewnode_from_scaffold (Scaffold::TextChanged)); }
+        viewnode_from_scaffold (
+          Scaffold::TextChanged { staged: false, unstaged: true } )); }
     if ! node_changes . ids_diff . iter() // changes to ids
            . all ( |d| matches! ( d, Diff_Item::Unchanged (_) )) {
       prepend_idcol_with_children (
@@ -111,9 +112,9 @@ fn maybe_mark_added_or_deleted (
   skgnode_diff : &SkgnodeDiff,
 ) -> bool {
   match skgnode_diff . status {
-    GitDiffStatus::Added    => { t . diff = Some (NodeDiffStatus::New);
+    GitDiffStatus::Added    => { set_truenode_legacy_diff (t, NodeDiffStatus::New);
                                  true },
-    GitDiffStatus::Deleted  => { t . diff = Some (NodeDiffStatus::Removed);
+    GitDiffStatus::Deleted  => { set_truenode_legacy_diff (t, NodeDiffStatus::Removed);
                                  true },
     GitDiffStatus::Modified => false }}
 
@@ -141,7 +142,8 @@ fn prepend_idcol_with_children (
         Diff_Item::Removed (id) =>
           ( id . 0 . clone(), Some (FieldDiffStatus::Removed)), };
     let id_scaffold : Scaffold =
-      Scaffold::ID { id: id_str . into(), diff };
+      Scaffold::ID { id: id_str . into(),
+                     membership: legacy_field_diff_to_membership (diff) };
     let id_viewnode : ViewNode =
       viewnode_from_scaffold (id_scaffold);
     idcol_mut . append (id_viewnode); }}
@@ -194,7 +196,7 @@ fn mark_newhere_children (
             . map ( |fd| fd . status == GitDiffStatus::Added )
             . unwrap_or (false);
         if ! is_new_file {
-          t . diff = Some (NodeDiffStatus::NewHere); }} } }}
+          set_truenode_legacy_diff (t, NodeDiffStatus::NewHere); }} } }}
 
 fn insert_phantom_nodes_for_removed_children (
   node_mut           : &mut NodeMut<ViewNode>,
@@ -224,10 +226,12 @@ fn insert_phantom_nodes_for_removed_children (
       title_for_phantom(
         removed_child_id, &child_source,
         Some (source_diffs), &empty_map, config );
+    let (ex, mem) : (ExistenceAxes, MembershipAxes) =
+      legacy_phantom_axes (child_diff_status);
     node_mut . prepend (
       mk_phantom_viewnode (
         removed_child_id . clone(),
         child_source,
         child_title,
-        child_diff_status )); }
+        ex, mem )); }
   Ok (()) }

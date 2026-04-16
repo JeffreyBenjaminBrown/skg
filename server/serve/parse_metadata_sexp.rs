@@ -17,7 +17,7 @@
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
-use crate::types::git::{NodeDiffStatus, FieldDiffStatus};
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
 use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode, ContainerwardPathStats, IndefOrDef, NodeContainRels, NodeLinksourceRels, Birth};
 use crate::types::unchecked_viewnode::{
     UncheckedViewNode, UncheckedViewNodeKind, UncheckedTrueNode,
@@ -47,8 +47,12 @@ pub struct ViewnodeMetadata {
   pub viewStats: ViewNodeStats,
   pub edit_request: Option<EditRequest>,
   pub view_requests: HashSet<ViewRequest>,
-  pub truenode_diff: Option<NodeDiffStatus>,
-  pub scaffold_diff: Option<FieldDiffStatus>,
+  pub truenode_existence  : ExistenceAxes,
+  pub truenode_membership : MembershipAxes,
+  pub truenode_not_in_git : bool,
+  pub scaffold_membership : MembershipAxes,
+  pub textchanged_staged   : bool,
+  pub textchanged_unstaged : bool,
   // When true, this is a DeletedNode (id and source are used).
   pub is_deleted_node: bool,
   // When Some, this is a DeletedScaff carrying its kind.
@@ -68,8 +72,12 @@ pub fn default_metadata() -> ViewnodeMetadata {
     viewStats: ViewNodeStats::default(),
     edit_request: None,
     view_requests: HashSet::new(),
-    truenode_diff: None,
-    scaffold_diff: None,
+    truenode_existence  : ExistenceAxes::default(),
+    truenode_membership : MembershipAxes::default(),
+    truenode_not_in_git : false,
+    scaffold_membership : MembershipAxes::default(),
+    textchanged_staged   : false,
+    textchanged_unstaged : false,
     is_deleted_node: false,
     deleted_scaff_kind: None, }}
 
@@ -102,13 +110,16 @@ pub fn viewnode_from_metadata (
               scaffold . repr_in_client () ))
           } else { None };
         let scaffold_with_title : Scaffold = match scaffold {
-          // Use headline title for string and apply scaffold_diff
+          // Use headline title for string and apply scaffold membership axes
           Scaffold::Alias { .. } => Scaffold::Alias {
                               text: title . clone (),
-                              diff: metadata . scaffold_diff },
+                              membership: metadata . scaffold_membership },
           Scaffold::ID    { .. } => Scaffold::ID {
                               id: title . clone () . into (),
-                              diff: metadata . scaffold_diff },
+                              membership: metadata . scaffold_membership },
+          Scaffold::TextChanged { .. } => Scaffold::TextChanged {
+                              staged   : metadata . textchanged_staged,
+                              unstaged : metadata . textchanged_unstaged },
           other => other . clone () };
         ( UncheckedViewNodeKind::Scaff (scaffold_with_title), error )
       } else {
@@ -128,7 +139,9 @@ pub fn viewnode_from_metadata (
             graphStats       : metadata . graphStats . clone (),
             viewStats        : metadata . viewStats . clone (),
             view_requests    : metadata . view_requests . clone (),
-            diff             : metadata . truenode_diff,
+            existence        : metadata . truenode_existence,
+            membership       : metadata . truenode_membership,
+            not_in_git       : metadata . truenode_not_in_git,
             indef_or_def, } ),
           None ) }
     };
@@ -175,15 +188,28 @@ pub fn parse_metadata_to_viewnodemd (
           "deleted" => {
             result . is_deleted_node = true;
             parse_deleted_sexp ( &items[1..], &mut result ) ?; },
-          "diff" => {
-            // (diff <value>) at top level is for Scaffolds (Alias/ID)
-            if items . len () != 2 {
-              return Err ( "diff requires exactly one value" . to_string () ); }
-            let value : String =
-              atom_to_string ( &items[1] ) ?;
-            result . scaffold_diff = Some (
-              FieldDiffStatus::from_client_string (&value)
-                . ok_or_else ( || format! ( "Invalid FieldDiffStatus value: {}", value ))? ); },
+          "staged" => {
+            // (staged ATOMS) at top level is for Scaffolds (Alias/ID).
+            apply_axis_atoms_to_membership_scaffold (
+              &items[1..],
+              true,  // staged
+              &mut result . scaffold_membership ) ?; },
+          "unstaged" => {
+            apply_axis_atoms_to_membership_scaffold (
+              &items[1..],
+              false, // unstaged
+              &mut result . scaffold_membership ) ?; },
+          "textChanged" => {
+            // (textChanged STAGE_TAGS) for the TextChanged scaffold.
+            result . scaffold = Some (
+              Scaffold::TextChanged { staged: false, unstaged: false } );
+            for tag in &items[1..] {
+              let tag_str : String = atom_to_string (tag) ?;
+              match tag_str . as_str () {
+                "staged"   => result . textchanged_staged   = true,
+                "unstaged" => result . textchanged_unstaged = true,
+                other => return Err ( format! (
+                  "Unknown textChanged stage tag: {}", other )), } } },
           "deletedScaffold" => {
             if items . len () != 2 {
               return Err ( "deletedScaffold requires exactly one kind value" . to_string () ); }
@@ -211,7 +237,7 @@ pub fn parse_metadata_to_viewnodemd (
           "focused"  => result . focused = true,
           "folded"   => result . folded = true,
           // Scaffold kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
-          "alias"    => result . scaffold = Some ( Scaffold::Alias { text: String::new(), diff: None } ),
+          "alias"    => result . scaffold = Some ( Scaffold::Alias { text: String::new(), membership: MembershipAxes::default() } ),
           "aliasCol" => result . scaffold = Some (Scaffold::AliasCol),
           "forestRoot" => result . scaffold = Some (Scaffold::BufferRoot),
           "hiddenInSubscribeeCol" =>
@@ -221,11 +247,12 @@ pub fn parse_metadata_to_viewnodemd (
           "subscribeeCol" =>
             result . scaffold = Some (Scaffold::SubscribeeCol),
           "textChanged" =>
-            result . scaffold = Some (Scaffold::TextChanged),
+            result . scaffold = Some (
+              Scaffold::TextChanged { staged: false, unstaged: false } ),
           "idCol" =>
             result . scaffold = Some (Scaffold::IDCol),
           "id" =>
-            result . scaffold = Some ( Scaffold::ID { id: ID::default(), diff: None } ),
+            result . scaffold = Some ( Scaffold::ID { id: ID::default(), membership: MembershipAxes::default() } ),
           "deletedScaffold" =>
             return Err ( "deletedScaffold as bare atom is no longer supported; use (deletedScaffold kindString)" . to_string () ),
           _ => {
@@ -281,26 +308,76 @@ fn parse_node_sexp (
               "contentOf"   => Birth::ContentOf,
               _ => return Err ( format! (
                 "Invalid birth value: {}", value )), }; },
-          "diff" => {
-            if subitems . len () != 2 {
-              return Err ( "diff requires exactly one value" . to_string () ); }
-            let value : String =
-              atom_to_string ( &subitems[1] ) ?;
-            metadata . truenode_diff = Some (
-              NodeDiffStatus::from_client_string (&value)
-                . ok_or_else ( || format! ( "Invalid NodeDiffStatus value: {}", value ))? ); },
+          "staged" => {
+            apply_axis_atoms_to_truenode (
+              &subitems[1..],
+              true,  // staged
+              &mut metadata . truenode_existence,
+              &mut metadata . truenode_membership ) ?; },
+          "unstaged" => {
+            apply_axis_atoms_to_truenode (
+              &subitems[1..],
+              false, // unstaged
+              &mut metadata . truenode_existence,
+              &mut metadata . truenode_membership ) ?; },
           _ => { return Err ( format! ( "Unknown node key: {}",
                                          key )); }} },
       Sexp::Atom (_) => {
         let bare_value : String =
           atom_to_string (element) ?;
         match bare_value . as_str () {
-          "indefinitive"  => metadata . indefinitive = true,
+          "indefinitive" => metadata . indefinitive = true,
+          "notInGit"     => metadata . truenode_not_in_git = true,
           _ => {
             return Err ( format! ( "Unknown node value: {}",
                                     bare_value )); }} },
       _ => { return Err ( "Unexpected element in node"
                            . to_string () ); }} }
+  Ok (( )) }
+
+/// Apply a sequence of axis atoms (newX, removedX, newM, removedM) to
+/// a TrueNode's existence and membership axes for the given stage.
+fn apply_axis_atoms_to_truenode (
+  atoms      : &[Sexp],
+  is_staged  : bool,
+  existence  : &mut ExistenceAxes,
+  membership : &mut MembershipAxes,
+) -> Result<(), String> {
+  for atom in atoms {
+    let atom_str : String = atom_to_string (atom) ?;
+    let (axis, sign) : (char, Sign) =
+      Sign::parse_axis_atom (&atom_str)
+        . ok_or_else ( || format! (
+          "Unknown axis atom: {}", atom_str )) ?;
+    let slot : &mut Option<Sign> = match (axis, is_staged) {
+      ('X', true)  => &mut existence  . staged,
+      ('X', false) => &mut existence  . unstaged,
+      ('M', true)  => &mut membership . staged,
+      ('M', false) => &mut membership . unstaged,
+      _ => unreachable!(), };
+    *slot = Some (sign); }
+  Ok (( )) }
+
+/// Apply axis atoms (newM, removedM only) to a Scaffold's membership.
+fn apply_axis_atoms_to_membership_scaffold (
+  atoms      : &[Sexp],
+  is_staged  : bool,
+  membership : &mut MembershipAxes,
+) -> Result<(), String> {
+  for atom in atoms {
+    let atom_str : String = atom_to_string (atom) ?;
+    let (axis, sign) : (char, Sign) =
+      Sign::parse_axis_atom (&atom_str)
+        . ok_or_else ( || format! (
+          "Unknown axis atom: {}", atom_str )) ?;
+    if axis != 'M' {
+      return Err ( format! (
+        "Scaffold (alias/id) only supports M axis atoms, got: {}",
+        atom_str )); }
+    let slot : &mut Option<Sign> =
+      if is_staged { &mut membership . staged }
+      else         { &mut membership . unstaged };
+    *slot = Some (sign); }
   Ok (( )) }
 
 /// Parse the (deleted (id X) (source S)) s-expression contents.

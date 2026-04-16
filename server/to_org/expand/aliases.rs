@@ -1,5 +1,6 @@
 use crate::dbs::filesystem::one_node::fetch_aliases_from_file;
 use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
+use crate::types::git::MembershipAxes;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{ViewNode, ViewRequest, Scaffold};
 use crate::types::memory::SkgNodeMap;
@@ -62,6 +63,6 @@ pub async fn build_and_integrate_aliases (
     insert_scaffold_as_child (
       tree, aliascol_id,
       Scaffold::Alias { text: alias . clone (),
-                        diff: None },
+                        membership: MembershipAxes::default () },
       false ) ?; }
   Ok (( )) }

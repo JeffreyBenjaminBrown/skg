@@ -7,6 +7,7 @@
 pub use super::viewnode::UncheckedTrueNode;
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
+use super::git::{ExistenceAxes, MembershipAxes};
 use super::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Scaffold, ScaffoldKind, DeletedNode, GraphNodeStats, ViewNodeStats, IndefOrDef, Birth, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
@@ -54,7 +55,9 @@ impl TryFrom<UncheckedTrueNode> for TrueNode {
       graphStats     : u . graphStats,
       viewStats      : u . viewStats,
       view_requests  : u . view_requests,
-      diff           : u . diff,
+      existence      : u . existence,
+      membership     : u . membership,
+      not_in_git     : u . not_in_git,
       indef_or_def   : u . indef_or_def,
     })
   }
@@ -99,7 +102,9 @@ impl From<TrueNode> for UncheckedTrueNode {
       graphStats     : t . graphStats,
       viewStats      : t . viewStats,
       view_requests  : t . view_requests,
-      diff           : t . diff,
+      existence      : t . existence,
+      membership     : t . membership,
+      not_in_git     : t . not_in_git,
       indef_or_def   : t . indef_or_def,
     }
   }
@@ -244,7 +249,9 @@ impl Default for UncheckedTrueNode {
       graphStats     : GraphNodeStats::default(),
       viewStats      : ViewNodeStats::default(),
       view_requests  : HashSet::new(),
-      diff           : None,
+      existence      : ExistenceAxes::default(),
+      membership     : MembershipAxes::default(),
+      not_in_git     : false,
       indef_or_def   : IndefOrDef::Definitive {
         body         : None,
         edit_request : None },

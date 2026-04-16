@@ -1,7 +1,7 @@
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
-use crate::types::viewnode::mk_phantom_viewnode;
+use crate::types::viewnode::{mk_phantom_viewnode, legacy_phantom_axes, set_truenode_legacy_diff};
 use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap};
-use crate::types::git::{SourceDiff, NodeDiffStatus, NodeChanges, node_changes_for_truenode, GitDiffStatus};
+use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff, NodeDiffStatus, NodeChanges, node_changes_for_truenode, GitDiffStatus};
 use crate::types::list::{Diff_Item, compute_interleaved_diff, itemlist_and_removedset_from_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_diff_status};
@@ -282,14 +282,18 @@ fn complete_content_children (
           mk_definitive_viewnode(
             id . clone(), d . source . clone(),
             d . title . clone(), None ),
-        ChildKind::RemovedHere =>
+        ChildKind::RemovedHere => {
+          let (ex, mem) : (ExistenceAxes, MembershipAxes) =
+            legacy_phantom_axes (NodeDiffStatus::RemovedHere);
           mk_phantom_viewnode(
             id . clone(), d . source . clone(),
-            d . title . clone(), NodeDiffStatus::RemovedHere ),
-        ChildKind::Removed =>
+            d . title . clone(), ex, mem ) },
+        ChildKind::Removed => {
+          let (ex, mem) : (ExistenceAxes, MembershipAxes) =
+            legacy_phantom_axes (NodeDiffStatus::Removed);
           mk_phantom_viewnode(
             id . clone(), d . source . clone(),
-            d . title . clone(), NodeDiffStatus::Removed ) } },
+            d . title . clone(), ex, mem ) } } },
   ) }
 
 /// 'erroneous content children' are children that look like content,
@@ -372,10 +376,13 @@ fn maybe_prepend_diff_view_scaffolds (
   if let Some (nc) = node_changes {
     if nc . text_changed {
       if unique_scaffold_child(
-        tree, node, &Scaffold::TextChanged
+        tree, node,
+        &Scaffold::TextChanged { staged: false, unstaged: false }
       ) ?. is_none() {
         insert_scaffold_as_child(
-          tree, node, Scaffold::TextChanged, true ) ?; } }
+          tree, node,
+          Scaffold::TextChanged { staged: false, unstaged: true },
+          true ) ?; } }
     maybe_prepend_id_col(
       tree, node, nc ) ?;
     maybe_prepend_alias_col(
@@ -549,5 +556,5 @@ fn set_truenode_diff (
   write_at_node_in_tree( tree, node,
     |vn : &mut ViewNode| {
       if let ViewNodeKind::True( ref mut t ) = vn . kind {
-        t . diff = Some (status); }}
+        set_truenode_legacy_diff (t, status); }}
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }

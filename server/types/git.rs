@@ -44,11 +44,48 @@ pub struct MembershipAxes {
 impl ExistenceAxes {
   pub fn is_empty (&self) -> bool {
     self . staged . is_none () && self . unstaged . is_none () }
+
+  /// Atoms for this stage's existence change, if any:
+  /// '+' -> "newX", '-' -> "removedX".
+  fn atom_for_stage (sign: Option<Sign>) -> Option<&'static str> {
+    match sign {
+      Some (Sign::Plus)  => Some ("newX"),
+      Some (Sign::Minus) => Some ("removedX"),
+      None               => None, } }
+
+  /// The atom-list for the staged side, e.g. "newX" or "" if empty.
+  pub fn staged_atom (&self) -> Option<&'static str> {
+    Self::atom_for_stage (self . staged) }
+  pub fn unstaged_atom (&self) -> Option<&'static str> {
+    Self::atom_for_stage (self . unstaged) }
 }
 
 impl MembershipAxes {
   pub fn is_empty (&self) -> bool {
     self . staged . is_none () && self . unstaged . is_none () }
+
+  fn atom_for_stage (sign: Option<Sign>) -> Option<&'static str> {
+    match sign {
+      Some (Sign::Plus)  => Some ("newM"),
+      Some (Sign::Minus) => Some ("removedM"),
+      None               => None, } }
+
+  pub fn staged_atom (&self) -> Option<&'static str> {
+    Self::atom_for_stage (self . staged) }
+  pub fn unstaged_atom (&self) -> Option<&'static str> {
+    Self::atom_for_stage (self . unstaged) }
+}
+
+impl Sign {
+  /// Parse an axis atom like "newX", "removedM" into (axis-letter, sign).
+  /// Returns Some ((axis, sign)) where axis is 'X' or 'M'.
+  pub fn parse_axis_atom (s: &str) -> Option<(char, Sign)> {
+    match s {
+      "newX"     => Some (('X', Sign::Plus)),
+      "removedX" => Some (('X', Sign::Minus)),
+      "newM"     => Some (('M', Sign::Plus)),
+      "removedM" => Some (('M', Sign::Minus)),
+      _          => None, } }
 }
 
 /// Represents changes for an entire source directory.

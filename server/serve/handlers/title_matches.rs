@@ -15,6 +15,7 @@ use crate::org_to_text::viewnode_forest_to_string;
 use crate::serve::ConnectionState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
+use crate::types::git::MembershipAxes;
 use crate::types::memory::ViewUri;
 use crate::types::memory::skgnode_from_map_or_disk;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
@@ -383,6 +384,6 @@ pub fn build_search_forest (
             folded  : false,
             kind    : ViewNodeKind::Scaff (
               Scaffold::Alias {
-                text : title . clone (),
-                diff : None } ) } ); }} }
+                text       : title . clone (),
+                membership : MembershipAxes::default () } ) } ); }} }
   (forest, search_results) }

@@ -3,7 +3,6 @@
 /// without requiring global context.
 
 use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind, UncheckedTrueNode};
-use crate::types::git::NodeDiffStatus;
 use crate::types::viewnode::{Scaffold, EditRequest, IndefOrDef};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::viewnode_skgnode::{
@@ -54,7 +53,7 @@ pub fn validate_local_structure (
           validate_hidden_outside_of_subscribee_col(tree, node_id),
         Scaffold::SubscribeeCol =>
           validate_subscribeecol(tree, node_id),
-        Scaffold::TextChanged =>
+        Scaffold::TextChanged { .. } =>
           validate_text_changed(tree, node_id),
         Scaffold::IDCol =>
           validate_idcol(tree, node_id),
@@ -180,7 +179,7 @@ fn validate_text_changed (
   if !generation_does_not_exist(tree, node_id, 1, true) {
     errors . push("TextChanged must have no (non-ignroed) children." . to_string()); }
   if !siblings_cannot_include(tree, node_id, |node|
-       matches!(&node . kind, UncheckedViewNodeKind::Scaff (Scaffold::TextChanged))) {
+       matches!(&node . kind, UncheckedViewNodeKind::Scaff (Scaffold::TextChanged { .. }))) {
     errors . push("TextChanged must be unique among its siblings." . to_string()); }
   errors }
 
@@ -231,7 +230,7 @@ fn validate_truenode (
          UncheckedViewNodeKind::Scaff (Scaffold::AliasCol)      |
          UncheckedViewNodeKind::Scaff (Scaffold::IDCol)         |
          UncheckedViewNodeKind::Scaff (Scaffold::SubscribeeCol) |
-         UncheckedViewNodeKind::Scaff (Scaffold::TextChanged)   |
+         UncheckedViewNodeKind::Scaff (Scaffold::TextChanged { .. })   |
          UncheckedViewNodeKind::Deleted (_)                     |
          UncheckedViewNodeKind::DeletedScaff (_)               )) {
     errors . push("TrueNode's children must include only TrueNode, AliasCol, IDCol, SubscribeeCol, TextChanged, Deleted, or DeletedScaff" . to_string()); }
@@ -278,10 +277,7 @@ pub fn nonignored_children_have_distinct_ids (
   let mut seen : HashSet<ID> = HashSet::new();
   for child in node_ref . children() {
     if let UncheckedViewNodeKind::True (t) = &child . value() . kind {
-      if ( !t . parent_ignores_it()
-           && !matches!( t . diff,
-                       Some( NodeDiffStatus::Removed )
-                       | Some( NodeDiffStatus::RemovedHere ))) {
+      if !t . parent_ignores_it() && !t . is_phantom () {
         if let Some (id) = &t . id {
           if !seen . insert(id . clone()) {
             return false; }} }} }

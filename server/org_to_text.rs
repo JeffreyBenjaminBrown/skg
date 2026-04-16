@@ -1,3 +1,4 @@
+use crate::types::git::MembershipAxes;
 use crate::types::misc::SkgConfig;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, EditRequest, GraphNodeStats, Birth };
 
@@ -111,10 +112,9 @@ fn scaffold_metadata_to_string (
   if focused { parts . push ( "focused" . to_string () ); }
   if folded  { parts . push ( "folded" . to_string () ); }
   match scaffold {
-    Scaffold::Alias { diff, .. } => {
+    Scaffold::Alias { membership, .. } => {
       parts . push ( "alias" . to_string () );
-      if let Some (d) = diff {
-        parts . push ( format! ( "(diff {})", d . repr_in_client() ) ); }}
+      append_membership_stage_forms (&mut parts, membership); }
     Scaffold::AliasCol =>
       parts . push ( "aliasCol" . to_string () ),
     Scaffold::BufferRoot =>
@@ -125,16 +125,32 @@ fn scaffold_metadata_to_string (
       parts . push ( "hiddenOutsideOfSubscribeeCol" . to_string () ),
     Scaffold::SubscribeeCol =>
       parts . push ( "subscribeeCol" . to_string () ),
-    Scaffold::TextChanged =>
-      parts . push ( "textChanged" . to_string () ),
+    Scaffold::TextChanged { staged, unstaged } => {
+      let mut tags : Vec<&'static str> = Vec::new ();
+      if *staged   { tags . push ("staged"); }
+      if *unstaged { tags . push ("unstaged"); }
+      if tags . is_empty ()
+      { parts . push ( "textChanged" . to_string () ); }
+      else
+      { parts . push ( format! ( "(textChanged {})", tags . join (" ") )); } }
     Scaffold::IDCol =>
       parts . push ( "idCol" . to_string () ),
-    Scaffold::ID { diff, .. } => {
+    Scaffold::ID { membership, .. } => {
       parts . push ( "id" . to_string () );
-      if let Some (d) = diff {
-        parts . push ( format! ( "(diff {})", d . repr_in_client() ) ); }}
+      append_membership_stage_forms (&mut parts, membership); }
   }
   Ok ( parts . join (" ")) }
+
+/// Emit '(staged AXES)' and/or '(unstaged AXES)' for a MembershipAxes.
+/// Adds nothing if neither stage has a change.
+fn append_membership_stage_forms (
+  parts      : &mut Vec<String>,
+  membership : &MembershipAxes,
+) {
+  if let Some (atom) = membership . staged_atom ()
+    { parts . push ( format! ( "(staged {})", atom ) ); }
+  if let Some (atom) = membership . unstaged_atom ()
+    { parts . push ( format! ( "(unstaged {})", atom ) ); } }
 
 /// Render metadata for a TrueNode:
 ///   (skg [focused] [folded] (node ...))
@@ -187,9 +203,25 @@ fn true_node_metadata_to_string (
       request_strings . sort ();
       Some ( format! ( "(viewRequests {})",
                        request_strings . join (" ") )) }
-    fn diff_status ( true_node : & TrueNode ) -> Option < String > {
-      true_node . diff . as_ref () . map ( | d |
-        format! ( "(diff {})", d . repr_in_client () )) }
+    fn staged_axes ( true_node : & TrueNode ) -> Option < String > {
+      let mut atoms : Vec<&'static str> = Vec::new ();
+      if let Some (a) = true_node . existence  . staged_atom ()
+        { atoms . push (a); }
+      if let Some (a) = true_node . membership . staged_atom ()
+        { atoms . push (a); }
+      if atoms . is_empty () { None }
+      else { Some ( format! ( "(staged {})", atoms . join (" "))) } }
+    fn unstaged_axes ( true_node : & TrueNode ) -> Option < String > {
+      let mut atoms : Vec<&'static str> = Vec::new ();
+      if let Some (a) = true_node . existence  . unstaged_atom ()
+        { atoms . push (a); }
+      if let Some (a) = true_node . membership . unstaged_atom ()
+        { atoms . push (a); }
+      if atoms . is_empty () { None }
+      else { Some ( format! ( "(unstaged {})", atoms . join (" "))) } }
+    fn not_in_git_atom ( true_node : & TrueNode ) -> Option < String > {
+      if true_node . not_in_git { Some ("notInGit" . to_string ()) }
+      else                      { None } }
     let mut parts : Vec < String > =
       vec! [ "node" . to_string () ];
     parts . push ( format! ( "(id {})", true_node . id . 0 ));
@@ -212,7 +244,11 @@ fn true_node_metadata_to_string (
     { parts . push (s); }
     if let Some (s) = view_requests (true_node)
     { parts . push (s); }
-    if let Some (s) = diff_status (true_node)
+    if let Some (s) = staged_axes (true_node)
+    { parts . push (s); }
+    if let Some (s) = unstaged_axes (true_node)
+    { parts . push (s); }
+    if let Some (s) = not_in_git_atom (true_node)
     { parts . push (s); }
     format! ( "({})", parts . join (" ")) }
   let mut parts : Vec < String > = Vec::new ();
