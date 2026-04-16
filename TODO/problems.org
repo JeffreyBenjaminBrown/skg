@@ -16,3 +16,42 @@
    server/util.rs. Already noted in MEMORY.md.
    If an invalid source reaches this function (e.g. from a search view),
    the server crashes. Should return Result.
+
+* Problems found during the staged/unstaged diff axis refactor
+
+** 'node_changes_for_truenode' returns a single NodeChanges
+   server/types/git.rs.
+   It picks the unstaged stage when both have changes, losing the
+   per-stage distinction. Save-pipeline consumers (id_col.rs and
+   aliascol.rs completion paths) therefore stamp every membership
+   change as unstaged, even if it actually came from a staged change.
+   Per-stage merging would require returning both stages (e.g. tuple
+   or struct) and updating those consumers to merge similarly to
+   apply_diff_to_forest's 'merged_axes_from_per_stage' helper.
+
+** Three SkgNode parses per changed file in 'compute_diff_for_source'
+   server/git_ops/diff.rs.
+   For each changed file we now load HEAD, index, and worktree YAML
+   blobs and parse them into SkgNodes. A small repo with N changed
+   files does 3N parses. At current sizes this is fine but worth
+   measuring on a larger garden.
+
+** 'compute_skgnode_diff' silently swallows YAML parse errors
+   server/git_ops/diff.rs.
+   load_from_head / load_from_index / load_from_disk return None on
+   parse failure (via '.ok()'), indistinguishable from "file absent".
+   A corrupt SkgNode therefore degrades to "no node_changes" silently.
+   Worth surfacing the error to logs.
+
+** 'NotInGit' is per-source but stamped per-truenode
+   server/to_org/render/diff.rs / process_truenode_diff.
+   Every truenode in a non-git source gets 'not_in_git = true'. The
+   wire-level emission is a per-truenode 'notInGit' atom too. A
+   per-source banner / source-herald prefix would scale better.
+
+** Stringly-typed cell-merge in herald post-pass
+   elisp/heralds-minor-mode.el / 'heralds--merge-stage-tokens'.
+   The post-pass identifies stage groups by parsing token strings
+   (matching the literal "staged:" / "unstaged:" prefix). If the
+   herald rule strings are ever changed, the regex must be updated in
+   lockstep. Manageable but a new fragility introduced by this design.
