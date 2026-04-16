@@ -6,7 +6,7 @@ use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use super::git::{SourceDiff, NodeDiffStatus};
+use super::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff};
 use super::misc::{ID, SkgConfig, SourceName};
 use super::skgnode::SkgNode;
 
@@ -29,19 +29,29 @@ pub fn title_for_phantom (
                   . ok() . map( |n| n . title ) )
     . unwrap_or_else( || format!( "TITLE NOT FOUND for ID {}", id . 0 )) }
 
-/// Unified diff status for phantom nodes.
-/// Returns Removed if source_diffs[source].deleted_nodes has id,
-/// else RemovedHere.
-pub fn phantom_diff_status (
+/// Diff axes for a phantom node, for use by the save / rerender pipeline.
+/// A phantom always has membership.unstaged = '-' (it's missing from
+/// this parent's worktree contains list). Existence is '-' on the
+/// unstaged side iff the file is also gone in the worktree (recorded in
+/// SourceDiff.deleted_nodes); otherwise existence axes are empty.
+pub fn phantom_axes (
   id           : &ID,
   source       : &SourceName,
   source_diffs : Option<&HashMap<SourceName, SourceDiff>>,
-) -> NodeDiffStatus {
-  if source_diffs
-    . and_then( |diffs| diffs . get (source) )
-    . map( |sd| sd . deleted_nodes . contains_key (id) )
-    . unwrap_or (false)
-  { NodeDiffStatus::Removed } else { NodeDiffStatus::RemovedHere } }
+) -> (ExistenceAxes, MembershipAxes) {
+  let file_gone : bool = source_diffs
+    . and_then ( |diffs| diffs . get (source) )
+    . map ( |sd| sd . deleted_nodes . contains_key (id) )
+    . unwrap_or (false);
+  let existence : ExistenceAxes =
+    if file_gone {
+      ExistenceAxes { staged: None, unstaged: Some (Sign::Minus) }
+    } else {
+      ExistenceAxes::default ()
+    };
+  let membership : MembershipAxes =
+    MembershipAxes { staged: None, unstaged: Some (Sign::Minus) };
+  (existence, membership) }
 
 /// Find the source for a node by checking which source directory
 /// contains its .skg file on disk. Returns None if not found in any source.

@@ -1,10 +1,10 @@
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
-use crate::types::viewnode::{mk_phantom_viewnode, legacy_phantom_axes, set_truenode_legacy_diff};
+use crate::types::viewnode::mk_phantom_viewnode;
 use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap};
-use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff, NodeDiffStatus, NodeChanges, node_changes_for_truenode, GitDiffStatus};
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeChanges, node_changes_for_truenode};
 use crate::types::list::{Diff_Item, compute_interleaved_diff, itemlist_and_removedset_from_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::phantom::{title_for_phantom, phantom_diff_status};
+use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::types::memory::find_source_many_ways;
 use crate::types::skgnode::SkgNode;
 use crate::git_ops::read_repo::skgnode_from_git_head;
@@ -31,9 +31,11 @@ use std::error::Error;
 use std::path::PathBuf;
 
 enum ChildKind {
-  Normal,      // in worktree, and in parent's content
-  RemovedHere, // in worktree, but removed from parent's content
-  Removed,     // not in worktree
+  /// In worktree, and in parent's content -- a real child.
+  Normal,
+  /// A phantom: missing from parent's worktree contains. Carries the
+  /// existence and membership axes the phantom should display.
+  Phantom (ExistenceAxes, MembershipAxes),
 }
 
 struct ChildData {
@@ -282,18 +284,10 @@ fn complete_content_children (
           mk_definitive_viewnode(
             id . clone(), d . source . clone(),
             d . title . clone(), None ),
-        ChildKind::RemovedHere => {
-          let (ex, mem) : (ExistenceAxes, MembershipAxes) =
-            legacy_phantom_axes (NodeDiffStatus::RemovedHere);
+        ChildKind::Phantom (ex, mem) =>
           mk_phantom_viewnode(
             id . clone(), d . source . clone(),
-            d . title . clone(), ex, mem ) },
-        ChildKind::Removed => {
-          let (ex, mem) : (ExistenceAxes, MembershipAxes) =
-            legacy_phantom_axes (NodeDiffStatus::Removed);
-          mk_phantom_viewnode(
-            id . clone(), d . source . clone(),
-            d . title . clone(), ex, mem ) } } },
+            d . title . clone(), ex, mem ) } },
   ) }
 
 /// 'erroneous content children' are children that look like content,
@@ -465,11 +459,9 @@ fn build_child_creation_data (
         find_source_many_ways(
           id, &child_sources, deleted_since_head_pid_src_map, map, config )
         . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
-      let kind : ChildKind =
-        match phantom_diff_status( // can only return Removed or RemovedHere
-          id, &phantom_source, source_diffs . as_ref() )
-        { NodeDiffStatus::Removed     => ChildKind::Removed,
-          _                           => ChildKind::RemovedHere };
+      let (ex, mem) : (ExistenceAxes, MembershipAxes) =
+        phantom_axes ( id, &phantom_source, source_diffs . as_ref () );
+      let kind : ChildKind = ChildKind::Phantom (ex, mem);
       let title : String = title_for_phantom(
         id, &phantom_source, source_diffs . as_ref(), map, config );
       result . insert( id . clone(),
@@ -489,7 +481,7 @@ fn build_child_creation_data (
                                  kind: ChildKind::Normal } ); }}
   Ok (result) }
 
-/// In diff view, set the TrueNode's 'diff' field.
+/// In diff view, set the TrueNode's per-stage diff axes.
 fn maybe_change_node_diff_status (
   tree         : &mut Tree<ViewNode>,
   node         : NodeId,
@@ -502,59 +494,83 @@ fn maybe_change_node_diff_status (
       Some (sd) => sd,
       None => return Ok(( )) };
   if !source_diff . is_git_repo {
-    return set_truenode_diff(
-      tree, node, NodeDiffStatus::NotInGit); }
+    return write_truenode_diff (
+      tree, node,
+      ExistenceAxes::default (),
+      MembershipAxes::default (),
+      true /* not_in_git */ ); }
   let file_path : PathBuf =
     PathBuf::from(format!("{}.skg", pid . 0));
-  if let Some (skgnode_diff)
-    = source_diff . unstaged . get (&file_path)
-        . or_else ( || source_diff . staged . get (&file_path) )
-    { match skgnode_diff . status {
-        GitDiffStatus::Added =>
-          return set_truenode_diff( tree, node,
-                                    NodeDiffStatus::New),
-        GitDiffStatus::Deleted =>
-          return set_truenode_diff( tree, node,
-                                    NodeDiffStatus::Removed),
-        GitDiffStatus::Modified => { // This case falls through to the NewHere logic. The same happens if there's no skgnode_diff (i.e. if fetching this file_path gave None).
-        } }}
-  { // NewHere: Node was added to its parent's contains list,
-    // but the file already existed (Added would have returned above).
+  let staged_x : Option<Sign> = source_diff . staged . get (&file_path)
+    . and_then ( |d| d . status . to_existence_sign () );
+  let unstaged_x : Option<Sign> = source_diff . unstaged . get (&file_path)
+    . and_then ( |d| d . status . to_existence_sign () );
+  // Membership axes derive from the parent's per-stage contains_diff:
+  // if pid is New(pid) in a stage, that stage's M is Plus.
+  let (staged_m, unstaged_m) : (Option<Sign>, Option<Sign>) = {
     let is_non_content : bool =
       read_at_node_in_tree( tree, node,
         |vn : &ViewNode| match &vn . kind {
           ViewNodeKind::True (t) => t . parent_ignores_it(),
           _ => true } ) ?;
-    if is_non_content { return Ok(( )); }
-    let (parent_pid, parent_source) : (ID, SourceName) =
-      match read_at_ancestor_in_tree( tree, node, 1,
-        |vn : &ViewNode| match &vn . kind {
-          ViewNodeKind::True (t) =>
-            Ok(( t . id . clone(), t . source . clone() )),
-          _ => Err ("not a TrueNode") })
-      { Ok( Ok (r) ) => r,
-        Ok( Err (_) ) | Err (_) => return Ok(( )) };
-    let parent_changes : Option<&NodeChanges> =
-      node_changes_for_truenode(
-        source_diffs, &parent_pid, &parent_source );
-    let nc : &NodeChanges = match parent_changes {
-      Some (nc) => nc,
-      None => return Ok(( )) };
-    let is_new_in_contains : bool =
-      nc . contains_diff . iter() . any(
-        |d| matches!( d, Diff_Item::New (id) if id == pid ) );
-    if is_new_in_contains {
-      set_truenode_diff(
-        tree, node, NodeDiffStatus::NewHere )?; }
-    Ok(( )) }}
+    if is_non_content { (None, None) }
+    else {
+      let parent : Option<(ID, SourceName)> =
+        read_at_ancestor_in_tree( tree, node, 1,
+          |vn : &ViewNode| match &vn . kind {
+            ViewNodeKind::True (t) =>
+              Ok(( t . id . clone(), t . source . clone() )),
+            _ => Err ("not a TrueNode") }
+        ) . ok () . and_then ( |r| r . ok () );
+      match parent {
+        None => (None, None),
+        Some ((parent_pid, parent_source)) => {
+          membership_signs_from_parent_contains (
+            source_diff, &parent_pid, &parent_source, pid ) }} } };
+  let existence  : ExistenceAxes  = ExistenceAxes  {
+    staged: staged_x, unstaged: unstaged_x };
+  let membership : MembershipAxes = MembershipAxes {
+    staged: staged_m, unstaged: unstaged_m };
+  write_truenode_diff (tree, node, existence, membership, false) }
 
-fn set_truenode_diff (
-  tree   : &mut Tree<ViewNode>,
-  node   : NodeId,
-  status : NodeDiffStatus,
+/// Look up per-stage M-axis signs for a child within a parent's contains.
+/// Returns (staged_m, unstaged_m); each is Some(Plus) iff the child was
+/// added to the parent's contains in that stage.
+fn membership_signs_from_parent_contains (
+  source_diff   : &SourceDiff,
+  parent_pid    : &ID,
+  parent_source : &SourceName,
+  child_pid     : &ID,
+) -> (Option<Sign>, Option<Sign>) {
+  // Both stages live under the same parent_source; we ignore other
+  // sources here. Look up the parent file in each stage's map and
+  // inspect its contains_diff.
+  let _ = parent_source; // signature symmetry; not used yet
+  let parent_file : PathBuf =
+    PathBuf::from ( format! ( "{}.skg", parent_pid . 0 ));
+  let staged_m : Option<Sign> = source_diff . staged . get (&parent_file)
+    . and_then ( |d| d . node_changes . as_ref () )
+    . and_then ( |nc| if nc . contains_diff . iter ()
+                          . any ( |d| matches! ( d, Diff_Item::New (id) if id == child_pid ))
+                       { Some (Sign::Plus) } else { None } );
+  let unstaged_m : Option<Sign> = source_diff . unstaged . get (&parent_file)
+    . and_then ( |d| d . node_changes . as_ref () )
+    . and_then ( |nc| if nc . contains_diff . iter ()
+                          . any ( |d| matches! ( d, Diff_Item::New (id) if id == child_pid ))
+                       { Some (Sign::Plus) } else { None } );
+  (staged_m, unstaged_m) }
+
+fn write_truenode_diff (
+  tree       : &mut Tree<ViewNode>,
+  node       : NodeId,
+  existence  : ExistenceAxes,
+  membership : MembershipAxes,
+  not_in_git : bool,
 ) -> Result<(), Box<dyn Error>> {
   write_at_node_in_tree( tree, node,
     |vn : &mut ViewNode| {
       if let ViewNodeKind::True( ref mut t ) = vn . kind {
-        set_truenode_legacy_diff (t, status); }}
+        t . existence  = existence;
+        t . membership = membership;
+        t . not_in_git = not_in_git; }}
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }

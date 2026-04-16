@@ -1,15 +1,15 @@
 use crate::dbs::filesystem::one_node::skgnodes_from_ids;
 use crate::git_ops::read_repo::skgnode_from_git_head;
-use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff, NodeDiffStatus};
+use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::types::memory::SkgNodeMap;
 use crate::types::memory::find_source_many_ways;
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::phantom::{title_for_phantom, phantom_diff_status};
+use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::types::skgnode::SkgNode;
 use crate::types::tree::generic::{ error_unless_node_satisfies, read_at_ancestor_in_tree, write_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_skgnode::{ unique_scaffold_child, insert_scaffold_as_child};
-use crate::types::viewnode::{mk_phantom_viewnode, legacy_phantom_axes};
+use crate::types::viewnode::mk_phantom_viewnode;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, Birth, mk_indefinitive_viewnode};
 use crate::update_buffer::util::{ move_child_to_end, subtree_satisfies, complete_relevant_children_in_viewnodetree};
 
@@ -21,7 +21,10 @@ use typedb_driver::TypeDBDriver;
 struct SubscribeeChildData {
   source  : SourceName,
   title   : String,
-  phantom : Option<NodeDiffStatus>, // None = normal subscribee
+  /// None = normal subscribee. Some((existence, membership)) = phantom
+  /// (subscription was removed); axes describe whether the subscribee's
+  /// '.skg' file is also gone in the worktree.
+  phantom : Option<(ExistenceAxes, MembershipAxes)>,
 }
 
 /// SubscribeeCol completion.
@@ -117,12 +120,10 @@ pub async fn complete_subscribee_col_preorder (
             mk_indefinitive_viewnode(
               id . clone(), d . source . clone(),
               d . title . clone(), Birth::ContentOf ),
-          Some (diff_status) => {
-            let (ex, mem) : (ExistenceAxes, MembershipAxes) =
-              legacy_phantom_axes (diff_status);
+          Some ((ex, mem)) =>
             mk_phantom_viewnode(
               id . clone(), d . source . clone(),
-              d . title . clone(), ex, mem ) } } }, ) ?; }
+              d . title . clone(), ex, mem ) } }, ) ?; }
   { // Ensure HiddenOutsideOfSubscribeeCol exists and is last.
     let hidden_outside : Option<NodeId> =
       unique_scaffold_child(
@@ -214,15 +215,15 @@ fn build_subscribee_child_data (
           child_skgid, &child_sources,
           deleted_since_head_pid_src_map, map, config )
         . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
-      let phantom : NodeDiffStatus =
-        phantom_diff_status( child_skgid, &child_src, source_diffs . as_ref() );
+      let axes : (ExistenceAxes, MembershipAxes) =
+        phantom_axes ( child_skgid, &child_src, source_diffs . as_ref() );
       let child_title : String =
         title_for_phantom( child_skgid, &child_src,
                            source_diffs . as_ref(), map, config );
       result . insert( child_skgid . clone(),
                      SubscribeeChildData { source: child_src,
                                            title: child_title,
-                                           phantom: Some (phantom) } );
+                                           phantom: Some (axes) } );
     } else { // Normal subscribee: exists in worktree subscriptions.
       if let Some( (s, t) ) = existing_children . get (child_skgid) {
         result . insert( child_skgid . clone(),

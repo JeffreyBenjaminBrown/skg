@@ -88,6 +88,15 @@ impl Sign {
       _          => None, } }
 }
 
+impl GitDiffStatus {
+  /// Map a file-level git status to an existence-axis sign.
+  /// Modified files have no existence change.
+  pub fn to_existence_sign (&self) -> Option<Sign> {
+    match self {
+      GitDiffStatus::Added    => Some (Sign::Plus),
+      GitDiffStatus::Deleted  => Some (Sign::Minus),
+      GitDiffStatus::Modified => None, } } }
+
 /// Represents changes for an entire source directory.
 /// (I assume each source is a separate git repo,
 /// but the code might work even if some are part of the same repo.)
