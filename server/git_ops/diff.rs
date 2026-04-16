@@ -4,18 +4,22 @@ use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 
 use super::misc::path_relative_to_repo;
-use super::read_repo::{open_repo, get_changed_skg_files, get_file_content_at_head};
+use super::read_repo::{
+  open_repo,
+  get_staged_changed_skg_files,
+  get_unstaged_changed_skg_files,
+  get_file_content_at_head,
+  get_file_content_at_index,
+};
 
 use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::path::{Path, PathBuf};
 use std::fs;
 
-/// Compares the current state of .skg files with HEAD.
-/// TRANSITIONAL: This still uses the legacy worktree-vs-HEAD diff
-/// (which lumps staged and unstaged together) and stuffs the result
-/// into the 'unstaged' map. A subsequent commit will split this into
-/// two real per-stage diffs against HEAD↔index and index↔worktree.
+/// Compute the per-stage diff for a source.
+/// 'staged'   compares HEAD  to the index.
+/// 'unstaged' compares the index to the worktree.
 pub fn compute_diff_for_source (
   source_path : &Path
 ) -> Result<SourceDiff, Box<dyn StdError>> {
@@ -23,62 +27,106 @@ pub fn compute_diff_for_source (
     match open_repo (source_path) {
       Some (r) => r,
       None => return Ok ( SourceDiff::new_not_git_repo() ) };
-  let changed_files : Vec<PathDiffStatus> =
-    get_changed_skg_files (&repo) ?;
-  let mut unstaged : HashMap<PathBuf, SkgnodeDiff> =
-    HashMap::new();
-  for entry in changed_files {
-    let skgnode_diff : SkgnodeDiff =
-      compute_skgnode_diff ( source_path, &repo, &entry ) ?;
-    unstaged . insert ( entry . path . clone(), skgnode_diff ); }
+  let staged : HashMap<PathBuf, SkgnodeDiff> =
+    build_stage_diffs (
+      source_path, &repo,
+      &get_staged_changed_skg_files (&repo) ?,
+      Stage::Staged ) ?;
+  let unstaged : HashMap<PathBuf, SkgnodeDiff> =
+    build_stage_diffs (
+      source_path, &repo,
+      &get_unstaged_changed_skg_files (&repo) ?,
+      Stage::Unstaged ) ?;
   let deleted_nodes : HashMap<ID, SkgNode> =
-    collect_deleted_nodes (&unstaged);
+    collect_deleted_nodes_for_both (&staged, &unstaged);
   Ok ( SourceDiff { is_git_repo: true,
-                    staged: HashMap::new(),
+                    staged,
                     unstaged,
                     deleted_nodes }) }
 
-fn compute_skgnode_diff (
+/// Tag for which pair of git states a stage compares.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Stage { Staged, Unstaged }
+
+fn build_stage_diffs (
+  source_path : &Path,
+  repo        : &git2::Repository,
+  changed     : &[PathDiffStatus],
+  stage       : Stage,
+) -> Result<HashMap<PathBuf, SkgnodeDiff>, Box<dyn StdError>> {
+  let mut result : HashMap<PathBuf, SkgnodeDiff> =
+    HashMap::new();
+  for entry in changed {
+    let skgnode_diff : SkgnodeDiff =
+      compute_skgnode_diff_for_stage (
+        source_path, repo, entry, stage ) ?;
+    result . insert ( entry . path . clone(), skgnode_diff ); }
+  Ok (result) }
+
+fn compute_skgnode_diff_for_stage (
   source_path : &Path,
   repo        : &git2::Repository,
   entry       : &PathDiffStatus,
+  stage       : Stage,
 ) -> Result<SkgnodeDiff, Box<dyn StdError>> {
   let abs_path : PathBuf =
     source_path . join ( &entry . path );
   let rel_path : PathBuf =
     path_relative_to_repo ( repo, &abs_path )
       . unwrap_or_else ( || entry . path . clone() );
-  let head_node : Option<SkgNode> =
-    match entry . status {
-      GitDiffStatus::Added => None,
-      _ => get_file_content_at_head ( repo, &rel_path ) ?
-             . and_then ( |s| serde_yaml::from_str (&s) . ok() ) };
-  let worktree_node : Option<SkgNode> =
-    match entry . status {
-      GitDiffStatus::Deleted => None,
-      _ => fs::read_to_string (&abs_path) . ok()
-             . and_then ( |s| serde_yaml::from_str (&s) . ok() ) };
+  // "before" is HEAD for staged, index for unstaged.
+  // "after"  is index for staged, worktree for unstaged.
+  let before_node : Option<SkgNode> = match (&entry . status, stage) {
+    (GitDiffStatus::Added, _)    => None,
+    (_, Stage::Staged)           => load_from_head  (repo, &rel_path),
+    (_, Stage::Unstaged)         => load_from_index (repo, &rel_path), };
+  let after_node : Option<SkgNode> = match (&entry . status, stage) {
+    (GitDiffStatus::Deleted, _)  => None,
+    (_, Stage::Staged)           => load_from_index (repo, &rel_path),
+    (_, Stage::Unstaged)         => load_from_disk  (&abs_path), };
   let node_changes : Option<NodeChanges> =
-    match (&head_node, &worktree_node) {
-      (Some (old), Some (new)) => {
-        Some ( compare_skgnodes ( old, new )) },
-      _ => None };
+    match (&before_node, &after_node) {
+      (Some (old), Some (new)) => Some ( compare_skgnodes (old, new) ),
+      _                        => None };
   Ok ( SkgnodeDiff {
     status: entry . status . clone(),
     node_changes,
-    head_node }) }
+    head_node: before_node }) }
 
-/// Collect SkgNodes for deleted files (exist in HEAD but not worktree).
-fn collect_deleted_nodes (
-  diffs : &HashMap<PathBuf, SkgnodeDiff>,
+fn load_from_head (
+  repo     : &git2::Repository,
+  rel_path : &Path,
+) -> Option<SkgNode> {
+  get_file_content_at_head (repo, rel_path) . ok () . flatten ()
+    . and_then ( |s| serde_yaml::from_str (&s) . ok () ) }
+
+fn load_from_index (
+  repo     : &git2::Repository,
+  rel_path : &Path,
+) -> Option<SkgNode> {
+  get_file_content_at_index (repo, rel_path) . ok () . flatten ()
+    . and_then ( |s| serde_yaml::from_str (&s) . ok () ) }
+
+fn load_from_disk (
+  abs_path : &Path,
+) -> Option<SkgNode> {
+  fs::read_to_string (abs_path) . ok ()
+    . and_then ( |s| serde_yaml::from_str (&s) . ok () ) }
+
+/// Collect SkgNodes for files that were deleted in either stage.
+/// Used to look up titles and bodies for phantom nodes.
+fn collect_deleted_nodes_for_both (
+  staged   : &HashMap<PathBuf, SkgnodeDiff>,
+  unstaged : &HashMap<PathBuf, SkgnodeDiff>,
 ) -> HashMap<ID, SkgNode> {
   let mut result : HashMap<ID, SkgNode> =
     HashMap::new();
-  for skgnode_diff in diffs . values() {
-    if skgnode_diff . status == GitDiffStatus::Deleted {
-      if let Some ( ref head_node ) = skgnode_diff . head_node {
-        { let pid : &ID = &head_node . pid;
-          result . insert ( pid . clone(), head_node . clone() ); }} }}
+  for diffs in [staged, unstaged] {
+    for skgnode_diff in diffs . values () {
+      if skgnode_diff . status == GitDiffStatus::Deleted {
+        if let Some ( ref head_node ) = skgnode_diff . head_node {
+          let pid : &ID = &head_node . pid;
+          result . insert ( pid . clone(), head_node . clone() ); }} } }
   result }
 
 /// Compare two SkgNodes and return the differences.
