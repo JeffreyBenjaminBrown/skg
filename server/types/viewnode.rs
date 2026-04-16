@@ -5,7 +5,7 @@
 /// Some 'ViewNode's correspond to SkgNodes; these are 'TrueNode's.
 /// Others do not so correspond, but rather encode information about neighboring tree nodes. These are 'Scaffold' nodes.
 
-use super::git::{ExistenceAxes, FieldDiffStatus, MembershipAxes, NodeDiffStatus, Sign};
+use super::git::{ExistenceAxes, MembershipAxes, Sign};
 use super::misc::{ID, SourceName};
 use std::collections::HashSet;
 use std::fmt;
@@ -542,75 +542,6 @@ pub fn mk_phantom_viewnode (
     { t . existence  = existence;
       t . membership = membership; }
   viewnode }
-
-/// TRANSITIONAL: convert a legacy FieldDiffStatus to MembershipAxes.
-/// Maps onto the unstaged axis only.
-pub fn legacy_field_diff_to_membership (
-  diff : Option<FieldDiffStatus>,
-) -> MembershipAxes {
-  match diff {
-    None                            => MembershipAxes::default(),
-    Some (FieldDiffStatus::New)     => MembershipAxes {
-      staged: None, unstaged: Some (Sign::Plus) },
-    Some (FieldDiffStatus::Removed) => MembershipAxes {
-      staged: None, unstaged: Some (Sign::Minus) }, } }
-
-/// TRANSITIONAL: convert MembershipAxes back to legacy FieldDiffStatus.
-/// Returns Some only when exactly one axis is non-None and only one
-/// sign appears across both axes. Lossy.
-pub fn membership_to_legacy_field_diff (
-  m : &MembershipAxes,
-) -> Option<FieldDiffStatus> {
-  match (m . staged, m . unstaged) {
-    (None,                  None)                 => None,
-    (Some (Sign::Plus),     None)                 |
-    (None,                  Some (Sign::Plus))    |
-    (Some (Sign::Plus),     Some (Sign::Plus))    => Some (FieldDiffStatus::New),
-    (Some (Sign::Minus),    None)                 |
-    (None,                  Some (Sign::Minus))   |
-    (Some (Sign::Minus),    Some (Sign::Minus))   => Some (FieldDiffStatus::Removed),
-    _                                             => None, } }
-
-/// TRANSITIONAL: stamp legacy NodeDiffStatus onto a TrueNode's axes.
-/// Used by code that hasn't been migrated to set axes directly yet.
-pub fn set_truenode_legacy_diff (
-  t      : &mut TrueNode,
-  status : NodeDiffStatus,
-) {
-  match status {
-    NodeDiffStatus::NotInGit => { t . not_in_git = true; },
-    other => {
-      let (existence, membership) : (ExistenceAxes, MembershipAxes) =
-        legacy_phantom_axes (other);
-      t . existence  = existence;
-      t . membership = membership; }} }
-
-/// TRANSITIONAL: convert a legacy NodeDiffStatus to (existence,
-/// membership) axes for phantom construction. Maps the old four-variant
-/// status onto the unstaged side of each axis (matching today's
-/// "everything is unstaged" pipeline behavior). Will be removed once
-/// `apply_diff_to_forest` and the phantom pipeline produce real per-stage
-/// axes directly.
-pub fn legacy_phantom_axes (
-  status : NodeDiffStatus,
-) -> (ExistenceAxes, MembershipAxes) {
-  match status {
-    NodeDiffStatus::Removed => (
-      ExistenceAxes  { staged: None, unstaged: Some (Sign::Minus) },
-      MembershipAxes { staged: None, unstaged: Some (Sign::Minus) }, ),
-    NodeDiffStatus::RemovedHere => (
-      ExistenceAxes::default (),
-      MembershipAxes { staged: None, unstaged: Some (Sign::Minus) }, ),
-    NodeDiffStatus::New => (
-      ExistenceAxes  { staged: None, unstaged: Some (Sign::Plus) },
-      MembershipAxes { staged: None, unstaged: Some (Sign::Plus) }, ),
-    NodeDiffStatus::NewHere => (
-      ExistenceAxes::default (),
-      MembershipAxes { staged: None, unstaged: Some (Sign::Plus) }, ),
-    NodeDiffStatus::NotInGit => (
-      ExistenceAxes::default (),
-      MembershipAxes::default (), ),
-  }}
 
 pub fn mk_definitive_viewnode (
   id     : ID,

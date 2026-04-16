@@ -7,9 +7,9 @@ use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_r
 use crate::to_org::expand::backpath::{ build_and_integrate_containerward_view_then_drop_request, build_and_integrate_sourceward_view_then_drop_request};
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
 use crate::to_org::util::{ DefinitiveMap, build_node_branch_minus_content, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
-use crate::types::git::{NodeDiffStatus, Sign};
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ContainerwardPathStats, IndefOrDef, Birth, mk_indefinitive_viewnode, set_truenode_legacy_diff };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ContainerwardPathStats, IndefOrDef, Birth, mk_indefinitive_viewnode };
 use crate::types::skgnode::SkgNode;
 use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::tree::generic::read_at_node_in_tree;
@@ -382,16 +382,23 @@ async fn mk_removed_child_viewnode (
 ) -> Result<ViewNode, Box<dyn Error>> {
   let in_worktree : bool =
     contents_in_worktree . contains ( &child_id . 0 );
-  let (child_diff, child_opt_skgnode)
-    : (NodeDiffStatus, Option<SkgNode>)
+  // The child is a phantom either way (its parent's worktree contains
+  // doesn't reference it). Existence depends on whether the child's
+  // own file is also gone in the worktree:
+  //   in worktree -> file exists; just M is removed.
+  //   not in worktree -> file gone; both X and M are removed.
+  let (existence, child_opt_skgnode)
+    : (ExistenceAxes, Option<SkgNode>)
     = if in_worktree
-      { ( NodeDiffStatus::RemovedHere,
+      { ( ExistenceAxes::default (),
           optskgnode_from_id (
             config, typedb_driver, child_id ) . await ? ) }
       else
-      { ( NodeDiffStatus::Removed,
+      { ( ExistenceAxes { staged: None, unstaged: Some (Sign::Minus) },
           skgnode_from_index_or_head ( child_id, parent_src, config
                                      ) . ok() ) };
+  let membership : MembershipAxes =
+    MembershipAxes { staged: None, unstaged: Some (Sign::Minus) };
   let child_skgnode : &SkgNode =
     child_opt_skgnode . as_ref()
     . ok_or_else ( || format! (
@@ -410,7 +417,8 @@ async fn mk_removed_child_viewnode (
   if let ViewNodeKind::True ( ref mut t ) = child_viewnode . kind {
     if let Some (source) = child_source {
       t . source = source; }
-    set_truenode_legacy_diff (t, child_diff); }
+    t . existence  = existence;
+    t . membership = membership; }
   Ok (child_viewnode) }
 
 /// Load title and body from index (preferred) or HEAD for a node

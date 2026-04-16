@@ -5,9 +5,7 @@ use crate::types::misc::{ID, SourceName};
 use crate::types::skgnode::SkgNode;
 
 use std::collections::HashMap;
-use std::fmt;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 //
 // Types
@@ -147,24 +145,6 @@ pub struct NodeChanges {
   pub contains_diff : Vec<Diff_Item<ID>>,
 }
 
-/// Indicates how a node differs between the current state and HEAD.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NodeDiffStatus {
-  New,         // did not exist in HEAD
-  NewHere,     // existed in HEAD but not in this relationship
-  Removed,     // existed in HEAD and is no longer in the worktree
-  RemovedHere, // exists in worktree but no longer in this relationship
-  NotInGit,    // its source is not a git repo
-}
-
-/// Diff status for scaffold fields (Alias, ID) in git diff view mode.
-/// Indicates how a field value differs between the current state and HEAD.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FieldDiffStatus {
-  New,      // Value was not in the list in HEAD
-  Removed,  // Value was in the list in HEAD, now gone
-}
-
 //
 // Implementations
 //
@@ -185,83 +165,6 @@ impl SourceDiff {
     let file_path : PathBuf =
       PathBuf::from( format!( "{}.skg", pid . 0 ) );
     map . get (&file_path) . cloned () }}
-
-impl NodeDiffStatus {
-  /// Single source of truth for NodeDiffStatus <-> client string bijection.
-  const REPRS_IN_CLIENT: &'static [(&'static str, NodeDiffStatus)] = &[
-    ("new",          NodeDiffStatus::New),
-    ("new-here",     NodeDiffStatus::NewHere),
-    ("removed",      NodeDiffStatus::Removed),
-    ("removed-here", NodeDiffStatus::RemovedHere),
-    ("not-in-git",   NodeDiffStatus::NotInGit),
-  ];
-
-  /// String representation as used in client metadata.
-  pub fn repr_in_client (&self) -> &'static str {
-    Self::REPRS_IN_CLIENT . iter()
-      . find ( |(_, nd)| nd == self )
-      . map ( |(s, _)| *s )
-      . expect ("REPRS_IN_CLIENT should cover all NodeDiffStatus variants") }
-
-  /// Parse a client string to a NodeDiffStatus.
-  pub fn from_client_string ( s: &str ) -> Option<NodeDiffStatus> {
-    Self::REPRS_IN_CLIENT . iter()
-      . find ( |(cs, _)| *cs == s )
-      . map ( |(_, nd)| *nd ) }
-}
-
-impl fmt::Display for NodeDiffStatus {
-  fn fmt (
-    &self,
-    f : &mut fmt::Formatter<'_>
-  ) -> fmt::Result {
-    write!(f, "{}", self . repr_in_client()) } }
-
-impl FromStr for NodeDiffStatus {
-  type Err = String;
-
-  fn from_str (
-    s : &str
-  ) -> Result<Self, Self::Err> {
-    Self::from_client_string (s)
-      . ok_or_else ( || format! ( "Unknown NodeDiffStatus value: {}", s ) ) } }
-
-impl FieldDiffStatus {
-  /// Single source of truth for FieldDiffStatus <-> client string bijection.
-  const REPRS_IN_CLIENT: &'static [(&'static str, FieldDiffStatus)] = &[
-    ("new",        FieldDiffStatus::New),
-    ("removed",    FieldDiffStatus::Removed),
-  ];
-
-  /// String representation as used in client metadata.
-  pub fn repr_in_client (&self) -> &'static str {
-    Self::REPRS_IN_CLIENT . iter()
-      . find ( |(_, fd)| fd == self )
-      . map ( |(s, _)| *s )
-      . expect ("REPRS_IN_CLIENT should cover all FieldDiffStatus variants") }
-
-  /// Parse a client string to a FieldDiffStatus.
-  pub fn from_client_string ( s: &str ) -> Option<FieldDiffStatus> {
-    Self::REPRS_IN_CLIENT . iter()
-      . find ( |(cs, _)| *cs == s )
-      . map ( |(_, fd)| *fd ) }
-}
-
-impl fmt::Display for FieldDiffStatus {
-  fn fmt (
-    &self,
-    f : &mut fmt::Formatter<'_>
-  ) -> fmt::Result {
-    write!(f, "{}", self . repr_in_client()) } }
-
-impl FromStr for FieldDiffStatus {
-  type Err = String;
-
-  fn from_str (
-    s : &str
-  ) -> Result<Self, Self::Err> {
-    Self::from_client_string (s)
-      . ok_or_else ( || format! ( "Unknown FieldDiffStatus value: {}", s ) ) } }
 
 //
 // Functions

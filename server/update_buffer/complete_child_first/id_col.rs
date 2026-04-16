@@ -1,5 +1,4 @@
-use crate::types::git::{FieldDiffStatus, MembershipAxes, NodeChanges};
-use crate::types::viewnode::legacy_field_diff_to_membership;
+use crate::types::git::{MembershipAxes, NodeChanges, Sign};
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SourceName};
 use crate::types::skgnode::SkgNode;
@@ -44,8 +43,8 @@ pub fn completeIDCol (
   let node_changes : Option<&NodeChanges> =
     node_changes_for_truenode(
       source_diffs, &parent_pid, &parent_source );
-  let (goal_list, diff_map)
-    : (Vec<ID>, HashMap<ID, Option<FieldDiffStatus>>)
+  let (goal_list, axes_map)
+    : (Vec<ID>, HashMap<ID, MembershipAxes>)
     = match node_changes {
       None => { // No git diff view: Easy.
         let goals : Vec<ID> =
@@ -54,21 +53,28 @@ pub fn completeIDCol (
             . collect();
         ( goals, HashMap::new() ) }
       Some (nc) => { // Git diff view.
+        // node_changes_for_truenode returns one NodeChanges (preferring
+        // unstaged); the membership change is therefore stamped on the
+        // unstaged axis. Per-stage merging would happen here if/when
+        // node_changes_for_truenode is generalised.
         let mut goals : Vec<ID> = Vec::new();
-        let mut dmap : HashMap<ID, Option<FieldDiffStatus>> =
+        let mut amap : HashMap<ID, MembershipAxes> =
           HashMap::new();
         for entry in &nc . ids_diff {
-          let (id, diff) : (ID, Option<FieldDiffStatus>) =
-            match entry {
-              Diff_Item::Unchanged (id) =>
-                ( id . clone(), None ),
-              Diff_Item::New (id) =>
-                ( id . clone(), Some (FieldDiffStatus::New) ),
-              Diff_Item::Removed (id) =>
-                ( id . clone(), Some (FieldDiffStatus::Removed) ), };
-          goals . push( id . clone() );
-          dmap . insert( id, diff ); }
-        ( goals, dmap ) } };
+          let (id, m) : (ID, MembershipAxes) = match entry {
+            Diff_Item::Unchanged (id) =>
+              ( id . clone(), MembershipAxes::default () ),
+            Diff_Item::New (id) =>
+              ( id . clone(),
+                MembershipAxes { staged: None,
+                                 unstaged: Some (Sign::Plus) } ),
+            Diff_Item::Removed (id) =>
+              ( id . clone(),
+                MembershipAxes { staged: None,
+                                 unstaged: Some (Sign::Minus) } ), };
+          goals . push (id . clone ());
+          amap . insert (id, m); }
+        ( goals, amap ) } };
   let is_id : fn (&ViewNode) -> bool =
     |viewnode| matches!( &viewnode . kind,
                          ViewNodeKind::Scaff( Scaffold::ID { .. } ) );
@@ -78,10 +84,8 @@ pub fn completeIDCol (
         id . clone(),
       _ => unreachable!(), };
   let create_id = |id: &ID| -> ViewNode {
-    let diff : Option<FieldDiffStatus> =
-      diff_map . get (id) . copied() . flatten();
     let membership : MembershipAxes =
-      legacy_field_diff_to_membership (diff);
+      axes_map . get (id) . copied () . unwrap_or_default ();
     viewnode_from_scaffold(
       Scaffold::ID { id: id . clone(), membership } ) };
   complete_relevant_children_in_viewnodetree(
