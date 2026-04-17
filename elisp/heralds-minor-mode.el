@@ -30,9 +30,9 @@
     (GREEN subscribeeCol "subscribees")
     (GREEN idCol "IDs")
     (GREEN id "ID")
-    (BLUE textChanged
-      (BLUE staged   "T:s")
-      (BLUE unstaged "T:u"))
+    (YELLOW textChanged
+      (staged   "staged")
+      (unstaged "unstaged"))
     (RED deletedScaffold (ANY "DELETED" IT))
     (RED deleted "DELETED"
       (id (ANY IT))
@@ -188,11 +188,12 @@ it; if mixed, the merged token uses heralds-yellow-face."
 
 (defun heralds--color-to-face
   (color-keyword)
-  "Map COLOR-KEYWORD (RED, GREEN, BLUE) to a face."
+  "Map COLOR-KEYWORD (RED, GREEN, BLUE, YELLOW) to a face."
   (cond
-    ((eq color-keyword 'RED) 'heralds-red-face)
-    ((eq color-keyword 'GREEN) 'heralds-green-face)
-    ((eq color-keyword 'BLUE) 'heralds-blue-face)
+    ((eq color-keyword 'RED)    'heralds-red-face)
+    ((eq color-keyword 'GREEN)  'heralds-green-face)
+    ((eq color-keyword 'BLUE)   'heralds-blue-face)
+    ((eq color-keyword 'YELLOW) 'heralds-yellow-face)
     (t nil)))
 
 ;;;###autoload

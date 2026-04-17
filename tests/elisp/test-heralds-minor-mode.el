@@ -126,8 +126,8 @@
     (erase-buffer)
     (insert "(skg (textChanged staged unstaged))")
     (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "T:s" result))
-      (should (string-match "T:u" result)))))
+      (should (string-match "staged" result))
+      (should (string-match "unstaged" result)))))
 
 (ert-deftest test-heralds-diff-display ()
   "Test that staged/unstaged axes are displayed as staged:.../unstaged:... heralds."
