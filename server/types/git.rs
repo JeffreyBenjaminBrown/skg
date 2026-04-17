@@ -39,65 +39,6 @@ pub struct MembershipAxes {
   pub unstaged : Option<Sign>,
 }
 
-impl ExistenceAxes {
-  pub fn is_empty (&self) -> bool {
-    self . staged . is_none () && self . unstaged . is_none () }
-
-  /// Atoms for this stage's existence change, if any:
-  /// '+' -> "newX", '-' -> "removedX".
-  fn atom_for_stage (sign: Option<Sign>) -> Option<&'static str> {
-    match sign {
-      Some (Sign::Plus)  => Some ("newX"),
-      Some (Sign::Minus) => Some ("removedX"),
-      None               => None, } }
-
-  /// The atom-list for the staged side, e.g. "newX" or "" if empty.
-  pub fn staged_atom (&self) -> Option<&'static str> {
-    Self::atom_for_stage (self . staged) }
-  pub fn unstaged_atom (&self) -> Option<&'static str> {
-    Self::atom_for_stage (self . unstaged) }
-}
-
-impl MembershipAxes {
-  pub fn is_empty (&self) -> bool {
-    self . staged . is_none () && self . unstaged . is_none () }
-
-  fn atom_for_stage (sign: Option<Sign>) -> Option<&'static str> {
-    match sign {
-      Some (Sign::Plus)  => Some ("newM"),
-      Some (Sign::Minus) => Some ("removedM"),
-      None               => None, } }
-
-  pub fn staged_atom (&self) -> Option<&'static str> {
-    Self::atom_for_stage (self . staged) }
-  pub fn unstaged_atom (&self) -> Option<&'static str> {
-    Self::atom_for_stage (self . unstaged) }
-}
-
-impl Sign {
-  /// Parse an axis atom like "newX", "removedM" into (axis-letter, sign).
-  /// Returns Some ((axis, sign)) where axis is 'X' or 'M'.
-  pub fn parse_axis_atom (s: &str) -> Option<(char, Sign)> {
-    match s {
-      "newX"     => Some (('X', Sign::Plus)),
-      "removedX" => Some (('X', Sign::Minus)),
-      "newM"     => Some (('M', Sign::Plus)),
-      "removedM" => Some (('M', Sign::Minus)),
-      _          => None, } }
-}
-
-impl GitDiffStatus {
-  /// Map a file-level git status to an existence-axis sign.
-  /// Modified files have no existence change.
-  pub fn to_existence_sign (&self) -> Option<Sign> {
-    match self {
-      GitDiffStatus::Added    => Some (Sign::Plus),
-      GitDiffStatus::Deleted  => Some (Sign::Minus),
-      GitDiffStatus::Modified => None, } } }
-
-/// Represents changes for an entire source directory.
-/// (I assume each source is a separate git repo,
-/// but the code might work even if some are part of the same repo.)
 /// Represents the per-stage diff for an entire source directory.
 /// 'staged'   maps each changed '.skg' file to its HEAD-vs-index diff.
 /// 'unstaged' maps each changed '.skg' file to its index-vs-worktree diff.
@@ -149,6 +90,53 @@ pub struct NodeChanges {
 // Implementations
 //
 
+impl Sign {
+  /// Parse an axis atom like "newX", "removedM" into (axis-letter, sign).
+  /// Returns Some ((axis, sign)) where axis is 'X' or 'M'.
+  pub fn parse_axis_atom (s: &str) -> Option<(char, Sign)> {
+    match s {
+      "newX"     => Some (('X', Sign::Plus)),
+      "removedX" => Some (('X', Sign::Minus)),
+      "newM"     => Some (('M', Sign::Plus)),
+      "removedM" => Some (('M', Sign::Minus)),
+      _          => None, } }
+}
+
+impl ExistenceAxes {
+  pub fn is_empty (&self) -> bool {
+    self . staged . is_none () && self . unstaged . is_none () }
+
+  /// Atoms for this stage's existence change, if any:
+  /// '+' -> "newX", '-' -> "removedX".
+  fn atom_for_stage (sign: Option<Sign>) -> Option<&'static str> {
+    match sign {
+      Some (Sign::Plus)  => Some ("newX"),
+      Some (Sign::Minus) => Some ("removedX"),
+      None               => None, } }
+
+  /// The atom-list for the staged side, e.g. "newX" or "" if empty.
+  pub fn staged_atom (&self) -> Option<&'static str> {
+    Self::atom_for_stage (self . staged) }
+  pub fn unstaged_atom (&self) -> Option<&'static str> {
+    Self::atom_for_stage (self . unstaged) }
+}
+
+impl MembershipAxes {
+  pub fn is_empty (&self) -> bool {
+    self . staged . is_none () && self . unstaged . is_none () }
+
+  fn atom_for_stage (sign: Option<Sign>) -> Option<&'static str> {
+    match sign {
+      Some (Sign::Plus)  => Some ("newM"),
+      Some (Sign::Minus) => Some ("removedM"),
+      None               => None, } }
+
+  pub fn staged_atom (&self) -> Option<&'static str> {
+    Self::atom_for_stage (self . staged) }
+  pub fn unstaged_atom (&self) -> Option<&'static str> {
+    Self::atom_for_stage (self . unstaged) }
+}
+
 impl SourceDiff {
   pub fn new_not_git_repo () -> Self {
     SourceDiff {
@@ -156,6 +144,15 @@ impl SourceDiff {
       staged       : HashMap::new(),
       unstaged     : HashMap::new(),
       deleted_nodes: HashMap::new() } } }
+
+impl GitDiffStatus {
+  /// Map a file-level git status to an existence-axis sign.
+  /// Modified files have no existence change.
+  pub fn to_existence_sign (&self) -> Option<Sign> {
+    match self {
+      GitDiffStatus::Added    => Some (Sign::Plus),
+      GitDiffStatus::Deleted  => Some (Sign::Minus),
+      GitDiffStatus::Modified => None, } } }
 
 //
 // Functions
