@@ -18,7 +18,7 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::to_org::expand::backpath::insert_containerward_ancestry_tree_recursive;
 use crate::to_org::util::DefinitiveMap;
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff};
+use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::memory::ViewUri;
 use crate::types::memory::{SkgNodeMap, skgnode_map_from_save_instructions};
 use crate::types::misc::{ID, SourceName, SkgConfig};
@@ -363,11 +363,7 @@ async fn attach_containerward_ancestries_to_removedhere_phantoms (
     for edge in forest . root () . traverse () {
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
         if let ViewNodeKind::True (t) = &node_ref . value () . kind {
-          // RemovedHere = membership removed but file still exists
-          // (existence axes empty). Today the legacy mapper only sets
-          // membership.unstaged = Minus for that case.
-          if t . membership . unstaged == Some (Sign::Minus)
-             && t . existence . is_empty () {
+          if t . is_removedhere_phantom () {
             result . push (
               ( node_ref . id (),
                 t . id . clone () )); }} }}

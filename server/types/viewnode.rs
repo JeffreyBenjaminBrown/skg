@@ -227,6 +227,16 @@ impl < Id, Src > TrueNode_Generic < Id, Src > {
     || self . membership . unstaged == Some (Sign::Minus)
     || self . existence  . unstaged == Some (Sign::Minus) }
 
+  /// A "removed-here" phantom: a phantom whose '.skg' file is still
+  /// present in the worktree (so TypeDB still knows the node and can
+  /// answer queries about it). Distinguished from a phantom whose file
+  /// is also gone, for which graph queries would fail.
+  pub fn is_removedhere_phantom (
+    &self,
+  ) -> bool {
+    self . is_phantom ()
+    && self . existence . unstaged != Some (Sign::Minus) }
+
   pub fn is_indefinitive (&self) -> bool {
     matches! ( self . indef_or_def,
                IndefOrDef::Indefinitive ) }

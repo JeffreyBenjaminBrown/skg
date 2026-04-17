@@ -2,17 +2,18 @@
 ///
 /// Format:
 ///   Scaffolds: (skg [focused] [folded] scaffoldKind)
-///   TrueNodes: (skg [focused] [folded] (node [(id ID)]
-///                                            [(source SOURCE)]
-///                                            [(birth independent|containerOf|linksTo)]
-///                                            [indefinitive]
-///                                            [cycle]
-///                                            [(stats [containsParent]
-///                                                    [(containers N)]
-///                                                    [(contents N)]
-///                                                    [(linksIn N)])]
-///                                            [(editRequest <delete | (merge ID)>)]
-///                                            [(viewRequests REQUEST...)]))
+///   TrueNodes: (skg [focused] [folded]
+///                   (node [(id ID)]
+///                         [(source SOURCE)]
+///                         [(birth independent|containerOf|linksTo)]
+///                         [indefinitive]
+///                         [cycle]
+///                         [(stats [containsParent]
+///                                 [(containers N)]
+///                                 [(contents N)]
+///                                 [(linksIn N)])]
+///                         [(editRequest <delete | (merge ID)>)]
+///                         [(viewRequests REQUEST...)]))
 
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SourceName};

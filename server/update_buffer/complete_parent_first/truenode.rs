@@ -31,11 +31,8 @@ use std::error::Error;
 use std::path::PathBuf;
 
 enum ChildKind {
-  /// In worktree, and in parent's content -- a real child.
-  Normal,
-  /// A phantom: missing from parent's worktree contains. Carries the
-  /// existence and membership axes the phantom should display.
-  Phantom (ExistenceAxes, MembershipAxes),
+  Normal, // In worktree, and in parent's content -- a real child.
+  Phantom (ExistenceAxes, MembershipAxes), // A phantom: missing from parent's worktree contains. Carries the existence and membership axes the phantom should display.
 }
 
 struct ChildData {

@@ -4,13 +4,7 @@ use crate::types::misc::ID;
 use crate::types::skgnode::SkgNode;
 
 use super::misc::path_relative_to_repo;
-use super::read_repo::{
-  open_repo,
-  get_staged_changed_skg_files,
-  get_unstaged_changed_skg_files,
-  get_file_content_at_head,
-  get_file_content_at_index,
-};
+use super::read_repo::{ get_file_content_at_head, get_file_content_at_index, get_staged_changed_skg_files, get_unstaged_changed_skg_files, open_repo, };
 
 use std::collections::HashMap;
 use std::error::Error as StdError;

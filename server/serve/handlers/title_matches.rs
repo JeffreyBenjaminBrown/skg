@@ -228,7 +228,6 @@ fn spawn_enrichment_thread (
       ancestry_by_id,
       graphnodestats } ); } ); }
 
-
 fn collect_ids_from_ancestry_node(
   node   : &AncestryTree,
   id_set : &mut HashSet<ID>,
@@ -236,7 +235,7 @@ fn collect_ids_from_ancestry_node(
   id_set . insert ( node . id () . clone () );
   if let AncestryTree::Inner ( _, children ) = node {
     for child in children {
-      collect_ids_from_ancestry_node ( child, id_set ); } } }
+      collect_ids_from_ancestry_node ( child, id_set ); }}}
 
 /// Build the tagged s-exp for a search enrichment payload.
 /// Format: (("response-type" "search-enrichment")

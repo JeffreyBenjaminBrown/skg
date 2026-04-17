@@ -21,10 +21,7 @@ use typedb_driver::TypeDBDriver;
 struct SubscribeeChildData {
   source  : SourceName,
   title   : String,
-  /// None = normal subscribee. Some((existence, membership)) = phantom
-  /// (subscription was removed); axes describe whether the subscribee's
-  /// '.skg' file is also gone in the worktree.
-  phantom : Option<(ExistenceAxes, MembershipAxes)>,
+  phantom : Option<(ExistenceAxes, MembershipAxes)>, // None = normal subscribee. Some((existence, membership)) = phantom (subscription was removed); axes describe whether the subscribee's '.skg' file is also gone in the worktree.
 }
 
 /// SubscribeeCol completion.
