@@ -155,16 +155,7 @@ impl SourceDiff {
       is_git_repo  : false,
       staged       : HashMap::new(),
       unstaged     : HashMap::new(),
-      deleted_nodes: HashMap::new() }}
-
-  /// Look up the SkgnodeDiff for a pid in a specific stage's map.
-  pub fn skgnode_diff_for_pid_in (
-    map : &HashMap<PathBuf, SkgnodeDiff>,
-    pid : &ID,
-  ) -> Option<SkgnodeDiff> {
-    let file_path : PathBuf =
-      PathBuf::from( format!( "{}.skg", pid . 0 ) );
-    map . get (&file_path) . cloned () }}
+      deleted_nodes: HashMap::new() } } }
 
 //
 // Functions

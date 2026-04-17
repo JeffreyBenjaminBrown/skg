@@ -76,25 +76,6 @@ pub fn skgnode_from_index_or_head (
     |e| format! ( "Failed to parse SkgNode for {} from HEAD: {}",
                   pid . 0, e ) . into ()) }
 
-/// Get a list of changed .skg files between the working directory and HEAD.
-/// Returns files that are Added, Modified, or Deleted.
-/// Mixes staged and unstaged changes; prefer the per-stage helpers
-/// 'get_staged_changed_skg_files' and 'get_unstaged_changed_skg_files'.
-pub fn get_changed_skg_files (
-  repo : &Repository
-) -> Result<Vec<PathDiffStatus>, Error> {
-  let head_tree : git2::Tree =
-    repo . head() ? . peel_to_tree() ?;
-  let mut opts : DiffOptions =
-    DiffOptions::new();
-  opts . pathspec ("*.skg");
-  opts . include_untracked (true); // Include new files not in HEAD
-  let diff : Diff = // Compare HEAD to the working directory
-    repo . diff_tree_to_workdir_with_index (
-      Some (&head_tree),
-      Some (&mut opts)) ?;
-  diff_to_entries (&diff) }
-
 /// Get the list of staged changes: files whose contents in the index
 /// differ from HEAD.
 pub fn get_staged_changed_skg_files (

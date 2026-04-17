@@ -29,13 +29,7 @@
     (GREEN hiddenOutsideOfSubscribeeCol "hiddenOut")
     (GREEN subscribeeCol "subscribees")
     (GREEN idCol "IDs")
-    (GREEN id "ID"
-      (BLUE staged
-        (GREEN newM     "staged:M")
-        (RED   removedM "staged:-M"))
-      (BLUE unstaged
-        (GREEN newM     "unstaged:M")
-        (RED   removedM "unstaged:-M")))
+    (GREEN id "ID")
     (BLUE textChanged
       (BLUE staged   "T:s")
       (BLUE unstaged "T:u"))
