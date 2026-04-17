@@ -30,15 +30,15 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::path::PathBuf;
 
-enum ChildKind {
-  Normal, // In worktree, and in parent's content -- a real child.
-  Phantom (ExistenceAxes, MembershipAxes), // A phantom: missing from parent's worktree contains. Carries the existence and membership axes the phantom should display.
+enum ContentReality {
+  Real, // Real content: Exists in worktree, and parent contains it at this position.
+  Phantom (ExistenceAxes, MembershipAxes), // Is not contained by parent at this position, and might not exist at all.
 }
 
 struct ChildData {
   title  : String,
   source : SourceName,
-  kind   : ChildKind,
+  kind   : ContentReality,
 }
 
 /// TrueNode completion.
@@ -277,11 +277,11 @@ fn complete_content_children (
       let d : &ChildData = child_data . get (id) . expect(
         "complete_content_children: child data not pre-fetched" );
       match d . kind {
-        ChildKind::Normal =>
+        ContentReality::Real =>
           mk_definitive_viewnode(
             id . clone(), d . source . clone(),
             d . title . clone(), None ),
-        ChildKind::Phantom (ex, mem) =>
+        ContentReality::Phantom (ex, mem) =>
           mk_phantom_viewnode(
             id . clone(), d . source . clone(),
             d . title . clone(), ex, mem ) } },
@@ -458,7 +458,7 @@ fn build_child_creation_data (
         . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
       let (ex, mem) : (ExistenceAxes, MembershipAxes) =
         phantom_axes ( id, &phantom_source, source_diffs . as_ref () );
-      let kind : ChildKind = ChildKind::Phantom (ex, mem);
+      let kind : ContentReality = ContentReality::Phantom (ex, mem);
       let title : String = title_for_phantom(
         id, &phantom_source, source_diffs . as_ref(), map, config );
       result . insert( id . clone(),
@@ -475,7 +475,7 @@ fn build_child_creation_data (
       result . insert( id . clone(),
                      ChildData { title: skg . title . clone(),
                                  source: skg . source . clone(),
-                                 kind: ChildKind::Normal } ); }}
+                                 kind: ContentReality::Real } ); }}
   Ok (result) }
 
 /// In diff view, set the TrueNode's per-stage diff axes.
