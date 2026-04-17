@@ -57,8 +57,15 @@
     If you use git to manage your data,
     enable this view to see what you've changed since your last commit,
     i.e. how your worktree differs from HEAD.
-*** C-c v m : skg-view-magit
+*** C-c v m : skg-magit-goto
     Opens a magit view of the changes to the file.
+    If the file appears in multiple sections (unstaged, staged,
+    untracked), point lands on the first and the user is warned.
+*** C-c v p : skg-magit-goto-in-parent
+    Opens a magit view of the parent's file, with point on
+    the first line in that section containing this node's ID.
+    Warns if the ID appears multiple times, or if the parent
+    appears in multiple sections.
 *** C-c v o : skg-view-org-ancestry
     If you're at a headline so deep in the tree
     that you can't remember where it came from,

@@ -63,7 +63,8 @@ and hide INTERNAL from M-x completion."
       (define-key map (kbd "C-c v h") #'skg-view-heralds-mode)
       (define-key map (kbd "C-c v d") #'skg-view-diff-mode)
       (define-key map (kbd "C-c v o") #'skg-view-org-ancestry)
-      (define-key map (kbd "C-c v m") #'skg-view-magit)
+      (define-key map (kbd "C-c v m") #'skg-magit-goto)
+      (define-key map (kbd "C-c v p") #'skg-magit-goto-in-parent)
       (define-key map (kbd "C-c i s") #'skg-id-stack))
     (progn;; local changes to view (and possibly interpretation
       (define-key map (kbd "C-c l a") #'skg-local-aliases)

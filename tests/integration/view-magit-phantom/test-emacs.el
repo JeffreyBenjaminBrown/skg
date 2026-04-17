@@ -1,4 +1,4 @@
-;;; Integration test: skg-view-magit on a removed-here phantom.
+;;; Integration test: skg-magit-goto-in-parent on a removed-here phantom.
 ;;;
 ;;; Graph at HEAD: a contains [b].
 ;;; Worktree:      a contains [].
@@ -6,7 +6,7 @@
 ;;; Phase 1: Open content view from a.
 ;;; Phase 2: Toggle diff mode on.
 ;;;          b appears as a removed-here phantom under a.
-;;; Phase 3: Call skg-view-magit on the phantom b.
+;;; Phase 3: Call skg-magit-goto-in-parent on the phantom b.
 ;;; Phase 4: Verify magit opened on a.skg's diff,
 ;;;          point on the line showing deletion of b's ID.
 
@@ -80,11 +80,11 @@
     (message "  Positioned on: %s"
              (buffer-substring-no-properties
               (line-beginning-position) (line-end-position)))
-    (skg-view-magit)
+    (skg-magit-goto-in-parent)
     (unless (skg-test-wait-for-response 20)
-      (test-fail "Timeout waiting for skg-view-magit response"))
+      (test-fail "Timeout waiting for skg-magit-goto-in-parent response"))
     (sleep-for 1)
-    (test-pass "skg-view-magit completed on phantom")))
+    (test-pass "skg-magit-goto-in-parent completed on phantom")))
 
 (defun phase-4-verify-magit-points-to-deletion-of-b-in-a ()
   (setq integration-test-phase "phase-4")

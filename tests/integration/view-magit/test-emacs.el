@@ -1,5 +1,5 @@
-;;; Integration test for skg-view-magit
-;;; Tests that skg-view-magit opens magit-status and reports staging state.
+;;; Integration test for skg-magit-goto
+;;; Tests that skg-magit-goto opens magit-status and reports staging state.
 
 (load-file "../../../elisp/skg-init.el")
 (load-file "../test-wait.el")
@@ -46,9 +46,9 @@
   (test-pass "Content view of x loaded"))
 
 (defun phase-1-magit-from-x ()
-  "From line 1 (node x), skg-view-magit should show unstaged changes."
+  "From line 1 (node x), skg-magit-goto should show unstaged changes."
   (setq integration-test-phase "magit-from-x")
-  (message "=== PHASE 1: skg-view-magit from x (modified file) ===")
+  (message "=== PHASE 1: skg-magit-goto from x (modified file) ===")
   (let (( buf (cl-find-if
                (lambda (b) (with-current-buffer b
                             (derived-mode-p 'skg-content-view-mode)))
@@ -57,7 +57,7 @@
     (goto-char (point-min))
     (message "Buffer content: %s"
              (buffer-substring-no-properties (point-min) (point-max)))
-    (skg-view-magit)
+    (skg-magit-goto)
     (unless (skg-test-wait-for-response)
       (test-fail "Timeout waiting for file path response"))
     ;; Give magit a moment to render
@@ -92,9 +92,9 @@
       (test-pass "Point is on 'modified x.skg' line"))))
 
 (defun phase-2-magit-from-y ()
-  "From line 2 (node y), skg-view-magit should report no changes."
+  "From line 2 (node y), skg-magit-goto should report no changes."
   (setq integration-test-phase "magit-from-y")
-  (message "=== PHASE 2: skg-view-magit from y (unchanged file) ===")
+  (message "=== PHASE 2: skg-magit-goto from y (unchanged file) ===")
   ;; Switch back to the skg content view
   (let (( buf (cl-find-if
                (lambda (b) (with-current-buffer b
@@ -107,12 +107,12 @@
     (message "Line 2: %s"
              (buffer-substring-no-properties
               (line-beginning-position) (line-end-position)))
-    (skg-view-magit)
+    (skg-magit-goto)
     (unless (skg-test-wait-for-response)
       (test-fail "Timeout waiting for file path response for y"))
     ;; Give magit a moment
     (sleep-for 1)
-    (test-pass "skg-view-magit completed for y")))
+    (test-pass "skg-magit-goto completed for y")))
 
 (defun integration-test-main ()
   "Main test orchestrator."
