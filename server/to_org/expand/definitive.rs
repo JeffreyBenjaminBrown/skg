@@ -109,8 +109,8 @@ async fn execute_definitive_view_request (
       forest, node_id,
       |n| match &n . kind {
         ViewNodeKind::True (t) =>
-          // The truenode's '.skg' is gone in the worktree.
-          // Body must be loaded from index (preferred) or HEAD.
+        // The truenode's '.skg' file is gone in the worktree.
+        // Body must be loaded from index (preferred) or HEAD.
           t . existence . unstaged == Some (Sign::Minus),
         _ => false } ) ?;
   let hidden_ids : HashSet < ID > =
@@ -382,8 +382,9 @@ async fn mk_removed_child_viewnode (
 ) -> Result<ViewNode, Box<dyn Error>> {
   let in_worktree : bool =
     contents_in_worktree . contains ( &child_id . 0 );
-  // The child is a phantom either way (its parent's worktree contains
-  // doesn't reference it). Existence depends on whether the child's
+  // The child is a phantom either way
+  // (absent from its parent's worktree content).
+  // Existence depends on whether the child's
   // own file is also gone in the worktree:
   //   in worktree -> file exists; just M is removed.
   //   not in worktree -> file gone; both X and M are removed.

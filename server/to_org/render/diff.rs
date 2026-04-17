@@ -118,7 +118,7 @@ fn process_truenode_diff (
         Scaffold::TextChanged { staged   : staged_text,
                                 unstaged : unstaged_text } )); }
   let merged_ids : Vec<(ID, MembershipAxes)> =
-    merged_axes_from_per_stage (
+    axes_from_per_stage_diffs (
       staged_changes   . map ( |c| c . ids_diff . as_slice () ),
       unstaged_changes . map ( |c| c . ids_diff . as_slice () ) );
   if merged_ids . iter () . any ( |(_, m)| ! m . is_empty () ) {
@@ -126,7 +126,7 @@ fn process_truenode_diff (
   // Compute per-stage contains diff for the parent so we can decorate
   // worktree children with M axes and insert phantoms.
   let merged_contains : Vec<(ID, MembershipAxes)> =
-    merged_axes_from_per_stage (
+    axes_from_per_stage_diffs (
       staged_changes   . map ( |c| c . contains_diff . as_slice () ),
       unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
   mark_membership_on_existing_children (
@@ -145,12 +145,20 @@ fn sign_from_status (status: &GitDiffStatus) -> Option<Sign> {
     GitDiffStatus::Deleted  => Some (Sign::Minus),
     GitDiffStatus::Modified => None, } }
 
-/// Merge per-stage Diff_Item lists (over IDs or aliases) into a single
-/// list of (item, MembershipAxes), where each axis records the sign on
-/// that stage if the item was New (+) or Removed (-).
-/// Unchanged items are still included with empty axes (for IDs we want
-/// them rendered in the IDcol; for contains they pass through anyway).
-fn merged_axes_from_per_stage<T: Clone + Eq + std::hash::Hash> (
+/// Combine two stages' Diff_Item lists into a single list of
+/// (item, MembershipAxes). Each axis cell records that stage's sign:
+/// New -> Plus, Removed -> Minus, Unchanged -> empty.
+///
+/// Used in this file for both `ids_diff` (when populating an IDCol with
+/// per-id axis markers) and `contains_diff` (when deciding which
+/// children to phantom and which to mark as added). The function is
+/// generic over the item type and doesn't itself know which field it
+/// came from.
+///
+/// Unchanged items are kept in the output with empty axes so callers
+/// that want a complete listing (e.g. the IDCol, which renders every ID
+/// even if unchanged) can iterate without re-reading the originals.
+fn axes_from_per_stage_diffs<T: Clone + Eq + std::hash::Hash> (
   staged_diff   : Option<&[Diff_Item<T>]>,
   unstaged_diff : Option<&[Diff_Item<T>]>,
 ) -> Vec<(T, MembershipAxes)> {
