@@ -194,6 +194,45 @@ The whole collection is wrapped in (skg ...).
 This metadata appears right after the org bullet and a whitespace,
 and right before another whitespace and the node's title.
 
-The possible metadata is specified in `server/types/orgnode.rs`.
+The metadata grammar (which keys are recognized and how they're
+parsed) lives in `server/serve/parse_metadata_sexp.rs`. The
+in-memory types those keys correspond to are in
+`server/types/viewnode.rs` (`TrueNode`, `Scaffold`, `ScaffoldKind`)
+and `server/types/git.rs` (`ExistenceAxes`, `MembershipAxes`, `Sign`).
+
 Metadata is not WYSIWYG; its appearance in the client
 is determined by `elisp/heralds-minor-mode`.
+
+## Diff-related metadata
+
+When git diff mode is on, additional keys decorate nodes and
+scaffolds with per-stage diff information. The 'staged' stage
+compares HEAD to the index; 'unstaged' compares the index to the
+worktree.
+
+Inside a `(node ...)` form (TrueNodes):
+- `(staged AXES)` and/or `(unstaged AXES)`, where `AXES` is a sequence
+  of bare atoms drawn from `{newX, removedX, newM, removedM}`. `X` =
+  existence (the node's `.skg` file appeared/disappeared in this
+  stage); `M` = membership (the node's appearance at this position in
+  the parent's contains list appeared/disappeared in this stage).
+- bare atom `notInGit` if the node's source is not a git repo.
+
+At top level inside `(skg ...)` (Scaffolds for Alias / ID):
+- `(staged AXES)` and/or `(unstaged AXES)` with `AXES` drawn only
+  from `{newM, removedM}` (scaffolds have no `.skg` file of their
+  own and so no X axis).
+
+Also at top level, for the TextChanged scaffold:
+- `(textChanged STAGE_TAGS)` where `STAGE_TAGS` is a subset of
+  `{staged, unstaged}` indicating which side(s) the node's title or
+  body changed on.
+
+Examples:
+```
+(skg (node (id 7) (source main) (unstaged newX newM)))
+(skg (node (id 9) (source main) indefinitive (staged removedM) (unstaged newM)))
+(skg alias (staged newM))
+(skg id (unstaged removedM))
+(skg (textChanged staged unstaged))
+```
