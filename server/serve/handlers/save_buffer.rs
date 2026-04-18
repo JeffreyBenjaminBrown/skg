@@ -198,7 +198,8 @@ pub async fn update_from_and_rerender_buffer (
           &source_moves,
           config . clone(),
           tantivy_index,
-          typedb_driver ) . await } ?;
+          typedb_driver,
+          &conn_state . graph ) . await } ?;
     if let Some (new_index) = save_replacement {
       *tantivy_index = new_index; }
     let merge_replacement : Option<TantivyIndex> =
@@ -208,7 +209,8 @@ pub async fn update_from_and_rerender_buffer (
           &merge_instructions,
           config . clone(),
           tantivy_index,
-          typedb_driver ) . await } ?;
+          typedb_driver,
+          &conn_state . graph ) . await } ?;
     if let Some (new_index) = merge_replacement {
       *tantivy_index = new_index; }
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(

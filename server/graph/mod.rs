@@ -46,6 +46,32 @@ impl Graph {
     self . nodes . len () }
 }
 
+/// Apply a batch of DefineNodes to the shared graph atomically.
+/// Clones the current Graph (cheap due to 'im''s structural
+/// sharing), applies Save/Delete mutations, and publishes the new
+/// snapshot via ArcSwap.
+///
+/// Called from the save pipeline after the filesystem write has
+/// succeeded. Readers in flight continue to see the old snapshot
+/// until their Arc<Graph> drops; subsequent readers see the new
+/// one.
+pub fn apply_node_defs (
+  graph     : &GraphHandle,
+  node_defs : &[crate::types::save::DefineNode],
+) {
+  use crate::types::save::{DefineNode, DeleteNode, SaveNode};
+  let old : Arc<Graph> = graph . load_full ();
+  let mut new_graph : Graph = (*old) . clone ();
+  for instr in node_defs {
+    match instr {
+      DefineNode::Save (SaveNode (node)) => {
+        let rust : NodeRust = NodeRust::from (node);
+        new_graph . nodes . insert (
+          rust . pid . clone (), rust ); }
+      DefineNode::Delete (DeleteNode { id, .. }) => {
+        new_graph . nodes . remove (id); } } }
+  graph . store ( Arc::new (new_graph) ); }
+
 /// Server-wide handle to the shared graph. Readers call
 /// '.load_full()' to snap a consistent 'Arc<Graph>'; writers
 /// build a new 'Arc<Graph>' (using 'im''s cheap clone +

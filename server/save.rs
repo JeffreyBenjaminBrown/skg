@@ -32,8 +32,9 @@ pub async fn update_graph_minus_merges (
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
   driver        : &TypeDBDriver,
+  graph         : &crate::graph::GraphHandle,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
-  tracing::info!("Updating (1) FS, (2) TypeDB, and (3) Tantivy ...");
+  tracing::info!("Updating (1) FS, (1b) in-memory graph, (2) TypeDB, and (3) Tantivy ...");
   let db_name : &str = &config . db_name;
 
   { // Step 1: FS (source of truth)
@@ -49,6 +50,13 @@ pub async fn update_graph_minus_merges (
           config . clone () ) } ?;
     tracing::info!( "   Deleted {} file(s), wrote {} file(s).",
               deleted_count, written_count ); }
+
+  { // Step 1b: In-memory graph — atomic snapshot swap so
+    // readers see a view that's consistent with what just landed
+    // on disk, and never a mid-save half-applied state.
+    let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "apply_node_defs_to_graph") . entered ();
+    crate::graph::apply_node_defs (graph, &node_defs); }
 
   // Steps 2 & 3: TypeDB (async) and Tantivy (sync) in parallel.
   // Both are independent after the FS update.

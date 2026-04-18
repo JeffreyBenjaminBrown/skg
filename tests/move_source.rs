@@ -155,7 +155,8 @@ fn test_move_node_to_another_owned_source (
     let replacement : Option<TantivyIndex> =
       update_graph_minus_merges (
         instructions, &source_moves,
-        config . clone(), &tantivy_index, &driver ) . await?;
+        config . clone(), &tantivy_index, &driver,
+        &skg::graph::new_handle (skg::graph::Graph::new ()) ) . await?;
     if let Some (new_idx) = replacement {
       tantivy_index = new_idx; }
 
@@ -248,7 +249,8 @@ fn test_move_node_referenced_by_extra_id (
     let replacement : Option<TantivyIndex> =
       update_graph_minus_merges (
         instructions, &source_moves,
-        config . clone(), &tantivy_index, &driver ) . await?;
+        config . clone(), &tantivy_index, &driver,
+        &skg::graph::new_handle (skg::graph::Graph::new ()) ) . await?;
     if let Some (new_idx) = replacement {
       tantivy_index = new_idx; }
 
@@ -314,7 +316,8 @@ fn test_move_multiple_nodes (
     let replacement : Option<TantivyIndex> =
       update_graph_minus_merges (
         instructions, &source_moves,
-        config . clone(), &_tantivy_index, &driver ) . await?;
+        config . clone(), &_tantivy_index, &driver,
+        &skg::graph::new_handle (skg::graph::Graph::new ()) ) . await?;
     if let Some (new_idx) = replacement {
       _tantivy_index = new_idx; }
 
@@ -520,7 +523,8 @@ fn test_source_only_change_with_populated_pool (
     let replacement : Option<TantivyIndex> =
       update_graph_minus_merges (
         instructions, &source_moves,
-        config . clone(), &tantivy_index, &driver ) . await?;
+        config . clone(), &tantivy_index, &driver,
+        &skg::graph::new_handle (skg::graph::Graph::new ()) ) . await?;
     if let Some (new_idx) = replacement {
       tantivy_index = new_idx; }
 

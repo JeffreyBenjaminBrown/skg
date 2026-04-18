@@ -98,6 +98,7 @@ async fn test_merge_2_into_1_impl(
     config . clone(),
     tantivy,
     driver,
+    &skg::graph::new_handle (skg::graph::Graph::new ()),
   ) . await?;
 
   // Verify results
@@ -355,6 +356,7 @@ async fn test_merge_1_into_2_impl(
     config . clone(),
     tantivy,
     driver,
+    &skg::graph::new_handle (skg::graph::Graph::new ()),
   ) . await?;
 
   // Verify results
