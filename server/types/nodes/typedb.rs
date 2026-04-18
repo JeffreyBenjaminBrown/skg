@@ -13,6 +13,7 @@
 
 use crate::types::misc::{ID, MSV, SourceName};
 use crate::types::nodes::complete::NodeComplete;
+use crate::types::textlinks::textlinks_from_node;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct NodeTypedb {
@@ -47,5 +48,19 @@ impl NodeTypedb {
       overrides_view_of            : complete . overrides_view_of . clone (),
       textlinks_to                 : textlinks,
     }
+  }
+
+  /// Convenience: build a NodeTypedb from a complete node, parsing
+  /// textlinks from its title+body in the process. Equivalent to
+  /// calling 'from_complete_and_textlinks' with parsed textlinks.
+  pub fn from_complete_parsing_textlinks (
+    complete : &NodeComplete,
+  ) -> Self {
+    let textlinks : Vec<ID> =
+      textlinks_from_node (complete)
+      . into_iter ()
+      . map ( |tl| tl . id )
+      . collect ();
+    Self::from_complete_and_textlinks (complete, textlinks)
   }
 }

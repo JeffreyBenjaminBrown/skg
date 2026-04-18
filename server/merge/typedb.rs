@@ -3,6 +3,7 @@ use crate::dbs::typedb::relationships::insert_relationship_from_list;
 use crate::dbs::typedb::util::ConceptRowStream;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::types::misc::ID;
+use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::save::Merge;
 use crate::types::skgnode::SkgNode;
 
@@ -47,9 +48,14 @@ async fn merge_one_node_in_typedb(
 ) -> Result<(), Box<dyn Error>> {
   let acquirer_id  : &ID = &updated_acquirer        . pid;
   let preserver_id : &ID = &acquiree_text_preserver . pid;
+  // Convert to NodeTypedb (narrow) at the boundary. Parses
+  // textlinks from the preserver's title+body.
+  let preserver_typedb : NodeTypedb =
+    NodeTypedb::from_complete_parsing_textlinks (
+      acquiree_text_preserver );
   create_node( // Create the text preserver node before using it.
     // PITFALL: Rerouting to a nonexistent node fails silently.
-    acquiree_text_preserver, tx) . await?;
+    &preserver_typedb, tx) . await?;
 
   { // Reroute relationships.
     reroute_relationships_for_merge (

@@ -19,6 +19,7 @@ pub use skg::dbs::typedb::relationships::create_all_relationships;
 pub use skg::to_org::render::content_view::multi_root_view;
 pub use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
 pub use skg::types::misc::{ID, SkgConfig, SkgfileSource, TantivyIndex, SourceName};
+pub use skg::types::nodes::typedb::NodeTypedb;
 pub use skg::types::skgnode::SkgNode;
 pub use skg::types::memory::SkgNodeMap;
 pub use skg::serve::ConnectionState;
@@ -104,10 +105,14 @@ pub async fn setup_test_dbs(
     read_all_skg_files_from_sources(
       &SkgConfig::dummyFromSources (sources))? };
 
+  let typedb_nodes : Vec<NodeTypedb> =
+    nodes . iter ()
+    . map (NodeTypedb::from_complete_parsing_textlinks)
+    . collect ();
   overwrite_new_empty_db(db_name, &driver) . await?;
   define_schema(db_name, &driver) . await?;
-  create_all_nodes(db_name, &driver, &nodes) . await?;
-  create_all_relationships(db_name, &driver, &nodes) . await?;
+  create_all_nodes(db_name, &driver, &typedb_nodes) . await?;
+  create_all_relationships(db_name, &driver, &typedb_nodes) . await?;
 
   let tantivy_index = create_empty_tantivy_index(&config . tantivy_folder)?;
   Ok((config, driver, tantivy_index))

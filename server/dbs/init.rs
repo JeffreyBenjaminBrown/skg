@@ -14,6 +14,7 @@ use crate::dbs::typedb::relationships::delete_all_outbound_relationships;
 use crate::dbs::typedb::util::connect_to_typedb;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::tantivy::NodeTantivy;
+use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::skgnode::SkgNode;
 
 use futures::executor::block_on;
@@ -153,11 +154,17 @@ fn incremental_init (
     tracing::info! ("No modified .skg files found.");
     return Ok (tantivy_index); }
   tracing::info! (count = nodes . len(), "Modified .skg file(s) found.");
+  // Convert to NodeTypedb (narrow) at the boundary. Parses
+  // textlinks from each node's title+body.
+  let typedb_nodes : Vec<NodeTypedb> =
+    nodes . iter ()
+    . map (NodeTypedb::from_complete_parsing_textlinks)
+    . collect ();
   block_on ( async {
     let t0 : Instant = Instant::now();
     let created : usize =
       create_only_nodes_with_no_ids_present (
-        &config . db_name, driver, &nodes ) . await ?;
+        &config . db_name, driver, &typedb_nodes ) . await ?;
     tracing::info! (created, elapsed_s = ?t0 . elapsed(),
               "New nodes created");
     let t1 : Instant = Instant::now();
@@ -171,7 +178,7 @@ fn incremental_init (
               "Deleted stale relationships");
     let t2 : Instant = Instant::now();
     create_all_relationships (
-      &config . db_name, driver, &nodes ) . await ?;
+      &config . db_name, driver, &typedb_nodes ) . await ?;
     tracing::info! (elapsed_s = ?t2 . elapsed(),
               "Recreated relationships");
     Ok::<(), Box<dyn Error>> (( )) } ) ?;
@@ -297,16 +304,22 @@ async fn populate_typedb_from_nodes (
     & config . db_name,
     driver ) . await ?;
   let t0 : Instant = Instant::now();
+  // Convert to NodeTypedb (narrow) at the boundary. Parses
+  // textlinks from each node's title+body.
+  let typedb_nodes : Vec<NodeTypedb> =
+    nodes . iter ()
+    . map (NodeTypedb::from_complete_parsing_textlinks)
+    . collect ();
   create_all_nodes (
     & config . db_name,
     driver,
-    nodes ) . await ?;
+    &typedb_nodes ) . await ?;
   tracing::info! (elapsed_s = ?t0 . elapsed(), "TypeDB nodes created");
   let t1 : Instant = Instant::now();
   create_all_relationships (
     & config . db_name,
     driver,
-    nodes ) . await ?;
+    &typedb_nodes ) . await ?;
   tracing::info! (elapsed_s = ?t1 . elapsed(), "TypeDB relationships created");
   Ok (( )) }
 

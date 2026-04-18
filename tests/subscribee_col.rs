@@ -9,6 +9,7 @@ use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID};
 use skg::types::memory::SkgNodeMap;
+use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::skgnode::SkgNode;
 use futures::executor::block_on;
 use std::error::Error;
@@ -29,10 +30,14 @@ async fn setup_multi_source_test(
   ) . await?;
   let nodes: Vec<SkgNode> =
     read_all_skg_files_from_sources (&config)?;
+  let typedb_nodes : Vec<NodeTypedb> =
+    nodes . iter ()
+    . map (NodeTypedb::from_complete_parsing_textlinks)
+    . collect ();
   overwrite_new_empty_db(db_name, &driver) . await?;
   define_schema(db_name, &driver) . await?;
-  create_all_nodes(db_name, &driver, &nodes) . await?;
-  create_all_relationships(db_name, &driver, &nodes) . await?;
+  create_all_nodes(db_name, &driver, &typedb_nodes) . await?;
+  create_all_relationships(db_name, &driver, &typedb_nodes) . await?;
   Ok((config, driver)) }
 
 async fn cleanup_test(

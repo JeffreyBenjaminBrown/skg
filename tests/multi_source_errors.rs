@@ -10,6 +10,7 @@ use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_f
 use skg::types::unchecked_viewnode::UncheckedViewNode;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::SkgConfig;
+use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::skgnode::SkgNode;
 use skg::types::memory::SkgNodeMap;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
@@ -44,10 +45,14 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
     // Load fixtures into database
     let nodes: Vec<SkgNode> =
       read_all_skg_files_from_sources (&config)?;
+    let typedb_nodes : Vec<NodeTypedb> =
+      nodes . iter ()
+      . map (NodeTypedb::from_complete_parsing_textlinks)
+      . collect ();
     overwrite_new_empty_db(&config . db_name, &driver) . await?;
     define_schema(&config . db_name, &driver) . await?;
-    create_all_nodes(&config . db_name, &driver, &nodes) . await?;
-    create_all_relationships(&config . db_name, &driver, &nodes) . await?;
+    create_all_nodes(&config . db_name, &driver, &typedb_nodes) . await?;
+    create_all_relationships(&config . db_name, &driver, &typedb_nodes) . await?;
 
     // Test buffer with multiple error conditions
     // Comments indicate the expected error for each line/group
@@ -139,10 +144,14 @@ fn test_foreign_node_modification_errors(
     // Load fixtures into database
     let nodes: Vec<SkgNode> =
       read_all_skg_files_from_sources (&config)?;
+    let typedb_nodes : Vec<NodeTypedb> =
+      nodes . iter ()
+      . map (NodeTypedb::from_complete_parsing_textlinks)
+      . collect ();
     overwrite_new_empty_db(&config . db_name, &driver) . await?;
     define_schema(&config . db_name, &driver) . await?;
-    create_all_nodes(&config . db_name, &driver, &nodes) . await?;
-    create_all_relationships(&config . db_name, &driver, &nodes) . await?;
+    create_all_nodes(&config . db_name, &driver, &typedb_nodes) . await?;
+    create_all_relationships(&config . db_name, &driver, &typedb_nodes) . await?;
 
     // Test 1: Foreign node modifications
     // (all other errors removed so initial validation passes)
@@ -304,10 +313,14 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     // Load fixtures into database
     let nodes: Vec<SkgNode> =
       read_all_skg_files_from_sources (&config)?;
+    let typedb_nodes : Vec<NodeTypedb> =
+      nodes . iter ()
+      . map (NodeTypedb::from_complete_parsing_textlinks)
+      . collect ();
     overwrite_new_empty_db(&config . db_name, &driver) . await?;
     define_schema(&config . db_name, &driver) . await?;
-    create_all_nodes(&config . db_name, &driver, &nodes) . await?;
-    create_all_relationships(&config . db_name, &driver, &nodes) . await?;
+    create_all_nodes(&config . db_name, &driver, &typedb_nodes) . await?;
+    create_all_relationships(&config . db_name, &driver, &typedb_nodes) . await?;
 
     // Test 1: Source move between owned sources is now allowed
     // priv-1 exists on disk in "private" source, but buffer specifies "public"

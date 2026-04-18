@@ -8,6 +8,7 @@ use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_out_links;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::nodes::tantivy::NodeTantivy;
+use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::save::{DefineNode, SaveNode, DeleteNode, SourceMove};
 use crate::types::skgnode::SkgNode;
 use crate::util::path_from_pid_and_source;
@@ -154,10 +155,16 @@ pub async fn update_typedb_from_saveinstructions (
       to_write_skgnodes . iter ()
       . map ( |n| n . pid . clone() )
       . collect ();
+    // Convert to NodeTypedb (narrow) at the boundary. Parses
+    // textlinks from each node's title+body.
+    let to_write_typedb : Vec<NodeTypedb> =
+      to_write_skgnodes . iter ()
+      . map (NodeTypedb::from_complete_parsing_textlinks)
+      . collect ();
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "create_only_nodes_with_no_ids_present") . entered ();
       create_only_nodes_with_no_ids_present (
-        db_name, driver, & to_write_skgnodes )
+        db_name, driver, & to_write_typedb )
       . await } ?;
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "delete_out_links") . entered ();
@@ -170,7 +177,7 @@ pub async fn update_typedb_from_saveinstructions (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "create_all_relationships") . entered ();
       create_all_relationships (
-        db_name, driver, & to_write_skgnodes )
+        db_name, driver, & to_write_typedb )
       . await } ?; }
 
   for sm in source_moves { // TODO ? parallelize

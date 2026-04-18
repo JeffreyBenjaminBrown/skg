@@ -2,8 +2,7 @@ use std::time::Duration;
 use std::error::Error;
 
 use crate::types::misc::ID;
-use crate::types::skgnode::SkgNode;
-use crate::types::textlinks::textlinks_from_node;
+use crate::types::nodes::typedb::NodeTypedb;
 
 use futures::stream::{self, StreamExt};
 use typedb_driver::{
@@ -31,7 +30,7 @@ pub const OUTBOUND_RELATIONSHIP_TYPES : &[(&str, &str, &str)] = &[
 pub async fn create_all_relationships (
   db_name    : &str,
   driver     : &TypeDBDriver,
-  nodes      : &[SkgNode]
+  nodes      : &[NodeTypedb]
 )-> Result < (), Box<dyn Error> > {
   tracing::info! ("Creating relationships ...");
   let results : Vec < Result < (), Box < dyn Error > > > =
@@ -48,7 +47,7 @@ pub async fn create_all_relationships (
 async fn create_relationships_for_one_node (
   db_name : &str,
   driver  : &TypeDBDriver,
-  node    : &SkgNode,
+  node    : &NodeTypedb,
 ) -> Result < (), Box<dyn Error> > {
   if count_relationships (node) == 0 { return Ok (()); }
   let primary_id : &ID = &node . pid;
@@ -73,7 +72,7 @@ async fn create_relationships_for_one_node (
   Ok (()) }
 
 pub async fn create_relationships_from_node (
-  node : &SkgNode,
+  node : &NodeTypedb,
   tx   : &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 
@@ -88,11 +87,7 @@ pub async fn create_relationships_from_node (
     . map_err(|e| format!("Failed to create 'contains' relationships: {}", e))?;
   insert_relationship_from_list (
     primary_id . as_str (),
-    & ( textlinks_from_node (&node)
-        . iter ()
-        . map ( |textlink|
-                 ID::from ( textlink . id . clone() ) )
-        . collect::<Vec<ID>>() ),
+    &node . textlinks_to,
     "textlinks_to",
     "source",
     "dest",
@@ -128,12 +123,12 @@ pub async fn create_relationships_from_node (
 /// Used by `create_all_relationships` to decide when to commit
 /// a batch and start a new transaction.
 fn count_relationships (
-  node : &SkgNode,
+  node : &NodeTypedb,
 ) -> usize {
   let contains : usize =
     node . contains . len();
   let textlinks : usize =
-    textlinks_from_node (node) . len();
+    node . textlinks_to . len();
   let subscribes : usize =
     node . subscribes_to . or_default() . len();
   let hides : usize =

@@ -23,6 +23,7 @@ use skg::test_utils::run_with_test_db;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::memory::SkgNodeMap;
+use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::skgnode::{SkgNode, empty_skgnode};
 use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
 use skg::types::viewnode::{ViewNode, ViewNodeKind};
@@ -290,7 +291,9 @@ async fn test_create_only_nodes_with_no_ids_present (
     create_only_nodes_with_no_ids_present (
       db_name,
       driver,
-      &vec! [ fn_a . clone (), fn_new . clone () ]
+      &vec! [
+        NodeTypedb::from_complete_parsing_textlinks (&fn_a),
+        NodeTypedb::from_complete_parsing_textlinks (&fn_new) ]
     ) . await ?;
   assert_eq! (
     created_count, 1,

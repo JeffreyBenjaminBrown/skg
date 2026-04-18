@@ -16,6 +16,7 @@ use skg::test_utils::cleanup_test_tantivy_and_typedb_dbs;
 use skg::types::errors::{SaveError, BufferValidationError};
 use skg::types::memory::SkgNodeMap;
 use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
+use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::skgnode::SkgNode;
 use skg::types::save::DefineNode;
 use std::error::Error;
@@ -52,10 +53,14 @@ async fn setup (
       DriverOptions::new (false, None)? ) . await?;
   let nodes : Vec<SkgNode> =
     read_all_skg_files_from_sources (&config)?;
+  let typedb_nodes : Vec<NodeTypedb> =
+    nodes . iter ()
+    . map (NodeTypedb::from_complete_parsing_textlinks)
+    . collect ();
   overwrite_new_empty_db (db_name, &driver) . await?;
   define_schema (db_name, &driver) . await?;
-  create_all_nodes (db_name, &driver, &nodes) . await?;
-  create_all_relationships (db_name, &driver, &nodes) . await?;
+  create_all_nodes (db_name, &driver, &typedb_nodes) . await?;
+  create_all_relationships (db_name, &driver, &typedb_nodes) . await?;
   let tantivy_index : TantivyIndex =
     create_empty_tantivy_index (&config . tantivy_folder)?;
   Ok ((config, driver, tantivy_index, temp_fixtures)) }

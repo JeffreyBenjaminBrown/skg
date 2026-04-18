@@ -1,5 +1,5 @@
 use crate::types::misc::{ID, SourceName};
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::typedb::NodeTypedb;
 
 use super::util::ConceptRowStream;
 
@@ -24,7 +24,7 @@ use typedb_driver::answer::QueryAnswer;
 pub async fn create_all_nodes (
   db_name : &str,
   driver  : &TypeDBDriver,
-  nodes   : &[SkgNode]
+  nodes   : &[NodeTypedb]
 )-> Result < (), Box<dyn Error> > {
   tracing::info!("Creating nodes ...");
   let results : Vec < Result < (), Box < dyn Error > > > =
@@ -43,7 +43,7 @@ pub async fn create_all_nodes (
 pub async fn create_only_nodes_with_no_ids_present (
   db_name : &str,
   driver  : &TypeDBDriver,
-  nodes   : &Vec <SkgNode>
+  nodes   : &Vec <NodeTypedb>
 ) -> Result < usize, Box<dyn Error> > {
   let mut all_pids : BTreeSet < String > =
     BTreeSet::new ();
@@ -56,7 +56,7 @@ pub async fn create_only_nodes_with_no_ids_present (
       driver,
       &all_pids
     ) . await ?;
-  let to_create : Vec < &SkgNode > =
+  let to_create : Vec < &NodeTypedb > =
     nodes . iter ()
     . filter ( |node| {
       let pid : &ID = &node . pid;
@@ -79,7 +79,7 @@ pub async fn create_only_nodes_with_no_ids_present (
 async fn create_one_node_in_own_tx (
   db_name : &str,
   driver  : &TypeDBDriver,
-  node    : &SkgNode,
+  node    : &NodeTypedb,
 ) -> Result < (), Box<dyn Error> > {
   let tx : Transaction =
     driver . transaction (
@@ -136,7 +136,7 @@ pub async fn create_node (
   //          any `extra_id` entities it needs.
   //          any `has_extra_id` relationships it needs.
   // Does *not* commit.
-  node: &SkgNode,
+  node: &NodeTypedb,
   tx: &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 
@@ -153,7 +153,7 @@ pub async fn create_node (
   Ok (()) }
 
 async fn insert_extra_ids (
-  node : &SkgNode,
+  node : &NodeTypedb,
   tx   : &typedb_driver::Transaction
 ) -> Result < (), Box<dyn Error> > {
 

@@ -11,6 +11,7 @@ use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, HeadlineInfo};
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
 use crate::types::misc::{MSV, SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName};
+use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::skgnode::SkgNode;
 use crate::types::unchecked_viewnode::{ UncheckedViewNode, UncheckedViewNodeKind };
@@ -120,10 +121,14 @@ where
       ). await?;
     let nodes: Vec<SkgNode> =
       read_all_skg_files_from_sources (&config)?;
+    let typedb_nodes : Vec<NodeTypedb> =
+      nodes . iter ()
+      . map (NodeTypedb::from_complete_parsing_textlinks)
+      . collect ();
     overwrite_new_empty_db(db_name, &driver) . await?;
     define_schema(db_name, &driver) . await?;
-    create_all_nodes(db_name, &driver, &nodes) . await?;
-    create_all_relationships(db_name, &driver, &nodes) . await?;
+    create_all_nodes(db_name, &driver, &typedb_nodes) . await?;
+    create_all_relationships(db_name, &driver, &typedb_nodes) . await?;
     guarded_test_then_cleanup(
       db_name, &config, &driver, None,
       test_fn(&config, &driver),
@@ -198,10 +203,14 @@ pub async fn populate_test_db_from_fixtures (
     db_name, driver ) . await ?;
   define_schema (
     db_name, driver ) . await?;
+  let typedb_nodes : Vec<NodeTypedb> =
+    nodes . iter ()
+    . map (NodeTypedb::from_complete_parsing_textlinks)
+    . collect ();
   create_all_nodes (
-    db_name, driver, &nodes ) . await ?;
+    db_name, driver, &typedb_nodes ) . await ?;
   create_all_relationships (
-    db_name, driver, &nodes ) . await ?;
+    db_name, driver, &typedb_nodes ) . await ?;
   Ok (( )) }
 
 /* PURPOSE: Set up test dbs (Tantivy and TypeDB)
