@@ -1,78 +1,14 @@
-use serde::{Serialize, Deserialize};
+//! Transitional shim. The real type is 'NodeComplete' in
+//! [[./nodes/complete.rs][server/types/nodes/complete.rs]].
+//!
+//! This module re-exports under the old 'SkgNode' name so existing
+//! call sites continue to compile during Plan A's migration.
+//! Later migration sweeps will update call sites to import
+//! 'NodeComplete' directly from 'types::nodes::complete' and this
+//! shim will be deleted.
 
-use super::misc::{ID, MSV, SourceName};
-
-/// This could be extended.
-/// A .skg file can have any number of associated FileProperties.
-#[allow(non_camel_case_types)]
-#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
-pub enum FileProperty {
-  Had_ID_Before_Import, // Node had an :ID: property before org-roam import.
-  Was_Overloaded, // Multiple org-roam nodes used the same ID (as an ID, not in a link). This guards against a bug in my org-roam data (I can't say it's a bug in org-roam; I don't know.) The importer merges their content into a single node with the ID that was overloaded in org-roam.
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
-pub struct SkgNode {
-  // There is a 1-to-1 correspondence between SkgNodes and actual .skg files -- a file can be read to a SkgNode, and a SkgNode can be written to a file. The files are the only permanent data. SkgNode is the format used to initialize the TypeDB and Tantivy databases.
-  // Tantivy will receive some of this data, and TypeDB some other subset. Tantivy associates IDs with titles. TypeDB represents all the connections between nodes (see 'schema.tql' for how). At least one field, `body`, is known to neither database; it is instead read directly from the files on disk when Rust builds a document for Emacs.
-  // PITFALL: Some([]) vs. None in the Optional lists:
-  // - On disk the distinction is not needed. Both Some([]) and None are both rendered on disk as a missing field.
-  // - When multiple SkgNodes need to be reconciled (as in reconcile_same_id_instructions or supplement_none_fields_from_disk_if_save), the distinction matters. This is because a SkgNode can be built from an ViewNode, which might or might not say something about the relevant field. If the ViewNode intends to convey "this field *should* be empty", then it reads 'Some([])'. If instead the ViewNode did not say anything about that field, we use None -- and later clobber it with whatever was on disk for that field, via 'supplement_none_fields_from_disk_if_save'.
-
-  pub title: String,
-
-  #[serde(default, skip_serializing_if = "MSV::skip_serializing")]
-  pub aliases: MSV<String>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.)
-
-  #[serde(skip_serializing, skip_deserializing)]
-  pub source: SourceName, // source name, inferred from file location and SkgConfig
-
-  pub pid: ID, // Primary ID. Determines filename, TypeDB identity, Tantivy key, map key. Never changes.
-
-  #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub extra_ids: Vec<ID>, // Extra IDs accumulated through merges. Usually empty.
-
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub body: Option<String>, // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding org headline, to which it belongs, and the next (if there is a next).
-
-  #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub contains: Vec<ID>, // See schema.tql.
-
-  #[serde(default, skip_serializing_if = "MSV::skip_serializing")]
-  pub subscribes_to: MSV<ID>, // See schema.tql.
-
-  #[serde(default, skip_serializing_if = "MSV::skip_serializing")]
-  pub hides_from_its_subscriptions: MSV<ID>, // See schema.tql.
-
-  #[serde(default, skip_serializing_if = "MSV::skip_serializing")]
-  pub overrides_view_of: MSV<ID>, // See schema.tql.
-
-  #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub misc: Vec<FileProperty>,
-}
-
-impl SkgNode {
-  pub fn all_ids (&self) -> impl Iterator<Item = &ID> {
-    std::iter::once (&self . pid)
-      . chain (self . extra_ids . iter()) }
-}
-
-//
-// Functions
-//
-
-/// Useful for making tests more readable.
-pub fn empty_skgnode () -> SkgNode {
-  SkgNode {
-    title                        : String::new (),
-    aliases                      : MSV::Unspecified,
-    source                       : SourceName::from ("main"),
-    pid                          : ID::new (""),
-    extra_ids                    : Vec::new (),
-    body                         : None,
-    contains                     : Vec::new(),
-    subscribes_to                : MSV::Unspecified,
-    hides_from_its_subscriptions : MSV::Unspecified,
-    overrides_view_of            : MSV::Unspecified,
-    misc                         : Vec::new (),
-  }}
+pub use crate::types::nodes::complete::{
+  FileProperty,
+  NodeComplete as SkgNode,
+  empty_node_complete as empty_skgnode,
+};
