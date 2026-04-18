@@ -62,7 +62,7 @@ pub struct SearchEnrichmentPayload {
 /// The slower one is 'enriched'
 /// with containerward paths and graphnodestats at each search hit,
 /// and is processed in the background -- the user need not await it.
-pub fn handle_title_matches_request (
+pub fn handle_text_search_request (
   stream           : &mut TcpStream,
   request          : &str,
   tantivy_index    : &TantivyIndex,

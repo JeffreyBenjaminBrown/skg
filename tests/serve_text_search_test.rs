@@ -1,4 +1,4 @@
-// cargo test --test serve_title_matches_test
+// cargo test --test serve_text_search_test
 
 use skg::context::ContextOriginType;
 use skg::dbs::tantivy::{search_index, update_context_origin_types};
@@ -8,7 +8,7 @@ use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex};
 use skg::types::skgnode::{SkgNode, empty_skgnode};
 use skg::types::viewnode::Scaffold;
 use skg::dbs::init::in_fs_wipe_index_then_create_it;
-use skg::serve::handlers::title_matches::{
+use skg::serve::handlers::text_search::{
   group_matches_by_id, build_search_forest, SearchScope};
 
 use std::collections::HashMap;
@@ -16,15 +16,15 @@ use std::path::Path;
 use std::fs;
 
 #[test]
-fn test_title_matches_org_format (
+fn test_text_search_org_format (
 ) -> Result < (), Box < dyn std::error::Error >> {
-  // This test verifies that the title matches response
+  // This test verifies that the text-search response
   // returns org-mode formatted results with grouped IDs.
 
   /* PITFALL: This is easiest to understand by reading just the definitions of the nodes and the assertions. The logic between those two portions, though necessary for *running* the test, is not particularly helpful for understanding the test. */
 
   let index_dir : &str =
-    "tests/serve_title_matches_test/temp_index";
+    "tests/serve_text_search_test/temp_index";
 
   // Test logic. (Cleanup follows it.)
   let test_result
