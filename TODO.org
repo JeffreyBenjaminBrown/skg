@@ -1,29 +1,35 @@
-* very worth it
-** git|magit|diff commands
-*** show staged, unstaged or all changes
-rather than 'diff:' show 'staged:' and 'unstaged:'
-*** skg-magit-goto
-Go to the section corresponding to that file.
-*** skg-magit-goto-in-parent
-Warn the user if it appears twice
-in the diff *or* the corresponding .skg file.
-*** AWAITS skg-stage
-User hopefully has looked at its children before this,
-because it is mostly that.
-And also at its text in magit if there is a 'text changed' child.
-*** AWAITS stage-stage-in-parent
-Warn and exit if it appears twice
-in the corresponding magit section.
-** distinguish pop-link from pop-id
-and add paste-link and paste-id,
-which don't change the stack.
-What would be more emacs-ish names for them?
+* ONGOING many and better skgnode types
+skg2/.claude/plans/many-and-better-node-types.org
+* coollected while dogfooding, unassimilated
+** BUG : C-c v v now taking forever
+not even warning why it failed.
+** need ID stack ops available in magit, .skg view
+** Use literal newlines in .skg body fields.
+Otherwise the diff is undreadable.
+
+Currently they use \n instead:
+```
++body: "Anti-march.\nNecessarily guided consciously,\nbecause the established long paths are not most of the map. "
+```
+** interactive: try diff view on aliases, IDs
+** cleaner code
+in server/serve/parse_metadata_sexp.rs,
+the first typedef, 'pub struct ViewnodeMetadata', feels unnatural.
+** TypeDB recursion for content views
+Are content (containerward) trees not determined recursively from TypeDB?
+If not, it might be worth doing. Other recursive graph queries are.
+* maybe : how to use AI
+Ask for criticism *before*
+asking to be asked for missing details.
+* ONGOING very worth it
 ** regex search
 Maybe a suite of seach commands.
 ** new command shortcuts
 see TODO/change-command-names-and-aliases.org
 ** when requesting containerward views
 warn the user that the buffer is updating
+* TODO in skg2: upgrade Tantivy
+skg(1) is on 0.26
 * considering
 ** There should only be one definitive view across all buffers.
 *** why
@@ -53,8 +59,8 @@ The buffer is: *using written knowledge*
   command-execute(org-shiftmetaright)
 "
 * ongoing Claude instances
-** one doing elisp stuff lately
-claude --resume 5b200f10-0aff-4f10-bb1c-8c645369e866
+** for the diff view improvement
+claude --resume "staged-unstaged-git-diff"
 ** a TypeDB expert
 claude --resume 29b4f070-12d2-4211-85da-a7f28929e08b
 * semi-permanent

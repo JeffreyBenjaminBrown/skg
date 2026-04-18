@@ -55,3 +55,73 @@
    (matching the literal "staged:" / "unstaged:" prefix). If the
    herald rule strings are ever changed, the regex must be updated in
    lockstep. Manageable but a new fragility introduced by this design.
+
+* Performance
+
+** 'fetch_all_graphnodestats' scales linearly in pids, ~60ms each
+   server/dbs/typedb/search/all_graphnodestats.rs.
+
+   The file header promises "one TypeDB query PER PID, all in parallel"
+   and cites ~15ms per query. In practice the TypeDB server (or the
+   driver) caps effective concurrency at roughly 4, so the total time
+   is (pids * ~250ms) / 4. Small views finish in well under a second;
+   medium-big views take multiple seconds.
+
+   Measured on data/public/ (29k .skg files):
+   - visit 'science' (root with 6 contents, ~10 pids in view): 0.68s total,
+     with fetch_all_graphnodestats ~0.35s.
+   - visit 'to watch' (root with 3 contents, ~95 pids in view): 5.5s total,
+     with fetch_all_graphnodestats ~5.0s.
+
+   Verified by forcing join_all -> a sequential await loop: per-query
+   time was ~250ms, total scaled 1:1 with pid count ('science' 2.5s,
+   'to watch' 23.5s). So join_all IS achieving parallelism; there is
+   just a ~4x ceiling that eats the gains as views grow.
+
+   Per-pid breakdown (emitted from temporary tracing in
+   fetch_one_pid_stats):
+   - tx.transaction(..) await  : ~8ms
+   - tx.query(..) await returns: ~270ms avg (it already waits some)
+   - first stream.next() await : +~4.5s (!) -- this is where to-watch
+     spends its time; most pids wait in a TypeDB-side queue before
+     their stream yields a document
+   - draining the stream       : negligible (single-row result)
+
+   The code comment "1 PID: 15ms, 24 PIDs: 4300ms" compared only the
+   old N-way-disjunction approach against the new per-pid approach.
+   The new approach is better than the old one but is still O(N), just
+   with a smaller constant and an unknown parallelism cap.
+
+   Options to try, in decreasing order of likely payoff:
+
+   1. Batch many pids into a single TypeDB query. Something like
+
+        match
+          $node isa node, has id $id;
+          { $id == "pid1" } or { $id == "pid2" } or ... ;
+        fetch { "id": $id, "containers": [...], ... };
+
+      returning one document per pid. Even if TypeDB evaluates the
+      disjunction poorly for joins, a fetch that only *dispatches* on
+      id should still be 1 query instead of N. Would remove the per-
+      transaction and per-round-trip overhead entirely.
+
+      TODO (Jeff speaking): We tried (1) once long ago. It was slower.
+
+   2. Share one transaction across all pids (driver.transaction once,
+      then run N queries on it). Might bypass whatever per-transaction
+      bottleneck is capping concurrency at ~4.
+
+   3. Split fetch_one_pid_stats into 6 separate relation-specific
+      aggregate queries ("find all containers of nodes in {pids}",
+      "find all contents of nodes in {pids}", etc) with the id set
+      passed in as a TypeDB collection. Each query does one relation,
+      across all pids, and folds results pid-by-pid in Rust.
+
+   4. Cache. The same pid can appear in many views within a session;
+      results are stable between writes. A small in-memory cache keyed
+      by pid and invalidated on save would eliminate repeats.
+
+   Until this is fixed, any view with more than a few dozen nodes
+   (i.e. any real working set above initial_node_limit/2) will have
+   multi-second first-render latency.

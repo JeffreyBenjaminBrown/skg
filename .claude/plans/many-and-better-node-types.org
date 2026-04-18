@@ -1,0 +1,789 @@
+* Plan: in-Rust graph projection, split into three sub-plans
+
+* DONE Please rewrite Plan A even yet again
+  acting on my new TODO comments.
+** repeating myself ;)
+  If new problems arise, append them to 'Problems' in Plan A
+  if that is their scope, or 'Problems, out of scope' otherwise.
+  If your rewrite closes an issue in 'Plan A / Problems', mark it DONE,
+  but don't otherwise rewrite 'Plan A / Problems'.
+  If I have asked any questions,
+  please respond in a child of the headline that has the question,
+  again without modifying the question (which I might not remember).
+
+* Shared context
+
+The original trigger was a specific slow view ('to watch'): see [[../../speed.org][speed.org]]. Investigation showed the latency isn't fixable from skg's side — it lives in TypeDB's query scheduling. That prompted Jeff to ask a bigger question: what if we stopped depending on TypeDB for the common, cheap queries and kept an in-process graph that Rust owns?
+
+Through dialog the correctness angle emerged: today the render pipeline consults three sources interchangeably — disk (via 'SkgNodeMap' and 'skgnode_from_map_or_disk'), TypeDB (for graph relations), and the per-connection pool ('SkgnodesInMemory' in [[../../server/types/memory.rs][server/types/memory.rs]]). Rules about which to consult are scattered. The scattered-ness is the real problem; perf would be a bonus.
+
+The plan splits into three concerns, each independently valuable:
+
+- *Plan A (detailed below)*: homogenize the SkgNode-ish types. Today 'SkgNode' is used everywhere and each destination silently ignores the fields it doesn't care about. Replace with a family of destination-specific structs so the type system enforces "TypeDB doesn't have bodies", "Tantivy doesn't have relations", etc.
+- *Plan B (sketch below)*: unify merges through 'Vec<DefineNode>'. Today merges have per-store implementations (fs, TypeDB). Make merges produce 'DefineNode' instructions that all sinks apply uniformly, eliminating duplicate logic and pre-empting the "third parallel merge implementation" tax that Plan C would otherwise introduce.
+- *Plan C (sketch below)*: introduce the in-Rust partial projection. Server-wide 'ArcSwap<Arc<Graph>>' holding 'im::HashMap<ID, NodeRust>'. Reads that fit the projection go here; advanced / recursive queries stay on TypeDB. Plan C becomes a small, clean plan once A+B have landed.
+
+Decisions already locked through dialog:
+
+- Projection tier: *A* — as wide as currently needed by in-memory consumers so no regression. Concretely: everything 'NodeComplete' has /except/ 'misc' (which is only read by Tantivy indexing and the org-roam importer, not by render/save/merge). We can always narrow later once a specific consumer is proven unused.
+- Concurrency: *ArcSwap + im::HashMap*.
+- Recursive queries stay on TypeDB indefinitely ('full_containerward_ancestry', 'containerward_path_stats_bulk', 'path_to_first_nonlinearity').
+
+Ground truth (reused across plans):
+
+- 'SkgNode' current fields ([[../../server/types/skgnode.rs][server/types/skgnode.rs]]): 'pid', 'source' (in-memory only; '#[serde(skip_...)]'), 'extra_ids', 'title', 'aliases: MSV<String>', 'body: Option<String>', 'contains: Vec<ID>', 'subscribes_to: MSV<ID>', 'hides_from_its_subscriptions: MSV<ID>', 'overrides_view_of: MSV<ID>', 'misc: Vec<FileProperty>'. 'source' is in memory but not on disk (inferred from file location). 'textlinks_to' is derived from body parsing, not stored on disk.
+- Save pipeline ([[../../server/save.rs][server/save.rs]]): fs → TypeDB → Tantivy (latter two parallel), all consume 'Vec<DefineNode>'. Pool merged reactively afterward.
+- Merge pipeline ([[../../server/merge.rs][server/merge.rs]], [[../../server/merge/typedb.rs][server/merge/typedb.rs]], [[../../server/merge/validate_merge.rs][server/merge/validate_merge.rs]]): separate path; reads and writes TypeDB directly without going through 'DefineNode'.
+- Corpus: 29,050 .skg files, ~6.6 MB. In-RAM footprint < 50 MB.
+
+* Plan A (detailed): homogenize SkgNode-ish types
+
+** Goal
+
+Replace the single 'SkgNode' type, currently used by every store, with a small family of destination-specific structs. Each struct contains exactly the fields its destination needs and no others. Conversions between them are mechanical 'From' impls. No behavior change; pure refactor for type safety.
+
+** Why now
+
+Today, the save-to-Tantivy path takes a full 'SkgNode' and ignores 'contains', 'subscribes_to', 'overrides_view_of', 'hides_from_its_subscriptions'. The TypeDB path takes a full 'SkgNode' and ignores 'title', 'body', 'aliases'. Both /could/ accidentally read those fields and silently rely on them — the type system gives no protection. Future refactors compound this risk. Plan C in particular depends on a distinct 'NodeRust' type to enforce "this is the projection, the other fields aren't here."
+
+** The type family
+
+Names negotiable; the shapes are load-bearing. Note that 'aliases',
+'subscribes_to', 'hides_from_its_subscriptions', and
+'overrides_view_of' use 'MSV<T>' (Maybe-Specified Vector; see
+[[../../server/types/misc.rs][server/types/misc.rs]]), not 'Option<Vec<T>>'. The distinction between
+"user didn't mention this field" and "user wants it empty" is real
+and load-bearing.
+
+#+begin_src rust
+  // types/nodes/fs.rs -- what the YAML on disk literally holds.
+  // Bit-exact with today's on-disk serialization.
+  // Does NOT include source (source is inferred from file location).
+  pub struct NodeFS {
+      pub pid                          : ID,
+      pub extra_ids                    : Vec<ID>,
+      pub title                        : String,
+      pub aliases                      : MSV<String>,
+      pub body                         : Option<String>,
+      pub contains                     : Vec<ID>,
+      pub subscribes_to                : MSV<ID>,
+      pub hides_from_its_subscriptions : MSV<ID>,
+      pub overrides_view_of            : MSV<ID>,
+      pub misc                         : Vec<FileProperty>,
+  }
+
+  // types/nodes/complete.rs -- NodeFS plus source.
+  // The in-memory "full node": what you get after reading YAML
+  // and attaching the source inferred from the file's directory.
+  pub struct NodeComplete {
+      pub pid                          : ID,
+      pub source                       : SourceName,
+      pub extra_ids                    : Vec<ID>,
+      pub title                        : String,
+      pub aliases                      : MSV<String>,
+      pub body                         : Option<String>,
+      pub contains                     : Vec<ID>,
+      pub subscribes_to                : MSV<ID>,
+      pub hides_from_its_subscriptions : MSV<ID>,
+      pub overrides_view_of            : MSV<ID>,
+      pub misc                         : Vec<FileProperty>,
+  }
+
+  // types/nodes/typedb.rs -- what TypeDB stores as a node entity
+  // plus its outbound relations. No title, aliases, or body.
+  pub struct NodeTypedb {
+      pub pid                          : ID,
+      pub source                       : SourceName,
+      pub extra_ids                    : Vec<ID>,
+      pub contains                     : Vec<ID>,
+      pub subscribes_to                : MSV<ID>,
+      pub hides_from_its_subscriptions : MSV<ID>,
+      pub overrides_view_of            : MSV<ID>,
+      // PITFALL: derived from the text.
+      // Not even NodeComplete has this
+      // (explicitly, although it has the text).
+      pub textlinks_to                 : Vec<ID>,
+  }
+
+  // types/nodes/tantivy.rs -- what Tantivy indexes.
+  // Includes 'misc' because 'Had_ID_Before_Import' feeds the
+  // context-ranking score multiplier (see context.rs).
+  pub struct NodeTantivy {
+      pub pid     : ID,
+      pub source  : SourceName,
+      pub title   : String,
+      pub aliases : MSV<String>,
+      pub body    : Option<String>,
+      pub misc    : Vec<FileProperty>,
+  }
+
+  // types/nodes/rust.rs -- the Tier A projection held in memory.
+  // Widened to match everything in-memory SkgNode consumers
+  // currently read (outbound relations included) so that
+  // deploying NodeRust can't regress behavior. Narrower than
+  // NodeComplete only in omitting 'misc'.
+  pub struct NodeRust {
+      pub pid                          : ID,
+      pub source                       : SourceName,
+      pub extra_ids                    : Vec<ID>,
+      pub title                        : String,
+      pub aliases                      : MSV<String>,
+      pub body                         : Option<String>,
+      pub contains                     : Vec<ID>,
+      pub subscribes_to                : MSV<ID>,
+      pub hides_from_its_subscriptions : MSV<ID>,
+      pub overrides_view_of            : MSV<ID>,
+  }
+#+end_src
+
+Names 'NodeFromClient' and 'NodeToClient' from the original sketch: on close reading, 'NodeFromClient' is functionally identical to 'NodeComplete' (the buffer parser in [[../../server/from_text.rs][server/from_text.rs]] produces one) and 'NodeToClient' is already the well-developed 'ViewNode' family in [[../../server/types/viewnode.rs][server/types/viewnode.rs]]. Plan A does not introduce new types for these two; 'NodeComplete' covers inbound and 'ViewNode' covers outbound.
+
+** Conversion impls
+
+Lossy downward from 'NodeComplete' in most directions. The disk
+round-trip is 'NodeFS + SourceName <-> NodeComplete'.
+
+#+begin_src rust
+  // YAML round-trip: NodeFS is what serde sees.
+  // Attach source (from file location) to produce NodeComplete.
+  impl NodeComplete {
+      pub fn from_fs_and_source (
+          fs     : NodeFS,
+          source : SourceName,
+      ) -> Self { /* move fields */ }
+  }
+  impl From<&NodeComplete> for NodeFS {
+      // Drop source; everything else is shared structure.
+      fn from (c: &NodeComplete) -> Self { /* ... */ }
+  }
+
+  impl From<&NodeComplete> for NodeTantivy {
+      // Drop relations. Keep title, aliases (MSV), body, misc.
+      fn from (c: &NodeComplete) -> Self { /* ... */ }
+  }
+
+  impl From<&NodeComplete> for NodeRust {
+      // Drop only 'misc'. Everything else is kept so in-memory
+      // SkgNode consumers don't regress.
+      fn from (c: &NodeComplete) -> Self { /* ... */ }
+  }
+
+  // NodeTypedb is the odd one out: it needs textlinks_to,
+  // which is NOT on NodeComplete (body parser produces it
+  // separately). So the constructor takes them alongside.
+  impl NodeTypedb {
+      pub fn from_complete_and_textlinks (
+          complete   : &NodeComplete,
+          textlinks  : Vec<ID>,
+      ) -> Self { /* ... */ }
+  }
+#+end_src
+
+No upward conversions (you can't recover 'body' from a 'NodeTantivy'). Rebuild path still reads 'NodeFS' from disk and attaches source.
+
+** Higher-kinded / proc-macro version: decided against for now
+
+Jeff floated a parameterized "list which fields you want" type. Rust can approximate via proc-macros but at six destination types it's more trouble than value. Plan A uses plain structs with hand-written 'From' impls. If the types drift or a seventh destination appears, revisit.
+
+** Call-site migration
+
+Replace 'SkgNode' with the narrower type at each call site according to what that site actually needs. Non-exhaustive map; run a full grep before committing.
+
+| File                                                                               | Today takes           | Narrow to                |
+|------------------------------------------------------------------------------------+-----------------------+--------------------------|
+| [[../../server/dbs/tantivy.rs][server/dbs/tantivy.rs]]                                                     | '&SkgNode'            | '&NodeTantivy'           |
+| [[../../server/dbs/typedb/nodes.rs][server/dbs/typedb/nodes.rs]]                                                | '&SkgNode'            | '&NodeTypedb'            |
+| [[../../server/dbs/typedb/relationships.rs][server/dbs/typedb/relationships.rs]]                                        | '&SkgNode'            | '&NodeTypedb'            |
+| [[../../server/dbs/filesystem/one_node.rs][server/dbs/filesystem/one_node.rs]] (read)                                  | returns 'SkgNode'     | returns 'NodeComplete'   |
+| [[../../server/dbs/filesystem/multiple_nodes.rs][server/dbs/filesystem/multiple_nodes.rs]]                                   | '&SkgNode' / returns  | '&NodeComplete' / returns|
+| [[../../server/types/memory.rs][server/types/memory.rs]] ('SkgNodeMap', 'skgnode_from_map_or_disk')         | 'SkgNode'-valued map  | 'NodeComplete'-valued    |
+| [[../../server/save.rs][server/save.rs]] ('update_typedb_from_saveinstructions', 'update_tantivy_from_saveinstructions') | unwraps 'SaveNode'    | construct narrower at boundary |
+| [[../../server/update_buffer.rs][server/update_buffer.rs]] (post-save pool merge)                            | 'SkgNode'-valued      | 'NodeComplete'-valued    |
+| [[../../server/merge/typedb.rs][server/merge/typedb.rs]]                                                    | 'SkgNode'-valued      | 'NodeComplete' (Plan B later reshapes) |
+| [[../../server/from_text.rs][server/from_text.rs]] (client parser)                                       | produces 'SkgNode'    | produces 'NodeComplete'  |
+
+Mechanical; reviewer-friendly one file at a time.
+
+** DefineNode / SaveNode
+
+'DefineNode::SaveNode(SkgNode)' is the save-pipeline intermediate. Two options:
+
+1. Keep 'SaveNode' carrying 'NodeComplete' (rename inside). All sinks convert at their boundary.
+2. Split 'SaveNode' into per-sink variants. Over-engineered; discard.
+
+Go with option 1. 'DefineNode::SaveNode(NodeComplete)' is a near-no-op rename.
+
+** Order of operations
+
+1. Introduce 'NodeComplete' as a type alias for 'SkgNode' in a new file [[../../server/types/nodes/complete.rs][server/types/nodes/complete.rs]]. Keeps everything compiling. Move 'FileProperty' alongside.
+2. Split 'NodeFS' out of 'NodeComplete': 'NodeFS' gets all the on-disk fields (everything except 'source') and becomes the '#[derive(Serialize, Deserialize)]' target. 'NodeComplete' keeps 'source' and gains 'from_fs_and_source'. Update the filesystem read/write paths to round-trip through 'NodeFS'. Verify YAML output is bit-exact with pre-change files (a diff against the 29k .skg corpus catches this).
+3. Add the three narrower structs ('NodeTypedb', 'NodeTantivy', 'NodeRust') and their 'From' impls.
+4. Migrate one consumer at a time, starting with the smallest (Tantivy is a good first target — narrow callsite, easy to verify). After each migration, run the full test suite.
+5. Once all call sites use narrower types where appropriate, delete the 'SkgNode' alias in favor of 'NodeComplete' everywhere.
+6. Replace every 'empty_skgnode'-style test helper in [[../../server/types/skgnode.rs][server/types/skgnode.rs]], [[../../server/test_utils.rs][server/test_utils.rs]], and per-test fixtures with a default constructor for the narrower type that each test actually cares about. For tests that truly need a full default node, 'NodeComplete::default()'. Mechanical but touches many files — sweep at the end so the earlier steps don't churn it.
+
+** Files touched (approximate)
+
+- [[../../server/types/nodes/][server/types/nodes/]] (new module) — one file per type ('fs.rs', 'complete.rs', 'typedb.rs', 'tantivy.rs', 'rust.rs'), plus 'mod.rs' and the 'FileProperty' enum.
+- [[../../server/types/skgnode.rs][server/types/skgnode.rs]] — keep as a shim that re-exports 'NodeComplete' during transition; remove after migration settles.
+- [[../../server/dbs/tantivy.rs][server/dbs/tantivy.rs]] — narrow to 'NodeTantivy'.
+- [[../../server/dbs/typedb/nodes.rs][server/dbs/typedb/nodes.rs]], [[../../server/dbs/typedb/relationships.rs][server/dbs/typedb/relationships.rs]], [[../../server/merge/typedb.rs][server/merge/typedb.rs]] — narrow to 'NodeTypedb'.
+- [[../../server/dbs/filesystem/][server/dbs/filesystem/]] — read path returns 'NodeFS', then filesystem layer attaches source to produce 'NodeComplete'. Write path takes 'NodeFS' (derived from a 'NodeComplete' via the 'From' impl).
+- [[../../server/git_ops/diff.rs][server/git_ops/diff.rs]] — the HEAD/index/worktree YAML parsers produce 'NodeFS' (they don't have a source context); if a source-aware diff is needed, the caller attaches source after parsing.
+- [[../../server/types/memory.rs][server/types/memory.rs]] — 'SkgNodeMap''s inner type follows 'SkgNode''s rename (to 'NodeComplete'). See the answer below for why it's not 'NodeRust'.
+- [[../../server/save.rs][server/save.rs]], [[../../server/update_buffer.rs][server/update_buffer.rs]], [[../../server/from_text.rs][server/from_text.rs]] — mechanical renames.
+- [[../../server/merge/][server/merge/]] — mechanical; Plan B will later reshape more deeply.
+- [[../../server/context.rs][server/context.rs]] — 'had_id_before_import' read moves from 'SkgNode.misc' to 'NodeTantivy.misc' (unchanged in semantics).
+- [[../../server/test_utils.rs][server/test_utils.rs]] and per-test fixtures in [[../../tests/][tests/]] — replace 'empty_skgnode'-style builders with defaults for whichever narrower type each test uses.
+
+No changes to Cargo.toml.
+
+** Verification
+
+- 'cargo build --bin skg' and 'cargo build --tests' after each migration step.
+- 'cargo nextest run' all-pass.
+- [[../../bash/emacs-tests.sh][bash/emacs-tests.sh]] all-pass.
+- [[../../bash/integration-tests.sh][bash/integration-tests.sh]] all-pass.
+- Measure view-render latency before and after (via the existing 'python3 /tmp/time_request.py' harness against 'data/public/'): 'science' and 'to watch' response times should be unchanged within noise.
+- Manual smoke: open a content view, save an edit, rebuild-dbs — each exercises a different subset of narrowed types.
+
+** Problems
+
+Genuinely interesting architectural questions in Plan A. None of these are blockers; they're things to settle during implementation.
+
+*** DONE Where does 'source' live?
+
+Today, 'source' (a 'SourceName') is not a field on 'SkgNode'. It's tracked alongside — the filesystem layer knows it because '.skg' files live in source-named directories, and TypeDB stores it as a separate attribute. Whenever code needs "this node's source", it has to be passed in separately; see [[../../server/types/memory.rs][server/types/memory.rs]] 'skgnode_from_map_or_disk' which takes '(pid, source, ...)' and [[../../server/dbs/typedb/search.rs][server/dbs/typedb/search.rs]] 'pid_and_source_from_id' whose entire job is recovering this.
+
+Plan A's proposed 'NodeComplete' (and all narrower types) includes 'source' as a field. That's a subtle semantic change: the node "knows its source" rather than having one attached externally. That's almost certainly the right move — it eliminates a class of "oops forgot to thread the source through" bugs — but it means touching every constructor of 'SkgNode' to also provide a source. Worth flagging because the blast radius is wider than "rename struct".
+
+I was imprecise when I wrote "not a field on SkgNode." Today 'SkgNode' *has* a 'source' field, but it's '#[serde(skip_serializing, skip_deserializing)]' — on the in-memory struct but not on disk. So the current state is: in-memory has source; disk does not. Resolved by splitting 'NodeFS' (what's on disk) from 'NodeComplete' (what's in memory) per Jeff's TODO.
+
+**** TODO distinguish them
+Excellent point!
+Let's distinguish NodeFS from NodeComplete, then.
+
+*** DONE 'textlinks_to' on 'NodeTypedb'
+
+'NodeTypedb' includes the 'textlinks_to' field because TypeDB needs it, but 'NodeComplete' does not because it comes from body parsing at init/save time, not from disk. This means the 'NodeTypedb' constructor is not purely mechanical from a 'NodeComplete': it needs parsed-textlinks handed to it.
+
+Today, body parsing to extract textlinks happens in [[../../server/dbs/init.rs][server/dbs/init.rs]] during node population and in the save pipeline. Plan A preserves the existing parse points but makes the "parsed textlinks go here" contract explicit by putting it on 'NodeTypedb''s constructor. Resolved per Jeff's TODO: field is named 'textlinks_to' and carries the PITFALL comment explaining its origin.
+
+**** TODO
+The tuple seems fine, yes.
+But let's not call it textlinks_to_derived.
+Instead let's put 'derived' in the comment that follows it:
+// PITFALL: derived from the text. Not even NodeComplete has this (explicitly, although it has the text).
+
+*** DONE 'aliases' as 'Option<Vec<String>>' vs 'Vec<String>'
+
+'NodeComplete' keeps 'aliases: Option<Vec<String>>' matching today. 'NodeTantivy' and 'NodeRust' use 'Vec<String>' (flattened). The implicit claim: 'None' and 'Some(vec![])' mean the same thing at the narrower-type layer. Need to verify that claim holds everywhere; if any site distinguishes them (e.g., "None means 'user has never thought about aliases', Some([]) means 'user explicitly set no aliases'"), the flattening is a semantic change.
+
+Quick grep for '.aliases' uses would answer this. My current read: no such distinction exists; the 'Option' is a YAML-serialization artifact (omit the key if empty) rather than a semantic choice. But confirm.
+
+I was wrong — the current 'SkgNode' already uses 'MSV<String>' for 'aliases' and 'MSV<ID>' for 'subscribes_to' / 'hides_from_its_subscriptions' / 'overrides_view_of'. My earlier sketch used 'Option<Vec<_>>', which was wrong. Resolved: the type family above uses 'MSV<T>' throughout, matching the current code.
+
+**** TODO
+The Option is sometimes needed.
+Where it is needed, though, it should be an MSV.
+See the typedef for 'MSV', which has (IIRC)
+a good header comment explaining its motivation.
+
+*** DONE 'NodeCompleteMap' rename blast radius
+
+Renaming 'SkgNodeMap' to 'NodeCompleteMap' (or similar) touches every render-path function signature. Mechanical but large diff. Alternative: leave the type-alias name 'SkgNodeMap' alone and let the underlying type rename to 'NodeCompleteMap' — callers won't know the difference. That localizes the rename to one line. Probably the right call.
+
+**** DONE
+After this, it seems like we should have
+pub type SkgNodeMap = HashMap<ID, NodeRust>;
+right? That is, NodeRust rather than NodeComplete?
+
+Renaming SkgNodeMap can wait.
+
+***** Answer: no, not under Plan A alone — NodeComplete
+
+The save / update-buffer pipeline reads non-Tier-A relations from
+whatever's in 'SkgNodeMap'. Concretely: 'hiddeninsubscribee_col.rs'
+and 'hiddenoutsideof_subscribeecol.rs' (both under
+[[../../server/update_buffer/complete_child_first/][server/update_buffer/complete_child_first/]]) read
+'hides_from_its_subscriptions' and 'subscribes_to'.
+'complete_parent_first/truenode.rs' reads them too. 'subscribee_col.rs'
+reads 'subscribes_to'. 'types/tree/viewnode_skgnode.rs' reads
+'subscribes_to' when completing view-requests.
+
+If 'SkgNodeMap' holds 'NodeRust', those fields disappear from the
+map and those callers break. Under Plan A the map stays
+'NodeComplete'-valued. Moving it to 'NodeRust' is a Plan C concern
+(and would require either widening the projection or rerouting those
+consumers to TypeDB).
+
+***** DONE
+Important clarification!
+NodeRust should start as wide as needed
+so that we don't lose functionality.
+If we currently get subscribe or other relationships
+from the in-memory Skgnodes,
+we should continue to do so as soon as NodeRust is deployed.
+
+****** Answer: widened — NodeRust = NodeComplete minus 'misc'
+
+Verified by grep across [[../../server/update_buffer/][server/update_buffer/]], [[../../server/from_text/][server/from_text/]],
+[[../../server/merge/][server/merge/]]: in-memory SkgNode consumers read 'contains',
+'title', 'body', 'aliases', 'extra_ids', 'pid', 'source',
+'subscribes_to', 'hides_from_its_subscriptions',
+'overrides_view_of'. Nobody in the render/save/merge paths reads
+'misc'; only Tantivy indexing and the org-roam importer do.
+
+So 'NodeRust' now carries all of those. Struct definition updated
+in the body above. The earlier parent-level 'Answer: no, not
+under Plan A alone — NodeComplete' (for why 'SkgNodeMap' is
+'NodeComplete'-valued) is obsolete: with this widening, 'NodeRust'
+serves everything 'SkgNodeMap' consumers need, so we could make
+'SkgNodeMap' hold 'NodeRust'. But you said "renaming SkgNodeMap
+can wait," and the alias-rename is orthogonal to the value-type
+swap — I'll defer the decision on when to swap the value type.
+
+*** DONE Circular dependency risk in the new module layout
+
+'NodeRust' is used by 'Graph' (Plan C); 'NodeTypedb' is used by TypeDB write code; 'NodeTantivy' by Tantivy write code. If we put all four types under [[../../server/types/nodes/][server/types/nodes/]], the module doesn't depend on anything else, so no risk there. But any helper impls (e.g. serde derivations for 'NodeComplete' that must match the existing YAML on disk) live with 'NodeComplete'. Make sure 'NodeComplete''s on-disk serialization is bit-exact with today's 'SkgNode' serialization during the transition — a rename must not change the YAML format.
+
+**** DONE
+There's nothing for me (Jeff) to add to this, right?
+This is just something for you to bear in mind when executing the plan?
+
+***** Answer: yes, nothing for you — just implementation guidance
+
+The item is a reminder about module layout and YAML bit-exactness
+during the transition. Nothing for you to decide.
+
+*** DONE New: YAML compatibility across the NodeFS split
+
+Splitting 'NodeFS' out of 'NodeComplete' introduces a /second/ type
+that has to serialize identically to today's 'SkgNode'. The current
+'SkgNode' carries '#[serde(skip_serializing, skip_deserializing)]'
+on 'source' — that attribute moves from 'SkgNode' to 'NodeComplete'
+(or disappears if 'NodeComplete' isn't 'Serialize' at all). 'NodeFS'
+takes the serde derives. Before switching, diff the YAML output of
+'NodeFS' vs 'SkgNode' across the 29k-file corpus as a guardrail
+(trivial loop: read each file as 'SkgNode', re-serialize as 'NodeFS',
+compare). Bit-exact equivalence = safe to swap.
+
+**** DONE
+Does NodeComplete serialize?
+I would have thought the only thing we serialize is NodeFS.
+I can see *de*-serializing to NodeComplete, though.
+
+I guess I'm no longer clear on whether to split NodeFS from NodeComplete.
+What do you think? Walk me through the implications of both.
+
+***** Walkthrough: two options
+
+You're right that 'NodeComplete' shouldn't serialize to YAML — the
+only thing disk should see is the on-disk shape. And even
+*de*-serialization is ambiguous: serde doesn't know the 'source',
+so it has to default-construct it or leave it unset, and then
+something outside serde attaches the real source.
+
+So the question is: do we need 'NodeFS' as a distinct type, or can
+we get the same safety with 'NodeComplete' and '#[skip_serializing,
+skip_deserializing]' on 'source' (which is what we already do for
+'SkgNode' today)?
+
+****** Option X (no split): one type, 'NodeComplete'
+
+Looks like today's 'SkgNode', renamed:
+
+#+begin_src rust
+  pub struct NodeComplete {
+      #[serde (skip_serializing, skip_deserializing)]
+      pub source : SourceName,
+      pub pid    : ID,
+      // ... all the other fields, unchanged ...
+  }
+#+end_src
+
+Reading YAML: serde produces 'NodeComplete' with 'source' at its
+default (empty / "main"). Caller sets the real source based on
+file location.
+
+Writing YAML: serde skips 'source'. YAML on disk is bit-exact with
+today.
+
+- /Pros/: Simpler. One type. Matches today almost literally (just
+  a rename). One fewer 'From' impl. No 'NodeFS' file to maintain.
+- /Cons/: 'NodeComplete' can exist in a "source wasn't set" state
+  immediately after deserialization. The type system doesn't force
+  you to attach one — you just have to remember. That's today's
+  footgun.
+- /Is the footgun real?/: it /could/ bite if someone deserialized a
+  node and passed it somewhere before source-attachment. In
+  practice it hasn't: the filesystem read functions are the only
+  deserialization site, and they attach source immediately. One
+  location, one convention, no bugs observed.
+
+****** Option Y (split): 'NodeFS' and 'NodeComplete'
+
+Two types:
+
+#+begin_src rust
+  pub struct NodeFS { /* no source; derives Serialize + Deserialize */ }
+  pub struct NodeComplete { pub source : SourceName, /* rest */ }
+  // Constructor forces source: NodeComplete::from_fs_and_source(fs, source)
+#+end_src
+
+Reading YAML: serde produces 'NodeFS'. Caller calls
+'NodeComplete::from_fs_and_source(fs, source_from_filesystem)' to
+produce a 'NodeComplete'. No path to a sourceless 'NodeComplete'
+exists.
+
+Writing YAML: caller calls 'NodeFS::from(&complete)' (drop source)
+then serializes the 'NodeFS'.
+
+- /Pros/: 'NodeComplete' provably always has a real source — the
+  type system enforces it. The "source never goes to disk"
+  invariant is also enforced by the type system (no 'Serialize'
+  impl on 'NodeComplete'), independent of any attribute.
+- /Cons/: Two types, one 'From' impl, one constructor call at every
+  deserialization boundary. A tiny bit more ceremony.
+- /Migration cost/: moderate. Every read-from-disk call site gains
+  the 'from_fs_and_source' step. Filesystem module is small; the
+  concentration of change there is good.
+
+****** My recommendation: Option X (no split)
+
+Option Y's safety gain is real but modest. The footgun it closes
+(default-constructed 'source' leaking past the read-from-disk
+boundary) hasn't bitten us in the year 'SkgNode' has had its
+current shape. The ceremony cost of Option Y is small but nonzero,
+and it multiplies across every deserialization site.
+
+Plan A's main thrust is already a win from the /four other/
+narrowing decisions ('NodeTypedb' vs 'NodeTantivy' vs 'NodeRust').
+Those enforce real invariants that today are unenforced and that
+/will/ bite during Plan C (e.g., "the in-memory graph can't
+accidentally pretend to know 'textlinks_to'"). Splitting 'NodeFS'
+is a /fifth/ narrowing decision with a smaller payoff.
+
+If a "source wasn't attached" bug shows up later, introducing
+'NodeFS' at that point is localized (the filesystem module plus
+one 'from_fs_and_source' call per deserialization site). Not hard
+to add, so not costly to defer.
+
+****** Consequences if you accept Option X
+
+- Drop 'NodeFS' from the type family. Everything else stays.
+- The "New: YAML compatibility across the NodeFS split" problem
+  becomes: "Verify YAML output is bit-exact after the
+  'SkgNode'→'NodeComplete' rename" — a less alarming form of the
+  same check.
+- Order-of-operations step 2 (the 'NodeFS' split) goes away.
+- Files touched in [[../../server/git_ops/diff.rs][server/git_ops/diff.rs]] (which I'd planned to
+  narrow to 'NodeFS') keep using 'NodeComplete' with default
+  source — fine, that module only cares about the diffable fields.
+
+Tell me which option you want and I'll redo the body of Plan A.
+
+
+****** DONE let's keep them separate
+Correctness is worth a tiny bit more ceremony.
+
+******* Acknowledged
+
+Keeping 'NodeFS' and 'NodeComplete' as distinct types (Option Y).
+The plan body already reflects this — no structural change needed.
+The 'from_fs_and_source' constructor and matching 'From<&NodeComplete>
+for NodeFS' round-trip stay in the Conversion impls section.
+
+The "New: YAML compatibility across the NodeFS split" problem
+stays as work to be done during implementation (guardrail diff
+against the 29k-file corpus); I've left it as ONGOING.
+
+*** DONE New: every 'empty_skgnode'-style test helper
+
+[[../../server/types/skgnode.rs][server/types/skgnode.rs]] 'empty_skgnode' (and its analogues in
+test_utils) constructs a zero-valued 'SkgNode'. These multiply into
+many tests (I counted 16 files referencing 'MSV' alone; most set
+default fields the same way). Each needs to be updated, or — better —
+replaced with 'NodeComplete::default()' where a full-default node is
+intended, or one of the narrower types' defaults where the test only
+cares about a subset. Mechanical but touches lots of test files.
+
+**** DONE
+Yes, this should be part of the plan.
+
+***** Answer: folded into Order of operations
+
+Added a step at the end of the Order of operations: "Replace every
+'empty_skgnode'-style test helper with a default for the type that
+specific test actually cares about." Also listed the test files in
+the Files touched section.
+
+*** DONE New: 'misc' lives where?
+
+Today 'misc: Vec<FileProperty>' is on every 'SkgNode'. It's consumed
+by Tantivy indexing (for the 'Had_ID_Before_Import' context-ranking
+boost) and by the org-roam importer. It should be on 'NodeFS',
+'NodeComplete', and 'NodeTantivy'. It does /not/ belong on
+'NodeTypedb' (no usage) or 'NodeRust' (no Tier A consumer). Flagged
+so the table in the body above is consistent with the intended
+semantics.
+
+**** DONE
+I don't know. What options do you see?
+
+***** Options
+
+I see four plausible placements of 'misc: Vec<FileProperty>' across
+the type family. 'misc' today is consumed by: Tantivy indexing (for
+the 'Had_ID_Before_Import' context-ranking score multiplier, via
+[[../../server/context.rs][server/context.rs]]) and the org-roam importer (which maintains
+'Was_Overloaded'). Not consumed by render, save, merge, or TypeDB.
+
+****** Option 1 (Recommended): narrow — on 'NodeFS', 'NodeComplete', 'NodeTantivy' only
+
+Matches Plan A's principle "each type carries only what its
+destination needs." Tantivy gets 'misc' because it indexes it;
+'NodeComplete' gets it so the filesystem round-trip is lossless;
+'NodeFS' gets it because it's on disk. 'NodeTypedb' and 'NodeRust'
+don't — those destinations never consume it.
+
+- /Pros/: cleanest. If a future consumer tries to read 'misc' from a
+  'NodeRust', it won't compile and we get a design conversation
+  rather than a silent wrong answer.
+- /Cons/: requires a deliberate widening if the Tier A render path
+  ever grows a use for 'misc' (hard to imagine — 'misc' is import
+  metadata, not user-facing graph data).
+
+****** Option 2: everywhere — on all five types
+
+Include 'misc' on 'NodeTypedb' and 'NodeRust' too, even though
+they don't currently consume it. "Future-proof."
+
+- /Pros/: symmetrical; no "is 'misc' on this type?" mental overhead.
+- /Cons/: undermines Plan A's whole point. If every type has every
+  field, we haven't narrowed. Bad.
+
+****** Option 3: sidecar — 'NodeMetadata' attached in parallel
+
+Extract 'misc' into its own type and pass it alongside wherever
+needed:
+
+#+begin_src rust
+  pub struct NodeMetadata {
+      pub pid  : ID,
+      pub misc : Vec<FileProperty>,
+  }
+#+end_src
+
+- /Pros/: decouples import/indexing metadata from the graph-ish
+  data. If more "file properties" get added over time, they live
+  together.
+- /Cons/: more plumbing for little gain. Today 'misc' has two
+  variants ('Had_ID_Before_Import', 'Was_Overloaded'); it's not
+  growing visibly. Sidecars justify themselves when the sidecar has
+  its own lifecycle, which this doesn't.
+
+****** Option 4: fold into dedicated boolean fields
+
+Replace 'Vec<FileProperty>' with boolean flags like
+'had_id_before_import: bool' and 'was_overloaded: bool'.
+
+- /Pros/: the two current uses /are/ booleans in practice. Type
+  becomes self-documenting (no "what's a FileProperty?" detour).
+- /Cons/: extension-unfriendly. Adding a new 'FileProperty' today
+  is appending to an enum; as separate booleans, every consumer
+  has to know about each flag. Also, the YAML shape changes
+  (currently a list of symbols; would become individual boolean
+  keys), which breaks on-disk compatibility. Disruptive for a
+  small win.
+
+****** Recommendation
+
+*Option 1* if the goal is Plan A's type-safety invariant done
+cleanly. The "should 'misc' be on every type for symmetry?"
+instinct (Option 2) is worth naming and rejecting — symmetry and
+narrowing are in tension, and Plan A resolves that tension in
+narrowing's favor.
+
+****** DONE Option 1
+
+******* Acknowledged
+
+'misc' on 'NodeFS', 'NodeComplete', and 'NodeTantivy' only; not
+on 'NodeTypedb' or 'NodeRust'. The plan body's type family
+already reflects this placement — no structural change needed.
+
+* Plan B (sketch): unify merges through 'Vec<DefineNode>'
+
+** Goal
+
+Today [[../../server/merge/typedb.rs][server/merge/typedb.rs]] mutates TypeDB directly while the fs side of the merge goes through its own code path. Make merges produce a 'Vec<DefineNode>' (or a similar instruction-list type) that all sinks apply uniformly.
+
+** Why
+
+Two reasons:
+
+- Removes duplicate merge logic (currently fs-side and typedb-side each "apply a merge" in their own ways).
+- Makes Plan C's graph-merge application automatic rather than adding a third parallel implementation.
+
+** Shape
+
+- Merge algorithm ([[../../server/merge.rs][server/merge.rs]], [[../../server/merge/mergeInstructionTriple.rs][server/merge/mergeInstructionTriple.rs]], [[../../server/merge/validate_merge.rs][server/merge/validate_merge.rs]]) reads state (from TypeDB and disk), computes which node absorbs which, and produces a 'Vec<DefineNode>' describing the resulting node set.
+- Feed that instruction vector into the existing save pipeline's sink-application code.
+- Merge becomes "special save": it uses the ordinary fan-out to sinks; only the /computation/ of what to save differs.
+
+** Open questions (to resolve when fleshing out)
+
+- Does 'validate_merge' still need direct TypeDB reads, or can it use the Plan-C in-memory graph (if A→C completes first)? Answer probably depends on ordering of A/B/C.
+- How to represent "delete A, save A-absorbed-into-B"? Likely two 'DefineNode's: a 'DeleteNode' for the acquiree plus a 'SaveNode' with the merged state for the acquirer.
+- Extra-id migration (the acquiree's pids become extra-ids on the acquirer) — already part of 'NodeComplete'. Just emit the updated node.
+- Are there merge cases that can't be expressed as a 'Vec<DefineNode>'? None that I see, but merge has edge cases; verify.
+
+** Files likely touched
+
+- [[../../server/merge.rs][server/merge.rs]]
+- [[../../server/merge/typedb.rs][server/merge/typedb.rs]]
+- [[../../server/merge/validate_merge.rs][server/merge/validate_merge.rs]]
+- [[../../server/merge/mergeInstructionTriple.rs][server/merge/mergeInstructionTriple.rs]]
+- Possibly [[../../server/save.rs][server/save.rs]] if the sink-fan-out needs minor shape changes to handle merge-style instructions.
+
+** Verification
+
+- Existing merge tests pass unchanged.
+- Integration test: two nodes merged, post-merge state visible in fs, TypeDB, and Tantivy identically.
+- 'cargo nextest run', [[../../bash/emacs-tests.sh][bash/emacs-tests.sh]], [[../../bash/integration-tests.sh][bash/integration-tests.sh]].
+
+* Plan C (sketch): in-Rust partial projection of the graph
+
+** Goal
+
+Add a server-wide, thread-safe in-memory store of a Tier A projection of the graph. Reads that fit the projection go here; everything else stays on TypeDB. Tantivy and disk are unchanged.
+
+Depends on: Plan A (for 'NodeRust') and Plan B (for uniform sink-application of merges).
+
+** Shape
+
+- New module [[../../server/graph/][server/graph/]] holding the 'Graph' type: 'im::HashMap<ID, NodeRust>'.
+- Server-wide handle: 'Arc<ArcSwap<Arc<Graph>>>'. Built at startup by folding graph population into the existing 'read_all_skg_files_from_sources' pass.
+- Readers call '.load_full()' which returns an 'Arc<Graph>'; use like a normal 'HashMap'.
+- Writers (in save): clone current via 'im''s O(log n) structural sharing, apply mutations from 'Vec<DefineNode>', atomically '.store()'.
+
+** Save pipeline becomes
+
+1. fs write (today; unchanged).
+2. *In-memory graph update* (new): derive the new 'Arc<Graph>' from the 'Vec<DefineNode>'. Single-digit ms.
+3. TypeDB + Tantivy in parallel (today; unchanged).
+
+If step 3 fails, rebuild that store from disk. Step 2 is already consistent with disk because step 1 succeeded.
+
+** Read routing (moves from TypeDB or pool to graph)
+
+- [[../../server/dbs/typedb/search.rs][server/dbs/typedb/search.rs]] 'pid_and_source_from_id' — HashMap lookup.
+- [[../../server/types/memory.rs][server/types/memory.rs]] 'skgnode_from_map_or_disk' — graph lookup. Eliminates all steady-state disk reads for SkgNodes.
+- [[../../server/to_org/render/initial_bfs.rs][server/to_org/render/initial_bfs.rs]] — 'contains' walk: graph lookup.
+- [[../../server/to_org/util.rs][server/to_org/util.rs]] 'skgnode_and_viewnode_from_id' — graph lookup.
+- subscribeeCol completion paths that walk 'contains' via TypeDB.
+
+Stays on TypeDB: 'fetch_all_graphnodestats' (only its 'contains'-side data could be served from graph; the rest — 'textlinks_to', 'subscribes', 'hides', 'overrides' — needs either Tier B or remains TypeDB), all recursive queries, all 'find_related_nodes' for non-contains relations.
+
+** Rebuild ([[../../server/serve/handlers/rebuild_dbs.rs][server/serve/handlers/rebuild_dbs.rs]])
+
+Extend to also rebuild the graph from disk, alongside TypeDB and Tantivy.
+
+** Consistency audit
+
+Small debug/test helper: diff 'graph.nodes[id].contains' against TypeDB's 'contains' edges from 'id'. Cheap, catches silent drift for the relations that live in both stores.
+
+** Open questions (to resolve when fleshing out)
+
+- Exact API shape for the 'Graph' type: methods on 'Graph', or public fields + free functions?
+- Whether the per-connection 'SkgnodesInMemory' shrinks to just per-view state ('views', 'root_ids') or goes away entirely — decide during A's 'SkgNodeMap' narrowing.
+- Whether background search enrichment needs to grab an 'Arc<Graph>' snapshot or if it's already reading elsewhere.
+- Startup cost measurement (expect ~1–2s on the current corpus).
+
+** Files likely touched
+
+- [[../../server/graph/][server/graph/]] (new module).
+- [[../../server/main.rs][server/main.rs]] — build at startup, pass into 'serve()'.
+- [[../../server/dbs/init.rs][server/dbs/init.rs]] — fold graph build into existing pass.
+- [[../../server/serve.rs][server/serve.rs]] — 'ConnectionState' gets a graph handle.
+- [[../../server/save.rs][server/save.rs]] — insert step 2.
+- [[../../server/serve/handlers/rebuild_dbs.rs][server/serve/handlers/rebuild_dbs.rs]] — extend rebuild.
+- Read-site files listed above.
+- [[../../Cargo.toml][Cargo.toml]] — add 'im', 'arc-swap'.
+
+** Verification
+
+- 'cargo nextest run', [[../../bash/emacs-tests.sh][bash/emacs-tests.sh]], [[../../bash/integration-tests.sh][bash/integration-tests.sh]].
+- 'science' and 'to watch' latency: unchanged or better.
+- After a save: consistency audit passes.
+- After 'rebuild-dbs': graph matches disk and TypeDB for projected relations.
+- Restart server → views render correctly.
+
+* Problems, out of scope
+
+Things noticed during exploration that aren't Plan A/B/C material but seem worth logging somewhere. Most could move into [[../../TODO/problems.org][TODO/problems.org]] at your discretion.
+
+** Inconsistent concurrency discipline across TypeDB read wrappers
+
+In [[../../server/dbs/typedb/][server/dbs/typedb/]] many functions that issue one TypeDB query per ID use 'stream::iter(...).buffer_unordered(TYPEDB_CONCURRENT_TRANSACTIONS)' — e.g. 'contains_from_pids', 'pids_from_ids', 'which_ids_exist'. But 'fetch_all_graphnodestats' uses unbounded 'join_all' instead (see [[../../server/dbs/typedb/search/all_graphnodestats.rs][server/dbs/typedb/search/all_graphnodestats.rs]]). No explanation in a comment; looks like an oversight. Consistent application of the cap is cheap to add and would make behavior predictable under heavy load.
+
+** Doc drift on 'initial_node_limit' default
+
+[[../../api-and-formats.md][api-and-formats.md]] says 'initial_node_limit' defaults to 100. [[../../server/consts.rs][server/consts.rs]] defines 'DEFAULT_INITIAL_NODE_LIMIT = 1000'. The hardcoded test default in [[../../server/types/misc.rs][server/types/misc.rs]] is 100. Pick one and update the other.
+
+** Per-connection pool is populated as a reactive side-effect
+
+Today the pool in 'SkgnodesInMemory' is populated after a render completes, by merging the transient 'SkgNodeMap' back in ([[../../server/update_buffer.rs][server/update_buffer.rs]] line ~107). This makes the pool implicitly stale relative to disk / TypeDB for the duration of a render. Plan C replaces this with an always-current server-wide graph, which is the clean fix. Noting here in case Plan C slips.
+
+** 'pid_and_source_from_id' is a TypeDB round-trip for data already in the pool
+
+'pid_and_source_from_id' resolves a node's primary id and source via TypeDB ([[../../server/dbs/typedb/search.rs][server/dbs/typedb/search.rs]] line ~127), but if the node is already in the pool its 'SkgNode' has everything we need (once 'source' moves onto 'NodeComplete' per Plan A's Problems section). Today this is a free TypeDB call per view render, per node. Plan C eliminates the call; Plan A eliminates the awkwardness of the source being external to the node. Worth noting as a latent inefficiency even without Plan C.
+
+** 'textlinks_to' is the only derived-not-stored relation
+
+Four of the five graph relations ('contains', 'subscribes_to', 'hides_from_its_subscriptions', 'overrides_view_of') live on 'SkgNode' on disk. 'textlinks_to' does not — it's derived from body parsing at init/save time. This asymmetry is invisible today because TypeDB materializes it and callers never know; but it becomes visible in Plan A ('NodeTypedb' needs an extra argument) and would become visible again if Tier B of Plan C ever tried to put 'textlinks_to' in the in-memory graph. Consider whether the asymmetry is worth preserving or whether 'textlinks_to' should become a real field on 'NodeComplete' and get written into the YAML on save. Pros of making it real: symmetry, easier reasoning. Cons: body-parse results become part of on-disk format, subtle versioning concern.
+
+** 'SkgNodeMap' is a per-render transactional layer that's hard to reason about
+
+The 'SkgNodeMap' threaded through every render function is a staging area between the pool and disk, with custom "check map first, then pool, then disk, then writeback to map" semantics ('skgnode_from_map_or_disk'). It's a small module but the mental model leaks into every caller. Plan C collapses it into a single 'graph.load_full()' call at function entry, after which reads are plain HashMap gets. Worth calling out as a meaningful simplification win for Plan C beyond what the sketch already says.
+
+** 'merge_one_node_in_typedb' builds Cypher-ish queries by string concat
+
+In [[../../server/merge/typedb.rs][server/merge/typedb.rs]] the merge logic generates TypeQL by format-stringing IDs directly into queries. Not an injection risk in this trust model (we control the IDs), but parameterized queries or a small query-builder abstraction would be cleaner. Plan B may naturally obsolete most of this file; if not, worth tidying separately.
+
+** Does 'ViewNode' also need narrowing?
+
+Narrowing in the sense that
+NodeTypedb narrows from NodeComplete.
+
+*** Answer: yes in principle, but the payoff is much smaller
+
+'ViewNode' already narrows in one way — via its 'ViewNodeKind' enum
+('True' / 'Scaffold' / 'Deleted' / 'DeletedScaff'). That sum-type
+split handles the biggest "which data is relevant" distinction.
+
+What's left is narrowing /within/ 'TrueNode': it carries 'title',
+'body', 'source', 'birth', 'id', 'indef_or_def', 'graphStats',
+'viewStats', 'diff', 'view_requests', 'parent_relation' — all on
+every node, even though different render passes touch different
+subsets. A 'TrueNodeBare' vs 'TrueNodeEnriched' split would mirror
+the NodeComplete → NodeTypedb pattern.
+
+Payoff is smaller than the 'SkgNode' split for two reasons:
+
+1. 'ViewNode' is internal to the rendering pipeline. Bugs from
+   reading-an-empty-field manifest as a bad render, not as a wire
+   error or a silent disk divergence. So the cost of such bugs is
+   lower.
+2. Rendering is a pipeline of enrichment passes — BFS, 'graphStats'
+   enrichment, diff application. Each pass /adds/ fields. A
+   "progressive enrichment" via several narrow types + 'From's
+   would need six-ish intermediate states instead of two-ish. That
+   might be worth it for clarity, but it's a deeper restructuring
+   than Plan A's "split by destination."
+
+Verdict: not blocking Plan A. If a specific pass-confusion bug
+appears after Plan A lands, revisit then.
+
+'ViewNode' in [[../../server/types/viewnode.rs][server/types/viewnode.rs]] already has distinct kinds ('TrueNode', 'Scaffold', 'DeletedNode', 'DeletedScaff') and holds rendered fields like 'title', 'body', 'graphStats'. It is already fairly well-typed. But there are still places where a full 'TrueNode' is carried around when only a subset is used. Out of scope for Plan A, but worth a second-pass audit in the future.
