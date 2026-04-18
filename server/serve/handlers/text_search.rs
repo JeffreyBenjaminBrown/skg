@@ -93,11 +93,17 @@ pub fn handle_text_search_request (
           . as_str ()
     { "everywhere" => SearchScope::Everything,
       _            => SearchScope::Rooty };
+  let search_opts : crate::dbs::tantivy::SearchOptions =
+    crate::dbs::tantivy::SearchOptions {
+      regex     : bool_key ( &sexp, "regex" ),
+      body      : bool_key ( &sexp, "body" ),
+      operators : bool_key ( &sexp, "operators" ), };
   match search_terms {
     Ok (search_terms) => {
       // --- Phase 1: immediate results without paths ---
       match search_index ( tantivy_index,
-                           &search_terms ) {
+                           &search_terms,
+                           &search_opts ) {
         Ok (( best_matches, searcher )) => {
           if best_matches . is_empty () {
             send_response_with_length_prefix (
@@ -158,6 +164,16 @@ pub fn handle_text_search_request (
         stream,
         & tag_text_response (
           TcpToClient::SearchResults, &error_msg )); }} }
+
+/// Read a boolean axis flag from the request sexp. Absent, empty, or
+/// any non-"true" string is treated as false.
+fn bool_key (
+  sexp : &Sexp,
+  key  : &str,
+) -> bool {
+  extract_v_from_kv_pair_in_sexp ( sexp, key )
+    . unwrap_or_default ()
+    == "true" }
 
 /// Spawn a background thread to compute containerward acnestries
 /// and graphnodestats, then write the structured payload

@@ -454,7 +454,8 @@ pub fn tantivy_contains_id(
 ) -> Result<bool, Box<dyn Error>> {
   let (matches, searcher)
     : (Vec<(f32, DocAddress)>, Searcher)
-    = search_index(tantivy_index, query)?;
+    = search_index ( tantivy_index, query,
+                     & crate::dbs::tantivy::SearchOptions::default () )?;
   for (_score, doc_address) in matches {
     let doc: TantivyDocument = searcher . doc (doc_address)?;
     let id_value: Option<String> =

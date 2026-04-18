@@ -137,6 +137,53 @@ fn wrap_as_phrase (
     inner . push ( ch ); }
   format! ( "\"{}\"", inner ) }
 
+/// Pre-process `query` for operators=true mode: preserve Tantivy's
+/// operator syntax, but backslash-escape any operator character
+/// sitting strictly inside a word (alphanumeric or underscore neighbors
+/// on both sides within the same whitespace-delimited token).
+///
+/// Effect: =AND= / =OR= / =NOT= / =+foo= / =-bar= / =(..)= / phrase
+/// quotes keep their operator meaning. =foo:bar= becomes =foo\:bar=
+/// so the literal text is findable. =C++= stays =C++= because the
+/// trailing =+= is not bounded by a word char on the right — it'll
+/// be handled by QueryParser's tokenization rather than by escape.
+///
+/// LIMITATION: the heuristic can't tell a known field name from a
+/// user word. =title_or_alias:dog= gets its =:= escaped too, so
+/// field-qualified queries need manual =\:= or the user switches
+/// back to operators=false.
+pub fn escape_tantivy_intra_word (
+  query : &str,
+) -> String {
+  let chars : Vec<char> = query . chars () . collect ();
+  let mut out : String =
+    String::with_capacity ( query . len () + 8 );
+  for (i, &ch) in chars . iter () . enumerate () {
+    if is_tantivy_operator_char (ch)
+       && has_word_neighbor (&chars, i, false)
+       && has_word_neighbor (&chars, i, true) {
+      out . push ( '\\' ); }
+    out . push (ch); }
+  out }
+
+/// True iff, scanning outward from index `i` within the current
+/// whitespace-delimited token, the first non-operator non-whitespace
+/// character is alphanumeric or underscore.
+fn has_word_neighbor (
+  chars   : &[char],
+  i       : usize,
+  forward : bool,
+) -> bool {
+  let range : Box<dyn Iterator<Item = usize>> =
+    if forward { Box::new ( (i + 1) .. chars . len () ) }
+    else       { Box::new ( (0 .. i) . rev () ) };
+  for j in range {
+    let c : char = chars [j];
+    if c . is_whitespace () { return false; }
+    if is_tantivy_operator_char (c) { continue; }
+    return c . is_alphanumeric () || c == '_'; }
+  false }
+
 fn is_tantivy_operator_char (
   ch : char,
 ) -> bool {
@@ -144,13 +191,28 @@ fn is_tantivy_operator_char (
     '+' | '-' | '&' | '|' | '!' | '(' | ')' | '{' | '}' |
     '[' | ']' | '^' | '"' | '~' | '*' | '?' | ':' | '\\' ) }
 
+/// Options for `search_index`. Defaults: all false — literal search
+/// across titles+aliases only, OR between words, operator chars
+/// treated as text.
+#[derive (Clone, Copy, Debug, Default)]
+pub struct SearchOptions {
+  pub regex     : bool, // Interpret the query as a per-token regex.
+                         // Bypasses QueryParser and builds RegexQuery
+                         // directly.
+  pub body      : bool, // Also search node bodies (titles always
+                         // searched).
+  pub operators : bool, // Preserve Tantivy operator syntax. Only
+                         // meaningful when regex=false.
+}
+
 /// Returns ALL matching Tantivy "Documents" (see glossary, above).
 /// No limit: context-based reranking (multipliers up to 100x)
 /// can reorder results arbitrarily, so the caller must see
 /// every match. The caller truncates after reranking.
 pub fn search_index (
   tantivy_index : &TantivyIndex,
-  query_text    : &str
+  query_text    : &str,
+  opts          : &SearchOptions,
 ) -> Result <
     ( Vec< ( f32, // relevance score
              tantivy::DocAddress )>, // ID for a tantivy Document. (Not a filepath.)
@@ -158,20 +220,21 @@ pub fn search_index (
     Box <dyn std::error::Error> > {
 
   tracing::info! (
-    "Finding files with titles or aliases matching \"{}\".",
-    query_text);
-  let escaped_query : String =
-    escape_tantivy_literal ( query_text );
+    query = query_text,
+    regex = opts . regex,
+    body = opts . body,
+    operators = opts . operators,
+    "Finding matches." );
   let searcher : Searcher = {
     let reader : IndexReader =
       tantivy_index . index . reader () ?;
     reader } . searcher();
-  let query : Box < dyn Query > = {
-    let query_parser : QueryParser =
-      QueryParser::for_index (
-        &tantivy_index . index,
-        vec! [ tantivy_index . title_or_alias_field ] );
-    query_parser } . parse_query ( &escaped_query ) ?;
+  let query : Box < dyn Query > =
+    if opts . regex {
+      build_regex_query ( tantivy_index, query_text, opts . body ) ?
+    } else {
+      build_parser_query (
+        tantivy_index, query_text, opts . operators, opts . body ) ? };
   Ok (( {
     let best_matches : Vec < ( f32, tantivy::DocAddress ) > =
       searcher . search (
@@ -180,6 +243,47 @@ pub fn search_index (
           . order_by_score () )?;
     best_matches },
        searcher )) }
+
+fn build_parser_query (
+  tantivy_index : &TantivyIndex,
+  query_text    : &str,
+  operators     : bool,
+  body          : bool,
+) -> Result < Box < dyn Query >, Box < dyn std::error::Error >> {
+  let preprocessed : String =
+    if operators { escape_tantivy_intra_word ( query_text ) }
+    else         { escape_tantivy_literal    ( query_text ) };
+  let fields : Vec<schema::Field> =
+    if body {
+      vec! [ tantivy_index . title_or_alias_field,
+             tantivy_index . body_field ]
+    } else {
+      vec! [ tantivy_index . title_or_alias_field ] };
+  let query_parser : QueryParser =
+    QueryParser::for_index ( &tantivy_index . index, fields );
+  Ok ( query_parser . parse_query ( &preprocessed ) ? ) }
+
+fn build_regex_query (
+  tantivy_index : &TantivyIndex,
+  pattern       : &str,
+  body          : bool,
+) -> Result < Box < dyn Query >, Box < dyn std::error::Error >> {
+  use tantivy::query::{BooleanQuery, Occur, RegexQuery};
+  let title_regex : RegexQuery =
+    RegexQuery::from_pattern (
+      pattern, tantivy_index . title_or_alias_field ) ?;
+  if ! body {
+    return Ok ( Box::new ( title_regex ) ); }
+  let body_regex : RegexQuery =
+    RegexQuery::from_pattern (
+      pattern, tantivy_index . body_field ) ?;
+  // SHOULD-SHOULD = OR between fields.
+  let bq : BooleanQuery =
+    BooleanQuery::new ( vec! [
+      ( Occur::Should, Box::new (title_regex) as Box<dyn Query> ),
+      ( Occur::Should, Box::new (body_regex ) as Box<dyn Query> ),
+    ] );
+  Ok ( Box::new (bq) ) }
 
 /// Updates the index with the provided SkgNodes.
 ///   For existing IDs, updates the title.

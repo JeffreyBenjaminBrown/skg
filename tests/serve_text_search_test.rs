@@ -1,7 +1,7 @@
 // cargo test --test serve_text_search_test
 
 use skg::context::ContextOriginType;
-use skg::dbs::tantivy::{search_index, update_context_origin_types};
+use skg::dbs::tantivy::{SearchOptions, search_index, update_context_origin_types};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
 use skg::org_to_text::viewnode_forest_to_string;
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex};
@@ -68,7 +68,7 @@ fn test_text_search_org_format (
       let search_terms : &str =
         "the bear eats cheese";
       let ( best_matches, searcher ) =
-        search_index ( &tantivy_index, search_terms ) ?;
+        search_index ( &tantivy_index, search_terms, &SearchOptions::default () ) ?;
       let matches_by_id =
         group_matches_by_id (
           best_matches, searcher, &tantivy_index,
@@ -156,7 +156,7 @@ fn test_text_search_org_format (
         &tantivy_index, &context_types ) ?;
 
       let ( best_matches_2, searcher_2 ) =
-        search_index ( &tantivy_index, search_terms ) ?;
+        search_index ( &tantivy_index, search_terms, &SearchOptions::default () ) ?;
       let matches_filtered =
         group_matches_by_id (
           best_matches_2, searcher_2, &tantivy_index,
