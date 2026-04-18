@@ -358,6 +358,8 @@ pub fn create_empty_tantivy_index (
     schema . get_field ("is_title") ?;
   let had_id_field: schema::Field =
     schema . get_field ("had_id") ?;
+  let body_field: schema::Field =
+    schema . get_field ("body") ?;
   Ok ( TantivyIndex {
     index: Arc::new ( { let index : Index =
                           Index::create_in_dir ( index_path, schema )?;
@@ -367,7 +369,8 @@ pub fn create_empty_tantivy_index (
     source_field,
     context_origin_type_field,
     is_title_field,
-    had_id_field, }) }
+    had_id_field,
+    body_field, }) }
 
 /// Removes any existing index at given path,
 /// creates a new one there,

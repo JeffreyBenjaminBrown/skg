@@ -41,6 +41,8 @@ pub(crate) fn open_existing_tantivy_index (
     schema . get_field ("is_title") ?;
   let had_id_field : schema::Field =
     schema . get_field ("had_id") ?;
+  let body_field : schema::Field =
+    schema . get_field ("body") ?;
   Ok ( TantivyIndex {
     index              : Arc::new (index),
     id_field,
@@ -48,13 +50,26 @@ pub(crate) fn open_existing_tantivy_index (
     source_field,
     context_origin_type_field,
     is_title_field,
-    had_id_field, } ) }
+    had_id_field,
+    body_field, } ) }
 
-/// The only Tantivy schema used so far.
-/// It includes three fields:
-/// - "id": STRING | STORED - the node's primary ID
-/// - "title_or_alias": TEXT | STORED - searchable titles and aliases
-/// - "source": STRING | STORED - the source name
+/// The Tantivy schema.
+/// Fields:
+/// - "id":                  STRING | STORED — the node's primary ID.
+/// - "title_or_alias":      TEXT   | STORED — searchable titles and aliases.
+/// - "source":              STRING | STORED — the source name.
+/// - "context_origin_type": STRING | STORED — Root/CycleMember/Target/…
+/// - "is_title":            STRING | STORED — "true" for the primary title,
+///                          "false" for alias docs.
+/// - "had_id":              STRING | STORED — "true" if the node had an
+///                          org-roam ID before import.
+/// - "body":                TEXT   | STORED — searchable body text. STORED
+///                          so that `update_context_origin_types` can
+///                          preserve the body when it does a
+///                          delete-and-readd to refresh origin types.
+///                          (The body is also on disk in the .skg file,
+///                          so this is duplication — revisit once origin
+///                          types are computed before indexing.)
 pub(super) fn mk_tantivy_schema() -> schema::Schema {
   let mut schema_builder : schema::SchemaBuilder =
     schema::Schema::builder();
@@ -70,6 +85,8 @@ pub(super) fn mk_tantivy_schema() -> schema::Schema {
     "is_title", schema::STRING | schema::STORED);
   schema_builder . add_text_field(
     "had_id", schema::STRING | schema::STORED);
+  schema_builder . add_text_field(
+    "body", schema::TEXT | schema::STORED);
   schema_builder . build() }
 
 /// Pre-process `query` so titles and aliases containing Tantivy
@@ -385,6 +402,13 @@ fn create_documents_from_node (
     if node . misc . contains (
       &FileProperty::Had_ID_Before_Import )
     { "true" } else { "false" };
+  // Only the primary-title doc carries the body.
+  // Alias docs share the id so body search still returns
+  // this node, but we don't duplicate the body text across
+  // aliases.
+  let body_text : String =
+    node . body . as_deref () . map_or ( String::new (),
+      |b| replace_each_link_with_its_label (b) );
   let mut documents: Vec<TantivyDocument> =
     Vec::new();
   let mut titles_and_aliases: Vec<String> =
@@ -393,8 +417,11 @@ fn create_documents_from_node (
     node . aliases . or_default () );
   for (i, title_or_alias) in
     titles_and_aliases . iter() . enumerate()
-  { let is_title : &str =
-      if i == 0 { "true" } else { "false" };
+  { let is_title : bool = i == 0;
+    let is_title_str : &str =
+      if is_title { "true" } else { "false" };
+    let body_for_this_doc : &str =
+      if is_title { body_text . as_str () } else { "" };
     documents . push (
       doc!(
         tantivy_index . id_field =>
@@ -407,9 +434,11 @@ fn create_documents_from_node (
         tantivy_index . context_origin_type_field =>
           "",
         tantivy_index . is_title_field =>
-          is_title,
+          is_title_str,
         tantivy_index . had_id_field =>
-          had_id ) ); }
+          had_id,
+        tantivy_index . body_field =>
+          body_for_this_doc ) ); }
   Ok (documents) }
 
 /// Updates context_origin_type for all documents matching each ID.
@@ -466,6 +495,11 @@ pub fn update_context_origin_types (
           . get_first ( tantivy_index . had_id_field )
           . and_then ( |v| v . as_str () )
           . unwrap_or ("false") . to_string ();
+      let body : String =
+        retrieved_doc
+          . get_first ( tantivy_index . body_field )
+          . and_then ( |v| v . as_str () )
+          . unwrap_or ("") . to_string ();
       writer . add_document ( doc! (
         tantivy_index . id_field =>
           pid . as_str (),
@@ -478,7 +512,9 @@ pub fn update_context_origin_types (
         tantivy_index . is_title_field =>
           is_title . as_str (),
         tantivy_index . had_id_field =>
-          had_id . as_str () )) ?;
+          had_id . as_str (),
+        tantivy_index . body_field =>
+          body . as_str () )) ?;
       updated_count += 1; } }
   commit_with_status (
     &mut writer, updated_count, "Context-updated") ?;
