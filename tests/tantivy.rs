@@ -6,7 +6,7 @@ use tantivy::schema as schema;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::in_fs_wipe_index_then_create_it;
-use skg::dbs::tantivy::{search_index, title_and_source_by_id, update_index_with_nodes};
+use skg::dbs::tantivy::{escape_tantivy_literal, search_index, title_and_source_by_id, update_index_with_nodes};
 use skg::types::misc::{ID, MSV, SourceName, TantivyIndex};
 use skg::types::skgnode::{SkgNode, empty_skgnode};
 
@@ -257,6 +257,80 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   println!("All alias tests passed!");
   Ok (())
 }
+
+#[test]
+fn test_escape_tantivy_literal (
+) {
+  assert_eq! ( escape_tantivy_literal ("plain words"),
+               "plain words",
+               "plain text should pass through unchanged" );
+  assert_eq! ( escape_tantivy_literal ("C++ tips"),
+               "\"C++\" tips",
+               "word with specials wrapped as phrase; plain word passes through" );
+  assert_eq! ( escape_tantivy_literal ("cat:dog"),
+               "\"cat:dog\"",
+               "colon forces phrase-wrap" );
+  assert_eq! ( escape_tantivy_literal ("[draft] plan"),
+               "\"[draft]\" plan",
+               "brackets force phrase-wrap of their word" );
+  assert_eq! ( escape_tantivy_literal ("up^2"),
+               "\"up^2\"",
+               "caret forces phrase-wrap" );
+  assert_eq! ( escape_tantivy_literal ("cat AND dog"),
+               "cat \"AND\" dog",
+               "bare AND should be wrapped as a phrase" );
+  assert_eq! ( escape_tantivy_literal ("foo OR bar NOT baz"),
+               "foo \"OR\" bar \"NOT\" baz",
+               "bare OR and NOT should be wrapped" );
+  assert_eq! ( escape_tantivy_literal ("sandwich"), // contains "and" but not "AND"
+               "sandwich",
+               "lowercase 'and' inside a word is untouched" );
+  assert_eq! ( escape_tantivy_literal ("say \"hi\""),
+               "say \"\\\"hi\\\"\"",
+               "quote inside a word escaped, whole word phrase-wrapped" );
+  assert_eq! ( escape_tantivy_literal (""),
+               "",
+               "empty string stays empty" ); }
+
+#[test]
+fn test_search_finds_titles_with_special_chars (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let empty : SkgNode = empty_skgnode ();
+  let mut c_plus : SkgNode = empty . clone ();
+  { c_plus . pid   = ID::new ("c_plus");
+    c_plus . title = "C++ tips" . to_string (); }
+  let mut brackets : SkgNode = empty . clone ();
+  { brackets . pid   = ID::new ("brackets");
+    brackets . title = "[draft] plan" . to_string (); }
+  let mut colons : SkgNode = empty . clone ();
+  { colons . pid   = ID::new ("colons");
+    colons . title = "cat:dog" . to_string (); }
+  let nodes : Vec<SkgNode> =
+    vec![c_plus, brackets, colons];
+  let index_dir : &str =
+    "/tmp/tantivy-test-special-chars";
+  let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
+    in_fs_wipe_index_then_create_it (
+      &nodes, Path::new (index_dir) ) ?;
+  for (query, expected_id) in &[
+    ("C++ tips",     "c_plus"),
+    ("[draft] plan", "brackets"),
+    ("cat:dog",      "colons"),
+  ] { let (matches, searcher) :
+        (Vec<(f32, tantivy::DocAddress)>, tantivy::Searcher) =
+        search_index (&tantivy_index, query) ?;
+      assert! ( !matches . is_empty (),
+                "literal '{}' should find a result", query );
+      let top_doc : tantivy::Document =
+        searcher . doc (matches[0] . 1) ?;
+      let top_id : &str =
+        top_doc
+        . get_first (tantivy_index . id_field) . unwrap ()
+        . as_text () . unwrap ();
+      assert_eq! ( top_id, *expected_id,
+                   "'{}' should find the {} node",
+                   query, expected_id ); }
+  Ok (( )) }
 
 #[test]
 fn test_title_by_id_returns_title_not_alias (

@@ -1,0 +1,700 @@
+#+TITLE: Plan — text-search extensions
+* DONE Please rewrite this plan,
+  acting on my changes (which I believe are all marked 'TODO').
+  If new problems arise, append them to 'Problems'.
+  If your rewrite closes an issue in 'Problems', mark it DONE,
+  but don't otherwise rewrite 'Problems'.
+  If I have asked any questions,
+  please respond in a child of the headline that has the question,
+  again without modifying the question (which I might not remember).
+
+** Summary of decisions baked in
+   - Escape-by-default for literal search.
+   - Fourth axis =operators=true|false= (default false). When
+     true, heuristically escape only intra-word operator chars so
+     =AND= / =OR= / phrases / grouping still work.
+   - Retire =C-c t t= / =C-c t e=.
+   - =C-c s= is a prefix; =C-c s RET= is the default, =C-c s i= is
+     interactive.
+   - Ship regex on tokenized text (don't add a raw_title field yet).
+   - Body search is additive: titles are always searched; =body=
+     means /also/ body. Interactive prompt wording reflects this.
+   - Body indexer commits per chunk; a marker file signals
+     completion for crash recovery.
+   - Incremental init re-indexes modified nodes with bodies inline
+     (no background needed for the incremental path).
+   - Surface body-index readiness in both server logs /and/ the
+     search buffer header.
+   - No back-compat shim for the request rename.
+
+* Context
+  [[../../text-search-options.org][text-search-options.org]] sets three outstanding goals, all
+  touching the text-search path that spans
+  [[../../elisp/skg-request-title-matches.el][skg-request-title-matches.el]],
+  [[../../server/serve/handlers/title_matches.rs][title_matches.rs]],
+  and [[../../server/dbs/tantivy.rs][tantivy.rs]]:
+
+  1. An escape-character round-trip integration test.
+  2. Independent search axes — rooty/everywhere, regex/literal,
+     titles/titles+body, plus a fourth =operators= axis that
+     preserves Tantivy operator syntax when turned on — with =C-c
+     s <RET>= for the default and =C-c s i= for interactive.
+  3. Indexing titles synchronously and bodies in the background so
+     the user can search titles immediately on startup.
+
+  Today only axis 1 (rooty/everywhere) is wired up — it reaches
+  Tantivy through the =scope= key on the request sexp, flowing to
+  'SearchScope' ([[../../server/serve/handlers/title_matches.rs][title_matches.rs:38]])
+  and filtering in 'group_matches_by_id'
+  ([[../../server/serve/handlers/title_matches.rs][title_matches.rs:265]]).
+  Regex and body search do not exist. The Tantivy schema
+  ([[../../server/dbs/tantivy.rs][tantivy.rs:63]]) has exactly one indexed field,
+  =title_or_alias=. 'SkgNode.body' ([[../../server/types/skgnode.rs][skgnode.rs:36]])
+  is defined but unindexed. 'search_index'
+  ([[../../server/dbs/tantivy.rs][tantivy.rs:84]]) passes the query string raw to Tantivy's
+  'QueryParser' with no sanitization, so special-character titles
+  like =C++ tips= are not findable by their literal text.
+
+  All three goals share one request-side change — a new
+  wire-protocol shape for text search — so I'll describe that
+  once and reuse it.
+
+* Shared infrastructure (used by goals 2 and 3)
+
+** Request shape
+   Current wire format (sent from
+   [[../../elisp/skg-request-title-matches.el][skg-request-title-matches.el:31]]):
+   #+begin_src elisp
+     ((request . "title matches") (terms . STRING) (scope . "rooty"|"everywhere"))
+   #+end_src
+   New format:
+   #+begin_src elisp
+     ((request . "text search")
+      (terms     . STRING)
+      (scope     . "rooty"|"everywhere")
+      (regex     . "true"|"false")
+      (body      . "true"|"false")
+      (operators . "true"|"false"))
+   #+end_src
+
+   =operators= only affects the regex-off path. When regex=true,
+   the pattern already /is/ operators, so the flag is ignored.
+
+   Rename 'RequestType::TitleMatches' →
+   'RequestType::TextSearch' in
+   [[../../server/serve/protocol.rs][protocol.rs]], along with the string tag. No compat shim
+   (repo contains all callers; two elisp files and one handler).
+
+** Search axes in the server
+
+*** Scope (already implemented)
+    Keep 'SearchScope' ([[../../server/serve/handlers/title_matches.rs][title_matches.rs:38]]) as is.
+
+*** Regex flag
+    Add a boolean parsed alongside 'scope' in the renamed
+    'handle_text_search_request' (see §"Server side" under
+    Goal 2).
+
+    In 'search_index' ([[../../server/dbs/tantivy.rs][tantivy.rs:84]]), branch on regex:
+    - Regex off (default): current 'QueryParser::for_index' path.
+      If =body=true=, hand the parser both fields
+      (=title_or_alias= and =body=); its default cross-field
+      semantics is SHOULD (OR across fields), which matches the
+      OR-default already documented in
+      [[../../docs/COMMANDS.org][COMMANDS.org]].
+    - Regex on: build 'tantivy::query::RegexQuery' per selected
+      field. For body+title, combine the two RegexQueries into a
+      single 'BooleanQuery' with SHOULD occurrences.
+
+    Caveat (from prior analysis in
+    [[../../text-search-options.org][text-search-options.org]] §"Regex — supported via RegexQuery"):
+    regex runs against tokens, not raw text. A pattern with
+    whitespace won't match. Document this in
+    [[../../docs/COMMANDS.org][COMMANDS.org]]; don't add a raw-title field yet (defer as
+    out-of-scope).
+
+*** Body flag
+    Requires a schema change (see §"Body schema" below). Once
+    the field exists, the body flag just appends it to the query
+    parser's field list (non-regex) or builds an extra RegexQuery
+    (regex mode).
+
+** Body schema and indexing
+   Add one field to 'mk_tantivy_schema' ([[../../server/dbs/tantivy.rs][tantivy.rs:63]]):
+   #+begin_src rust
+     schema_builder.add_text_field("body", schema::TEXT);
+   #+end_src
+   Not =STORED=: we only need it searchable. Skipping STORED
+   saves disk and makes re-writes cheaper.
+
+   Add =body_field= to the 'TantivyIndex' struct (in
+   [[../../server/types/misc.rs][misc.rs]] per existing convention) and to 'open_existing_tantivy_index'
+   ([[../../server/dbs/tantivy.rs][tantivy.rs:24]]).
+
+   Populate body in 'create_documents_from_node'
+   ([[../../server/dbs/tantivy.rs][tantivy.rs:322]]): only the =is_title="true"= document gets
+   a non-empty body (alias docs keep body empty). Apply
+   'replace_each_link_with_its_label'
+   ([[../../server/types/textlinks.rs][textlinks.rs]]) to the body too, so linked text is
+   searchable by label rather than UUID.
+
+   Schema version gate: any existing on-disk Tantivy index
+   without a =body= field will fail
+   'open_existing_tantivy_index'. The init path already falls
+   back to a full rebuild if 'incremental_init' pre-conditions
+   fail ([[../../server/dbs/init.rs][init.rs:95]]), and that suffices — old indexes will
+   wipe and rebuild automatically on first run.
+
+* DONE Goal 1: escape-character round-trip integration test
+
+** Approach
+   A round-trip test against today's code would fail: titles like
+   =C++ tips= or =foo:bar= aren't findable by typing the literal
+   text, because 'QueryParser' interprets =+=, =:=, etc. as
+   operators. The "big lacuna to fill" is /literal search of
+   titles containing special characters/. The test must exercise
+   that, so we need both an escape layer and the test together.
+
+   Escape layer: pre-process the query in the default (regex-off)
+   mode to backslash-escape Tantivy operator characters. The test
+   creates nodes with specials in their titles and asserts the
+   literal query finds them.
+
+** Implementation sketch
+   Two escape modes in [[../../server/dbs/tantivy.rs][tantivy.rs]], selected by =operators=:
+   - 'escape_tantivy_literal(query)' — operators=false (default).
+     Backslash-escapes every occurrence of =+ - & | ! ( ) { } [ ]
+     ^ " ~ * ? : \ /= and wraps bare =AND= / =OR= / =NOT= in
+     single-quote phrase escapes. Every operator char is treated
+     as literal.
+   - 'escape_tantivy_intra_word(query)' — operators=true. Walks
+     the query and escapes an operator char /only/ when both its
+     neighbors are non-whitespace non-operator characters (i.e.
+     the char is glued to a word on both sides). =C++= becomes
+     =C\+\+= but =AND= is untouched; =foo:bar= becomes
+     =foo\:bar= but =title_or_alias:dog= is untouched. Quotes
+     anchored to whitespace stay (phrase syntax); quotes mid-word
+     get escaped. Heuristic — document the edge cases in
+     [[../../docs/COMMANDS.org][COMMANDS.org]].
+
+   In 'search_index' (or its caller), apply whichever escape
+   mode matches =operators= when regex=false. In regex mode,
+   leave the pattern alone.
+
+   Integration test at
+   [[../../tests/integration/search-escape-chars/][tests/integration/search-escape-chars/]] (parallel to
+   [[../../tests/integration/search-for-title-and-visit-link/][search-for-title-and-visit-link/]]):
+   - =data/skg-data/= with three nodes whose titles exercise
+     different specials: e.g. ="c_plus" title "C++ tips"=,
+     ="brackets" title "[draft] plan"=,
+     ="colons" title "cat:dog"=.
+   - =test-emacs.el= calls 'skg-search' three times, once per
+     literal title, asserts the matching =(id ...)= appears in
+     the search buffer. Then runs a fourth case with
+     operators=true and a phrase query ="fox in socks"= against
+     a matching node, proving the operator-preserving path.
+   - =run-test.sh= copied from the existing search test.
+
+   Small unit tests alongside in [[../../tests/tantivy.rs][tests/tantivy.rs]] covering
+   both 'escape_tantivy_literal' and
+   'escape_tantivy_intra_word' directly (the integration path
+   is slow).
+
+* Goal 2: three independent search axes with C-c s bindings
+
+** Elisp side ([[../../elisp/skg-request-title-matches.el][skg-request-title-matches.el]], [[../../elisp/skg-keymaps-and-aliases.el][skg-keymaps-and-aliases.el]])
+
+*** New user-facing entry points
+    Replace 'skg-search-titles' / 'skg-search-titles-everywhere'
+    with:
+    - 'skg-search' — default: rooty=t, regex=nil, body=nil,
+      operators=nil. Prompts for terms only.
+    - 'skg-search-interactive' — prompts for terms, then for each
+      of the four booleans with 'y-or-n-p'. Prompts:
+      ="Rooty only? "=, ="Regex? "=, ="Include body text?
+      (titles are always searched) "=, and — only when regex is
+      nil — ="Use operator syntax (AND/OR/phrase/grouping)? "=.
+      Skip the last prompt in regex mode since it's ignored
+      there.
+
+    Both call a single internal 'skg--request-text-search (terms
+    scope regex body operators)' — a rename + generalization of
+    'skg--request-title-matches' at
+    [[../../elisp/skg-request-title-matches.el][skg-request-title-matches.el:24]]. The internal serializer
+    passes the four flags as "true"/"false" strings.
+
+*** Keybindings ([[../../elisp/skg-keymaps-and-aliases.el][skg-keymaps-and-aliases.el]])
+    Global + content-view map:
+    #+begin_src elisp
+      (kbd "C-c s RET") #'skg-search
+      (kbd "C-c s i")   #'skg-search-interactive
+    #+end_src
+    Drop the old =C-c t t= and =C-c t e= bindings
+    ([[../../elisp/skg-keymaps-and-aliases.el][skg-keymaps-and-aliases.el:46-58]]) and delete
+    'skg-search-titles' / 'skg-search-titles-everywhere'. No
+    compat aliases.
+
+    =C-c s= becomes a prefix. =C-c s RET= works because Emacs
+    treats =RET= as the "empty sequel" only when an entry for it
+    exists — so define it explicitly.
+
+** Server side
+   'handle_title_matches_request'
+   ([[../../server/serve/handlers/title_matches.rs][title_matches.rs:64]]) gains:
+   - rename to 'handle_text_search_request'
+   - parse =regex=, =body=, and =operators= bool keys from the
+     sexp, defaulting to false
+   - pass all five (terms, scope, regex, body, operators) down to
+     'search_index'
+
+   'search_index' ([[../../server/dbs/tantivy.rs][tantivy.rs:84]]) gains the four flags and
+   builds queries as described in §"Regex flag" above, selecting
+   escape mode via =operators=.
+
+   'group_matches_by_id' is unchanged — scope filtering stays
+   where it is.
+
+** Documentation
+   Update [[../../docs/COMMANDS.org][docs/COMMANDS.org]]:
+   - Replace the =C-c t t= / =C-c t e= sections with =C-c s RET=
+     / =C-c s i=.
+   - Document the four axes (scope, regex, body, operators) and
+     the interactive prompts.
+   - Move the existing "Query syntax" content (phrase, boolean,
+     grouping, boost) under "operators=true"; add the intra-word
+     escape heuristic as a caveat.
+   - Note that body and regex need a rebuilt Tantivy index (see
+     Goal 3 — the default startup path auto-rebuilds).
+
+* Goal 3: DEFER THIS ONE: index titles first, bodies in background
+
+** Approach: measure, then decide
+   The body field lands in the schema unconditionally (Goal 2
+   needs it). Initial approach is /synchronous/: populate body
+   inside 'create_documents_from_node' at init time, one pass,
+   same as today. Then measure.
+
+   Instrument 'initialize_tantivy_from_nodes'
+   ([[../../server/dbs/init.rs][init.rs:238]] already wraps it in a tracing span called
+   =initialize_tantivy=). Add =body_char_count= and
+   =title_char_count= as fields on that span for realistic sizing.
+
+   Threshold: if body indexing adds more than ~2s to the init
+   span on the public/ corpus (28k nodes per CLAUDE.md memory),
+   background it. Otherwise ship sync and stop.
+
+** Background path (only if measurement warrants)
+   The shape, modeled on the existing enrichment thread at
+   [[../../server/serve/handlers/title_matches.rs][title_matches.rs:187]]:
+
+   1. /Init/: 'initialize_tantivy_from_nodes' indexes
+      title+alias only (skip body in
+      'create_documents_from_node' when a new flag
+      'SkipBody=true' is passed).
+   2. /After init, in =main()/=: before 'serve' is called, spawn
+      a thread that walks all SkgNodes again and, for each,
+      deletes the existing id-keyed docs and re-adds with body
+      populated. Commit in chunks of e.g. 1000 nodes.
+   3. /Readiness flag/: 'Arc<AtomicBool> body_index_ready',
+      cloned into the thread. Exposed via 'TantivyIndex' (or a
+      new 'SearchReadiness' sibling struct passed to 'serve' and
+      each handler invocation).
+   4. /Handler behavior/: in 'handle_text_search_request', when
+      =body=true= and =body_index_ready= is false, respond with a
+      banner prepended to the rendered search buffer — e.g.
+      =# Body index still building; titles only.= — and proceed
+      with body=false. Same spirit as the phase-1/phase-2
+      enrichment pattern already in place.
+   5. /Logging/: 'tracing::info!' at build start ("Body indexer:
+      started, N nodes") and end ("Body indexer: done in Ts,
+      committed K chunks"). Logs land in
+      =<data_root>/logs/server-to-user.log= via the existing
+      subscriber in 'init_tracing' ([[../../server/main.rs][main.rs:250]]).
+   6. /Commit cadence/: per chunk of ~1000 nodes. See also the
+      crash-recovery problem below.
+
+   Nodes re-added during a save
+   ('update_tantivy_from_saveinstructions' in
+   [[../../server/save.rs][save.rs:228]]) will race with the background indexer. Two
+   safe patterns:
+   - Serialize with an 'Arc<Mutex<()>>' writer lock; saves and
+     the background thread both acquire before creating an
+     'IndexWriter'. Tantivy allows only one writer anyway, so
+     this merely formalizes it.
+   - Or: the background thread re-reads the node from disk
+     before each re-add, so a concurrent save wins last-write.
+
+   Prefer the writer-lock pattern — simpler.
+
+** Crash recovery: =.body_index_complete= marker
+   File: =<tantivy_folder>/.body_index_complete=. Absent by
+   default; written (empty file, fsync'd) only after the final
+   commit of a successful body build.
+
+   Init order on startup:
+   1. Commit title indexing.
+   2. Check for =.body_index_complete=:
+      - Present → body index is complete; set
+        =body_index_ready=true= and skip the background indexer.
+      - Absent → spawn background indexer; indexer removes the
+        marker file at start (redundant but cheap), builds
+        bodies in chunks, commits final chunk, fsyncs the
+        index, then writes and fsyncs the marker, then flips
+        =body_index_ready= to true.
+   3. When 'full_init' wipes the index directory it also wipes
+      the marker (it's inside the directory). A schema change
+      triggering full rebuild therefore resets body-index
+      status. No separate schema-version gate needed for the
+      marker.
+
+   PITFALL comment to add on the marker-write call:
+   #+begin_src rust
+     // PITFALL: must fsync the Tantivy commit BEFORE writing this
+     // marker, and fsync the marker before flipping ready=true.
+     // Otherwise a crash between steps leaves: (a) marker present
+     // but some bodies missing, which subsequent startups would
+     // trust; (b) ready=true broadcast to handlers before the
+     // marker is durable, causing the next startup to redo work.
+     // Edge case still possible: disk-level reordering if the
+     // filesystem doesn't honor fsync (NFS, some tmpfs).
+   #+end_src
+
+** Incremental init interaction
+   'incremental_init' ([[../../server/dbs/init.rs][init.rs:139]]) re-indexes only the
+   .skg files modified since the last marker. Body-indexing
+   policy there:
+   - Modified nodes get their bodies indexed /inline/ as part of
+     the delete-then-readd step — no skip, no background
+     thread. The incremental set is small (typically a handful
+     of saves); there's no startup-latency pressure to defer.
+   - Unmodified nodes retain their bodies from the previous
+     run, which is why the =.body_index_complete= marker must
+     have been present before we took the incremental path.
+   - Precondition for taking 'incremental_init' must therefore
+     include =.body_index_complete= existing. Add it as a
+     fifth precondition at [[../../server/dbs/init.rs][init.rs:95]]. If absent, fall
+     through to 'full_init' (which will spawn the background
+     body indexer).
+   - On successful incremental init: re-fsync the marker
+     (touching it is enough; content is empty) and set
+     =body_index_ready=true= immediately.
+
+** Files touched (server)
+   - [[../../server/serve/protocol.rs][protocol.rs]]: rename 'RequestType::TitleMatches' →
+     'TextSearch'.
+   - [[../../server/dbs/init.rs][init.rs]]: marker-file handling; add
+     =.body_index_complete= as a fifth 'incremental_init'
+     precondition; in 'full_init' and 'incremental_init' spawn
+     the background body indexer. Thread signature
+     'fn background_body_indexer(nodes: Arc<[SkgNode]>, ti:
+     TantivyIndex, ready: Arc<AtomicBool>, marker_path: PathBuf)'.
+   - [[../../server/dbs/tantivy.rs][tantivy.rs]]: 'create_documents_from_node' takes a
+     'skip_body: bool' parameter; two escape functions
+     ('escape_tantivy_literal', 'escape_tantivy_intra_word');
+     'search_index' gains the four flags and branches on
+     =regex= and =operators=.
+   - [[../../server/types/misc.rs][misc.rs]]: 'TantivyIndex' grows 'body_index_ready:
+     Arc<AtomicBool>' (and a body_field).
+   - [[../../server/main.rs][main.rs]]: ensure the background thread outlives init —
+     have 'full_init' return its join handle to 'main'.
+   - [[../../server/serve/handlers/title_matches.rs][title_matches.rs]]: rename to 'handle_text_search_request';
+     parse four flags; check =body_index_ready= when body=true
+     and prepend a banner if not.
+   - [[../../server/save.rs][save.rs]]: coordinate writer access with the background
+     body indexer via 'Arc<Mutex<()>>' writer lock.
+
+** Files touched (elisp + docs)
+   - [[../../elisp/skg-request-title-matches.el][skg-request-title-matches.el]]: rename file to
+     =skg-request-text-search.el=; 'skg-search',
+     'skg-search-interactive', and private
+     'skg--request-text-search' (four-flag serializer).
+   - [[../../elisp/skg-keymaps-and-aliases.el][skg-keymaps-and-aliases.el]]: retire =C-c t t= / =C-c t
+     e=; bind =C-c s RET= / =C-c s i=.
+   - [[../../docs/COMMANDS.org][docs/COMMANDS.org]]: replace old =C-c t= sections.
+
+* Verification
+
+** Unit tests
+   - 'cargo nextest run' (TypeDB must be running per
+     [[../../CLAUDE.md][CLAUDE.md]]) — existing tests in
+     [[../../tests/tantivy.rs][tests/tantivy.rs]] and
+     [[../../tests/serve_title_matches_test.rs][tests/serve_title_matches_test.rs]] should still pass after
+     the rename; expect to update the mock request sexp shape.
+   - New unit tests for 'escape_tantivy_literal' and
+     'escape_tantivy_intra_word' in [[../../tests/tantivy.rs][tests/tantivy.rs]].
+
+** Integration tests
+   - =bash/integration-tests.sh= — runs all
+     tests/integration/*/run-test.sh under parallelism. Existing
+     [[../../tests/integration/search-for-title-and-visit-link/][search-for-title-and-visit-link]] and
+     [[../../tests/integration/search-enrichment/][search-enrichment]] need their =test-emacs.el= updated to
+     call 'skg-search' instead of 'skg-search-titles-everywhere'
+     (with body=nil, scope=everywhere).
+   - New [[../../tests/integration/search-escape-chars/][search-escape-chars]] integration test exercising 3
+     special-char titles.
+
+** Manual ELisp tests
+   - =bash/emacs-tests.sh= — verify keymap definitions load and
+     'skg-search' is bound to =C-c s RET=.
+
+** Manual end-to-end
+   1. Start TypeDB, =cargo run -- data/skgconfig.toml=; watch
+      for "Server ready." and the body-indexer start/finish log
+      lines.
+   2. =C-c s RET=, type a title, verify rooty-only hits.
+   3. =C-c s i=, enter a body-text fragment, answer rooty=N,
+      regex=N, body=Y, operators=N — verify body hits appear.
+   4. =C-c s i=, enter =C++ tips=, answer rooty=Y, regex=N,
+      body=N, operators=N — verify the literal match lands
+      (default escape path working).
+   5. =C-c s i=, enter ="fox in socks"=, answer rooty=N, regex=N,
+      body=N, operators=Y — verify phrase search still works
+      (operators path working).
+   6. Before body-index readiness, =C-c s i= with body=Y should
+     show the =# Body index still building= banner in the
+     search buffer.
+
+* Problems
+
+** Vague pieces in the spec
+
+*** DONE "Or maybe there already is one?"
+    There isn't. The existing
+    [[../../tests/integration/search-for-title-and-visit-link/][search-for-title-and-visit-link]] test uses plain-ASCII
+    titles ="apples"=, ="bears"=. No fixture anywhere exercises
+    Tantivy specials. Confirmed via grep.
+
+*** DONE "Round-trip" semantics
+    The phrase "round-trip integration test" is ambiguous: does
+    it mean /save a node with special chars, then find it by
+    typing the literal text/, or /accept a user's special-char
+    query verbatim and pass it through regardless of matches/?
+    I planned for the former because it's the user-visible
+    property. If you meant the latter, only the sanitizer test
+    in [[../../tests/tantivy.rs][tests/tantivy.rs]] is needed and the integration test is
+    unnecessary.
+
+**** TODO Jeff speaking
+lol I don't know. I was parroting what an earlier you (Claude 4.6)
+said yesterday. So whatever seems to you like the big lacuna to fill,
+probably is.
+
+***** Claude speaking
+Going with the first interpretation — "save a node with specials,
+search for it by literal title, get it back" — because that's the
+user-visible property and the current code genuinely can't do it.
+The sanitizer in Goal 1 is the fix; the integration test is the
+proof.
+
+*** DONE Sanitizer vs. "escape-everything mode"
+    [[../../text-search-options.org][text-search-options.org]] §"Recommended priority order" item
+    3 mentions /both/ "catch parse_query errors + helpful
+    message" /and/ "escape-literally mode toggle". I proposed
+    making the default mode literal (auto-escaped), with regex
+    mode as the opt-in "raw syntax" path. That subsumes both.
+    But it /loses/ the existing documented Tantivy syntax
+    features ( =+foo -bar=, phrases, grouping) for users who
+    liked them. Two ways to thread the needle:
+    1. Leave default unescaped (matches today's behavior and
+       current [[../../docs/COMMANDS.org][COMMANDS.org]] docs), add a fourth axis
+       =literal=true|false=, default literal=false. Now users
+       who want =C++= search pass =literal=true=.
+    2. Escape by default (my proposal), and advertise regex mode
+       as the way to get operators.
+    I recommend (2). (1) gives four axes and an even bigger
+    prompt in 'skg-search-interactive'. But flagging this for
+    your call.
+
+**** TODO Let's go with (2).
+
+*** DONE Fate of =C-c t t= / =C-c t e=
+    The goal defines =C-c s= without saying to retire the old
+    bindings. I proposed retiring them — two bindings for the
+    same action invites drift. Confirm?
+
+**** TODO confirmed
+
+*** DONE =C-c s= as a prefix vs. a single binding
+    =C-c s <RET>= and =C-c s i= together make =C-c s= a prefix.
+    Standard Emacs pattern, works fine. Just confirming you
+    meant =RET= literally (the Return key) rather than "just hit
+    C-c s alone."
+
+**** TODO right
+Otherwise the short one would preclude the long one.
+
+** Architectural choices the goals don't address
+
+*** DONE Regex on tokenized text
+    'RegexQuery' matches tokens, not raw strings. A regex with
+    whitespace can't match — =foo bar= will never match the
+    title =foo bar= because the tokenizer split it. Fixes
+    involve adding a =raw_title= STRING field, doubling index
+    size. I deferred this; proposing we ship tokenized-regex
+    first with a doc note.
+
+**** TODO agreed
+
+*** DONE Body search adds a fourth axis, quietly
+    The text of the goal says three axes. But body search
+    without title search is odd (you'd miss matches on the
+    title) — and the user says explicitly "Searching bodies but
+    not titles seems silly." So there are really three
+    meaningful combinations: titles-only, body-only-unchecked
+    (skipped), and titles+body. My plan treats the body flag as
+    /additive/ — body=true means "also body" — which matches the
+    user's intent. Worth making explicit in the prompt:
+    ='Include body text? (titles always searched)'=.
+
+**** TODO agreed
+
+*** DONE Background body indexing commit strategy
+    If the body indexer commits once at the end, a server crash
+    mid-build loses all progress and next startup redoes
+    everything. If it commits per chunk, partial results leak
+    into searches before readiness flips (benign but could
+    confuse). I proposed per-chunk; simple. Noting the trade.
+
+**** TODO agreed
+
+*** DONE Readiness flag needs a log line the user can see
+    If body indexing takes 30s, users will wonder why a body
+    search silently shows a warning. Add a banner-level log at
+    build start and end, plus a reply field on search responses
+    the elisp side can surface in the search buffer header.
+    Small addition, flagging because it's UX not code.
+
+**** TODO agreed
+
+*** DONE Request-name rename is a breaking change
+    The TCP protocol is not versioned. Renaming =title matches=
+    → =text search= means old Elisp clients can't talk to new
+    servers. In this repo both sides ship together so it's fine,
+    but worth saying out loud.
+
+**** TODO no back compat needed (yet)
+So far I'm the only dev and only user.
+
+*** DONE Escape-by-default + tokenized-regex together lose phrase/boolean/grouping
+    With option 2 chosen, the default (regex-off) path
+    backslash-escapes Tantivy operators — so ="foo bar"=, =foo
+    AND bar=, and =(foo OR bar)= all become literal. Regex-on
+    mode can't recover them either, because RegexQuery runs per
+    token (=foo bar= is two tokens, no single-token pattern can
+    match across them). Net effect: the features currently
+    documented in
+    [[../../docs/COMMANDS.org][COMMANDS.org]] §"Query syntax" — phrase, boolean, grouping
+    — become unreachable.
+    Three exits:
+    1. Accept the loss; delete those sections of COMMANDS.org.
+    2. Add a fourth axis =operators=true|false= that, when true,
+       passes the query to QueryParser with minimal escaping
+       (only escape operator chars that are clearly intra-word,
+       like =foo:bar= → =foo\:bar=). Intra-word detection is
+       heuristic.
+    3. When an escaped query returns zero hits, re-run through
+       QueryParser unescaped as a fallback.
+    Worth deciding before implementing Goal 1.
+
+**** TODO Let's go with (2).
+
+*** DONE Body indexer crash recovery
+    If the server crashes mid-body-build, the partial body index
+    is on disk with no indication of which nodes are complete.
+    Next startup's AtomicBool starts at false — so the indexer
+    runs again, deleting and re-adding every node's docs. Works,
+    but /doubles/ writer traffic for any node already body-indexed
+    in the previous run.
+    Simplest fix: a marker file
+    =<tantivy_folder>/.body_index_complete= written at the end
+    of a successful build. On startup: if missing, run the
+    indexer; if present, skip and set ready=true immediately.
+    Mirrors the existing =.skg_init_marker= pattern at
+    [[../../server/dbs/init.rs][init.rs:95]].
+
+**** TODO sure, let's do that
+Be sure to add a PITFALL comment explaining why it's there,
+and what if anything could still go wrong.
+
+*** DONE Body indexer vs. incremental-init divergence
+    'incremental_init' ([[../../server/dbs/init.rs][init.rs:139]]) re-indexes only
+    modified nodes. If body indexing is backgrounded, we need to
+    skip bodies there too, then re-run the background body
+    indexer — but only for the modified subset (since everything
+    else still has a body from the previous run). Plan doesn't
+    currently cover this; needs a pass.
+
+**** TODO Please add that to the plan.
+
+** Pushback on complexity
+
+*** Do we need regex at all in v1?
+    Tantivy's QueryParser already supports =+foo -bar=, phrases,
+    grouping — most of what users reach for when they say
+    "regex." Real regex buys: leading-wildcard, char classes,
+    backreferences. Of those, only leading-wildcard is commonly
+    asked for. The priority list in
+    [[../../text-search-options.org][text-search-options.org]] §"Recommended priority order" puts
+    regex at #4, behind input sanitization. Worth
+    considering implementing sanitization (goal 1) and body
+    search (goal 3) first, and regex second. I folded all three
+    into one plan because the wire protocol is easier to change
+    once.
+
+*** Three-boolean prompt is clunky
+    =C-c s i= asking three y-or-n questions in sequence is
+    clicky. Alternatives: (a) one 'completing-read' with
+    preset combinations like ="rooty | regex | body+rooty"=; (b)
+    prefix args (=C-1 C-c s=, =C-2 C-c s=, ...). I kept the
+    spec's three-prompt form — but (a) scales better if axes
+    grow.
+
+* Problems, out of scope
+
+** Stale doc-comment in 'mk_tantivy_schema'
+   [[../../server/dbs/tantivy.rs][tantivy.rs:58-62]] says "It includes three fields: id,
+   title_or_alias, source" but the schema has six. Drift since
+   3 extras were added. Small doc fix.
+
+** 'context_origin_type' populated via delete-and-readd
+   'create_documents_from_node' ([[../../server/dbs/tantivy.rs][tantivy.rs:351]]) writes
+   =context_origin_type => ""= initially, then
+   'update_context_origin_types' ([[../../server/dbs/tantivy.rs][tantivy.rs:361]]) deletes and
+   re-adds /every document/ to fill in the origin type. O(N)
+   extra writer work. Cleaner: compute origin types before
+   indexing (so
+   'create_documents_from_node' has the value to hand). This
+   becomes more appealing if bodies are added, since each
+   delete-then-readd now also copies the body.
+
+** 'spawn_enrichment_thread' uses block_on inside std::thread::spawn
+   [[../../server/serve/handlers/title_matches.rs][title_matches.rs:187]] calls
+   'futures::executor::block_on' twice from inside a
+   'std::thread'. Works but wastes a thread on blocked I/O. A
+   small 'tokio::spawn' on a shared multi-threaded runtime
+   would be cleaner and cheaper if the handler count grows.
+
+** DONE Prefix-wildcard doc discrepancy
+   [[../../text-search-options.org][text-search-options.org]] §"Prefix queries" asserted =histor*=
+   works in Tantivy 0.19. [[../../docs/COMMANDS.org][docs/COMMANDS.org]] §"Caveats"
+   asserted =histor*= matches nothing. Experiment (built an index
+   with titles "history", "historical", "hello" and ran queries
+   through QueryParser directly): =histor*= returns 0 hits,
+   =hist*= and =histor= likewise 0. COMMANDS.org was right.
+   Bonus finding: =*story= returns all three docs — Tantivy 0.19
+   QueryParser silently mis-parses leading wildcards into
+   match-all-ish garbage. text-search-options.org is wrong on
+   this point.
+
+** "NOT as a keyword is broken" (COMMANDS.org caveat)
+   [[../../docs/COMMANDS.org][docs/COMMANDS.org:66-68]] documents that =NOT dog= errors and
+   =dog AND NOT puppy= silently returns nothing. Real fix is
+   small — pre-parse and rewrite =NOT X= → =-X=, or upgrade
+   Tantivy — but the current state is hostile to users.
+
+** Escape-char handling currently doesn't exist
+   Already called out in goal 1, but the scope-of-fix matters:
+   the current state is that /any/ title with =: [ ] ^ " += in
+   it is not findable by literal text. Not merely "advanced
+   users beware" — it silently mis-parses. Goal 1 is a real
+   bug fix, not polish.

@@ -19,10 +19,46 @@
     Run 'skg-view' (below)
     from one of the links in the search results
     to go to the view from that node.
+**** Query syntax
+     Queries are literal. The query string is split on whitespace,
+     and any word containing a Tantivy operator character
+     (=+ - & | ! ( ) { } [ ] ^ " ~ * ? : \=) or the bare keyword
+     =AND= / =OR= / =NOT= is wrapped as a phrase so its contents
+     are searched literally. Words without specials pass through.
+     What this gets you:
+     - *Default is OR between words*. "dog cat" matches titles
+       containing either word; a title with both outranks one
+       with only one.
+     - *Literal special characters*. A title like "C++ tips",
+       "[draft] plan", or "cat:dog" is findable by typing its
+       literal text.
+     What this costs (for now):
+     - Boolean =AND= / =OR= / =NOT=, require/exclude (=+= / =-=),
+       quoted phrases, grouping =(...)=, field =title_or_alias:=,
+       and boost =^= are all treated as literal content instead
+       of operators. Planned restoration: a future
+       =operators=true= axis on the search command.
+**** Caveats
+     - Only titles and aliases are indexed.
+       Body text is not searchable.
+     - Each alias is indexed as its own document, so a query can
+       match on an alias even when the title doesn't mention the
+       searched word. The returned node is still the aliased one.
+     - Prefix search is not supported. Tantivy 0.19's QueryParser
+       accepts "histor*" without complaint but matches nothing
+       (verified by experiment). Regardless, the escape layer
+       above phrase-wraps any word containing =*=, so the wildcard
+       never even reaches Tantivy.
+     - Results are ranked by BM25 times a context-origin factor
+       (Root 100×, CycleMember ~32×, Target 10×, HadID 10×,
+       MultiContained ~3.2×, everything else 1×). A weaker text
+       match on a root can outrank a stronger match on a leaf.
+       Use =C-c t e= to see everything, unfiltered.
 *** C-c t e : skg-search-titles-everywhere
     Like skg-search-titles, but shows all matches
     regardless of graph role — including multi-contained
     and otherwise unremarkable nodes.
+    Query syntax is the same as skg-search-titles, above.
 *** C-c v v : skg-view
     Calling this when the cursor is on a link, a node's metadata,
     a bare UUID, or a .skg filename

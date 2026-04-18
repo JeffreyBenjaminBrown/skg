@@ -77,6 +77,61 @@ pub(super) fn mk_tantivy_schema() -> schema::Schema {
     "had_id", schema::STRING | schema::STORED);
   schema_builder . build() }
 
+/// Pre-process `query` so titles and aliases containing Tantivy
+/// operator characters are findable by typing the literal text.
+///
+/// Strategy: split on whitespace. Any word that contains an operator
+/// char — or is one of the boolean keywords AND / OR / NOT — is
+/// wrapped as a Tantivy phrase ("..."), which treats its contents as
+/// literal content (tokenized, but not operator-interpreted). Words
+/// with no specials pass through unchanged, preserving the OR-default
+/// across terms that
+/// [[../../docs/COMMANDS.org][docs/COMMANDS.org]] advertises and
+/// existing tests (e.g. `test_aliases`) rely on.
+///
+/// Why per-word phrasing rather than whole-query:
+/// Wrapping the whole query as a phrase would collapse OR-default
+/// into phrase-only (AND + adjacency). Per-word wrapping keeps OR
+/// between words while making each word's contents literal.
+///
+/// Why phrase-wrap rather than backslash-escape each char:
+/// Tantivy 0.19's QueryParser does not accept `\[` / `\]` etc.
+/// outside phrases — it errors with SyntaxError. Phrase-wrapping is
+/// the most reliable way to pass operator chars through the parser.
+pub fn escape_tantivy_literal (
+  query : &str,
+) -> String {
+  query
+    . split_whitespace ()
+    . map ( |word| {
+      let needs_wrap : bool =
+        word == "AND" || word == "OR" || word == "NOT" ||
+        word . chars () . any ( is_tantivy_operator_char );
+      if needs_wrap {
+        wrap_as_phrase ( word )
+      } else {
+        word . to_string () }} )
+    . collect::<Vec<String>> ()
+    . join ( " " ) }
+
+fn wrap_as_phrase (
+  word : &str,
+) -> String {
+  let mut inner : String =
+    String::with_capacity ( word . len () + 4 );
+  for ch in word . chars () {
+    if ch == '\\' || ch == '"' {
+      inner . push ( '\\' ); }
+    inner . push ( ch ); }
+  format! ( "\"{}\"", inner ) }
+
+fn is_tantivy_operator_char (
+  ch : char,
+) -> bool {
+  matches! ( ch,
+    '+' | '-' | '&' | '|' | '!' | '(' | ')' | '{' | '}' |
+    '[' | ']' | '^' | '"' | '~' | '*' | '?' | ':' | '\\' ) }
+
 /// Returns ALL matching Tantivy "Documents" (see glossary, above).
 /// No limit: context-based reranking (multipliers up to 100x)
 /// can reorder results arbitrarily, so the caller must see
@@ -93,6 +148,8 @@ pub fn search_index (
   tracing::info! (
     "Finding files with titles or aliases matching \"{}\".",
     query_text);
+  let escaped_query : String =
+    escape_tantivy_literal ( query_text );
   let searcher : Searcher = {
     let reader : IndexReader =
       tantivy_index . index . reader () ?;
@@ -102,7 +159,7 @@ pub fn search_index (
       QueryParser::for_index (
         &tantivy_index . index,
         vec! [ tantivy_index . title_or_alias_field ] );
-    query_parser } . parse_query (query_text) ?;
+    query_parser } . parse_query ( &escaped_query ) ?;
   Ok (( {
     let best_matches : Vec < ( f32, tantivy::DocAddress ) > =
       searcher . search (
