@@ -55,8 +55,9 @@ async fn merge_container_into_content_impl (
   "};
 
   let mut conn_state : ConnectionState = ConnectionState {
-    diff_mode_enabled : false,
-    memory            : SkgnodesInMemory::new () };
+        diff_mode_enabled : false,
+        memory            : SkgnodesInMemory::new (),
+        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
   let mut stream : TcpStream =

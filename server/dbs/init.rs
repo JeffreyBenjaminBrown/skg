@@ -38,6 +38,7 @@ use typedb_driver::{
 pub struct InitData {
   pub driver        : Arc<TypeDBDriver>,
   pub tantivy_index : TantivyIndex,
+  pub graph         : crate::graph::GraphHandle,
   pub had_id_set    : HashSet<ID>,
   pub all_node_ids  : HashSet<ID>,
   pub link_targets  : HashSet<ID>,
@@ -208,9 +209,13 @@ fn init_data_from_nodes (
   let ( map_to_content, map_to_containers )
     : ( MapToContent, MapToContainers )
     = contains_maps_from_nodes (&nodes);
+  let graph : crate::graph::GraphHandle =
+    crate::graph::new_handle (
+      crate::graph::Graph::from_completes (nodes) );
   InitData {
     driver,
     tantivy_index,
+    graph,
     had_id_set,
     all_node_ids,
     link_targets,

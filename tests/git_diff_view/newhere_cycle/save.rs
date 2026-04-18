@@ -28,8 +28,9 @@ fn test_newhere_cycle_survives_save()
 
     // Round-trip through the save pipeline.
     let mut conn_state : ConnectionState = ConnectionState {
-      diff_mode_enabled : true,
-      memory            : SkgnodesInMemory::new () };
+        diff_mode_enabled : true,
+        memory            : SkgnodesInMemory::new (),
+        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
     let (mut stream, _) = mk_test_tcp_stream_pair ();
     let response = update_from_and_rerender_buffer(
       &mut stream,

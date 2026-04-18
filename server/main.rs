@@ -74,6 +74,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
   let InitData { driver        : typedb_driver,
                   tantivy_index,
+                  graph,
                   had_id_set,
                   all_node_ids,
                   link_targets,
@@ -96,7 +97,7 @@ fn main() -> Result<(), Box<dyn Error>> {
   listener . set_nonblocking (false) ?;
   tracing::info! ("Server ready.");
 
-  serve (config, typedb_driver, tantivy_index, listener)
+  serve (config, typedb_driver, tantivy_index, graph, listener)
     . map_err ( |e| Box::new (e)
                  as Box<dyn Error>) ?;
   Ok (( )) }

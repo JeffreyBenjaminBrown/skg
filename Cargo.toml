@@ -42,12 +42,14 @@ name = "function_conversions_for_refactor"
 path = "tools/function_conversions_for_refactor/function_conversions_for_refactor.rs"
 
 [dependencies]
+arc-swap = "1"
 async-std = { version = "1.12", features = ["attributes"] }
 ctrlc = "3.4"
 ego-tree = "0.6"
 filetime = "0.2"
 futures = "0.3"
 git2 = "0.18"
+im = "15"
 indoc = "2"
 itertools = "0.14"
 rand = "0.8"

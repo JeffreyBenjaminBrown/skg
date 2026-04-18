@@ -46,8 +46,9 @@ fn test_definitive_view_limit_10
         let mut config = config . clone();
         config . initial_node_limit = 10;
         let mut conn_state : ConnectionState = ConnectionState {
-          diff_mode_enabled : false,
-          memory            : SkgnodesInMemory::new () };
+        diff_mode_enabled : false,
+        memory            : SkgnodesInMemory::new (),
+        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
@@ -114,8 +115,9 @@ fn test_definitive_view_limit_5_or_6
         let mut config5 = config . clone();
         config5 . initial_node_limit = 5;
         let mut conn_state : ConnectionState = ConnectionState {
-          diff_mode_enabled : false,
-          memory            : SkgnodesInMemory::new () };
+        diff_mode_enabled : false,
+        memory            : SkgnodesInMemory::new (),
+        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_5 = update_from_and_rerender_buffer (
           &mut stream,
@@ -127,8 +129,9 @@ fn test_definitive_view_limit_5_or_6
         let mut config6 = config . clone();
         config6 . initial_node_limit = 6;
         let mut conn_state : ConnectionState = ConnectionState {
-          diff_mode_enabled : false,
-          memory            : SkgnodesInMemory::new () };
+        diff_mode_enabled : false,
+        memory            : SkgnodesInMemory::new (),
+        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_6 = update_from_and_rerender_buffer (
           &mut stream,
@@ -198,8 +201,9 @@ fn test_definitive_view_limit_1_to_4
         let mut config1 = config . clone();
         config1 . initial_node_limit = 1;
         let mut conn_state : ConnectionState = ConnectionState {
-          diff_mode_enabled : false,
-          memory            : SkgnodesInMemory::new () };
+        diff_mode_enabled : false,
+        memory            : SkgnodesInMemory::new (),
+        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_1 = update_from_and_rerender_buffer (
           &mut stream,
@@ -210,8 +214,9 @@ fn test_definitive_view_limit_1_to_4
         let mut config4 = config . clone();
         config4 . initial_node_limit = 4;
         let mut conn_state : ConnectionState = ConnectionState {
-          diff_mode_enabled : false,
-          memory            : SkgnodesInMemory::new () };
+        diff_mode_enabled : false,
+        memory            : SkgnodesInMemory::new (),
+        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_4 = update_from_and_rerender_buffer (
           &mut stream,
@@ -275,8 +280,9 @@ fn test_definitive_view_conflicting
         let mut config = config . clone();
         config . initial_node_limit = 100;
         let mut conn_state : ConnectionState = ConnectionState {
-          diff_mode_enabled : false,
-          memory            : SkgnodesInMemory::new () };
+        diff_mode_enabled : false,
+        memory            : SkgnodesInMemory::new (),
+        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
@@ -329,8 +335,9 @@ fn test_definitive_view_with_cycle
         let mut config = config . clone();
         config . initial_node_limit = 100;
         let mut conn_state : ConnectionState = ConnectionState {
-          diff_mode_enabled : false,
-          memory            : SkgnodesInMemory::new () };
+        diff_mode_enabled : false,
+        memory            : SkgnodesInMemory::new (),
+        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
@@ -377,8 +384,9 @@ fn test_definitive_view_with_repeat
         let mut config = config . clone();
         config . initial_node_limit = 100;
         let mut conn_state : ConnectionState = ConnectionState {
-          diff_mode_enabled : false,
-          memory            : SkgnodesInMemory::new () };
+        diff_mode_enabled : false,
+        memory            : SkgnodesInMemory::new (),
+        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
@@ -432,8 +440,9 @@ fn test_definitive_view_request_cleared
         let mut config = config . clone();
         config . initial_node_limit = 100;
         let mut conn_state : ConnectionState = ConnectionState {
-          diff_mode_enabled : false,
-          memory            : SkgnodesInMemory::new () };
+        diff_mode_enabled : false,
+        memory            : SkgnodesInMemory::new (),
+        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,

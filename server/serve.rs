@@ -49,14 +49,16 @@ use typedb_driver::TypeDBDriver;
 pub struct ConnectionState {
   pub diff_mode_enabled : bool,
   pub memory            : SkgnodesInMemory,
+  pub graph             : crate::graph::GraphHandle,
   // PITFALL: If Emacs crashes or the TCP connection drops without sending close-view messages, SkgnodesInMemory is still freed, because ConnectionState is owned by handle_emacs and dropped when the connection loop exits (n == 0). There's no leak. HOWEVER, the pool may briefly hold stale entries for views that were conceptually "closed" by the crash. This is harmless: the entries are freed moments later when ConnectionState drops.
 }
 
 /// Pipes TCP input from Emacs into handle_emacs.
 pub fn serve (
-  config        : SkgConfig,
-  typedb_driver : Arc<TypeDBDriver>,
-  tantivy_index : TantivyIndex,
+  config         : SkgConfig,
+  typedb_driver  : Arc<TypeDBDriver>,
+  tantivy_index  : TantivyIndex,
+  graph          : crate::graph::GraphHandle,
   emacs_listener : TcpListener,
 ) -> std::io::Result<()> {
 
@@ -68,6 +70,8 @@ pub fn serve (
           Arc::clone (&typedb_driver); // Cloning permits the main thread to keep the driver and index. If they were passed here instead of cloned, their ownership would be moved into the first spawned thread, making them unavailable for the next connection.
         let tantivy_index_clone : TantivyIndex =
           tantivy_index . clone ();
+        let graph_clone : crate::graph::GraphHandle =
+          Arc::clone (&graph);
         let config_clone : SkgConfig =
           config        . clone ();
         thread::spawn ( move || {
@@ -75,6 +79,7 @@ pub fn serve (
             stream,
             typedb_driver_clone,
             tantivy_index_clone,
+            graph_clone,
             & config_clone, ) } ); }
       Err (e) => {
         tracing::error!(error = %e, "Connection failed"); }} }
@@ -88,12 +93,14 @@ fn handle_emacs (
   mut stream        : TcpStream,
   typedb_driver     : Arc<TypeDBDriver>,
   mut tantivy_index : TantivyIndex,
+  graph             : crate::graph::GraphHandle,
   config            : &SkgConfig,
 ) {
   let mut conn_state : ConnectionState =
     ConnectionState {
       diff_mode_enabled : false,
-      memory            : SkgnodesInMemory::new () };
+      memory            : SkgnodesInMemory::new (),
+      graph             : graph . clone (), };
 
   let enrichment_slot // To update search results once the 'enrichment' (containerward paths + graphnodestats) has been computed.
     : Arc<Mutex<Option<SearchEnrichmentPayload>>> =

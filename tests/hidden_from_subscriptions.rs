@@ -147,7 +147,8 @@ fn test_every_kind_of_col(
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
-        memory            : SkgnodesInMemory::new () };
+        memory            : SkgnodesInMemory::new (),
+        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
           &mut stream,
@@ -222,7 +223,8 @@ fn test_hidden_within_but_none_without(
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
-        memory            : SkgnodesInMemory::new () };
+        memory            : SkgnodesInMemory::new (),
+        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
           &mut stream,
@@ -298,7 +300,8 @@ fn test_hidden_without_but_none_within(
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
-        memory            : SkgnodesInMemory::new () };
+        memory            : SkgnodesInMemory::new (),
+        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
         &mut stream,
@@ -370,7 +373,8 @@ fn test_overlapping_hidden_within(
                modified_view);
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
-        memory            : SkgnodesInMemory::new () };
+        memory            : SkgnodesInMemory::new (),
+        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
         &mut stream,
