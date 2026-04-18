@@ -27,7 +27,7 @@
             skg-request-rerender-all-views
             skg-request-save
             skg-request-single-root-content-view
-            skg-request-title-matches
+            skg-request-text-search
             skg-request-verify-connection
             skg-request-views
             skg-sexpr-dsl-for-edits

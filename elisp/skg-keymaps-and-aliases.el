@@ -6,7 +6,7 @@
 ;;;   skg-content-view-mode-map  (for skg content view buffers)
 ;;;   skg-id-stack-mode-map      (for the id-stack edit buffer)
 ;;;   skg-sexp-edit-mode-map     (for the sexp-edit buffer)
-;;;   global C-c t t             (skg-search-titles, available everywhere)
+;;;   global C-c s RET           (skg-search, available everywhere)
 ;;;   magit C-c v v              (skg-view, available in magit buffers)
 
 ;; No requires here — the underlying functions are loaded by skg-client.el,
@@ -43,8 +43,9 @@ and hide INTERNAL from M-x completion."
 ;; Keymaps
 ;;
 
-(global-set-key ;; Global
- (kbd "C-c t t") #'skg-search-titles)
+(progn ;; Global
+  (global-set-key (kbd "C-c s RET") #'skg-search)
+  (global-set-key (kbd "C-c s i")   #'skg-search-interactive))
 
 (with-eval-after-load 'magit ;; Magit
   (define-key magit-mode-map (kbd "C-c v v") #'skg-view))
@@ -53,9 +54,9 @@ and hide INTERNAL from M-x completion."
   (let (( map (make-sparse-keymap) ))
     (progn;; save
       (define-key map (kbd "C-x C-s") #'skg-request-save-buffer))
-    (progn;; title text search
-      (define-key map (kbd "C-c t t") #'skg-search-titles)
-      (define-key map (kbd "C-c t e") #'skg-search-titles-everywhere))
+    (progn;; text search
+      (define-key map (kbd "C-c s RET") #'skg-search)
+      (define-key map (kbd "C-c s i")   #'skg-search-interactive))
     (progn;; view
       (define-key map (kbd "C-c v v") #'skg-view)
       (define-key map (kbd "C-c v i") #'skg-view-id)
