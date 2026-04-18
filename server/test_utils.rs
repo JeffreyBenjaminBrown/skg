@@ -262,16 +262,37 @@ pub async fn setup_test_tantivy_and_typedb_dbs (
 /// - The Tantivy index directory (if it exists)
 ///
 /// Does NOT delete the .skg fixture files.
+///
+/// PITFALL: Retries TypeDB delete on "database is in use" errors.
+/// This is a race: when a test returns, Rust Transactions drop and
+/// signal close asynchronously, but the TypeDB server may not have
+/// finished releasing them before we ask to delete the database.
+/// The retries give the server time to catch up.
 pub async fn cleanup_test_tantivy_and_typedb_dbs(
   db_name: &str,
   driver: &TypeDBDriver,
   tantivy_folder: Option<&Path>,
 ) -> Result<(), Box<dyn Error>> {
-  // Delete TypeDB database
-  let databases : &DatabaseManager = driver . databases();
-  if databases . contains (db_name) . await? {
-    let database : Arc<Database> = databases . get (db_name) . await?;
-    database . delete() . await?; }
+  { // Delete TypeDB database (with retry).
+    let databases : &DatabaseManager = driver . databases();
+    if databases . contains (db_name) . await? {
+      let max_attempts : usize = 20; // 20 * 50ms = 1s total
+      let mut last_err : Option<Box<dyn Error>> = None;
+      for attempt in 0 .. max_attempts {
+        let database : Arc<Database> =
+          databases . get (db_name) . await?;
+        match database . delete() . await {
+          Ok (()) => { last_err = None; break; }
+          Err (e) => {
+            let msg : String = e . to_string();
+            if msg . contains ("is in use") && attempt + 1 < max_attempts {
+              // block_on is single-threaded; a blocking sleep
+              // is safe and doesn't need a tokio/async-std timer.
+              std::thread::sleep (
+                std::time::Duration::from_millis (50) );
+              last_err = Some ( Box::new (e) ); }
+            else { last_err = Some ( Box::new (e) ); break; }} } }
+      if let Some (e) = last_err { return Err (e); } } }
 
   // Delete Tantivy index if path provided and exists
   if let Some (tantivy_path) = tantivy_folder {
