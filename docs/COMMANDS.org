@@ -11,54 +11,83 @@
    and beegin to edit another one.
    It won't stop you, but the results could be bad.
 ** changing the whole view
-*** C-c t t : skg-search-titles
-    Searches titles and aliases, but only shows "interesting" nodes:
-    roots, cycle members, link targets, and nodes that had an
-    org-roam ID before import. This filters out multi-contained
-    nodes and nodes with no special graph role.
-    Run 'skg-view' (below)
-    from one of the links in the search results
-    to go to the view from that node.
-**** Query syntax
+*** C-c s RET : skg-search
+    Text search across titles and aliases, showing only
+    "interesting" nodes: roots, cycle members, link targets, and
+    nodes that had an org-roam ID before import. Multi-contained
+    nodes and nodes with no special graph role are filtered out.
+
+    One prompt — the search terms. All axes take their conservative
+    defaults: rooty scope, no regex, titles only (no body), no
+    Tantivy operator syntax.
+
+    Run 'skg-view' (below) from one of the links in the search
+    results to open the view from that node.
+*** C-c s i : skg-search-interactive
+    Same as skg-search but asks for the four axis flags before
+    sending:
+
+    - *Rooty?* — no flips scope to "everywhere" (shows all
+      Tantivy matches regardless of graph role, including the
+      humblest leaves).
+    - *Regex?* — yes switches to per-token regex. Bypasses the
+      query parser; the pattern is handed to Tantivy's
+      'RegexQuery' verbatim.
+    - *Body?* — yes adds the body field to the search (titles
+      are always searched).
+    - *Operators?* — yes preserves Tantivy operator syntax
+      (AND / OR / NOT / +foo / -bar / phrase / grouping /
+      field:). Intra-word operator chars still get escaped so
+      =foo:bar= remains findable. Skipped if regex is yes
+      (operators is meaningless there).
+
+**** Query syntax with default axes (operators=false, regex=false)
      Queries are literal. The query string is split on whitespace,
      and any word containing a Tantivy operator character
      (=+ - & | ! ( ) { } [ ] ^ " ~ * ? : \=) or the bare keyword
      =AND= / =OR= / =NOT= is wrapped as a phrase so its contents
      are searched literally. Words without specials pass through.
-     What this gets you:
-     - *Default is OR between words*. "dog cat" matches titles
-       containing either word; a title with both outranks one
-       with only one.
+     - *OR between words*. "dog cat" matches titles containing
+       either word; a title with both outranks one with only one.
      - *Literal special characters*. A title like "C++ tips",
        "[draft] plan", or "cat:dog" is findable by typing its
        literal text.
-     What this costs (for now):
-     - Boolean =AND= / =OR= / =NOT=, require/exclude (=+= / =-=),
-       quoted phrases, grouping =(...)=, field =title_or_alias:=,
-       and boost =^= are all treated as literal content instead
-       of operators. Planned restoration: a future
-       =operators=true= axis on the search command.
+
+**** Query syntax with operators=true
+     The query is handed to Tantivy's QueryParser, with one
+     heuristic adjustment: any operator character sitting strictly
+     inside a word (with word chars on both sides, scanning
+     through consecutive operators within the same token) is
+     backslash-escaped. So =foo:bar= stays findable as a literal,
+     but =AND= / =OR= / =+foo= / =-bar= / ="fox in socks"= /
+     =(dog OR cat)= keep their operator meaning.
+
+     Known imperfection: the heuristic can't distinguish a
+     configured field name from a user word, so
+     =title_or_alias:dog= gets its =:= escaped too. Field-
+     qualified queries need manual =\:= in operators mode.
+
+**** Query syntax with regex=true
+     The query is passed to 'tantivy::query::RegexQuery'. Matches
+     are against *tokens*, not raw text — the indexer lowercases
+     and splits on whitespace, so =foo bar= as a regex won't
+     match a title because tokens are individually lowercased
+     words. Patterns like =histor.*= work for prefix search
+     ('history', 'historical'). Combine with body=true for
+     =BooleanQuery SHOULD-SHOULD= across title and body fields.
+
 **** Caveats
-     - Only titles and aliases are indexed.
-       Body text is not searchable.
      - Each alias is indexed as its own document, so a query can
        match on an alias even when the title doesn't mention the
        searched word. The returned node is still the aliased one.
-     - Prefix search is not supported. Tantivy 0.19's QueryParser
-       accepts "histor*" without complaint but matches nothing
-       (verified by experiment). Regardless, the escape layer
-       above phrase-wraps any word containing =*=, so the wildcard
-       never even reaches Tantivy.
      - Results are ranked by BM25 times a context-origin factor
        (Root 100×, CycleMember ~32×, Target 10×, HadID 10×,
        MultiContained ~3.2×, everything else 1×). A weaker text
        match on a root can outrank a stronger match on a leaf.
-       Use =C-c t e= to see everything, unfiltered.
-*** C-c t e : skg-search-titles-everywhere
-    Like skg-search-titles, but shows all matches
-    regardless of graph role — including multi-contained
-    and otherwise unremarkable nodes.
-    Query syntax is the same as skg-search-titles, above.
+       Use =C-c s i= with rooty=no to see everything, unfiltered.
+     - Regex distance is tokenwise. For whole-title regex (e.g.
+       patterns spanning spaces) we'd need a separate
+       non-tokenized =raw_title= field. Not done yet.
 *** C-c v v : skg-view
     Calling this when the cursor is on a link, a node's metadata,
     a bare UUID, or a .skg filename

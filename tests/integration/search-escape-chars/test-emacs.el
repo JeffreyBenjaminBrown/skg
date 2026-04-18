@@ -1,6 +1,6 @@
 ;;; Integration test: literal search of titles with Tantivy operator chars.
-;;; Uses skg-search-titles-everywhere so rooty filtering doesn't mask
-;;; the fixture nodes (which have no containers, links, or cycles).
+;;; Uses skg--request-text-search with scope=everywhere so rooty filtering
+;;; doesn't mask the fixture nodes (which have no containers, links, or cycles).
 
 (load-file "../../../elisp/skg-init.el")
 (load-file "../../../elisp/skg-test-utils.el")
@@ -12,7 +12,7 @@
   "Run QUERY and verify the search buffer contains (id EXPECTED-ID)."
   (message "=== Searching literal: %s ===" query)
   (setq integration-test-phase (format "searching %s" query))
-  (skg-search-titles-everywhere query)
+  (skg--request-text-search query "everywhere" nil nil nil)
   (skg-test-wait-for-buffer (skg-search-buffer-name query))
   (let ((search-buffer (get-buffer (skg-search-buffer-name query))))
     (if search-buffer
