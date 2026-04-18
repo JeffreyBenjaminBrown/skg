@@ -46,6 +46,13 @@ pub fn handle_rebuild_dbs_request (
       &link_targets, &map_to_content, &map_to_containers )
       . map_err ( |e| format! ("Context computation failed: {}", e) ) ?;
     tracing::info!("Context rankings recomputed.");
+    // Rebuild the in-memory graph from disk too, so it stays in
+    // lockstep with the freshly repopulated TypeDB/Tantivy.
+    let fresh_graph : crate::graph::Graph =
+      crate::graph::Graph::from_completes (&nodes);
+    conn_state . graph . store (
+      std::sync::Arc::new (fresh_graph) );
+    tracing::info!("In-memory graph rebuilt.");
     Ok (())
   })();
   let msg : String = match result {
