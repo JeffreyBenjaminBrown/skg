@@ -3,6 +3,8 @@
 use std::path::Path;
 use std::collections::HashMap;
 use tantivy::schema as schema;
+use tantivy::TantivyDocument;
+use tantivy::schema::document::Value;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::in_fs_wipe_index_then_create_it;
@@ -47,11 +49,11 @@ fn test_many_tantivy_things (
   if !best_matches . is_empty() {
     let (_top_score, top_doc_address): (f32, tantivy::DocAddress) =
       best_matches[0];
-    let top_doc: tantivy::Document =
+    let top_doc: TantivyDocument =
       searcher . doc (top_doc_address)?;
     let top_id: &str =
       top_doc . get_first (id_field)
-      . unwrap() . as_text() . unwrap();
+      . unwrap() . as_str() . unwrap();
     assert!(
       top_id == "5",
       "Expected primary ID '5' to have highest score, but got: {}",
@@ -70,11 +72,11 @@ fn test_many_tantivy_things (
 
   let (_initial_score, initial_top_address): (f32, tantivy::DocAddress) =
     initial_matches[0];
-  let initial_top_doc: tantivy::Document =
+  let initial_top_doc: TantivyDocument =
     initial_searcher . doc (initial_top_address)?;
   let initial_top_id: &str =
     initial_top_doc . get_first (id_field)
-    . unwrap() . as_text() . unwrap();
+    . unwrap() . as_str() . unwrap();
 
   assert_eq!(initial_top_id, "1",
             "Expected node 1 to be top result initially, but got: {}",
@@ -107,11 +109,11 @@ fn test_many_tantivy_things (
   // Check first result is node 6
   let (_final_score1, final_address1): (f32, tantivy::DocAddress) =
     final_matches[0];
-  let final_doc1: tantivy::Document =
+  let final_doc1: TantivyDocument =
     final_searcher . doc (final_address1)?;
   let final_id1: &str =
     final_doc1 . get_first(tantivy_index . id_field)
-    . unwrap() . as_text() . unwrap();
+    . unwrap() . as_str() . unwrap();
 
   assert_eq!(final_id1, "6",
             "Expected node 6 to be first result after update, but got: {}",
@@ -121,11 +123,11 @@ fn test_many_tantivy_things (
   // Check second result is node 1
   let (_final_score2, final_address2): (f32, tantivy::DocAddress) =
     final_matches[1];
-  let final_doc2: tantivy::Document =
+  let final_doc2: TantivyDocument =
     final_searcher . doc (final_address2)?;
   let final_id2: &str =
     final_doc2 . get_first(tantivy_index . id_field)
-    . unwrap() . as_text() . unwrap();
+    . unwrap() . as_str() . unwrap();
 
   assert_eq!(final_id2, "1",
             "Expected node 1 to be second result after update, but got: {}",
@@ -147,14 +149,14 @@ pub fn print_search_results(
     let mut path_to_results: HashMap <String, Vec<(f32, String)>> =
       HashMap::new();
     for (score, doc_address) in best_matches {
-      let retrieved_doc: tantivy::Document =
+      let retrieved_doc: TantivyDocument =
         searcher . doc (doc_address)?;
       let path_value: &str =
         retrieved_doc . get_first (id_field)
-        . unwrap() . as_text() . unwrap();
+        . unwrap() . as_str() . unwrap();
       let title_value: &str =
         retrieved_doc . get_first (title_or_alias_field)
-        . unwrap() . as_text() . unwrap();
+        . unwrap() . as_str() . unwrap();
       path_to_results
         . entry(path_value . to_string())
         . or_insert_with (Vec::new)
@@ -204,9 +206,9 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let ids1: Vec<String> =
     matches1 . iter()
     . map(|(_score, doc_address)| {
-      let doc = searcher1 . doc (*doc_address) . unwrap();
+      let doc = searcher1 . doc::<TantivyDocument> (*doc_address) . unwrap();
       doc . get_first(tantivy_index . id_field) . unwrap()
-        . as_text() . unwrap() . to_string() })
+        . as_str() . unwrap() . to_string() })
     . collect();
 
   // Should return apple as top hit, and also banana and kiwi somewhere
@@ -224,8 +226,8 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
     search_index(&tantivy_index, "chomp apple")?;
   let ids2: Vec<String> = matches2 . iter()
     . map(|(_score, doc_address)| {
-      let doc = searcher2 . doc (*doc_address) . unwrap();
-      doc . get_first(tantivy_index . id_field) . unwrap() . as_text() . unwrap() . to_string()
+      let doc = searcher2 . doc::<TantivyDocument> (*doc_address) . unwrap();
+      doc . get_first(tantivy_index . id_field) . unwrap() . as_str() . unwrap() . to_string()
     })
     . collect();
 
@@ -239,8 +241,8 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let (matches3, searcher3) = search_index(&tantivy_index, "throw banana")?;
   let ids3: Vec<String> = matches3 . iter()
     . map(|(_score, doc_address)| {
-      let doc = searcher3 . doc (*doc_address) . unwrap();
-      doc . get_first(tantivy_index . id_field) . unwrap() . as_text() . unwrap() . to_string()
+      let doc = searcher3 . doc::<TantivyDocument> (*doc_address) . unwrap();
+      doc . get_first(tantivy_index . id_field) . unwrap() . as_str() . unwrap() . to_string()
     })
     . collect();
 
@@ -321,12 +323,12 @@ fn test_search_finds_titles_with_special_chars (
         search_index (&tantivy_index, query) ?;
       assert! ( !matches . is_empty (),
                 "literal '{}' should find a result", query );
-      let top_doc : tantivy::Document =
+      let top_doc : TantivyDocument =
         searcher . doc (matches[0] . 1) ?;
       let top_id : &str =
         top_doc
         . get_first (tantivy_index . id_field) . unwrap ()
-        . as_text () . unwrap ();
+        . as_str () . unwrap ();
       assert_eq! ( top_id, *expected_id,
                    "'{}' should find the {} node",
                    query, expected_id ); }

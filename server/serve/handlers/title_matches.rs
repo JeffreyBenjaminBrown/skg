@@ -28,7 +28,8 @@ use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
-use tantivy::{Document, Searcher};
+use tantivy::{TantivyDocument, Searcher};
+use tantivy::schema::document::Value;
 use typedb_driver::TypeDBDriver;
 
 /// "Rooty" nodes have the most interesting graph structure:
@@ -273,27 +274,27 @@ pub fn group_matches_by_id (
   for (score, doc_address) in best_matches {
     match searcher . doc (doc_address) {
       Ok (retrieved_doc) => {
-        let retrieved_doc : Document = retrieved_doc;
+        let retrieved_doc : TantivyDocument = retrieved_doc;
         let id_opt : Option < ID > =
           retrieved_doc
             . get_first ( tantivy_index . id_field )
-            . and_then ( |v| v . as_text() )
+            . and_then ( |v| v . as_str() )
             . map ( |s| ID::from (s) );
         let title_opt : Option < String > =
           retrieved_doc
             . get_first ( tantivy_index . title_or_alias_field )
-            . and_then ( |v| v . as_text() )
+            . and_then ( |v| v . as_str() )
             . map ( |s| s . to_string() );
         let source : SourceName =
           SourceName::from (
             retrieved_doc
               . get_first ( tantivy_index . source_field )
-              . and_then ( |v| v . as_text () )
+              . and_then ( |v| v . as_str () )
               . unwrap_or ("") );
         let origin_type : Option < ContextOriginType > =
           retrieved_doc
             . get_first ( tantivy_index . context_origin_type_field )
-            . and_then ( |v| v . as_text () )
+            . and_then ( |v| v . as_str () )
             . and_then ( ContextOriginType::from_label );
         if matches! ( scope, SearchScope::Rooty ) {
           match origin_type {

@@ -30,7 +30,8 @@ use typedb_driver::answer::{QueryAnswer, ConceptRow};
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Transaction, TransactionType, Database, DatabaseManager};
 use crate::dbs::typedb::util::ConceptRowStream;
 use std::sync::Arc;
-use tantivy::{DocAddress, Searcher};
+use tantivy::{DocAddress, Searcher, TantivyDocument};
+use tantivy::schema::document::Value;
 
 
 /// Run tests with automatic database setup and cleanup.
@@ -455,10 +456,10 @@ pub fn tantivy_contains_id(
     : (Vec<(f32, DocAddress)>, Searcher)
     = search_index(tantivy_index, query)?;
   for (_score, doc_address) in matches {
-    let doc: tantivy::Document = searcher . doc (doc_address)?;
+    let doc: TantivyDocument = searcher . doc (doc_address)?;
     let id_value: Option<String> =
       doc . get_first(tantivy_index . id_field)
-      . and_then(|v| v . as_text() . map (String::from));
+      . and_then(|v| v . as_str() . map (String::from));
     if id_value == Some(expected_id . to_string()) {
       return Ok (true); }}
   Ok (false) }

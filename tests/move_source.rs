@@ -21,7 +21,8 @@ use skg::types::save::DefineNode;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::fs;
-use tantivy::DocAddress;
+use tantivy::{DocAddress, TantivyDocument};
+use tantivy::schema::document::Value;
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
 
 /// Set up a fresh test environment: copy fixtures to temp,
@@ -101,15 +102,15 @@ fn tantivy_source_for_id (
     : (Vec<(f32, DocAddress)>, tantivy::Searcher) =
     search_index (tantivy_index, query)?;
   for (_score, doc_address) in matches {
-    let doc : tantivy::Document =
+    let doc : TantivyDocument =
       searcher . doc (doc_address)?;
     let id_value : Option<String> =
       doc . get_first (tantivy_index . id_field)
-      . and_then (|v| v . as_text() . map (String::from));
+      . and_then (|v| v . as_str() . map (String::from));
     if id_value . as_deref() == Some (expected_id) {
       let source_value : Option<String> =
         doc . get_first (tantivy_index . source_field)
-        . and_then (|v| v . as_text() . map (String::from));
+        . and_then (|v| v . as_str() . map (String::from));
       return Ok (source_value); }}
   Ok (None) }
 

@@ -8,7 +8,8 @@ use crate::types::textlinks::replace_each_link_with_its_label;
 use crate::types::misc::{ID, SourceName, TantivyIndex};
 use crate::types::skgnode::{FileProperty, SkgNode};
 
-use tantivy::{Index, IndexWriter, doc, Term, IndexReader, Searcher, Document};
+use tantivy::{Index, IndexWriter, doc, Term, IndexReader, Searcher, TantivyDocument};
+use tantivy::schema::document::Value;
 use tantivy::query::{QueryParser, Query};
 use tantivy::collector::TopDocs;
 use tantivy::schema;
@@ -29,23 +30,17 @@ pub(crate) fn open_existing_tantivy_index (
   let schema : schema::Schema =
     index . schema();
   let id_field : schema::Field =
-    schema . get_field ("id")
-    . ok_or ("Schema missing 'id' field") ?;
+    schema . get_field ("id") ?;
   let title_or_alias_field : schema::Field =
-    schema . get_field ("title_or_alias")
-    . ok_or ("Schema missing 'title_or_alias' field") ?;
+    schema . get_field ("title_or_alias") ?;
   let source_field : schema::Field =
-    schema . get_field ("source")
-    . ok_or ("Schema missing 'source' field") ?;
+    schema . get_field ("source") ?;
   let context_origin_type_field : schema::Field =
-    schema . get_field ("context_origin_type")
-    . ok_or ("Schema missing 'context_origin_type' field") ?;
+    schema . get_field ("context_origin_type") ?;
   let is_title_field : schema::Field =
-    schema . get_field ("is_title")
-    . ok_or ("Schema missing 'is_title' field") ?;
+    schema . get_field ("is_title") ?;
   let had_id_field : schema::Field =
-    schema . get_field ("had_id")
-    . ok_or ("Schema missing 'had_id' field") ?;
+    schema . get_field ("had_id") ?;
   Ok ( TantivyIndex {
     index              : Arc::new (index),
     id_field,
@@ -164,7 +159,8 @@ pub fn search_index (
     let best_matches : Vec < ( f32, tantivy::DocAddress ) > =
       searcher . search (
         &query, &TopDocs::with_limit (
-          crate::consts::TANTIVY_SEARCH_LIMIT ) )?;
+          crate::consts::TANTIVY_SEARCH_LIMIT )
+          . order_by_score () )?;
     best_matches },
        searcher )) }
 
@@ -224,7 +220,7 @@ where I: IntoIterator<Item = &'a SkgNode>, {
 
   let mut indexed_count: usize = 0;
   for node in nodes {
-    let documents: Vec<Document> =
+    let documents: Vec<TantivyDocument> =
       create_documents_from_node(
         node, tantivy_index )?;
     for document in documents {
@@ -251,27 +247,28 @@ pub fn title_and_source_by_id (
   let results : Vec < (f32, tantivy::DocAddress) > =
     searcher . search (
       &query, &TopDocs::with_limit (
-        crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT ) ) . ok () ?;
+        crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT )
+        . order_by_score () ) . ok () ?;
   let mut fallback : Option < (String, SourceName) > = None;
   for (_score, doc_address) in &results {
-    let retrieved_doc : Document =
+    let retrieved_doc : TantivyDocument =
       searcher . doc (*doc_address) . ok () ?;
     let is_title : bool =
       retrieved_doc
         . get_first ( tantivy_index . is_title_field )
-        . and_then ( |v| v . as_text () )
+        . and_then ( |v| v . as_str () )
         . map ( |s| s == "true" )
         . unwrap_or (false);
     let title_or_alias : Option < String > =
       retrieved_doc
         . get_first ( tantivy_index . title_or_alias_field )
-        . and_then ( |v| v . as_text () )
+        . and_then ( |v| v . as_str () )
         . map ( |s| s . to_string () );
     let source : SourceName =
       SourceName::from (
         retrieved_doc
           . get_first ( tantivy_index . source_field )
-          . and_then ( |v| v . as_text () )
+          . and_then ( |v| v . as_str () )
           . unwrap_or ("") );
     if is_title {
       return title_or_alias . map (
@@ -306,25 +303,26 @@ pub fn titles_by_ids (
     let results : Vec < (f32, tantivy::DocAddress) > =
       match searcher . search (
         &query, &TopDocs::with_limit (
-          crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT ) )
+          crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT )
+          . order_by_score () )
       { Ok (r) => r,
         Err (_) => continue };
     let mut fallback : Option<String> = None;
     for (_score, doc_address) in &results {
-      let retrieved_doc : Document =
+      let retrieved_doc : TantivyDocument =
         match searcher . doc (*doc_address) {
           Ok (d) => d,
           Err (_) => continue };
       let is_title : bool =
         retrieved_doc
           . get_first ( tantivy_index . is_title_field )
-          . and_then ( |v| v . as_text () )
+          . and_then ( |v| v . as_str () )
           . map ( |s| s == "true" )
           . unwrap_or (false);
       let title_or_alias : Option<String> =
         retrieved_doc
           . get_first ( tantivy_index . title_or_alias_field )
-          . and_then ( |v| v . as_text () )
+          . and_then ( |v| v . as_str () )
           . map ( |s| s . to_string () );
       if is_title {
         if let Some (t) = title_or_alias {
@@ -360,14 +358,15 @@ pub fn subset_with_hadid (
         schema::IndexRecordOption::Basic ));
     let hits : Vec < (f32, tantivy::DocAddress) > =
       match searcher . search (
-        &query, &TopDocs::with_limit (1) )
+        &query, &TopDocs::with_limit (1)
+          . order_by_score () )
       { Ok (h) => h,
         Err (_) => continue };
     if let Some ( (_score, doc_address) ) = hits . first () {
-      if let Ok (doc) = searcher . doc (*doc_address) {
+      if let Ok (doc) = searcher . doc::<TantivyDocument> (*doc_address) {
         let had_id : bool =
           doc . get_first ( tantivy_index . had_id_field )
-          . and_then ( |v| v . as_text () )
+          . and_then ( |v| v . as_str () )
           . map ( |s| s == "true" )
           . unwrap_or (false);
         if had_id {
@@ -379,14 +378,14 @@ pub fn subset_with_hadid (
 fn create_documents_from_node (
   node: &SkgNode,
   tantivy_index: &TantivyIndex,
-) -> Result < Vec < Document >,
+) -> Result < Vec < TantivyDocument >,
               Box < dyn Error >> {
   let primary_id : &ID = &node . pid;
   let had_id : &str =
     if node . misc . contains (
       &FileProperty::Had_ID_Before_Import )
     { "true" } else { "false" };
-  let mut documents: Vec<Document> =
+  let mut documents: Vec<TantivyDocument> =
     Vec::new();
   let mut titles_and_aliases: Vec<String> =
     vec![node . title . clone()];
@@ -437,34 +436,35 @@ pub fn update_context_origin_types (
     let results : Vec < (f32, tantivy::DocAddress) > =
       searcher . search (
         &query, &TopDocs::with_limit (
-          crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT )) ?;
+          crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT )
+          . order_by_score () ) ?;
     if results . is_empty () { continue; }
     writer . delete_term ( // Delete all documents for this ID.
       Term::from_field_text (
         tantivy_index . id_field, pid . as_str () ));
     for (_score, doc_address) in &results {
       // Re-add with the new context_origin_type.
-      let retrieved_doc : Document =
+      let retrieved_doc : TantivyDocument =
         searcher . doc (*doc_address) ?;
       let title_or_alias : String =
         retrieved_doc
           . get_first ( tantivy_index . title_or_alias_field )
-          . and_then ( |v| v . as_text () )
+          . and_then ( |v| v . as_str () )
           . unwrap_or ("") . to_string ();
       let source : String =
         retrieved_doc
           . get_first ( tantivy_index . source_field )
-          . and_then ( |v| v . as_text () )
+          . and_then ( |v| v . as_str () )
           . unwrap_or ("") . to_string ();
       let is_title : String =
         retrieved_doc
           . get_first ( tantivy_index . is_title_field )
-          . and_then ( |v| v . as_text () )
+          . and_then ( |v| v . as_str () )
           . unwrap_or ("false") . to_string ();
       let had_id : String =
         retrieved_doc
           . get_first ( tantivy_index . had_id_field )
-          . and_then ( |v| v . as_text () )
+          . and_then ( |v| v . as_str () )
           . unwrap_or ("false") . to_string ();
       writer . add_document ( doc! (
         tantivy_index . id_field =>
