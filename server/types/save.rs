@@ -1,5 +1,5 @@
 use super::misc::{ID, SourceName};
-use super::skgnode::SkgNode;
+use super::nodes::complete::NodeComplete;
 use super::errors::{SaveError, BufferValidationError};
 
 
@@ -36,7 +36,7 @@ pub enum DefineNode {
 
 /// A Save instruction.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct SaveNode(pub SkgNode);
+pub struct SaveNode(pub NodeComplete);
 
 /// A Delete instruction.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -205,12 +205,12 @@ impl Merge {
   }
 
   /// Extracts the three targets from a Merge:
-  /// - acquiree_text_preserver -> &SkgNode
-  /// - updated_acquirer -> &SkgNode
+  /// - acquiree_text_preserver -> &NodeComplete
+  /// - updated_acquirer -> &NodeComplete
   /// - acquiree_to_delete -> (&ID, &SourceName)
   pub fn targets_from_merge (
     &self
-  ) -> (&SkgNode, &SkgNode, (&ID, &SourceName)) {
+  ) -> (&NodeComplete, &NodeComplete, (&ID, &SourceName)) {
     ( &self . acquiree_text_preserver . 0,
       &self . updated_acquirer . 0,
       (&self . acquiree_to_delete . id, &self . acquiree_to_delete . source) )

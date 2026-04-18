@@ -12,7 +12,7 @@
 
 use crate::dbs::typedb::util::concept_document::extract_id_from_map;
 use crate::types::misc::ID;
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{GraphNodeStats, NodeContainRels, NodeLinksourceRels};
 
 use futures::StreamExt;
@@ -52,11 +52,11 @@ impl AllGraphNodeStats {
     } } }
 
 /// Extract GraphNodeStats for a single PID
-/// from AllGraphNodeStats and an optional disk SkgNode.
+/// from AllGraphNodeStats and an optional disk NodeComplete.
 pub fn graphnodestats_for_pid (
   pid     : &ID,
   stats   : &AllGraphNodeStats,
-  skgnode : Option<&SkgNode>,
+  skgnode : Option<&NodeComplete>,
 ) -> GraphNodeStats {
   let aliasing : bool =
     skgnode

@@ -5,7 +5,7 @@ use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::types::misc::ID;
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::save::Merge;
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 
 use futures::StreamExt;
 use std::collections::HashSet;
@@ -28,7 +28,7 @@ pub(super) async fn merge_nodes_in_typedb (
     let ( acquiree_text_preserver,
           updated_acquirer,
           (acquiree_id, _acquiree_source) )
-      : (&SkgNode, &SkgNode, (&ID, _))
+      : (&NodeComplete, &NodeComplete, (&ID, _))
       = merge . targets_from_merge();
     merge_one_node_in_typedb (
       &tx,
@@ -42,8 +42,8 @@ pub(super) async fn merge_nodes_in_typedb (
 /// Adds the processing for a single merge to the transaction.
 async fn merge_one_node_in_typedb(
   tx: &Transaction,
-  acquiree_text_preserver : &SkgNode,
-  updated_acquirer        : &SkgNode,
+  acquiree_text_preserver : &NodeComplete,
+  updated_acquirer        : &NodeComplete,
   acquiree_id             : &ID,
 ) -> Result<(), Box<dyn Error>> {
   let acquirer_id  : &ID = &updated_acquirer        . pid;

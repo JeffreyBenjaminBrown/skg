@@ -30,7 +30,7 @@ pub fn handle_rebuild_dbs_request (
       . map_err ( |e| format! ("Tantivy rebuild failed: {}", e) ) ?;
     *tantivy_index = new_tantivy;
     tracing::info!("Tantivy rebuilt.");
-    let nodes : Vec<crate::types::skgnode::SkgNode> =
+    let nodes : Vec<crate::types::nodes::complete::NodeComplete> =
       crate::dbs::filesystem::multiple_nodes
         ::read_all_skg_files_from_sources (config)
       . map_err ( |e| format! ("Reading .skg files for context: {}", e) ) ?;

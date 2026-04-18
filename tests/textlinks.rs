@@ -8,7 +8,7 @@ use skg::types::textlinks::{
 use skg::types::textlinks::TextLink;
 use skg::types::errors::TextLinkParseError;
 use skg::types::misc::ID;
-use skg::types::skgnode::{SkgNode, empty_skgnode};
+use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
 #[test]
 fn test_textlink_to_string() {
@@ -114,8 +114,8 @@ fn test_textlinks_from_text_with_nested_brackets() {
 
 #[test]
 fn test_textlinks_from_node() {
-  let mut test_node : SkgNode =
-    empty_skgnode ();
+  let mut test_node : NodeComplete =
+    empty_node_complete ();
   { test_node . title = "Title with two textlinks: [[id:textlink1][First TextLink]] and [[id:textlink2][Second TextLink]]" . to_string();
     test_node . pid = ID::new ("id");
     test_node . body = Some("Some text with a link [[id:textlink3][Third TextLink]] and another [[id:textlink4][Fourth TextLink]]" . to_string()); }

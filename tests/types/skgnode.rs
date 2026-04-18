@@ -2,7 +2,7 @@
 // Tests for new map-based helpers
 //
 
-use skg::types::skgnode::{empty_skgnode, SkgNode};
+use skg::types::nodes::complete::{empty_node_complete, NodeComplete};
 use skg::types::memory::{skgnode_for_viewnode, skgnode_map_from_save_instructions, SkgNodeMap};
 use skg::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, default_truenode};
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
@@ -17,12 +17,12 @@ fn test_skgnode_for_viewnode_with_id_in_map() {
   // TrueNode with ID that exists in map → returns Some
   let id : ID =
     ID::new ("test-id-123");
-  let skgnode : SkgNode =
-    SkgNode {
+  let skgnode : NodeComplete =
+    NodeComplete {
       title : "Test Node" . to_string(),
       pid : id . clone(),
       source : SourceName::from ("main"),
-      .. empty_skgnode()
+      .. empty_node_complete()
     };
   let mut map : SkgNodeMap = SkgNodeMap::new();
   map . insert(id . clone(), skgnode . clone());
@@ -46,9 +46,9 @@ fn test_skgnode_for_viewnode_with_id_in_map() {
   };
 
   let result :
-    Option<&SkgNode> =
+    Option<&NodeComplete> =
     skgnode_for_viewnode(&viewnode, &mut map, &config) . unwrap();
-  assert!(result . is_some(), "Should find SkgNode for TrueNode with ID in map");
+  assert!(result . is_some(), "Should find NodeComplete for TrueNode with ID in map");
   assert_eq!(result . unwrap() . title, "Test Node");
 }
 
@@ -92,7 +92,7 @@ fn test_skgnode_for_viewnode_with_id_not_in_map() {
     timing_log         : false,
     max_ancestry_depth : 20,
   };
-  let result : Result<Option<&SkgNode>, Box<dyn Error>> =
+  let result : Result<Option<&NodeComplete>, Box<dyn Error>> =
     // Should error because the file doesn't exist on disk
     skgnode_for_viewnode(&viewnode, &mut map, &config);
   assert!(result . is_err(), "Should return error when ID not in map and file not on disk");
@@ -102,11 +102,11 @@ fn test_skgnode_for_viewnode_with_id_not_in_map() {
 fn test_skgnode_for_viewnode_scaffold() {
   // Scaffold → returns None
   let skgnode :
-    SkgNode =
-    SkgNode {
+    NodeComplete =
+    NodeComplete {
       title : "Test Node" . to_string(),
       pid : ID::new ("test-id-789"),
-      .. empty_skgnode()
+      .. empty_node_complete()
     };
 
   let mut map :
@@ -135,7 +135,7 @@ fn test_skgnode_for_viewnode_scaffold() {
   };
 
   let result :
-    Option<&SkgNode> =
+    Option<&NodeComplete> =
     skgnode_for_viewnode(&viewnode, &mut map, &config) . unwrap();
   assert!(result . is_none(), "Should return None for Scaffold nodes");
 }
@@ -154,20 +154,20 @@ fn test_skgnode_map_from_save_instructions() {
     ID::new ("id-003");
 
   let skgnode1 :
-    SkgNode =
-    SkgNode {
+    NodeComplete =
+    NodeComplete {
       title : "Node 1" . to_string(),
       pid : id1 . clone(),
-      .. empty_skgnode()
+      .. empty_node_complete()
     };
 
   let skgnode2 :
-    SkgNode =
-    SkgNode {
+    NodeComplete =
+    NodeComplete {
       title : "Node 2" . to_string(),
       pid : id2 . clone(),
       extra_ids : vec![ID::new ("extra-id")],
-      .. empty_skgnode()
+      .. empty_node_complete()
     };
 
   let instructions : Vec<DefineNode> =
@@ -181,7 +181,7 @@ fn test_skgnode_map_from_save_instructions() {
     SkgNodeMap =
     skgnode_map_from_save_instructions (&instructions);
 
-  // Delete instructions don't contribute to the map (they carry no SkgNode data)
+  // Delete instructions don't contribute to the map (they carry no NodeComplete data)
   assert_eq!(map . len(), 2, "Map should contain 2 entries (Delete doesn't contribute)");
   assert_eq!(map . get (&id1) . unwrap() . title, "Node 1");
   assert_eq!(map . get (&id2) . unwrap() . title, "Node 2");

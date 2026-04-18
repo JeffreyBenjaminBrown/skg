@@ -3,7 +3,7 @@ use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generations::collect_generation_ids;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_skgnode::write_at_truenode_in_tree;
@@ -34,7 +34,7 @@ pub type DefinitiveMap =
 // Fetching, building and modifying SkgNodes and ViewNodes
 // ======================================================
 
-/// Fetch a SkgNode from disk (queries TypeDB for source).
+/// Fetch a NodeComplete from disk (queries TypeDB for source).
 /// Make an ViewNode from it, with validated title.
 /// Return both.
 pub async fn skgnode_and_viewnode_from_id (
@@ -42,7 +42,7 @@ pub async fn skgnode_and_viewnode_from_id (
   driver : &TypeDBDriver,
   skgid  : &ID,
   map    : &mut SkgNodeMap,
-) -> Result < ( SkgNode, ViewNode ), Box<dyn Error> > {
+) -> Result < ( NodeComplete, ViewNode ), Box<dyn Error> > {
   let (pid_resolved, source) : (ID, SourceName) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "skgnode_and_viewnode_from_id" ). entered();
@@ -53,7 +53,7 @@ pub async fn skgnode_and_viewnode_from_id (
   skgnode_and_viewnode_from_pid_and_source (
     config, &pid_resolved, &source, map ) }
 
-/// Fetch a SkgNode from disk given PID and source.
+/// Fetch a NodeComplete from disk given PID and source.
 /// Make an ViewNode from it, with validated title.
 /// Return both.
 pub(super) fn skgnode_and_viewnode_from_pid_and_source (
@@ -61,14 +61,14 @@ pub(super) fn skgnode_and_viewnode_from_pid_and_source (
   pid    : &ID,
   source : &SourceName,
   map    : &mut SkgNodeMap,
-) -> Result < ( SkgNode, ViewNode ), Box<dyn Error> > {
-  let skgnode : &SkgNode =
+) -> Result < ( NodeComplete, ViewNode ), Box<dyn Error> > {
+  let skgnode : &NodeComplete =
     skgnode_from_map_or_disk( pid, source, map, config )?;
   let title : String = skgnode . title . replace ( '\n', " " );
   if title . is_empty () {
     return Err ( Box::new ( io::Error::new (
       io::ErrorKind::InvalidData,
-      format! ( "SkgNode with ID {} has an empty title",
+      format! ( "NodeComplete with ID {} has an empty title",
                  pid ), )) ); }
   let viewnode : ViewNode = mk_definitive_viewnode (
     pid . clone (),
@@ -272,7 +272,7 @@ pub async fn make_and_append_child_pair (
   driver         : &TypeDBDriver,
 ) -> Result < NodeId, // the new node
               Box<dyn Error> > {
-  let (_child_skgnode, child_viewnode) : (SkgNode, ViewNode) =
+  let (_child_skgnode, child_viewnode) : (NodeComplete, ViewNode) =
     skgnode_and_viewnode_from_id (
       config, driver, child_skgid, map ) . await ?;
   let child_treeid : NodeId =
@@ -302,7 +302,7 @@ pub async fn build_node_branch_minus_content (
   let result : Result < NodeId, Box<dyn Error> > =
     match (tree_and_parent, map) {
       (Some ( (tree, parent_treeid) ), Some (map)) => {
-        let (_skgnode, viewnode) : (SkgNode, ViewNode) =
+        let (_skgnode, viewnode) : (NodeComplete, ViewNode) =
           skgnode_and_viewnode_from_id (
             config, driver, skgid, map ) . await ?;
         let child_treeid : NodeId = // Add ViewNode to tree
@@ -318,7 +318,7 @@ pub async fn build_node_branch_minus_content (
       (None, None) => {
         let mut map : SkgNodeMap =
           SkgNodeMap::new ();
-        let (_skgnode, viewnode) : (SkgNode, ViewNode) =
+        let (_skgnode, viewnode) : (NodeComplete, ViewNode) =
           skgnode_and_viewnode_from_id (
             config, driver, skgid, &mut map ) . await ?;
         let mut tree : Tree<ViewNode> =
@@ -336,7 +336,7 @@ pub async fn build_node_branch_minus_content (
   result }
 
 /// Collect content child IDs from a node.
-/// Returns empty vec if the node is indefinitive or has no SkgNode.
+/// Returns empty vec if the node is indefinitive or has no NodeComplete.
 /// Errors if passed a Scaffold.
 pub(super) fn content_ids_if_definitive_else_empty (
   tree   : &Tree<ViewNode>,

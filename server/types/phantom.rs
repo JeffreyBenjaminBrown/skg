@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use super::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff};
 use super::misc::{ID, SkgConfig, SourceName};
-use super::skgnode::SkgNode;
+use super::nodes::complete::NodeComplete;
 
 /// Unified title lookup for phantom nodes.
 /// Lookup order: source_diffs deleted_nodes → map → disk → fallback.
@@ -16,7 +16,7 @@ pub fn title_for_phantom (
   id           : &ID,
   source       : &SourceName,
   source_diffs : Option<&HashMap<SourceName, SourceDiff>>,
-  map          : &HashMap<ID, SkgNode>,
+  map          : &HashMap<ID, NodeComplete>,
   config       : &SkgConfig,
 ) -> String {
   source_diffs

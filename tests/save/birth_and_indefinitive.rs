@@ -6,7 +6,7 @@ use skg::save::update_fs_from_saveinstructions;
 use skg::save::update_typedb_from_saveinstructions;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::ID;
-use skg::types::skgnode::SkgNode;
+use skg::types::nodes::complete::NodeComplete;
 use skg::types::memory::SkgNodeMap;
 
 use indoc::indoc;
@@ -62,7 +62,7 @@ fn test_birth_and_indefinitive(
           config . clone(), )?;
 
         { // verify indefinitive is treated correctly
-          let node2 : SkgNode =
+          let node2 : NodeComplete =
             skgnode_from_id(
               config, driver, &ID("2" . to_string() ))
             . await?;
@@ -72,7 +72,7 @@ fn test_birth_and_indefinitive(
           "Node 2 should only contain [3]. It might look like 4 was appended, but because node 2 is 'indefinitive', that node 4 child should be ignored by node 2." ); }
 
         { // verify birth=Independent is treated correctly
-          let node1 : SkgNode =
+          let node1 : NodeComplete =
             skgnode_from_id(
               config, driver, &ID("1" . to_string() ))
             . await?;

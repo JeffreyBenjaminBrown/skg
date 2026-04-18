@@ -5,7 +5,7 @@ use skg::dbs::tantivy::{search_index, update_context_origin_types};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
 use skg::org_to_text::viewnode_forest_to_string;
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex};
-use skg::types::skgnode::{SkgNode, empty_skgnode};
+use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::viewnode::Scaffold;
 use skg::dbs::init::in_fs_wipe_index_then_create_it;
 use skg::serve::handlers::title_matches::{
@@ -32,8 +32,8 @@ fn test_title_matches_org_format (
     = ( || {
 
       // Create test nodes with overlapping titles/aliases
-      let mut node1 : SkgNode = // the best match
-        empty_skgnode ();
+      let mut node1 : NodeComplete = // the best match
+        empty_node_complete ();
       node1 . pid =
         ID::new ("id_1");
       node1 . title =
@@ -44,21 +44,21 @@ fn test_title_matches_org_format (
           "the cheese" . to_string ()
         ] );
 
-      let mut node2 : SkgNode = // matches, but less well
-        empty_skgnode ();
+      let mut node2 : NodeComplete = // matches, but less well
+        empty_node_complete ();
       node2 . pid =
         ID::new ("id_2");
       node2 . title =
         "cheese makes me happy" . to_string ();
 
-      let mut node3 : SkgNode = // will not match
-        empty_skgnode ();
+      let mut node3 : NodeComplete = // will not match
+        empty_node_complete ();
       node3 . pid =
         ID::new ("id_3");
       node3 . title =
         "aliens evade silently" . to_string ();
 
-      let nodes : Vec < SkgNode > =
+      let nodes : Vec < NodeComplete > =
         vec! [ node1, node2, node3 ];
 
       let ( tantivy_index, _ ) : ( TantivyIndex, usize ) =

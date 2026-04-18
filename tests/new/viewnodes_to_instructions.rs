@@ -11,7 +11,7 @@ use skg::test_utils::extract_skgnode_if_save_else_error;
 use skg::types::viewnode::{ViewNode, forest_root_viewnode};
 use skg::types::misc::{ID, MSV};
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
-use skg::types::skgnode::SkgNode;
+use skg::types::nodes::complete::NodeComplete;
 use ego_tree::Tree;
 
 #[test]
@@ -36,7 +36,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_basic() {
   assert_eq!(instructions . len(), 3, "Should have 3 instructions");
 
   // Test root1
-  let root1_skg : &SkgNode = match &instructions[0] {
+  let root1_skg : &NodeComplete = match &instructions[0] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(root1_skg . title, "root node 1");
@@ -47,7 +47,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_basic() {
                    DefineNode::Save (_)));
 
   // Test child1
-  let child1_skg : &SkgNode = match &instructions[1] {
+  let child1_skg : &NodeComplete = match &instructions[1] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(child1_skg . title, "child 1");
@@ -91,7 +91,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_with_aliases() {
   assert_eq!(instructions . len(), 2, "Should have 2 instructions");
 
   // Test main node
-  let main_skg : &SkgNode = match &instructions[0] {
+  let main_skg : &NodeComplete = match &instructions[0] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(main_skg . title, "main node");
@@ -102,7 +102,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_with_aliases() {
   assert_eq!(main_skg . aliases, MSV::Specified(vec!["first alias" . to_string(), "second alias" . to_string()]));
 
   // Test content child
-  let content_skg : &SkgNode = match &instructions[1] {
+  let content_skg : &NodeComplete = match &instructions[1] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(content_skg . title, "content child");
@@ -129,7 +129,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_no_aliases() {
 
   assert_eq!(instructions . len(), 2);
 
-  let node1_skg : &SkgNode = match &instructions[0] {
+  let node1_skg : &NodeComplete = match &instructions[0] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(node1_skg . aliases, MSV::Unspecified, "Should have no aliases");
@@ -186,7 +186,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_mixed_relations() {
   // AliasCol and Alias should be skipped
   assert_eq!(instructions . len(), 5);
 
-  let root_skg : &SkgNode = match &instructions[0] {
+  let root_skg : &NodeComplete = match &instructions[0] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(root_skg . title, "root node");
@@ -215,23 +215,23 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_deep_nesting() {
   assert_eq!(instructions . len(), 5);
 
   // Check contains relationships
-  let level1_skg : &SkgNode =
+  let level1_skg : &NodeComplete =
     extract_skgnode_if_save_else_error(&instructions[0]);
   assert_eq!(level1_skg . contains, vec![ID::from ("level2a"), ID::from ("level2b")]);
 
-  let level2a_skg : &SkgNode =
+  let level2a_skg : &NodeComplete =
     extract_skgnode_if_save_else_error(&instructions[1]);
   assert_eq!(level2a_skg . contains, vec![ID::from ("level3a")]);
 
-  let level3a_skg : &SkgNode =
+  let level3a_skg : &NodeComplete =
     extract_skgnode_if_save_else_error(&instructions[2]);
   assert_eq!(level3a_skg . contains, vec![ID::from ("level4")]);
 
-  let level4_skg : &SkgNode =
+  let level4_skg : &NodeComplete =
     extract_skgnode_if_save_else_error(&instructions[3]);
   assert_eq!(level4_skg . contains, vec![]); // Leaf node
 
-  let level2b_skg : &SkgNode =
+  let level2b_skg : &NodeComplete =
     extract_skgnode_if_save_else_error(&instructions[4]);
   assert_eq!(level2b_skg . contains, vec![]); // Leaf node
 }
@@ -284,7 +284,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_only_aliases() {
 
   assert_eq!(instructions . len(), 1); // Only main node
 
-  let main_skg : &SkgNode = match &instructions[0] {
+  let main_skg : &NodeComplete = match &instructions[0] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(main_skg . aliases, MSV::Specified(vec!["alias one" . to_string(), "alias two" . to_string()]));
@@ -318,7 +318,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_complex_scenario() {
   assert_eq!(instructions . len(), 7); // doc1, section1, subsection1a, section2, section3, doc2, ref_section
 
   // Test doc1
-  let doc1_skg : &SkgNode = match &instructions[0] {
+  let doc1_skg : &NodeComplete = match &instructions[0] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(doc1_skg . title, "Document 1");
@@ -341,7 +341,7 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_complex_scenario() {
       panic!("Expected Delete, got Save") };
 
   // Test that subsection1a is child of section1
-  let section1_skg : &SkgNode = match &instructions[1] {
+  let section1_skg : &NodeComplete = match &instructions[1] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(section1_skg . contains, vec![ID::from ("subsection1a")]);

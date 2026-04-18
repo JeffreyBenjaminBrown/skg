@@ -2,7 +2,7 @@ use crate::types::git::{ GitDiffStatus, PathDiffStatus, SourceDiff, SkgnodeDiff,
 use crate::types::list::{compute_interleaved_diff, Diff_Item};
 use crate::types::misc::{ID, SourceName};
 use crate::types::nodes::fs::NodeFS;
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 
 use super::misc::path_relative_to_repo;
 use super::read_repo::{ get_file_content_at_head, get_file_content_at_index, get_staged_changed_skg_files, get_unstaged_changed_skg_files, open_repo, };
@@ -32,7 +32,7 @@ pub fn compute_diff_for_source (
       source_path, &repo,
       &get_unstaged_changed_skg_files (&repo) ?,
       Stage::Unstaged ) ?;
-  let deleted_nodes : HashMap<ID, SkgNode> =
+  let deleted_nodes : HashMap<ID, NodeComplete> =
     collect_deleted_nodes_for_both (&staged, &unstaged);
   Ok ( SourceDiff { is_git_repo: true,
                     staged,
@@ -71,11 +71,11 @@ fn compute_skgnode_diff_for_stage (
       . unwrap_or_else ( || entry . path . clone() );
   // "before" is HEAD for staged, index for unstaged.
   // "after"  is index for staged, worktree for unstaged.
-  let before_node : Option<SkgNode> = match (&entry . status, stage) {
+  let before_node : Option<NodeComplete> = match (&entry . status, stage) {
     (GitDiffStatus::Added, _)    => None,
     (_, Stage::Staged)           => load_from_head  (repo, &rel_path),
     (_, Stage::Unstaged)         => load_from_index (repo, &rel_path), };
-  let after_node : Option<SkgNode> = match (&entry . status, stage) {
+  let after_node : Option<NodeComplete> = match (&entry . status, stage) {
     (GitDiffStatus::Deleted, _)  => None,
     (_, Stage::Staged)           => load_from_index (repo, &rel_path),
     (_, Stage::Unstaged)         => load_from_disk  (&abs_path), };
@@ -89,33 +89,33 @@ fn compute_skgnode_diff_for_stage (
     head_node: before_node }) }
 
 /// Parses a NodeFS from a YAML blob, then attaches a default
-/// (empty) source to produce a SkgNode. This preserves today's
+/// (empty) source to produce a NodeComplete. This preserves today's
 /// behavior: diff.rs doesn't know the real source of its blobs,
 /// so nodes built here have source at its default. Downstream
 /// consumers that care about source do not use diff-derived nodes.
 fn nodefs_as_skgnode_with_default_source (
   yaml : &str,
-) -> Option<SkgNode> {
+) -> Option<NodeComplete> {
   let node_fs : NodeFS = serde_yaml::from_str (yaml) . ok () ?;
   Some ( node_fs . into_complete ( SourceName::default ())) }
 
 fn load_from_head (
   repo     : &git2::Repository,
   rel_path : &Path,
-) -> Option<SkgNode> {
+) -> Option<NodeComplete> {
   get_file_content_at_head (repo, rel_path) . ok () . flatten ()
     . and_then ( |s| nodefs_as_skgnode_with_default_source (&s) ) }
 
 fn load_from_index (
   repo     : &git2::Repository,
   rel_path : &Path,
-) -> Option<SkgNode> {
+) -> Option<NodeComplete> {
   get_file_content_at_index (repo, rel_path) . ok () . flatten ()
     . and_then ( |s| nodefs_as_skgnode_with_default_source (&s) ) }
 
 fn load_from_disk (
   abs_path : &Path,
-) -> Option<SkgNode> {
+) -> Option<NodeComplete> {
   fs::read_to_string (abs_path) . ok ()
     . and_then ( |s| nodefs_as_skgnode_with_default_source (&s) ) }
 
@@ -124,8 +124,8 @@ fn load_from_disk (
 fn collect_deleted_nodes_for_both (
   staged   : &HashMap<PathBuf, SkgnodeDiff>,
   unstaged : &HashMap<PathBuf, SkgnodeDiff>,
-) -> HashMap<ID, SkgNode> {
-  let mut result : HashMap<ID, SkgNode> =
+) -> HashMap<ID, NodeComplete> {
+  let mut result : HashMap<ID, NodeComplete> =
     HashMap::new();
   for diffs in [staged, unstaged] {
     for skgnode_diff in diffs . values () {
@@ -137,8 +137,8 @@ fn collect_deleted_nodes_for_both (
 
 /// Compare two SkgNodes and return the differences.
 fn compare_skgnodes (
-  old : &SkgNode,
-  new : &SkgNode,
+  old : &NodeComplete,
+  new : &NodeComplete,
 ) -> NodeChanges {
   let text_changed : bool =
     old . title != new . title ||

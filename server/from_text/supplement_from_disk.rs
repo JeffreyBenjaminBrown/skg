@@ -1,18 +1,18 @@
 /// PURPOSE:
-/// When a SkgNode is created from user input,
-/// it might not mention every SkgNode field.
+/// When a NodeComplete is created from user input,
+/// it might not mention every NodeComplete field.
 /// If it contains Some([]) for that field,
 /// then the user is asking to empty the field.
 /// But if it has None for that field,
 /// then the field should not be changed --
 /// which means it must be read from disk
-/// and inserted into the SkgNode.
+/// and inserted into the NodeComplete.
 
 use crate::dbs::filesystem::one_node::optskgnode_from_id;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::memory::SkgNodeMap;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -27,12 +27,12 @@ pub async fn supplement_none_fields_from_disk_if_save (
   pool        : &SkgNodeMap,
   instruction : DefineNode
 ) -> Result<(DefineNode, Option<SourceMove>), Box<dyn Error>> {
-  let mut from_buffer : SkgNode = match instruction {
+  let mut from_buffer : NodeComplete = match instruction {
     DefineNode::Delete (_) => return Ok ((instruction, None)),
     DefineNode::Save(SaveNode (sn)) => sn };
   let pid: ID =
     from_buffer . pid . clone();
-  let from_disk : Option<SkgNode> =
+  let from_disk : Option<NodeComplete> =
     if let Some (from_pool) = pool . get (&pid)
       { Some ( from_pool . clone () ) }
       else { optskgnode_from_id( config, driver, &pid

@@ -7,14 +7,14 @@ use skg::from_text::supplement_from_disk::
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, MSV, SkgConfig};
 use skg::types::save::{DefineNode, SaveNode};
-use skg::types::skgnode::{SkgNode, empty_skgnode};
+use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::memory::SkgNodeMap;
 
 async fn supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
   config    : &SkgConfig,
   driver    : &typedb_driver::TypeDBDriver,
-  user_node : SkgNode
-) -> Result<SkgNode, Box<dyn Error>> {
+  user_node : NodeComplete
+) -> Result<NodeComplete, Box<dyn Error>> {
   let (result, _source_move) =
     supplement_none_fields_from_disk_if_save (
       config, driver, &SkgNodeMap::new(),
@@ -41,11 +41,11 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
   driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
 
-  { let mut user_node : SkgNode = empty_skgnode ();
+  { let mut user_node : NodeComplete = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . aliases = MSV::Unspecified; }
-    let result : SkgNode =
+    let result : NodeComplete =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
@@ -54,11 +54,11 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
                    "alias 2 on disk" . to_string () ]),
       "Unspecified aliases from client should be replaced aliases from disk." ); }
 
-  { let mut user_node : SkgNode = empty_skgnode ();
+  { let mut user_node : NodeComplete = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . aliases = MSV::Specified ( vec![] ); }
-    let result : SkgNode =
+    let result : NodeComplete =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
@@ -66,11 +66,11 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
       MSV::Specified ( vec![] ),
       "Specified ( [] ) aliases from client should be preserved, not replaced by data from disk." ); }
 
-  { let mut user_node : SkgNode = empty_skgnode ();
+  { let mut user_node : NodeComplete = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . aliases = MSV::Specified ( vec![ "new alias" . to_string () ] ); }
-    let result : SkgNode =
+    let result : NodeComplete =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
@@ -97,11 +97,11 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
   driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
 
-  { let mut user_node : SkgNode = empty_skgnode ();
+  { let mut user_node : NodeComplete = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . subscribes_to = MSV::Unspecified; }
-    let result : SkgNode =
+    let result : NodeComplete =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
@@ -110,11 +110,11 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
                    ID::new ("sub_2_on_disk") ]),
       "Unspecified subscribes_to from client should be replaced with subscribes_to from disk." ); }
 
-  { let mut user_node : SkgNode = empty_skgnode ();
+  { let mut user_node : NodeComplete = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . subscribes_to = MSV::Specified ( vec![] ); }
-    let result : SkgNode =
+    let result : NodeComplete =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
@@ -122,11 +122,11 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
       MSV::Specified ( vec![] ),
       "Specified ( [] ) subscribes_to from client should be preserved, not replaced by data from disk." ); }
 
-  { let mut user_node : SkgNode = empty_skgnode ();
+  { let mut user_node : NodeComplete = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . subscribes_to = MSV::Specified ( vec![ ID::new ("new_sub") ] ); }
-    let result : SkgNode =
+    let result : NodeComplete =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
@@ -153,11 +153,11 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
   driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
 
-  { let mut user_node : SkgNode = empty_skgnode ();
+  { let mut user_node : NodeComplete = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . hides_from_its_subscriptions = MSV::Unspecified; }
-    let result : SkgNode =
+    let result : NodeComplete =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
@@ -165,11 +165,11 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
       MSV::Specified ( vec![ ID::new ("hide_1_on_disk") ]),
       "Unspecified hides_from_its_subscriptions from client should be replaced with hides from disk." ); }
 
-  { let mut user_node : SkgNode = empty_skgnode ();
+  { let mut user_node : NodeComplete = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . hides_from_its_subscriptions = MSV::Specified ( vec![] ); }
-    let result : SkgNode =
+    let result : NodeComplete =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
@@ -177,11 +177,11 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
       MSV::Specified ( vec![] ),
       "Specified ( [] ) hides_from_its_subscriptions from client should be preserved, not replaced by data from disk." ); }
 
-  { let mut user_node : SkgNode = empty_skgnode ();
+  { let mut user_node : NodeComplete = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . hides_from_its_subscriptions = MSV::Specified ( vec![ ID::new ("new_hide") ] ); }
-    let result : SkgNode =
+    let result : NodeComplete =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
@@ -208,11 +208,11 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
   driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
 
-  { let mut user_node : SkgNode = empty_skgnode ();
+  { let mut user_node : NodeComplete = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . overrides_view_of = MSV::Unspecified; }
-    let result : SkgNode =
+    let result : NodeComplete =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
@@ -222,11 +222,11 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
                    ID::new ("override_3_on_disk") ]),
       "Unspecified overrides_view_of from client should be replaced with overrides from disk." ); }
 
-  { let mut user_node : SkgNode = empty_skgnode ();
+  { let mut user_node : NodeComplete = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . overrides_view_of = MSV::Specified ( vec![] ); }
-    let result : SkgNode =
+    let result : NodeComplete =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
@@ -234,11 +234,11 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
       MSV::Specified ( vec![] ),
       "Specified ( [] ) overrides_view_of from client should be preserved, not replaced by data from disk." ); }
 
-  { let mut user_node : SkgNode = empty_skgnode ();
+  { let mut user_node : NodeComplete = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . overrides_view_of = MSV::Specified ( vec![ ID::new ("new_override") ] ); }
-    let result : SkgNode =
+    let result : NodeComplete =
       supplement_none_fields_from_disk_if_save_THEN_extract_skgnode (
         &config, &driver, user_node ) . await ?;
     assert_eq! (

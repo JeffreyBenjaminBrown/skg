@@ -1,22 +1,22 @@
 // Tests for to_org complete contents functions
 
 use skg::types::maps::add_v_to_map_if_absent;
-use skg::types::skgnode::{empty_skgnode, SkgNode};
+use skg::types::nodes::complete::{empty_node_complete, NodeComplete};
 use skg::types::memory::SkgNodeMap;
 use skg::types::misc::ID;
 
 #[tokio::test]
 async fn test_add_v_to_map_if_absent_already_present() {
-  // If SkgNode already in map, should not call fetch function
+  // If NodeComplete already in map, should not call fetch function
   let id :
     ID =
     ID::new ("test-id-123");
   let skgnode :
-    SkgNode =
-    SkgNode {
+    NodeComplete =
+    NodeComplete {
       title : "Cached Node" . to_string(),
       pid : id . clone(),
-      .. empty_skgnode()
+      .. empty_node_complete()
     };
 
   let mut map :

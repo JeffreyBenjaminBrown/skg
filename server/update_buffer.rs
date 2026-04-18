@@ -23,7 +23,7 @@ use crate::types::memory::ViewUri;
 use crate::types::memory::{SkgNodeMap, skgnode_map_from_save_instructions};
 use crate::types::misc::{ID, SourceName, SkgConfig};
 use crate::types::save::{DefineNode, Merge, SaveNode};
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
 use crate::to_org::util::mark_view_roots_independent;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
@@ -66,7 +66,7 @@ pub async fn update_views_after_save (
     // Reload acquirers from disk so the map reflects the post-merge .skg files.
     let pid    : &ID         = &m . updated_acquirer . 0 . pid;
     let source : &SourceName = &m . updated_acquirer . 0 . source;
-    let skgnode : SkgNode = skgnode_from_pid_and_source (
+    let skgnode : NodeComplete = skgnode_from_pid_and_source (
       config, pid . clone(), source ) ?;
     skgnode_map . insert ( pid . clone(), skgnode ); }
   let source_diffs

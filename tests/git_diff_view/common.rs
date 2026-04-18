@@ -19,8 +19,9 @@ pub use skg::dbs::typedb::relationships::create_all_relationships;
 pub use skg::to_org::render::content_view::multi_root_view;
 pub use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
 pub use skg::types::misc::{ID, SkgConfig, SkgfileSource, TantivyIndex, SourceName};
+pub use skg::types::nodes::fs::NodeFS;
 pub use skg::types::nodes::typedb::NodeTypedb;
-pub use skg::types::skgnode::SkgNode;
+pub use skg::types::nodes::complete::NodeComplete;
 pub use skg::types::memory::SkgNodeMap;
 pub use skg::serve::ConnectionState;
 pub use skg::types::memory::SkgnodesInMemory;
@@ -94,7 +95,7 @@ pub async fn setup_test_dbs(
     DriverOptions::new(false, None)?
   ) . await?;
 
-  let nodes : Vec<SkgNode> = {
+  let nodes : Vec<NodeComplete> = {
     let mut sources : HashMap<SourceName, SkgfileSource> =
       HashMap::new();
     sources . insert(SourceName::from ("main"),
@@ -138,11 +139,13 @@ pub async fn cleanup_test_dbs(
 // Disk verification helpers
 //
 
-pub fn read_skgnode(repo_path: &Path, id: &str) -> Result<SkgNode, Box<dyn Error>> {
+pub fn read_skgnode(repo_path: &Path, id: &str) -> Result<NodeComplete, Box<dyn Error>> {
+  // Read YAML as NodeFS, then attach source.
+  // Tests in this module use source "main".
   let path = repo_path . join(format!("{}.skg", id));
   let content = fs::read_to_string (&path)?;
-  let node: SkgNode = serde_yaml::from_str (&content)?;
-  Ok (node)
+  let node_fs: NodeFS = serde_yaml::from_str (&content)?;
+  Ok ( node_fs . into_complete ( SourceName::from ("main") ))
 }
 
 //

@@ -1,7 +1,7 @@
 use crate::types::git::{MembershipAxes, NodeChanges, Sign};
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SourceName};
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::memory::SkgNodeMap;
 use crate::types::git::{SourceDiff, node_changes_for_truenode};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor};
@@ -16,7 +16,7 @@ use std::error::Error;
 ///
 /// - Verify this node is an IDCol
 /// - Verify its parent is a TrueNode
-/// - Fetch the corresponding SkgNode from the map
+/// - Fetch the corresponding NodeComplete from the map
 /// - Read its IDs into a goal list
 /// - In diff view, also build a diff-status map from NodeChanges.ids_diff
 /// - Reconcile children via complete_relevant_children_in_viewnodetree
@@ -37,9 +37,9 @@ pub fn completeIDCol (
     pid_and_source_from_ancestor(
       tree, idcol_node_id, 1,
       "completeIDCol" ) ?;
-  let parent_skgnode : &SkgNode =
+  let parent_skgnode : &NodeComplete =
     map . get (&parent_pid)
-    . ok_or ("completeIDCol: Parent SkgNode not in map")?;
+    . ok_or ("completeIDCol: Parent NodeComplete not in map")?;
   let node_changes : Option<&NodeChanges> =
     node_changes_for_truenode(
       source_diffs, &parent_pid, &parent_source );

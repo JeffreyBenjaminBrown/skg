@@ -6,7 +6,7 @@ use crate::types::memory::SkgNodeMap;
 use crate::types::memory::find_source_many_ways;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::{ error_unless_node_satisfies, read_at_ancestor_in_tree, write_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_skgnode::{ unique_scaffold_child, insert_scaffold_as_child};
 use crate::types::viewnode::mk_phantom_viewnode;
@@ -88,7 +88,7 @@ pub async fn complete_subscribee_col_preorder (
       . cloned()
       . collect();
     if !missing . is_empty() { // Ensure all subscribees are in the map.
-      let fetched_missing : Vec<SkgNode> =
+      let fetched_missing : Vec<NodeComplete> =
         skgnodes_from_ids( config, driver, &missing ) . await ?;
       for skg in fetched_missing {
         { let id : &ID = &skg . pid;
@@ -150,7 +150,7 @@ fn diff_aware_goal_list (
       . and_then( |diffs| diffs . get (parent_source) )
       . filter( |sd| sd . is_git_repo )
       . and_then(
-         |_| { let skg : SkgNode =
+         |_| { let skg : NodeComplete =
                  skgnode_from_git_head(
                    parent_skgid, parent_source, config )
                  . ok() ?;

@@ -9,7 +9,7 @@ use tempfile::{tempdir, TempDir};
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::one_node::write_skgnode_to_source;
 use skg::types::misc::{SkgfileSource, SkgConfig, ID, SourceName};
-use skg::types::skgnode::{SkgNode, empty_skgnode};
+use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
 /// Helper to create a minimal SkgConfig for tests.
 fn test_config(sources: HashMap<SourceName, SkgfileSource>
@@ -35,18 +35,18 @@ fn test_load_from_single_source() {
     test_config (sources) };
 
   // Create a test node
-  let mut node : SkgNode = empty_skgnode();
+  let mut node : NodeComplete = empty_node_complete();
   node . pid = ID::new ("test1");
   node . title = "Test Node 1" . to_string();
   node . source = SourceName::from ("main");
   write_skgnode_to_source(&node, &config) . unwrap();
 
-  let result : IoResult<Vec<SkgNode>> =
+  let result : IoResult<Vec<NodeComplete>> =
     read_all_skg_files_from_sources (&config);
   assert!(result . is_ok(),
           "Should successfully load from single source");
 
-  let nodes : Vec<SkgNode> = result . unwrap();
+  let nodes : Vec<NodeComplete> = result . unwrap();
   assert_eq!(nodes . len(), 1, "Should have loaded 1 node");
   assert_eq!(&*nodes[0] . source, "main", "Source should be 'main'");
   assert_eq!(nodes[0] . title, "Test Node 1");
@@ -81,37 +81,37 @@ fn test_load_from_multiple_sources() {
     test_config (sources) };
 
   // Create nodes in main source
-  let mut node1 : SkgNode = empty_skgnode();
+  let mut node1 : NodeComplete = empty_node_complete();
   node1 . pid = ID::new ("main1");
   node1 . title = "Main Node 1" . to_string();
   node1 . source = SourceName::from ("main");
   write_skgnode_to_source(&node1, &config) . unwrap();
 
-  let mut node2 : SkgNode = empty_skgnode();
+  let mut node2 : NodeComplete = empty_node_complete();
   node2 . pid = ID::new ("main2");
   node2 . title = "Main Node 2" . to_string();
   node2 . source = SourceName::from ("main");
   write_skgnode_to_source(&node2, &config) . unwrap();
 
   // Create nodes in shared source
-  let mut node3 : SkgNode = empty_skgnode();
+  let mut node3 : NodeComplete = empty_node_complete();
   node3 . pid = ID::new ("shared1");
   node3 . title = "Shared Node 1" . to_string();
   node3 . source = SourceName::from ("shared");
   write_skgnode_to_source(&node3, &config) . unwrap();
 
-  let result : IoResult<Vec<SkgNode>> =
+  let result : IoResult<Vec<NodeComplete>> =
     read_all_skg_files_from_sources (&config);
   assert!(result . is_ok(), "Should successfully load from multiple sources");
 
-  let nodes : Vec<SkgNode> = result . unwrap();
+  let nodes : Vec<NodeComplete> = result . unwrap();
   assert_eq!(nodes . len(), 3, "Should have loaded 3 nodes total");
 
   // Verify sources are set correctly
-  let main_nodes: Vec<&SkgNode> = nodes . iter()
+  let main_nodes: Vec<&NodeComplete> = nodes . iter()
     . filter(|n| &*n . source == "main")
     . collect();
-  let shared_nodes: Vec<&SkgNode> = nodes . iter()
+  let shared_nodes: Vec<&NodeComplete> = nodes . iter()
     . filter(|n| &*n . source == "shared")
     . collect();
 
@@ -149,19 +149,19 @@ fn test_duplicate_id_detection_across_sources() {
     test_config (sources) };
 
   // Create node with same ID in both sources
-  let mut node1 : SkgNode = empty_skgnode();
+  let mut node1 : NodeComplete = empty_node_complete();
   node1 . pid = ID::new ("duplicate_id");
   node1 . title = "Node in Main" . to_string();
   node1 . source = SourceName::from ("main");
   write_skgnode_to_source(&node1, &config) . unwrap();
 
-  let mut node2 : SkgNode = empty_skgnode();
+  let mut node2 : NodeComplete = empty_node_complete();
   node2 . pid = ID::new ("duplicate_id");
   node2 . title = "Node in Shared" . to_string();
   node2 . source = SourceName::from ("shared");
   write_skgnode_to_source(&node2, &config) . unwrap();
 
-  let result : IoResult<Vec<SkgNode>> =
+  let result : IoResult<Vec<NodeComplete>> =
     read_all_skg_files_from_sources (&config);
   assert!(result . is_err(), "Should fail due to duplicate ID");
 
@@ -202,7 +202,7 @@ fn test_node_with_multiple_ids_duplicate_detection() {
     test_config (sources) };
 
   // Create node in main with multiple IDs
-  let mut node1 : SkgNode = empty_skgnode();
+  let mut node1 : NodeComplete = empty_node_complete();
   node1 . pid = ID::new ("id1");
   node1 . extra_ids = vec![ID::new ("id2")];
   node1 . title = "Node with Multiple IDs" . to_string();
@@ -210,14 +210,14 @@ fn test_node_with_multiple_ids_duplicate_detection() {
   write_skgnode_to_source(&node1, &config) . unwrap();
 
   // Create node in shared that has one overlapping ID
-  let mut node2 : SkgNode = empty_skgnode();
+  let mut node2 : NodeComplete = empty_node_complete();
   node2 . pid = ID::new ("id2");
   node2 . extra_ids = vec![ID::new ("id3")];
   node2 . title = "Another Node" . to_string();
   node2 . source = SourceName::from ("shared");
   write_skgnode_to_source(&node2, &config) . unwrap();
 
-  let result : IoResult<Vec<SkgNode>> =
+  let result : IoResult<Vec<NodeComplete>> =
     read_all_skg_files_from_sources (&config);
   assert!(result . is_err(), "Should fail due to overlapping ID");
 
@@ -232,7 +232,7 @@ fn test_load_from_empty_sources() {
   let source_path : PathBuf = temp_dir . path() . join ("empty_source");
   fs::create_dir_all (&source_path) . unwrap();
 
-  let result : IoResult<Vec<SkgNode>> = {
+  let result : IoResult<Vec<NodeComplete>> = {
     let mut sources : HashMap<SourceName, SkgfileSource> =
       HashMap::new();
     sources . insert(
@@ -245,7 +245,7 @@ fn test_load_from_empty_sources() {
     read_all_skg_files_from_sources(&test_config (sources)) };
   assert!(result . is_ok(), "Should successfully handle empty source");
 
-  let nodes : Vec<SkgNode> = result . unwrap();
+  let nodes : Vec<NodeComplete> = result . unwrap();
   assert_eq!(nodes . len(), 0, "Should have loaded 0 nodes from empty source");
 }
 
@@ -278,29 +278,29 @@ fn test_source_field_set_correctly() {
     test_config (sources) };
 
   // Create nodes
-  let mut node_a : SkgNode = empty_skgnode();
+  let mut node_a : NodeComplete = empty_node_complete();
   node_a . pid = ID::new ("node_a");
   node_a . title = "Node A" . to_string();
   node_a . source = SourceName::from ("source_a");
   write_skgnode_to_source(&node_a, &config) . unwrap();
 
-  let mut node_b : SkgNode = empty_skgnode();
+  let mut node_b : NodeComplete = empty_node_complete();
   node_b . pid = ID::new ("node_b");
   node_b . title = "Node B" . to_string();
   node_b . source = SourceName::from ("source_b");
   write_skgnode_to_source(&node_b, &config) . unwrap();
 
-  let result : IoResult<Vec<SkgNode>> =
+  let result : IoResult<Vec<NodeComplete>> =
     read_all_skg_files_from_sources (&config);
   assert!(result . is_ok());
 
-  let nodes : Vec<SkgNode> = result . unwrap();
+  let nodes : Vec<NodeComplete> = result . unwrap();
   assert_eq!(nodes . len(), 2);
 
   // Find each node and verify source
-  let node_a_result : Option<&SkgNode> =
+  let node_a_result : Option<&NodeComplete> =
     nodes . iter() . find(|n| n . pid . as_str() == "node_a");
-  let node_b_result : Option<&SkgNode> =
+  let node_b_result : Option<&NodeComplete> =
     nodes . iter() . find(|n| n . pid . as_str() == "node_b");
 
   assert!(node_a_result . is_some());
@@ -343,8 +343,8 @@ fn test_many_duplicate_ids_creates_org_file() {
   // Create 15 nodes with duplicate IDs
   for i in 1..=15 {
     let id : String = format!("dup_id_{}", i);
-    let mut node_a : SkgNode = empty_skgnode();
-    let mut node_b : SkgNode = empty_skgnode();
+    let mut node_a : NodeComplete = empty_node_complete();
+    let mut node_b : NodeComplete = empty_node_complete();
     node_a . pid = ID::new (&id);
     node_b . pid = ID::new (&id);
     node_a . title = format!("Node A {}", i);
@@ -354,7 +354,7 @@ fn test_many_duplicate_ids_creates_org_file() {
     write_skgnode_to_source(&node_a, &config) . unwrap();
     write_skgnode_to_source(&node_b, &config) . unwrap(); }
 
-  let result : IoResult<Vec<SkgNode>> =
+  let result : IoResult<Vec<NodeComplete>> =
     read_all_skg_files_from_sources (&config);
   assert!(result . is_err(), "Should fail due to duplicate IDs");
 
@@ -419,7 +419,7 @@ fn test_unreadable_files_creates_org_file() {
   let write_config : SkgConfig = test_config (write_sources);
 
   // Create a valid node in the good source
-  let mut node : SkgNode = empty_skgnode();
+  let mut node : NodeComplete = empty_node_complete();
   node . pid = ID::new ("test1");
   node . title = "Test Node" . to_string();
   node . source = SourceName::from ("source_good");
@@ -443,7 +443,7 @@ fn test_unreadable_files_creates_org_file() {
       path: source_bad . clone(),
       user_owns_it: true, } );
 
-  let result : IoResult<Vec<SkgNode>> =
+  let result : IoResult<Vec<NodeComplete>> =
     read_all_skg_files_from_sources(&test_config (sources));
   assert!(result . is_err(), "Should fail due to unreadable source");
 

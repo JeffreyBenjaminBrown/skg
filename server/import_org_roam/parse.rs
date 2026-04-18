@@ -31,11 +31,11 @@
 ///    that lacks an `:ID:` gets a fresh UUID.
 ///
 /// 5. **Emit SkgNodes.** Walk the forest depth-first, converting each
-///    `SectionTree` into a flat `SkgNode` whose `contains` field lists
+///    `SectionTree` into a flat `NodeComplete` whose `contains` field lists
 ///    its direct children by ID.
 
 use crate::types::misc::{ID, MSV, SourceName};
-use crate::types::skgnode::{FileProperty, SkgNode};
+use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 use std::path::Path;
 use uuid::Uuid;
@@ -67,7 +67,7 @@ struct SectionTree {
 
 pub fn parse_org_file (
   path : &Path,
-) -> Vec<SkgNode> {
+) -> Vec<NodeComplete> {
   let contents : String = match std::fs::read_to_string (path) {
     Ok (s) => s,
     Err (_) => return vec![], };
@@ -84,7 +84,7 @@ pub fn parse_org_file (
   for st in &mut forest {
     insert_super_indentation_groups (st);
     assign_missing_ids (st); }
-  let mut nodes : Vec<SkgNode> = Vec::new();
+  let mut nodes : Vec<NodeComplete> = Vec::new();
   for st in &forest {
     collect_skgnodes (st, &lines, &mut nodes); }
   nodes }
@@ -254,7 +254,7 @@ fn group_children_by_level (
   vec![ special_node, normal_node ] }
 
 //
-// SkgNode collection
+// NodeComplete collection
 //
 
 fn assign_missing_ids (
@@ -268,9 +268,9 @@ fn assign_missing_ids (
 fn collect_skgnodes (
   tree  : &SectionTree,
   lines : &[String],
-  out   : &mut Vec<SkgNode>,
+  out   : &mut Vec<NodeComplete>,
 ) {
-  let node : SkgNode = skgnode_from_section_tree (tree, lines);
+  let node : NodeComplete = skgnode_from_section_tree (tree, lines);
   out . push (node);
   for child in &tree . children {
     collect_skgnodes (child, lines, out); }}
@@ -278,7 +278,7 @@ fn collect_skgnodes (
 fn skgnode_from_section_tree (
   tree  : &SectionTree,
   lines : &[String],
-) -> SkgNode {
+) -> NodeComplete {
   // All sections have IDs after assign_missing_ids pre-pass.
   let id_str : &str =
     tree . section . id . as_ref() . unwrap();
@@ -300,7 +300,7 @@ fn skgnode_from_section_tree (
     match tree . section . roam_aliases . clone() {
       None    => MSV::Unspecified,
       Some(v) => MSV::Specified(v) };
-  SkgNode {
+  NodeComplete {
     title    : tree . section . headline . clone(),
     aliases,
     source   : SourceName::default(),

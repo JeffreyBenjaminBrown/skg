@@ -1,7 +1,7 @@
 use crate::dbs::filesystem::one_node::{skgnodes_from_ids, skgnode_from_pid_and_source};
 use crate::types::many_to_many::ManyToMany;
 use crate::types::save::{DefineNode, SaveNode};
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use super::misc::{ID, SkgConfig, SourceName};
 use super::phantom::source_from_disk;
@@ -22,14 +22,14 @@ pub enum ViewUri {
   SearchView  (String), // query
 }
 
-pub type SkgNodeMap = HashMap<ID, SkgNode>;
+pub type SkgNodeMap = HashMap<ID, NodeComplete>;
 
 /// Persistent cross-request cache of all SkgNodes currently displayed
 /// in any Emacs view. The pool is the authoritative in-memory store;
 /// SkgNodeMap is the per-request transactional layer that shadows it.
 /// See also: SkgNodeMap (the per-request working set).
 pub struct SkgnodesInMemory {
-  pub pool        : HashMap<ID, SkgNode>,
+  pub pool        : HashMap<ID, NodeComplete>,
   pub views       : HashMap<ViewUri, ViewState>,
   // Includes both (graph) content views and search result views. See the definition of 'ViewUri'.
   // TODO ? OPTIMIZE:
@@ -190,7 +190,7 @@ impl SkgnodesInMemory {
 /// this does not return those.)
 fn root_ids_from_forest (
   forest : &Tree<ViewNode>,
-  pool   : &HashMap<ID, SkgNode>,
+  pool   : &HashMap<ID, NodeComplete>,
 ) -> HashSet<ID> {
   let mut ids : HashSet<ID> = HashSet::new ();
   for child in forest . root () . children () {
@@ -201,29 +201,29 @@ fn root_ids_from_forest (
           ids . insert ( extra_id . clone () ); }}}}
   ids }
 
-/// Extract SkgNode for an ViewNode from the map (tried first) or disk.
+/// Extract NodeComplete for an ViewNode from the map (tried first) or disk.
 /// Updates the map if needed.
 /// Returns None for Scaffolds.
 pub fn skgnode_for_viewnode<'a> (
   viewnode : &ViewNode,
   map     : &'a mut SkgNodeMap,
   config  : &SkgConfig,
-) -> Result<Option<&'a SkgNode>, Box<dyn Error>>
+) -> Result<Option<&'a NodeComplete>, Box<dyn Error>>
 { match &viewnode . kind {
     ViewNodeKind::True (t) => {
-      let skgnode : &SkgNode =
+      let skgnode : &NodeComplete =
         skgnode_from_map_or_disk(
           &t . id, &t . source, map, config)?;
       Ok(Some (skgnode)) },
     _ => Ok (None) }}
 
 /// Build a SkgNodeMap from DefineNodes.
-/// Each SkgNode is indexed by its first ID.
+/// Each NodeComplete is indexed by its first ID.
 /// PITFALL: Does not include every node in the buffer --
 /// just the ones that generated instructions.
 /// Hence the importance of 'skgnode_from_map_or_disk'.
 /// PITFALL: Only Save instructions contribute;
-/// Delete instructions carry no SkgNode data.
+/// Delete instructions carry no NodeComplete data.
 pub fn skgnode_map_from_save_instructions (
   instructions : &Vec<DefineNode>,
 ) -> SkgNodeMap
@@ -244,7 +244,7 @@ pub async fn skgnode_map_from_forest (
 { let mut all_tree_ids : Vec<ID> = Vec::new();
   collect_ids_from_subtree (
     forest, forest . root () . id (), &mut all_tree_ids );
-  let nodes : Vec<SkgNode> = skgnodes_from_ids (
+  let nodes : Vec<NodeComplete> = skgnodes_from_ids (
     config, driver, &all_tree_ids ) . await ?;
   let mut map : SkgNodeMap = SkgNodeMap::new ();
   for node in nodes {
@@ -252,20 +252,20 @@ pub async fn skgnode_map_from_forest (
       map . insert ( id . clone (), node ); }}
   Ok (map) }
 
-/// Get a SkgNode from the map, or from disk if it's not there.
+/// Get a NodeComplete from the map, or from disk if it's not there.
 /// Updates the map.
 pub fn skgnode_from_map_or_disk<'a>(
   id: &ID,
   source: &SourceName,
   map: &'a mut SkgNodeMap,
   config: &SkgConfig,
-) -> Result<&'a SkgNode, Box<dyn Error>> {
+) -> Result<&'a NodeComplete, Box<dyn Error>> {
   if !map . contains_key (id) {
-    let skgnode: SkgNode = skgnode_from_pid_and_source(
+    let skgnode: NodeComplete = skgnode_from_pid_and_source(
       config, id . clone(), source)?;
     map . insert(id . clone(), skgnode); }
   map . get (id) . ok_or_else(
-    || "SkgNode should be in map after fetch" . into( )) }
+    || "NodeComplete should be in map after fetch" . into( )) }
 
 fn collect_ids_from_subtree (
   tree    : &Tree<ViewNode>,

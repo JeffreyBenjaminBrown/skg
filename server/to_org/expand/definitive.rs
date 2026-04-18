@@ -10,7 +10,7 @@ use crate::to_org::util::{ DefinitiveMap, build_node_branch_minus_content, get_i
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ContainerwardPathStats, IndefOrDef, Birth, mk_indefinitive_viewnode };
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::viewnode_skgnode::{write_at_truenode_in_tree, pid_and_source_from_treenode};
@@ -229,7 +229,7 @@ fn indefinitize_content_subtree (
 /// but operates on an existing PairTree.
 ///
 /// The starting node is already definitive. This function:
-/// - Reads content children from the SkgNode in the tree
+/// - Reads content children from the NodeComplete in the tree
 /// - Adds them as children using BFS
 /// - Marks repeats (nodes already in `visited`) as indefinitive
 /// - Adds new definitive nodes to `visited`
@@ -293,7 +293,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
     generation += 1; }
   Ok (( )) }
 
-/// Fetches SkgNode from map or disk.
+/// Fetches NodeComplete from map or disk.
 /// Updates title and body.
 /// Preserves all other ViewNode data.
 fn from_disk_replace_title_body_and_skgnode (
@@ -305,11 +305,11 @@ fn from_disk_replace_title_body_and_skgnode (
   let (pid, src) : (ID, SourceName) =
     pid_and_source_from_treenode ( tree, node_id,
       "from_disk_replace_title_body_and_skgnode" ) ?;
-  let skgnode : &SkgNode = skgnode_from_map_or_disk (
+  let skgnode : &NodeComplete = skgnode_from_map_or_disk (
     &pid, &src, map, config ) ?;
   let title : String = skgnode . title . clone();
   if title . is_empty () {
-    return Err ( format! ( "SkgNode {} has empty title", pid ) . into () ); }
+    return Err ( format! ( "NodeComplete {} has empty title", pid ) . into () ); }
   let body : Option < String > = skgnode . body . clone ();
   write_at_truenode_in_tree ( tree, node_id, |t| {
     t . title = title;
@@ -339,7 +339,7 @@ async fn extendDefinitiveSubtree_fromGit (
       "extendDefinitiveSubtree_fromGit" ) ?;
   let (contents, contents_in_worktree)
     : (Vec<ID>, HashSet<String>) =
-    { let skgnode : SkgNode =
+    { let skgnode : NodeComplete =
         skgnode_from_index_or_head ( &pid, &src, config ) ?;
       let contents : Vec<ID> =
         skgnode . contains;
@@ -389,7 +389,7 @@ async fn mk_removed_child_viewnode (
   //   in worktree -> file exists; just M is removed.
   //   not in worktree -> file gone; both X and M are removed.
   let (existence, child_opt_skgnode)
-    : (ExistenceAxes, Option<SkgNode>)
+    : (ExistenceAxes, Option<NodeComplete>)
     = if in_worktree
       { ( ExistenceAxes::default (),
           optskgnode_from_id (
@@ -400,10 +400,10 @@ async fn mk_removed_child_viewnode (
                                      ) . ok() ) };
   let membership : MembershipAxes =
     MembershipAxes { staged: None, unstaged: Some (Sign::Minus) };
-  let child_skgnode : &SkgNode =
+  let child_skgnode : &NodeComplete =
     child_opt_skgnode . as_ref()
     . ok_or_else ( || format! (
-      "mk_removed_child_viewnode: no SkgNode for child {}",
+      "mk_removed_child_viewnode: no NodeComplete for child {}",
       child_id ) ) ?;
   let child_source : Option<SourceName> =
     if in_worktree { Some ( child_skgnode . source . clone() ) }
@@ -434,7 +434,7 @@ fn from_git_replace_title_body (
   let (pid, src) : (ID, SourceName) =
     pid_and_source_from_treenode ( tree, node_id,
       "from_git_replace_title_body" ) ?;
-  let skgnode : SkgNode =
+  let skgnode : NodeComplete =
     skgnode_from_index_or_head ( &pid, &src, config ) ?;
   write_at_truenode_in_tree (
     tree, node_id, |t| {

@@ -1,7 +1,7 @@
 use crate::types::git::{MembershipAxes, NodeChanges, Sign, SourceDiff, node_changes_for_truenode};
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SourceName};
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::memory::SkgNodeMap;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth};
 use crate::types::tree::generic::{pid_and_source_from_ancestor, read_at_ancestor_in_tree};
@@ -16,7 +16,7 @@ use std::error::Error;
 /// Per the spec in buffer-update.org:
 /// - Verify this node is an AliasCol
 /// - Verify its parent is a TrueNode
-/// - Fetch the corresponding SkgNode from the map
+/// - Fetch the corresponding NodeComplete from the map
 /// - Read its aliases into 'aliases'
 /// - Partition the AliasCol's children into:
 ///   - TrueNodes with birth != ContentOf
@@ -44,9 +44,9 @@ pub fn completeAliasCol (
     pid_and_source_from_ancestor(
       tree, aliascol_node_id, 1,
       "completeAliasCol" ) ?;
-  let parent_skgnode : &SkgNode =
+  let parent_skgnode : &NodeComplete =
     map . get (&parent_pid)
-    . ok_or ("completeAliasCol: Parent SkgNode not in map")?;
+    . ok_or ("completeAliasCol: Parent NodeComplete not in map")?;
   let node_changes : Option<&NodeChanges> =
     node_changes_for_truenode(
       source_diffs, &parent_pid, &parent_source );

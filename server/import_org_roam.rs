@@ -2,7 +2,7 @@ pub mod parse;
 
 use crate::types::misc::{ID, SourceName};
 use crate::types::nodes::fs::NodeFS;
-use crate::types::skgnode::{FileProperty, SkgNode};
+use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 use std::collections::HashMap;
 use std::error::Error;
@@ -53,7 +53,7 @@ pub fn import_org_roam_directory (
   // Collect all nodes into a map keyed by primary ID.
   // When multiple org files define the same ID,
   // merge their children rather than clobbering.
-  let mut node_map : HashMap<ID, SkgNode> = HashMap::new();
+  let mut node_map : HashMap<ID, NodeComplete> = HashMap::new();
   for entry in WalkDir::new (org_dir)
     . into_iter()
     . filter_map (|e| e . ok() )
@@ -62,7 +62,7 @@ pub fn import_org_roam_directory (
         . map_or (false, |ext| ext == "org") }) {
     let path : &Path = entry . path();
     stats . files_read += 1;
-    let nodes : Vec<SkgNode> =
+    let nodes : Vec<NodeComplete> =
       parse::parse_org_file (path);
     for mut node in nodes {
       node . source = source . clone();
@@ -93,8 +93,8 @@ pub fn import_org_roam_directory (
 /// Appends children, body text, and aliases from the newcomer.
 /// Tags the result with Was_Overloaded.
 fn merge_into_existing (
-  existing : &mut SkgNode,
-  newcomer : &SkgNode,
+  existing : &mut NodeComplete,
+  newcomer : &NodeComplete,
 ) {
   if ! existing . misc . contains (&FileProperty::Was_Overloaded) {
     existing . misc . push (FileProperty::Was_Overloaded); }
@@ -128,7 +128,7 @@ fn merge_into_existing (
       existing . misc . push (FileProperty::Had_ID_Before_Import); }}
 
 fn write_skgnode_to_dir (
-  node       : &SkgNode,
+  node       : &NodeComplete,
   output_dir : &Path,
 ) -> Result<(), Box<dyn Error>> {
   let pid : &ID = &node . pid;

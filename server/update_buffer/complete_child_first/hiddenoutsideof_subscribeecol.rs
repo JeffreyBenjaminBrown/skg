@@ -5,7 +5,7 @@ use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::types::memory::find_source_many_ways;
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::memory::SkgNodeMap;
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, write_at_ancestor_in_tree, with_node_mut};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth, mk_indefinitive_viewnode};
@@ -63,10 +63,10 @@ pub fn complete_hiddenoutsideofsubscribeecol (
     pid_and_source_from_ancestor(
       tree, node, 2,
       "complete_hiddenoutsideofsubscribeecol" ) ?;
-  let wt_subscriber_skgnode : &SkgNode =
+  let wt_subscriber_skgnode : &NodeComplete =
     map . get (&subscriber_pid)
     . ok_or( "complete_hiddenoutsideofsubscribeecol: \
-             subscriber SkgNode not in map" ) ?;
+             subscriber NodeComplete not in map" ) ?;
   let wt_subscriber_hides : Vec<ID> =
     wt_subscriber_skgnode . hides_from_its_subscriptions
       . or_default() . to_vec();

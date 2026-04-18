@@ -1,6 +1,6 @@
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::fs::NodeFS;
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::util::path_from_pid_and_source;
 use std::error::Error;
@@ -14,7 +14,7 @@ pub async fn skgnode_from_id (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   skgid  : &ID
-) -> Result<SkgNode, Box<dyn Error>> {
+) -> Result<NodeComplete, Box<dyn Error>> {
   let (pid, source) : (ID, SourceName) =
     pid_and_source_from_id (
       & config . db_name, driver, skgid
@@ -29,20 +29,20 @@ pub async fn skgnodes_from_ids (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   ids    : &[ID],
-) -> Result<Vec<SkgNode>, Box<dyn Error>> {
-  let mut nodes : Vec<SkgNode> = Vec::new();
+) -> Result<Vec<NodeComplete>, Box<dyn Error>> {
+  let mut nodes : Vec<NodeComplete> = Vec::new();
   for id in ids {
-    let node : SkgNode =
+    let node : NodeComplete =
       skgnode_from_id ( config, driver, id ) . await ?;
     nodes . push (node); }
   Ok (nodes) }
 
-/// Reads a SkgNode from disk given its PID and source.
+/// Reads a NodeComplete from disk given its PID and source.
 pub fn skgnode_from_pid_and_source (
   config : &SkgConfig,
   pid    : ID,
   source : &SourceName,
-) -> io::Result<SkgNode> {
+) -> io::Result<NodeComplete> {
   let node_fs : NodeFS = {
     let path : String =
       path_from_pid_and_source( config, source, pid )
@@ -58,7 +58,7 @@ pub async fn optskgnode_from_id (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   skgid  : &ID
-) -> Result<Option<SkgNode>, Box<dyn Error>> {
+) -> Result<Option<NodeComplete>, Box<dyn Error>> {
   match skgnode_from_id(
     config, driver, skgid
   ) . await {
@@ -87,7 +87,7 @@ pub async fn fetch_aliases_from_file (
     _ => Vec::new(), }}
 
 pub fn write_skgnode_to_source (
-  skgnode : &SkgNode,
+  skgnode : &NodeComplete,
   config  : &SkgConfig,
 ) -> io::Result<()> {
   let pid : &ID = &skgnode . pid;
@@ -141,7 +141,7 @@ pub(super) fn read_skgnode
   if node_fs . title . is_empty() {
     return Err(io::Error::new(
       io::ErrorKind::InvalidData,
-      format!("SkgNode at {:?} has an empty title", file_path),
+      format!("NodeComplete at {:?} has an empty title", file_path),
     )); }
   if node_fs . pid . as_str() . is_empty() {
     return Err(io::Error::new(
@@ -156,7 +156,7 @@ pub(super) fn read_skgnode
 /// source is not written to the YAML on disk.
 pub(super) fn write_skgnode
   <P : AsRef<Path>>
-  ( skgnode   : &SkgNode,
+  ( skgnode   : &NodeComplete,
     file_path : P
   ) -> io::Result<()> {
     let node_fs : NodeFS = NodeFS::from (skgnode);

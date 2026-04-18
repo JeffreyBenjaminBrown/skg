@@ -1,5 +1,5 @@
 /// Skg lets users control a graph, viewing it through a tree view in a text editor.
-/// Nodes of the graph are represented via the 'SkgNode' type.
+/// Nodes of the graph are represented via the 'NodeComplete' type.
 /// Nodes of the tree are represented via the 'ViewNode' type.
 ///   (That name might change once there are more clients. The only client so far is written in Emacs org-mode; hence the name.)
 /// Some 'ViewNode's correspond to SkgNodes; these are 'TrueNode's.
@@ -61,7 +61,7 @@ pub type TrueNode          = TrueNode_Generic < ID, SourceName >;
 pub type UncheckedTrueNode = TrueNode_Generic < Option < ID >,
                                                 Option < SourceName >>;
 
-/// A ViewNode that corresponds to a SkgNode.
+/// A ViewNode that corresponds to a NodeComplete.
 #[derive( Debug, Clone, PartialEq )]
 #[allow (non_camel_case_types)]
 pub struct TrueNode_Generic < Id, Src > {

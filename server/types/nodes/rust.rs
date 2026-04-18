@@ -1,6 +1,6 @@
 //! NodeRust: the Tier A projection held in memory.
 //!
-//! Wide enough to match everything in-memory SkgNode consumers
+//! Wide enough to match everything in-memory NodeComplete consumers
 //! currently read (render, save completion, merge), so deploying
 //! NodeRust doesn't regress behavior. Narrower than NodeComplete
 //! only in omitting 'misc' (which is consumed only by Tantivy
@@ -32,7 +32,7 @@ pub struct NodeRust {
 
 impl From<&NodeComplete> for NodeRust {
   /// Drop only 'misc'. Everything else is kept so in-memory
-  /// SkgNode consumers don't regress.
+  /// NodeComplete consumers don't regress.
   fn from (c: &NodeComplete) -> Self {
     NodeRust {
       pid                          : c . pid . clone (),

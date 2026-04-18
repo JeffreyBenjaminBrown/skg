@@ -12,7 +12,7 @@ use crate::dbs::typedb::search::find_container_ids_of_pid;
 use crate::dbs::typedb::util::ConceptRowStream;
 use crate::types::misc::{ID, TantivyIndex};
 use crate::types::save::{DefineNode, SaveNode};
-use crate::types::skgnode::{FileProperty, SkgNode};
+use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::textlinks::textlinks_from_node;
 use crate::types::viewnode::ContainerwardPathStats;
 
@@ -434,7 +434,7 @@ fn climb_containerward_to_cycle (
 /// from loaded SkgNodes.
 /// This avoids a ~22s TypeDB query on 28k-node datasets.
 pub fn contains_maps_from_nodes (
-  nodes : &[SkgNode],
+  nodes : &[NodeComplete],
 ) -> (MapToContent, MapToContainers) {
   let mut to_content    : MapToContent    = HashMap::new ();
   let mut to_containers : MapToContainers = HashMap::new ();
@@ -453,7 +453,7 @@ pub fn contains_maps_from_nodes (
 /// (The previous implementation, which queried TypeDB,
 /// took ~2.5 seconds for 28k nodes.)
 pub fn link_targets_from_nodes (
-  nodes : &[SkgNode],
+  nodes : &[NodeComplete],
 ) -> HashSet<ID> {
   nodes . iter ()
   . flat_map ( |node| {
@@ -465,7 +465,7 @@ pub fn link_targets_from_nodes (
 /// Collect the set of IDs of nodes whose misc field
 /// contains Had_ID_Before_Import.
 pub fn had_id_set_from_nodes (
-  nodes : &[SkgNode],
+  nodes : &[NodeComplete],
 ) -> HashSet<ID> {
   nodes . iter ()
   . filter ( |n|

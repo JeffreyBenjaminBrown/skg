@@ -20,7 +20,7 @@ use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::nodes::tantivy::NodeTantivy;
-use skg::types::skgnode::SkgNode;
+use skg::types::nodes::complete::NodeComplete;
 
 use std::collections::HashSet;
 use std::env;
@@ -39,7 +39,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
 
   // Step 1: Read all .skg files
   let t0 : Instant = Instant::now ();
-  let nodes : Vec<SkgNode> =
+  let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config) ?;
   let read_time : f64 = t0 . elapsed () . as_secs_f64 ();
   println! ("\n1. Read {} .skg files: {:.3}s", nodes . len (), read_time);

@@ -1,5 +1,5 @@
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::types::viewnode::ViewNode;
 use crate::types::tree::viewnode_skgnode::{ pid_and_source_from_treenode, write_at_truenode_in_tree };
@@ -22,7 +22,7 @@ pub fn clobberIndefinitiveViewnode (
   let (node_id, source) : (ID, SourceName) =
     pid_and_source_from_treenode (
       tree, treeid, "clobberIndefinitiveViewnode" ) ?;
-  let skgnode : &SkgNode =
+  let skgnode : &NodeComplete =
     skgnode_from_map_or_disk ( &node_id, &source, map, config ) ?;
   let title : String = skgnode . title . clone();
   let source : SourceName = skgnode . source . clone();

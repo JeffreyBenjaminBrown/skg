@@ -5,7 +5,7 @@ use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::types::memory::find_source_many_ways;
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::memory::SkgNodeMap;
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, write_at_ancestor_in_tree, with_node_mut};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth, mk_indefinitive_viewnode};
@@ -57,14 +57,14 @@ pub fn complete_hiddeninsubscribee_col (
       tree, node, 3,
       "complete_hiddeninsubscribee_col" ) ?;
   let subscribee_contains : Vec<ID> = {
-    let subscribee_skgnode : &SkgNode =
-      map . get (&subscribee_pid) . ok_or ("complete_hiddeninsubscribee_col: subscribee SkgNode not in map") ?;
+    let subscribee_skgnode : &NodeComplete =
+      map . get (&subscribee_pid) . ok_or ("complete_hiddeninsubscribee_col: subscribee NodeComplete not in map") ?;
     subscribee_skgnode . contains . clone() };
   let subscriber_hides : Vec<ID> = {
-    let subscriber_skgnode : &SkgNode =
+    let subscriber_skgnode : &NodeComplete =
       map . get (&subscriber_pid)
       . ok_or( "complete_hiddeninsubscribee_col: \
-               subscriber SkgNode not in map" ) ?;
+               subscriber NodeComplete not in map" ) ?;
     subscriber_skgnode . hides_from_its_subscriptions
       . or_default() . to_vec() };
   let worktree_content : Vec<ID> =

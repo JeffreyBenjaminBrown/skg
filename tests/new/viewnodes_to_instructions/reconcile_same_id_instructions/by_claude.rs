@@ -5,18 +5,18 @@ use std::collections::HashMap;
 use skg::from_text::viewnodes_to_instructions::reconcile_same_id_instructions::collect_dup_instructions;
 use skg::test_utils::extract_skgnode_if_save_else_error;
 use skg::types::misc::{ID, MSV, SourceName};
-use skg::types::skgnode::SkgNode;
+use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 
-// Helper function to create a basic SkgNode for testing
+// Helper function to create a basic NodeComplete for testing
 fn create_test_node(
     id: &str,
     title: &str,
     aliases: Option<Vec<String>>,
     body: Option<String>,
     contains: Vec<ID>
-) -> SkgNode {
-    SkgNode {
+) -> NodeComplete {
+    NodeComplete {
         title: title . to_string(),
         aliases: match aliases {
           None => MSV::Unspecified,
@@ -35,7 +35,7 @@ fn create_test_node(
 
 // Helper function to create a DefineNode
 fn create_instruction(
-  node: SkgNode,
+  node: NodeComplete,
   to_delete: bool
 ) -> DefineNode {
   if to_delete {
@@ -169,15 +169,15 @@ fn test_inconsistent_to_delete_values() {
 #[test]
 fn test_alias_collection_and_deduplication() {
     // Test that aliases are collected and deduplicated correctly
-    let node1 : SkgNode = create_test_node(
+    let node1 : NodeComplete = create_test_node(
       "id1", "Node 1",
       Some(vec!["alias1" . to_string(), "alias2" . to_string() ] ),
       None, vec![]);
-    let node2 : SkgNode = create_test_node(
+    let node2 : NodeComplete = create_test_node(
       "id1", "Node 1 Again",
       Some(vec!["alias2" . to_string(), "alias3" . to_string() ] ),
       None, vec![]);
-    let node3 : SkgNode = create_test_node(
+    let node3 : NodeComplete = create_test_node(
       "id1", "Node 1 Third",
       Some(vec!["alias1" . to_string(), "alias4" . to_string() ] ),
       None, vec![]);
@@ -279,7 +279,7 @@ fn test_last_instruction_defines_title_and_body() {
     let mut maybe_body : Option<String> = None;
 
     for instr in &instructions {
-        let skg_node : &SkgNode =
+        let skg_node : &NodeComplete =
           extract_skgnode_if_save_else_error (instr);
         maybe_title = Some(skg_node . title . clone());
         if skg_node . body . is_some() {
@@ -320,7 +320,7 @@ fn test_defining_instruction_takes_precedence() {
 
     for instr in &instructions {
         if instr . is_save() {
-            let skg_node : &SkgNode =
+            let skg_node : &NodeComplete =
               extract_skgnode_if_save_else_error (instr);
             last_title = Some(skg_node . title . clone());
             last_body = skg_node . body . clone();
@@ -378,7 +378,7 @@ fn test_body_from_disk_when_no_instruction_has_body() {
     let mut maybe_body : Option<String> = None;
 
     for instr in &instructions {
-      let skg_node : &SkgNode =
+      let skg_node : &NodeComplete =
         extract_skgnode_if_save_else_error (instr);
       if skg_node . body . is_some() {
         maybe_body = skg_node . body . clone(); }}

@@ -10,7 +10,7 @@ use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID};
 use skg::types::memory::SkgNodeMap;
 use skg::types::nodes::typedb::NodeTypedb;
-use skg::types::skgnode::SkgNode;
+use skg::types::nodes::complete::NodeComplete;
 use futures::executor::block_on;
 use std::error::Error;
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
@@ -28,7 +28,7 @@ async fn setup_multi_source_test(
     Credentials::new("admin", "password"),
     DriverOptions::new(false, None)?,
   ) . await?;
-  let nodes: Vec<SkgNode> =
+  let nodes: Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config)?;
   let typedb_nodes : Vec<NodeTypedb> =
     nodes . iter ()

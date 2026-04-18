@@ -14,7 +14,7 @@ use skg::context::{
 };
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
-use skg::types::skgnode::{FileProperty, SkgNode, empty_skgnode};
+use skg::types::nodes::complete::{FileProperty, NodeComplete, empty_node_complete};
 
 #[test]
 fn test_from_label_unknown () {
@@ -36,34 +36,34 @@ fn test_label_roundtrip () {
 
 #[test]
 fn test_had_id_set_from_nodes_empty () {
-  let nodes : Vec<SkgNode> = vec![];
+  let nodes : Vec<NodeComplete> = vec![];
   let result : HashSet<ID> = had_id_set_from_nodes (&nodes);
   assert! (result . is_empty ()); }
 
 #[test]
 fn test_had_id_set_from_nodes_mixed () {
-  let mut node_with : SkgNode = empty_skgnode ();
+  let mut node_with : NodeComplete = empty_node_complete ();
   node_with . pid = ID::new ("has-id");
   node_with . misc = vec![FileProperty::Had_ID_Before_Import];
-  let mut node_without : SkgNode = empty_skgnode ();
+  let mut node_without : NodeComplete = empty_node_complete ();
   node_without . pid = ID::new ("no-id");
-  let nodes : Vec<SkgNode> = vec![node_with, node_without];
+  let nodes : Vec<NodeComplete> = vec![node_with, node_without];
   let result : HashSet<ID> = had_id_set_from_nodes (&nodes);
   assert_eq! (result . len (), 1);
   assert! (result . contains (&ID::new ("has-id"))); }
 
 #[test]
 fn test_link_targets_from_nodes () {
-  let mut node1 : SkgNode = empty_skgnode ();
+  let mut node1 : NodeComplete = empty_node_complete ();
   node1 . pid = ID::new ("src");
   node1 . title =
     "see [[id:tgt1][target one]]" . to_string ();
   node1 . body = Some (
     "also [[id:tgt2][target two]]" . to_string () );
-  let mut node2 : SkgNode = empty_skgnode ();
+  let mut node2 : NodeComplete = empty_node_complete ();
   node2 . pid = ID::new ("other");
   node2 . title = "no links here" . to_string ();
-  let nodes : Vec<SkgNode> = vec![node1, node2];
+  let nodes : Vec<NodeComplete> = vec![node1, node2];
   let targets : HashSet<ID> =
     link_targets_from_nodes (&nodes);
   assert_eq! (targets . len (), 2);
@@ -233,7 +233,7 @@ fn test_full_context_pipeline () {
           abbreviation : None,
           path         : PathBuf::from ("tests/contexts/fixtures"),
           user_owns_it : true } )]) );
-  let nodes : Vec<SkgNode> =
+  let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config)
     . expect ("failed to read fixture .skg files");
   // Extract data from SkgNodes.

@@ -1,7 +1,7 @@
 use crate::types::viewnode::EditRequest;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, TrueNode, IndefOrDef};
 use crate::types::misc::{ID, MSV};
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::viewnode_skgnode::{
@@ -91,7 +91,7 @@ fn maybe_instruction_from_treenode (
       let node_ref : NodeRef<ViewNode> =
         tree . get (node_id) . ok_or(
           "maybe_instruction_from_treenode: node not found")?;
-      Ok(Some(DefineNode::Save(SaveNode(SkgNode {
+      Ok(Some(DefineNode::Save(SaveNode(NodeComplete {
         title:   t . title . clone(),
         aliases: collect_grandchild_aliases_for_viewnode(
           tree, node_id)?,

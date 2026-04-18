@@ -1,7 +1,7 @@
 //! NodeFS: the on-disk shape of a node.
 //!
 //! What the YAML on disk literally holds. Bit-exact with today's
-//! SkgNode on-disk serialization — does NOT include 'source'
+//! NodeComplete on-disk serialization — does NOT include 'source'
 //! (which is inferred from file location, not stored in YAML).
 //!
 //! Conversions:
@@ -18,10 +18,11 @@ use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct NodeFS {
-  // Field order and serde attributes mirror 'SkgNode' exactly, so
+  // Field order and serde attributes mirror 'NodeComplete' exactly, so
   // YAML output is bit-exact. When anything here changes, update
-  // the matching field in 'SkgNode' (see server/types/skgnode.rs)
-  // and vice versa, until the SkgNode alias is retired.
+  // the matching field in 'NodeComplete'
+  // (see [[./complete.rs][server/types/nodes/complete.rs]]) and
+  // vice versa.
 
   pub title: String,
 

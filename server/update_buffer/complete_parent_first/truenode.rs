@@ -6,7 +6,7 @@ use crate::types::list::{Diff_Item, compute_interleaved_diff, itemlist_and_remov
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::types::memory::find_source_many_ways;
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::git_ops::read_repo::skgnode_from_git_head;
 use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
 use crate::util::setlike_vector_subtraction;
@@ -112,7 +112,7 @@ pub fn complete_truenode_preorder (
     if let IndefOrDef::Definitive { edit_request, .. }
       = &mut t . indef_or_def
       { *edit_request = None; } } ) ?;
-  let skgnode : &SkgNode =
+  let skgnode : &NodeComplete =
     skgnode_from_map_or_disk( &pid, &source, map, config ) ?;
   if ! is_saved_view { // The saved (definitive) view of a node *defines* the title and body, but other views need those fields updated.
     let disk_title : String = skgnode . title . clone ();
@@ -122,7 +122,7 @@ pub fn complete_truenode_preorder (
       if let IndefOrDef::Definitive { body, .. } = &mut t . indef_or_def {
         *body = disk_body; } }
     ) ?; }
-  let skgnode : &SkgNode =
+  let skgnode : &NodeComplete =
     skgnode_from_map_or_disk( &pid, &source, map, config ) ?;
   let content_ids : Vec<ID> =
     skgnode . contains . clone();
@@ -210,7 +210,7 @@ fn content_goal_list (
       pid_and_source_from_ancestor( tree, node, 2,
                                     "content_goal_list" ) ?;
     let worktree_hidden : Vec<ID> =
-      { let grandparent_skgnode : &SkgNode =
+      { let grandparent_skgnode : &NodeComplete =
           skgnode_from_map_or_disk(
             &grandparent_pid, &grandparent_source, map, config ) ?;
         grandparent_skgnode . hides_from_its_subscriptions
@@ -338,7 +338,7 @@ fn order_children_as_scaffolds_then_ignored_then_content (
   { move_child_to_end( tree, node, cid ) ?; }
   Ok(( )) }
 
-/// If the SkgNode subscribes to anything and no SubscribeeCol
+/// If the NodeComplete subscribes to anything and no SubscribeeCol
 /// child exists yet, prepend an empty one.
 /// (It will be populated when processing visits the SubscribeeCol.)
 fn maybe_prepend_subscribee_col (
@@ -470,7 +470,7 @@ fn build_child_creation_data (
         find_source_many_ways( id, &child_sources,
                      deleted_since_head_pid_src_map, map, config )
         . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
-      let skg : &SkgNode =
+      let skg : &NodeComplete =
         skgnode_from_map_or_disk( id, &child_source, map, config ) ?;
       result . insert( id . clone(),
                      ChildData { title: skg . title . clone(),

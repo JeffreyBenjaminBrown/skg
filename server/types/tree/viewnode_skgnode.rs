@@ -8,7 +8,7 @@ use crate::types::viewnode::{
     viewnode_from_scaffold };
 use crate::types::unchecked_viewnode::{
     UncheckedViewNode, UncheckedViewNodeKind };
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::memory::SkgNodeMap;
 use crate::types::list::dedup_vector;
 use super::generic::{write_at_node_in_tree, with_node_mut};
@@ -95,7 +95,7 @@ pub fn unique_scaffold_child (
 }
 
 /// Extract PIDs for the subscriber and its subscribees.
-/// Returns an error if the node has no SkgNode.
+/// Returns an error if the node has no NodeComplete.
 pub fn pids_for_subscriber_and_its_subscribees (
   tree    : &Tree<ViewNode>,
   map     : &SkgNodeMap,
@@ -103,8 +103,8 @@ pub fn pids_for_subscriber_and_its_subscribees (
 ) -> Result < ( ID, Vec < ID > ),
               Box<dyn Error> > {
   let pid : ID = get_id_from_treenode ( tree, node_id ) ?;
-  let skgnode : &SkgNode =
-    map . get (&pid) . ok_or ("pids_for_subscriber_and_its_subscribees: SkgNode should exist in map") ?;
+  let skgnode : &NodeComplete =
+    map . get (&pid) . ok_or ("pids_for_subscriber_and_its_subscribees: NodeComplete should exist in map") ?;
   Ok (( skgnode . pid . clone (),
         skgnode . subscribes_to . or_default() . to_vec() )) }
 
@@ -131,9 +131,9 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
     . ok_or ("SubscribeeCol has no parent (subscriber)") ?;
   let subscriber_id : ID =
     get_id_from_treenode ( tree, grandparent_ref . id () ) ?;
-  let skgnode : &SkgNode =
+  let skgnode : &NodeComplete =
     map . get (&subscriber_id)
-    . ok_or ("Subscriber SkgNode not in map") ?;
+    . ok_or ("Subscriber NodeComplete not in map") ?;
   Ok (( subscribee_pid,
         skgnode . pid . clone() )) }
 
@@ -154,7 +154,7 @@ pub fn insert_scaffold_as_child (
   Ok (col_id) }
 
 /// Fetch a node from disk and append it as an indefinitive child.
-/// Also adds the SkgNode to the map.
+/// Also adds the NodeComplete to the map.
 pub async fn append_indefinitive_from_disk_as_child (
   tree      : &mut Tree<ViewNode>,
   map       : &mut SkgNodeMap,
@@ -164,7 +164,7 @@ pub async fn append_indefinitive_from_disk_as_child (
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  let ( _skgnode, content_viewnode ) : ( SkgNode, ViewNode ) =
+  let ( _skgnode, content_viewnode ) : ( NodeComplete, ViewNode ) =
     skgnode_and_viewnode_from_id (
       config, driver, node_id, map ) . await ?;
   let viewnode : ViewNode =

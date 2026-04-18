@@ -9,7 +9,7 @@ use skg::dbs::init::in_fs_wipe_index_then_create_it;
 use skg::dbs::tantivy::{search_index, title_and_source_by_id, update_index_with_nodes};
 use skg::types::misc::{ID, MSV, SourceName, TantivyIndex};
 use skg::types::nodes::tantivy::NodeTantivy;
-use skg::types::skgnode::{SkgNode, empty_skgnode};
+use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
 #[test]
 fn test_many_tantivy_things (
@@ -20,7 +20,7 @@ fn test_many_tantivy_things (
     Path::new (index_dir);
 
   let config = load_config ("tests/tantivy/fixtures/skgconfig.toml")?;
-  let nodes: Vec<SkgNode> =
+  let nodes: Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config)?;
 
   let (tantivy_index, indexed_count): (TantivyIndex, usize) =
@@ -82,9 +82,9 @@ fn test_many_tantivy_things (
             initial_top_id);
   println!("✓ Initial search correctly found node 1 as top result");
 
-  // Create a new SkgNode with ID 6 and title "This is one big tuna."
-  let mut new_node : SkgNode =
-    empty_skgnode ();
+  // Create a new NodeComplete with ID 6 and title "This is one big tuna."
+  let mut new_node : NodeComplete =
+    empty_node_complete ();
   { new_node . title = "This is one big tuna." . to_string();
     new_node . pid = ID::new ("6"); }
 
@@ -172,7 +172,7 @@ pub fn print_search_results(
 
 #[test]
 fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
-  let empty_node : SkgNode = empty_skgnode ();
+  let empty_node : NodeComplete = empty_node_complete ();
   let mut apple  = empty_node . clone();
   { apple . pid      = ID::new ("apple");
     apple . title    =               "eat apple" . to_string();
@@ -264,13 +264,13 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn test_title_by_id_returns_title_not_alias (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty_node : SkgNode = empty_skgnode ();
+  let empty_node : NodeComplete = empty_node_complete ();
   let mut node = empty_node . clone ();
   { node . pid     = ID::new ("node-with-aliases");
     node . title   =               "The Real Title" . to_string ();
     node . aliases = MSV::Specified (vec![   "Alias One" . to_string (),
                                    "Alias Two" . to_string () ]); }
-  let nodes : Vec<SkgNode> = vec![node];
+  let nodes : Vec<NodeComplete> = vec![node];
   let index_dir : &str =
     "/tmp/tantivy-test-title-by-id";
   let (tantivy_index, indexed_count) : (TantivyIndex, usize) =

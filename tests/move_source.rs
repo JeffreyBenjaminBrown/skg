@@ -17,7 +17,7 @@ use skg::types::errors::{SaveError, BufferValidationError};
 use skg::types::memory::SkgNodeMap;
 use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use skg::types::nodes::typedb::NodeTypedb;
-use skg::types::skgnode::SkgNode;
+use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::DefineNode;
 use std::error::Error;
 use std::path::{Path, PathBuf};
@@ -51,7 +51,7 @@ async fn setup (
       "127.0.0.1:1729",
       Credentials::new ("admin", "password"),
       DriverOptions::new (false, None)? ) . await?;
-  let nodes : Vec<SkgNode> =
+  let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config)?;
   let typedb_nodes : Vec<NodeTypedb> =
     nodes . iter ()
@@ -169,12 +169,12 @@ fn test_move_node_to_another_owned_source (
       assert!( new_path . exists(),
                "b.skg should exist in private/"); }
 
-    { // FS: read SkgNode back from disk via TypeDB lookup
-      let node_b : SkgNode =
+    { // FS: read NodeComplete back from disk via TypeDB lookup
+      let node_b : NodeComplete =
         skgnode_from_id (&config, &driver, &ID::new ("b"))
         . await?;
       assert_eq!(node_b . source, SourceName::from ("private"),
-                 "SkgNode read from disk should have source=private"); }
+                 "NodeComplete read from disk should have source=private"); }
 
     { // TypeDB: source should be updated
       let (pid, source) : (ID, SourceName) =
@@ -192,22 +192,22 @@ fn test_move_node_to_another_owned_source (
                  "Tantivy should show source=private for b"); }
 
     { // Other nodes unchanged
-      let node_a : SkgNode =
+      let node_a : NodeComplete =
         skgnode_from_id (&config, &driver, &ID::new ("a"))
         . await?;
       assert_eq!(node_a . source, SourceName::from ("public"));
-      let node_c : SkgNode =
+      let node_c : NodeComplete =
         skgnode_from_id (&config, &driver, &ID::new ("c"))
         . await?;
       assert_eq!(node_c . source, SourceName::from ("public")); }
 
     { // Containment relationships should be unchanged
-      let node_a : SkgNode =
+      let node_a : NodeComplete =
         skgnode_from_id (&config, &driver, &ID::new ("a"))
         . await?;
       assert!(node_a . contains . contains (&ID::new ("b")),
               "a should still contain b after move");
-      let node_b : SkgNode =
+      let node_b : NodeComplete =
         skgnode_from_id (&config, &driver, &ID::new ("b"))
         . await?;
       assert!(node_b . contains . contains (&ID::new ("c")),
@@ -485,7 +485,7 @@ fn test_source_only_change_with_populated_pool (
 
     // Populate pool with the nodes as they exist on disk (source=public).
     let pool : SkgNodeMap = {
-      let nodes : Vec<SkgNode> =
+      let nodes : Vec<NodeComplete> =
         read_all_skg_files_from_sources (&config)?;
       let mut m : SkgNodeMap = SkgNodeMap::new();
       for node in nodes {

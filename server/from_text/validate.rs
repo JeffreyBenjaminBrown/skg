@@ -2,7 +2,7 @@ use crate::dbs::filesystem::one_node::optskgnode_from_id;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode, Merge, SourceMove};
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 
 use std::collections::HashSet;
 use typedb_driver::TypeDBDriver;
@@ -110,8 +110,8 @@ pub(super) fn validate_merges_involve_only_owned_nodes(
 /// (because the user did not mention it in the buffer),
 /// and therefore does not represent an edit.
 pub(crate) fn buffernode_differs_from_disknode(
-  buffer_node: &SkgNode,
-  disk_node: &SkgNode,
+  buffer_node: &NodeComplete,
+  disk_node: &NodeComplete,
 ) -> bool {
   fn fields_match<T: Clone + PartialEq>(
     buffer: &MSV<T>,

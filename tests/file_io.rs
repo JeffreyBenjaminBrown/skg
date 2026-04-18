@@ -9,7 +9,7 @@ use skg::dbs::filesystem::one_node::{
   fetch_aliases_from_file,
   skgnode_from_pid_and_source, write_skgnode_to_source};
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
-use skg::types::skgnode::{SkgNode, empty_skgnode};
+use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::misc::{ID, MSV, SkgConfig, SourceName};
 use skg::test_utils::{run_with_test_db, skgnode_example};
 
@@ -31,13 +31,13 @@ fn test_node_io() {
   ) . unwrap();
 
   // Write the example node to a file
-  let mut example : SkgNode = skgnode_example();
+  let mut example : NodeComplete = skgnode_example();
   example . source = SourceName::from ("output");
   write_skgnode_to_source ( &example, &config )
     . unwrap ();
 
   // Read that file, reverse its lists, write to another file
-  let read_node : SkgNode = skgnode_from_pid_and_source (
+  let read_node : NodeComplete = skgnode_from_pid_and_source (
     &config, example . pid . clone(), &SourceName::from ("output") ) . unwrap ();
   let mut reversed = reverse_some_of_node (&read_node);
   reversed . source = SourceName::from ("output");
@@ -79,7 +79,7 @@ fn test_node_io() {
 }
 
 fn verify_body_not_needed() {
-  // If a SkgNode's `body` is the empty string,
+  // If a NodeComplete's `body` is the empty string,
   // then that field need not be written to disk.
 
   // Load config, overriding "output" to point to temp dir
@@ -114,8 +114,8 @@ fn verify_body_not_needed() {
   );
 }
 
-pub fn reverse_some_of_node(node: &SkgNode) -> SkgNode {
-  // Create a new SkgNode reversing two of its lists,
+pub fn reverse_some_of_node(node: &NodeComplete) -> NodeComplete {
+  // Create a new NodeComplete reversing two of its lists,
   // `contains` and `subscribes_to`.
   // This is only for testing purposes,
   // to show reading from and writing to disk work;
@@ -129,7 +129,7 @@ pub fn reverse_some_of_node(node: &SkgNode) -> SkgNode {
     MSV::Specified (mut v) => {
       v . reverse();
       MSV::Specified (v) } };
-  SkgNode {
+  NodeComplete {
     contains          : reversed_contains,
     subscribes_to     : reversed_subscribes_to,
 
@@ -164,7 +164,7 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
       user_owns_it: true, });
     SkgConfig::dummyFromSources (sources) };
 
-  let mut test_node : SkgNode = empty_skgnode ();
+  let mut test_node : NodeComplete = empty_node_complete ();
   { test_node . title = "Title with two textlinks: [[(id textlink1][First) TextLink]] and [[(id textlink2][Second) TextLink]]"
       . to_string();
     test_node . aliases = MSV::Specified(vec![ "alias 1" . to_string(),
@@ -175,7 +175,7 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
 
   { // Write to a file and read it back.
     write_skgnode_to_source(&test_node, &config)?;
-    let read_node : SkgNode = skgnode_from_pid_and_source(
+    let read_node : NodeComplete = skgnode_from_pid_and_source(
       &config, ID::new ("test123"), &SourceName::from ("temp"))?;
     assert_eq!( test_node, read_node,
                 "Nodes should have matched." ); }

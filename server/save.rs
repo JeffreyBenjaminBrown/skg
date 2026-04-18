@@ -10,7 +10,7 @@ use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::save::{DefineNode, SaveNode, DeleteNode, SourceMove};
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::util::path_from_pid_and_source;
 
 use itertools::{Itertools, Either};
@@ -109,7 +109,7 @@ pub async fn update_graph_minus_merges (
 ///      create_only_nodes_with_no_ids_present
 /// 4) Delete all outbound `contains` from those nodes, via
 ///      delete_out_links
-///    PITFALL: Only the primary ID from each SkgNode is used.
+///    PITFALL: Only the primary ID from each NodeComplete is used.
 /// 5) Recreate all relationships for those nodes, via
 ///      create_all_relationships
 pub async fn update_typedb_from_saveinstructions (
@@ -147,7 +147,7 @@ pub async fn update_typedb_from_saveinstructions (
         . await } ?; }}
 
   { // create | update
-    let to_write_skgnodes : Vec<SkgNode> =
+    let to_write_skgnodes : Vec<NodeComplete> =
       to_save . iter ()
       . map ( |SaveNode (node) | node . clone() )
       . collect ();
@@ -208,7 +208,7 @@ pub fn update_fs_from_saveinstructions (
         delete_targets, config . clone () ) ?
     } else { 0 } };
   let written : usize = {
-    let nodes_to_write : Vec<SkgNode> =
+    let nodes_to_write : Vec<NodeComplete> =
       to_save . into_iter ()
       . map ( |SaveNode (node) | node )
       . collect ();

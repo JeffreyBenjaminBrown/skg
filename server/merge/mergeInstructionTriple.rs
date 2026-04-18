@@ -3,7 +3,7 @@ use crate::types::save::{Merge, SaveNode, DeleteNode};
 use crate::types::misc::{MSV, SkgConfig, ID};
 use crate::types::viewnode::EditRequest;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode};
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::list::dedup_vector;
 use crate::util::setlike_vector_subtraction;
 
@@ -50,15 +50,15 @@ async fn optmerge_from_viewnode (
     Some(EditRequest::Merge (id)) => id,
     _ => return Ok (None) };
   let acquirer_id : &ID = &t . id;
-  let acquirer_from_disk : SkgNode =
+  let acquirer_from_disk : NodeComplete =
     skgnode_from_id(
       config, driver, acquirer_id ) . await?;
-  let acquiree_from_disk : SkgNode =
+  let acquiree_from_disk : NodeComplete =
     skgnode_from_id(
       config, driver, &acquiree_id ) . await?;
-  let acquiree_text_preserver : SkgNode =
+  let acquiree_text_preserver : NodeComplete =
     create_acquiree_text_preserver (&acquiree_from_disk);
-  let updated_acquirer : SkgNode =
+  let updated_acquirer : NodeComplete =
     three_merged_skgnodes( &acquirer_from_disk,
                            &acquiree_from_disk,
                            &acquiree_text_preserver)?;
@@ -73,18 +73,18 @@ async fn optmerge_from_viewnode (
         source : acquiree_from_disk . source . clone() }} )) }
 
 /// Computes the updated acquirer node with all fields properly merged.
-/// Returns a new SkgNode with:
+/// Returns a new NodeComplete with:
 /// - Combined IDs from both nodes
 /// - contains: [acquiree_text_preserver] + acquirer's + acquiree's novel contents
 ///   - 'Novel' = not among the acquirer's contents
 /// - Combined relationship fields (subscribes_to, overrides_view_of)
 /// - Filtered hides_from_its_subscriptions (can't hide your own content)
 fn three_merged_skgnodes(
-  acquirer_from_disk: &SkgNode,
-  acquiree_from_disk: &SkgNode,
-  acquiree_text_preserver: &SkgNode,
-) -> Result<SkgNode, String> {
-  let mut updated_acquirer: SkgNode =
+  acquirer_from_disk: &NodeComplete,
+  acquiree_from_disk: &NodeComplete,
+  acquiree_text_preserver: &NodeComplete,
+) -> Result<NodeComplete, String> {
+  let mut updated_acquirer: NodeComplete =
     acquirer_from_disk . clone();
   { // Append acquiree's IDs (esp. its PID) to acquirer's extra_ids.
     let mut combined_extra_ids : Vec<ID> =
@@ -143,8 +143,8 @@ fn three_merged_skgnodes(
   Ok (updated_acquirer) }
 
 /// Create an acquiree_text_preserver from the acquiree's data
-fn create_acquiree_text_preserver(acquiree: &SkgNode) -> SkgNode {
-  SkgNode {
+fn create_acquiree_text_preserver(acquiree: &NodeComplete) -> NodeComplete {
+  NodeComplete {
     title: format!("MERGED: {}", acquiree . title),
     aliases: MSV::Unspecified,
     source: acquiree . source . clone(),

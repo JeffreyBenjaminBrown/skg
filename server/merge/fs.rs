@@ -1,7 +1,7 @@
 use crate::dbs::filesystem::one_node::write_skgnode_to_source;
 use crate::types::save::Merge;
 use crate::types::misc::{SkgConfig, ID, SourceName};
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::util::path_from_pid_and_source;
 use std::error::Error;
 
@@ -19,7 +19,7 @@ pub(super) fn merge_nodes_in_fs (
     let ( acquiree_text_preserver,
           updated_acquirer,
           (acquiree_id, acquiree_source) )
-      : (&SkgNode, &SkgNode, (&ID, &SourceName))
+      : (&NodeComplete, &NodeComplete, (&ID, &SourceName))
       = merge . targets_from_merge();
     write_skgnode_to_source(
       acquiree_text_preserver,

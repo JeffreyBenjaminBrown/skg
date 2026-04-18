@@ -7,7 +7,7 @@
 use crate::types::textlinks::replace_each_link_with_its_label;
 use crate::types::misc::{ID, SourceName, TantivyIndex};
 use crate::types::nodes::tantivy::NodeTantivy;
-use crate::types::skgnode::FileProperty;
+use crate::types::nodes::complete::FileProperty;
 
 use tantivy::{Index, IndexWriter, doc, Term, IndexReader, Searcher, Document};
 use tantivy::query::{QueryParser, Query};

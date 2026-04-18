@@ -15,7 +15,7 @@ use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID, TantivyIndex};
 use skg::types::nodes::typedb::NodeTypedb;
-use skg::types::skgnode::SkgNode;
+use skg::types::nodes::complete::NodeComplete;
 use skg::types::memory::SkgNodeMap;
 use skg::serve::ConnectionState;
 use skg::types::memory::SkgnodesInMemory;
@@ -48,7 +48,7 @@ async fn setup_test(
     Credentials::new("admin", "password"),
     DriverOptions::new(false, None)?,
   ) . await?;
-  let nodes: Vec<SkgNode> =
+  let nodes: Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config)?;
   let typedb_nodes : Vec<NodeTypedb> =
     nodes . iter ()

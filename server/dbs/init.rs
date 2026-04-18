@@ -15,7 +15,7 @@ use crate::dbs::typedb::util::connect_to_typedb;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::nodes::typedb::NodeTypedb;
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 
 use futures::executor::block_on;
 use std::collections::HashSet;
@@ -75,7 +75,7 @@ pub fn initialize_dbs (
           touch_init_marker (&marker_path);
           // Incremental init only reads modified files.
           // We must read all files for the full set.
-          let nodes : Vec<SkgNode> =
+          let nodes : Vec<NodeComplete> =
             read_all_skg_files_from_sources (config)
             . unwrap_or_default ();
           return init_data_from_nodes (
@@ -147,7 +147,7 @@ fn incremental_init (
     open_existing_tantivy_index (
       Path::new ( &config . tantivy_folder )) ?;
   tracing::info! ("Reading modified .skg files...");
-  let nodes : Vec<SkgNode> =
+  let nodes : Vec<NodeComplete> =
     read_modified_skg_files_from_sources (
       config, marker_mtime ) ?;
   if nodes . is_empty() {
@@ -193,7 +193,7 @@ fn incremental_init (
   Ok (tantivy_index) }
 
 fn init_data_from_nodes (
-  nodes         : &[SkgNode],
+  nodes         : &[NodeComplete],
   driver        : Arc<TypeDBDriver>,
   tantivy_index : TantivyIndex,
 ) -> InitData {
@@ -225,7 +225,7 @@ fn full_init (
   driver : TypeDBDriver,
 ) -> InitData {
   tracing::info! ("Performing full init...");
-  let nodes : Vec<SkgNode> =
+  let nodes : Vec<NodeComplete> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "read_all_skg_files" ). entered();
       tracing::info! ("Reading .skg files from all sources...");
@@ -263,7 +263,7 @@ fn touch_init_marker (
 
 pub fn initialize_typedb_from_nodes (
   config : & SkgConfig,
-  nodes  : &[SkgNode],
+  nodes  : &[NodeComplete],
 ) -> Arc<TypeDBDriver> {
   // Connects to the TypeDB server,
   // then populates it with the provided SkgNodes.
@@ -284,7 +284,7 @@ pub async fn rebuild_typedb_from_disk (
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
-  let nodes : Vec<SkgNode> =
+  let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (config) ?;
   populate_typedb_from_nodes (
     config, driver, &nodes ) . await }
@@ -295,7 +295,7 @@ pub async fn rebuild_typedb_from_disk (
 async fn populate_typedb_from_nodes (
   config : &SkgConfig,
   driver : &TypeDBDriver,
-  nodes  : &[SkgNode],
+  nodes  : &[NodeComplete],
 ) -> Result<(), Box<dyn Error>> {
   overwrite_new_empty_db (
     & config . db_name,
@@ -325,7 +325,7 @@ async fn populate_typedb_from_nodes (
 
 fn initialize_tantivy_from_nodes (
   config : & SkgConfig,
-  nodes  : & [SkgNode],
+  nodes  : & [NodeComplete],
 ) -> TantivyIndex {
   tracing::info! ("Initializing Tantivy index...");
   let (tantivy_index, indexed_count)
@@ -345,7 +345,7 @@ fn initialize_tantivy_from_nodes (
 pub fn rebuild_tantivy_from_disk (
   config : &SkgConfig,
 ) -> Result<TantivyIndex, Box<dyn Error>> {
-  let nodes : Vec<SkgNode> =
+  let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (config) ?;
   let (tantivy_index, _indexed_count)
     : ( TantivyIndex, usize ) =
@@ -399,7 +399,7 @@ pub fn create_empty_tantivy_index (
 /// PITFALL: The index is not the data it indexes.
 /// This only deletes the former.
 pub fn in_fs_wipe_index_then_create_it (
-  nodes      : &[SkgNode],
+  nodes      : &[NodeComplete],
   index_path : &Path,
 ) -> Result<(TantivyIndex,
              usize), // number of documents indexed

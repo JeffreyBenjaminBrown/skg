@@ -13,7 +13,7 @@ use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
 use crate::types::misc::{MSV, SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName};
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::save::{DefineNode, SaveNode};
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::unchecked_viewnode::{ UncheckedViewNode, UncheckedViewNodeKind };
 
 use ego_tree::{Tree, NodeRef};
@@ -119,7 +119,7 @@ where
         Credentials::new("admin", "password"),
         DriverOptions::new(false, None)?,
       ). await?;
-    let nodes: Vec<SkgNode> =
+    let nodes: Vec<NodeComplete> =
       read_all_skg_files_from_sources (&config)?;
     let typedb_nodes : Vec<NodeTypedb> =
       nodes . iter ()
@@ -188,7 +188,7 @@ pub async fn populate_test_db_from_fixtures (
   db_name: &str,
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
-  let nodes: Vec<SkgNode> = {
+  let nodes: Vec<NodeComplete> = {
     let mut sources: HashMap<SourceName, SkgfileSource> = HashMap::new();
     sources . insert(
       SourceName::from ("main"),
@@ -494,9 +494,9 @@ pub fn strip_org_comments(s: &str) -> String {
     . collect::<Vec<String>>()
     . join ("\n") }
 
-/// Example SkgNode for use in tests.
-pub fn skgnode_example () -> SkgNode {
-  SkgNode {
+/// Example NodeComplete for use in tests.
+pub fn skgnode_example () -> NodeComplete {
+  NodeComplete {
     title: "This text gets indexed." . to_string(),
     aliases: MSV::Unspecified,
     source: SourceName::from ("main"),
@@ -514,10 +514,10 @@ It better be okay with newlines."# . to_string() ),
     overrides_view_of: MSV::Unspecified,
     misc: Vec::new (), }}
 
-/// Extract SkgNode from Save variant; panics on Delete.
+/// Extract NodeComplete from Save variant; panics on Delete.
 pub fn extract_skgnode_if_save_else_error(
   instr: &DefineNode
-) -> &SkgNode {
+) -> &NodeComplete {
   match instr {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") }}

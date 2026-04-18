@@ -1,7 +1,7 @@
 use crate::dbs::filesystem::one_node::{read_skgnode, validate_pid_matches_filename, write_skgnode};
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, SourceName};
 use crate::types::nodes::fs::NodeFS;
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 use crate::util::path_from_pid_and_source;
 
 use std::collections::{HashMap, HashSet};
@@ -15,8 +15,8 @@ use std::fs::{self, DirEntry, ReadDir};
 /// If errors are found, writes detailed error reports to org files.
 pub fn read_all_skg_files_from_sources (
   config: &SkgConfig
-) -> io::Result<Vec<SkgNode>> {
-  let mut all_nodes: Vec<SkgNode> = Vec::new();
+) -> io::Result<Vec<NodeComplete>> {
+  let mut all_nodes: Vec<NodeComplete> = Vec::new();
   let mut seen_ids: HashMap < String,       // ID
                               Vec<String> > // source names
     // Maps each ID to all sources containing it
@@ -82,13 +82,13 @@ pub fn read_all_skg_files_from_sources (
 fn read_skg_files_from_folder (
   source_name : &SourceName,
   config      : &SkgConfig,
-) -> io::Result < Vec<SkgNode> > {
+) -> io::Result < Vec<NodeComplete> > {
   let source : &SkgfileSource =
     config . sources . get (source_name)
     . ok_or_else(|| io::Error::new(
       io::ErrorKind::NotFound,
       format!("Source '{}' not found in config", source_name)))?;
-  let mut nodes : Vec<SkgNode> = Vec::new ();
+  let mut nodes : Vec<NodeComplete> = Vec::new ();
   let entries : ReadDir = // an iterator
     fs::read_dir (&source . path) ?;
   for entry in entries {
@@ -101,7 +101,7 @@ fn read_skg_files_from_folder (
       let node_fs : NodeFS =
         read_skgnode (&path) ?;
       validate_pid_matches_filename (&node_fs, &path) ?;
-      let skgnode : SkgNode =
+      let skgnode : NodeComplete =
         node_fs . into_complete ( source_name . clone ());
       nodes . push (skgnode); }}
   Ok (nodes) }
@@ -111,8 +111,8 @@ fn read_skg_files_from_folder (
 pub fn read_modified_skg_files_from_sources (
   config : &SkgConfig,
   since  : std::time::SystemTime,
-) -> io::Result<Vec<SkgNode>> {
-  let mut all_nodes : Vec<SkgNode> = Vec::new();
+) -> io::Result<Vec<NodeComplete>> {
+  let mut all_nodes : Vec<NodeComplete> = Vec::new();
   let mut seen_ids  : HashSet<String> = HashSet::new();
   for (source_name, source) in config . sources . iter() {
     let entries : ReadDir =
@@ -138,7 +138,7 @@ pub fn read_modified_skg_files_from_sources (
           io::ErrorKind::InvalidData,
           format! ("Duplicate primary ID '{}' within batch",
                    pid_str )) ); }
-      let skgnode : SkgNode =
+      let skgnode : NodeComplete =
         node_fs . into_complete ( source_name . clone ());
       all_nodes . push (skgnode); }}
   Ok (all_nodes) }
@@ -218,10 +218,10 @@ fn report_load_errors(
   Ok(())
 }
 
-/// Writes all given `SkgNode`s to disk, at `config.skg_folder`,
+/// Writes all given `NodeComplete`s to disk, at `config.skg_folder`,
 /// using the primary ID as the filename, followed by `.skg`.
 pub fn write_all_nodes_to_fs (
-  nodes  : Vec<SkgNode>,
+  nodes  : Vec<NodeComplete>,
   config : SkgConfig,
 ) -> io  ::Result<usize> { // number of files written
 

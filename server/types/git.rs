@@ -2,7 +2,7 @@
 
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SourceName};
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -50,7 +50,7 @@ pub struct SourceDiff {
   pub unstaged : HashMap<PathBuf, SkgnodeDiff>,
   /// Nodes that existed in HEAD but not in worktree (deleted files).
   /// Loaded from git HEAD or from the index. Used for phantom titles.
-  pub deleted_nodes: HashMap<ID, SkgNode>,
+  pub deleted_nodes: HashMap<ID, NodeComplete>,
 }
 
 /// All the diff info for a single .skg file.
@@ -59,7 +59,7 @@ pub struct SkgnodeDiff {
   // TODO ? Since we keep the skgnode around for deleted nodes already, why not just do that for everything, and dispense with the node_changes field?
   pub status: GitDiffStatus,
   pub node_changes: Option<NodeChanges>,
-  pub head_node: Option<SkgNode>, // only for deleted files
+  pub head_node: Option<NodeComplete>, // only for deleted files
 }
 
 /// A single entry representing a changed file.
@@ -77,7 +77,7 @@ pub enum GitDiffStatus {
   Deleted,  // File was deleted (in HEAD but not on disk)
 }
 
-/// Represents changes to a single SkgNode.
+/// Represents changes to a single NodeComplete.
 #[derive(Debug, Clone, Default)]
 pub struct NodeChanges {
   pub text_changed  : bool,

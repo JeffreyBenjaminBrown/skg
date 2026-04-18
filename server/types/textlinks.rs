@@ -5,7 +5,7 @@ use std::sync::LazyLock;
 
 use crate::types::misc::ID;
 use crate::types::errors::TextLinkParseError;
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 
 // LazyLock<Regex> ensures each regex is compiled exactly once, on first use, rather than per call.
 static TEXTLINK_PATTERN : LazyLock<Regex> =
@@ -73,7 +73,7 @@ impl FromStr for TextLink {
 //
 
 pub fn textlinks_from_node (
-  node : &SkgNode )
+  node : &NodeComplete )
   -> Vec<TextLink> {
   // All textlinks in its title
   // and (if present) its body.

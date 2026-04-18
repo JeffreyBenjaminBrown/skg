@@ -11,7 +11,7 @@ use skg::types::unchecked_viewnode::UncheckedViewNode;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::SkgConfig;
 use skg::types::nodes::typedb::NodeTypedb;
-use skg::types::skgnode::SkgNode;
+use skg::types::nodes::complete::NodeComplete;
 use skg::types::memory::SkgNodeMap;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
@@ -43,7 +43,7 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
       ) . await?;
 
     // Load fixtures into database
-    let nodes: Vec<SkgNode> =
+    let nodes: Vec<NodeComplete> =
       read_all_skg_files_from_sources (&config)?;
     let typedb_nodes : Vec<NodeTypedb> =
       nodes . iter ()
@@ -142,7 +142,7 @@ fn test_foreign_node_modification_errors(
       ) . await?;
 
     // Load fixtures into database
-    let nodes: Vec<SkgNode> =
+    let nodes: Vec<NodeComplete> =
       read_all_skg_files_from_sources (&config)?;
     let typedb_nodes : Vec<NodeTypedb> =
       nodes . iter ()
@@ -311,7 +311,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     ) . await?;
 
     // Load fixtures into database
-    let nodes: Vec<SkgNode> =
+    let nodes: Vec<NodeComplete> =
       read_all_skg_files_from_sources (&config)?;
     let typedb_nodes : Vec<NodeTypedb> =
       nodes . iter ()

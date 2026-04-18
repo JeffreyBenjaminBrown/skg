@@ -1,7 +1,7 @@
 use crate::types::git::PathDiffStatus;
 use crate::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
 use crate::types::nodes::fs::NodeFS;
-use crate::types::skgnode::SkgNode;
+use crate::types::nodes::complete::NodeComplete;
 
 use git2::{Repository, Diff, DiffOptions, Error, ErrorCode, ObjectType};
 use std::error::Error as StdError;
@@ -10,12 +10,12 @@ use std::str::from_utf8;
 
 use super::misc::{diff_delta_to_entry, path_relative_to_repo};
 
-/// Load a SkgNode from git HEAD given its ID and source.
+/// Load a NodeComplete from git HEAD given its ID and source.
 pub fn skgnode_from_git_head (
   pid    : &ID,
   src    : &SourceName,
   config : &SkgConfig,
-) -> Result<SkgNode, Box<dyn StdError>> {
+) -> Result<NodeComplete, Box<dyn StdError>> {
   let source_config : &SkgfileSource =
     config . sources . get (src)
     . ok_or_else ( || format! ( "Source '{}' not found in config",
@@ -37,11 +37,11 @@ pub fn skgnode_from_git_head (
                                         rel_path )) ?;
   let node_fs : NodeFS =
     serde_yaml::from_str (&content_str) . map_err (
-      |e| format! ( "Failed to parse SkgNode for {}: {}",
+      |e| format! ( "Failed to parse NodeComplete for {}: {}",
                     pid . 0, e )) ?;
   Ok ( node_fs . into_complete ( src . clone ())) }
 
-/// Load a SkgNode for a node whose worktree file is gone, preferring
+/// Load a NodeComplete for a node whose worktree file is gone, preferring
 /// the index version over HEAD when both exist (since the index is
 /// staged and therefore more recent).
 /// Returns Err if neither location has the file.
@@ -49,7 +49,7 @@ pub fn skgnode_from_index_or_head (
   pid    : &ID,
   src    : &SourceName,
   config : &SkgConfig,
-) -> Result<SkgNode, Box<dyn StdError>> {
+) -> Result<NodeComplete, Box<dyn StdError>> {
   let source_config : &SkgfileSource =
     config . sources . get (src)
     . ok_or_else ( || format! ( "Source '{}' not found in config",
@@ -67,7 +67,7 @@ pub fn skgnode_from_index_or_head (
   // Index first.
   if let Some (content) = get_file_content_at_index (&repo, &rel_path) ? {
     let node_fs : NodeFS = serde_yaml::from_str (&content) . map_err (
-      |e| format! ( "Failed to parse SkgNode for {} from index: {}",
+      |e| format! ( "Failed to parse NodeComplete for {} from index: {}",
                     pid . 0, e )) ?;
     return Ok ( node_fs . into_complete ( src . clone ())); }
   // HEAD fallback.
@@ -75,7 +75,7 @@ pub fn skgnode_from_index_or_head (
     . ok_or_else ( || format! (
       "File {:?} not found in index or HEAD", rel_path )) ?;
   let node_fs : NodeFS = serde_yaml::from_str (&content) . map_err (
-    |e| format! ( "Failed to parse SkgNode for {} from HEAD: {}",
+    |e| format! ( "Failed to parse NodeComplete for {} from HEAD: {}",
                   pid . 0, e )) ?;
   Ok ( node_fs . into_complete ( src . clone ())) }
 

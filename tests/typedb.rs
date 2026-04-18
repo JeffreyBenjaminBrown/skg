@@ -24,7 +24,7 @@ use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::memory::SkgNodeMap;
 use skg::types::nodes::typedb::NodeTypedb;
-use skg::types::skgnode::{SkgNode, empty_skgnode};
+use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
 use skg::types::viewnode::{ViewNode, ViewNodeKind};
 
@@ -277,11 +277,11 @@ async fn test_create_only_nodes_with_no_ids_present (
 
   // Prepare two SkgNodes: one existing ("a"), one new ("new").
   // Keep other fields minimal/empty as requested.
-  let mut fn_a : SkgNode = empty_skgnode ();
+  let mut fn_a : NodeComplete = empty_node_complete ();
   { fn_a . title = "ignore this string" . to_string ();
     fn_a . pid   = ID::from ("a"); }
 
-  let mut fn_new : SkgNode = empty_skgnode ();
+  let mut fn_new : NodeComplete = empty_node_complete ();
   { fn_new . title = "ignore this string" . to_string ();
     fn_new . pid   = ID::from ("new"); }
 
@@ -324,7 +324,7 @@ async fn test_create_only_nodes_with_no_ids_present (
   assert_eq! (
     final_number_of_nodes,
     initial_number_of_nodes + 1,
-    "SkgNode count should increase by exactly 1 (only 'new' was created)." );
+    "NodeComplete count should increase by exactly 1 (only 'new' was created)." );
 
   Ok ( () ) }
 
