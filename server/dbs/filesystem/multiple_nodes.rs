@@ -1,5 +1,6 @@
 use crate::dbs::filesystem::one_node::{read_skgnode, validate_pid_matches_filename, write_skgnode};
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, SourceName};
+use crate::types::nodes::fs::NodeFS;
 use crate::types::skgnode::SkgNode;
 use crate::util::path_from_pid_and_source;
 
@@ -97,10 +98,11 @@ fn read_skg_files_from_folder (
          path . extension () . map_or (
            false,                  // None => no extension found
            |ext| ext == "skg") ) { // Some
-      let mut skgnode: SkgNode =
+      let node_fs : NodeFS =
         read_skgnode (&path) ?;
-      validate_pid_matches_filename (&skgnode, &path) ?;
-      skgnode . source = source_name . clone();
+      validate_pid_matches_filename (&node_fs, &path) ?;
+      let skgnode : SkgNode =
+        node_fs . into_complete ( source_name . clone ());
       nodes . push (skgnode); }}
   Ok (nodes) }
 
@@ -125,18 +127,19 @@ pub fn read_modified_skg_files_from_sources (
       let mtime : std::time::SystemTime =
         fs::metadata (&path) ? . modified() ?;
       if mtime <= since { continue; }
-      let mut skgnode : SkgNode =
+      let node_fs : NodeFS =
         read_skgnode (&path) ?;
-      validate_pid_matches_filename (&skgnode, &path) ?;
+      validate_pid_matches_filename (&node_fs, &path) ?;
       let pid_str : String =
-        skgnode . pid
+        node_fs . pid
         . to_string();
       if ! seen_ids . insert (pid_str . clone()) {
         return Err ( io::Error::new (
           io::ErrorKind::InvalidData,
           format! ("Duplicate primary ID '{}' within batch",
                    pid_str )) ); }
-      skgnode . source = source_name . clone();
+      let skgnode : SkgNode =
+        node_fs . into_complete ( source_name . clone ());
       all_nodes . push (skgnode); }}
   Ok (all_nodes) }
 

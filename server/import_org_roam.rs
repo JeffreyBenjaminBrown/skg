@@ -1,6 +1,7 @@
 pub mod parse;
 
 use crate::types::misc::{ID, SourceName};
+use crate::types::nodes::fs::NodeFS;
 use crate::types::skgnode::{FileProperty, SkgNode};
 
 use std::collections::HashMap;
@@ -135,6 +136,7 @@ fn write_skgnode_to_dir (
     format! ("{}.skg", &pid . 0);
   let path : std::path::PathBuf =
     output_dir . join (&filename);
-  let yaml : String = serde_yaml::to_string (node)?;
+  let node_fs : NodeFS = NodeFS::from (node);
+  let yaml    : String = serde_yaml::to_string (&node_fs)?;
   fs::write (&path, &yaml)?;
   Ok (( )) }

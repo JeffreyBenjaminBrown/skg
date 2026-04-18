@@ -1,4 +1,5 @@
 use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::nodes::fs::NodeFS;
 use crate::types::skgnode::SkgNode;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::util::path_from_pid_and_source;
@@ -42,15 +43,13 @@ pub fn skgnode_from_pid_and_source (
   pid    : ID,
   source : &SourceName,
 ) -> io::Result<SkgNode> {
-  let mut skgnode : SkgNode = {
+  let node_fs : NodeFS = {
     let path : String =
       path_from_pid_and_source( config, source, pid )
       . map_err ( |e| io::Error::new (
         io::ErrorKind::NotFound, e) ) ?;
     read_skgnode (path)? };
-  skgnode . source = // needed because it's not serialized
-    source . clone();
-  Ok (skgnode) }
+  Ok ( node_fs . into_complete ( source . clone () )) }
 
 /// Reads a node from disk, returning None if not found
 /// (either in DB or on filesystem).
@@ -104,7 +103,7 @@ pub fn write_skgnode_to_source (
 /// This property is assumed by `path_from_pid_and_source` and
 /// elsewhere but was never validated on read.
 pub(super) fn validate_pid_matches_filename (
-  node : &SkgNode,
+  node : &NodeFS,
   path : &Path,
 ) -> io::Result<()> {
   let pid : &ID = &node . pid;
@@ -123,41 +122,48 @@ pub(super) fn validate_pid_matches_filename (
   Ok (( )) }
 
 /// Effectively private.
+///
+/// Returns a NodeFS (on-disk shape, no source). Callers attach
+/// source via 'NodeFS::into_complete' based on file location.
 pub(super) fn read_skgnode
   <P : AsRef <Path>> // any type that can be converted to an &Path
   (file_path : P
-  ) -> io::Result <SkgNode> {
+  ) -> io::Result <NodeFS> {
 
   let file_path : &Path = file_path . as_ref ();
-  let skgnode   : SkgNode = {
-    let contents  : String = fs::read_to_string (file_path)?;
+  let node_fs   : NodeFS = {
+    let contents : String = fs::read_to_string (file_path)?;
     serde_yaml::from_str (&contents)
     . map_err (
       |e| io::Error::new (
         io::ErrorKind::InvalidData,
         e . to_string () )) ? };
-  if skgnode . title . is_empty() {
+  if node_fs . title . is_empty() {
     return Err(io::Error::new(
       io::ErrorKind::InvalidData,
       format!("SkgNode at {:?} has an empty title", file_path),
     )); }
-  if skgnode . pid . as_str() . is_empty() {
+  if node_fs . pid . as_str() . is_empty() {
     return Err(io::Error::new(
       io::ErrorKind::InvalidData,
       format!(".skg file at {:?} has no IDs", file_path),
     )); }
-  Ok (skgnode) }
+  Ok (node_fs) }
 
 /// Effectively private.
+///
+/// Converts to 'NodeFS' (drops source) before serializing, so
+/// source is not written to the YAML on disk.
 pub(super) fn write_skgnode
   <P : AsRef<Path>>
   ( skgnode   : &SkgNode,
     file_path : P
   ) -> io::Result<()> {
+    let node_fs : NodeFS = NodeFS::from (skgnode);
     fs::write ( file_path,
                 {
                   let yaml_string : String =
-                    serde_yaml::to_string (skgnode)
+                    serde_yaml::to_string (&node_fs)
                     . map_err (
                       |e| io::Error::new(
                         io::ErrorKind::InvalidData,

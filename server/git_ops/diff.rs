@@ -1,6 +1,7 @@
 use crate::types::git::{ GitDiffStatus, PathDiffStatus, SourceDiff, SkgnodeDiff, NodeChanges };
 use crate::types::list::{compute_interleaved_diff, Diff_Item};
-use crate::types::misc::ID;
+use crate::types::misc::{ID, SourceName};
+use crate::types::nodes::fs::NodeFS;
 use crate::types::skgnode::SkgNode;
 
 use super::misc::path_relative_to_repo;
@@ -87,25 +88,36 @@ fn compute_skgnode_diff_for_stage (
     node_changes,
     head_node: before_node }) }
 
+/// Parses a NodeFS from a YAML blob, then attaches a default
+/// (empty) source to produce a SkgNode. This preserves today's
+/// behavior: diff.rs doesn't know the real source of its blobs,
+/// so nodes built here have source at its default. Downstream
+/// consumers that care about source do not use diff-derived nodes.
+fn nodefs_as_skgnode_with_default_source (
+  yaml : &str,
+) -> Option<SkgNode> {
+  let node_fs : NodeFS = serde_yaml::from_str (yaml) . ok () ?;
+  Some ( node_fs . into_complete ( SourceName::default ())) }
+
 fn load_from_head (
   repo     : &git2::Repository,
   rel_path : &Path,
 ) -> Option<SkgNode> {
   get_file_content_at_head (repo, rel_path) . ok () . flatten ()
-    . and_then ( |s| serde_yaml::from_str (&s) . ok () ) }
+    . and_then ( |s| nodefs_as_skgnode_with_default_source (&s) ) }
 
 fn load_from_index (
   repo     : &git2::Repository,
   rel_path : &Path,
 ) -> Option<SkgNode> {
   get_file_content_at_index (repo, rel_path) . ok () . flatten ()
-    . and_then ( |s| serde_yaml::from_str (&s) . ok () ) }
+    . and_then ( |s| nodefs_as_skgnode_with_default_source (&s) ) }
 
 fn load_from_disk (
   abs_path : &Path,
 ) -> Option<SkgNode> {
   fs::read_to_string (abs_path) . ok ()
-    . and_then ( |s| serde_yaml::from_str (&s) . ok () ) }
+    . and_then ( |s| nodefs_as_skgnode_with_default_source (&s) ) }
 
 /// Collect SkgNodes for files that were deleted in either stage.
 /// Used to look up titles and bodies for phantom nodes.

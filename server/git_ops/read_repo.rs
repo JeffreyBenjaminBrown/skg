@@ -1,5 +1,6 @@
 use crate::types::git::PathDiffStatus;
 use crate::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
+use crate::types::nodes::fs::NodeFS;
 use crate::types::skgnode::SkgNode;
 
 use git2::{Repository, Diff, DiffOptions, Error, ErrorCode, ObjectType};
@@ -34,11 +35,11 @@ pub fn skgnode_from_git_head (
   let content_str : String =
     content . ok_or_else ( || format! ( "File {:?} not found at HEAD",
                                         rel_path )) ?;
-  let skgnode : SkgNode =
+  let node_fs : NodeFS =
     serde_yaml::from_str (&content_str) . map_err (
       |e| format! ( "Failed to parse SkgNode for {}: {}",
                     pid . 0, e )) ?;
-  Ok (skgnode) }
+  Ok ( node_fs . into_complete ( src . clone ())) }
 
 /// Load a SkgNode for a node whose worktree file is gone, preferring
 /// the index version over HEAD when both exist (since the index is
@@ -65,16 +66,18 @@ pub fn skgnode_from_index_or_head (
     . unwrap_or (file_path . clone ());
   // Index first.
   if let Some (content) = get_file_content_at_index (&repo, &rel_path) ? {
-    return serde_yaml::from_str (&content) . map_err (
+    let node_fs : NodeFS = serde_yaml::from_str (&content) . map_err (
       |e| format! ( "Failed to parse SkgNode for {} from index: {}",
-                    pid . 0, e ) . into ()); }
+                    pid . 0, e )) ?;
+    return Ok ( node_fs . into_complete ( src . clone ())); }
   // HEAD fallback.
   let content : String = get_file_content_at_head (&repo, &rel_path) ?
     . ok_or_else ( || format! (
       "File {:?} not found in index or HEAD", rel_path )) ?;
-  serde_yaml::from_str (&content) . map_err (
+  let node_fs : NodeFS = serde_yaml::from_str (&content) . map_err (
     |e| format! ( "Failed to parse SkgNode for {} from HEAD: {}",
-                  pid . 0, e ) . into ()) }
+                  pid . 0, e )) ?;
+  Ok ( node_fs . into_complete ( src . clone ())) }
 
 /// Get the list of staged changes: files whose contents in the index
 /// differ from HEAD.
