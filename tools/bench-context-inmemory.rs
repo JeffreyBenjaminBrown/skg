@@ -19,6 +19,7 @@ use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::nodes::tantivy::NodeTantivy;
 use skg::types::skgnode::SkgNode;
 
 use std::collections::HashSet;
@@ -88,9 +89,11 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
     create_empty_tantivy_index (tantivy_dir . path ()) ?;
   // Populate Tantivy with node titles so context types can be stored
   let t5 : Instant = Instant::now ();
+  let tantivy_nodes : Vec<NodeTantivy> =
+    nodes . iter () . map (NodeTantivy::from) . collect ();
   let indexed : usize =
     skg::dbs::tantivy::update_index_with_nodes (
-      &nodes, &tantivy_index ) ?;
+      &tantivy_nodes, &tantivy_index ) ?;
   let tantivy_pop_time : f64 = t5 . elapsed () . as_secs_f64 ();
   println! ("3. Tantivy populated ({} docs): {:.3}s",
             indexed, tantivy_pop_time);
@@ -131,7 +134,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
       create_empty_tantivy_index (
         &tantivy_dir . path () . join (format! ("run{}", i)) ) ?;
     skg::dbs::tantivy::update_index_with_nodes (
-      &nodes, &tantivy_index2 ) ?;
+      &tantivy_nodes, &tantivy_index2 ) ?;
     let t : Instant = Instant::now ();
     let _ = compute_and_store_context_types (
       &tantivy_index2,

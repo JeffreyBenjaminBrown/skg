@@ -6,7 +6,8 @@
 
 use crate::types::textlinks::replace_each_link_with_its_label;
 use crate::types::misc::{ID, SourceName, TantivyIndex};
-use crate::types::skgnode::{FileProperty, SkgNode};
+use crate::types::nodes::tantivy::NodeTantivy;
+use crate::types::skgnode::FileProperty;
 
 use tantivy::{Index, IndexWriter, doc, Term, IndexReader, Searcher, Document};
 use tantivy::query::{QueryParser, Query};
@@ -111,12 +112,12 @@ pub fn search_index (
     best_matches },
        searcher )) }
 
-/// Updates the index with the provided SkgNodes.
+/// Updates the index with the provided nodes.
 ///   For existing IDs, updates the title.
 ///   For new IDs, adds new entries.
 /// Returns the number of documents processed.
 pub fn update_index_with_nodes (
-  nodes: &[SkgNode],
+  nodes: &[NodeTantivy],
   tantivy_index: &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {
 
@@ -138,7 +139,7 @@ pub fn delete_nodes_from_index<'a, I>(
   writer: &mut IndexWriter,
   tantivy_index: &TantivyIndex,
 ) -> Result<(), Box<dyn Error>>
-where I: Iterator<Item = &'a SkgNode>, {
+where I: Iterator<Item = &'a NodeTantivy>, {
   for node in nodes_iter {
     { let primary_id : &ID = &node . pid;
       writer . delete_term (
@@ -163,7 +164,7 @@ pub fn add_documents_to_tantivy_writer<'a, I> (
   writer        : &mut IndexWriter,
   tantivy_index : &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>>
-where I: IntoIterator<Item = &'a SkgNode>, {
+where I: IntoIterator<Item = &'a NodeTantivy>, {
 
   let mut indexed_count: usize = 0;
   for node in nodes {
@@ -320,7 +321,7 @@ pub fn subset_with_hadid (
 /* -------------------- Private helpers -------------------- */
 
 fn create_documents_from_node (
-  node: &SkgNode,
+  node: &NodeTantivy,
   tantivy_index: &TantivyIndex,
 ) -> Result < Vec < Document >,
               Box < dyn Error >> {

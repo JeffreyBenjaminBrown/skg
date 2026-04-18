@@ -13,6 +13,7 @@ use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_all_outbound_relationships;
 use crate::dbs::typedb::util::connect_to_typedb;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
+use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::skgnode::SkgNode;
 
 use futures::executor::block_on;
@@ -175,8 +176,11 @@ fn incremental_init (
               "Recreated relationships");
     Ok::<(), Box<dyn Error>> (( )) } ) ?;
   let t3 : Instant = Instant::now();
+  // Convert to NodeTantivy (narrow) at the boundary.
+  let tantivy_nodes : Vec<NodeTantivy> =
+    nodes . iter () . map (NodeTantivy::from) . collect ();
   let indexed : usize =
-    update_index_with_nodes (&nodes, &tantivy_index) ?;
+    update_index_with_nodes (&tantivy_nodes, &tantivy_index) ?;
   tracing::info! (indexed, elapsed_s = ?t3 . elapsed(),
             "Tantivy: updated documents");
   Ok (tantivy_index) }
@@ -389,8 +393,11 @@ pub fn in_fs_wipe_index_then_create_it (
             Box<dyn Error>> {
   let tantivy_index : TantivyIndex =
     create_empty_tantivy_index (index_path)?;
+  // Convert to NodeTantivy (narrow) at the boundary.
+  let tantivy_nodes : Vec<NodeTantivy> =
+    nodes . iter () . map (NodeTantivy::from) . collect ();
   let indexed_count: usize =
-    update_index_with_nodes ( nodes, & tantivy_index )?;
+    update_index_with_nodes ( &tantivy_nodes, & tantivy_index )?;
   Ok (( tantivy_index, indexed_count )) }
 
 pub async fn overwrite_new_empty_db (

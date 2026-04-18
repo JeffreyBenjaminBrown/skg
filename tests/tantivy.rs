@@ -8,6 +8,7 @@ use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::in_fs_wipe_index_then_create_it;
 use skg::dbs::tantivy::{search_index, title_and_source_by_id, update_index_with_nodes};
 use skg::types::misc::{ID, MSV, SourceName, TantivyIndex};
+use skg::types::nodes::tantivy::NodeTantivy;
 use skg::types::skgnode::{SkgNode, empty_skgnode};
 
 #[test]
@@ -89,7 +90,9 @@ fn test_many_tantivy_things (
 
   // Update the index with the new node
   let update_count: usize =
-    update_index_with_nodes(&[new_node], &tantivy_index)?;
+    update_index_with_nodes (
+      &[NodeTantivy::from (&new_node)],
+      &tantivy_index) ?;
   assert_eq!(update_count, 1,
             "Expected to update exactly 1 document, but updated: {}",
             update_count);

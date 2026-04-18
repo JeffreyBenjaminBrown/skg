@@ -7,6 +7,7 @@ use crate::dbs::typedb::nodes::update_node_source;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_out_links;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
+use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::save::{DefineNode, SaveNode, DeleteNode, SourceMove};
 use crate::types::skgnode::SkgNode;
 use crate::util::path_from_pid_and_source;
@@ -241,17 +242,18 @@ pub(super) fn update_tantivy_from_saveinstructions (
       DefineNode::Delete(DeleteNode { id, .. }) => id }),
     &mut writer,
     tantivy_index)?;
+  // Add documents only for non-deletion instructions.
+  // Convert to NodeTantivy (narrow) at the boundary.
+  let nodes_to_add: Vec<NodeTantivy> =
+    instructions . iter()
+    . filter_map( |instr| match instr {
+        DefineNode::Save(SaveNode (node)) =>
+          Some ( NodeTantivy::from (node) ),
+        DefineNode::Delete (_) => None } )
+    . collect();
   let processed_count: usize =
     add_documents_to_tantivy_writer(
-      { // Add documents only for non-deletion instructions.
-        let nodes_to_add: Vec<&SkgNode> =
-          instructions . iter()
-          . filter_map( |instr| match instr {
-              DefineNode::Save(SaveNode (node)) => Some (node),
-              DefineNode::Delete (_) => None } )
-          . collect();
-        nodes_to_add },
-      &mut writer, tantivy_index )? ;
+      & nodes_to_add, &mut writer, tantivy_index )? ;
   commit_with_status(
     &mut writer, processed_count, "Updated")?;
   Ok (processed_count) }
