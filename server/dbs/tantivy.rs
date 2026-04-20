@@ -113,7 +113,7 @@ pub fn title_and_source_by_id (
       tantivy_index, &searcher, id,
       crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT ) ?;
   let (doc, was_fallback) : (TantivyDocument, bool) =
-    pick_title_doc ( tantivy_index, &searcher, &doc_addresses ) ?;
+    pick_title_doc ( tantivy_index, &searcher, id, &doc_addresses ) ?;
   if was_fallback {
     tracing::warn! (
       "title_and_source_by_id: no is_title=\"true\" document \
@@ -147,7 +147,7 @@ pub fn titles_by_ids (
         None     => continue };
     let (doc, was_fallback) : (TantivyDocument, bool) =
       match pick_title_doc (
-        tantivy_index, &searcher, &doc_addresses )
+        tantivy_index, &searcher, id, &doc_addresses )
       { Some (d) => d,
         None     => continue };
     if was_fallback {
@@ -180,9 +180,9 @@ pub fn subset_with_hadid (
     let Some (addr) = doc_addresses . first ()
       else { continue };
     let doc : TantivyDocument =
-      match searcher . doc (*addr) {
-        Ok (d)  => d,
-        Err (_) => continue };
+      match load_doc_or_warn ( &searcher, *addr, id ) {
+        Some (d) => d,
+        None     => continue };
     if bool_field_eq_true ( &doc, tantivy_index . had_id_field ) {
       result . insert ( id . clone () ); } }
   result }
@@ -210,24 +210,41 @@ fn doc_addresses_for_id (
 
 /// Walk the doc addresses for a single ID and pick the one marked
 /// is_title="true". If none is, fall back to the first doc (an
-/// alias). Returns (chosen doc, was_fallback). Broken docs are
-/// skipped rather than aborting.
+/// alias). Returns (chosen doc, was_fallback). Broken docs log a
+/// warning and are skipped.
 fn pick_title_doc (
   tantivy_index : &TantivyIndex,
   searcher      : &Searcher,
+  id            : &ID,
   doc_addresses : &[tantivy::DocAddress],
 ) -> Option < (TantivyDocument, bool) > {
   let mut fallback : Option<TantivyDocument> = None;
   for addr in doc_addresses {
     let doc : TantivyDocument =
-      match searcher . doc (*addr) {
-        Ok (d)  => d,
-        Err (_) => continue };
+      match load_doc_or_warn ( searcher, *addr, id ) {
+        Some (d) => d,
+        None     => continue };
     if bool_field_eq_true ( &doc, tantivy_index . is_title_field ) {
       return Some ( (doc, false) ); }
     if fallback . is_none () {
       fallback = Some (doc); } }
   fallback . map ( |d| (d, true) ) }
+
+/// Fetch a stored doc by address. Logs a warning on failure so
+/// operators can diagnose corrupt indexes; returns None so callers
+/// can skip this address and continue.
+fn load_doc_or_warn (
+  searcher : &Searcher,
+  addr     : tantivy::DocAddress,
+  id       : &ID,
+) -> Option < TantivyDocument > {
+  match searcher . doc (addr) {
+    Ok (doc) => Some (doc),
+    Err (e)  => {
+      tracing::warn! (
+        "Failed to load Tantivy doc for ID {} at {:?}: {}",
+        id, addr, e );
+      None }} }
 
 fn bool_field_eq_true (
   doc   : &TantivyDocument,

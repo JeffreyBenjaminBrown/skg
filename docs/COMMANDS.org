@@ -13,7 +13,8 @@
 ** changing the whole view
 *** C-c s RET : skg-search
     Text search across titles and aliases, showing only
-    "interesting" nodes: roots, cycle members, link targets, and
+    "rooty" nodes, which are most likely to be of interest:
+    roots, cycle members, link targets, and
     nodes that had an org-roam ID before import. Multi-contained
     nodes and nodes with no special graph role are filtered out.
 

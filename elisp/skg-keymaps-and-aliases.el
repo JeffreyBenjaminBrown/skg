@@ -3,11 +3,13 @@
 ;;; PURPOSE: All skg keybindings and user-facing command aliases.
 ;;;
 ;;; Keymaps gathered here:
-;;;   skg-content-view-mode-map  (for skg content view buffers)
-;;;   skg-id-stack-mode-map      (for the id-stack edit buffer)
-;;;   skg-sexp-edit-mode-map     (for the sexp-edit buffer)
-;;;   global C-c s RET           (skg-search, available everywhere)
-;;;   magit C-c v v              (skg-view, available in magit buffers)
+;;;   skg-content-view-mode-map (for skg content view buffers)
+;;;   skg-id-stack-mode-map     (for the id-stack edit buffer)
+;;;   skg-sexp-edit-mode-map    (for the sexp-edit buffer)
+;;;   global (available everywhere)
+;;;     C-c s RET               (skg-search)
+;;;     C-c s i                 (skg-search-interactive
+;;;   magit C-c v v             (skg-view, available in magit buffers)
 
 ;; No requires here — the underlying functions are loaded by skg-client.el,
 ;; which also requires this file. Adding requires here would create a cycle.
