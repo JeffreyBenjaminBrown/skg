@@ -1,7 +1,7 @@
 // cargo test --test serve_text_search_test
 
 use skg::context::ContextOriginType;
-use skg::dbs::tantivy::update_context_origin_types;
+use skg::dbs::tantivy::context_update::update_context_origin_types;
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
 use skg::org_to_text::viewnode_forest_to_string;

@@ -6,7 +6,8 @@
 /// Origins (roots, link targets, multiply-contained nodes, cycle members,
 /// nodes with Had_ID_Before_Import) get score multipliers at search time.
 
-use crate::dbs::tantivy::{subset_with_hadid, update_context_origin_types};
+use crate::dbs::tantivy::subset_with_hadid;
+use crate::dbs::tantivy::context_update::update_context_origin_types;
 use crate::dbs::typedb::paths::containerward_path_stats_bulk;
 use crate::dbs::typedb::search::find_container_ids_of_pid;
 use crate::dbs::typedb::util::ConceptRowStream;
