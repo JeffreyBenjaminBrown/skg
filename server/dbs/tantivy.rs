@@ -107,50 +107,24 @@ pub fn title_and_source_by_id (
 ) -> Option < (String, SourceName) > {
   let reader : IndexReader =
     tantivy_index . index . reader () . ok () ?;
-  let searcher : Searcher =
-    reader . searcher ();
-  let query : Box < dyn Query > =
-    Box::new ( tantivy::query::TermQuery::new (
-      Term::from_field_text (
-        tantivy_index . id_field, id . as_str () ),
-      schema::IndexRecordOption::Basic ));
-  let results : Vec < (f32, tantivy::DocAddress) > =
-    searcher . search (
-      &query, &TopDocs::with_limit (
-        crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT )
-        . order_by_score () ) . ok () ?;
-  let mut fallback : Option < (String, SourceName) > = None;
-  for (_score, doc_address) in &results {
-    let retrieved_doc : TantivyDocument =
-      searcher . doc (*doc_address) . ok () ?;
-    let is_title : bool =
-      retrieved_doc
-        . get_first ( tantivy_index . is_title_field )
-        . and_then ( |v| v . as_str () )
-        . map ( |s| s == "true" )
-        . unwrap_or (false);
-    let title_or_alias : Option < String > =
-      retrieved_doc
-        . get_first ( tantivy_index . title_or_alias_field )
-        . and_then ( |v| v . as_str () )
-        . map ( |s| s . to_string () );
-    let source : SourceName =
-      SourceName::from (
-        retrieved_doc
-          . get_first ( tantivy_index . source_field )
-          . and_then ( |v| v . as_str () )
-          . unwrap_or ("") );
-    if is_title {
-      return title_or_alias . map (
-        |t| (t, source) ); }
-    if fallback . is_none () {
-      fallback = title_or_alias . map (
-        |t| (t, source) ); } }
-  tracing::warn! (
-    "title_and_source_by_id: no is_title=\"true\" document \
-     found for ID {}. Falling back to first title_or_alias.",
-    id );
-  fallback }
+  let searcher : Searcher = reader . searcher ();
+  let doc_addresses : Vec<tantivy::DocAddress> =
+    doc_addresses_for_id (
+      tantivy_index, &searcher, id,
+      crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT ) ?;
+  let (doc, was_fallback) : (TantivyDocument, bool) =
+    pick_title_doc ( tantivy_index, &searcher, &doc_addresses ) ?;
+  if was_fallback {
+    tracing::warn! (
+      "title_and_source_by_id: no is_title=\"true\" document \
+       found for ID {}. Falling back to first title_or_alias.",
+      id ); }
+  let title : String =
+    string_field ( &doc, tantivy_index . title_or_alias_field ) ?;
+  let source : SourceName = SourceName::from (
+    string_field ( &doc, tantivy_index . source_field )
+      . unwrap_or_default () . as_str () );
+  Some ( (title, source) ) }
 
 /// Look up canonical titles for multiple IDs in a single searcher session.
 /// IDs not found in Tantivy are absent from the result.
@@ -165,48 +139,25 @@ pub fn titles_by_ids (
       Err (_) => return result };
   let searcher : Searcher = reader . searcher ();
   for id in ids {
-    let query : Box < dyn Query > =
-      Box::new ( tantivy::query::TermQuery::new (
-        Term::from_field_text (
-          tantivy_index . id_field, id . as_str () ),
-        schema::IndexRecordOption::Basic ));
-    let results : Vec < (f32, tantivy::DocAddress) > =
-      match searcher . search (
-        &query, &TopDocs::with_limit (
-          crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT )
-          . order_by_score () )
-      { Ok (r) => r,
-        Err (_) => continue };
-    let mut fallback : Option<String> = None;
-    for (_score, doc_address) in &results {
-      let retrieved_doc : TantivyDocument =
-        match searcher . doc (*doc_address) {
-          Ok (d) => d,
-          Err (_) => continue };
-      let is_title : bool =
-        retrieved_doc
-          . get_first ( tantivy_index . is_title_field )
-          . and_then ( |v| v . as_str () )
-          . map ( |s| s == "true" )
-          . unwrap_or (false);
-      let title_or_alias : Option<String> =
-        retrieved_doc
-          . get_first ( tantivy_index . title_or_alias_field )
-          . and_then ( |v| v . as_str () )
-          . map ( |s| s . to_string () );
-      if is_title {
-        if let Some (t) = title_or_alias {
-          result . insert ( id . clone (), t ); }
-        fallback = None; // signal: found title, skip fallback
-        break; }
-      if fallback . is_none () {
-        fallback = title_or_alias; } }
-    if let Some (fb) = fallback {
+    let doc_addresses : Vec<tantivy::DocAddress> =
+      match doc_addresses_for_id (
+        tantivy_index, &searcher, id,
+        crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT )
+      { Some (a) => a,
+        None     => continue };
+    let (doc, was_fallback) : (TantivyDocument, bool) =
+      match pick_title_doc (
+        tantivy_index, &searcher, &doc_addresses )
+      { Some (d) => d,
+        None     => continue };
+    if was_fallback {
       tracing::debug! (
         "titles_by_ids: no is_title=\"true\" document \
          found for ID {}. Falling back to first title_or_alias.",
-        id );
-      result . insert ( id . clone (), fb ); } }
+        id ); }
+    if let Some (title) = string_field (
+      &doc, tantivy_index . title_or_alias_field )
+    { result . insert ( id . clone (), title ); } }
   result }
 
 /// Return the subset of the input for which 'had_id' is true.
@@ -214,32 +165,84 @@ pub fn subset_with_hadid (
   tantivy_index : &TantivyIndex,
   ids           : &HashSet<ID>,
 ) -> HashSet<ID> {
-  let reader : IndexReader
-    = match tantivy_index . index . reader () {
+  let reader : IndexReader =
+    match tantivy_index . index . reader () {
       Ok (r) => r,
       Err (_) => return HashSet::new () };
   let searcher : Searcher = reader . searcher ();
   let mut result : HashSet<ID> = HashSet::new ();
   for id in ids {
-    let query : Box < dyn Query > =
-      Box::new ( tantivy::query::TermQuery::new (
-        Term::from_field_text (
-          tantivy_index . id_field, id . as_str () ),
-        schema::IndexRecordOption::Basic ));
-    let hits : Vec < (f32, tantivy::DocAddress) > =
-      match searcher . search (
-        &query, &TopDocs::with_limit (1)
-          . order_by_score () )
-      { Ok (h) => h,
+    let doc_addresses : Vec<tantivy::DocAddress> =
+      match doc_addresses_for_id (
+        tantivy_index, &searcher, id, 1 )
+      { Some (a) => a,
+        None     => continue };
+    let Some (addr) = doc_addresses . first ()
+      else { continue };
+    let doc : TantivyDocument =
+      match searcher . doc (*addr) {
+        Ok (d)  => d,
         Err (_) => continue };
-    if let Some ( (_score, doc_address) ) = hits . first () {
-      if let Ok (doc) = searcher . doc::<TantivyDocument> (*doc_address) {
-        let had_id : bool =
-          doc . get_first ( tantivy_index . had_id_field )
-          . and_then ( |v| v . as_str () )
-          . map ( |s| s == "true" )
-          . unwrap_or (false);
-        if had_id {
-          result . insert (id . clone () ); }} }}
+    if bool_field_eq_true ( &doc, tantivy_index . had_id_field ) {
+      result . insert ( id . clone () ); } }
   result }
+
+/// Run an exact-match TermQuery against the id_field, returning
+/// the matching doc addresses (scores discarded). None on any
+/// index/search error; an empty vec means "no hits" (distinct from
+/// error).
+fn doc_addresses_for_id (
+  tantivy_index : &TantivyIndex,
+  searcher      : &Searcher,
+  id            : &ID,
+  limit         : usize,
+) -> Option < Vec<tantivy::DocAddress> > {
+  let query : Box<dyn Query> =
+    Box::new ( tantivy::query::TermQuery::new (
+      Term::from_field_text (
+        tantivy_index . id_field, id . as_str () ),
+      schema::IndexRecordOption::Basic ));
+  searcher . search (
+    &query, &TopDocs::with_limit (limit) . order_by_score () )
+    . ok ()
+    . map ( |hits| hits . into_iter ()
+              . map ( |(_, a)| a ) . collect () ) }
+
+/// Walk the doc addresses for a single ID and pick the one marked
+/// is_title="true". If none is, fall back to the first doc (an
+/// alias). Returns (chosen doc, was_fallback). Broken docs are
+/// skipped rather than aborting.
+fn pick_title_doc (
+  tantivy_index : &TantivyIndex,
+  searcher      : &Searcher,
+  doc_addresses : &[tantivy::DocAddress],
+) -> Option < (TantivyDocument, bool) > {
+  let mut fallback : Option<TantivyDocument> = None;
+  for addr in doc_addresses {
+    let doc : TantivyDocument =
+      match searcher . doc (*addr) {
+        Ok (d)  => d,
+        Err (_) => continue };
+    if bool_field_eq_true ( &doc, tantivy_index . is_title_field ) {
+      return Some ( (doc, false) ); }
+    if fallback . is_none () {
+      fallback = Some (doc); } }
+  fallback . map ( |d| (d, true) ) }
+
+fn bool_field_eq_true (
+  doc   : &TantivyDocument,
+  field : schema::Field,
+) -> bool {
+  doc . get_first (field)
+    . and_then ( |v| v . as_str () )
+    . map ( |s| s == "true" )
+    . unwrap_or (false) }
+
+fn string_field (
+  doc   : &TantivyDocument,
+  field : schema::Field,
+) -> Option<String> {
+  doc . get_first (field)
+    . and_then ( |v| v . as_str () )
+    . map ( |s| s . to_string () ) }
 
