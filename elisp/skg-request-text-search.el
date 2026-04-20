@@ -23,10 +23,7 @@ titles only, no Tantivy operator syntax."
   (let* ((rooty     (y-or-n-p "Rooty only (filter to roots/cycles/targets/hadID)? "))
          (regex     (y-or-n-p "Regex? "))
          (body      (y-or-n-p "Include body text (titles are always searched)? "))
-         (operators (unless regex
-                      ;; operators is a no-op in regex mode (the regex
-                      ;; already IS operators), so skip the prompt.
-                      (y-or-n-p "Use operator syntax (AND/OR/phrase/grouping)? "))))
+         (operators (y-or-n-p "Use operator syntax (AND/OR/NOT/+/-)? ")))
     (skg--request-text-search search-terms
                               (if rooty "rooty" "everywhere")
                               regex

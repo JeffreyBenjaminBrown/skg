@@ -447,6 +447,127 @@ fn test_search_regex_axis (
               "regex 'histor.*' should NOT match 'hello' (got {:?})", ids ); }
   Ok (( )) }
 
+/// Multi-word regex: whitespace splits the pattern; each piece
+/// becomes its own RegexQuery, SHOULD-combined. A pattern containing
+/// literal whitespace could never match a single token, so splitting
+/// is the only way for multi-word regex queries to return anything.
+#[test]
+fn test_search_regex_multiword (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let empty : SkgNode = empty_skgnode ();
+  let mk = |pid : &str, title : &str| -> SkgNode {
+    let mut n : SkgNode = empty . clone ();
+    n . pid = ID::new (pid);
+    n . title = title . to_string ();
+    n };
+  let nodes : Vec<SkgNode> = vec! [
+    mk ("polsci",   "political science"),
+    mk ("polit",    "political"),
+    mk ("sci",      "science"),
+    mk ("bio",      "biology") ];
+  let (ti, _) : (TantivyIndex, usize) =
+    in_fs_wipe_index_then_create_it (
+      &nodes,
+      Path::new ("/tmp/tantivy-test-regex-multiword") ) ?;
+  let gather = | pattern : &str | -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let opts : SearchOptions =
+      SearchOptions { regex: true, ..SearchOptions::default () };
+    let (matches, searcher) = search_index (&ti, pattern, &opts) ?;
+    let mut ids : Vec<String> = Vec::new ();
+    for (_, addr) in &matches {
+      let doc : TantivyDocument = searcher . doc (*addr) ?;
+      ids . push (
+        doc . get_first (ti . id_field) . unwrap ()
+        . as_str () . unwrap () . to_string () ); }
+    Ok (ids) };
+  { // Literal multi-word: each word OR'd.
+    let ids : Vec<String> = gather ("political science") ?;
+    assert! ( ids . contains (&"polsci" . to_string ()),
+              "should match 'political science' (got {:?})", ids );
+    assert! ( ids . contains (&"polit"  . to_string ()),
+              "should match 'political' (got {:?})", ids );
+    assert! ( ids . contains (&"sci"    . to_string ()),
+              "should match 'science' (got {:?})", ids );
+    assert! ( ! ids . contains (&"bio" . to_string ()),
+              "should NOT match 'biology' (got {:?})", ids ); }
+  { // Prefix regex per piece.
+    let ids : Vec<String> = gather ("polit.* scien.*") ?;
+    assert! ( ids . contains (&"polsci" . to_string ()),
+              "prefix regex should match 'political science' (got {:?})", ids );
+    assert! ( ids . contains (&"polit"  . to_string ()),
+              "prefix regex should match 'political' (got {:?})", ids );
+    assert! ( ids . contains (&"sci"    . to_string ()),
+              "prefix regex should match 'science' (got {:?})", ids );
+    assert! ( ! ids . contains (&"bio" . to_string ()),
+              "prefix regex should NOT match 'biology' (got {:?})", ids ); }
+  Ok (( )) }
+
+/// Regex + operators: AND / OR / NOT / +foo / -bar combine
+/// per-piece RegexQueries at the document level.
+#[test]
+fn test_search_regex_with_operators (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let empty : SkgNode = empty_skgnode ();
+  let mk = |pid : &str, title : &str| -> SkgNode {
+    let mut n : SkgNode = empty . clone ();
+    n . pid = ID::new (pid);
+    n . title = title . to_string ();
+    n };
+  let nodes : Vec<SkgNode> = vec! [
+    mk ("polsci",   "political science"),
+    mk ("polbio",   "political biology"),
+    mk ("scibio",   "science biology"),
+    mk ("bio",      "biology") ];
+  let (ti, _) : (TantivyIndex, usize) =
+    in_fs_wipe_index_then_create_it (
+      &nodes,
+      Path::new ("/tmp/tantivy-test-regex-operators") ) ?;
+  let gather = | pattern : &str | -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let opts : SearchOptions =
+      SearchOptions { regex: true, operators: true,
+                      ..SearchOptions::default () };
+    let (matches, searcher) = search_index (&ti, pattern, &opts) ?;
+    let mut ids : Vec<String> = Vec::new ();
+    for (_, addr) in &matches {
+      let doc : TantivyDocument = searcher . doc (*addr) ?;
+      ids . push (
+        doc . get_first (ti . id_field) . unwrap ()
+        . as_str () . unwrap () . to_string () ); }
+    Ok (ids) };
+  { // AND: docs must contain tokens matching both patterns.
+    let ids : Vec<String> = gather ("poli.* AND sci.*") ?;
+    assert! ( ids . contains (&"polsci" . to_string ()),
+              "AND should match 'political science' (got {:?})", ids );
+    assert! ( ! ids . contains (&"polbio" . to_string ()),
+              "AND should NOT match 'political biology' (got {:?})", ids );
+    assert! ( ! ids . contains (&"scibio" . to_string ()),
+              "AND should NOT match 'science biology' (got {:?})", ids );
+    assert! ( ! ids . contains (&"bio" . to_string ()),
+              "AND should NOT match 'biology' (got {:?})", ids ); }
+  { // NOT: second piece becomes MUST_NOT.
+    let ids : Vec<String> = gather ("poli.* NOT bio.*") ?;
+    assert! ( ids . contains (&"polsci" . to_string ()),
+              "NOT should match 'political science' (got {:?})", ids );
+    assert! ( ! ids . contains (&"polbio" . to_string ()),
+              "NOT should exclude 'political biology' (got {:?})", ids );
+    assert! ( ! ids . contains (&"scibio" . to_string ()),
+              "NOT should exclude 'science biology' (got {:?})", ids ); }
+  { // +/- prefix: same effect without the keyword.
+    let ids : Vec<String> = gather ("+poli.* -bio.*") ?;
+    assert! ( ids . contains (&"polsci" . to_string ()),
+              "+/- should match 'political science' (got {:?})", ids );
+    assert! ( ! ids . contains (&"polbio" . to_string ()),
+              "+/- should exclude 'political biology' (got {:?})", ids ); }
+  { // Explicit OR matches the default SHOULD behavior.
+    let ids : Vec<String> = gather ("poli.* OR bio.*") ?;
+    assert! ( ids . contains (&"polsci" . to_string ()),
+              "OR should match 'political science' (got {:?})", ids );
+    assert! ( ids . contains (&"polbio" . to_string ()),
+              "OR should match 'political biology' (got {:?})", ids );
+    assert! ( ids . contains (&"bio" . to_string ()),
+              "OR should match 'biology' (got {:?})", ids ); }
+  Ok (( )) }
+
 #[test]
 fn test_title_by_id_returns_title_not_alias (
 ) -> Result<(), Box<dyn std::error::Error>> {
