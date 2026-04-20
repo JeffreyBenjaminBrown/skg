@@ -36,7 +36,7 @@ Ground truth (reused across plans):
 - Merge pipeline ([[../../server/merge.rs][server/merge.rs]], [[../../server/merge/typedb.rs][server/merge/typedb.rs]], [[../../server/merge/validate_merge.rs][server/merge/validate_merge.rs]]): separate path; reads and writes TypeDB directly without going through 'DefineNode'.
 - Corpus: 29,050 .skg files, ~6.6 MB. In-RAM footprint < 50 MB.
 
-* Plan A (detailed): homogenize SkgNode-ish types
+* DONE Plan A (detailed): homogenize SkgNode-ish types
 
 ** Goal
 

@@ -1,4 +1,6 @@
 use crate::dbs::filesystem::one_node::skgnode_from_id;
+use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
+use crate::dbs::typedb::search::find_related_nodes;
 use crate::types::save::{Merge, SaveNode, DeleteNode};
 use crate::types::misc::{MSV, SkgConfig, ID};
 use crate::types::viewnode::EditRequest;
@@ -8,8 +10,68 @@ use crate::types::list::dedup_vector;
 use crate::util::setlike_vector_subtraction;
 
 use ego_tree::Tree;
+use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
+
+/// Find every node that has an outbound relation pointing at the
+/// acquiree via one of the five outbound-relation shapes. The
+/// acquiree plays the object (second relationship member — role_b in
+/// 'OUTBOUND_RELATIONSHIP_TYPES'); the neighbor plays the subject
+/// (first relationship member — role_a). These neighbors'
+/// outbound edges to acquiree would be destroyed by cascade when the
+/// acquiree is deleted; they must be re-saved so the save pipeline
+/// re-creates the edges (extra_id resolution then redirects them to
+/// the acquirer).
+pub async fn affected_neighbors_of_merge (
+  db_name     : &str,
+  driver      : &TypeDBDriver,
+  acquiree_id : &ID,
+) -> Result < HashSet<ID>, Box<dyn Error> > {
+  let inputs : [ID; 1] = [ acquiree_id . clone () ];
+  let mut all : HashSet<ID> = HashSet::new ();
+  for (relation, neighbor_role, acquiree_role) in OUTBOUND_RELATIONSHIP_TYPES {
+    let neighbors : HashSet<ID> = find_related_nodes (
+      db_name, driver, &inputs,
+      relation, acquiree_role, neighbor_role ) . await ?;
+    all . extend (neighbors); }
+  Ok (all) }
+
+/// For a batch of merges, discover every affected neighbor across all
+/// acquirees, filter out any that are themselves acquirers or acquirees
+/// in the batch (those are already handled by the primary 3×N
+/// DefineNodes), load each neighbor's NodeComplete from disk, and wrap
+/// in SaveNode. The resulting SaveNodes carry /unchanged/ NodeCompletes
+/// — the acquiree_id stays in whatever vectors it's in, and extra_id
+/// resolution handles the redirection to acquirer at TypeDB
+/// relationship-creation time.
+pub async fn neighbor_savenodes_for_merges (
+  merges : &[Merge],
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+) -> Result < Vec<SaveNode>, Box<dyn Error> > {
+  if merges . is_empty () {
+    return Ok (Vec::new ()); }
+  let primary_pids : HashSet<ID> = merges . iter ()
+    . flat_map ( |m| [
+        m . acquirer_id () . clone (),
+        m . acquiree_id () . clone () ] )
+    . collect ();
+  let mut neighbors : HashSet<ID> = HashSet::new ();
+  for merge in merges {
+    let for_this : HashSet<ID> = affected_neighbors_of_merge (
+      &config . db_name, driver, merge . acquiree_id ()
+    ) . await ?;
+    neighbors . extend (for_this); }
+  let to_load : Vec<ID> =
+    neighbors . difference (&primary_pids) . cloned () . collect ();
+  let mut save_nodes : Vec<SaveNode> =
+    Vec::with_capacity (to_load . len ());
+  for pid in &to_load {
+    let node : NodeComplete =
+      skgnode_from_id (config, driver, pid) . await ?;
+    save_nodes . push ( SaveNode (node) ); }
+  Ok (save_nodes) }
 
 /// PURPOSE: For each ViewNode with a merge instruction, creates a Merge:
 /// - acquiree_text_preserver: new node containing the acquiree's title and body

@@ -174,6 +174,40 @@ async fn insert_extra_ids (
         . await ?; }}
   Ok (()) }
 
+/// Replace all has_extra_id relations (and their extra_id entities) for
+/// this node with a fresh set derived from 'node.extra_ids'. Runs its
+/// own transaction.
+///
+/// Needed by the save pipeline for /existing/ nodes being re-saved:
+/// 'create_only_nodes_with_no_ids_present' skips existing nodes, so
+/// their extra_ids never get updated through the normal create path.
+///
+/// PITFALL: This must complete for every to_write_pid /before/ any
+/// 'create_all_relationships' call runs, because those calls resolve
+/// target IDs through 'has_extra_id'. A neighbor save whose target is
+/// the acquirer needs the freshly-added has_extra_id (acquiree_pid →
+/// acquirer) to exist at lookup time.
+pub async fn overwrite_extra_ids_of_node (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  node    : &NodeTypedb,
+) -> Result < (), Box<dyn Error> > {
+  let tx : Transaction =
+    driver . transaction (
+      db_name, TransactionType::Write ) . await ?;
+  // Delete old has_extra_id relations and their extra_id entities.
+  tx . query ( format! (
+    r#"match
+         $node isa node, has id "{}";
+         $e isa extra_id;
+         $rel isa has_extra_id ( node: $node, extra_id: $e );
+       delete $rel;
+       delete $e;"#,
+    node . pid . as_str () ) ) . await . ok (); // ok(): no-op if none exist
+  insert_extra_ids ( node, &tx ) . await ?;
+  tx . commit () . await ?;
+  Ok (()) }
+
 /// ASSUMES: All input IDs are PIDs.
 /// PURPOSE: Delete the node corresponding to every ID it receives,
 /// including its extra IDs.

@@ -4,9 +4,11 @@ use crate::dbs::memory::{GraphHandle, apply_definenodes};
 use crate::dbs::tantivy::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::nodes::delete_nodes_from_pids;
+use crate::dbs::typedb::nodes::overwrite_extra_ids_of_node;
 use crate::dbs::typedb::nodes::update_node_source;
+use crate::dbs::typedb::nodes::which_ids_exist;
 use crate::dbs::typedb::relationships::create_all_relationships;
-use crate::dbs::typedb::relationships::delete_out_links;
+use crate::dbs::typedb::relationships::delete_all_outbound_relationships;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::nodes::typedb::NodeTypedb;
@@ -15,6 +17,7 @@ use crate::types::nodes::complete::NodeComplete;
 use crate::util::path_from_pid_and_source;
 
 use itertools::{Itertools, Either};
+use std::collections::{BTreeSet, HashSet};
 use std::error::Error;
 use std::io;
 use std::time::{Duration, Instant};
@@ -164,25 +167,35 @@ pub async fn update_typedb_from_saveinstructions (
       to_write_skgnodes . iter ()
       . map ( |n| n . pid . clone() )
       . collect ();
-    // Convert to NodeTypedb (narrow) at the boundary. Parses
-    // textlinks from each node's title+body.
-    let to_write_typedb : Vec<NodeTypedb> =
+    let to_write_typedb : Vec<NodeTypedb> = // Convert to NodeTypedb (narrow) at the boundary. Parses textlinks from each node's title+body.
       to_write_skgnodes . iter ()
       . map (NodeTypedb::from_complete_parsing_textlinks)
       . collect ();
+    let pre_existing_pids : HashSet<String> = { // "Pre-existing" = not being created now. Existing ones need their has_extra_id relations re-synced below; create_only_nodes_with_no_ids_present handles extra_ids only for newly-created nodes via its internal call to 'create_node'.
+      let pids_btreeset : BTreeSet<String> =
+        to_write_pids . iter ()
+        . map ( |p| p . to_string () )
+        . collect ();
+      which_ids_exist (db_name, driver, &pids_btreeset) . await ? };
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "create_only_nodes_with_no_ids_present") . entered ();
       create_only_nodes_with_no_ids_present (
         db_name, driver, & to_write_typedb )
       . await } ?;
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "delete_out_links") . entered ();
-      delete_out_links (
-        db_name, driver,
-        & to_write_pids, // Will barf if nonempty, which is good.
-        "contains",
-        "container" )
-      . await } ?;
+    { // For existing nodes, re-sync extra_ids.
+      // PITFALL: This pass must complete for every pre-existing pid before any create_all_relationships call runs, because those calls resolve target IDs through has_extra_id — a neighbor save whose target is a merged-into acquirer needs the freshly-added has_extra_id (acquiree_pid → acquirer) to exist at lookup time.
+      let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "replace_extra_ids_of_existing_nodes") . entered ();
+      for node in & to_write_typedb {
+        if pre_existing_pids . contains (node . pid . as_str ()) {
+          overwrite_extra_ids_of_node (
+            db_name, driver, node ) . await ?; } } }
+    { // Delete all 5 outbound relation types before recreating. Otherwise re-saves of existing nodes duplicate every outbound relation except 'contains'.
+      let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "delete_all_outbound_relationships") . entered ();
+      delete_all_outbound_relationships (
+        db_name, driver, & to_write_pids )
+      . await ?; }
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "create_all_relationships") . entered ();
       create_all_relationships (

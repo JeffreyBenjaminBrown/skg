@@ -1,0 +1,273 @@
+#+TITLE: Plan B: unify merges through Vec<DefineNode>
+
+* Context
+
+Today, [[../../server/merge.rs][server/merge.rs]] dispatches to four per-sink merge modules. Three of them ([[../../server/merge/fs.rs][fs.rs]], [[../../server/merge/tantivy.rs][tantivy.rs]], and the in-memory graph block inline in 'merge_nodes') already do the same thing: flatten each Merge to three 'DefineNode's via ''Merge::to_vec'' and pipe those through the ordinary save-pipeline functions. Only [[../../server/merge/typedb.rs][merge/typedb.rs]] still has per-relation rewiring code that bypasses the save pipeline.
+
+The goal: replace [[../../server/merge/typedb.rs][merge/typedb.rs]] with the same "flatten to 'Vec<DefineNode>', hand to the save pipeline" shape the other three sinks use. When done, 'merge_nodes' becomes a thin wrapper that computes one 'Vec<DefineNode>' and fans it out through the existing ''update_*_from_saveinstructions'' functions. One code path for merges; the instruction-list vocabulary is shared with normal saves.
+
+For the big-picture motivation — why we wanted a uniform 'Vec<DefineNode>' across sinks in the first place, and how this interacts with the in-memory graph (Plan C) — see [[../../.claude/plans/many-and-better-node-types.org][many-and-better-node-types.org]]. This plan only describes the /what and how/ of Plan B.
+
+* Current state
+
+Entry point: ''merge_nodes'' in [[../../server/merge.rs][server/merge.rs]]. For each sink, the status today (on branch 'many-and-better-node-types'):
+
+- *Filesystem*: [[../../server/merge/fs.rs][merge/fs.rs]] calls ''update_fs_from_saveinstructions'' on the flattened 'DefineNode's. Uniform. Good.
+- *In-memory graph*: the inline block in 'merge_nodes' flattens Merges via ''Merge::to_vec'' and calls ''apply_definenodes''. Uniform. Good.
+- *TypeDB*: [[../../server/merge/typedb.rs][merge/typedb.rs]] performs ~15 distinct TypeQL mutations per merge (see ''merge_one_node_in_typedb''). Calls ''create_node'' for the preserver, then eight ''reroute_relationships_for_merge'' / ''drop_relationships_for_merge'' calls for the five relation types and their two roles, plus ''reroute_what_acquiree_hides'' (which itself runs a TypeDB query), plus ''reroute_extra_ids_for_merge'' and ''create_and_connect_extra_id'', plus the acquiree delete, plus the final ''insert_relationship_from_list'' to add the preserver to the acquirer's contents. Not uniform. Plan B replaces this.
+- *Tantivy*: [[../../server/merge/tantivy.rs][merge/tantivy.rs]] calls ''update_tantivy_from_saveinstructions'' on the flattened 'DefineNode's. Uniform. Good.
+
+The 'Vec<DefineNode>' that ''Merge::to_vec'' produces ([[../../server/types/save.rs][server/types/save.rs]] line 185) is three instructions per Merge:
+
+  - 'SaveNode(acquiree_text_preserver)' — a brand-new node carrying the acquiree's body.
+  - 'SaveNode(updated_acquirer)' — the acquirer with its new 'contains', 'extra_ids' (includes acquiree's pid and extra_ids), 'subscribes_to', 'hides_from_its_subscriptions', and 'overrides_view_of' already baked in by ''three_merged_skgnodes'' in [[../../server/merge/mergeInstructionTriple.rs][mergeInstructionTriple.rs]].
+  - 'DeleteNode(acquiree_to_delete)'.
+
+Those three 'DefineNode's fully describe what the merge does /from the acquirer's and acquiree's perspective/. What they don't describe are *inbound* edges: relations in other nodes that pointed at the acquiree.
+
+* The simplifying insight
+
+Every inbound reference to the acquiree, whether it lives in another node's 'contains' / 'subscribes_to' / 'hides_from_its_subscriptions' / 'overrides_view_of' field or is derived from another node's body text (a textlink), stays valid /without being rewritten/. The acquiree's pid becomes an 'extra_id' on the acquirer (that's already in 'updated_acquirer.extra_ids'). TypeDB's ''insert_relationship_from_list'' ([[../../server/dbs/typedb/relationships.rs][server/dbs/typedb/relationships.rs]] line ~150) already resolves a reference either directly or through 'has_extra_id'. So a neighbor node whose 'contains' vec still holds 'acquiree_id' will, on any save, have a TypeDB 'contains' relation created pointing at the acquirer.
+
+That's also the answer to "does N still hide or override the merged entity post-merge?" — yes, because the user intent was expressed toward one of the two merged nodes and those are now one thing. Extra_id resolution propagates that intent automatically.
+
+Two consequences:
+
+1. *No neighbor .skg file edits are required.* Neighbor 'contains' / 'subscribes_to' / 'hides_from_its_subscriptions' / 'overrides_view_of' vectors stay as they are, with 'acquiree_id' in place; resolution to acquirer happens at read time.
+
+2. *Neighbor SaveNodes are still needed — but only to close the temporal gap in TypeDB.* TypeDB cascade-deletes every relation involving the acquiree when the acquiree is deleted. Without something re-creating those relations immediately, TypeDB is inconsistent with FS until each affected neighbor happens to be saved again for unrelated reasons. Re-saving those neighbors /now/ (with their 'NodeComplete's unchanged) is enough: the save pipeline cascade-re-creates their outbound relations, extra_id resolution points them at the acquirer. FS and TypeDB end up identical post-merge.
+
+* Target state
+
+''merge_nodes'' in [[../../server/merge.rs][server/merge.rs]] shrinks to roughly:
+
+  1. For each Merge, compute the three primary DefineNodes ('Merge::to_vec()') plus a set of "affected neighbor" SaveNodes (defined below).
+  2. Concatenate into one 'Vec<DefineNode>'.
+  3. Call ''update_fs_from_saveinstructions'', ''apply_definenodes'' on the graph, ''update_typedb_from_saveinstructions'', ''update_tantivy_from_saveinstructions'' in the same order as today's [[../../server/save.rs][save.rs]].
+
+[[../../server/merge/typedb.rs][server/merge/typedb.rs]] goes away, along with [[../../server/merge/fs.rs][server/merge/fs.rs]] and [[../../server/merge/tantivy.rs][server/merge/tantivy.rs]] (they become trivial wrappers at that point, so fold them into 'merge_nodes' directly).
+
+* Approach
+
+** Step 1: discover affected neighbors
+
+A neighbor N is "affected" if any of the following is true in TypeDB — in each case, the acquiree plays the object (second relationship member) and N plays the subject (first relationship member) — i.e. the outbound edge lives on N, pointing at acquiree:
+
+  - N plays 'container' in a 'contains' relation (N contains acquiree).
+  - N plays 'subscriber' in a 'subscribes' relation (N subscribes to acquiree).
+  - N plays 'source' in a 'textlinks_to' relation (N's body has a textlink to acquiree).
+  - N plays 'hider' in a 'hides_from_its_subscriptions' relation (N hides acquiree).
+  - N plays 'replacement' in an 'overrides_view_of' relation (N replaces acquiree's view).
+
+Everything where acquiree played the /subject/ (first relationship member) — acquiree contains X, acquiree subscribes to Y, acquiree's body has textlinks out to Z, acquiree hides W, acquiree replaces V — is already covered by the primary 3×N DefineNodes: updated_acquirer's fields inherit those, and the preserver re-derives its outbound textlinks from the preserved body text when saved. No neighbor save needed for those.
+
+Add a function ''affected_neighbors_of_merge'' (probably living in [[../../server/merge/mergeInstructionTriple.rs][mergeInstructionTriple.rs]] alongside ''three_merged_skgnodes'') that:
+
+  - Issues the five TypeDB queries above for a given acquiree_id, returning a deduplicated 'Vec<ID>' of PIDs.
+  - Filters out any PIDs that are themselves acquiree_ids or acquirer_ids in /any/ merge in the current batch — those are already handled by the primary 3×N DefineNodes, and re-saving them would double-process.
+
+For each affected neighbor PID, load its current 'NodeComplete' from disk (via ''skgnode_from_id'' in [[../../server/dbs/filesystem/one_node.rs][server/dbs/filesystem/one_node.rs]]) and wrap it in 'SaveNode'. The NodeComplete's fields are /unchanged/ — acquiree_id stays in whatever vector it's in. Extra_id resolution does the work.
+
+Concatenate: '[primary 3×N DefineNodes] ++ [neighbor SaveNodes]' → one 'Vec<DefineNode>'.
+
+*** PITFALL: cross-merge dedup
+
+Using R_i = acquirer of merge i, E_i = acquiree of merge i: suppose R2 contains E1 (so R2 plays 'container' in a contains relation with E1 as the object). The neighbor-of-merge-1 discovery step would pick up R2. But R2 is already in the primary 3×N DefineNodes as merge 2's 'updated_acquirer'; emitting a neighbor SaveNode for it would double-process. Dedup by subtracting the set '{all R_i} ∪ {all E_i}' from discovered neighbors before loading their NodeCompletes.
+
+**** DONE Jeff speaking
+Huh? You wrote 'merge 2 acquires node B ... B itself is the acquirer ...' Which is B, acquirer or acquiree?
+
+Better names to use would be:
+R1 = acquirer in merge 1
+E1 = acquiree in merge 1
+R2, E2: etc.
+
+***** DONE
+Rewritten above using the R_i / E_i naming. "B" no longer appears.
+
+*** DONE Jeff speaking
+You wrote
+```
+  - It plays 'container' or 'contained' in a 'contains' relation with the acquiree.
+  - It plays 'subscriber' or 'subscribee' in a 'subscribes' relation with the acquiree.
+```
+I believe that should be:
+```
+  - It plays 'container' in a 'contains' relation with the acquiree.
+  - It plays 'subscriber' in a 'subscribes' relation with the acquiree.
+```
+That's because if it was instead the content or the subscribee, the relationship would be reconstructed from the acquirer.
+
+Am I wrong?
+
+**** DONE
+You're right. For 'contained' and 'subscribee' cases, the relation has acquiree playing the /subject/ (first relationship member — acquiree contains X, acquiree subscribes to Y). Those are already captured in 'updated_acquirer.contains' and 'updated_acquirer.subscribes_to' (since ''three_merged_skgnodes'' unions acquiree's outbound fields into the updated acquirer). When updated_acquirer is saved, ''create_all_relationships'' re-creates those edges with acquirer as container/subscriber — no neighbor save needed.
+
+Only the cases where acquiree is the object (acquiree plays 'contained' / 'subscribee' / 'dest' / 'hidden' / 'replaced') require neighbor saves, because those edges live on /other/ nodes' outbound fields and only re-form when those other nodes are saved.
+
+Step 1's bullet list has been corrected to name only the subject role of N, and a sentence below the list explicitly calls out why the other direction is already covered.
+** Step 2: fix latent save-pipeline gaps
+
+Two things that ''update_typedb_from_saveinstructions'' in [[../../server/save.rs][server/save.rs]] does not do today, which Plan B needs:
+
+*** Extra_id updates for existing nodes
+
+''create_only_nodes_with_no_ids_present'' in [[../../server/dbs/typedb/nodes.rs][dbs/typedb/nodes.rs]] calls ''insert_extra_ids'' only for /new/ nodes (ones whose pid isn't already in TypeDB). For existing nodes being re-saved — which includes every merge's 'updated_acquirer' — the new extra_ids never get written.
+
+Fix: before ''create_all_relationships'', for every 'to_write_pid' that already exists, delete all 'has_extra_id' relations with that node as 'node', then call ''insert_extra_ids'' with the node's current extra_id list. Idempotent; same pattern as today's "delete outbound contains then recreate" dance.
+
+This fix benefits /all/ saves, not just merges. Today, a user editing a node's extra_ids via the save pipeline would silently drop the change in TypeDB — that's a latent bug that Plan B happens to expose.
+
+*** Outbound-relation cleanup for all relation types
+
+''update_typedb_from_saveinstructions'' currently calls ''delete_out_links'' only for ('contains', 'container'). It then runs ''create_all_relationships'' which inserts relations for all five types. For an existing node being re-saved, outbound textlinks_to / subscribes / hides / overrides get /duplicated/ because their old copies weren't deleted.
+
+Fix: loop over ''OUTBOUND_RELATIONSHIP_TYPES'' in [[../../server/dbs/typedb/relationships.rs][dbs/typedb/relationships.rs]] and call ''delete_out_links'' for each '(relation_name, role_a)'. Then ''create_all_relationships'' runs against a clean slate.
+
+Also a latent bug Plan B exposes: today, re-saving an existing node with (say) edited textlinks would leave the old textlinks in place alongside the new ones.
+
+** Step 3: rewrite 'merge_nodes'
+
+The new ''merge_nodes'' body:
+
+  1. If 'merge_instructions' is empty, return Ok.
+  2. For each Merge, call ''affected_neighbors_of_merge'' to find neighbor PIDs.
+  3. Dedup neighbor PIDs across the batch; subtract all acquirer_ids and acquiree_ids.
+  4. Load neighbor NodeCompletes from disk; wrap in SaveNode.
+  5. Concatenate primary DefineNodes + neighbor SaveNodes.
+  6. Call ''update_fs_from_saveinstructions'' with empty source_moves. On error, return.
+  7. Call ''apply_definenodes'' on the graph handle.
+  8. Call ''update_typedb_from_saveinstructions''. On error, ''rebuild_typedb_from_disk'' (same recovery as today's 'merge_nodes').
+  9. Call ''update_tantivy_from_saveinstructions''. On error, ''rebuild_tantivy_from_disk'' and return the new index.
+
+Structurally identical to ''update_graph_minus_merges'' in [[../../server/save.rs][save.rs]]. In fact after Plan B the two functions are different only in /what they put into the Vec<DefineNode>/; the fan-out is the same. A single shared helper that takes a 'Vec<DefineNode>' and applies it to all four sinks with the usual recovery would finish the unification — noted as a follow-on.
+
+** Step 4: delete the old merge sink modules
+
+Remove:
+
+  - [[../../server/merge/typedb.rs][server/merge/typedb.rs]] entirely (''merge_nodes_in_typedb'', ''merge_one_node_in_typedb'', ''reroute_relationships_for_merge'', ''drop_relationships_for_merge'', ''reroute_what_acquiree_hides'', ''reroute_extra_ids_for_merge'', ''create_and_connect_extra_id'').
+  - [[../../server/merge/fs.rs][server/merge/fs.rs]] (the new ''merge_nodes'' inlines it).
+  - [[../../server/merge/tantivy.rs][server/merge/tantivy.rs]] (same).
+
+Update [[../../server/merge.rs][server/merge.rs]]'s module declarations accordingly.
+
+* Files likely touched
+
+- [[../../server/merge.rs][server/merge.rs]] — rewrite ''merge_nodes''.
+- [[../../server/merge/mergeInstructionTriple.rs][server/merge/mergeInstructionTriple.rs]] — add ''affected_neighbors_of_merge'' or similar. This is the natural home: the file already holds the "compute the Merge from viewnode forest + disk reads" logic.
+- [[../../server/merge/fs.rs][server/merge/fs.rs]] — delete.
+- [[../../server/merge/tantivy.rs][server/merge/tantivy.rs]] — delete.
+- [[../../server/merge/typedb.rs][server/merge/typedb.rs]] — delete.
+- [[../../server/save.rs][server/save.rs]] — fix extra_ids update path and outbound-relation cleanup in ''update_typedb_from_saveinstructions'' (or wherever cleaner).
+- [[../../server/dbs/typedb/nodes.rs][server/dbs/typedb/nodes.rs]] — possibly expose a "delete all has_extra_id relations for this pid" helper if one isn't already suitable. ''reroute_extra_ids_for_merge'' in merge/typedb.rs is close but not quite.
+- [[../../server/dbs/typedb/relationships.rs][server/dbs/typedb/relationships.rs]] — confirm ''delete_out_links'' accepts any relation_name / role_a pair (it should; just making sure).
+
+Nothing changes in: [[../../server/merge/validate_merge.rs][merge/validate_merge.rs]] (validation is independent of application); [[../../server/types/save.rs][types/save.rs]] ('Merge::to_vec' stays the same); [[../../server/dbs/memory.rs][dbs/memory.rs]] (the in-memory graph already applies DefineNodes uniformly).
+
+* Verification
+
+** Automated
+
+- 'cargo build' and 'cargo build --tests' after each step.
+- 'bash bash/nextest.sh' all-pass. In particular:
+  - [[../../tests/merge/merge_nodes.rs][tests/merge/merge_nodes.rs]] — has 'test_merge_2_into_1' and 'test_merge_1_into_2', the core merge tests. These exercise extra_ids migration, 'contains' rewiring, and the "overlap deduplicated" case.
+  - [[../../tests/merge/merge_container_into_content.rs][tests/merge/merge_container_into_content.rs]] — full save-and-rerender pipeline with a merge-inside-contains pattern.
+  - [[../../tests/move_source.rs][tests/move_source.rs]] — exercises ''update_graph_minus_merges''; the save-pipeline fixes from Step 2 must not regress it.
+- [[../../bash/emacs-tests.sh][bash/emacs-tests.sh]] and [[../../bash/integration-tests.sh][bash/integration-tests.sh]] all-pass.
+
+** Manual / custom
+
+- *FS vs TypeDB consistency check post-merge*: write a scratch test that performs a merge, then compares every relation in TypeDB against the FS-derived expectation (every neighbor's current 'contains' / 'subscribes_to' / 'hides_from_its_subscriptions' / 'overrides_view_of' resolved through extra_ids). Expect zero divergence. If Plan C's consistency audit exists by that point, use it.
+
+- *Latent-bug regression*: before Step 2, write a small test that saves an existing node with an added extra_id and with altered textlinks in the body, then queries TypeDB to confirm both are picked up. This test should /fail/ on main; it should pass after Step 2's fixes. That documents the bug fix and guards against regression.
+
+- *Merge + rebuild-dbs consistency*: perform a merge, run rebuild-dbs from disk, diff TypeDB state before and after rebuild. Post-Plan-B: zero difference (because the "drop hides/overrides" behavior — which rebuild-dbs did not preserve — is gone).
+
+* Problems
+
+** DONE How many TypeDB queries per merge?
+
+Step 1 issues five queries per acquiree (one per relation-role pair). On a batch of N merges, that's 5N queries. Each returns at most thousands of neighbors in an adversarial case, typically O(10). Not obviously a problem — merges are rare and user-triggered — but flagging it because Plan C has established that TypeDB queries are the /latency/ bottleneck we set out to address. Worth measuring before concluding it's fine.
+
+Possible mitigation: if Plan C phase 3 (route reads through graph) has landed, three of the five queries ('contains', 'subscribes', 'hides', 'overrides' inbound) could come from the in-memory graph /if/ the graph maintains inverse indexes. It does not today. Building those indexes is Plan C's concern; Plan B should not block on them.
+
+Textlinks inbound cannot come from the graph — the graph stores NodeRust, which omits 'textlinks_to'. That query stays on TypeDB regardless.
+
+*** Jeff : it's fine.
+Merges are very rare.
+
+** DONE Neighbor NodeComplete loads hit the disk
+
+Step 1 loads N neighbor NodeCompletes from .skg files after discovering their PIDs. For typical merges (few neighbors), negligible. For pathological merges (thousands of neighbors), multi-second. Flagging because it scales with neighbor count.
+
+If Plan C phase 3 has landed, these loads become in-memory graph lookups — free. Again, don't block Plan B on this; just note that Plan B gets faster when Plan C phase 3 lands.
+
+** DONE Tantivy over-indexing
+
+The neighbor SaveNodes also flow to Tantivy's ''update_tantivy_from_saveinstructions'', which re-indexes each neighbor's title + body. Those are unchanged (a neighbor's title/body isn't touched by the merge), so the re-index is pure waste.
+
+Mitigation: either filter the 'Vec<DefineNode>' before passing to Tantivy (keep only the primary 3×N), or accept the over-indexing since Tantivy is fast. Recommend accepting for now; revisit if benchmarks show it matters. Documents as a known over-index.
+
+** DONE FS over-writing
+
+Same story for FS: the neighbor SaveNodes re-write neighbor .skg files with unchanged content. Pure I/O waste (mtimes change, git-dirty state changes). Same mitigation: filter or accept.
+
+This one might actually /matter/: dirtying mtimes on arbitrary neighbors affects git history and incremental-rebuild heuristics. A single merge could touch hundreds of files that "didn't really change." Jeff should probably filter for FS at least.
+
+Concrete filter: before calling ''update_fs_from_saveinstructions'', strip every SaveNode whose NodeComplete matches disk byte-for-byte (re-read and diff). Clunky but reliable; or, smarter, strip anything not in the primary 3×N set. The neighbor SaveNodes only exist to propagate the cascade+recreate through TypeDB.
+
+Decision: only send primary 3×N SaveNodes to FS and Tantivy. Send primary 3×N /plus/ neighbor SaveNodes to TypeDB (via a parameter split or two separate calls). The in-memory graph gets primary 3×N (graph stores NodeRust; neighbor NodeRust is unchanged so re-publishing is a waste — but applying them is also harmless and keeps the code path uniform; minor).
+
+Unification regresses slightly: the fan-out is no longer a single 'Vec<DefineNode>' but a "primary DefineNodes + TypeDB-only DefineNodes" pair. Still uniform for fs/tantivy/graph; only TypeDB sees the expanded list. That asymmetry is worth the I/O savings.
+
+*** DONE Jeff : agreed
+
+** DONE The 'updated_acquirer.hides_from_its_subscriptions' logic in 'three_merged_skgnodes'
+
+Today's ''three_merged_skgnodes'' filters 'updated_acquirer.hides_from_its_subscriptions' to remove anything in 'new_contains' ("you can't hide your own content"). That logic lives on the acquirer side (its own hides field) and stays unchanged — Plan B doesn't touch it. But it's worth noting: the pre-existing filter is the /only/ place where the union-of-two-hides-lists gets special-cased. Every /other/ field is a plain union/dedup. That asymmetry is fine but worth keeping in mind if future merges want richer semantics.
+
+** DONE What if a neighbor save fails mid-batch?
+
+The current ''merge_nodes'' has rebuild-on-TypeDB-failure and rebuild-on-Tantivy-failure recovery. That recovery is at the /all-sinks-for-this-merge/ level, not per-DefineNode. Plan B preserves that. If mid-batch we fail to save neighbor N, the rebuild-from-disk kicks in — correct but potentially slow. Not a new risk; just inheriting the current model.
+
+** Ordering within the DefineNode batch
+
+''update_typedb_from_saveinstructions'' partitions into 'to_delete' and 'to_save' and processes all deletes before all saves. That's fine for us: the acquiree delete cascades first, then the preserver save creates the preserver, then the updated_acquirer and neighbor saves re-establish relations with extra_id resolution pointing at the acquirer.
+
+One subtle ordering requirement: 'has_extra_id' for the acquirer (the new acquiree-pid-as-extra-id) must exist /before/ any neighbor save runs, because the neighbor saves resolve acquiree_id through has_extra_id. Current ''create_all_relationships'' does not create has_extra_id; ''create_node'' does via ''insert_extra_ids'' /but only for new nodes/. So the Step 2 fix (extra_ids update for existing nodes) must happen strictly before the per-neighbor ''create_all_relationships''.
+
+Concretely: the Step 2 fix's "delete all has_extra_id then re-insert" pass should happen once, for all saves, before the ''create_all_relationships'' loop. Not per-node-interleaved. That's a schedule constraint worth writing into the fix's implementation.
+
+The implementation must carry a PITFALL comment at the extra_ids-update call site in ''update_typedb_from_saveinstructions'' explaining the ordering requirement — specifically: "This pass must complete for every to_write_pid /before/ any ''create_all_relationships'' call runs, because those calls resolve target IDs through 'has_extra_id', and a neighbor save whose target is the acquirer needs the freshly-added has_extra_id (acquiree_pid → acquirer) to exist at lookup time."
+
+*** DONE be sure to PITFALL-document this in some comment
+It looks like it could trip someone up.
+
+Noted in the plan body above. The fix will not compile without the PITFALL comment.
+
+** DONE Is 'merge_nodes_in_fs' really a no-op today for neighbor files?
+
+Yes — I confirmed by reading [[../../server/merge/fs.rs][merge/fs.rs]]. It passes the three primary DefineNodes to ''update_fs_from_saveinstructions''. Neighbors' .skg files are never touched. Plan B preserves this (per the "FS over-writing" decision above): FS still only sees the primary 3×N.
+
+* Problems, out of scope
+
+** 'create_all_relationships' does not handle 'has_extra_id'
+
+PITFALL comment at [[../../server/dbs/typedb/relationships.rs][server/dbs/typedb/relationships.rs]] line 29. 'has_extra_id' creation is split off into 'insert_extra_ids' which is called by 'create_node' /only for new nodes/. So any update-path save — including but not limited to merges — silently drops extra_id changes. Plan B's Step 2 fix addresses this, but the underlying architecture (an "optional attribute" relation that gets special-cased in creation but not in update) is worth auditing more broadly. Flagging for [[../../TODO/problems.org][TODO/problems.org]].
+
+** Duplicate outbound relations on re-save of existing nodes
+
+Same root cause as above: ''update_typedb_from_saveinstructions'' only ''delete_out_links'' for 'contains', but ''create_all_relationships'' inserts for all five types. Any existing-node save accumulates duplicates for the other four types. Plan B's Step 2 fix addresses this; worth auditing for other paths that might exhibit it (imports, rebuilds).
+
+** Validation and merge-compute still bypass the in-memory graph
+
+[[../../server/merge/validate_merge.rs][validate_merge.rs]] calls ''pid_and_source_from_id'' which hits TypeDB. ''instructiontriples_from_the_merges_in_an_viewnode_forest'' in [[../../server/merge/mergeInstructionTriple.rs][mergeInstructionTriple.rs]] calls ''skgnode_from_id'' which hits TypeDB + disk. Both could come from the in-memory graph ([[../../server/dbs/memory.rs][dbs/memory.rs]]) if Plan C phase 3 had routed reads through it. Not a Plan B concern but consuming free performance until Plan C closes it.
+
+** String-concatenated TypeQL
+
+The merge/typedb.rs queries build TypeQL by format-stringing IDs directly. Not an injection risk in this trust model, but brittle. Plan B removes the whole file, which resolves this specific instance. But the pattern recurs in [[../../server/dbs/typedb/][server/dbs/typedb/]] — worth a broader audit and maybe a lightweight query-builder abstraction.
+
+** The three-DefineNode abstraction is output-oriented; merge is input-oriented
+
+The real architectural tension behind Plan B: 'DefineNode' describes /what a node should look like after this operation/. A merge, in its natural formulation, describes /what was pointing at the acquiree that must now point at someone else/. The simplifying insight (extra_id resolution does the rewiring) bridges the gap without changing the abstraction — but only because extra_id resolution happens to cover all five relation types' inbound cases. If a future relation type is added that extra_id resolution /doesn't/ handle (e.g., a relation that must distinguish the merged nodes rather than treat them as equivalent), Plan B's approach would need revisiting. Not a concern today; worth remembering.

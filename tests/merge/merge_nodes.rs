@@ -480,14 +480,19 @@ async fn verify_typedb_after_merge_1_into_2 (
   assert!(!node_2_hides . contains(&ID::from ("hidden-from-subscriptions-of-1-but-in-content-of-2")),
           "Node 2 should NOT hide hidden-from-subscriptions-of-1-but-in-content-of-2");
 
-  // - hides-1-from-subscriptions hid [1, 11] → should now hide [11] only (relationship hiding 1 is DROPPED)
+  // - hides-1-from-subscriptions hid [1, 11] on disk.
+  //   Post-merge, TypeDB resolves the "1" reference through has_extra_id
+  //   to node 2 (the acquirer). So hides-1-from-subscriptions should
+  //   hide [2, 11]. Node 1 itself no longer exists as a node entity.
   let hides_1_targets: HashSet<ID> = find_related_nodes(
     db_name, driver, & [ ID::from ("hides-1-from-subscriptions") ], "hides_from_its_subscriptions", "hider", "hidden"
   ) . await?;
   assert!(hides_1_targets . contains(&ID::from ("11")),
           "hides-1-from-subscriptions should still hide 11");
-  assert!(!hides_1_targets . contains(&ID::from ("1")) && !hides_1_targets . contains(&ID::from ("2")),
-          "hides-1-from-subscriptions should NOT hide 1 or 2 (relationship to merged node is DROPPED)");
+  assert!(hides_1_targets . contains(&ID::from ("2")),
+          "hides-1-from-subscriptions should now hide 2 (extra_id resolution of 1 → 2)");
+  assert!(!hides_1_targets . contains(&ID::from ("1")),
+          "Node 1 no longer exists as a node entity");
 
   // Overrides relationships should be processed correctly
   // - Node 1's overrides [1-overrides-view-of] should transfer to node 2
@@ -497,13 +502,15 @@ async fn verify_typedb_after_merge_1_into_2 (
   assert!(node_2_overrides . contains(&ID::from ("1-overrides-view-of")),
           "Node 2 should override view of 1-overrides-view-of (transferred from node 1)");
 
-  // - overrides-view-of-1 that overrode [1] should have that relationship DROPPED (1 no longer exists to be replaced)
+  // - overrides-view-of-1 overrode [1] on disk. Post-merge, extra_id
+  //   resolution redirects "1" to node 2, so it now overrides [2].
   let overrides_view_of_1_targets: HashSet<ID> = find_related_nodes(
     db_name, driver, & [ ID::from ("overrides-view-of-1") ],
     "overrides_view_of", "replacement", "replaced" ) . await ?;
-  assert!(!overrides_view_of_1_targets . contains(&ID::from ("1")) &&
-          !overrides_view_of_1_targets . contains(&ID::from ("2")),
-          "overrides-view-of-1 should NOT override 1 or 2 (relationship to merged node is DROPPED)");
+  assert!(overrides_view_of_1_targets . contains(&ID::from ("2")),
+          "overrides-view-of-1 should now override 2 (extra_id resolution of 1 → 2)");
+  assert!(!overrides_view_of_1_targets . contains(&ID::from ("1")),
+          "Node 1 no longer exists as a node entity");
   Ok (( )) }
 
 fn verify_filesystem_after_merge_1_into_2(
