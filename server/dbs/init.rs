@@ -6,7 +6,7 @@ use crate::context::link_targets_from_nodes;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::multiple_nodes::read_modified_skg_files_from_sources;
 use crate::dbs::tantivy::open_existing_tantivy_index;
-use crate::dbs::tantivy::update_index_with_nodes;
+use crate::dbs::tantivy::write::update_index_with_nodes;
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::relationships::create_all_relationships;

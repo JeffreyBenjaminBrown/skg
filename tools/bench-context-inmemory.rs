@@ -89,7 +89,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
   // Populate Tantivy with node titles so context types can be stored
   let t5 : Instant = Instant::now ();
   let indexed : usize =
-    skg::dbs::tantivy::update_index_with_nodes (
+    skg::dbs::tantivy::write::update_index_with_nodes (
       &nodes, &tantivy_index ) ?;
   let tantivy_pop_time : f64 = t5 . elapsed () . as_secs_f64 ();
   println! ("3. Tantivy populated ({} docs): {:.3}s",
@@ -130,7 +130,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
     let tantivy_index2 : TantivyIndex =
       create_empty_tantivy_index (
         &tantivy_dir . path () . join (format! ("run{}", i)) ) ?;
-    skg::dbs::tantivy::update_index_with_nodes (
+    skg::dbs::tantivy::write::update_index_with_nodes (
       &nodes, &tantivy_index2 ) ?;
     let t : Instant = Instant::now ();
     let _ = compute_and_store_context_types (
