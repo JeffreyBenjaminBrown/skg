@@ -34,7 +34,7 @@ impl NodeTypedb {
   /// Build a NodeTypedb from a complete node plus parsed textlinks.
   /// 'textlinks' is the caller's responsibility (derived from body
   /// parsing); NodeComplete doesn't carry it.
-  pub fn from_complete_and_textlinks (
+  pub fn from_nodecomplete_and_textlinks (
     complete  : &NodeComplete,
     textlinks : Vec<ID>,
   ) -> Self {
@@ -52,7 +52,7 @@ impl NodeTypedb {
 
   /// Convenience: build a NodeTypedb from a complete node, parsing
   /// textlinks from its title+body in the process. Equivalent to
-  /// calling 'from_complete_and_textlinks' with parsed textlinks.
+  /// calling 'from_nodecomplete_and_textlinks' with parsed textlinks.
   pub fn from_complete_parsing_textlinks (
     complete : &NodeComplete,
   ) -> Self {
@@ -61,6 +61,6 @@ impl NodeTypedb {
       . into_iter ()
       . map ( |tl| tl . id )
       . collect ();
-    Self::from_complete_and_textlinks (complete, textlinks)
+    Self::from_nodecomplete_and_textlinks (complete, textlinks)
   }
 }

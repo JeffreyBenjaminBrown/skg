@@ -172,7 +172,7 @@ round-trip is 'NodeFS + SourceName <-> NodeComplete'.
   // which is NOT on NodeComplete (body parser produces it
   // separately). So the constructor takes them alongside.
   impl NodeTypedb {
-      pub fn from_complete_and_textlinks (
+      pub fn from_nodecomplete_and_textlinks (
           complete   : &NodeComplete,
           textlinks  : Vec<ID>,
       ) -> Self { /* ... */ }
