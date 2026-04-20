@@ -5,7 +5,7 @@ use skg::context::{
   ContextOriginType,
   MapToContent,
   MapToContainers,
-  contains_maps_from_nodes,
+  content_maps_from_nodes,
   had_id_set_from_nodes,
   link_targets_from_nodes,
   find_roots_and_multiply_contained,
@@ -239,7 +239,7 @@ fn test_full_context_pipeline () {
   // Extract data from SkgNodes.
   let ( map_to_content, map_to_containers )
     : ( MapToContent, MapToContainers )
-    = contains_maps_from_nodes (&nodes);
+    = content_maps_from_nodes (&nodes);
   let link_targets : HashSet<ID> =
     link_targets_from_nodes (&nodes);
   let had_id_set : HashSet<ID> =

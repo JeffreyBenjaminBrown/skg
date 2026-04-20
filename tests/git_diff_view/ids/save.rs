@@ -19,7 +19,7 @@ fn test_delete_id_col_scaffold_respawns()
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
         memory            : SkgnodesInMemory::new (),
-        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
+        graph             : new_handle (Graph::new ()) };
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -59,7 +59,7 @@ fn test_delete_id_scaffolds_respawns()
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
         memory            : SkgnodesInMemory::new (),
-        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
+        graph             : new_handle (Graph::new ()) };
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -93,7 +93,7 @@ fn test_edit_id_scaffold_respawns()
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
         memory            : SkgnodesInMemory::new (),
-        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
+        graph             : new_handle (Graph::new ()) };
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -136,7 +136,7 @@ fn test_move_id_scaffolds_to_child_respawns()
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
         memory            : SkgnodesInMemory::new (),
-        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
+        graph             : new_handle (Graph::new ()) };
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,

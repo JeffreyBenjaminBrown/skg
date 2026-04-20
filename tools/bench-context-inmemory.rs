@@ -9,7 +9,7 @@
 
 use skg::context::{
   compute_and_store_context_types,
-  contains_maps_from_nodes,
+  content_maps_from_nodes,
   had_id_set_from_nodes,
   link_targets_from_nodes,
   MapToContent,
@@ -71,7 +71,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
   let t4 : Instant = Instant::now ();
   let ( contains_map, reverse_map )
     : ( MapToContent, MapToContainers )
-    = contains_maps_from_nodes (&nodes);
+    = content_maps_from_nodes (&nodes);
   let maps_time : f64 = t4 . elapsed () . as_secs_f64 ();
   let edge_count : usize =
     contains_map . values () . map ( |v| v . len () ) . sum ();

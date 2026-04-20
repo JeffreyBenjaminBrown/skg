@@ -19,7 +19,7 @@ fn test_delete_text_changed_scaffold_respawns()
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
         memory            : SkgnodesInMemory::new (),
-        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
+        graph             : new_handle (Graph::new ()) };
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -56,7 +56,7 @@ fn test_edit_text_changed_node_updates_disk()
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
         memory            : SkgnodesInMemory::new (),
-        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
+        graph             : new_handle (Graph::new ()) };
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -94,7 +94,7 @@ fn test_edit_text_changed_scaffold_respawns()
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
         memory            : SkgnodesInMemory::new (),
-        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
+        graph             : new_handle (Graph::new ()) };
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -134,7 +134,7 @@ fn test_move_text_changed_scaffold_respawns()
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
         memory            : SkgnodesInMemory::new (),
-        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
+        graph             : new_handle (Graph::new ()) };
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
@@ -169,7 +169,7 @@ fn test_move_text_changed_to_unedited_node_respawns()
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
         memory            : SkgnodesInMemory::new (),
-        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
+        graph             : new_handle (Graph::new ()) };
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,

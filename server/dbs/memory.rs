@@ -12,6 +12,7 @@ use std::sync::Arc;
 use crate::types::misc::ID;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
+use crate::types::save::{DefineNode, DeleteNode, SaveNode};
 
 /// The in-memory projection of the graph.
 ///
@@ -28,7 +29,7 @@ impl Graph {
 
   /// Build from a slice of NodeCompletes. Typically called at
   /// startup after reading all .skg files from disk.
-  pub fn from_completes (completes: &[NodeComplete]) -> Self {
+  pub fn from_nodecompletes (completes: &[NodeComplete]) -> Self {
     let mut nodes : im::HashMap<ID, NodeRust> =
       im::HashMap::new ();
     for c in completes {
@@ -52,11 +53,10 @@ impl Graph {
 /// succeeded. Readers in flight continue to see the old snapshot
 /// until their Arc<Graph> drops; subsequent readers see the new
 /// one.
-pub fn apply_node_defs (
+pub fn apply_definenodes (
   graph     : &GraphHandle,
-  node_defs : &[crate::types::save::DefineNode],
+  node_defs : &[DefineNode],
 ) {
-  use crate::types::save::{DefineNode, DeleteNode, SaveNode};
   let old : Arc<Graph> = graph . load_full ();
   let mut new_graph : Graph = (*old) . clone ();
   for instr in node_defs {

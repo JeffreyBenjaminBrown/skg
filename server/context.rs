@@ -433,7 +433,7 @@ fn climb_containerward_to_cycle (
 /// Build (map-to-content, map-to-containers) maps
 /// from loaded SkgNodes.
 /// This avoids a ~22s TypeDB query on 28k-node datasets.
-pub fn contains_maps_from_nodes (
+pub fn content_maps_from_nodes (
   nodes : &[NodeComplete],
 ) -> (MapToContent, MapToContainers) {
   let mut to_content    : MapToContent    = HashMap::new ();

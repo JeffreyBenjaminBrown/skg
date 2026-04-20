@@ -4,5 +4,6 @@
 
 pub mod filesystem;
 pub mod init;
+pub mod memory;
 pub mod tantivy;
 pub mod typedb;

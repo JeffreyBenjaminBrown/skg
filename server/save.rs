@@ -1,5 +1,6 @@
 use crate::dbs::filesystem::multiple_nodes::{write_all_nodes_to_fs, delete_all_nodes_from_fs};
 use crate::dbs::init::{rebuild_typedb_from_disk, rebuild_tantivy_from_disk};
+use crate::dbs::memory::{GraphHandle, apply_definenodes};
 use crate::dbs::tantivy::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::nodes::delete_nodes_from_pids;
@@ -32,14 +33,14 @@ pub async fn update_graph_minus_merges (
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
   driver        : &TypeDBDriver,
-  graph         : &crate::graph::GraphHandle,
+  graph         : &GraphHandle,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
-  tracing::info!("Updating (1) FS, (1b) in-memory graph, (2) TypeDB, and (3) Tantivy ...");
+  tracing::info!("Updating FS, in-memory graph, TypeDB, and Tantivy ...");
   let db_name : &str = &config . db_name;
 
-  { // Step 1: FS (source of truth)
+  { // FS (source of truth)
     // TODO: Print per-source write information
-    tracing::info!( "1) Writing {} instruction(s) to disk ...",
+    tracing::info!( "Writing {} instruction(s) to disk ...",
                { let total_input : usize = node_defs . len ();
                  total_input } );
     let (deleted_count, written_count) : (usize, usize) =
@@ -51,14 +52,14 @@ pub async fn update_graph_minus_merges (
     tracing::info!( "   Deleted {} file(s), wrote {} file(s).",
               deleted_count, written_count ); }
 
-  { // Step 1b: In-memory graph — atomic snapshot swap so
-    // readers see a view that's consistent with what just landed
-    // on disk, and never a mid-save half-applied state.
+  { // In-memory graph — atomic snapshot swap so readers see a
+    // view that's consistent with what just landed on disk, and
+    // never a mid-save half-applied state.
     let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "apply_node_defs_to_graph") . entered ();
-    crate::graph::apply_node_defs (graph, &node_defs); }
+      "apply_definenodes_to_graph") . entered ();
+    apply_definenodes (graph, &node_defs); }
 
-  // Steps 2 & 3: TypeDB (async) and Tantivy (sync) in parallel.
+  // TypeDB (async) and Tantivy (sync) in parallel.
   // Both are independent after the FS update.
   let tantivy_instructions : Vec<DefineNode> = node_defs . clone ();
   let tantivy_idx : TantivyIndex = tantivy_index . clone ();
@@ -71,7 +72,7 @@ pub async fn update_graph_minus_merges (
         . map_err ( |e| e . to_string () );
       (result, t0 . elapsed ()) });
 
-  if let Err (e) = { // Step 2: TypeDB
+  if let Err (e) = { // TypeDB
     let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "update_typedb_from_saveinstructions") . entered ();
     update_typedb_from_saveinstructions (
@@ -86,7 +87,7 @@ pub async fn update_graph_minus_merges (
     } else {
       tracing::info!("   TypeDB update complete."); }
 
-  // Step 3: collect Tantivy result from its thread
+  // Collect Tantivy result from its thread.
   let (tantivy_result, tantivy_duration)
     : (Result<usize, String>, Duration) =
     tantivy_handle . join ()

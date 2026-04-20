@@ -30,7 +30,7 @@ fn test_newhere_cycle_survives_save()
     let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
         memory            : SkgnodesInMemory::new (),
-        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
+        graph             : new_handle (Graph::new ()) };
     let (mut stream, _) = mk_test_tcp_stream_pair ();
     let response = update_from_and_rerender_buffer(
       &mut stream,

@@ -12,6 +12,7 @@ pub mod protocol;
 pub mod util;
 
 use crate::dbs::typedb::util::delete_database;
+use crate::dbs::memory::GraphHandle;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
@@ -49,7 +50,7 @@ use typedb_driver::TypeDBDriver;
 pub struct ConnectionState {
   pub diff_mode_enabled : bool,
   pub memory            : SkgnodesInMemory,
-  pub graph             : crate::graph::GraphHandle,
+  pub graph             : GraphHandle,
   // PITFALL: If Emacs crashes or the TCP connection drops without sending close-view messages, SkgnodesInMemory is still freed, because ConnectionState is owned by handle_emacs and dropped when the connection loop exits (n == 0). There's no leak. HOWEVER, the pool may briefly hold stale entries for views that were conceptually "closed" by the crash. This is harmless: the entries are freed moments later when ConnectionState drops.
 }
 
@@ -58,7 +59,7 @@ pub fn serve (
   config         : SkgConfig,
   typedb_driver  : Arc<TypeDBDriver>,
   tantivy_index  : TantivyIndex,
-  graph          : crate::graph::GraphHandle,
+  graph          : GraphHandle,
   emacs_listener : TcpListener,
 ) -> std::io::Result<()> {
 
@@ -70,7 +71,7 @@ pub fn serve (
           Arc::clone (&typedb_driver); // Cloning permits the main thread to keep the driver and index. If they were passed here instead of cloned, their ownership would be moved into the first spawned thread, making them unavailable for the next connection.
         let tantivy_index_clone : TantivyIndex =
           tantivy_index . clone ();
-        let graph_clone : crate::graph::GraphHandle =
+        let graph_clone : GraphHandle =
           Arc::clone (&graph);
         let config_clone : SkgConfig =
           config        . clone ();
@@ -93,7 +94,7 @@ fn handle_emacs (
   mut stream        : TcpStream,
   typedb_driver     : Arc<TypeDBDriver>,
   mut tantivy_index : TantivyIndex,
-  graph             : crate::graph::GraphHandle,
+  graph             : GraphHandle,
   config            : &SkgConfig,
 ) {
   let mut conn_state : ConnectionState =

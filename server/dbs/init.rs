@@ -1,7 +1,7 @@
 // PURPOSE: Initialize TypeDB and Tantivy databases.
 
 use crate::context::{MapToContent, MapToContainers};
-use crate::context::{contains_maps_from_nodes, had_id_set_from_nodes};
+use crate::context::{content_maps_from_nodes, had_id_set_from_nodes};
 use crate::context::link_targets_from_nodes;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::multiple_nodes::read_modified_skg_files_from_sources;
@@ -16,6 +16,7 @@ use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::nodes::complete::NodeComplete;
+use crate::dbs::memory::{Graph, GraphHandle, new_handle};
 
 use futures::executor::block_on;
 use std::collections::HashSet;
@@ -38,7 +39,7 @@ use typedb_driver::{
 pub struct InitData {
   pub driver        : Arc<TypeDBDriver>,
   pub tantivy_index : TantivyIndex,
-  pub graph         : crate::graph::GraphHandle,
+  pub graph         : GraphHandle,
   pub had_id_set    : HashSet<ID>,
   pub all_node_ids  : HashSet<ID>,
   pub link_targets  : HashSet<ID>,
@@ -155,9 +156,7 @@ fn incremental_init (
     tracing::info! ("No modified .skg files found.");
     return Ok (tantivy_index); }
   tracing::info! (count = nodes . len(), "Modified .skg file(s) found.");
-  // Convert to NodeTypedb (narrow) at the boundary. Parses
-  // textlinks from each node's title+body.
-  let typedb_nodes : Vec<NodeTypedb> =
+  let typedb_nodes : Vec<NodeTypedb> = // Convert to NodeTypedb (narrow) at the boundary. Parses textlinks from each node's title+body.
     nodes . iter ()
     . map (NodeTypedb::from_complete_parsing_textlinks)
     . collect ();
@@ -184,8 +183,7 @@ fn incremental_init (
               "Recreated relationships");
     Ok::<(), Box<dyn Error>> (( )) } ) ?;
   let t3 : Instant = Instant::now();
-  // Convert to NodeTantivy (narrow) at the boundary.
-  let tantivy_nodes : Vec<NodeTantivy> =
+  let tantivy_nodes : Vec<NodeTantivy> = // Convert to NodeTantivy (narrow) at the boundary.
     nodes . iter () . map (NodeTantivy::from) . collect ();
   let indexed : usize =
     update_index_with_nodes (&tantivy_nodes, &tantivy_index) ?;
@@ -208,10 +206,9 @@ fn init_data_from_nodes (
     link_targets_from_nodes (&nodes);
   let ( map_to_content, map_to_containers )
     : ( MapToContent, MapToContainers )
-    = contains_maps_from_nodes (&nodes);
-  let graph : crate::graph::GraphHandle =
-    crate::graph::new_handle (
-      crate::graph::Graph::from_completes (nodes) );
+    = content_maps_from_nodes (&nodes);
+  let graph : GraphHandle =
+    new_handle ( Graph::from_nodecompletes (nodes) );
   InitData {
     driver,
     tantivy_index,
@@ -309,9 +306,7 @@ async fn populate_typedb_from_nodes (
     & config . db_name,
     driver ) . await ?;
   let t0 : Instant = Instant::now();
-  // Convert to NodeTypedb (narrow) at the boundary. Parses
-  // textlinks from each node's title+body.
-  let typedb_nodes : Vec<NodeTypedb> =
+  let typedb_nodes : Vec<NodeTypedb> = // Convert to NodeTypedb (narrow) at the boundary. Parses textlinks from each node's title+body.
     nodes . iter ()
     . map (NodeTypedb::from_complete_parsing_textlinks)
     . collect ();
@@ -411,8 +406,7 @@ pub fn in_fs_wipe_index_then_create_it (
             Box<dyn Error>> {
   let tantivy_index : TantivyIndex =
     create_empty_tantivy_index (index_path)?;
-  // Convert to NodeTantivy (narrow) at the boundary.
-  let tantivy_nodes : Vec<NodeTantivy> =
+  let tantivy_nodes : Vec<NodeTantivy> = // Convert to NodeTantivy (narrow) at the boundary.
     nodes . iter () . map (NodeTantivy::from) . collect ();
   let indexed_count: usize =
     update_index_with_nodes ( &tantivy_nodes, & tantivy_index )?;

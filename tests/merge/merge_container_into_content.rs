@@ -23,6 +23,7 @@ use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
 use skg::serve::ConnectionState;
 use skg::types::memory::SkgnodesInMemory;
 use skg::types::memory::SkgNodeMap;
+use skg::dbs::memory::{Graph, new_handle};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex, SourceName};
 
 use typedb_driver::TypeDBDriver;
@@ -57,7 +58,7 @@ async fn merge_container_into_content_impl (
   let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
         memory            : SkgnodesInMemory::new (),
-        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
+        graph             : new_handle (Graph::new ()) };
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
   let mut stream : TcpStream =

@@ -19,6 +19,7 @@ use skg::types::nodes::complete::NodeComplete;
 use skg::types::memory::SkgNodeMap;
 use skg::serve::ConnectionState;
 use skg::types::memory::SkgnodesInMemory;
+use skg::dbs::memory::{Graph, new_handle};
 use futures::executor::block_on;
 use std::error::Error;
 use std::net::TcpStream;
@@ -148,7 +149,7 @@ fn test_every_kind_of_col(
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
         memory            : SkgnodesInMemory::new (),
-        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
+        graph             : new_handle (Graph::new ()) };
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
           &mut stream,
@@ -224,7 +225,7 @@ fn test_hidden_within_but_none_without(
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
         memory            : SkgnodesInMemory::new (),
-        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
+        graph             : new_handle (Graph::new ()) };
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
           &mut stream,
@@ -301,7 +302,7 @@ fn test_hidden_without_but_none_within(
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
         memory            : SkgnodesInMemory::new (),
-        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
+        graph             : new_handle (Graph::new ()) };
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
         &mut stream,
@@ -374,7 +375,7 @@ fn test_overlapping_hidden_within(
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
         memory            : SkgnodesInMemory::new (),
-        graph             : skg::graph::new_handle (skg::graph::Graph::new ()) };
+        graph             : new_handle (Graph::new ()) };
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
         &mut stream,

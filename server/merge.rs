@@ -5,8 +5,9 @@ pub mod mergeInstructionTriple;
 pub mod validate_merge;
 
 use crate::dbs::init::{rebuild_typedb_from_disk, rebuild_tantivy_from_disk};
+use crate::dbs::memory::{GraphHandle, apply_definenodes};
 use crate::types::misc::{SkgConfig, TantivyIndex};
-use crate::types::save::Merge;
+use crate::types::save::{DefineNode, Merge};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
@@ -22,7 +23,7 @@ pub async fn merge_nodes (
   config             : SkgConfig,
   tantivy_index      : &TantivyIndex,
   driver             : &TypeDBDriver,
-  graph              : &crate::graph::GraphHandle,
+  graph              : &GraphHandle,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
   tracing::info!(
     "Merging nodes in FS, in-memory graph, TypeDB, and Tantivy, in that order ..." );
@@ -35,11 +36,11 @@ pub async fn merge_nodes (
     tracing::info!("   Filesystem merge complete."); }
 
   { // In-memory graph: apply all Merges as DefineNodes.
-    let flat : Vec<crate::types::save::DefineNode> =
+    let flat : Vec<DefineNode> =
       merge_instructions . iter ()
       . flat_map ( |m| m . to_vec () )
       . collect ();
-    crate::graph::apply_node_defs (graph, &flat);
+    apply_definenodes (graph, &flat);
     tracing::info!("   In-memory graph merge complete."); }
 
   if let Err (e)
