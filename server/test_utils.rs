@@ -4,7 +4,7 @@ pub use guard::TestDbGuard;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
 use crate::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
-use crate::dbs::tantivy::search_index;
+use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
@@ -455,7 +455,7 @@ pub fn tantivy_contains_id(
   let (matches, searcher)
     : (Vec<(f32, DocAddress)>, Searcher)
     = search_index ( tantivy_index, query,
-                     & crate::dbs::tantivy::SearchOptions::default () )?;
+                     & SearchOptions::default () )?;
   for (_score, doc_address) in matches {
     let doc: TantivyDocument = searcher . doc (doc_address)?;
     let id_value: Option<String> =

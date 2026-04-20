@@ -7,7 +7,7 @@ use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::one_node::skgnode_from_id;
 use skg::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
-use skg::dbs::tantivy::{SearchOptions, search_index};
+use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::from_text::buffer_to_viewnode_forest_and_save_instructions;

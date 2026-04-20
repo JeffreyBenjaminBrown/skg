@@ -8,7 +8,7 @@ pub mod render_enriched_search_buffer;
 
 use crate::consts::SEARCH_DISPLAY_LIMIT;
 use crate::context::ContextOriginType;
-use crate::dbs::tantivy::search_index;
+use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
 use crate::dbs::typedb::search::all_graphnodestats::{ AllGraphNodeStats, fetch_all_graphnodestats};
 use crate::org_to_text::viewnode_forest_to_string;
@@ -93,8 +93,8 @@ pub fn handle_text_search_request (
           . as_str ()
     { "everywhere" => SearchScope::Everything,
       _            => SearchScope::Rooty };
-  let search_opts : crate::dbs::tantivy::SearchOptions =
-    crate::dbs::tantivy::SearchOptions {
+  let search_opts : SearchOptions =
+    SearchOptions {
       regex     : bool_key ( &sexp, "regex" ),
       body      : bool_key ( &sexp, "body" ),
       operators : bool_key ( &sexp, "operators" ), };
