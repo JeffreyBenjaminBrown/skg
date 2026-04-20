@@ -1,17 +1,10 @@
-//! NodeRust: the Tier A projection held in memory.
+//! NodeRust: the projection held in the in-memory graph.
 //!
 //! Wide enough to match everything in-memory NodeComplete consumers
 //! currently read (render, save completion, merge), so deploying
 //! NodeRust doesn't regress behavior. Narrower than NodeComplete
 //! only in omitting 'misc' (which is consumed only by Tantivy
 //! indexing and the org-roam importer, not by in-memory readers).
-//!
-//! Plan C will use 'im::HashMap<ID, NodeRust>' as the in-memory
-//! graph's value type. For now this struct just exists so Plan C
-//! can build on Plan A.
-//!
-//! See /home/ubuntu/.claude/plans/many-and-better-node-types.org
-//! (Plan A) for the overall design.
 
 use crate::types::misc::{ID, MSV, SourceName};
 use crate::types::nodes::complete::NodeComplete;

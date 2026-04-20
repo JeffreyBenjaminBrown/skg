@@ -7,9 +7,6 @@
 //! Conversions:
 //! - 'NodeFS::into_complete(source)' produces a NodeComplete.
 //! - 'From<&NodeComplete> for NodeFS' drops source for writing.
-//!
-//! See /home/ubuntu/.claude/plans/many-and-better-node-types.org
-//! (Plan A) for the overall design.
 
 use serde::{Serialize, Deserialize};
 
@@ -18,11 +15,7 @@ use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct NodeFS {
-  // Field order and serde attributes mirror 'NodeComplete' exactly, so
-  // YAML output is bit-exact. When anything here changes, update
-  // the matching field in 'NodeComplete'
-  // (see [[./complete.rs][server/types/nodes/complete.rs]]) and
-  // vice versa.
+  // Field order and serde attributes mirror 'NodeComplete' exactly, so YAML output is bit-exact. When anything here changes, update the matching field in 'NodeComplete' (see [[./complete.rs][server/types/nodes/complete.rs]]) and vice versa.
 
   pub title: String,
 

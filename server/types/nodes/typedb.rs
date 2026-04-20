@@ -7,9 +7,6 @@
 //! stored on disk or on NodeComplete. The constructor takes it
 //! alongside a &NodeComplete so the caller explicitly supplies
 //! the parsed result.
-//!
-//! See /home/ubuntu/.claude/plans/many-and-better-node-types.org
-//! (Plan A) for the overall design.
 
 use crate::types::misc::{ID, MSV, SourceName};
 use crate::types::nodes::complete::NodeComplete;

@@ -5,9 +5,6 @@
 //! 'ArcSwap' so readers never block writers and writers never
 //! block readers — writers clone via 'im''s structural sharing
 //! (O(log n) per mutation) and atomically publish a new snapshot.
-//!
-//! See /home/ubuntu/.claude/plans/many-and-better-node-types.org
-//! (Plan C) for the overall design.
 
 use arc_swap::ArcSwap;
 use std::sync::Arc;
@@ -16,7 +13,7 @@ use crate::types::misc::ID;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
 
-/// The Tier A in-memory projection of the graph.
+/// The in-memory projection of the graph.
 ///
 /// Values are 'NodeRust' — everything a 'NodeComplete' has except
 /// 'misc' (which no in-memory consumer reads today).

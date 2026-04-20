@@ -12,9 +12,6 @@
 //! write, convert 'NodeComplete' -> 'NodeFS' via 'From' (dropping
 //! 'source'), then serialize the 'NodeFS'. This way the type
 //! system enforces that 'source' never appears in YAML.
-//!
-//! See /home/ubuntu/.claude/plans/many-and-better-node-types.org
-//! (Plan A) for the overall design.
 
 use crate::types::misc::{ID, MSV, SourceName};
 
@@ -29,29 +26,9 @@ pub enum FileProperty {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct NodeComplete {
-  // There is a 1-to-1 correspondence between NodeCompletes and
-  // actual .skg files. A file can be read into a NodeFS, then
-  // given a source to produce a NodeComplete; a NodeComplete
-  // can be converted to NodeFS and written back. The files are
-  // the only permanent data. NodeComplete is the format used to
-  // initialize the TypeDB and Tantivy databases (via narrowing
-  // conversions to NodeTypedb / NodeTantivy at their boundaries).
-  //
-  // Tantivy receives some of this data, and TypeDB some other
-  // subset. Tantivy associates IDs with titles. TypeDB represents
-  // all the connections between nodes (see 'schema.tql' for how).
-  // At least one field, `body`, is known to neither database; it
-  // is instead read directly from the files on disk when Rust
-  // builds a document for Emacs.
-  //
-  // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/misc.rs)
-  // distinguishes 'Unspecified' ("user didn't mention this field")
-  // from 'Specified(vec![...])' ("user wants it to be this value,
-  // even if empty"). This matters when reconciling multiple
-  // NodeCompletes (e.g. 'reconcile_same_id_instructions' and
-  // 'supplement_none_fields_from_disk_if_save'). On disk the
-  // distinction is not needed: both 'Unspecified' and
-  // 'Specified(vec![])' are rendered as a missing field.
+  // There is a 1-to-1 correspondence between NodeCompletes and actual .skg files. A file can be read into a NodeFS, then given a source to produce a NodeComplete; a NodeComplete can be converted to NodeFS and written back. The files are the only permanent data. NodeComplete is the format used to initialize the TypeDB and Tantivy databases (via narrowing conversions to NodeTypedb / NodeTantivy at their boundaries).
+  // Tantivy receives some of this data, and TypeDB some other subset. Tantivy associates IDs with titles. TypeDB represents all the connections between nodes (see 'schema.tql' for how). At least one field, `body`, is known to neither database; it is instead read directly from the files on disk when Rust builds a document for Emacs.
+  // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/misc.rs) distinguishes 'Unspecified' ("user didn't mention this field") from 'Specified(vec![...])' ("user wants it to be this value, even if empty"). This matters when reconciling multiple NodeCompletes (e.g. 'reconcile_same_id_instructions' and supplement_none_fields_from_disk_if_save'). On disk the distinction is not needed: both 'Unspecified' and Specified(vec![])' are rendered as a missing field.
 
   pub title: String,
 
@@ -65,13 +42,10 @@ pub struct NodeComplete {
 
   pub body: Option<String>, // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding org headline, to which it belongs, and the next (if there is a next).
 
-  pub contains: Vec<ID>, // See schema.tql.
-
-  pub subscribes_to: MSV<ID>, // See schema.tql.
-
-  pub hides_from_its_subscriptions: MSV<ID>, // See schema.tql.
-
-  pub overrides_view_of: MSV<ID>, // See schema.tql.
+  pub contains                     : Vec<ID>, // See schema.tql.
+  pub subscribes_to                : MSV<ID>, // See schema.tql.
+  pub hides_from_its_subscriptions : MSV<ID>, // See schema.tql.
+  pub overrides_view_of            : MSV<ID>, // See schema.tql.
 
   pub misc: Vec<FileProperty>,
 }

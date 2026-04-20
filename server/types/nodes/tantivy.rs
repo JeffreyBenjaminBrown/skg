@@ -3,9 +3,6 @@
 //! Title, aliases, and body for full-text search. No relations.
 //! Includes 'misc' because 'Had_ID_Before_Import' feeds the
 //! context-ranking score multiplier (see [[../../../server/context.rs][context.rs]]).
-//!
-//! See /home/ubuntu/.claude/plans/many-and-better-node-types.org
-//! (Plan A) for the overall design.
 
 use crate::types::misc::{ID, MSV, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
