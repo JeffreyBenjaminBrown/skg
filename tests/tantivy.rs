@@ -8,7 +8,8 @@ use tantivy::schema::document::Value;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::in_fs_wipe_index_then_create_it;
-use skg::dbs::tantivy::{SearchOptions, escape_tantivy_intra_word, escape_tantivy_literal, search_index, title_and_source_by_id, update_index_with_nodes};
+use skg::dbs::tantivy::{SearchOptions, search_index, title_and_source_by_id, update_index_with_nodes};
+use skg::dbs::tantivy::escape::{escape_tantivy_intra_word, escape_tantivy_literal};
 use skg::types::misc::{ID, MSV, SourceName, TantivyIndex};
 use skg::types::skgnode::{SkgNode, empty_skgnode};
 
