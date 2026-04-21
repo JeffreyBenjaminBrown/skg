@@ -84,8 +84,19 @@ impl InRustGraph {
 
   /// Build from a slice of NodeCompletes. Typically called at
   /// startup after reading all .skg files from disk.
+  ///
+  /// Two-pass, because canonical-keyed inverse indexes require peer
+  /// resolution through 'extra_id_to_pid' at index time. A single-
+  /// pass load couldn't resolve a reference to an extra_id of a
+  /// not-yet-loaded node. First pass populates 'extra_id_to_pid'
+  /// only; second pass inserts nodes and builds inverse entries with
+  /// full resolution available.
   pub fn from_nodecompletes (completes: &[NodeComplete]) -> Self {
     let mut g : InRustGraph = InRustGraph::new ();
+    for c in completes {
+      for extraid in &c . extra_ids {
+        g . extra_id_to_pid . insert (
+          extraid . clone (), c . pid . clone () ); } }
     for c in completes {
       let rust : NodeRust = NodeRust::from (c);
       g . nodes . insert ( rust . pid . clone (), rust . clone () );
@@ -114,44 +125,110 @@ impl InRustGraph {
     Some ( ( pid, node . source . clone () ) ) }
 }
 
+/// Resolves any known ID (primary pid or extra_id) to the primary
+/// pid. Primary pids pass through unchanged; extra_ids are mapped via
+/// 'extra_id_to_pid'. IDs unknown to memory fall through as-is, so
+/// callers can index-under-unknown without having to check first.
+fn id_to_pid (g: &InRustGraph, id: &ID) -> ID {
+  g . extra_id_to_pid . get (id) . cloned ()
+    . unwrap_or_else ( || id . clone () ) }
+
 /// Add a node's contributions to every inverse index. Idempotent if
 /// the node is not already contributing.
+///
+/// PITFALL: the extra_id_to_pid update happens FIRST, so the
+/// peer-resolution loops below see this node's newly-acquired aliases.
+/// This matters in a merge batch: if a subsequent neighbor Save
+/// references an acquiree pid that's now an extra_id of this node,
+/// 'id_to_pid' during that neighbor's add resolves the reference to
+/// this node's canonical pid.
 fn add_to_inverse_indexes (g: &mut InRustGraph, node: &NodeRust) {
   let pid : &ID = &node . pid;
-  for peer in &node . contains {
-    add_to_inverse_map (&mut g . contained_by, peer, pid); }
-  for peer in node . subscribes_to . or_default () {
-    add_to_inverse_map (&mut g . subscribers_of, peer, pid); }
-  for peer in node . hides_from_its_subscriptions . or_default () {
-    add_to_inverse_map (&mut g . hiders_of, peer, pid); }
-  for peer in node . overrides_view_of . or_default () {
-    add_to_inverse_map (&mut g . replacements_of, peer, pid); }
-  for peer in &node . textlinks_to {
-    add_to_inverse_map (&mut g . textlinks_in, peer, pid); }
   for extra in &node . extra_ids {
-    g . extra_id_to_pid . insert ( extra . clone (), pid . clone () ); } }
+    g . extra_id_to_pid . insert ( extra . clone (), pid . clone () ); }
+  for peer in &node . contains {
+    let resolved : ID = id_to_pid (g, peer);
+    add_to_inverse_map (&mut g . contained_by, &resolved, pid); }
+  for peer in node . subscribes_to . or_default () {
+    let resolved : ID = id_to_pid (g, peer);
+    add_to_inverse_map (&mut g . subscribers_of, &resolved, pid); }
+  for peer in node . hides_from_its_subscriptions . or_default () {
+    let resolved : ID = id_to_pid (g, peer);
+    add_to_inverse_map (&mut g . hiders_of, &resolved, pid); }
+  for peer in node . overrides_view_of . or_default () {
+    let resolved : ID = id_to_pid (g, peer);
+    add_to_inverse_map (&mut g . replacements_of, &resolved, pid); }
+  for peer in &node . textlinks_to {
+    let resolved : ID = id_to_pid (g, peer);
+    add_to_inverse_map (&mut g . textlinks_in, &resolved, pid); } }
 
 /// Remove a node's contributions from every inverse index. Used
 /// during update (before inserting the new NodeRust) and during
 /// delete.
+///
+/// Peers are resolved through the CURRENT 'extra_id_to_pid'. Correct
+/// because the prior 'add_to_inverse_indexes' for this node used the
+/// same resolution, and 'apply_definenodes' only grows the alias map
+/// — never revokes — so the key each peer originally landed under is
+/// still reachable through the same resolution now.
 fn remove_from_inverse_indexes (g: &mut InRustGraph, node: &NodeRust) {
   let pid : &ID = &node . pid;
   for peer in &node . contains {
-    remove_from_inverse_map (&mut g . contained_by, peer, pid); }
+    let resolved : ID = id_to_pid (g, peer);
+    remove_from_inverse_map (&mut g . contained_by, &resolved, pid); }
   for peer in node . subscribes_to . or_default () {
-    remove_from_inverse_map (&mut g . subscribers_of, peer, pid); }
+    let resolved : ID = id_to_pid (g, peer);
+    remove_from_inverse_map (&mut g . subscribers_of, &resolved, pid); }
   for peer in node . hides_from_its_subscriptions . or_default () {
-    remove_from_inverse_map (&mut g . hiders_of, peer, pid); }
+    let resolved : ID = id_to_pid (g, peer);
+    remove_from_inverse_map (&mut g . hiders_of, &resolved, pid); }
   for peer in node . overrides_view_of . or_default () {
-    remove_from_inverse_map (&mut g . replacements_of, peer, pid); }
+    let resolved : ID = id_to_pid (g, peer);
+    remove_from_inverse_map (&mut g . replacements_of, &resolved, pid); }
   for peer in &node . textlinks_to {
-    remove_from_inverse_map (&mut g . textlinks_in, peer, pid); }
+    let resolved : ID = id_to_pid (g, peer);
+    remove_from_inverse_map (&mut g . textlinks_in, &resolved, pid); }
   for extra in &node . extra_ids {
     // Only remove if it still points at this pid — defensive against
     // cross-batch races where a later save has already claimed the
     // extra_id.
     if g . extra_id_to_pid . get (extra) == Some (pid) {
       g . extra_id_to_pid . remove (extra); } } }
+
+/// When a Save promotes an ID to an extra_id of 'target_pid', any
+/// inverse-index entries previously keyed under that ID need to move
+/// to 'target_pid' — otherwise a subsequent "who points at target_pid?"
+/// query wouldn't find the pre-promotion references.
+///
+/// Applied for each new extra_id (not already present in old_rust).
+/// Idempotent when 'inverse_X[extra_id]' is empty.
+fn migrate_inverse_entries_for_new_extraids (
+  g            : &mut InRustGraph,
+  target_pid   : &ID,
+  new_rust     : &NodeRust,
+  old_rust_opt : Option<&NodeRust>,
+) {
+  fn migrate_one (
+    map  : &mut im::HashMap<ID, im::HashSet<ID>>,
+    from : &ID,
+    to   : &ID,
+  ) {
+    if let Some (entries) = map . remove (from) {
+      let mut merged : im::HashSet<ID> =
+        map . get (to) . cloned () . unwrap_or_default ();
+      merged . extend (entries);
+      map . insert ( to . clone (), merged ); } }
+  let old_extraids : std::collections::HashSet<&ID> = match old_rust_opt {
+    Some (old) => old . extra_ids . iter () . collect (),
+    None       => std::collections::HashSet::new (), };
+  for extraid in &new_rust . extra_ids {
+    if old_extraids . contains (extraid) { continue; }
+    if extraid == target_pid { continue; }
+    migrate_one (&mut g . contained_by, extraid, target_pid);
+    migrate_one (&mut g . subscribers_of, extraid, target_pid);
+    migrate_one (&mut g . hiders_of, extraid, target_pid);
+    migrate_one (&mut g . replacements_of, extraid, target_pid);
+    migrate_one (&mut g . textlinks_in, extraid, target_pid); } }
 
 fn add_to_inverse_map (
   map   : &mut im::HashMap<ID, im::HashSet<ID>>,
@@ -178,18 +255,30 @@ fn remove_from_inverse_map (
 /// sharing), applies Save/Delete mutations along with their inverse-
 /// index updates, and publishes the new snapshot via ArcSwap.
 ///
-/// For each Save of an existing node, the pre-save NodeRust is read
-/// /before/ the new one is inserted so the inverse-index diff is
-/// correct: old entries are stripped, new ones added. For each
-/// Delete, the pre-delete NodeRust is read and its contributions are
-/// stripped before it's removed from the node map.
+/// Per-Save ordering: remove-old-inverse → migrate-inverse-for-new-
+/// extraids → insert-new-node → add-new-inverse. The migration step
+/// is load-bearing for merges: when an acquirer gains the acquiree's
+/// pid as an extra_id, any inverse-index entries keyed under the
+/// acquiree pid (pre-merge references from neighbors) need to move
+/// to the acquirer pid. The add step then runs with extra_id_to_pid
+/// already updated, so subsequent Saves in the same batch resolve
+/// references through the new alias.
 ///
-/// PITFALL: During a merge batch the ordering is Delete(acquiree) →
-/// Save(updated_acquirer). Between those two instructions the
-/// 'extra_id_to_pid' entry for 'acquiree.pid' briefly points at
-/// nothing. That never-visible state is fine because apply_definenodes
-/// processes the batch as a single atomic COW + publish — no reader
-/// ever sees the intermediate map.
+/// PITFALL (monotonic alias acquisition): we rely on extra_id_to_pid
+/// only growing within a batch, never retracting. 'remove_from_inverse_
+/// indexes' resolves old peers through the current alias map, which
+/// finds the key the old add originally landed under because nothing
+/// revoked that mapping between then and now. If revocation is ever
+/// added as a real operation, the remove-side peer resolution needs
+/// to be rethought.
+///
+/// PITFALL (extra_id revocation unsupported): a Save whose new
+/// NodeRust /drops/ an extra_id that the old NodeRust had is not
+/// handled gracefully. Neighbor raw references to the dropped
+/// extra_id would fall through 'id_to_pid' unresolved and land under
+/// the raw id — inconsistent with TypeDB. No production path exercises
+/// this today; if a user feature ever needs it, a dedicated migration
+/// (symmetric to the acquire path) would be required.
 ///
 /// Called from the save pipeline after the filesystem write has
 /// succeeded.
@@ -203,8 +292,13 @@ pub fn apply_definenodes (
     match instr {
       DefineNode::Save (SaveNode (node)) => {
         let new_rust : NodeRust = NodeRust::from (node);
-        if let Some (old_rust) = new_graph . nodes . get (&new_rust . pid) . cloned () {
-          remove_from_inverse_indexes (&mut new_graph, &old_rust); }
+        let old_rust_opt : Option<NodeRust> =
+          new_graph . nodes . get (&new_rust . pid) . cloned ();
+        if let Some (old_rust) = &old_rust_opt {
+          remove_from_inverse_indexes (&mut new_graph, old_rust); }
+        migrate_inverse_entries_for_new_extraids (
+          &mut new_graph, &new_rust . pid,
+          &new_rust, old_rust_opt . as_ref () );
         new_graph . nodes . insert (
           new_rust . pid . clone (), new_rust . clone () );
         add_to_inverse_indexes (&mut new_graph, &new_rust); }
