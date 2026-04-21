@@ -107,6 +107,11 @@ struct OnePidStats {
   content_ids                  : Vec < ID >,
 }
 
+/// Dispatcher: routes to 'fetch_all_graphnodestats_in_rust' when the
+/// in-Rust memory is initialized, otherwise to
+/// 'fetch_all_graphnodestats_from_typedb'. In the running server the
+/// memory path is always taken; the TypeDB path is exercised only by
+/// tests that bypass 'init_global_handle'.
 pub async fn fetch_all_graphnodestats (
   db_name : &str,
   driver  : &TypeDBDriver,
@@ -117,13 +122,22 @@ pub async fn fetch_all_graphnodestats (
   let pid_set : HashSet < ID > =
     pids . iter () . cloned () . collect ();
   if let Some (graph_snap) = snapshot_global () {
-    return Ok ( fetch_all_graphnodestats_from_memory (
+    return Ok ( fetch_all_graphnodestats_in_rust (
       &graph_snap, pids, &pid_set ) ); }
-  // TypeDB branch: exercised only by tests that bypass
-  // 'init_global_handle'. Uses 'buffer_unordered
-  // (TYPEDB_CONCURRENT_TRANSACTIONS)' for consistency with the rest
-  // of the TypeDB module (unbounded 'join_all' was a prior
-  // inconsistency).
+  fetch_all_graphnodestats_from_typedb (
+    db_name, driver, pids, &pid_set ) . await }
+
+/// TypeDB-backed implementation. Exercised only by tests that bypass
+/// 'init_global_handle'; in the running server the dispatcher routes
+/// to 'fetch_all_graphnodestats_in_rust' instead. Uses
+/// 'buffer_unordered (TYPEDB_CONCURRENT_TRANSACTIONS)' for consistency
+/// with the rest of the TypeDB module.
+async fn fetch_all_graphnodestats_from_typedb (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  pids    : &[ID],
+  pid_set : &HashSet<ID>,
+) -> Result < AllGraphNodeStats, Box<dyn Error> > {
   let results : Vec < Result < OnePidStats, Box < dyn Error > > > =
     stream::iter ( pids . iter ()
       . map ( |pid| fetch_one_pid_stats ( db_name, driver, pid ) ) )
@@ -176,15 +190,14 @@ pub async fn fetch_all_graphnodestats (
     content_to_containers,
   }) }
 
-/// In-memory counterpart of 'fetch_all_graphnodestats'. Computes
-/// every field from NodeRust and the inverse indexes — no TypeDB
-/// round-trips.
+/// In-memory implementation. Computes every field from NodeRust and
+/// the inverse indexes — no TypeDB round-trips.
 ///
 /// PITFALL: 'has_subscribes' and 'has_overrides' are "in either
 /// role": a node qualifies if it's on /either/ side of a
 /// subscribes / overrides relation.
 /// Matches the TypeDB version's behaviour.
-fn fetch_all_graphnodestats_from_memory (
+fn fetch_all_graphnodestats_in_rust (
   graph   : &InRustMemory,
   pids    : &[ID],
   pid_set : &HashSet<ID>,

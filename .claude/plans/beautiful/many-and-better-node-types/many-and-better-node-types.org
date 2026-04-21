@@ -684,7 +684,7 @@ If step 3 fails, rebuild that store from disk. Step 2 is already consistent with
 - [[../../server/to_org/util.rs][server/to_org/util.rs]] 'skgnode_and_viewnode_from_id' — graph lookup.
 - subscribeeCol completion paths that walk 'contains' via TypeDB.
 
-Stays on TypeDB: 'fetch_all_graphnodestats' (only its 'contains'-side data could be served from graph; the rest — 'textlinks_to', 'subscribes', 'hides', 'overrides' — needs either Tier B or remains TypeDB), all recursive queries, all 'find_related_nodes' for non-contains relations.
+Stays on TypeDB: 'fetch_all_graphnodestats_from_typedb' (only its 'contains'-side data could be served from graph; the rest — 'textlinks_to', 'subscribes', 'hides', 'overrides' — needs either Tier B or remains TypeDB), all recursive queries, all 'find_related_nodes' for non-contains relations.
 
 ** Rebuild ([[../../server/serve/handlers/rebuild_dbs.rs][server/serve/handlers/rebuild_dbs.rs]])
 
@@ -726,7 +726,7 @@ Things noticed during exploration that aren't Plan A/B/C material but seem worth
 
 ** Inconsistent concurrency discipline across TypeDB read wrappers
 
-In [[../../server/dbs/typedb/][server/dbs/typedb/]] many functions that issue one TypeDB query per ID use 'stream::iter(...).buffer_unordered(TYPEDB_CONCURRENT_TRANSACTIONS)' — e.g. 'contains_from_pids', 'pids_from_ids', 'which_ids_exist'. But 'fetch_all_graphnodestats' uses unbounded 'join_all' instead (see [[../../server/dbs/typedb/search/all_graphnodestats.rs][server/dbs/typedb/search/all_graphnodestats.rs]]). No explanation in a comment; looks like an oversight. Consistent application of the cap is cheap to add and would make behavior predictable under heavy load.
+In [[../../server/dbs/typedb/][server/dbs/typedb/]] many functions that issue one TypeDB query per ID use 'stream::iter(...).buffer_unordered(TYPEDB_CONCURRENT_TRANSACTIONS)' — e.g. 'contains_from_pids', 'pids_from_ids', 'which_ids_exist'. But 'fetch_all_graphnodestats_from_typedb' uses unbounded 'join_all' instead (see [[../../server/dbs/typedb/search/all_graphnodestats.rs][server/dbs/typedb/search/all_graphnodestats.rs]]). No explanation in a comment; looks like an oversight. Consistent application of the cap is cheap to add and would make behavior predictable under heavy load.
 
 ** Doc drift on 'initial_node_limit' default
 

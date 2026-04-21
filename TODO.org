@@ -26,9 +26,14 @@ Maybe a suite of seach commands.
 see TODO/change-command-names-and-aliases.org
 ** when requesting containerward views
 warn the user that the buffer is updating
-* DONE ? to review changes from branch 'many-and-better-node-types'
-git diff 194575ca774337ca6507e1045a40ea158db28374 \
-         edc5542ee4ea5e1a3989121b608111321dc2736b
+* some terminus commits from 'many-and-better-node-types'
+** commits
+*** plan began
+d4dd2e850b449aa4ff92820f9dd66aad48cd6b0b
+*** plan part A complete
+656d66e7ea52a070ec23e26e7cc54b10364ae6a8
+*** plan ended
+edc5542ee4ea5e1a3989121b608111321dc2736b
 * considering
 ** There should only be one definitive view across all buffers.
 *** why

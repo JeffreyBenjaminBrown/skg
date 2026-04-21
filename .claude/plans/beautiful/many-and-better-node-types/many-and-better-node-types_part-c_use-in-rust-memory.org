@@ -15,7 +15,7 @@ Terminology: "in-Rust memory" (or "memory") is the concept. The Rust type is 'Gr
   - 'pid_and_source_from_id' ([[../../server/dbs/typedb/search.rs][dbs/typedb/search.rs]]) — TypeDB point query, called once per node in render paths.
   - 'skgnode_from_map_or_disk' ([[../../server/types/memory.rs][types/memory.rs]]) — disk fallback behind the per-request 'SkgNodeMap' shadow.
   - 'find_related_nodes' — per-relation TypeDB lookup (contains, subscribes, hides, overrides, textlinks_to).
-  - 'fetch_all_graphnodestats' ([[../../server/dbs/typedb/search/all_graphnodestats.rs][all_graphnodestats.rs]]) — eight-field aggregate per node. Identified as the dominant latency contributor on "to watch".
+  - 'fetch_all_graphnodestats_from_typedb' ([[../../server/dbs/typedb/search/all_graphnodestats.rs][all_graphnodestats.rs]]) — eight-field aggregate per node. Identified as the dominant latency contributor on "to watch".
   - Recursive containerward queries ([[../../server/dbs/typedb/ancestry.rs][ancestry.rs]], [[../../server/dbs/typedb/paths.rs][paths.rs]]).
 - 'SkgnodesInMemory.pool' exists per-connection but is lazy-populated at view-open and largely redundant with the in-Rust memory (see [[../../one-memory-or-two.org][one-memory-or-two.org]]).
 
@@ -24,7 +24,7 @@ Terminology: "in-Rust memory" (or "memory") is the concept. The Rust type is 'Gr
 - Read paths that fit the NodeRust projection are served from memory — no TypeDB hit.
 - Full inverse-index coverage closes the "reverse-lookup" gap for all five outbound relations (contains, subscribes, hides_from_its_subscriptions, overrides_view_of, textlinks_to).
 - Containerward recursive queries walk the in-Rust memory instead of TypeDB.
-- 'fetch_all_graphnodestats' runs entirely in memory.
+- 'fetch_all_graphnodestats_from_typedb' runs entirely in memory.
 - 'SkgnodesInMemory.pool' and 'SkgnodesInMemory.id_resolver' are retired; the per-connection structure shrinks to view bookkeeping.
 
 * Approach
@@ -73,7 +73,7 @@ Save-pipeline exception: during the in-flight portion of a save, 'SkgNodeMap' ho
 
 Each migration replaces the function body; call sites are unchanged. Bonus: call-site TypeDBDriver parameters can be dropped where the function no longer needs one.
 
-** Step 5: migrate 'fetch_all_graphnodestats' entirely
+** Step 5: migrate 'fetch_all_graphnodestats_from_typedb' entirely
 
 With Step 1's wide inverse indexes plus 'textlinks_in', every field in [[../../server/dbs/typedb/search/all_graphnodestats.rs][all_graphnodestats.rs]]'s output can be computed from memory:
 
@@ -86,7 +86,7 @@ With Step 1's wide inverse indexes plus 'textlinks_in', every field in [[../../s
   - 'container_to_contents'            — iterate pids, read 'NodeRust.contains'.
   - 'content_to_containers'            — 'contained_by' lookup per pid.
 
-Nothing stays on TypeDB for this function. The entire 'fetch_all_graphnodestats' becomes an in-memory pass: microseconds per node, not milliseconds.
+Nothing stays on TypeDB for this function. The entire 'fetch_all_graphnodestats_from_typedb' becomes an in-memory pass: microseconds per node, not milliseconds.
 
 ** Step 6: shrink 'SkgnodesInMemory'
 
@@ -148,7 +148,7 @@ Each item is a self-contained follow-up that can land as its own commit. None bl
 
 The type name 'Graph' in [[../../server/dbs/memory.rs][server/dbs/memory.rs]] is ambiguous — "the graph" in this project can mean the whole knowledge graph, the TypeDB representation, or the in-Rust thing. Rename to 'InRustMemory'. Blast radius: every reference to 'Graph', 'GraphHandle', 'apply_definenodes' (signature), 'Graph::from_nodecompletes', 'new_handle'. Mechanical find-and-replace; verify all tests pass.
 
-*** Unbounded 'join_all' in 'fetch_all_graphnodestats'
+*** Unbounded 'join_all' in 'fetch_all_graphnodestats_from_typedb'
 
 [[../../server/dbs/typedb/search/all_graphnodestats.rs][all_graphnodestats.rs]] uses 'futures::future::join_all' with no concurrency cap, unlike other TypeDB functions that use 'buffer_unordered (TYPEDB_CONCURRENT_TRANSACTIONS)'. After Step 5 the function is fully in-memory and this no longer matters for TypeDB load — but if any residual TypeDB calls remain (or if the function is used before Step 5 lands), switch to 'buffer_unordered' for consistency.
 
@@ -205,7 +205,7 @@ Plan B's merge emits neighbor SaveNodes so TypeDB stays consistent post-merge. M
 When a SaveNode is applied, we must remove the pre-save entries this node contributed to each inverse index (contained_by, subscribers_of, hiders_of, replacements_of, textlinks_in, extra_id_to_pid) before adding the new set. 'apply_definenodes' already reads the old NodeRust before writing the new one for the forward 'contains' diff; Step 1 extends that read to cover all five outbound fields plus 'extra_ids'.
 
 ** DONE 'has_subscribes' / 'has_overrides' directionality
-'fetch_all_graphnodestats' reports two boolean-ish fields: 'has_subscribes' and 'has_overrides'. The open question: does the caller interpret each as "this node has outbound subscribes / overrides", as "this node has inbound subscribes / overrides", or as "this node participates in /any/ subscribes / overrides relation"? Needs a read of 'fetch_one_pid_stats' in [[../../server/dbs/typedb/search/all_graphnodestats.rs][all_graphnodestats.rs]] plus the UI code that consumes the result. With Step 1's wide indexes, both outbound and inbound can be served from memory either way — so the question is about /what the correct boolean is/, not about whether memory can produce it.
+'fetch_all_graphnodestats_from_typedb' reports two boolean-ish fields: 'has_subscribes' and 'has_overrides'. The open question: does the caller interpret each as "this node has outbound subscribes / overrides", as "this node has inbound subscribes / overrides", or as "this node participates in /any/ subscribes / overrides relation"? Needs a read of 'fetch_one_pid_stats' in [[../../server/dbs/typedb/search/all_graphnodestats.rs][all_graphnodestats.rs]] plus the UI code that consumes the result. With Step 1's wide indexes, both outbound and inbound can be served from memory either way — so the question is about /what the correct boolean is/, not about whether memory can produce it.
 
 *** DONE (Jeff speaking) Please elaborate.
 You wrote 'these field check', but fields don't do stuff.
