@@ -20,13 +20,18 @@ use crate::types::misc::{ID, SourceName};
 
 /// Fast container lookup by primary ID.
 /// Assumes the input is a primary ID (not an extra ID).
-/// Skips the extra_id `or` pattern used by find_related_nodes,
-/// which is the dominant cost in that query.
+/// Consults the in-Rust memory first (via the process-global handle
+/// set at startup); falls back to TypeDB if memory isn't initialized.
 pub async fn find_container_ids_of_pid (
   db_name : &str,
   driver  : &TypeDBDriver,
   pid     : &ID,
 ) -> Result < HashSet<ID>, Box<dyn Error> > {
+  if let Some (graph_snap) = crate::dbs::memory::snapshot_global () {
+    let result : HashSet<ID> = graph_snap . contained_by . get (pid)
+      . map ( |s| s . iter () . cloned () . collect () )
+      . unwrap_or_default ();
+    return Ok (result); }
   let tx : Transaction =
     driver . transaction (
       db_name, TransactionType::Read
@@ -53,7 +58,10 @@ pub async fn find_container_ids_of_pid (
 /// Generalized function to find related nodes via a specified relationship.
 /// Returns the IDs of nodes in the `output_role` position
 /// related to any of the input nodes.
-/// Sends one query per input ID, bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
+/// Consults the in-Rust memory first (via the process-global handle
+/// set at startup); falls back to TypeDB if memory isn't initialized.
+/// Sends one query per input ID (TypeDB fallback path), bounded by
+/// TYPEDB_CONCURRENT_TRANSACTIONS.
 pub async fn find_related_nodes (
   db_name     : &str,
   driver      : &TypeDBDriver,
@@ -64,6 +72,9 @@ pub async fn find_related_nodes (
 ) -> Result < HashSet<ID>, Box<dyn Error> > {
   if nodes . is_empty () {
     return Ok ( HashSet::new () ); }
+  if let Some (graph_snap) = crate::dbs::memory::snapshot_global () {
+    return Ok ( find_related_nodes_from_memory (
+      &graph_snap, nodes, relation, input_role, output_role ) ); }
   let relation : String    = relation    . to_string ();
   let input_role : String  = input_role  . to_string ();
   let output_role : String = output_role . to_string ();
@@ -79,6 +90,62 @@ pub async fn find_related_nodes (
   for set in sets {
     result . extend ( set ? ); }
   Ok (result) }
+
+/// In-memory counterpart of 'find_related_nodes'. Dispatches on
+/// (relation, input_role, output_role) to the appropriate forward
+/// field or inverse index on 'Graph'. Inputs are resolved through
+/// 'extra_id_to_pid' first.
+fn find_related_nodes_from_memory (
+  graph       : &crate::dbs::memory::Graph,
+  nodes       : &[ID],
+  relation    : &str,
+  input_role  : &str,
+  output_role : &str,
+) -> HashSet<ID> {
+  let mut out : HashSet<ID> = HashSet::new ();
+  for raw_id in nodes {
+    let pid : ID = match graph . pid_of (raw_id) {
+      Some (p) => p,
+      None     => continue };
+    match (relation, input_role, output_role) {
+      // Forward lookups: read the field on the node.
+      ("contains",                     "container",   "contained")  =>
+        if let Some (n) = graph . nodes . get (&pid) {
+          out . extend ( n . contains . iter () . cloned () ); },
+      ("subscribes",                   "subscriber",  "subscribee") =>
+        if let Some (n) = graph . nodes . get (&pid) {
+          out . extend ( n . subscribes_to . or_default () . iter () . cloned () ); },
+      ("hides_from_its_subscriptions", "hider",       "hidden")     =>
+        if let Some (n) = graph . nodes . get (&pid) {
+          out . extend ( n . hides_from_its_subscriptions . or_default () . iter () . cloned () ); },
+      ("overrides_view_of",            "replacement", "replaced")   =>
+        if let Some (n) = graph . nodes . get (&pid) {
+          out . extend ( n . overrides_view_of . or_default () . iter () . cloned () ); },
+      ("textlinks_to",                 "source",      "dest")       =>
+        if let Some (n) = graph . nodes . get (&pid) {
+          out . extend ( n . textlinks_to . iter () . cloned () ); },
+      // Inverse lookups: consult the inverse index.
+      ("contains",                     "contained",   "container")  =>
+        if let Some (s) = graph . contained_by . get (&pid) {
+          out . extend ( s . iter () . cloned () ); },
+      ("subscribes",                   "subscribee",  "subscriber") =>
+        if let Some (s) = graph . subscribers_of . get (&pid) {
+          out . extend ( s . iter () . cloned () ); },
+      ("hides_from_its_subscriptions", "hidden",      "hider")      =>
+        if let Some (s) = graph . hiders_of . get (&pid) {
+          out . extend ( s . iter () . cloned () ); },
+      ("overrides_view_of",            "replaced",    "replacement") =>
+        if let Some (s) = graph . replacements_of . get (&pid) {
+          out . extend ( s . iter () . cloned () ); },
+      ("textlinks_to",                 "dest",        "source")     =>
+        if let Some (s) = graph . textlinks_in . get (&pid) {
+          out . extend ( s . iter () . cloned () ); },
+      // Unknown (relation, input, output) combination: shouldn't
+      // happen — the five outbound types have exactly two roles
+      // each. Return empty (caller will get no matches).
+      _ => {},
+    } }
+  out }
 
 /// Find related nodes for a single input ID.
 async fn find_related_nodes_for_one_id (

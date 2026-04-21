@@ -1,7 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
+use std::sync::Arc;
 use typedb_driver::TypeDBDriver;
 
+use crate::dbs::memory::{Graph, snapshot_global};
 use crate::dbs::typedb::search::find_container_ids_of_pid;
 use crate::types::misc::ID;
 
@@ -47,6 +49,10 @@ pub async fn full_containerward_ancestry(
   origin    : &ID,
   max_depth : usize,
 ) -> Result<AncestryTree, Box<dyn Error>> {
+  if let Some (graph_snap) = snapshot_global () {
+    return Ok ( full_containerward_ancestry_from_memory (
+      &graph_snap, origin, max_depth ) ); }
+  // TypeDB fallback (used by tests that don't initialize memory):
   // BFS state: for each node we've decided to expand,
   // record its containers (once queried). Leaves (Root,
   // Repeated, DepthTruncated) get no entry here.
@@ -203,6 +209,68 @@ fn assemble(
               depth_truncated_keys ), } )
         . collect ();
       AncestryTree::Inner ( id, children ) }, } }
+
+/// In-memory containerward ancestry, walking the 'contained_by'
+/// inverse index. Same BFS structure as the TypeDB version but no
+/// async / no parallel queries / no frontier-batching.
+fn full_containerward_ancestry_from_memory (
+  graph     : &Arc<Graph>,
+  origin    : &ID,
+  max_depth : usize,
+) -> AncestryTree {
+  let mut children_of : HashMap<usize, Vec<(ID, NodeFate)>> =
+    HashMap::new ();
+  let mut id_of : HashMap<usize, ID> =
+    HashMap::new ();
+  let mut depth_truncated_keys : HashSet<usize> =
+    HashSet::new ();
+  let mut next_key : usize = 0;
+  let origin_key : usize = next_key;
+  id_of . insert (origin_key, origin . clone ());
+  next_key += 1;
+  let mut frontier : Vec<(usize, ID)> =
+    vec![(origin_key, origin . clone ())];
+  let mut visited : HashSet<ID> =
+    HashSet::from ([origin . clone ()]);
+  let mut depth : usize = 1;
+  while ! frontier . is_empty () {
+    if depth >= max_depth {
+      for (parent_key, _) in & frontier {
+        depth_truncated_keys . insert ( *parent_key ); }
+      break; }
+    let mut next_frontier : Vec<(usize, ID)> =
+      Vec::new ();
+    for (parent_key, current_id) in & frontier {
+      let containers : HashSet<ID> = {
+        let empty : im::HashSet<ID> = im::HashSet::new ();
+        graph . contained_by . get (current_id)
+          . unwrap_or (&empty)
+          . iter () . cloned () . collect () };
+      if containers . is_empty () {
+        children_of . insert ( *parent_key, vec![] );
+      } else {
+        let mut node_children : Vec<(ID, NodeFate)> =
+          Vec::new ();
+        for container_id in &containers {
+          if visited . contains (container_id) {
+            node_children . push ((
+              container_id . clone (), NodeFate::Repeated ));
+          } else {
+            let child_key : usize = next_key;
+            next_key += 1;
+            id_of . insert (child_key, container_id . clone ());
+            visited . insert (container_id . clone ());
+            node_children . push ((
+              container_id . clone (),
+              NodeFate::Open ( child_key ) ));
+            next_frontier . push ((
+              child_key, container_id . clone () )); } }
+        children_of . insert ( *parent_key, node_children ); } }
+    frontier = next_frontier;
+    depth += 1; }
+  assemble (
+    origin_key, & id_of, & children_of,
+    & depth_truncated_keys ) }
 
 /// Compute full containerward ancestry for each ID in parallel.
 /// IDs whose ancestry lookup fails are logged and omitted.
