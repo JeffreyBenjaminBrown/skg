@@ -215,10 +215,10 @@
     (should (equal (skg--format-id-stack-as-org)
                    "* second\nid-2\n* first\nid-1")) ))
 
-(ert-deftest test-skg-id-stack ()
-  "Test that skg-id-stack creates buffer with correct content."
+(ert-deftest test-skg-view-id-stack ()
+  "Test that skg-view-id-stack creates buffer with correct content."
   (let (( skg-id-stack '(("uuid-123" "My Node")) ))
-    (skg-id-stack)
+    (skg-view-id-stack)
     (should (equal (buffer-name) "*skg-id-stack*"))
     (should (equal (buffer-string) "* My Node\nuuid-123"))
     (should skg-id-stack-mode)
@@ -227,7 +227,7 @@
 (ert-deftest test-skg--save-id-stack-buffer ()
   "Test that saving the id-stack buffer updates skg-id-stack."
   (let (( skg-id-stack '(("old-id" "old label")) ))
-    (skg-id-stack)
+    (skg-view-id-stack)
     (erase-buffer)
     (insert "* new label\nnew-id\n* another\nanother-id\n")
     (skg--save-id-stack-buffer)

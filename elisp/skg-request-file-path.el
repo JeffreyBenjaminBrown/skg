@@ -4,25 +4,30 @@
 ;;; and open a magit view navigated to an appropriate location.
 ;;;
 ;;; USER-FACING FUNCTIONS
-;;;   skg-magit-goto
-;;;   skg-magit-goto-in-parent
+;;;   skg-goto-in-magit
+;;;   skg-goto-in-magit-parent
 
 (require 'skg-id-search)
 (require 'skg-magit-titles)
 (require 'skg-state)
 (require 'skg-length-prefix)
 
-(defun skg-magit-goto ()
+(defun skg-goto-in-magit (&optional in-parent)
   "Open magit-status and go to the first section for the .skg file
 of the node at point. If the file appears in multiple sections
-\(unstaged, staged, untracked\), go to the first and warn the user."
-  (interactive)
-  (let (( info (skg--magit-node-info-at-point) ))
-    (when info
-      (skg--request-file-path-with-handler
-       (car info) (cdr info) #'skg--magit-goto-handle-response))))
+\(unstaged, staged, untracked\), go to the first and warn the user.
+With a prefix argument IN-PARENT, navigate instead to the first line
+in the parent's magit section that contains this node's ID
+\(equivalent to `skg-goto-in-magit-parent')."
+  (interactive "P")
+  (if in-parent
+      (skg-goto-in-magit-parent)
+    (let (( info (skg--magit-node-info-at-point) ))
+      (when info
+        (skg--request-file-path-with-handler
+         (car info) (cdr info) #'skg--magit-goto-handle-response)))))
 
-(defun skg-magit-goto-in-parent ()
+(defun skg-goto-in-magit-parent ()
   "Open magit-status on the parent's .skg file, and go to the first
 line in the parent's magit section that contains this node's ID.
 Warn the user if the ID appears multiple times in that section,
@@ -168,7 +173,7 @@ Returns the section object, or nil."
              sections ", "))
 
 (defun skg--magit-goto-handle-response (_tcp-proc payload)
-  "Handle the get-file-path response for `skg-magit-goto'.
+  "Handle the get-file-path response for `skg-goto-in-magit'.
 Navigate to the first magit section for the file,
 reporting the staging status and warning if the file appears
 in multiple sections."
@@ -193,7 +198,7 @@ in multiple sections."
                    (skg--magit-kind-label (car (car sections))))))))))
 
 (defun skg--magit-goto-in-parent-handle-response (node-id _tcp-proc payload)
-  "Handle the get-file-path response for `skg-magit-goto-in-parent'.
+  "Handle the get-file-path response for `skg-goto-in-magit-parent'.
 Navigate to the first line in the parent's first magit section
 that contains NODE-ID. Warn if NODE-ID appears multiple times
 there, or if the parent has multiple sections. If NODE-ID does

@@ -49,7 +49,7 @@
         (with-current-buffer search-buffer
           (goto-char (point-min))
           ;; Find the headline with (id apples) in metadata
-          ;; and position cursor on the metadata so skg-view can read it.
+          ;; and position cursor on the metadata so skg-goto can read it.
           (if (re-search-forward "(id apples)" nil t)
               (progn
                 (message "✓ Found apples metadata, positioning cursor")
@@ -59,9 +59,9 @@
                           (line-beginning-position)
                           (line-end-position)))
 
-                ;; Visit via skg-view (reads id from metadata)
-                (message "Calling skg-view...")
-                (skg-view)
+                ;; Visit via skg-goto (reads id from metadata)
+                (message "Calling skg-goto...")
+                (skg-goto)
 
                 ;; Wait for the content view buffer to be created
                 (skg-test-wait-for

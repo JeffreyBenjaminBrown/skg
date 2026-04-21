@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Integration test: skg-magit-goto-in-parent on a removed-here phantom.
+# Integration test: skg-goto-in-magit-parent on a removed-here phantom.
 #
 # Graph at HEAD: a contains [b].
 # Worktree:      a contains [].  (b removed from a's content)
@@ -8,7 +8,7 @@
 #
 # The test opens a content view from a, toggles diff mode,
 # verifies b appears as a removed-here phantom,
-# calls skg-magit-goto-in-parent on that phantom, and checks that
+# calls skg-goto-in-magit-parent on that phantom, and checks that
 # magit navigates to a.skg (the parent) at the deletion line.
 
 set -e

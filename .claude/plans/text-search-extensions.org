@@ -200,7 +200,7 @@
    'escape_tantivy_intra_word' directly (the integration path
    is slow).
 
-* Goal 2: three independent search axes with C-c s bindings
+* DONE Goal 2: three independent search axes with C-c s bindings
 
 ** Elisp side ([[../../elisp/skg-request-title-matches.el][skg-request-title-matches.el]], [[../../elisp/skg-keymaps-and-aliases.el][skg-keymaps-and-aliases.el]])
 

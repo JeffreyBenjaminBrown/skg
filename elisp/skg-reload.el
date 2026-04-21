@@ -41,7 +41,7 @@
             skg-keymaps-and-aliases
             skg-magit-titles
             skg-file-minor-mode
-            skg-view-org-ancestry
+            skg-show-org-ancestry
             heralds-minor-mode )))
     (dolist (feat skg-features)
       (when (featurep feat)

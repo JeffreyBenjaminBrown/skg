@@ -11,8 +11,9 @@
 ;;;   skg-pop-id
 ;;;   skg-pop-link
 ;;;   skg-validate-id-stack-buffer
-;;;   skg-view
-;;;   skg-id-stack
+;;;   skg-goto
+;;;   skg-goto-by-id
+;;;   skg-view-id-stack
 
 ;; todo ? speed : This could be more efficient.
 ;; It re-reads the same text a few times.
@@ -92,7 +93,7 @@ Point is always restored."
               (setq result (skg--id-at-point)) )) )) )
     result ))
 
-(defun skg-view ()
+(defun skg-goto ()
   "Open a content view for the nearest ID on the current line."
   (interactive)
   (let (( result (skg-nearest-id) ))
@@ -102,8 +103,8 @@ Point is always restored."
           (skg-request-single-root-content-view-from-id id))
       (message "No ID found on this line")) ))
 
-(defun skg-view-id (id)
-  "Open a content view for ID, prompting when called interactively. (skg-view is usually more convenient.)"
+(defun skg-goto-by-id (id)
+  "Open a content view for ID, prompting when called interactively. (skg-goto is usually more convenient.)"
   (interactive "sNode ID: ")
   (message "Visiting node: %s" id)
   (skg-request-single-root-content-view-from-id id))
@@ -444,7 +445,7 @@ Returns (error MESSAGE) if validation fails."
 
 ;; skg-id-stack-mode-map is defined in skg-keymaps-and-aliases.el.
 
-(defun skg-id-stack ()
+(defun skg-view-id-stack ()
   "Open a buffer to edit `skg-id-stack'.
 The buffer displays the stack in org format
 (label headlines and ID bodies).
@@ -480,7 +481,7 @@ Overrides save to update `skg-id-stack' instead of writing to a file."
   :keymap skg-id-stack-mode-map)
 
 ;; Hide from M-x: this mode is only activated
-;; programmatically by 'skg-id-stack'.
+;; programmatically by 'skg-view-id-stack'.
 (put 'skg-id-stack-mode 'completion-predicate #'ignore)
 
 (provide 'skg-id-search)

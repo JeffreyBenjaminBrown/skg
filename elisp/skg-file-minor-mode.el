@@ -13,14 +13,14 @@
 
 (defvar skg-file-minor-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c v v") #'skg-view)
+    (define-key map (kbd "C-c g RET") #'skg-goto)
     map)
   "Keymap for `skg-file-minor-mode'.")
 
 ;;;###autoload
 (define-minor-mode skg-file-minor-mode
   "Minor mode for buffers visiting .skg files.
-Enables skg navigation keys like \\[skg-view] on UUIDs
+Enables skg navigation keys like \\[skg-goto] on UUIDs
 and .skg filenames."
   :lighter " skg"
   :keymap skg-file-minor-mode-map)

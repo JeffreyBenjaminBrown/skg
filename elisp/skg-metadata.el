@@ -3,27 +3,27 @@
 ;;; PURPOSE: Utilities to parse and edit skg headline metadata.
 ;;;
 ;;; USER-FACING FUNCTIONS
-;;;   skg-local-delete
-;;;   skg-local-delete-recursive
-;;;   skg-local-indefinitive
+;;;   skg-delete
+;;;   skg-delete-recursive
+;;;   skg-make-indefinitive
 
 (require 'org)
 (require 'org-fold-core)
 (require 'skg-sexpr-search)
 
-(defun skg-local-delete (&optional recursive)
+(defun skg-delete (&optional recursive)
   "Mark the headline at point for deletion.
 With a prefix argument RECURSIVE, also mark every truenode
-org-descendent (equivalent to `skg-local-delete-recursive').
+org-descendent (equivalent to `skg-delete-recursive').
 Edits the metadata to include `delete` in the `editRequest` section.
 Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive "P")
   (if recursive
-      (skg-local-delete-recursive)
+      (skg-delete-recursive)
     (skg-edit-metadata-at-point '(skg (node (editRequest delete))))
     (message "This change will only be applied when you save the buffer.")))
 
-(defun skg-local-delete-recursive ()
+(defun skg-delete-recursive ()
   "Mark the headline at point, and every truenode org-descendent of it,
 for deletion. Descendent headlines that are not truenodes (phantoms,
 aliascol, id-col, etc.) are skipped. Does NOT save;
@@ -48,7 +48,7 @@ call `skg-request-save-buffer' afterward."
         (outline-next-heading))))
   (message "This change will only be applied when you save the buffer."))
 
-(defun skg-local-indefinitive ()
+(defun skg-make-indefinitive ()
   "Mark the headline at point as indefinitive.
 Edits the metadata to include `indefinitive` in the `node` section.
 Does NOT save; call `skg-request-save-buffer' afterward."

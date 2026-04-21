@@ -96,7 +96,7 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
             (test-pass "Found src in search results")
 
             ;; Position cursor on the src metadata
-            ;; so skg-view can extract the id.
+            ;; so skg-goto can extract the id.
             (goto-char (point-min))
             (if (search-forward "(id src)" nil t)
                 (progn
@@ -104,8 +104,8 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
                   (message "Line: %s"
                            (buffer-substring-no-properties
                             (line-beginning-position) (line-end-position)))
-                  (message "Positioned on src metadata, calling skg-view...")
-                  (skg-view)
+                  (message "Positioned on src metadata, calling skg-goto...")
+                  (skg-goto)
 
                   ;; Wait for content view buffer to show src's content
                   ;; (src's title contains a [[id:dest][...]] link)

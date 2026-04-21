@@ -1,7 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; PURPOSE: Interactive s-expression editing utilities.
-;;; From a 'source buffer', the user can call skg-local-metadata
+;;; From a 'source buffer', the user can call skg-view-metadata
 ;;; to open a new 'sexp edit' buffer,
 ;;; where the sexp is rendered as an org-tree.
 ;;;

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Integration test for skg-magit-goto
-# Tests: from a content view, skg-magit-goto opens magit-status
+# Integration test for skg-goto-in-magit
+# Tests: from a content view, skg-goto-in-magit opens magit-status
 # and navigates to the correct file with the right staging message.
 #
 # Setup: a git repo with two .skg files committed, then one modified.

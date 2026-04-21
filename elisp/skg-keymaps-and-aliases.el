@@ -7,9 +7,9 @@
 ;;;   skg-id-stack-mode-map     (for the id-stack edit buffer)
 ;;;   skg-sexp-edit-mode-map    (for the sexp-edit buffer)
 ;;;   global (available everywhere)
-;;;     C-c s RET               (skg-search)
-;;;     C-c s i                 (skg-search-interactive
-;;;   magit C-c v v             (skg-view, available in magit buffers)
+;;;     C-c f RET               (skg-search)
+;;;     C-c f i                 (skg-search-interactive)
+;;;   magit C-c g RET           (skg-goto, available in magit buffers)
 
 ;; No requires here — the underlying functions are loaded by skg-client.el,
 ;; which also requires this file. Adding requires here would create a cycle.
@@ -29,58 +29,61 @@ and hide INTERNAL from M-x completion."
 ;; Aliases
 ;;
 
-(skg-alias skg-save skg-request-save-buffer)
-(skg-alias skg-local-aliases         skg-request-aliases-view)
-(skg-alias skg-local-containerward   skg-request-containerward-view)
-(skg-alias skg-local-definitive      skg-request-definitive-view)
-(skg-alias skg-local-link-sourceward
+(skg-alias skg-save                  skg-request-save-buffer)
+(skg-alias skg-show-aliases          skg-request-aliases-view)
+(skg-alias skg-show-containerward    skg-request-containerward-view)
+(skg-alias skg-show-sourceward       skg-request-sourceward-view)
+(skg-alias skg-show-link-sourceward
            ;; For if someone forgets "source" but remembers "link".
            skg-request-sourceward-view)
-(skg-alias skg-local-sourceward      skg-request-sourceward-view)
-(skg-alias skg-view-from-node-id     skg-request-single-root-content-view-from-id)
+(skg-alias skg-make-definitive       skg-request-definitive-view)
 (skg-alias skg-view-heralds-mode     heralds-minor-mode)
-(skg-alias skg-local-metadata        skg-edit-metadata)
+(skg-alias skg-view-metadata         skg-edit-metadata)
 
 ;;
 ;; Keymaps
 ;;
 
 (progn ;; Global
-  (global-set-key (kbd "C-c s RET") #'skg-search)
-  (global-set-key (kbd "C-c s i")   #'skg-search-interactive))
+  (global-set-key (kbd "C-c f RET") #'skg-search)
+  (global-set-key (kbd "C-c f i")   #'skg-search-interactive))
 
 (with-eval-after-load 'magit ;; Magit
-  (define-key magit-mode-map (kbd "C-c v v") #'skg-view))
+  (define-key magit-mode-map (kbd "C-c g RET") #'skg-goto))
 
 (defvar skg-content-view-mode-map ;; Content view keymap
   (let (( map (make-sparse-keymap) ))
     (progn;; save
       (define-key map (kbd "C-x C-s") #'skg-request-save-buffer))
+    (progn;; delete (prefix arg => recursive)
+      (define-key map (kbd "C-c <backspace>") #'skg-delete))
     (progn;; text search
-      (define-key map (kbd "C-c s RET") #'skg-search)
-      (define-key map (kbd "C-c s i")   #'skg-search-interactive))
-    (progn;; view
-      (define-key map (kbd "C-c v v") #'skg-view)
-      (define-key map (kbd "C-c v i") #'skg-view-id)
-      (define-key map (kbd "C-c v n") #'skg-view-new-empty)
-      (define-key map (kbd "C-c v h") #'skg-view-heralds-mode)
+      (define-key map (kbd "C-c f RET") #'skg-search)
+      (define-key map (kbd "C-c f i")   #'skg-search-interactive))
+    (progn;; goto (prefix arg on magit variant => parent-in-magit)
+      (define-key map (kbd "C-c g RET") #'skg-goto)
+      (define-key map (kbd "C-c g i")   #'skg-goto-by-id)
+      (define-key map (kbd "C-c g m")   #'skg-goto-in-magit))
+    (progn;; show (requests that server render a local change to the view)
+      (define-key map (kbd "C-c s a") #'skg-show-aliases)
+      (define-key map (kbd "C-c s c") #'skg-show-containerward)
+      (define-key map (kbd "C-c s n") #'skg-show-org-ancestry)
+      (define-key map (kbd "C-c s s") #'skg-show-sourceward)
+      (define-key map (kbd "C-c s t") #'skg-show-stats))
+    (progn;; properties
+      (define-key map (kbd "C-c p d") #'skg-make-definitive)
+      (define-key map (kbd "C-c p i") #'skg-make-indefinitive))
+    (progn;; view (buffer-level view state)
       (define-key map (kbd "C-c v d") #'skg-view-diff-mode)
-      (define-key map (kbd "C-c v o") #'skg-view-org-ancestry)
-      (define-key map (kbd "C-c v m") #'skg-magit-goto)
-      (define-key map (kbd "C-c v p") #'skg-magit-goto-in-parent)
-      (define-key map (kbd "C-c i s") #'skg-id-stack))
-    (progn;; local changes to view (and possibly interpretation
-      (define-key map (kbd "C-c l a") #'skg-local-aliases)
-      (define-key map (kbd "C-c l c") #'skg-local-containerward)
-      (define-key map (kbd "C-c l s") #'skg-local-sourceward)
-      (define-key map (kbd "C-c l d") #'skg-local-definitive)
-      (define-key map (kbd "C-c l i") #'skg-local-indefinitive)
-      (define-key map (kbd "C-c l m") #'skg-local-metadata)
-      (define-key map (kbd "C-c l <backspace>") #'skg-local-delete))
-    (progn;; id navigation and stack
+      (define-key map (kbd "C-c v e") #'skg-view-new-empty)
+      (define-key map (kbd "C-c v h") #'skg-view-heralds-mode)
+      (define-key map (kbd "C-c v m") #'skg-view-metadata)
+      (define-key map (kbd "C-c v s") #'skg-view-id-stack))
+    (progn;; id navigation (moving among IDs in the current buffer)
       (define-key map (kbd "C-c i n") #'skg-id-next)
       (define-key map (kbd "C-c i p") #'skg-id-prev)
-      (define-key map (kbd "C-c i u") #'skg-id-push)
+      (define-key map (kbd "C-c i u") #'skg-id-push))
+    (progn;; copy-from / pop-from the id stack
       (define-key map (kbd "C-c o i") #'skg-paste-id)
       (define-key map (kbd "C-c o l") #'skg-paste-link)
       (define-key map (kbd "C-c o I") #'skg-pop-id)
