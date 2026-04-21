@@ -4,18 +4,48 @@
 ;;;
 ;;; USER-FACING FUNCTIONS
 ;;;   skg-local-delete
+;;;   skg-local-delete-recursive
 ;;;   skg-local-indefinitive
 
 (require 'org)
 (require 'org-fold-core)
 (require 'skg-sexpr-search)
 
-(defun skg-local-delete ()
+(defun skg-local-delete (&optional recursive)
   "Mark the headline at point for deletion.
+With a prefix argument RECURSIVE, also mark every truenode
+org-descendent (equivalent to `skg-local-delete-recursive').
 Edits the metadata to include `delete` in the `editRequest` section.
 Does NOT save; call `skg-request-save-buffer' afterward."
+  (interactive "P")
+  (if recursive
+      (skg-local-delete-recursive)
+    (skg-edit-metadata-at-point '(skg (node (editRequest delete))))
+    (message "This change will only be applied when you save the buffer.")))
+
+(defun skg-local-delete-recursive ()
+  "Mark the headline at point, and every truenode org-descendent of it,
+for deletion. Descendent headlines that are not truenodes (phantoms,
+aliascol, id-col, etc.) are skipped. Does NOT save;
+call `skg-request-save-buffer' afterward."
   (interactive)
-  (skg-edit-metadata-at-point '(skg (node (editRequest delete))))
+  (unless (org-at-heading-p)
+    (user-error "Not on a headline"))
+  (save-excursion
+    (let ((start-level (org-outline-level)))
+      (skg-edit-metadata-at-point
+       '(skg (node (editRequest delete)))) ;; mark this one
+      (outline-next-heading)
+      (while (and (not (eobp))
+                  (> (org-outline-level) start-level))
+        (let* ((parts (skg-split-as-stars-metadata-title
+                       (skg-get-current-headline-text)))
+               (meta (and parts (nth 1 parts))))
+          (when (and meta (not (string-empty-p meta))
+                     (skg-sexp-subtree-p (read meta) '(skg (node))))
+            (skg-edit-metadata-at-point ;; mark a descendent
+             '(skg (node (editRequest delete))))))
+        (outline-next-heading))))
   (message "This change will only be applied when you save the buffer."))
 
 (defun skg-local-indefinitive ()

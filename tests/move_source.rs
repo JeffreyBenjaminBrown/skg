@@ -7,7 +7,7 @@ use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::one_node::skgnode_from_id;
 use skg::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
-use skg::dbs::tantivy::search_index;
+use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::from_text::buffer_to_viewnode_forest_and_save_instructions;
@@ -23,7 +23,8 @@ use skg::types::save::DefineNode;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::fs;
-use tantivy::DocAddress;
+use tantivy::{DocAddress, TantivyDocument};
+use tantivy::schema::document::Value;
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
 
 /// Set up a fresh test environment: copy fixtures to temp,
@@ -105,17 +106,17 @@ fn tantivy_source_for_id (
 ) -> Result<Option<String>, Box<dyn Error>> {
   let (matches, searcher)
     : (Vec<(f32, DocAddress)>, tantivy::Searcher) =
-    search_index (tantivy_index, query)?;
+    search_index (tantivy_index, query, &SearchOptions::default ())?;
   for (_score, doc_address) in matches {
-    let doc : tantivy::Document =
+    let doc : TantivyDocument =
       searcher . doc (doc_address)?;
     let id_value : Option<String> =
       doc . get_first (tantivy_index . id_field)
-      . and_then (|v| v . as_text() . map (String::from));
+      . and_then (|v| v . as_str() . map (String::from));
     if id_value . as_deref() == Some (expected_id) {
       let source_value : Option<String> =
         doc . get_first (tantivy_index . source_field)
-        . and_then (|v| v . as_text() . map (String::from));
+        . and_then (|v| v . as_str() . map (String::from));
       return Ok (source_value); }}
   Ok (None) }
 

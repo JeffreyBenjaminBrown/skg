@@ -11,18 +11,111 @@
    and beegin to edit another one.
    It won't stop you, but the results could be bad.
 ** changing the whole view
-*** C-c t t : skg-search-titles
-    Searches titles and aliases, but only shows "interesting" nodes:
-    roots, cycle members, link targets, and nodes that had an
-    org-roam ID before import. This filters out multi-contained
-    nodes and nodes with no special graph role.
-    Run 'skg-view' (below)
-    from one of the links in the search results
-    to go to the view from that node.
-*** C-c t e : skg-search-titles-everywhere
-    Like skg-search-titles, but shows all matches
-    regardless of graph role — including multi-contained
-    and otherwise unremarkable nodes.
+*** C-c s RET : skg-search
+    Text search across titles and aliases, showing only
+    "rooty" nodes, which are most likely to be of interest:
+    roots, cycle members, link targets, and
+    nodes that had an org-roam ID before import. Multi-contained
+    nodes and nodes with no special graph role are filtered out.
+
+    One prompt — the search terms. All axes take their conservative
+    defaults: rooty scope, no regex, titles only (no body), no
+    Tantivy operator syntax.
+
+    Run 'skg-view' (below) from one of the links in the search
+    results to open the view from that node.
+*** C-c s i : skg-search-interactive
+    Same as skg-search but asks for the four axis flags before
+    sending:
+
+    - *Rooty?* — no flips scope to "everywhere" (shows all
+      Tantivy matches regardless of graph role, including the
+      humblest leaves).
+    - *Regex?* — yes switches to per-token regex. Bypasses the
+      query parser; the pattern is handed to Tantivy's
+      'RegexQuery' verbatim.
+    - *Body?* — yes adds the body field to the search (titles
+      are always searched).
+    - *Operators?* — yes enables AND / OR / NOT / +foo / -bar
+      semantics. In non-regex mode operators pass through
+      Tantivy's QueryParser (phrase quotes, grouping, field: all
+      work; intra-word operator chars get escaped so =foo:bar=
+      remains findable). In regex mode operators combine the
+      per-piece RegexQueries at the document level — see the
+      regex=true section below.
+
+**** Query syntax with default axes (operators=false, regex=false)
+     Queries are literal. The query string is split on whitespace,
+     and any word containing a Tantivy operator character
+     (=+ - & | ! ( ) { } [ ] ^ " ~ * ? : \=) or the bare keyword
+     =AND= / =OR= / =NOT= is wrapped as a phrase so its contents
+     are searched literally. Words without specials pass through.
+     - *OR between words*. "dog cat" matches titles containing
+       either word; a title with both outranks one with only one.
+     - *Literal special characters*. A title like "C++ tips",
+       "[draft] plan", or "cat:dog" is findable by typing its
+       literal text.
+
+**** Query syntax with operators=true
+     The query is handed to Tantivy's QueryParser, with one
+     heuristic adjustment: any operator character sitting strictly
+     inside a word (with word chars on both sides, scanning
+     through consecutive operators within the same token) is
+     backslash-escaped. So =foo:bar= stays findable as a literal,
+     but =AND= / =OR= / =+foo= / =-bar= / ="fox in socks"= /
+     =(dog OR cat)= keep their operator meaning.
+
+     Known imperfection: the heuristic can't distinguish a
+     configured field name from a user word, so
+     =title_or_alias:dog= gets its =:= escaped too. Field-
+     qualified queries need manual =\:= in operators mode.
+
+**** Query syntax with regex=true
+     The query is split on whitespace and each piece is handed to
+     'tantivy::query::RegexQuery' as its own pattern. Matches are
+     against *tokens*, not raw text: the indexer lowercases and
+     splits on whitespace, so no stored token ever contains a
+     space. That's why splitting is the only way multi-word regex
+     queries return anything. Patterns like =histor.*= work for
+     prefix search ('history', 'historical'), and =polit.* scien.*=
+     combines two such prefix searches. Combine with body=true to
+     also search body fields.
+
+     The *=*= gotcha*: in regex =*= means "zero or more of the
+     previous character", NOT "any characters" (that's =.*=). So
+     =sci*= matches the tokens =sc=, =sci=, =scii=, … — not
+     "anything starting with sci". Use =sci.*= for that.
+
+     With operators=false, pieces are OR'd (SHOULD-combined)
+     like the non-regex default.
+
+     With operators=true, the keywords =AND= / =OR= / =NOT= and
+     the prefixes =+piece= / =-piece= combine the per-piece
+     RegexQueries at the document level:
+     - =poli.* AND sci.*= — documents whose tokens include one
+       matching =poli.*= AND one matching =sci.*=.
+     - =poli.* NOT bio.*= — documents matching =poli.*= and NOT
+       any token matching =bio.*=.
+     - =+poli.* -bio.*= — same as above, without the keywords.
+     - =poli.* OR sci.*= — explicit OR, same as the default.
+     Keywords are consumed rather than matched as patterns. An
+     =AND= adjacent to a piece on either side promotes that piece
+     to MUST.
+
+**** Caveats
+     - Each alias is indexed as its own document, so a query can
+       match on an alias even when the title doesn't mention the
+       searched word. The returned node is still the aliased one.
+     - Results are ranked by BM25 times a context-origin factor
+       (Root 100×, CycleMember ~32×, Target 10×, HadID 10×,
+       MultiContained ~3.2×, everything else 1×). A weaker text
+       match on a root can outrank a stronger match on a leaf.
+       Use =C-c s i= with rooty=no to see everything, unfiltered.
+     - Regex distance is tokenwise: a pattern never spans
+       whitespace, because we split the query on whitespace before
+       handing the pieces to RegexQuery. A true whole-title regex
+       (one pattern that matches across spaces) would need a
+       separate non-tokenized =raw_title= field. Not done yet.
 *** C-c v v : skg-view
     Calling this when the cursor is on a link, a node's metadata,
     a bare UUID, or a .skg filename

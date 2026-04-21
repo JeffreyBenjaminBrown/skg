@@ -6,7 +6,7 @@ use crate::context::link_targets_from_nodes;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::multiple_nodes::read_modified_skg_files_from_sources;
 use crate::dbs::tantivy::open_existing_tantivy_index;
-use crate::dbs::tantivy::update_index_with_nodes;
+use crate::dbs::tantivy::write::update_index_with_nodes;
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::relationships::create_all_relationships;
@@ -364,23 +364,19 @@ pub fn create_empty_tantivy_index (
   let schema : schema::Schema =
     crate::dbs::tantivy::mk_tantivy_schema();
   let id_field: schema::Field =
-    schema . get_field ("id")
-    . ok_or ("Schema missing 'id' field")?;
+    schema . get_field ("id") ?;
   let title_or_alias_field: schema::Field =
-    schema . get_field ("title_or_alias")
-    . ok_or ("Schema missing 'title_or_alias' field")?;
+    schema . get_field ("title_or_alias") ?;
   let source_field: schema::Field =
-    schema . get_field ("source")
-    . ok_or ("Schema missing 'source' field")?;
+    schema . get_field ("source") ?;
   let context_origin_type_field: schema::Field =
-    schema . get_field ("context_origin_type")
-    . ok_or ("Schema missing 'context_origin_type' field")?;
+    schema . get_field ("context_origin_type") ?;
   let is_title_field: schema::Field =
-    schema . get_field ("is_title")
-    . ok_or ("Schema missing 'is_title' field")?;
+    schema . get_field ("is_title") ?;
   let had_id_field: schema::Field =
-    schema . get_field ("had_id")
-    . ok_or ("Schema missing 'had_id' field")?;
+    schema . get_field ("had_id") ?;
+  let body_field: schema::Field =
+    schema . get_field ("body") ?;
   Ok ( TantivyIndex {
     index: Arc::new ( { let index : Index =
                           Index::create_in_dir ( index_path, schema )?;
@@ -390,7 +386,8 @@ pub fn create_empty_tantivy_index (
     source_field,
     context_origin_type_field,
     is_title_field,
-    had_id_field, }) }
+    had_id_field,
+    body_field, }) }
 
 /// Removes any existing index at given path,
 /// creates a new one there,

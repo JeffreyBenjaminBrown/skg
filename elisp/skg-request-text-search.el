@@ -1,8 +1,8 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; USER-FACING FUNCTIONS
-;;;   skg-search-titles
-;;;   skg-search-titles-everywhere
+;;;   skg-search               — defaults: rooty, no regex, no body, no operators
+;;;   skg-search-interactive   — prompts for each of the four axes
 ;;;
 ;;; DATA USED/ASSUMED: See /api.md.
 
@@ -11,28 +11,45 @@
 (require 'skg-length-prefix)
 (require 'heralds-minor-mode)
 
-(defun skg-search-titles (search-terms)
-  "Search titles, showing only origin nodes (roots, targets, etc.)."
+(defun skg-search (search-terms)
+  "Text search with the conservative defaults: rooty scope, no regex,
+titles only, no Tantivy operator syntax."
   (interactive "sSearch terms: ")
-  (skg--request-title-matches search-terms "rooty"))
+  (skg--request-text-search search-terms "rooty" nil nil nil))
 
-(defun skg-search-titles-everywhere (search-terms)
-  "Search titles, showing all matches including non-origin nodes."
+(defun skg-search-interactive (search-terms)
+  "Text search with per-axis prompts for scope, regex, body, operators."
   (interactive "sSearch terms: ")
-  (skg--request-title-matches search-terms "everywhere"))
+  (let* ((rooty     (y-or-n-p "Rooty only (filter to roots/cycles/targets/hadID)? "))
+         (regex     (y-or-n-p "Regex? "))
+         (body      (y-or-n-p "Include body text (titles are always searched)? "))
+         (operators (y-or-n-p "Use operator syntax (AND/OR/NOT/+/-)? ")))
+    (skg--request-text-search search-terms
+                              (if rooty "rooty" "everywhere")
+                              regex
+                              body
+                              operators)))
 
-(defun skg--request-title-matches (search-terms scope)
-  "Request title matches from the Rust server.
-SCOPE is \"rooty\" (filtered) or \"everywhere\" (unfiltered)."
+(defun skg--bool-to-string (b)
+  "Serialize B as the wire-format \"true\" or \"false\"."
+  (if b "true" "false"))
+
+(defun skg--request-text-search (search-terms scope regex body operators)
+  "Request a text search from the Rust server.
+SCOPE is \"rooty\" or \"everywhere\".
+REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
          (clean-terms (if (stringp search-terms)
                           (substring-no-properties search-terms)
                         search-terms))
          (request-s-exp
           (concat (prin1-to-string
-                   `((request . "title matches")
-                     (terms . ,clean-terms)
-                     (scope . ,scope)))
+                   `((request   . "text search")
+                     (terms     . ,clean-terms)
+                     (scope     . ,scope)
+                     (regex     . ,(skg--bool-to-string regex))
+                     (body      . ,(skg--bool-to-string body))
+                     (operators . ,(skg--bool-to-string operators))))
                   "\n")))
     (skg-register-response-handler
      ;; Register phase 1 handler (one-shot)
@@ -142,4 +159,4 @@ may already be read-only from a previous search."
       (insert "\n")))
   (set-buffer-modified-p nil))
 
-(provide 'skg-request-title-matches)
+(provide 'skg-request-text-search)

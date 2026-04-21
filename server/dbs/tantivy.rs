@@ -1,16 +1,25 @@
-// PURPOSE: Creates a Tantivy index from SkgNodes,
-// associating each node's primary ID with its processed title and aliases.
+// PURPOSE: Tantivy integration. This file holds schema + index
+// opening, plus exact-ID document lookups. The other phases live
+// in submodules:
+//   - escape:         query preprocessing (pure strings).
+//   - search:         the text-search API (QueryParser / RegexQuery).
+//   - write:          update/delete/add documents + commit helper.
+//   - context_update: refresh `context_origin_type` via
+//                     delete-and-readd.
 
 // GLOSSARY:
 // See the Tantivy section in glossary.md.
 
-use crate::types::textlinks::replace_each_link_with_its_label;
-use crate::types::misc::{ID, SourceName, TantivyIndex};
-use crate::types::nodes::tantivy::NodeTantivy;
-use crate::types::nodes::complete::FileProperty;
+pub mod context_update;
+pub mod escape;
+pub mod search;
+pub mod write;
 
-use tantivy::{Index, IndexWriter, doc, Term, IndexReader, Searcher, Document};
-use tantivy::query::{QueryParser, Query};
+use crate::types::misc::{ID, SourceName, TantivyIndex};
+
+use tantivy::{Index, Term, IndexReader, Searcher, TantivyDocument};
+use tantivy::schema::document::Value;
+use tantivy::query::Query;
 use tantivy::collector::TopDocs;
 use tantivy::schema;
 use std::collections::{HashMap, HashSet};
@@ -30,23 +39,19 @@ pub(crate) fn open_existing_tantivy_index (
   let schema : schema::Schema =
     index . schema();
   let id_field : schema::Field =
-    schema . get_field ("id")
-    . ok_or ("Schema missing 'id' field") ?;
+    schema . get_field ("id") ?;
   let title_or_alias_field : schema::Field =
-    schema . get_field ("title_or_alias")
-    . ok_or ("Schema missing 'title_or_alias' field") ?;
+    schema . get_field ("title_or_alias") ?;
   let source_field : schema::Field =
-    schema . get_field ("source")
-    . ok_or ("Schema missing 'source' field") ?;
+    schema . get_field ("source") ?;
   let context_origin_type_field : schema::Field =
-    schema . get_field ("context_origin_type")
-    . ok_or ("Schema missing 'context_origin_type' field") ?;
+    schema . get_field ("context_origin_type") ?;
   let is_title_field : schema::Field =
-    schema . get_field ("is_title")
-    . ok_or ("Schema missing 'is_title' field") ?;
+    schema . get_field ("is_title") ?;
   let had_id_field : schema::Field =
-    schema . get_field ("had_id")
-    . ok_or ("Schema missing 'had_id' field") ?;
+    schema . get_field ("had_id") ?;
+  let body_field : schema::Field =
+    schema . get_field ("body") ?;
   Ok ( TantivyIndex {
     index              : Arc::new (index),
     id_field,
@@ -54,13 +59,26 @@ pub(crate) fn open_existing_tantivy_index (
     source_field,
     context_origin_type_field,
     is_title_field,
-    had_id_field, } ) }
+    had_id_field,
+    body_field, } ) }
 
-/// The only Tantivy schema used so far.
-/// It includes three fields:
-/// - "id": STRING | STORED - the node's primary ID
-/// - "title_or_alias": TEXT | STORED - searchable titles and aliases
-/// - "source": STRING | STORED - the source name
+/// The Tantivy schema.
+/// Fields:
+/// - "id":                  STRING | STORED — the node's primary ID.
+/// - "title_or_alias":      TEXT   | STORED — searchable titles and aliases.
+/// - "source":              STRING | STORED — the source name.
+/// - "context_origin_type": STRING | STORED — Root/CycleMember/Target/…
+/// - "is_title":            STRING | STORED — "true" for the primary title,
+///                          "false" for alias docs.
+/// - "had_id":              STRING | STORED — "true" if the node had an
+///                          org-roam ID before import.
+/// - "body":                TEXT   | STORED — searchable body text. STORED
+///                          so that `update_context_origin_types` can
+///                          preserve the body when it does a
+///                          delete-and-readd to refresh origin types.
+///                          (The body is also on disk in the .skg file,
+///                          so this is duplication — revisit once origin
+///                          types are computed before indexing.)
 pub(super) fn mk_tantivy_schema() -> schema::Schema {
   let mut schema_builder : schema::SchemaBuilder =
     schema::Schema::builder();
@@ -76,105 +94,9 @@ pub(super) fn mk_tantivy_schema() -> schema::Schema {
     "is_title", schema::STRING | schema::STORED);
   schema_builder . add_text_field(
     "had_id", schema::STRING | schema::STORED);
+  schema_builder . add_text_field(
+    "body", schema::TEXT | schema::STORED);
   schema_builder . build() }
-
-/// Returns ALL matching Tantivy "Documents" (see glossary, above).
-/// No limit: context-based reranking (multipliers up to 100x)
-/// can reorder results arbitrarily, so the caller must see
-/// every match. The caller truncates after reranking.
-pub fn search_index (
-  tantivy_index : &TantivyIndex,
-  query_text    : &str
-) -> Result <
-    ( Vec< ( f32, // relevance score
-             tantivy::DocAddress )>, // ID for a tantivy Document. (Not a filepath.)
-      Searcher ),
-    Box <dyn std::error::Error> > {
-
-  tracing::info! (
-    "Finding files with titles or aliases matching \"{}\".",
-    query_text);
-  let searcher : Searcher = {
-    let reader : IndexReader =
-      tantivy_index . index . reader () ?;
-    reader } . searcher();
-  let query : Box < dyn Query > = {
-    let query_parser : QueryParser =
-      QueryParser::for_index (
-        &tantivy_index . index,
-        vec! [ tantivy_index . title_or_alias_field ] );
-    query_parser } . parse_query (query_text) ?;
-  Ok (( {
-    let best_matches : Vec < ( f32, tantivy::DocAddress ) > =
-      searcher . search (
-        &query, &TopDocs::with_limit (
-          crate::consts::TANTIVY_SEARCH_LIMIT ) )?;
-    best_matches },
-       searcher )) }
-
-/// Updates the index with the provided nodes.
-///   For existing IDs, updates the title.
-///   For new IDs, adds new entries.
-/// Returns the number of documents processed.
-pub fn update_index_with_nodes (
-  nodes: &[NodeTantivy],
-  tantivy_index: &TantivyIndex,
-) -> Result<usize, Box<dyn Error>> {
-
-  let mut writer: IndexWriter =
-    tantivy_index . index . writer (
-      crate::consts::TANTIVY_WRITER_BUFFER_BYTES)?;
-  delete_nodes_from_index(
-    // Delete those IDs from the index. (They'll come back.)
-    nodes . iter(), &mut writer, tantivy_index)?;
-  let processed_count: usize = // Add new associations.
-    add_documents_to_tantivy_writer (
-      nodes, &mut writer, tantivy_index)?;
-  commit_with_status(
-    &mut writer, processed_count, "Updated")?;
-  Ok (processed_count) }
-
-pub fn delete_nodes_from_index<'a, I>(
-  nodes_iter: I,
-  writer: &mut IndexWriter,
-  tantivy_index: &TantivyIndex,
-) -> Result<(), Box<dyn Error>>
-where I: Iterator<Item = &'a NodeTantivy>, {
-  for node in nodes_iter {
-    { let primary_id : &ID = &node . pid;
-      writer . delete_term (
-        Term::from_field_text( tantivy_index . id_field,
-                               primary_id . as_str() ) ); }}
-  Ok (( )) }
-
-pub fn delete_nodes_by_id_from_index<'a, I>(
-  ids_iter: I,
-  writer: &mut IndexWriter,
-  tantivy_index: &TantivyIndex,
-) -> Result<(), Box<dyn Error>>
-where I: Iterator<Item = &'a ID>, {
-  for id in ids_iter {
-    writer . delete_term (
-      Term::from_field_text( tantivy_index . id_field,
-                             id . as_str() ) ); }
-  Ok (( )) }
-
-pub fn add_documents_to_tantivy_writer<'a, I> (
-  nodes         : I,
-  writer        : &mut IndexWriter,
-  tantivy_index : &TantivyIndex,
-) -> Result<usize, Box<dyn Error>>
-where I: IntoIterator<Item = &'a NodeTantivy>, {
-
-  let mut indexed_count: usize = 0;
-  for node in nodes {
-    let documents: Vec<Document> =
-      create_documents_from_node(
-        node, tantivy_index )?;
-    for document in documents {
-      writer . add_document (document)?;
-      indexed_count += 1; }}
-  Ok (indexed_count) }
 
 /// Look up the canonical title and source for a node by its exact primary ID.
 /// Prefers the document marked is_title="true"; falls back to the
@@ -185,49 +107,24 @@ pub fn title_and_source_by_id (
 ) -> Option < (String, SourceName) > {
   let reader : IndexReader =
     tantivy_index . index . reader () . ok () ?;
-  let searcher : Searcher =
-    reader . searcher ();
-  let query : Box < dyn Query > =
-    Box::new ( tantivy::query::TermQuery::new (
-      Term::from_field_text (
-        tantivy_index . id_field, id . as_str () ),
-      schema::IndexRecordOption::Basic ));
-  let results : Vec < (f32, tantivy::DocAddress) > =
-    searcher . search (
-      &query, &TopDocs::with_limit (
-        crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT ) ) . ok () ?;
-  let mut fallback : Option < (String, SourceName) > = None;
-  for (_score, doc_address) in &results {
-    let retrieved_doc : Document =
-      searcher . doc (*doc_address) . ok () ?;
-    let is_title : bool =
-      retrieved_doc
-        . get_first ( tantivy_index . is_title_field )
-        . and_then ( |v| v . as_text () )
-        . map ( |s| s == "true" )
-        . unwrap_or (false);
-    let title_or_alias : Option < String > =
-      retrieved_doc
-        . get_first ( tantivy_index . title_or_alias_field )
-        . and_then ( |v| v . as_text () )
-        . map ( |s| s . to_string () );
-    let source : SourceName =
-      SourceName::from (
-        retrieved_doc
-          . get_first ( tantivy_index . source_field )
-          . and_then ( |v| v . as_text () )
-          . unwrap_or ("") );
-    if is_title {
-      return title_or_alias . map (
-        |t| (t, source) ); }
-    if fallback . is_none () {
-      fallback = title_or_alias . map (
-        |t| (t, source) ); } }
-  tracing::warn! (
-    "title_and_source_by_id: no is_title=\"true\" document \
-     found for ID {}. Falling back to first title_or_alias.",
-    id );
-  fallback }
+  let searcher : Searcher = reader . searcher ();
+  let doc_addresses : Vec<tantivy::DocAddress> =
+    doc_addresses_for_id (
+      tantivy_index, &searcher, id,
+      crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT ) ?;
+  let (doc, was_fallback) : (TantivyDocument, bool) =
+    pick_title_doc ( tantivy_index, &searcher, id, &doc_addresses ) ?;
+  if was_fallback {
+    tracing::warn! (
+      "title_and_source_by_id: no is_title=\"true\" document \
+       found for ID {}. Falling back to first title_or_alias.",
+      id ); }
+  let title : String =
+    string_field ( &doc, tantivy_index . title_or_alias_field ) ?;
+  let source : SourceName = SourceName::from (
+    string_field ( &doc, tantivy_index . source_field )
+      . unwrap_or_default () . as_str () );
+  Some ( (title, source) ) }
 
 /// Look up canonical titles for multiple IDs in a single searcher session.
 /// IDs not found in Tantivy are absent from the result.
@@ -242,47 +139,25 @@ pub fn titles_by_ids (
       Err (_) => return result };
   let searcher : Searcher = reader . searcher ();
   for id in ids {
-    let query : Box < dyn Query > =
-      Box::new ( tantivy::query::TermQuery::new (
-        Term::from_field_text (
-          tantivy_index . id_field, id . as_str () ),
-        schema::IndexRecordOption::Basic ));
-    let results : Vec < (f32, tantivy::DocAddress) > =
-      match searcher . search (
-        &query, &TopDocs::with_limit (
-          crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT ) )
-      { Ok (r) => r,
-        Err (_) => continue };
-    let mut fallback : Option<String> = None;
-    for (_score, doc_address) in &results {
-      let retrieved_doc : Document =
-        match searcher . doc (*doc_address) {
-          Ok (d) => d,
-          Err (_) => continue };
-      let is_title : bool =
-        retrieved_doc
-          . get_first ( tantivy_index . is_title_field )
-          . and_then ( |v| v . as_text () )
-          . map ( |s| s == "true" )
-          . unwrap_or (false);
-      let title_or_alias : Option<String> =
-        retrieved_doc
-          . get_first ( tantivy_index . title_or_alias_field )
-          . and_then ( |v| v . as_text () )
-          . map ( |s| s . to_string () );
-      if is_title {
-        if let Some (t) = title_or_alias {
-          result . insert ( id . clone (), t ); }
-        fallback = None; // signal: found title, skip fallback
-        break; }
-      if fallback . is_none () {
-        fallback = title_or_alias; } }
-    if let Some (fb) = fallback {
+    let doc_addresses : Vec<tantivy::DocAddress> =
+      match doc_addresses_for_id (
+        tantivy_index, &searcher, id,
+        crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT )
+      { Some (a) => a,
+        None     => continue };
+    let (doc, was_fallback) : (TantivyDocument, bool) =
+      match pick_title_doc (
+        tantivy_index, &searcher, id, &doc_addresses )
+      { Some (d) => d,
+        None     => continue };
+    if was_fallback {
       tracing::debug! (
         "titles_by_ids: no is_title=\"true\" document \
          found for ID {}. Falling back to first title_or_alias.",
-        id );
-      result . insert ( id . clone (), fb ); } }
+        id ); }
+    if let Some (title) = string_field (
+      &doc, tantivy_index . title_or_alias_field )
+    { result . insert ( id . clone (), title ); } }
   result }
 
 /// Return the subset of the input for which 'had_id' is true.
@@ -290,153 +165,101 @@ pub fn subset_with_hadid (
   tantivy_index : &TantivyIndex,
   ids           : &HashSet<ID>,
 ) -> HashSet<ID> {
-  let reader : IndexReader
-    = match tantivy_index . index . reader () {
+  let reader : IndexReader =
+    match tantivy_index . index . reader () {
       Ok (r) => r,
       Err (_) => return HashSet::new () };
   let searcher : Searcher = reader . searcher ();
   let mut result : HashSet<ID> = HashSet::new ();
   for id in ids {
-    let query : Box < dyn Query > =
-      Box::new ( tantivy::query::TermQuery::new (
-        Term::from_field_text (
-          tantivy_index . id_field, id . as_str () ),
-        schema::IndexRecordOption::Basic ));
-    let hits : Vec < (f32, tantivy::DocAddress) > =
-      match searcher . search (
-        &query, &TopDocs::with_limit (1) )
-      { Ok (h) => h,
-        Err (_) => continue };
-    if let Some ( (_score, doc_address) ) = hits . first () {
-      if let Ok (doc) = searcher . doc (*doc_address) {
-        let had_id : bool =
-          doc . get_first ( tantivy_index . had_id_field )
-          . and_then ( |v| v . as_text () )
-          . map ( |s| s == "true" )
-          . unwrap_or (false);
-        if had_id {
-          result . insert (id . clone () ); }} }}
+    let doc_addresses : Vec<tantivy::DocAddress> =
+      match doc_addresses_for_id (
+        tantivy_index, &searcher, id, 1 )
+      { Some (a) => a,
+        None     => continue };
+    let Some (addr) = doc_addresses . first ()
+      else { continue };
+    let doc : TantivyDocument =
+      match load_doc_or_warn ( &searcher, *addr, id ) {
+        Some (d) => d,
+        None     => continue };
+    if bool_field_eq_true ( &doc, tantivy_index . had_id_field ) {
+      result . insert ( id . clone () ); } }
   result }
 
-/* -------------------- Private helpers -------------------- */
-
-fn create_documents_from_node (
-  node: &NodeTantivy,
-  tantivy_index: &TantivyIndex,
-) -> Result < Vec < Document >,
-              Box < dyn Error >> {
-  let primary_id : &ID = &node . pid;
-  let had_id : &str =
-    if node . misc . contains (
-      &FileProperty::Had_ID_Before_Import )
-    { "true" } else { "false" };
-  let mut documents: Vec<Document> =
-    Vec::new();
-  let mut titles_and_aliases: Vec<String> =
-    vec![node . title . clone()];
-  titles_and_aliases . extend_from_slice (
-    node . aliases . or_default () );
-  for (i, title_or_alias) in
-    titles_and_aliases . iter() . enumerate()
-  { let is_title : &str =
-      if i == 0 { "true" } else { "false" };
-    documents . push (
-      doc!(
-        tantivy_index . id_field =>
-          primary_id . as_str (),
-        tantivy_index . title_or_alias_field =>
-          replace_each_link_with_its_label (
-            title_or_alias ),
-        tantivy_index . source_field =>
-          node . source . as_str(),
-        tantivy_index . context_origin_type_field =>
-          "",
-        tantivy_index . is_title_field =>
-          is_title,
-        tantivy_index . had_id_field =>
-          had_id ) ); }
-  Ok (documents) }
-
-/// Updates context_origin_type for all documents matching each ID.
-/// Deletes and re-adds each document with the new context_origin_type.
-pub fn update_context_origin_types (
-  tantivy_index       : &TantivyIndex,
-  context_types_by_id : &HashMap<ID, String>,
-) -> Result<usize, Box<dyn Error>> {
-  let reader : IndexReader =
-    tantivy_index . index . reader () ?;
-  let searcher : Searcher =
-    reader . searcher ();
-  let mut writer : IndexWriter =
-    tantivy_index . index . writer (
-      crate::consts::TANTIVY_WRITER_BUFFER_BYTES) ?;
-  let mut updated_count : usize = 0;
-  for (pid, context_type) in context_types_by_id {
-    let query : Box < dyn Query > =
-      // Find all documents with this ID.
-      Box::new ( tantivy::query::TermQuery::new (
-        Term::from_field_text (
-          tantivy_index . id_field, pid . as_str () ),
-        schema::IndexRecordOption::Basic ));
-    let results : Vec < (f32, tantivy::DocAddress) > =
-      searcher . search (
-        &query, &TopDocs::with_limit (
-          crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT )) ?;
-    if results . is_empty () { continue; }
-    writer . delete_term ( // Delete all documents for this ID.
+/// Run an exact-match TermQuery against the id_field, returning
+/// the matching doc addresses (scores discarded). None on any
+/// index/search error; an empty vec means "no hits" (distinct from
+/// error).
+fn doc_addresses_for_id (
+  tantivy_index : &TantivyIndex,
+  searcher      : &Searcher,
+  id            : &ID,
+  limit         : usize,
+) -> Option < Vec<tantivy::DocAddress> > {
+  let query : Box<dyn Query> =
+    Box::new ( tantivy::query::TermQuery::new (
       Term::from_field_text (
-        tantivy_index . id_field, pid . as_str () ));
-    for (_score, doc_address) in &results {
-      // Re-add with the new context_origin_type.
-      let retrieved_doc : Document =
-        searcher . doc (*doc_address) ?;
-      let title_or_alias : String =
-        retrieved_doc
-          . get_first ( tantivy_index . title_or_alias_field )
-          . and_then ( |v| v . as_text () )
-          . unwrap_or ("") . to_string ();
-      let source : String =
-        retrieved_doc
-          . get_first ( tantivy_index . source_field )
-          . and_then ( |v| v . as_text () )
-          . unwrap_or ("") . to_string ();
-      let is_title : String =
-        retrieved_doc
-          . get_first ( tantivy_index . is_title_field )
-          . and_then ( |v| v . as_text () )
-          . unwrap_or ("false") . to_string ();
-      let had_id : String =
-        retrieved_doc
-          . get_first ( tantivy_index . had_id_field )
-          . and_then ( |v| v . as_text () )
-          . unwrap_or ("false") . to_string ();
-      writer . add_document ( doc! (
-        tantivy_index . id_field =>
-          pid . as_str (),
-        tantivy_index . title_or_alias_field =>
-          title_or_alias . as_str (),
-        tantivy_index . source_field =>
-          source . as_str (),
-        tantivy_index . context_origin_type_field =>
-          context_type . as_str (),
-        tantivy_index . is_title_field =>
-          is_title . as_str (),
-        tantivy_index . had_id_field =>
-          had_id . as_str () )) ?;
-      updated_count += 1; } }
-  commit_with_status (
-    &mut writer, updated_count, "Context-updated") ?;
-  Ok (updated_count) }
+        tantivy_index . id_field, id . as_str () ),
+      schema::IndexRecordOption::Basic ));
+  searcher . search (
+    &query, &TopDocs::with_limit (limit) . order_by_score () )
+    . ok ()
+    . map ( |hits| hits . into_iter ()
+              . map ( |(_, a)| a ) . collect () ) }
 
-pub fn commit_with_status (
-  writer: &mut IndexWriter,
-  indexed_count: usize,
-  operation: &str,
-) -> Result<(), Box<dyn Error>> {
-  if indexed_count > 0 {
-    tracing::info!( "{} {} documents. Committing changes...",
-              operation, indexed_count );
-    writer . commit () ?;
-  } else {
-    tracing::debug!("No documents to process found."); }
-  Ok (( )) }
+/// Walk the doc addresses for a single ID and pick the one marked
+/// is_title="true". If none is, fall back to the first doc (an
+/// alias). Returns (chosen doc, was_fallback). Broken docs log a
+/// warning and are skipped.
+fn pick_title_doc (
+  tantivy_index : &TantivyIndex,
+  searcher      : &Searcher,
+  id            : &ID,
+  doc_addresses : &[tantivy::DocAddress],
+) -> Option < (TantivyDocument, bool) > {
+  let mut fallback : Option<TantivyDocument> = None;
+  for addr in doc_addresses {
+    let doc : TantivyDocument =
+      match load_doc_or_warn ( searcher, *addr, id ) {
+        Some (d) => d,
+        None     => continue };
+    if bool_field_eq_true ( &doc, tantivy_index . is_title_field ) {
+      return Some ( (doc, false) ); }
+    if fallback . is_none () {
+      fallback = Some (doc); } }
+  fallback . map ( |d| (d, true) ) }
+
+/// Fetch a stored doc by address. Logs a warning on failure so
+/// operators can diagnose corrupt indexes; returns None so callers
+/// can skip this address and continue.
+fn load_doc_or_warn (
+  searcher : &Searcher,
+  addr     : tantivy::DocAddress,
+  id       : &ID,
+) -> Option < TantivyDocument > {
+  match searcher . doc (addr) {
+    Ok (doc) => Some (doc),
+    Err (e)  => {
+      tracing::warn! (
+        "Failed to load Tantivy doc for ID {} at {:?}: {}",
+        id, addr, e );
+      None }} }
+
+fn bool_field_eq_true (
+  doc   : &TantivyDocument,
+  field : schema::Field,
+) -> bool {
+  doc . get_first (field)
+    . and_then ( |v| v . as_str () )
+    . map ( |s| s == "true" )
+    . unwrap_or (false) }
+
+fn string_field (
+  doc   : &TantivyDocument,
+  field : schema::Field,
+) -> Option<String> {
+  doc . get_first (field)
+    . and_then ( |v| v . as_str () )
+    . map ( |s| s . to_string () ) }
+

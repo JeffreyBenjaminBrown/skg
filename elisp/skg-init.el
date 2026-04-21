@@ -15,7 +15,8 @@
 ;;;     skg-local-metadata
 ;;;     skg-local-sourceward
 ;;;     skg-save
-;;;     skg-search-titles
+;;;     skg-search
+;;;     skg-search-interactive
 ;;;     skg-view-from-node-id
 ;;;     skg-view-heralds-mode
 ;;;   elisp/skg-buffer.el
@@ -58,7 +59,7 @@
 (require 'skg-buffer)
 (require 'skg-client)
 (require 'skg-id-search)
-(require 'skg-request-title-matches)
+(require 'skg-request-text-search)
 (require 'skg-request-views)
 (require 'skg-sexpr-edit)
 (require 'skg-sexpr-search)

@@ -1,36 +1,35 @@
 * new command shortcuts
 ** C-c <backspace> :: delete
-skg-local-delete           ::     C-c <backspace>
-skg-local-delete-recursive :: C-u C-c <backspace>
+*** skg-local-delete           -> skg-delete           ::     C-c <backspace>
+*** skg-local-delete-recursive -> skg-delete-recursive :: C-u C-c <backspace>
 ** C-c g :: goto
-skg-skg-view-new-empty -> skg-goto-nothing | skg-goto-new
-skg-view               -> skg-goto
-skg-view-id            -> skg-goto-by-id
-skg-view-magit         -> skg-goto-in-magit
-skg-local-metadata     -> skg-goto-metadata
+*** skg-skg-view-new-empty -> skg-goto-nothing | skg-goto-new
+*** skg-view               -> skg-goto
+*** skg-view-id            -> skg-goto-by-id
+*** skg-view-magit         -> skg-goto-in-magit
 ** C-c i :: insert (a local change)
-skg-view-org-ancestry
-skg-local-aliases       -> skg-insert-show-aliases
-skg-local-containerward -> skg-insert-show-containerward
-skg-local-sourceward    -> skg-insert-show-sourceward
-skg-show-stats          -> skg-insert-show-stats
-** C-c m :: mode
-skg-id-stack-mode
+*** skg-view-org-ancestry   -> skg-show-org-ancestry
+*** skg-local-aliases       -> skg-show-aliases
+*** skg-local-containerward -> skg-show-containerward
+*** skg-local-sourceward    -> skg-show-sourceward
+*** skg-show-stats          -> skg-show-stats
 ** C-c p :: properties
-skg-local-definitive
-skg-local-indefinitive
-** C-c s :: search
-skg-search-titles (C-c t t)
-skg-search-titles-everywhere (C-c t e)
+*** skg-local-definitive   -> skg-make-definitive
+*** skg-local-indefinitive -> skg-make-indefinitive
+** C-c f :: search (f is for "find")
+*** skg-search-titles            C-c f RET
+*** skg-search-titles-everywhere C-c f e
 ** C-c v :: view
-skg-view-heralds-mode
-skg-view-diff-mode
+*** C-c v h :: skg-view-heralds-mode
+*** C-c v d :: skg-view-diff-mode
+*** C-c v s :: skg-id-stack -> skg-view-id-stack
+*** C-c v m :: skg-local-metadata -> skg-view-metadata
 ** C-c i :: IDs, except for popping|copying
-skg-id-next
-skg-id-prev
-skg-id-push
+*** C-c i n :: skg-id-next
+*** C-c i p :: skg-id-prev
+*** C-c i u :: skg-id-push
 ** C-c o :: popping|copying IDs
-C-c o   l :: pop  link
-C-c o S-l :: copy link from top of stack, without changing stack
-C-c o   i :: pop  ID
-C-c o S-i :: copy ID   from top of stack, without changing stack
+*** C-c o   l :: pop  link
+*** C-c o S-l :: copy link from top of stack, without changing stack
+*** C-c o   i :: pop  ID
+*** C-c o S-i :: copy ID   from top of stack, without changing stack

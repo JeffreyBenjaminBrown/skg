@@ -8,7 +8,7 @@ pub mod render_enriched_search_buffer;
 
 use crate::consts::SEARCH_DISPLAY_LIMIT;
 use crate::context::ContextOriginType;
-use crate::dbs::tantivy::search_index;
+use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
 use crate::dbs::typedb::search::all_graphnodestats::{ AllGraphNodeStats, fetch_all_graphnodestats};
 use crate::org_to_text::viewnode_forest_to_string;
@@ -27,7 +27,8 @@ use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
-use tantivy::{Document, Searcher};
+use tantivy::{TantivyDocument, Searcher};
+use tantivy::schema::document::Value;
 use typedb_driver::TypeDBDriver;
 
 /// "Rooty" nodes have the most interesting graph structure:
@@ -60,7 +61,7 @@ pub struct SearchEnrichmentPayload {
 /// The slower one is 'enriched'
 /// with containerward paths and graphnodestats at each search hit,
 /// and is processed in the background -- the user need not await it.
-pub fn handle_title_matches_request (
+pub fn handle_text_search_request (
   stream           : &mut TcpStream,
   request          : &str,
   tantivy_index    : &TantivyIndex,
@@ -91,11 +92,17 @@ pub fn handle_title_matches_request (
           . as_str ()
     { "everywhere" => SearchScope::Everything,
       _            => SearchScope::Rooty };
+  let search_opts : SearchOptions =
+    SearchOptions {
+      regex     : bool_key ( &sexp, "regex" ),
+      body      : bool_key ( &sexp, "body" ),
+      operators : bool_key ( &sexp, "operators" ), };
   match search_terms {
     Ok (search_terms) => {
       // --- Phase 1: immediate results without paths ---
       match search_index ( tantivy_index,
-                           &search_terms ) {
+                           &search_terms,
+                           &search_opts ) {
         Ok (( best_matches, searcher )) => {
           if best_matches . is_empty () {
             send_response_with_length_prefix (
@@ -150,6 +157,16 @@ pub fn handle_title_matches_request (
         stream,
         & tag_text_response (
           TcpToClient::SearchResults, &error_msg )); }} }
+
+/// Read a boolean axis flag from the request sexp. Absent, empty, or
+/// any non-"true" string is treated as false.
+fn bool_key (
+  sexp : &Sexp,
+  key  : &str,
+) -> bool {
+  extract_v_from_kv_pair_in_sexp ( sexp, key )
+    . unwrap_or_default ()
+    == "true" }
 
 /// Spawn a background thread to compute containerward acnestries
 /// and graphnodestats, then write the structured payload
@@ -266,27 +283,27 @@ pub fn group_matches_by_id (
   for (score, doc_address) in best_matches {
     match searcher . doc (doc_address) {
       Ok (retrieved_doc) => {
-        let retrieved_doc : Document = retrieved_doc;
+        let retrieved_doc : TantivyDocument = retrieved_doc;
         let id_opt : Option < ID > =
           retrieved_doc
             . get_first ( tantivy_index . id_field )
-            . and_then ( |v| v . as_text() )
+            . and_then ( |v| v . as_str() )
             . map ( |s| ID::from (s) );
         let title_opt : Option < String > =
           retrieved_doc
             . get_first ( tantivy_index . title_or_alias_field )
-            . and_then ( |v| v . as_text() )
+            . and_then ( |v| v . as_str() )
             . map ( |s| s . to_string() );
         let source : SourceName =
           SourceName::from (
             retrieved_doc
               . get_first ( tantivy_index . source_field )
-              . and_then ( |v| v . as_text () )
+              . and_then ( |v| v . as_str () )
               . unwrap_or ("") );
         let origin_type : Option < ContextOriginType > =
           retrieved_doc
             . get_first ( tantivy_index . context_origin_type_field )
-            . and_then ( |v| v . as_text () )
+            . and_then ( |v| v . as_str () )
             . and_then ( ContextOriginType::from_label );
         if matches! ( scope, SearchScope::Rooty ) {
           match origin_type {

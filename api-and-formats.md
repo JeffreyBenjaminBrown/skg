@@ -10,11 +10,15 @@ So far there are these endpoints:
   - Request: ((request . "verify connection"))
   - Response: Plain text with newline termination: "This is the skg server verifying the connection."
 
-## Search in titles
-  - Request: ((request . "title matches") (terms . "SEARCH_TERMS") (scope . "SCOPE"))
+## Text search
+  - Request: ((request . "text search") (terms . "SEARCH_TERMS") (scope . "SCOPE") (regex . "BOOL") (body . "BOOL") (operators . "BOOL"))
     - `scope` is optional; defaults to "rooty".
       - "rooty": only returns nodes with relationships suggesting they are especially rootlike -- so literal roots, but also cycle-roots, link targets, and things that had an ID when imported. Defined in the negative, 'rooty' excludes MultiContained and untyped nodes.
       - "everywhere": returns all Tantivy matches regardless of origin type, including the humblest leaves.
+    - `regex`, `body`, `operators` are optional; each defaults to "false".
+      - "regex=true": interpret the query as a per-token regex; a RegexQuery is built directly and the QueryParser is bypassed.
+      - "body=true": also search node bodies (titles are always searched).
+      - "operators=true": preserve Tantivy operator syntax (AND / OR / phrase / +foo / -bar / grouping / field:). Intra-word operator chars still get escaped heuristically so C++ etc. remain findable. Ignored in regex mode.
 
   - Phase 1, immediate: Server sends LP buffer content with response-type "search-results". Results are ordinary indefinitive non-content TrueNodes (not special scaffold types).
 
@@ -41,7 +45,7 @@ So far there are these endpoints:
        `content` is the re-rendered saved buffer (nil on failure). `errors` is a list of error/warning strings (empty list if none).
   - If the server errors before sending the early lock message (e.g. malformed request), only one message is sent: the error response in the save-result format.
 
-## Snapshot response (part of search enrichment; see "Search in titles" above)
+## Snapshot response (part of search enrichment; see "Text search" above)
   - Request: First `((request . "snapshot response") (terms . "TERMS"))\n`, then `Content-Length: N\r\n\r\n<buffer text>`.
   - Initiated by the client in response to a "request-snapshot" message from the server.
   - Response: LP response-type "search-enrichment" with enriched buffer content.

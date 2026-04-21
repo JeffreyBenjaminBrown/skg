@@ -5,7 +5,7 @@ use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
 use crate::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
 use crate::dbs::memory::{InRustGraph, InRustGraphHandle, audit::{audit_memory_against_typedb, format_mismatches}, new_handle};
-use crate::dbs::tantivy::search_index;
+use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
@@ -32,7 +32,8 @@ use typedb_driver::answer::{QueryAnswer, ConceptRow};
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Transaction, TransactionType, Database, DatabaseManager};
 use crate::dbs::typedb::util::ConceptRowStream;
 use std::sync::Arc;
-use tantivy::{DocAddress, Searcher};
+use tantivy::{DocAddress, Searcher, TantivyDocument};
+use tantivy::schema::document::Value;
 
 
 /// Run tests with automatic database setup and cleanup.
@@ -509,12 +510,13 @@ pub fn tantivy_contains_id(
 ) -> Result<bool, Box<dyn Error>> {
   let (matches, searcher)
     : (Vec<(f32, DocAddress)>, Searcher)
-    = search_index(tantivy_index, query)?;
+    = search_index ( tantivy_index, query,
+                     & SearchOptions::default () )?;
   for (_score, doc_address) in matches {
-    let doc: tantivy::Document = searcher . doc (doc_address)?;
+    let doc: TantivyDocument = searcher . doc (doc_address)?;
     let id_value: Option<String> =
       doc . get_first(tantivy_index . id_field)
-      . and_then(|v| v . as_text() . map (String::from));
+      . and_then(|v| v . as_str() . map (String::from));
     if id_value == Some(expected_id . to_string()) {
       return Ok (true); }}
   Ok (false) }

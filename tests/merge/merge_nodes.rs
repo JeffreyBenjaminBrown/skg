@@ -288,7 +288,7 @@ fn verify_tantivy_after_merge_2_into_1(
   let acquiree_text_preserver_id: &ID =
     &merge_instructions[0] . targets_from_merge() . 0 . pid;
   let found_acquiree_text_preserver: bool =
-    tantivy_contains_id(tantivy_index, "\"MERGED: 2\"", &acquiree_text_preserver_id . 0)?;
+    tantivy_contains_id(tantivy_index, "MERGED: 2", &acquiree_text_preserver_id . 0)?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");
   Ok (( )) }
 
@@ -641,7 +641,7 @@ fn verify_tantivy_after_merge_1_into_2(
   let acquiree_text_preserver_id: &ID =
     &merge_instructions[0] . targets_from_merge() . 0 . pid;
   let found_acquiree_text_preserver: bool = tantivy_contains_id(
-    tantivy_index, "\"MERGED: 1\"", &acquiree_text_preserver_id . 0 )?;
+    tantivy_index, "MERGED: 1", &acquiree_text_preserver_id . 0 )?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");
 
   Ok (( )) }

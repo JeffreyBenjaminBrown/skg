@@ -4,5 +4,5 @@ pub mod rebuild_dbs;
 pub mod rerender_all_views;
 pub mod save_buffer;
 pub mod single_root_view;
-pub mod title_matches;
+pub mod text_search;
 pub mod titles_by_ids;

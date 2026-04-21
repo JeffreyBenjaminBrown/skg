@@ -24,8 +24,8 @@ use crate::serve::handlers::rerender_all_views::{
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request;
-use crate::serve::handlers::title_matches::render_enriched_search_buffer::insert_containerward_ancestries_into_search_view;
-use crate::serve::handlers::title_matches::{ handle_title_matches_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
+use crate::serve::handlers::text_search::render_enriched_search_buffer::insert_containerward_ancestries_into_search_view;
+use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
 use crate::types::errors::BufferValidationError;
@@ -88,7 +88,7 @@ pub fn serve (
 
 /// This function directs requests from the stream to one of
 ///   handle_sexp_document_request
-///   handle_title_matches_request
+///   handle_text_search_request
 /// API: See /api.md
 fn handle_emacs (
   mut stream        : TcpStream,
@@ -161,11 +161,11 @@ fn handle_emacs (
               &tantivy_index,
               config,
               &mut conn_state ); }
-          Ok (RequestType::TitleMatches) => {
+          Ok (RequestType::TextSearch) => {
             // Cancel any in-flight background search
             search_cancelled . store (true, Ordering::SeqCst);
             snapshot_requested = false;
-            handle_title_matches_request (
+            handle_text_search_request (
               &mut stream,
               &request_header,
               &tantivy_index,
