@@ -45,13 +45,21 @@ pub struct Mismatch {
 /// Audit every node in memory against TypeDB. Returns the list of
 /// mismatches (empty on success).
 ///
+/// Vocabulary: each outbound relation (see [[../../schema.tql]]) is an
+/// ordered pair (first member, second member). For 'contains' that's
+/// (container, contained); for 'subscribes' it's (subscriber,
+/// subscribee); etc. The node being audited is the first member;
+/// the IDs in 'NodeRust.contains', 'NodeRust.subscribes_to', etc.,
+/// are the second members.
+///
 /// Memory and TypeDB have an asymmetry worth naming:
 /// - /Inverse/ indexes in memory are canonical-pid-keyed, matching
 ///   TypeDB's has_extra_id-resolved view. Direct 'inverse_X[pid]'
 ///   lookup compares apples-to-apples.
 /// - /Forward/ fields on NodeRust remain raw (mirroring what the
-///   .skg file literally has) — so we map each memory peer through
-///   'pid_of' before comparing to TypeDB's already-resolved answer.
+///   .skg file literally has) — so we map each second-member ID
+///   through 'pid_of' before comparing to TypeDB's already-resolved
+///   answer.
 pub async fn audit_memory_against_typedb (
   graph   : &InRustGraph,
   db_name : &str,
@@ -61,9 +69,9 @@ pub async fn audit_memory_against_typedb (
   for (pid, node) in graph . nodes . iter () {
     for (relation, subject_role, object_role) in OUTBOUND_RELATIONS {
       { // Outbound: NodeRust forward fields are raw; resolve each
-        // peer through pid_of before comparing.
+        // second-member ID through pid_of before comparing.
         let memory_set : HashSet<ID> =
-          outbound_peers_from_memory (node, relation) . iter ()
+          outbound_second_members_from_memory (node, relation) . iter ()
           . map ( |id| graph . pid_of (id) . unwrap_or (id . clone ()) )
           . collect ();
         let typedb_set : HashSet<ID> =
@@ -79,7 +87,7 @@ pub async fn audit_memory_against_typedb (
             typedb    : typedb_set, } ); } }
       { // Inverse: canonical-pid-keyed, direct lookup.
         let memory_set : HashSet<ID> =
-          inverse_peers_from_memory (graph, pid, relation);
+          inverse_first_members_from_memory (graph, pid, relation);
         let typedb_set : HashSet<ID> =
           find_related_nodes_for_one_id (
             db_name, driver, pid,
@@ -93,7 +101,9 @@ pub async fn audit_memory_against_typedb (
             typedb    : typedb_set, } ); } } } }
   Ok (mismatches) }
 
-fn outbound_peers_from_memory (
+/// IDs appearing as the second member of 'node''s outbound edges in
+/// the named relation (see [[../../schema.tql]]).
+fn outbound_second_members_from_memory (
   node     : &crate::types::nodes::rust::NodeRust,
   relation : &str,
 ) -> HashSet<ID> {
@@ -106,7 +116,9 @@ fn outbound_peers_from_memory (
     _ => HashSet::new (),
   } }
 
-fn inverse_peers_from_memory (
+/// pids of nodes that play the first-member role in the named
+/// relation with 'pid' as the second member (see [[../../schema.tql]]).
+fn inverse_first_members_from_memory (
   graph    : &InRustGraph,
   pid      : &ID,
   relation : &str,

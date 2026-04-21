@@ -113,8 +113,8 @@ pub fn find_related_nodes_from_memory (
       None     => continue };
     // Forward fields on NodeRust mirror disk and thus carry raw IDs;
     // callers expect canonical pids (to match what TypeDB's
-    // has_extra_id-resolved query would return). Resolve each peer
-    // through pid_of before inserting.
+    // has_extra_id-resolved query would return). Resolve each second-
+    // member ID (see schema.tql) through pid_of before inserting.
     let resolve = |id: &ID| -> ID {
       graph . pid_of (id) . unwrap_or_else ( || id . clone () ) };
     match (relation, input_role, output_role) {
