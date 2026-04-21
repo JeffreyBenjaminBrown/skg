@@ -42,6 +42,7 @@ fn test_skgnode_for_viewnode_with_id_in_map() {
     initial_node_limit : 100,
     delete_on_quit     : false,
     timing_log         : false,
+    auto_audit_daily   : false,
     max_ancestry_depth : 20,
   };
 
@@ -90,6 +91,7 @@ fn test_skgnode_for_viewnode_with_id_not_in_map() {
     initial_node_limit : 100,
     delete_on_quit     : false,
     timing_log         : false,
+    auto_audit_daily   : false,
     max_ancestry_depth : 20,
   };
   let result : Result<Option<&NodeComplete>, Box<dyn Error>> =
@@ -131,6 +133,7 @@ fn test_skgnode_for_viewnode_scaffold() {
     initial_node_limit : 100,
     delete_on_quit     : false,
     timing_log         : false,
+    auto_audit_daily   : false,
     max_ancestry_depth : 20,
   };
 
