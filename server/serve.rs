@@ -12,7 +12,7 @@ pub mod protocol;
 pub mod util;
 
 use crate::dbs::typedb::util::delete_database;
-use crate::dbs::memory::InRustMemoryHandle;
+use crate::dbs::memory::InRustGraphHandle;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
@@ -29,7 +29,7 @@ use crate::serve::handlers::title_matches::{ handle_title_matches_request, Searc
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
 use crate::types::errors::BufferValidationError;
-use crate::types::memory::{SkgnodesInMemory, ViewUri};
+use crate::types::memory::{SkgnodesInViews, ViewUri};
 use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::unchecked_viewnode::{UncheckedViewNode,unchecked_to_checked_tree};
 use crate::types::viewnode::ViewNode;
@@ -49,9 +49,9 @@ use typedb_driver::TypeDBDriver;
 /// Per-connection ("global") state.
 pub struct ConnectionState {
   pub diff_mode_enabled : bool,
-  pub memory            : SkgnodesInMemory,
-  pub graph             : InRustMemoryHandle,
-  // PITFALL: If Emacs crashes or the TCP connection drops without sending close-view messages, SkgnodesInMemory is still freed, because ConnectionState is owned by handle_emacs and dropped when the connection loop exits (n == 0). There's no leak. HOWEVER, the pool may briefly hold stale entries for views that were conceptually "closed" by the crash. This is harmless: the entries are freed moments later when ConnectionState drops.
+  pub memory            : SkgnodesInViews,
+  pub graph             : InRustGraphHandle,
+  // PITFALL: If Emacs crashes or the TCP connection drops without sending close-view messages, SkgnodesInViews is still freed, because ConnectionState is owned by handle_emacs and dropped when the connection loop exits (n == 0). There's no leak. HOWEVER, the pool may briefly hold stale entries for views that were conceptually "closed" by the crash. This is harmless: the entries are freed moments later when ConnectionState drops.
 }
 
 /// Pipes TCP input from Emacs into handle_emacs.
@@ -59,7 +59,7 @@ pub fn serve (
   config         : SkgConfig,
   typedb_driver  : Arc<TypeDBDriver>,
   tantivy_index  : TantivyIndex,
-  graph          : InRustMemoryHandle,
+  graph          : InRustGraphHandle,
   emacs_listener : TcpListener,
 ) -> std::io::Result<()> {
 
@@ -71,7 +71,7 @@ pub fn serve (
           Arc::clone (&typedb_driver); // Cloning permits the main thread to keep the driver and index. If they were passed here instead of cloned, their ownership would be moved into the first spawned thread, making them unavailable for the next connection.
         let tantivy_index_clone : TantivyIndex =
           tantivy_index . clone ();
-        let graph_clone : InRustMemoryHandle =
+        let graph_clone : InRustGraphHandle =
           Arc::clone (&graph);
         let config_clone : SkgConfig =
           config        . clone ();
@@ -94,13 +94,13 @@ fn handle_emacs (
   mut stream        : TcpStream,
   typedb_driver     : Arc<TypeDBDriver>,
   mut tantivy_index : TantivyIndex,
-  graph             : InRustMemoryHandle,
+  graph             : InRustGraphHandle,
   config            : &SkgConfig,
 ) {
   let mut conn_state : ConnectionState =
     ConnectionState {
       diff_mode_enabled : false,
-      memory            : SkgnodesInMemory::new (),
+      memory            : SkgnodesInViews::new (),
       graph             : graph . clone (), };
 
   let enrichment_slot // To update search results once the 'enrichment' (containerward paths + graphnodestats) has been computed.

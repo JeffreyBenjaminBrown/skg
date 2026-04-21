@@ -36,7 +36,7 @@ pub type SkgNodeMap = HashMap<ID, NodeComplete>;
 /// the global — and because removing it would touch several handler
 /// call sites. Plan C's read-through-memory migration works
 /// correctly whether pool is present or empty.
-pub struct SkgnodesInMemory {
+pub struct SkgnodesInViews {
   pub pool        : HashMap<ID, NodeComplete>,
   pub views       : HashMap<ViewUri, ViewState>,
   // Includes both (graph) content views and search result views. See the definition of 'ViewUri'.
@@ -73,9 +73,9 @@ impl ViewUri {
   pub fn is_search ( &self ) -> bool {
     matches! ( self, ViewUri::SearchView (_) ) } }
 
-impl SkgnodesInMemory {
+impl SkgnodesInViews {
   pub fn new () -> Self {
-    SkgnodesInMemory {
+    SkgnodesInViews {
       pool        : HashMap::new (),
       views       : HashMap::new (),
       root_ids    : ManyToMany::new () }}

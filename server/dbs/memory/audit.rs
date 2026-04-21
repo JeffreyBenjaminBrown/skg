@@ -14,7 +14,7 @@ use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-use crate::dbs::memory::InRustMemory;
+use crate::dbs::memory::InRustGraph;
 use crate::dbs::typedb::search::find_related_nodes_for_one_id;
 use crate::types::misc::ID;
 
@@ -45,7 +45,7 @@ pub struct Mismatch {
 /// Audit every node in memory against TypeDB. Returns the list of
 /// mismatches (empty on success).
 pub async fn audit_memory_against_typedb (
-  graph   : &InRustMemory,
+  graph   : &InRustGraph,
   db_name : &str,
   driver  : &TypeDBDriver,
 ) -> Result < Vec<Mismatch>, Box<dyn Error> > {
@@ -98,7 +98,7 @@ fn outbound_peers_from_memory (
   } }
 
 fn inverse_peers_from_memory (
-  graph    : &InRustMemory,
+  graph    : &InRustGraph,
   pid      : &ID,
   relation : &str,
 ) -> HashSet<ID> {

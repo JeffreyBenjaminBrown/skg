@@ -11,7 +11,7 @@
 /// PIDs from the already-built viewnode tree.
 
 use crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS;
-use crate::dbs::memory::{InRustMemory, snapshot_global};
+use crate::dbs::memory::{InRustGraph, snapshot_global};
 use crate::dbs::typedb::util::concept_document::extract_id_from_map;
 use crate::types::misc::ID;
 use crate::types::nodes::complete::NodeComplete;
@@ -198,7 +198,7 @@ async fn fetch_all_graphnodestats_from_typedb (
 /// subscribes / overrides relation.
 /// Matches the TypeDB version's behaviour.
 fn fetch_all_graphnodestats_in_rust (
-  graph   : &InRustMemory,
+  graph   : &InRustGraph,
   pids    : &[ID],
   pid_set : &HashSet<ID>,
 ) -> AllGraphNodeStats {

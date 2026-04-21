@@ -18,8 +18,8 @@ use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::memory::SkgNodeMap;
 use skg::serve::ConnectionState;
-use skg::types::memory::SkgnodesInMemory;
-use skg::dbs::memory::{InRustMemory, new_handle};
+use skg::types::memory::SkgnodesInViews;
+use skg::dbs::memory::{InRustGraph, new_handle};
 use futures::executor::block_on;
 use std::error::Error;
 use std::net::TcpStream;
@@ -148,8 +148,8 @@ fn test_every_kind_of_col(
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
-        memory            : SkgnodesInMemory::new (),
-        graph             : new_handle (InRustMemory::new ()) };
+        memory            : SkgnodesInViews::new (),
+        graph             : new_handle (InRustGraph::new ()) };
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
           &mut stream,
@@ -224,8 +224,8 @@ fn test_hidden_within_but_none_without(
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
-        memory            : SkgnodesInMemory::new (),
-        graph             : new_handle (InRustMemory::new ()) };
+        memory            : SkgnodesInViews::new (),
+        graph             : new_handle (InRustGraph::new ()) };
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
           &mut stream,
@@ -301,8 +301,8 @@ fn test_hidden_without_but_none_within(
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
-        memory            : SkgnodesInMemory::new (),
-        graph             : new_handle (InRustMemory::new ()) };
+        memory            : SkgnodesInViews::new (),
+        graph             : new_handle (InRustGraph::new ()) };
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
         &mut stream,
@@ -374,8 +374,8 @@ fn test_overlapping_hidden_within(
                modified_view);
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
-        memory            : SkgnodesInMemory::new (),
-        graph             : new_handle (InRustMemory::new ()) };
+        memory            : SkgnodesInViews::new (),
+        graph             : new_handle (InRustGraph::new ()) };
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
         &mut stream,

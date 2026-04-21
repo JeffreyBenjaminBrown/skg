@@ -16,7 +16,7 @@ use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::nodes::complete::NodeComplete;
-use crate::dbs::memory::{InRustMemory, InRustMemoryHandle, new_handle};
+use crate::dbs::memory::{InRustGraph, InRustGraphHandle, new_handle};
 
 use futures::executor::block_on;
 use std::collections::HashSet;
@@ -39,7 +39,7 @@ use typedb_driver::{
 pub struct InitData {
   pub driver        : Arc<TypeDBDriver>,
   pub tantivy_index : TantivyIndex,
-  pub graph         : InRustMemoryHandle,
+  pub graph         : InRustGraphHandle,
   pub had_id_set    : HashSet<ID>,
   pub all_node_ids  : HashSet<ID>,
   pub link_targets  : HashSet<ID>,
@@ -207,8 +207,8 @@ fn init_data_from_nodes (
   let ( map_to_content, map_to_containers )
     : ( MapToContent, MapToContainers )
     = content_maps_from_nodes (&nodes);
-  let graph : InRustMemoryHandle =
-    new_handle ( InRustMemory::from_nodecompletes (nodes) );
+  let graph : InRustGraphHandle =
+    new_handle ( InRustGraph::from_nodecompletes (nodes) );
   InitData {
     driver,
     tantivy_index,

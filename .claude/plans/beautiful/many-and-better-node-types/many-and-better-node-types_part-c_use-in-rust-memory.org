@@ -6,7 +6,7 @@
 
 What this plan covers: phases 3 and 5 — /route reads through the in-Rust memory/ and /consistency-audit it/. For the /why/ (original latency trigger on the "to watch" view, correctness argument about scattered read sources, the ArcSwap + 'im::HashMap' concurrency choice), see the parent plan.
 
-Terminology: "in-Rust memory" (or "memory") is the concept. The Rust type is 'Graph' (slated for rename to 'InRustMemory' — see Miscellaneous fixes). When talking about the role it plays in the system we say "in-Rust memory"; when talking about the data structure today we say 'Graph'.
+Terminology: "in-Rust memory" (or "memory") is the concept. The Rust type is 'Graph' (slated for rename to 'InRustGraph' — see Miscellaneous fixes). When talking about the role it plays in the system we say "in-Rust memory"; when talking about the data structure today we say 'Graph'.
 
 * Current state
 
@@ -17,7 +17,7 @@ Terminology: "in-Rust memory" (or "memory") is the concept. The Rust type is 'Gr
   - 'find_related_nodes' — per-relation TypeDB lookup (contains, subscribes, hides, overrides, textlinks_to).
   - 'fetch_all_graphnodestats_from_typedb' ([[../../server/dbs/typedb/search/all_graphnodestats.rs][all_graphnodestats.rs]]) — eight-field aggregate per node. Identified as the dominant latency contributor on "to watch".
   - Recursive containerward queries ([[../../server/dbs/typedb/ancestry.rs][ancestry.rs]], [[../../server/dbs/typedb/paths.rs][paths.rs]]).
-- 'SkgnodesInMemory.pool' exists per-connection but is lazy-populated at view-open and largely redundant with the in-Rust memory (see [[../../one-memory-or-two.org][one-memory-or-two.org]]).
+- 'SkgnodesInViews.pool' exists per-connection but is lazy-populated at view-open and largely redundant with the in-Rust memory (see [[../../one-memory-or-two.org][one-memory-or-two.org]]).
 
 * Target state
 
@@ -25,7 +25,7 @@ Terminology: "in-Rust memory" (or "memory") is the concept. The Rust type is 'Gr
 - Full inverse-index coverage closes the "reverse-lookup" gap for all five outbound relations (contains, subscribes, hides_from_its_subscriptions, overrides_view_of, textlinks_to).
 - Containerward recursive queries walk the in-Rust memory instead of TypeDB.
 - 'fetch_all_graphnodestats_from_typedb' runs entirely in memory.
-- 'SkgnodesInMemory.pool' and 'SkgnodesInMemory.id_resolver' are retired; the per-connection structure shrinks to view bookkeeping.
+- 'SkgnodesInViews.pool' and 'SkgnodesInViews.id_resolver' are retired; the per-connection structure shrinks to view bookkeeping.
 
 * Approach
 
@@ -88,9 +88,9 @@ With Step 1's wide inverse indexes plus 'textlinks_in', every field in [[../../s
 
 Nothing stays on TypeDB for this function. The entire 'fetch_all_graphnodestats_from_typedb' becomes an in-memory pass: microseconds per node, not milliseconds.
 
-** Step 6: shrink 'SkgnodesInMemory'
+** Step 6: shrink 'SkgnodesInViews'
 
-Once Steps 2-3 land, 'SkgnodesInMemory.pool' is strictly redundant with memory. Remove:
+Once Steps 2-3 land, 'SkgnodesInViews.pool' is strictly redundant with memory. Remove:
 
   - 'pool: HashMap<ID, NodeComplete>'
   - 'id_resolver: HashMap<ID, (ID, SourceName)>' — its role is now covered by 'extra_id_to_pid' plus 'NodeRust.source'.
@@ -144,9 +144,9 @@ Beyond the test-time use in Step 7, expose the audit as an opt-in scheduled-at-s
 
 Each item is a self-contained follow-up that can land as its own commit. None blocks the main Plan C work, but each is cheap and worth doing.
 
-*** Rename 'Graph' → 'InRustMemory'
+*** Rename 'Graph' → 'InRustGraph'
 
-The type name 'Graph' in [[../../server/dbs/memory.rs][server/dbs/memory.rs]] is ambiguous — "the graph" in this project can mean the whole knowledge graph, the TypeDB representation, or the in-Rust thing. Rename to 'InRustMemory'. Blast radius: every reference to 'Graph', 'GraphHandle', 'apply_definenodes' (signature), 'Graph::from_nodecompletes', 'new_handle'. Mechanical find-and-replace; verify all tests pass.
+The type name 'Graph' in [[../../server/dbs/memory.rs][server/dbs/memory.rs]] is ambiguous — "the graph" in this project can mean the whole knowledge graph, the TypeDB representation, or the in-Rust thing. Rename to 'InRustGraph'. Blast radius: every reference to 'Graph', 'GraphHandle', 'apply_definenodes' (signature), 'Graph::from_nodecompletes', 'new_handle'. Mechanical find-and-replace; verify all tests pass.
 
 *** Unbounded 'join_all' in 'fetch_all_graphnodestats_from_typedb'
 
@@ -173,7 +173,7 @@ Add a warning to [[../../coding-advice/formatting.org][coding-advice/formatting.
 - [[../../server/types/nodes/rust.rs][server/types/nodes/rust.rs]] — add 'textlinks_to' field; update the 'From<&NodeComplete>' impl to parse textlinks.
 - [[../../server/dbs/memory.rs][server/dbs/memory.rs]] — add six inverse indexes; update 'apply_definenodes' and 'from_nodecompletes' to maintain them.
 - [[../../server/dbs/typedb/search.rs][server/dbs/typedb/search.rs]] — 'pid_and_source_from_id' routed through memory.
-- [[../../server/types/memory.rs][server/types/memory.rs]] — 'skgnode_from_map_or_disk' routes through memory; 'SkgnodesInMemory' shrinks.
+- [[../../server/types/memory.rs][server/types/memory.rs]] — 'skgnode_from_map_or_disk' routes through memory; 'SkgnodesInViews' shrinks.
 - [[../../server/dbs/typedb/ancestry.rs][server/dbs/typedb/ancestry.rs]] — 'full_containerward_ancestry' in-memory.
 - [[../../server/dbs/typedb/paths.rs][server/dbs/typedb/paths.rs]] — 'containerward_path_stats_bulk', 'path_containerward_to_first_nonlinearity', and 'path_sourceward_to_first_nonlinearity' all in-memory.
 - [[../../server/dbs/typedb/search/all_graphnodestats.rs][server/dbs/typedb/search/all_graphnodestats.rs]] — fully in-memory per Step 5.

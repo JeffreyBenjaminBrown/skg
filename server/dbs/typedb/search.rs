@@ -14,7 +14,7 @@ use typedb_driver::{
 };
 
 use crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS;
-use crate::dbs::memory::{InRustMemory, snapshot_global};
+use crate::dbs::memory::{InRustGraph, snapshot_global};
 use crate::dbs::typedb::util::ConceptRowStream;
 use crate::dbs::typedb::util::concept_document::extract_id_from_node;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
@@ -100,7 +100,7 @@ pub async fn find_related_nodes (
 /// field or inverse index on 'Graph'. Inputs are resolved through
 /// 'extra_id_to_pid' first.
 fn find_related_nodes_from_memory (
-  graph       : &InRustMemory,
+  graph       : &InRustGraph,
   nodes       : &[ID],
   relation    : &str,
   input_role  : &str,

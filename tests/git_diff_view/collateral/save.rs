@@ -44,8 +44,8 @@ fn test_collateral_view_preserves_diff_annotations()
       // 2. Build a ConnectionState with diff_mode_enabled.
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
-        memory            : SkgnodesInMemory::new (),
-        graph             : new_handle (InRustMemory::new ()) };
+        memory            : SkgnodesInViews::new (),
+        graph             : new_handle (InRustGraph::new ()) };
       for (pid, skgnode) in &map {
         conn_state . memory . pool . insert (
           pid . clone (), skgnode . clone () ); }

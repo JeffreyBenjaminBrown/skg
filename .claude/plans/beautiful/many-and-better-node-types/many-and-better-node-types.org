@@ -15,7 +15,7 @@
 
 The original trigger was a specific slow view ('to watch'): see [[../../speed.org][speed.org]]. Investigation showed the latency isn't fixable from skg's side — it lives in TypeDB's query scheduling. That prompted Jeff to ask a bigger question: what if we stopped depending on TypeDB for the common, cheap queries and kept an in-process graph that Rust owns?
 
-Through dialog the correctness angle emerged: today the render pipeline consults three sources interchangeably — disk (via 'SkgNodeMap' and 'skgnode_from_map_or_disk'), TypeDB (for graph relations), and the per-connection pool ('SkgnodesInMemory' in [[../../server/types/memory.rs][server/types/memory.rs]]). Rules about which to consult are scattered. The scattered-ness is the real problem; perf would be a bonus.
+Through dialog the correctness angle emerged: today the render pipeline consults three sources interchangeably — disk (via 'SkgNodeMap' and 'skgnode_from_map_or_disk'), TypeDB (for graph relations), and the per-connection pool ('SkgnodesInViews' in [[../../server/types/memory.rs][server/types/memory.rs]]). Rules about which to consult are scattered. The scattered-ness is the real problem; perf would be a bonus.
 
 The plan splits into three concerns, each independently valuable:
 
@@ -697,7 +697,7 @@ Small debug/test helper: diff 'graph.nodes[id].contains' against TypeDB's 'conta
 ** Open questions (to resolve when fleshing out)
 
 - Exact API shape for the 'Graph' type: methods on 'Graph', or public fields + free functions?
-- Whether the per-connection 'SkgnodesInMemory' shrinks to just per-view state ('views', 'root_ids') or goes away entirely — decide during A's 'SkgNodeMap' narrowing.
+- Whether the per-connection 'SkgnodesInViews' shrinks to just per-view state ('views', 'root_ids') or goes away entirely — decide during A's 'SkgNodeMap' narrowing.
 - Whether background search enrichment needs to grab an 'Arc<Graph>' snapshot or if it's already reading elsewhere.
 - Startup cost measurement (expect ~1–2s on the current corpus).
 
@@ -734,7 +734,7 @@ In [[../../server/dbs/typedb/][server/dbs/typedb/]] many functions that issue on
 
 ** Per-connection pool is populated as a reactive side-effect
 
-Today the pool in 'SkgnodesInMemory' is populated after a render completes, by merging the transient 'SkgNodeMap' back in ([[../../server/update_buffer.rs][server/update_buffer.rs]] line ~107). This makes the pool implicitly stale relative to disk / TypeDB for the duration of a render. Plan C replaces this with an always-current server-wide graph, which is the clean fix. Noting here in case Plan C slips.
+Today the pool in 'SkgnodesInViews' is populated after a render completes, by merging the transient 'SkgNodeMap' back in ([[../../server/update_buffer.rs][server/update_buffer.rs]] line ~107). This makes the pool implicitly stale relative to disk / TypeDB for the duration of a render. Plan C replaces this with an always-current server-wide graph, which is the clean fix. Noting here in case Plan C slips.
 
 ** 'pid_and_source_from_id' is a TypeDB round-trip for data already in the pool
 

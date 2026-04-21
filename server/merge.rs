@@ -2,7 +2,7 @@ pub mod mergeInstructionTriple;
 pub mod validate_merge;
 
 use crate::dbs::init::{rebuild_typedb_from_disk, rebuild_tantivy_from_disk};
-use crate::dbs::memory::{InRustMemoryHandle, apply_definenodes};
+use crate::dbs::memory::{InRustGraphHandle, apply_definenodes};
 use crate::merge::mergeInstructionTriple::neighbor_savenodes_for_merges;
 use crate::save::{ update_fs_from_saveinstructions, update_tantivy_from_saveinstructions, update_typedb_from_saveinstructions };
 use crate::types::misc::{SkgConfig, TantivyIndex};
@@ -35,7 +35,7 @@ pub async fn merge_nodes (
   config             : SkgConfig,
   tantivy_index      : &TantivyIndex,
   driver             : &TypeDBDriver,
-  graph              : &InRustMemoryHandle,
+  graph              : &InRustGraphHandle,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
   if merge_instructions . is_empty () {
     return Ok (None); }

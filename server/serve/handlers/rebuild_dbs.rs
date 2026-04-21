@@ -5,7 +5,7 @@ use crate::context::{
   link_targets_from_nodes};
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::init::{rebuild_typedb_from_disk, rebuild_tantivy_from_disk};
-use crate::dbs::memory::InRustMemory;
+use crate::dbs::memory::InRustGraph;
 use crate::serve::ConnectionState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_text_response};
@@ -50,8 +50,8 @@ pub fn handle_rebuild_dbs_request (
       . map_err ( |e| format! ("Context computation failed: {}", e) ) ?;
     tracing::info!("Context rankings recomputed.");
     { // Rebuild the in-memory graph from disk too, so it stays in sync with the freshly repopulated TypeDB/Tantivy.
-      let fresh_graph : InRustMemory =
-        InRustMemory::from_nodecompletes (&nodes);
+      let fresh_graph : InRustGraph =
+        InRustGraph::from_nodecompletes (&nodes);
       conn_state . graph . store (
         Arc::new (fresh_graph) );
       tracing::info!("In-memory graph rebuilt."); }

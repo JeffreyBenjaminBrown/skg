@@ -1,6 +1,6 @@
 // cargo test merge::merge_nodes
 
-use skg::dbs::memory::{InRustMemory, new_handle};
+use skg::dbs::memory::{InRustGraph, new_handle};
 use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_viewnode_forest;
 use skg::merge::merge_nodes;
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
@@ -99,7 +99,7 @@ async fn test_merge_2_into_1_impl(
     config . clone(),
     tantivy,
     driver,
-    &new_handle (InRustMemory::new ()),
+    &new_handle (InRustGraph::new ()),
   ) . await?;
 
   // Verify results
@@ -357,7 +357,7 @@ async fn test_merge_1_into_2_impl(
     config . clone(),
     tantivy,
     driver,
-    &new_handle (InRustMemory::new ()),
+    &new_handle (InRustGraph::new ()),
   ) . await?;
 
   // Verify results
