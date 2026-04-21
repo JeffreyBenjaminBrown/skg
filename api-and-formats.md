@@ -147,7 +147,7 @@ Pass its path as a command-line argument (default: `data/skgconfig.toml`) when s
 | `db_name`            | yes      |         | TypeDB database name.                                            |
 | `tantivy_folder`     | yes      |         | Directory for the Tantivy search index. Relative to data root.   |
 | `port`               | no       | 1730    | TCP port for Rust-Emacs communication.                           |
-| `initial_node_limit` | no       | 100     | Max nodes to render in initial content views.                    |
+| `initial_node_limit` | no       | 1000    | Max nodes to render in initial content views.                    |
 | `delete_on_quit`     | no       | false   | Delete the TypeDB database on server shutdown. Mainly for tests. |
 | `timing_log`         | no       | false   | When true, writes a JSON log to `<data_root>/logs/server.jsonl`. |
 

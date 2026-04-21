@@ -15,7 +15,7 @@ use crate::types::misc::ID;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{GraphNodeStats, NodeContainRels, NodeLinksourceRels};
 
-use futures::StreamExt;
+use futures::stream::{self, StreamExt};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use typedb_driver::{
@@ -117,12 +117,17 @@ pub async fn fetch_all_graphnodestats (
   if let Some (graph_snap) = crate::dbs::memory::snapshot_global () {
     return Ok ( fetch_all_graphnodestats_from_memory (
       &graph_snap, pids, &pid_set ) ); }
-  let futures : Vec < _ > =
-    pids . iter ()
-    . map ( |pid| fetch_one_pid_stats ( db_name, driver, pid ) )
-    . collect ();
+  // Bounded concurrency: unbounded 'join_all' here has been flagged
+  // as a pre-existing inconsistency with the rest of the TypeDB
+  // module, which uses 'buffer_unordered (TYPEDB_CONCURRENT_TRANSACTIONS)'.
+  // After Step 5 of Plan C this branch is only reached when memory
+  // isn't initialized (tests), but the fix is cheap either way.
   let results : Vec < Result < OnePidStats, Box < dyn Error > > > =
-    futures::future::join_all (futures) . await;
+    stream::iter ( pids . iter ()
+      . map ( |pid| fetch_one_pid_stats ( db_name, driver, pid ) ) )
+    . buffer_unordered (
+        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+    . collect () . await;
   let mut num_containers : HashMap < ID, usize > = HashMap::new ();
   let mut num_contents   : HashMap < ID, usize > = HashMap::new ();
   let mut num_links_in_from_containers : HashMap < ID, usize > =

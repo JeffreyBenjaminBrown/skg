@@ -58,3 +58,9 @@ but if you are an AI, it's pretty much costless, so please do.
    But if possible, use one of the above tricks to group the comment with the code it applies to, rendering the trailing empty line unnecessary.
 * Reformat nothing for its own sake.
   All the above are how you should format new or modified code. Do not change existing code, however, to meet these formatting specifications.
+* In Org-mode documents, do not wrap code references in double apostrophes.
+  That is: write 'function_name' (single apostrophes), not ''function_name'' (double).
+  A dense sequence of double-apostrophe wrappers across a long
+  document can freeze Emacs's org-mode via pathological regex
+  backtracking in the emphasis parser. Single-apostrophe wrapping is
+  safe and is the project convention.

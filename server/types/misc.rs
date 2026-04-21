@@ -257,7 +257,7 @@ impl SkgConfig {
       db_name            : "unused" . to_string(),
       tantivy_folder     : PathBuf::from ("/tmp/unused"),
       port               : 0,
-      initial_node_limit : 100,
+      initial_node_limit : crate::consts::DEFAULT_INITIAL_NODE_LIMIT,
       delete_on_quit     : false,
       timing_log         : false,
       max_ancestry_depth : default_max_ancestry_depth(), }}
