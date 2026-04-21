@@ -24,20 +24,23 @@ pub enum ViewUri {
 
 pub type SkgNodeMap = HashMap<ID, NodeComplete>;
 
-/// Persistent cross-request cache of all SkgNodes currently displayed
-/// in any Emacs view. The pool is the authoritative in-memory store;
-/// SkgNodeMap is the per-request transactional layer that shadows it.
-/// See also: SkgNodeMap (the per-request working set).
+/// Per-connection caches. 'pool' is the cross-request NodeComplete
+/// cache for nodes displayed in any open Emacs view. SkgNodeMap is
+/// the per-request transactional layer that shadows it.
+///
+/// With the in-Rust memory in place, pool is redundant with the
+/// server-wide 'Graph' for everything except 'misc' (which no
+/// in-memory consumer reads today). It is retained here for now as
+/// a small optimization — direct hash lookup without snapshotting
+/// the global — and because removing it would touch several handler
+/// call sites. Plan C's read-through-memory migration works
+/// correctly whether pool is present or empty.
 pub struct SkgnodesInMemory {
   pub pool        : HashMap<ID, NodeComplete>,
   pub views       : HashMap<ViewUri, ViewState>,
   // Includes both (graph) content views and search result views. See the definition of 'ViewUri'.
   // TODO ? OPTIMIZE:
   // The reverse lookup (PID -> views) is computed by scanning `views` via views_containing(). This is O(views) per call, fine for < 10 views. If the number of views grows large, consider a bijective map (HashMap<ID, HashSet<ViewUri>> maintained alongside this one) for O(1) reverse lookups.
-
-  pub id_resolver : HashMap<ID, (ID, SourceName)>,
-  // TODO ? OPTIMIZE:
-  // id_resolver is not yet wired into the render pipeline (which would require threading &mut SkgnodesInMemory through render_initial_forest_bfs and complete_viewtree). If pid_and_source_from_id remains a bottleneck after pool seeding, wire id_resolver into skgnode_and_viewnode_from_id, or apply the batch-query optimization from typedb-batching.org.
 
   root_ids        : ManyToMany<ID, ViewUri>, // Maps every root ID (primary + extra) ↔ ViewUri. Supports many-to-many because a view can have multiple roots, and an ID could be a root in multiple views. Maintained by register_view / update_view / unregister_view.
 }
@@ -74,13 +77,11 @@ impl SkgnodesInMemory {
     SkgnodesInMemory {
       pool        : HashMap::new (),
       views       : HashMap::new (),
-      id_resolver : HashMap::new (),
       root_ids    : ManyToMany::new () }}
 
   pub fn clear (&mut self) {
     self . pool        . clear ();
     self . views       . clear ();
-    self . id_resolver . clear ();
     self . root_ids    = ManyToMany::new (); }
 
   pub fn viewuri_to_pids (
@@ -175,9 +176,7 @@ impl SkgnodesInMemory {
       self . views . values ()
       . flat_map ( |vs| vs . pids . iter () . cloned () )
       . collect ();
-    self . pool . retain ( |pid, _| referenced . contains (pid));
-    self . id_resolver . retain (
-      |_, (target_pid, _)| referenced . contains (target_pid)); }
+    self . pool . retain ( |pid, _| referenced . contains (pid)); }
 }
 
 //
