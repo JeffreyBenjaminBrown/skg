@@ -122,13 +122,21 @@ async fn find_related_nodes_for_one_id (
           &concept . to_string () )) ); } }
   Ok (found) }
 
-/// Runs a single TypeDB query to get both PID and source.
-/// Returns None if not found.
+/// Returns the primary ID and source of a node, given any of its
+/// IDs (primary or extra). Returns None if not found.
+///
+/// Consults the in-Rust memory first (via the process-global handle
+/// set at startup); falls back to TypeDB if memory isn't initialized
+/// or doesn't have the id. Memory hits skip the TypeDB round-trip
+/// entirely, which is the hot-path win for Plan C.
 pub async fn pid_and_source_from_id (
   db_name : &str,
   driver  : &TypeDBDriver,
   skgid  : &ID
 ) -> Result < Option<(ID, SourceName)>, Box<dyn Error> > {
+  if let Some (graph_snap) = crate::dbs::memory::snapshot_global () {
+    if let Some (ps) = graph_snap . pid_and_source (skgid) {
+      return Ok ( Some (ps) ); } }
   let tx : Transaction =
     driver . transaction (
       db_name, TransactionType::Read

@@ -8,12 +8,37 @@
 //! per mutation) and atomically publish a new snapshot.
 
 use arc_swap::ArcSwap;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
-use crate::types::misc::ID;
+use crate::types::misc::{ID, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
+
+/// Process-global handle to the in-Rust memory.
+///
+/// Set once, at server startup (see 'init_global_handle'). Read-only
+/// afterwards. Functions on hot read paths (notably
+/// 'pid_and_source_from_id') consult this handle to bypass TypeDB
+/// without requiring every caller to thread a '&Graph' parameter.
+///
+/// PITFALL: tests that don't initialize this will see 'None' here
+/// and must fall back to whatever they were using before. That's the
+/// reason the consulting callers check and degrade gracefully rather
+/// than panicking.
+static GLOBAL_HANDLE : OnceLock<GraphHandle> = OnceLock::new ();
+
+/// Set the process-global handle. Must be called exactly once, at
+/// server startup, after the initial 'Graph' has been built.
+pub fn init_global_handle (handle: GraphHandle) {
+  GLOBAL_HANDLE . set (handle) . ok ()
+    . expect ("GLOBAL_HANDLE initialized twice"); }
+
+/// Snap the current in-Rust memory if the global handle has been
+/// initialized; returns None otherwise (e.g. during tests or before
+/// server startup completes).
+pub fn snapshot_global () -> Option<Arc<Graph>> {
+  GLOBAL_HANDLE . get () . map ( |h| h . load_full () ) }
 
 /// The in-memory projection of the graph.
 ///
@@ -75,6 +100,13 @@ impl Graph {
       Some (id . clone ())
     } else {
       self . extra_id_to_pid . get (id) . cloned () } }
+
+  /// Resolve an ID (primary or extra) to its '(pid, source)'.
+  /// Returns None if the ID is unknown.
+  pub fn pid_and_source (&self, id: &ID) -> Option<(ID, SourceName)> {
+    let pid : ID = self . pid_of (id) ?;
+    let node : &NodeRust = self . nodes . get (&pid) ?;
+    Some ( ( pid, node . source . clone () ) ) }
 }
 
 /// Add a node's contributions to every inverse index. Idempotent if

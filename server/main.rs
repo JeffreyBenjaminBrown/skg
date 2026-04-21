@@ -87,6 +87,11 @@ fn main() -> Result<(), Box<dyn Error>> {
   *SHUTDOWN_DRIVER . lock () . unwrap () =
     Some ( Arc::clone (&typedb_driver) );
 
+  // Install the process-global handle to the in-Rust memory so that
+  // hot read paths (e.g. 'pid_and_source_from_id') can bypass TypeDB
+  // without every caller threading a '&Graph' parameter.
+  skg::dbs::memory::init_global_handle ( Arc::clone (&graph) );
+
   compute_context_rankings (
     &tantivy_index, had_id_set, all_node_ids,
     link_targets, map_to_content, map_to_containers );
