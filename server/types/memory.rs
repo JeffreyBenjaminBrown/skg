@@ -252,8 +252,17 @@ pub async fn skgnode_map_from_forest (
       map . insert ( id . clone (), node ); }}
   Ok (map) }
 
-/// Get a NodeComplete from the map, or from disk if it's not there.
-/// Updates the map.
+/// Get a NodeComplete from the per-request map, else the in-Rust
+/// memory, else disk. Updates the map with whichever source
+/// produced the node so subsequent lookups within the same request
+/// hit the map.
+///
+/// PITFALL: the in-Rust memory stores 'NodeRust', which drops
+/// 'misc'. A NodeComplete synthesized from memory therefore has
+/// 'misc: Vec::new()'. No in-memory consumer reads 'misc' (only
+/// Tantivy indexing and the org-roam importer do, and neither of
+/// those goes through this function), so the synthesis is lossless
+/// for this function's callers.
 pub fn skgnode_from_map_or_disk<'a>(
   id: &ID,
   source: &SourceName,
@@ -261,11 +270,37 @@ pub fn skgnode_from_map_or_disk<'a>(
   config: &SkgConfig,
 ) -> Result<&'a NodeComplete, Box<dyn Error>> {
   if !map . contains_key (id) {
-    let skgnode: NodeComplete = skgnode_from_pid_and_source(
-      config, id . clone(), source)?;
+    let skgnode: NodeComplete =
+      if let Some (skgnode_from_mem) =
+        nodecomplete_from_memory (id)
+      { skgnode_from_mem }
+      else {
+        skgnode_from_pid_and_source (
+          config, id . clone (), source) ? };
     map . insert(id . clone(), skgnode); }
   map . get (id) . ok_or_else(
     || "NodeComplete should be in map after fetch" . into( )) }
+
+/// Synthesize a NodeComplete from the in-Rust memory if the id is
+/// there (primary or extra). Returns None if memory isn't
+/// initialized or doesn't have the id. 'misc' is synthesized as
+/// empty — see the PITFALL on 'skgnode_from_map_or_disk'.
+fn nodecomplete_from_memory (id: &ID) -> Option<NodeComplete> {
+  let graph_snap = crate::dbs::memory::snapshot_global () ?;
+  let pid : ID = graph_snap . pid_of (id) ?;
+  let rust = graph_snap . nodes . get (&pid) ?;
+  Some ( NodeComplete {
+    pid                          : rust . pid . clone (),
+    source                       : rust . source . clone (),
+    extra_ids                    : rust . extra_ids . clone (),
+    title                        : rust . title . clone (),
+    aliases                      : rust . aliases . clone (),
+    body                         : rust . body . clone (),
+    contains                     : rust . contains . clone (),
+    subscribes_to                : rust . subscribes_to . clone (),
+    hides_from_its_subscriptions : rust . hides_from_its_subscriptions . clone (),
+    overrides_view_of            : rust . overrides_view_of . clone (),
+    misc                         : Vec::new (), } ) }
 
 fn collect_ids_from_subtree (
   tree    : &Tree<ViewNode>,
