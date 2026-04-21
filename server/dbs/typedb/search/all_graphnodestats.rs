@@ -10,6 +10,8 @@
 /// This is always true for the graphnodestats path, which collects
 /// PIDs from the already-built viewnode tree.
 
+use crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS;
+use crate::dbs::memory::{InRustMemory, snapshot_global};
 use crate::dbs::typedb::util::concept_document::extract_id_from_map;
 use crate::types::misc::ID;
 use crate::types::nodes::complete::NodeComplete;
@@ -114,19 +116,18 @@ pub async fn fetch_all_graphnodestats (
     return Ok ( AllGraphNodeStats::empty() ); }
   let pid_set : HashSet < ID > =
     pids . iter () . cloned () . collect ();
-  if let Some (graph_snap) = crate::dbs::memory::snapshot_global () {
+  if let Some (graph_snap) = snapshot_global () {
     return Ok ( fetch_all_graphnodestats_from_memory (
       &graph_snap, pids, &pid_set ) ); }
-  // Bounded concurrency: unbounded 'join_all' here has been flagged
-  // as a pre-existing inconsistency with the rest of the TypeDB
-  // module, which uses 'buffer_unordered (TYPEDB_CONCURRENT_TRANSACTIONS)'.
-  // After Step 5 of Plan C this branch is only reached when memory
-  // isn't initialized (tests), but the fix is cheap either way.
+  // TypeDB branch: exercised only by tests that bypass
+  // 'init_global_handle'. Uses 'buffer_unordered
+  // (TYPEDB_CONCURRENT_TRANSACTIONS)' for consistency with the rest
+  // of the TypeDB module (unbounded 'join_all' was a prior
+  // inconsistency).
   let results : Vec < Result < OnePidStats, Box < dyn Error > > > =
     stream::iter ( pids . iter ()
       . map ( |pid| fetch_one_pid_stats ( db_name, driver, pid ) ) )
-    . buffer_unordered (
-        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+    . buffer_unordered ( TYPEDB_CONCURRENT_TRANSACTIONS )
     . collect () . await;
   let mut num_containers : HashMap < ID, usize > = HashMap::new ();
   let mut num_contents   : HashMap < ID, usize > = HashMap::new ();
@@ -181,10 +182,10 @@ pub async fn fetch_all_graphnodestats (
 ///
 /// PITFALL: 'has_subscribes' and 'has_overrides' are "in either
 /// role": a node qualifies if it's on /either/ side of a
-/// subscribes / overrides relation (per Jeff's directionality
-/// decision). Matches the TypeDB version's behaviour.
+/// subscribes / overrides relation.
+/// Matches the TypeDB version's behaviour.
 fn fetch_all_graphnodestats_from_memory (
-  graph   : &crate::dbs::memory::InRustMemory,
+  graph   : &InRustMemory,
   pids    : &[ID],
   pid_set : &HashSet<ID>,
 ) -> AllGraphNodeStats {
@@ -223,18 +224,23 @@ fn fetch_all_graphnodestats_from_memory (
           if src_has_content { with += 1; } else { without += 1; } }
         (with, without) }
       else { (0, 0) };
-    num_links_in_from_containers . insert ( pid . clone (), from_containers );
-    num_links_in_from_leaves     . insert ( pid . clone (), from_leaves );
+    num_links_in_from_containers . insert ( pid . clone (),
+                                            from_containers );
+    num_links_in_from_leaves     . insert ( pid . clone (),
+                                            from_leaves );
     // has_subscribes / has_overrides: either role.
     let out_sub : bool =
-      node_opt . map ( |n| ! n . subscribes_to . or_default () . is_empty () )
+      node_opt . map ( |n| ! n . subscribes_to
+                        . or_default () . is_empty () )
       . unwrap_or (false);
     let in_sub  : bool =
       graph . subscribers_of . get (pid)
       . map ( |s| ! s . is_empty () ) . unwrap_or (false);
-    if out_sub || in_sub { has_subscribes . insert ( pid . clone () ); }
+    if out_sub || in_sub { has_subscribes
+                           . insert ( pid . clone () ); }
     let out_ov : bool =
-      node_opt . map ( |n| ! n . overrides_view_of . or_default () . is_empty () )
+      node_opt . map ( |n| ! n . overrides_view_of
+                        . or_default () . is_empty () )
       . unwrap_or (false);
     let in_ov  : bool =
       graph . replacements_of . get (pid)
@@ -247,7 +253,8 @@ fn fetch_all_graphnodestats_from_memory (
         . filter ( |cid| pid_set . contains (*cid) )
         . cloned () . collect ();
       if ! intersected . is_empty () {
-        container_to_contents . insert ( pid . clone (), intersected ); } }
+        container_to_contents . insert ( pid . clone (),
+                                         intersected ); }}
     // content_to_containers[pid] = contained_by ∩ pid_set
     if let Some (containers) = graph . contained_by . get (pid) {
       let intersected : HashSet<ID> =
@@ -255,7 +262,8 @@ fn fetch_all_graphnodestats_from_memory (
         . filter ( |cid| pid_set . contains (*cid) )
         . cloned () . collect ();
       if ! intersected . is_empty () {
-        content_to_containers . insert ( pid . clone (), intersected ); } } }
+        content_to_containers . insert ( pid . clone (),
+                                         intersected ); }}}
   AllGraphNodeStats {
     num_containers,
     num_contents,

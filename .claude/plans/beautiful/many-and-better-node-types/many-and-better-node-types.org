@@ -653,7 +653,7 @@ Two reasons:
 - Integration test: two nodes merged, post-merge state visible in fs, TypeDB, and Tantivy identically.
 - 'cargo nextest run', [[../../bash/emacs-tests.sh][bash/emacs-tests.sh]], [[../../bash/integration-tests.sh][bash/integration-tests.sh]].
 
-* DONE Plan C (sketch): in-Rust partial projection of the graph
+* ONGOING Plan C (sketch): in-Rust partial projection of the graph
 
 ** Goal
 

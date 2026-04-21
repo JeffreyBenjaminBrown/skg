@@ -1,4 +1,5 @@
 use crate::dbs::filesystem::one_node::{skgnodes_from_ids, skgnode_from_pid_and_source};
+use crate::dbs::memory::snapshot_global;
 use crate::types::many_to_many::ManyToMany;
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::nodes::complete::NodeComplete;
@@ -285,7 +286,7 @@ pub fn skgnode_from_map_or_disk<'a>(
 /// initialized or doesn't have the id. 'misc' is synthesized as
 /// empty — see the PITFALL on 'skgnode_from_map_or_disk'.
 fn nodecomplete_from_memory (id: &ID) -> Option<NodeComplete> {
-  let graph_snap = crate::dbs::memory::snapshot_global () ?;
+  let graph_snap = snapshot_global () ?;
   let pid : ID = graph_snap . pid_of (id) ?;
   let rust = graph_snap . nodes . get (&pid) ?;
   Some ( NodeComplete {

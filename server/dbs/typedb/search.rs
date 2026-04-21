@@ -13,6 +13,8 @@ use typedb_driver::{
   TypeDBDriver,
 };
 
+use crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS;
+use crate::dbs::memory::{InRustMemory, snapshot_global};
 use crate::dbs::typedb::util::ConceptRowStream;
 use crate::dbs::typedb::util::concept_document::extract_id_from_node;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
@@ -20,14 +22,16 @@ use crate::types::misc::{ID, SourceName};
 
 /// Fast container lookup by primary ID.
 /// Assumes the input is a primary ID (not an extra ID).
-/// Consults the in-Rust memory first (via the process-global handle
-/// set at startup); falls back to TypeDB if memory isn't initialized.
+/// Reads the in-Rust memory (populated at server startup). The
+/// TypeDB branch below is exercised only by tests that bypass
+/// 'init_global_handle'; in the running server the memory path is
+/// always taken.
 pub async fn find_container_ids_of_pid (
   db_name : &str,
   driver  : &TypeDBDriver,
   pid     : &ID,
 ) -> Result < HashSet<ID>, Box<dyn Error> > {
-  if let Some (graph_snap) = crate::dbs::memory::snapshot_global () {
+  if let Some (graph_snap) = snapshot_global () {
     let result : HashSet<ID> = graph_snap . contained_by . get (pid)
       . map ( |s| s . iter () . cloned () . collect () )
       . unwrap_or_default ();
@@ -58,10 +62,11 @@ pub async fn find_container_ids_of_pid (
 /// Generalized function to find related nodes via a specified relationship.
 /// Returns the IDs of nodes in the `output_role` position
 /// related to any of the input nodes.
-/// Consults the in-Rust memory first (via the process-global handle
-/// set at startup); falls back to TypeDB if memory isn't initialized.
-/// Sends one query per input ID (TypeDB fallback path), bounded by
-/// TYPEDB_CONCURRENT_TRANSACTIONS.
+/// Reads the in-Rust memory (populated at server startup). The
+/// TypeDB branch below is exercised only by tests that bypass
+/// 'init_global_handle'; in the running server the memory path is
+/// always taken. The TypeDB path sends one query per input ID,
+/// bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
 pub async fn find_related_nodes (
   db_name     : &str,
   driver      : &TypeDBDriver,
@@ -72,7 +77,7 @@ pub async fn find_related_nodes (
 ) -> Result < HashSet<ID>, Box<dyn Error> > {
   if nodes . is_empty () {
     return Ok ( HashSet::new () ); }
-  if let Some (graph_snap) = crate::dbs::memory::snapshot_global () {
+  if let Some (graph_snap) = snapshot_global () {
     return Ok ( find_related_nodes_from_memory (
       &graph_snap, nodes, relation, input_role, output_role ) ); }
   let relation : String    = relation    . to_string ();
@@ -83,8 +88,7 @@ pub async fn find_related_nodes (
       . map ( |id| find_related_nodes_for_one_id (
                 db_name, driver, id,
                 &relation, &input_role, &output_role )) )
-    . buffer_unordered (
-        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+    . buffer_unordered ( TYPEDB_CONCURRENT_TRANSACTIONS )
     . collect () . await;
   let mut result : HashSet<ID> = HashSet::new ();
   for set in sets {
@@ -96,7 +100,7 @@ pub async fn find_related_nodes (
 /// field or inverse index on 'Graph'. Inputs are resolved through
 /// 'extra_id_to_pid' first.
 fn find_related_nodes_from_memory (
-  graph       : &crate::dbs::memory::InRustMemory,
+  graph       : &InRustMemory,
   nodes       : &[ID],
   relation    : &str,
   input_role  : &str,
@@ -194,16 +198,18 @@ pub(crate) async fn find_related_nodes_for_one_id (
 /// Returns the primary ID and source of a node, given any of its
 /// IDs (primary or extra). Returns None if not found.
 ///
-/// Consults the in-Rust memory first (via the process-global handle
-/// set at startup); falls back to TypeDB if memory isn't initialized
-/// or doesn't have the id. Memory hits skip the TypeDB round-trip
-/// entirely, which is the hot-path win for Plan C.
+/// Reads the in-Rust memory (populated at server startup). The
+/// TypeDB branch below is exercised only by tests that bypass
+/// 'init_global_handle', or on the rare case that memory is
+/// initialized but doesn't hold the id (normally memory contains
+/// every node across all sources). In the running server the
+/// memory path covers the hot case.
 pub async fn pid_and_source_from_id (
   db_name : &str,
   driver  : &TypeDBDriver,
   skgid  : &ID
 ) -> Result < Option<(ID, SourceName)>, Box<dyn Error> > {
-  if let Some (graph_snap) = crate::dbs::memory::snapshot_global () {
+  if let Some (graph_snap) = snapshot_global () {
     if let Some (ps) = graph_snap . pid_and_source (skgid) {
       return Ok ( Some (ps) ); } }
   let tx : Transaction =

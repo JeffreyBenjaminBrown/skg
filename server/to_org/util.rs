@@ -35,8 +35,8 @@ pub type DefinitiveMap =
 // ======================================================
 
 /// Fetch a NodeComplete from disk (resolves id→(pid,source) via
-/// 'pid_and_source_from_id', which consults the in-Rust memory
-/// first and falls back to TypeDB).
+/// 'pid_and_source_from_id', which reads the in-Rust memory — see
+/// that function for the TypeDB fallback, which is test-only).
 /// Make a ViewNode from it, with validated title. Return both.
 pub async fn skgnode_and_viewnode_from_id (
   config : &SkgConfig,

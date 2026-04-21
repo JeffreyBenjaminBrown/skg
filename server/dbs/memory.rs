@@ -37,8 +37,10 @@ pub fn init_global_handle (handle: InRustMemoryHandle) {
     . expect ("GLOBAL_HANDLE initialized twice"); }
 
 /// Snap the current in-Rust memory if the global handle has been
-/// initialized; returns None otherwise (e.g. during tests or before
-/// server startup completes).
+/// initialized; returns None otherwise. In the running server
+/// 'init_global_handle' is called during startup before any request
+/// is served, so None here indicates a test that bypassed startup
+/// (or code running before startup completes).
 pub fn snapshot_global () -> Option<Arc<InRustMemory>> {
   GLOBAL_HANDLE . get () . map ( |h| h . load_full () ) }
 

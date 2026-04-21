@@ -7,6 +7,8 @@ use std::sync::Arc;
 use tantivy::Index;
 use tantivy::schema::Field;
 
+use crate::consts::{DEFAULT_INITIAL_NODE_LIMIT, DEFAULT_PORT};
+
 //
 // Type Definitions
 //
@@ -127,10 +129,10 @@ where
 }
 
 fn default_port() -> u16 {
-  crate::consts::DEFAULT_PORT }
+  DEFAULT_PORT }
 
 fn default_initial_node_limit() -> usize {
-  crate::consts::DEFAULT_INITIAL_NODE_LIMIT }
+  DEFAULT_INITIAL_NODE_LIMIT }
 
 fn default_max_ancestry_depth() -> usize {
   20 }
@@ -257,7 +259,7 @@ impl SkgConfig {
       db_name            : "unused" . to_string(),
       tantivy_folder     : PathBuf::from ("/tmp/unused"),
       port               : 0,
-      initial_node_limit : crate::consts::DEFAULT_INITIAL_NODE_LIMIT,
+      initial_node_limit : DEFAULT_INITIAL_NODE_LIMIT,
       delete_on_quit     : false,
       timing_log         : false,
       max_ancestry_depth : default_max_ancestry_depth(), }}
@@ -274,8 +276,8 @@ impl SkgConfig {
       sources,
       db_name            : db_name . to_string(),
       tantivy_folder     : PathBuf::from (tantivy_folder),
-      port               : crate::consts::DEFAULT_PORT,
-      initial_node_limit : crate::consts::DEFAULT_INITIAL_NODE_LIMIT,
+      port               : DEFAULT_PORT,
+      initial_node_limit : DEFAULT_INITIAL_NODE_LIMIT,
       delete_on_quit     : false,
       timing_log         : false,
       max_ancestry_depth : default_max_ancestry_depth(), }}
