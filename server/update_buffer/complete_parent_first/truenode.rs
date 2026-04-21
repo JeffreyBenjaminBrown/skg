@@ -450,6 +450,13 @@ fn build_child_creation_data (
   let mut result : HashMap<ID, ChildData> = HashMap::new();
   for id in goal_list {
     if result . contains_key (id) { continue; }
+    // Skip IDs already present as children in the viewnode tree.
+    // 'complete_relevant_children_in_viewnodetree' only needs
+    // ChildData for children it creates from scratch; existing
+    // children keep their in-tree state. Eagerly reading disk for
+    // every goal_list ID would fail (ENOENT) for children that
+    // this save just deleted, since their .skg file is gone.
+    if child_sources . contains_key (id) { continue; }
     let is_phantom : bool = removed_ids . contains (id);
     if is_phantom {
       let phantom_source : SourceName =

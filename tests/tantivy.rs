@@ -341,17 +341,17 @@ fn test_escape_tantivy_intra_word (
 #[test]
 fn test_search_finds_titles_with_special_chars (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : SkgNode = empty_skgnode ();
-  let mut c_plus : SkgNode = empty . clone ();
+  let empty : NodeComplete = empty_node_complete ();
+  let mut c_plus : NodeComplete = empty . clone ();
   { c_plus . pid   = ID::new ("c_plus");
     c_plus . title = "C++ tips" . to_string (); }
-  let mut brackets : SkgNode = empty . clone ();
+  let mut brackets : NodeComplete = empty . clone ();
   { brackets . pid   = ID::new ("brackets");
     brackets . title = "[draft] plan" . to_string (); }
-  let mut colons : SkgNode = empty . clone ();
+  let mut colons : NodeComplete = empty . clone ();
   { colons . pid   = ID::new ("colons");
     colons . title = "cat:dog" . to_string (); }
-  let nodes : Vec<SkgNode> =
+  let nodes : Vec<NodeComplete> =
     vec![c_plus, brackets, colons];
   let index_dir : &str =
     "/tmp/tantivy-test-special-chars";
@@ -382,15 +382,15 @@ fn test_search_finds_titles_with_special_chars (
 #[test]
 fn test_search_body_axis (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : SkgNode = empty_skgnode ();
-  let mut recipe : SkgNode = empty . clone ();
+  let empty : NodeComplete = empty_node_complete ();
+  let mut recipe : NodeComplete = empty . clone ();
   { recipe . pid   = ID::new ("recipe");
     recipe . title = "soup recipe" . to_string ();
     recipe . body  = Some ( "add paprika and salt" . to_string () ); }
-  let mut decoy : SkgNode = empty . clone ();
+  let mut decoy : NodeComplete = empty . clone ();
   { decoy . pid   = ID::new ("decoy");
     decoy . title = "shopping list" . to_string (); }
-  let nodes : Vec<SkgNode> = vec! [recipe, decoy];
+  let nodes : Vec<NodeComplete> = vec! [recipe, decoy];
   let (ti, _) : (TantivyIndex, usize) =
     in_fs_wipe_index_then_create_it (
       &nodes, Path::new ("/tmp/tantivy-test-body-axis") ) ?;
@@ -418,17 +418,17 @@ fn test_search_body_axis (
 #[test]
 fn test_search_regex_axis (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : SkgNode = empty_skgnode ();
-  let mut history    : SkgNode = empty . clone ();
+  let empty : NodeComplete = empty_node_complete ();
+  let mut history    : NodeComplete = empty . clone ();
   { history    . pid   = ID::new ("history");
     history    . title = "history" . to_string (); }
-  let mut historical : SkgNode = empty . clone ();
+  let mut historical : NodeComplete = empty . clone ();
   { historical . pid   = ID::new ("historical");
     historical . title = "historical" . to_string (); }
-  let mut hello      : SkgNode = empty . clone ();
+  let mut hello      : NodeComplete = empty . clone ();
   { hello      . pid   = ID::new ("hello");
     hello      . title = "hello" . to_string (); }
-  let nodes : Vec<SkgNode> = vec! [history, historical, hello];
+  let nodes : Vec<NodeComplete> = vec! [history, historical, hello];
   let (ti, _) : (TantivyIndex, usize) =
     in_fs_wipe_index_then_create_it (
       &nodes, Path::new ("/tmp/tantivy-test-regex-axis") ) ?;
@@ -457,13 +457,13 @@ fn test_search_regex_axis (
 #[test]
 fn test_search_regex_multiword (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : SkgNode = empty_skgnode ();
-  let mk = |pid : &str, title : &str| -> SkgNode {
-    let mut n : SkgNode = empty . clone ();
+  let empty : NodeComplete = empty_node_complete ();
+  let mk = |pid : &str, title : &str| -> NodeComplete {
+    let mut n : NodeComplete = empty . clone ();
     n . pid = ID::new (pid);
     n . title = title . to_string ();
     n };
-  let nodes : Vec<SkgNode> = vec! [
+  let nodes : Vec<NodeComplete> = vec! [
     mk ("polsci",   "political science"),
     mk ("polit",    "political"),
     mk ("sci",      "science"),
@@ -510,13 +510,13 @@ fn test_search_regex_multiword (
 #[test]
 fn test_search_regex_with_operators (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : SkgNode = empty_skgnode ();
-  let mk = |pid : &str, title : &str| -> SkgNode {
-    let mut n : SkgNode = empty . clone ();
+  let empty : NodeComplete = empty_node_complete ();
+  let mk = |pid : &str, title : &str| -> NodeComplete {
+    let mut n : NodeComplete = empty . clone ();
     n . pid = ID::new (pid);
     n . title = title . to_string ();
     n };
-  let nodes : Vec<SkgNode> = vec! [
+  let nodes : Vec<NodeComplete> = vec! [
     mk ("polsci",   "political science"),
     mk ("polbio",   "political biology"),
     mk ("scibio",   "science biology"),
