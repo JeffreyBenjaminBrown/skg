@@ -1,5 +1,3 @@
-* ONGOING many and better skgnode types
-skg2/.claude/plans/many-and-better-node-types.org
 * coollected while dogfooding, unassimilated
 ** BUG : C-c v v now taking forever
 not even warning why it failed.
@@ -28,8 +26,9 @@ Maybe a suite of seach commands.
 see TODO/change-command-names-and-aliases.org
 ** when requesting containerward views
 warn the user that the buffer is updating
-* TODO in skg2: upgrade Tantivy
-skg(1) is on 0.26
+* DONE ? to review changes from branch 'many-and-better-node-types'
+git diff 194575ca774337ca6507e1045a40ea158db28374 \
+         edc5542ee4ea5e1a3989121b608111321dc2736b
 * considering
 ** There should only be one definitive view across all buffers.
 *** why
@@ -59,8 +58,6 @@ The buffer is: *using written knowledge*
   command-execute(org-shiftmetaright)
 "
 * ongoing Claude instances
-** for the diff view improvement
-claude --resume "staged-unstaged-git-diff"
 ** a TypeDB expert
 claude --resume 29b4f070-12d2-4211-85da-a7f28929e08b
 * semi-permanent

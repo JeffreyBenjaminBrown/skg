@@ -1,0 +1,336 @@
+#+TITLE: Plan C: route reads through the in-Rust memory
+
+* Context
+
+"Plan C" in the parent plan ([[../../.claude/plans/many-and-better-node-types.org][many-and-better-node-types.org]]) introduces a server-wide, ArcSwap-fronted 'im::HashMap<ID, NodeRust>' — the "in-Rust memory" — so reads that fit the projection can bypass TypeDB. Phases 1, 2, and 4 are already on this branch: the memory is scaffolded ([[../../server/dbs/memory.rs][server/dbs/memory.rs]]), maintained on save and merge ([[../../server/save.rs][server/save.rs]], [[../../server/merge.rs][server/merge.rs]]), and rebuilt on rebuild-dbs ([[../../server/serve/handlers/rebuild_dbs.rs][rebuild_dbs.rs]]).
+
+What this plan covers: phases 3 and 5 — /route reads through the in-Rust memory/ and /consistency-audit it/. For the /why/ (original latency trigger on the "to watch" view, correctness argument about scattered read sources, the ArcSwap + 'im::HashMap' concurrency choice), see the parent plan.
+
+Terminology: "in-Rust memory" (or "memory") is the concept. The Rust type is 'Graph' (slated for rename to 'InRustMemory' — see Miscellaneous fixes). When talking about the role it plays in the system we say "in-Rust memory"; when talking about the data structure today we say 'Graph'.
+
+* Current state
+
+- 'Graph' in [[../../server/dbs/memory.rs][server/dbs/memory.rs]] holds 'im::HashMap<ID, NodeRust>' and nothing else. No inverse indexes.
+- Every read still hits TypeDB or disk:
+  - 'pid_and_source_from_id' ([[../../server/dbs/typedb/search.rs][dbs/typedb/search.rs]]) — TypeDB point query, called once per node in render paths.
+  - 'skgnode_from_map_or_disk' ([[../../server/types/memory.rs][types/memory.rs]]) — disk fallback behind the per-request 'SkgNodeMap' shadow.
+  - 'find_related_nodes' — per-relation TypeDB lookup (contains, subscribes, hides, overrides, textlinks_to).
+  - 'fetch_all_graphnodestats' ([[../../server/dbs/typedb/search/all_graphnodestats.rs][all_graphnodestats.rs]]) — eight-field aggregate per node. Identified as the dominant latency contributor on "to watch".
+  - Recursive containerward queries ([[../../server/dbs/typedb/ancestry.rs][ancestry.rs]], [[../../server/dbs/typedb/paths.rs][paths.rs]]).
+- 'SkgnodesInMemory.pool' exists per-connection but is lazy-populated at view-open and largely redundant with the in-Rust memory (see [[../../one-memory-or-two.org][one-memory-or-two.org]]).
+
+* Target state
+
+- Read paths that fit the NodeRust projection are served from memory — no TypeDB hit.
+- Full inverse-index coverage closes the "reverse-lookup" gap for all five outbound relations (contains, subscribes, hides_from_its_subscriptions, overrides_view_of, textlinks_to).
+- Containerward recursive queries walk the in-Rust memory instead of TypeDB.
+- 'fetch_all_graphnodestats' runs entirely in memory.
+- 'SkgnodesInMemory.pool' and 'SkgnodesInMemory.id_resolver' are retired; the per-connection structure shrinks to view bookkeeping.
+
+* Approach
+
+** Step 1: widen NodeRust and add inverse indexes
+
+Widen NodeRust (in [[../../server/types/nodes/rust.rs][server/types/nodes/rust.rs]]):
+
+  - Add 'textlinks_to: Vec<ID>'. Derived at load / save / merge time by parsing body text — mirrors the existing derivation in 'NodeTypedb::from_complete_parsing_textlinks' ([[../../server/types/nodes/typedb.rs][nodes/typedb.rs]]). This breaks Plan A's earlier invariant "NodeRust = NodeComplete minus misc"; the new invariant is "NodeRust = NodeTypedb plus title + aliases + body" (i.e. what a render-time consumer might need, derivations included).
+
+Add six fields on 'Graph':
+
+  - 'contained_by            : im::HashMap<ID, im::HashSet<ID>>' — reverse of 'contains'.
+  - 'subscribers_of          : im::HashMap<ID, im::HashSet<ID>>' — reverse of 'subscribes_to'.
+  - 'hiders_of               : im::HashMap<ID, im::HashSet<ID>>' — reverse of 'hides_from_its_subscriptions'.
+  - 'replacements_of         : im::HashMap<ID, im::HashSet<ID>>' — reverse of 'overrides_view_of'.
+  - 'textlinks_in            : im::HashMap<ID, im::HashSet<ID>>' — reverse of 'textlinks_to'.
+  - 'extra_id_to_pid         : im::HashMap<ID, ID>' — maps any of a node's extra_ids to that node's pid.
+
+Maintain all six (plus the six forward fields on NodeRust) in 'apply_definenodes' and 'Graph::from_nodecompletes'. On a Save, diff the old node (if any) against the new: remove old inverse entries, add new. On a Delete, purge all inverse entries the deleted node created.
+
+PITFALL: 'apply_definenodes' already reads the pre-save NodeRust before writing the post-save one (for the forward-edge replacement). Extend that read to cover /all/ outbound fields so the inverse-index diffs are correct. During a merge batch the COW + atomic publish boundary means no reader sees a half-applied state.
+
+** Step 2: route 'pid_and_source_from_id' through memory
+
+[[../../server/dbs/typedb/search.rs][search.rs]]'s 'pid_and_source_from_id' becomes a memory lookup: try 'Graph::get(id)' → 'NodeRust.source'; else try 'extra_id_to_pid.get(id)' → 'Graph::get(pid)' → 'NodeRust.source'. Returns None if both miss.
+
+Signature change: takes '&Graph' (a snapshot taken by the caller via 'handle.load_full()') instead of '&TypeDBDriver'. Call sites: [[../../server/to_org/util.rs][to_org/util.rs]] ('skgnode_and_viewnode_from_id'), the initial-BFS path, and any other render-time callers.
+
+Eliminates one TypeDB call per node in the render path.
+
+** Step 3: route 'skgnode_from_map_or_disk' through memory
+
+'skgnode_from_map_or_disk' in [[../../server/types/memory.rs][types/memory.rs]] currently returns '&NodeComplete' from the per-request 'SkgNodeMap' (with disk fallback). Change the fallback order to 'SkgNodeMap' → memory → disk.
+
+Plan A established that no in-memory consumer reads 'NodeComplete.misc' (only Tantivy indexing and the org-roam importer do). With Step 1's widening, NodeRust also carries 'textlinks_to'. So a NodeRust looked up in memory has everything render / save / merge need. The caller receives a NodeRust (not NodeComplete) — this is a type change that ripples through the callers in [[../../server/to_org/][to_org/]] and [[../../server/update_buffer/][update_buffer/]], but they don't use the missing field.
+
+Save-pipeline exception: during the in-flight portion of a save, 'SkgNodeMap' holds the /in-progress/ NodeCompletes (the save that's being built). The in-Rust memory doesn't have those yet (memory is updated only /after/ the FS write). Keep the 'SkgNodeMap' fallback ordering as written: SkgNodeMap first (captures in-progress edits), memory second (captures everything else), disk last (final fallback, which should rarely fire once memory is always-current).
+
+** Step 4: migrate containerward recursive queries
+
+- 'full_containerward_ancestry' in [[../../server/dbs/typedb/ancestry.rs][ancestry.rs]] → BFS over 'contained_by' in memory.
+- 'containerward_path_stats_bulk' in [[../../server/dbs/typedb/paths.rs][paths.rs]] → BFS over 'contained_by' with fork/cycle detection in memory.
+- 'path_containerward_to_first_nonlinearity' → linear walk over 'contained_by' in memory.
+- 'path_sourceward_to_first_nonlinearity' → linear walk over 'textlinks_in' in memory (newly possible after Step 1's widening). Before Step 1, this stayed on TypeDB; after Step 1, it can move too.
+
+Each migration replaces the function body; call sites are unchanged. Bonus: call-site TypeDBDriver parameters can be dropped where the function no longer needs one.
+
+** Step 5: migrate 'fetch_all_graphnodestats' entirely
+
+With Step 1's wide inverse indexes plus 'textlinks_in', every field in [[../../server/dbs/typedb/search/all_graphnodestats.rs][all_graphnodestats.rs]]'s output can be computed from memory:
+
+  - 'num_contents'                     — 'NodeRust.contains.len()'
+  - 'num_containers'                   — 'contained_by.get(pid).map_or(0, |s| s.len())'
+  - 'num_links_in_from_containers'     — iterate 'textlinks_in.get(pid)', count those whose NodeRust has non-empty 'contains'.
+  - 'num_links_in_from_leaves'         — same iteration, count those with empty 'contains'.
+  - 'has_subscribes'                   — 'NodeRust.subscribes_to' non-empty OR 'subscribers_of.get(pid)' non-empty (see clarification on directionality in Problems).
+  - 'has_overrides'                    — 'NodeRust.overrides_view_of' non-empty OR 'replacements_of.get(pid)' non-empty.
+  - 'container_to_contents'            — iterate pids, read 'NodeRust.contains'.
+  - 'content_to_containers'            — 'contained_by' lookup per pid.
+
+Nothing stays on TypeDB for this function. The entire 'fetch_all_graphnodestats' becomes an in-memory pass: microseconds per node, not milliseconds.
+
+** Step 6: shrink 'SkgnodesInMemory'
+
+Once Steps 2-3 land, 'SkgnodesInMemory.pool' is strictly redundant with memory. Remove:
+
+  - 'pool: HashMap<ID, NodeComplete>'
+  - 'id_resolver: HashMap<ID, (ID, SourceName)>' — its role is now covered by 'extra_id_to_pid' plus 'NodeRust.source'.
+
+Remaining fields — 'views', 'root_ids' — are genuinely per-connection view state. Keep the struct, consider renaming to reflect its new scope ('ViewRegistry' or similar). Out of scope for this plan; flag as follow-up.
+
+Also remove the post-render pool-merge side-effect in [[../../server/update_buffer.rs][update_buffer.rs]] (~line 107). The pool no longer exists; nothing to merge into.
+
+Commits can be fine-grained: land Step 1's data-structure additions, then each read-path migration, then the pool removal. The atomic unit is "build compiles + tests pass", not "one PR contains all of Plan C".
+
+** Step 7: consistency-audit helper
+
+A test-time function 'audit_memory_against_typedb' (new module [[../../server/dbs/memory/audit.rs][server/dbs/memory/audit.rs]]) that compares the in-Rust memory to TypeDB and returns a list of mismatches. Its action, per node:
+
+  1. /Forward pass/: for each of the five outbound relations (contains, subscribes_to, hides_from_its_subscriptions, overrides_view_of, textlinks_to), read NodeRust's field in memory, query TypeDB for the same relation's peers, and diff the two sets.
+  2. /Inverse pass/: for each of the five inverse indexes ('contained_by', 'subscribers_of', 'hiders_of', 'replacements_of', 'textlinks_in'), read the index entry in memory, query TypeDB for the inverse-role peers, and diff.
+
+Any difference is a 'Mismatch' record carrying the node id, the relation, and the in-memory vs TypeDB sets. An empty 'Vec<Mismatch>' means memory and TypeDB agree for every node in the fixture.
+
+Callable from tests: add one call after each save/merge in the existing merge tests and in [[../../tests/move_source.rs][move_source.rs]]. Cost scales with the test fixture's node count; running it against a small fixture (< 100 nodes) takes < 1 s. Document in the helper's doc-comment that it is intended for /test fixtures/ and is not suitable for running over the full 29k-node production corpus (which would take minutes).
+
+The purpose is to catch silent drift: if 'apply_definenodes' has a subtle bug — e.g. an inverse-index update missed on one specific relation — the audit makes it visible immediately after the save/merge that introduced it, rather than letting drift accumulate.
+
+** Step 8: opt-in scheduled audit
+
+Beyond the test-time use in Step 7, expose the audit as an opt-in scheduled-at-startup check for live servers.
+
+*Config*: add 'auto_audit_daily: bool' to the config struct in [[../../server/types/misc.rs][server/types/misc.rs]] (the 'SkgConfig' type) plus its TOML parser. Default false. Set it to true in [[../../data/skgconfig.toml][data/skgconfig.toml]] (Jeff's own config) as part of this step.
+
+*Staleness check at startup*: in [[../../server/main.rs][server/main.rs]]'s post-init path, if 'auto_audit_daily' is true, compare today's date (local date, via 'chrono' or manual date formatting from 'SystemTime') against the contents of '{data_root}/last-audit.time'. If the file is missing or its date is earlier than today, schedule an audit.
+
+*Backgrounded-at-lowest-priority execution*: spawn the audit via 'std::thread::spawn' and drop the thread's scheduling priority before running. On Linux the cheapest way is 'libc::nice(19)' (nicest; runs only when CPU is idle); a heavier but more thorough option is 'SCHED_IDLE' via 'libc::sched_setscheduler'. Either way, the audit must never block the main connection loop. When it finishes, write today's date to 'last-audit.time' regardless of result.
+
+*Error reporting*:
+
+  - If the audit returns an empty 'Vec<Mismatch>': silent success. Update 'last-audit.time' and exit the thread.
+  - If non-empty: append a dated headline to '{data_root}/audits.org' with one sub-headline per 'Mismatch'. Append, don't overwrite — the file is a running log.
+  - Notify the client by /piggy-backing on the next outbound buffer/ (view render or save response). The audit thread sets a "pending audit warning" slot on 'ConnectionState' (or a server-wide slot if reached before any connection). The next time the server is about to send a buffer to a client — whatever the triggering request was — it prepends a warning line like "N audit errors detected during the daily audit — see 'audits.org'." and clears the slot. No new message type in the TCP protocol; no client polling.
+
+*Scope of the audit*: full corpus. At 29k nodes × 10 TypeDB queries the audit takes minutes; acceptable because it runs at nice(19) / SCHED_IDLE so the user never feels it. If that proves painful, sharding (audit 1/Nth of nodes per day) is a low-effort follow-up.
+
+*audits.org format*:
+
+  * 2026-04-21 (42 errors)
+  ** Node 'abc-def-...': relation 'contains' mismatch
+  Memory has: [x, y, z]
+  TypeDB has: [x, y]
+  ** Node ...
+
+** Steps 8a, 8b etc.: Miscellaneous fixes
+
+Each item is a self-contained follow-up that can land as its own commit. None blocks the main Plan C work, but each is cheap and worth doing.
+
+*** Rename 'Graph' → 'InRustMemory'
+
+The type name 'Graph' in [[../../server/dbs/memory.rs][server/dbs/memory.rs]] is ambiguous — "the graph" in this project can mean the whole knowledge graph, the TypeDB representation, or the in-Rust thing. Rename to 'InRustMemory'. Blast radius: every reference to 'Graph', 'GraphHandle', 'apply_definenodes' (signature), 'Graph::from_nodecompletes', 'new_handle'. Mechanical find-and-replace; verify all tests pass.
+
+*** Unbounded 'join_all' in 'fetch_all_graphnodestats'
+
+[[../../server/dbs/typedb/search/all_graphnodestats.rs][all_graphnodestats.rs]] uses 'futures::future::join_all' with no concurrency cap, unlike other TypeDB functions that use 'buffer_unordered (TYPEDB_CONCURRENT_TRANSACTIONS)'. After Step 5 the function is fully in-memory and this no longer matters for TypeDB load — but if any residual TypeDB calls remain (or if the function is used before Step 5 lands), switch to 'buffer_unordered' for consistency.
+
+*** Doc drift on 'initial_node_limit'
+
+[[../../api-and-formats.md][api-and-formats.md]] says 100; [[../../server/consts.rs][consts.rs]] says 1000; test default in [[../../server/types/misc.rs][types/misc.rs]] is 100. Pick one and fix the others.
+
+*** Merge-compute reads could come from memory
+
+'instructiontriples_from_the_merges_in_an_viewnode_forest' in [[../../server/merge/mergeInstructionTriple.rs][mergeInstructionTriple.rs]] still calls 'skgnode_from_id' (disk + TypeDB) for each acquirer and acquiree. After Step 3 lands, these become memory lookups. Same migration pattern as other render-time reads.
+
+*** 'validate_merge' bypasses memory
+
+[[../../server/merge/validate_merge.rs][validate_merge.rs]] still calls 'pid_and_source_from_id' on TypeDB directly. After Step 2, it becomes a memory lookup. Ride along with Step 2.
+
+*** Document the double-apostrophe pitfall in org-mode
+
+Add a warning to [[../../coding-advice/formatting.org][coding-advice/formatting.org]]: do /not/ use paired double-apostrophes — ''like this'' — to wrap code references in org-mode documents. A dense sequence of them can freeze Emacs's org-mode font-lock via pathological regex backtracking in the emphasis parser. Single-apostrophe wrapping — 'like this' — is safe and is the existing convention in this project.
+
+* Files likely touched
+
+- [[../../server/types/nodes/rust.rs][server/types/nodes/rust.rs]] — add 'textlinks_to' field; update the 'From<&NodeComplete>' impl to parse textlinks.
+- [[../../server/dbs/memory.rs][server/dbs/memory.rs]] — add six inverse indexes; update 'apply_definenodes' and 'from_nodecompletes' to maintain them.
+- [[../../server/dbs/typedb/search.rs][server/dbs/typedb/search.rs]] — 'pid_and_source_from_id' routed through memory.
+- [[../../server/types/memory.rs][server/types/memory.rs]] — 'skgnode_from_map_or_disk' routes through memory; 'SkgnodesInMemory' shrinks.
+- [[../../server/dbs/typedb/ancestry.rs][server/dbs/typedb/ancestry.rs]] — 'full_containerward_ancestry' in-memory.
+- [[../../server/dbs/typedb/paths.rs][server/dbs/typedb/paths.rs]] — 'containerward_path_stats_bulk', 'path_containerward_to_first_nonlinearity', and 'path_sourceward_to_first_nonlinearity' all in-memory.
+- [[../../server/dbs/typedb/search/all_graphnodestats.rs][server/dbs/typedb/search/all_graphnodestats.rs]] — fully in-memory per Step 5.
+- [[../../server/to_org/util.rs][server/to_org/util.rs]], [[../../server/to_org/render/initial_bfs.rs][to_org/render/initial_bfs.rs]], [[../../server/to_org/expand/][to_org/expand/]] — call-site threading of '&Graph' (or passing the handle).
+- [[../../server/update_buffer.rs][server/update_buffer.rs]] and [[../../server/update_buffer/][update_buffer/]] — drop pool-merge side-effect once Step 6 lands.
+- [[../../server/serve.rs][server/serve.rs]] — the 'graph' field on 'ConnectionState' is already in place.
+- New: [[../../server/dbs/memory/audit.rs][server/dbs/memory/audit.rs]] — consistency audit helper.
+- [[../../server/types/misc.rs][server/types/misc.rs]] — add 'auto_audit_daily' config field (Step 8).
+- [[../../server/main.rs][server/main.rs]] — startup staleness check + low-priority background audit (Step 8).
+- [[../../data/skgconfig.toml][data/skgconfig.toml]] — set 'auto_audit_daily = true' (Step 8).
+
+Possibly added to [[../../Cargo.toml][Cargo.toml]]: 'chrono' if we want calendar-date arithmetic; 'libc' for 'nice'/'sched_setscheduler'. Keep as "possibly" until the implementation confirms simpler options (e.g. formatting a 'SystemTime' as YYYY-MM-DD via 'std' alone is viable and avoids the 'chrono' dep).
+
+* Verification
+
+- 'cargo build' and 'cargo build --tests' after each step.
+- 'bash bash/nextest.sh --no-fail-fast' — all pass.
+- The consistency audit (Step 7) added after each save/merge in existing merge and move_source tests: must return empty mismatch list.
+- [[../../bash/emacs-tests.sh][emacs-tests.sh]] and [[../../bash/integration-tests.sh][integration-tests.sh]] pass.
+- Benchmark: time a render of "to watch" (the slow view from [[../../speed.org][speed.org]]) before and after Step 5. Expected: per-node TypeDB round-trips vanish; render latency drops from multi-second to sub-second.
+- Benchmark: restart-to-first-render latency. Memory-build cost grows slightly with Step 1's wider NodeRust and inverse indexes, but should still be < 2 s at 29k nodes.
+
+* Problems
+
+** DONE Inverse-index maintenance on merges
+Plan B's merge emits neighbor SaveNodes so TypeDB stays consistent post-merge. Memory now needs the same treatment: when 'apply_definenodes' processes a neighbor SaveNode, the inverse-index diff must happen correctly. The neighbor's NodeRust 'contains' / 'extra_ids' are unchanged (neighbor saves carry stale acquiree_ids, per Plan B's extra_id-resolution semantic), so the inverse indexes are unchanged too. Nothing to do beyond correct implementation of the SaveNode update in Step 1 — just flagging that Plan B's design carries through cleanly.
+
+** DONE 'extra_id_to_pid' and other inverse-index updates need the old-state read
+When a SaveNode is applied, we must remove the pre-save entries this node contributed to each inverse index (contained_by, subscribers_of, hiders_of, replacements_of, textlinks_in, extra_id_to_pid) before adding the new set. 'apply_definenodes' already reads the old NodeRust before writing the new one for the forward 'contains' diff; Step 1 extends that read to cover all five outbound fields plus 'extra_ids'.
+
+** DONE 'has_subscribes' / 'has_overrides' directionality
+'fetch_all_graphnodestats' reports two boolean-ish fields: 'has_subscribes' and 'has_overrides'. The open question: does the caller interpret each as "this node has outbound subscribes / overrides", as "this node has inbound subscribes / overrides", or as "this node participates in /any/ subscribes / overrides relation"? Needs a read of 'fetch_one_pid_stats' in [[../../server/dbs/typedb/search/all_graphnodestats.rs][all_graphnodestats.rs]] plus the UI code that consumes the result. With Step 1's wide indexes, both outbound and inbound can be served from memory either way — so the question is about /what the correct boolean is/, not about whether memory can produce it.
+
+*** DONE (Jeff speaking) Please elaborate.
+You wrote 'these field check', but fields don't do stuff.
+I am confused.
+
+**** Response
+Rewritten. Fields don't check anything; the function that /populates/ these boolean output fields does. The question is whether that population logic should treat the field as "outbound only", "inbound only", or "any direction", and the answer depends on what the view UI wants to display. Step 1's wide indexes make all three interpretations implementable from memory — the decision is a semantic one to confirm with the UI code, not an implementation blocker.
+
+*** DONE (Jeff speaking)
+Ah, now I understand the question.
+Both of them should mean it is involved in
+any subscription or override relationship in either role.
+
+**** Impelled change
+Step 5's bullets already encode this interpretation — 'has_subscribes' is "'NodeRust.subscribes_to' non-empty OR 'subscribers_of.get(pid)' non-empty", same shape for 'has_overrides'. The ambiguity flagged in the problem above is resolved: the correct semantic is "any participation in /either/ role". No further plan-body change needed.
+
+** DONE NodeRust body is an ~6.6 MB in-RAM cost
+'NodeRust.body' is already populated today, and the corpus is ~6.6 MB across 29k files. If the corpus grows 10× and bodies average longer, this becomes a real cost. Worth a /runtime memory usage/ measurement after Step 1 lands (not a blocker, just a data point).
+
+** DONE Consistency-audit cost
+Running the audit over a small test fixture (10-100 nodes) is cheap (one TypeDB query batch per inverse direction, < 1 s total). Running it over the full 29k-node corpus is expensive (seconds-to-minutes) because it issues 5 queries per node for the five outbound relations plus five more for the inverse directions. Hook it into per-test-fixture verification; do not run against the corpus in CI.
+
+*** DONE (Jeff)
+What do you mean by 'auditing the full corpus'?
+
+**** Response
+Clarified above. "The full corpus" = the ~29k .skg files under 'data/public/'. That's the size of the production-ish dataset. Small test fixtures ("test corpus") contain tens of nodes; that's what the audit is intended for.
+
+*** DONE (Jeff)
+I know what the corpus is, silly :)
+What I don't know is what you mean by auditing it.
+
+**** Response
+The audit is a check for silent drift between the in-Rust memory and TypeDB. It does this, for every node in the in-Rust memory:
+
+  1. Read the node's five outbound relation fields from its in-memory NodeRust: 'contains', 'subscribes_to', 'hides_from_its_subscriptions', 'overrides_view_of', 'textlinks_to'.
+  2. Issue the corresponding TypeDB queries — one per relation — asking TypeDB for the node's outbound peers in that relation.
+  3. Compare the two sets. Any difference is a mismatch.
+  4. Do the same for the five inverse indexes ('contained_by', 'subscribers_of', 'hiders_of', 'replacements_of', 'textlinks_in') against the corresponding inverse-role TypeDB queries.
+
+The output is a list of mismatches — each one saying "for node X, in relation R, memory says {...} but TypeDB says {...}". Empty list = no drift.
+
+Purpose: if 'apply_definenodes' has a subtle bug (e.g. misses an inverse-index update on a specific relation), the audit catches it immediately after a save/merge runs in a test. Without the audit, drift can accumulate silently for many saves before producing an observably-wrong render.
+
+**** Impelled change
+Step 7's description rewritten to make the /action/ explicit. See the updated Step 7 body.
+
+*** DONE (Jeff) Ah. Let's let users opt in to daily audits.
+It should be configurable whether to do it on a schedule
+in someone's config. My config (data/skgconfig.toml)
+should have the option set.
+Every time the server launches,
+if today is a day different from the 'last-audit.time'
+file in the user's data folder, it should run an audit --
+but backgrounded at the lowest priority,
+so the user never feels it.
+
+If the audit finds errors,
+the user should get a message in the client,
+and the errors should be described in
+a file in the user's data folder called 'audits.org',
+with a headline for each day with errors,
+and subheadlines for each error.
+
+**** Impelled change
+Added a new plan step — "Step 8: opt-in scheduled audit" — describing the config flag, the startup-time staleness check against 'last-audit.time', the backgrounded-at-lowest-priority execution, and the error-reporting path (append to 'audits.org', notify client). [[../../data/skgconfig.toml][data/skgconfig.toml]] gets the flag set. See Step 8 in the Approach section. Two implementation questions flagged there for resolution at implementation time: how to push a notification to the next-connected client (today's TCP protocol is request-response only), and whether audit scope is full corpus or view-visible subset (I'm inclined toward full corpus since Jeff wrote "so the user never feels it").
+
+***** DONE Jeff speaking
+
+Yes, full corpus. I guess we don't really want Emacs polling for messages. Let's just have the message piggy-back on the next buffer creation or modification from the server. (Actually I'm not sure whether the server can deliver a buffer of warnings alongside a new buffer of graph content, but I'm sure it can do so when responding to a save request.)
+
+****** Impelled change
+Resolved both implementation questions in Step 8:
+
+  - *Audit scope*: full corpus, as you indicated.
+  - *Client notification*: piggy-back on the next outbound buffer. No polling; no independent push channel. Mechanics: the audit thread, on finding errors, sets a "pending audit warning" slot on the server's per-connection state (or a global slot if one connection should see the warning regardless of which TCP connection is up at the time). When the server is about to send any buffer to a client — a view render or a save response — it prepends the warning text to the buffer (a short "N audit errors — see 'audits.org'" line). The slot is cleared after that next outbound buffer.
+
+  Realistic shape: a view-render response is a single string blob today, so prepending a warning line is a one-line code change at the send site. A save response is structurally similar. Detecting "any new buffer/modification" covers both view renders and post-save rerenders. No new message type in the TCP protocol.
+
+Step 8's error-reporting bullet list updated to reflect both decisions.
+
+** DONE Pool-elimination is a big diff
+Step 6 removes pool, id_resolver, and the post-render merge. Touches many call sites. Not blocking; land it as its own commit or short sequence of commits once Steps 1-5 are in place.
+
+*** DONE (Jeff)
+You've got full git permissions (just no API creds).
+Make as many commits as you think are appropriate.
+
+**** Response
+Acknowledged. Removed the "split the PR" framing; replaced with "Step 6 is its own commit(s), landing after the read-path migrations stabilize." Plan C's commit granularity is at my discretion, constrained only by "build + tests green at each commit."
+
+** DONE In-flight save visibility during render
+The three-tier fallback of 'skgnode_from_map_or_disk' (SkgNodeMap → memory → disk) matters because the in-Rust memory is updated only /after/ the FS write, while 'SkgNodeMap' carries in-progress edits for the current save. Keep the fallback order. If a reader somehow runs /during/ a save (shouldn't happen in single-client, but a background enrichment thread could), the memory snapshot it holds is the pre-save one — consistent, not stale-half-done. The consistency story is: "every reader sees a consistent snapshot; writers publish atomically."
+
+** DONE Deciding when to take the memory snapshot
+Rendering a view typically runs many lookups. Today each 'skgnode_from_map_or_disk' call may re-consult the per-request map. After Step 3, the pattern becomes: take a single 'Arc<Graph>' via 'handle.load_full()' at request start; thread it through. If the render pipeline is long-running and a save commits mid-render, the render still sees the pre-save memory. That's fine for correctness (consistent snapshot) but means a freshly-saved node won't appear in an in-progress render. Current behavior is similar (pool is also a snapshot). No regression; worth documenting.
+
+** DONE Decision deferred: subscribers_of / hiders_of / replacements_of
+If these are wanted, Step 1 widens by three fields. Benchmarks first — if 'find_related_nodes' on subscribes / hides / overrides is measurably hot after Steps 2-5, add them. Otherwise skip.
+
+*** DONE I think we need them.
+For graphnodestats. That was what slowed things down enough to warrant many-and-better-node-types.org. Since graphnodestats will (maybe they do already) report whether there is any subscription/hide/override action, they would be a similar bottleneck if they relied on TypeDB. And the queries made for those stats are simple, not recursive, hence appropriate for the in-Rust memory.
+
+**** Impelled change
+Step 1 now includes all three (subscribers_of, hiders_of, replacements_of) plus textlinks_in, so graphnodestats can report subscription / hide / override / link activity entirely from memory. No benchmark gate.
+
+** DONE Please try to figure out why this document might be freezing Emacs. It keeps happening when I try to view it in org-mode.
+
+*** DONE
+That seemed to work. Please document a warning against using double single-quotes in org mode in coding-advice/.
+
+**** Impelled change
+Added a new item to Miscellaneous fixes: "Document the double-apostrophe pitfall in coding-advice/formatting.org". That's the closest existing file on formatting conventions; likely just an addition to its existing guidance.
+
+*** Response
+Hypothesis: the earlier draft used double single-quotes — ''function_name'' — as a wrapper for Rust function names to visually distinguish them from field/type names (which were wrapped in single single-quotes). Org-mode's emphasis parser scans for paired apostrophes as part of various emphasis / smart-quote / quotation rules; a sequence of 40+ unclosed-looking ''...'' markers across a long file can trigger pathological regex backtracking in 'org-do-emphasis-faces' or related font-lock regexes, especially inside links and property blocks.
+
+Fix: the rewrite above uses only /single/ single-quotes for all code references — function names, type names, field names alike. No double-apostrophe markers remain. That matches Plan B's conventions (which you read without trouble).
+
+If the freeze persists after this rewrite: next suspect is the density of 'org-link' brackets ([[../../…][…]]) triggering 'org-activate-links' on every re-render; mitigating that would mean dropping some links or changing link display via 'org-link-descriptive'. But try the double-apostrophe fix first.
+** DONE Textlinks in the in-Rust memory
+(Superseded by Step 1's widening. Keeping the original note only for history; see Step 1 for the final design.)
+
+*** DONE gah, again, we'll need it
+because again the graphnodestats need to report link action.
+
+**** Impelled change
+Step 1 now adds 'textlinks_to: Vec<ID>' to NodeRust (derived from body parsing at load time, matching 'NodeTypedb::from_complete_parsing_textlinks') plus 'textlinks_in: im::HashMap<ID, im::HashSet<ID>>' as the inverse index on 'Graph'. Step 5's graphnodestats migration becomes fully in-memory as a result, and Step 4 extends to 'path_sourceward_to_first_nonlinearity' too.
