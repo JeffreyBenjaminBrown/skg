@@ -147,8 +147,10 @@ fn find_related_nodes_from_memory (
     } }
   out }
 
-/// Find related nodes for a single input ID.
-async fn find_related_nodes_for_one_id (
+/// Find related nodes for a single input ID. TypeDB-backed;
+/// bypasses the in-Rust memory shortcut. Exposed at crate scope
+/// for the audit helper which needs the raw TypeDB answer.
+pub(crate) async fn find_related_nodes_for_one_id (
   db_name     : &str,
   driver      : &TypeDBDriver,
   id          : &ID,
