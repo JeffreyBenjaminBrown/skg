@@ -17,7 +17,6 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
 use crate::types::git::MembershipAxes;
 use crate::types::memory::ViewUri;
-use crate::types::memory::skgnode_from_map_or_disk;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, Birth, forest_root_viewnode, mk_indefinitive_viewnode};
@@ -119,16 +118,10 @@ pub fn handle_title_matches_request (
             // Render first, before register_view moves the forest
             viewnode_forest_to_string ( &forest, config )
             . expect ("search forest rendering never fails");
-          for (id, (source, _)) in &matches_by_id {
-            // Populate pool with SkgNodes for each result ID.
-            let _ = skgnode_from_map_or_disk (
-              id, source,
-              &mut conn_state . memory . pool, config ); }
           let uri : ViewUri =
             ViewUri::SearchView ( search_terms . clone () );
           if conn_state . memory . views . contains_key (&uri) {
-            // A previous search with the same terms exists.
-            // Clean up its pool entries before overwriting.
+            // Replace prior search with the same terms.
             conn_state . memory . unregister_view (&uri); }
           conn_state . memory . register_view (
             uri, forest, &search_results );

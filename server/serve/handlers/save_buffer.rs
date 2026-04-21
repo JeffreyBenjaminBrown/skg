@@ -66,21 +66,10 @@ pub fn handle_save_buffer_request (
 ) {
   let viewuri_from_request_result : Result<ViewUri, String> =
     view_uri_from_request (request);
-  let saveview_skgnodes_pre_save : SkgNodeMap = {
-    // the skgnodes already in memory for this view
-    let mut it : SkgNodeMap = SkgNodeMap::new ();
-    if let Ok (ref uri) = viewuri_from_request_result {
-      for pid in conn_state . memory . viewuri_to_pids (uri) {
-        if let Some (skgnode)
-          = conn_state . memory . pool . get (&pid)
-          { it . insert ( pid, skgnode . clone () ); }} }
-    tracing::debug!("save-diagnostic: view-uri={}, pool-size={}, pool-total={}",
-              match &viewuri_from_request_result {
-                Ok (uri) => uri . repr_in_client (),
-                Err (_) => "<nil>" . to_string () },
-              it . len(),
-              conn_state . memory . pool . len());
-    it };
+  let saveview_skgnodes_pre_save : SkgNodeMap =
+    // Per-request transactional shadow. The save pipeline populates
+    // it lazily from in-Rust memory / disk as it reads each node.
+    SkgNodeMap::new ();
   match read_length_prefixed_content (reader) {
     Ok (initial_buffer_content) => {
       { // Send early lock message before the expensive pipeline.

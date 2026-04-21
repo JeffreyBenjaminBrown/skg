@@ -29,7 +29,7 @@ use crate::serve::handlers::title_matches::{ handle_title_matches_request, Searc
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
 use crate::types::errors::BufferValidationError;
-use crate::types::memory::{SkgnodesInViews, ViewUri};
+use crate::types::memory::{SkgNodeMap, SkgnodesInViews, ViewUri};
 use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::unchecked_viewnode::{UncheckedViewNode,unchecked_to_checked_tree};
 use crate::types::viewnode::ViewNode;
@@ -51,7 +51,7 @@ pub struct ConnectionState {
   pub diff_mode_enabled : bool,
   pub memory            : SkgnodesInViews,
   pub graph             : InRustGraphHandle,
-  // PITFALL: If Emacs crashes or the TCP connection drops without sending close-view messages, SkgnodesInViews is still freed, because ConnectionState is owned by handle_emacs and dropped when the connection loop exits (n == 0). There's no leak. HOWEVER, the pool may briefly hold stale entries for views that were conceptually "closed" by the crash. This is harmless: the entries are freed moments later when ConnectionState drops.
+  // If Emacs crashes or the TCP connection drops without sending close-view messages, SkgnodesInViews is still freed, because ConnectionState is owned by handle_emacs and dropped when the connection loop exits (n == 0). There's no leak.
 }
 
 /// Pipes TCP input from Emacs into handle_emacs.
@@ -292,16 +292,17 @@ fn handle_snapshot_response (
     Err (e) => {
       tracing::error! ("snapshot response: parse failed: {}", e);
       return; }};
+  let mut skgnode_map : SkgNodeMap = SkgNodeMap::new ();
   insert_containerward_ancestries_into_search_view (
     &mut viewforest, &payload . search_results,
     &payload . ancestry_by_id, tantivy_index,
-    &mut conn_state . memory . pool, config );
+    &mut skgnode_map, config );
   { let root_treeid : NodeId =
       viewforest . root () . id ();
     set_metadata_relationships_in_node_recursive (
       &mut viewforest, root_treeid,
       &payload . graphnodestats,
-      &mut conn_state . memory . pool, config ); }
+      &mut skgnode_map, config ); }
   let enriched : String =
     viewnode_forest_to_string ( &viewforest, config )
     . expect ("search viewforest rendering never fails");

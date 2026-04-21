@@ -25,19 +25,11 @@ pub enum ViewUri {
 
 pub type SkgNodeMap = HashMap<ID, NodeComplete>;
 
-/// Per-connection caches. 'pool' is the cross-request NodeComplete
-/// cache for nodes displayed in any open Emacs view. SkgNodeMap is
-/// the per-request transactional layer that shadows it.
-///
-/// With the in-Rust memory in place, pool is redundant with the
-/// server-wide 'Graph' for everything except 'misc' (which no
-/// in-memory consumer reads today). It is retained here for now as
-/// a small optimization — direct hash lookup without snapshotting
-/// the global — and because removing it would touch several handler
-/// call sites. Plan C's read-through-memory migration works
-/// correctly whether pool is present or empty.
+/// Per-connection view bookkeeping. Each entry in 'views' is a
+/// currently-open buffer (content or search) with its forest and PID
+/// set. 'root_ids' is the reverse lookup — which view(s) is this
+/// ID a root of.
 pub struct SkgnodesInViews {
-  pub pool        : HashMap<ID, NodeComplete>,
   pub views       : HashMap<ViewUri, ViewState>,
   // Includes both (graph) content views and search result views. See the definition of 'ViewUri'.
   // TODO ? OPTIMIZE:
@@ -76,12 +68,10 @@ impl ViewUri {
 impl SkgnodesInViews {
   pub fn new () -> Self {
     SkgnodesInViews {
-      pool        : HashMap::new (),
       views       : HashMap::new (),
       root_ids    : ManyToMany::new () }}
 
   pub fn clear (&mut self) {
-    self . pool        . clear ();
     self . views       . clear ();
     self . root_ids    = ManyToMany::new (); }
 
@@ -116,7 +106,7 @@ impl SkgnodesInViews {
     forest : Tree<ViewNode>,
     pids   : &[ID],
   ) { let rids : HashSet<ID> =
-        root_ids_from_forest ( &forest, &self . pool );
+        root_ids_from_forest ( &forest );
       for rid in &rids {
         self . root_ids . insert (
           rid . clone (), uri . clone () ); }
@@ -138,7 +128,7 @@ impl SkgnodesInViews {
         . collect ();
       self . root_ids . remove_right (uri);
       let rids : HashSet<ID> =
-        root_ids_from_forest ( &new_forest, &self . pool );
+        root_ids_from_forest ( &new_forest );
       for rid in &rids {
         self . root_ids . insert (
           rid . clone (), uri . clone () ); }
@@ -149,15 +139,13 @@ impl SkgnodesInViews {
       else { self . views . insert (
                uri . clone (),
                ViewState { forest : new_forest,
-                           pids } ); }
-      self . gc (); }
+                           pids } ); } }
 
   pub fn unregister_view (
     &mut self,
     uri : &ViewUri,
   ) { self . root_ids . remove_right (uri);
-      self . views . remove (uri);
-      self . gc (); }
+      self . views . remove (uri); }
 
   pub fn views_containing (
     &self,
@@ -167,17 +155,6 @@ impl SkgnodesInViews {
       . filter ( |(_, vs)| vs . pids . contains (pid) )
       . map ( |(uri, _)| uri . clone () )
       . collect () }
-
-  // SCALING NOTE: gc() is O(views * pids_per_view). For typical usage
-  // (< 10 views, < 1000 nodes each) this is negligible. If it becomes
-  // a bottleneck, replace with reference counting: increment on
-  // register/update, decrement on update/unregister, remove at zero.
-  fn gc (&mut self) {
-    let referenced : HashSet<ID> =
-      self . views . values ()
-      . flat_map ( |vs| vs . pids . iter () . cloned () )
-      . collect ();
-    self . pool . retain ( |pid, _| referenced . contains (pid)); }
 }
 
 //
@@ -188,17 +165,24 @@ impl SkgnodesInViews {
 /// -- i.e. every level-1 headline -- in the view.
 /// (There can be graph roots at other levels, via non-Content birth;
 /// this does not return those.)
+///
+/// Extra_ids are pulled from the in-Rust memory. If memory isn't
+/// initialized (tests that bypass 'init_global_handle'), only
+/// primary ids are collected — extras aren't available.
 fn root_ids_from_forest (
   forest : &Tree<ViewNode>,
-  pool   : &HashMap<ID, NodeComplete>,
 ) -> HashSet<ID> {
   let mut ids : HashSet<ID> = HashSet::new ();
+  let memory = snapshot_global ();
   for child in forest . root () . children () {
     if let ViewNodeKind::True (t) = &child . value () . kind {
       ids . insert ( t . id . clone () );
-      if let Some (skgnode) = pool . get ( &t . id ) {
-        for extra_id in skgnode . all_ids() {
-          ids . insert ( extra_id . clone () ); }}}}
+      if let Some (mem) = memory . as_ref () {
+        if let Some (pid) = mem . pid_of ( &t . id ) {
+          if let Some (node) = mem . nodes . get (&pid) {
+            ids . insert ( pid . clone () );
+            for extra_id in &node . extra_ids {
+              ids . insert ( extra_id . clone () ); }}}}}}
   ids }
 
 /// Extract NodeComplete for an ViewNode from the map (tried first) or disk.

@@ -104,7 +104,6 @@ pub async fn update_views_after_save (
         &deleted_by_this_save_pids,
         true ) . await } ?;
   if let Ok (uri) = viewuri_from_request_result {
-    merge_skgnodemap_into_pool (&skgnode_map, conn_state);
     conn_state . memory . update_view (
       uri, saved_view_mut);
     let collateral_uris : Vec<ViewUri> =
@@ -119,7 +118,7 @@ pub async fn update_views_after_save (
         collateral_uris . iter ()
           . map ( |u| u . repr_in_client () )
           . collect::<Vec<_>> ()); }
-    for curi in collateral_uris { // Same rerender_view pipeline as the saved view, but with is_saved_view=false. Each view builds on the pool enriched by prior views, and is streamed to Emacs immediately.
+    for curi in collateral_uris { // Same rerender_view pipeline as the saved view, but with is_saved_view=false. Each rerender fetches from the in-Rust memory directly. Streamed to Emacs immediately.
       let mut forest : Tree<ViewNode> = match
         conn_state . memory . viewuri_to_view (&curi) {
           Some (f) => f . clone (),
@@ -128,8 +127,7 @@ pub async fn update_views_after_save (
               "Collateral view {}: no viewforest found",
               curi . repr_in_client () ));
             continue; } };
-      let mut map : SkgNodeMap =
-        seed_skgnodemap_from_pool (&curi, conn_state);
+      let mut map : SkgNodeMap = SkgNodeMap::new ();
       match { let _span : tracing::span::EnteredSpan =
                 tracing::info_span!( "rerender_view (collateral)"
                 ). entered();
@@ -140,7 +138,6 @@ pub async fn update_views_after_save (
           &deleted_by_this_save_pids,
           false ) . await }
       { Ok (text) => {
-          merge_skgnodemap_into_pool (&map, conn_state);
           conn_state . memory . update_view (&curi, forest);
           send_response_with_length_prefix (
             stream,
@@ -181,28 +178,6 @@ fn find_collateral_view_uris (
     . filter ( |uri| uri != saved_uri )
     . collect ();
   uris . into_iter () . collect () }
-
-/// Build a SkgNodeMap for a view by pulling every PID
-/// in that view's forest from the pool.
-pub fn seed_skgnodemap_from_pool (
-  uri        : &ViewUri,
-  conn_state : &ConnectionState,
-) -> SkgNodeMap {
-  let mut it : SkgNodeMap = SkgNodeMap::new ();
-  for pid in conn_state . memory . viewuri_to_pids (uri) {
-    if let Some (skgnode)
-      = conn_state . memory . pool . get (&pid)
-      { it . insert ( pid, skgnode . clone () ); } }
-  it }
-
-/// Merge a completed SkgNodeMap into the pool.
-pub fn merge_skgnodemap_into_pool (
-  map        : &SkgNodeMap,
-  conn_state : &mut ConnectionState,
-) {
-  for (pid, skgnode) in map {
-    conn_state . memory . pool . insert (
-      pid . clone (), skgnode . clone () ); } }
 
 /// Strip stale diff data, re-complete the viewtree,
 /// set graph/view stats, and render to string.

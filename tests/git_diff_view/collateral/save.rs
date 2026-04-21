@@ -42,13 +42,12 @@ fn test_collateral_view_preserves_diff_annotations()
       assert_buffer_contains(&initial_buffer, GIT_DIFF_VIEW);
 
       // 2. Build a ConnectionState with diff_mode_enabled.
+      // (Fixture nodes are on disk via setup_git_repo_with_fixtures;
+      // the rerender pipeline reads them as needed.)
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
         memory            : SkgnodesInViews::new (),
         graph             : new_handle (InRustGraph::new ()) };
-      for (pid, skgnode) in &map {
-        conn_state . memory . pool . insert (
-          pid . clone (), skgnode . clone () ); }
 
       // 3. Register buffer 1 and buffer 2,
       //    both viewing the same forest rooted at "a".

@@ -7,7 +7,7 @@ use crate::types::git::SourceDiff;
 use crate::types::memory::{SkgNodeMap, ViewUri};
 use crate::types::misc::{ID, SourceName, SkgConfig};
 use crate::types::viewnode::ViewNode;
-use crate::update_buffer::{ rerender_view, seed_skgnodemap_from_pool, merge_skgnodemap_into_pool};
+use crate::update_buffer::rerender_view;
 
 use ego_tree::Tree;
 use futures::executor::block_on;
@@ -68,8 +68,7 @@ pub fn stream_rerender_views (
             "View {}: no viewforest found",
             uri . repr_in_client () ));
           continue; } };
-    let mut map : SkgNodeMap =
-      seed_skgnodemap_from_pool (&uri, conn_state);
+    let mut map : SkgNodeMap = SkgNodeMap::new ();
     match block_on ( async {
       let _span : tracing::span::EnteredSpan =
         tracing::info_span! (
@@ -82,7 +81,6 @@ pub fn stream_rerender_views (
         &deleted_by_this_save_pids,
         false ) . await } )
     { Ok (text) => {
-        merge_skgnodemap_into_pool (&map, conn_state);
         conn_state . memory . update_view (&uri, forest);
         send_response_with_length_prefix (
           stream,

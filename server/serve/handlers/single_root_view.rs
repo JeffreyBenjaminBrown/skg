@@ -58,11 +58,8 @@ pub fn handle_single_root_view_request (
               config,
               &node_id,
               conn_state . diff_mode_enabled ) . await
-            { Ok ( (buffer_content, map, pids, forest) ) => {
+            { Ok ( (buffer_content, _map, pids, forest) ) => {
                 if let Ok (view_uri) = &view_uri_result {
-                  for (pid, skgnode) in map {
-                    conn_state . memory . pool . insert (
-                      pid, skgnode ); }
                   conn_state . memory . register_view (
                     view_uri . clone (),
                     forest,
