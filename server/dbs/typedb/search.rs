@@ -111,23 +111,29 @@ fn find_related_nodes_from_memory (
     let pid : ID = match graph . pid_of (raw_id) {
       Some (p) => p,
       None     => continue };
+    // Forward fields on NodeRust mirror disk and thus carry raw IDs;
+    // callers expect canonical pids (to match what TypeDB's
+    // has_extra_id-resolved query would return). Resolve each peer
+    // through pid_of before inserting.
+    let resolve = |id: &ID| -> ID {
+      graph . pid_of (id) . unwrap_or_else ( || id . clone () ) };
     match (relation, input_role, output_role) {
       // Forward lookups: read the field on the node.
       ("contains",                     "container",   "contained")  =>
         if let Some (n) = graph . nodes . get (&pid) {
-          out . extend ( n . contains . iter () . cloned () ); },
+          out . extend ( n . contains . iter () . map (&resolve) ); },
       ("subscribes",                   "subscriber",  "subscribee") =>
         if let Some (n) = graph . nodes . get (&pid) {
-          out . extend ( n . subscribes_to . or_default () . iter () . cloned () ); },
+          out . extend ( n . subscribes_to . or_default () . iter () . map (&resolve) ); },
       ("hides_from_its_subscriptions", "hider",       "hidden")     =>
         if let Some (n) = graph . nodes . get (&pid) {
-          out . extend ( n . hides_from_its_subscriptions . or_default () . iter () . cloned () ); },
+          out . extend ( n . hides_from_its_subscriptions . or_default () . iter () . map (&resolve) ); },
       ("overrides_view_of",            "replacement", "replaced")   =>
         if let Some (n) = graph . nodes . get (&pid) {
-          out . extend ( n . overrides_view_of . or_default () . iter () . cloned () ); },
+          out . extend ( n . overrides_view_of . or_default () . iter () . map (&resolve) ); },
       ("textlinks_to",                 "source",      "dest")       =>
         if let Some (n) = graph . nodes . get (&pid) {
-          out . extend ( n . textlinks_to . iter () . cloned () ); },
+          out . extend ( n . textlinks_to . iter () . map (&resolve) ); },
       // Inverse lookups: consult the inverse index.
       ("contains",                     "contained",   "container")  =>
         if let Some (s) = graph . contained_by . get (&pid) {
