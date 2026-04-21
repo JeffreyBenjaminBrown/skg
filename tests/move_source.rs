@@ -11,7 +11,7 @@ use skg::dbs::tantivy::search_index;
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::from_text::buffer_to_viewnode_forest_and_save_instructions;
-use skg::dbs::memory::{Graph, new_handle};
+use skg::dbs::memory::{InRustMemory, new_handle};
 use skg::save::update_graph_minus_merges;
 use skg::test_utils::cleanup_test_tantivy_and_typedb_dbs;
 use skg::types::errors::{SaveError, BufferValidationError};
@@ -157,7 +157,7 @@ fn test_move_node_to_another_owned_source (
       update_graph_minus_merges (
         instructions, &source_moves,
         config . clone(), &tantivy_index, &driver,
-        &new_handle (Graph::new ()) ) . await?;
+        &new_handle (InRustMemory::new ()) ) . await?;
     if let Some (new_idx) = replacement {
       tantivy_index = new_idx; }
 
@@ -251,7 +251,7 @@ fn test_move_node_referenced_by_extra_id (
       update_graph_minus_merges (
         instructions, &source_moves,
         config . clone(), &tantivy_index, &driver,
-        &new_handle (Graph::new ()) ) . await?;
+        &new_handle (InRustMemory::new ()) ) . await?;
     if let Some (new_idx) = replacement {
       tantivy_index = new_idx; }
 
@@ -318,7 +318,7 @@ fn test_move_multiple_nodes (
       update_graph_minus_merges (
         instructions, &source_moves,
         config . clone(), &_tantivy_index, &driver,
-        &new_handle (Graph::new ()) ) . await?;
+        &new_handle (InRustMemory::new ()) ) . await?;
     if let Some (new_idx) = replacement {
       _tantivy_index = new_idx; }
 
@@ -525,7 +525,7 @@ fn test_source_only_change_with_populated_pool (
       update_graph_minus_merges (
         instructions, &source_moves,
         config . clone(), &tantivy_index, &driver,
-        &new_handle (Graph::new ()) ) . await?;
+        &new_handle (InRustMemory::new ()) ) . await?;
     if let Some (new_idx) = replacement {
       tantivy_index = new_idx; }
 

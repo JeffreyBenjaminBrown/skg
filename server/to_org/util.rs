@@ -34,9 +34,10 @@ pub type DefinitiveMap =
 // Fetching, building and modifying SkgNodes and ViewNodes
 // ======================================================
 
-/// Fetch a NodeComplete from disk (queries TypeDB for source).
-/// Make an ViewNode from it, with validated title.
-/// Return both.
+/// Fetch a NodeComplete from disk (resolves id→(pid,source) via
+/// 'pid_and_source_from_id', which consults the in-Rust memory
+/// first and falls back to TypeDB).
+/// Make a ViewNode from it, with validated title. Return both.
 pub async fn skgnode_and_viewnode_from_id (
   config : &SkgConfig,
   driver : &TypeDBDriver,

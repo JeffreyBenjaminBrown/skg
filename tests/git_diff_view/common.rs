@@ -25,7 +25,7 @@ pub use skg::types::nodes::complete::NodeComplete;
 pub use skg::types::memory::SkgNodeMap;
 pub use skg::serve::ConnectionState;
 pub use skg::types::memory::SkgnodesInMemory;
-pub use skg::dbs::memory::{Graph, new_handle};
+pub use skg::dbs::memory::{InRustMemory, new_handle};
 
 //
 // Git helpers

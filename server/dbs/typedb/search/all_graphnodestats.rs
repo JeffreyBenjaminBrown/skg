@@ -184,7 +184,7 @@ pub async fn fetch_all_graphnodestats (
 /// subscribes / overrides relation (per Jeff's directionality
 /// decision). Matches the TypeDB version's behaviour.
 fn fetch_all_graphnodestats_from_memory (
-  graph   : &crate::dbs::memory::Graph,
+  graph   : &crate::dbs::memory::InRustMemory,
   pids    : &[ID],
   pid_set : &HashSet<ID>,
 ) -> AllGraphNodeStats {

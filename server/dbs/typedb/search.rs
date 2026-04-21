@@ -96,7 +96,7 @@ pub async fn find_related_nodes (
 /// field or inverse index on 'Graph'. Inputs are resolved through
 /// 'extra_id_to_pid' first.
 fn find_related_nodes_from_memory (
-  graph       : &crate::dbs::memory::Graph,
+  graph       : &crate::dbs::memory::InRustMemory,
   nodes       : &[ID],
   relation    : &str,
   input_role  : &str,

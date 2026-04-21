@@ -1,6 +1,6 @@
 use crate::dbs::filesystem::multiple_nodes::{write_all_nodes_to_fs, delete_all_nodes_from_fs};
 use crate::dbs::init::{rebuild_typedb_from_disk, rebuild_tantivy_from_disk};
-use crate::dbs::memory::{GraphHandle, apply_definenodes};
+use crate::dbs::memory::{InRustMemoryHandle, apply_definenodes};
 use crate::dbs::tantivy::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::nodes::delete_nodes_from_pids;
@@ -36,7 +36,7 @@ pub async fn update_graph_minus_merges (
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
   driver        : &TypeDBDriver,
-  graph         : &GraphHandle,
+  graph         : &InRustMemoryHandle,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
   tracing::info!("Updating FS, in-memory graph, TypeDB, and Tantivy ...");
   let db_name : &str = &config . db_name;

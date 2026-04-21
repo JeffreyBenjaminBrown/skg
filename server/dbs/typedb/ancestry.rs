@@ -3,7 +3,7 @@ use std::error::Error;
 use std::sync::Arc;
 use typedb_driver::TypeDBDriver;
 
-use crate::dbs::memory::{Graph, snapshot_global};
+use crate::dbs::memory::{InRustMemory, snapshot_global};
 use crate::dbs::typedb::search::find_container_ids_of_pid;
 use crate::types::misc::ID;
 
@@ -214,7 +214,7 @@ fn assemble(
 /// inverse index. Same BFS structure as the TypeDB version but no
 /// async / no parallel queries / no frontier-batching.
 fn full_containerward_ancestry_from_memory (
-  graph     : &Arc<Graph>,
+  graph     : &Arc<InRustMemory>,
   origin    : &ID,
   max_depth : usize,
 ) -> AncestryTree {
