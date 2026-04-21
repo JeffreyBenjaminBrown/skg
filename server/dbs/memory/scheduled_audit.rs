@@ -1,42 +1,100 @@
-//! Opt-in scheduled consistency audit.
+//! Opt-in scheduled consistency audit — paced daemon.
 //!
 //! When 'SkgConfig.auto_audit_daily' is true, the server runs the
-//! memory-vs-TypeDB audit at most once per day, backgrounded at the
-//! lowest OS scheduling priority so the user never feels it.
+//! memory-vs-TypeDB audit in a background thread at nice(19),
+//! processing pids in batches of 128 with a 15-second sleep between
+//! batches. A full 29k-node corpus takes ~1 hour, during which
+//! TypeDB gets regular breathing room.
 //!
-//! Staleness is tracked by the date stored in '{data_root}/last-audit.time'.
-//! On server startup, if today's date (local) is later than the date in
-//! that file — or the file doesn't exist — an audit thread spawns.
-//! On completion, the thread writes today's date back, and on mismatch
-//! appends to '{data_root}/audits.org'.
+//! Per-pid progress is persisted in '<data_root>/.audit.csv' (see
+//! [[audit_store.rs]]), so a crash or restart mid-pass resumes
+//! where it left off: pids stamped with today's date are skipped.
+//!
+//! Daemon lifecycle: runs for the whole server process. When the
+//! current pass completes, the thread sleeps ~60s, checks for date
+//! rollover, and on a new day rebuilds 'to_audit' from
+//! (corpus - audited-today) and starts again. If skg is restarted
+//! daily, resume works too — on startup the thread picks up today's
+//! unfinished pids.
+//!
+//! Mismatch reporting:
+//! - '<data_root>/audits.org' gets one headline per day with all the
+//!   day's mismatches as sub-headlines, appended as they're found.
+//! - The pending-warning slot ("N audit errors — see audits.org") is
+//!   updated after each batch with the count of pids newly flagged
+//!   since the last client-facing notification. Drained by the next
+//!   outbound buffer (view render or save response).
+//!
+//! Migration from the old design: the obsolete
+//! '<data_root>/last-audit.time' file (one-run-per-day stamp) is
+//! deleted on startup if present.
+//!
+//! Batch tuning constants are at the top of this file so a reviewer
+//! can see them without hunting through code.
 
 use futures::executor::block_on;
+use rand::seq::SliceRandom;
+use std::collections::HashSet;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use typedb_driver::TypeDBDriver;
 
 use crate::dbs::memory::{InRustGraph, InRustGraphHandle};
-use crate::dbs::memory::audit::{audit_memory_against_typedb, Mismatch};
-use crate::types::misc::SkgConfig;
+use crate::dbs::memory::audit::{audit_one_node, Mismatch};
+use crate::dbs::memory::audit_store::{
+  AuditRecord, RecordedMismatch,
+  load, pids_needing_audit_today,
+  prune_to_corpus, record_from_mismatch, save};
+use crate::types::misc::{ID, SkgConfig};
+
+// ---- Tunable constants ------------------------------------------
+
+/// Pids audited per batch before sleeping. At 10 TypeDB queries per
+/// pid, one batch fires ~1280 queries in rapid succession (bounded
+/// by TYPEDB_CONCURRENT_TRANSACTIONS) before we pause.
+const BATCH_SIZE : usize = 128;
+
+/// Seconds to sleep between batches while the pass is active.
+/// Combined with BATCH_SIZE this gives ~1 hour for a 29k corpus.
+const BATCH_SLEEP_SECS : u64 = 15;
+
+/// Seconds to sleep when the current pass is complete, before
+/// checking whether a new day has started. Controls how quickly the
+/// daemon notices midnight rollover on a long-running server.
+const IDLE_POLL_SECS : u64 = 60;
+
+// ---- Pending-warning slot ---------------------------------------
 
 /// Pending audit warning for the next outbound buffer. Set by the
-/// background audit thread on mismatch; drained by whichever
-/// outbound-buffer path fires next (view render or save response),
-/// which prepends the text to its buffer.
+/// background audit thread after each batch that turned up new
+/// mismatches; drained by whichever outbound-buffer path fires next
+/// (view render or save response), which prepends the text to its
+/// buffer.
 static PENDING_AUDIT_WARNING : Mutex<Option<String>> = Mutex::new (None);
 
-/// Set the pending-warning slot (overwriting any prior value).
-pub fn set_pending_audit_warning (msg : String) {
+/// Pids that the audit flagged today but whose mismatches have not
+/// yet been reported to the client (because no outbound buffer has
+/// drained the warning slot since). Cleared when the slot is drained.
+static UNREPORTED_FLAGGED_PIDS : Mutex<Option<HashSet<ID>>> =
+  Mutex::new (None);
+
+fn set_pending_audit_warning (msg : String) {
   *PENDING_AUDIT_WARNING . lock () . unwrap () = Some (msg); }
 
-/// Take the pending-warning slot if present. Called by outbound-
-/// buffer paths; they prepend the returned text to their buffer.
+/// Called by outbound-buffer paths. Returns any pending warning and
+/// clears BOTH the warning slot and the unreported-pids set, so
+/// subsequent batches accumulate a fresh batch of 'new since
+/// client-notified' pids.
 pub fn take_pending_audit_warning () -> Option<String> {
-  PENDING_AUDIT_WARNING . lock () . unwrap () . take () }
+  let msg : Option<String> =
+    PENDING_AUDIT_WARNING . lock () . unwrap () . take ();
+  if let Some (set) = UNREPORTED_FLAGGED_PIDS . lock () . unwrap () . as_mut () {
+    set . clear (); }
+  msg }
 
 /// Convenience: if a warning is pending, prepend it (plus a blank
 /// line) to 'buf'. Used by handlers that emit buffer text.
@@ -45,54 +103,221 @@ pub fn prepend_audit_warning (buf : String) -> String {
     None      => buf,
     Some (w)  => format! ("{}\n\n{}", w, buf), } }
 
-/// If 'auto_audit_daily' is enabled and no audit has run today, spawn
-/// a backgrounded audit thread. Returns immediately; the thread does
-/// its own bookkeeping.
-pub fn schedule_if_stale (
+/// Add a pid newly flagged by this batch to the unreported set and
+/// refresh the warning slot to reflect the cumulative count.
+fn note_new_flagged_pid (pid : ID) {
+  let mut guard = UNREPORTED_FLAGGED_PIDS . lock () . unwrap ();
+  let set : &mut HashSet<ID> = guard . get_or_insert_with (HashSet::new);
+  set . insert (pid);
+  let n : usize = set . len ();
+  drop (guard);
+  set_pending_audit_warning ( format! (
+    "{} audit error{} detected today — see 'audits.org'.",
+    n, if n == 1 { "" } else { "s" } )); }
+
+// ---- Startup entry point ----------------------------------------
+
+/// If 'auto_audit_daily' is enabled, spawn the background audit
+/// daemon. Returns immediately. Also performs one-time migration:
+/// deletes the obsolete 'last-audit.time' file if present.
+pub fn schedule_daemon (
   config : &SkgConfig,
   driver : Arc<TypeDBDriver>,
   graph  : InRustGraphHandle,
 ) {
+  migrate_remove_obsolete_stamp (config);
   if ! config . auto_audit_daily {
     return; }
-  let today : String = today_yyyy_mm_dd ();
-  let stamp_path : PathBuf = last_audit_path (config);
-  let last : Option<String> = fs::read_to_string (&stamp_path)
-    . ok ()
-    . map ( |s| s . trim () . to_string () );
-  let stale : bool = match &last {
-    None            => true,
-    Some (date)     => date . as_str () < today . as_str (), };
-  if ! stale {
-    tracing::debug! (last = ?last, "auto_audit_daily: last audit is recent; skipping");
-    return; }
-  tracing::info! ("auto_audit_daily: scheduling background audit");
-  let config_clone   : SkgConfig = config . clone ();
-  let data_root      : PathBuf  = config . data_root . clone ();
-  let db_name        : String   = config . db_name . clone ();
+  tracing::info! ("auto_audit_daily: starting paced audit daemon");
+  let data_root : PathBuf = config . data_root . clone ();
+  let db_name   : String  = config . db_name . clone ();
   thread::spawn ( move || {
     set_lowest_priority ();
-    let snap : Arc<InRustGraph> = graph . load_full ();
-    let result : Result <Vec<Mismatch>, Box<dyn std::error::Error>> =
-      block_on ( audit_memory_against_typedb (
-        &snap, &db_name, &driver ) );
-    match result {
-      Ok (mismatches) => {
-        if ! mismatches . is_empty () {
-          append_mismatches_to_audits_org (
-            &data_root, &today, &mismatches );
-          set_pending_audit_warning ( format! (
-            "{} audit error{} detected during the daily audit — see 'audits.org'.",
-            mismatches . len (),
-            if mismatches . len () == 1 { "" } else { "s" } )); }
-        write_last_audit_stamp (&config_clone, &today);
+    daemon_loop (data_root, db_name, driver, graph); } ); }
+
+/// Old design wrote '<data_root>/last-audit.time' as a once-per-day
+/// stamp for the whole corpus. Obsolete under the per-pid store.
+fn migrate_remove_obsolete_stamp (config : &SkgConfig) {
+  let path : PathBuf = config . data_root . join ("last-audit.time");
+  if path . exists () {
+    if let Err (e) = fs::remove_file (&path) {
+      tracing::warn! (path = %path . display (), error = %e,
+        "audit migration: could not remove obsolete last-audit.time"); } } }
+
+// ---- Daemon ----------------------------------------------------
+
+fn daemon_loop (
+  data_root : PathBuf,
+  db_name   : String,
+  driver    : Arc<TypeDBDriver>,
+  graph     : InRustGraphHandle,
+) {
+  let mut today : String = today_yyyy_mm_dd ();
+  let mut store : Vec<AuditRecord> =
+    initial_store_for_today (&data_root, &graph, &today);
+  let mut to_audit : Vec<ID> =
+    build_todo (&graph, &store, &today);
+  tracing::info! (
+    initial_todo = to_audit . len (), date = %today,
+    "auto_audit_daily: daemon loop starting");
+  loop {
+    if to_audit . is_empty () {
+      thread::sleep (Duration::from_secs (IDLE_POLL_SECS));
+      let now : String = today_yyyy_mm_dd ();
+      if now != today {
+        today = now;
+        store = initial_store_for_today (&data_root, &graph, &today);
+        to_audit = build_todo (&graph, &store, &today);
         tracing::info! (
-          mismatches = mismatches . len (),
-          "auto_audit_daily: audit complete"); }
+          new_todo = to_audit . len (), date = %today,
+          "auto_audit_daily: date rolled over; new pass starting"); }
+      continue; }
+    // Grab up to BATCH_SIZE pids from the end of the to_audit list.
+    let take : usize = BATCH_SIZE . min (to_audit . len ());
+    let batch_start : usize = to_audit . len () - take;
+    let batch : Vec<ID> = to_audit . split_off (batch_start);
+    process_batch (
+      &batch, &graph, &db_name, &driver,
+      &data_root, &today, &mut store);
+    thread::sleep (Duration::from_secs (BATCH_SLEEP_SECS)); } }
+
+/// On pass start (initial startup or date rollover): load the
+/// existing store, prune entries for pids no longer in the corpus,
+/// save the pruned store back. Returns the pruned store.
+fn initial_store_for_today (
+  data_root : &Path,
+  graph     : &InRustGraphHandle,
+  _today    : &str,
+) -> Vec<AuditRecord> {
+  let snap : Arc<InRustGraph> = graph . load_full ();
+  let corpus : HashSet<ID> =
+    snap . nodes . keys () . cloned () . collect ();
+  let raw : Vec<AuditRecord> = load (data_root);
+  let pruned : Vec<AuditRecord> = prune_to_corpus (raw, &corpus);
+  if let Err (e) = save (data_root, &pruned) {
+    tracing::warn! (error = %e,
+      "auto_audit_daily: failed to persist pruned store"); }
+  pruned }
+
+/// Build the per-pass to-audit list: corpus minus pids already
+/// audited today. Randomized so repeat passes don't always hit the
+/// same nodes first.
+fn build_todo (
+  graph : &InRustGraphHandle,
+  store : &[AuditRecord],
+  today : &str,
+) -> Vec<ID> {
+  let snap : Arc<InRustGraph> = graph . load_full ();
+  let corpus : HashSet<ID> =
+    snap . nodes . keys () . cloned () . collect ();
+  let mut list : Vec<ID> =
+    pids_needing_audit_today (store, &corpus, today);
+  list . shuffle (&mut rand::thread_rng ());
+  list }
+
+/// Process one batch: audit each pid, update the store in memory,
+/// persist the whole store, append discovered mismatches to
+/// audits.org, and refresh the client-facing warning slot.
+fn process_batch (
+  batch     : &[ID],
+  graph     : &InRustGraphHandle,
+  db_name   : &str,
+  driver    : &TypeDBDriver,
+  data_root : &Path,
+  today     : &str,
+  store     : &mut Vec<AuditRecord>,
+) {
+  let snap : Arc<InRustGraph> = graph . load_full ();
+  let mut new_mismatches : Vec<Mismatch> = Vec::new ();
+  for pid in batch {
+    let mismatches : Vec<Mismatch> = match block_on (
+      audit_one_node (&snap, db_name, driver, pid) )
+    { Ok (v)  => v,
       Err (e) => {
-        // Don't update last-audit.time on error — try again next launch.
-        tracing::error! (error = %e,
-          "auto_audit_daily: audit failed"); } } } ); }
+        tracing::warn! (pid = %pid, error = %e,
+          "auto_audit_daily: audit of node failed; skipping");
+        continue; } };
+    let recorded : Vec<RecordedMismatch> =
+      mismatches . iter () . map (record_from_mismatch) . collect ();
+    if ! mismatches . is_empty () {
+      note_new_flagged_pid (pid . clone ());
+      new_mismatches . extend (mismatches); }
+    upsert_record (store, AuditRecord {
+      pid : pid . clone (),
+      audited_on : today . to_string (),
+      mismatches : recorded, }); }
+  if let Err (e) = save (data_root, store) {
+    tracing::warn! (error = %e,
+      "auto_audit_daily: failed to persist store after batch"); }
+  if ! new_mismatches . is_empty () {
+    append_mismatches_to_audits_org (
+      data_root, today, &new_mismatches); } }
+
+/// Replace or insert an AuditRecord in 'store' by pid.
+fn upsert_record (store : &mut Vec<AuditRecord>, rec : AuditRecord) {
+  if let Some (existing) = store . iter_mut ()
+    . find ( |r| r . pid == rec . pid )
+  { *existing = rec; }
+  else { store . push (rec); } }
+
+// ---- audits.org writer ------------------------------------------
+
+/// Append mismatches to '<data_root>/audits.org'. If this is the
+/// first append of the day, write today's section heading first.
+///
+/// "First append of the day" is detected by scanning the file's
+/// current contents for '* <today>'. If it's there, skip the
+/// heading; otherwise write it.
+fn append_mismatches_to_audits_org (
+  data_root  : &Path,
+  date       : &str,
+  mismatches : &[Mismatch],
+) {
+  let path : PathBuf = data_root . join ("audits.org");
+  let need_heading : bool = ! today_heading_present (&path, date);
+  let mut file = match OpenOptions::new ()
+    . create (true) . append (true) . open (&path)
+  { Ok (f)  => f,
+    Err (e) => { tracing::warn! (
+      path = %path . display (), error = %e,
+      "auto_audit_daily: failed to open audits.org");
+      return; } };
+  let mut text : String = String::new ();
+  if need_heading {
+    text . push_str ( & format! ("\n* {}\n", date)); }
+  for m in mismatches {
+    text . push_str ( & format! (
+      "** Node '{}': {} {} mismatch\n   Memory: {:?}\n   TypeDB: {:?}\n",
+      m . pid, m . relation, m . role,
+      m . memory, m . typedb )); }
+  if let Err (e) = file . write_all (text . as_bytes ()) {
+    tracing::warn! (path = %path . display (), error = %e,
+      "auto_audit_daily: failed to append to audits.org"); } }
+
+fn today_heading_present (path : &Path, date : &str) -> bool {
+  let needle : String = format! ("* {}", date);
+  match fs::read_to_string (path) {
+    Ok (text) => text . lines () . any ( |l| l . starts_with (&needle) ),
+    Err (_)   => false, } }
+
+// ---- Priority / date helpers ------------------------------------
+
+/// Drop this thread's scheduling priority to the OS minimum so the
+/// audit never contends with user-facing work. On Linux this is
+/// 'nice(19)'.
+///
+/// PITFALL: nice only affects CPU on this thread (the client side of
+/// audit queries). TypeDB processes queries on its own threads at
+/// normal priority, so niceness alone wouldn't prevent TypeDB
+/// saturation — which is why the audit is ALSO paced (BATCH_SLEEP_SECS)
+/// to give TypeDB breathing room between bursts.
+#[cfg(unix)]
+fn set_lowest_priority () {
+  // Safety: nice(2) is a pure syscall; 19 is the maximum niceness.
+  unsafe { libc::nice (19); } }
+
+#[cfg(not(unix))]
+fn set_lowest_priority () { /* No-op on non-Unix */ }
 
 /// Format the current local date as 'YYYY-MM-DD'. No chrono
 /// dependency: we convert UTC seconds to a calendar date by hand.
@@ -124,65 +349,75 @@ fn days_since_epoch_to_date_string (days : u64) -> String {
   let year  : i64 = if month <= 2 { y + 1 } else { y };
   format! ("{:04}-{:02}-{:02}", year, month, day) }
 
-fn last_audit_path (config : &SkgConfig) -> PathBuf {
-  config . data_root . join ("last-audit.time") }
-
-fn write_last_audit_stamp (config : &SkgConfig, date : &str) {
-  let path : PathBuf = last_audit_path (config);
-  if let Err (e) = fs::write (&path, format! ("{}\n", date)) {
-    tracing::warn! (path = %path . display (), error = %e,
-      "auto_audit_daily: failed to write last-audit.time"); } }
-
-fn append_mismatches_to_audits_org (
-  data_root  : &std::path::Path,
-  date       : &str,
-  mismatches : &[Mismatch],
-) {
-  let path : PathBuf = data_root . join ("audits.org");
-  let mut file = match OpenOptions::new ()
-    . create (true) . append (true) . open (&path)
-  { Ok (f)  => f,
-    Err (e) => { tracing::warn! (
-      path = %path . display (), error = %e,
-      "auto_audit_daily: failed to open audits.org");
-      return; } };
-  let mut text : String = format! (
-    "\n* {} ({} error{})\n",
-    date, mismatches . len (),
-    if mismatches . len () == 1 { "" } else { "s" } );
-  for m in mismatches {
-    text . push_str ( & format! (
-      "** Node '{}': {} {} mismatch\n   Memory: {:?}\n   TypeDB: {:?}\n",
-      m . pid, m . relation, m . direction,
-      m . memory, m . typedb )); }
-  if let Err (e) = file . write_all (text . as_bytes ()) {
-    tracing::warn! (path = %path . display (), error = %e,
-      "auto_audit_daily: failed to append to audits.org"); } }
-
-/// Drop this thread's scheduling priority to the OS minimum so the
-/// audit never contends with user-facing work. On Linux this is
-/// 'nice(19)'.
-#[cfg(unix)]
-fn set_lowest_priority () {
-  // Safety: nice(2) is a pure syscall; 19 is the maximum niceness.
-  unsafe { libc::nice (19); } }
-
-#[cfg(not(unix))]
-fn set_lowest_priority () { /* No-op on non-Unix */ }
-
 #[cfg(test)]
 mod tests {
   use super::*;
+  use tempfile::TempDir;
 
   #[test]
   fn date_conversion_known_values () {
-    // UNIX epoch.
     assert_eq! (days_since_epoch_to_date_string (0), "1970-01-01");
-    // First day of 2000.
     assert_eq! (days_since_epoch_to_date_string (10_957), "2000-01-01");
-    // Leap-day transition.
     assert_eq! (days_since_epoch_to_date_string (11_016), "2000-02-29");
     assert_eq! (days_since_epoch_to_date_string (11_017), "2000-03-01");
-    // A post-2000 date we can cross-check against a calendar.
     assert_eq! (days_since_epoch_to_date_string (20_453), "2025-12-31");
-    assert_eq! (days_since_epoch_to_date_string (20_454), "2026-01-01"); } }
+    assert_eq! (days_since_epoch_to_date_string (20_454), "2026-01-01"); }
+
+  #[test]
+  fn today_heading_detection () {
+    let tmp : TempDir = TempDir::new () . unwrap ();
+    let path : PathBuf = tmp . path () . join ("audits.org");
+    // Missing file: no heading.
+    assert! (! today_heading_present (&path, "2026-04-21"));
+    fs::write (
+      &path,
+      "\n* 2026-04-20\n** prior stuff\n\n* 2026-04-21\n** today\n"
+    ) . unwrap ();
+    assert! (today_heading_present (&path, "2026-04-21"));
+    assert! (today_heading_present (&path, "2026-04-20"));
+    assert! (! today_heading_present (&path, "2026-04-22")); }
+
+  #[test]
+  fn upsert_replaces_existing () {
+    let mut store : Vec<AuditRecord> = vec! [
+      AuditRecord { pid : ID::new ("a"),
+                    audited_on : "2026-04-20" . to_string (),
+                    mismatches : Vec::new () },
+    ];
+    upsert_record (&mut store, AuditRecord {
+      pid : ID::new ("a"),
+      audited_on : "2026-04-21" . to_string (),
+      mismatches : Vec::new () });
+    assert_eq! (store . len (), 1);
+    assert_eq! (store[0] . audited_on, "2026-04-21"); }
+
+  #[test]
+  fn upsert_inserts_new () {
+    let mut store : Vec<AuditRecord> = Vec::new ();
+    upsert_record (&mut store, AuditRecord {
+      pid : ID::new ("a"),
+      audited_on : "2026-04-21" . to_string (),
+      mismatches : Vec::new () });
+    assert_eq! (store . len (), 1);
+    assert_eq! (store[0] . pid . as_str (), "a"); }
+
+  #[test]
+  fn migrate_deletes_obsolete_stamp () {
+    let tmp : TempDir = TempDir::new () . unwrap ();
+    let stamp : PathBuf = tmp . path () . join ("last-audit.time");
+    fs::write (&stamp, "2026-04-20\n") . unwrap ();
+    assert! (stamp . exists ());
+    let config : SkgConfig = SkgConfig {
+      data_root          : tmp . path () . to_path_buf (),
+      sources            : std::collections::HashMap::new (),
+      db_name            : "test" . to_string (),
+      tantivy_folder     : PathBuf::from ("/tmp/tantivy-test-scheduled-audit"),
+      port               : 0,
+      initial_node_limit : 100,
+      delete_on_quit     : false,
+      timing_log         : false,
+      auto_audit_daily   : false,
+      max_ancestry_depth : 20,
+    };
+    migrate_remove_obsolete_stamp (&config);
+    assert! (! stamp . exists ()); } }
