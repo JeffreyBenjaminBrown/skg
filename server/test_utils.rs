@@ -4,6 +4,7 @@ pub use guard::TestDbGuard;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
 use crate::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
+use crate::dbs::memory::{InRustGraph, InRustGraphHandle, audit::{audit_memory_against_typedb, format_mismatches}, new_handle};
 use crate::dbs::tantivy::search_index;
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
@@ -181,6 +182,31 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), Box<dyn Error>> {
   }
   Ok(())
 }
+
+/// Build an in-Rust graph handle preloaded from the test config's
+/// fixtures on disk. Use this when a test needs the in-Rust memory
+/// to agree with TypeDB for auditing.
+pub fn graph_handle_from_config (
+  config : &SkgConfig,
+) -> Result<InRustGraphHandle, Box<dyn Error>> {
+  let nodes : Vec<NodeComplete> =
+    read_all_skg_files_from_sources (config) ?;
+  Ok ( new_handle ( InRustGraph::from_nodecompletes (&nodes) )) }
+
+/// Audit the given in-Rust graph handle against TypeDB; panic with a
+/// detailed message if they disagree. Intended for per-test-fixture
+/// post-mutation verification.
+pub async fn audit_memory_or_panic (
+  handle  : &InRustGraphHandle,
+  db_name : &str,
+  driver  : &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
+  let snap : Arc<InRustGraph> = handle . load_full ();
+  let mismatches = audit_memory_against_typedb (
+    &snap, db_name, driver ) . await ?;
+  if ! mismatches . is_empty () {
+    panic! ("audit failed:\n{}", format_mismatches (&mismatches)); }
+  Ok (( )) }
 
 /// A helper function for tests.
 pub async fn populate_test_db_from_fixtures (

@@ -1,9 +1,9 @@
 // cargo test merge::merge_nodes
 
-use skg::dbs::memory::{InRustGraph, new_handle};
+use skg::dbs::memory::InRustGraphHandle;
 use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_viewnode_forest;
 use skg::merge::merge_nodes;
-use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid};
+use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid, graph_handle_from_config, audit_memory_or_panic};
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SourceName};
 use skg::types::viewnode::{EditRequest, ViewNode, ViewNodeKind, TrueNode, IndefOrDef, forest_root_viewnode, default_truenode};
 use skg::types::nodes::complete::NodeComplete;
@@ -94,12 +94,14 @@ async fn test_merge_2_into_1_impl(
              1,
              "Should have 1 Merge");
 
+  let graph : InRustGraphHandle =
+    graph_handle_from_config (config) ?;
   merge_nodes(
     &merge_instructions,
     config . clone(),
     tantivy,
     driver,
-    &new_handle (InRustGraph::new ()),
+    &graph,
   ) . await?;
 
   // Verify results
@@ -109,6 +111,7 @@ async fn test_merge_2_into_1_impl(
     config, &merge_instructions)?;
   verify_tantivy_after_merge_2_into_1(
     tantivy, &merge_instructions )?;
+  audit_memory_or_panic (&graph, &config . db_name, driver) . await?;
   Ok(( )) }
 
 async fn verify_typedb_after_merge_2_into_1 (
@@ -352,12 +355,14 @@ async fn test_merge_1_into_2_impl(
              1,
              "Should have 1 Merge");
 
+  let graph : InRustGraphHandle =
+    graph_handle_from_config (config) ?;
   merge_nodes(
     &merge_instructions,
     config . clone(),
     tantivy,
     driver,
-    &new_handle (InRustGraph::new ()),
+    &graph,
   ) . await?;
 
   // Verify results
@@ -367,6 +372,7 @@ async fn test_merge_1_into_2_impl(
     config, &merge_instructions)?;
   verify_tantivy_after_merge_1_into_2(
     tantivy, &merge_instructions)?;
+  audit_memory_or_panic (&graph, &config . db_name, driver) . await?;
   Ok(( )) }
 
 async fn verify_typedb_after_merge_1_into_2 (

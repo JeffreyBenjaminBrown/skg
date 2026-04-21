@@ -11,9 +11,9 @@ use skg::dbs::tantivy::search_index;
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::from_text::buffer_to_viewnode_forest_and_save_instructions;
-use skg::dbs::memory::{InRustGraph, new_handle};
+use skg::dbs::memory::InRustGraphHandle;
 use skg::save::update_graph_minus_merges;
-use skg::test_utils::cleanup_test_tantivy_and_typedb_dbs;
+use skg::test_utils::{cleanup_test_tantivy_and_typedb_dbs, graph_handle_from_config, audit_memory_or_panic};
 use skg::types::errors::{SaveError, BufferValidationError};
 use skg::types::memory::SkgNodeMap;
 use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
@@ -153,13 +153,16 @@ fn test_move_node_to_another_owned_source (
     assert_eq!(source_moves[0] . old_source . as_str(), "public");
     assert_eq!(source_moves[0] . new_source . as_str(), "private");
 
+    let graph : InRustGraphHandle =
+      graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
       update_graph_minus_merges (
         instructions, &source_moves,
         config . clone(), &tantivy_index, &driver,
-        &new_handle (InRustGraph::new ()) ) . await?;
+        &graph ) . await?;
     if let Some (new_idx) = replacement {
       tantivy_index = new_idx; }
+    audit_memory_or_panic (&graph, &config . db_name, &driver) . await?;
 
     { // FS: old file should be gone, new file should exist
       let old_path : PathBuf =
@@ -247,13 +250,16 @@ fn test_move_node_referenced_by_extra_id (
     assert_eq!(source_moves[0] . pid . 0, "b",
                "SourceMove should use PID, not extra_id");
 
+    let graph : InRustGraphHandle =
+      graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
       update_graph_minus_merges (
         instructions, &source_moves,
         config . clone(), &tantivy_index, &driver,
-        &new_handle (InRustGraph::new ()) ) . await?;
+        &graph ) . await?;
     if let Some (new_idx) = replacement {
       tantivy_index = new_idx; }
+    audit_memory_or_panic (&graph, &config . db_name, &driver) . await?;
 
     { // FS: old file gone, new file present
       let old_path : PathBuf =
@@ -314,13 +320,16 @@ fn test_move_multiple_nodes (
     assert!(move_pids . contains (&"b"), "Should move b");
     assert!(move_pids . contains (&"c"), "Should move c");
 
+    let graph : InRustGraphHandle =
+      graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
       update_graph_minus_merges (
         instructions, &source_moves,
         config . clone(), &_tantivy_index, &driver,
-        &new_handle (InRustGraph::new ()) ) . await?;
+        &graph ) . await?;
     if let Some (new_idx) = replacement {
       _tantivy_index = new_idx; }
+    audit_memory_or_panic (&graph, &config . db_name, &driver) . await?;
 
     { // FS
       assert!( ! temp_fixtures . join ("public/b.skg") . exists() );
@@ -521,13 +530,16 @@ fn test_source_only_change_with_populated_pool (
     assert!(b_in_instructions,
             "b's save instruction must survive filtering");
 
+    let graph : InRustGraphHandle =
+      graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
       update_graph_minus_merges (
         instructions, &source_moves,
         config . clone(), &tantivy_index, &driver,
-        &new_handle (InRustGraph::new ()) ) . await?;
+        &graph ) . await?;
     if let Some (new_idx) = replacement {
       tantivy_index = new_idx; }
+    audit_memory_or_panic (&graph, &config . db_name, &driver) . await?;
 
     { // FS: old file gone, new file present
       assert!( ! temp_fixtures . join ("public/b.skg") . exists(),

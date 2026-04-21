@@ -18,12 +18,12 @@ use std::net::TcpStream;
 use std::path::Path;
 
 use skg::dbs::filesystem::one_node::skgnode_from_pid_and_source;
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::{run_with_test_db, graph_handle_from_config, audit_memory_or_panic};
 use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
 use skg::serve::ConnectionState;
 use skg::types::memory::SkgnodesInViews;
 use skg::types::memory::SkgNodeMap;
-use skg::dbs::memory::{InRustGraph, new_handle};
+use skg::dbs::memory::InRustGraphHandle;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex, SourceName};
 
 use typedb_driver::TypeDBDriver;
@@ -55,10 +55,12 @@ async fn merge_container_into_content_impl (
     ** (skg (node (id c) (source main))) c
   "};
 
+  let graph : InRustGraphHandle =
+    graph_handle_from_config (config) ?;
   let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
         memory            : SkgnodesInViews::new (),
-        graph             : new_handle (InRustGraph::new ()) };
+        graph             : graph . clone () };
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
   let mut stream : TcpStream =
@@ -226,4 +228,5 @@ async fn merge_container_into_content_impl (
       failures . join ("\n  - ") );
     panic!("{}", msg); }
 
+  audit_memory_or_panic (&graph, &config . db_name, driver) . await?;
   Ok (( )) }
