@@ -1,4 +1,4 @@
-use crate::dbs::filesystem::one_node::{skgnodes_from_ids, skgnode_from_pid_and_source};
+use crate::dbs::filesystem::one_node::{skgnode_from_id, skgnodes_from_ids, skgnode_from_pid_and_source};
 use crate::dbs::memory::snapshot_global;
 use crate::types::many_to_many::ManyToMany;
 use crate::types::save::{DefineNode, SaveNode};
@@ -263,6 +263,19 @@ pub async fn skgnode_map_from_forest (
 /// Tantivy indexing and the org-roam importer do, and neither of
 /// those goes through this function), so the synthesis is lossless
 /// for this function's callers.
+/// Memory-first fetch: try the in-Rust memory, fall back to disk
+/// (which itself resolves id→(pid,source) via 'pid_and_source_from_id',
+/// which also consults memory). For callers that don't maintain a
+/// per-request SkgNodeMap shadow.
+pub async fn skgnode_from_memory_or_disk (
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+  id     : &ID,
+) -> Result<NodeComplete, Box<dyn Error>> {
+  if let Some (n) = nodecomplete_from_memory (id) {
+    return Ok (n); }
+  skgnode_from_id (config, driver, id) . await }
+
 pub fn skgnode_from_map_or_disk<'a>(
   id: &ID,
   source: &SourceName,
@@ -285,7 +298,7 @@ pub fn skgnode_from_map_or_disk<'a>(
 /// there (primary or extra). Returns None if memory isn't
 /// initialized or doesn't have the id. 'misc' is synthesized as
 /// empty — see the PITFALL on 'skgnode_from_map_or_disk'.
-fn nodecomplete_from_memory (id: &ID) -> Option<NodeComplete> {
+pub fn nodecomplete_from_memory (id: &ID) -> Option<NodeComplete> {
   let graph_snap = snapshot_global () ?;
   let pid : ID = graph_snap . pid_of (id) ?;
   let rust = graph_snap . nodes . get (&pid) ?;
