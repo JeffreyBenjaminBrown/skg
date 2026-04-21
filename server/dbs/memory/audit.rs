@@ -94,41 +94,64 @@ pub async fn audit_memory_against_typedb (
   driver  : &TypeDBDriver,
 ) -> Result < Vec<Mismatch>, Box<dyn Error> > {
   let mut mismatches : Vec<Mismatch> = Vec::new ();
-  for (pid, node) in graph . nodes . iter () {
-    for (relation, subject_role, object_role) in OUTBOUND_RELATIONSHIP_TYPES {
-      { // pid plays the first-column role ('subject_role'): memory's
-        // answer comes from NodeRust's forward field (raw), resolved
-        // through pid_of to match TypeDB's has_extra_id-aware view.
-        let memory_set : HashSet<ID> =
-          outbound_second_members_from_memory (node, relation) . iter ()
-          . map ( |id| graph . pid_of (id) . unwrap_or (id . clone ()) )
-          . collect ();
-        let typedb_set : HashSet<ID> =
-          find_related_nodes_for_one_id (
-            db_name, driver, pid,
-            relation, subject_role, object_role ) . await ?;
-        if memory_set != typedb_set {
-          mismatches . push ( Mismatch {
-            pid       : pid . clone (),
-            relation,
-            role      : subject_role,
-            memory    : memory_set,
-            typedb    : typedb_set, } ); } }
-      { // pid plays the second-column role ('object_role'): memory's
-        // answer is the canonical-pid-keyed inverse-index lookup.
-        let memory_set : HashSet<ID> =
-          inverse_first_members_from_memory (graph, pid, relation);
-        let typedb_set : HashSet<ID> =
-          find_related_nodes_for_one_id (
-            db_name, driver, pid,
-            relation, object_role, subject_role ) . await ?;
-        if memory_set != typedb_set {
-          mismatches . push ( Mismatch {
-            pid       : pid . clone (),
-            relation,
-            role      : object_role,
-            memory    : memory_set,
-            typedb    : typedb_set, } ); } } } }
+  for pid in graph . nodes . keys () {
+    mismatches . extend (
+      audit_one_node (graph, db_name, driver, pid) . await ? ); }
+  Ok (mismatches) }
+
+/// Audit a single node against TypeDB. Issues ten queries (five
+/// relations × two roles) and returns the Mismatches for this pid.
+/// Empty vec means memory and TypeDB agree about every
+/// relation/role for this pid.
+///
+/// Used by the paced scheduled audit (which calls this per-pid in
+/// batches) and also by 'audit_memory_against_typedb' (which
+/// iterates all pids).
+pub async fn audit_one_node (
+  graph   : &InRustGraph,
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  pid     : &ID,
+) -> Result < Vec<Mismatch>, Box<dyn Error> > {
+  let node : &crate::types::nodes::rust::NodeRust =
+    match graph . nodes . get (pid) {
+      Some (n) => n,
+      None     => return Ok ( Vec::new () ) };
+  let mut mismatches : Vec<Mismatch> = Vec::new ();
+  for (relation, subject_role, object_role) in OUTBOUND_RELATIONSHIP_TYPES {
+    { // pid plays the first-column role ('subject_role'): memory's
+      // answer comes from NodeRust's forward field (raw), resolved
+      // through pid_of to match TypeDB's has_extra_id-aware view.
+      let memory_set : HashSet<ID> =
+        outbound_second_members_from_memory (node, relation) . iter ()
+        . map ( |id| graph . pid_of (id) . unwrap_or (id . clone ()) )
+        . collect ();
+      let typedb_set : HashSet<ID> =
+        find_related_nodes_for_one_id (
+          db_name, driver, pid,
+          relation, subject_role, object_role ) . await ?;
+      if memory_set != typedb_set {
+        mismatches . push ( Mismatch {
+          pid       : pid . clone (),
+          relation,
+          role      : subject_role,
+          memory    : memory_set,
+          typedb    : typedb_set, } ); } }
+    { // pid plays the second-column role ('object_role'): memory's
+      // answer is the canonical-pid-keyed inverse-index lookup.
+      let memory_set : HashSet<ID> =
+        inverse_first_members_from_memory (graph, pid, relation);
+      let typedb_set : HashSet<ID> =
+        find_related_nodes_for_one_id (
+          db_name, driver, pid,
+          relation, object_role, subject_role ) . await ?;
+      if memory_set != typedb_set {
+        mismatches . push ( Mismatch {
+          pid       : pid . clone (),
+          relation,
+          role      : object_role,
+          memory    : memory_set,
+          typedb    : typedb_set, } ); } } }
   Ok (mismatches) }
 
 /// IDs appearing as the second member of 'node''s outbound edges in
