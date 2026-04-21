@@ -45,12 +45,13 @@ pub struct Mismatch {
 /// Audit every node in memory against TypeDB. Returns the list of
 /// mismatches (empty on success).
 ///
-/// Memory stores raw IDs (as they appear on disk), while TypeDB
-/// resolves extra_ids at query time via 'has_extra_id'. Before
-/// comparing, we resolve memory's outputs to match TypeDB's
-/// semantics: raw peer IDs are mapped through 'extra_id_to_pid',
-/// and inverse-index lookups for pid X union entries from X and
-/// from every one of X's extra_ids.
+/// Memory and TypeDB have an asymmetry worth naming:
+/// - /Inverse/ indexes in memory are canonical-pid-keyed, matching
+///   TypeDB's has_extra_id-resolved view. Direct 'inverse_X[pid]'
+///   lookup compares apples-to-apples.
+/// - /Forward/ fields on NodeRust remain raw (mirroring what the
+///   .skg file literally has) — so we map each memory peer through
+///   'pid_of' before comparing to TypeDB's already-resolved answer.
 pub async fn audit_memory_against_typedb (
   graph   : &InRustGraph,
   db_name : &str,
@@ -59,8 +60,8 @@ pub async fn audit_memory_against_typedb (
   let mut mismatches : Vec<Mismatch> = Vec::new ();
   for (pid, node) in graph . nodes . iter () {
     for (relation, subject_role, object_role) in OUTBOUND_RELATIONS {
-      { // Outbound: memory = NodeRust field (raw peers, resolved
-        // to pids); TypeDB = peers where pid plays subject_role.
+      { // Outbound: NodeRust forward fields are raw; resolve each
+        // peer through pid_of before comparing.
         let memory_set : HashSet<ID> =
           outbound_peers_from_memory (node, relation) . iter ()
           . map ( |id| graph . pid_of (id) . unwrap_or (id . clone ()) )
@@ -76,12 +77,9 @@ pub async fn audit_memory_against_typedb (
             direction : "outbound",
             memory    : memory_set,
             typedb    : typedb_set, } ); } }
-      { // Inverse: memory = inverse-index entries under pid AND
-        // under each of pid's extra_ids (mirroring TypeDB's
-        // has_extra_id resolution); TypeDB = peers where pid plays
-        // object_role.
+      { // Inverse: canonical-pid-keyed, direct lookup.
         let memory_set : HashSet<ID> =
-          inverse_peers_resolved (graph, pid, &node . extra_ids, relation);
+          inverse_peers_from_memory (graph, pid, relation);
         let typedb_set : HashSet<ID> =
           find_related_nodes_for_one_id (
             db_name, driver, pid,
@@ -94,20 +92,6 @@ pub async fn audit_memory_against_typedb (
             memory    : memory_set,
             typedb    : typedb_set, } ); } } } }
   Ok (mismatches) }
-
-/// Collect inverse-index entries under pid and under each of pid's
-/// extra_ids, union them. Matches TypeDB's extra_id-resolved view.
-fn inverse_peers_resolved (
-  graph     : &InRustGraph,
-  pid       : &ID,
-  extra_ids : &[ID],
-  relation  : &str,
-) -> HashSet<ID> {
-  let mut out : HashSet<ID> =
-    inverse_peers_from_memory (graph, pid, relation);
-  for ex in extra_ids {
-    out . extend ( inverse_peers_from_memory (graph, ex, relation) ); }
-  out }
 
 fn outbound_peers_from_memory (
   node     : &crate::types::nodes::rust::NodeRust,
