@@ -1,0 +1,329 @@
+#+TITLE: Canonical-keyed maps (forward and inverse) for the in-Rust memory
+
+* Context
+
+The in-Rust memory ([[../../server/dbs/memory.rs][server/dbs/memory.rs]]) keeps five inverse indexes ('contained_by', 'subscribers_of', 'hiders_of', 'replacements_of', 'textlinks_in') plus 'extra_id_to_pid'. Today, all five inverse maps are keyed by the /raw/ ID that appears in the source field — whatever the .skg file literally has in 'contains: [X]', 'subscribes_to: [X]', etc. If that raw X later becomes an extra_id of some other pid P (via a merge), the inverse index keeps the entry under X; nothing migrates it to P.
+
+That's wrong under "who points at pid P?" queries. The audit caught this when I wired it into the merge tests: 'pid=2 relation=subscribes direction=inverse memory={} typedb={ID("subscribes-to-1")}' — memory had the entry under "1" (the pre-merge pid), TypeDB resolves "1" → "2" via 'has_extra_id' and returned the right answer. I patched the audit to union inverse-index entries under pid + its extra_ids so the comparison would be apples-to-apples ('inverse_peers_resolved' in [[../../server/dbs/memory/audit.rs][audit.rs]]). But the underlying inconsistency stays — every reader of the inverse indexes has to know to do the union, and most don't.
+
+This plan switches the inverse indexes to /canonical-pid keys/: when an edge points at a raw ID, resolve it through 'extra_id_to_pid' before indexing, and on merges migrate any pre-existing entries keyed under a now-extra_id to the new pid. Forward fields on 'NodeRust' stay raw (matching what's on disk); the inverse indexes become the place where "what points at pid P" has a single, authoritative answer.
+
+The outcome: every reader becomes a one-line 'inverse_X.get(&pid)' — no union dance, no correctness caveats. One pre-existing under-reporting bug in 'find_related_nodes_from_memory' (see "Problems, out of scope") gets fixed for free.
+
+* Design
+
+** Forward fields: unchanged
+
+'NodeRust.contains', 'NodeRust.subscribes_to', etc., keep raw IDs as they appear on disk. This preserves the "memory mirrors disk" invariant and avoids having to rewrite every neighbor's outbound fields when a merge happens.
+
+The audit's outbound resolution (map memory's raw peers through 'extra_id_to_pid' before comparing to TypeDB) stays as-is; it's compensating for this asymmetry and that's fine.
+
+** Inverse indexes: canonical-pid keyed
+
+Every 'add_to_inverse_map' call resolves the peer ID through 'extra_id_to_pid' first. If the peer isn't a known extra_id, it's used as-is (matches today for non-aliased targets). Concretely: 'id_to_pid(g, id) = g.extra_id_to_pid.get(id).cloned().unwrap_or_else(|| id.clone())'. The helper accepts either an extra_id (mapped via the extra_id_to_pid table) or a primary pid (passed through unchanged); "assuming the ID exists at all" means: if neither, we fall through to the ID unchanged rather than failing — inverse maps already tolerate keys for unknown targets (see "corpus load" below).
+
+** Migration at merge time
+
+When a 'Save' in a batch introduces new extra_ids — i.e., the new 'NodeRust.extra_ids' has IDs that weren't on the old 'NodeRust.extra_ids' — each such /new/ extra_id E might have inverse-index entries keyed under E from before it was an extra_id. For each of the five inverse maps, we move 'inverse[E]' into 'inverse[pid]' and remove 'inverse[E]'. 'im::HashMap' makes this O(1) per map per new extra_id (structural sharing on the union; remove is free).
+
+** Ordering within 'apply_definenodes'
+
+Critical: extra_id_to_pid updates must happen before the inverse-index adds, so peer resolution for this save and for subsequent saves in the same batch sees the just-acquired aliases.
+
+For each 'DefineNode::Save(new)':
+
+  1. Read old 'NodeRust' for this pid (if any).
+  2. 'remove_from_inverse_indexes(g, old)' — resolves old peers through the /current/ 'extra_id_to_pid' (which may already reflect prior saves in this batch). Old peers that are aliases resolve to the pid they currently alias; matches the key the old add landed under.
+  3. Migrate: for each extra_id in 'new.extra_ids', move 'inverse_X[extra_id]' into 'inverse_X[new.pid]' (all five maps). Idempotent if 'inverse_X[extra_id]' is empty.
+  4. Update 'g.extra_id_to_pid' with 'new.extra_ids'.
+  5. Insert 'new' into 'g.nodes'.
+  6. 'add_to_inverse_indexes(g, new)' — each peer goes through 'id_to_pid' before keying.
+
+Steps 4 and 5 can stay inside 'add_to_inverse_indexes' (as today) if we call migrate BEFORE add. Ordering in the step list above makes the dependency explicit.
+
+For each 'DefineNode::Delete(node)':
+
+  1. Read 'NodeRust' of node.
+  2. 'remove_from_inverse_indexes(g, node)' — each peer resolves through current 'extra_id_to_pid', which finds the canonical key it was added under.
+  3. Remove the deleted node's extra_ids from 'extra_id_to_pid' (today's code already does this defensively).
+  4. Remove from 'g.nodes'.
+
+No migration needed on Delete — we're not promoting anything to an alias.
+
+** Invariants worth documenting in comments
+
+Three invariants we're relying on; the first two go into PITFALL comments near 'apply_definenodes', the third near 'find_related_nodes_from_memory' and 'fetch_all_graphnodestats_in_rust':
+
+  1. /Monotonic alias acquisition/: within a batch, 'extra_id_to_pid' only grows and never retracts. Peer-resolution during 'remove_from_inverse_indexes' of an old NodeRust uses the current 'extra_id_to_pid', which finds the canonical key the old add originally landed under — correct because nothing revoked that mapping between then and now. If revocation is ever added as a real operation, this analysis breaks.
+
+  2. /Extra_id revocation is unsupported/: the in-Rust memory does not gracefully handle a save whose new NodeRust drops an extra_id that the old NodeRust had. Neighbor raw references to the dropped extra_id would fall through 'id_to_pid' unresolved and land under the raw id in the inverse indexes — inconsistent with TypeDB's view. If a user ever needs this, a dedicated migration (symmetric to the acquire path) would be required.
+
+  3. /All peer reads from memory are canonicalized/: both inverse queries ('inverse_X[pid]' direct lookup) and forward queries (reading 'NodeRust.contains' etc.) return canonical pids. Inverse is canonicalized at index time; forward is canonicalized at read time via 'id_to_pid' (Step 9). The forward fields on 'NodeRust' themselves remain raw — they mirror disk — but no public memory read exposes raw peer IDs.
+
+* Implementation steps
+
+** Step 1 — Add 'id_to_pid' helper
+
+Add a free function 'fn id_to_pid(g: &InRustGraph, id: &ID) -> ID' inside [[../../server/dbs/memory.rs][memory.rs]]. Doc-comment: "Resolves any known ID (primary pid or extra_id) to the primary pid. Primary pids pass through unchanged; extra_ids are mapped via 'extra_id_to_pid'. IDs unknown to memory fall through as-is, so callers can index-under-unknown without having to check first." Used by 'add_to_inverse_indexes' and 'remove_from_inverse_indexes'.
+
+*** DONE call this 'id_to_pid'
+and explain in the comment that it should work
+for both extra IDs and PIDs, assuming the ID exists at all.
+
+**** Impelled change
+Renamed throughout the plan: helper is now 'id_to_pid'. Doc-comment updated (see Step 1 body) to spell out: primary pids pass through, extra_ids resolve via the extra_id_to_pid table, unknown IDs pass through unchanged so inverse maps can still index under them (they exist today — e.g., references to nodes not yet loaded at index time; the corpus-load two-pass in Step 7 eliminates that case at load time but the permissive fall-through stays for defense-in-depth).
+
+** Step 2 — Thread 'id_to_pid' through 'add_to_inverse_indexes' and 'remove_from_inverse_indexes'
+
+Five peer loops in 'add_to_inverse_indexes', five in 'remove_from_inverse_indexes'. Each becomes:
+
+#+begin_src rust
+  for peer in &node . contains {
+    let resolved : ID = id_to_pid (g, peer);
+    add_to_inverse_map (&mut g . contained_by, &resolved, pid); }
+#+end_src
+
+Also in 'add_to_inverse_indexes': move the 'extra_id_to_pid' update loop to the /top/ of the function, so the peer-resolution loops below see the new extra_ids. Write a comment explaining the ordering constraint.
+
+** Step 3 — Add 'migrate_inverse_entries_for_new_extraids'
+
+New free function in [[../../server/dbs/memory.rs][memory.rs]]:
+
+#+begin_src rust
+  fn migrate_inverse_entries_for_new_extraids (
+    g            : &mut InRustGraph,
+    target_pid   : &ID,
+    new_rust     : &NodeRust,
+    old_rust_opt : Option<&NodeRust>,
+  ) {
+    fn migrate_one (
+      map  : &mut im::HashMap<ID, im::HashSet<ID>>,
+      from : &ID,
+      to   : &ID,
+    ) {
+      if let Some (entries) = map . remove (from) {
+        let mut merged : im::HashSet<ID> =
+          map . get (to) . cloned () . unwrap_or_default ();
+        merged . extend (entries);
+        map . insert ( to . clone (), merged ); } }
+    let old_extraids : HashSet<&ID> = match old_rust_opt {
+      Some (old) => old . extra_ids . iter () . collect (),
+      None       => HashSet::new (), };
+    for extraid in &new_rust . extra_ids {
+      if old_extraids . contains (extraid) { continue; }
+      if extraid == target_pid { continue; }
+      migrate_one (&mut g . contained_by, extraid, target_pid);
+      migrate_one (&mut g . subscribers_of, extraid, target_pid);
+      migrate_one (&mut g . hiders_of, extraid, target_pid);
+      migrate_one (&mut g . replacements_of, extraid, target_pid);
+      migrate_one (&mut g . textlinks_in, extraid, target_pid); } }
+#+end_src
+
+*** DONE define migrate_one inside the definition of migrate_inverse_entries_for_new_extraids
+since I imagine nothing else will refer to it.
+
+**** Impelled change
+Nested 'migrate_one' inside 'migrate_inverse_entries_for_new_extraids' in the Step 3 code sample. Agree — it has no other callers, and scoping it inward keeps the helper's purpose local.
+
+** Step 4 — Call the migration in 'apply_definenodes'
+
+In 'apply_definenodes' inside [[../../server/dbs/memory.rs][memory.rs]], the Save branch currently does:
+
+#+begin_src rust
+  DefineNode::Save (SaveNode (node)) => {
+    let new_rust : NodeRust = NodeRust::from (node);
+    if let Some (old_rust) = new_graph . nodes . get (&new_rust . pid) . cloned () {
+      remove_from_inverse_indexes (&mut new_graph, &old_rust); }
+    new_graph . nodes . insert (
+      new_rust . pid . clone (), new_rust . clone () );
+    add_to_inverse_indexes (&mut new_graph, &new_rust); }
+#+end_src
+
+Add the migration call between remove and insert, passing both old and new rust:
+
+#+begin_src rust
+  DefineNode::Save (SaveNode (node)) => {
+    let new_rust : NodeRust = NodeRust::from (node);
+    let old_rust_opt : Option<NodeRust> =
+      new_graph . nodes . get (&new_rust . pid) . cloned ();
+    if let Some (old_rust) = &old_rust_opt {
+      remove_from_inverse_indexes (&mut new_graph, old_rust); }
+    migrate_inverse_entries_for_new_extraids (
+      &mut new_graph, &new_rust . pid,
+      &new_rust, old_rust_opt . as_ref () );
+    new_graph . nodes . insert (
+      new_rust . pid . clone (), new_rust . clone () );
+    add_to_inverse_indexes (&mut new_graph, &new_rust); }
+#+end_src
+
+Add a PITFALL comment on 'apply_definenodes' explaining the order: remove-old → migrate → insert-nodes → add-new (with extraids-first inside add).
+
+** Step 5 — Simplify 'inverse_peers_resolved' in the audit
+
+[[../../server/dbs/memory/audit.rs][audit.rs]] currently unions inverse lookups across pid + extra_ids. That workaround is no longer needed — 'inverse_X[pid]' is authoritative. Replace 'inverse_peers_resolved' with a direct 'inverse_peers_from_memory(graph, pid, relation)' call.
+
+Keep the outbound-side resolution ('memory_set' mapped through 'pid_of'). That's compensating for the forward fields staying raw, which this change doesn't alter.
+
+** Step 6 — Verify readers need no changes
+
+The 14 inverse-index reader sites (enumerated in exploration, below) all just do 'graph.inverse_X.get(&pid)' or similar. With canonical-keyed inverse, they become correct with no code changes:
+
+- [[../../server/dbs/typedb/search.rs][search.rs]]:35 ('find_container_ids_of_pid')
+- [[../../server/dbs/typedb/search.rs][search.rs]]:133, 136, 139, 142, 145 ('find_related_nodes_from_memory' — five inverse branches)
+- [[../../server/dbs/typedb/search/all_graphnodestats.rs][all_graphnodestats.rs]]:219, 229, 250, 259, 272 ('fetch_all_graphnodestats_in_rust' — five stats fields)
+- [[../../server/dbs/typedb/ancestry.rs][ancestry.rs]]:246 ('full_containerward_ancestry_from_memory' BFS)
+- [[../../server/dbs/memory/audit.rs][audit.rs]]:131-135 (audit's 'inverse_peers_from_memory', still used post-step-5)
+
+No signature changes anywhere. This is the whole point of canonicalizing the keys.
+
+** Step 7 — Two-pass corpus load in 'from_nodecompletes'
+
+'InRustGraph::from_nodecompletes' in [[../../server/dbs/memory.rs][memory.rs]] currently iterates NodeCompletes in whatever order the caller supplies. Under canonical-keyed inverse, that order matters — a node whose outbound peer is an extra_id of a not-yet-loaded node would land under the raw ID.
+
+Change it to two-pass:
+
+  1. First pass: iterate every NodeComplete, populate 'g.extra_id_to_pid' for each node's extra_ids. No inverse index work.
+  2. Second pass: iterate again, this time calling 'add_to_inverse_indexes' (which now sees a fully-populated 'extra_id_to_pid' and resolves every peer correctly).
+
+The 'g.nodes' insertion can happen in either pass; cleanest is the second pass alongside 'add_to_inverse_indexes'.
+
+** Step 8 — Regression test: 'find_related_nodes' over a just-merged pid
+
+Under today's raw-keyed inverse, 'find_related_nodes_from_memory' under-reports for inverse queries against a pid that has acquired aliases via merge (see "Problems, out of scope"). Post-migration this is fixed automatically, but we want a test that would have caught the bug.
+
+Add to [[../../tests/merge/merge_nodes.rs][tests/merge/merge_nodes.rs]] (or a new companion file) after 'test_merge_1_into_2_impl' runs its existing asserts: build a graph from config, perform the merge, then call 'find_related_nodes' with the acquirer's pid as input and each of the five inverse relations. For each relation, the returned set should contain every neighbor whose raw-disk reference was to the acquiree's pre-merge pid. Extend the same test with forward-direction queries — for each relation, call 'find_related_nodes' with a neighbor's pid as input and assert the returned set contains the /acquirer/'s pid (canonical), not the acquiree's raw pre-merge pid. This exercises both the Step 6/7 inverse path and Step 9's forward-path fix. With both changes in place, the assertions pass; with raw-keyed inverse or raw-peer forward reads, they would have failed.
+
+** Step 9 — Resolve-on-read for forward branches
+
+'find_related_nodes_from_memory' in [[../../server/dbs/typedb/search.rs][search.rs]] currently returns 'n.contains' (and the four sibling fields) /raw/ in its forward branches. Its TypeDB fallback returns canonical pids. Symmetric to the inverse-side fix, this one makes the memory path also return canonical pids, removing a silent same-function-returns-different-values inconsistency.
+
+Change the five forward branches (lines 116, 119, 122, 125, 128 of search.rs) from 'out.extend(n.X.iter().cloned())' to 'out.extend(n.X.iter().map(|id| id_to_pid(graph, id)))' — or pull into a small helper if the repetition bites.
+
+Also in [[../../server/dbs/typedb/search/all_graphnodestats.rs][all_graphnodestats.rs]] 'fetch_all_graphnodestats_in_rust': the 'container_to_contents' construction at lines 263–270 filters 'n.contains' against 'pid_set'. Resolve each element through 'id_to_pid' before the filter, so references that happen to be extra_ids of pids in 'pid_set' are matched. The length-only reads (lines 224, 235) don't need changing — len is invariant under resolution.
+
+No other forward-read sites identified during the survey, but a grep for '\.contains\b' / '\.subscribes_to\b' / '\.hides_from_its_subscriptions\b' / '\.overrides_view_of\b' / '\.textlinks_to\b' on 'NodeRust' values is worth running while doing Step 9 to catch anything I missed.
+
+* Verification
+
+- 'cargo check' and 'cargo check --tests' after each step. The signatures don't change, so most of the rebuild is incremental.
+- 'cargo nextest run --no-fail-fast' — all 267 tests pass, plus the new Step 8 regression test (making it 268). The audit-enabled merge and move_source tests are the load-bearing ones here: they exercise 'apply_definenodes' with merges that promote pids to extraids, and the audit verifies memory-vs-TypeDB agreement.
+- After step 5, the audit still returns empty for the merge tests. The mismatches the audit previously detected (raw-keyed memory vs resolved TypeDB) are gone at the source — memory is now resolved.
+- The Step 8 regression test should pass. Optional extra signal: temporarily revert the canonical-keyed change, confirm it /fails/, re-apply.
+- Diff the full 'cargo nextest' output before vs. after: the only meaningful change should be test runtime (slight speedup from not doing the union) plus the new test. No existing test semantics change.
+
+* Problems
+
+** Peer resolution in 'remove_from_inverse_indexes' uses the /current/ 'extra_id_to_pid'
+When removing old peer entries, we resolve through the current map. If an extraid was added earlier in the same batch, the old peer resolves to the post-merge pid — which is exactly where the old add originally landed (because the /previous/ save already saw the alias). So removal hits the right key. This works /only/ because 'apply_definenodes' processes saves sequentially with monotonic updates to 'extra_id_to_pid' — no save ever /removes/ an alias that a later save depends on. That invariant holds for merges (aliases are acquired, not revoked). If we ever add "un-merge" or "alias revocation" as an operation, this assumption needs revisiting.
+
+*** DONE be sure to document this in comments
+
+**** Impelled change
+Added a new "Invariants worth documenting in comments" subsection under the Design section. Both invariants (monotonic alias acquisition; revocation unsupported) will land as PITFALL comments on 'apply_definenodes' during implementation.
+
+** The migration uses 'new_rust.extra_ids \ old_rust.extra_ids' to find /new/ aliases
+For merges this is correct: the acquirer gains the acquiree's pid as a new extraid. But: what if a user saves a node and /removes/ an extra_id? Plan B's pipeline treats 'NodeComplete.extra_ids' as the authoritative post-save state, so yes, removal is expressible. What should the inverse-index behavior be? Today: 'remove_from_inverse_indexes' takes the old rust with the removed extraid still present, resolves peers through the /current/ 'extra_id_to_pid' (which still has the removed extraid pointing to pid) — we remove from 'inverse[pid]'. Then 'add_to_inverse_indexes' adds to 'inverse[pid]' since the extraid is gone. So net-net, the entry stays under pid — but the /reverse/ direction (the neighbor's raw-id reference in its own 'contains' now resolves to... nothing, because the extraid is no longer in 'extra_id_to_pid'). That neighbor's raw-id reference now falls through 'resolve_best' unchanged, so its contribution to 'inverse[raw_id]' gets added fresh. Result: inverse gains an entry under the raw-id. That seems wrong but is probably unreachable in practice (users don't revoke extraids).
+
+Worth flagging for you: do you want to decide how revocation should behave, or defer with a comment saying "revocation is unsupported"?
+
+*** DONE say extra_id revocation is unsupported
+
+**** Impelled change
+Documented in the "Invariants worth documenting in comments" subsection under Design. Will also appear as a PITFALL comment on 'apply_definenodes' during implementation. The plan no longer considers revocation a decision-to-defer; it's a non-goal.
+
+** DONE 'migrate_one' on an 'im::HashMap' is O(|entries|) in the worst case
+'im::HashMap::get(to).cloned()' is cheap because 'im' uses structural sharing — the clone is a pointer bump, not a full copy. The 'extend' is O(|entries being moved|). 'im::HashSet::extend' still shares the pre-existing slots but allocates new internal nodes for each insertion. On a 29k-node corpus with typical fanout this is negligible. If a single extra_id had thousands of inverse entries moving, we'd notice.
+
+** DONE Corpus load path
+'InRustGraph::from_nodecompletes' calls 'add_to_inverse_indexes' per-node in load order. If node A (with 'contains: [X]') is loaded before node Y (whose 'extra_ids' includes X), then A's add sees 'extra_id_to_pid' /not yet/ knowing X→Y, and 'inverse_contained_by[X]' = {A.pid}. Later Y loads and populates 'extra_id_to_pid[X] = Y.pid', but 'inverse_contained_by' is never re-keyed. This is the same bug we're fixing for merges, but at load time. Either:
+
+  (a) Do a two-pass load: first pass builds 'extra_id_to_pid' from all extra_ids; second pass adds inverse entries with resolution.
+  (b) Run the migration pass at the end of 'from_nodecompletes': after all nodes are inserted, for each node's extraids, migrate 'inverse_X[extraid]' into 'inverse_X[pid]'.
+
+(a) is cleaner. (b) is cheaper if most nodes have no extraids. I'd go with (a).
+
+*** DONE Yes, (a).
+
+**** Impelled change
+Added Step 7 to Implementation: two-pass corpus load in 'from_nodecompletes'. First pass populates 'extra_id_to_pid' only; second pass adds to 'g.nodes' and calls 'add_to_inverse_indexes' (with full alias resolution available).
+
+** DONE Test coverage for the "find_related_nodes on merged pid" bug
+The current test suite exercises 'find_related_nodes_from_memory' indirectly through the audit. The audit has always been correct because it does the union. So the pre-existing under-reporting bug in 'find_related_nodes_from_memory' may be invisible in the test harness. Worth adding a small test after this change that queries 'find_related_nodes' for an inverse relation on a just-merged pid, asserting it finds neighbors whose raw references were under the now-acquired pid. This gives the fix regression protection.
+
+*** DONE yes please, add to plan
+
+**** Impelled change
+Added Step 8 to Implementation: regression test that queries 'find_related_nodes' on a just-merged acquirer's pid for each inverse relation and asserts the neighbors whose raw-disk references were under the pre-merge pid are found. Verification updated to reference it.
+
+** DONE Interaction with the audit's outbound resolution
+Post-migration, the audit's inverse path is direct (no union). The outbound path still resolves memory's raw peers through 'extra_id_to_pid'. That's correct (memory's forward fields stay raw). Worth a doc-comment update on 'audit_memory_against_typedb' explaining the asymmetry.
+
+*** DONE agreed
+
+**** Impelled change
+Step 5 gets a doc-comment update as part of the work: 'audit_memory_against_typedb' gets a paragraph naming the asymmetry (inverse: direct, outbound: resolve-on-read because forward fields stay raw).
+
+** DONE don't use 'extra' as a nooun
+I tried to change every instance but may have missed some in this plan, and I didn't even try in the codebase.
+Use 'extra_id' or 'extraid', which are clearly nouns. (I prefer it without the underscore if its part of a function name, because it's easier to interpret.)
+
+*** Response + impelled changes
+Swept the plan body. Two remaining noun uses fixed ("now-extra ID" → "now-extra_id"; "each such /new/ extra E" → "each such /new/ extra_id E"; "it was an extra" → "it was an extra_id"; "per new extra" → "per new extra_id"). Remaining "extra" uses are adjectival ("extra signal") or inside your TODO text and stay untouched. Function naming uses 'extraid' (no underscore): 'migrate_inverse_entries_for_new_extraids' already follows this. 'id_to_pid' doesn't contain the token.
+
+Codebase sweep is a separate item, out of scope for this plan. Existing code uses 'extra_ids' (field name, plural; matches convention) and 'extra_id_to_pid' (map name). Where functions or variables treat a single extra_id as a thing, a grep-and-rename pass is straightforward — noting as follow-up, but not folded into this plan's implementation steps.
+
+* Problems, out of scope
+
+** BUG: 'find_related_nodes_from_memory' has been under-reporting inverse queries
+Confirmed during exploration. When called with 'relation=subscribes, input_role=subscribee, output_role=subscriber' (i.e., "who subscribes to pid X?"), the function reads 'graph.subscribers_of.get(&pid)' directly. Under today's raw-keyed inverse, this misses entries keyed under pid's extra_ids — i.e., any neighbor whose source text has 'subscribes_to: [an_extra_id_of_X]'. After merges, this is a real gap. The fix in this plan closes it automatically (no code change to 'find_related_nodes_from_memory'). We should add a regression test — see "Problems".
+
+*** DONE agreed, add the test to the plan
+
+**** Impelled change
+Added as Step 8 in Implementation. See that step for the shape.
+
+** ARCHITECTURE: After this change, 'inverse_peers_resolved' in the audit goes away entirely
+It becomes a two-line wrapper around 'inverse_peers_from_memory' with no added behavior. Delete it and inline 'inverse_peers_from_memory' at the audit's call site. One fewer helper.
+
+** ARCHITECTURE: Forward fields could also be canonicalized
+This plan keeps 'NodeRust.contains' etc. raw. Under the "memory mirrors disk" invariant that's consistent, and it avoids rewriting every neighbor's NodeRust on merge. But forward-field canonicalization would let the audit drop its outbound resolution too, and would make 'find_related_nodes_from_memory''s forward branches simpler. Cost: every merge must iterate every neighbor's NodeRust and rewrite any references to the acquiree pid. Probably not worth it (merges are rare; forward queries are already correct via post-read resolution), but worth naming as a follow-up worth considering if new forward-reader bugs emerge.
+
+*** TODO please elaborate
+I don't understand. If memory mirrors disk,
+and on disk we have maps from PID to (say) contents,
+then NodeRust.contains should be correct, no?
+Or is the problem that we need to resolve an ID to a PID
+before finding its content?
+
+**** Response
+Your second guess. NodeRust.contains is "correct" in the sense that it mirrors what the .skg file literally has — yes. But the IDs /inside/ 'contains' are whatever the neighbor-node-author wrote when they referenced their target. After a merge, those IDs can be either a primary pid or an extra_id of some other node. Plan B deliberately does NOT rewrite neighbor files at merge time (to avoid dirtying every neighbor's mtime for a referential change the user didn't directly edit).
+
+So when a caller does 'graph.get(neighbor).contains → [X]' and wants to know "which node is X?", they have to resolve X through 'id_to_pid' because X might be an extra_id.
+
+Concrete consequence: 'find_related_nodes_from_memory' today has a forward branch that returns 'n.contains' directly as the result. Its TypeDB fallback returns canonical pids (TypeDB's query resolves has_extra_id internally). So the /same public function/ returns raw IDs when the memory path fires and canonical pids when the TypeDB path fires. That's a silent inconsistency, symmetric to the inverse-side one this plan fixes.
+
+The analogous cheap fix: apply 'id_to_pid' to each element of 'n.contains' (and the other forward fields) before returning, in 'find_related_nodes_from_memory' and anywhere else that currently returns raw peers. That's a 5-line change, 100% local to the memory-read code path. Not in scope for this plan because (a) the inverse-side fix is the hot-path issue we set out to address, and (b) the forward-side fix can land as its own small commit without touching anything this plan touches. Flagging for a follow-up.
+
+The more invasive alternative — canonicalizing 'NodeRust.contains' at merge time by rewriting every neighbor's in-memory NodeRust — loses the "memory mirrors disk" invariant and requires iterating every neighbor on every merge. I wouldn't recommend it. The resolve-on-read fix is cleaner.
+
+**** TODO let's include the cleaner of the two fix options
+as part of this plan
+
+***** Impelled change
+Added Step 9: resolve-on-read in forward branches. Two call sites:
+
+  1. [[../../server/dbs/typedb/search.rs][search.rs]] 'find_related_nodes_from_memory' forward branches (five of them, lines 116–130): each currently extends 'out' with 'n.contains.iter().cloned()' or equivalent. Change to map each peer through 'id_to_pid' before insertion. Five identical 3-line edits.
+
+  2. [[../../server/dbs/typedb/search/all_graphnodestats.rs][all_graphnodestats.rs]] 'fetch_all_graphnodestats_in_rust':
+     - Line 265–267: 'container_to_contents' filters 'n.contains' against 'pid_set'. Raw IDs in 'n.contains' won't hit 'pid_set' if they're actually extra_ids of pids in 'pid_set'. Resolve each via 'id_to_pid' before the filter.
+     - Lines 218–221 ('num_containers' count) and 223–225 ('num_contents' count) are len() operations; length is invariant to resolution. No change.
+     - Lines 228–239 partition 'textlinks_in' sources by whether each source has non-empty 'contains'. This reads 'n.contains' for its emptiness, not its content. No change.
+
+With Step 9, this invariant holds everywhere memory is read for forward peers: returned IDs are canonical pids.
+
+Verification for Step 9: extend the Step 8 regression test to also exercise a /forward/ query — on a node whose forward field references an acquiree's pre-merge pid, assert that 'find_related_nodes' returns the acquirer's pid (matching what TypeDB would return). Without Step 9 this would return the acquiree's raw pre-merge id instead of the acquirer pid.
+
+Problems item worth adding: the "Invariants" subsection in the Design section now needs a third bullet naming that /forward/ reads are also canonicalized-at-read. Let me add that.
+
+** INEFFICIENCY: 'fetch_all_graphnodestats_in_rust' does 'textlinks_in' partition-by-containment
+[[../../server/dbs/typedb/search/all_graphnodestats.rs][all_graphnodestats.rs]]:229 iterates 'textlinks_in.get(pid)' and, for each source, looks up its NodeRust to check if 'contains' is non-empty (partitioning 'num_links_in_from_containers' vs 'num_links_in_from_leaves'). That's fine today but worth noting: if we added an explicit 'source_has_content: im::HashSet<ID>' index (the set of pids with non-empty 'contains'), the partition would become a direct lookup. Not urgent. Orthogonal to this plan.

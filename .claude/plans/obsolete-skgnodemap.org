@@ -1,0 +1,78 @@
+#+TITLE: Retire 'SkgNodeMap' — sketch
+
+* Context
+
+'SkgNodeMap' is the 'HashMap<ID, NodeComplete>' threaded through the render and save pipelines as a per-request "transactional shadow" cache. Pre-Plan-C, it served two distinct purposes:
+
+  1. /Read cache/: accumulate NodeComplete lookups so a pipeline stage doesn't re-read the same node twice (from disk, TypeDB, or pool).
+  2. /In-progress save state/: built from 'Vec<DefineNode>' via 'skgnode_map_from_save_instructions', fed into rerender so the post-save view reflects the new state /before/ any store other than FS had committed.
+
+After Plan C, both roles are redundant. The in-Rust memory is updated during the save pipeline ('apply_definenodes' at [[../../server/save.rs][save.rs]]:63) /before/ rerender runs, so memory carries the post-save state by the time any rendering happens. And memory is effectively free to read (ArcSwap + im::HashMap, O(1) snapshot at request start, O(1) lookups after). The SkgNodeMap just duplicates a snapshot that memory already holds.
+
+Removing it simplifies every handler signature that currently threads '&mut SkgNodeMap' (~20 sites) and drops one conceptual layer from the "where does this NodeComplete live?" mental model.
+
+* Key call sites
+
+Type alias and helpers ([[../../server/types/memory.rs][server/types/memory.rs]]):
+
+  - 'type SkgNodeMap = HashMap<ID, NodeComplete>' — the alias itself.
+  - 'skgnode_from_map_or_disk' — returns '&'a NodeComplete'; tries map, falls through to memory, falls through to disk.
+  - 'skgnode_from_memory_or_disk' — already exists (added in commit 4b8e6af5). Returns owned 'NodeComplete'. Memory-first, then disk. This is the intended replacement.
+  - 'skgnode_map_from_save_instructions' — builds a map from a 'Vec<DefineNode>'. Obsolete after removal.
+  - 'skgnode_map_from_forest' — batch-load for a forest. Obsolete.
+  - 'skgnode_for_viewnode' — single-node helper. Obsolete.
+
+Pass-through parameter sites (~20): [[../../server/to_org/util.rs][to_org/util.rs]], [[../../server/to_org/render/initial_bfs.rs][to_org/render/initial_bfs.rs]], [[../../server/to_org/render/content_view.rs][to_org/render/content_view.rs]], [[../../server/to_org/render/truncate_after_node_in_gen.rs][to_org/render/truncate_after_node_in_gen.rs]], [[../../server/to_org/expand/backpath.rs][to_org/expand/backpath.rs]], [[../../server/update_buffer.rs][update_buffer.rs]], [[../../server/update_buffer/graphnodestats.rs][update_buffer/graphnodestats.rs]], [[../../server/from_text.rs][from_text.rs]], [[../../server/from_text/supplement_from_disk.rs][from_text/supplement_from_disk.rs]], [[../../server/from_text/buffer_to_viewnodes/add_missing_info.rs][from_text/buffer_to_viewnodes/add_missing_info.rs]], [[../../server/from_text/viewnodes_to_instructions.rs][from_text/viewnodes_to_instructions.rs]], [[../../server/dbs/typedb/util/pids_from_ids.rs][dbs/typedb/util/pids_from_ids.rs]], [[../../server/serve/handlers/title_matches/render_enriched_search_buffer.rs][serve/handlers/title_matches/render_enriched_search_buffer.rs]], [[../../server/serve/handlers/save_buffer.rs][serve/handlers/save_buffer.rs]], [[../../server/serve.rs][serve.rs]].
+
+Render entry points that /return/ a SkgNodeMap: 'content_view', 'single_root_view', 'multi_root_view'. Callers currently discard the returned map in most sites.
+
+* Approach
+
+** Step 1 — Audit the return type change
+'skgnode_from_map_or_disk' returns '&'a NodeComplete' (a reference into the map). The replacement 'skgnode_from_memory_or_disk' returns owned 'NodeComplete'. Most callers read a few fields and discard — they'd accept either shape without ceremony. Do a grep-and-read sweep for long-lived refs returned from 'skgnode_from_map_or_disk': those sites either clone at receive or refactor to take a snapshot scope. Expected: few or none.
+
+** Step 2 — Route every read through 'skgnode_from_memory_or_disk'
+Replace every 'skgnode_from_map_or_disk(id, source, map, config)' call with 'skgnode_from_memory_or_disk(config, driver, id).await'. Note the signature shift: drops 'map' and 'source' (memory resolves id→source internally), gains 'driver' (same driver most callers already have in scope) and becomes async.
+
+Sites that need '.await' may not already be in async contexts; a few sync render paths might need 'block_on'. Audit while migrating.
+
+** Step 3 — Drop the '&mut SkgNodeMap' parameters
+Signature-by-signature removal. Each function takes '&mut SkgNodeMap' currently; remove the param and update callers. The diff is mechanical and large — closest analog in recent history is the pool removal (commit 83c84ad5).
+
+** Step 4 — Drop the SkgNodeMap return from render entry points
+'content_view', 'single_root_view', 'multi_root_view' return '(String, SkgNodeMap, Vec<ID>, Tree<ViewNode>)'. Drop the map from the tuple. Callers already discard it in most sites — the few that keep it can allocate fresh locally.
+
+** Step 5 — Delete dead helpers and the alias
+'skgnode_from_map_or_disk', 'skgnode_map_from_save_instructions', 'skgnode_map_from_forest', 'skgnode_for_viewnode' all become dead. Delete them and the 'SkgNodeMap' alias. Tests that directly test these helpers go too (e.g., 'test_skgnode_map_from_save_instructions' in [[../../tests/types/skgnode.rs][tests/types/skgnode.rs]]).
+
+** Step 6 — Verify via test suite
+'cargo nextest run --no-fail-fast' — all 267 (or 268, if the extra_id plan lands first) tests pass. 'bash/emacs-tests.sh' and 'bash/integration-tests.sh' too. No observable behavior should change; just fewer layers.
+
+* Problems
+
+** The async conversion may ripple
+'skgnode_from_memory_or_disk' is async because it falls through to 'skgnode_from_id', which is async. Current 'skgnode_from_map_or_disk' is sync. Call sites in sync contexts need to either pull async upward (if the calling chain is reachable from an async handler) or wrap with 'block_on'. Grep for current sync callers to scope.
+
+** Commit granularity
+Plan C Step 6 (pool removal) was one commit touching 8 files. SkgNodeMap removal touches ~20 files — possibly split as:
+  - Commit A: Step 2 (routing shift) — could be one bulk diff with careful review.
+  - Commit B: Steps 3+4 (param / return cleanup).
+  - Commit C: Step 5 (delete helpers).
+Or keep it all in one: each step compiles on its own, so either works.
+
+** Pre-Plan-C callers might expect SkgNodeMap to hold in-flight saves
+Re-audit 'save_buffer.rs''s 'saveview_skgnodes_pre_save' flow. After my pool-removal work it's already 'SkgNodeMap::new()' — empty — and the save pipeline populates nothing special into it. If that's truly the case (confirmed at the time of this sketch), removal is safe. Still worth a grep for any code that /inserts/ into a SkgNodeMap outside the 'skgnode_from_map_or_disk' helper; those would be signs of a pattern I missed.
+
+** Edge: 'skgnode_map_from_save_instructions' in tests
+[[../../tests/types/skgnode.rs][tests/types/skgnode.rs]] has tests for 'skgnode_map_from_save_instructions' directly. Removing the helper removes the tests too — OK, but worth noting so the PR description doesn't look like a regression in coverage.
+
+** Does 'skgnode_for_viewnode' do something structural that I'm missing?
+It's not just 'map.get(&viewnode.id)' — it has Scaffold filtering logic. Before deleting, verify its callers can call 'skgnode_from_memory_or_disk' directly plus do the Scaffold check inline. Probably they already do but check.
+
+* Problems, out of scope
+
+** INEFFICIENCY: No batched memory read
+Today when a render pass looks up many nodes, each 'skgnode_from_map_or_disk' re-enters the helper. Under the replacement, each lookup is 'snapshot_global()' (ArcSwap load, O(1) but involves an atomic op) plus a HashMap get. Most handlers would be fine snapping once at the start of the request and reading from the snapshot. Consider adding a 'skgnode_from_snapshot(&snap, id)' convenience that takes a pre-loaded 'Arc<InRustGraph>' to avoid the repeated 'snapshot_global()' calls. Not required for correctness or obvious perf — flag if profiling suggests it.
+
+** ARCHITECTURE: 'NodeComplete' clone per lookup
+'skgnode_from_memory_or_disk' clones NodeComplete out of NodeRust (synthesizing 'misc: Vec::new()'). NodeComplete is ~10 small fields plus a few Vecs; not tiny, not huge. Hot-path renders do ~100 of these per view. Measured cost: negligible per our existing profiling. Flag in case it ever shows up.
