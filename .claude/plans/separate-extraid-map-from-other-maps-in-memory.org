@@ -288,7 +288,7 @@ It becomes a two-line wrapper around 'inverse_peers_from_memory' with no added b
 ** ARCHITECTURE: Forward fields could also be canonicalized
 This plan keeps 'NodeRust.contains' etc. raw. Under the "memory mirrors disk" invariant that's consistent, and it avoids rewriting every neighbor's NodeRust on merge. But forward-field canonicalization would let the audit drop its outbound resolution too, and would make 'find_related_nodes_from_memory''s forward branches simpler. Cost: every merge must iterate every neighbor's NodeRust and rewrite any references to the acquiree pid. Probably not worth it (merges are rare; forward queries are already correct via post-read resolution), but worth naming as a follow-up worth considering if new forward-reader bugs emerge.
 
-*** TODO please elaborate
+*** DONE please elaborate
 I don't understand. If memory mirrors disk,
 and on disk we have maps from PID to (say) contents,
 then NodeRust.contains should be correct, no?
@@ -306,7 +306,7 @@ The analogous cheap fix: apply 'id_to_pid' to each element of 'n.contains' (and 
 
 The more invasive alternative — canonicalizing 'NodeRust.contains' at merge time by rewriting every neighbor's in-memory NodeRust — loses the "memory mirrors disk" invariant and requires iterating every neighbor on every merge. I wouldn't recommend it. The resolve-on-read fix is cleaner.
 
-**** TODO let's include the cleaner of the two fix options
+**** DONE let's include the cleaner of the two fix options
 as part of this plan
 
 ***** Impelled change

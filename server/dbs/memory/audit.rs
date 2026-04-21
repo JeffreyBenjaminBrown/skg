@@ -54,12 +54,13 @@ pub struct Mismatch {
 ///
 /// Memory and TypeDB have an asymmetry worth naming:
 /// - /Inverse/ indexes in memory are canonical-pid-keyed, matching
-///   TypeDB's has_extra_id-resolved view. Direct 'inverse_X[pid]'
+///   TypeDB's has_extra_id-aware query view. Direct 'inverse_X[pid]'
 ///   lookup compares apples-to-apples.
 /// - /Forward/ fields on NodeRust remain raw (mirroring what the
 ///   .skg file literally has) — so we map each second-member ID
-///   through 'pid_of' before comparing to TypeDB's already-resolved
-///   answer.
+///   through 'pid_of' to its corresponding pid (which might be the
+///   id itself) before comparing to TypeDB's answer (which already
+///   reflects has_extra_id lookups).
 pub async fn audit_memory_against_typedb (
   graph   : &InRustGraph,
   db_name : &str,
@@ -68,8 +69,9 @@ pub async fn audit_memory_against_typedb (
   let mut mismatches : Vec<Mismatch> = Vec::new ();
   for (pid, node) in graph . nodes . iter () {
     for (relation, subject_role, object_role) in OUTBOUND_RELATIONS {
-      { // Outbound: NodeRust forward fields are raw; resolve each
-        // second-member ID through pid_of before comparing.
+      { // Outbound: NodeRust forward fields are raw; map each
+        // second-member ID to its corresponding pid (which might be
+        // the id itself) via pid_of before comparing.
         let memory_set : HashSet<ID> =
           outbound_second_members_from_memory (node, relation) . iter ()
           . map ( |id| graph . pid_of (id) . unwrap_or (id . clone ()) )

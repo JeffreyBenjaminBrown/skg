@@ -85,13 +85,14 @@ impl InRustGraph {
   /// Build from a slice of NodeCompletes. Typically called at
   /// startup after reading all .skg files from disk.
   ///
-  /// Two-pass, because canonical-keyed inverse indexes require
-  /// resolving each outbound relation's second member
-  /// (see [[../../schema.tql]]) through 'extra_id_to_pid' at index
-  /// time. A single-pass load couldn't resolve a reference to an
+  /// Two-pass, because canonical-keyed inverse indexes need to
+  /// map each outbound relation's second member (see
+  /// [[../../schema.tql]]) to its corresponding pid (which might
+  /// be the id itself) via 'extra_id_to_pid' at index time. A
+  /// single-pass load couldn't do this for a reference to an
   /// extra_id of a not-yet-loaded node. First pass populates
   /// 'extra_id_to_pid' only; second pass inserts nodes and builds
-  /// inverse entries with full resolution available.
+  /// inverse entries with full lookup available.
   pub fn from_nodecompletes (completes: &[NodeComplete]) -> Self {
     let mut g : InRustGraph = InRustGraph::new ();
     for c in completes {
@@ -139,63 +140,65 @@ fn id_to_pid (g: &InRustGraph, id: &ID) -> ID {
 ///
 /// For each outbound relation ('contains', 'subscribes_to', etc.) on
 /// 'node', 'node' is the first member and each ID in the list is the
-/// second member (see [[../../schema.tql]]). We index each second
-/// member ID (after resolving through 'extra_id_to_pid') mapped to
+/// second member (see [[../../schema.tql]]). We index each
+/// second-member ID's corresponding pid (which might be the id
+/// itself, if the id isn't an extra_id of any other node) mapped to
 /// 'node.pid'.
 ///
 /// PITFALL: the 'extra_id_to_pid' update happens FIRST, so the
-/// second-member resolution loops below see this node's newly-acquired
-/// aliases. This matters in a merge batch: if a subsequent neighbor
-/// Save references an acquiree pid that's now an extra_id of this
-/// node, 'id_to_pid' during that neighbor's add resolves the reference
-/// to this node's canonical pid.
+/// loops below see this node's newly-acquired aliases when they look
+/// up corresponding pids. This matters in a merge batch: if a
+/// subsequent neighbor Save references an acquiree pid that's now an
+/// extra_id of this node, 'id_to_pid' during that neighbor's add
+/// maps the reference to this node's canonical pid.
 fn add_to_inverse_indexes (g: &mut InRustGraph, node: &NodeRust) {
   let pid : &ID = &node . pid;
   for extra in &node . extra_ids {
     g . extra_id_to_pid . insert ( extra . clone (), pid . clone () ); }
   for second_member in &node . contains {
-    let resolved : ID = id_to_pid (g, second_member);
-    add_to_inverse_map (&mut g . contained_by, &resolved, pid); }
+    let corresponding_pid : ID = id_to_pid (g, second_member);
+    add_to_inverse_map (&mut g . contained_by, &corresponding_pid, pid); }
   for second_member in node . subscribes_to . or_default () {
-    let resolved : ID = id_to_pid (g, second_member);
-    add_to_inverse_map (&mut g . subscribers_of, &resolved, pid); }
+    let corresponding_pid : ID = id_to_pid (g, second_member);
+    add_to_inverse_map (&mut g . subscribers_of, &corresponding_pid, pid); }
   for second_member in node . hides_from_its_subscriptions . or_default () {
-    let resolved : ID = id_to_pid (g, second_member);
-    add_to_inverse_map (&mut g . hiders_of, &resolved, pid); }
+    let corresponding_pid : ID = id_to_pid (g, second_member);
+    add_to_inverse_map (&mut g . hiders_of, &corresponding_pid, pid); }
   for second_member in node . overrides_view_of . or_default () {
-    let resolved : ID = id_to_pid (g, second_member);
-    add_to_inverse_map (&mut g . replacements_of, &resolved, pid); }
+    let corresponding_pid : ID = id_to_pid (g, second_member);
+    add_to_inverse_map (&mut g . replacements_of, &corresponding_pid, pid); }
   for second_member in &node . textlinks_to {
-    let resolved : ID = id_to_pid (g, second_member);
-    add_to_inverse_map (&mut g . textlinks_in, &resolved, pid); } }
+    let corresponding_pid : ID = id_to_pid (g, second_member);
+    add_to_inverse_map (&mut g . textlinks_in, &corresponding_pid, pid); } }
 
 /// Remove a node's contributions from every inverse index. Used
 /// during update (before inserting the new NodeRust) and during
 /// delete.
 ///
 /// Each outbound relation's second member ID (see [[../../schema.tql]])
-/// is resolved through the CURRENT 'extra_id_to_pid'. Correct because
-/// the prior 'add_to_inverse_indexes' for this node used the same
-/// resolution, and 'apply_definenodes' only grows the alias map —
-/// never revokes — so the key each second-member ID originally landed
-/// under is still reachable through the same resolution now.
+/// is mapped to its corresponding pid (which might be the id itself)
+/// via the CURRENT 'extra_id_to_pid'. Correct because the prior
+/// 'add_to_inverse_indexes' for this node used the same table, and
+/// 'apply_definenodes' only grows that table — never shrinks —
+/// so the key each second-member's contribution originally landed
+/// under is still reachable through the same lookup now.
 fn remove_from_inverse_indexes (g: &mut InRustGraph, node: &NodeRust) {
   let pid : &ID = &node . pid;
   for second_member in &node . contains {
-    let resolved : ID = id_to_pid (g, second_member);
-    remove_from_inverse_map (&mut g . contained_by, &resolved, pid); }
+    let corresponding_pid : ID = id_to_pid (g, second_member);
+    remove_from_inverse_map (&mut g . contained_by, &corresponding_pid, pid); }
   for second_member in node . subscribes_to . or_default () {
-    let resolved : ID = id_to_pid (g, second_member);
-    remove_from_inverse_map (&mut g . subscribers_of, &resolved, pid); }
+    let corresponding_pid : ID = id_to_pid (g, second_member);
+    remove_from_inverse_map (&mut g . subscribers_of, &corresponding_pid, pid); }
   for second_member in node . hides_from_its_subscriptions . or_default () {
-    let resolved : ID = id_to_pid (g, second_member);
-    remove_from_inverse_map (&mut g . hiders_of, &resolved, pid); }
+    let corresponding_pid : ID = id_to_pid (g, second_member);
+    remove_from_inverse_map (&mut g . hiders_of, &corresponding_pid, pid); }
   for second_member in node . overrides_view_of . or_default () {
-    let resolved : ID = id_to_pid (g, second_member);
-    remove_from_inverse_map (&mut g . replacements_of, &resolved, pid); }
+    let corresponding_pid : ID = id_to_pid (g, second_member);
+    remove_from_inverse_map (&mut g . replacements_of, &corresponding_pid, pid); }
   for second_member in &node . textlinks_to {
-    let resolved : ID = id_to_pid (g, second_member);
-    remove_from_inverse_map (&mut g . textlinks_in, &resolved, pid); }
+    let corresponding_pid : ID = id_to_pid (g, second_member);
+    remove_from_inverse_map (&mut g . textlinks_in, &corresponding_pid, pid); }
   for extra in &node . extra_ids {
     // Only remove if it still points at this pid — defensive against
     // cross-batch races where a later save has already claimed the
@@ -269,24 +272,25 @@ fn remove_from_inverse_map (
 /// pid as an extra_id, any inverse-index entries keyed under the
 /// acquiree pid (pre-merge references from neighbors) need to move
 /// to the acquirer pid. The add step then runs with extra_id_to_pid
-/// already updated, so subsequent Saves in the same batch resolve
-/// references through the new alias.
+/// already updated, so subsequent Saves in the same batch look up
+/// corresponding pids through the new alias.
 ///
 /// PITFALL (monotonic alias acquisition): we rely on extra_id_to_pid
 /// only growing within a batch, never retracting. 'remove_from_inverse_
-/// indexes' resolves each second-member ID (see [[../../schema.tql]])
-/// through the current alias map, which finds the key the old add
-/// originally landed under because nothing revoked that mapping
-/// between then and now. If revocation is ever added as a real
-/// operation, the remove-side resolution needs to be rethought.
+/// indexes' looks up each second-member's (see [[../../schema.tql]]) PID
+/// through the current alias map, which finds
+/// the key the old add originally landed under because nothing revoked
+/// that mapping between then and now. If revocation is ever added as
+/// a real operation, the remove-side lookup needs to be rethought.
 ///
 /// PITFALL (extra_id revocation unsupported): a Save whose new
 /// NodeRust /drops/ an extra_id that the old NodeRust had is not
 /// handled gracefully. Neighbor raw references to the dropped
-/// extra_id would fall through 'id_to_pid' unresolved and land under
-/// the raw id — inconsistent with TypeDB. No production path exercises
-/// this today; if a user feature ever needs it, a dedicated migration
-/// (symmetric to the acquire path) would be required.
+/// extra_id would fall through 'id_to_pid' (since 'id_to_pid' would
+/// no longer know the extra_id) and land under the raw id —
+/// inconsistent with TypeDB. No production path exercises this today;
+/// if a user feature ever needs it, a dedicated migration (symmetric
+/// to the acquire path) would be required.
 ///
 /// Called from the save pipeline after the filesystem write has
 /// succeeded.

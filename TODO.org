@@ -1,3 +1,6 @@
+* ONGOING cleaning
+** The term 'skgnode' should be changed in function names.
+** SkgnodeMap: Now redundant?
 * coollected while dogfooding, unassimilated
 ** BUG : C-c v v now taking forever
 not even warning why it failed.
@@ -20,8 +23,6 @@ If not, it might be worth doing. Other recursive graph queries are.
 Ask for criticism *before*
 asking to be asked for missing details.
 * ONGOING very worth it
-** regex search
-Maybe a suite of seach commands.
 ** new command shortcuts
 see TODO/change-command-names-and-aliases.org
 ** when requesting containerward views
@@ -33,7 +34,7 @@ d4dd2e850b449aa4ff92820f9dd66aad48cd6b0b
 *** plan part A complete
 656d66e7ea52a070ec23e26e7cc54b10364ae6a8
 *** plan ended
-edc5542ee4ea5e1a3989121b608111321dc2736b
+f6664360241ec9de0c89a0934445eeb37d147a87
 * considering
 ** There should only be one definitive view across all buffers.
 *** why

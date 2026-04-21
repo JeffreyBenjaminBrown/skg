@@ -260,14 +260,16 @@ fn fetch_all_graphnodestats_in_rust (
       . map ( |s| ! s . is_empty () ) . unwrap_or (false);
     if out_ov || in_ov { has_overrides . insert ( pid . clone () ); }
     // container_to_contents[pid] = contains ∩ pid_set.
-    // n.contains carries raw IDs; resolve each to its canonical pid
-    // before the set-membership test so references that are actually
-    // extra_ids of pids in pid_set are matched.
+    // n.contains carries raw IDs; map each to its corresponding pid
+    // (which might be itself) before the set-membership test
+    // so references that are actually extra_ids of pids in pid_set
+    // are matched.
     if let Some (n) = node_opt {
       let intersected : HashSet<ID> =
         n . contains . iter ()
-        . map ( |cid| graph . pid_of (cid) . unwrap_or_else ( || cid . clone () ) )
-        . filter ( |resolved| pid_set . contains (resolved) )
+        . map ( |cid| graph . pid_of (cid)
+                 . unwrap_or_else ( || cid . clone () ) )
+        . filter ( |pid| pid_set . contains (pid) )
         . collect ();
       if ! intersected . is_empty () {
         container_to_contents . insert ( pid . clone (),
