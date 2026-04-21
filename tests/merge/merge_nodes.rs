@@ -11,7 +11,7 @@ use skg::types::save::Merge;
 use skg::dbs::filesystem::one_node::skgnode_from_pid_and_source;
 use skg::util::path_from_pid_and_source;
 use skg::dbs::typedb::search::contains_from_pids::contains_from_pids;
-use skg::dbs::typedb::search::find_related_nodes;
+use skg::dbs::typedb::search::{find_related_nodes, find_related_nodes_from_memory};
 
 use ego_tree::Tree;
 use std::collections::{HashSet, HashMap};
@@ -643,6 +643,137 @@ fn verify_tantivy_after_merge_1_into_2(
   let found_acquiree_text_preserver: bool = tantivy_contains_id(
     tantivy_index, "\"MERGED: 1\"", &acquiree_text_preserver_id . 0 )?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");
+
+  Ok (( )) }
+
+// ============================================================
+// Test: memory queries resolve extra_ids after a merge
+// ============================================================
+//
+// After merging 1 into 2, neighbors' raw references to "1" should
+// surface as canonical "2" when queried via the in-Rust memory path.
+// Before the canonical-keyed-inverse + forward-resolve-on-read
+// changes, inverse queries under-reported (raw-keyed) and forward
+// queries returned raw IDs; the same public function's TypeDB
+// fallback has always returned canonical pids. This test locks in
+// the memory path's canonicalized behavior.
+#[test]
+fn test_memory_queries_resolve_aliases_after_merge()
+  -> Result<(), Box<dyn Error>>
+{ let fixtures_path = PathBuf::from ("tests/merge/merge_nodes/fixtures");
+  let temp_fixtures_path = PathBuf::from ("/tmp/merge-test-aliases-after-merge-fixtures");
+  let tantivy_path = PathBuf::from ("/tmp/tantivy-test-merge-aliases-after-merge");
+  if temp_fixtures_path . exists() {
+    fs::remove_dir_all (&temp_fixtures_path)?; }
+  if tantivy_path . exists() {
+    fs::remove_dir_all (&tantivy_path)?; }
+  copy_dir_all (&fixtures_path, &temp_fixtures_path)?;
+  let result : Result<(), Box<dyn Error>> =
+    run_with_test_db (
+      "skg-test-merge-aliases-after-merge",
+      "/tmp/merge-test-aliases-after-merge-fixtures",
+      "/tmp/tantivy-test-merge-aliases-after-merge",
+      |config, driver, tantivy| Box::pin ( async move {
+        test_memory_queries_resolve_aliases_after_merge_impl (
+          config, driver, tantivy ) . await } ));
+  if temp_fixtures_path . exists() {
+    fs::remove_dir_all (&temp_fixtures_path)?; }
+  result }
+
+async fn test_memory_queries_resolve_aliases_after_merge_impl (
+  config  : &SkgConfig,
+  driver  : &TypeDBDriver,
+  tantivy : &TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  // Merge 1 into 2. Acquirer=2, acquiree=1.
+  let view_node_2 =
+    mk_test_viewnode ("2", "2",
+                      Some (EditRequest::Merge (ID::from ("1"))));
+  let mut forest : Tree<ViewNode> = Tree::new (forest_root_viewnode ());
+  forest . root_mut () . append (view_node_2);
+  let merge_instructions : Vec<Merge> =
+    instructiontriples_from_the_merges_in_an_viewnode_forest (
+      &forest, config, driver ) . await?;
+  let graph : InRustGraphHandle =
+    graph_handle_from_config (config) ?;
+  merge_nodes (
+    &merge_instructions, config . clone (),
+    tantivy, driver, &graph ) . await?;
+
+  let snap = graph . load_full ();
+  let input_acquirer : Vec<ID> = vec![ID::from ("2")];
+
+  // === Inverse queries: "who points at pid 2?" ===
+
+  let subscribers : HashSet<ID> =
+    find_related_nodes_from_memory (
+      &snap, &input_acquirer,
+      "subscribes", "subscribee", "subscriber" );
+  assert!( subscribers . contains (&ID::from ("subscribes-to-1")),
+           "inverse subscribes under pid 2 should include \
+            subscribes-to-1 (its subscribes_to = [1], which aliases 2)" );
+
+  let hiders : HashSet<ID> =
+    find_related_nodes_from_memory (
+      &snap, &input_acquirer,
+      "hides_from_its_subscriptions", "hidden", "hider" );
+  assert!( hiders . contains (&ID::from ("hides-1-from-subscriptions")),
+           "inverse hides under pid 2 should include \
+            hides-1-from-subscriptions" );
+
+  let replacements : HashSet<ID> =
+    find_related_nodes_from_memory (
+      &snap, &input_acquirer,
+      "overrides_view_of", "replaced", "replacement" );
+  assert!( replacements . contains (&ID::from ("overrides-view-of-1")),
+           "inverse overrides_view_of under pid 2 should include \
+            overrides-view-of-1" );
+
+  let textlink_sources : HashSet<ID> =
+    find_related_nodes_from_memory (
+      &snap, &input_acquirer,
+      "textlinks_to", "dest", "source" );
+  assert!( textlink_sources . contains (&ID::from ("links-to-1")),
+           "inverse textlinks_to under pid 2 should include \
+            links-to-1 (its body has a link to id 1, which aliases 2)" );
+
+  // === Forward queries: neighbors' outbound should resolve 1 → 2 ===
+
+  let subscribee_of_s2_1 : HashSet<ID> =
+    find_related_nodes_from_memory (
+      &snap, &vec![ID::from ("subscribes-to-1")],
+      "subscribes", "subscriber", "subscribee" );
+  assert!( subscribee_of_s2_1 . contains (&ID::from ("2")),
+           "subscribes-to-1's forward subscribes should resolve to \
+            canonical pid 2 (was raw 1 on disk)" );
+  assert!( ! subscribee_of_s2_1 . contains (&ID::from ("1")),
+           "forward query should NOT return raw acquiree pid 1" );
+
+  let hidden_by_h1 : HashSet<ID> =
+    find_related_nodes_from_memory (
+      &snap, &vec![ID::from ("hides-1-from-subscriptions")],
+      "hides_from_its_subscriptions", "hider", "hidden" );
+  assert!( hidden_by_h1 . contains (&ID::from ("2")),
+           "hides-1-from-subscriptions's forward hides should include \
+            canonical pid 2" );
+  assert!( hidden_by_h1 . contains (&ID::from ("11")),
+           "hides-1-from-subscriptions also hides 11 (unchanged)" );
+
+  let replaced_by_ov1 : HashSet<ID> =
+    find_related_nodes_from_memory (
+      &snap, &vec![ID::from ("overrides-view-of-1")],
+      "overrides_view_of", "replacement", "replaced" );
+  assert!( replaced_by_ov1 . contains (&ID::from ("2")),
+           "overrides-view-of-1's forward overrides should resolve \
+            to canonical pid 2" );
+
+  let destinations_of_l1 : HashSet<ID> =
+    find_related_nodes_from_memory (
+      &snap, &vec![ID::from ("links-to-1")],
+      "textlinks_to", "source", "dest" );
+  assert!( destinations_of_l1 . contains (&ID::from ("2")),
+           "links-to-1's forward textlinks should resolve to \
+            canonical pid 2" );
 
   Ok (( )) }
 

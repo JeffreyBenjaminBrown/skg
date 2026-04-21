@@ -99,7 +99,7 @@ pub async fn find_related_nodes (
 /// (relation, input_role, output_role) to the appropriate forward
 /// field or inverse index on 'Graph'. Inputs are resolved through
 /// 'extra_id_to_pid' first.
-fn find_related_nodes_from_memory (
+pub fn find_related_nodes_from_memory (
   graph       : &InRustGraph,
   nodes       : &[ID],
   relation    : &str,
