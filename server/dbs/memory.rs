@@ -8,6 +8,7 @@
 //! per mutation) and atomically publish a new snapshot.
 
 pub mod audit;
+pub mod scheduled_audit;
 
 use arc_swap::ArcSwap;
 use std::sync::{Arc, OnceLock};

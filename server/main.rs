@@ -10,6 +10,7 @@ use skg::context::{compute_and_store_context_types, MapToContent, MapToContainer
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::{InitData, initialize_dbs};
 use skg::dbs::memory::init_global_handle;
+use skg::dbs::memory::scheduled_audit::schedule_if_stale;
 use skg::dbs::typedb::util::{connect_to_typedb, delete_database};
 use skg::import_org_roam::import_org_roam_directory;
 use skg::serve::serve;
@@ -92,6 +93,9 @@ fn main() -> Result<(), Box<dyn Error>> {
   // hot read paths (e.g. 'pid_and_source_from_id') can bypass TypeDB
   // without every caller threading a '&Graph' parameter.
   init_global_handle ( Arc::clone (&graph) );
+
+  schedule_if_stale (
+    &config, Arc::clone (&typedb_driver), Arc::clone (&graph) );
 
   compute_context_rankings (
     &tantivy_index, had_id_set, all_node_ids,
