@@ -1,3 +1,4 @@
+use crate::dbs::memory::scheduled_audit::prepend_audit_warning;
 use crate::serve::ConnectionState;
 use crate::to_org::render::content_view::single_root_view;
 use crate::serve::protocol::TcpToClient;
@@ -64,6 +65,8 @@ pub fn handle_single_root_view_request (
                     view_uri . clone (),
                     forest,
                     &pids ); }
+                let buffer_content : String =
+                  prepend_audit_warning (buffer_content);
                 format_buffer_response_sexp (
                   & buffer_content,
                   & vec![] ) },

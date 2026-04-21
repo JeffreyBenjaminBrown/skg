@@ -14,7 +14,7 @@ use futures::executor::block_on;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 use typedb_driver::TypeDBDriver;
@@ -22,6 +22,28 @@ use typedb_driver::TypeDBDriver;
 use crate::dbs::memory::{InRustGraph, InRustGraphHandle};
 use crate::dbs::memory::audit::{audit_memory_against_typedb, Mismatch};
 use crate::types::misc::SkgConfig;
+
+/// Pending audit warning for the next outbound buffer. Set by the
+/// background audit thread on mismatch; drained by whichever
+/// outbound-buffer path fires next (view render or save response),
+/// which prepends the text to its buffer.
+static PENDING_AUDIT_WARNING : Mutex<Option<String>> = Mutex::new (None);
+
+/// Set the pending-warning slot (overwriting any prior value).
+pub fn set_pending_audit_warning (msg : String) {
+  *PENDING_AUDIT_WARNING . lock () . unwrap () = Some (msg); }
+
+/// Take the pending-warning slot if present. Called by outbound-
+/// buffer paths; they prepend the returned text to their buffer.
+pub fn take_pending_audit_warning () -> Option<String> {
+  PENDING_AUDIT_WARNING . lock () . unwrap () . take () }
+
+/// Convenience: if a warning is pending, prepend it (plus a blank
+/// line) to 'buf'. Used by handlers that emit buffer text.
+pub fn prepend_audit_warning (buf : String) -> String {
+  match take_pending_audit_warning () {
+    None      => buf,
+    Some (w)  => format! ("{}\n\n{}", w, buf), } }
 
 /// If 'auto_audit_daily' is enabled and no audit has run today, spawn
 /// a backgrounded audit thread. Returns immediately; the thread does
@@ -58,7 +80,11 @@ pub fn schedule_if_stale (
       Ok (mismatches) => {
         if ! mismatches . is_empty () {
           append_mismatches_to_audits_org (
-            &data_root, &today, &mismatches ); }
+            &data_root, &today, &mismatches );
+          set_pending_audit_warning ( format! (
+            "{} audit error{} detected during the daily audit — see 'audits.org'.",
+            mismatches . len (),
+            if mismatches . len () == 1 { "" } else { "s" } )); }
         write_last_audit_stamp (&config_clone, &today);
         tracing::info! (
           mismatches = mismatches . len (),
