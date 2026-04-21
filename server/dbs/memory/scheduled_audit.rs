@@ -153,7 +153,7 @@ fn append_mismatches_to_audits_org (
   for m in mismatches {
     text . push_str ( & format! (
       "** Node '{}': {} {} mismatch\n   Memory: {:?}\n   TypeDB: {:?}\n",
-      m . pid, m . relation, m . direction,
+      m . pid, m . relation, m . role,
       m . memory, m . typedb )); }
   if let Err (e) = file . write_all (text . as_bytes ()) {
     tracing::warn! (path = %path . display (), error = %e,

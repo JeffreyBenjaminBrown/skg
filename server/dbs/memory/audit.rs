@@ -15,30 +15,57 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 use crate::dbs::memory::InRustGraph;
+use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
 use crate::dbs::typedb::search::find_related_nodes_for_one_id;
 use crate::types::misc::ID;
 
-/// The five outbound-relation (relation, subject_role, object_role)
-/// triples we audit. 'subject' plays the "active" end (first
-/// relationship member in OUTBOUND_RELATIONSHIP_TYPES); 'object' plays
-/// the "passive" end.
-const OUTBOUND_RELATIONS : &[(&str, &str, &str)] = &[
-  ("contains",                     "container",   "contained"),
-  ("subscribes",                   "subscriber",  "subscribee"),
-  ("hides_from_its_subscriptions", "hider",       "hidden"),
-  ("overrides_view_of",            "replacement", "replaced"),
-  ("textlinks_to",                 "source",      "dest"),
-];
-
-/// One disagreement between memory and TypeDB for one (node, relation)
-/// pair. 'direction' is "outbound" or "inverse"; 'relation' names the
-/// TypeDB relation type.
+/// A single disagreement between the in-Rust memory and TypeDB, for
+/// a particular node in a particular relation in a particular role.
+/// The audit produces zero or more of these per node per pass: a node
+/// might have no mismatches (everything agrees), or several (e.g. a
+/// 'contains' mismatch for the container role AND a 'subscribes'
+/// mismatch for the subscribee role).
 #[derive(Debug, Clone)]
 pub struct Mismatch {
+  /// The node being audited. Memory and TypeDB disagree about one of
+  /// /this/ node's relationships. ('pid' is primary ID — the node's
+  /// canonical identifier, as distinct from any extra_ids.)
   pub pid       : ID,
+  /// Which of the five outbound relation types this disagreement is
+  /// about. Takes a value from the first column of
+  /// 'OUTBOUND_RELATIONSHIP_TYPES' in
+  /// [[../../typedb/relationships.rs]] — so one of "contains",
+  /// "textlinks_to", "subscribes", "hides_from_its_subscriptions",
+  /// or "overrides_view_of".
   pub relation  : &'static str,
-  pub direction : &'static str, // "outbound" | "inverse"
+  /// Which role 'pid' plays in the relation. Takes a value from the
+  /// second or third column of 'OUTBOUND_RELATIONSHIP_TYPES' in
+  /// [[../../typedb/relationships.rs]] — specifically, one of the
+  /// two roles associated with 'relation'. For 'contains' that's
+  /// "container" or "contained"; for 'subscribes' that's "subscriber"
+  /// or "subscribee"; etc. (See [[../../../schema.tql]] for the
+  /// canonical schema definition.)
+  ///
+  /// The memory-side answer that's compared against TypeDB depends
+  /// on which role this is:
+  ///   If 'pid' plays the /first-column role/ (container, source,
+  ///     subscriber, hider, replacement) — memory's answer is the
+  ///     forward field on pid's NodeRust (e.g. NodeRust.contains),
+  ///     resolved through extra_id_to_pid to match TypeDB's
+  ///     has_extra_id-aware view.
+  ///   If 'pid' plays the /second-column role/ (contained, dest,
+  ///     subscribee, hidden, replaced) — memory's answer is the
+  ///     inverse-index lookup (e.g. graph.contained_by[pid]),
+  ///     already canonical-pid-keyed.
+  pub role : &'static str,
+  /// What the in-Rust memory says the peer set is (after any needed
+  /// canonicalization — see the role-specific descriptions above).
+  /// The set may be empty, which is a valid memory answer meaning
+  /// "no known peers in this relation in this role."
   pub memory    : HashSet<ID>,
+  /// What TypeDB says the peer set is. Obtained by issuing the
+  /// has_extra_id-aware query for 'pid' in the complementary role
+  /// (the one 'pid' is NOT playing here). Also may be empty.
   pub typedb    : HashSet<ID>,
 }
 
@@ -68,10 +95,10 @@ pub async fn audit_memory_against_typedb (
 ) -> Result < Vec<Mismatch>, Box<dyn Error> > {
   let mut mismatches : Vec<Mismatch> = Vec::new ();
   for (pid, node) in graph . nodes . iter () {
-    for (relation, subject_role, object_role) in OUTBOUND_RELATIONS {
-      { // Outbound: NodeRust forward fields are raw; map each
-        // second-member ID to its corresponding pid (which might be
-        // the id itself) via pid_of before comparing.
+    for (relation, subject_role, object_role) in OUTBOUND_RELATIONSHIP_TYPES {
+      { // pid plays the first-column role ('subject_role'): memory's
+        // answer comes from NodeRust's forward field (raw), resolved
+        // through pid_of to match TypeDB's has_extra_id-aware view.
         let memory_set : HashSet<ID> =
           outbound_second_members_from_memory (node, relation) . iter ()
           . map ( |id| graph . pid_of (id) . unwrap_or (id . clone ()) )
@@ -84,10 +111,11 @@ pub async fn audit_memory_against_typedb (
           mismatches . push ( Mismatch {
             pid       : pid . clone (),
             relation,
-            direction : "outbound",
+            role      : subject_role,
             memory    : memory_set,
             typedb    : typedb_set, } ); } }
-      { // Inverse: canonical-pid-keyed, direct lookup.
+      { // pid plays the second-column role ('object_role'): memory's
+        // answer is the canonical-pid-keyed inverse-index lookup.
         let memory_set : HashSet<ID> =
           inverse_first_members_from_memory (graph, pid, relation);
         let typedb_set : HashSet<ID> =
@@ -98,7 +126,7 @@ pub async fn audit_memory_against_typedb (
           mismatches . push ( Mismatch {
             pid       : pid . clone (),
             relation,
-            direction : "inverse",
+            role      : object_role,
             memory    : memory_set,
             typedb    : typedb_set, } ); } } } }
   Ok (mismatches) }
@@ -146,7 +174,7 @@ pub fn format_mismatches (mismatches : &[Mismatch]) -> String {
     mismatches . len () );
   for m in mismatches {
     s . push_str ( & format! (
-      "  pid={} relation={} direction={} memory={:?} typedb={:?}\n",
-      m . pid, m . relation, m . direction,
+      "  pid={} relation={} role={} memory={:?} typedb={:?}\n",
+      m . pid, m . relation, m . role,
       m . memory, m . typedb ) ); }
   s }
