@@ -55,3 +55,20 @@
    (matching the literal "staged:" / "unstaged:" prefix). If the
    herald rule strings are ever changed, the regex must be updated in
    lockstep. Manageable but a new fragility introduced by this design.
+
+* Other problems
+
+** 'skg-first-sexpr-on-line' fabricates a (node ...) child
+   elisp/skg-sexpr/skg-sexpr-search.el / skg-strip-heralds-from-sexp.
+   The stripper calls 'skg-edit-nested-sexp' with instructions
+   '(skg (node (graphStats (DELETE ...)) (viewStats (DELETE ...))))'.
+   The DSL's merge semantics append '(node ...)' to any sexp that
+   lacks one, so every non-truenode sexp that round-trips through the
+   stripper comes out with a fabricated '(node (graphStats ...)
+   (viewStats ...))' child. This makes 'skg-sexp-subtree-p' against
+   the simple pattern '(skg (node))' spuriously match phantoms,
+   search viewnodes, etc. Existing callers (skg-request-file-path)
+   accidentally dodge the bug by matching the more specific
+   '(skg (node (id)))'. Fix candidates: stripper should use
+   DELETE-only instructions, or short-circuit when the target lacks
+   '(node ...)' to begin with.
