@@ -114,6 +114,9 @@ pub async fn fetch_all_graphnodestats (
     return Ok ( AllGraphNodeStats::empty() ); }
   let pid_set : HashSet < ID > =
     pids . iter () . cloned () . collect ();
+  if let Some (graph_snap) = crate::dbs::memory::snapshot_global () {
+    return Ok ( fetch_all_graphnodestats_from_memory (
+      &graph_snap, pids, &pid_set ) ); }
   let futures : Vec < _ > =
     pids . iter ()
     . map ( |pid| fetch_one_pid_stats ( db_name, driver, pid ) )
@@ -166,6 +169,98 @@ pub async fn fetch_all_graphnodestats (
     container_to_contents,
     content_to_containers,
   }) }
+
+/// In-memory counterpart of 'fetch_all_graphnodestats'. Computes
+/// every field from NodeRust and the inverse indexes — no TypeDB
+/// round-trips.
+///
+/// PITFALL: 'has_subscribes' and 'has_overrides' are "in either
+/// role": a node qualifies if it's on /either/ side of a
+/// subscribes / overrides relation (per Jeff's directionality
+/// decision). Matches the TypeDB version's behaviour.
+fn fetch_all_graphnodestats_from_memory (
+  graph   : &crate::dbs::memory::Graph,
+  pids    : &[ID],
+  pid_set : &HashSet<ID>,
+) -> AllGraphNodeStats {
+  let mut num_containers               : HashMap<ID, usize> = HashMap::new ();
+  let mut num_contents                 : HashMap<ID, usize> = HashMap::new ();
+  let mut num_links_in_from_containers : HashMap<ID, usize> = HashMap::new ();
+  let mut num_links_in_from_leaves     : HashMap<ID, usize> = HashMap::new ();
+  let mut has_subscribes               : HashSet<ID> = HashSet::new ();
+  let mut has_overrides                : HashSet<ID> = HashSet::new ();
+  let mut container_to_contents
+    : HashMap<ID, HashSet<ID>> = HashMap::new ();
+  let mut content_to_containers
+    : HashMap<ID, HashSet<ID>> = HashMap::new ();
+  for pid in pids {
+    let node_opt = graph . nodes . get (pid);
+    // num_containers: size of inverse-contains set.
+    let n_containers : usize =
+      graph . contained_by . get (pid)
+      . map ( |s| s . len () ) . unwrap_or (0);
+    num_containers . insert ( pid . clone (), n_containers );
+    // num_contents: length of outbound contains.
+    let n_contents : usize =
+      node_opt . map ( |n| n . contains . len () ) . unwrap_or (0);
+    num_contents . insert ( pid . clone (), n_contents );
+    // Link sources: partition textlinks_in by whether source has
+    // non-empty contains.
+    let (from_containers, from_leaves) : (usize, usize) =
+      if let Some (sources) = graph . textlinks_in . get (pid) {
+        let mut with    : usize = 0;
+        let mut without : usize = 0;
+        for src_pid in sources {
+          let src_has_content : bool =
+            graph . nodes . get (src_pid)
+            . map ( |n| ! n . contains . is_empty () )
+            . unwrap_or (false);
+          if src_has_content { with += 1; } else { without += 1; } }
+        (with, without) }
+      else { (0, 0) };
+    num_links_in_from_containers . insert ( pid . clone (), from_containers );
+    num_links_in_from_leaves     . insert ( pid . clone (), from_leaves );
+    // has_subscribes / has_overrides: either role.
+    let out_sub : bool =
+      node_opt . map ( |n| ! n . subscribes_to . or_default () . is_empty () )
+      . unwrap_or (false);
+    let in_sub  : bool =
+      graph . subscribers_of . get (pid)
+      . map ( |s| ! s . is_empty () ) . unwrap_or (false);
+    if out_sub || in_sub { has_subscribes . insert ( pid . clone () ); }
+    let out_ov : bool =
+      node_opt . map ( |n| ! n . overrides_view_of . or_default () . is_empty () )
+      . unwrap_or (false);
+    let in_ov  : bool =
+      graph . replacements_of . get (pid)
+      . map ( |s| ! s . is_empty () ) . unwrap_or (false);
+    if out_ov || in_ov { has_overrides . insert ( pid . clone () ); }
+    // container_to_contents[pid] = contains ∩ pid_set
+    if let Some (n) = node_opt {
+      let intersected : HashSet<ID> =
+        n . contains . iter ()
+        . filter ( |cid| pid_set . contains (*cid) )
+        . cloned () . collect ();
+      if ! intersected . is_empty () {
+        container_to_contents . insert ( pid . clone (), intersected ); } }
+    // content_to_containers[pid] = contained_by ∩ pid_set
+    if let Some (containers) = graph . contained_by . get (pid) {
+      let intersected : HashSet<ID> =
+        containers . iter ()
+        . filter ( |cid| pid_set . contains (*cid) )
+        . cloned () . collect ();
+      if ! intersected . is_empty () {
+        content_to_containers . insert ( pid . clone (), intersected ); } } }
+  AllGraphNodeStats {
+    num_containers,
+    num_contents,
+    num_links_in_from_containers,
+    num_links_in_from_leaves,
+    has_subscribes,
+    has_overrides,
+    container_to_contents,
+    content_to_containers,
+  } }
 
 async fn fetch_one_pid_stats (
   db_name : &str,
