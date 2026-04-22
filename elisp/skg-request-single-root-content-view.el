@@ -53,18 +53,20 @@ VIEW-URI is the pre-generated UUID to assign to the new buffer."
                 (message "Already viewing this node (it is a root of this view)"))
                (t (switch-to-buffer buf))))
           ;; Normal content view response.
-          (let ((content-value (cadr (assoc 'content response)))
-                (errors-list (cadr (assoc 'errors response))))
-            (when content-value
+          (let* ((content-value (cadr (assoc 'content response)))
+                 (errors-list (cadr (assoc 'errors response)))
+                 (has-content (and content-value
+                                   (not (string-empty-p content-value)))))
+            (when has-content
               (let ((buf-name (skg-content-view-buffer-name
                                content-value)))
                 (skg-open-org-buffer-from-text
                  tcp-proc content-value buf-name view-uri)))
             (when (and errors-list (not (equal errors-list nil)))
-              (let ((errors-text (if (listp errors-list)
-                                     (mapconcat 'identity errors-list "\n\n")
-                                   errors-list)))
-                (skg-show-save-warnings errors-text)) ))))
+              (let ((errors-text (skg-errors-to-org-string errors-list)))
+                (if has-content
+                    (skg-show-save-warnings errors-text)
+                  (skg-show-save-errors errors-text)))))))
     (error
      (message "skg content view error: %S" err)
      (skg-log 'error 'view "parsing content view response: %S" err)

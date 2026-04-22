@@ -1,4 +1,4 @@
-use crate::dbs::memory::scheduled_audit::prepend_audit_warning;
+use crate::dbs::memory::scheduled_audit::take_pending_audit_warning;
 use crate::serve::ConnectionState;
 use crate::to_org::render::content_view::single_root_view;
 use crate::serve::protocol::TcpToClient;
@@ -65,17 +65,22 @@ pub fn handle_single_root_view_request (
                     view_uri . clone (),
                     forest,
                     &pids ); }
-                let buffer_content : String =
-                  prepend_audit_warning (buffer_content);
+                let errors : Vec<String> =
+                  take_pending_audit_warning ()
+                    . map ( |w| vec! [w] )
+                    . unwrap_or_default ();
                 format_buffer_response_sexp (
                   & buffer_content,
-                  & vec![] ) },
-              Err (e) => { // If we fail to generate the view, return error in content
-                let error_content : String = format!(
-                  "Error generating document: {}", e);
+                  & errors ) },
+              Err (e) => { // If we fail to generate the view, ship the generation error (and any pending audit warning) in the errors vec, with empty content so the client skips opening a main buffer.
+                let mut errors : Vec<String> = Vec::new ();
+                if let Some (w) = take_pending_audit_warning ()
+                { errors . push (w); }
+                errors . push ( format! (
+                  "Error generating document: {}", e ));
                 format_buffer_response_sexp (
-                  & error_content,
-                  & vec![] ) }} } ) };
+                  & String::new (),
+                  & errors ) }} } ) };
       send_response_with_length_prefix (
         stream,
         & tag_sexp_response (
