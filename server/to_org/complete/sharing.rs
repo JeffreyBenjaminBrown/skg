@@ -11,7 +11,6 @@ use crate::types::tree::viewnode_skgnode::{
   pids_for_subscriber_and_its_subscribees,
   pid_for_subscribee_and_its_subscriber_grandparent,
   unique_scaffold_child };
-use crate::types::memory::SkgNodeMap;
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::HashSet;
@@ -46,7 +45,6 @@ pub fn type_and_parent_type_consistent_with_subscribee (
 ///   a HiddenOutsideOfSubscribeeCol
 pub async fn maybe_add_subscribeeCol_branch (
   tree    : &mut Tree<ViewNode>,
-  map     : &mut SkgNodeMap,
   node_id : NodeId, // if applicable, this is the subscriber
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
@@ -68,7 +66,7 @@ pub async fn maybe_add_subscribeeCol_branch (
       tree, node_id, &Scaffold::SubscribeeCol )? . is_some ()
     { return Ok (( )); }}
   let ( subscriber_pid, subscribee_ids ) : ( ID, Vec < ID > ) =
-    pids_for_subscriber_and_its_subscribees ( tree, map, node_id ) ?;
+    pids_for_subscriber_and_its_subscribees ( tree, node_id, config ) ?;
   if subscribee_ids . is_empty () { // Skip because it would be empty.
     return Ok (( )); }
 
@@ -100,12 +98,12 @@ pub async fn maybe_add_subscribeeCol_branch (
           Scaffold::HiddenOutsideOfSubscribeeCol, false ) ?;
       for hidden_id in hidden_outside_content {
         append_indefinitive_from_disk_as_child (
-          tree, map, hidden_outside_col_nid, & hidden_id,
+          tree, hidden_outside_col_nid, & hidden_id,
           Birth::ContentOf, config, driver
         ) . await ?; }}
     for subscribee_id in subscribee_ids {
       append_indefinitive_from_disk_as_child (
-        tree, map, subscribee_col_nid, & subscribee_id,
+        tree, subscribee_col_nid, & subscribee_id,
         Birth::ContentOf, config, driver
       ) . await ?; }}
   Ok (( )) }
@@ -117,7 +115,6 @@ pub async fn maybe_add_subscribeeCol_branch (
 ///   subscriber -> SubsribeeCol -> Subscribee
 pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   tree              : &mut Tree<ViewNode>,
-  map               : &mut SkgNodeMap,
   subscribee_treeid : NodeId,
   config            : &SkgConfig,
   driver            : &TypeDBDriver,
@@ -132,7 +129,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   { return Ok (( )); }
   let ( subscribee_pid, subscriber_pid ) : ( ID, ID ) =
     pid_for_subscribee_and_its_subscriber_grandparent (
-      tree, map, subscribee_treeid ) ?;
+      tree, subscribee_treeid, config ) ?;
   let ( _visible, hidden_in_content )
     : ( HashSet < ID >, HashSet < ID > )
     = partition_subscribee_content_for_subscriber (
@@ -147,6 +144,6 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   for hidden_id in hidden_in_content {
     // populate the collection
     append_indefinitive_from_disk_as_child (
-      tree, map, hidden_col_nid, & hidden_id,
+      tree, hidden_col_nid, & hidden_id,
       Birth::ContentOf, config, driver ) . await ?; }
   Ok (( )) }

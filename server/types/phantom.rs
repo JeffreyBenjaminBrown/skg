@@ -1,31 +1,28 @@
 /// Utilities for phantom node lookup in git diff view.
 /// A phantom is a display-only placeholder for a removed node.
 
-use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
+use super::memory::skgnode_from_memory_or_disk;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 use super::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff};
 use super::misc::{ID, SkgConfig, SourceName};
-use super::nodes::complete::NodeComplete;
 
 /// Unified title lookup for phantom nodes.
-/// Lookup order: source_diffs deleted_nodes → map → disk → fallback.
+/// Lookup order: source_diffs deleted_nodes → memory/disk → fallback.
 pub fn title_for_phantom (
   id           : &ID,
   source       : &SourceName,
   source_diffs : Option<&HashMap<SourceName, SourceDiff>>,
-  map          : &HashMap<ID, NodeComplete>,
   config       : &SkgConfig,
 ) -> String {
   source_diffs
     . and_then( |diffs| diffs . get (source) )
     . and_then( |sd| sd . deleted_nodes . get (id) )
     . map( |n| n . title . clone() )
-    . or_else( || map . get (id) . map( |n| n . title . clone() ))
-    . or_else( || skgnode_from_pid_and_source(
-                    config, id . clone(), source )
+    . or_else( || skgnode_from_memory_or_disk (
+                    config, id, source )
                   . ok() . map( |n| n . title ) )
     . unwrap_or_else( || format!( "TITLE NOT FOUND for ID {}", id . 0 )) }
 

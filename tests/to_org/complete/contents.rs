@@ -2,8 +2,9 @@
 
 use skg::types::maps::add_v_to_map_if_absent;
 use skg::types::nodes::complete::{empty_node_complete, NodeComplete};
-use skg::types::memory::SkgNodeMap;
+
 use skg::types::misc::ID;
+use std::collections::HashMap;
 
 #[tokio::test]
 async fn test_add_v_to_map_if_absent_already_present() {
@@ -19,9 +20,7 @@ async fn test_add_v_to_map_if_absent_already_present() {
       .. empty_node_complete()
     };
 
-  let mut map :
-    SkgNodeMap =
-    SkgNodeMap::new();
+  let mut map : HashMap<ID, NodeComplete> = HashMap::new();
   map . insert(id . clone(), skgnode . clone());
 
   // Fetch function that would load from disk (not called since already cached)

@@ -323,23 +323,23 @@ fn collect_ids_from_subtree (
 /// Lookup a node's source by trying, in order:
 /// - sources_from_siblings
 /// - deleted_since_head_pid_src_map
-/// - map
-/// - disk (which, if used, updates the SkgnodeMap)
+/// - in-Rust memory (handles nodes created in this save that have
+///   no disk file yet)
+/// - disk (scan source directories for a matching .skg filename)
 pub fn find_source_many_ways (
   id                             : &ID,
   sources_from_siblings          : &HashMap<ID, SourceName>, // When 'find_source_many_ways' is called from a parent, the parent's child viewnodes can be scanned for IDs and put here. If that's not done and this is empty, the source will still probably be found.
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>, // built by deleted_ids_to_source
-  map                            : &mut SkgNodeMap,
   config                         : &SkgConfig,
 ) -> Result<SourceName, String> {
   if let Some (s) = sources_from_siblings . get (id)
     { return Ok ( s . clone () ); }
   if let Some (s) = deleted_since_head_pid_src_map . get (id)
     { return Ok ( s . clone () ); }
-
-  // PITFALL: The next eight lines, just to look up from the map or disk, looks overcomplex but is necessary. (1) map.get is needed for correctness, not just speed — if the node is in memory but its .skg file isn't on disk (e.g. newly created in this save), source_from_disk would fail, even though the answer is sitting in the map. (2) source_from_disk is needed because skgnode_from_map_or_disk requires a source parameter — it can't find the file without knowing which  source directory to look in. (3) The only genuine redundancy is that skgnode_from_map_or_disk re-checks map.contains_key(id) even though we just verified the node isn't there. That's harmless.
-  if let Some (s) = map . get (id) . map ( |n| n . source . clone () )
-    { return Ok (s); }
+  if let Some (( _pid, src )) =
+    snapshot_global ()
+      . as_deref () . and_then ( |g| g . pid_and_source (id) )
+    { return Ok (src); }
   let source : SourceName =
     source_from_disk ( id, config )
     . ok_or_else ( || format! (

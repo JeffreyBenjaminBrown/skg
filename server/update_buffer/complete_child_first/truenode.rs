@@ -2,7 +2,6 @@ use crate::to_org::expand::definitive::execute_view_requests;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest};
-use crate::types::memory::SkgNodeMap;
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -17,7 +16,6 @@ use typedb_driver::TypeDBDriver;
 pub async fn complete_truenode (
   node               : NodeId,
   tree               : &mut Tree<ViewNode>,
-  map                : &mut SkgNodeMap,
   visited            : &mut DefinitiveMap,
   config             : &SkgConfig,
   driver             : &TypeDBDriver,
@@ -33,7 +31,7 @@ pub async fn complete_truenode (
     extract_view_requests_definitive_first( tree, node ) ?;
   if requests . is_empty() { return Ok(( )); }
   execute_view_requests(
-    tree, map, requests, config, driver,
+    tree, requests, config, driver,
     visited, errors, deleted_since_head_pid_src_map ) . await ?;
   Ok(( )) }
 

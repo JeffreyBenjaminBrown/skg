@@ -9,8 +9,7 @@ pub use complete::complete_viewtree;
 pub use graphnodestats::set_graphnodestats_in_forest;
 pub use viewnodestats::set_viewnodestats_in_forest;
 
-use crate::dbs::filesystem::one_node::skgnode_from_pid_and_source;
-use crate::dbs::memory::scheduled_audit::prepend_audit_warning;
+use crate::dbs::memory::{memory_coherent_with_save_instructions, scheduled_audit::prepend_audit_warning};
 use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::serve::ConnectionState;
@@ -21,10 +20,8 @@ use crate::to_org::expand::backpath::insert_containerward_ancestry_tree_recursiv
 use crate::to_org::util::DefinitiveMap;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::memory::ViewUri;
-use crate::types::memory::{SkgNodeMap, skgnode_map_from_save_instructions};
 use crate::types::misc::{ID, SourceName, SkgConfig};
 use crate::types::save::{DefineNode, Merge, SaveNode};
-use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
 use crate::to_org::util::mark_view_roots_independent;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
@@ -49,27 +46,20 @@ pub async fn update_views_after_save (
   saved_view                  : Tree<ViewNode>,
   save_instructions           : Vec<DefineNode>,
   merge_instructions          : &[Merge],
-  saveview_skgnodes_pre_save  : SkgNodeMap,
   diff_mode_enabled           : bool,
   config                      : &SkgConfig,
   typedb_driver               : &TypeDBDriver,
   viewuri_from_request_result : &Result<ViewUri, String>,
   conn_state                  : &mut ConnectionState,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  let mut skgnode_map : SkgNodeMap = {
-    let mut it : SkgNodeMap =
-      skgnode_map_from_save_instructions (& save_instructions);
-    for (pid, skgnode) in saveview_skgnodes_pre_save {
-      it . entry (pid) // The 'or_insert_with' means user edits from skgnode_map_from_save_instructions are given priority.
-        . or_insert_with ( || skgnode ); }
-    it };
-  for m in merge_instructions {
-    // Reload acquirers from disk so the map reflects the post-merge .skg files.
-    let pid    : &ID         = &m . updated_acquirer . 0 . pid;
-    let source : &SourceName = &m . updated_acquirer . 0 . source;
-    let skgnode : NodeComplete = skgnode_from_pid_and_source (
-      config, pid . clone(), source ) ?;
-    skgnode_map . insert ( pid . clone(), skgnode ); }
+  // PITFALL: Memory must already reflect every Save and Delete in
+  // 'save_instructions' by the time this function runs. Violating
+  // this invariant (e.g. by reordering the save pipeline so that
+  // 'update_views_after_save' runs before 'apply_definenodes')
+  // would let the rerender read stale NodeCompletes from memory.
+  debug_assert! (
+    memory_coherent_with_save_instructions (&save_instructions) . is_ok (),
+    "update_views_after_save: in-Rust memory not coherent with save_instructions" );
   let source_diffs
     : Option<HashMap<SourceName, SourceDiff>>
     = if diff_mode_enabled
@@ -96,7 +86,6 @@ pub async fn update_views_after_save (
         "rerender_view (saved)" ). entered();
       rerender_view (
         &mut saved_view_mut,
-        &mut skgnode_map,
         &source_diffs,
         config,
         typedb_driver,
@@ -128,12 +117,11 @@ pub async fn update_views_after_save (
               "Collateral view {}: no viewforest found",
               curi . repr_in_client () ));
             continue; } };
-      let mut map : SkgNodeMap = SkgNodeMap::new ();
       match { let _span : tracing::span::EnteredSpan =
                 tracing::info_span!( "rerender_view (collateral)"
                 ). entered();
         rerender_view (
-          &mut forest, &mut map,
+          &mut forest,
           &source_diffs, config, typedb_driver,
           &mut errors, &deleted_since_head_pid_src_map,
           &deleted_by_this_save_pids,
@@ -185,7 +173,6 @@ fn find_collateral_view_uris (
 /// set graph/view stats, and render to string.
 pub async fn rerender_view (
   forest                         : &mut Tree<ViewNode>,
-  map                            : &mut SkgNodeMap,
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   config                         : &SkgConfig,
   typedb_driver                  : &TypeDBDriver,
@@ -202,19 +189,19 @@ pub async fn rerender_view (
   let mut defmap : DefinitiveMap = DefinitiveMap::new ();
   tracing::debug!("rerender_view: starting complete_viewtree");
   complete_viewtree (
-    forest, map, &mut defmap,
+    forest, &mut defmap,
     source_diffs, config, typedb_driver,
     errors, deleted_since_head_pid_src_map,
     deleted_by_this_save_pids,
     is_saved_view ) . await ?;
   mark_view_roots_independent (forest);
   attach_containerward_ancestries_to_removedhere_phantoms (
-    forest, map, config, typedb_driver ) . await ?;
+    forest, config, typedb_driver ) . await ?;
   tracing::debug!("rerender_view: complete_viewtree done ({:.3}s), starting graphnodestats",
             t_rerender . elapsed () . as_secs_f64 ());
   let ( container_to_contents, content_to_containers ) =
     set_graphnodestats_in_forest (
-      forest, map, config, typedb_driver ) . await ?;
+      forest, config, typedb_driver ) . await ?;
   tracing::debug!("rerender_view: graphnodestats done ({:.3}s), rendering to string",
             t_rerender . elapsed () . as_secs_f64 ());
   set_viewnodestats_in_forest (
@@ -331,7 +318,6 @@ pub fn clear_diff_metadata (
 /// Short-circuits when no RemovedHere phantoms exist.
 async fn attach_containerward_ancestries_to_removedhere_phantoms (
   forest        : &mut Tree<ViewNode>,
-  map           : &mut SkgNodeMap,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
@@ -361,6 +347,6 @@ async fn attach_containerward_ancestries_to_removedhere_phantoms (
         for child in children . iter () . rev () {
           insert_containerward_ancestry_tree_recursive (
             child, phantom_nid,
-            forest, map, config, typedb_driver
+            forest, config, typedb_driver
           ) . await ?; }} }}
   Ok (( )) }

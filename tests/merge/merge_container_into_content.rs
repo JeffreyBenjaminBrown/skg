@@ -22,7 +22,7 @@ use skg::test_utils::{run_with_test_db, graph_handle_from_config, audit_memory_o
 use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
 use skg::serve::ConnectionState;
 use skg::types::memory::SkgnodesInViews;
-use skg::types::memory::SkgNodeMap;
+
 use skg::dbs::memory::InRustGraphHandle;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex, SourceName};
 
@@ -68,7 +68,7 @@ async fn merge_container_into_content_impl (
   let response = update_from_and_rerender_buffer (
     &mut stream,
     input_org_text, driver, config, tantivy, false,
-    SkgNodeMap::new(),
+
     &Err ( String::new () ), &mut conn_state ) . await ?;
 
   println!("Rendered buffer after merge:\n{}", response . saved_view);

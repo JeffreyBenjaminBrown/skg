@@ -1,8 +1,8 @@
 use crate::types::git::{MembershipAxes, NodeChanges, Sign, SourceDiff, node_changes_for_truenode};
 use crate::types::list::Diff_Item;
-use crate::types::misc::{ID, SourceName};
+use crate::types::memory::skgnode_from_memory_or_disk;
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::memory::SkgNodeMap;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth};
 use crate::types::tree::generic::{pid_and_source_from_ancestor, read_at_ancestor_in_tree};
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, treat_certain_children};
@@ -28,9 +28,9 @@ use std::error::Error;
 /// - Order the final Alias children to match the order in 'aliases'
 pub fn completeAliasCol (
   tree             : &mut Tree<ViewNode>,
-  map              : &SkgNodeMap,
   aliascol_node_id : NodeId,
   source_diffs     : &Option<HashMap<SourceName, SourceDiff>>,
+  config           : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   { let is_aliascol : bool = // barf if not an aliascol
       read_at_ancestor_in_tree(
@@ -44,9 +44,10 @@ pub fn completeAliasCol (
     pid_and_source_from_ancestor(
       tree, aliascol_node_id, 1,
       "completeAliasCol" ) ?;
-  let parent_skgnode : &NodeComplete =
-    map . get (&parent_pid)
-    . ok_or ("completeAliasCol: Parent NodeComplete not in map")?;
+  let parent_skgnode : NodeComplete =
+    skgnode_from_memory_or_disk (
+      config, &parent_pid, &parent_source )
+    . map_err ( |_| "completeAliasCol: parent NodeComplete not found" ) ?;
   let node_changes : Option<&NodeChanges> =
     node_changes_for_truenode(
       source_diffs, &parent_pid, &parent_source );

@@ -1,8 +1,6 @@
 use crate::dbs::tantivy::title_and_source_by_id;
 use crate::dbs::typedb::ancestry::AncestryTree;
-use crate::types::memory::skgnode_from_map_or_disk;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
-use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Birth, mk_indefinitive_viewnode};
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
@@ -11,13 +9,11 @@ use std::collections::HashMap;
 /// Insert full containerward ancestry trees into the search forest,
 /// under each level-1 result TrueNode.
 /// Ancestry children are prepended (inserted first among siblings).
-/// Also populates the pool with SkgNodes for each ancestor node.
 pub(crate) fn insert_containerward_ancestries_into_search_view (
   forest         : &mut Tree<ViewNode>,
   search_results : &[ID],
   ancestry_by_id : &HashMap<ID, AncestryTree>,
   tantivy_index  : &TantivyIndex,
-  pool           : &mut HashMap<ID, NodeComplete>,
   config         : &SkgConfig,
 ) {
   // Search results ("hits") are level-1 BufferRoot children.
@@ -41,7 +37,7 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
           // the ancestry ends up first among siblings.
           insert_containerward_ancestry_tree (
             child, *node_nid,
-            forest, tantivy_index, pool, config ); } } } } }
+            forest, tantivy_index, config ); } } } } }
 
 /// Recursively insert an AncestryTree and its children
 /// as indefinitive non-content TrueNode children
@@ -51,21 +47,19 @@ fn insert_containerward_ancestry_tree(
   parent_nid    : NodeId,
   forest        : &mut Tree<ViewNode>,
   tantivy_index : &TantivyIndex,
-  pool          : &mut HashMap<ID, NodeComplete>,
   config        : &SkgConfig,
 ) {
   let child_nid : NodeId =
     prepend_containing_child_from_tantivy (
       node . id (), parent_nid,
-      forest, tantivy_index, pool, config );
+      forest, tantivy_index, config );
   if let AncestryTree::Inner ( _, children ) = node {
     for child in children {
       insert_containerward_ancestry_tree (
         child, child_nid,
-        forest, tantivy_index, pool, config ); } } }
+        forest, tantivy_index, config ); } } }
 
 /// Looks up a node's title and source from Tantivy,
-/// populates the NodeComplete pool, and
 /// prepends an indefinitive independent TrueNode child
 /// under the given parent.
 /// Returns the new child's NodeId.
@@ -74,16 +68,13 @@ fn prepend_containing_child_from_tantivy (
   parent_treeid : NodeId, // where to prepend
   forest        : &mut Tree<ViewNode>,
   tantivy_index : &TantivyIndex,
-  pool          : &mut HashMap<ID, NodeComplete>,
-  config        : &SkgConfig,
+  _config       : &SkgConfig,
 ) -> NodeId {
   let (title, source) : (String, SourceName) =
     title_and_source_by_id ( tantivy_index, node_id )
     . unwrap_or_else ( ||
       ( node_id . as_str () . to_string (),
         SourceName::from ("search") ) );
-  let _ = skgnode_from_map_or_disk ( // updates the map
-    node_id, &source, pool, config );
   let viewnode : ViewNode =
     mk_indefinitive_viewnode ( node_id . clone (), source, title,
                                Birth::ContainerOf );

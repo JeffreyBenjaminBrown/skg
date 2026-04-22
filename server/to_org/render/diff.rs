@@ -14,7 +14,6 @@ use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::title_for_phantom;
 use crate::types::memory::find_source_many_ways;
-use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, viewnode_from_scaffold, mk_phantom_viewnode };
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::types::tree::viewnode_skgnode::pid_and_source_from_treenode;
@@ -260,7 +259,6 @@ fn insert_phantoms_for_missing_contains (
   config             : &SkgConfig,
 ) -> Result<(), String> {
   let empty_children : HashMap<ID, SourceName> = HashMap::new();
-  let mut empty_map  : HashMap<ID, NodeComplete>    = HashMap::new();
   for (id, membership) in merged_contains {
     let has_negative : bool =
       membership . staged   == Some (Sign::Minus)
@@ -269,13 +267,13 @@ fn insert_phantoms_for_missing_contains (
     let child_source : SourceName =
       find_source_many_ways (
         id, &empty_children,
-        deleted_since_head_pid_src_map, &mut empty_map, config ) ?;
+        deleted_since_head_pid_src_map, config ) ?;
     let child_existence : ExistenceAxes =
       existence_axes_for_phantom (id, &child_source, source_diff, source_diffs);
     let child_title : String =
       title_for_phantom (
         id, &child_source,
-        Some (source_diffs), &empty_map, config );
+        Some (source_diffs), config );
     node_mut . prepend (
       mk_phantom_viewnode (
         id . clone (), child_source, child_title,

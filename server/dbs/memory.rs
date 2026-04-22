@@ -321,6 +321,36 @@ pub fn apply_definenodes (
         new_graph . nodes . remove (id); } } }
   graph . store ( Arc::new (new_graph) ); }
 
+/// Check that in-Rust memory reflects the expected post-apply state
+/// for a batch of save instructions: every Save's pid is present in
+/// memory, and every Delete's id is absent. Used as a 'debug_assert!'
+/// invariant guard at the top of 'update_views_after_save' to catch
+/// pipeline-ordering regressions (someone reshuffles the pipeline so
+/// rerender runs before 'apply_definenodes'). Returns Ok (()) on
+/// coherence, Err with the offending pid's detail otherwise. Never
+/// panics — the caller wraps in 'debug_assert!' so release builds pay
+/// no cost.
+pub fn memory_coherent_with_save_instructions (
+  save_instructions : &[DefineNode],
+) -> Result<(), String> {
+  let snap : Option<Arc<InRustGraph>> = snapshot_global ();
+  let graph : &InRustGraph = match snap . as_deref () {
+    Some (g) => g,
+    None     => return Ok (( )), }; // memory not yet initialized (tests); nothing to check
+  for instr in save_instructions {
+    match instr {
+      DefineNode::Save (SaveNode (node)) => {
+        if ! graph . nodes . contains_key (&node . pid) {
+          return Err ( format! (
+            "Save instruction pid {} absent from memory",
+            node . pid )); }}
+      DefineNode::Delete (DeleteNode { id, .. }) => {
+        if graph . nodes . contains_key (id) {
+          return Err ( format! (
+            "Delete instruction id {} still present in memory",
+            id )); }} } }
+  Ok (( )) }
+
 /// Server-wide handle to the shared graph. Readers call
 /// '.load_full()' to snap a consistent 'Arc<InRustGraph>'; writers
 /// build a new 'Arc<InRustGraph>' (using 'im''s cheap clone +

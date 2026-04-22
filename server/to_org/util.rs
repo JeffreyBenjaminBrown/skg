@@ -1,12 +1,12 @@
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
-use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
+use crate::types::memory::skgnode_from_memory_or_disk;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generations::collect_generation_ids;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
-use crate::types::tree::viewnode_skgnode::write_at_truenode_in_tree;
+use crate::types::tree::viewnode_skgnode::{pid_and_source_from_treenode, write_at_truenode_in_tree};
 use crate::types::viewnode::ViewRequest;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, Birth, forest_root_viewnode, mk_definitive_viewnode };
 
@@ -34,15 +34,13 @@ pub type DefinitiveMap =
 // Fetching, building and modifying SkgNodes and ViewNodes
 // ======================================================
 
-/// Fetch a NodeComplete from disk (resolves id→(pid,source) via
-/// 'pid_and_source_from_id', which reads the in-Rust memory — see
-/// that function for the TypeDB fallback, which is test-only).
-/// Make a ViewNode from it, with validated title. Return both.
+/// Fetch a NodeComplete from memory or disk. Resolves id→(pid,source)
+/// via 'pid_and_source_from_id', then reads. Makes a ViewNode with
+/// validated title. Returns both.
 pub async fn skgnode_and_viewnode_from_id (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   skgid  : &ID,
-  map    : &mut SkgNodeMap,
 ) -> Result < ( NodeComplete, ViewNode ), Box<dyn Error> > {
   let (pid_resolved, source) : (ID, SourceName) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -52,19 +50,17 @@ pub async fn skgnode_and_viewnode_from_id (
     . ok_or_else( || format!(
       "ID '{}' not found in database", skgid ))?;
   skgnode_and_viewnode_from_pid_and_source (
-    config, &pid_resolved, &source, map ) }
+    config, &pid_resolved, &source ) }
 
-/// Fetch a NodeComplete from disk given PID and source.
-/// Make an ViewNode from it, with validated title.
-/// Return both.
+/// Fetch a NodeComplete from memory or disk given PID and source.
+/// Makes an ViewNode with validated title. Returns both.
 pub(super) fn skgnode_and_viewnode_from_pid_and_source (
   config : &SkgConfig,
   pid    : &ID,
   source : &SourceName,
-  map    : &mut SkgNodeMap,
 ) -> Result < ( NodeComplete, ViewNode ), Box<dyn Error> > {
-  let skgnode : &NodeComplete =
-    skgnode_from_map_or_disk( pid, source, map, config )?;
+  let skgnode : NodeComplete =
+    skgnode_from_memory_or_disk ( config, pid, source )?;
   let title : String = skgnode . title . replace ( '\n', " " );
   if title . is_empty () {
     return Err ( Box::new ( io::Error::new (
@@ -76,13 +72,12 @@ pub(super) fn skgnode_and_viewnode_from_pid_and_source (
     source . clone (),
     title,
     skgnode . body . clone () );
-  Ok (( skgnode . clone (), viewnode )) }
+  Ok (( skgnode, viewnode )) }
 
 /// Set node to indefinitive,
 /// and reset title and source.
 pub(super) fn makeIndefinitiveAndClobber (
   tree    : &mut Tree<ViewNode>,
-  map     : &mut SkgNodeMap,
   node_id : NodeId,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
@@ -90,7 +85,7 @@ pub(super) fn makeIndefinitiveAndClobber (
     tree, node_id,
     |t| { t . indef_or_def = IndefOrDef::Indefinitive; }
     ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  clobberIndefinitiveViewnode ( tree, map, node_id, config ) ?;
+  clobberIndefinitiveViewnode ( tree, node_id, config ) ?;
   Ok (( )) }
 
 /// This function's callers add a pristine, out-of-context
@@ -102,7 +97,6 @@ pub(super) fn makeIndefinitiveAndClobber (
 /// - build a subscribee branch if needed
 pub async fn complete_branch_minus_content (
   tree     : &mut Tree<ViewNode>,
-  map      : &mut SkgNodeMap,
   node_id  : NodeId,
   visited  : &mut DefinitiveMap,
   config   : &SkgConfig,
@@ -113,11 +107,11 @@ pub async fn complete_branch_minus_content (
     tree, node_id, visited ) ?;
   if truenode_in_tree_is_indefinitive ( tree, node_id )?
   { clobberIndefinitiveViewnode (
-      tree, map, node_id, config ) ?; }
+      tree, node_id, config ) ?; }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "maybe_add_subscribeeCol_branch" ). entered();
     maybe_add_subscribeeCol_branch (
-      tree, map, node_id, config, driver ) . await } ?;
+      tree, node_id, config, driver ) . await } ?;
   Ok (( )) }
 
 /// Does only what it says -- in particular,
@@ -173,18 +167,16 @@ pub async fn stub_forest_from_root_ids (
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
   visited  : &mut DefinitiveMap,
-) -> Result < (Tree<ViewNode>, SkgNodeMap), Box<dyn Error> > {
+) -> Result < Tree<ViewNode>, Box<dyn Error> > {
   let mut forest : Tree<ViewNode> = Tree::new ( forest_root_viewnode () );
-  let mut map : SkgNodeMap = SkgNodeMap::new ();
   let forest_root_treeid : NodeId = forest . root () . id ();
   for root_skgid in root_skgids {
     build_node_branch_minus_content (
       Some ( (&mut forest, forest_root_treeid) ),
-      Some (&mut map),
       root_skgid, config, driver, visited
     ) . await ?; }
   mark_view_roots_independent ( &mut forest );
-  Ok ( (forest, map) ) }
+  Ok (forest) }
 
 /// Mark direct TrueNode children of BufferRoot as birth=Independent.
 /// View roots are not rendered because of a parent relationship;
@@ -266,7 +258,6 @@ pub fn get_id_from_treenode (
 /// 'build_node_branch_minus_content.
 pub async fn make_and_append_child_pair (
   tree          : &mut Tree<ViewNode>,
-  map           : &mut SkgNodeMap,
   parent_treeid : NodeId, // will parent the new node
   child_skgid   : &ID, // how to find the new node
   config         : &SkgConfig,
@@ -275,7 +266,7 @@ pub async fn make_and_append_child_pair (
               Box<dyn Error> > {
   let (_child_skgnode, child_viewnode) : (NodeComplete, ViewNode) =
     skgnode_and_viewnode_from_id (
-      config, driver, child_skgid, map ) . await ?;
+      config, driver, child_skgid ) . await ?;
   let child_treeid : NodeId =
     with_node_mut ( // append child
       tree, parent_treeid,
@@ -287,13 +278,10 @@ pub async fn make_and_append_child_pair (
 /// Builds a node from disk, place it in a tree,
 /// complete the branch it implies except for 'content' descendents,
 /// and return the NodeId of the branch root.
-/// - If tree_and_parent is None and map is None:
-///   creates new tree (but doesn't return it)
-/// - If tree_and_parent is Some and map is Some:
-///   appends to tree
+/// - If tree_and_parent is None, creates a new tree (not returned).
+/// - If tree_and_parent is Some, appends to the existing tree.
 pub async fn build_node_branch_minus_content (
   tree_and_parent : Option<(&mut Tree<ViewNode>, NodeId)>, // if modifying an existing tree, attach as a child here
-  map             : Option<&mut SkgNodeMap>,
   skgid           : &ID, // what to fetch
   config          : &SkgConfig,
   driver          : &TypeDBDriver,
@@ -301,11 +289,11 @@ pub async fn build_node_branch_minus_content (
 ) -> Result < NodeId, Box<dyn Error> > {
   let t0 : std::time::Instant = std::time::Instant::now();
   let result : Result < NodeId, Box<dyn Error> > =
-    match (tree_and_parent, map) {
-      (Some ( (tree, parent_treeid) ), Some (map)) => {
+    match tree_and_parent {
+      Some ( (tree, parent_treeid) ) => {
         let (_skgnode, viewnode) : (NodeComplete, ViewNode) =
           skgnode_and_viewnode_from_id (
-            config, driver, skgid, map ) . await ?;
+            config, driver, skgid ) . await ?;
         let child_treeid : NodeId = // Add ViewNode to tree
           with_node_mut (
             tree, parent_treeid,
@@ -313,23 +301,20 @@ pub async fn build_node_branch_minus_content (
               parent_mut . append (viewnode) . id () ))
           . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
         complete_branch_minus_content (
-          tree, map, child_treeid, visited,
+          tree, child_treeid, visited,
           config, driver ) . await ?;
         Ok (child_treeid) },
-      (None, None) => {
-        let mut map : SkgNodeMap =
-          SkgNodeMap::new ();
+      None => {
         let (_skgnode, viewnode) : (NodeComplete, ViewNode) =
           skgnode_and_viewnode_from_id (
-            config, driver, skgid, &mut map ) . await ?;
+            config, driver, skgid ) . await ?;
         let mut tree : Tree<ViewNode> =
           Tree::new (viewnode);
         let root_treeid : NodeId = tree . root () . id ();
         complete_branch_minus_content (
-          &mut tree, &mut map, root_treeid, visited,
+          &mut tree, root_treeid, visited,
           config, driver ) . await ?;
         Ok (root_treeid) },
-      _ => Err("build_node_branch_minus_content: tree_and_parent and map must both be Some or both be None" . into()),
     };
   tracing::info!("{}: {:.3}s",
                  format! ("build_node_branch_minus_content({})", skgid),
@@ -341,16 +326,17 @@ pub async fn build_node_branch_minus_content (
 /// Errors if passed a Scaffold.
 pub(super) fn content_ids_if_definitive_else_empty (
   tree   : &Tree<ViewNode>,
-  map    : &SkgNodeMap,
   treeid : NodeId,
+  config : &SkgConfig,
 ) -> Result < Vec < ID >, Box<dyn Error> > {
   if truenode_in_tree_is_indefinitive ( tree, treeid ) ? {
     return Ok ( Vec::new () ); }
-  let node_id : ID =
-    match get_id_from_treenode ( tree, treeid ) {
-      Ok (id) => id,
+  let (pid, source) : (ID, SourceName) =
+    match pid_and_source_from_treenode (
+      tree, treeid, "content_ids_if_definitive_else_empty" ) {
+      Ok (p) => p,
       Err (_) => return Ok ( Vec::new () ), };
-  Ok ( map . get (&node_id)
+  Ok ( skgnode_from_memory_or_disk ( config, &pid, &source )
     . map ( |skgnode| skgnode . contains . clone () )
     . unwrap_or_default () ) }
 

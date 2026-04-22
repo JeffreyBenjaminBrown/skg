@@ -8,7 +8,7 @@ use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID};
-use skg::types::memory::SkgNodeMap;
+
 use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::nodes::complete::NodeComplete;
 use futures::executor::block_on;
@@ -63,7 +63,7 @@ fn test_subscribee_col_appears_for_subscribers(
     let db_name = "skg-test-subscribee-col";
     let (config, driver) =
       setup_multi_source_test (db_name) . await?;
-    let (result, _map, _pids, _) : (String, SkgNodeMap, Vec<ID>, _) =
+    let (result, _pids, _) : (String, Vec<ID>, _) =
       single_root_view( &driver, &config, &ID("1" . to_string()), false
                       ) . await?;
     println!("SubscribeeCol test result:\n{}", result);

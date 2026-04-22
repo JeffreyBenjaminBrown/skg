@@ -66,10 +66,6 @@ pub fn handle_save_buffer_request (
 ) {
   let viewuri_from_request_result : Result<ViewUri, String> =
     view_uri_from_request (request);
-  let saveview_skgnodes_pre_save : SkgNodeMap =
-    // Per-request transactional shadow. The save pipeline populates
-    // it lazily from in-Rust memory / disk as it reads each node.
-    SkgNodeMap::new ();
   match read_length_prefixed_content (reader) {
     Ok (initial_buffer_content) => {
       { // Send early lock message before the expensive pipeline.
@@ -89,7 +85,6 @@ pub fn handle_save_buffer_request (
             & initial_buffer_content,
             typedb_driver, config, tantivy_index,
             conn_state . diff_mode_enabled,
-            saveview_skgnodes_pre_save,
             &viewuri_from_request_result,
             conn_state ))
         { Ok (save_response) => {
@@ -154,7 +149,6 @@ pub async fn update_from_and_rerender_buffer (
   config                      : &SkgConfig,
   tantivy_index               : &mut TantivyIndex,
   diff_mode_enabled           : bool,
-  saveview_skgnodes_pre_save  : SkgNodeMap,
   viewuri_from_request_result : &Result<ViewUri, String>,
   conn_state                  : &mut ConnectionState,
 ) -> Result<SaveResponse, Box<dyn Error>> {
@@ -170,8 +164,7 @@ pub async fn update_from_and_rerender_buffer (
             "buffer_to_viewnode_forest_and_save_instructions"
           ) . entered();
         buffer_to_viewnode_forest_and_save_instructions (
-          org_buffer_text, config, typedb_driver,
-          &saveview_skgnodes_pre_save ) . await
+          org_buffer_text, config, typedb_driver ) . await
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
   if forest . root() . children() . next() . is_none()
@@ -215,7 +208,6 @@ pub async fn update_from_and_rerender_buffer (
     forest,
     save_instructions,
     &merge_instructions,
-    saveview_skgnodes_pre_save,
     diff_mode_enabled,
     config,
     typedb_driver,

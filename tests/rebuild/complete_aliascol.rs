@@ -10,7 +10,6 @@ use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::viewnode::ViewNode;
 use skg::types::misc::SkgConfig;
-use skg::types::memory::{SkgNodeMap, skgnode_map_from_forest};
 use skg::types::misc::SourceName;
 use skg::types::git::SourceDiff;
 
@@ -54,8 +53,6 @@ async fn test_completeAliasCol_logic (
     org_to_uninterpreted_nodes (org_text) ?. 0;
   let mut forest : Tree < ViewNode > =
     unchecked_to_checked_tree (unchecked_forest) ?;
-  let mut map : SkgNodeMap =
-    skgnode_map_from_forest ( & forest, config, driver ) . await ?;
 
   // Get the first "tree root" (node "a" and its children)
   let tree_a_id : NodeId =
@@ -75,12 +72,7 @@ async fn test_completeAliasCol_logic (
   };
 
   // Test 1: First AliasCol should have b and c (deduped, valid only, disk order)
-  completeAliasCol (
-    &mut forest,
-    &mut map,
-    aliascol_1_id,
-    &source_diffs
-  )?;
+  completeAliasCol ( &mut forest, aliascol_1_id, &source_diffs, config )?;
 
   {
     let aliascol_1_ref =
@@ -108,12 +100,7 @@ async fn test_completeAliasCol_logic (
   }
 
   // Test 2: Second AliasCol should have b and c, and gain focus
-  completeAliasCol (
-    &mut forest,
-    &mut map,
-    aliascol_2_id,
-    &source_diffs
-  )?;
+  completeAliasCol ( &mut forest, aliascol_2_id, &source_diffs, config )?;
 
   {
     let aliascol_2_ref =
@@ -155,9 +142,9 @@ async fn test_completeAliasCol_logic (
   let result : Result < (), Box<dyn Error> > =
     completeAliasCol (
       &mut forest,
-      &mut map,
       aliascol_3_id,
-      &source_diffs
+      &source_diffs,
+      config
     );
 
   assert! (
@@ -200,8 +187,6 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
     org_to_uninterpreted_nodes (org_text) ?. 0;
   let mut forest : Tree < ViewNode > =
     unchecked_to_checked_tree (unchecked_forest) ?;
-  let mut map : SkgNodeMap =
-    skgnode_map_from_forest ( & forest, config, driver ) . await ?;
 
   let tree_root_id : NodeId =
     forest . root () . first_child () . unwrap () . id ();
@@ -222,9 +207,9 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   // Test first AliasCol
   completeAliasCol (
     &mut forest,
-    &mut map,
     first_aliascol_id,
-    &source_diffs
+    &source_diffs,
+    config
   )?;
 
   {
@@ -268,9 +253,9 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   // Test second AliasCol
   completeAliasCol (
     &mut forest,
-    &mut map,
     second_aliascol_id,
-    &source_diffs
+    &source_diffs,
+    config
   )?;
 
   {

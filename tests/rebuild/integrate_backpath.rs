@@ -9,7 +9,7 @@ use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::viewnode::{ViewNode, ViewNodeKind, Birth};
-use skg::types::memory::SkgNodeMap;
+
 use skg::org_to_text::viewnode_forest_to_string;
 
 use ego_tree::{NodeId,Tree};
@@ -59,9 +59,9 @@ async fn test_path_with_cycle_impl(
   let cycle_nodes = HashSet::from([ID::from ("1")]);
 
   // Integrate the path
-  let mut map : SkgNodeMap = SkgNodeMap::new();
+  
   integrate_path_that_might_fork_or_cycle(
-    &mut forest, &mut map, root_id, path, branches,
+    &mut forest, root_id, path, branches,
     cycle_nodes, &config, driver, Birth::ContainerOf
   ). await?;
 
@@ -138,9 +138,9 @@ async fn test_path_with_branches_no_cycle_impl(
   let cycle_nodes = HashSet::new();
 
   // Integrate the path
-  let mut map : SkgNodeMap = SkgNodeMap::new();
+  
   integrate_path_that_might_fork_or_cycle(
-    &mut forest, &mut map, node_1_id, path, branches,
+    &mut forest, node_1_id, path, branches,
     cycle_nodes, &config, driver, Birth::ContainerOf
   ). await?;
 
@@ -220,9 +220,9 @@ async fn test_path_with_branches_with_cycle_impl(
   let cycle_nodes = HashSet::from([ID::from ("1")]);
 
   // Integrate the path
-  let mut map : SkgNodeMap = SkgNodeMap::new();
+  
   integrate_path_that_might_fork_or_cycle(
-    &mut forest, &mut map, node_1_id, path, branches,
+    &mut forest, node_1_id, path, branches,
     cycle_nodes, &config, driver, Birth::ContainerOf
   ). await?;
 
@@ -276,9 +276,9 @@ async fn test_fork_expansion_at_origin_impl(
     unchecked_to_checked_tree (unchecked_forest)?;
   let node_a11_id : NodeId =
     forest . root () . first_child () . unwrap () . id ();
-  let mut map : SkgNodeMap = SkgNodeMap::new();
+  
   build_and_integrate_containerward_path (
-    &mut forest, &mut map, node_a11_id, &config, driver
+    &mut forest, node_a11_id, &config, driver
   ) . await ?;
   // Expected: a11 gets two children (a1 and a2).
   // Under a1: branches {a, a1} (sorted: a first, then a1).

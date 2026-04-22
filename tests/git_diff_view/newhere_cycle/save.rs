@@ -23,7 +23,7 @@ fn test_newhere_cycle_survives_save()
 
     // First render the initial view (view pipeline — known to work).
     let root_ids = vec![ID("1" . to_string())];
-    let (initial_view, _map, _pids, _) : (String, SkgNodeMap, Vec<ID>, _) =
+    let (initial_view, _pids, _) : (String, Vec<ID>, _) =
       multi_root_view(&driver, &config, &root_ids, true) . await?;
 
     // Round-trip through the save pipeline.
@@ -34,7 +34,7 @@ fn test_newhere_cycle_survives_save()
     let (mut stream, _) = mk_test_tcp_stream_pair ();
     let response = update_from_and_rerender_buffer(
       &mut stream,
-      &initial_view, &driver, &config, &mut tantivy, true, SkgNodeMap::new(),
+      &initial_view, &driver, &config, &mut tantivy, true,
       &Err ( String::new () ), &mut conn_state ) . await?;
 
     assert_buffer_contains( &response . saved_view,

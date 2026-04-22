@@ -33,7 +33,7 @@ use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::SkgConfig;
 use skg::types::viewnode::{ViewNode, ViewNodeKind, Birth};
-use skg::types::memory::SkgNodeMap;
+
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
@@ -89,11 +89,10 @@ async fn test_sourceward_ancestry_impl (
     unchecked_to_checked_tree (unchecked_forest) ?;
   let node_a : NodeId =
     forest . root () . first_child () . unwrap () . id ();
-  let mut map : SkgNodeMap = SkgNodeMap::new ();
 
   // Request sourceward expansion from "a".
   build_and_integrate_sourceward_path (
-    &mut forest, &mut map, node_a, config, driver
+    &mut forest, node_a, config, driver
   ) . await ?;
 
   // --- a should have exactly 2 LinksTo children: b and d ---

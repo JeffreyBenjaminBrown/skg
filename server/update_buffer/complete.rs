@@ -7,7 +7,6 @@
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::git::SourceDiff;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, ScaffoldKind};
-use crate::types::memory::SkgNodeMap;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 
@@ -20,7 +19,6 @@ use typedb_driver::TypeDBDriver;
 
 pub async fn complete_viewtree (
   forest             : &mut Tree<ViewNode>,
-  map                : &mut SkgNodeMap,
   defmap             : &mut DefinitiveMap,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
@@ -33,20 +31,19 @@ pub async fn complete_viewtree (
   let root_treeid : NodeId = forest . root () . id ();
   complete_preorder_recursive (
     forest, root_treeid,
-    map, defmap, source_diffs, config, driver,
+    defmap, source_diffs, config, driver,
     deleted_since_head_pid_src_map,
     deleted_by_this_save_pids,
     is_saved_view ) . await ?;
   complete_postorder_recursive (
     forest, root_treeid,
-    map, defmap, source_diffs, config, driver,
+    defmap, source_diffs, config, driver,
     errors, deleted_since_head_pid_src_map ) . await ?;
   Ok(( )) }
 
 fn complete_preorder_recursive<'a> (
   tree               : &'a mut Tree<ViewNode>,
   treeid             : NodeId,
-  map                : &'a mut SkgNodeMap,
   defmap             : &'a mut DefinitiveMap,
   source_diffs       : &'a Option<HashMap<SourceName, SourceDiff>>,
   config             : &'a SkgConfig,
@@ -58,7 +55,7 @@ fn complete_preorder_recursive<'a> (
   // See the 'MANUAL RECURSION' comment at the top of this file.
   Box::pin ( async move {
     complete_preorder_with_limited_recursion (
-      tree, treeid, map, defmap, source_diffs, config, driver,
+      tree, treeid, defmap, source_diffs, config, driver,
       deleted_since_head_pid_src_map, deleted_by_this_save_pids,
       is_saved_view
     ) . await ?;
@@ -68,7 +65,7 @@ fn complete_preorder_recursive<'a> (
     for child_treeid in child_treeids {
       complete_preorder_recursive (
         tree, child_treeid,
-        map, defmap, source_diffs, config, driver,
+        defmap, source_diffs, config, driver,
         deleted_since_head_pid_src_map, deleted_by_this_save_pids,
         is_saved_view
       ) . await ?; }
@@ -77,7 +74,6 @@ fn complete_preorder_recursive<'a> (
 fn complete_postorder_recursive<'a> (
   tree               : &'a mut Tree<ViewNode>,
   treeid             : NodeId,
-  map                : &'a mut SkgNodeMap,
   defmap             : &'a mut DefinitiveMap,
   source_diffs       : &'a Option<HashMap<SourceName, SourceDiff>>,
   config             : &'a SkgConfig,
@@ -93,11 +89,11 @@ fn complete_postorder_recursive<'a> (
     for child_treeid in child_treeids {
       complete_postorder_recursive (
         tree, child_treeid,
-        map, defmap, source_diffs, config, driver,
+        defmap, source_diffs, config, driver,
         errors, deleted_since_head_pid_src_map
       ) . await ?; }
     complete_postorder_with_limited_recursion (
-      tree, treeid, map, defmap, source_diffs, config, driver,
+      tree, treeid, defmap, source_diffs, config, driver,
       errors, deleted_since_head_pid_src_map
     ) . await ?;
     Ok(( )) }) }
@@ -108,7 +104,6 @@ fn complete_postorder_recursive<'a> (
 async fn complete_preorder_with_limited_recursion (
   tree               : &mut Tree<ViewNode>,
   treeid             : NodeId,
-  map                : &mut SkgNodeMap,
   defmap             : &mut DefinitiveMap,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
@@ -135,14 +130,14 @@ async fn complete_preorder_with_limited_recursion (
   if matches!( kind, ViewNodeKind::True (_)) {
     super::complete_parent_first::truenode::
     complete_truenode_preorder (
-      treeid, tree, map, defmap, source_diffs, config,
+      treeid, tree, defmap, source_diffs, config,
       deleted_since_head_pid_src_map, deleted_by_this_save_pids,
       is_saved_view ) ?;
   } else if matches!( kind,
       ViewNodeKind::Scaff (Scaffold::SubscribeeCol) ) {
         super::complete_parent_first::subscribee_col::
         complete_subscribee_col_preorder (
-          treeid, tree, map, source_diffs, config, driver,
+          treeid, tree, source_diffs, config, driver,
           deleted_since_head_pid_src_map
         ) . await ?; }
   // No-op for: Deleted, DeletedScaff (whose parent is not
@@ -156,7 +151,6 @@ async fn complete_preorder_with_limited_recursion (
 async fn complete_postorder_with_limited_recursion (
   tree               : &mut Tree<ViewNode>,
   treeid             : NodeId,
-  map                : &mut SkgNodeMap,
   defmap             : &mut DefinitiveMap,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
@@ -169,27 +163,27 @@ async fn complete_postorder_with_limited_recursion (
   if matches!( kind, ViewNodeKind::True (_)) {
     super::complete_child_first::truenode::
     complete_truenode (
-      treeid, tree, map, defmap, config, driver,
+      treeid, tree, defmap, config, driver,
       errors, deleted_since_head_pid_src_map ) . await ?;
   } else if matches!(
     kind, ViewNodeKind::Scaff (Scaffold::AliasCol)) {
       super::complete_child_first::aliascol::
-      completeAliasCol ( tree, map, treeid, source_diffs ) ?;
+      completeAliasCol ( tree, treeid, source_diffs, config ) ?;
   } else if matches!(
       kind, ViewNodeKind::Scaff (Scaffold::IDCol)) {
         super::complete_child_first::id_col::
-        completeIDCol ( treeid, tree, map, source_diffs ) ?;
+        completeIDCol ( treeid, tree, source_diffs, config ) ?;
   } else if matches!(
     kind, ViewNodeKind::Scaff (Scaffold::HiddenInSubscribeeCol)) {
       super::complete_child_first::hiddeninsubscribee_col::
       complete_hiddeninsubscribee_col (
-        treeid, tree, map, source_diffs, config,
+        treeid, tree, source_diffs, config,
         deleted_since_head_pid_src_map ) ?;
   } else if matches!( kind,
       ViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol)) {
         super::complete_child_first::hiddenoutsideof_subscribeecol::
         complete_hiddenoutsideofsubscribeecol (
-          treeid, tree, map, source_diffs, config,
+          treeid, tree, source_diffs, config,
           deleted_since_head_pid_src_map ) ?;
   } else if matches!( kind, ViewNodeKind::Deleted (_)) { // no-op
   } else if matches!( kind, ViewNodeKind::DeletedScaff (_) ) {

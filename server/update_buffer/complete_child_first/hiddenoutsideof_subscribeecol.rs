@@ -4,9 +4,8 @@ use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff, NodeChanges, 
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
-use crate::types::memory::find_source_many_ways;
+use crate::types::memory::{find_source_many_ways, skgnode_from_memory_or_disk};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::memory::SkgNodeMap;
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, write_at_ancestor_in_tree, with_node_mut};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth, mk_indefinitive_viewnode};
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, treat_certain_children, subtree_satisfies};
@@ -36,7 +35,6 @@ struct HiddenChildData {
 pub fn complete_hiddenoutsideofsubscribeecol (
   node               : NodeId,
   tree               : &mut Tree<ViewNode>,
-  map                : &mut SkgNodeMap,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
@@ -63,10 +61,9 @@ pub fn complete_hiddenoutsideofsubscribeecol (
     pid_and_source_from_ancestor(
       tree, node, 2,
       "complete_hiddenoutsideofsubscribeecol" ) ?;
-  let wt_subscriber_skgnode : &NodeComplete =
-    map . get (&subscriber_pid)
-    . ok_or( "complete_hiddenoutsideofsubscribeecol: \
-             subscriber NodeComplete not in map" ) ?;
+  let wt_subscriber_skgnode : NodeComplete =
+    skgnode_from_memory_or_disk (
+      config, &subscriber_pid, &subscriber_source ) ?;
   let wt_subscriber_hides : Vec<ID> =
     wt_subscriber_skgnode . hides_from_its_subscriptions
       . or_default() . to_vec();
@@ -76,8 +73,14 @@ pub fn complete_hiddenoutsideofsubscribeecol (
   let wt_all_subscribee_content : HashSet<ID> =
     // everything contained by any subscribee
     wt_subscribees . iter()
-      . filter_map( |pid| map . get (pid) )
-      . flat_map( |skg| skg . contains . iter() . cloned() )
+      . flat_map ( |pid| {
+        match snapshot_global_source (pid, config) {
+          Some (src) =>
+            skgnode_from_memory_or_disk ( config, pid, &src )
+              . ok ()
+              . map ( |skg| skg . contains )
+              . unwrap_or_default (),
+          None => Vec::new () } } )
       . collect();
   let wt_content : Vec<ID> =
     // what the subscriber hides that no subscribee contains
@@ -100,8 +103,8 @@ pub fn complete_hiddenoutsideofsubscribeecol (
                               . into_vec() ))
               . unwrap_or_default();
         let head_all_subscribee_content : HashSet<ID> =
-          head_subscribee_contains_from_map_and_diffs(
-            &head_subscribees, map, source_diffs );
+          head_subscribee_contains_from_memory_and_diffs(
+            &head_subscribees, source_diffs, config );
         let head_content : Vec<ID> =
           head_subscriber_hides . iter()
             . filter( |id| !head_all_subscribee_content . contains (id) )
@@ -112,7 +115,7 @@ pub fn complete_hiddenoutsideofsubscribeecol (
   let child_data : HashMap<ID, HiddenChildData> = // Pre-compute this, so that the create_child closure captures only owned data and does not conflict with the &mut Tree borrow in complete_relevant_children_in_viewnodetree.
     build_hidden_child_data(
       tree, node, &goal_list, &removed_ids,
-      source_diffs, map, deleted_since_head_pid_src_map, config ) ?;
+      source_diffs, deleted_since_head_pid_src_map, config ) ?;
   complete_relevant_children_in_viewnodetree(
     tree, node,
     |vn : &ViewNode| matches!( &vn . kind,
@@ -168,20 +171,20 @@ pub fn complete_hiddenoutsideofsubscribeecol (
 
 /// From HEAD, compute the union of some subscribees' content.
 /// For each subscribee pid:
-/// - Look up its source from the map. If missing, skip.
+/// - Look up its source from memory. If missing, skip.
 /// - Get node_changes via node_changes_for_truenode. If present,
 ///     HEAD contains = Unchanged + Removed items from contains_diff.
-///   If absent, HEAD = worktree, so use contains from the map.
-fn head_subscribee_contains_from_map_and_diffs (
+///   If absent, HEAD = worktree, so read contains from memory/disk.
+fn head_subscribee_contains_from_memory_and_diffs (
   head_subscribees : &[ID],
-  map              : &SkgNodeMap,
   source_diffs     : &Option<HashMap<SourceName, SourceDiff>>,
+  config           : &SkgConfig,
 ) -> HashSet<ID> {
   let mut result : HashSet<ID> = HashSet::new();
   for pid in head_subscribees {
     let subscribee_source : SourceName =
-      match map . get (pid) {
-        Some (skg) => skg . source . clone(),
+      match snapshot_global_source (pid, config) {
+        Some (s) => s,
         None => continue };
     let nc : Option<&NodeChanges> =
       node_changes_for_truenode(
@@ -195,10 +198,25 @@ fn head_subscribee_contains_from_map_and_diffs (
                 { result . insert( id . clone() ); },
             Diff_Item::New (_) => {} } } },
       None => {
-        if let Some (skg) = map . get (pid) {
-          for id in skg . contains . iter() . cloned() {
+        if let Ok (skg) = skgnode_from_memory_or_disk (
+          config, pid, &subscribee_source )
+        { for id in skg . contains . into_iter () {
             result . insert (id); } } } } }
   result }
+
+/// Resolve a node's source: try the in-Rust memory snapshot first, fall back
+/// to scanning source directories for the matching '.skg' file. Tests that
+/// bypass 'init_global_handle' rely on the disk fallback.
+fn snapshot_global_source (
+  pid    : &ID,
+  config : &SkgConfig,
+) -> Option<SourceName> {
+  if let Some (s) =
+    crate::dbs::memory::snapshot_global ()
+      . as_deref ()
+      . and_then ( |g| g . pid_and_source (pid) . map ( |(_, s)| s ) )
+  { return Some (s); }
+  crate::types::phantom::source_from_disk (pid, config) }
 
 /// Build a map from child ID to HiddenChildData.
 /// For each ID in goal_list, pre-compute the source, title, and
@@ -211,7 +229,6 @@ fn build_hidden_child_data (
   goal_list          : &[ID],
   removed_ids        : &HashSet<ID>,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
-  map                : &mut SkgNodeMap,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
 ) -> Result<HashMap<ID, HiddenChildData>, Box<dyn Error>> {
@@ -236,13 +253,13 @@ fn build_hidden_child_data (
       let child_src : SourceName =
         find_source_many_ways(
           child_skgid, &child_sources,
-          deleted_since_head_pid_src_map, map, config )
+          deleted_since_head_pid_src_map, config )
         . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
       let axes : (ExistenceAxes, MembershipAxes) =
         phantom_axes ( child_skgid, &child_src, source_diffs . as_ref() );
       let child_title : String =
         title_for_phantom( child_skgid, &child_src,
-                           source_diffs . as_ref(), map, config );
+                           source_diffs . as_ref(), config );
       result . insert( child_skgid . clone(),
                      HiddenChildData { source: child_src,
                                        title: child_title,
@@ -253,14 +270,16 @@ fn build_hidden_child_data (
                        HiddenChildData { source: s . clone(),
                                          title: t . clone(),
                                          phantom: None } );
-      } else if let Some (skg) = map . get (child_skgid) {
+      } else {
+        let child_src : SourceName =
+          find_source_many_ways (
+            child_skgid, &child_sources,
+            deleted_since_head_pid_src_map, config )
+          . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+        let skg : NodeComplete = skgnode_from_memory_or_disk (
+          config, child_skgid, &child_src ) ?;
         result . insert( child_skgid . clone(),
                        HiddenChildData { source: skg . source . clone(),
                                          title: skg . title . clone(),
-                                         phantom: None } );
-      } else {
-        return Err( format!(
-          "build_hidden_child_data: \
-           child {} not found in children or map",
-          child_skgid . 0 ) . into() ); } } }
+                                         phantom: None } ); } } }
   Ok (result) }

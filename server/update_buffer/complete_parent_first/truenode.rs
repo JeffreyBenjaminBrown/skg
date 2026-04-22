@@ -8,7 +8,7 @@ use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::types::memory::find_source_many_ways;
 use crate::types::nodes::complete::NodeComplete;
 use crate::git_ops::read_repo::skgnode_from_git_head;
-use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
+use crate::types::memory::skgnode_from_memory_or_disk;
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, Scaffold, DeletedNode, IndefOrDef,
@@ -63,7 +63,6 @@ struct ChildData {
 pub fn complete_truenode_preorder (
   node               : NodeId,
   tree               : &mut Tree<ViewNode>,
-  map                : &mut SkgNodeMap,
   defmap             : &mut DefinitiveMap,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
@@ -101,7 +100,7 @@ pub fn complete_truenode_preorder (
           ViewNodeKind::True (t) => t . is_indefinitive (),
           _ => false } ) ?;
     if is_indefinitive {
-      clobberIndefinitiveViewnode( tree, map, node, config ) ?;
+      clobberIndefinitiveViewnode( tree, node, config ) ?;
       return Ok(( )); }}
   if deleted_by_this_save_pids . contains (&pid) {
     mutate_truenode_to_deletednode (
@@ -112,8 +111,8 @@ pub fn complete_truenode_preorder (
     if let IndefOrDef::Definitive { edit_request, .. }
       = &mut t . indef_or_def
       { *edit_request = None; } } ) ?;
-  let skgnode : &NodeComplete =
-    skgnode_from_map_or_disk( &pid, &source, map, config ) ?;
+  let skgnode : NodeComplete =
+    skgnode_from_memory_or_disk ( config, &pid, &source ) ?;
   if ! is_saved_view { // The saved (definitive) view of a node *defines* the title and body, but other views need those fields updated.
     let disk_title : String = skgnode . title . clone ();
     let disk_body  : Option<String> = skgnode . body . clone ();
@@ -122,8 +121,6 @@ pub fn complete_truenode_preorder (
       if let IndefOrDef::Definitive { body, .. } = &mut t . indef_or_def {
         *body = disk_body; } }
     ) ?; }
-  let skgnode : &NodeComplete =
-    skgnode_from_map_or_disk( &pid, &source, map, config ) ?;
   let content_ids : Vec<ID> =
     skgnode . contains . clone();
   let subscribes_to : Vec<ID> =
@@ -135,10 +132,10 @@ pub fn complete_truenode_preorder (
       // git diff view makes a difference
       content_goal_list(
         tree, node, &content_ids, node_changes,
-        is_sub, map, config ) ?;
+        is_sub, config ) ?;
     complete_content_children(
       tree, node, &goal_list, &removed_ids,
-      source_diffs, map, config, deleted_since_head_pid_src_map ) ?;
+      source_diffs, config, deleted_since_head_pid_src_map ) ?;
     mark_erroneous_content_children_as_indep(
       tree, node, &apparent_content_ids ) ?; }
   order_children_as_scaffolds_then_ignored_then_content(
@@ -193,7 +190,6 @@ fn content_goal_list (
   content_ids   : &[ID],
   node_changes  : Option<&NodeChanges>,
   is_subscribee : bool,
-  map           : &mut SkgNodeMap,
   config        : &SkgConfig,
 ) -> Result<(Vec<ID>, HashSet<ID>, Vec<ID>), Box<dyn Error>> {
   if !is_subscribee {
@@ -210,9 +206,9 @@ fn content_goal_list (
       pid_and_source_from_ancestor( tree, node, 2,
                                     "content_goal_list" ) ?;
     let worktree_hidden : Vec<ID> =
-      { let grandparent_skgnode : &NodeComplete =
-          skgnode_from_map_or_disk(
-            &grandparent_pid, &grandparent_source, map, config ) ?;
+      { let grandparent_skgnode : NodeComplete =
+          skgnode_from_memory_or_disk (
+            config, &grandparent_pid, &grandparent_source ) ?;
         grandparent_skgnode . hides_from_its_subscriptions
           . or_default() . to_vec() };
     let apparent_content_ids : Vec<ID> =
@@ -255,14 +251,13 @@ fn complete_content_children (
   goal_list          : &[ID],
   removed_ids        : &HashSet<ID>,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
-  map                : &mut SkgNodeMap,
   config             : &SkgConfig,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   let child_data : HashMap<ID, ChildData> =
     build_child_creation_data(
       tree, node, goal_list, removed_ids,
-      source_diffs, map, config, deleted_since_head_pid_src_map ) ?;
+      source_diffs, config, deleted_since_head_pid_src_map ) ?;
   complete_relevant_children_in_viewnodetree(
     tree, node,
     |vn : &ViewNode| matches!( &vn . kind,
@@ -433,7 +428,6 @@ fn build_child_creation_data (
   goal_list          : &[ID],
   removed_ids        : &HashSet<ID>,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
-  map                : &mut SkgNodeMap,
   config             : &SkgConfig,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
@@ -461,13 +455,13 @@ fn build_child_creation_data (
     if is_phantom {
       let phantom_source : SourceName =
         find_source_many_ways(
-          id, &child_sources, deleted_since_head_pid_src_map, map, config )
+          id, &child_sources, deleted_since_head_pid_src_map, config )
         . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
       let (ex, mem) : (ExistenceAxes, MembershipAxes) =
         phantom_axes ( id, &phantom_source, source_diffs . as_ref () );
       let kind : ContentReality = ContentReality::Phantom (ex, mem);
       let title : String = title_for_phantom(
-        id, &phantom_source, source_diffs . as_ref(), map, config );
+        id, &phantom_source, source_diffs . as_ref(), config );
       result . insert( id . clone(),
                        ChildData { title,
                                    source: phantom_source,
@@ -475,10 +469,10 @@ fn build_child_creation_data (
     } else {
       let child_source : SourceName =
         find_source_many_ways( id, &child_sources,
-                     deleted_since_head_pid_src_map, map, config )
+                     deleted_since_head_pid_src_map, config )
         . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
-      let skg : &NodeComplete =
-        skgnode_from_map_or_disk( id, &child_source, map, config ) ?;
+      let skg : NodeComplete =
+        skgnode_from_memory_or_disk ( config, id, &child_source ) ?;
       result . insert( id . clone(),
                      ChildData { title: skg . title . clone(),
                                  source: skg . source . clone(),

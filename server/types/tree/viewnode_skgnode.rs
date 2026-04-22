@@ -1,6 +1,7 @@
 /// Node access utilities for ego_tree::Tree<ViewNode> and Tree<UncheckedViewNode>
 
 use crate::to_org::util::{skgnode_and_viewnode_from_id, get_id_from_treenode};
+use crate::types::memory::skgnode_from_memory_or_disk;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, TrueNode, Scaffold,
@@ -9,7 +10,6 @@ use crate::types::viewnode::{
 use crate::types::unchecked_viewnode::{
     UncheckedViewNode, UncheckedViewNodeKind };
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::memory::SkgNodeMap;
 use crate::types::list::dedup_vector;
 use super::generic::{write_at_node_in_tree, with_node_mut};
 
@@ -95,16 +95,17 @@ pub fn unique_scaffold_child (
 }
 
 /// Extract PIDs for the subscriber and its subscribees.
-/// Returns an error if the node has no NodeComplete.
 pub fn pids_for_subscriber_and_its_subscribees (
   tree    : &Tree<ViewNode>,
-  map     : &SkgNodeMap,
   node_id : NodeId,
+  config  : &SkgConfig,
 ) -> Result < ( ID, Vec < ID > ),
               Box<dyn Error> > {
-  let pid : ID = get_id_from_treenode ( tree, node_id ) ?;
-  let skgnode : &NodeComplete =
-    map . get (&pid) . ok_or ("pids_for_subscriber_and_its_subscribees: NodeComplete should exist in map") ?;
+  let (pid, source) : (ID, SourceName) =
+    pid_and_source_from_treenode (
+      tree, node_id, "pids_for_subscriber_and_its_subscribees" ) ?;
+  let skgnode : NodeComplete =
+    skgnode_from_memory_or_disk ( config, &pid, &source ) ?;
   Ok (( skgnode . pid . clone (),
         skgnode . subscribes_to . or_default() . to_vec() )) }
 
@@ -112,8 +113,8 @@ pub fn pids_for_subscriber_and_its_subscribees (
 /// Expects: subscriber -> SubscribeeCol -> Subscribee (this node)
 pub fn pid_for_subscribee_and_its_subscriber_grandparent (
   tree    : &Tree<ViewNode>,
-  map     : &SkgNodeMap,
   node_id : NodeId,
+  config  : &SkgConfig,
 ) -> Result < ( ID, ID ), Box<dyn Error> > {
   let subscribee_pid : ID = get_id_from_treenode ( tree, node_id ) ?;
   let node_ref : NodeRef < ViewNode > =
@@ -129,11 +130,13 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
   let grandparent_ref : NodeRef < ViewNode > =
     parent_ref . parent ()
     . ok_or ("SubscribeeCol has no parent (subscriber)") ?;
-  let subscriber_id : ID =
-    get_id_from_treenode ( tree, grandparent_ref . id () ) ?;
-  let skgnode : &NodeComplete =
-    map . get (&subscriber_id)
-    . ok_or ("Subscriber NodeComplete not in map") ?;
+  let (subscriber_id, subscriber_source) : (ID, SourceName) =
+    pid_and_source_from_treenode (
+      tree, grandparent_ref . id (),
+      "pid_for_subscribee_and_its_subscriber_grandparent" ) ?;
+  let skgnode : NodeComplete =
+    skgnode_from_memory_or_disk (
+      config, &subscriber_id, &subscriber_source ) ?;
   Ok (( subscribee_pid,
         skgnode . pid . clone() )) }
 
@@ -154,10 +157,8 @@ pub fn insert_scaffold_as_child (
   Ok (col_id) }
 
 /// Fetch a node from disk and append it as an indefinitive child.
-/// Also adds the NodeComplete to the map.
 pub async fn append_indefinitive_from_disk_as_child (
   tree      : &mut Tree<ViewNode>,
-  map       : &mut SkgNodeMap,
   parent_id : NodeId,
   node_id   : &ID,
   birth     : Birth,
@@ -166,7 +167,7 @@ pub async fn append_indefinitive_from_disk_as_child (
 ) -> Result < (), Box<dyn Error> > {
   let ( _skgnode, content_viewnode ) : ( NodeComplete, ViewNode ) =
     skgnode_and_viewnode_from_id (
-      config, driver, node_id, map ) . await ?;
+      config, driver, node_id ) . await ?;
   let viewnode : ViewNode =
     mk_indefinitive_from_viewnode (
       content_viewnode, birth )

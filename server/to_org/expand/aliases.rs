@@ -3,7 +3,6 @@ use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
 use crate::types::git::MembershipAxes;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{ViewNode, ViewRequest, Scaffold};
-use crate::types::memory::SkgNodeMap;
 use crate::types::tree::viewnode_skgnode::{
   insert_scaffold_as_child, unique_scaffold_child};
 
@@ -13,7 +12,6 @@ use typedb_driver::TypeDBDriver;
 
 pub async fn build_and_integrate_aliases_view_then_drop_request (
   tree          : &mut Tree<ViewNode>,
-  _map          : &mut SkgNodeMap,
   node_id       : ego_tree::NodeId,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,

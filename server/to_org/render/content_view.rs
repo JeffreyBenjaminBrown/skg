@@ -14,7 +14,6 @@ use crate::to_org::render::diff::apply_diff_to_forest;
 use crate::to_org::render::initial_bfs::render_initial_forest_bfs;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
-use crate::types::memory::SkgNodeMap;
 use crate::update_buffer::graphnodestats::set_graphnodestats_in_forest;
 use crate::update_buffer::viewnodestats::set_viewnodestats_in_forest;
 
@@ -30,7 +29,7 @@ pub async fn single_root_view (
   config            : &SkgConfig,
   root_id           : &ID,
   diff_mode_enabled : bool,
-) -> Result < (String, SkgNodeMap, Vec<ID>, Tree<ViewNode>),
+) -> Result < (String, Vec<ID>, Tree<ViewNode>),
               Box<dyn Error> > {
   multi_root_view (
     driver,
@@ -44,9 +43,9 @@ pub async fn multi_root_view (
   config            : &SkgConfig,
   root_ids          : &[ID],
   diff_mode_enabled : bool,
-) -> Result < (String, SkgNodeMap, Vec<ID>, Tree<ViewNode>),
+) -> Result < (String, Vec<ID>, Tree<ViewNode>),
               Box<dyn Error> > {
-  let (mut forest, mut map) : (Tree<ViewNode>, SkgNodeMap) =
+  let mut forest : Tree<ViewNode> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "render_initial_forest_bfs" ). entered();
       render_initial_forest_bfs (
@@ -63,7 +62,7 @@ pub async fn multi_root_view (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "set_graphnodestats_in_forest" ). entered();
       set_graphnodestats_in_forest (
-        &mut forest, &mut map,
+        &mut forest,
         config, driver ) . await } ?;
   set_viewnodestats_in_forest (
     &mut forest, &container_to_contents, &content_to_containers,
@@ -79,4 +78,4 @@ pub async fn multi_root_view (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "viewnode_forest_to_string" ). entered();
       viewnode_forest_to_string (& forest, config) } ?;
-  Ok ((buffer_content, map, pids, forest)) }
+  Ok ((buffer_content, pids, forest)) }

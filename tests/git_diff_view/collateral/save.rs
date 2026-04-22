@@ -33,8 +33,8 @@ fn test_collateral_view_preserves_diff_annotations()
 
       // 1. Get an initial diff view of "a".
       let root_ids : Vec<ID> = vec![ID("a" . to_string())];
-      let (initial_buffer, map, pids, forest)
-        : (String, SkgNodeMap, Vec<ID>, Tree<ViewNode>) =
+      let (initial_buffer, pids, forest)
+        : (String, Vec<ID>, Tree<ViewNode>) =
         multi_root_view (
           &driver, &config, &root_ids, true ) . await ?;
 
@@ -68,7 +68,7 @@ fn test_collateral_view_preserves_diff_annotations()
         update_from_and_rerender_buffer (
           &mut stream,
           &save_input, &driver, &config, &mut tantivy,
-          true, map,
+          true,
           &Ok ( uri_1 . clone () ),
           &mut conn_state ) . await ?;
 

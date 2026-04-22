@@ -22,7 +22,7 @@ fn test_delete_removed_node_respawns()
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
           &mut stream,
-          &input, driver, config, tantivy, true, SkgNodeMap::new(),
+          &input, driver, config, tantivy, true,
           &Err ( String::new () ), &mut conn_state
         ) . await?;
 
@@ -62,7 +62,7 @@ fn test_delete_removed_here_node_respawns()
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &input, driver, config, tantivy, true,
         &Err ( String::new () ), &mut conn_state
       ) . await?;
 
@@ -100,7 +100,7 @@ fn test_delete_new_here_updates_disk()
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &input, driver, config, tantivy, true,
         &Err ( String::new () ), &mut conn_state
       ) . await?;
 
@@ -144,7 +144,7 @@ fn test_add_new_child_creates_on_disk()
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &input, driver, config, tantivy, true,
         &Err ( String::new () ), &mut conn_state
       ) . await?;
 

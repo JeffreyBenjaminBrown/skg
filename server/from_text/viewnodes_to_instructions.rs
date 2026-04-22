@@ -1,9 +1,9 @@
 pub mod to_naive_instructions;
 pub mod reconcile_same_id_instructions;
 
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::memory::nodecomplete_from_memory;
+use crate::types::misc::SkgConfig;
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
-use crate::types::memory::SkgNodeMap;
 use crate::types::viewnode::ViewNode;
 
 use to_naive_instructions::naive_saveinstructions_from_tree;
@@ -23,7 +23,6 @@ pub async fn viewnode_forest_to_nonmerge_save_instructions (
   forest : &Tree<ViewNode>, // "forest" = tree with BufferRoot
   config : &SkgConfig,
   driver : &TypeDBDriver,
-  pool   : &SkgNodeMap
 ) -> Result<(Vec<DefineNode>, Vec<SourceMove>), Box<dyn Error>> {
   let naive_instructions : Vec<DefineNode> =
     naive_saveinstructions_from_tree (
@@ -32,7 +31,7 @@ pub async fn viewnode_forest_to_nonmerge_save_instructions (
     reconcile_same_id_instructions (naive_instructions) ?;
   let changed_instructions : Vec<DefineNode> =
     filter_unchanged_save_instructions (
-      instructions_without_dups, pool );
+      instructions_without_dups );
   let mut result : Vec<DefineNode> = // Mapping supplement_none_fields_from_disk_if_save over changed_instructions would be simpler, but async functions can't be mapped.
     Vec::with_capacity ( changed_instructions . len() );
   let mut source_moves : Vec<SourceMove> = Vec::new();
@@ -40,7 +39,7 @@ pub async fn viewnode_forest_to_nonmerge_save_instructions (
     let (supplemented, maybe_move)
       : (DefineNode, Option<SourceMove>)
       = supplement_none_fields_from_disk_if_save (
-          config, driver, pool, instr
+          config, driver, instr
         ) . await ?;
     result . push (supplemented);
     if let Some (sm) = maybe_move {
@@ -48,21 +47,20 @@ pub async fn viewnode_forest_to_nonmerge_save_instructions (
   Ok ((result, source_moves)) }
 
 /// Filters out Save instructions that would be no-ops,
-/// because they match the pre-save pool entry (nothing changed).
-/// Delete instructions and new nodes (not in pool) are kept.
+/// because they match the pre-save in-Rust memory entry
+/// (nothing changed). Delete instructions and new nodes (not yet
+/// in memory) are kept.
 fn filter_unchanged_save_instructions (
   instructions : Vec<DefineNode>,
-  pool         : &SkgNodeMap,
 ) -> Vec<DefineNode> {
   let initial_count : usize = instructions . len();
   let filtered : Vec<DefineNode> = instructions
     . into_iter()
     . filter(|instr| match instr {
       DefineNode::Save(SaveNode (node)) => {
-        let id : &ID = &node . pid;
-        match pool . get (id) {
-          Some (pool_node) =>
-            buffernode_differs_from_disknode (node, pool_node),
+        match nodecomplete_from_memory (&node . pid) {
+          Some (pre_save) =>
+            buffernode_differs_from_disknode (node, &pre_save),
           None => true, }}
       DefineNode::Delete (_) => true, })
     . collect();

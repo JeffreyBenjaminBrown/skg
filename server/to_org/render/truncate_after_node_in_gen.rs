@@ -6,7 +6,6 @@ use crate::to_org::util::{
   nodes_after_in_generation };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::ViewNode;
-use crate::types::memory::SkgNodeMap;
 
 use ego_tree::{Tree, NodeId};
 use std::cmp::min;
@@ -22,7 +21,6 @@ use typedb_driver::TypeDBDriver;
 /// - truncate the preceding generation after the limit-hitting node's parent
 pub async fn add_last_generation_and_truncate_some_of_previous (
   tree           : &mut Tree<ViewNode>,
-  map            : &mut SkgNodeMap,
   generation     : usize,
   children       : &[(NodeId, ID)],
   space_left     : usize,
@@ -45,10 +43,10 @@ pub async fn add_last_generation_and_truncate_some_of_previous (
       else {
         let new_treeid : NodeId =
           make_and_append_child_pair (
-            tree, map, *parent_treeid, child_skgid, config, driver ) . await ?;
-        makeIndefinitiveAndClobber ( tree, map, new_treeid, config ) ?; }}
+            tree, *parent_treeid, child_skgid, config, driver ) . await ?;
+        makeIndefinitiveAndClobber ( tree, new_treeid, config ) ?; }}
   truncate_after_node_in_generation_in_tree (
-    tree, map, generation - 1, limit_parent_treeid,
+    tree, generation - 1, limit_parent_treeid,
     effective_root, visited, config ) ?;
   Ok (( )) }
 
@@ -58,7 +56,6 @@ pub async fn add_last_generation_and_truncate_some_of_previous (
 /// Truncated nodes are re-rendered using 'makeIndefinitiveAndClobber'.
 fn truncate_after_node_in_generation_in_tree (
   tree           : &mut Tree<ViewNode>,
-  map            : &mut SkgNodeMap,
   generation     : usize,
   node_id        : NodeId, // truncate after this one
   effective_root : NodeId, // gen 0
@@ -71,5 +68,5 @@ fn truncate_after_node_in_generation_in_tree (
   for id in nodes_to_truncate {
     if let Ok (pid) = get_id_from_treenode ( tree, id ) {
       visited . remove (&pid); }
-    makeIndefinitiveAndClobber ( tree, map, id, config ) ?; }
+    makeIndefinitiveAndClobber ( tree, id, config ) ?; }
   Ok (( )) }

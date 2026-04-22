@@ -4,7 +4,7 @@ use crate::dbs::typedb::search::all_graphnodestats::{
   AllGraphNodeStats};
 use crate::to_org::util::collect_ids_from_tree;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
+use crate::types::memory::skgnode_from_memory_or_disk;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{GraphNodeStats, ViewNode, ViewNodeKind};
 
@@ -18,7 +18,6 @@ use typedb_driver::TypeDBDriver;
 /// can pass to `set_viewnodestats_in_forest`.
 pub async fn set_graphnodestats_in_forest (
   forest : &mut Tree<ViewNode>,
-  map    : &mut SkgNodeMap,
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result < ( HashMap < ID, HashSet < ID > >,
@@ -40,7 +39,6 @@ pub async fn set_graphnodestats_in_forest (
       forest,
       root_treeid,
       & stats,
-      map,
       config ) };
   Ok (( stats . container_to_contents,
         stats . content_to_containers )) }
@@ -49,20 +47,18 @@ pub fn set_metadata_relationships_in_node_recursive (
   tree   : &mut Tree<ViewNode>,
   treeid : NodeId,
   stats  : &AllGraphNodeStats,
-  map    : &mut SkgNodeMap,
   config : &SkgConfig,
 ) {
-  // PITFALL: Disk lookup (skgnode_from_map_or_disk) mutably borrows map, so it must happen in a separate block from the mutable tree borrow below.
   let new_stats : Option < GraphNodeStats > =
     { // PITFALL: Uses 'false' for phantom and deleted nodes. Getting 'true' where appropriate would be expensive, requiring inquiry into the git history not just of the phantom, but also of things it was connected to.
       match & tree . get (treeid) . unwrap () . value () . kind {
         ViewNodeKind::True (t) => {
-          let skgnode_opt : Option<&NodeComplete> =
-            skgnode_from_map_or_disk (
-              &t . id, &t . source, map, config
+          let skgnode_opt : Option<NodeComplete> =
+            skgnode_from_memory_or_disk (
+              config, &t . id, &t . source
             ). ok ();
           Some ( graphnodestats_for_pid (
-            &t . id, stats, skgnode_opt )) },
+            &t . id, stats, skgnode_opt . as_ref () )) },
         _ => None } // Scaff, Deleted, DeletedScaff
     };
   match new_stats {
@@ -80,5 +76,4 @@ pub fn set_metadata_relationships_in_node_recursive (
       tree,
       child_treeid,
       stats,
-      map,
       config ); } }

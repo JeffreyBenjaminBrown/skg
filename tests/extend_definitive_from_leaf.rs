@@ -12,7 +12,7 @@ use skg::test_utils::run_with_test_db;
 use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
 use skg::serve::ConnectionState;
 use skg::types::memory::SkgnodesInViews;
-use skg::types::memory::SkgNodeMap;
+
 use skg::dbs::memory::{InRustGraph, new_handle};
 
 fn mk_test_tcp_stream ()
@@ -54,7 +54,7 @@ fn test_definitive_view_limit_10
         let response = update_from_and_rerender_buffer (
           &mut stream,
           input_org_text, driver, &config, tantivy, false,
-          SkgNodeMap::new(),
+
           &Err ( String::new () ), &mut conn_state ) . await ?;
         response . saved_view };
 
@@ -123,7 +123,7 @@ fn test_definitive_view_limit_5_or_6
         let response_5 = update_from_and_rerender_buffer (
           &mut stream,
           input_org_text, driver, &config5, tantivy, false,
-          SkgNodeMap::new(),
+
           &Err ( String::new () ), &mut conn_state ) . await ?;
         response_5 . saved_view };
       let result_6 = {
@@ -137,7 +137,7 @@ fn test_definitive_view_limit_5_or_6
         let response_6 = update_from_and_rerender_buffer (
           &mut stream,
           input_org_text, driver, &config6, tantivy, false,
-          SkgNodeMap::new(),
+
           &Err ( String::new () ), &mut conn_state ) . await ?;
         response_6 . saved_view };
 
@@ -208,7 +208,7 @@ fn test_definitive_view_limit_1_to_4
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_1 = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config1, tantivy, false, SkgNodeMap::new(),
+          input_org_text, driver, &config1, tantivy, false,
           &Err ( String::new () ), &mut conn_state ) . await ?;
         response_1 . saved_view };
       let result_4 = {
@@ -221,7 +221,7 @@ fn test_definitive_view_limit_1_to_4
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_4 = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config4, tantivy, false, SkgNodeMap::new(),
+          input_org_text, driver, &config4, tantivy, false,
           &Err ( String::new () ), &mut conn_state ) . await ?;
         response_4 . saved_view };
 
@@ -287,7 +287,7 @@ fn test_definitive_view_conflicting
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config, tantivy, false, SkgNodeMap::new(),
+          input_org_text, driver, &config, tantivy, false,
           &Err ( String::new () ), &mut conn_state ) . await ?;
         response . saved_view };
 
@@ -342,7 +342,7 @@ fn test_definitive_view_with_cycle
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config, tantivy, false, SkgNodeMap::new(),
+          input_org_text, driver, &config, tantivy, false,
           &Err ( String::new () ), &mut conn_state ) . await ?;
         response . saved_view };
 
@@ -391,7 +391,7 @@ fn test_definitive_view_with_repeat
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config, tantivy, false, SkgNodeMap::new(),
+          input_org_text, driver, &config, tantivy, false,
           &Err ( String::new () ), &mut conn_state ) . await ?;
         response . saved_view };
 
@@ -447,7 +447,7 @@ fn test_definitive_view_request_cleared
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config, tantivy, false, SkgNodeMap::new(),
+          input_org_text, driver, &config, tantivy, false,
           &Err ( String::new () ), &mut conn_state ) . await ?;
         response . saved_view };
 

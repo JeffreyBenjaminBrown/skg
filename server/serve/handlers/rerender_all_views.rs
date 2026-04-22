@@ -4,7 +4,7 @@ use crate::serve::handlers::save_buffer::{ compute_diff_for_every_source, delete
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_errors_sexp, format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response, tag_text_response};
 use crate::types::git::SourceDiff;
-use crate::types::memory::{SkgNodeMap, ViewUri};
+use crate::types::memory::ViewUri;
 use crate::types::misc::{ID, SourceName, SkgConfig};
 use crate::types::viewnode::ViewNode;
 use crate::update_buffer::rerender_view;
@@ -68,14 +68,13 @@ pub fn stream_rerender_views (
             "View {}: no viewforest found",
             uri . repr_in_client () ));
           continue; } };
-    let mut map : SkgNodeMap = SkgNodeMap::new ();
     match block_on ( async {
       let _span : tracing::span::EnteredSpan =
         tracing::info_span! (
           "rerender_view (rerender-all)"
         ) . entered ();
       rerender_view (
-        &mut forest, &mut map,
+        &mut forest,
         &source_diffs, config, typedb_driver,
         &mut errors, &deleted_since_head_pid_src_map,
         &deleted_by_this_save_pids,

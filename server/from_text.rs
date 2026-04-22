@@ -12,7 +12,6 @@ pub mod validate;
 
 use crate::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_viewnode_forest;
 use crate::types::errors::{BufferValidationError, SaveError};
-use crate::types::memory::SkgNodeMap;
 use crate::types::misc::SkgConfig;
 use crate::types::save::{Merge, DefineNode, SourceMove};
 use crate::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
@@ -31,7 +30,6 @@ pub async fn buffer_to_viewnode_forest_and_save_instructions (
   buffer_text : &str,
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
-  pool        : &SkgNodeMap
 ) -> Result< ( Tree<ViewNode>,    // the view
                Vec<DefineNode>,   // instructions
                Vec<Merge>,        // instructions
@@ -49,7 +47,7 @@ pub async fn buffer_to_viewnode_forest_and_save_instructions (
     // For why, see the header comment of one of them,
     // 'find_buffer_errors_for_saving'.
     add_missing_info_to_forest (
-      & mut unchecked_forest, & config . db_name, driver, pool )
+      & mut unchecked_forest, & config . db_name, driver )
     . await } . map_err (SaveError::DatabaseError) ?;
   { // If saving is impossible, don't.
     let mut validation_errors : Vec<BufferValidationError> =
@@ -72,7 +70,7 @@ pub async fn buffer_to_viewnode_forest_and_save_instructions (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "viewnode_forest_to_nonmerge_save_instructions" ). entered();
       viewnode_forest_to_nonmerge_save_instructions (
-        & viewnode_forest, config, driver, pool )
+        & viewnode_forest, config, driver )
       . await } . map_err (SaveError::DatabaseError) ?;
   let nonmerge_instructions : Vec<DefineNode> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(

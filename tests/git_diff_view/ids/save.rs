@@ -23,7 +23,7 @@ fn test_delete_id_col_scaffold_respawns()
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &input, driver, config, tantivy, true,
         &Err ( String::new () ), &mut conn_state ) . await?;
 
       // DISK: 1.skg should still have the worktree ids
@@ -63,7 +63,7 @@ fn test_delete_id_scaffolds_respawns()
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &input, driver, config, tantivy, true,
         &Err ( String::new () ), &mut conn_state ) . await?;
 
       // DISK: 1.skg should still have the worktree ids
@@ -97,7 +97,7 @@ fn test_edit_id_scaffold_respawns()
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &input, driver, config, tantivy, true,
         &Err ( String::new () ), &mut conn_state ) . await?;
 
       // DISK: 1.skg should still have the original worktree ids
@@ -140,7 +140,7 @@ fn test_move_id_scaffolds_to_child_respawns()
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, true, SkgNodeMap::new(),
+        &input, driver, config, tantivy, true,
         &Err ( String::new () ), &mut conn_state ) . await?;
 
       // DISK: child.skg should not have any new ids

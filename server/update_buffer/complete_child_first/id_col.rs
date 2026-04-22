@@ -1,8 +1,8 @@
 use crate::types::git::{MembershipAxes, NodeChanges, Sign};
 use crate::types::list::Diff_Item;
-use crate::types::misc::{ID, SourceName};
+use crate::types::memory::skgnode_from_memory_or_disk;
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::memory::SkgNodeMap;
 use crate::types::git::{SourceDiff, node_changes_for_truenode};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, viewnode_from_scaffold};
@@ -24,8 +24,8 @@ use std::error::Error;
 pub fn completeIDCol (
   idcol_node_id : NodeId,
   tree          : &mut Tree<ViewNode>,
-  map           : &SkgNodeMap,
   source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
+  config        : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
     tree, idcol_node_id,
@@ -37,9 +37,10 @@ pub fn completeIDCol (
     pid_and_source_from_ancestor(
       tree, idcol_node_id, 1,
       "completeIDCol" ) ?;
-  let parent_skgnode : &NodeComplete =
-    map . get (&parent_pid)
-    . ok_or ("completeIDCol: Parent NodeComplete not in map")?;
+  let parent_skgnode : NodeComplete =
+    skgnode_from_memory_or_disk (
+      config, &parent_pid, &parent_source )
+    . map_err ( |_| "completeIDCol: parent NodeComplete not found" ) ?;
   let node_changes : Option<&NodeChanges> =
     node_changes_for_truenode(
       source_diffs, &parent_pid, &parent_source );

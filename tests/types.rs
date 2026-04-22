@@ -2,6 +2,3 @@
 
 #[path = "types/tree.rs"]
 mod tree;
-
-#[path = "types/skgnode.rs"]
-mod skgnode;

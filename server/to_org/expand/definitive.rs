@@ -11,7 +11,7 @@ use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ContainerwardPathStats, IndefOrDef, Birth, mk_indefinitive_viewnode };
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::memory::{SkgNodeMap, skgnode_from_map_or_disk};
+use crate::types::memory::skgnode_from_memory_or_disk;
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::viewnode_skgnode::{write_at_truenode_in_tree, pid_and_source_from_treenode};
 
@@ -22,7 +22,6 @@ use typedb_driver::TypeDBDriver;
 
 pub async fn execute_view_requests (
   forest        : &mut Tree<ViewNode>,
-  map           : &mut SkgNodeMap,
   requests      : Vec < (NodeId, ViewRequest) >,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
@@ -34,19 +33,19 @@ pub async fn execute_view_requests (
     match request {
       ViewRequest::Aliases => {
         build_and_integrate_aliases_view_then_drop_request (
-          forest, map, node_id, config, typedb_driver, errors )
+          forest, node_id, config, typedb_driver, errors )
           . await ?; },
       ViewRequest::Containerward => {
         build_and_integrate_containerward_view_then_drop_request (
-          forest, map, node_id, config, typedb_driver, errors )
+          forest, node_id, config, typedb_driver, errors )
           . await ?; },
       ViewRequest::Sourceward => {
         build_and_integrate_sourceward_view_then_drop_request (
-          forest, map, node_id, config, typedb_driver, errors )
+          forest, node_id, config, typedb_driver, errors )
           . await ?; },
       ViewRequest::Definitive => {
         execute_definitive_view_request (
-          forest, map, node_id, config, typedb_driver,
+          forest, node_id, config, typedb_driver,
           visited, errors,
           deleted_since_head_pid_src_map ) . await ?; },
       ViewRequest::ContainerwardStats => {
@@ -94,7 +93,6 @@ async fn execute_containerwardstats_request (
 /// PITFALL: The indefinitization step can miss things: If definitive A contains indefinitive B, and elsewhere there is a definitive B, then when one requests a definitive view of A somewhere else, it will indefinitize the earlier A, but it will not indefinitize the earlier B. This seems fine -- searching through the whole tree for duplicates of A's recursive content would be expensive, and unless the user has strange habits they will at most rarely encounter this behavior.
 async fn execute_definitive_view_request (
   forest        : &mut Tree<ViewNode>, // "forest" = tree with BufferRoot
-  map           : &mut SkgNodeMap,
   node_id       : NodeId,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
@@ -115,11 +113,11 @@ async fn execute_definitive_view_request (
         _ => false } ) ?;
   let hidden_ids : HashSet < ID > =
     // If node is a subscribee, we may need to hide some content.
-    get_hidden_ids_if_subscribee ( forest, map, node_id ) ?;
+    get_hidden_ids_if_subscribee ( forest, node_id, config ) ?;
   if let Some (&preexisting_node_id) =
     visited . get (& node_pid)
   { if preexisting_node_id != node_id {
-    indefinitize_content_subtree ( forest, map,
+    indefinitize_content_subtree ( forest,
                                    preexisting_node_id,
                                    visited, config ) ?; }}
   { // Remove request, mark definitive, replace title/body, add to visited.
@@ -135,21 +133,21 @@ async fn execute_definitive_view_request (
           // PITFALL: This per-node git lookup might be slow. Hard to see how to batch the lookoup, though, since it's from git.
           forest, node_id, config ) ?; }
       else { from_disk_replace_title_body_and_skgnode (
-               forest, map, node_id, config ) ?; }
+               forest, node_id, config ) ?; }
     visited . insert ( node_pid . clone(), node_id ); }
   if is_removed_node {
     extendDefinitiveSubtree_fromGit (
-      forest, map, node_id, config . initial_node_limit,
+      forest, node_id, config . initial_node_limit,
       visited, config, &hidden_ids, typedb_driver,
       deleted_since_head_pid_src_map ) . await ?; }
   else {
     extendDefinitiveSubtreeFromLeaf (
-      forest, map, node_id, config . initial_node_limit,
+      forest, node_id, config . initial_node_limit,
       visited, config, typedb_driver, &hidden_ids ) . await ?;
     if type_and_parent_type_consistent_with_subscribee (
       forest, node_id ) ?
     { maybe_add_hiddenInSubscribeeCol_branch (
-        forest, map, node_id, config, typedb_driver
+        forest, node_id, config, typedb_driver
       ) . await ?; } }
   Ok (( )) }
 
@@ -159,8 +157,8 @@ async fn execute_definitive_view_request (
 /// Otherwise returns the empty set.
 fn get_hidden_ids_if_subscribee (
   tree    : &Tree<ViewNode>,
-  map     : &SkgNodeMap,
   node_id : NodeId,
+  config  : &SkgConfig,
 ) -> Result < HashSet < ID >, Box<dyn Error> > {
   let node_ref : NodeRef < ViewNode > =
     tree . get (node_id)
@@ -176,14 +174,17 @@ fn get_hidden_ids_if_subscribee (
     let subscriber : NodeRef < ViewNode > =
       subscribee_col . parent ()
       . ok_or ("get_hidden_ids_if_subscribee: SubscribeeCol has no parent (Subscriber)") ?;
-    let subscriber_id : ID =
-      get_id_from_treenode ( tree, subscriber . id() ) ?;
+    let (subscriber_id, subscriber_source) : (ID, SourceName) =
+      pid_and_source_from_treenode (
+        tree, subscriber . id(),
+        "get_hidden_ids_if_subscribee" ) ?;
+    let skgnode : NodeComplete =
+      skgnode_from_memory_or_disk (
+        config, &subscriber_id, &subscriber_source ) ?;
     let hidden_ids : HashSet < ID > =
-      map . get (&subscriber_id)
-      . map ( |skgnode| skgnode . hides_from_its_subscriptions
-                . or_default () )
-      . unwrap_or (&[])
-      . iter () . cloned () . collect ();
+      skgnode . hides_from_its_subscriptions
+        . or_default ()
+        . iter () . cloned () . collect ();
     Ok (hidden_ids) }}
 
 /// Does two things:
@@ -195,7 +196,6 @@ fn get_hidden_ids_if_subscribee (
 ///   sharing-related nodes among the input node's descendents.
 fn indefinitize_content_subtree (
   tree    : &mut Tree<ViewNode>,
-  map     : &mut SkgNodeMap,
   node_id : NodeId,
   visited : &mut DefinitiveMap,
   config  : &SkgConfig,
@@ -217,10 +217,10 @@ fn indefinitize_content_subtree (
       (node_pid, content_child_treeids) };
   if ! truenode_in_tree_is_indefinitive ( tree, node_id ) ? {
     visited . remove (&node_pid);
-    makeIndefinitiveAndClobber ( tree, map, node_id, config ) ?; }
+    makeIndefinitiveAndClobber ( tree, node_id, config ) ?; }
   for child_treeid in content_child_treeids { // recurse
     indefinitize_content_subtree (
-      tree, map, child_treeid, visited, config ) ?; }
+      tree, child_treeid, visited, config ) ?; }
   Ok (( )) }
 
 /// Expands content for a node using BFS with a node limit.
@@ -248,7 +248,6 @@ fn indefinitize_content_subtree (
 /// 'hidden_ids' will be empty.
 async fn extendDefinitiveSubtreeFromLeaf (
   tree           : &mut Tree<ViewNode>,
-  map            : &mut SkgNodeMap,
   effective_root : NodeId, // It contained the request and is already in the tree. it was indefinitive when the request was issued, but was made definitive by 'execute_definitive_view_request'.
   limit          : usize,
   visited        : &mut DefinitiveMap,
@@ -259,7 +258,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
   let mut gen_with_children : Vec < (NodeId, // effective root
                                      ID) > = // one of its children
     content_ids_if_definitive_else_empty (
-      tree, map, effective_root ) ?
+      tree, effective_root, config ) ?
     . into_iter ()
     . filter ( |skgid| ! hidden_ids . contains (skgid) )
     . map ( |child_skgid| (effective_root, child_skgid) )
@@ -272,41 +271,39 @@ async fn extendDefinitiveSubtreeFromLeaf (
       // and truncate later parents.
       let space_left : usize = limit - nodes_rendered;
       add_last_generation_and_truncate_some_of_previous (
-        tree, map, generation, &gen_with_children,
+        tree, generation, &gen_with_children,
         space_left, effective_root, visited, config, driver ) . await ?;
       return Ok (( )); }
     let mut next_gen : Vec < (NodeId, ID) > = Vec::new ();
     for (parent_treeid, child_skgid) in gen_with_children {
       let new_treeid : NodeId = build_node_branch_minus_content (
         Some((tree, parent_treeid)),
-        Some (map),
         &child_skgid, config, driver, visited ) . await ?;
       nodes_rendered += 1;
       if ! truenode_in_tree_is_indefinitive ( tree, new_treeid ) ? {
         // No filtering here; 'hidden_ids' only applies to top-level.
         let grandchild_skgids : Vec < ID > =
           content_ids_if_definitive_else_empty (
-            tree, map, new_treeid ) ?;
+            tree, new_treeid, config ) ?;
         for grandchild_skgid in grandchild_skgids {
           next_gen . push ( (new_treeid, grandchild_skgid) ); }} }
     gen_with_children = next_gen;
     generation += 1; }
   Ok (( )) }
 
-/// Fetches NodeComplete from map or disk.
+/// Fetches NodeComplete from memory or disk.
 /// Updates title and body.
 /// Preserves all other ViewNode data.
 fn from_disk_replace_title_body_and_skgnode (
   tree    : &mut Tree<ViewNode>,
-  map     : &mut SkgNodeMap,
   node_id : NodeId,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
   let (pid, src) : (ID, SourceName) =
     pid_and_source_from_treenode ( tree, node_id,
       "from_disk_replace_title_body_and_skgnode" ) ?;
-  let skgnode : &NodeComplete = skgnode_from_map_or_disk (
-    &pid, &src, map, config ) ?;
+  let skgnode : NodeComplete = skgnode_from_memory_or_disk (
+    config, &pid, &src ) ?;
   let title : String = skgnode . title . clone();
   if title . is_empty () {
     return Err ( format! ( "NodeComplete {} has empty title", pid ) . into () ); }
@@ -325,7 +322,6 @@ fn from_disk_replace_title_body_and_skgnode (
 /// Children that don't exist in TypeDB are marked as Removed.
 async fn extendDefinitiveSubtree_fromGit (
   tree           : &mut Tree<ViewNode>,
-  _map           : &mut SkgNodeMap,
   effective_root : NodeId,
   limit          : usize,
   visited        : &mut DefinitiveMap,

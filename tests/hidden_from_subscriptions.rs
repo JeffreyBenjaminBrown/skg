@@ -16,7 +16,7 @@ use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID, TantivyIndex};
 use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::nodes::complete::NodeComplete;
-use skg::types::memory::SkgNodeMap;
+
 use skg::serve::ConnectionState;
 use skg::types::memory::SkgnodesInViews;
 use skg::dbs::memory::{InRustGraph, new_handle};
@@ -122,8 +122,8 @@ fn test_every_kind_of_col(
       "tests/hidden_from_subscriptions/fixtures-every-kind-of-col/skgconfig.toml"
     ) . await?;
 
-    let (initial_view, _map, _pids, _)
-      : (String, SkgNodeMap, Vec<ID>, _)
+    let (initial_view, _pids, _)
+      : (String, Vec<ID>, _)
       = single_root_view(
           &driver, &config,
           &ID("R" . to_string()), // Initial view from R ("subscribeR")
@@ -154,7 +154,7 @@ fn test_every_kind_of_col(
       let response = update_from_and_rerender_buffer (
           &mut stream,
           &modified_view, &driver, &config, &mut tantivy, false,
-          SkgNodeMap::new(),
+
           &Err ( String::new () ), &mut conn_state
         ) . await ?;
       response . saved_view };
@@ -202,8 +202,8 @@ fn test_hidden_within_but_none_without(
     let db_name = "skg-test-hidden-within-but-none-without";
     let (config, driver, mut tantivy) = setup_test(
       db_name, "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml" ) . await?;
-    let (initial_view, _map, _pids, _)
-      : (String, SkgNodeMap, Vec<ID>, _)
+    let (initial_view, _pids, _)
+      : (String, Vec<ID>, _)
       = single_root_view( &driver, &config,
                           &ID("R" . to_string()), // the root
                           false ) . await?;
@@ -230,7 +230,7 @@ fn test_hidden_within_but_none_without(
       let response = update_from_and_rerender_buffer (
           &mut stream,
           &modified_view, &driver, &config, &mut tantivy, false,
-          SkgNodeMap::new(),
+
           &Err ( String::new () ), &mut conn_state
         ) . await ?;
       response . saved_view };
@@ -278,8 +278,8 @@ fn test_hidden_without_but_none_within(
     let (config, driver, mut tantivy) =
       setup_test(db_name,
                  "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within/skgconfig.toml") . await?;
-    let (initial_view, _map, _pids, _)
-      : (String, SkgNodeMap, Vec<ID>, _)
+    let (initial_view, _pids, _)
+      : (String, Vec<ID>, _)
       = single_root_view( &driver, &config,
                           &ID("R" . to_string()), // origin of the view
                           false ) . await?;
@@ -307,7 +307,7 @@ fn test_hidden_without_but_none_within(
       let response = update_from_and_rerender_buffer (
         &mut stream,
         &modified_view, &driver, &config, &mut tantivy, false,
-        SkgNodeMap::new(),
+
         &Err ( String::new () ), &mut conn_state ) . await ?;
       response . saved_view };
     println!("View from R after save with definitive view requests:\n{}",
@@ -352,8 +352,8 @@ fn test_overlapping_hidden_within(
     let (config, driver, mut tantivy) =
       setup_test(db_name,
                  "tests/hidden_from_subscriptions/fixtures-overlapping-hidden-within/skgconfig.toml") . await?;
-    let (initial_view, _map, _pids, _)
-      : (String, SkgNodeMap, Vec<ID>, _)
+    let (initial_view, _pids, _)
+      : (String, Vec<ID>, _)
       = single_root_view( &driver, &config,
                           &ID("R" . to_string()), // root of the view
                           false ) . await?;
@@ -380,7 +380,7 @@ fn test_overlapping_hidden_within(
       let response = update_from_and_rerender_buffer (
         &mut stream,
         &modified_view, &driver, &config, &mut tantivy, false,
-        SkgNodeMap::new(),
+
         &Err ( String::new () ), &mut conn_state ) . await ?;
       response . saved_view };
     println!("View from R after save with definitive view requests:\n{}", expanded);

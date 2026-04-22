@@ -12,7 +12,7 @@ use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::viewnode::ViewNode;
-use skg::types::memory::SkgNodeMap;
+
 use skg::org_to_text::viewnode_forest_to_string;
 
 use indoc::indoc;
@@ -66,9 +66,9 @@ async fn test_multi_cycle_fork_impl(
     unchecked_to_checked_tree (unchecked_forest)?;
   let node_a_id =
     forest . root () . first_child () . unwrap () . id ();
-  let mut map : SkgNodeMap = SkgNodeMap::new();
+  
   build_and_integrate_containerward_path (
-    &mut forest, &mut map, node_a_id, &config, driver
+    &mut forest, node_a_id, &config, driver
   ) . await ?;
   // Sorted branches [b, d, f] are prepended in order,
   // so visual order is reversed: f, d, b.

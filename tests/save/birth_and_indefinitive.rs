@@ -7,7 +7,7 @@ use skg::save::update_typedb_from_saveinstructions;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::ID;
 use skg::types::nodes::complete::NodeComplete;
-use skg::types::memory::SkgNodeMap;
+
 
 use indoc::indoc;
 use std::error::Error;
@@ -49,8 +49,7 @@ fn test_birth_and_indefinitive(
           buffer_to_viewnode_forest_and_save_instructions(
             org_text,
             config,
-            driver,
-            &SkgNodeMap::new(), ) . await?;
+            driver ) . await?;
         update_typedb_from_saveinstructions(
           &config . db_name,
           driver,

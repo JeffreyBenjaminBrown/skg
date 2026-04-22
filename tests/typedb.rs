@@ -22,7 +22,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nod
 use skg::test_utils::run_with_test_db;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{ID, SkgConfig};
-use skg::types::memory::SkgNodeMap;
+
 use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
@@ -359,8 +359,8 @@ async fn test_recursive_document (
   driver  : &TypeDBDriver,
   config  : &SkgConfig
 ) -> Result<(), Box<dyn Error>> {
-  let (result_org_text, _map, _pids, _)
-    : (String, SkgNodeMap, Vec<ID>, _)
+  let (result_org_text, _pids, _)
+    : (String, Vec<ID>, _)
     = single_root_view (
           driver, config, &ID ( "a" . to_string () ), false
         ) . await ?;

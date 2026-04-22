@@ -12,7 +12,7 @@ use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::SkgConfig;
 use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::nodes::complete::NodeComplete;
-use skg::types::memory::SkgNodeMap;
+
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::typedb::nodes::create_all_nodes;
@@ -68,8 +68,8 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
     let mut forest: Tree<UncheckedViewNode> =
       org_to_uninterpreted_nodes (&buffer_text)?. 0;
     add_missing_info_to_forest(
-      &mut forest, &config . db_name, &driver,
-      &SkgNodeMap::new() ) . await?;
+      &mut forest, &config . db_name, &driver
+      ) . await?;
     let errors: Vec<BufferValidationError> =
       find_buffer_errors_for_saving(
         &forest, &config, &driver) . await?;
@@ -177,7 +177,6 @@ fn test_foreign_node_modification_errors(
         &buffer_text,
         &config,
         &driver,
-        &SkgNodeMap::new()
       ) . await;
 
       assert!(result . is_err(), "Expected errors for foreign node modifications");
@@ -244,7 +243,6 @@ fn test_foreign_node_modification_errors(
         &buffer_text,
         &config,
         &driver,
-        &SkgNodeMap::new()
       ) . await;
 
       assert!(result . is_err(),
@@ -337,7 +335,6 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         &buffer_text,
         &config,
         &driver,
-        &SkgNodeMap::new()
       ) . await;
 
       assert!(result . is_ok(),
@@ -368,7 +365,6 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         &buffer_text,
         &config,
         &driver,
-        &SkgNodeMap::new()
       ) . await;
 
       println!("\n=== InconsistentSources test ===");

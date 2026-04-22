@@ -22,7 +22,6 @@ pub use skg::types::misc::{ID, SkgConfig, SkgfileSource, TantivyIndex, SourceNam
 pub use skg::types::nodes::fs::NodeFS;
 pub use skg::types::nodes::typedb::NodeTypedb;
 pub use skg::types::nodes::complete::NodeComplete;
-pub use skg::types::memory::SkgNodeMap;
 pub use skg::serve::ConnectionState;
 pub use skg::types::memory::SkgnodesInViews;
 pub use skg::dbs::memory::{InRustGraph, new_handle};

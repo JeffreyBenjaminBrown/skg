@@ -21,7 +21,6 @@ use crate::to_org::util::{stub_forest_from_root_ids, content_ids_if_definitive_e
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
 use crate::types::misc::{SkgConfig, ID};
 use crate::types::viewnode::ViewNode;
-use crate::types::memory::SkgNodeMap;
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
@@ -35,9 +34,9 @@ pub async fn render_initial_forest_bfs (
   root_ids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
-) -> Result < (Tree<ViewNode>, SkgNodeMap), Box<dyn Error> > {
+) -> Result < Tree<ViewNode>, Box<dyn Error> > {
   let mut visited : DefinitiveMap = DefinitiveMap::new();
-  let (mut forest, mut map) : (Tree<ViewNode>, SkgNodeMap) =
+  let mut forest : Tree<ViewNode> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "stub_forest_from_root_ids" ). entered();
       stub_forest_from_root_ids (
@@ -49,7 +48,6 @@ pub async fn render_initial_forest_bfs (
     . collect ();
   render_generation_and_recurse (
     &mut forest,
-    &mut map,
     root_nodes, // the last complete generation
     1,          // the last complete generation's number
     0, // nodes_rendered (BufferRoot doesn't count)
@@ -59,12 +57,11 @@ pub async fn render_initial_forest_bfs (
     config,
     driver,
   ) . await ?;
-  Ok ( (forest, map) ) }
+  Ok (forest) }
 
 /// Returns when the generation is empty or the limit is reached.
 fn render_generation_and_recurse<'a> (
   forest         : &'a mut Tree<ViewNode>,
-  map            : &'a mut SkgNodeMap,
   gen_nodeids    : Vec < NodeId >, // nodes of deepest generation rendered so far
   gen_int        : usize,          // number of deepest generation rendered so far (0 = root)
   rendered_count : usize,
@@ -82,7 +79,7 @@ fn render_generation_and_recurse<'a> (
     let rendered_count : usize = rendered_count + nodes_in_gen;
     let parent_child_rels_to_add : Vec < (NodeId, ID) > =
       collect_rels_to_children_from_generation (
-        forest, map, &gen_nodeids );
+        forest, &gen_nodeids, config );
     let next_gen_count : usize =
       parent_child_rels_to_add . len();
     if rendered_count + next_gen_count < limit {
@@ -91,16 +88,16 @@ fn render_generation_and_recurse<'a> (
               "add_children", gen = gen_int + 1, count = next_gen_count
             ). entered();
           add_children_and_collect_their_ids (
-            forest, map, parent_child_rels_to_add, visited, config, driver
+            forest, parent_child_rels_to_add, visited, config, driver
         ) . await } ?;
       render_generation_and_recurse (
-        forest, map, next_gen, gen_int + 1,
+        forest, next_gen, gen_int + 1,
         rendered_count, limit, effective_root,
         visited, config, driver,
       ) . await }
     else {
       add_last_generation_and_truncate_some_of_previous (
-        forest, map, gen_int + 1, &parent_child_rels_to_add,
+        forest, gen_int + 1, &parent_child_rels_to_add,
         limit - rendered_count, effective_root,
         visited, config, driver,
       ) . await ?;
@@ -111,7 +108,6 @@ fn render_generation_and_recurse<'a> (
 /// Return their NodeIds.
 async fn add_children_and_collect_their_ids (
   forest      : &mut Tree<ViewNode>,
-  map         : &mut SkgNodeMap,
   rels_to_add : Vec < (NodeId, ID) >,
   visited     : &mut DefinitiveMap,
   config      : &SkgConfig,
@@ -121,7 +117,6 @@ async fn add_children_and_collect_their_ids (
   for (parent_treeid, child_skgid) in rels_to_add {
     let child_treeid : NodeId = build_node_branch_minus_content (
       Some ( (&mut *forest, parent_treeid) ),
-      Some ( &mut *map ),
       &child_skgid, config, driver, visited ) . await ?;
     child_treeids . push (child_treeid); }
   Ok (child_treeids) }
@@ -132,14 +127,14 @@ async fn add_children_and_collect_their_ids (
 /// Returns (parent_treeid, child_skgid) tuples.
 fn collect_rels_to_children_from_generation (
   forest       : &Tree<ViewNode>,
-  map          : &SkgNodeMap,
   nodes_in_gen : &[NodeId],
+  config       : &SkgConfig,
 ) -> Vec < (NodeId, ID) > {
   let mut children : Vec < (NodeId, ID) > = Vec::new ();
   for treeid in nodes_in_gen {
     if let Ok (child_skgids) =
       content_ids_if_definitive_else_empty (
-        forest, map, *treeid )
+        forest, *treeid, config )
     { for child_skgid in child_skgids {
       children . push ( (*treeid, child_skgid) ); }} }
   children }

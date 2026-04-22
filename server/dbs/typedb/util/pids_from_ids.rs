@@ -12,38 +12,42 @@ use ego_tree::{NodeRef, NodeMut, NodeId, Tree};
 
 use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind};
 use crate::types::misc::ID;
-use crate::types::memory::SkgNodeMap;
+use crate::dbs::memory::snapshot_global;
 use crate::dbs::typedb::util::concept_document::extract_id_from_node;
 
 /// Collect all IDs, batch-lookup their PIDs in TypeDB, then replace.
-/// Only query TypeDB for nodes not already in the skgnodemap.
+/// Only query TypeDB for nodes not already resolvable in the in-Rust
+/// memory snapshot.
 pub async fn replace_ids_with_pids(
   forest  : &mut Tree<UncheckedViewNode>,
   root_id : NodeId,
   db_name : &str,
   driver  : &TypeDBDriver,
-  pool    : &SkgNodeMap,
 ) -> Result<(), Box<dyn Error>> {
   let mut all_ids: Vec<ID> = Vec::new();
   collect_ids_in_tree( forest . root(),
                        &mut all_ids );
-  let mut pids_from_pool: HashMap<ID, Option<ID>> =
+  let snap = snapshot_global ();
+  let mut pids_from_memory: HashMap<ID, Option<ID>> =
     HashMap::new();
-  let mut unknown_ids: Vec<ID> = // not in the pool
+  let mut unknown_ids: Vec<ID> = // not resolvable via memory
     Vec::new();
   for id in all_ids {
-    if pool . contains_key (&id) {
-      pids_from_pool . insert ( id . clone(), Some (id) );
-    } else { unknown_ids . push (id); }}
-  tracing::debug!("replace_ids_with_pids: {} in pool, {} need TypeDB query",
-            pids_from_pool . len(), unknown_ids . len());
+    let resolved : Option<ID> =
+      snap . as_deref () . and_then ( |g| g . pid_of (&id) );
+    match resolved {
+      Some (pid) => {
+        pids_from_memory . insert ( id, Some (pid) ); }
+      None => { unknown_ids . push (id); } } }
+  tracing::debug!("replace_ids_with_pids: {} from memory, {} need TypeDB query",
+            pids_from_memory . len(), unknown_ids . len());
   let pids_from_typedb: HashMap<ID, Option<ID>> =
     pids_from_ids( db_name, driver, &unknown_ids
     ) . await?;
-  pids_from_pool . extend (pids_from_typedb);
+  pids_from_memory . extend (pids_from_typedb);
   if let Some (root_mut) = forest . get_mut (root_id) {
     assign_pids_throughout_tree_from_map(
-      root_mut, &pids_from_pool); }
+      root_mut, &pids_from_memory); }
   Ok(( )) }
 
 /// Collect IDs for bulk PID lookup

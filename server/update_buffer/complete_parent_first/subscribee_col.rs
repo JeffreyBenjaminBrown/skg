@@ -1,9 +1,7 @@
-use crate::dbs::filesystem::one_node::skgnodes_from_ids;
 use crate::git_ops::read_repo::skgnode_from_git_head;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
-use crate::types::memory::SkgNodeMap;
-use crate::types::memory::find_source_many_ways;
+use crate::types::memory::{find_source_many_ways, skgnode_from_memory_or_disk};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::types::nodes::complete::NodeComplete;
@@ -39,10 +37,9 @@ struct SubscribeeChildData {
 pub async fn complete_subscribee_col_preorder (
   node               : NodeId,
   tree               : &mut Tree<ViewNode>,
-  map                : &mut SkgNodeMap,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
-  driver             : &TypeDBDriver,
+  _driver            : &TypeDBDriver,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
@@ -65,9 +62,11 @@ pub async fn complete_subscribee_col_preorder (
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
     . ok_or ("complete_subscribee_col_preorder: parent is not a TrueNode") ?;
   let worktree_subscribees : Vec<ID> =
-    map . get (&parent_skgid)
-      . map( |skg| skg . subscribes_to . or_default() . to_vec() )
-      . unwrap_or_default();
+    skgnode_from_memory_or_disk (
+      config, &parent_skgid, &parent_source )
+      . ok ()
+      . map ( |skg| skg . subscribes_to . or_default () . to_vec () )
+      . unwrap_or_default ();
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
     diff_aware_goal_list(
       source_diffs, &parent_source, &parent_skgid,
@@ -83,21 +82,11 @@ pub async fn complete_subscribee_col_preorder (
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     return Ok(( )); }
   if parent_indefinitive || source_diffs . is_some() { // If the parent is indefinitive, its SubscribeeCol might not reflect the truth, so we complete its children. If source_diffs is present (diff view), even a definitive parent needs reconciliation, so that removed subscribees appear as phantoms. (If the parent is definitive and the diff view is off, though, then the parent just *defined* what its children should be, so they don't need completion.)
-    let missing : Vec<ID> = worktree_subscribees . iter()
-      . filter( |id| !map . contains_key (id) )
-      . cloned()
-      . collect();
-    if !missing . is_empty() { // Ensure all subscribees are in the map.
-      let fetched_missing : Vec<NodeComplete> =
-        skgnodes_from_ids( config, driver, &missing ) . await ?;
-      for skg in fetched_missing {
-        { let id : &ID = &skg . pid;
-          map . insert( id . clone(), skg ); } } }
     let child_data : HashMap<ID, SubscribeeChildData> =
       // Pre-compute child creation data so that the create_child closure argument to complete_relevant_children_in_viewnodetree captures only owned data and does not conflict with the &mut Tree borrow in complete_relevant_children_in_viewnodetree.
       build_subscribee_child_data(
         tree, node, &goal_list, &removed_ids,
-        source_diffs, map, deleted_since_head_pid_src_map, config ) ?;
+        source_diffs, deleted_since_head_pid_src_map, config ) ?;
     complete_relevant_children_in_viewnodetree(
       tree, node,
       |vn : &ViewNode| matches!( &vn . kind,
@@ -184,7 +173,6 @@ fn build_subscribee_child_data (
   goal_list          : &[ID],
   removed_ids        : &HashSet<ID>,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
-  map                : &mut SkgNodeMap,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
 ) -> Result<HashMap<ID, SubscribeeChildData>,
@@ -210,13 +198,13 @@ fn build_subscribee_child_data (
       let child_src : SourceName =
         find_source_many_ways(
           child_skgid, &child_sources,
-          deleted_since_head_pid_src_map, map, config )
+          deleted_since_head_pid_src_map, config )
         . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
       let axes : (ExistenceAxes, MembershipAxes) =
         phantom_axes ( child_skgid, &child_src, source_diffs . as_ref() );
       let child_title : String =
         title_for_phantom( child_skgid, &child_src,
-                           source_diffs . as_ref(), map, config );
+                           source_diffs . as_ref(), config );
       result . insert( child_skgid . clone(),
                      SubscribeeChildData { source: child_src,
                                            title: child_title,
@@ -227,14 +215,16 @@ fn build_subscribee_child_data (
                        SubscribeeChildData { source: s . clone(),
                                              title: t . clone(),
                                              phantom: None } );
-      } else if let Some (skg) = map . get (child_skgid) {
+      } else {
+        let child_src : SourceName =
+          find_source_many_ways (
+            child_skgid, &child_sources,
+            deleted_since_head_pid_src_map, config )
+          . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+        let skg : NodeComplete = skgnode_from_memory_or_disk (
+          config, child_skgid, &child_src ) ?;
         result . insert( child_skgid . clone(),
                        SubscribeeChildData { source: skg . source . clone(),
                                              title: skg . title . clone(),
-                                             phantom: None } );
-      } else {
-        return Err( format!(
-          "build_subscribee_child_data: \
-           subscribee {} not found in children or map",
-          child_skgid . 0 ) . into() ); } } }
+                                             phantom: None } ); } } }
   Ok (result) }

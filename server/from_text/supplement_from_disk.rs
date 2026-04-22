@@ -13,7 +13,6 @@ use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::memory::SkgNodeMap;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
@@ -24,7 +23,6 @@ use typedb_driver::TypeDBDriver;
 pub async fn supplement_none_fields_from_disk_if_save (
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
-  pool        : &SkgNodeMap,
   instruction : DefineNode
 ) -> Result<(DefineNode, Option<SourceMove>), Box<dyn Error>> {
   let mut from_buffer : NodeComplete = match instruction {
@@ -33,10 +31,8 @@ pub async fn supplement_none_fields_from_disk_if_save (
   let pid: ID =
     from_buffer . pid . clone();
   let from_disk : Option<NodeComplete> =
-    if let Some (from_pool) = pool . get (&pid)
-      { Some ( from_pool . clone () ) }
-      else { optskgnode_from_id( config, driver, &pid
-                               ) . await? };
+    optskgnode_from_id( config, driver, &pid
+                      ) . await?;
   let mut source_move : Option<SourceMove> = None;
   if let Some (disk_node) = from_disk {
     { // Replace buffer's (singleton) ids

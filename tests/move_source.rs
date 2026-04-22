@@ -15,7 +15,7 @@ use skg::dbs::memory::InRustGraphHandle;
 use skg::save::update_graph_minus_merges;
 use skg::test_utils::{cleanup_test_tantivy_and_typedb_dbs, graph_handle_from_config, audit_memory_or_panic};
 use skg::types::errors::{SaveError, BufferValidationError};
-use skg::types::memory::SkgNodeMap;
+
 use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::nodes::complete::NodeComplete;
@@ -146,8 +146,8 @@ fn test_move_node_to_another_owned_source (
     "};
     let (_forest, instructions, _merges, source_moves)
       = buffer_to_viewnode_forest_and_save_instructions (
-          org_text, &config, &driver,
-          &SkgNodeMap::new() ) . await?;
+          org_text, &config, &driver
+          ) . await?;
     assert_eq!(source_moves . len(), 1,
                "Expected exactly 1 source move");
     assert_eq!(source_moves[0] . pid . 0, "b");
@@ -242,8 +242,7 @@ fn test_move_node_referenced_by_extra_id (
     "};
     let (_forest, instructions, _merges, source_moves)
       = buffer_to_viewnode_forest_and_save_instructions (
-          org_text, &config, &driver,
-          &SkgNodeMap::new() ) . await?;
+          org_text, &config, &driver ) . await?;
 
     // source_moves should use the PID, not the extra_id
     assert_eq!(source_moves . len(), 1,
@@ -311,8 +310,8 @@ fn test_move_multiple_nodes (
     "};
     let (_forest, instructions, _merges, source_moves)
       = buffer_to_viewnode_forest_and_save_instructions (
-          org_text, &config, &driver,
-          &SkgNodeMap::new() ) . await?;
+          org_text, &config, &driver
+          ) . await?;
     assert_eq!(source_moves . len(), 2,
                "Expected 2 source moves");
 
@@ -373,8 +372,8 @@ fn test_move_to_foreign_source_rejected (
     "};
     let result =
       buffer_to_viewnode_forest_and_save_instructions (
-        org_text, &config, &driver,
-        &SkgNodeMap::new() ) . await;
+        org_text, &config, &driver
+        ) . await;
     assert!(result . is_err(),
             "Moving to foreign source should be rejected");
     if let Err (SaveError::DatabaseError (e)) = &result {
@@ -410,8 +409,8 @@ fn test_move_from_foreign_source_rejected (
     "};
     let result =
       buffer_to_viewnode_forest_and_save_instructions (
-        org_text, &config, &driver,
-        &SkgNodeMap::new() ) . await;
+        org_text, &config, &driver
+        ) . await;
     assert!(result . is_err(),
             "Moving from foreign source should be rejected");
 
@@ -441,8 +440,8 @@ fn test_move_and_merge_simultaneously_rejected (
     "};
     let result =
       buffer_to_viewnode_forest_and_save_instructions (
-        org_text, &config, &driver,
-        &SkgNodeMap::new() ) . await;
+        org_text, &config, &driver
+        ) . await;
     assert!(result . is_err(),
             "Moving and merging same node should be rejected");
     match result {
@@ -477,8 +476,8 @@ fn test_no_source_change_produces_no_moves (
     "};
     let (_forest, _instructions, _merges, source_moves)
       = buffer_to_viewnode_forest_and_save_instructions (
-          org_text, &config, &driver,
-          &SkgNodeMap::new() ) . await?;
+          org_text, &config, &driver
+          ) . await?;
     assert_eq!(source_moves . len(), 0,
                "No source changes => no source moves");
 
@@ -497,14 +496,9 @@ fn test_source_only_change_with_populated_pool (
       : (SkgConfig, TypeDBDriver, TantivyIndex, PathBuf)
       = setup (db_name, "move-source-8") . await?;
 
-    // Populate pool with the nodes as they exist on disk (source=public).
-    let pool : SkgNodeMap = {
-      let nodes : Vec<NodeComplete> =
-        read_all_skg_files_from_sources (&config)?;
-      let mut m : SkgNodeMap = SkgNodeMap::new();
-      for node in nodes {
-        m . insert (node . pid . clone(), node); }
-      m };
+    // Read all nodes (for test parity with earlier pool-populating variant).
+    let _nodes : Vec<NodeComplete> =
+      read_all_skg_files_from_sources (&config)?;
 
     // Change only b's source to private.
     // Title, body, contains — all identical to disk.
@@ -515,7 +509,7 @@ fn test_source_only_change_with_populated_pool (
     "};
     let (_forest, instructions, _merges, source_moves)
       = buffer_to_viewnode_forest_and_save_instructions (
-          org_text, &config, &driver, &pool ) . await?;
+          org_text, &config, &driver ) . await?;
 
     // The source move must be detected even with populated pool.
     assert_eq!(source_moves . len(), 1,
