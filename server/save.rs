@@ -159,16 +159,16 @@ pub async fn update_typedb_from_saveinstructions (
         . await } ?; }}
 
   { // create | update
-    let to_write_skgnodes : Vec<NodeComplete> =
+    let to_write_nodecompletes : Vec<NodeComplete> =
       to_save . iter ()
       . map ( |SaveNode (node) | node . clone() )
       . collect ();
     let to_write_pids : Vec<ID> =
-      to_write_skgnodes . iter ()
+      to_write_nodecompletes . iter ()
       . map ( |n| n . pid . clone() )
       . collect ();
     let to_write_typedb : Vec<NodeTypedb> = // Convert to NodeTypedb (narrow) at the boundary. Parses textlinks from each node's title+body.
-      to_write_skgnodes . iter ()
+      to_write_nodecompletes . iter ()
       . map (NodeTypedb::from_complete_parsing_textlinks)
       . collect ();
     let pre_existing_pids : HashSet<String> = { // "Pre-existing" = not being created now. Existing ones need their has_extra_id relations re-synced below; create_only_nodes_with_no_ids_present handles extra_ids only for newly-created nodes via its internal call to 'create_node'.

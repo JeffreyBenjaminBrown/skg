@@ -193,7 +193,7 @@ fn install_shutdown_signal_handler (
   } ) . expect ("Error setting Ctrl+C handler"); }
 
 /// Compute context origin types for search ranking.
-/// Fully in-memory: all data is pre-computed from SkgNodes at init.
+/// Fully in-memory: all data is pre-computed from NodeCompletes at init.
 /// Consumes (and frees) the large lookup maps after use.
 fn compute_context_rankings (
   tantivy_index     : &TantivyIndex,

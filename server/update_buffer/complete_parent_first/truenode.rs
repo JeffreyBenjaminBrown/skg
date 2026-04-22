@@ -7,14 +7,14 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::types::memory::find_source_many_ways;
 use crate::types::nodes::complete::NodeComplete;
-use crate::git_ops::read_repo::skgnode_from_git_head;
-use crate::types::memory::skgnode_from_memory_or_disk;
+use crate::git_ops::read_repo::nodecomplete_from_git_head;
+use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, Scaffold, DeletedNode, IndefOrDef,
     Birth, mk_definitive_viewnode};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
-use crate::types::tree::viewnode_skgnode::{
+use crate::types::tree::viewnode_nodecomplete::{
     pid_and_source_from_treenode,
     write_at_truenode_in_tree,
     unique_scaffold_child,
@@ -111,20 +111,20 @@ pub fn complete_truenode_preorder (
     if let IndefOrDef::Definitive { edit_request, .. }
       = &mut t . indef_or_def
       { *edit_request = None; } } ) ?;
-  let skgnode : NodeComplete =
-    skgnode_from_memory_or_disk ( config, &pid, &source ) ?;
+  let nodecomplete : NodeComplete =
+    nodecomplete_from_memory_or_disk ( config, &pid, &source ) ?;
   if ! is_saved_view { // The saved (definitive) view of a node *defines* the title and body, but other views need those fields updated.
-    let disk_title : String = skgnode . title . clone ();
-    let disk_body  : Option<String> = skgnode . body . clone ();
+    let disk_title : String = nodecomplete . title . clone ();
+    let disk_body  : Option<String> = nodecomplete . body . clone ();
     write_at_truenode_in_tree ( tree, node, |t| {
       t . title = disk_title;
       if let IndefOrDef::Definitive { body, .. } = &mut t . indef_or_def {
         *body = disk_body; } }
     ) ?; }
   let content_ids : Vec<ID> =
-    skgnode . contains . clone();
+    nodecomplete . contains . clone();
   let subscribes_to : Vec<ID> =
-    skgnode . subscribes_to . or_default() . to_vec();
+    nodecomplete . subscribes_to . or_default() . to_vec();
   let node_changes : Option<&NodeChanges> =
     node_changes_for_truenode( source_diffs, &pid, &source );
   let is_sub : bool = is_subscribee( tree, node ) ?;
@@ -206,10 +206,10 @@ fn content_goal_list (
       pid_and_source_from_ancestor( tree, node, 2,
                                     "content_goal_list" ) ?;
     let worktree_hidden : Vec<ID> =
-      { let grandparent_skgnode : NodeComplete =
-          skgnode_from_memory_or_disk (
+      { let grandparent_nodecomplete : NodeComplete =
+          nodecomplete_from_memory_or_disk (
             config, &grandparent_pid, &grandparent_source ) ?;
-        grandparent_skgnode . hides_from_its_subscriptions
+        grandparent_nodecomplete . hides_from_its_subscriptions
           . or_default() . to_vec() };
     let apparent_content_ids : Vec<ID> =
       setlike_vector_subtraction (
@@ -220,7 +220,7 @@ fn content_goal_list (
                  HashSet::new()),
         Some (nc) => {
           let head_hidden : Vec<ID> =
-            skgnode_from_git_head(
+            nodecomplete_from_git_head(
                 &grandparent_pid, &grandparent_source, config )
               . ok()
               . map( |skg| skg . hides_from_its_subscriptions . into_vec() )
@@ -472,7 +472,7 @@ fn build_child_creation_data (
                      deleted_since_head_pid_src_map, config )
         . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
       let skg : NodeComplete =
-        skgnode_from_memory_or_disk ( config, id, &child_source ) ?;
+        nodecomplete_from_memory_or_disk ( config, id, &child_source ) ?;
       result . insert( id . clone(),
                      ChildData { title: skg . title . clone(),
                                  source: skg . source . clone(),

@@ -1,6 +1,6 @@
 use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
 use crate::dbs::typedb::search::find_related_nodes;
-use crate::types::memory::skgnode_from_memory_or_disk_async;
+use crate::types::memory::nodecomplete_from_memory_or_disk_async;
 use crate::types::save::{Merge, SaveNode, DeleteNode};
 use crate::types::misc::{MSV, SkgConfig, ID};
 use crate::types::viewnode::EditRequest;
@@ -69,7 +69,7 @@ pub async fn neighbor_savenodes_for_merges (
     Vec::with_capacity (to_load . len ());
   for pid in &to_load {
     let node : NodeComplete =
-      skgnode_from_memory_or_disk_async (config, driver, pid) . await ?;
+      nodecomplete_from_memory_or_disk_async (config, driver, pid) . await ?;
     save_nodes . push ( SaveNode (node) ); }
   Ok (save_nodes) }
 
@@ -113,15 +113,15 @@ async fn optmerge_from_viewnode (
     _ => return Ok (None) };
   let acquirer_id : &ID = &t . id;
   let acquirer_from_disk : NodeComplete =
-    skgnode_from_memory_or_disk_async (
+    nodecomplete_from_memory_or_disk_async (
       config, driver, acquirer_id ) . await?;
   let acquiree_from_disk : NodeComplete =
-    skgnode_from_memory_or_disk_async (
+    nodecomplete_from_memory_or_disk_async (
       config, driver, &acquiree_id ) . await?;
   let acquiree_text_preserver : NodeComplete =
     create_acquiree_text_preserver (&acquiree_from_disk);
   let updated_acquirer : NodeComplete =
-    three_merged_skgnodes( &acquirer_from_disk,
+    three_merged_nodecompletes( &acquirer_from_disk,
                            &acquiree_from_disk,
                            &acquiree_text_preserver)?;
   Ok(Some(Merge {
@@ -141,7 +141,7 @@ async fn optmerge_from_viewnode (
 ///   - 'Novel' = not among the acquirer's contents
 /// - Combined relationship fields (subscribes_to, overrides_view_of)
 /// - Filtered hides_from_its_subscriptions (can't hide your own content)
-fn three_merged_skgnodes(
+fn three_merged_nodecompletes(
   acquirer_from_disk: &NodeComplete,
   acquiree_from_disk: &NodeComplete,
   acquiree_text_preserver: &NodeComplete,

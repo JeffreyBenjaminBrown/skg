@@ -51,7 +51,7 @@ impl SaveResponse {
 
 /// Handles save buffer requests from Emacs.
 /// - Reads the buffer content (with length prefix).
-/// - Builds an initial SkgnodeMap from the ConnectionState's memory. It can change during the save process.
+/// - Builds an initial NodeCompleteMap from the ConnectionState's memory. It can change during the save process.
 /// - 'update_from_and_rerender_buffer'
 /// - Responds to Emacs (with length prefix).
 pub fn handle_save_buffer_request (
@@ -264,8 +264,8 @@ pub fn deleted_ids_to_source (
   for (source_name, source_diff) in source_diffs {
     for diffs in [ &source_diff . staged,
                    &source_diff . unstaged ] {
-      for (path, skgnode_diff) in diffs {
-        if skgnode_diff . status == GitDiffStatus::Deleted {
+      for (path, nodecomplete_diff) in diffs {
+        if nodecomplete_diff . status == GitDiffStatus::Deleted {
           if let Some (stem) = path . file_stem() {
             let id : ID = ID ( stem . to_string_lossy()
                                . into_owned() );

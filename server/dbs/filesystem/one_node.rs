@@ -10,7 +10,7 @@ use std::fs;
 use serde_yaml;
 use typedb_driver::TypeDBDriver;
 
-pub async fn skgnode_from_id (
+pub async fn nodecomplete_from_id (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   skgid  : &ID
@@ -21,11 +21,11 @@ pub async fn skgnode_from_id (
     ) . await ?
     . ok_or_else ( || format! (
       "ID '{}' not found in database", skgid ) ) ?;
-  Ok ( skgnode_from_pid_and_source (
+  Ok ( nodecomplete_from_pid_and_source (
     config, pid, &source )? ) }
 
-/// Fetch multiple SkgNodes from disk given a list of IDs.
-pub async fn skgnodes_from_ids (
+/// Fetch multiple NodeCompletes from disk given a list of IDs.
+pub async fn nodecompletes_from_ids (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   ids    : &[ID],
@@ -33,12 +33,12 @@ pub async fn skgnodes_from_ids (
   let mut nodes : Vec<NodeComplete> = Vec::new();
   for id in ids {
     let node : NodeComplete =
-      skgnode_from_id ( config, driver, id ) . await ?;
+      nodecomplete_from_id ( config, driver, id ) . await ?;
     nodes . push (node); }
   Ok (nodes) }
 
 /// Reads a NodeComplete from disk given its PID and source.
-pub fn skgnode_from_pid_and_source (
+pub fn nodecomplete_from_pid_and_source (
   config : &SkgConfig,
   pid    : ID,
   source : &SourceName,
@@ -48,21 +48,21 @@ pub fn skgnode_from_pid_and_source (
       path_from_pid_and_source( config, source, pid )
       . map_err ( |e| io::Error::new (
         io::ErrorKind::NotFound, e) ) ?;
-    read_skgnode (path)? };
+    read_nodecomplete (path)? };
   Ok ( node_fs . into_complete ( source . clone () )) }
 
 /// Reads a node from disk, returning None if not found
 /// (either in DB or on filesystem).
 /// ERRORS are propagated only if they are not of the 'not found' kind.
-pub async fn optskgnode_from_id (
+pub async fn optnodecomplete_from_id (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   skgid  : &ID
 ) -> Result<Option<NodeComplete>, Box<dyn Error>> {
-  match skgnode_from_id(
+  match nodecomplete_from_id(
     config, driver, skgid
   ) . await {
-    Ok (skgnode) => Ok(Some (skgnode)),
+    Ok (nodecomplete) => Ok(Some (nodecomplete)),
     Err (e)      => {
       let error_msg: String = e . to_string();
       if error_msg . contains ("not found")
@@ -79,24 +79,24 @@ pub async fn fetch_aliases_from_file (
   driver : &TypeDBDriver,
   skgid  : ID,
 ) -> Vec<String> {
-  match optskgnode_from_id(
+  match optnodecomplete_from_id(
     config, driver, &skgid
   ) . await {
-    Ok ( Some (skgnode)) =>
-      skgnode . aliases . into_vec(),
+    Ok ( Some (nodecomplete)) =>
+      nodecomplete . aliases . into_vec(),
     _ => Vec::new(), }}
 
-pub fn write_skgnode_to_source (
-  skgnode : &NodeComplete,
+pub fn write_nodecomplete_to_source (
+  nodecomplete : &NodeComplete,
   config  : &SkgConfig,
 ) -> io::Result<()> {
-  let pid : &ID = &skgnode . pid;
+  let pid : &ID = &nodecomplete . pid;
   let path : String =
     path_from_pid_and_source(
-      config, &skgnode . source, pid . clone() )
+      config, &nodecomplete . source, pid . clone() )
     . map_err ( |e| io::Error::new (
       io::ErrorKind::NotFound, e) ) ?;
-  write_skgnode ( skgnode, &path ) }
+  write_nodecomplete ( nodecomplete, &path ) }
 
 
 /// Checks that a node's primary ID matches the filename stem.
@@ -125,7 +125,7 @@ pub(super) fn validate_pid_matches_filename (
 ///
 /// Returns a NodeFS (on-disk shape, no source). Callers attach
 /// source via 'NodeFS::into_complete' based on file location.
-pub(super) fn read_skgnode
+pub(super) fn read_nodecomplete
   <P : AsRef <Path>> // any type that can be converted to an &Path
   (file_path : P
   ) -> io::Result <NodeFS> {
@@ -154,12 +154,12 @@ pub(super) fn read_skgnode
 ///
 /// Converts to 'NodeFS' (drops source) before serializing, so
 /// source is not written to the YAML on disk.
-pub(super) fn write_skgnode
+pub(super) fn write_nodecomplete
   <P : AsRef<Path>>
-  ( skgnode   : &NodeComplete,
+  ( nodecomplete   : &NodeComplete,
     file_path : P
   ) -> io::Result<()> {
-    let node_fs : NodeFS = NodeFS::from (skgnode);
+    let node_fs : NodeFS = NodeFS::from (nodecomplete);
     fs::write ( file_path,
                 {
                   let yaml_string : String =

@@ -1,10 +1,10 @@
-use crate::git_ops::read_repo::skgnode_from_git_head;
+use crate::git_ops::read_repo::nodecomplete_from_git_head;
 use crate::types::viewnode::mk_phantom_viewnode;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff, NodeChanges, node_changes_for_truenode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
-use crate::types::memory::{find_source_many_ways, skgnode_from_memory_or_disk};
+use crate::types::memory::{find_source_many_ways, nodecomplete_from_memory_or_disk};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, write_at_ancestor_in_tree, with_node_mut};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth, mk_indefinitive_viewnode};
@@ -61,14 +61,14 @@ pub fn complete_hiddenoutsideofsubscribeecol (
     pid_and_source_from_ancestor(
       tree, node, 2,
       "complete_hiddenoutsideofsubscribeecol" ) ?;
-  let wt_subscriber_skgnode : NodeComplete =
-    skgnode_from_memory_or_disk (
+  let wt_subscriber_nodecomplete : NodeComplete =
+    nodecomplete_from_memory_or_disk (
       config, &subscriber_pid, &subscriber_source ) ?;
   let wt_subscriber_hides : Vec<ID> =
-    wt_subscriber_skgnode . hides_from_its_subscriptions
+    wt_subscriber_nodecomplete . hides_from_its_subscriptions
       . or_default() . to_vec();
   let wt_subscribees : Vec<ID> =
-    wt_subscriber_skgnode . subscribes_to
+    wt_subscriber_nodecomplete . subscribes_to
       . or_default() . to_vec();
   let wt_all_subscribee_content : HashSet<ID> =
     // everything contained by any subscribee
@@ -76,7 +76,7 @@ pub fn complete_hiddenoutsideofsubscribeecol (
       . flat_map ( |pid| {
         match snapshot_global_source (pid, config) {
           Some (src) =>
-            skgnode_from_memory_or_disk ( config, pid, &src )
+            nodecomplete_from_memory_or_disk ( config, pid, &src )
               . ok ()
               . map ( |skg| skg . contains )
               . unwrap_or_default (),
@@ -94,7 +94,7 @@ pub fn complete_hiddenoutsideofsubscribeecol (
       Some (_) => {
         let (head_subscriber_hides, head_subscribees)
           : (Vec<ID>, Vec<ID>)
-          = skgnode_from_git_head(
+          = nodecomplete_from_git_head(
                 &subscriber_pid, &subscriber_source, config )
               . ok()
               . map( |skg| (skg . hides_from_its_subscriptions
@@ -198,7 +198,7 @@ fn head_subscribee_contains_from_memory_and_diffs (
                 { result . insert( id . clone() ); },
             Diff_Item::New (_) => {} } } },
       None => {
-        if let Ok (skg) = skgnode_from_memory_or_disk (
+        if let Ok (skg) = nodecomplete_from_memory_or_disk (
           config, pid, &subscribee_source )
         { for id in skg . contains . into_iter () {
             result . insert (id); } } } } }
@@ -276,7 +276,7 @@ fn build_hidden_child_data (
             child_skgid, &child_sources,
             deleted_since_head_pid_src_map, config )
           . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
-        let skg : NodeComplete = skgnode_from_memory_or_disk (
+        let skg : NodeComplete = nodecomplete_from_memory_or_disk (
           config, child_skgid, &child_src ) ?;
         result . insert( child_skgid . clone(),
                        HiddenChildData { source: skg . source . clone(),

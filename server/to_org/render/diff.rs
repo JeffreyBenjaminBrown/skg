@@ -9,14 +9,14 @@
 /// Phantoms are inserted wherever some stage's parent.contains had the
 /// child but the worktree's parent.contains lacks it.
 
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, SkgnodeDiff, GitDiffStatus, NodeChanges};
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges};
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::title_for_phantom;
 use crate::types::memory::find_source_many_ways;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, viewnode_from_scaffold, mk_phantom_viewnode };
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
-use crate::types::tree::viewnode_skgnode::pid_and_source_from_treenode;
+use crate::types::tree::viewnode_nodecomplete::pid_and_source_from_treenode;
 
 use ego_tree::{Tree, NodeMut, NodeRef, NodeId};
 use std::collections::HashMap;
@@ -58,7 +58,7 @@ fn process_node_for_diff (
     _ => Ok (()) }}
 
 /// Decorate a TrueNode (and its scaffold/phantom children) with the
-/// per-stage axes derived from staged and unstaged SkgnodeDiffs.
+/// per-stage axes derived from staged and unstaged NodeCompleteDiffs.
 fn process_truenode_diff (
   mut node_mut       : NodeMut<ViewNode>,
   source_diffs       : &HashMap<SourceName, SourceDiff>,
@@ -82,9 +82,9 @@ fn process_truenode_diff (
     return Ok (( )); }
   let file_path : PathBuf =
     PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-  let staged   : Option<&SkgnodeDiff> =
+  let staged   : Option<&NodeCompleteDiff> =
     source_diff . staged   . get (&file_path);
-  let unstaged : Option<&SkgnodeDiff> =
+  let unstaged : Option<&NodeCompleteDiff> =
     source_diff . unstaged . get (&file_path);
   if staged . is_none () && unstaged . is_none ()
     { return Ok (( )); }

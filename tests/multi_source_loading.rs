@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use tempfile::{tempdir, TempDir};
 
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
-use skg::dbs::filesystem::one_node::write_skgnode_to_source;
+use skg::dbs::filesystem::one_node::write_nodecomplete_to_source;
 use skg::types::misc::{SkgfileSource, SkgConfig, ID, SourceName};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
@@ -22,7 +22,7 @@ fn test_load_from_single_source() {
   let source_path : PathBuf = temp_dir . path() . join ("main");
   fs::create_dir_all (&source_path) . unwrap();
 
-  let config : SkgConfig = { // Needed by write_skgnode_to_source
+  let config : SkgConfig = { // Needed by write_nodecomplete_to_source
     let mut sources : HashMap<SourceName, SkgfileSource> =
       HashMap::new();
     sources . insert(
@@ -39,7 +39,7 @@ fn test_load_from_single_source() {
   node . pid = ID::new ("test1");
   node . title = "Test Node 1" . to_string();
   node . source = SourceName::from ("main");
-  write_skgnode_to_source(&node, &config) . unwrap();
+  write_nodecomplete_to_source(&node, &config) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
     read_all_skg_files_from_sources (&config);
@@ -85,20 +85,20 @@ fn test_load_from_multiple_sources() {
   node1 . pid = ID::new ("main1");
   node1 . title = "Main Node 1" . to_string();
   node1 . source = SourceName::from ("main");
-  write_skgnode_to_source(&node1, &config) . unwrap();
+  write_nodecomplete_to_source(&node1, &config) . unwrap();
 
   let mut node2 : NodeComplete = empty_node_complete();
   node2 . pid = ID::new ("main2");
   node2 . title = "Main Node 2" . to_string();
   node2 . source = SourceName::from ("main");
-  write_skgnode_to_source(&node2, &config) . unwrap();
+  write_nodecomplete_to_source(&node2, &config) . unwrap();
 
   // Create nodes in shared source
   let mut node3 : NodeComplete = empty_node_complete();
   node3 . pid = ID::new ("shared1");
   node3 . title = "Shared Node 1" . to_string();
   node3 . source = SourceName::from ("shared");
-  write_skgnode_to_source(&node3, &config) . unwrap();
+  write_nodecomplete_to_source(&node3, &config) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
     read_all_skg_files_from_sources (&config);
@@ -153,13 +153,13 @@ fn test_duplicate_id_detection_across_sources() {
   node1 . pid = ID::new ("duplicate_id");
   node1 . title = "Node in Main" . to_string();
   node1 . source = SourceName::from ("main");
-  write_skgnode_to_source(&node1, &config) . unwrap();
+  write_nodecomplete_to_source(&node1, &config) . unwrap();
 
   let mut node2 : NodeComplete = empty_node_complete();
   node2 . pid = ID::new ("duplicate_id");
   node2 . title = "Node in Shared" . to_string();
   node2 . source = SourceName::from ("shared");
-  write_skgnode_to_source(&node2, &config) . unwrap();
+  write_nodecomplete_to_source(&node2, &config) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
     read_all_skg_files_from_sources (&config);
@@ -207,7 +207,7 @@ fn test_node_with_multiple_ids_duplicate_detection() {
   node1 . extra_ids = vec![ID::new ("id2")];
   node1 . title = "Node with Multiple IDs" . to_string();
   node1 . source = SourceName::from ("main");
-  write_skgnode_to_source(&node1, &config) . unwrap();
+  write_nodecomplete_to_source(&node1, &config) . unwrap();
 
   // Create node in shared that has one overlapping ID
   let mut node2 : NodeComplete = empty_node_complete();
@@ -215,7 +215,7 @@ fn test_node_with_multiple_ids_duplicate_detection() {
   node2 . extra_ids = vec![ID::new ("id3")];
   node2 . title = "Another Node" . to_string();
   node2 . source = SourceName::from ("shared");
-  write_skgnode_to_source(&node2, &config) . unwrap();
+  write_nodecomplete_to_source(&node2, &config) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
     read_all_skg_files_from_sources (&config);
@@ -282,13 +282,13 @@ fn test_source_field_set_correctly() {
   node_a . pid = ID::new ("node_a");
   node_a . title = "Node A" . to_string();
   node_a . source = SourceName::from ("source_a");
-  write_skgnode_to_source(&node_a, &config) . unwrap();
+  write_nodecomplete_to_source(&node_a, &config) . unwrap();
 
   let mut node_b : NodeComplete = empty_node_complete();
   node_b . pid = ID::new ("node_b");
   node_b . title = "Node B" . to_string();
   node_b . source = SourceName::from ("source_b");
-  write_skgnode_to_source(&node_b, &config) . unwrap();
+  write_nodecomplete_to_source(&node_b, &config) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
     read_all_skg_files_from_sources (&config);
@@ -351,8 +351,8 @@ fn test_many_duplicate_ids_creates_org_file() {
     node_b . title = format!("Node B {}", i);
     node_a . source = SourceName::from ("source_a");
     node_b . source = SourceName::from ("source_b");
-    write_skgnode_to_source(&node_a, &config) . unwrap();
-    write_skgnode_to_source(&node_b, &config) . unwrap(); }
+    write_nodecomplete_to_source(&node_a, &config) . unwrap();
+    write_nodecomplete_to_source(&node_b, &config) . unwrap(); }
 
   let result : IoResult<Vec<NodeComplete>> =
     read_all_skg_files_from_sources (&config);
@@ -423,7 +423,7 @@ fn test_unreadable_files_creates_org_file() {
   node . pid = ID::new ("test1");
   node . title = "Test Node" . to_string();
   node . source = SourceName::from ("source_good");
-  write_skgnode_to_source(&node, &write_config) . unwrap();
+  write_nodecomplete_to_source(&node, &write_config) . unwrap();
 
   // Create config with both sources for reading (including the bad one)
   let mut sources : HashMap<SourceName, SkgfileSource> =

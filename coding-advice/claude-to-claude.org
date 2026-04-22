@@ -101,7 +101,7 @@ There are three ways to test the code:
   - textlinks_to: org-roam style [[id:...]] hyperlinks
 
   The view system is ephemeral scaffolding rebuilt every save:
-  - TrueNode: corresponds to an SkgNode, can be Definitive (editable) or Indefinitive (read-only)
+  - TrueNode: corresponds to an NodeComplete, can be Definitive (editable) or Indefinitive (read-only)
   - Scaffold: display-only nodes (AliasCol, IDCol, SubscribeeCol, HiddenInSubscribeeCol, etc.)
   - 'complete_viewtree' does two DFS passes:
     preorder (parent-first): reconcile children, add subscription scaffolds

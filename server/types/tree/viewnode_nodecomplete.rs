@@ -1,7 +1,7 @@
 /// Node access utilities for ego_tree::Tree<ViewNode> and Tree<UncheckedViewNode>
 
-use crate::to_org::util::{skgnode_and_viewnode_from_id, get_id_from_treenode};
-use crate::types::memory::skgnode_from_memory_or_disk;
+use crate::to_org::util::{nodecomplete_and_viewnode_from_id, get_id_from_treenode};
+use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, TrueNode, Scaffold,
@@ -104,10 +104,10 @@ pub fn pids_for_subscriber_and_its_subscribees (
   let (pid, source) : (ID, SourceName) =
     pid_and_source_from_treenode (
       tree, node_id, "pids_for_subscriber_and_its_subscribees" ) ?;
-  let skgnode : NodeComplete =
-    skgnode_from_memory_or_disk ( config, &pid, &source ) ?;
-  Ok (( skgnode . pid . clone (),
-        skgnode . subscribes_to . or_default() . to_vec() )) }
+  let nodecomplete : NodeComplete =
+    nodecomplete_from_memory_or_disk ( config, &pid, &source ) ?;
+  Ok (( nodecomplete . pid . clone (),
+        nodecomplete . subscribes_to . or_default() . to_vec() )) }
 
 /// Extract PIDs for a Subscribee and its grandparent (the subscriber).
 /// Expects: subscriber -> SubscribeeCol -> Subscribee (this node)
@@ -134,11 +134,11 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
     pid_and_source_from_treenode (
       tree, grandparent_ref . id (),
       "pid_for_subscribee_and_its_subscriber_grandparent" ) ?;
-  let skgnode : NodeComplete =
-    skgnode_from_memory_or_disk (
+  let nodecomplete : NodeComplete =
+    nodecomplete_from_memory_or_disk (
       config, &subscriber_id, &subscriber_source ) ?;
   Ok (( subscribee_pid,
-        skgnode . pid . clone() )) }
+        nodecomplete . pid . clone() )) }
 
 pub fn insert_scaffold_as_child (
   tree          : &mut Tree<ViewNode>,
@@ -165,8 +165,8 @@ pub async fn append_indefinitive_from_disk_as_child (
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  let ( _skgnode, content_viewnode ) : ( NodeComplete, ViewNode ) =
-    skgnode_and_viewnode_from_id (
+  let ( _nodecomplete, content_viewnode ) : ( NodeComplete, ViewNode ) =
+    nodecomplete_and_viewnode_from_id (
       config, driver, node_id ) . await ?;
   let viewnode : ViewNode =
     mk_indefinitive_from_viewnode (

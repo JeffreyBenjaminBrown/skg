@@ -17,11 +17,11 @@ use std::error::Error;
 use std::net::TcpStream;
 use std::path::Path;
 
-use skg::dbs::filesystem::one_node::skgnode_from_pid_and_source;
+use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_source;
 use skg::test_utils::{run_with_test_db, graph_handle_from_config, audit_memory_or_panic};
 use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
 use skg::serve::ConnectionState;
-use skg::types::memory::SkgnodesInViews;
+use skg::types::memory::OpenViews;
 
 use skg::dbs::memory::InRustGraphHandle;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex, SourceName};
@@ -59,7 +59,7 @@ async fn merge_container_into_content_impl (
     graph_handle_from_config (config) ?;
   let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : false,
-        memory            : SkgnodesInViews::new (),
+        memory            : OpenViews::new (),
         graph             : graph . clone () };
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
@@ -88,19 +88,19 @@ async fn merge_container_into_content_impl (
       "a.skg should be deleted after merge" . to_string() ); }
 
   // aa.skg should exist and have the merged content.
-  let aa_skgnode =
-    skgnode_from_pid_and_source (
+  let aa_nodecomplete =
+    nodecomplete_from_pid_and_source (
       config, ID::from ("aa"), &SourceName::from ("main") ) ?;
-  if !aa_skgnode . extra_ids . contains (&ID::from ("a")) {
+  if !aa_nodecomplete . extra_ids . contains (&ID::from ("a")) {
     failures . push (
       "aa should have 'a' as an extra_id" . to_string() ); }
-  if !aa_skgnode . contains . contains (&ID::from ("x")) {
+  if !aa_nodecomplete . contains . contains (&ID::from ("x")) {
     failures . push (
       "aa should still contain x" . to_string() ); }
-  if !aa_skgnode . contains . contains (&ID::from ("b")) {
+  if !aa_nodecomplete . contains . contains (&ID::from ("b")) {
     failures . push (
       "aa should now contain b (adopted from a)" . to_string() ); }
-  if !aa_skgnode . contains . contains (&ID::from ("c")) {
+  if !aa_nodecomplete . contains . contains (&ID::from ("c")) {
     failures . push (
       "aa should now contain c (adopted from a)" . to_string() ); }
 
@@ -109,7 +109,7 @@ async fn merge_container_into_content_impl (
   // but not x, b, c, or aa.
   let known_ids : Vec<&str> = vec!["x", "b", "c", "aa"];
   let preserver_candidates : Vec<&ID> =
-    aa_skgnode . contains . iter()
+    aa_nodecomplete . contains . iter()
     . filter ( |id| !known_ids . contains (& id . 0 . as_str()) )
     . collect();
   if preserver_candidates . len() != 1 {
@@ -118,29 +118,29 @@ async fn merge_container_into_content_impl (
       preserver_candidates . len(), preserver_candidates ) );
   } else {
     let preserver_pid : &ID = preserver_candidates[0];
-    let preserver_skgnode =
-      skgnode_from_pid_and_source (
+    let preserver_nodecomplete =
+      nodecomplete_from_pid_and_source (
         config, preserver_pid . clone(),
         &SourceName::from ("main") ) ?;
-    if preserver_skgnode . title != "MERGED: a" {
+    if preserver_nodecomplete . title != "MERGED: a" {
       failures . push ( format!(
         "Text preserver title should be 'MERGED: a', got '{}'",
-        preserver_skgnode . title )); }
-    if preserver_skgnode . source != SourceName::from ("main") {
+        preserver_nodecomplete . title )); }
+    if preserver_nodecomplete . source != SourceName::from ("main") {
       failures . push ( format!(
         "Text preserver source should be 'main', got '{:?}'",
-        preserver_skgnode . source )); }
-    if !preserver_skgnode . contains . is_empty() {
+        preserver_nodecomplete . source )); }
+    if !preserver_nodecomplete . contains . is_empty() {
       failures . push ( format!(
         "Text preserver should have no contents, got {:?}",
-        preserver_skgnode . contains )); }
-    if !preserver_skgnode . extra_ids . is_empty() {
+        preserver_nodecomplete . contains )); }
+    if !preserver_nodecomplete . extra_ids . is_empty() {
       failures . push ( format!(
         "Text preserver should have no extra_ids, got {:?}",
-        preserver_skgnode . extra_ids )); } }
+        preserver_nodecomplete . extra_ids )); } }
 
   // aa must not contain itself in the filesystem.
-  if aa_skgnode . contains . contains (&ID::from ("aa")) {
+  if aa_nodecomplete . contains . contains (&ID::from ("aa")) {
     failures . push (
       "aa contains itself on filesystem (self-containment after merge)"
       . to_string() ); }

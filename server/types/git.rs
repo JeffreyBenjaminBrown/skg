@@ -46,8 +46,8 @@ pub struct MembershipAxes {
 #[derive(Debug, Clone)]
 pub struct SourceDiff {
   pub is_git_repo: bool,
-  pub staged   : HashMap<PathBuf, SkgnodeDiff>,
-  pub unstaged : HashMap<PathBuf, SkgnodeDiff>,
+  pub staged   : HashMap<PathBuf, NodeCompleteDiff>,
+  pub unstaged : HashMap<PathBuf, NodeCompleteDiff>,
   /// Nodes that existed in HEAD but not in worktree (deleted files).
   /// Loaded from git HEAD or from the index. Used for phantom titles.
   pub deleted_nodes: HashMap<ID, NodeComplete>,
@@ -55,8 +55,8 @@ pub struct SourceDiff {
 
 /// All the diff info for a single .skg file.
 #[derive(Debug, Clone)]
-pub struct SkgnodeDiff {
-  // TODO ? Since we keep the skgnode around for deleted nodes already, why not just do that for everything, and dispense with the node_changes field?
+pub struct NodeCompleteDiff {
+  // TODO ? Since we keep the nodecomplete around for deleted nodes already, why not just do that for everything, and dispense with the node_changes field?
   pub status: GitDiffStatus,
   pub node_changes: Option<NodeChanges>,
   pub head_node: Option<NodeComplete>, // only for deleted files

@@ -8,7 +8,7 @@ use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SourceName};
 use skg::types::viewnode::{EditRequest, ViewNode, ViewNodeKind, TrueNode, IndefOrDef, forest_root_viewnode, default_truenode};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::Merge;
-use skg::dbs::filesystem::one_node::skgnode_from_pid_and_source;
+use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_source;
 use skg::util::path_from_pid_and_source;
 use skg::dbs::typedb::search::contains_from_pids::contains_from_pids;
 use skg::dbs::typedb::search::{find_related_nodes, find_related_nodes_from_memory};
@@ -182,7 +182,7 @@ fn verify_filesystem_after_merge_2_into_1(
             "2.skg should be deleted" );
 
   // Node 1's file should be updated
-  let node_1: NodeComplete = skgnode_from_pid_and_source(
+  let node_1: NodeComplete = nodecomplete_from_pid_and_source(
     config, ID::from ("1"), &SourceName::from ("main") )?;
   assert_eq!(&node_1 . pid, &ID::from ("1"));
   assert_eq!(node_1 . extra_ids . len(), 2, "Node 1 should have 2 extra_ids");
@@ -247,7 +247,7 @@ fn verify_filesystem_after_merge_2_into_1(
            "acquiree_text_preserver file should exist" );
 
   let acquiree_text_preserver: NodeComplete =
-    skgnode_from_pid_and_source( config,
+    nodecomplete_from_pid_and_source( config,
                                  acquiree_text_preserver_id . clone(),
                                  &SourceName::from ("main") )?;
   assert!(acquiree_text_preserver . title . starts_with ("MERGED: "));
@@ -531,7 +531,7 @@ fn verify_filesystem_after_merge_1_into_2(
             "1.skg should be deleted" );
 
   // Node 2's file should be updated
-  let node_2: NodeComplete = skgnode_from_pid_and_source(
+  let node_2: NodeComplete = nodecomplete_from_pid_and_source(
     config, ID::from ("2"), &SourceName::from ("main") )?;
 
   // Should have pid=2, extra_ids=[2-extra-id, 1]
@@ -597,7 +597,7 @@ fn verify_filesystem_after_merge_1_into_2(
            "acquiree_text_preserver file should exist" );
 
   let acquiree_text_preserver: NodeComplete =
-    skgnode_from_pid_and_source( config,
+    nodecomplete_from_pid_and_source( config,
                                  acquiree_text_preserver_id . clone(),
                                  &SourceName::from ("main") )?;
   assert!(acquiree_text_preserver . title . starts_with ("MERGED: "));

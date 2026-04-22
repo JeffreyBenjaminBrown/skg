@@ -1,5 +1,9 @@
-* ONGOING cleaning
-** The term 'skgnode' should be changed in function names.
+* my data
+** org-roam import: Use actual newlines.
+** retrieve the commits in data/public-1-mangled/
+* TODO fix audit error messages
+They currently land at the top of the main buffer,
+rather than a separate error buffer.
 * coollected while dogfooding, unassimilated
 ** Use literal newlines in .skg body fields.
 Otherwise the diff is undreadable.
@@ -18,11 +22,6 @@ If not, it might be worth doing. Other recursive graph queries are.
 * maybe : how to use AI
 Ask for criticism *before*
 asking to be asked for missing details.
-* ONGOING very worth it
-** new command shortcuts
-see TODO/change-command-names-and-aliases.org
-** when requesting containerward views
-warn the user that the buffer is updating
 * commit history
 ** UNREVIEWED : the Rust-v-Typedb audit code
 ad9b84c8ad476b93b911c0513107ab70df15c449..34b23094fc839224dc6accdbffcd4adf58eebc51

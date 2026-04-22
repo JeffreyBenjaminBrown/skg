@@ -74,7 +74,7 @@ pub type MapToContainers = HashMap<ID, Vec<ID>>;
 /// Compute context origin types for all nodes and update Tantivy.
 /// Returns the map from node ID to context origin type label.
 ///
-/// Fully in-memory: all data is pre-computed from SkgNodes at init.
+/// Fully in-memory: all data is pre-computed from NodeCompletes at init.
 /// No TypeDB queries, no async. On a 28k-node dataset this is
 /// near-instantaneous (sub-second).
 pub fn compute_and_store_context_types (
@@ -432,7 +432,7 @@ fn climb_containerward_to_cycle (
 //
 
 /// Build (map-to-content, map-to-containers) maps
-/// from loaded SkgNodes.
+/// from loaded NodeCompletes.
 /// This avoids a ~22s TypeDB query on 28k-node datasets.
 pub fn content_maps_from_nodes (
   nodes : &[NodeComplete],

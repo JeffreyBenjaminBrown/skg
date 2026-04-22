@@ -11,7 +11,7 @@ use std::str::from_utf8;
 use super::misc::{diff_delta_to_entry, path_relative_to_repo};
 
 /// Load a NodeComplete from git HEAD given its ID and source.
-pub fn skgnode_from_git_head (
+pub fn nodecomplete_from_git_head (
   pid    : &ID,
   src    : &SourceName,
   config : &SkgConfig,
@@ -45,7 +45,7 @@ pub fn skgnode_from_git_head (
 /// the index version over HEAD when both exist (since the index is
 /// staged and therefore more recent).
 /// Returns Err if neither location has the file.
-pub fn skgnode_from_index_or_head (
+pub fn nodecomplete_from_index_or_head (
   pid    : &ID,
   src    : &SourceName,
   config : &SkgConfig,

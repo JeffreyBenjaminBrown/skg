@@ -18,7 +18,7 @@ fn test_delete_text_changed_scaffold_respawns()
 
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
-        memory            : SkgnodesInViews::new (),
+        memory            : OpenViews::new (),
         graph             : new_handle (InRustGraph::new ()) };
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
@@ -27,12 +27,12 @@ fn test_delete_text_changed_scaffold_respawns()
         &Err ( String::new () ), &mut conn_state ) . await?;
 
       // DISK: 1.skg should still have the new title
-      let node_1 = read_skgnode(repo_path, "1")?;
+      let node_1 = read_nodecomplete(repo_path, "1")?;
       assert_eq!(node_1 . title, "1 has a new title.",
         "1.skg should still have the new title");
 
       // DISK: 11.skg should still have the new body
-      let node_11 = read_skgnode(repo_path, "11")?;
+      let node_11 = read_nodecomplete(repo_path, "11")?;
       assert_eq!(node_11 . body, Some("11 has a new body." . to_string()),
         "11.skg should still have the new body");
 
@@ -55,7 +55,7 @@ fn test_edit_text_changed_node_updates_disk()
 
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
-        memory            : SkgnodesInViews::new (),
+        memory            : OpenViews::new (),
         graph             : new_handle (InRustGraph::new ()) };
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
@@ -64,7 +64,7 @@ fn test_edit_text_changed_node_updates_disk()
         &Err ( String::new () ), &mut conn_state ) . await?;
 
       // DISK: 1.skg should have the newest title
-      let node_1 = read_skgnode(repo_path, "1")?;
+      let node_1 = read_nodecomplete(repo_path, "1")?;
       assert_eq!(node_1 . title, "1 has an even newer title.",
         "1.skg should have the edited title");
 
@@ -93,7 +93,7 @@ fn test_edit_text_changed_scaffold_respawns()
 
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
-        memory            : SkgnodesInViews::new (),
+        memory            : OpenViews::new (),
         graph             : new_handle (InRustGraph::new ()) };
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
@@ -102,7 +102,7 @@ fn test_edit_text_changed_scaffold_respawns()
         &Err ( String::new () ), &mut conn_state ) . await?;
 
       // DISK: No changes should occur
-      let node_1 = read_skgnode(repo_path, "1")?;
+      let node_1 = read_nodecomplete(repo_path, "1")?;
       assert_eq!(node_1 . title, "1 has a new title.",
         "1.skg should be unchanged");
 
@@ -133,7 +133,7 @@ fn test_move_text_changed_scaffold_respawns()
 
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
-        memory            : SkgnodesInViews::new (),
+        memory            : OpenViews::new (),
         graph             : new_handle (InRustGraph::new ()) };
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
@@ -142,7 +142,7 @@ fn test_move_text_changed_scaffold_respawns()
         &Err ( String::new () ), &mut conn_state ) . await?;
 
       // DISK: No changes should occur
-      let node_1 = read_skgnode(repo_path, "1")?;
+      let node_1 = read_nodecomplete(repo_path, "1")?;
       assert_eq!(node_1 . title, "1 has a new title.",
         "1.skg should be unchanged");
 
@@ -168,7 +168,7 @@ fn test_move_text_changed_to_unedited_node_respawns()
 
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
-        memory            : SkgnodesInViews::new (),
+        memory            : OpenViews::new (),
         graph             : new_handle (InRustGraph::new ()) };
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
@@ -177,7 +177,7 @@ fn test_move_text_changed_to_unedited_node_respawns()
         &Err ( String::new () ), &mut conn_state ) . await?;
 
       // DISK: No changes should occur
-      let node_12 = read_skgnode(repo_path, "12")?;
+      let node_12 = read_nodecomplete(repo_path, "12")?;
       assert_eq!(node_12 . title, "12",
         "12.skg should be unchanged");
       let contains_12 = node_12 . contains;

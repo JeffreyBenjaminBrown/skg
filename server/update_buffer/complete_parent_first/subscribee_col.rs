@@ -1,12 +1,12 @@
-use crate::git_ops::read_repo::skgnode_from_git_head;
+use crate::git_ops::read_repo::nodecomplete_from_git_head;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
-use crate::types::memory::{find_source_many_ways, skgnode_from_memory_or_disk};
+use crate::types::memory::{find_source_many_ways, nodecomplete_from_memory_or_disk};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::{ error_unless_node_satisfies, read_at_ancestor_in_tree, write_at_ancestor_in_tree, with_node_mut};
-use crate::types::tree::viewnode_skgnode::{ unique_scaffold_child, insert_scaffold_as_child};
+use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child, insert_scaffold_as_child};
 use crate::types::viewnode::mk_phantom_viewnode;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, Birth, mk_indefinitive_viewnode};
 use crate::update_buffer::util::{ move_child_to_end, subtree_satisfies, complete_relevant_children_in_viewnodetree};
@@ -62,7 +62,7 @@ pub async fn complete_subscribee_col_preorder (
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
     . ok_or ("complete_subscribee_col_preorder: parent is not a TrueNode") ?;
   let worktree_subscribees : Vec<ID> =
-    skgnode_from_memory_or_disk (
+    nodecomplete_from_memory_or_disk (
       config, &parent_skgid, &parent_source )
       . ok ()
       . map ( |skg| skg . subscribes_to . or_default () . to_vec () )
@@ -140,7 +140,7 @@ fn diff_aware_goal_list (
       . filter( |sd| sd . is_git_repo )
       . and_then(
          |_| { let skg : NodeComplete =
-                 skgnode_from_git_head(
+                 nodecomplete_from_git_head(
                    parent_skgid, parent_source, config )
                  . ok() ?;
                if skg . subscribes_to . is_unspecified() { None }
@@ -221,7 +221,7 @@ fn build_subscribee_child_data (
             child_skgid, &child_sources,
             deleted_since_head_pid_src_map, config )
           . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
-        let skg : NodeComplete = skgnode_from_memory_or_disk (
+        let skg : NodeComplete = nodecomplete_from_memory_or_disk (
           config, child_skgid, &child_src ) ?;
         result . insert( child_skgid . clone(),
                        SubscribeeChildData { source: skg . source . clone(),

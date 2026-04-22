@@ -46,7 +46,7 @@ fn test_collateral_view_preserves_diff_annotations()
       // the rerender pipeline reads them as needed.)
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
-        memory            : SkgnodesInViews::new (),
+        memory            : OpenViews::new (),
         graph             : new_handle (InRustGraph::new ()) };
 
       // 3. Register buffer 1 and buffer 2,

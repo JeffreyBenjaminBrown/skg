@@ -1,4 +1,4 @@
-/// Parse an org-roam `.org` file into a flat Vec of SkgNodes.
+/// Parse an org-roam `.org` file into a flat Vec of NodeCompletes.
 ///
 /// # Strategy
 ///
@@ -30,7 +30,7 @@
 /// 4. **Assign missing IDs.** Any section (original or synthetic)
 ///    that lacks an `:ID:` gets a fresh UUID.
 ///
-/// 5. **Emit SkgNodes.** Walk the forest depth-first, converting each
+/// 5. **Emit NodeCompletes.** Walk the forest depth-first, converting each
 ///    `SectionTree` into a flat `NodeComplete` whose `contains` field lists
 ///    its direct children by ID.
 
@@ -86,7 +86,7 @@ pub fn parse_org_file (
     assign_missing_ids (st); }
   let mut nodes : Vec<NodeComplete> = Vec::new();
   for st in &forest {
-    collect_skgnodes (st, &lines, &mut nodes); }
+    collect_nodecompletes (st, &lines, &mut nodes); }
   nodes }
 
 //
@@ -265,17 +265,17 @@ fn assign_missing_ids (
   for child in &mut tree . children {
     assign_missing_ids (child); }}
 
-fn collect_skgnodes (
+fn collect_nodecompletes (
   tree  : &SectionTree,
   lines : &[String],
   out   : &mut Vec<NodeComplete>,
 ) {
-  let node : NodeComplete = skgnode_from_section_tree (tree, lines);
+  let node : NodeComplete = nodecomplete_from_section_tree (tree, lines);
   out . push (node);
   for child in &tree . children {
-    collect_skgnodes (child, lines, out); }}
+    collect_nodecompletes (child, lines, out); }}
 
-fn skgnode_from_section_tree (
+fn nodecomplete_from_section_tree (
   tree  : &SectionTree,
   lines : &[String],
 ) -> NodeComplete {

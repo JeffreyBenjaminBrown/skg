@@ -8,7 +8,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nod
 use skg::from_text::viewnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_tree;
 use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
 use skg::from_text::viewnodes_to_instructions::reconcile_same_id_instructions::reconcile_same_id_instructions;
-use skg::test_utils::{run_with_test_db, extract_skgnode_if_save_else_error};
+use skg::test_utils::{run_with_test_db, extract_nodecomplete_if_save_else_error};
 use skg::types::misc::ID;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
@@ -74,7 +74,7 @@ fn test_deletions_excluded (
       assert!(id2_instruction . is_delete());
       assert_eq!(
         // id 1 should contain 3 and not 2 (which is being deleted)
-        extract_skgnode_if_save_else_error (id1_instruction) . contains,
+        extract_nodecomplete_if_save_else_error (id1_instruction) . contains,
         vec![ID::from ("3")]);
       Ok (( )) } ) ) }
 
@@ -103,13 +103,13 @@ fn test_defining_node_defines (
       let id1_instruction = reduced . iter()
         . find(|instr| get_id (instr) == &ID::from ("1"))
         . unwrap();
-      assert_eq!( extract_skgnode_if_save_else_error (id1_instruction) . title,
+      assert_eq!( extract_nodecomplete_if_save_else_error (id1_instruction) . title,
                   "1 definer");
       { // Defining instruction should define body completely, even if None
-        assert_eq!(extract_skgnode_if_save_else_error (id1_instruction) . body,
+        assert_eq!(extract_nodecomplete_if_save_else_error (id1_instruction) . body,
                    None); }
       { // Only definer's contents are used
-        assert_eq!(extract_skgnode_if_save_else_error (id1_instruction) . contains,
+        assert_eq!(extract_nodecomplete_if_save_else_error (id1_instruction) . contains,
                    vec![ID::from ("3")]); }
       Ok (( )) } )) }
 
@@ -143,7 +143,7 @@ fn test_adding_without_definer (
         let id2_instruction = reduced . iter()
           . find(|instr| get_id (instr) == &ID::from ("2"))
           . expect ("Should have instruction for id:2");
-        assert_eq!(extract_skgnode_if_save_else_error (id2_instruction) . title,
+        assert_eq!(extract_nodecomplete_if_save_else_error (id2_instruction) . title,
                    "2"); }
 
       { // id:4 has one definitive and one indefinitive
@@ -152,8 +152,8 @@ fn test_adding_without_definer (
           . find(|instr| get_id (instr) == &ID::from ("4"))
           . expect ("Should have instruction for id:4");
         assert_eq!( // Contains should only have what the definitive specified, and no data from the indefinitive
-          extract_skgnode_if_save_else_error (id4_instruction) . title, "4");
-        assert_eq!(extract_skgnode_if_save_else_error (id4_instruction) . contains,
+          extract_nodecomplete_if_save_else_error (id4_instruction) . title, "4");
+        assert_eq!(extract_nodecomplete_if_save_else_error (id4_instruction) . contains,
                    Vec::<ID>::new()); }
 
       Ok (( )) } )) }

@@ -1,4 +1,4 @@
-use crate::dbs::filesystem::one_node::optskgnode_from_id;
+use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode, Merge, SourceMove};
@@ -40,7 +40,7 @@ pub async fn validate_and_filter_foreign_instructions(
           filtered . push (instr);
           continue; }
         let primary_id : &ID = &node . pid;
-        match optskgnode_from_id(
+        match optnodecomplete_from_id(
           config, driver, primary_id
         ) . await {
           Ok(Some (disk_node)) => {

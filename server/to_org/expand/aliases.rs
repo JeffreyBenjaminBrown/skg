@@ -3,7 +3,7 @@ use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
 use crate::types::git::MembershipAxes;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{ViewNode, ViewRequest, Scaffold};
-use crate::types::tree::viewnode_skgnode::{
+use crate::types::tree::viewnode_nodecomplete::{
   insert_scaffold_as_child, unique_scaffold_child};
 
 use ego_tree::Tree;

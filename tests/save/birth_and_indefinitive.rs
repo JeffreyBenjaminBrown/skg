@@ -1,6 +1,6 @@
 // cargo test --test save birth_and_indefinitive
 
-use skg::dbs::filesystem::one_node::skgnode_from_id;
+use skg::dbs::filesystem::one_node::nodecomplete_from_id;
 use skg::from_text::buffer_to_viewnode_forest_and_save_instructions;
 use skg::save::update_fs_from_saveinstructions;
 use skg::save::update_typedb_from_saveinstructions;
@@ -62,7 +62,7 @@ fn test_birth_and_indefinitive(
 
         { // verify indefinitive is treated correctly
           let node2 : NodeComplete =
-            skgnode_from_id(
+            nodecomplete_from_id(
               config, driver, &ID("2" . to_string() ))
             . await?;
         assert_eq!(
@@ -72,7 +72,7 @@ fn test_birth_and_indefinitive(
 
         { // verify birth=Independent is treated correctly
           let node1 : NodeComplete =
-            skgnode_from_id(
+            nodecomplete_from_id(
               config, driver, &ID("1" . to_string() ))
             . await?;
         assert!(

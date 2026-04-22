@@ -76,7 +76,7 @@ pub fn import_org_roam_directory (
         else {
           node_map . insert (pid, node); }} }}
   for (_pid, node) in &node_map {
-    match write_skgnode_to_dir (node, output_dir) {
+    match write_nodecomplete_to_dir (node, output_dir) {
       Ok (()) => { stats . nodes_written += 1; }
       Err (e) => {
         let msg : String = format! (
@@ -127,7 +127,7 @@ fn merge_into_existing (
     { // Preserve Had_ID_Before_Import from either side.
       existing . misc . push (FileProperty::Had_ID_Before_Import); }}
 
-fn write_skgnode_to_dir (
+fn write_nodecomplete_to_dir (
   node       : &NodeComplete,
   output_dir : &Path,
 ) -> Result<(), Box<dyn Error>> {

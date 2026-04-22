@@ -1,4 +1,4 @@
-use crate::dbs::filesystem::one_node::{skgnode_from_id, skgnode_from_pid_and_source};
+use crate::dbs::filesystem::one_node::{nodecomplete_from_id, nodecomplete_from_pid_and_source};
 use crate::dbs::memory::snapshot_global;
 use crate::types::many_to_many::ManyToMany;
 use crate::types::nodes::complete::NodeComplete;
@@ -26,7 +26,7 @@ pub enum ViewUri {
 /// currently-open buffer (content or search) with its forest and PID
 /// set. 'root_ids' is the reverse lookup — which view(s) is this
 /// ID a root of.
-pub struct SkgnodesInViews {
+pub struct OpenViews {
   pub views       : HashMap<ViewUri, ViewState>,
   // Includes both (graph) content views and search result views. See the definition of 'ViewUri'.
   // TODO ? OPTIMIZE:
@@ -62,9 +62,9 @@ impl ViewUri {
   pub fn is_search ( &self ) -> bool {
     matches! ( self, ViewUri::SearchView (_) ) } }
 
-impl SkgnodesInViews {
+impl OpenViews {
   pub fn new () -> Self {
-    SkgnodesInViews {
+    OpenViews {
       views       : HashMap::new (),
       root_ids    : ManyToMany::new () }}
 
@@ -185,31 +185,31 @@ fn root_ids_from_forest (
 /// Memory-first NodeComplete read, disk fallback, id-based.
 ///
 /// Async because the id→(pid, source) resolution goes through
-/// 'skgnode_from_id', which consults TypeDB when memory is
+/// 'nodecomplete_from_id', which consults TypeDB when memory is
 /// uninitialized. Callers that already have '(pid, source)' in
-/// hand should prefer the sync 'skgnode_from_memory_or_disk'
+/// hand should prefer the sync 'nodecomplete_from_memory_or_disk'
 /// below.
-pub async fn skgnode_from_memory_or_disk_async (
+pub async fn nodecomplete_from_memory_or_disk_async (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   id     : &ID,
 ) -> Result<NodeComplete, Box<dyn Error>> {
   if let Some (n) = nodecomplete_from_memory (id) {
     return Ok (n); }
-  skgnode_from_id (config, driver, id) . await }
+  nodecomplete_from_id (config, driver, id) . await }
 
 /// Memory-first NodeComplete read, disk fallback, given an
 /// already-resolved '(pid, source)'. Sync — never consults TypeDB,
 /// so callers in sync contexts don't have to become async. For the
-/// id-only path use 'skgnode_from_memory_or_disk_async'.
-pub fn skgnode_from_memory_or_disk (
+/// id-only path use 'nodecomplete_from_memory_or_disk_async'.
+pub fn nodecomplete_from_memory_or_disk (
   config : &SkgConfig,
   pid    : &ID,
   source : &SourceName,
 ) -> Result<NodeComplete, Box<dyn Error>> {
   if let Some (n) = nodecomplete_from_memory (pid)
     { return Ok (n); }
-  Ok ( skgnode_from_pid_and_source (
+  Ok ( nodecomplete_from_pid_and_source (
          config, pid . clone (), source ) ? ) }
 
 /// Synthesize a NodeComplete from the in-Rust memory if the id is

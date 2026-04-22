@@ -29,18 +29,18 @@
    or struct) and updating those consumers to merge similarly to
    apply_diff_to_forest's 'merged_axes_from_per_stage' helper.
 
-** Three SkgNode parses per changed file in 'compute_diff_for_source'
+** Three NodeComplete parses per changed file in 'compute_diff_for_source'
    server/git_ops/diff.rs.
    For each changed file we now load HEAD, index, and worktree YAML
-   blobs and parse them into SkgNodes. A small repo with N changed
+   blobs and parse them into NodeCompletes. A small repo with N changed
    files does 3N parses. At current sizes this is fine but worth
    measuring on a larger garden.
 
-** 'compute_skgnode_diff' silently swallows YAML parse errors
+** 'compute_nodecomplete_diff' silently swallows YAML parse errors
    server/git_ops/diff.rs.
    load_from_head / load_from_index / load_from_disk return None on
    parse failure (via '.ok()'), indistinguishable from "file absent".
-   A corrupt SkgNode therefore degrades to "no node_changes" silently.
+   A corrupt NodeComplete therefore degrades to "no node_changes" silently.
    Worth surfacing the error to logs.
 
 ** 'NotInGit' is per-source but stamped per-truenode

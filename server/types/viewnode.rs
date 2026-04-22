@@ -2,7 +2,7 @@
 /// Nodes of the graph are represented via the 'NodeComplete' type.
 /// Nodes of the tree are represented via the 'ViewNode' type.
 ///   (That name might change once there are more clients. The only client so far is written in Emacs org-mode; hence the name.)
-/// Some 'ViewNode's correspond to SkgNodes; these are 'TrueNode's.
+/// Some 'ViewNode's correspond to NodeCompletes; these are 'TrueNode's.
 /// Others do not so correspond, but rather encode information about neighboring tree nodes. These are 'Scaffold' nodes.
 
 use super::git::{ExistenceAxes, MembershipAxes, Sign};

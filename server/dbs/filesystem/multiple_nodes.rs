@@ -1,4 +1,4 @@
-use crate::dbs::filesystem::one_node::{read_skgnode, validate_pid_matches_filename, write_skgnode};
+use crate::dbs::filesystem::one_node::{read_nodecomplete, validate_pid_matches_filename, write_nodecomplete};
 use crate::types::misc::{SkgConfig, SkgfileSource, ID, SourceName};
 use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::complete::NodeComplete;
@@ -99,11 +99,11 @@ fn read_skg_files_from_folder (
            false,                  // None => no extension found
            |ext| ext == "skg") ) { // Some
       let node_fs : NodeFS =
-        read_skgnode (&path) ?;
+        read_nodecomplete (&path) ?;
       validate_pid_matches_filename (&node_fs, &path) ?;
-      let skgnode : NodeComplete =
+      let nodecomplete : NodeComplete =
         node_fs . into_complete ( source_name . clone ());
-      nodes . push (skgnode); }}
+      nodes . push (nodecomplete); }}
   Ok (nodes) }
 
 /// Like `read_all_skg_files_from_sources` but only reads files
@@ -128,7 +128,7 @@ pub fn read_modified_skg_files_from_sources (
         fs::metadata (&path) ? . modified() ?;
       if mtime <= since { continue; }
       let node_fs : NodeFS =
-        read_skgnode (&path) ?;
+        read_nodecomplete (&path) ?;
       validate_pid_matches_filename (&node_fs, &path) ?;
       let pid_str : String =
         node_fs . pid
@@ -138,9 +138,9 @@ pub fn read_modified_skg_files_from_sources (
           io::ErrorKind::InvalidData,
           format! ("Duplicate primary ID '{}' within batch",
                    pid_str )) ); }
-      let skgnode : NodeComplete =
+      let nodecomplete : NodeComplete =
         node_fs . into_complete ( source_name . clone ());
-      all_nodes . push (skgnode); }}
+      all_nodes . push (nodecomplete); }}
   Ok (all_nodes) }
 
 /// Reports duplicate IDs found across sources.
@@ -248,7 +248,7 @@ pub fn write_all_nodes_to_fs (
         & config, & node . source, pid )
       . map_err ( |e| io::Error::new (
         io::ErrorKind::NotFound, e) ) ?;
-    write_skgnode ( & node, & Path::new ( &path )) ?;
+    write_nodecomplete ( & node, & Path::new ( &path )) ?;
     written += 1; }
   Ok (written) }
 

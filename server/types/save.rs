@@ -50,7 +50,7 @@ pub struct DeleteNode {
 #[derive(Debug, Clone)]
 pub struct Merge {
   pub acquiree_text_preserver : SaveNode, // new node with acquiree's title and body
-  pub updated_acquirer        : SaveNode, // acquirer with acquiree's IDs, contents, and relationships merged in. (This is complex; see 'three_merged_skgnodes'.)
+  pub updated_acquirer        : SaveNode, // acquirer with acquiree's IDs, contents, and relationships merged in. (This is complex; see 'three_merged_nodecompletes'.)
   pub acquiree_to_delete      : DeleteNode,
 }
 

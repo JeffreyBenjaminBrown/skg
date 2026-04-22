@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 use skg::from_text::viewnodes_to_instructions::reconcile_same_id_instructions::collect_dup_instructions;
-use skg::test_utils::extract_skgnode_if_save_else_error;
+use skg::test_utils::extract_nodecomplete_if_save_else_error;
 use skg::types::misc::{ID, MSV, SourceName};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
@@ -192,7 +192,7 @@ fn test_alias_collection_and_deduplication() {
     let mut all_aliases : Vec<String> = vec![];
     for instr in &instructions {
       if let MSV::Specified (aliases)
-        = &extract_skgnode_if_save_else_error (instr) . aliases
+        = &extract_nodecomplete_if_save_else_error (instr) . aliases
         { all_aliases . extend( aliases . iter() . cloned() ); }}
 
     // Deduplicate
@@ -280,7 +280,7 @@ fn test_last_instruction_defines_title_and_body() {
 
     for instr in &instructions {
         let skg_node : &NodeComplete =
-          extract_skgnode_if_save_else_error (instr);
+          extract_nodecomplete_if_save_else_error (instr);
         maybe_title = Some(skg_node . title . clone());
         if skg_node . body . is_some() {
             maybe_body = skg_node . body . clone();
@@ -321,7 +321,7 @@ fn test_defining_instruction_takes_precedence() {
     for instr in &instructions {
         if instr . is_save() {
             let skg_node : &NodeComplete =
-              extract_skgnode_if_save_else_error (instr);
+              extract_nodecomplete_if_save_else_error (instr);
             last_title = Some(skg_node . title . clone());
             last_body = skg_node . body . clone();
             last_content = skg_node . contains . clone();
@@ -355,7 +355,7 @@ fn test_initial_content_from_disk_when_no_defining() {
     for instr in &instructions {
       if instr . is_save() {
         let contents : &Vec<ID> =
-          &extract_skgnode_if_save_else_error (instr) . contains;
+          &extract_nodecomplete_if_save_else_error (instr) . contains;
         all_contents . extend(contents . iter() . cloned() ); }}
 
     // Should collect content from both instructions
@@ -379,7 +379,7 @@ fn test_body_from_disk_when_no_instruction_has_body() {
 
     for instr in &instructions {
       let skg_node : &NodeComplete =
-        extract_skgnode_if_save_else_error (instr);
+        extract_nodecomplete_if_save_else_error (instr);
       if skg_node . body . is_some() {
         maybe_body = skg_node . body . clone(); }}
 

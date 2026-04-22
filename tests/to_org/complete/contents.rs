@@ -12,7 +12,7 @@ async fn test_add_v_to_map_if_absent_already_present() {
   let id :
     ID =
     ID::new ("test-id-123");
-  let skgnode :
+  let nodecomplete :
     NodeComplete =
     NodeComplete {
       title : "Cached Node" . to_string(),
@@ -21,7 +21,7 @@ async fn test_add_v_to_map_if_absent_already_present() {
     };
 
   let mut map : HashMap<ID, NodeComplete> = HashMap::new();
-  map . insert(id . clone(), skgnode . clone());
+  map . insert(id . clone(), nodecomplete . clone());
 
   // Fetch function that would load from disk (not called since already cached)
   let fetch_fn = |_key: &ID| async {
