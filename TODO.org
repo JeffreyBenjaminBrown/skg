@@ -1,7 +1,6 @@
 * ONGOING cleaning
 ** The term 'skgnode' should be changed in function names.
 * coollected while dogfooding, unassimilated
-** make the ID stack ops available in magit, .skg view
 ** Use literal newlines in .skg body fields.
 Otherwise the diff is undreadable.
 
