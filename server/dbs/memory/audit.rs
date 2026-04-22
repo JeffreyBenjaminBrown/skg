@@ -12,11 +12,11 @@
 
 use std::collections::HashSet;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use typedb_driver::{Transaction, TransactionType, TypeDBDriver};
 
 use crate::dbs::memory::InRustGraph;
 use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
-use crate::dbs::typedb::search::find_related_nodes_for_one_id;
+use crate::dbs::typedb::search::find_related_nodes_for_one_id_in_tx;
 use crate::types::misc::ID;
 
 /// A single disagreement between the in-Rust memory and TypeDB, for
@@ -93,25 +93,28 @@ pub async fn audit_memory_against_typedb (
   db_name : &str,
   driver  : &TypeDBDriver,
 ) -> Result < Vec<Mismatch>, Box<dyn Error> > {
+  let tx : Transaction = driver . transaction (
+    db_name, TransactionType::Read ) . await ?;
   let mut mismatches : Vec<Mismatch> = Vec::new ();
   for pid in graph . nodes . keys () {
     mismatches . extend (
-      audit_one_node (graph, db_name, driver, pid) . await ? ); }
+      audit_one_node (graph, &tx, pid) . await ? ); }
   Ok (mismatches) }
 
 /// Audit a single node against TypeDB. Issues ten queries (five
-/// relations × two roles) and returns the Mismatches for this pid.
-/// Empty vec means memory and TypeDB agree about every
-/// relation/role for this pid.
+/// relations × two roles) on the caller-provided read transaction
+/// and returns the Mismatches for this pid. Empty vec means memory
+/// and TypeDB agree about every relation/role for this pid.
 ///
-/// Used by the paced scheduled audit (which calls this per-pid in
-/// batches) and also by 'audit_memory_against_typedb' (which
-/// iterates all pids).
+/// Takes '&Transaction' (not '&TypeDBDriver') so callers can
+/// amortize transaction setup across many pids — opening a tx per
+/// pid would dominate query cost. Used by the paced scheduled audit
+/// (which opens one tx per batch) and by 'audit_memory_against_typedb'
+/// (which opens one tx per whole corpus pass).
 pub async fn audit_one_node (
-  graph   : &InRustGraph,
-  db_name : &str,
-  driver  : &TypeDBDriver,
-  pid     : &ID,
+  graph : &InRustGraph,
+  tx    : &Transaction,
+  pid   : &ID,
 ) -> Result < Vec<Mismatch>, Box<dyn Error> > {
   let node : &crate::types::nodes::rust::NodeRust =
     match graph . nodes . get (pid) {
@@ -127,8 +130,8 @@ pub async fn audit_one_node (
         . map ( |id| graph . pid_of (id) . unwrap_or (id . clone ()) )
         . collect ();
       let typedb_set : HashSet<ID> =
-        find_related_nodes_for_one_id (
-          db_name, driver, pid,
+        find_related_nodes_for_one_id_in_tx (
+          tx, pid,
           relation, subject_role, object_role ) . await ?;
       if memory_set != typedb_set {
         mismatches . push ( Mismatch {
@@ -142,8 +145,8 @@ pub async fn audit_one_node (
       let memory_set : HashSet<ID> =
         inverse_first_members_from_memory (graph, pid, relation);
       let typedb_set : HashSet<ID> =
-        find_related_nodes_for_one_id (
-          db_name, driver, pid,
+        find_related_nodes_for_one_id_in_tx (
+          tx, pid,
           relation, object_role, subject_role ) . await ?;
       if memory_set != typedb_set {
         mismatches . push ( Mismatch {

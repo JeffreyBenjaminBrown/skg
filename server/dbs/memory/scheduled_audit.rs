@@ -41,7 +41,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use typedb_driver::TypeDBDriver;
+use typedb_driver::{Transaction, TransactionType, TypeDBDriver};
 
 use crate::dbs::memory::{InRustGraph, InRustGraphHandle};
 use crate::dbs::memory::audit::{audit_one_node, Mismatch};
@@ -218,6 +218,11 @@ fn build_todo (
 /// Process one batch: audit each pid, update the store in memory,
 /// persist the whole store, append discovered mismatches to
 /// audits.org, and refresh the client-facing warning slot.
+///
+/// Opens one read transaction per batch and reuses it across all
+/// 1280 (128 pids × 10 queries) of the batch's TypeDB reads. Per-
+/// query transaction setup was previously dominant — 1280 tx opens
+/// took minutes, not seconds.
 fn process_batch (
   batch     : &[ID],
   graph     : &InRustGraphHandle,
@@ -228,10 +233,17 @@ fn process_batch (
   store     : &mut Vec<AuditRecord>,
 ) {
   let snap : Arc<InRustGraph> = graph . load_full ();
+  let tx : Transaction = match block_on (
+    driver . transaction (db_name, TransactionType::Read) )
+  { Ok (t) => t,
+    Err (e) => {
+      tracing::warn! (error = %e,
+        "auto_audit_daily: could not open read tx; skipping batch");
+      return; } };
   let mut new_mismatches : Vec<Mismatch> = Vec::new ();
   for pid in batch {
     let mismatches : Vec<Mismatch> = match block_on (
-      audit_one_node (&snap, db_name, driver, pid) )
+      audit_one_node (&snap, &tx, pid) )
     { Ok (v)  => v,
       Err (e) => {
         tracing::warn! (pid = %pid, error = %e,
@@ -246,6 +258,7 @@ fn process_batch (
       pid : pid . clone (),
       audited_on : today . to_string (),
       mismatches : recorded, }); }
+  drop (tx);
   if let Err (e) = save (data_root, store) {
     tracing::warn! (error = %e,
       "auto_audit_daily: failed to persist store after batch"); }

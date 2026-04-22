@@ -1,10 +1,7 @@
 * ONGOING cleaning
 ** The term 'skgnode' should be changed in function names.
-** SkgnodeMap: Now redundant?
 * coollected while dogfooding, unassimilated
-** BUG : C-c v v now taking forever
-not even warning why it failed.
-** need ID stack ops available in magit, .skg view
+** make the ID stack ops available in magit, .skg view
 ** Use literal newlines in .skg body fields.
 Otherwise the diff is undreadable.
 

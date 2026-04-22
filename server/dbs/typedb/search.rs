@@ -166,6 +166,10 @@ pub fn find_related_nodes_from_memory (
 /// Find related nodes for a single input ID. TypeDB-backed;
 /// bypasses the in-Rust memory shortcut. Exposed at crate scope
 /// for the audit helper which needs the raw TypeDB answer.
+///
+/// Opens its own read transaction. For hot loops (e.g. the paced
+/// audit) that issue many queries back-to-back, use the in-tx
+/// variant below to amortize transaction setup.
 pub(crate) async fn find_related_nodes_for_one_id (
   db_name     : &str,
   driver      : &TypeDBDriver,
@@ -174,12 +178,27 @@ pub(crate) async fn find_related_nodes_for_one_id (
   input_role  : &str,
   output_role : &str,
 ) -> Result < HashSet<ID>, Box<dyn Error> > {
-  let output_id_var : String =
-    format! ("{}_id", output_role);
   let tx : Transaction =
     driver . transaction (
       db_name, TransactionType::Read
     ) . await ?;
+  find_related_nodes_for_one_id_in_tx (
+    &tx, id, relation, input_role, output_role ) . await }
+
+/// 'find_related_nodes_for_one_id' variant that reuses a caller-
+/// provided read transaction. Multiple calls on the same 'tx' share
+/// its setup cost, which (under load) is tens of milliseconds per
+/// open — dominant over query execution for the audit's small
+/// results.
+pub(crate) async fn find_related_nodes_for_one_id_in_tx (
+  tx          : &Transaction,
+  id          : &ID,
+  relation    : &str,
+  input_role  : &str,
+  output_role : &str,
+) -> Result < HashSet<ID>, Box<dyn Error> > {
+  let output_id_var : String =
+    format! ("{}_id", output_role);
   let mut stream : ConceptRowStream = {
     let answer : QueryAnswer = tx . query ( format! (
       r#"match

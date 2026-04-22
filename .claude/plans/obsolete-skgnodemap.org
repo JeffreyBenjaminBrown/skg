@@ -234,13 +234,13 @@ An alternative is one bulk commit; either works since each step compiles. I favo
 
 The sketch plan's proposal to route all reads through the existing async helper (now renamed to 'skgnode_from_memory_or_disk_async') would contaminate ~8 sync call chains (including a recursive tree walker). Design § "Two replacement helpers" introduces a sync 'skgnode_from_memory_or_disk' that takes '(pid, source)'. Every sync reader already has both in scope, so no async uplift is needed anywhere. Async readers use 'skgnode_from_memory_or_disk_async'. Why this is probably solved rather than definitely: I haven't read every single one of the ~30 sites exhaustively, so there might be a sync caller where the source isn't in scope. If so, that site gets an additional 'snapshot_global' + 'pid_and_source' call (pure memory read, sync, O(1)) — no async uplift still.
 
-** ONGOING (likely solved): Post-save memory really does carry the merge/acquirer state
+** DONE (likely solved): Post-save memory really does carry the merge/acquirer state
 
 The mirror-drop in Step 5 is safe /if/ 'apply_definenodes' in [[../../server/merge.rs][merge.rs]]:63 has committed the post-merge acquirer to 'InRustGraphHandle' before 'update_views_after_save' runs. Confirmed by reading: 'merge_nodes' is called at [[../../server/serve/handlers/save_buffer.rs][save_buffer.rs]]:197-202, /before/ 'update_views_after_save' at line 213. The two-pass handle flow ('load_full' then 'store') inside 'apply_definenodes' is synchronous from the caller's perspective — by the time 'merge_nodes' returns, the next 'snapshot_global' sees the merged state.
 
 One edge case worth double-checking in implementation: if a save batch partially fails (e.g. one instruction errors after others committed), does the memory reflect the partial commit? Reading [[../../server/save.rs][save.rs]]:63 and [[../../server/merge.rs][merge.rs]]:63, 'apply_definenodes' is atomic per call (one load, one store); but the save pipeline makes multiple 'apply_definenodes' calls (saves, then merges). A mid-pipeline error would leave memory partially updated — same as today's disk state. No regression from removing the mirror.
 
-*** ONGOING Can you elaborate on how you would double-check it?
+*** DONE Can you elaborate on how you would double-check it?
 
 **** Response
 
@@ -266,7 +266,7 @@ Three checks, cheap to cheap-ish to most-rigorous:
 
 Of the three, (1) is the argument I'd rely on for correctness, (2) is the cheap insurance to ship, and (3) is free to do because it's already in the verify step.
 
-**** ONGOING all 3 sound good
+**** DONE all 3 sound good
 That second step should be implemented via a standalone function.
 
 ***** Response + impelled change
@@ -298,7 +298,8 @@ Benefits of the standalone shape:
 
 Impelled change: add this function to the plan as part of Step 5 (the in-flight-mirror drop), since that's the step that makes the assert meaningful — before Step 5 the mirror covers for memory, so the coherence check isn't load-bearing. The 'debug_assert!' call lands in [[../../server/update_buffer.rs][update_buffer.rs]]'s 'update_views_after_save', right before any reads.
 
-***** TODO you wrote 'Impelled change: add this ...'
+***** DONE you wrote 'Impelled change: add this ...'
+
 But did you actually add it to the plan?
 I'm only finding the string 'memory_coherent_with_save_instructions'
 once in this document.
@@ -323,11 +324,11 @@ You're right, and I apologize — I've been describing impelled changes but not 
 
 Plan-body edits coming, in the same session as my response to your next TODO so the full diff is coherent. Going forward I'll apply each impelled change inline with the response that names it, not just describe it.
 
-** ONGOING 'misc' loss in NodeComplete synthesis
+** DONE 'misc' loss in NodeComplete synthesis
 
 'nodecomplete_from_memory' synthesizes 'misc: Vec::new()' because 'NodeRust' drops 'misc'. Comment at [[../../server/types/memory.rs][memory.rs]]:244-249 asserts no in-memory consumer reads 'misc' — only Tantivy indexing and the org-roam importer, neither of which goes through SkgNodeMap. This is a load-bearing invariant. Re-grep for '.misc' usage on NodeComplete values reached through these call chains to confirm it still holds. If any new consumer has snuck in, either (a) it should read from the FS for 'misc' specifically, or (b) 'NodeRust' needs a 'misc' field — the first is probably right, since 'misc' is a catch-all for arbitrary extension fields that shouldn't participate in the hot graph read path.
 
-*** ONGOING When you say "Re-grep for '.misc' usage"
+*** DONE When you say "Re-grep for '.misc' usage"
 do you mean that should be part of the plan?
 
 **** Response + impelled change
@@ -342,7 +343,7 @@ Specifically, under Step 1 (since that's where the 'misc'-dropping sync helper l
 
 If the grep comes back clean (my expectation), nothing to do besides note the result in the commit message. If it comes back with an unexpected hit, that's a blocker: fix it before landing Step 3 (parameter removal), because Step 3 is what makes the memory path the only source.
 
-**** TODO ah, well let's do that now, then
+**** DONE ah, well let's do that now, then
 It seems like part of the planning step;
 no reason to wait until implementation to do the research.
 (Or am I wrong?)
@@ -380,7 +381,7 @@ Under the plan as written, 'misc' would silently reset to 'Vec::new ()' on every
 
 With this step, the 'misc-loss' Problem is fully resolved, not merely "likely solved".
 
-***** TODO
+***** DONE
 That disk lookup would have to happen
 for every node in every save, yes?
 If so, let's instead make Misc part of the NodeRust type.
