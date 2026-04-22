@@ -16,7 +16,7 @@ use typedb_driver::{Transaction, TransactionType, TypeDBDriver};
 
 use crate::dbs::memory::InRustGraph;
 use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
-use crate::dbs::typedb::search::find_related_nodes_for_one_id_in_tx;
+use crate::dbs::typedb::search::find_related_nodes_for_one_primary_pid_in_tx;
 use crate::types::misc::ID;
 
 /// A single disagreement between the in-Rust memory and TypeDB, for
@@ -120,41 +120,44 @@ pub async fn audit_one_node (
     match graph . nodes . get (pid) {
       Some (n) => n,
       None     => return Ok ( Vec::new () ) };
-  let mut mismatches : Vec<Mismatch> = Vec::new ();
+  // Build the 10 expected memory answers up front (cheap), then
+  // fire all 10 TypeDB queries concurrently on the same tx. Results
+  // come back in order via join_all. Previous version ran the 10
+  // queries sequentially; parallelizing lets TypeDB use more of its
+  // worker threads and cuts per-pid wall time.
+  let mut memory_answers : Vec<(HashSet<ID>, &'static str, &'static str)> =
+    Vec::with_capacity (10);
+  let mut query_futures = Vec::with_capacity (10);
   for (relation, subject_role, object_role) in OUTBOUND_RELATIONSHIP_TYPES {
-    { // pid plays the first-column role ('subject_role'): memory's
-      // answer comes from NodeRust's forward field (raw), resolved
-      // through pid_of to match TypeDB's has_extra_id-aware view.
+    { // pid plays the first-column role ('subject_role')
       let memory_set : HashSet<ID> =
         outbound_second_members_from_memory (node, relation) . iter ()
         . map ( |id| graph . pid_of (id) . unwrap_or (id . clone ()) )
         . collect ();
-      let typedb_set : HashSet<ID> =
-        find_related_nodes_for_one_id_in_tx (
-          tx, pid,
-          relation, subject_role, object_role ) . await ?;
-      if memory_set != typedb_set {
-        mismatches . push ( Mismatch {
-          pid       : pid . clone (),
-          relation,
-          role      : subject_role,
-          memory    : memory_set,
-          typedb    : typedb_set, } ); } }
-    { // pid plays the second-column role ('object_role'): memory's
-      // answer is the canonical-pid-keyed inverse-index lookup.
+      memory_answers . push ((memory_set, relation, subject_role));
+      query_futures . push (
+        find_related_nodes_for_one_primary_pid_in_tx (
+          tx, pid, relation, subject_role, object_role )); }
+    { // pid plays the second-column role ('object_role')
       let memory_set : HashSet<ID> =
         inverse_first_members_from_memory (graph, pid, relation);
-      let typedb_set : HashSet<ID> =
-        find_related_nodes_for_one_id_in_tx (
-          tx, pid,
-          relation, object_role, subject_role ) . await ?;
-      if memory_set != typedb_set {
-        mismatches . push ( Mismatch {
-          pid       : pid . clone (),
-          relation,
-          role      : object_role,
-          memory    : memory_set,
-          typedb    : typedb_set, } ); } } }
+      memory_answers . push ((memory_set, relation, object_role));
+      query_futures . push (
+        find_related_nodes_for_one_primary_pid_in_tx (
+          tx, pid, relation, object_role, subject_role )); } }
+  let typedb_answers : Vec<Result<HashSet<ID>, Box<dyn Error>>> =
+    futures::future::join_all (query_futures) . await;
+  let mut mismatches : Vec<Mismatch> = Vec::new ();
+  for ((memory_set, relation, role), typedb_result)
+    in memory_answers . into_iter () . zip (typedb_answers) {
+    let typedb_set : HashSet<ID> = typedb_result ?;
+    if memory_set != typedb_set {
+      mismatches . push ( Mismatch {
+        pid       : pid . clone (),
+        relation,
+        role,
+        memory    : memory_set,
+        typedb    : typedb_set, } ); } }
   Ok (mismatches) }
 
 /// IDs appearing as the second member of 'node''s outbound edges in

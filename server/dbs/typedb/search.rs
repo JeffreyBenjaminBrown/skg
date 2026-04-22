@@ -199,19 +199,68 @@ pub(crate) async fn find_related_nodes_for_one_id_in_tx (
 ) -> Result < HashSet<ID>, Box<dyn Error> > {
   let output_id_var : String =
     format! ("{}_id", output_role);
+  // Query shape: start from a specific input id (indexed lookup),
+  // follow the relation, fetch the output's id. The earlier shape
+  // led with '$output isa node, has id $out_id' which the planner
+  // read as "enumerate all nodes + their ids" — ~29k work per
+  // query. This form constrains $input first, then reaches $output
+  // through the relation.
+  //
+  // The 'or' handles the case where 'id' is an extra_id of some
+  // node rather than a primary id. For the audit (which always
+  // passes primary pids), the extra_id branch never matches, but
+  // the disjunction still costs planning + evaluation. Callers
+  // that know they have a primary pid should prefer
+  // 'find_related_nodes_for_one_primary_pid_in_tx' below.
   let mut stream : ConceptRowStream = {
     let answer : QueryAnswer = tx . query ( format! (
       r#"match
-           ${output} isa node, has id ${output_id};
            {{ ${input} isa node, has id "{}"; }} or
-           {{ ${input} isa node;
-              $e isa extra_id, has id "{}";
+           {{ $e isa extra_id, has id "{}";
               $extra_rel isa has_extra_id ( node:     ${input},
                                             extra_id: $e ); }};
            $rel isa {relation} ( {input}: ${input},
                                   {output}: ${output} );
+           ${output} has id ${output_id};
            select ${output_id};"#,
       id, id,
+      input = input_role,
+      output = output_role,
+      output_id = output_id_var,
+      relation = relation ) ) . await ?;
+    answer } . into_rows ();
+  let mut found : HashSet<ID> = HashSet::new ();
+  while let Some (row_result) = stream . next () . await {
+    let row : ConceptRow = row_result ?;
+    if let Some (concept) = row . get (&output_id_var) ? {
+      found . insert ( ID (
+        extract_payload_from_typedb_string_rep (
+          &concept . to_string () )) ); } }
+  Ok (found) }
+
+/// Like 'find_related_nodes_for_one_id_in_tx' but assumes the
+/// given id is a primary pid (not an extra_id). Omits the
+/// extra_id disjunction from the query — substantial planner +
+/// evaluator savings. The audit always has primary pids in hand;
+/// this is the right variant for it.
+pub(crate) async fn find_related_nodes_for_one_primary_pid_in_tx (
+  tx          : &Transaction,
+  pid         : &ID,
+  relation    : &str,
+  input_role  : &str,
+  output_role : &str,
+) -> Result < HashSet<ID>, Box<dyn Error> > {
+  let output_id_var : String =
+    format! ("{}_id", output_role);
+  let mut stream : ConceptRowStream = {
+    let answer : QueryAnswer = tx . query ( format! (
+      r#"match
+           ${input} isa node, has id "{}";
+           $rel isa {relation} ( {input}: ${input},
+                                  {output}: ${output} );
+           ${output} has id ${output_id};
+           select ${output_id};"#,
+      pid,
       input = input_role,
       output = output_role,
       output_id = output_id_var,

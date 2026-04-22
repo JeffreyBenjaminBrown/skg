@@ -58,8 +58,11 @@ use crate::types::misc::{ID, SkgConfig};
 /// by TYPEDB_CONCURRENT_TRANSACTIONS) before we pause.
 const BATCH_SIZE : usize = 128;
 
-/// Seconds to sleep between batches while the pass is active.
-/// Combined with BATCH_SIZE this gives ~1 hour for a 29k corpus.
+/// Minimum seconds to sleep between batches. The actual sleep is
+/// 'max (BATCH_SLEEP_SECS, batch_duration)', which caps TypeDB
+/// utilization at ~50% regardless of how long a batch takes. A
+/// fixed 15s between 60s batches would leave TypeDB pegged at ~80%;
+/// scaling the sleep to match the batch gives real breathing room.
 const BATCH_SLEEP_SECS : u64 = 15;
 
 /// Seconds to sleep when the current pass is complete, before
@@ -176,10 +179,18 @@ fn daemon_loop (
     let take : usize = BATCH_SIZE . min (to_audit . len ());
     let batch_start : usize = to_audit . len () - take;
     let batch : Vec<ID> = to_audit . split_off (batch_start);
+    let batch_start_time : std::time::Instant =
+      std::time::Instant::now ();
     process_batch (
       &batch, &graph, &db_name, &driver,
       &data_root, &today, &mut store);
-    thread::sleep (Duration::from_secs (BATCH_SLEEP_SECS)); } }
+    // Adaptive sleep: at least BATCH_SLEEP_SECS, but no less than
+    // the batch's wall-clock duration. Caps TypeDB utilization at
+    // 50% regardless of query speed.
+    let work_dur : Duration = batch_start_time . elapsed ();
+    let sleep_dur : Duration =
+      work_dur . max (Duration::from_secs (BATCH_SLEEP_SECS));
+    thread::sleep (sleep_dur); } }
 
 /// On pass start (initial startup or date rollover): load the
 /// existing store, prune entries for pids no longer in the corpus,
@@ -215,14 +226,54 @@ fn build_todo (
   list . shuffle (&mut rand::thread_rng ());
   list }
 
+/// Audit all 'pids' concurrently (up to PID_CONCURRENCY at once)
+/// on the given tx, preserving input order in the output vec.
+async fn audit_batch_concurrently<'a> (
+  snap  : &'a Arc<InRustGraph>,
+  tx    : &'a Transaction,
+  pids  : &'a [ID],
+) -> Vec<(ID, Result<Vec<Mismatch>, String>)> {
+  use futures::stream::{FuturesUnordered, StreamExt};
+  type Fut<'a> = std::pin::Pin<
+    Box<dyn std::future::Future<
+      Output = (ID, Result<Vec<Mismatch>, String>) > + 'a>>;
+  let mut stream : FuturesUnordered<Fut<'a>> = FuturesUnordered::new ();
+  let mut iter = pids . iter ();
+  for _ in 0 .. PID_CONCURRENCY {
+    if let Some (pid) = iter . next () {
+      let pid_owned : ID = pid . clone ();
+      stream . push ( Box::pin ( async move {
+        ( pid_owned . clone (),
+          audit_one_node (snap, tx, &pid_owned) . await
+            . map_err ( |e| e . to_string () ) ) } )); } }
+  let mut out : Vec<(ID, Result<Vec<Mismatch>, String>)> =
+    Vec::with_capacity (pids . len ());
+  while let Some (done) = stream . next () . await {
+    out . push (done);
+    if let Some (pid) = iter . next () {
+      let pid_owned : ID = pid . clone ();
+      stream . push ( Box::pin ( async move {
+        ( pid_owned . clone (),
+          audit_one_node (snap, tx, &pid_owned) . await
+            . map_err ( |e| e . to_string () ) ) } )); } }
+  out }
+
+/// How many pids to audit concurrently within a batch. Bench with
+/// the real 29k-node corpus (see tools/bench-audit.rs) showed:
+///   - sequential (1):  1.86 ms/pid
+///   - concurrency 8:   0.73 ms/pid (~2.5x faster)
+///   - concurrency 16: 0.86 ms/pid (starts regressing)
+///   - concurrency 32: 1.13 ms/pid (worse)
+/// Sweet spot is around 8 — above that, TypeDB's planner/executor
+/// starts thrashing.
+const PID_CONCURRENCY : usize = 8;
+
 /// Process one batch: audit each pid, update the store in memory,
 /// persist the whole store, append discovered mismatches to
 /// audits.org, and refresh the client-facing warning slot.
 ///
-/// Opens one read transaction per batch and reuses it across all
-/// 1280 (128 pids × 10 queries) of the batch's TypeDB reads. Per-
-/// query transaction setup was previously dominant — 1280 tx opens
-/// took minutes, not seconds.
+/// Opens one read transaction per batch, reuses it across all pids,
+/// and audits up to PID_CONCURRENCY pids concurrently.
 fn process_batch (
   batch     : &[ID],
   graph     : &InRustGraphHandle,
@@ -232,6 +283,7 @@ fn process_batch (
   today     : &str,
   store     : &mut Vec<AuditRecord>,
 ) {
+  let t_batch : std::time::Instant = std::time::Instant::now ();
   let snap : Arc<InRustGraph> = graph . load_full ();
   let tx : Transaction = match block_on (
     driver . transaction (db_name, TransactionType::Read) )
@@ -240,11 +292,13 @@ fn process_batch (
       tracing::warn! (error = %e,
         "auto_audit_daily: could not open read tx; skipping batch");
       return; } };
+  let t_first_pid : std::time::Instant = std::time::Instant::now ();
+  let results : Vec<(ID, Result<Vec<Mismatch>, String>)> = block_on (
+    audit_batch_concurrently (&snap, &tx, batch));
   let mut new_mismatches : Vec<Mismatch> = Vec::new ();
-  for pid in batch {
-    let mismatches : Vec<Mismatch> = match block_on (
-      audit_one_node (&snap, &tx, pid) )
-    { Ok (v)  => v,
+  for (pid, result) in results {
+    let mismatches : Vec<Mismatch> = match result {
+      Ok (v)  => v,
       Err (e) => {
         tracing::warn! (pid = %pid, error = %e,
           "auto_audit_daily: audit of node failed; skipping");
@@ -258,13 +312,20 @@ fn process_batch (
       pid : pid . clone (),
       audited_on : today . to_string (),
       mismatches : recorded, }); }
+  let audit_elapsed : f64 =
+    t_first_pid . elapsed () . as_secs_f64 ();
   drop (tx);
   if let Err (e) = save (data_root, store) {
     tracing::warn! (error = %e,
       "auto_audit_daily: failed to persist store after batch"); }
   if ! new_mismatches . is_empty () {
     append_mismatches_to_audits_org (
-      data_root, today, &new_mismatches); } }
+      data_root, today, &new_mismatches); }
+  tracing::info! (
+    pids = batch . len (),
+    audit_s = format! ("{:.2}", audit_elapsed),
+    batch_s = format! ("{:.2}", t_batch . elapsed () . as_secs_f64 ()),
+    "auto_audit_daily: batch done"); }
 
 /// Replace or insert an AuditRecord in 'store' by pid.
 fn upsert_record (store : &mut Vec<AuditRecord>, rec : AuditRecord) {
