@@ -1,6 +1,7 @@
 use std::time::Duration;
 use std::error::Error;
 
+use crate::dbs::memory::snapshot_global;
 use crate::types::misc::ID;
 use crate::types::nodes::typedb::NodeTypedb;
 
@@ -147,8 +148,31 @@ pub async fn insert_relationship_from_list (
   tx: &typedb_driver::Transaction
 ) -> Result<(), Box<dyn Error>> {
 
+  // If memory is initialized, resolve each target_id to its
+  // primary pid up front. Avoids the disjunctive match below
+  // ('or { extra_id ... }') which TypeDB's planner evaluates by
+  // scanning every extra_id entity — catastrophically slow on
+  // a non-trivial corpus. Only the unresolved-via-memory fallback
+  // path (tests that bypass 'init_global_handle') pays that cost.
+  let snap = snapshot_global ();
   for target_id in id_list {
-    let query : String = format! ( r#"
+    let target_pid : Option<ID> =
+      snap . as_deref () . and_then ( |g| g . pid_of (target_id) );
+    let query : String = match target_pid {
+      Some (pid) => format! ( r#"
+                match
+                  $from isa node, has id "{}";
+                  $to   isa node, has id "{}";
+                insert
+                  $r isa {}
+                    ({}: $from,
+                     {}: $to);"#,
+                primary_id,
+                pid . as_str (),
+                relation_name,
+                from_role,
+                to_role ),
+      None => format! ( r#"
                 match
                   $from isa node, has id "{}";
                   {{ $to isa node, has id "{}"; }} or
@@ -165,7 +189,7 @@ pub async fn insert_relationship_from_list (
                 target_id . as_str(),
                 relation_name,
                 from_role,
-                to_role );
+                to_role ), };
 
     tx . query(query . clone()) . await
       . map_err(|e| format!(
