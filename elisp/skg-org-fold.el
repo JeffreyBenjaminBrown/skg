@@ -1,9 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 ;;
 ;; PURPOSE: Read, act on, and edit 'folded' metadata.
-;;;
-;;; USER-FACING FUNCTIONS
-;;;   (none)
 ;;
 ;; BACKGROUND:
 ;; If a node's branches are folded,

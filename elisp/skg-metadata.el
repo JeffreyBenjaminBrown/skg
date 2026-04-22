@@ -1,11 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; PURPOSE: Utilities to parse and edit skg headline metadata.
-;;;
-;;; USER-FACING FUNCTIONS
-;;;   skg-delete
-;;;   skg-delete-recursive
-;;;   skg-make-indefinitive
 
 (require 'org)
 (require 'org-fold-core)

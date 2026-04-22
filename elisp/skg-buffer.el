@@ -1,7 +1,4 @@
 ;;; -*- lexical-binding: t; -*-
-;;;
-;;; USER-FACING FUNCTIONS
-;;;   skg-open-empty-content-view
 
 (require 'org-id)
 (require 'cl-lib)

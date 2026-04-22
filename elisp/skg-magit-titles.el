@@ -6,9 +6,6 @@
 ;;;
 ;;; PITFALL: The after-string overlays break home/end navigation
 ;;; when lines are truncated. See PITFALLs.org for details and mitigations.
-;;;
-;;; USER-FACING FUNCTIONS
-;;;   skg-magit-titles-mode
 
 (require 'skg-id-search)
 (require 'skg-state)

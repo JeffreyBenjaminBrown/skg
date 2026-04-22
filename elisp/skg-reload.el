@@ -2,9 +2,6 @@
 ;;;
 ;;; PURPOSE: Force-reload all skg modules.
 ;;; Evaluate this file to pick up code changes without restarting Emacs.
-;;;
-;;; USER-FACING FUNCTIONS
-;;;   skg-reload
 
 (defun skg-reload ()
   "Unload all skg features and reload from disk."

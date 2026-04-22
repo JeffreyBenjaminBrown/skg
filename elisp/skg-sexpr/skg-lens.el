@@ -6,9 +6,6 @@
 ;;; Currently, it is used to turn a text-only metadata sexp
 ;;; into a shorter, colorful visual representation.
 ;;; But it might turn out to be useful for other things.
-;;;
-;;; USER-FACING FUNCTIONS
-;;;   (none)
 
 (require 'cl-lib)
 

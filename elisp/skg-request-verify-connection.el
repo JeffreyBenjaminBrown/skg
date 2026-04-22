@@ -1,8 +1,5 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; USER-FACING FUNCTIONS
-;;;   skg-connection-verify
-;;;
 ;;; DATA USED/ASSUMED: See /api.md.
 
 (require 'skg-length-prefix)

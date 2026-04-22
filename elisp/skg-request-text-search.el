@@ -1,9 +1,5 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; USER-FACING FUNCTIONS
-;;;   skg-search               — defaults: rooty, no regex, no body, no operators
-;;;   skg-search-interactive   — prompts for each of the four axes
-;;;
 ;;; DATA USED/ASSUMED: See /api.md.
 
 (require 'skg-client)

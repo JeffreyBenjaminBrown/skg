@@ -1,7 +1,4 @@
 ;;; -*- lexical-binding: t; -*-
-;;;
-;;; USER-FACING FUNCTIONS
-;;;   skg-view-new-empty
 
 (require 'skg-buffer)
 (require 'skg-config)

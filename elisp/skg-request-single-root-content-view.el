@@ -1,8 +1,5 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; USER-FACING FUNCTIONS
-;;;   skg-request-single-root-content-view-from-id
-;;;
 ;;; DATA USED/ASSUMED: See /api.md.
 
 (require 'skg-log)

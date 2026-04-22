@@ -1,7 +1,4 @@
 ;;; -*- lexical-binding: t; -*-
-;;;
-;;; USER-FACING FUNCTIONS
-;;;   skg-view-diff-mode
 
 (require 'skg-length-prefix)
 (require 'skg-lock-buffers)

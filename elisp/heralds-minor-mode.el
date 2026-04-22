@@ -3,9 +3,6 @@
 ;;; PURPOSE
 ;;; See the comment for 'heralds-minor-mode' below.
 ;;;
-;;; USER-FACING FUNCTIONS
-;;;   heralds-minor-mode
-;;;
 ;;; PITFALL: ORPHANED OVERLAYS
 ;;; Switching major modes (e.g. org -> text -> org) kills all
 ;;; buffer-local variables, including `heralds-overlays'. But the

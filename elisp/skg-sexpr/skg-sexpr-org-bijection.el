@@ -22,9 +22,6 @@
 ;;; - Multi-word headlines become symbols with spaces.
 ;;; - Childless non-root headlines become bare atoms, not lists.
 ;;;
-;;; User-facing functions:
-;;;   NONE
-;;;
 ;;; ENTRY POINTS:
 ;;;   sexp-to-org
 ;;;   org-to-sexp

@@ -5,9 +5,6 @@
 ;;; UUID.skg filenames, pid: lines, etc.) in the file.
 ;;; All the action (so far) is in the definition of
 ;;;   skg-file-minor-mode-map.
-;;;
-;;; USER-FACING FUNCTIONS
-;;;   skg-file-minor-mode
 
 (require 'skg-id-search)
 

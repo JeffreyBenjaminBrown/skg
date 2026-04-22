@@ -1,7 +1,4 @@
 ;;; -*- lexical-binding: t; -*-
-;;;
-;;; USER-FACING FUNCTIONS
-;;;   skg-rebuild-dbs
 
 (require 'skg-length-prefix)
 

@@ -1,19 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; PURPOSE: Extract, search for, and visit (in a new view) IDs.
-;;;
-;;; USER-FACING FUNCTIONS
-;;;   skg-id-next
-;;;   skg-id-prev
-;;;   skg-id-push
-;;;   skg-paste-id
-;;;   skg-paste-link
-;;;   skg-pop-id
-;;;   skg-pop-link
-;;;   skg-validate-id-stack-buffer
-;;;   skg-goto
-;;;   skg-goto-by-id
-;;;   skg-view-id-stack
 
 ;; todo ? speed : This could be more efficient.
 ;; It re-reads the same text a few times.

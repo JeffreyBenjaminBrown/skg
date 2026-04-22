@@ -4,9 +4,6 @@
 ;;; From a 'source buffer', the user can call skg-view-metadata
 ;;; to open a new 'sexp edit' buffer,
 ;;; where the sexp is rendered as an org-tree.
-;;;
-;;; User-facing functions:
-;;;   skg-edit-metadata
 
 (require 'skg-buffer)
 (require 'skg-config)

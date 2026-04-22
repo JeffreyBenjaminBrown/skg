@@ -1,20 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; PURPOSE: All skg keybindings and user-facing command aliases.
-;;;
-;;; Keymaps gathered here:
-;;;   skg-content-view-mode-map (for skg content view buffers)
-;;;   skg-id-stack-mode-map     (for the id-stack edit buffer)
-;;;   skg-sexp-edit-mode-map    (for the sexp-edit buffer)
-;;;   global (available everywhere)
-;;;     C-c f RET               (skg-search)
-;;;     C-c f i                 (skg-search-interactive)
-;;;   magit                     (bindings added to magit-mode-map)
-;;;     C-c g RET               (skg-goto)
-;;;     C-c o i                 (skg-paste-id)
-;;;     C-c o l                 (skg-paste-link)
-;;;     C-c o I                 (skg-pop-id)
-;;;     C-c o L                 (skg-pop-link)
 
 ;; No requires here — the underlying functions are loaded by skg-client.el,
 ;; which also requires this file. Adding requires here would create a cycle.

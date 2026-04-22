@@ -2,10 +2,6 @@
 ;;;
 ;;; PURPOSE: Request the on-disk file path for a node,
 ;;; and open a magit view navigated to an appropriate location.
-;;;
-;;; USER-FACING FUNCTIONS
-;;;   skg-goto-in-magit
-;;;   skg-goto-in-magit-parent
 
 (require 'skg-id-search)
 (require 'skg-magit-titles)

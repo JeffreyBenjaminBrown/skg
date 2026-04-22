@@ -2,9 +2,6 @@
 ;;;
 ;;; PURPOSE: Generic utilities that
 ;;; read, compare, edit and transform s-exps.
-;;;
-;;; USER-FACING FUNCTIONS
-;;;   (none)
 
 (require 'skg-sexpr-dsl-for-edits)
 (require 'skg-compare-sexpr)

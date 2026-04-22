@@ -5,9 +5,6 @@
 ;;; (This file does not handle adding length prefixes to outgoing
 ;;; messages. That's easier, and done inline where messages are sent,
 ;;; e.g., in skg-request-save.el.)
-;;;
-;;; USER-FACING FUNCTIONS
-;;;   (none)
 
 (require 'skg-log)
 (require 'skg-state)

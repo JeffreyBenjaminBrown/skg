@@ -4,13 +4,6 @@
 ;;; and stats (containerward stats)
 ;;; by adding metadata to the current headline and saving the buffer,
 ;;; allowing Rust to process the request during completion.
-;;;
-;;; USER-FACING FUNCTIONS
-;;;   skg-request-aliases-view ()
-;;;   skg-request-containerward-view ()
-;;;   skg-request-definitive-view ()
-;;;   skg-request-sourceward-view ()
-;;;   skg-show-stats ()
 
 (require 'skg-metadata)
 (require 'skg-request-save)
