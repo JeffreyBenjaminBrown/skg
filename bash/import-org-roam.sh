@@ -1,7 +1,7 @@
 set -euo pipefail
 
 # Imports an org-roam directory into skg.
-# Run this from inside the Docker container.
+# Runs on the host; delegates the cargo import to a Docker container.
 #
 # Usage:
 #   bash/import-org-roam.sh SOURCE DEST NICKNAME
@@ -10,6 +10,10 @@ set -euo pipefail
 #   SOURCE    — path to the org-roam directory
 #   DEST      — path to the destination skg source directory
 #   NICKNAME  — short name for the source
+#
+# The Docker container name is prompted for interactively at runtime,
+# since running this inside the container would leave no API keys on
+# the host to sign the resulting git commit.
 
 if [ "$#" -ne 3 ]; then
   echo "Usage: bash/import-org-roam.sh SOURCE DEST NICKNAME"
@@ -19,6 +23,12 @@ fi
 SOURCE="$1"
 DEST="$2"
 NICKNAME="$3"
+
+read -rp "IMPORTANT: Name of the docker container to run this in? " CONTAINER
+if [ -z "$CONTAINER" ]; then
+  echo "No container name given; aborting."
+  exit 1
+fi
 
 SKG_CONFIG="${SKG_CONFIG:-data/skgconfig.toml}"
 SKG_PORT="$(grep -m1 '^[[:space:]]*port' "$SKG_CONFIG" \
@@ -36,11 +46,12 @@ if [[ "$yn" =~ ^[Yy]$ ]]; then
 fi
 
 #
-# Step 2: Cargo import
+# Step 2: Cargo import (inside Docker)
 #
 
-echo "Running cargo import-org-roam ..."
-cargo run --bin skg -- import-org-roam "$SOURCE" "$DEST" "$NICKNAME"
+echo "Running cargo import-org-roam in container $CONTAINER ..."
+docker exec -w /home/ubuntu "$CONTAINER" \
+  cargo run --bin skg -- import-org-roam "$SOURCE" "$DEST" "$NICKNAME"
 echo "Import complete."
 
 #
