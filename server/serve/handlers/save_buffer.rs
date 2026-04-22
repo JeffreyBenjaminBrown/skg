@@ -18,7 +18,6 @@ use crate::types::errors::SaveError;
 use crate::types::git::{SourceDiff, GitDiffStatus};
 use crate::types::misc::{ID, SourceName, SkgConfig, TantivyIndex};
 use crate::types::save::{DefineNode, Merge, SourceMove, format_save_error_as_org};
-use crate::types::memory::SkgNodeMap;
 use crate::types::memory::ViewUri;
 use crate::types::viewnode::ViewNode;
 use crate::update_buffer::update_views_after_save;

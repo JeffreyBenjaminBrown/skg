@@ -1,13 +1,12 @@
-use crate::dbs::filesystem::one_node::{skgnode_from_id, skgnodes_from_ids, skgnode_from_pid_and_source};
+use crate::dbs::filesystem::one_node::{skgnode_from_id, skgnode_from_pid_and_source};
 use crate::dbs::memory::snapshot_global;
 use crate::types::many_to_many::ManyToMany;
-use crate::types::save::{DefineNode, SaveNode};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use super::misc::{ID, SkgConfig, SourceName};
 use super::phantom::source_from_disk;
 
-use ego_tree::{Tree, NodeId, NodeRef};
+use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -22,8 +21,6 @@ pub enum ViewUri {
   ContentView (String), // UUID
   SearchView  (String), // query
 }
-
-pub type SkgNodeMap = HashMap<ID, NodeComplete>;
 
 /// Per-connection view bookkeeping. Each entry in 'views' is a
 /// currently-open buffer (content or search) with its forest and PID
@@ -185,57 +182,6 @@ fn root_ids_from_forest (
               ids . insert ( extra_id . clone () ); }}}}}}
   ids }
 
-/// Extract NodeComplete for an ViewNode from the map (tried first) or disk.
-/// Updates the map if needed.
-/// Returns None for Scaffolds.
-pub fn skgnode_for_viewnode<'a> (
-  viewnode : &ViewNode,
-  map     : &'a mut SkgNodeMap,
-  config  : &SkgConfig,
-) -> Result<Option<&'a NodeComplete>, Box<dyn Error>>
-{ match &viewnode . kind {
-    ViewNodeKind::True (t) => {
-      let skgnode : &NodeComplete =
-        skgnode_from_map_or_disk(
-          &t . id, &t . source, map, config)?;
-      Ok(Some (skgnode)) },
-    _ => Ok (None) }}
-
-/// Build a SkgNodeMap from DefineNodes.
-/// Each NodeComplete is indexed by its first ID.
-/// PITFALL: Does not include every node in the buffer --
-/// just the ones that generated instructions.
-/// Hence the importance of 'skgnode_from_map_or_disk'.
-/// PITFALL: Only Save instructions contribute;
-/// Delete instructions carry no NodeComplete data.
-pub fn skgnode_map_from_save_instructions (
-  instructions : &Vec<DefineNode>,
-) -> SkgNodeMap
-{ instructions . iter()
-    . filter_map( |instr| match instr {
-        DefineNode::Save(SaveNode (skgnode)) =>
-          Some (( skgnode . pid . clone(),
-                  skgnode . clone() )),
-        DefineNode::Delete (_) => None } )
-    . collect() }
-
-/// Fetches (batched) SkgNodes from disk for all IDs in the tree.
-pub async fn skgnode_map_from_forest (
-  forest : &Tree<ViewNode>,
-  config : &SkgConfig,
-  driver : &TypeDBDriver,
-) -> Result<SkgNodeMap, Box<dyn Error>>
-{ let mut all_tree_ids : Vec<ID> = Vec::new();
-  collect_ids_from_subtree (
-    forest, forest . root () . id (), &mut all_tree_ids );
-  let nodes : Vec<NodeComplete> = skgnodes_from_ids (
-    config, driver, &all_tree_ids ) . await ?;
-  let mut map : SkgNodeMap = SkgNodeMap::new ();
-  for node in nodes {
-    { let id : &ID = &node . pid;
-      map . insert ( id . clone (), node ); }}
-  Ok (map) }
-
 /// Memory-first NodeComplete read, disk fallback, id-based.
 ///
 /// Async because the id→(pid, source) resolution goes through
@@ -266,24 +212,6 @@ pub fn skgnode_from_memory_or_disk (
   Ok ( skgnode_from_pid_and_source (
          config, pid . clone (), source ) ? ) }
 
-pub fn skgnode_from_map_or_disk<'a>(
-  id: &ID,
-  source: &SourceName,
-  map: &'a mut SkgNodeMap,
-  config: &SkgConfig,
-) -> Result<&'a NodeComplete, Box<dyn Error>> {
-  if !map . contains_key (id) {
-    let skgnode: NodeComplete =
-      if let Some (skgnode_from_mem) =
-        nodecomplete_from_memory (id)
-      { skgnode_from_mem }
-      else {
-        skgnode_from_pid_and_source (
-          config, id . clone (), source) ? };
-    map . insert(id . clone(), skgnode); }
-  map . get (id) . ok_or_else(
-    || "NodeComplete should be in map after fetch" . into( )) }
-
 /// Synthesize a NodeComplete from the in-Rust memory if the id is
 /// there (primary or extra). Returns None if memory isn't
 /// initialized or doesn't have the id.
@@ -303,22 +231,6 @@ pub fn nodecomplete_from_memory (id: &ID) -> Option<NodeComplete> {
     hides_from_its_subscriptions : rust . hides_from_its_subscriptions . clone (),
     overrides_view_of            : rust . overrides_view_of . clone (),
     misc                         : rust . misc . clone (), } ) }
-
-fn collect_ids_from_subtree (
-  tree    : &Tree<ViewNode>,
-  node_id : NodeId,
-  ids_out : &mut Vec<ID>, )
-{ let node_ref : NodeRef<ViewNode> =
-    tree . get (node_id) . unwrap ();
-  match &node_ref . value () . kind {
-    ViewNodeKind::True (t)    =>
-      ids_out . push ( t . id . clone () ),
-    ViewNodeKind::Deleted (d) =>
-      ids_out . push ( d . id . clone () ),
-    _ => {} }
-  for child in node_ref . children () {
-    collect_ids_from_subtree (
-      tree, child . id (), ids_out ); }}
 
 /// Lookup a node's source by trying, in order:
 /// - sources_from_siblings
