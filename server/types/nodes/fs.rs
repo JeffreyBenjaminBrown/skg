@@ -66,7 +66,84 @@ impl NodeFS {
       misc                         : self . misc,
     }
   }
+
+  /// Serialize to YAML, emitting the 'body' field as a block literal
+  /// (`body: |2-` / `body: |2`) so multi-line bodies are readable in
+  /// version control rather than collapsed to a single-line
+  /// double-quoted string with `\n` escapes.
+  ///
+  /// Field order matches the struct declaration, matching what a
+  /// plain `serde_yaml::to_string(self)` would produce. Reads
+  /// (`serde_yaml::from_str`) already accept every scalar style, so
+  /// existing .skg files need no migration.
+  ///
+  /// Falls back to the default `serde_yaml` rendering for body strings
+  /// that cannot be losslessly represented in block form (e.g. ones
+  /// containing carriage returns or NUL bytes).
+  pub fn to_yaml (
+    &self,
+  ) -> Result<String, serde_yaml::Error> {
+    let value : serde_yaml::Value =
+      serde_yaml::to_value (self)?;
+    let mapping : &serde_yaml::Mapping =
+      value . as_mapping ()
+      . expect ("NodeFS serializes as a YAML mapping");
+    let mut out : String = String::new();
+    for (key, val) in mapping . iter () {
+      let is_body : bool =
+        key . as_str() == Some ("body");
+      let block : Option<String> =
+        if is_body {
+          val . as_str()
+            . and_then (block_scalar_for_body) }
+        else { None };
+      match block {
+        Some (rendered) => out . push_str (&rendered),
+        None => {
+          // Singleton mapping, so 'serde_yaml::to_string'
+          // renders just this one key-value pair.
+          let singleton : serde_yaml::Mapping =
+            [(key . clone (), val . clone ())]
+            . into_iter () . collect ();
+          out . push_str (
+            & serde_yaml::to_string (&singleton)?); } } }
+    Ok (out) }
 }
+
+/// Render BODY as a YAML block-literal key-value of the form
+/// `body: |2…\n  line\n  line\n`. Returns Some only when the result
+/// round-trips exactly through `serde_yaml::from_str`; otherwise None,
+/// signalling the caller to fall back to the default rendering.
+fn block_scalar_for_body (
+  body : &str,
+) -> Option<String> {
+  let ends_nl : bool = body . ends_with ('\n');
+  let inner : &str =
+    // Block form's final newline is implied by `|2`; `|2-` strips it.
+    if ends_nl { & body [.. body . len() - 1] }
+    else       { body };
+  let chomp : &str = if ends_nl { "" } else { "-" };
+  // Indentation indicator first, then chomping indicator — matches
+  // serde_yaml's own emitter style (e.g. `|2-`).
+  let mut out : String =
+    format! ("body: |2{}\n", chomp);
+  for line in inner . split ('\n') {
+    if line . is_empty () { out . push ('\n'); }
+    else {
+      out . push_str ("  ");
+      out . push_str (line);
+      out . push ('\n'); } }
+  // Round-trip guard: parse what we emitted and accept only if the
+  // decoded body is bit-for-bit identical to the input.
+  let parsed : Result<serde_yaml::Value, _> =
+    serde_yaml::from_str (&out);
+  match parsed {
+    Ok (v) => {
+      let got : Option<&str> =
+        v . get ("body") . and_then (|b| b . as_str ());
+      if got == Some (body) { Some (out) }
+      else { None } }
+    Err (_) => None, } }
 
 impl From<&NodeComplete> for NodeFS {
   /// Drop 'source'. Everything else is cloned.

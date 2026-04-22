@@ -163,7 +163,7 @@ pub(super) fn write_nodecomplete
     fs::write ( file_path,
                 {
                   let yaml_string : String =
-                    serde_yaml::to_string (&node_fs)
+                    node_fs . to_yaml ()
                     . map_err (
                       |e| io::Error::new(
                         io::ErrorKind::InvalidData,

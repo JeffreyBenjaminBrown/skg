@@ -137,6 +137,6 @@ fn write_nodecomplete_to_dir (
   let path : std::path::PathBuf =
     output_dir . join (&filename);
   let node_fs : NodeFS = NodeFS::from (node);
-  let yaml    : String = serde_yaml::to_string (&node_fs)?;
+  let yaml    : String = node_fs . to_yaml ()?;
   fs::write (&path, &yaml)?;
   Ok (( )) }
