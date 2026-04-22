@@ -27,8 +27,10 @@ asking to be asked for missing details.
 see TODO/change-command-names-and-aliases.org
 ** when requesting containerward views
 warn the user that the buffer is updating
-* some terminus commits from 'many-and-better-node-types'
-** commits
+* commit history
+** UNREVIEWED : the Rust-v-Typedb audit code
+ad9b84c8ad476b93b911c0513107ab70df15c449..34b23094fc839224dc6accdbffcd4adf58eebc51
+** 'many-and-better-node-types' : some terminus commits
 *** plan began
 d4dd2e850b449aa4ff92820f9dd66aad48cd6b0b
 *** plan part A complete

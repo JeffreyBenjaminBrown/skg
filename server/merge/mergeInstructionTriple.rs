@@ -1,6 +1,6 @@
 use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
 use crate::dbs::typedb::search::find_related_nodes;
-use crate::types::memory::skgnode_from_memory_or_disk;
+use crate::types::memory::skgnode_from_memory_or_disk_async;
 use crate::types::save::{Merge, SaveNode, DeleteNode};
 use crate::types::misc::{MSV, SkgConfig, ID};
 use crate::types::viewnode::EditRequest;
@@ -69,7 +69,7 @@ pub async fn neighbor_savenodes_for_merges (
     Vec::with_capacity (to_load . len ());
   for pid in &to_load {
     let node : NodeComplete =
-      skgnode_from_memory_or_disk (config, driver, pid) . await ?;
+      skgnode_from_memory_or_disk_async (config, driver, pid) . await ?;
     save_nodes . push ( SaveNode (node) ); }
   Ok (save_nodes) }
 
@@ -113,10 +113,10 @@ async fn optmerge_from_viewnode (
     _ => return Ok (None) };
   let acquirer_id : &ID = &t . id;
   let acquirer_from_disk : NodeComplete =
-    skgnode_from_memory_or_disk (
+    skgnode_from_memory_or_disk_async (
       config, driver, acquirer_id ) . await?;
   let acquiree_from_disk : NodeComplete =
-    skgnode_from_memory_or_disk (
+    skgnode_from_memory_or_disk_async (
       config, driver, &acquiree_id ) . await?;
   let acquiree_text_preserver : NodeComplete =
     create_acquiree_text_preserver (&acquiree_from_disk);

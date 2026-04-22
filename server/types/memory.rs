@@ -236,22 +236,14 @@ pub async fn skgnode_map_from_forest (
       map . insert ( id . clone (), node ); }}
   Ok (map) }
 
-/// Get a NodeComplete from the per-request map, else the in-Rust
-/// memory, else disk. Updates the map with whichever source
-/// produced the node so subsequent lookups within the same request
-/// hit the map.
+/// Memory-first NodeComplete read, disk fallback, id-based.
 ///
-/// PITFALL: the in-Rust memory stores 'NodeRust', which drops
-/// 'misc'. A NodeComplete synthesized from memory therefore has
-/// 'misc: Vec::new()'. No in-memory consumer reads 'misc' (only
-/// Tantivy indexing and the org-roam importer do, and neither of
-/// those goes through this function), so the synthesis is lossless
-/// for this function's callers.
-/// Memory-first fetch: try the in-Rust memory, fall back to disk
-/// (which itself resolves id→(pid,source) via 'pid_and_source_from_id',
-/// which also consults memory). For callers that don't maintain a
-/// per-request SkgNodeMap shadow.
-pub async fn skgnode_from_memory_or_disk (
+/// Async because the id→(pid, source) resolution goes through
+/// 'skgnode_from_id', which consults TypeDB when memory is
+/// uninitialized. Callers that already have '(pid, source)' in
+/// hand should prefer the sync 'skgnode_from_memory_or_disk'
+/// below.
+pub async fn skgnode_from_memory_or_disk_async (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   id     : &ID,
@@ -259,6 +251,20 @@ pub async fn skgnode_from_memory_or_disk (
   if let Some (n) = nodecomplete_from_memory (id) {
     return Ok (n); }
   skgnode_from_id (config, driver, id) . await }
+
+/// Memory-first NodeComplete read, disk fallback, given an
+/// already-resolved '(pid, source)'. Sync — never consults TypeDB,
+/// so callers in sync contexts don't have to become async. For the
+/// id-only path use 'skgnode_from_memory_or_disk_async'.
+pub fn skgnode_from_memory_or_disk (
+  config : &SkgConfig,
+  pid    : &ID,
+  source : &SourceName,
+) -> Result<NodeComplete, Box<dyn Error>> {
+  if let Some (n) = nodecomplete_from_memory (pid)
+    { return Ok (n); }
+  Ok ( skgnode_from_pid_and_source (
+         config, pid . clone (), source ) ? ) }
 
 pub fn skgnode_from_map_or_disk<'a>(
   id: &ID,
@@ -280,8 +286,7 @@ pub fn skgnode_from_map_or_disk<'a>(
 
 /// Synthesize a NodeComplete from the in-Rust memory if the id is
 /// there (primary or extra). Returns None if memory isn't
-/// initialized or doesn't have the id. 'misc' is synthesized as
-/// empty — see the PITFALL on 'skgnode_from_map_or_disk'.
+/// initialized or doesn't have the id.
 pub fn nodecomplete_from_memory (id: &ID) -> Option<NodeComplete> {
   let graph_snap = snapshot_global () ?;
   let pid : ID = graph_snap . pid_of (id) ?;
@@ -297,7 +302,7 @@ pub fn nodecomplete_from_memory (id: &ID) -> Option<NodeComplete> {
     subscribes_to                : rust . subscribes_to . clone (),
     hides_from_its_subscriptions : rust . hides_from_its_subscriptions . clone (),
     overrides_view_of            : rust . overrides_view_of . clone (),
-    misc                         : Vec::new (), } ) }
+    misc                         : rust . misc . clone (), } ) }
 
 fn collect_ids_from_subtree (
   tree    : &Tree<ViewNode>,
@@ -339,6 +344,4 @@ pub fn find_source_many_ways (
     source_from_disk ( id, config )
     . ok_or_else ( || format! (
       "find_source_many_ways: no source found for {}", id . 0 )) ?;
-  skgnode_from_map_or_disk ( id, &source, map, config )
-    . map_err ( |e| e . to_string () ) ?;
   Ok (source) }
