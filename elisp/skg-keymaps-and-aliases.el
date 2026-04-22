@@ -9,7 +9,12 @@
 ;;;   global (available everywhere)
 ;;;     C-c f RET               (skg-search)
 ;;;     C-c f i                 (skg-search-interactive)
-;;;   magit C-c g RET           (skg-goto, available in magit buffers)
+;;;   magit                     (bindings added to magit-mode-map)
+;;;     C-c g RET               (skg-goto)
+;;;     C-c o i                 (skg-paste-id)
+;;;     C-c o l                 (skg-paste-link)
+;;;     C-c o I                 (skg-pop-id)
+;;;     C-c o L                 (skg-pop-link)
 
 ;; No requires here — the underlying functions are loaded by skg-client.el,
 ;; which also requires this file. Adding requires here would create a cycle.
@@ -49,7 +54,11 @@ and hide INTERNAL from M-x completion."
   (global-set-key (kbd "C-c f i")   #'skg-search-interactive))
 
 (with-eval-after-load 'magit ;; Magit
-  (define-key magit-mode-map (kbd "C-c g RET") #'skg-goto))
+  (define-key magit-mode-map (kbd "C-c g RET") #'skg-goto)
+  (define-key magit-mode-map (kbd "C-c o i")   #'skg-paste-id)
+  (define-key magit-mode-map (kbd "C-c o l")   #'skg-paste-link)
+  (define-key magit-mode-map (kbd "C-c o I")   #'skg-pop-id)
+  (define-key magit-mode-map (kbd "C-c o L")   #'skg-pop-link))
 
 (defvar skg-content-view-mode-map ;; Content view keymap
   (let (( map (make-sparse-keymap) ))

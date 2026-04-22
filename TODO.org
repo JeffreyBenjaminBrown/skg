@@ -2,7 +2,6 @@
 ** org-roam import: Use actual newlines.
 ** retrieve the commits in data/public-1-mangled/
 * coollected while dogfooding, unassimilated
-** make the ID stack ops available in magit, .skg view
 ** Use literal newlines in .skg body fields.
 Otherwise the diff is undreadable.
 
