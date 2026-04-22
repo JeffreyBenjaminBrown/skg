@@ -99,13 +99,6 @@ pub fn take_pending_audit_warning () -> Option<String> {
     set . clear (); }
   msg }
 
-/// Convenience: if a warning is pending, prepend it (plus a blank
-/// line) to 'buf'. Used by handlers that emit buffer text.
-pub fn prepend_audit_warning (buf : String) -> String {
-  match take_pending_audit_warning () {
-    None      => buf,
-    Some (w)  => format! ("{}\n\n{}", w, buf), } }
-
 /// Add a pid newly flagged by this batch to the unreported set and
 /// refresh the warning slot to reflect the cumulative count.
 fn note_new_flagged_pid (pid : ID) {

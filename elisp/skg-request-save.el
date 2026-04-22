@@ -137,6 +137,15 @@ which would trigger overlay modification-hooks if still present."
           (skg-handle-save-sexp payload)))
     (skg--unlock-all-save-locked)) )
 
+(defun skg-errors-to-org-string (errors-list)
+  "Convert ERRORS-LIST (from the server) to org-buffer text.
+Each error becomes its own top-level headline. This is the single
+place where server-side `Vec<String>` errors get org-formatted for
+display in the warnings/errors buffer."
+  (if (listp errors-list)
+      (mapconcat (lambda (e) (concat "* " e)) errors-list "\n")
+    (concat "* " errors-list)))
+
 (defun skg-handle-save-sexp (sexp-string)
   "Parse and handle save response s-exp: ((content ...) (errors (...)))."
   (condition-case err
@@ -146,10 +155,7 @@ which would trigger overlay modification-hooks if still present."
         (when content-value
           (skg-replace-buffer-with-new-content nil content-value))
         (when errors-list
-          (let ((errors-text
-                 (if (listp errors-list)
-                     (mapconcat 'identity errors-list "\n\n")
-                   errors-list)))
+          (let ((errors-text (skg-errors-to-org-string errors-list)))
             (if content-value
                 (skg-show-save-warnings ;; Success with warnings
                  errors-text)

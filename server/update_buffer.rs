@@ -9,7 +9,7 @@ pub use complete::complete_viewtree;
 pub use graphnodestats::set_graphnodestats_in_forest;
 pub use viewnodestats::set_viewnodestats_in_forest;
 
-use crate::dbs::memory::{memory_coherent_with_save_instructions, scheduled_audit::prepend_audit_warning};
+use crate::dbs::memory::{memory_coherent_with_save_instructions, scheduled_audit::take_pending_audit_warning};
 use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
 use crate::org_to_text::viewnode_forest_to_string;
 use crate::serve::ConnectionState;
@@ -128,7 +128,6 @@ pub async fn update_views_after_save (
           false ) . await }
       { Ok (text) => {
           conn_state . memory . update_view (&curi, forest);
-          let text : String = prepend_audit_warning (text);
           send_response_with_length_prefix (
             stream,
             & tag_sexp_response (
@@ -138,7 +137,9 @@ pub async fn update_views_after_save (
           errors . push ( format! (
             "Collateral view {}: {}",
             curi . repr_in_client (), e )); }} }}
-  Ok ( SaveResponse { saved_view : prepend_audit_warning (saved_text),
+  if let Some (w) = take_pending_audit_warning () {
+    errors . insert (0, w); }
+  Ok ( SaveResponse { saved_view : saved_text,
                        errors } ) }
 
 /// Given the saved ViewUri and save instructions,
