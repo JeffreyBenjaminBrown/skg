@@ -5,7 +5,7 @@
 use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind, UncheckedTrueNode};
 use crate::types::viewnode::{Scaffold, EditRequest, IndefOrDef};
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::tree::viewnode_skgnode::{
+use crate::types::tree::viewnode_nodecomplete::{
   generation_includes_only,
   generation_exists_and_includes,
   generation_does_not_exist,

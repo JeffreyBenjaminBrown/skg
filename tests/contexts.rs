@@ -223,7 +223,7 @@ fn test_extend_contexts_for_cycles_detects_cycle () {
 /// See tests/contexts/fixtures/README.org
 #[test]
 fn test_full_context_pipeline () {
-  // Load SkgNodes from fixture files.
+  // Load NodeCompletes from fixture files.
   let config : SkgConfig =
     SkgConfig::dummyFromSources (
       HashMap::from ([(
@@ -236,7 +236,7 @@ fn test_full_context_pipeline () {
   let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config)
     . expect ("failed to read fixture .skg files");
-  // Extract data from SkgNodes.
+  // Extract data from NodeCompletes.
   let ( map_to_content, map_to_containers )
     : ( MapToContent, MapToContainers )
     = content_maps_from_nodes (&nodes);

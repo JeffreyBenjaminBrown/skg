@@ -457,9 +457,9 @@ fn test_body_whitespace_mixed_indent_with_false_headline () {
   assert_eq! (nodes[0] . body . as_deref(),
               Some ("  some text\n    indented\n  * sneaky bullet") ); }
 
-/// Render a tree of SkgNodes as org text (no metadata),
+/// Render a tree of NodeCompletes as org text (no metadata),
 /// starting from the given root ID, for test comparison.
-fn render_skgnodes_as_org (
+fn render_nodecompletes_as_org (
   nodes   : &[NodeComplete],
   root_id : &ID,
 ) -> String {
@@ -515,7 +515,7 @@ fn test_super_indentation_creates_grouping_nodes () {
   let nodes : Vec<NodeComplete> =
     parse_org_file (f . path());
   let rendered : String =
-    render_skgnodes_as_org (&nodes, &ID::new ("a-id"));
+    render_nodecompletes_as_org (&nodes, &ID::new ("a-id"));
   let expected : &str = "\
 * a
 ** These are special!

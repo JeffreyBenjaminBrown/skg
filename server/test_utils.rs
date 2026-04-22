@@ -544,7 +544,7 @@ pub fn strip_org_comments(s: &str) -> String {
     . join ("\n") }
 
 /// Example NodeComplete for use in tests.
-pub fn skgnode_example () -> NodeComplete {
+pub fn nodecomplete_example () -> NodeComplete {
   NodeComplete {
     title: "This text gets indexed." . to_string(),
     aliases: MSV::Unspecified,
@@ -564,7 +564,7 @@ It better be okay with newlines."# . to_string() ),
     misc: Vec::new (), }}
 
 /// Extract NodeComplete from Save variant; panics on Delete.
-pub fn extract_skgnode_if_save_else_error(
+pub fn extract_nodecomplete_if_save_else_error(
   instr: &DefineNode
 ) -> &NodeComplete {
   match instr {

@@ -268,7 +268,7 @@ pub fn initialize_typedb_from_nodes (
   nodes  : &[NodeComplete],
 ) -> Arc<TypeDBDriver> {
   // Connects to the TypeDB server,
-  // then populates it with the provided SkgNodes.
+  // then populates it with the provided NodeCompletes.
   tracing::info! ("Initializing TypeDB database...");
   let driver : TypeDBDriver = connect_to_typedb();
   block_on ( async {

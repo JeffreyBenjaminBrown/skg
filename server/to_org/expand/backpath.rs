@@ -9,10 +9,10 @@
 
 use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
 use crate::dbs::typedb::paths::{ paths_to_first_nonlinearities, PathToFirstNonlinearity};
-use crate::to_org::util::{ get_id_from_treenode, skgnode_and_viewnode_from_id, remove_completed_view_request};
+use crate::to_org::util::{ get_id_from_treenode, nodecomplete_and_viewnode_from_id, remove_completed_view_request};
 
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::tree::viewnode_skgnode::{ find_child_by_id, find_children_by_ids};
+use crate::types::tree::viewnode_nodecomplete::{ find_child_by_id, find_children_by_ids};
 use crate::types::viewnode::ViewRequest;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Birth, mk_indefinitive_from_viewnode };
 
@@ -349,7 +349,7 @@ pub async fn prepend_indefinitive_child (
   birth          : Birth,
 ) -> Result < NodeId, Box<dyn Error> > {
   let ( _, child_viewnode ) : ( _, ViewNode ) =
-    skgnode_and_viewnode_from_id (
+    nodecomplete_and_viewnode_from_id (
       config, driver, child_skgid
     ) . await ?;
   let viewnode : ViewNode =

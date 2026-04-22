@@ -14,10 +14,10 @@ This map is passed through 'complete_viewtree' -> 'complete_truenode_preorder' -
 Consequence: the same node can be definitive in multiple buffers simultaneously, each unaware of the others.
 
 *** What cross-buffer infrastructure already exists
-'SkgnodesInViews' ([[../../server/types/memory.rs][memory.rs]]) already tracks state across views:
+'OpenViews' ([[../../server/types/memory.rs][memory.rs]]) already tracks state across views:
 
 - ~views: HashMap<ViewUri, ViewState>~ — every open view's forest and PID set
-- ~pool: HashMap<ID, SkgNode>~ — shared SkgNode cache
+- ~pool: HashMap<ID, NodeComplete>~ — shared NodeComplete cache
 - ~root_ids: ManyToMany<ID, ViewUri>~ — maps root IDs to their view URIs (many-to-many)
 - 'views_containing(pid)' — returns all ViewUris whose forest contains a given PID
 - 'content_view_uri_for_root_id(id)' — returns the ViewUri where an ID is a root (used by 'skg-view' to jump to existing views instead of opening duplicates)
@@ -43,7 +43,7 @@ There are three mostly-independent design axes.
 *** Axis 1: Global definitive registry
 Where to track "node X is definitively shown in view Y"?
 
-Agreed approach: Replace 'root_ids' with a new ~definitive_ids: HashMap<ID, ViewUri>~ in 'SkgnodesInViews'. This maps each definitively-shown node to the view it appears in. A plain HashMap (not ManyToMany) enforces the one-view-per-node invariant by construction. For view cleanup on close, we scan the map (cheap with < 10 views, < 1000 entries).
+Agreed approach: Replace 'root_ids' with a new ~definitive_ids: HashMap<ID, ViewUri>~ in 'OpenViews'. This maps each definitively-shown node to the view it appears in. A plain HashMap (not ManyToMany) enforces the one-view-per-node invariant by construction. For view cleanup on close, we scan the map (cheap with < 10 views, < 1000 entries).
 
 'skg-view' lookup becomes: check definitive_ids first.
 

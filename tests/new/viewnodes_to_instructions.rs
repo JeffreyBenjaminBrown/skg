@@ -7,7 +7,7 @@ use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
 use skg::from_text::viewnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_tree;
-use skg::test_utils::extract_skgnode_if_save_else_error;
+use skg::test_utils::extract_nodecomplete_if_save_else_error;
 use skg::types::viewnode::{ViewNode, forest_root_viewnode};
 use skg::types::misc::{ID, MSV};
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
@@ -216,23 +216,23 @@ fn test_viewnode_forest_to_nonmerge_save_instructions_deep_nesting() {
 
   // Check contains relationships
   let level1_skg : &NodeComplete =
-    extract_skgnode_if_save_else_error(&instructions[0]);
+    extract_nodecomplete_if_save_else_error(&instructions[0]);
   assert_eq!(level1_skg . contains, vec![ID::from ("level2a"), ID::from ("level2b")]);
 
   let level2a_skg : &NodeComplete =
-    extract_skgnode_if_save_else_error(&instructions[1]);
+    extract_nodecomplete_if_save_else_error(&instructions[1]);
   assert_eq!(level2a_skg . contains, vec![ID::from ("level3a")]);
 
   let level3a_skg : &NodeComplete =
-    extract_skgnode_if_save_else_error(&instructions[2]);
+    extract_nodecomplete_if_save_else_error(&instructions[2]);
   assert_eq!(level3a_skg . contains, vec![ID::from ("level4")]);
 
   let level4_skg : &NodeComplete =
-    extract_skgnode_if_save_else_error(&instructions[3]);
+    extract_nodecomplete_if_save_else_error(&instructions[3]);
   assert_eq!(level4_skg . contains, vec![]); // Leaf node
 
   let level2b_skg : &NodeComplete =
-    extract_skgnode_if_save_else_error(&instructions[4]);
+    extract_nodecomplete_if_save_else_error(&instructions[4]);
   assert_eq!(level2b_skg . contains, vec![]); // Leaf node
 }
 

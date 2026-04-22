@@ -430,7 +430,7 @@ All four parameters are already available in
 
 Note: the variable changes from =&SourceName= to =SourceName=
 (owned). The subsequent line that uses =child_source= (passed to
-=skgnode_from_map_or_disk=) takes =&SourceName=, so use
+=nodecomplete_from_map_or_disk=) takes =&SourceName=, so use
 =&child_source= there.
 
 Import =source_from_disk= at the top of the file from

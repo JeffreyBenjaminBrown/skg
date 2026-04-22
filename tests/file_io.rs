@@ -7,11 +7,11 @@ use std::path::PathBuf;
 
 use skg::dbs::filesystem::one_node::{
   fetch_aliases_from_file,
-  skgnode_from_pid_and_source, write_skgnode_to_source};
+  nodecomplete_from_pid_and_source, write_nodecomplete_to_source};
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::misc::{ID, MSV, SkgConfig, SourceName};
-use skg::test_utils::{run_with_test_db, skgnode_example};
+use skg::test_utils::{run_with_test_db, nodecomplete_example};
 
 const CONFIG_PATH: &str = "tests/file_io/fixtures/skgconfig.toml";
 
@@ -31,19 +31,19 @@ fn test_node_io() {
   ) . unwrap();
 
   // Write the example node to a file
-  let mut example : NodeComplete = skgnode_example();
+  let mut example : NodeComplete = nodecomplete_example();
   example . source = SourceName::from ("output");
-  write_skgnode_to_source ( &example, &config )
+  write_nodecomplete_to_source ( &example, &config )
     . unwrap ();
 
   // Read that file, reverse its lists, write to another file
-  let read_node : NodeComplete = skgnode_from_pid_and_source (
+  let read_node : NodeComplete = nodecomplete_from_pid_and_source (
     &config, example . pid . clone(), &SourceName::from ("output") ) . unwrap ();
   let mut reversed = reverse_some_of_node (&read_node);
   reversed . source = SourceName::from ("output");
   reversed . pid = ID::new ("reversed");
 
-  write_skgnode_to_source(&reversed, &config) . unwrap();
+  write_nodecomplete_to_source(&reversed, &config) . unwrap();
   let out_filename: PathBuf =
     test_dir . join(&example . pid . 0) . with_extension ("skg");
   let reversed_filename : &str =
@@ -89,12 +89,12 @@ fn verify_body_not_needed() {
     &[("output", PathBuf::from ("/tmp/file_io_test"))],
   ) . unwrap();
 
-  let mut node = skgnode_from_pid_and_source (
+  let mut node = nodecomplete_from_pid_and_source (
     &config, ID::new ("example"), &SourceName::from ("fixtures") ) . unwrap();
   node . source = SourceName::from ("output");
   node . body = None; // mutate it
   node . pid = ID::new ("no_unindexed"); // match pid to filename
-  write_skgnode_to_source(
+  write_nodecomplete_to_source(
     &node, &config ) . unwrap();
   // Parse both files as YAML for semantic comparison
   let generated_yaml: serde_yaml::Value =
@@ -174,8 +174,8 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
     test_node . body = Some("Some text with a link [[(id textlink3][Third) TextLink]] and another [[(id textlink4][Fourth) TextLink]]" . to_string()); }
 
   { // Write to a file and read it back.
-    write_skgnode_to_source(&test_node, &config)?;
-    let read_node : NodeComplete = skgnode_from_pid_and_source(
+    write_nodecomplete_to_source(&test_node, &config)?;
+    let read_node : NodeComplete = nodecomplete_from_pid_and_source(
       &config, ID::new ("test123"), &SourceName::from ("temp"))?;
     assert_eq!( test_node, read_node,
                 "Nodes should have matched." ); }

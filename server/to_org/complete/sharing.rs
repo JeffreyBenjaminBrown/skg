@@ -5,7 +5,7 @@ use crate::dbs::typedb::search::hidden_in_subscribee_content::{
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth};
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
-use crate::types::tree::viewnode_skgnode::{
+use crate::types::tree::viewnode_nodecomplete::{
   append_indefinitive_from_disk_as_child,
   insert_scaffold_as_child,
   pids_for_subscriber_and_its_subscribees,

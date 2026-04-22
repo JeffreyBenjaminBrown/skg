@@ -23,7 +23,7 @@ pub use skg::types::nodes::fs::NodeFS;
 pub use skg::types::nodes::typedb::NodeTypedb;
 pub use skg::types::nodes::complete::NodeComplete;
 pub use skg::serve::ConnectionState;
-pub use skg::types::memory::SkgnodesInViews;
+pub use skg::types::memory::OpenViews;
 pub use skg::dbs::memory::{InRustGraph, new_handle};
 
 //
@@ -139,7 +139,7 @@ pub async fn cleanup_test_dbs(
 // Disk verification helpers
 //
 
-pub fn read_skgnode(repo_path: &Path, id: &str) -> Result<NodeComplete, Box<dyn Error>> {
+pub fn read_nodecomplete(repo_path: &Path, id: &str) -> Result<NodeComplete, Box<dyn Error>> {
   // Read YAML as NodeFS, then attach source.
   // Tests in this module use source "main".
   let path = repo_path . join(format!("{}.skg", id));

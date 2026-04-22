@@ -47,7 +47,7 @@ cannot happen in Emacs Lisp.
 is what the LP receiver uses. But those are treated as opaque
 byte buffers, not as text with characters.)
 
-** What happened with the 'guitar' skgnode
+** What happened with the 'guitar' nodecomplete
 
 The server renders a content view as an org-mode string, wraps it
 in a sexp, and sends it over TCP. Before sending, there's a debug

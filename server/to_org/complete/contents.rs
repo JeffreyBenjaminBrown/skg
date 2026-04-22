@@ -1,8 +1,8 @@
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::memory::skgnode_from_memory_or_disk;
+use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::viewnode::ViewNode;
-use crate::types::tree::viewnode_skgnode::{ pid_and_source_from_treenode, write_at_truenode_in_tree };
+use crate::types::tree::viewnode_nodecomplete::{ pid_and_source_from_treenode, write_at_truenode_in_tree };
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
@@ -21,10 +21,10 @@ pub fn clobberIndefinitiveViewnode (
   let (node_id, source) : (ID, SourceName) =
     pid_and_source_from_treenode (
       tree, treeid, "clobberIndefinitiveViewnode" ) ?;
-  let skgnode : NodeComplete =
-    skgnode_from_memory_or_disk ( config, &node_id, &source ) ?;
-  let title : String = skgnode . title . clone();
-  let source : SourceName = skgnode . source . clone();
+  let nodecomplete : NodeComplete =
+    nodecomplete_from_memory_or_disk ( config, &node_id, &source ) ?;
+  let title : String = nodecomplete . title . clone();
+  let source : SourceName = nodecomplete . source . clone();
   write_at_truenode_in_tree ( tree, treeid, |t| {
     t . title = title;
     t . source = source; }

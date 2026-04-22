@@ -4,7 +4,7 @@ use crate::types::misc::{ID, MSV};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 use crate::types::tree::generic::read_at_node_in_tree;
-use crate::types::tree::viewnode_skgnode::{
+use crate::types::tree::viewnode_nodecomplete::{
   collect_grandchild_aliases_for_viewnode, unique_scaffold_child };
 use crate::types::list::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};

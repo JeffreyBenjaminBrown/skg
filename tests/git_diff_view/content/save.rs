@@ -17,7 +17,7 @@ fn test_delete_removed_node_respawns()
 
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
-        memory            : SkgnodesInViews::new (),
+        memory            : OpenViews::new (),
         graph             : new_handle (InRustGraph::new ()) };
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
@@ -31,7 +31,7 @@ fn test_delete_removed_node_respawns()
         "gets-removed.skg should stay deleted");
 
       // DISK: 11.skg should still contain moves and not gets-removed
-      let node_11 = read_skgnode(repo_path, "11")?;
+      let node_11 = read_nodecomplete(repo_path, "11")?;
       let contains_11 = node_11 . contains;
       assert!(contains_11 . contains(&ID("moves" . to_string())),
         "11.skg should still contain moves");
@@ -57,7 +57,7 @@ fn test_delete_removed_here_node_respawns()
 
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
-        memory            : SkgnodesInViews::new (),
+        memory            : OpenViews::new (),
         graph             : new_handle (InRustGraph::new ()) };
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
@@ -67,7 +67,7 @@ fn test_delete_removed_here_node_respawns()
       ) . await?;
 
       // DISK: 12.skg should still have empty contains
-      let node_12 = read_skgnode(repo_path, "12")?;
+      let node_12 = read_nodecomplete(repo_path, "12")?;
       let contains_12 = node_12 . contains;
       assert!(!contains_12 . contains(&ID("moves" . to_string())),
         "12.skg should not contain moves");
@@ -95,7 +95,7 @@ fn test_delete_new_here_updates_disk()
 
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
-        memory            : SkgnodesInViews::new (),
+        memory            : OpenViews::new (),
         graph             : new_handle (InRustGraph::new ()) };
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
@@ -105,7 +105,7 @@ fn test_delete_new_here_updates_disk()
       ) . await?;
 
       // DISK: 11.skg should no longer contain moves
-      let node_11 = read_skgnode(repo_path, "11")?;
+      let node_11 = read_nodecomplete(repo_path, "11")?;
       let contains_11 = node_11 . contains;
       assert!(!contains_11 . contains(&ID("moves" . to_string())),
         "11.skg should no longer contain moves");
@@ -139,7 +139,7 @@ fn test_add_new_child_creates_on_disk()
 
       let mut conn_state : ConnectionState = ConnectionState {
         diff_mode_enabled : true,
-        memory            : SkgnodesInViews::new (),
+        memory            : OpenViews::new (),
         graph             : new_handle (InRustGraph::new ()) };
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
@@ -151,14 +151,14 @@ fn test_add_new_child_creates_on_disk()
       // DISK: newer.skg should be created with correct id and title
       assert!(repo_path . join ("newer.skg") . exists(),
         "newer.skg should be created");
-      let node_newer = read_skgnode(repo_path, "newer")?;
+      let node_newer = read_nodecomplete(repo_path, "newer")?;
       assert_eq!(&node_newer . pid, &ID("newer" . to_string()),
         "newer.skg should have id 'newer'");
       assert_eq!(node_newer . title, "newer",
         "newer.skg should have title 'newer'");
 
       // DISK: 12.skg should contain newer
-      let node_12 = read_skgnode(repo_path, "12")?;
+      let node_12 = read_nodecomplete(repo_path, "12")?;
       let contains_12 = node_12 . contains;
       assert!(contains_12 . contains(&ID("newer" . to_string())),
         "12.skg should contain newer");

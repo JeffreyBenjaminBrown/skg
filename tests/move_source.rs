@@ -5,7 +5,7 @@ use futures::executor::block_on;
 use indoc::indoc;
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
-use skg::dbs::filesystem::one_node::skgnode_from_id;
+use skg::dbs::filesystem::one_node::nodecomplete_from_id;
 use skg::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::dbs::typedb::nodes::create_all_nodes;
@@ -177,7 +177,7 @@ fn test_move_node_to_another_owned_source (
 
     { // FS: read NodeComplete back from disk via TypeDB lookup
       let node_b : NodeComplete =
-        skgnode_from_id (&config, &driver, &ID::new ("b"))
+        nodecomplete_from_id (&config, &driver, &ID::new ("b"))
         . await?;
       assert_eq!(node_b . source, SourceName::from ("private"),
                  "NodeComplete read from disk should have source=private"); }
@@ -199,22 +199,22 @@ fn test_move_node_to_another_owned_source (
 
     { // Other nodes unchanged
       let node_a : NodeComplete =
-        skgnode_from_id (&config, &driver, &ID::new ("a"))
+        nodecomplete_from_id (&config, &driver, &ID::new ("a"))
         . await?;
       assert_eq!(node_a . source, SourceName::from ("public"));
       let node_c : NodeComplete =
-        skgnode_from_id (&config, &driver, &ID::new ("c"))
+        nodecomplete_from_id (&config, &driver, &ID::new ("c"))
         . await?;
       assert_eq!(node_c . source, SourceName::from ("public")); }
 
     { // Containment relationships should be unchanged
       let node_a : NodeComplete =
-        skgnode_from_id (&config, &driver, &ID::new ("a"))
+        nodecomplete_from_id (&config, &driver, &ID::new ("a"))
         . await?;
       assert!(node_a . contains . contains (&ID::new ("b")),
               "a should still contain b after move");
       let node_b : NodeComplete =
-        skgnode_from_id (&config, &driver, &ID::new ("b"))
+        nodecomplete_from_id (&config, &driver, &ID::new ("b"))
         . await?;
       assert!(node_b . contains . contains (&ID::new ("c")),
               "b should still contain c after move"); }

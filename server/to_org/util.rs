@@ -1,12 +1,12 @@
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
-use crate::types::memory::skgnode_from_memory_or_disk;
+use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generations::collect_generation_ids;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
-use crate::types::tree::viewnode_skgnode::{pid_and_source_from_treenode, write_at_truenode_in_tree};
+use crate::types::tree::viewnode_nodecomplete::{pid_and_source_from_treenode, write_at_truenode_in_tree};
 use crate::types::viewnode::ViewRequest;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, Birth, forest_root_viewnode, mk_definitive_viewnode };
 
@@ -31,37 +31,37 @@ pub type DefinitiveMap =
 
 
 // ======================================================
-// Fetching, building and modifying SkgNodes and ViewNodes
+// Fetching, building and modifying NodeCompletes and ViewNodes
 // ======================================================
 
 /// Fetch a NodeComplete from memory or disk. Resolves id→(pid,source)
 /// via 'pid_and_source_from_id', then reads. Makes a ViewNode with
 /// validated title. Returns both.
-pub async fn skgnode_and_viewnode_from_id (
+pub async fn nodecomplete_and_viewnode_from_id (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   skgid  : &ID,
 ) -> Result < ( NodeComplete, ViewNode ), Box<dyn Error> > {
   let (pid_resolved, source) : (ID, SourceName) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "skgnode_and_viewnode_from_id" ). entered();
+        "nodecomplete_and_viewnode_from_id" ). entered();
       pid_and_source_from_id(
         &config . db_name, driver, skgid) . await? }
     . ok_or_else( || format!(
       "ID '{}' not found in database", skgid ))?;
-  skgnode_and_viewnode_from_pid_and_source (
+  nodecomplete_and_viewnode_from_pid_and_source (
     config, &pid_resolved, &source ) }
 
 /// Fetch a NodeComplete from memory or disk given PID and source.
 /// Makes an ViewNode with validated title. Returns both.
-pub(super) fn skgnode_and_viewnode_from_pid_and_source (
+pub(super) fn nodecomplete_and_viewnode_from_pid_and_source (
   config : &SkgConfig,
   pid    : &ID,
   source : &SourceName,
 ) -> Result < ( NodeComplete, ViewNode ), Box<dyn Error> > {
-  let skgnode : NodeComplete =
-    skgnode_from_memory_or_disk ( config, pid, source )?;
-  let title : String = skgnode . title . replace ( '\n', " " );
+  let nodecomplete : NodeComplete =
+    nodecomplete_from_memory_or_disk ( config, pid, source )?;
+  let title : String = nodecomplete . title . replace ( '\n', " " );
   if title . is_empty () {
     return Err ( Box::new ( io::Error::new (
       io::ErrorKind::InvalidData,
@@ -71,8 +71,8 @@ pub(super) fn skgnode_and_viewnode_from_pid_and_source (
     pid . clone (),
     source . clone (),
     title,
-    skgnode . body . clone () );
-  Ok (( skgnode, viewnode )) }
+    nodecomplete . body . clone () );
+  Ok (( nodecomplete, viewnode )) }
 
 /// Set node to indefinitive,
 /// and reset title and source.
@@ -89,7 +89,7 @@ pub(super) fn makeIndefinitiveAndClobber (
   Ok (( )) }
 
 /// This function's callers add a pristine, out-of-context
-/// (skgnode, viewnode) pair to the tree.
+/// (nodecomplete, viewnode) pair to the tree.
 /// Integrating the pair into the tree requires more work
 /// (and later will require even more, probably),
 /// which this function does:
@@ -264,8 +264,8 @@ pub async fn make_and_append_child_pair (
   driver         : &TypeDBDriver,
 ) -> Result < NodeId, // the new node
               Box<dyn Error> > {
-  let (_child_skgnode, child_viewnode) : (NodeComplete, ViewNode) =
-    skgnode_and_viewnode_from_id (
+  let (_child_nodecomplete, child_viewnode) : (NodeComplete, ViewNode) =
+    nodecomplete_and_viewnode_from_id (
       config, driver, child_skgid ) . await ?;
   let child_treeid : NodeId =
     with_node_mut ( // append child
@@ -291,8 +291,8 @@ pub async fn build_node_branch_minus_content (
   let result : Result < NodeId, Box<dyn Error> > =
     match tree_and_parent {
       Some ( (tree, parent_treeid) ) => {
-        let (_skgnode, viewnode) : (NodeComplete, ViewNode) =
-          skgnode_and_viewnode_from_id (
+        let (_nodecomplete, viewnode) : (NodeComplete, ViewNode) =
+          nodecomplete_and_viewnode_from_id (
             config, driver, skgid ) . await ?;
         let child_treeid : NodeId = // Add ViewNode to tree
           with_node_mut (
@@ -305,8 +305,8 @@ pub async fn build_node_branch_minus_content (
           config, driver ) . await ?;
         Ok (child_treeid) },
       None => {
-        let (_skgnode, viewnode) : (NodeComplete, ViewNode) =
-          skgnode_and_viewnode_from_id (
+        let (_nodecomplete, viewnode) : (NodeComplete, ViewNode) =
+          nodecomplete_and_viewnode_from_id (
             config, driver, skgid ) . await ?;
         let mut tree : Tree<ViewNode> =
           Tree::new (viewnode);
@@ -336,8 +336,8 @@ pub(super) fn content_ids_if_definitive_else_empty (
       tree, treeid, "content_ids_if_definitive_else_empty" ) {
       Ok (p) => p,
       Err (_) => return Ok ( Vec::new () ), };
-  Ok ( skgnode_from_memory_or_disk ( config, &pid, &source )
-    . map ( |skgnode| skgnode . contains . clone () )
+  Ok ( nodecomplete_from_memory_or_disk ( config, &pid, &source )
+    . map ( |nodecomplete| nodecomplete . contains . clone () )
     . unwrap_or_default () ) }
 
 /// Collect ego_tree::NodeIds after
@@ -367,7 +367,7 @@ pub(super) fn nodes_after_in_generation (
 
 
 // ==============================================
-// Reading from SkgNodes and ViewNodes, esp. in trees
+// Reading from NodeCompletes and ViewNodes, esp. in trees
 // ==============================================
 
 /// Check if a TrueNode is indefinitive.

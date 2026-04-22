@@ -1,6 +1,6 @@
 use crate::types::git::{MembershipAxes, NodeChanges, Sign, SourceDiff, node_changes_for_truenode};
 use crate::types::list::Diff_Item;
-use crate::types::memory::skgnode_from_memory_or_disk;
+use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth};
@@ -44,8 +44,8 @@ pub fn completeAliasCol (
     pid_and_source_from_ancestor(
       tree, aliascol_node_id, 1,
       "completeAliasCol" ) ?;
-  let parent_skgnode : NodeComplete =
-    skgnode_from_memory_or_disk (
+  let parent_nodecomplete : NodeComplete =
+    nodecomplete_from_memory_or_disk (
       config, &parent_pid, &parent_source )
     . map_err ( |_| "completeAliasCol: parent NodeComplete not found" ) ?;
   let node_changes : Option<&NodeChanges> =
@@ -56,7 +56,7 @@ pub fn completeAliasCol (
     = match node_changes {
       None => { // No git diff view: Easy.
         let goals : Vec<String> =
-          parent_skgnode . aliases . or_default() . to_vec();
+          parent_nodecomplete . aliases . or_default() . to_vec();
         ( goals, HashMap::new() ) }
       Some (nc) => { // Git diff view.
         // node_changes_for_truenode returns one NodeChanges (preferring

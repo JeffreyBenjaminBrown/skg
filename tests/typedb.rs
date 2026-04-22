@@ -275,7 +275,7 @@ async fn test_create_only_nodes_with_no_ids_present (
   let initial_number_of_nodes : usize =
     count_nodes ( db_name, driver ) . await ?;
 
-  // Prepare two SkgNodes: one existing ("a"), one new ("new").
+  // Prepare two NodeCompletes: one existing ("a"), one new ("new").
   // Keep other fields minimal/empty as requested.
   let mut fn_a : NodeComplete = empty_node_complete ();
   { fn_a . title = "ignore this string" . to_string ();

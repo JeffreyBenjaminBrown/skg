@@ -16,7 +16,7 @@ generation using 'futures::future::join_all', similar to
 what was done for graphnodestats. Expected: ~90ms → ~5ms.
 
 Complication: each call mutates the shared tree and map.
-Would need to fetch (skgnode, viewnode) pairs in parallel,
+Would need to fetch (nodecomplete, viewnode) pairs in parallel,
 then append them to the tree sequentially. The TypeDB query
 (pid_and_source_from_id) is the slow part; the tree mutation
 is instant.

@@ -29,7 +29,7 @@ use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnr
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
 use crate::types::errors::BufferValidationError;
-use crate::types::memory::{SkgnodesInViews, ViewUri};
+use crate::types::memory::{OpenViews, ViewUri};
 use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::unchecked_viewnode::{UncheckedViewNode,unchecked_to_checked_tree};
 use crate::types::viewnode::ViewNode;
@@ -49,9 +49,9 @@ use typedb_driver::TypeDBDriver;
 /// Per-connection ("global") state.
 pub struct ConnectionState {
   pub diff_mode_enabled : bool,
-  pub memory            : SkgnodesInViews,
+  pub memory            : OpenViews,
   pub graph             : InRustGraphHandle,
-  // If Emacs crashes or the TCP connection drops without sending close-view messages, SkgnodesInViews is still freed, because ConnectionState is owned by handle_emacs and dropped when the connection loop exits (n == 0). There's no leak.
+  // If Emacs crashes or the TCP connection drops without sending close-view messages, OpenViews is still freed, because ConnectionState is owned by handle_emacs and dropped when the connection loop exits (n == 0). There's no leak.
 }
 
 /// Pipes TCP input from Emacs into handle_emacs.
@@ -100,7 +100,7 @@ fn handle_emacs (
   let mut conn_state : ConnectionState =
     ConnectionState {
       diff_mode_enabled : false,
-      memory            : SkgnodesInViews::new (),
+      memory            : OpenViews::new (),
       graph             : graph . clone (), };
 
   let enrichment_slot // To update search results once the 'enrichment' (containerward paths + graphnodestats) has been computed.

@@ -4,7 +4,7 @@ use crate::dbs::typedb::search::all_graphnodestats::{
   AllGraphNodeStats};
 use crate::to_org::util::collect_ids_from_tree;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::memory::skgnode_from_memory_or_disk;
+use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{GraphNodeStats, ViewNode, ViewNodeKind};
 
@@ -53,12 +53,12 @@ pub fn set_metadata_relationships_in_node_recursive (
     { // PITFALL: Uses 'false' for phantom and deleted nodes. Getting 'true' where appropriate would be expensive, requiring inquiry into the git history not just of the phantom, but also of things it was connected to.
       match & tree . get (treeid) . unwrap () . value () . kind {
         ViewNodeKind::True (t) => {
-          let skgnode_opt : Option<NodeComplete> =
-            skgnode_from_memory_or_disk (
+          let nodecomplete_opt : Option<NodeComplete> =
+            nodecomplete_from_memory_or_disk (
               config, &t . id, &t . source
             ). ok ();
           Some ( graphnodestats_for_pid (
-            &t . id, stats, skgnode_opt . as_ref () )) },
+            &t . id, stats, nodecomplete_opt . as_ref () )) },
         _ => None } // Scaff, Deleted, DeletedScaff
     };
   match new_stats {

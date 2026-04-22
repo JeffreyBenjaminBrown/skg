@@ -1,10 +1,10 @@
-use crate::git_ops::read_repo::skgnode_from_git_head;
+use crate::git_ops::read_repo::nodecomplete_from_git_head;
 use crate::types::viewnode::mk_phantom_viewnode;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff, NodeChanges, node_changes_for_truenode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
-use crate::types::memory::{find_source_many_ways, skgnode_from_memory_or_disk};
+use crate::types::memory::{find_source_many_ways, nodecomplete_from_memory_or_disk};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, write_at_ancestor_in_tree, with_node_mut};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth, mk_indefinitive_viewnode};
@@ -55,15 +55,15 @@ pub fn complete_hiddeninsubscribee_col (
       tree, node, 3,
       "complete_hiddeninsubscribee_col" ) ?;
   let subscribee_contains : Vec<ID> = {
-    let subscribee_skgnode : NodeComplete =
-      skgnode_from_memory_or_disk (
+    let subscribee_nodecomplete : NodeComplete =
+      nodecomplete_from_memory_or_disk (
         config, &subscribee_pid, &subscribee_source ) ?;
-    subscribee_skgnode . contains . clone() };
+    subscribee_nodecomplete . contains . clone() };
   let subscriber_hides : Vec<ID> = {
-    let subscriber_skgnode : NodeComplete =
-      skgnode_from_memory_or_disk (
+    let subscriber_nodecomplete : NodeComplete =
+      nodecomplete_from_memory_or_disk (
         config, &subscriber_pid, &subscriber_source ) ?;
-    subscriber_skgnode . hides_from_its_subscriptions
+    subscriber_nodecomplete . hides_from_its_subscriptions
       . or_default() . to_vec() };
   let worktree_content : Vec<ID> =
     { // Intersection of subscriber_hides and subscribee_contains,
@@ -166,7 +166,7 @@ fn goallist_and_removedids_for_hiddeninsubscribeecol_with_diff (
         . collect(),
       None => subscribee_contains . to_vec() };
   let head_subscriber_hides : Vec<ID> =
-    skgnode_from_git_head(
+    nodecomplete_from_git_head(
         subscriber_pid, subscriber_source, config )
       . ok()
       . map( |skg| skg . hides_from_its_subscriptions . into_vec() )
@@ -238,7 +238,7 @@ fn build_hidden_child_data (
             child_skgid, &child_sources,
             deleted_since_head_pid_src_map, config )
           . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
-        let skg : NodeComplete = skgnode_from_memory_or_disk (
+        let skg : NodeComplete = nodecomplete_from_memory_or_disk (
           config, child_skgid, &child_src ) ?;
         result . insert( child_skgid . clone(),
                        HiddenChildData { source: skg . source . clone(),

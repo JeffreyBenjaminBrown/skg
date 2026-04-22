@@ -8,7 +8,7 @@
 /// which means it must be read from disk
 /// and inserted into the NodeComplete.
 
-use crate::dbs::filesystem::one_node::optskgnode_from_id;
+use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
@@ -31,7 +31,7 @@ pub async fn supplement_none_fields_from_disk_if_save (
   let pid: ID =
     from_buffer . pid . clone();
   let from_disk : Option<NodeComplete> =
-    optskgnode_from_id( config, driver, &pid
+    optnodecomplete_from_id( config, driver, &pid
                       ) . await?;
   let mut source_move : Option<SourceMove> = None;
   if let Some (disk_node) = from_disk {

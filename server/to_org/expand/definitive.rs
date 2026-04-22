@@ -1,7 +1,7 @@
-use crate::dbs::filesystem::one_node::optskgnode_from_id;
+use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
 use crate::dbs::typedb::nodes::which_ids_exist;
 use crate::dbs::typedb::paths::containerward_path_stats_bulk;
-use crate::git_ops::read_repo::skgnode_from_index_or_head;
+use crate::git_ops::read_repo::nodecomplete_from_index_or_head;
 use crate::to_org::complete::sharing::{ maybe_add_hiddenInSubscribeeCol_branch, type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::backpath::{ build_and_integrate_containerward_view_then_drop_request, build_and_integrate_sourceward_view_then_drop_request};
@@ -11,9 +11,9 @@ use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ContainerwardPathStats, IndefOrDef, Birth, mk_indefinitive_viewnode };
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::memory::skgnode_from_memory_or_disk;
+use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::tree::generic::read_at_node_in_tree;
-use crate::types::tree::viewnode_skgnode::{write_at_truenode_in_tree, pid_and_source_from_treenode};
+use crate::types::tree::viewnode_nodecomplete::{write_at_truenode_in_tree, pid_and_source_from_treenode};
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use std::collections::{BTreeSet,HashSet,HashMap};
@@ -132,7 +132,7 @@ async fn execute_definitive_view_request (
       { from_git_replace_title_body (
           // PITFALL: This per-node git lookup might be slow. Hard to see how to batch the lookoup, though, since it's from git.
           forest, node_id, config ) ?; }
-      else { from_disk_replace_title_body_and_skgnode (
+      else { from_disk_replace_title_body_and_nodecomplete (
                forest, node_id, config ) ?; }
     visited . insert ( node_pid . clone(), node_id ); }
   if is_removed_node {
@@ -178,11 +178,11 @@ fn get_hidden_ids_if_subscribee (
       pid_and_source_from_treenode (
         tree, subscriber . id(),
         "get_hidden_ids_if_subscribee" ) ?;
-    let skgnode : NodeComplete =
-      skgnode_from_memory_or_disk (
+    let nodecomplete : NodeComplete =
+      nodecomplete_from_memory_or_disk (
         config, &subscriber_id, &subscriber_source ) ?;
     let hidden_ids : HashSet < ID > =
-      skgnode . hides_from_its_subscriptions
+      nodecomplete . hides_from_its_subscriptions
         . or_default ()
         . iter () . cloned () . collect ();
     Ok (hidden_ids) }}
@@ -294,20 +294,20 @@ async fn extendDefinitiveSubtreeFromLeaf (
 /// Fetches NodeComplete from memory or disk.
 /// Updates title and body.
 /// Preserves all other ViewNode data.
-fn from_disk_replace_title_body_and_skgnode (
+fn from_disk_replace_title_body_and_nodecomplete (
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
   let (pid, src) : (ID, SourceName) =
     pid_and_source_from_treenode ( tree, node_id,
-      "from_disk_replace_title_body_and_skgnode" ) ?;
-  let skgnode : NodeComplete = skgnode_from_memory_or_disk (
+      "from_disk_replace_title_body_and_nodecomplete" ) ?;
+  let nodecomplete : NodeComplete = nodecomplete_from_memory_or_disk (
     config, &pid, &src ) ?;
-  let title : String = skgnode . title . clone();
+  let title : String = nodecomplete . title . clone();
   if title . is_empty () {
     return Err ( format! ( "NodeComplete {} has empty title", pid ) . into () ); }
-  let body : Option < String > = skgnode . body . clone ();
+  let body : Option < String > = nodecomplete . body . clone ();
   write_at_truenode_in_tree ( tree, node_id, |t| {
     t . title = title;
     if let IndefOrDef::Definitive { body: ref mut b, .. }
@@ -335,10 +335,10 @@ async fn extendDefinitiveSubtree_fromGit (
       "extendDefinitiveSubtree_fromGit" ) ?;
   let (contents, contents_in_worktree)
     : (Vec<ID>, HashSet<String>) =
-    { let skgnode : NodeComplete =
-        skgnode_from_index_or_head ( &pid, &src, config ) ?;
+    { let nodecomplete : NodeComplete =
+        nodecomplete_from_index_or_head ( &pid, &src, config ) ?;
       let contents : Vec<ID> =
-        skgnode . contains;
+        nodecomplete . contains;
       let not_hidden : BTreeSet<String> =
         contents . iter()
         . filter ( |id| ! hidden_ids . contains (id) )
@@ -384,32 +384,32 @@ async fn mk_removed_child_viewnode (
   // own file is also gone in the worktree:
   //   in worktree -> file exists; just M is removed.
   //   not in worktree -> file gone; both X and M are removed.
-  let (existence, child_opt_skgnode)
+  let (existence, child_opt_nodecomplete)
     : (ExistenceAxes, Option<NodeComplete>)
     = if in_worktree
       { ( ExistenceAxes::default (),
-          optskgnode_from_id (
+          optnodecomplete_from_id (
             config, typedb_driver, child_id ) . await ? ) }
       else
       { ( ExistenceAxes { staged: None, unstaged: Some (Sign::Minus) },
-          skgnode_from_index_or_head ( child_id, parent_src, config
+          nodecomplete_from_index_or_head ( child_id, parent_src, config
                                      ) . ok() ) };
   let membership : MembershipAxes =
     MembershipAxes { staged: None, unstaged: Some (Sign::Minus) };
-  let child_skgnode : &NodeComplete =
-    child_opt_skgnode . as_ref()
+  let child_nodecomplete : &NodeComplete =
+    child_opt_nodecomplete . as_ref()
     . ok_or_else ( || format! (
       "mk_removed_child_viewnode: no NodeComplete for child {}",
       child_id ) ) ?;
   let child_source : Option<SourceName> =
-    if in_worktree { Some ( child_skgnode . source . clone() ) }
+    if in_worktree { Some ( child_nodecomplete . source . clone() ) }
     else           { deleted_since_head_pid_src_map . get (child_id)
                        . cloned() };
   let mut child_viewnode : ViewNode =
     mk_indefinitive_viewnode (
       child_id . clone(),
-      child_skgnode . source . clone(),
-      child_skgnode . title . clone(),
+      child_nodecomplete . source . clone(),
+      child_nodecomplete . title . clone(),
       Birth::ContentOf );
   if let ViewNodeKind::True ( ref mut t ) = child_viewnode . kind {
     if let Some (source) = child_source {
@@ -430,13 +430,13 @@ fn from_git_replace_title_body (
   let (pid, src) : (ID, SourceName) =
     pid_and_source_from_treenode ( tree, node_id,
       "from_git_replace_title_body" ) ?;
-  let skgnode : NodeComplete =
-    skgnode_from_index_or_head ( &pid, &src, config ) ?;
+  let nodecomplete : NodeComplete =
+    nodecomplete_from_index_or_head ( &pid, &src, config ) ?;
   write_at_truenode_in_tree (
     tree, node_id, |t| {
-      t . title = skgnode . title;
+      t . title = nodecomplete . title;
       if let IndefOrDef::Definitive { body: ref mut b, .. }
         = t . indef_or_def
-        { *b = skgnode . body; } } )
+        { *b = nodecomplete . body; } } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (( )) }

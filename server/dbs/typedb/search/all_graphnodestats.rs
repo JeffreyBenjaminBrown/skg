@@ -58,14 +58,14 @@ impl AllGraphNodeStats {
 pub fn graphnodestats_for_pid (
   pid     : &ID,
   stats   : &AllGraphNodeStats,
-  skgnode : Option<&NodeComplete>,
+  nodecomplete : Option<&NodeComplete>,
 ) -> GraphNodeStats {
   let aliasing : bool =
-    skgnode
+    nodecomplete
     . map ( |n| ! n . aliases . or_default () . is_empty () )
     . unwrap_or (false);
   let extra_ids : bool =
-    skgnode
+    nodecomplete
     . map ( |n| ! n . extra_ids . is_empty () )
     . unwrap_or (false);
   let contain_rels : Option<NodeContainRels> =
