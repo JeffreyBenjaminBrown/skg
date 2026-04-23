@@ -1,5 +1,4 @@
-use crate::types::git::{MembershipAxes, NodeChanges, Sign, SourceDiff, node_changes_for_truenode};
-use crate::types::list::Diff_Item;
+use crate::types::git::{MembershipAxes, NodeChanges, SourceDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_truenode};
 use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
@@ -48,38 +47,26 @@ pub fn completeAliasCol (
     nodecomplete_from_memory_or_disk (
       config, &parent_pid, &parent_source )
     . map_err ( |_| "completeAliasCol: parent NodeComplete not found" ) ?;
-  let node_changes : Option<&NodeChanges> =
-    node_changes_for_truenode(
+  let (staged_nc, unstaged_nc)
+    : (Option<&NodeChanges>, Option<&NodeChanges>) =
+    per_stage_node_changes_for_truenode (
       source_diffs, &parent_pid, &parent_source );
   let (goal_list, axes_map)
-    : (Vec<String>, HashMap<String, MembershipAxes>)
-    = match node_changes {
-      None => { // No git diff view: Easy.
-        let goals : Vec<String> =
-          parent_nodecomplete . aliases . or_default() . to_vec();
-        ( goals, HashMap::new() ) }
-      Some (nc) => { // Git diff view.
-        // node_changes_for_truenode returns one NodeChanges (preferring
-        // unstaged); the membership change is therefore stamped on the
-        // unstaged axis.
-        let mut goals : Vec<String> = Vec::new();
-        let mut amap : HashMap<String, MembershipAxes> =
-          HashMap::new();
-        for entry in &nc . aliases_diff {
-          let (text, m) : (String, MembershipAxes) = match entry {
-            Diff_Item::Unchanged (t) =>
-              ( t . clone(), MembershipAxes::default () ),
-            Diff_Item::New (t) =>
-              ( t . clone(),
-                MembershipAxes { staged: None,
-                                 unstaged: Some (Sign::Plus) } ),
-            Diff_Item::Removed (t) =>
-              ( t . clone(),
-                MembershipAxes { staged: None,
-                                 unstaged: Some (Sign::Minus) } ), };
-          goals . push (text . clone ());
-          amap . insert (text, m); }
-        ( goals, amap ) } };
+    : (Vec<String>, HashMap<String, MembershipAxes>) =
+    if staged_nc . is_none () && unstaged_nc . is_none () {
+      let goals : Vec<String> =
+        parent_nodecomplete . aliases . or_default() . to_vec();
+      ( goals, HashMap::new() )
+    } else {
+      let merged : Vec<(String, MembershipAxes)> =
+        axes_from_per_stage_diffs (
+          staged_nc   . map ( |c| c . aliases_diff . as_slice () ),
+          unstaged_nc . map ( |c| c . aliases_diff . as_slice () ) );
+      let goals : Vec<String> =
+        merged . iter () . map ( |(t, _)| t . clone () ) . collect ();
+      let amap : HashMap<String, MembershipAxes> =
+        merged . into_iter () . collect ();
+      ( goals, amap ) };
   let is_alias : fn (&ViewNode) -> bool =
     // relevance to complete_relevant_children
     |viewnode| matches!( &viewnode . kind,

@@ -286,6 +286,7 @@ pub fn insert_after(buffer: &str, after_substring: &str, new_line: &str) -> Stri
 //
 
 /// Create a git repo with head->worktree transition from fixture directories.
+/// The worktree changes land unstaged (index == HEAD).
 pub fn setup_git_repo_with_fixtures(
   repo_path: &Path,
   head_fixtures: &str,
@@ -305,4 +306,34 @@ pub fn setup_git_repo_with_fixtures(
   copy_dir_all(Path::new (worktree_fixtures), repo_path)?;
 
   Ok (repo)
+}
+
+/// Like 'setup_git_repo_with_fixtures' but then 'git add .' after
+/// switching the worktree, so the transition lands staged (index == worktree,
+/// both differ from HEAD) rather than unstaged.
+pub fn setup_git_repo_with_fixtures_staged(
+  repo_path: &Path,
+  head_fixtures: &str,
+  worktree_fixtures: &str,
+) -> Result<Repository, Box<dyn Error>> {
+  let repo = setup_git_repo_with_fixtures(
+    repo_path, head_fixtures, worktree_fixtures )?;
+  stage_everything(&repo)?;
+  Ok (repo)
+}
+
+/// Stage every .skg change currently in the worktree (including
+/// deletions) so that the full diff lives on the staged side.
+pub fn stage_everything(
+  repo: &Repository,
+) -> Result<(), Box<dyn Error>> {
+  let mut index = repo . index ()?;
+  index . add_all(
+    ["*.skg"],
+    git2::IndexAddOption::DEFAULT,
+    None )?;
+  // add_all doesn't register deletions for files removed from the worktree.
+  index . update_all(["*.skg"], None)?;
+  index . write ()?;
+  Ok (( ))
 }

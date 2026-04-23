@@ -162,7 +162,16 @@ impl GitDiffStatus {
 /// Returns None if not in diff view, the source is not a git repo,
 /// or there are no recorded changes for this node's .skg file in
 /// either stage. If both stages have changes, the unstaged side is
-/// returned (transitional; see `apply_diff_to_forest` rewrite).
+/// returned.
+///
+/// DEPRECATED: pre-merges the two stages into one, losing per-stage
+/// distinction. Save-pipeline consumers that need accurate
+/// staged-vs-unstaged attribution should call
+/// 'per_stage_node_changes_for_truenode' instead. Known consequence
+/// of the merge: when a save rewrites a file with only byte-level
+/// (not semantic) changes, the unstaged entry has all-Unchanged
+/// diffs; this function returns that one, hiding the staged side's
+/// real changes.
 pub fn node_changes_for_truenode<'a> (
   source_diffs : &'a Option<HashMap<SourceName, SourceDiff>>,
   pid          : &ID,
@@ -177,3 +186,76 @@ pub fn node_changes_for_truenode<'a> (
       sourcediff . unstaged . get (&file_path)
         . or_else( || sourcediff . staged . get (&file_path) ) ?
         . node_changes . as_ref() } ) }
+
+/// Returns the (staged, unstaged) pair of NodeChanges for a TrueNode,
+/// without merging. Either element may be None (that stage has no
+/// diff entry for this file, or the entry has 'node_changes: None').
+///
+/// Prefer this over 'node_changes_for_truenode' for any code that
+/// cares about per-stage attribution OR needs to detect changes that
+/// live on only one side (e.g. ids_diff / aliases_diff / contains_diff
+/// changes that were staged before a save-induced worktree rewrite).
+pub fn per_stage_node_changes_for_truenode<'a> (
+  source_diffs : &'a Option<HashMap<SourceName, SourceDiff>>,
+  pid          : &ID,
+  source       : &SourceName,
+) -> (Option<&'a NodeChanges>, Option<&'a NodeChanges>) {
+  let sd : Option<&SourceDiff> =
+    source_diffs . as_ref () . and_then ( |d| d . get (source) );
+  let sd : Option<&SourceDiff> =
+    sd . filter ( |sd| sd . is_git_repo );
+  let file_path : PathBuf =
+    PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
+  let staged : Option<&NodeChanges> =
+    sd . and_then ( |sd| sd . staged   . get (&file_path) )
+       . and_then ( |d| d . node_changes . as_ref () );
+  let unstaged : Option<&NodeChanges> =
+    sd . and_then ( |sd| sd . unstaged . get (&file_path) )
+       . and_then ( |d| d . node_changes . as_ref () );
+  (staged, unstaged) }
+
+/// Union the per-stage signs for a list-field diff into a single
+/// (item, MembershipAxes) list. Order comes from whichever stage is
+/// present (prefers unstaged if both, matching apply_diff_to_forest's
+/// baseline choice). Items present in only one stage's diff are
+/// included with their stage's sign and the other stage unset.
+///
+/// 'Unchanged' in a single stage contributes an unset axis for that
+/// stage: the item is still listed (so goal-list building can see it)
+/// but no sign is placed there.
+pub fn axes_from_per_stage_diffs<T: Clone + Eq + std::hash::Hash> (
+  staged_diff   : Option<&[Diff_Item<T>]>,
+  unstaged_diff : Option<&[Diff_Item<T>]>,
+) -> Vec<(T, MembershipAxes)> {
+  let mut result : Vec<(T, MembershipAxes)> = Vec::new ();
+  let mut index : HashMap<T, usize> = HashMap::new ();
+  let baseline : &[Diff_Item<T>] = unstaged_diff
+    . or (staged_diff)
+    . unwrap_or (&[]);
+  for item in baseline {
+    let value : T = match item {
+      Diff_Item::Unchanged (v) | Diff_Item::New (v) | Diff_Item::Removed (v)
+        => v . clone (), };
+    if ! index . contains_key (&value) {
+      index . insert ( value . clone (), result . len () );
+      result . push ( ( value, MembershipAxes::default () )); } }
+  let apply = | result : &mut Vec<(T, MembershipAxes)>,
+                index  : &mut HashMap<T, usize>,
+                diff   : Option<&[Diff_Item<T>]>,
+                set_axis : fn(&mut MembershipAxes, Option<Sign>) | {
+    if let Some (slice) = diff {
+      for item in slice {
+        let (value, sign) : (T, Option<Sign>) = match item {
+          Diff_Item::New      (v) => ( v . clone (), Some (Sign::Plus)),
+          Diff_Item::Removed  (v) => ( v . clone (), Some (Sign::Minus)),
+          Diff_Item::Unchanged (_) => continue, };
+        let i : usize = *index . entry (value . clone ())
+          . or_insert_with ( || {
+            result . push ( ( value . clone (), MembershipAxes::default () ));
+            result . len () - 1 });
+        set_axis (&mut result[i] . 1, sign); } } };
+  apply (&mut result, &mut index, staged_diff,
+         |m, s| m . staged   = s);
+  apply (&mut result, &mut index, unstaged_diff,
+         |m, s| m . unstaged = s);
+  result }

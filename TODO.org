@@ -1,5 +1,4 @@
-* my data
-** retrieve the commits in data/public-1-mangled/
+* ONGOING audit git diff view code
 * coollected while dogfooding, unassimilated
 ** interactive: try diff view on aliases, IDs
 ** cleaner code

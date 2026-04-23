@@ -25,3 +25,25 @@ pub fn setup_git_repo_with_fixtures(
     "tests/git_diff_view/ids/fixtures/worktree",
   )
 }
+
+/// Same transition, but staged (index == worktree).
+pub fn setup_git_repo_with_fixtures_staged(
+  repo_path: &Path,
+) -> Result<Repository, Box<dyn Error>> {
+  super::super::common::setup_git_repo_with_fixtures_staged(
+    repo_path,
+    "tests/git_diff_view/ids/fixtures/head",
+    "tests/git_diff_view/ids/fixtures/worktree",
+  )
+}
+
+/// Expected diff view when the id changes are staged (not unstaged).
+pub const GIT_DIFF_VIEW_STAGED: &str = "\
+* (skg (node (id 1) (source main))) 1
+** (skg idCol) its IDs
+*** (skg id) 1
+*** (skg id (staged removedM)) 2
+*** (skg id (staged newM)) 2'
+*** (skg id) 3
+** (skg (node (id child) (source main))) child
+";

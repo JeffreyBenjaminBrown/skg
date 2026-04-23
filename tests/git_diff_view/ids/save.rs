@@ -161,8 +161,39 @@ fn test_move_id_scaffolds_to_child_respawns()
       Ok(()) }) })
 }
 
+/// Same as 'test_delete_id_col_scaffold_respawns' but with the fixture
+/// transition staged (git add) rather than unstaged. The respawned IDCol
+/// children should report '(staged ...)' tags — this verifies that the
+/// save-rerender pipeline (completeIDCol + complete_viewtree) honors the
+/// staged/unstaged distinction instead of merging stages and defaulting
+/// to unstaged.
+#[test]
+fn test_delete_id_col_scaffold_respawns_staged()
+  -> Result<(), Box<dyn Error>>
+{
+  run_save_test_staged(
+    "skg-test-save-del-idcol-staged",
+    |config, driver, tantivy, _repo_path| { Box::pin(async move {
+      let input = without_lines_containing(
+        GIT_DIFF_VIEW_STAGED, "skg id");
+
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : true,
+        memory            : OpenViews::new (),
+        graph             : new_handle (InRustGraph::new ()) };
+      let (mut stream, _) = mk_test_tcp_stream_pair ();
+      let response = update_from_and_rerender_buffer(
+        &mut stream,
+        &input, driver, config, tantivy, true,
+        &Err ( String::new () ), &mut conn_state ) . await?;
+
+      assert_buffer_contains(
+        &response . saved_view, GIT_DIFF_VIEW_STAGED);
+      Ok(()) }) })
+}
+
 //
-// Test runner helper
+// Test runner helpers
 //
 
 fn run_save_test<F>(db_name: &str, test_fn: F) -> Result<(), Box<dyn Error>>
@@ -174,11 +205,42 @@ where
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
 {
+  run_save_test_with_setup(
+    db_name, setup_git_repo_with_fixtures, test_fn)
+}
+
+fn run_save_test_staged<F>(db_name: &str, test_fn: F) -> Result<(), Box<dyn Error>>
+where
+  F: for<'a> FnOnce(
+    &'a SkgConfig,
+    &'a TypeDBDriver,
+    &'a mut TantivyIndex,
+    &'a Path
+  ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
+{
+  run_save_test_with_setup(
+    db_name, setup_git_repo_with_fixtures_staged, test_fn)
+}
+
+fn run_save_test_with_setup<S, F>(
+  db_name : &str,
+  setup   : S,
+  test_fn : F,
+) -> Result<(), Box<dyn Error>>
+where
+  S: FnOnce (&Path) -> Result<Repository, Box<dyn Error>>,
+  F: for<'a> FnOnce(
+    &'a SkgConfig,
+    &'a TypeDBDriver,
+    &'a mut TantivyIndex,
+    &'a Path
+  ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
+{
   let tantivy_folder = format!("/tmp/tantivy-{}", db_name);
 
   let temp_dir = TempDir::new()?;
   let repo_path = temp_dir . path();
-  setup_git_repo_with_fixtures (repo_path)?;
+  setup (repo_path)?;
 
   block_on(async {
     let (config, driver, mut tantivy) =

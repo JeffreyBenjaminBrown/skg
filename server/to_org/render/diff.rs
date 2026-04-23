@@ -9,8 +9,7 @@
 /// Phantoms are inserted wherever some stage's parent.contains had the
 /// child but the worktree's parent.contains lacks it.
 
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges};
-use crate::types::list::Diff_Item;
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges, axes_from_per_stage_diffs};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::title_for_phantom;
 use crate::types::memory::find_source_many_ways;
@@ -143,62 +142,6 @@ fn sign_from_status (status: &GitDiffStatus) -> Option<Sign> {
     GitDiffStatus::Added    => Some (Sign::Plus),
     GitDiffStatus::Deleted  => Some (Sign::Minus),
     GitDiffStatus::Modified => None, } }
-
-/// Combine two stages' Diff_Item lists into a single list of
-/// (item, MembershipAxes). Each axis cell records that stage's sign:
-/// New -> Plus, Removed -> Minus, Unchanged -> empty.
-///
-/// Used in this file for both `ids_diff` (when populating an IDCol with
-/// per-id axis markers) and `contains_diff` (when deciding which
-/// children to phantom and which to mark as added). The function is
-/// generic over the item type and doesn't itself know which field it
-/// came from.
-///
-/// Unchanged items are kept in the output with empty axes so callers
-/// that want a complete listing (e.g. the IDCol, which renders every ID
-/// even if unchanged) can iterate without re-reading the originals.
-fn axes_from_per_stage_diffs<T: Clone + Eq + std::hash::Hash> (
-  staged_diff   : Option<&[Diff_Item<T>]>,
-  unstaged_diff : Option<&[Diff_Item<T>]>,
-) -> Vec<(T, MembershipAxes)> {
-  let mut result : Vec<(T, MembershipAxes)> = Vec::new ();
-  let mut index : HashMap<T, usize> = HashMap::new ();
-  // 'Unchanged' baseline: collect from whichever stage we have first.
-  let baseline : &[Diff_Item<T>] = unstaged_diff
-    . or (staged_diff)
-    . unwrap_or (&[]);
-  for item in baseline {
-    let value : T = match item {
-      Diff_Item::Unchanged (v) | Diff_Item::New (v) | Diff_Item::Removed (v)
-        => v . clone (), };
-    if ! index . contains_key (&value) {
-      index . insert ( value . clone (), result . len () );
-      result . push ( ( value, MembershipAxes::default () )); } }
-  // Apply staged signs.
-  if let Some (slice) = staged_diff {
-    for item in slice {
-      let (value, sign) : (T, Option<Sign>) = match item {
-        Diff_Item::New      (v) => ( v . clone (), Some (Sign::Plus)),
-        Diff_Item::Removed  (v) => ( v . clone (), Some (Sign::Minus)),
-        Diff_Item::Unchanged (_) => continue, };
-      let i : usize = *index . entry (value . clone ())
-        . or_insert_with ( || {
-          result . push ( ( value . clone (), MembershipAxes::default () ));
-          result . len () - 1 });
-      result[i] . 1 . staged = sign; } }
-  // Apply unstaged signs.
-  if let Some (slice) = unstaged_diff {
-    for item in slice {
-      let (value, sign) : (T, Option<Sign>) = match item {
-        Diff_Item::New      (v) => ( v . clone (), Some (Sign::Plus)),
-        Diff_Item::Removed  (v) => ( v . clone (), Some (Sign::Minus)),
-        Diff_Item::Unchanged (_) => continue, };
-      let i : usize = *index . entry (value . clone ())
-        . or_insert_with ( || {
-          result . push ( ( value . clone (), MembershipAxes::default () ));
-          result . len () - 1 });
-      result[i] . 1 . unstaged = sign; } }
-  result }
 
 /// Prepend an IDCol scaffold populated with per-id ID scaffolds.
 fn prepend_idcol_with_children (

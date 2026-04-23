@@ -19,15 +19,79 @@
 
 * Problems found during the staged/unstaged diff axis refactor
 
-** 'node_changes_for_truenode' returns a single NodeChanges
+** (partly fixed) 'node_changes_for_truenode' merges the two stages
    server/types/git.rs.
-   It picks the unstaged stage when both have changes, losing the
-   per-stage distinction. Save-pipeline consumers (id_col.rs and
-   aliascol.rs completion paths) therefore stamp every membership
-   change as unstaged, even if it actually came from a staged change.
-   Per-stage merging would require returning both stages (e.g. tuple
-   or struct) and updating those consumers to merge similarly to
-   apply_diff_to_forest's 'merged_axes_from_per_stage' helper.
+   Picks the unstaged stage when both have changes, losing the
+   per-stage distinction. Worse, when a save rewrites a file with
+   only byte-level (not semantic) changes, the unstaged entry has
+   all-Unchanged diffs; this function returned that one, hiding the
+   staged side's real changes so IDCol/AliasCol/TextChanged
+   scaffolds weren't emitted and per-stage tags were wrong.
+
+   Fixed 2026-04-23: added 'per_stage_node_changes_for_truenode'
+   returning '(Option<&NodeChanges>, Option<&NodeChanges>)', and
+   moved 'axes_from_per_stage_diffs' to types/git.rs. Rewrote
+   completeIDCol, completeAliasCol, and
+   maybe_prepend_diff_view_scaffolds to consult both stages.
+
+   Still-open callers of 'node_changes_for_truenode':
+   - 'content_goal_list' in complete_parent_first/truenode.rs, which
+     uses 'contains_diff' for phantom placement. If a contains-list
+     change is staged only (e.g. after a save rewrites the file
+     byte-differently), removed children will be dropped from the
+     goal list and phantoms won't appear.
+   - 'complete_subscribee_col_preorder' and the two
+     'complete_hidden*_col' functions, which use node_changes
+     similarly. Same class of bug for subscribees / hidden children.
+
+   Plan: migrate these callers to 'per_stage_node_changes_for_truenode'
+   and use 'axes_from_per_stage_diffs' for list-field membership.
+   Then delete 'node_changes_for_truenode'.
+
+** Test coverage: every git-diff-view test exercises only unstaged
+   tests/git_diff_view/common.rs.
+   'setup_git_repo_with_fixtures' copies fixtures, commits, then
+   overwrites the worktree without staging. Every integration test
+   therefore uses unstaged changes; the staged code paths were
+   entirely uncovered, which is how phantom_axes, TextChanged, and
+   the node_changes_for_truenode merge bugs all slipped through.
+
+   Added 'setup_git_repo_with_fixtures_staged' and one staged
+   save-path test (ids::save::test_delete_id_col_scaffold_respawns_staged)
+   that exercises the save-rerender pipeline with staged changes,
+   which caught the most recent bug.
+
+   Still missing: parallel staged-variant tests for the other save
+   scenarios (text, content, newhere_cycle, collateral) plus tests
+   that mix staged + unstaged on the same file. Without these, the
+   remaining node_changes_for_truenode callers could easily regress.
+
+** 'head_node' field on NodeCompleteDiff is a misnomer
+   server/types/git.rs, populated in server/git_ops/diff.rs.
+   The struct comment says "only for deleted files", but the field
+   is populated with the 'before' state of the stage: HEAD for the
+   staged stage, INDEX for the unstaged stage. So for an
+   unstaged-only-deleted file, 'head_node' actually holds the INDEX
+   contents. Currently only read by 'collect_deleted_nodes_for_both'
+   for phantom title lookup, where the value still makes sense.
+   Worth renaming to 'before_node' or similar; would save future
+   debugging.
+
+** 'mk_removed_child_viewnode' hardcodes unstaged=Minus axes
+   server/to_org/expand/definitive.rs lines 394, 398.
+   When a parent .skg file is deleted, its children are loaded from
+   git HEAD and rendered as phantoms. Both existence and membership
+   axes are hardcoded as 'staged: None, unstaged: Some(Minus)',
+   which misattributes already-staged parent-deletions to the
+   unstaged side. Sibling bug to the one just fixed in phantom_axes
+   (types/phantom.rs). Fix is analogous: derive per-stage signs from
+   the parent's file-level diff status (staged vs unstaged maps in
+   SourceDiff), rather than assuming the change is on the unstaged
+   side. Additionally, for a deleted-parent scenario the child's
+   membership axis should probably mirror the parent's existence
+   axis (if parent removed staged, children are 'removed from
+   contains' staged too), which is a bit more nuanced than the pure
+   contains_diff lookup used in phantom_axes.
 
 ** Three NodeComplete parses per changed file in 'compute_diff_for_source'
    server/git_ops/diff.rs.

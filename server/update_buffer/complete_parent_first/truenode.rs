@@ -1,7 +1,7 @@
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::types::viewnode::mk_phantom_viewnode;
 use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap};
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeChanges, node_changes_for_truenode};
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeChanges, node_changes_for_truenode, per_stage_node_changes_for_truenode};
 use crate::types::list::{Diff_Item, compute_interleaved_diff, itemlist_and_removedset_from_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
@@ -143,8 +143,9 @@ pub fn complete_truenode_preorder (
   maybe_prepend_subscribee_col(
     tree, node, &subscribes_to ) ?;
   maybe_prepend_diff_view_scaffolds(
-    tree, node, node_changes,
+    tree, node,
     source_diffs, &pid, &source ) ?;
+  let _ = node_changes; // still used elsewhere above
   Ok(( )) }
 
 fn mutate_truenode_to_deletednode (
@@ -355,87 +356,70 @@ fn maybe_prepend_subscribee_col (
 /// - IDCol with ID children (if IDs changed)
 /// - AliasCol with Alias children (if aliases changed)
 /// Each is only prepended if absent.
+///
+/// Reads per-stage NodeChanges directly rather than going through the
+/// merged view, so that a change present on only the staged side (or
+/// only the unstaged side) still triggers scaffold emission. See
+/// 'per_stage_node_changes_for_truenode' for why the merged view
+/// would drop such changes post-save.
 fn maybe_prepend_diff_view_scaffolds (
   tree         : &mut Tree<ViewNode>,
   node         : NodeId,
-  node_changes : Option<&NodeChanges>,
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
   pid          : &ID,
   source       : &SourceName,
 ) -> Result<(), Box<dyn Error>> {
-  if let Some (nc) = node_changes {
-    if nc . text_changed {
-      if unique_scaffold_child(
+  let (staged_nc, unstaged_nc)
+    : (Option<&NodeChanges>, Option<&NodeChanges>) =
+    per_stage_node_changes_for_truenode (
+      source_diffs, pid, source );
+  if staged_nc . is_none () && unstaged_nc . is_none () {
+    return Ok (( )); }
+  let staged_text   : bool = staged_nc   . map ( |nc| nc . text_changed ) . unwrap_or (false);
+  let unstaged_text : bool = unstaged_nc . map ( |nc| nc . text_changed ) . unwrap_or (false);
+  if staged_text || unstaged_text {
+    if unique_scaffold_child(
+      tree, node,
+      &Scaffold::TextChanged { staged: false, unstaged: false }
+    ) ?. is_none() {
+      insert_scaffold_as_child(
         tree, node,
-        &Scaffold::TextChanged { staged: false, unstaged: false }
-      ) ?. is_none() {
-        let (staged, unstaged) : (bool, bool) =
-          per_stage_textchanged (source_diffs, pid, source);
-        insert_scaffold_as_child(
-          tree, node,
-          Scaffold::TextChanged { staged, unstaged },
-          true ) ?; } }
-    maybe_prepend_id_col(
-      tree, node, nc ) ?;
-    maybe_prepend_alias_col(
-      tree, node, nc ) ?; }
-  Ok(( )) }
-
-/// Read NodeChanges.text_changed from each stage's map in SourceDiff.
-/// Returns (staged, unstaged). If node_changes_for_truenode reports a
-/// text change, at least one of these will be true.
-fn per_stage_textchanged (
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
-  pid          : &ID,
-  source       : &SourceName,
-) -> (bool, bool) {
-  let sd : Option<&SourceDiff> =
-    source_diffs . as_ref () . and_then ( |d| d . get (source) );
-  let file : PathBuf =
-    PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-  let stage_tc = | map : &HashMap<PathBuf, crate::types::git::NodeCompleteDiff> | -> bool {
-    map . get (&file)
-      . and_then ( |d| d . node_changes . as_ref () )
-      . map ( |nc| nc . text_changed ) . unwrap_or (false) };
-  let staged   : bool = sd . map ( |sd| stage_tc (&sd . staged)   ) . unwrap_or (false);
-  let unstaged : bool = sd . map ( |sd| stage_tc (&sd . unstaged) ) . unwrap_or (false);
-  (staged, unstaged) }
-
-/// If the node's IDs differ between disk and HEAD,
-/// prepend an empty IDCol scaffold.
-/// (It will be populated when processing visits the IDCol.)
-fn maybe_prepend_id_col (
-  tree         : &mut Tree<ViewNode>,
-  node         : NodeId,
-  node_changes : &NodeChanges,
-) -> Result<(), Box<dyn Error>> {
-  let has_id_changes : bool = node_changes . ids_diff . iter()
-    . any( |d| !matches!( d, Diff_Item::Unchanged (_)) );
-  if has_id_changes {
+        Scaffold::TextChanged { staged: staged_text,
+                                unstaged: unstaged_text },
+        true ) ?; } }
+  let ids_changed : bool =
+    has_list_changes (
+      staged_nc   . map ( |nc| nc . ids_diff . as_slice () ),
+      unstaged_nc . map ( |nc| nc . ids_diff . as_slice () ) );
+  if ids_changed {
     if unique_scaffold_child(
       tree, node, &Scaffold::IDCol
     ) ?. is_none() {
       insert_scaffold_as_child(
         tree, node, Scaffold::IDCol, true ) ?; } }
-  Ok(( )) }
-
-/// If the node's aliases differ between disk and HEAD,
-/// prepend an empty AliasCol scaffold.
-/// (It will be populated when processing visits the AliasCol.)
-fn maybe_prepend_alias_col (
-  tree         : &mut Tree<ViewNode>,
-  node         : NodeId,
-  node_changes : &NodeChanges,
-) -> Result<(), Box<dyn Error>> {
-  let has_alias_changes : bool = node_changes . aliases_diff . iter()
-    . any( |d| !matches!( d, Diff_Item::Unchanged (_)) );
-  if has_alias_changes {
+  let aliases_changed : bool =
+    has_list_changes (
+      staged_nc   . map ( |nc| nc . aliases_diff . as_slice () ),
+      unstaged_nc . map ( |nc| nc . aliases_diff . as_slice () ) );
+  if aliases_changed {
     if unique_scaffold_child(
       tree, node, &Scaffold::AliasCol
     ) ?. is_none() {
       insert_scaffold_as_child(
         tree, node, Scaffold::AliasCol, true ) ?; } }
   Ok(( )) }
+
+/// True iff either stage's diff slice contains a New or Removed item.
+/// Generic over the diff item type so the same helper works for
+/// ids_diff, aliases_diff, etc.
+fn has_list_changes<T> (
+  staged   : Option<&[Diff_Item<T>]>,
+  unstaged : Option<&[Diff_Item<T>]>,
+) -> bool {
+  let non_trivial = | slice : Option<&[Diff_Item<T>]> | -> bool {
+    slice . map ( |s| s . iter () . any ( |d|
+      ! matches! ( d, Diff_Item::Unchanged (_) ))) . unwrap_or (false) };
+  non_trivial (staged) || non_trivial (unstaged) }
 
 /// WHAT IT DOES: Maps each child of 'node' to a ChildData:
 /// determines title, source, and phantom|normal status
@@ -607,7 +591,7 @@ fn write_truenode_diff (
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::types::git::{GitDiffStatus, NodeChanges, NodeCompleteDiff};
+  use crate::types::git::{GitDiffStatus, NodeCompleteDiff};
 
   fn source_name (s: &str) -> SourceName { SourceName ( s . to_string () ) }
   fn id          (s: &str) -> ID          { ID ( s . to_string () ) }
@@ -643,34 +627,44 @@ mod tests {
     m . insert (src . clone (), sd);
     Some (m) }
 
+  fn text_changed_both (
+    diffs : &Option<HashMap<SourceName, SourceDiff>>,
+    pid   : &ID,
+    src   : &SourceName,
+  ) -> (bool, bool) {
+    let (s, u) = per_stage_node_changes_for_truenode (diffs, pid, src);
+    ( s . map ( |n| n . text_changed ) . unwrap_or (false),
+      u . map ( |n| n . text_changed ) . unwrap_or (false) )
+  }
+
   #[test]
   fn text_change_only_staged () {
-    let src : SourceName = source_name ("public");
-    let pid : ID         = id ("n");
+    let src = source_name ("public");
+    let pid = id ("n");
     let diffs = diffs_with (&src, sd_with (&pid, Some (true), None));
-    assert_eq! ( per_stage_textchanged (&diffs, &pid, &src), (true, false) );
+    assert_eq! ( text_changed_both (&diffs, &pid, &src), (true, false) );
   }
 
   #[test]
   fn text_change_only_unstaged () {
-    let src : SourceName = source_name ("public");
-    let pid : ID         = id ("n");
+    let src = source_name ("public");
+    let pid = id ("n");
     let diffs = diffs_with (&src, sd_with (&pid, None, Some (true)));
-    assert_eq! ( per_stage_textchanged (&diffs, &pid, &src), (false, true) );
+    assert_eq! ( text_changed_both (&diffs, &pid, &src), (false, true) );
   }
 
   #[test]
   fn text_change_both_stages () {
-    let src : SourceName = source_name ("public");
-    let pid : ID         = id ("n");
+    let src = source_name ("public");
+    let pid = id ("n");
     let diffs = diffs_with (&src, sd_with (&pid, Some (true), Some (true)));
-    assert_eq! ( per_stage_textchanged (&diffs, &pid, &src), (true, true) );
+    assert_eq! ( text_changed_both (&diffs, &pid, &src), (true, true) );
   }
 
   #[test]
   fn no_diff_at_all () {
-    let src : SourceName = source_name ("public");
-    let pid : ID         = id ("n");
-    assert_eq! ( per_stage_textchanged (&None, &pid, &src), (false, false) );
+    let src = source_name ("public");
+    let pid = id ("n");
+    assert_eq! ( text_changed_both (&None, &pid, &src), (false, false) );
   }
 }

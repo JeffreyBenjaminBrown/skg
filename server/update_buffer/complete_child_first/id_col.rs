@@ -1,9 +1,8 @@
-use crate::types::git::{MembershipAxes, NodeChanges, Sign};
-use crate::types::list::Diff_Item;
+use crate::types::git::{MembershipAxes, NodeChanges};
 use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::git::{SourceDiff, node_changes_for_truenode};
+use crate::types::git::{SourceDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_truenode};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, viewnode_from_scaffold};
 use crate::update_buffer::util::complete_relevant_children_in_viewnodetree;
@@ -41,41 +40,29 @@ pub fn completeIDCol (
     nodecomplete_from_memory_or_disk (
       config, &parent_pid, &parent_source )
     . map_err ( |_| "completeIDCol: parent NodeComplete not found" ) ?;
-  let node_changes : Option<&NodeChanges> =
-    node_changes_for_truenode(
+  let (staged_nc, unstaged_nc)
+    : (Option<&NodeChanges>, Option<&NodeChanges>) =
+    per_stage_node_changes_for_truenode (
       source_diffs, &parent_pid, &parent_source );
   let (goal_list, axes_map)
-    : (Vec<ID>, HashMap<ID, MembershipAxes>)
-    = match node_changes {
-      None => { // No git diff view: Easy.
-        let goals : Vec<ID> =
-          parent_nodecomplete . all_ids()
-            . cloned()
-            . collect();
-        ( goals, HashMap::new() ) }
-      Some (nc) => { // Git diff view.
-        // node_changes_for_truenode returns one NodeChanges (preferring
-        // unstaged); the membership change is therefore stamped on the
-        // unstaged axis. Per-stage merging would happen here if/when
-        // node_changes_for_truenode is generalised.
-        let mut goals : Vec<ID> = Vec::new();
-        let mut amap : HashMap<ID, MembershipAxes> =
-          HashMap::new();
-        for entry in &nc . ids_diff {
-          let (id, m) : (ID, MembershipAxes) = match entry {
-            Diff_Item::Unchanged (id) =>
-              ( id . clone(), MembershipAxes::default () ),
-            Diff_Item::New (id) =>
-              ( id . clone(),
-                MembershipAxes { staged: None,
-                                 unstaged: Some (Sign::Plus) } ),
-            Diff_Item::Removed (id) =>
-              ( id . clone(),
-                MembershipAxes { staged: None,
-                                 unstaged: Some (Sign::Minus) } ), };
-          goals . push (id . clone ());
-          amap . insert (id, m); }
-        ( goals, amap ) } };
+    : (Vec<ID>, HashMap<ID, MembershipAxes>) =
+    if staged_nc . is_none () && unstaged_nc . is_none () {
+      // No git diff view, or no changes for this file in either stage.
+      let goals : Vec<ID> =
+        parent_nodecomplete . all_ids()
+          . cloned()
+          . collect();
+      ( goals, HashMap::new() )
+    } else {
+      let merged : Vec<(ID, MembershipAxes)> =
+        axes_from_per_stage_diffs (
+          staged_nc   . map ( |c| c . ids_diff . as_slice () ),
+          unstaged_nc . map ( |c| c . ids_diff . as_slice () ) );
+      let goals : Vec<ID> =
+        merged . iter () . map ( |(id, _)| id . clone () ) . collect ();
+      let amap : HashMap<ID, MembershipAxes> =
+        merged . into_iter () . collect ();
+      ( goals, amap ) };
   let is_id : fn (&ViewNode) -> bool =
     |viewnode| matches!( &viewnode . kind,
                          ViewNodeKind::Scaff( Scaffold::ID { .. } ) );
