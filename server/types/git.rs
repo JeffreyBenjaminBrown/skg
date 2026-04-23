@@ -158,43 +158,13 @@ impl GitDiffStatus {
 // Functions
 //
 
-/// Look up the NodeChanges for a TrueNode from source_diffs.
-/// Returns None if not in diff view, the source is not a git repo,
-/// or there are no recorded changes for this node's .skg file in
-/// either stage. If both stages have changes, the unstaged side is
-/// returned.
+/// Returns the (staged, unstaged) pair of NodeChanges for a TrueNode.
+/// Either element may be None (that stage has no diff entry for this
+/// file, or the entry has 'node_changes: None').
 ///
-/// DEPRECATED: pre-merges the two stages into one, losing per-stage
-/// distinction. Save-pipeline consumers that need accurate
-/// staged-vs-unstaged attribution should call
-/// 'per_stage_node_changes_for_truenode' instead. Known consequence
-/// of the merge: when a save rewrites a file with only byte-level
-/// (not semantic) changes, the unstaged entry has all-Unchanged
-/// diffs; this function returns that one, hiding the staged side's
-/// real changes.
-pub fn node_changes_for_truenode<'a> (
-  source_diffs : &'a Option<HashMap<SourceName, SourceDiff>>,
-  pid          : &ID,
-  source       : &SourceName,
-) -> Option<&'a NodeChanges> {
-  source_diffs . as_ref() . and_then(
-    |diffs| {
-      let sourcediff : &SourceDiff = diffs . get (source) ?;
-      if !sourcediff . is_git_repo { return None; }
-      let file_path : PathBuf =
-        PathBuf::from( format!( "{}.skg", pid . 0 ) );
-      sourcediff . unstaged . get (&file_path)
-        . or_else( || sourcediff . staged . get (&file_path) ) ?
-        . node_changes . as_ref() } ) }
-
-/// Returns the (staged, unstaged) pair of NodeChanges for a TrueNode,
-/// without merging. Either element may be None (that stage has no
-/// diff entry for this file, or the entry has 'node_changes: None').
-///
-/// Prefer this over 'node_changes_for_truenode' for any code that
-/// cares about per-stage attribution OR needs to detect changes that
-/// live on only one side (e.g. ids_diff / aliases_diff / contains_diff
-/// changes that were staged before a save-induced worktree rewrite).
+/// Consumers that need a flat HEAD→worktree view can compose both
+/// stages via 'net_diff_from_per_stage'. Consumers that need
+/// per-stage signs use 'axes_from_per_stage_diffs'.
 pub fn per_stage_node_changes_for_truenode<'a> (
   source_diffs : &'a Option<HashMap<SourceName, SourceDiff>>,
   pid          : &ID,
