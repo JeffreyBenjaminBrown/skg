@@ -153,18 +153,39 @@ Returns a string with text properties for color rendering."
   (object
     rule
     current-color)
-  "Transform OBJECT using RULE with CURRENT-COLOR context."
-  (let
-      ((new-color
-         (or (skg--extract-color rule) current-color))
-        (results '()))
-    (dolist
-        (rule-child (skg--rule-children rule))
-      (setq results
-            (nconc results
-                   (skg--transform-sexp-flat-dispatch
-                    object rule-child new-color))))
-    results))
+  "Transform OBJECT using RULE with CURRENT-COLOR context.
+String-literal children of RULE are collected into a prefix, which is
+concatenated (no separator) before each output that this rule's list
+children produce. If no list child fires, the prefix does not appear."
+  (let* ((new-color
+           (or (skg--extract-color rule) current-color))
+         (rule-children (skg--rule-children rule))
+         (prefix
+           (mapconcat
+             #'identity
+             (cl-remove-if-not #'stringp rule-children)
+             ""))
+         (results '()))
+    (dolist (rule-child rule-children)
+      (when (listp rule-child)
+        (setq results
+              (nconc results
+                     (skg--transform-sexp-flat-dispatch
+                      object rule-child new-color)))))
+    (if (string-empty-p prefix) results
+      (mapcar
+        (lambda (r) (skg--prepend-prefix r prefix new-color))
+        results))))
+
+(defun skg--prepend-prefix
+  (output prefix color)
+  "Return PREFIX concatenated with OUTPUT.
+The PREFIX carries COLOR as its skg-color text property; OUTPUT's own
+text properties are preserved by `concat'."
+  (let ((pre (copy-sequence prefix)))
+    (when color
+      (put-text-property 0 (length pre) 'skg-color color pre))
+    (concat pre output)))
 
 (defun skg--transform-sexp-flat-dispatch
   (object
