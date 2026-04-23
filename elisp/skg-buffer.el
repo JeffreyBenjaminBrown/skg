@@ -117,16 +117,32 @@ otherwise generate a new UUID."
                 (string= uri (buffer-local-value 'skg-view-uri buf)))
               (buffer-list)))
 
+(defun skg-buffer-p (buf)
+  "Return non-nil if BUF appears to be a skg buffer.
+Tries, in order: the buffer-local `skg-view-uri', derivation
+from `skg-content-view-mode', and the shape of the first line
+\(a heading whose remainder begins with `\(skg'). The final
+fallback lets `skg-close-all-skg-buffers' recognise skg buffers
+even after `skg-reload' has cleared the first two indicators:
+`unload-feature' wipes buffer-local bindings for vars declared
+in the unloaded file and unbinds the major-mode function
+\(degrading the buffer to `org-mode')."
+  (and (buffer-live-p buf)
+       (with-current-buffer buf
+         (or (and (boundp 'skg-view-uri) skg-view-uri)
+             (derived-mode-p 'skg-content-view-mode)
+             (save-excursion
+               (goto-char (point-min))
+               (looking-at "^\\*+ +(skg"))))))
+
 (defun skg-close-all-skg-buffers ()
-  "Kill all buffers that have a non-nil `skg-view-uri'.
+  "Kill all skg buffers (see `skg-buffer-p' for what counts).
 Clears each buffer's modified flag first, since stale views
 are not worth saving. Each kill triggers `skg-send-close-view'
-via the buffer's `kill-buffer-hook'."
+via the buffer's `kill-buffer-hook' (which is a no-op after
+`skg-reload' has stripped the hook)."
   (interactive)
-  (let ((bufs (cl-remove-if-not
-               (lambda (buf)
-                 (buffer-local-value 'skg-view-uri buf))
-               (buffer-list))))
+  (let ((bufs (cl-remove-if-not #'skg-buffer-p (buffer-list))))
     (dolist (buf bufs)
       (with-current-buffer buf
         (set-buffer-modified-p nil))
