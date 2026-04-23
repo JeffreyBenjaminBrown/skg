@@ -1,7 +1,7 @@
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::types::viewnode::mk_phantom_viewnode;
 use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap};
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeChanges, node_changes_for_truenode, per_stage_node_changes_for_truenode};
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeChanges, net_diff_from_per_stage, per_stage_node_changes_for_truenode};
 use crate::types::list::{Diff_Item, compute_interleaved_diff, itemlist_and_removedset_from_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
@@ -125,13 +125,16 @@ pub fn complete_truenode_preorder (
     nodecomplete . contains . clone();
   let subscribes_to : Vec<ID> =
     nodecomplete . subscribes_to . or_default() . to_vec();
-  let node_changes : Option<&NodeChanges> =
-    node_changes_for_truenode( source_diffs, &pid, &source );
+  let (staged_nc, unstaged_nc)
+    : (Option<&NodeChanges>, Option<&NodeChanges>) =
+    per_stage_node_changes_for_truenode (
+      source_diffs, &pid, &source );
   let is_sub : bool = is_subscribee( tree, node ) ?;
   { let (goal_list, removed_ids, apparent_content_ids) =
       // git diff view makes a difference
       content_goal_list(
-        tree, node, &content_ids, node_changes,
+        tree, node, &content_ids,
+        staged_nc, unstaged_nc,
         is_sub, config ) ?;
     complete_content_children(
       tree, node, &goal_list, &removed_ids,
@@ -145,7 +148,6 @@ pub fn complete_truenode_preorder (
   maybe_prepend_diff_view_scaffolds(
     tree, node,
     source_diffs, &pid, &source ) ?;
-  let _ = node_changes; // still used elsewhere above
   Ok(( )) }
 
 fn mutate_truenode_to_deletednode (
@@ -186,22 +188,32 @@ fn is_subscribee (
     . unwrap_or (false);
   Ok( is_content_of_parent && parent_is_subscribee_col ) }
 
+/// Reads per-stage contains_diff (rather than the merged view from
+/// 'node_changes_for_truenode') so that a contains-list removal that
+/// lives on only the staged side still produces phantoms. The net
+/// HEAD→worktree diff is recomposed via 'net_diff_from_per_stage'
+/// before being fed to the goal-list logic.
 fn content_goal_list (
   tree          : &Tree<ViewNode>,
   node          : NodeId,
   content_ids   : &[ID],
-  node_changes  : Option<&NodeChanges>,
+  staged_nc     : Option<&NodeChanges>,
+  unstaged_nc   : Option<&NodeChanges>,
   is_subscribee : bool,
   config        : &SkgConfig,
 ) -> Result<(Vec<ID>, HashSet<ID>, Vec<ID>), Box<dyn Error>> {
+  let no_diff : bool =
+    staged_nc . is_none () && unstaged_nc . is_none ();
   if !is_subscribee {
     let apparent_content_ids : Vec<ID> = content_ids . to_vec();
     let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
-      match node_changes {
-        None => (content_ids . to_vec(),
-                 HashSet::new()),
-        Some (nc) =>
-          itemlist_and_removedset_from_diff( &nc . contains_diff ) };
+      if no_diff {
+        ( content_ids . to_vec (), HashSet::new () )
+      } else {
+        let net : Vec<Diff_Item<ID>> = net_diff_from_per_stage (
+          staged_nc   . map ( |c| c . contains_diff . as_slice () ),
+          unstaged_nc . map ( |c| c . contains_diff . as_slice () ));
+        itemlist_and_removedset_from_diff (&net) };
     Ok(( goal_list, removed_ids, apparent_content_ids ))
   } else {
     let (grandparent_pid, grandparent_source) : (ID, SourceName) =
@@ -217,29 +229,31 @@ fn content_goal_list (
       setlike_vector_subtraction (
         content_ids . to_vec(), &worktree_hidden );
     let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
-      match node_changes {
-        None => (apparent_content_ids . clone(),
-                 HashSet::new()),
-        Some (nc) => {
-          let head_hidden : Vec<ID> =
-            nodecomplete_from_git_head(
-                &grandparent_pid, &grandparent_source, config )
-              . ok()
-              . map( |skg| skg . hides_from_its_subscriptions . into_vec() )
-              . unwrap_or_default();
-          let head_visible : Vec<ID> =
-            setlike_vector_subtraction(
-              nc . contains_diff . iter() . filter_map (
-                  |d| match d { // If it's New, it was not in HEAD.
-                    Diff_Item::Unchanged (id) |
-                      Diff_Item::Removed (id) => Some( id . clone() ),
-                    Diff_Item::New (_) => None } )
-                . collect(),
-              &head_hidden );
-          let visible_diff : Vec<Diff_Item<ID>> =
-            compute_interleaved_diff(
-              &head_visible, &apparent_content_ids );
-          itemlist_and_removedset_from_diff (&visible_diff) }, };
+      if no_diff {
+        ( apparent_content_ids . clone (), HashSet::new () )
+      } else {
+        let net : Vec<Diff_Item<ID>> = net_diff_from_per_stage (
+          staged_nc   . map ( |c| c . contains_diff . as_slice () ),
+          unstaged_nc . map ( |c| c . contains_diff . as_slice () ));
+        let head_hidden : Vec<ID> =
+          nodecomplete_from_git_head(
+              &grandparent_pid, &grandparent_source, config )
+            . ok()
+            . map( |skg| skg . hides_from_its_subscriptions . into_vec() )
+            . unwrap_or_default();
+        let head_visible : Vec<ID> =
+          setlike_vector_subtraction(
+            net . iter () . filter_map (
+                |d| match d { // Items that were in HEAD: Unchanged or Removed.
+                  Diff_Item::Unchanged (id) |
+                    Diff_Item::Removed (id) => Some( id . clone() ),
+                  Diff_Item::New (_) => None } )
+              . collect(),
+            &head_hidden );
+        let visible_diff : Vec<Diff_Item<ID>> =
+          compute_interleaved_diff(
+            &head_visible, &apparent_content_ids );
+        itemlist_and_removedset_from_diff (&visible_diff) };
     Ok(( goal_list, removed_ids, apparent_content_ids ))
   } }
 

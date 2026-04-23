@@ -259,3 +259,35 @@ pub fn axes_from_per_stage_diffs<T: Clone + Eq + std::hash::Hash> (
   apply (&mut result, &mut index, unstaged_diff,
          |m, s| m . unstaged = s);
   result }
+
+/// Compose two stage diffs into a single HEAD→worktree diff.
+///
+/// Classifies each item by presence at HEAD and at worktree:
+///   present in HEAD    iff staged   is None OR Minus
+///   present in worktree iff unstaged is None OR Plus
+/// and emits Unchanged / New / Removed accordingly. Items absent
+/// from both HEAD and worktree (Plus then Minus: added staged, then
+/// removed unstaged) are dropped — they're not part of the net diff.
+///
+/// Used by consumers that need a flat "what changed HEAD vs
+/// worktree" view across both stages. For consumers that need the
+/// per-stage signs separately, use 'axes_from_per_stage_diffs'.
+pub fn net_diff_from_per_stage<T: Clone + Eq + std::hash::Hash> (
+  staged_diff   : Option<&[Diff_Item<T>]>,
+  unstaged_diff : Option<&[Diff_Item<T>]>,
+) -> Vec<Diff_Item<T>> {
+  let axes : Vec<(T, MembershipAxes)> =
+    axes_from_per_stage_diffs (staged_diff, unstaged_diff);
+  let mut out : Vec<Diff_Item<T>> = Vec::with_capacity (axes . len ());
+  for (id, m) in axes {
+    // present at HEAD iff staged is None or Minus
+    let in_head : bool = ! matches! (m . staged,   Some (Sign::Plus));
+    // present at worktree iff unstaged is None or Plus
+    let in_wt   : bool = ! matches! (m . unstaged, Some (Sign::Minus));
+    let item : Option<Diff_Item<T>> = match (in_head, in_wt) {
+      (true,  true)  => Some (Diff_Item::Unchanged (id)),
+      (false, true)  => Some (Diff_Item::New       (id)),
+      (true,  false) => Some (Diff_Item::Removed   (id)),
+      (false, false) => None, };
+    if let Some (d) = item { out . push (d); } }
+  out }
