@@ -8,20 +8,15 @@
 (require 'skg-state)
 (require 'skg-length-prefix)
 
-(defun skg-goto-in-magit (&optional in-parent)
+(defun skg-goto-in-magit ()
   "Open magit-status and go to the first section for the .skg file
 of the node at point. If the file appears in multiple sections
-\(unstaged, staged, untracked\), go to the first and warn the user.
-With a prefix argument IN-PARENT, navigate instead to the first line
-in the parent's magit section that contains this node's ID
-\(equivalent to `skg-goto-in-magit-parent')."
-  (interactive "P")
-  (if in-parent
-      (skg-goto-in-magit-parent)
-    (let (( info (skg--magit-node-info-at-point) ))
-      (when info
-        (skg--request-file-path-with-handler
-         (car info) (cdr info) #'skg--magit-goto-handle-response)))))
+\(unstaged, staged, untracked\), go to the first and warn the user."
+  (interactive)
+  (let (( info (skg--magit-node-info-at-point) ))
+    (when info
+      (skg--request-file-path-with-handler
+       (car info) (cdr info) #'skg--magit-goto-handle-response))))
 
 (defun skg-goto-in-magit-parent ()
   "Open magit-status on the parent's .skg file, and go to the first
@@ -41,6 +36,24 @@ file section and the user is informed."
            (lambda (tcp-proc payload)
              (skg--magit-goto-in-parent-handle-response
               node-id tcp-proc payload))))))))
+
+(defun skg-goto-in-magit-and-close-this ()
+  "Like `skg-goto-in-magit', but also kill the buffer it was called
+from once the request has been issued."
+  (interactive)
+  (let ((buf (current-buffer)))
+    (skg-goto-in-magit)
+    (when (buffer-live-p buf)
+      (kill-buffer buf))))
+
+(defun skg-goto-in-magit-parent-and-close-this ()
+  "Like `skg-goto-in-magit-parent', but also kill the buffer it was
+called from once the request has been issued."
+  (interactive)
+  (let ((buf (current-buffer)))
+    (skg-goto-in-magit-parent)
+    (when (buffer-live-p buf)
+      (kill-buffer buf))))
 
 (defun skg--magit-node-info-at-point ()
   "Return a cons (id . source) for the node on the current line,

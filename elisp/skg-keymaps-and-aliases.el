@@ -41,6 +41,7 @@ and hide INTERNAL from M-x completion."
 
 (with-eval-after-load 'magit ;; Magit
   (define-key magit-mode-map (kbd "C-c g RET") #'skg-goto)
+  (define-key magit-mode-map (kbd "C-c G RET") #'skg-goto-and-close-this)
   (define-key magit-mode-map (kbd "C-c o i")   #'skg-paste-id)
   (define-key magit-mode-map (kbd "C-c o l")   #'skg-paste-link)
   (define-key magit-mode-map (kbd "C-c o I")   #'skg-pop-id)
@@ -55,10 +56,15 @@ and hide INTERNAL from M-x completion."
     (progn;; text search
       (define-key map (kbd "C-c f RET") #'skg-search)
       (define-key map (kbd "C-c f i")   #'skg-search-interactive))
-    (progn;; goto (prefix arg on magit variant => parent-in-magit)
+    (progn;; goto. Capital-G variants kill the buffer they were called from.
       (define-key map (kbd "C-c g RET") #'skg-goto)
+      (define-key map (kbd "C-c G RET") #'skg-goto-and-close-this)
       (define-key map (kbd "C-c g i")   #'skg-goto-by-id)
-      (define-key map (kbd "C-c g m")   #'skg-goto-in-magit))
+      (define-key map (kbd "C-c G i")   #'skg-goto-by-id-and-close-this)
+      (define-key map (kbd "C-c g m")   #'skg-goto-in-magit)
+      (define-key map (kbd "C-c G m")   #'skg-goto-in-magit-and-close-this)
+      (define-key map (kbd "C-c g M")   #'skg-goto-in-magit-parent)
+      (define-key map (kbd "C-c G M")   #'skg-goto-in-magit-parent-and-close-this))
     (progn;; show (requests that server render a local change to the view)
       (define-key map (kbd "C-c s a") #'skg-show-aliases)
       (define-key map (kbd "C-c s c") #'skg-show-containerward)

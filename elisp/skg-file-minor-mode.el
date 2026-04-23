@@ -11,6 +11,7 @@
 (defvar skg-file-minor-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c g RET") #'skg-goto)
+    (define-key map (kbd "C-c G RET") #'skg-goto-and-close-this)
     (define-key map (kbd "C-c o i")   #'skg-paste-id)
     (define-key map (kbd "C-c o l")   #'skg-paste-link)
     (define-key map (kbd "C-c o I")   #'skg-pop-id)
