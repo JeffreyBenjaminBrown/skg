@@ -27,9 +27,9 @@
     (GREEN subscribeeCol "subscribees")
     (GREEN idCol "IDs")
     (GREEN id "ID")
-    (YELLOW textChanged
-      (staged   "staged")
-      (unstaged "unstaged"))
+    (GREEN textChanged "text changed : "
+      (RED staged   "staged")
+      (RED unstaged "unstaged"))
     (RED deletedScaffold (ANY "DELETED" IT))
     (RED deleted "DELETED"
       (id (ANY IT))
@@ -92,10 +92,12 @@
 Tokens are propertized strings created by skg-transform-sexp-flat.
 Colons between letters are preserved (like 'req:containers').
 Colons followed by '-' or '+' are also preserved (e.g. 'staged:-M').
+Colons with a space on either side are preserved too, so literal
+prefixes from rule strings (e.g. \"text changed : \") survive.
 Structural colons added by the transform are removed (like '3:{' -> '3{').
 We detect this by checking if both sides of a colon are alphanumeric --
-treating '-' and '+' as alphanumeric for this purpose since they often
-appear as label values (sign markers).
+treating '-', '+', and space as alphanumeric for this purpose since they
+often appear as label values (sign markers) or as literal separators.
 Multiple tokens are separated by spaces.
 Hide ID if there are other tokens present."
   (when tokens
@@ -105,7 +107,7 @@ Hide ID if there are other tokens present."
                (let* ((s token)
                       (cleaned
                         (replace-regexp-in-string
-                          "\\([^[:alnum:]+-]\\):\\|:\\([^[:alnum:]+-]\\)"
+                          "\\([^[:alnum:]+ -]\\):\\|:\\([^[:alnum:]+ -]\\)"
                           "\\1\\2"
                           s))
                       (color (get-text-property 0 'skg-color token)))

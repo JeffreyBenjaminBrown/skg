@@ -57,7 +57,7 @@ claude --resume 29b4f070-12d2-4211-85da-a7f28929e08b
 ** For minimalism, remember [[id:b6747d36-711b-42e7-aa80-b9b2be53fe6c][my Skg priorities]].
 ** how to import from org-roam
 *** automatically
-./bash/import-org-roam.sh public/ data/public/ public skg2
+./bash/import-org-roam.sh public-copy/ data/public/ public
 *** manually
 **** remove the .skg files and .git
 **** cargo run --bin skg -- import-org-roam public/ data/public/ public

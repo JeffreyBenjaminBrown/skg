@@ -122,12 +122,14 @@
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "aliases" result)))
 
-    ;; Test textChanged with both stages
+    ;; Test textChanged with both stages.
+    ;; The rule has a string-literal prefix "text changed : " that
+    ;; should ride along with each of the sub-rule outputs.
     (erase-buffer)
     (insert "(skg (textChanged staged unstaged))")
     (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "staged" result))
-      (should (string-match "unstaged" result)))))
+      (should (string-match "text changed : staged" result))
+      (should (string-match "text changed : unstaged" result)))))
 
 (ert-deftest test-heralds-diff-display ()
   "Test that staged/unstaged axes are displayed as staged:.../unstaged:... heralds."

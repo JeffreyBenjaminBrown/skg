@@ -89,4 +89,33 @@ Does not apply because c is a label in the rule and not in the object."
                                           '(a (b (ANY x IT y)) ))
                  '("x:c:y") )))
 
+(ert-deftest test-skg-transform-sexp-flat-string-prefix-prepends-to-child-outputs ()
+  "A string literal in a non-leaf rule is concatenated as a prefix
+before each output that the rule's list children produce."
+  (should
+    (equal
+      (skg-transform-sexp-flat
+        '(a (b c))
+        '(a (b "B: " (c "cc"))))
+      '("B: cc"))))
+
+(ert-deftest test-skg-transform-sexp-flat-string-prefix-no-children-match-no-output ()
+  "If no list child fires, a string-literal prefix produces nothing."
+  (should
+    (equal
+      (skg-transform-sexp-flat
+        '(a (b c))
+        '(a (b "B: " (d "dd")))) ;; d absent in object
+      '())))
+
+(ert-deftest test-skg-transform-sexp-flat-string-prefix-applies-to-each-match ()
+  "The string-literal prefix is prepended to every output of every
+matching list child, not just the first."
+  (should
+    (equal
+      (skg-transform-sexp-flat
+        '(a (b c d))
+        '(a (b "B: " (c "cc") (d "dd"))))
+      '("B: cc" "B: dd"))))
+
 (provide 'test-skg-lens)
