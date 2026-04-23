@@ -89,9 +89,9 @@ fn process_truenode_diff (
     { return Ok (( )); }
   // Stamp the node's existence axes from the per-stage file statuses.
   let staged_x   : Option<Sign> =
-    staged   . and_then ( |d| sign_from_status (&d . status));
+    staged   . and_then ( |d| d . status . to_existence_sign ());
   let unstaged_x : Option<Sign> =
-    unstaged . and_then ( |d| sign_from_status (&d . status));
+    unstaged . and_then ( |d| d . status . to_existence_sign ());
   if let ViewNodeKind::True ( ref mut t ) = node_mut . value() . kind {
     t . existence . staged   = staged_x;
     t . existence . unstaged = unstaged_x; }
@@ -134,14 +134,6 @@ fn process_truenode_diff (
     source_diff, source_diffs,
     deleted_since_head_pid_src_map, config ) ?;
   Ok (( )) }
-
-/// Map a file-level git status to a sign on the existence axis.
-/// Modified files have no existence change.
-fn sign_from_status (status: &GitDiffStatus) -> Option<Sign> {
-  match status {
-    GitDiffStatus::Added    => Some (Sign::Plus),
-    GitDiffStatus::Deleted  => Some (Sign::Minus),
-    GitDiffStatus::Modified => None, } }
 
 /// Prepend an IDCol scaffold populated with per-id ID scaffolds.
 fn prepend_idcol_with_children (
@@ -238,7 +230,7 @@ fn existence_axes_for_phantom (
   let resolved : &SourceDiff =
     source_diffs . get (source) . unwrap_or (source_diff);
   let staged_x : Option<Sign> = resolved . staged   . get (&file_path)
-    . and_then ( |d| sign_from_status (&d . status));
+    . and_then ( |d| d . status . to_existence_sign ());
   let unstaged_x : Option<Sign> = resolved . unstaged . get (&file_path)
-    . and_then ( |d| sign_from_status (&d . status));
+    . and_then ( |d| d . status . to_existence_sign ());
   ExistenceAxes { staged: staged_x, unstaged: unstaged_x } }

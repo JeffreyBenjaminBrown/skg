@@ -234,6 +234,32 @@ pub fn axes_from_per_stage_diffs<T: Clone + Eq + std::hash::Hash> (
          |m, s| m . unstaged = s);
   result }
 
+/// Per-stage file-level ExistenceAxes for a node, derived from
+/// 'SourceDiff's staged / unstaged maps. Each stage's sign comes
+/// from the file's git status in that stage (Added → Plus,
+/// Deleted → Minus, Modified / absent → None).
+///
+/// Used by both the de-novo diff-application path (for the TrueNode
+/// itself) and the save-rerender expand path (for phantoms of a
+/// removed parent's children). Previously each caller rolled its own
+/// lookup; extract lets them share + test it.
+pub fn file_existence_axes_from_source_diff (
+  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  pid          : &ID,
+  source       : &SourceName,
+) -> ExistenceAxes {
+  let sd : Option<&SourceDiff> =
+    source_diffs . as_ref () . and_then ( |d| d . get (source) );
+  let file : PathBuf =
+    PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
+  let staged : Option<Sign> = sd
+    . and_then ( |sd| sd . staged . get (&file) )
+    . and_then ( |d| d . status . to_existence_sign () );
+  let unstaged : Option<Sign> = sd
+    . and_then ( |sd| sd . unstaged . get (&file) )
+    . and_then ( |d| d . status . to_existence_sign () );
+  ExistenceAxes { staged, unstaged } }
+
 /// Compose two stage diffs into a single HEAD→worktree diff.
 ///
 /// Classifies each item by presence at HEAD and at worktree:

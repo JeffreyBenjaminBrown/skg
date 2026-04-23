@@ -7,7 +7,7 @@ use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_r
 use crate::to_org::expand::backpath::{ build_and_integrate_containerward_view_then_drop_request, build_and_integrate_sourceward_view_then_drop_request};
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
 use crate::to_org::util::{ DefinitiveMap, build_node_branch_minus_content, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff};
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ContainerwardPathStats, IndefOrDef, Birth, mk_indefinitive_viewnode };
 use crate::types::nodes::complete::NodeComplete;
@@ -18,7 +18,6 @@ use crate::types::tree::viewnode_nodecomplete::{write_at_truenode_in_tree, pid_a
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use std::collections::{BTreeSet,HashSet,HashMap};
 use std::error::Error;
-use std::path::PathBuf;
 use typedb_driver::TypeDBDriver;
 
 pub async fn execute_view_requests (
@@ -374,25 +373,6 @@ async fn extendDefinitiveSubtree_fromGit (
     parent_mut . append (child_viewnode);
     visited . insert ( child_id . clone(), effective_root ); }
   Ok (( )) }
-
-/// Read a node's per-stage file-level ExistenceAxes from a
-/// SourceDiff. Added|Deleted statuses map to Plus|Minus per stage.
-fn file_existence_axes_from_source_diff (
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
-  pid          : &ID,
-  source       : &SourceName,
-) -> ExistenceAxes {
-  let sd : Option<&SourceDiff> =
-    source_diffs . as_ref () . and_then ( |d| d . get (source) );
-  let file : PathBuf =
-    PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-  let staged : Option<Sign> = sd
-    . and_then ( |sd| sd . staged . get (&file) )
-    . and_then ( |d| d . status . to_existence_sign () );
-  let unstaged : Option<Sign> = sd
-    . and_then ( |sd| sd . unstaged . get (&file) )
-    . and_then ( |d| d . status . to_existence_sign () );
-  ExistenceAxes { staged, unstaged } }
 
 /// Derive child-membership-removal axes from parent-existence-removal
 /// axes. When the parent's file is deleted in a given stage, any
