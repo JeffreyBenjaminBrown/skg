@@ -1,4 +1,5 @@
 * ONGOING audit git diff view code
+* like goto, but close this view in so doing
 * coollected while dogfooding, unassimilated
 ** interactive: try diff view on aliases, IDs
 ** cleaner code

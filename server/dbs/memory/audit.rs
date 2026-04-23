@@ -6,6 +6,14 @@
 //! fields / the inverse indexes. Any difference is a 'Mismatch'. An
 //! empty 'Vec<Mismatch>' means memory and TypeDB agree for every node.
 //!
+//! Dangling outbound references (e.g. a '[[id:X]]' link in a body whose
+//! target X has no node on disk) are NOT reported: TypeDB's
+//! 'insert_relationship_from_list' silently drops such relations at
+//! rebuild time (the '$to' match fails), and authored links to
+//! unavailable (e.g., private)
+/// nodes are routine, so memory's own copy of them is
+//! filtered out before the compare. See the filter in 'audit_one_node'.
+//!
 //! Intended for small test fixtures (< 100 nodes). Running this against
 //! the full 29k-node production corpus issues 10 queries per node and
 //! takes minutes — not suitable for CI.
@@ -130,9 +138,15 @@ pub async fn audit_one_node (
   let mut query_futures = Vec::with_capacity (10);
   for (relation, subject_role, object_role) in OUTBOUND_RELATIONSHIP_TYPES {
     { // pid plays the first-column role ('subject_role')
+      // 'filter_map' here drops outbound references whose target
+      // doesn't resolve to a known node. TypeDB's
+      // 'insert_relationship_from_list' silently drops those at
+      // rebuild time (the 'match $to isa node, has id "..."' clause
+      // finds nothing), so reporting them as mismatches is noise.
+      // See TODO/problems.org 'Dangling outbound references ...'.
       let memory_set : HashSet<ID> =
         outbound_second_members_from_memory (node, relation) . iter ()
-        . map ( |id| graph . pid_of (id) . unwrap_or (id . clone ()) )
+        . filter_map ( |id| graph . pid_of (id) )
         . collect ();
       memory_answers . push ((memory_set, relation, subject_role));
       query_futures . push (
