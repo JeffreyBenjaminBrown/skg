@@ -40,12 +40,36 @@ and hide INTERNAL from M-x completion."
   (global-set-key (kbd "C-c f i")   #'skg-search-interactive))
 
 (with-eval-after-load 'magit ;; Magit
+  ;; Popping to the id stack would make no sense here,
+  ;; because magit buffers cannot be written to.
+  ;; Pushing to it could be done from magit, but would be tricky,
+  ;; requiring extracting titles from overlays.
   (define-key magit-mode-map (kbd "C-c g RET") #'skg-goto)
   (define-key magit-mode-map (kbd "C-c G RET") #'skg-goto-and-close-this)
-  (define-key magit-mode-map (kbd "C-c o i")   #'skg-paste-id)
-  (define-key magit-mode-map (kbd "C-c o l")   #'skg-paste-link)
-  (define-key magit-mode-map (kbd "C-c o I")   #'skg-pop-id)
-  (define-key magit-mode-map (kbd "C-c o L")   #'skg-pop-link))
+  (define-key magit-mode-map (kbd "C-c i n")   #'skg-id-next)
+  (define-key magit-mode-map (kbd "C-c i p")   #'skg-id-prev))
+
+(progn ;; Minibuffer
+  (define-key minibuffer-local-map (kbd "C-c o i") #'skg-paste-id)
+  (define-key minibuffer-local-map (kbd "C-c o l") #'skg-paste-link)
+  (define-key minibuffer-local-map (kbd "C-c o I") #'skg-pop-id)
+  (define-key minibuffer-local-map (kbd "C-c o L") #'skg-pop-link))
+
+(defvar skg-file-minor-mode-map ;; .skg files
+  ;; The minor mode itself is defined in skg-file-minor-mode.el.
+  ;; Ops to push to the id stack are omitted, like in magit,
+  ;; because associating a title with each ID is tricky.
+  (let (( map (make-sparse-keymap) ))
+    (define-key map (kbd "C-c g RET") #'skg-goto)
+    (define-key map (kbd "C-c G RET") #'skg-goto-and-close-this)
+    (define-key map (kbd "C-c i n")   #'skg-id-next)
+    (define-key map (kbd "C-c i p")   #'skg-id-prev)
+    (define-key map (kbd "C-c o i")   #'skg-paste-id)
+    (define-key map (kbd "C-c o l")   #'skg-paste-link)
+    (define-key map (kbd "C-c o I")   #'skg-pop-id)
+    (define-key map (kbd "C-c o L")   #'skg-pop-link)
+    map )
+  "Keymap for `skg-file-minor-mode'.")
 
 (defvar skg-content-view-mode-map ;; Content view keymap
   (let (( map (make-sparse-keymap) ))

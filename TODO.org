@@ -3,9 +3,6 @@
 *** commit recursively
 *** view all changes in one buffer
 ** Commit existence of node from skg, outside of magit.
-* id stack ops must be available from minibuffer
-at least from a metadata view,
-for use during merges (and maybe other things)
 * TODO make it comfortable
 ** Privacy: Permit user to hide certain sources from view.
 *** Figure out the diff logic for insertions when some are hidden.

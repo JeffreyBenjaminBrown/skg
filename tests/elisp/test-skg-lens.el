@@ -99,14 +99,16 @@ before each output that the rule's list children produce."
         '(a (b "B: " (c "cc"))))
       '("B: cc"))))
 
-(ert-deftest test-skg-transform-sexp-flat-string-prefix-no-children-match-no-output ()
-  "If no list child fires, a string-literal prefix produces nothing."
+(ert-deftest test-skg-transform-sexp-flat-string-prefix-no-children-match-emits-prefix ()
+  "If no list child fires, a string-literal prefix is emitted alone.
+This lets rules like (RED deleted \"DELETED\" (id) (source)) serve
+as a label even when their sub-rules are vacuous."
   (should
     (equal
       (skg-transform-sexp-flat
         '(a (b c))
         '(a (b "B: " (d "dd")))) ;; d absent in object
-      '())))
+      '("B: "))))
 
 (ert-deftest test-skg-transform-sexp-flat-string-prefix-applies-to-each-match ()
   "The string-literal prefix is prepended to every output of every

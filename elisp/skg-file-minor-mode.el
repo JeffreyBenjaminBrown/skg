@@ -3,21 +3,10 @@
 ;;; PURPOSE: Minor mode enabled in buffers visiting .skg files.
 ;;; Provides skg keybindings that operate on IDs (bare UUIDs,
 ;;; UUID.skg filenames, pid: lines, etc.) in the file.
-;;; All the action (so far) is in the definition of
-;;;   skg-file-minor-mode-map.
+;;; The keymap `skg-file-minor-mode-map' is defined in
+;;; skg-keymaps-and-aliases.el alongside the other skg keymaps.
 
 (require 'skg-id-search)
-
-(defvar skg-file-minor-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c g RET") #'skg-goto)
-    (define-key map (kbd "C-c G RET") #'skg-goto-and-close-this)
-    (define-key map (kbd "C-c o i")   #'skg-paste-id)
-    (define-key map (kbd "C-c o l")   #'skg-paste-link)
-    (define-key map (kbd "C-c o I")   #'skg-pop-id)
-    (define-key map (kbd "C-c o L")   #'skg-pop-link)
-    map)
-  "Keymap for `skg-file-minor-mode'.")
 
 ;;;###autoload
 (define-minor-mode skg-file-minor-mode

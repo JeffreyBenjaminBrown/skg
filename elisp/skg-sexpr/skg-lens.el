@@ -154,9 +154,12 @@ Returns a string with text properties for color rendering."
     rule
     current-color)
   "Transform OBJECT using RULE with CURRENT-COLOR context.
-String-literal children of RULE are collected into a prefix, which is
-concatenated (no separator) before each output that this rule's list
-children produce. If no list child fires, the prefix does not appear."
+String-literal children of RULE are collected into a prefix. When
+any list child of RULE fires, the prefix is concatenated (no
+separator) before each of its outputs. When no list child fires
+but the prefix is non-empty, the prefix is emitted alone -- so
+rules like (RED deleted \"DELETED\" (id) (source)) serve as a
+label for the structure even when their sub-rules are vacuous."
   (let* ((new-color
            (or (skg--extract-color rule) current-color))
          (rule-children (skg--rule-children rule))
@@ -172,10 +175,14 @@ children produce. If no list child fires, the prefix does not appear."
               (nconc results
                      (skg--transform-sexp-flat-dispatch
                       object rule-child new-color)))))
-    (if (string-empty-p prefix) results
-      (mapcar
-        (lambda (r) (skg--prepend-prefix r prefix new-color))
-        results))))
+    (cond
+      ((string-empty-p prefix) results)
+      ((null results)
+       (list (skg--prepend-prefix "" prefix new-color)))
+      (t
+       (mapcar
+         (lambda (r) (skg--prepend-prefix r prefix new-color))
+         results)))))
 
 (defun skg--prepend-prefix
   (output prefix color)
