@@ -163,7 +163,7 @@ async fn complete_postorder_with_limited_recursion (
   if matches!( kind, ViewNodeKind::True (_)) {
     super::complete_child_first::truenode::
     complete_truenode (
-      treeid, tree, defmap, config, driver,
+      treeid, tree, defmap, source_diffs, config, driver,
       errors, deleted_since_head_pid_src_map ) . await ?;
   } else if matches!(
     kind, ViewNodeKind::Scaff (Scaffold::AliasCol)) {

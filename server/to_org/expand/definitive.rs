@@ -7,7 +7,7 @@ use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_r
 use crate::to_org::expand::backpath::{ build_and_integrate_containerward_view_then_drop_request, build_and_integrate_sourceward_view_then_drop_request};
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
 use crate::to_org::util::{ DefinitiveMap, build_node_branch_minus_content, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ContainerwardPathStats, IndefOrDef, Birth, mk_indefinitive_viewnode };
 use crate::types::nodes::complete::NodeComplete;
@@ -18,11 +18,13 @@ use crate::types::tree::viewnode_nodecomplete::{write_at_truenode_in_tree, pid_a
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use std::collections::{BTreeSet,HashSet,HashMap};
 use std::error::Error;
+use std::path::PathBuf;
 use typedb_driver::TypeDBDriver;
 
 pub async fn execute_view_requests (
   forest        : &mut Tree<ViewNode>,
   requests      : Vec < (NodeId, ViewRequest) >,
+  source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
   visited       : &mut DefinitiveMap,
@@ -45,7 +47,7 @@ pub async fn execute_view_requests (
           . await ?; },
       ViewRequest::Definitive => {
         execute_definitive_view_request (
-          forest, node_id, config, typedb_driver,
+          forest, node_id, source_diffs, config, typedb_driver,
           visited, errors,
           deleted_since_head_pid_src_map ) . await ?; },
       ViewRequest::ContainerwardStats => {
@@ -94,6 +96,7 @@ async fn execute_containerwardstats_request (
 async fn execute_definitive_view_request (
   forest        : &mut Tree<ViewNode>, // "forest" = tree with BufferRoot
   node_id       : NodeId,
+  source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
   visited       : &mut DefinitiveMap,
@@ -138,7 +141,7 @@ async fn execute_definitive_view_request (
   if is_removed_node {
     extendDefinitiveSubtree_fromGit (
       forest, node_id, config . initial_node_limit,
-      visited, config, &hidden_ids, typedb_driver,
+      visited, source_diffs, config, &hidden_ids, typedb_driver,
       deleted_since_head_pid_src_map ) . await ?; }
   else {
     extendDefinitiveSubtreeFromLeaf (
@@ -325,6 +328,7 @@ async fn extendDefinitiveSubtree_fromGit (
   effective_root : NodeId,
   limit          : usize,
   visited        : &mut DefinitiveMap,
+  source_diffs   : &Option<HashMap<SourceName, SourceDiff>>,
   config         : &SkgConfig,
   hidden_ids     : &HashSet<ID>,
   typedb_driver  : &TypeDBDriver,
@@ -333,6 +337,12 @@ async fn extendDefinitiveSubtree_fromGit (
   let (pid, src) : (ID, SourceName) =
     pid_and_source_from_treenode ( tree, effective_root,
       "extendDefinitiveSubtree_fromGit" ) ?;
+  // The parent's file is gone from the worktree; its per-stage
+  // file status determines in which stage its deletion happened,
+  // which in turn determines the child's membership-removal stage.
+  let parent_deletion_axes : ExistenceAxes =
+    file_existence_axes_from_source_diff (
+      source_diffs, &pid, &src );
   let (contents, contents_in_worktree)
     : (Vec<ID>, HashSet<String>) =
     { let nodecomplete : NodeComplete =
@@ -355,6 +365,7 @@ async fn extendDefinitiveSubtree_fromGit (
     let child_viewnode : ViewNode =
       mk_removed_child_viewnode (
         child_id, &src, &contents_in_worktree,
+        &parent_deletion_axes, source_diffs,
         deleted_since_head_pid_src_map,
         config, typedb_driver ) . await ?;
     let mut parent_mut : NodeMut<ViewNode> = // Add child to tree
@@ -364,6 +375,39 @@ async fn extendDefinitiveSubtree_fromGit (
     visited . insert ( child_id . clone(), effective_root ); }
   Ok (( )) }
 
+/// Read a node's per-stage file-level ExistenceAxes from a
+/// SourceDiff. Added|Deleted statuses map to Plus|Minus per stage.
+fn file_existence_axes_from_source_diff (
+  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  pid          : &ID,
+  source       : &SourceName,
+) -> ExistenceAxes {
+  let sd : Option<&SourceDiff> =
+    source_diffs . as_ref () . and_then ( |d| d . get (source) );
+  let file : PathBuf =
+    PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
+  let staged : Option<Sign> = sd
+    . and_then ( |sd| sd . staged . get (&file) )
+    . and_then ( |d| d . status . to_existence_sign () );
+  let unstaged : Option<Sign> = sd
+    . and_then ( |sd| sd . unstaged . get (&file) )
+    . and_then ( |d| d . status . to_existence_sign () );
+  ExistenceAxes { staged, unstaged } }
+
+/// Derive child-membership-removal axes from parent-existence-removal
+/// axes. When the parent's file is deleted in a given stage, any
+/// child it used to contain is "removed from its contains" in that
+/// same stage. Plus signs on existence (file re-added) don't
+/// propagate — this is a deletion-only mapping.
+fn membership_minus_from_existence_minus (
+  ex : &ExistenceAxes,
+) -> MembershipAxes {
+  let sign_minus = | s : Option<Sign> |
+    if matches! (s, Some (Sign::Minus)) { Some (Sign::Minus) } else { None };
+  MembershipAxes {
+    staged:   sign_minus (ex . staged),
+    unstaged: sign_minus (ex . unstaged), } }
+
 /// Build an ViewNode for a child of
 /// a removed (in the git diff sense) node.
 /// The child is loaded from the worktree if it exists there,
@@ -372,6 +416,8 @@ async fn mk_removed_child_viewnode (
   child_id           : &ID,
   parent_src         : &SourceName,
   contents_in_worktree : &HashSet<String>,
+  parent_deletion_axes : &ExistenceAxes,
+  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
   typedb_driver      : &TypeDBDriver,
@@ -379,11 +425,9 @@ async fn mk_removed_child_viewnode (
   let in_worktree : bool =
     contents_in_worktree . contains ( &child_id . 0 );
   // The child is a phantom either way
-  // (absent from its parent's worktree content).
-  // Existence depends on whether the child's
-  // own file is also gone in the worktree:
-  //   in worktree -> file exists; just M is removed.
-  //   not in worktree -> file gone; both X and M are removed.
+  // (absent from its parent's worktree content). Existence depends
+  // on whether the child's own file is gone; if gone, stage(s) of
+  // its deletion come from the source_diff for the child's file.
   let (existence, child_opt_nodecomplete)
     : (ExistenceAxes, Option<NodeComplete>)
     = if in_worktree
@@ -391,11 +435,16 @@ async fn mk_removed_child_viewnode (
           optnodecomplete_from_id (
             config, typedb_driver, child_id ) . await ? ) }
       else
-      { ( ExistenceAxes { staged: None, unstaged: Some (Sign::Minus) },
+      { ( file_existence_axes_from_source_diff (
+            source_diffs, child_id, parent_src ),
           nodecomplete_from_index_or_head ( child_id, parent_src, config
                                      ) . ok() ) };
+  // Child's membership in this removed parent's contains mirrors
+  // the stages in which the parent was removed: if the parent's
+  // file was deleted staged, the child's membership-as-contained-by
+  // this parent is also removed staged, and similarly for unstaged.
   let membership : MembershipAxes =
-    MembershipAxes { staged: None, unstaged: Some (Sign::Minus) };
+    membership_minus_from_existence_minus (parent_deletion_axes);
   let child_nodecomplete : &NodeComplete =
     child_opt_nodecomplete . as_ref()
     . ok_or_else ( || format! (

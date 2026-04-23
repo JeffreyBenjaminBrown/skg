@@ -1,5 +1,6 @@
 use crate::to_org::expand::definitive::execute_view_requests;
 use crate::to_org::util::DefinitiveMap;
+use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest};
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
@@ -17,6 +18,7 @@ pub async fn complete_truenode (
   node               : NodeId,
   tree               : &mut Tree<ViewNode>,
   visited            : &mut DefinitiveMap,
+  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
   driver             : &TypeDBDriver,
   errors             : &mut Vec<String>,
@@ -31,7 +33,7 @@ pub async fn complete_truenode (
     extract_view_requests_definitive_first( tree, node ) ?;
   if requests . is_empty() { return Ok(( )); }
   execute_view_requests(
-    tree, requests, config, driver,
+    tree, requests, source_diffs, config, driver,
     visited, errors, deleted_since_head_pid_src_map ) . await ?;
   Ok(( )) }
 
