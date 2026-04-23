@@ -117,3 +117,110 @@ fn test_collateral_view_preserves_diff_annotations()
   } ) ?;
   Ok (( ))
 }
+
+/// Same scenario, but with b's body change staged (git add) before
+/// the save. After save, the forest mixes stages:
+/// - b's textChanged lives on the STAGED side (from the pre-save
+///   git add; save didn't touch b).
+/// - c is new on the UNSTAGED side (save created it in the
+///   worktree; save doesn't git add).
+/// - a's contains picked up c on the UNSTAGED side (save rewrote
+///   a.skg but didn't stage it).
+///
+/// Asserts that the collateral re-render correctly attributes each
+/// change to the right stage.
+#[test]
+fn test_collateral_view_staged_text_and_unstaged_add()
+  -> Result<(), Box<dyn Error>>
+{
+  let db_name : &str = "skg-test-collateral-diff-staged";
+  let tantivy_folder : String =
+    format!("/tmp/tantivy-{}", db_name);
+  let temp_dir : TempDir = TempDir::new()?;
+  let repo_path : &Path = temp_dir . path();
+  setup_git_repo_with_fixtures_staged (repo_path)?;
+
+  let (_config, driver, _tantivy, _save_response, _initial_buffer,
+       uri_2, read_end)
+    : (SkgConfig, TypeDBDriver, TantivyIndex, SaveResponse,
+       String, ViewUri, TcpStream) =
+    block_on ( async {
+      let (config, driver, mut tantivy)
+        : (SkgConfig, TypeDBDriver, TantivyIndex) =
+        setup_test_dbs (
+          db_name, repo_path . to_str() . unwrap(),
+          &tantivy_folder ) . await ?;
+
+      let root_ids : Vec<ID> = vec![ID("a" . to_string())];
+      let (initial_buffer, pids, forest)
+        : (String, Vec<ID>, Tree<ViewNode>) =
+        multi_root_view (
+          &driver, &config, &root_ids, true ) . await ?;
+
+      // Sanity: initial view has textChanged attributed to staged.
+      assert_buffer_contains(&initial_buffer, GIT_DIFF_VIEW_STAGED);
+
+      let mut conn_state : ConnectionState = ConnectionState {
+        diff_mode_enabled : true,
+        memory            : OpenViews::new (),
+        graph             : new_handle (InRustGraph::new ()) };
+
+      let uri_1 : ViewUri = ViewUri::ContentView ( "buffer-1" . to_string() );
+      let uri_2 : ViewUri = ViewUri::ContentView ( "buffer-2" . to_string() );
+      conn_state . memory . register_view (
+        uri_1 . clone (), forest . clone (), &pids );
+      conn_state . memory . register_view (
+        uri_2 . clone (), forest . clone (), &pids );
+
+      let save_input : String = insert_after (
+        &initial_buffer, "(id a)",
+        "** (skg (node (id c))) c" );
+      let (mut stream, read_end) = mk_test_tcp_stream_pair ();
+      let save_response : SaveResponse =
+        update_from_and_rerender_buffer (
+          &mut stream,
+          &save_input, &driver, &config, &mut tantivy,
+          true,
+          &Ok ( uri_1 . clone () ),
+          &mut conn_state ) . await ?;
+
+      Result::<_, Box<dyn Error>>::Ok ((
+        config, driver, tantivy, save_response,
+        initial_buffer, uri_2, read_end )) } ) ?;
+
+  let mut reader : BufReader<TcpStream> =
+    BufReader::new (read_end);
+  let collateral_msgs : Vec<String> =
+    skg::test_utils::read_all_lp_messages (&mut reader);
+  assert_eq! ( collateral_msgs . len (), 1,
+    "Expected 1 collateral view, got {}", collateral_msgs . len () );
+  let body : &str = &collateral_msgs[0];
+  assert! ( body . contains ("collateral-view"),
+    "Expected collateral-view response, got: {}", body );
+  assert! ( body . contains (&uri_2 . repr_in_client ()),
+    "Collateral update should be for buffer 2, got: {}", body );
+  let collateral_buffer : String =
+    skg::test_utils::extract_string_field_from_sexp (body, "content")
+    . expect ("content field not found in collateral-view sexp");
+
+  // b still has textChanged, attributed to staged (save didn't
+  // touch b and didn't stage anything).
+  assert_buffer_contains ( &collateral_buffer,
+    "** (skg (node (id b) (source main))) b\n\
+     *** (skg (textChanged staged))" );
+
+  // c is new on the unstaged side — save wrote c.skg to worktree
+  // but didn't git add it.
+  assert_buffer_contains ( &collateral_buffer,
+    "** (skg (node (id c) (unstaged newX newM))) c" );
+
+  assert!( repo_path . join ("c.skg") . exists (),
+    "c.skg should have been created on disk" );
+
+  block_on ( async {
+    cleanup_test_dbs (
+      db_name, &driver,
+      Some ( Path::new (&tantivy_folder) )) . await
+  } ) ?;
+  Ok (( ))
+}
