@@ -16,8 +16,24 @@
 (require 'cl-lib)
 (require 'skg-sexpr-search)
 
+;; -----------------------------------------------------------------
+;; Stage-prefix coupling
+;;
+;; Tokens produced by the stage sub-rules below carry a literal
+;; "staged:" or "unstaged:" prefix. The post-pass 'heralds--merge-
+;; stage-tokens' identifies and regroups them by matching that
+;; prefix. The two sides MUST agree on the prefix strings.
+;;
+;; Centralizing them in these constants (then splicing via `) makes
+;; the coupling explicit: one value drives both the rule output and
+;; the detector. Changing a prefix updates everything in lockstep.
+(defconst heralds--stage-prefix-staged   "staged:"
+  "Prefix attached to each per-stage token emitted for the staged stage.")
+(defconst heralds--stage-prefix-unstaged "unstaged:"
+  "Prefix attached to each per-stage token emitted for the unstaged stage.")
+
 (defconst heralds--transform-rules
-  '(skg
+  `(skg
     (focused)
     (folded)
     (GREEN aliasCol "aliases")
@@ -35,11 +51,11 @@
       (id (ANY IT))
       (source))
     (BLUE staged
-      (GREEN newM     "staged:M")
-      (RED   removedM "staged:-M"))
+      (GREEN newM     ,(concat heralds--stage-prefix-staged "M"))
+      (RED   removedM ,(concat heralds--stage-prefix-staged "-M")))
     (BLUE unstaged
-      (GREEN newM     "unstaged:M")
-      (RED   removedM "unstaged:-M"))
+      (GREEN newM     ,(concat heralds--stage-prefix-unstaged "M"))
+      (RED   removedM ,(concat heralds--stage-prefix-unstaged "-M")))
     (BLUE node
       (ANY "◌") ;; For nodes with no ID. heralds--post-process-text removes it if there's an ID.
       (id (ANY "●")) ;; For nodes with an ID. heralds--post-process-text removes it if there are non-default stats.
@@ -75,15 +91,15 @@
         (sourcewardView "req:sources")
         (definitiveView "req:definitive"))
       (BLUE staged
-        (GREEN newX     "staged:X")
-        (RED   removedX "staged:-X")
-        (GREEN newM     "staged:M")
-        (RED   removedM "staged:-M"))
+        (GREEN newX     ,(concat heralds--stage-prefix-staged "X"))
+        (RED   removedX ,(concat heralds--stage-prefix-staged "-X"))
+        (GREEN newM     ,(concat heralds--stage-prefix-staged "M"))
+        (RED   removedM ,(concat heralds--stage-prefix-staged "-M")))
       (BLUE unstaged
-        (GREEN newX     "unstaged:X")
-        (RED   removedX "unstaged:-X")
-        (GREEN newM     "unstaged:M")
-        (RED   removedM "unstaged:-M"))
+        (GREEN newX     ,(concat heralds--stage-prefix-unstaged "X"))
+        (RED   removedX ,(concat heralds--stage-prefix-unstaged "-X"))
+        (GREEN newM     ,(concat heralds--stage-prefix-unstaged "M"))
+        (RED   removedM ,(concat heralds--stage-prefix-unstaged "-M")))
       (RED notInGit "diff:not-in-git")))
   "Rules to convert metadata sexps into herald tokens.")
 
@@ -129,22 +145,29 @@ Hide ID if there are other tokens present."
                  " "))))
 
 (defun heralds--stage-prefix (s)
-  "If S starts with 'staged:' or 'unstaged:', return that prefix
-\(without the trailing colon, e.g. 'staged'). Otherwise nil."
+  "If S starts with one of the stage-prefix constants, return it
+\(e.g. \"staged:\" or \"unstaged:\"), otherwise nil.
+
+Uses the same two 'heralds--stage-prefix-*' constants that drive
+the transform rules, so the pair of sides can't drift."
   (cond
-   ((string-prefix-p "staged:"   s) "staged")
-   ((string-prefix-p "unstaged:" s) "unstaged")
+   ((string-prefix-p heralds--stage-prefix-staged   s) heralds--stage-prefix-staged)
+   ((string-prefix-p heralds--stage-prefix-unstaged s) heralds--stage-prefix-unstaged)
    (t nil)))
 
 (defun heralds--merge-stage-tokens (tokens)
-  "Merge adjacent TOKENS that share a 'staged:' or 'unstaged:' prefix.
-Suffixes are concatenated (so 'staged:X' + 'staged:M' becomes
-'staged:XM' and 'staged:-X' + 'staged:-M' becomes 'staged:-X-M').
-Adjacent stage tokens with /different/ stage prefixes (e.g. 'staged:M'
-followed by 'unstaged:M') get glued together by ',' rather than the
-default ' ', producing 'staged:M,unstaged:M'.
+  "Merge adjacent TOKENS that share a \"staged:\" or \"unstaged:\" prefix.
+Suffixes are concatenated (so \"staged:X\" + \"staged:M\" becomes
+\"staged:XM\" and \"staged:-X\" + \"staged:-M\" becomes \"staged:-X-M\").
+Adjacent stage tokens with /different/ stage prefixes (e.g. \"staged:M\"
+followed by \"unstaged:M\") get glued together by `,' rather than the
+default ` ', producing \"staged:M,unstaged:M\".
 Color: if all merged suffixes within a stage have the same face, keep
-it; if mixed, the merged token uses heralds-yellow-face."
+it; if mixed, the merged token uses 'heralds-yellow-face'.
+
+The prefix strings this function groups on come from
+'heralds--stage-prefix-*' — the same constants used in
+'heralds--transform-rules'."
   (let ((result nil)
         (current nil)
         (current-prefix nil)
@@ -168,9 +191,9 @@ it; if mixed, the merged token uses heralds-yellow-face."
         (let ((p (heralds--stage-prefix tok)))
           (cond
            ;; Continuation of the current group: strip the prefix,
-           ;; keep just the suffix (the part after "staged:" / "unstaged:").
+           ;; keep just the suffix.
            ((and p current-prefix (string= p current-prefix))
-            (push (substring tok (1+ (length p))) current)
+            (push (substring tok (length p)) current)
             (push (get-text-property 0 'face tok) current-faces))
            ;; Start a new stage group.
            (p
