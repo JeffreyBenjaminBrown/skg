@@ -88,29 +88,35 @@ pub fn viewnode_to_string (
   match &viewnode . kind {
     ViewNodeKind::Scaff (scaffold) =>
       scaffold_metadata_to_string (
-        viewnode . focused, viewnode . folded, scaffold ),
+        viewnode . focused, viewnode . folded,
+        viewnode . body_folded, scaffold ),
     ViewNodeKind::True (true_node) =>
       Ok ( true_node_metadata_to_string (
-        viewnode . focused, viewnode . folded, true_node, config )),
+        viewnode . focused, viewnode . folded,
+        viewnode . body_folded, true_node, config )),
     ViewNodeKind::Deleted (deleted_node) =>
       Ok ( deleted_node_metadata_to_string (
-        viewnode . focused, viewnode . folded, deleted_node )),
+        viewnode . focused, viewnode . folded,
+        viewnode . body_folded, deleted_node )),
     ViewNodeKind::DeletedScaff (kind) =>
       Ok ( deleted_scaff_metadata_to_string (
-        viewnode . focused, viewnode . folded, kind )) }}
+        viewnode . focused, viewnode . folded,
+        viewnode . body_folded, kind )) }}
 
 /// Render metadata for a Scaffold:
 ///   (skg [focused] [folded] scaffoldKind)
 /// where scaffoldKind is a bare atom.
 /// ERRORS: if scaffold is BufferRoot.
 fn scaffold_metadata_to_string (
-  focused  : bool,
-  folded   : bool,
-  scaffold : &Scaffold
+  focused     : bool,
+  folded      : bool,
+  body_folded : bool,
+  scaffold    : &Scaffold
 ) -> Result < String, Box<dyn Error> > {
   let mut parts : Vec < String > = Vec::new ();
-  if focused { parts . push ( "focused" . to_string () ); }
-  if folded  { parts . push ( "folded" . to_string () ); }
+  if focused     { parts . push ( "focused"    . to_string () ); }
+  if folded      { parts . push ( "folded"     . to_string () ); }
+  if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   match scaffold {
     Scaffold::Alias { membership, .. } => {
       parts . push ( "alias" . to_string () );
@@ -155,10 +161,11 @@ fn append_membership_stage_forms (
 /// Render metadata for a TrueNode:
 ///   (skg [focused] [folded] (node ...))
 fn true_node_metadata_to_string (
-  focused   : bool,
-  folded    : bool,
-  true_node : & TrueNode,
-  config    : & SkgConfig,
+  focused     : bool,
+  folded      : bool,
+  body_folded : bool,
+  true_node   : & TrueNode,
+  config      : & SkgConfig,
 ) -> String {
   fn node_sexp (
     true_node : & TrueNode,
@@ -252,8 +259,9 @@ fn true_node_metadata_to_string (
     { parts . push (s); }
     format! ( "({})", parts . join (" ")) }
   let mut parts : Vec < String > = Vec::new ();
-  if focused { parts . push ( "focused" . to_string () ); }
-  if folded  { parts . push ( "folded" . to_string () ); }
+  if focused     { parts . push ( "focused"    . to_string () ); }
+  if folded      { parts . push ( "folded"     . to_string () ); }
+  if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   parts . push ( node_sexp (true_node, config));
   parts . join (" ") }
 
@@ -262,11 +270,13 @@ fn true_node_metadata_to_string (
 fn deleted_node_metadata_to_string (
   focused      : bool,
   folded       : bool,
+  body_folded  : bool,
   deleted_node : &DeletedNode,
 ) -> String {
   let mut parts : Vec < String > = Vec::new ();
-  if focused { parts . push ( "focused" . to_string () ); }
-  if folded  { parts . push ( "folded" . to_string () ); }
+  if focused     { parts . push ( "focused"    . to_string () ); }
+  if folded      { parts . push ( "folded"     . to_string () ); }
+  if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   parts . push ( format! ( "(deleted (id {}) (source {}))",
                             deleted_node . id . 0,
                             deleted_node . source ));
@@ -275,13 +285,15 @@ fn deleted_node_metadata_to_string (
 /// Render metadata for a DeletedScaff:
 ///   (skg [focused] [folded] (deletedScaffold kindString))
 fn deleted_scaff_metadata_to_string (
-  focused : bool,
-  folded  : bool,
-  kind    : &ScaffoldKind,
+  focused     : bool,
+  folded      : bool,
+  body_folded : bool,
+  kind        : &ScaffoldKind,
 ) -> String {
   let mut parts : Vec < String > = Vec::new ();
-  if focused { parts . push ( "focused" . to_string () ); }
-  if folded  { parts . push ( "folded" . to_string () ); }
+  if focused     { parts . push ( "focused"    . to_string () ); }
+  if folded      { parts . push ( "folded"     . to_string () ); }
+  if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   parts . push ( format! ( "(deletedScaffold {})",
                            kind . repr_in_client () ) );
   parts . join (" ") }

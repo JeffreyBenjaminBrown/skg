@@ -17,16 +17,23 @@
 
 (defun skg-fold-marked-headlines ()
   "PURPOSE:
-Hide all headlines marked with 'folded' metadata,
-by folding their parents.
+Restore the user's fold state from per-headline metadata markers.
+.
+Two markers are recognised:
+- 'folded'      : THIS headline is hidden inside a folded ancestor.
+                  We restore that by folding its parent's subtree.
+- 'bodyFolded'  : THIS headline is visible but its body is hidden
+                  (e.g. via `org-fold-hide-entry'). We restore that
+                  by hiding this headline's entry directly.
 .
 METHOD:
-First unfold everything.
-Then process the buffer from the top, via this loop:
-- Find the next visible node with 'folded' in its metadata
-- Navigate to its parent
-- Fold that parent"
+- First unfold everything.
+- Pass 1: find every headline with `bodyFolded' and hide its entry.
+- Pass 2: iteratively find a visible `folded'-marked headline and
+  fold its parent. We loop because folding a parent makes more
+  `folded' headlines invisible, removing them from the search."
   (org-show-all)
+  (skg--fold-bodies-of-bodyfolded-headlines)
   (goto-char (point-min))
   (let ((found t))
     (while found
@@ -47,25 +54,48 @@ Then process the buffer from the top, via this loop:
         (when (org-up-heading-safe)
           (org-cycle)) )) ))
 
+(defun skg--fold-bodies-of-bodyfolded-headlines ()
+  "Hide the entry of every headline tagged `bodyFolded' in metadata.
+Assumes the buffer is currently fully shown — we only need to add the
+fold; we don't have to undo any prior fold."
+  (save-excursion
+    (goto-char (point-min))
+    (while (not (eobp))
+      (beginning-of-line)
+      (when (and (org-at-heading-p)
+                 (skg-headline-has-bodyfolded-in-view-p))
+        (org-fold-hide-entry))
+      (forward-line 1))))
+
 (defun skg-remove-folded-markers ()
-  "Remove 'folded' from all (skg ...) metadata markers.
-Re-folds headlines that had folded children using org-mode functions."
+  "Remove 'folded' and 'bodyFolded' markers from all (skg ...) metadata.
+Re-folds headlines that had folded children using org-mode functions,
+and re-hides entries that had `bodyFolded'."
   (save-excursion
     (let ((inhibit-read-only t)
           (parent-markers
            ;; This processes the entire buffer.
-           (skg-collect-parent-markers-of-folded-headlines)))
+           (skg-collect-parent-markers-of-folded-headlines))
+          (bodyfolded-markers
+           (skg-collect-markers-of-bodyfolded-headlines)))
       (org-show-all) ;; so that text editing works
       (progn ;; Remove "folded" from metadata using DELETE operation.
         ;; This also processes the entire buffer.
         (goto-char (point-min))
         (while (not (eobp))
           (beginning-of-line)
-          (when (and (org-at-heading-p)
-                     (skg-headline-has-folded-in-view-p))
-            (skg-edit-metadata-at-point
-             '(skg (DELETE folded))))
+          (when (org-at-heading-p)
+            (when (skg-headline-has-folded-in-view-p)
+              (skg-edit-metadata-at-point '(skg (DELETE folded))))
+            (when (skg-headline-has-bodyfolded-in-view-p)
+              (skg-edit-metadata-at-point '(skg (DELETE bodyFolded)))))
           (forward-line 1)))
+      (progn ;; Re-hide entries that had `bodyFolded'.
+        (dolist (m bodyfolded-markers)
+          (goto-char m)
+          (when (org-at-heading-p)
+            (org-fold-hide-entry))
+          (set-marker m nil)))
       (progn;; This is a third pass through the entire buffer.
         (dolist (parent-marker parent-markers)
           (goto-char parent-marker)
@@ -73,18 +103,65 @@ Re-folds headlines that had folded children using org-mode functions."
             (org-fold-hide-subtree))
           (set-marker parent-marker nil))))))
 
+(defun skg-collect-markers-of-bodyfolded-headlines ()
+  "Collect markers pointing to each headline tagged `bodyFolded'.
+Caller must `set-marker' each to nil when done."
+  (let ((markers '()))
+    (save-excursion
+      (goto-char (point-min))
+      (while (not (eobp))
+        (beginning-of-line)
+        (when (and (org-at-heading-p)
+                   (skg-headline-has-bodyfolded-in-view-p))
+          (push (point-marker) markers))
+        (forward-line 1)))
+    markers))
+
 (defun skg-add-folded-markers ()
-  "Add 'folded' to metadata of all invisible headlines in the buffer.
-Merges '(skg folded)' into existing metadata.
-If metadata already contains 'folded', no change."
+  "Annotate the headline at each fold-relevant position.
+- For each *invisible* headline (hidden inside a folded ancestor),
+  merge `(skg folded)' into its metadata.
+- For each *visible* headline whose body content is hidden (e.g.
+  via `org-fold-hide-entry'), merge `(skg bodyFolded)' instead.
+The two flags are mutually exclusive in this pass — a hidden
+headline doesn't get to record its own body state, since it's
+already covered by the ancestor's subtree fold."
   (save-excursion
     (goto-char (point-min))
     (while (not (eobp))
       (beginning-of-line)
-      (when (and (org-at-heading-p)
-                 (invisible-p (point)))
-        (skg-edit-metadata-at-point '(skg folded)))
+      (when (org-at-heading-p)
+        (cond
+         ((invisible-p (point))
+          (skg-edit-metadata-at-point '(skg folded)))
+         ((skg-headline-body-hidden-p)
+          (skg-edit-metadata-at-point '(skg bodyFolded)))))
       (forward-line 1))))
+
+(defun skg-headline-body-hidden-p ()
+  "Return t when point is at a visible headline whose body is hidden
+*by an entry fold* rather than by a subtree fold above it.
+.
+Operationally:
+- The first line after this headline must exist, must not itself be
+  a headline, and must be invisible.
+- AND the next headline in the buffer (this headline's first child
+  or its next sibling) must be visible — or absent. If the next
+  headline is also hidden, the body's hiddenness is a consequence of
+  this headline's subtree being folded, which the existing `folded'
+  marker mechanism already restores via the children's markers; we
+  must not double-record it."
+  (save-excursion
+    (forward-line 1)
+    (and (not (eobp))
+         (not (org-at-heading-p))
+         (invisible-p (point))
+         (let ((next-heading
+                (save-excursion
+                  (when (outline-next-heading)
+                    (point)))))
+           (or (null next-heading)
+               (not (invisible-p next-heading)))))))
 
 (defun skg-collect-parent-markers-of-folded-headlines ()
   "Collect markers for parent headlines of all headlines with folded markers.
@@ -113,6 +190,17 @@ Caller is responsible for freeing the markers with set-marker."
   "Return t if the current headline has 'folded' in its metadata.
 Assumes point is at the beginning of a headline.
 Verifies the structure is (skg ... folded ...)."
+  (skg--headline-has-bare-marker-p 'folded))
+
+(defun skg-headline-has-bodyfolded-in-view-p ()
+  "Return t if the current headline has 'bodyFolded' in its metadata.
+Assumes point is at the beginning of a headline.
+Verifies the structure is (skg ... bodyFolded ...)."
+  (skg--headline-has-bare-marker-p 'bodyFolded))
+
+(defun skg--headline-has-bare-marker-p (marker)
+  "Return t if the current headline's metadata contains the bare atom MARKER.
+Assumes point is at the beginning of a headline."
   (when (org-at-heading-p)
     (let* ((headline-text (skg-get-current-headline-text))
            (match-result (skg-split-as-stars-metadata-title
@@ -122,6 +210,6 @@ Verifies the structure is (skg ... folded ...)."
           (when (and metadata-sexp
                      (not (string-empty-p metadata-sexp)))
             (skg-sexp-subtree-p (read metadata-sexp)
-                                '(skg folded))))))))
+                                (list 'skg marker))))))))
 
 (provide 'skg-org-fold)

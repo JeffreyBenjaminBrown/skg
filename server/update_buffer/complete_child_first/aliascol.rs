@@ -80,9 +80,10 @@ pub fn completeAliasCol (
     let membership : MembershipAxes =
       axes_map . get (text) . copied () . unwrap_or_default ();
     ViewNode {
-      focused : false,
-      folded  : false,
-      kind    : ViewNodeKind::Scaff(
+      focused     : false,
+      folded      : false,
+      body_folded : false,
+      kind        : ViewNodeKind::Scaff(
         Scaffold::Alias { text : text . clone(),
                           membership } ), } };
   complete_relevant_children_in_viewnodetree(

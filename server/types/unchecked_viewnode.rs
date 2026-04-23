@@ -20,9 +20,10 @@ use std::collections::{HashMap, HashSet};
 /// Unchecked version of ViewNode - for parsing/validation phase.
 #[derive(Debug, Clone, PartialEq)]
 pub struct UncheckedViewNode {
-  pub focused : bool,
-  pub folded  : bool,
-  pub kind    : UncheckedViewNodeKind,
+  pub focused     : bool,
+  pub folded      : bool,
+  pub body_folded : bool,
+  pub kind        : UncheckedViewNodeKind,
 }
 
 // UncheckedTrueNode is defined in viewnode.rs.
@@ -83,9 +84,10 @@ impl TryFrom<UncheckedViewNode> for ViewNode {
 
   fn try_from(u: UncheckedViewNode) -> Result<Self, Self::Error> {
     Ok(ViewNode {
-      focused : u . focused,
-      folded  : u . folded,
-      kind    : ViewNodeKind::try_from(u . kind)?,
+      focused     : u . focused,
+      folded      : u . folded,
+      body_folded : u . body_folded,
+      kind        : ViewNodeKind::try_from(u . kind)?,
     })
   }
 }
@@ -126,9 +128,10 @@ impl From<ViewNodeKind> for UncheckedViewNodeKind {
 impl From<ViewNode> for UncheckedViewNode {
   fn from(o: ViewNode) -> Self {
     UncheckedViewNode {
-      focused : o . focused,
-      folded  : o . folded,
-      kind    : UncheckedViewNodeKind::from(o . kind),
+      focused     : o . focused,
+      folded      : o . folded,
+      body_folded : o . body_folded,
+      kind        : UncheckedViewNodeKind::from(o . kind),
     }
   }
 }
@@ -262,9 +265,10 @@ impl Default for UncheckedTrueNode {
 impl Default for UncheckedViewNode {
   fn default() -> Self {
     UncheckedViewNode {
-      focused : false,
-      folded  : false,
-      kind    : UncheckedViewNodeKind::True(UncheckedTrueNode::default()),
+      focused     : false,
+      folded      : false,
+      body_folded : false,
+      kind        : UncheckedViewNodeKind::True(UncheckedTrueNode::default()),
     }
   }
 }
@@ -316,12 +320,14 @@ impl UncheckedViewNode {
 
 pub fn unchecked_forest_root_viewnode() -> UncheckedViewNode {
   UncheckedViewNode {
-    focused : false,
-    folded  : false,
-    kind    : UncheckedViewNodeKind::Scaff (Scaffold::BufferRoot), }}
+    focused     : false,
+    folded      : false,
+    body_folded : false,
+    kind        : UncheckedViewNodeKind::Scaff (Scaffold::BufferRoot), }}
 
 pub fn unchecked_viewnode_from_scaffold(scaffold: Scaffold) -> UncheckedViewNode {
   UncheckedViewNode {
-    focused : false,
-    folded  : false,
-    kind    : UncheckedViewNodeKind::Scaff (scaffold), }}
+    focused     : false,
+    folded      : false,
+    body_folded : false,
+    kind        : UncheckedViewNodeKind::Scaff (scaffold), }}

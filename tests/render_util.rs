@@ -8,8 +8,9 @@ use std::collections::HashMap;
 #[test]
 fn test_viewnode_to_text_no_metadata () {
   let node : ViewNode = ViewNode {
-    focused : false,
-    folded  : false,
+    focused     : false,
+    folded      : false,
+    body_folded : false,
     kind    : ViewNodeKind::True (
       default_truenode ( ID::from ("test"),
                          SourceName::from ("main"),
@@ -29,8 +30,9 @@ fn test_viewnode_to_text_with_body () {
                           SourceName::from ("main"),
                           "Test Title" . to_string() ) };
   let node : ViewNode = ViewNode {
-    focused : false,
-    folded  : false,
+    focused     : false,
+    folded      : false,
+    body_folded : false,
     kind    : ViewNodeKind::True (t), };
   let result : String =
     viewnode_to_text ( 2, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
@@ -54,8 +56,9 @@ fn test_viewnode_to_text_with_id_metadata () {
                           SourceName::from ("main"),
                           "Test Title" . to_string() ) };
   let node : ViewNode = ViewNode {
-    focused : false,
-    folded  : false,
+    focused     : false,
+    folded      : false,
+    body_folded : false,
     kind    : ViewNodeKind::True (t), };
   let result : String =
     viewnode_to_text ( 3, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
@@ -73,8 +76,9 @@ fn test_metadata_ordering () {
                           SourceName::from ("main"),
                           "Test" . to_string() ) };
   let node : ViewNode = ViewNode {
-    focused : false,
-    folded  : false,
+    focused     : false,
+    folded      : false,
+    body_folded : false,
     kind    : ViewNodeKind::True (t), };
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
@@ -96,7 +100,7 @@ fn test_non_content_birth_forces_container_herald () {
       .. default_truenode ( ID::from ("n"),
                             SourceName::from ("main"),
                             "N" . to_string () ) };
-    ViewNode { focused : false, folded : false,
+    ViewNode { focused : false, folded : false, body_folded : false,
                kind : ViewNodeKind::True (t) } };
   let cfg : SkgConfig =
     SkgConfig::dummyFromSources ( HashMap::new () );

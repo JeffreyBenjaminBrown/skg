@@ -32,9 +32,10 @@ pub enum Birth {
 /// Corresponds to an Emacs headline-body pair.
 #[derive( Debug, Clone, PartialEq )]
 pub struct ViewNode {
-  pub focused : bool,
-  pub folded  : bool,
-  pub kind    : ViewNodeKind,
+  pub focused     : bool,
+  pub folded      : bool, // Is this     hidden in its parent?
+  pub body_folded : bool, // Is the body hidden in this?
+  pub kind        : ViewNodeKind,
 }
 
 #[derive( Debug, Clone, PartialEq )]
@@ -609,9 +610,10 @@ pub fn mk_viewnode (
   indef_or_def  : IndefOrDef,
   view_requests : HashSet < ViewRequest >,
 ) -> ViewNode {
-  ViewNode { focused : false,
-             folded  : false,
-             kind    : ViewNodeKind::True (
+  ViewNode { focused     : false,
+             folded      : false,
+             body_folded : false,
+             kind        : ViewNodeKind::True (
                TrueNode { birth,
                           view_requests,
                           indef_or_def,
@@ -621,15 +623,17 @@ pub fn mk_viewnode (
 /// Create a Scaffold ViewNode from a Scaffold.
 pub fn viewnode_from_scaffold ( scaffold : Scaffold ) -> ViewNode {
   ViewNode {
-    focused : false,
-    folded  : false,
-    kind    : ViewNodeKind::Scaff (scaffold),
+    focused     : false,
+    folded      : false,
+    body_folded : false,
+    kind        : ViewNodeKind::Scaff (scaffold),
   }}
 
 /// Helper to create a BufferRoot ViewNode.
 pub fn forest_root_viewnode () -> ViewNode {
   ViewNode {
-    focused : false,
-    folded  : false,
-    kind    : ViewNodeKind::Scaff (Scaffold::BufferRoot),
+    focused     : false,
+    folded      : false,
+    body_folded : false,
+    kind        : ViewNodeKind::Scaff (Scaffold::BufferRoot),
   }}
