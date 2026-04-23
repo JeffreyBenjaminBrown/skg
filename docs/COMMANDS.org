@@ -11,7 +11,7 @@ if you have unsaved edits in one view
 and beegin to edit another one.
 It won't stop you, but the results could be bad.
 ** deletion
-*** C-c <backspace> : skg-delete
+***     C-c <backspace> : skg-delete
 Marks the node at point for deletion from the graph.
 Upon saving the view, it will vanish not just from this view,
 but from the graph itself.
@@ -37,7 +37,7 @@ Tantivy operator syntax.
 
 Run 'skg-goto' (below) from one of the links in the search
 results to open the view from that node.
-*** C-c f i : skg-search-interactive
+*** C-c f i   : skg-search-interactive
 Same as skg-search but asks for the four axis flags before
 sending:
 
@@ -139,25 +139,25 @@ use skg-id-next and skg-id-prev
 to identify where those are.
 *** C-c G RET : skg-goto-and-close-this
 Like skg-goto, but also closes the buffer it was called from.
-*** C-c g i : skg-goto-by-id
+*** C-c g i   : skg-goto-by-id
 'skg-goto' is usually more convenient.
 
 This requires a literal v4 UUID string, like
 3861db2c-7f16-4814-b403-52b5e05d5e0a
 It can be useful going from git to skg.
-*** C-c G i : skg-goto-by-id-and-close-this
-*** C-c g m : skg-goto-in-magit
+*** C-c G i   : skg-goto-by-id-and-close-this
+*** C-c g m   : skg-goto-in-magit
 Opens a magit view of the changes to the file containing the
 node at point. If the file appears in multiple sections
 (unstaged, staged, untracked), point lands on the first and
 the user is warned.
-*** C-c G m : skg-goto-in-magit-and-close-this
-*** C-c g M : skg-goto-in-magit-parent
+*** C-c G m   : skg-goto-in-magit-and-close-this
+*** C-c g M   : skg-goto-in-magit-parent
 Opens a magit view of the *parent*'s file, with point on
 the first line in that section containing this node's ID.
 Warns if the ID appears multiple times, or if the parent
 appears in multiple sections.
-*** C-c G M : skg-goto-in-magit-parent-and-close-this
+*** C-c G M   : skg-goto-in-magit-parent-and-close-this
 ** showing more information about a node
 These commands don't edit the graph. Each inserts a request
 into the metadata of the node at point that, on save, causes
