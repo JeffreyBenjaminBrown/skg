@@ -157,6 +157,9 @@ fn format_buffer_validation_error (
     BufferValidationError::LocalStructureViolation(msg, id) => {
       format!("Local structure violation:\n- ID: {}\n- {}\n",
               id . 0, msg) },
+    BufferValidationError::EditRequestOnIndefinitive (id) => {
+      format!("Edit request on an indefinitive (phantom) node:\n- ID: {}\n- Phantoms are indefinitive; indefinitive nodes cannot carry write instructions.\n- To delete or merge this node, visit a definitive view of it first (C-c g RET).\n",
+              id . 0) },
     BufferValidationError::Other (msg) => {
       format!("{}\n", msg) }, }}
 

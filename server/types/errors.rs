@@ -38,6 +38,7 @@ pub enum BufferValidationError {
   MultipleDefinitiveRequestsForSameId    (ID), // Multiple definitive view requests for the same ID
   EmptyTitle                             (ID),
   LocalStructureViolation        (String, ID), // (error message, nearest ancestor ID)
+  EditRequestOnIndefinitive      (ID), // Indefinitive (read-only) nodes -- phantoms in particular -- cannot carry write instructions like (editRequest delete) or (editRequest (merge X)). The user must visit a definitive view of the node first.
   Other                          (String),
 }
 
@@ -98,6 +99,8 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Node {:?} has an empty title. Every definitive node must have a non-empty title.", id),
       BufferValidationError::LocalStructureViolation(msg, id) =>
         write!(f, "Local structure violation at ID {:?}: {}", id, msg),
+      BufferValidationError::EditRequestOnIndefinitive (id) =>
+        write!(f, "Edit request on indefinitive (phantom) node {:?}. Phantoms are indefinitive; indefinitive nodes cannot carry write instructions. Visit a definitive view of the node first (C-c g RET).", id),
       BufferValidationError::Other (msg) =>
         write!(f, "{}", msg), }} }
 

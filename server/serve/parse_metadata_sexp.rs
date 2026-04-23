@@ -134,6 +134,19 @@ pub fn viewnode_from_metadata (
           { IndefOrDef::Definitive {
               body,
               edit_request : metadata . edit_request . clone () } };
+        // An edit_request on an indefinitive node has nowhere to live
+        // (IndefOrDef::Indefinitive carries none), so the user's
+        // instruction to delete or merge would silently vanish. Emit a
+        // validation error instead so the save is rejected with a
+        // clear message. We can only report this when the id is
+        // known; if it isn't, other validations cover the missing-id
+        // case.
+        let error : Option<BufferValidationError> =
+          if     metadata . indefinitive
+              && metadata . edit_request . is_some ()
+          { metadata . id . clone ()
+            . map ( BufferValidationError::EditRequestOnIndefinitive ) }
+          else { None };
         ( UncheckedViewNodeKind::True ( UncheckedTrueNode {
             title,
             id               : metadata . id . clone (),
@@ -146,7 +159,7 @@ pub fn viewnode_from_metadata (
             membership       : metadata . truenode_membership,
             not_in_git       : metadata . truenode_not_in_git,
             indef_or_def, } ),
-          None ) }
+          error ) }
     };
   ( UncheckedViewNode { focused     : metadata . focused,
                        folded      : metadata . folded,
