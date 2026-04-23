@@ -8,6 +8,14 @@ and automatically update the other dbs (not just disk as now)
 ** ? "any rel" ought to be what a single backward view shows
   link sources, containers, subscribers
     (but not overriders or hiders -- those should be more obscure)
+** AWAITS saving while narrowed
+When the buffer is narrowed, if the user saves, skg should walk backward from the first character until it finds the start of a headline. It's likely the first character *is* the start of a headline, but maybe not -- the user might be lookoing, e.g., at a proper subset of a body.
+
+Similarly, on the other side, skg should search forward until it finds the first character of a new headline (or the end of the buffer), and truncate right before that character (or including it, if it's the end of the buffer). Again it's likely that the very next character is the start of a new headline, but not neecessarily.
+
+Then skg can just restore the narrowed window so that it starts and ends at those two points. This way, even if things change outside the context, it will know exactly where to start and end.
+
+This isn't perfect, because there might be multiple headlines with the same IDs. If there are, screw it, skg should just report that duplicative IDs are interfering with its ability to save while narrowed, and let the user worry about it.
 * TODO make it comfortable
 ** save should work even when view is narrowed
 ** having to start and stop the server is annoying

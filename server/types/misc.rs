@@ -104,6 +104,7 @@ pub struct TantivyIndex {
   pub index                     : Arc<Index>,
   pub id_field                  : Field,
   pub title_or_alias_field      : Field,
+  pub raw_title_field           : Field, // Un-reduced title for is_title=true docs: preserves textlink syntax (e.g. "[[id:X][label]]") that 'title_or_alias_field' strips to bare labels. Populated only on primary-title docs; empty for alias docs. Used by the 'titles by ids' endpoint so clients can tell link-titles from plain titles.
   pub source_field              : Field,
   pub context_origin_type_field : Field,
   pub is_title_field            : Field,

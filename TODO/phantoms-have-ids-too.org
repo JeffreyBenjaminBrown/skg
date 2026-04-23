@@ -1,0 +1,175 @@
+#+TITLE: Phantoms have ids too -- audit of elisp files that pattern-match on (skg (node ...))
+#+DATE: 2026-04-23
+
+* TL;DR
+Of the three other elisp sites that pattern-match on =(skg (node ...))=:
+
+- 'skg-focus.el'    -- already correct; no change needed.
+- 'skg-org-fold.el' -- already correct; no change needed.
+- 'heralds-minor-mode.el' -- handles deleted-phantom metadata but renders it
+  poorly: the full UUID gets smushed against the "DELETED" label. A one-line
+  rule tweak fixes it. Purely cosmetic.
+
+So the only code change proposed in this write-up is a small cosmetic tweak
+to heralds. The other two files are included here with a short justification
+so the audit is on the record.
+
+* Background
+Deleted-phantom metadata has a distinct shape from TrueNode metadata:
+
+- TrueNode:        =(skg (node    (id X) (source S) ...))=
+- Deleted phantom: =(skg (deleted (id X) (source S)))=
+
+The Rust side emits the two forms from different =ViewNodeKind= variants
+('True' vs 'Deleted') in 'server/types/viewnode.rs'. The grammar for
+=(deleted ...)= lives in 'parse_deleted_sexp' in
+'server/serve/parse_metadata_sexp.rs'.
+
+The bug just fixed in 'skg-id-search.el' was that three helpers only
+recognised the =node= shape, so =C-c g m= on a Deleted phantom wrongly
+reported "Not a truenode line (no id in metadata)." This document audits
+the other elisp sites that mention =(skg (node ...))=.
+
+* DONE skg-focus.el -- no change needed
+  The one place it uses =skg-sexp-subtree-p= is in
+  'skg-headline-has-focused-in-view-p':
+
+  #+begin_src elisp
+    (skg-sexp-subtree-p (read metadata-sexp) '(skg focused))
+  #+end_src
+
+  The =focused= marker sits at the top level of =(skg ...)= as a sibling
+  of the =node= / =deleted= sub-form. It is therefore visible to
+  =skg-sexp-subtree-p= regardless of which sub-form is present.
+
+  Verified by experiment:
+
+  : focused-p on (skg (node    (id x) (source p)) focused) => t
+  : focused-p on (skg (deleted (id x) (source p)) focused) => t
+  : focused-p on (skg (node    (id x) (source p)))         => nil
+  : focused-p on (skg (deleted (id x) (source p)))         => nil
+
+  Open design question, not a bug: /should/ a deleted phantom be
+  focus-able at all? The 'focused' marker is a view-state annotation
+  about where point was, and a phantom is a transient render artefact
+  that might disappear on the next save. My guess is that in practice
+  no one will focus a phantom, so this never comes up -- but if we
+  want to rule it out explicitly, that's a separate ticket.
+
+* DONE skg-org-fold.el -- no change needed
+  All fold-state checks route through 'skg--headline-has-bare-marker-p',
+  which looks for bare atoms at the top of =(skg ...)=:
+
+  #+begin_src elisp
+    (skg-sexp-subtree-p (read metadata-sexp)
+                        (list 'skg marker))
+  #+end_src
+
+  where 'marker' is 'folded' or 'bodyFolded'. Same structural argument
+  as focus: these markers sit as siblings of =(node ...)= /
+  =(deleted ...)=, so the predicate fires correctly for both shapes.
+
+  Verified:
+
+  : folded-p on (skg (node    (id x) (source p)) folded) => t
+  : folded-p on (skg (deleted (id x) (source p)) folded) => t
+  : folded-p on (skg (node    (id x) (source p)))        => nil
+  : folded-p on (skg (deleted (id x) (source p)))        => nil
+
+  Same open design question as focus -- and the answer is arguably
+  clearer here, since folding /does/ plausibly apply to a phantom
+  subtree (a deleted container could still have visible descendants
+  that the user wants folded out of view). So the status quo of
+  "folding works on phantoms" is probably correct.
+
+* DONE heralds-minor-mode.el -- cosmetic rule tweak
+** the current state: handles it, but ugly
+  'heralds--transform-rules' already has rules for the =deleted= and
+  =deletedScaffold= sub-forms (lines 33-36 of heralds-minor-mode.el):
+
+  #+begin_src elisp
+    (RED deletedScaffold (ANY "DELETED" IT))
+    (RED deleted "DELETED"
+      (id (ANY IT))
+      (source))
+  #+end_src
+
+  The =(id (ANY IT))= rule means "emit the id value verbatim". So for
+  the metadata Jeff pasted:
+
+  : (skg (deleted (id 82762908-a353-43d0-8fc0-2b9205e28502) (source public)))
+
+  the current heralds output is (verified by experiment):
+
+  : "DELETED82762908-a353-43d0-8fc0-2b9205e28502"
+
+  The full UUID is dumped into the display with no separator. By
+  contrast, a TrueNode with an id is rendered as a compact bullet
+  "●", because its rule is =(id (ANY "●"))= rather than =(id (ANY IT))=.
+
+** proposed fix
+  Make the deleted rule match the truenode rule's compact style:
+
+  #+begin_src diff
+      (RED deletedScaffold (ANY "DELETED" IT))
+      (RED deleted "DELETED"
+  -     (id (ANY IT))
+  +     (id (ANY "●"))
+        (source))
+  #+end_src
+
+  After this tweak, the same metadata renders as:
+
+  : "DELETED●"
+
+  And with a staging marker present
+  ('(skg (deleted ...) (staged removedM))'):
+
+  : "DELETED● staged:-M"
+
+  Both verified by experiment.
+
+** alternative considered: suppress the id entirely
+  Using =(id)= and =(source)= as terminal rules (produce nothing) seems
+  attractive -- the UUID is redundant once "DELETED" is visible, and
+  the user can still get it via =C-c g m= or =skg-id-search=. But I
+  tested this:
+
+  #+begin_src elisp
+    (RED deleted "DELETED" (id) (source))
+  #+end_src
+
+  and it made the entire deleted herald disappear (returned nil for
+  the bare phantom case; worked fine when a sibling staging form was
+  present). I did not chase down why -- my guess is that
+  'skg-transform-sexp-flat' drops a rule whose children-with-rules all
+  produce nothing. If we want this cleaner form, the transform engine
+  needs investigation. The =(id (ANY "●"))= fix above doesn't depend on
+  that and is strictly safer, so I'd start there.
+
+** post-processing audit
+  'heralds--post-process-text' removes the bullet "◌" when the sexp
+  contains =(skg (node (id)))=, and removes "⦿" when
+  =(skg (node (graphStats)))= or =(skg (node (viewStats)))= is present.
+  None of these paths apply to the =deleted= sub-form, and that's
+  correct: those tokens are emitted only under =(BLUE node ...)=, which
+  never matches a deleted phantom. So no post-processing change is
+  needed.
+
+* TODO What's out of scope for this write-up
+** skg-edit-metadata-at-point on deleted phantoms
+  Whether merging =(skg focused)= / =(skg folded)= into a deleted-
+  phantom's metadata via 'skg-edit-metadata-at-point' preserves the
+  =(deleted ...)= sub-form correctly. Reading-side predicates handle
+  both shapes; writing-side I have not tested. Probably fine -- the
+  marker is a sibling, not nested -- but worth a real try.
+
+** magit navigation for a truly-gone file
+  The server's 'get file path' handler returns "File not found: <path>"
+  when the .skg file is gone from disk. 'skg--magit-setup-from-response'
+  detects the "Error"-prefix and stops there. For a Deleted phantom,
+  that's often the right answer (the file is gone!), but the user may
+  want to be navigated to the deletion in HEAD anyway -- via
+  =git log --all --diff-filter=D= or by finding the file under the
+  magit 'staged' section if the deletion is still staged. Out of scope
+  for the current elisp audit; this is a server/ux question.
