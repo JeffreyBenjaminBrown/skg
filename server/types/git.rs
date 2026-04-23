@@ -59,7 +59,11 @@ pub struct NodeCompleteDiff {
   // TODO ? Since we keep the nodecomplete around for deleted nodes already, why not just do that for everything, and dispense with the node_changes field?
   pub status: GitDiffStatus,
   pub node_changes: Option<NodeChanges>,
-  pub head_node: Option<NodeComplete>, // only for deleted files
+  /// The "before" state of this stage: HEAD for staged, INDEX for
+  /// unstaged. Populated only for Deleted status; read by
+  /// 'collect_deleted_nodes_for_both' to resolve phantom titles.
+  /// Name reflects the stage's baseline rather than always-HEAD.
+  pub before_node: Option<NodeComplete>,
 }
 
 /// A single entry representing a changed file.

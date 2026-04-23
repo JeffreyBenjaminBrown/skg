@@ -618,7 +618,7 @@ mod tests {
         aliases_diff:  Vec::new (),
         ids_diff:      Vec::new (),
         contains_diff: Vec::new (), } ),
-      head_node: None, } }
+      before_node: None, } }
 
   fn sd_with (
     pid     : &ID,

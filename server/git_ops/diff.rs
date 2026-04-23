@@ -86,7 +86,7 @@ fn compute_nodecomplete_diff_for_stage (
   Ok ( NodeCompleteDiff {
     status: entry . status . clone(),
     node_changes,
-    head_node: before_node }) }
+    before_node }) }
 
 /// Parses a NodeFS from a YAML blob, then attaches a default
 /// (empty) source to produce a NodeComplete. This preserves today's
@@ -130,9 +130,9 @@ fn collect_deleted_nodes_for_both (
   for diffs in [staged, unstaged] {
     for nodecomplete_diff in diffs . values () {
       if nodecomplete_diff . status == GitDiffStatus::Deleted {
-        if let Some ( ref head_node ) = nodecomplete_diff . head_node {
-          let pid : &ID = &head_node . pid;
-          result . insert ( pid . clone(), head_node . clone() ); }} } }
+        if let Some ( ref before_node ) = nodecomplete_diff . before_node {
+          let pid : &ID = &before_node . pid;
+          result . insert ( pid . clone(), before_node . clone() ); }} } }
   result }
 
 /// Compare two NodeCompletes and return the differences.

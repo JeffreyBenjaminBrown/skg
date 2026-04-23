@@ -126,7 +126,7 @@ mod tests {
         aliases_diff:  Vec::new (),
         ids_diff:      Vec::new (),
         contains_diff, } ),
-      head_node: None, } }
+      before_node: None, } }
 
   fn source_diff_with_parent_contains (
     parent_pid : &ID,
