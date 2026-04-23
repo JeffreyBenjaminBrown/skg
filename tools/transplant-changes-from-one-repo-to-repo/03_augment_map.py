@@ -34,7 +34,7 @@ from pathlib import Path
 
 import yaml
 
-WORK = Path("/home/ubuntu/mangle-work")
+WORK = Path(__file__).resolve().parent / "output"
 MANGLED_DIR = Path("/home/ubuntu/data/public-1-mangled")
 BASE_COMMIT = "181e2264"
 

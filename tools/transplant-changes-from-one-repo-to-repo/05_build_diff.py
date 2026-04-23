@@ -51,12 +51,12 @@ import yaml
 
 import skg_fmt as S
 
-WORK = Path("/home/ubuntu/mangle-work")
+WORK = Path(__file__).resolve().parent / "output"
 MANGLED_DIR = Path("/home/ubuntu/data/public-1-mangled")
 PUBLIC_DIR = Path("/home/ubuntu/data/public")
 BASE_COMMIT = "181e2264"
-OUT_DIFF = Path("/home/ubuntu/mangle.diff")
-OUT_UNRES = Path("/home/ubuntu/mangle-unresolved.org")
+OUT_DIFF = WORK / "mangle.diff"
+OUT_UNRES = WORK / "mangle-unresolved.org"
 
 
 def git_show(commit: str, relpath: str) -> str | None:
@@ -397,6 +397,7 @@ def main():
                 "public/ already matches the edit (no action needed)."
             )
 
+    WORK.mkdir(parents=True, exist_ok=True)
     OUT_DIFF.write_text("".join(diffs), encoding="utf-8")
     if unresolved:
         preamble = (

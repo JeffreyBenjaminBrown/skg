@@ -51,9 +51,13 @@ Edit the top-of-file constants in each script if your paths differ:
 - =BASE_COMMIT= — the git SHA in =MANGLED_DIR= of the initial-import
   commit. Everything after this commit is treated as user edits to
   carry over.
-- =WORK= — scratch space for JSON artifacts between steps.
-- =OUT_DIFF= — where the final unified diff is written.
-- =OUT_UNRES= — where items needing manual review are logged.
+- =WORK= — where all generated artifacts (JSON + diff + unresolved
+  notes) land. Defaults to =output/= next to the scripts, created on
+  first write.
+- =OUT_DIFF= — the final unified diff, defaults to
+  =output/mangle.diff=.
+- =OUT_UNRES= — items needing manual review, defaults to
+  =output/mangle-unresolved.org=.
 
 ** Pipeline
 
@@ -67,12 +71,13 @@ Run in order from this directory:
   python3 05_build_diff.py      # mangle.diff + mangle-unresolved.org
 #+end_src
 
-Then verify and apply:
+Then verify and apply (paths are relative to this tool's directory):
 
 #+begin_src sh
   cd /home/ubuntu/data/public
-  git apply --check /home/ubuntu/mangle.diff   # dry run
-  git apply         /home/ubuntu/mangle.diff
+  DIFF=/home/ubuntu/tools/transplant-changes-from-one-repo-to-repo/output/mangle.diff
+  git apply --check "$DIFF"   # dry run
+  git apply         "$DIFF"
 #+end_src
 
 ** What each step does

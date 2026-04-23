@@ -48,7 +48,7 @@ import yaml
 
 MANGLED_DIR = Path("/home/ubuntu/data/public-1-mangled")
 PUBLIC_DIR  = Path("/home/ubuntu/data/public")
-WORK = Path("/home/ubuntu/mangle-work")
+WORK = Path(__file__).resolve().parent / "output"
 
 
 def load_dir(p: Path) -> dict:
@@ -201,7 +201,7 @@ def main():
     print(f"  mapped: {len(uuid_map)} / {len(mangled)}")
     print(f"  unmapped: {len(unmapped)}")
 
-    WORK.mkdir(exist_ok=True)
+    WORK.mkdir(parents=True, exist_ok=True)
     with open(WORK / "uuid_map.json", "w") as f:
         json.dump(uuid_map, f, indent=2, sort_keys=True)
     with open(WORK / "unmapped.json", "w") as f:

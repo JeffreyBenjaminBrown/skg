@@ -44,7 +44,7 @@ import yaml
 MANGLED_DIR = Path("/home/ubuntu/data/public-1-mangled")
 PUBLIC_DIR = Path("/home/ubuntu/data/public")
 BASE_COMMIT = "181e2264"
-WORK = Path("/home/ubuntu/mangle-work")
+WORK = Path(__file__).resolve().parent / "output"
 
 
 def git_show(commit: str, relpath: str) -> str | None:
@@ -233,6 +233,7 @@ def main():
         "needed_map_keys": sorted(needed),
     }
 
+    WORK.mkdir(parents=True, exist_ok=True)
     with open(WORK / "targets.json", "w") as f:
         json.dump(targets, f, indent=2, sort_keys=True)
 
