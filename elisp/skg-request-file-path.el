@@ -66,7 +66,7 @@ or nil (with a user message) if no valid node metadata is found."
         (message "No metadata sexp found on this line.")
         nil)
        ((not (skg--metadata-sexp-contains-id-p sexp))
-        (message "Not a truenode line (no id in metadata).")
+        (message "No id in this line's metadata.")
         nil)
        (t
         (let (( id     (skg--extract-id-from-metadata-sexp sexp) )
