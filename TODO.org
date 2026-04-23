@@ -1,5 +1,25 @@
-* ONGOING audit git diff view code
-* like goto, but close this view in so doing
+* TODO make it comfortable
+** Privacy: Permit user to hide certain sources from view.
+*** Figure out the diff logic for insertions when some are hidden.
+I think I see how: Just pin each thing to its last visible sibling.
+** save should work even when view is narrowed
+** having to start and stop the server is annoying
+** bug ? forward-sexp chokes on {
+skg-find-sexp-end (line 62 in this same file) counts only () and works fine.
+So Skg developers have to know to use Skg-specific sexp navigation.
+But maybe that's appropriate?
+** some skg-request-* functions save, others don't
+* TODO really want but can wait
+** importing org-roam should be possible while server is running
+and automatically update the other dbs (not just disk as now)
+** ? "any rel" ought to be what a single backward view shows
+link sources, containers, subscribers
+(but not overriders or hiders -- those should be more obscure)
+* TODO merge & export these notes
+** DONE "TODO" items in this repo
+** [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skg]]
+** [[id:627da2c2-2f34-46ac-a6d3-9c625c4ff31d][AI]]
+** [[id:001d7913-c431-461c-92ae-a6a39394856c][processing]]
 * coollected while dogfooding, unassimilated
 ** interactive: try diff view on aliases, IDs
 ** cleaner code
@@ -29,9 +49,6 @@ it's very nice if that one jump goes directly to
 the one big context where it and its brothers were made.
 *** how
 See TODO/one-definitive-view/
-* TODO SLOW : calling up containerward views.
-* bug ? Saw '0{' everywhere.
-Rebuilding the dbs made it go away.
 * bug ?? M-S <right> to indent subtree
 ** worked but gave this warning
 ⛔ Warning (org-element): org-element--cache: Unregistered buffer modifications detected (39030 != 36493). Resetting.
@@ -81,19 +98,10 @@ so it has time to ingest the data
 *** It is valid to dogfood even as only reading.
 * an important constraint on any graph serialization format
 Deleting a node file should make sense.
-* TODO the first search froze Emacs again
-* TODO incremental init seems like garbage
+* incremental init seemed like garbage
 see TODO/what-affects-dbs.org
-* TODO make it comfortable
-** save should work even when view is narrowed
-** having to start and stop the server is annoying
-* TODO really want but can wait
-** Privacy: Permit user to hide certain sources from view.
-*** Figure out the diff logic for insertions when some are hidden.
-I think I see how: Just pin each thing to its last visible sibling.
-** importing org-roam should be possible while server is running
-and automatically update the other dbs (not just disk as now)
-** server can't verify connection initially
+but that was before some tremendous improvements in performance
+on <2026-04-22 Wed> and before and maybe after
 * TODO ?
 ** Links to links are currently annoying. Are they important?
 ** ignorable ? parentContains does seem like valid graph data
@@ -132,20 +140,6 @@ Save the buffer.
 Problem: The first headline disappears.
 * TODO review commit 7dacceadcee6ea260ae19625bc8e7da1c77986d1
 which was to fix test db accumulation
-* ? containerwardPathCol, sourceCol
-** ? distinguish those from the other 'skg-local-*' commands?
-** labels
-*** containerwardPathCol would say "is recursively contained in these descendents"
-*** sourceCol would say "is targeted by links from these children"
-**** discarding
-each of which is recursively contained in its descendents"
-*** two varieties of source children depicted
-- a root flag with source
-- a containerwardPathCol
-* Bug ? forward-sexp chokes on {
-skg-find-sexp-end (line 62 in this same file) counts only () and works fine.
-So Skg developers have to know to use Skg-specific sexp navigation.
-But maybe that's appropriate?
 * Have Claude report bugs.
 * Report bugs about Claude.
 ** whitespace for distinct org domains: illegible
@@ -154,13 +148,6 @@ if the quotation is represented as leading whitespace.
 * Dogfood and develop in separate places on disk.
 That way I can keep investigating the latest usable commit
 while a new one is being developed.
-* Does the first visit take a lot longer?
-* ONGOING I am committing to it in my personal data,
-linking to things only skg has.
-* etags should ignore **/abandoned
-* ? "any rel" ought to be what a single backward view shows
-  link sources, containers, subscribers
-    (but not overriders or hiders -- those should be more obscure)
 * eliminate some 'tracing' commands
   Anything that's blazing fast can be safely removed.
 * if needed, convert to haskell
@@ -186,8 +173,6 @@ linking to things only skg has.
 ** Useful when checking changes
    "This node changed; show it to me in context."
    e.g. with git
-* 'C-c C-o' ought to be the skg-visit-node shortcut.
-  To match what it does (follow a link) in org-mode.
 * dogfooding
 ** commands to probe better
 *** TODO C-c g m : skg-view-magit
@@ -212,50 +197,14 @@ linking to things only skg has.
 ** I may have damaged my data.
    I think I did. Searching for 'motivation' used,
    I'm sure, to return a hit with exactly that title.
-** I wanted immediately upon trying it.
-*** delete in view-descendents all parent-ignores branches
-*** do until all of node's children
-** Branching containerward is slow.
-* magit bug!
-I just copoied this text from magit:
-
-  ```elisp
-  -(progn
-  -  (load-file "../elisp/skg-init.el")
-  -  (skg-client-init "../data/skgconfig.toml"))
-  +  (progn                                                                   (load-file "../elisp/skg-reload.el")
-  +    (skg-reload)                                                           (skg-client-init "../data/skgconfig.toml"))
-   ```
-But when I look at it in magit,
-I don't see any of the lines without a + or - in front.
-What's going on?
 * [[./docs/en-espanol.org][En Español]]
 * deciding whether a node is a relationship is up to the user
 * generalize it : a node is a map from one to many
-* nodes as relationships ? solved
-  split links in 2, containers and non-containers
-* These should be unavailable to the user.
-  skg-request-title-matches
-  skg-request-single-root-content-view-from-id
-  skg-request-save-buffer
-  skg-validate-id-stack-buffer
-  skg-edit-sexp-at-or-after-point
-  skg-show-indefinitive
-  heralds-minor-mode
-* review, comment the new context-generation code
-* to reload skg in Emacs
-  (load-file "~/hodal/skg/elisp/skg-init.el")
-* some skg-request-* functions save, others don't
 * figure out how to work in parallel with Claude
   Need two copies of the repo.
   Claude advances features while I review older code.
   When I commit, Claude pulls in those changes,
   and fixes any merges that break.
-* TODO merge & export these notes
-** DONE "TODO" items in this repo
-** [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skg]]
-** [[id:627da2c2-2f34-46ac-a6d3-9c625c4ff31d][AI]]
-** [[id:001d7913-c431-461c-92ae-a6a39394856c][processing]]
 * internalizing
 ** It is legitimate to commit before testing.
    Even AI-generated code.

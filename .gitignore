@@ -16,6 +16,7 @@
  # generated each time by run-servers.sh
 /bash/shutdown-servers.sh
 
+/claude-*.org
 /data
 /example-data
 /target
