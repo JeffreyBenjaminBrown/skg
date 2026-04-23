@@ -23,3 +23,24 @@ pub fn setup_git_repo_with_fixtures(
     "tests/git_diff_view/text/fixtures/worktree",
   )
 }
+
+/// Same transition, staged (index == worktree != HEAD).
+pub fn setup_git_repo_with_fixtures_staged(
+  repo_path: &Path,
+) -> Result<Repository, Box<dyn Error>> {
+  super::super::common::setup_git_repo_with_fixtures_staged(
+    repo_path,
+    "tests/git_diff_view/text/fixtures/head",
+    "tests/git_diff_view/text/fixtures/worktree",
+  )
+}
+
+/// Expected diff view when the text changes are staged.
+pub const GIT_DIFF_VIEW_STAGED: &str = "\
+* (skg (node (id 1) (source main))) 1 has a new title.
+** (skg (textChanged staged))
+** (skg (node (id 11) (source main))) 11
+11 has a new body.
+*** (skg (textChanged staged))
+** (skg (node (id 12) (source main))) 12
+";

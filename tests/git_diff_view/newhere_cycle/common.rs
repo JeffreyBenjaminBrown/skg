@@ -19,3 +19,20 @@ pub fn setup_git_repo_with_fixtures(
     "tests/git_diff_view/newhere_cycle/fixtures/worktree",
   )
 }
+
+/// Same transition, staged.
+pub fn setup_git_repo_with_fixtures_staged(
+  repo_path: &Path,
+) -> Result<Repository, Box<dyn Error>> {
+  super::super::common::setup_git_repo_with_fixtures_staged(
+    repo_path,
+    "tests/git_diff_view/newhere_cycle/fixtures/head",
+    "tests/git_diff_view/newhere_cycle/fixtures/worktree",
+  )
+}
+
+/// Expected output when the transition is staged.
+pub const GIT_DIFF_VIEW_STAGED: &str = "\
+* (skg (node (id 1) (source main))) 1
+** (skg (node (id 1) (staged newM))) 1
+";
