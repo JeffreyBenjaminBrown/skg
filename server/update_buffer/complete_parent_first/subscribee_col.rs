@@ -85,7 +85,8 @@ pub async fn complete_subscribee_col_preorder (
     let child_data : HashMap<ID, SubscribeeChildData> =
       // Pre-compute child creation data so that the create_child closure argument to complete_relevant_children_in_viewnodetree captures only owned data and does not conflict with the &mut Tree borrow in complete_relevant_children_in_viewnodetree.
       build_subscribee_child_data(
-        tree, node, &goal_list, &removed_ids,
+        tree, node, &parent_skgid, &parent_source,
+        &goal_list, &removed_ids,
         source_diffs, deleted_since_head_pid_src_map, config ) ?;
     complete_relevant_children_in_viewnodetree(
       tree, node,
@@ -170,6 +171,8 @@ fn diff_aware_goal_list (
 fn build_subscribee_child_data (
   tree               : &Tree<ViewNode>,
   node               : NodeId,
+  parent_skgid       : &ID,
+  parent_source      : &SourceName,
   goal_list          : &[ID],
   removed_ids        : &HashSet<ID>,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
@@ -201,7 +204,9 @@ fn build_subscribee_child_data (
           deleted_since_head_pid_src_map, config )
         . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
       let axes : (ExistenceAxes, MembershipAxes) =
-        phantom_axes ( child_skgid, &child_src, source_diffs . as_ref() );
+        phantom_axes ( child_skgid, &child_src,
+                       parent_skgid, parent_source,
+                       source_diffs . as_ref() );
       let child_title : String =
         title_for_phantom( child_skgid, &child_src,
                            source_diffs . as_ref(), config );

@@ -84,7 +84,8 @@ pub fn complete_hiddeninsubscribee_col (
           &subscribee_contains, &worktree_content, config ) };
   let child_data : HashMap<ID, HiddenChildData> = // Pre-compute this, so that the create_child closure argument to complete_relevant_children_in_viewnodetree captures only owned data and does not conflict with the &mut Tree borrow in complete_relevant_children_in_viewnodetree.
     build_hidden_child_data(
-      tree, node, &goal_list, &removed_ids,
+      tree, node, &subscribee_pid, &subscribee_source,
+      &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, config ) ?;
   complete_relevant_children_in_viewnodetree(
     tree, node,
@@ -187,6 +188,8 @@ fn goallist_and_removedids_for_hiddeninsubscribeecol_with_diff (
 fn build_hidden_child_data (
   tree               : &Tree<ViewNode>,
   node               : NodeId,
+  parent_skgid       : &ID,
+  parent_source      : &SourceName,
   goal_list          : &[ID],
   removed_ids        : &HashSet<ID>,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
@@ -218,7 +221,9 @@ fn build_hidden_child_data (
         . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
       let axes : (ExistenceAxes, MembershipAxes) =
         phantom_axes (
-          child_skgid, &child_src, source_diffs . as_ref() );
+          child_skgid, &child_src,
+          parent_skgid, parent_source,
+          source_diffs . as_ref() );
       let child_title : String =
         title_for_phantom( child_skgid, &child_src,
                            source_diffs . as_ref(), config );

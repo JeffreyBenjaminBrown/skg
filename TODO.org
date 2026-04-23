@@ -1,21 +1,13 @@
 * my data
-** org-roam import: Use actual newlines.
 ** retrieve the commits in data/public-1-mangled/
 * coollected while dogfooding, unassimilated
-** Use literal newlines in .skg body fields.
-Otherwise the diff is undreadable.
-
-Currently they use \n instead:
-```
-+body: "Anti-march.\nNecessarily guided consciously,\nbecause the established long paths are not most of the map. "
-```
 ** interactive: try diff view on aliases, IDs
 ** cleaner code
+*** motivation
 in server/serve/parse_metadata_sexp.rs,
 the first typedef, 'pub struct ViewnodeMetadata', feels unnatural.
-** TypeDB recursion for content views
-Are content (containerward) trees not determined recursively from TypeDB?
-If not, it might be worth doing. Other recursive graph queries are.
+*** counterargument
+It's in parser code I never look at.
 * maybe : how to use AI
 Ask for criticism *before*
 asking to be asked for missing details.

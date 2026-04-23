@@ -143,7 +143,8 @@ pub fn complete_truenode_preorder (
   maybe_prepend_subscribee_col(
     tree, node, &subscribes_to ) ?;
   maybe_prepend_diff_view_scaffolds(
-    tree, node, node_changes ) ?;
+    tree, node, node_changes,
+    source_diffs, &pid, &source ) ?;
   Ok(( )) }
 
 fn mutate_truenode_to_deletednode (
@@ -356,8 +357,11 @@ fn maybe_prepend_subscribee_col (
 /// Each is only prepended if absent.
 fn maybe_prepend_diff_view_scaffolds (
   tree         : &mut Tree<ViewNode>,
-  node      : NodeId,
+  node         : NodeId,
   node_changes : Option<&NodeChanges>,
+  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  pid          : &ID,
+  source       : &SourceName,
 ) -> Result<(), Box<dyn Error>> {
   if let Some (nc) = node_changes {
     if nc . text_changed {
@@ -365,15 +369,37 @@ fn maybe_prepend_diff_view_scaffolds (
         tree, node,
         &Scaffold::TextChanged { staged: false, unstaged: false }
       ) ?. is_none() {
+        let (staged, unstaged) : (bool, bool) =
+          per_stage_textchanged (source_diffs, pid, source);
         insert_scaffold_as_child(
           tree, node,
-          Scaffold::TextChanged { staged: false, unstaged: true },
+          Scaffold::TextChanged { staged, unstaged },
           true ) ?; } }
     maybe_prepend_id_col(
       tree, node, nc ) ?;
     maybe_prepend_alias_col(
       tree, node, nc ) ?; }
   Ok(( )) }
+
+/// Read NodeChanges.text_changed from each stage's map in SourceDiff.
+/// Returns (staged, unstaged). If node_changes_for_truenode reports a
+/// text change, at least one of these will be true.
+fn per_stage_textchanged (
+  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  pid          : &ID,
+  source       : &SourceName,
+) -> (bool, bool) {
+  let sd : Option<&SourceDiff> =
+    source_diffs . as_ref () . and_then ( |d| d . get (source) );
+  let file : PathBuf =
+    PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
+  let stage_tc = | map : &HashMap<PathBuf, crate::types::git::NodeCompleteDiff> | -> bool {
+    map . get (&file)
+      . and_then ( |d| d . node_changes . as_ref () )
+      . map ( |nc| nc . text_changed ) . unwrap_or (false) };
+  let staged   : bool = sd . map ( |sd| stage_tc (&sd . staged)   ) . unwrap_or (false);
+  let unstaged : bool = sd . map ( |sd| stage_tc (&sd . unstaged) ) . unwrap_or (false);
+  (staged, unstaged) }
 
 /// If the node's IDs differ between disk and HEAD,
 /// prepend an empty IDCol scaffold.
@@ -431,6 +457,9 @@ fn build_child_creation_data (
   config             : &SkgConfig,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
+  let (parent_pid, parent_source) : (ID, SourceName) =
+    pid_and_source_from_treenode (
+      tree, node, "build_child_creation_data" ) ?;
   let child_sources : HashMap<ID, SourceName> =
     { let node_ref : NodeRef<ViewNode> =
         tree . get (node)
@@ -458,7 +487,9 @@ fn build_child_creation_data (
           id, &child_sources, deleted_since_head_pid_src_map, config )
         . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
       let (ex, mem) : (ExistenceAxes, MembershipAxes) =
-        phantom_axes ( id, &phantom_source, source_diffs . as_ref () );
+        phantom_axes ( id, &phantom_source,
+                       &parent_pid, &parent_source,
+                       source_diffs . as_ref () );
       let kind : ContentReality = ContentReality::Phantom (ex, mem);
       let title : String = title_for_phantom(
         id, &phantom_source, source_diffs . as_ref(), config );
@@ -572,3 +603,74 @@ fn write_truenode_diff (
         t . membership = membership;
         t . not_in_git = not_in_git; }}
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::types::git::{GitDiffStatus, NodeChanges, NodeCompleteDiff};
+
+  fn source_name (s: &str) -> SourceName { SourceName ( s . to_string () ) }
+  fn id          (s: &str) -> ID          { ID ( s . to_string () ) }
+
+  fn make_diff_entry (text_changed: bool) -> NodeCompleteDiff {
+    NodeCompleteDiff {
+      status: GitDiffStatus::Modified,
+      node_changes: Some ( NodeChanges {
+        text_changed,
+        aliases_diff:  Vec::new (),
+        ids_diff:      Vec::new (),
+        contains_diff: Vec::new (), } ),
+      head_node: None, } }
+
+  fn sd_with (
+    pid     : &ID,
+    staged  : Option<bool>,
+    unstag  : Option<bool>,
+  ) -> SourceDiff {
+    let file : PathBuf = PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
+    let mut s : HashMap<PathBuf, NodeCompleteDiff> = HashMap::new ();
+    let mut u : HashMap<PathBuf, NodeCompleteDiff> = HashMap::new ();
+    if let Some (t) = staged { s . insert (file . clone (), make_diff_entry (t)); }
+    if let Some (t) = unstag { u . insert (file,           make_diff_entry (t)); }
+    SourceDiff {
+      is_git_repo: true,
+      staged: s, unstaged: u,
+      deleted_nodes: HashMap::new (), } }
+
+  fn diffs_with (src: &SourceName, sd: SourceDiff)
+    -> Option<HashMap<SourceName, SourceDiff>> {
+    let mut m : HashMap<SourceName, SourceDiff> = HashMap::new ();
+    m . insert (src . clone (), sd);
+    Some (m) }
+
+  #[test]
+  fn text_change_only_staged () {
+    let src : SourceName = source_name ("public");
+    let pid : ID         = id ("n");
+    let diffs = diffs_with (&src, sd_with (&pid, Some (true), None));
+    assert_eq! ( per_stage_textchanged (&diffs, &pid, &src), (true, false) );
+  }
+
+  #[test]
+  fn text_change_only_unstaged () {
+    let src : SourceName = source_name ("public");
+    let pid : ID         = id ("n");
+    let diffs = diffs_with (&src, sd_with (&pid, None, Some (true)));
+    assert_eq! ( per_stage_textchanged (&diffs, &pid, &src), (false, true) );
+  }
+
+  #[test]
+  fn text_change_both_stages () {
+    let src : SourceName = source_name ("public");
+    let pid : ID         = id ("n");
+    let diffs = diffs_with (&src, sd_with (&pid, Some (true), Some (true)));
+    assert_eq! ( per_stage_textchanged (&diffs, &pid, &src), (true, true) );
+  }
+
+  #[test]
+  fn no_diff_at_all () {
+    let src : SourceName = source_name ("public");
+    let pid : ID         = id ("n");
+    assert_eq! ( per_stage_textchanged (&None, &pid, &src), (false, false) );
+  }
+}
