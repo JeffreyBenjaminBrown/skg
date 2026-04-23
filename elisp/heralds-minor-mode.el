@@ -32,7 +32,7 @@
       (RED unstaged "unstaged"))
     (RED deletedScaffold (ANY "DELETED" IT))
     (RED deleted "DELETED"
-      (id (ANY IT))
+      (id)
       (source))
     (BLUE staged
       (GREEN newM     "staged:M")
