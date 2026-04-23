@@ -42,6 +42,10 @@ name = "bench-audit"
 path = "tools/bench-audit.rs"
 
 [[bin]]
+name = "probe-audit"
+path = "tools/probe-audit.rs"
+
+[[bin]]
 name = "top-contents"
 path = "tools/top-contents.rs"
 

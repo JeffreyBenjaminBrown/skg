@@ -11,7 +11,7 @@
 //! 'insert_relationship_from_list' silently drops such relations at
 //! rebuild time (the '$to' match fails), and authored links to
 //! unavailable (e.g., private)
-/// nodes are routine, so memory's own copy of them is
+//! nodes are routine, so memory's own copy of them is
 //! filtered out before the compare. See the filter in 'audit_one_node'.
 //!
 //! Intended for small test fixtures (< 100 nodes). Running this against
