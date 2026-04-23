@@ -15,9 +15,10 @@ fn test_get_id_from_treenode_with_id() {
                        SourceName::from ("main"),
                        "Test" . to_string() );
   let viewnode : ViewNode =
-    ViewNode { focused : false,
-              folded  : false,
-              kind    : ViewNodeKind::True (t) };
+    ViewNode { focused     : false,
+              folded      : false,
+              body_folded : false,
+              kind        : ViewNodeKind::True (t) };
   let tree : Tree<ViewNode> = Tree::new (viewnode);
   let root_id : NodeId = tree . root() . id();
   let result : Result<ID, Box<dyn std::error::Error>> =
@@ -32,9 +33,10 @@ fn test_get_id_from_treenode_scaffold() {
   let viewnode :
     ViewNode =
     ViewNode {
-      focused : false,
-      folded : false,
-      kind : ViewNodeKind::Scaff (Scaffold::AliasCol),
+      focused     : false,
+      folded       : false,
+      body_folded : false,
+      kind        : ViewNodeKind::Scaff (Scaffold::AliasCol),
     };
   let tree : Tree<ViewNode> = Tree::new (viewnode);
   let root_id : NodeId = tree . root() . id();

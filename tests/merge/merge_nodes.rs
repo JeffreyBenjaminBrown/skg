@@ -32,9 +32,10 @@ fn mk_test_viewnode (
     .. default_truenode ( ID::from (id),
                           SourceName::from ("main"),
                           title . to_string() ) };
-  ViewNode { focused : false,
-            folded  : false,
-            kind    : ViewNodeKind::True (t) }}
+  ViewNode { focused     : false,
+            folded      : false,
+            body_folded : false,
+            kind        : ViewNodeKind::True (t) }}
 
 #[test]
 fn test_merge_2_into_1() -> Result<(), Box<dyn Error>> {

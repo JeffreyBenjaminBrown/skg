@@ -380,18 +380,20 @@ pub fn build_search_forest (
           let mut result_mut : NodeMut<ViewNode> =
             forest . get_mut (result_treeid) . unwrap ();
           result_mut . append ( ViewNode {
-            focused : false,
-            folded  : true,
-            kind    : ViewNodeKind::Scaff (
+            focused     : false,
+            folded      : true,
+            body_folded : false,
+            kind        : ViewNodeKind::Scaff (
               Scaffold::AliasCol ) } )
           . id () };
         for (_score, title) in sorted_matches . iter () . skip (1) {
           let mut aliascol_mut : NodeMut<ViewNode> =
             forest . get_mut (aliascol_id) . unwrap ();
           aliascol_mut . append ( ViewNode {
-            focused : false,
-            folded  : false,
-            kind    : ViewNodeKind::Scaff (
+            focused     : false,
+            folded      : false,
+            body_folded : false,
+            kind        : ViewNodeKind::Scaff (
               Scaffold::Alias {
                 text       : title . clone (),
                 membership : MembershipAxes::default () } ) } ); }} }
