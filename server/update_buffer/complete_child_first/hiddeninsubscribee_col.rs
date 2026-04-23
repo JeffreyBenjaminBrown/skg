@@ -1,6 +1,6 @@
 use crate::git_ops::read_repo::nodecomplete_from_git_head;
 use crate::types::viewnode::mk_phantom_viewnode;
-use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff, NodeChanges, node_changes_for_truenode};
+use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff, NodeChanges, net_diff_from_per_stage, per_stage_node_changes_for_truenode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
@@ -143,6 +143,10 @@ pub fn complete_hiddeninsubscribee_col (
 /// Reconstruct the HEAD version of hidden-in-subscribee content,
 /// diff it against the worktree version,
 /// and return the goal list and removed set.
+///
+/// Uses per-stage contains_diff (via 'net_diff_from_per_stage')
+/// rather than the merged 'node_changes_for_truenode' view, so that
+/// staged-only contains-list changes still produce phantoms.
 fn goallist_and_removedids_for_hiddeninsubscribeecol_with_diff (
   source_diffs        : &Option<HashMap<SourceName, SourceDiff>>,
   subscribee_pid      : &ID,
@@ -153,19 +157,23 @@ fn goallist_and_removedids_for_hiddeninsubscribeecol_with_diff (
   worktree_content    : &[ID],
   config              : &SkgConfig,
 ) -> (Vec<ID>, HashSet<ID>) {
-  let subscribee_node_changes : Option<&NodeChanges> =
-    node_changes_for_truenode(
+  let (staged_nc, unstaged_nc)
+    : (Option<&NodeChanges>, Option<&NodeChanges>) =
+    per_stage_node_changes_for_truenode (
       source_diffs, subscribee_pid, subscribee_source );
   let head_subscribee_contains : Vec<ID> =
-    match subscribee_node_changes {
-      Some (nc) =>
-        nc . contains_diff . iter() . filter_map(
-          |d| match d {
+    if staged_nc . is_none () && unstaged_nc . is_none () {
+      subscribee_contains . to_vec ()
+    } else {
+      let net : Vec<Diff_Item<ID>> = net_diff_from_per_stage (
+        staged_nc   . map ( |c| c . contains_diff . as_slice () ),
+        unstaged_nc . map ( |c| c . contains_diff . as_slice () ));
+      net . iter () . filter_map (
+          |d| match d { // Items that were in HEAD: Unchanged or Removed.
             Diff_Item::Unchanged (id) |
-              Diff_Item::Removed (id) => Some( id . clone() ),
+              Diff_Item::Removed (id) => Some ( id . clone () ),
             Diff_Item::New (_) => None } )
-        . collect(),
-      None => subscribee_contains . to_vec() };
+        . collect () };
   let head_subscriber_hides : Vec<ID> =
     nodecomplete_from_git_head(
         subscriber_pid, subscriber_source, config )

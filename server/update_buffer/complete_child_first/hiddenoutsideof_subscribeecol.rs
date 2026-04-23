@@ -1,6 +1,6 @@
 use crate::git_ops::read_repo::nodecomplete_from_git_head;
 use crate::types::viewnode::mk_phantom_viewnode;
-use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff, NodeChanges, node_changes_for_truenode};
+use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff, NodeChanges, net_diff_from_per_stage, per_stage_node_changes_for_truenode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
@@ -173,9 +173,11 @@ pub fn complete_hiddenoutsideofsubscribeecol (
 /// From HEAD, compute the union of some subscribees' content.
 /// For each subscribee pid:
 /// - Look up its source from memory. If missing, skip.
-/// - Get node_changes via node_changes_for_truenode. If present,
-///     HEAD contains = Unchanged + Removed items from contains_diff.
-///   If absent, HEAD = worktree, so read contains from memory/disk.
+/// - Read per-stage contains_diff via
+///   'per_stage_node_changes_for_truenode' and compose the net
+///   HEAD→worktree view. Items that were in HEAD are Unchanged +
+///   Removed in the net diff. If neither stage has changes for
+///   this file, HEAD = worktree, so read contains from memory/disk.
 fn head_subscribee_contains_from_memory_and_diffs (
   head_subscribees : &[ID],
   source_diffs     : &Option<HashMap<SourceName, SourceDiff>>,
@@ -187,22 +189,25 @@ fn head_subscribee_contains_from_memory_and_diffs (
       match snapshot_global_source (pid, config) {
         Some (s) => s,
         None => continue };
-    let nc : Option<&NodeChanges> =
-      node_changes_for_truenode(
+    let (staged_nc, unstaged_nc)
+      : (Option<&NodeChanges>, Option<&NodeChanges>) =
+      per_stage_node_changes_for_truenode (
         source_diffs, pid, &subscribee_source );
-    match nc {
-      Some (nc) => {
-        for d in &nc . contains_diff {
-          match d {
-            Diff_Item::Unchanged (id) |
-              Diff_Item::Removed (id) =>
-                { result . insert( id . clone() ); },
-            Diff_Item::New (_) => {} } } },
-      None => {
-        if let Ok (skg) = nodecomplete_from_memory_or_disk (
-          config, pid, &subscribee_source )
-        { for id in skg . contains . into_iter () {
-            result . insert (id); } } } } }
+    if staged_nc . is_none () && unstaged_nc . is_none () {
+      if let Ok (skg) = nodecomplete_from_memory_or_disk (
+        config, pid, &subscribee_source )
+      { for id in skg . contains . into_iter () {
+          result . insert (id); } }
+    } else {
+      let net : Vec<Diff_Item<ID>> = net_diff_from_per_stage (
+        staged_nc   . map ( |c| c . contains_diff . as_slice () ),
+        unstaged_nc . map ( |c| c . contains_diff . as_slice () ));
+      for d in &net {
+        match d {
+          Diff_Item::Unchanged (id) |
+            Diff_Item::Removed (id) =>
+              { result . insert ( id . clone () ); },
+          Diff_Item::New (_) => {} } } } }
   result }
 
 /// Resolve a node's source: try the in-Rust memory snapshot first, fall back
