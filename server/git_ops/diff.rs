@@ -93,31 +93,49 @@ fn compute_nodecomplete_diff_for_stage (
 /// behavior: diff.rs doesn't know the real source of its blobs,
 /// so nodes built here have source at its default. Downstream
 /// consumers that care about source do not use diff-derived nodes.
+///
+/// Parse failures are logged at WARN level (with path + origin for
+/// context) and returned as None — distinct from "file absent",
+/// which also returns None but without logging. Callers can't
+/// currently distinguish the two cases, but a corrupt file will at
+/// least show up in the server logs.
 fn nodefs_as_nodecomplete_with_default_source (
-  yaml : &str,
+  yaml    : &str,
+  origin  : &str,
+  context : &Path,
 ) -> Option<NodeComplete> {
-  let node_fs : NodeFS = serde_yaml::from_str (yaml) . ok () ?;
-  Some ( node_fs . into_complete ( SourceName::default ())) }
+  match serde_yaml::from_str::<NodeFS> (yaml) {
+    Ok (node_fs) =>
+      Some ( node_fs . into_complete ( SourceName::default ())),
+    Err (e) => {
+      tracing::warn! (
+        origin, path = %context . display (), error = %e,
+        "compute_nodecomplete_diff: YAML parse failed; \
+         treating as if file were absent");
+      None } } }
 
 fn load_from_head (
   repo     : &git2::Repository,
   rel_path : &Path,
 ) -> Option<NodeComplete> {
   get_file_content_at_head (repo, rel_path) . ok () . flatten ()
-    . and_then ( |s| nodefs_as_nodecomplete_with_default_source (&s) ) }
+    . and_then ( |s| nodefs_as_nodecomplete_with_default_source (
+                       &s, "HEAD", rel_path) ) }
 
 fn load_from_index (
   repo     : &git2::Repository,
   rel_path : &Path,
 ) -> Option<NodeComplete> {
   get_file_content_at_index (repo, rel_path) . ok () . flatten ()
-    . and_then ( |s| nodefs_as_nodecomplete_with_default_source (&s) ) }
+    . and_then ( |s| nodefs_as_nodecomplete_with_default_source (
+                       &s, "index", rel_path) ) }
 
 fn load_from_disk (
   abs_path : &Path,
 ) -> Option<NodeComplete> {
   fs::read_to_string (abs_path) . ok ()
-    . and_then ( |s| nodefs_as_nodecomplete_with_default_source (&s) ) }
+    . and_then ( |s| nodefs_as_nodecomplete_with_default_source (
+                       &s, "worktree", abs_path) ) }
 
 /// Collect NodeCompletes for files that were deleted in either stage.
 /// Used to look up titles and bodies for phantom nodes.
