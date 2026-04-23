@@ -1,0 +1,206 @@
+* Jeff's 2-paragraph overview
+
+Given two repos,
+this creates a diff that can be applied to the second,
+based on the changes in the first --
+despite the fact that many IDs for isomorphic nodes are distinct.
+This code could be useful
+if what that happened to me before happens again.
+
+That story is:
+I imported from my public org-roam notes into skg,
+made some changes in that in-skg image,
+*and* modified the org-roam notes themselves.
+Then I realized org-roam import was mangling newlines.
+So I re-imported the updated org-roam notes
+(which means entirely different IDs
+for any node that had no ID in org-roam)
+and then ported over the changes
+from the first repo to the second.
+
+
+* Claude's detailed description: port post-import edits from one import into the next
+
+** When to use this
+
+You have two imports from the same org-roam source into skg:
+
+- =data/public-1-mangled/= — the older import. You've made edits inside
+  skg since importing (new notes, title/body fixes, contains-list
+  reorganizations). It is a git repo; its initial commit is the raw
+  import state, and subsequent commits are your skg-era edits.
+- =data/public/= — a fresh re-import of the (evolved) same org-roam
+  source. Clean but missing everything you did since the first import.
+
+This pipeline produces =mangle.diff=: a unified diff that carries your
+post-initial-import edits from the old repo into the new one. Apply
+with =git apply= inside =data/public/=.
+
+The non-trivial part: the two repos share almost no UUIDs for
+idless org headlines (org-roam gives them fresh random UUIDs on
+each import), so carrying over a "removed UUID X from contains" edit
+requires finding the public/ equivalent of X by content (title,
+body, contains-neighbors), not by UUID.
+
+** Inputs / knobs
+
+Edit the top-of-file constants in each script if your paths differ:
+
+- =MANGLED_DIR= — the old import repo (must be a git repo).
+- =PUBLIC_DIR= — the new import directory (applying diff target).
+- =BASE_COMMIT= — the git SHA in =MANGLED_DIR= of the initial-import
+  commit. Everything after this commit is treated as user edits to
+  carry over.
+- =WORK= — scratch space for JSON artifacts between steps.
+- =OUT_DIFF= — where the final unified diff is written.
+- =OUT_UNRES= — where items needing manual review are logged.
+
+** Pipeline
+
+Run in order from this directory:
+
+#+begin_src sh
+  python3 01_build_map.py       # uuid_map.json + unmapped.json + indices
+  python3 02_collect_targets.py # targets.json (what changed + what needs mapping)
+  python3 03_augment_map.py     # fix renamed files via their BASE title
+  python3 04_check_alignment.py # sanity check: map(base_contains) == public_contains
+  python3 05_build_diff.py      # mangle.diff + mangle-unresolved.org
+#+end_src
+
+Then verify and apply:
+
+#+begin_src sh
+  cd /home/ubuntu/data/public
+  git apply --check /home/ubuntu/mangle.diff   # dry run
+  git apply         /home/ubuntu/mangle.diff
+#+end_src
+
+** What each step does
+
+*** 01_build_map.py
+Parses every =.skg= in both repos, then builds a UUID map mangled →
+public in three escalating passes:
+
+1. *Pass-through*: any UUID present in both repos maps to itself.
+2. *Title match*: for unmatched mangled UUIDs, look up by title in
+   public/. 1 candidate → mapped; 0 → flagged as "no title match";
+   ≥2 → escalate.
+3. *Body + contains-relation disambiguation*: for ≥2 candidates,
+   narrow first by body equality, then iteratively by how many
+   already-mapped parents/children overlap.
+
+Writes =uuid_map.json= plus =unmapped.json= with reasons.
+
+*** 02_collect_targets.py
+Uses =git diff --name-status BASE HEAD= in the mangled repo to
+enumerate Added and Modified files, then extracts per-file semantic
+edits (title / body / misc / list-field inserts+deletes).
+
+Writes =targets.json=. Key field =needed_map_keys= lists the UUIDs
+that the diff-builder will actually dereference through the map.
+Everything else in =uuid_map.json= is available but unused.
+
+*** 03_augment_map.py
+Handles the common case where the mangled edit *was* a title
+change: the HEAD title won't match anything in public/, but the
+BASE title will. For each modified mangled file still unmapped
+after step 01, retry via its =git show BASE:./file.skg= title.
+
+Writes an updated =uuid_map.json= (merged) and
+=still_unresolved.json= for anything that's still unmapped after
+this fallback.
+
+*** 04_check_alignment.py
+Sanity check: for every modified mangled file, verify that
+=map(mangled_base_contains) == public_contains= (field by field).
+This is the invariant step 05 relies on — if it holds, replacing
+public's contains list with =map(mangled_head_contains)= correctly
+translates inserts/deletes at the right positions.
+
+Prints =OK= / =BAD= per (file, field). If you see =BAD=, the
+position-based edit in step 05 won't be meaningful for that file;
+the patch will still apply but the result won't reflect your
+intent.
+
+*** 05_build_diff.py
+The main diff generator. For each target file:
+
+- *Added* (22 in our run): read mangled, rewrite every UUID in its
+  list-fields through the map (added-file UUIDs stay as themselves,
+  since they enter public/ unchanged). Emit as a new file in
+  public/.
+- *Modified* (14 in our run): look up the public/ counterpart via
+  =uuid_map=. Apply semantic edits at text level (minimal diff):
+  - title / body / misc / extra_ids changes: replace that field's
+    span with the new value. Body uses skg's =body: |2-= block
+    scalar form.
+  - list-field changes (contains, subscribes_to, etc.): replace
+    the entire list with =map(mangled_head_list)=. Per step 04's
+    invariant this preserves positions from public/.
+
+Writes =mangle.diff= (unified, git-apply-able) plus
+=mangle-unresolved.org= for files where the edit is a no-op (public/
+already matches) or where the mangled target file is missing
+entirely from public/.
+
+** Assumptions / invariants this relies on
+
+- =MANGLED_DIR= is a git repo; =BASE_COMMIT= is the initial-import
+  commit.
+- For every modified mangled file, its public/ counterpart's
+  =contains= list is exactly =map(mangled_base's contains)=. This is
+  what step 04 verifies. It holds when both imports derived from the
+  same org-roam source and only the UUIDs-for-idless-headlines
+  differ.
+- Added-file UUIDs are unique (not already in public/). Step 05
+  doesn't check this but will produce a duplicate-file error from
+  =git apply= if violated.
+- Skg's on-disk YAML format stays approximately as it is today
+  (=skg_fmt.py= mirrors it). If =NodeFS::to_yaml= changes,
+  =skg_fmt.emit_body_block= and =skg_fmt.FIELD_ORDER= may need
+  updating to keep diffs minimal — but correctness is preserved
+  regardless since skg re-reads on load.
+
+** Re-running after the diff has been applied
+
+This pipeline is intended for a one-shot port. If you've already
+applied =mangle.diff= to =PUBLIC_DIR= and re-run all five steps:
+
+- step 01 shows a smaller unmapped count (some post-edit UUIDs now
+  live in public/),
+- step 04 may show =BAD= alignments (public/ now has the post-edit
+  list, which no longer equals =map(mangled_base_list)=),
+- step 05 produces a smaller diff (the already-applied edits become
+  no-ops and land in =mangle-unresolved.org= as "no effective
+  change").
+
+None of this indicates a bug. To get a clean re-run, reset
+=PUBLIC_DIR= with =git checkout= or =git reset=, or run the pipeline
+against a fresh snapshot of the pre-patch public/ state.
+
+** Known limitations
+
+- Assumes parent-child contains alignment (step 04 invariant). If a
+  modified file's contains list has drifted in public/ relative to
+  mangled-base, the per-position semantics break and the diff just
+  clobbers public/'s contains list with =map(mangled_head)=. Step
+  04's output is your warning signal.
+- Does not handle MSV (maybe-scalar-or-vec) idiosyncrasies in
+  =subscribes_to=, =hides_from_its_subscriptions=, =overrides_view_of=
+  beyond str-or-list normalization. If a mangled edit changes an MSV
+  from unspecified to a single scalar, the diff uses a list.
+- Subscription-list changes get the same position-based treatment as
+  contains; no separate invariant check. In practice we haven't seen
+  these edited.
+
+** Iterating
+
+If the generated diff looks off for some file:
+
+1. Inspect the specific case in =mangle-unresolved.org= and/or via
+   =git -C data/public-1-mangled diff BASE HEAD -- <uuid>.skg=.
+2. Re-run step 05 after any fix — =uuid_map.json= / =targets.json=
+   don't need rebuilding unless you changed step 01's or 02's
+   inputs.
+3. For one-off manual edits, hand-write the hunk and append it to
+   =mangle.diff=.
