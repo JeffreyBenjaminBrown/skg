@@ -35,10 +35,19 @@ pub fn load_config (
   let mut config: SkgConfig = {
     let contents: String = fs::read_to_string (path) ?;
     toml::from_str (&contents) ? };
-  config . data_root = Path::new (path)
-    . parent()
-    . unwrap_or ( Path::new (".") )
-    . to_path_buf();
+  config . data_root = {
+    // Canonicalized so that downstream joins (make_paths_absolute,
+    // path_from_pid_and_source, strip_prefix in get_file_path) yield
+    // absolute paths uniformly -- matters for paths whose files do
+    // not exist on disk (e.g. Deleted phantoms), where the
+    // canonicalize-in-handler fallback would otherwise leave the
+    // raw path relative while data_root is absolute, and
+    // strip_prefix would silently fail.
+    let raw : PathBuf = Path::new (path)
+      . parent ()
+      . unwrap_or ( Path::new (".") )
+      . to_path_buf ();
+    fs::canonicalize (&raw) . unwrap_or (raw) };
   make_paths_absolute (&mut config);
   validate_source_paths_creating_owned_ones_if_needed(
     &config . sources)?;
@@ -82,10 +91,13 @@ pub fn load_config_with_overrides (
   let mut config: SkgConfig = {
     let contents: String = fs::read_to_string (path)?;
     toml::from_str (&contents)? };
-  config . data_root = Path::new (path)
-    . parent()
-    . unwrap_or ( Path::new (".") )
-    . to_path_buf();
+  config . data_root = {
+    // See load_config above for why canonicalize is necessary here.
+    let raw : PathBuf = Path::new (path)
+      . parent ()
+      . unwrap_or ( Path::new (".") )
+      . to_path_buf ();
+    fs::canonicalize (&raw) . unwrap_or (raw) };
   make_paths_absolute (&mut config);
   if let Some (name) = db_name {
     config . db_name = name . to_string();

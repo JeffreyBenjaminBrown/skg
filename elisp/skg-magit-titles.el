@@ -42,11 +42,12 @@ Returns a list of (start end id-string) triples."
     (nreverse positions)))
 
 (defun skg-magit-titles--annotate-buffer ()
-  "Clear overlays, scan for IDs, and request titles from the server."
+  "Clear overlays, scan for IDs, shorten their display, and request titles from the server."
   (skg-magit-titles--clear-overlays)
   (let ((positions (skg-magit-titles--collect-ids)))
     (when positions
       (setq skg-magit-titles--positions positions)
+      (skg-magit-titles--shorten-id-overlays positions)
       (let* ((generation
               (setq skg-magit-titles--generation
                     (1+ skg-magit-titles--generation)))
@@ -56,6 +57,23 @@ Returns a list of (start end id-string) triples."
              (buf (current-buffer)))
         (skg-magit-titles--request-titles
          unique-ids generation buf)))))
+
+(defun skg-magit-titles--shorten-id-overlays (positions)
+  "Put a display overlay over each id's tail (chars 9 onward) so
+only the first 8 chars are shown, followed by an ellipsis. The
+underlying buffer text is unchanged, so copy-paste still yields
+the full id. POSITIONS is a list of (start end id-string) triples."
+  (dolist (pos positions)
+    (let* ((start (nth 0 pos))
+           (end   (nth 1 pos))
+           (tail-start (+ start 8)))
+      (when (< tail-start end)
+        (let ((ov (make-overlay tail-start end nil t nil)))
+          (overlay-put ov 'skg-magit-title t)
+          (overlay-put ov 'evaporate t)
+          (overlay-put ov 'display
+                       (propertize "…"
+                                   'face 'skg-magit-title-face)))))))
 
 (defun skg-magit-titles--request-titles (ids generation buf)
   "Send a titles-by-ids request for IDS.
@@ -106,13 +124,25 @@ BUF is the magit buffer to annotate."
                    (id-str (nth 2 pos))
                    (title  (gethash id-str title-map)))
               (when title
-                (let* ((ov (make-overlay start end nil t nil)))
+                (let* ((display-title
+                        (skg-magit-titles--format-title title))
+                       (ov (make-overlay start end nil t nil)))
                   (overlay-put ov 'skg-magit-title t)
                   (overlay-put ov 'evaporate t)
                   (overlay-put ov 'after-string
                                (propertize
-                                (concat " " title)
+                                (concat " " display-title)
                                 'face 'skg-magit-title-face)))))))))))
+
+(defun skg-magit-titles--format-title (title)
+  "Return the display form of TITLE for annotation.
+Every '[[id:X][LABEL]]' sub-expression in TITLE is replaced
+by '[[LABEL]]', so link-bearing titles render as links without
+exposing the id. Plain titles pass through unchanged."
+  (replace-regexp-in-string
+   "\\[\\[id:[^]]+\\]\\[\\([^]]+\\)\\]\\]"
+   "[[\\1]]"
+   title))
 
 ;;;###autoload
 (define-minor-mode skg-magit-titles-mode

@@ -367,6 +367,8 @@ pub fn create_empty_tantivy_index (
     schema . get_field ("id") ?;
   let title_or_alias_field: schema::Field =
     schema . get_field ("title_or_alias") ?;
+  let raw_title_field: schema::Field =
+    schema . get_field ("raw_title") ?;
   let source_field: schema::Field =
     schema . get_field ("source") ?;
   let context_origin_type_field: schema::Field =
@@ -383,6 +385,7 @@ pub fn create_empty_tantivy_index (
                         index } ),
     id_field,
     title_or_alias_field,
+    raw_title_field,
     source_field,
     context_origin_type_field,
     is_title_field,

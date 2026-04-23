@@ -105,6 +105,10 @@ fn create_documents_from_node (
       if is_title { "true" } else { "false" };
     let body_for_this_doc : &str =
       if is_title { body_text . as_str () } else { "" };
+    // Un-reduced title preserved only on the primary-title doc;
+    // alias docs get an empty string.
+    let raw_title_for_this_doc : &str =
+      if is_title { title_or_alias . as_str () } else { "" };
     documents . push (
       doc!(
         tantivy_index . id_field =>
@@ -112,6 +116,8 @@ fn create_documents_from_node (
         tantivy_index . title_or_alias_field =>
           replace_each_link_with_its_label (
             title_or_alias ),
+        tantivy_index . raw_title_field =>
+          raw_title_for_this_doc,
         tantivy_index . source_field =>
           node . source . as_str(),
         tantivy_index . context_origin_type_field =>

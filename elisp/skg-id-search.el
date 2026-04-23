@@ -270,20 +270,27 @@ Prompts for the link label, defaulting to the title from the stack."
 
 (defun skg--metadata-sexp-contains-id-p
     (sexp)
-  "Return t if SEXP contains an id in the structure (skg (node (id ...)))."
-  (skg-sexp-subtree-p sexp '(skg (node (id)))))
+  "Return t if SEXP contains an id under the TrueNode shape
+(skg (node (id ...))) or the Deleted-phantom shape
+(skg (deleted (id ...)))."
+  (or (skg-sexp-subtree-p sexp '(skg (node    (id))))
+      (skg-sexp-subtree-p sexp '(skg (deleted (id))))))
 
 (defun skg--extract-id-from-metadata-sexp
     (sexp)
-  "Extract the id value from SEXP, a list like (skg (node (id X) ...)).
-Returns the id as a string, or nil if not found."
-  (let ((val (car (skg-sexp-cdr-at-path sexp '(skg node id)))))
+  "Extract the id value from SEXP. Accepts either the TrueNode shape
+(skg (node (id X) ...)) or the Deleted-phantom shape
+(skg (deleted (id X) ...)). Returns the id as a string, or nil."
+  (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node    id)))
+                 (car (skg-sexp-cdr-at-path sexp '(skg deleted id))))))
     (when val (format "%s" val))))
 
 (defun skg--extract-source-from-metadata-sexp (sexp)
-  "Extract the source value from SEXP, a list like (skg (node (source X) ...)).
-Returns the source as a string, or nil if not found."
-  (let ((val (car (skg-sexp-cdr-at-path sexp '(skg node source)))))
+  "Extract the source value from SEXP. Accepts either the TrueNode shape
+(skg (node (source X) ...)) or the Deleted-phantom shape
+(skg (deleted (source X) ...)). Returns the source as a string, or nil."
+  (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node    source)))
+                 (car (skg-sexp-cdr-at-path sexp '(skg deleted source))))))
     (when val (format "%s" val))))
 
 (defun skg--metadata-is-removed-here-phantom-p (sexp)

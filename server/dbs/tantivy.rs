@@ -42,6 +42,8 @@ pub(crate) fn open_existing_tantivy_index (
     schema . get_field ("id") ?;
   let title_or_alias_field : schema::Field =
     schema . get_field ("title_or_alias") ?;
+  let raw_title_field : schema::Field =
+    schema . get_field ("raw_title") ?;
   let source_field : schema::Field =
     schema . get_field ("source") ?;
   let context_origin_type_field : schema::Field =
@@ -56,6 +58,7 @@ pub(crate) fn open_existing_tantivy_index (
     index              : Arc::new (index),
     id_field,
     title_or_alias_field,
+    raw_title_field,
     source_field,
     context_origin_type_field,
     is_title_field,
@@ -65,7 +68,11 @@ pub(crate) fn open_existing_tantivy_index (
 /// The Tantivy schema.
 /// Fields:
 /// - "id":                  STRING | STORED — the node's primary ID.
-/// - "title_or_alias":      TEXT   | STORED — searchable titles and aliases.
+/// - "title_or_alias":      TEXT   | STORED — searchable titles and aliases,
+///                          with textlinks reduced to their labels.
+/// - "raw_title":           STRING | STORED — the un-reduced title, stored
+///                          only on is_title="true" docs. Preserves the
+///                          textlink syntax that 'title_or_alias' strips.
 /// - "source":              STRING | STORED — the source name.
 /// - "context_origin_type": STRING | STORED — Root/CycleMember/Target/…
 /// - "is_title":            STRING | STORED — "true" for the primary title,
@@ -86,6 +93,8 @@ pub(super) fn mk_tantivy_schema() -> schema::Schema {
     "id", schema::STRING | schema::STORED);
   schema_builder . add_text_field(
     "title_or_alias", schema::TEXT | schema::STORED);
+  schema_builder . add_text_field(
+    "raw_title", schema::STRING | schema::STORED);
   schema_builder . add_text_field(
     "source", schema::STRING | schema::STORED);
   schema_builder . add_text_field(
@@ -155,9 +164,16 @@ pub fn titles_by_ids (
         "titles_by_ids: no is_title=\"true\" document \
          found for ID {}. Falling back to first title_or_alias.",
         id ); }
-    if let Some (title) = string_field (
-      &doc, tantivy_index . title_or_alias_field )
-    { result . insert ( id . clone (), title ); } }
+    // Prefer the un-reduced raw title (only on is_title="true" docs);
+    // fall back to 'title_or_alias' for the alias-only fallback case,
+    // which has no raw_title stored.
+    let title : Option<String> =
+      string_field ( &doc, tantivy_index . raw_title_field )
+        . filter ( |s| !s . is_empty () )
+        . or_else ( || string_field (
+          &doc, tantivy_index . title_or_alias_field ));
+    if let Some (t) = title
+    { result . insert ( id . clone (), t ); } }
   result }
 
 /// Return the subset of the input for which 'had_id' is true.

@@ -56,6 +56,11 @@ pub fn update_context_origin_types (
           . get_first ( tantivy_index . title_or_alias_field )
           . and_then ( |v| v . as_str () )
           . unwrap_or ("") . to_string ();
+      let raw_title : String =
+        retrieved_doc
+          . get_first ( tantivy_index . raw_title_field )
+          . and_then ( |v| v . as_str () )
+          . unwrap_or ("") . to_string ();
       let source : String =
         retrieved_doc
           . get_first ( tantivy_index . source_field )
@@ -81,6 +86,8 @@ pub fn update_context_origin_types (
           pid . as_str (),
         tantivy_index . title_or_alias_field =>
           title_or_alias . as_str (),
+        tantivy_index . raw_title_field =>
+          raw_title . as_str (),
         tantivy_index . source_field =>
           source . as_str (),
         tantivy_index . context_origin_type_field =>
