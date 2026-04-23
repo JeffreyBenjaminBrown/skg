@@ -96,6 +96,24 @@ Point is always restored."
   (message "Visiting node: %s" id)
   (skg-request-single-root-content-view-from-id id))
 
+(defun skg-goto-and-close-this ()
+  "Like `skg-goto', but also kill the buffer it was called from
+once the goto request has been issued."
+  (interactive)
+  (let ((buf (current-buffer)))
+    (skg-goto)
+    (when (buffer-live-p buf)
+      (kill-buffer buf))))
+
+(defun skg-goto-by-id-and-close-this (id)
+  "Like `skg-goto-by-id', but also kill the buffer it was called
+from once the goto request has been issued."
+  (interactive "sNode ID: ")
+  (let ((buf (current-buffer)))
+    (skg-goto-by-id id)
+    (when (buffer-live-p buf)
+      (kill-buffer buf))))
+
 (defun skg-id-next ()
   "Move point to the next ID occurrence.
 An ID can appear in metadata like (skg (node (id X)) ...),
