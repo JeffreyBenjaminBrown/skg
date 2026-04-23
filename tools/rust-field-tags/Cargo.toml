@@ -1,0 +1,12 @@
+[package]
+name = "rust-field-tags"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "rust-field-tags"
+path = "rust-field-tags.rs"
+
+[dependencies]
+syn = { version = "2", features = ["full", "visit", "extra-traits"] }
+proc-macro2 = { version = "1", features = ["span-locations"] }

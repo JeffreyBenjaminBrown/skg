@@ -1,5 +1,3 @@
-* definitely worth it
-** etags should ignore any folder named 'abandoned'
 * ONGOING audit git diff view code
 * TODO really want but can wait
 ** Privacy: Permit user to hide certain sources from view.
