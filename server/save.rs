@@ -50,7 +50,7 @@ pub async fn update_graph_minus_merges (
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "update_fs_from_savenode_defs") . entered ();
         update_fs_from_saveinstructions (
-          node_defs . clone (), source_moves,
+          &node_defs, source_moves,
           config . clone () ) } ?;
     tracing::info!( "   Deleted {} file(s), wrote {} file(s).",
               deleted_count, written_count ); }
@@ -127,7 +127,7 @@ pub async fn update_graph_minus_merges (
 pub async fn update_typedb_from_saveinstructions (
   db_name      : &str,
   driver       : &TypeDBDriver,
-  node_defs    : &Vec<DefineNode>,
+  node_defs    : &[DefineNode],
   source_moves : &[SourceMove],
 ) -> Result<(), Box<dyn Error>> {
 
@@ -210,13 +210,13 @@ pub async fn update_typedb_from_saveinstructions (
   Ok (( )) }
 
 pub fn update_fs_from_saveinstructions (
-  node_defs : Vec<DefineNode>,
+  node_defs    : &[DefineNode],
   source_moves : &[SourceMove],
   config       : SkgConfig,
 ) -> io::Result<(usize, usize)> { // (deleted, written)
   let ( to_delete, to_save )
     : ( Vec<DeleteNode>, Vec<SaveNode> )
-    = node_defs . into_iter() . partition_map(
+    = node_defs . iter() . cloned() . partition_map(
       |instr| match instr {
         DefineNode::Delete (d) => Either::Left (d),
         DefineNode::Save (s)   => Either::Right (s) } );

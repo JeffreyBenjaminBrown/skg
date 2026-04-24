@@ -54,7 +54,7 @@ pub async fn merge_nodes (
   { // Filesystem.
     tracing::info!("1) Merging in filesystem ...");
     update_fs_from_saveinstructions (
-      primary_definenodes . clone (),
+      &primary_definenodes,
       &[], // No source-moves during a merge.
       config . clone () ) ?;
     tracing::info!("   Filesystem merge complete."); }

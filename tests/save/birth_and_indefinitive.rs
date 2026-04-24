@@ -56,7 +56,7 @@ fn test_birth_and_indefinitive(
           &save_instructions,
           &[], ). await?;
         update_fs_from_saveinstructions(
-          save_instructions,
+          &save_instructions,
           &[],
           config . clone(), )?;
 
