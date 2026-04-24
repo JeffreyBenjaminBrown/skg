@@ -8,3 +8,6 @@ mod merge_nodes;
 
 #[path = "merge/merge_container_into_content.rs"]
 mod merge_container_into_content;
+
+#[path = "merge/merge_acquiree_in_sibling_subtree.rs"]
+mod merge_acquiree_in_sibling_subtree;
