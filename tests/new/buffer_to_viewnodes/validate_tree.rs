@@ -494,6 +494,71 @@ fn test_empty_title_allowed_for_indefinitive_and_delete (
       Ok(( )) } )) }
 
 #[test]
+fn test_definitive_request_with_only_non_content_children_is_allowed (
+) -> Result<(), Box<dyn Error>> {
+  // A definitive view request on an indefinitive node whose children
+  // are all NON-content (birth != ContentOf) should be permitted: the
+  // expansion would fill the node with content, and non-content
+  // children (e.g. 'birth containerOf' ancestry stubs) don't conflict
+  // with that. Only ContentOf children would be clobbered.
+  run_with_test_db(
+    "skg-test-definitive-non-content-children",
+    "tests/merge/merge_nodes/fixtures",
+    "/tmp/tantivy-test-definitive-non-content-children",
+    |config, driver, _tantivy| Box::pin (async move {
+      let input : &str =
+        indoc! {"
+                * (skg (node (id parent) (source main) indefinitive (viewRequests definitiveView))) parent
+                ** (skg (node (id ancestor) (source main) (birth containerOf))) non-content child
+            "};
+      let forest : Tree<UncheckedViewNode> =
+        org_to_uninterpreted_nodes (input) . unwrap () . 0;
+      let errors : Vec<BufferValidationError> =
+        find_buffer_errors_for_saving (
+          &forest, config, driver ) . await ?;
+      let hits : Vec<&BufferValidationError> = errors . iter ()
+        . filter ( |e| matches! (
+          e, BufferValidationError::DefinitiveRequestOnNodeWithContentChildren (_) ))
+        . collect ();
+      assert_eq! ( hits . len (), 0,
+        "Non-content children should not trigger \
+         DefinitiveRequestOnNodeWithContentChildren. Errors: {:?}",
+        errors );
+      Ok (( )) } )) }
+
+#[test]
+fn test_definitive_request_with_content_child_is_rejected (
+) -> Result<(), Box<dyn Error>> {
+  // Flip side: a ContentOf child (the default when 'birth' is absent)
+  // DOES conflict with expansion, so the error should fire.
+  run_with_test_db(
+    "skg-test-definitive-content-children",
+    "tests/merge/merge_nodes/fixtures",
+    "/tmp/tantivy-test-definitive-content-children",
+    |config, driver, _tantivy| Box::pin (async move {
+      let input : &str =
+        indoc! {"
+                * (skg (node (id parent) (source main) indefinitive (viewRequests definitiveView))) parent
+                ** (skg (node (id c) (source main))) content child
+            "};
+      let forest : Tree<UncheckedViewNode> =
+        org_to_uninterpreted_nodes (input) . unwrap () . 0;
+      let errors : Vec<BufferValidationError> =
+        find_buffer_errors_for_saving (
+          &forest, config, driver ) . await ?;
+      let hits : Vec<&BufferValidationError> = errors . iter ()
+        . filter ( |e| matches! (
+          e, BufferValidationError::DefinitiveRequestOnNodeWithContentChildren (id)
+            if id . 0 == "parent" ))
+        . collect ();
+      assert_eq! ( hits . len (), 1,
+        "A ContentOf child should trigger exactly one \
+         DefinitiveRequestOnNodeWithContentChildren for 'parent'. \
+         Errors: {:?}",
+        errors );
+      Ok (( )) } )) }
+
+#[test]
 fn test_edit_request_on_indefinitive_is_rejected_at_parse_time() {
   // A phantom (indefinitive) node marked for deletion cannot be
   // saved: IndefOrDef::Indefinitive has no slot for an edit_request,

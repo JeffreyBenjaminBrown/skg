@@ -34,7 +34,7 @@ pub enum BufferValidationError {
   CannotMoveAndMergeSimultaneously (ID),
   SourceNotInConfig              (ID, SourceName),
   DefinitiveRequestOnDefinitiveNode      (ID), // A definitive view request on a node that is already definitive
-  DefinitiveRequestOnNodeWithChildren    (ID), // A definitive view request on a node that has children
+  DefinitiveRequestOnNodeWithContentChildren (ID), // A definitive view request on a node that has content (birth=ContentOf) children. Non-content children (e.g. containerOf ancestry stubs) don't trigger this.
   MultipleDefinitiveRequestsForSameId    (ID), // Multiple definitive view requests for the same ID
   EmptyTitle                             (ID),
   LocalStructureViolation        (String, ID), // (error message, nearest ancestor ID)
@@ -91,8 +91,8 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Node {:?} references source '{}' which does not exist in config", id, source),
       BufferValidationError::DefinitiveRequestOnDefinitiveNode (id) =>
         write!(f, "Definitive view request on a node that is already definitive (ID {:?}). The node already shows its content; no expansion needed.", id),
-      BufferValidationError::DefinitiveRequestOnNodeWithChildren (id) =>
-        write!(f, "Definitive view request on a node with children (ID {:?}). The expansion would clobber those children. Save without the request first, then delete children and retry.", id),
+      BufferValidationError::DefinitiveRequestOnNodeWithContentChildren (id) =>
+        write!(f, "Definitive view request on a node with content children (ID {:?}). The expansion would clobber those children. Save without the request first, then delete children and retry.", id),
       BufferValidationError::MultipleDefinitiveRequestsForSameId (id) =>
         write!(f, "Multiple definitive view requests for the same ID {:?}. At most one request per ID is allowed.", id),
       BufferValidationError::EmptyTitle(id) =>

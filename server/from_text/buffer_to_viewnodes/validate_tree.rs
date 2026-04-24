@@ -1,7 +1,7 @@
 pub mod contradictory_instructions;
 
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::viewnode::ViewRequest;
+use crate::types::viewnode::{Birth, ViewRequest};
 use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind};
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::errors::BufferValidationError;
@@ -79,7 +79,11 @@ pub async fn find_buffer_errors_for_saving (
 
 /// For each node in the forest, if it has a definitive view request,
 /// verify that:
-/// - The node is indefinitive and childless.
+/// - The node is indefinitive.
+/// - It has no content children (TrueNode children with birth ==
+///   ContentOf). Non-content children — containerOf ancestry stubs,
+///   linksTo references, scaffolds, etc. — don't block expansion:
+///   they won't be clobbered by it.
 /// - No other node with the same ID has a definitive view request,
 ///   because there can only be one definitive view.
 fn validate_definitive_view_requests (
@@ -98,9 +102,14 @@ fn validate_definitive_view_requests (
           { // Error: must be indefinitive
             if ! t . is_indefinitive ()
             { errors . push( BufferValidationError::DefinitiveRequestOnDefinitiveNode( id . clone() )); }}
-          { // Error: must be childless
-            if node_ref . children() . next() . is_some()
-            { errors . push( BufferValidationError::DefinitiveRequestOnNodeWithChildren( id . clone() )); }}
+          { // Error: must have no content children.
+            let has_content_children : bool =
+              node_ref . children () . any ( |child| matches! (
+                &child . value () . kind,
+                UncheckedViewNodeKind::True (ct)
+                  if ct . birth == Birth::ContentOf ));
+            if has_content_children
+            { errors . push( BufferValidationError::DefinitiveRequestOnNodeWithContentChildren( id . clone() )); }}
           { // Error: at most one request per ID
             if ! ids_with_requests . insert(id . clone())
             { errors . push( BufferValidationError::MultipleDefinitiveRequestsForSameId( id . clone() )); }} }}} }} }
