@@ -70,7 +70,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
             Root body content
             ** (skg folded (node (id child1))) child1
             Child1 body
-            * (skg (node (birth independent) indefinitive)) independent root node
+            * (skg (node (birth independent) indef)) independent root node
             ParentIgnores body
             * (skg (node (viewStats cycle))) cycling node
             This node has cycle flag

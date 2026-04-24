@@ -1,8 +1,36 @@
-* TODO make git ops faster
-** ?
-*** commit recursively
-*** view all changes in one buffer
-** Commit existence of node from skg, outside of magit.
+* merge : views of acquiree should become acquirer
+* ? I want the 'helps' relation.
+And 'needs', surely.
+* stack push with prompt for label, for other contexts
+Even stack push, if it just prompted for a label,
+could be available from magit, shell, .skg view.
+Same keyboard shortcuts but slightly different commands,
+to prompt for label.
+* make git faster
+** TODO commit eval
+Can ask for it for staged, unstaged or all changes.
+
+If a node is new, it's fine as long as it's valid.
+(What are the validation rules?
+Some relationships enable/preclude others.)
+
+If a node was removed, and all references to it removed,
+it is reported deleted and listed.
+
+Anything orphaned by a deletion is reported,
+with the corresponding deletion.
+Anything whose container(s) changed is reported as such.
+
+A new content is fine if _.
+
+[New|deleted] [rel type] is fine if _.
+
+Changes to text are reported.
+
+To test, compute this two ways: From disk and from dbs.
+** TODO be able to visit ghost nodes
+** view all changes in one buffer
+* C-c f 1 : if there's only one perfect match, go straight there
 * TODO make it comfortable
 ** Privacy: Permit user to hide certain sources from view.
 *** Figure out the diff logic for insertions when some are hidden.

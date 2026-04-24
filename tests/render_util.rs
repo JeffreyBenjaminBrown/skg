@@ -63,7 +63,7 @@ fn test_viewnode_to_text_with_id_metadata () {
   let result : String =
     viewnode_to_text ( 3, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("TrueNode rendering never fails");
-  assert_eq! ( result, "*** (skg (node (id test123) (source main) indefinitive)) Test Title\n" ); }
+  assert_eq! ( result, "*** (skg (node (id test123) (source main) indef)) Test Title\n" ); }
 
 #[test]
 fn test_metadata_ordering () {
@@ -86,10 +86,15 @@ fn test_metadata_ordering () {
   assert_eq! ( result, "* (skg (node (id xyz) (source main) (viewStats cycle))) Test\n" ); }
 
 #[test]
-fn test_non_content_birth_forces_container_herald () {
-  // A node with containers=1, contents=0 (the defaults).
-  // With birth=ContentOf this suppresses the containsHerald.
-  // With birth=Independent (or any non-ContentOf) it's forced.
+fn test_birth_affects_container_count_emission () {
+  // A node with containers=1, contents=0.
+  // The server emits `(containers N)` only when the birth-specific
+  // suppression rule doesn't apply:
+  //   - ContentOf:   hide when containers == 1.
+  //   - Independent: hide when containers == 0.
+  //   - ContainerOf / LinksTo: always show.
+  // The client builds the compound herald from the raw atoms; the
+  // `(containsHerald ...)` atom is not emitted server-side.
   let make_node = | birth : Birth | -> ViewNode {
     let t : TrueNode = TrueNode {
       birth,
@@ -104,25 +109,27 @@ fn test_non_content_birth_forces_container_herald () {
                kind : ViewNodeKind::True (t) } };
   let cfg : SkgConfig =
     SkgConfig::dummyFromSources ( HashMap::new () );
-  let content : String =
-    viewnode_to_text ( 1, &make_node (Birth::ContentOf), &cfg )
-    . expect ("renders");
-  let independent : String =
-    viewnode_to_text ( 1, &make_node (Birth::Independent), &cfg )
-    . expect ("renders");
-  let container_of : String =
-    viewnode_to_text ( 1, &make_node (Birth::ContainerOf), &cfg )
-    . expect ("renders");
-  let links_to : String =
-    viewnode_to_text ( 1, &make_node (Birth::LinksTo), &cfg )
-    . expect ("renders");
-  // ContentOf: herald suppressed (default containers/contents).
-  assert! ( ! content . contains ("containsHerald"),
-            "ContentOf should suppress default containsHerald" );
-  // All non-ContentOf: herald forced, showing "1{".
-  assert! ( independent . contains ("(containsHerald 1{)"),
-            "Independent should force containsHerald: {}", independent );
-  assert! ( container_of . contains ("(containsHerald 1{)"),
-            "ContainerOf should force containsHerald: {}", container_of );
-  assert! ( links_to . contains ("(containsHerald 1{)"),
-            "LinksTo should force containsHerald: {}", links_to ); }
+  let content      : String = viewnode_to_text (
+    1, &make_node (Birth::ContentOf),   &cfg ) . unwrap ();
+  let independent  : String = viewnode_to_text (
+    1, &make_node (Birth::Independent), &cfg ) . unwrap ();
+  let container_of : String = viewnode_to_text (
+    1, &make_node (Birth::ContainerOf), &cfg ) . unwrap ();
+  let links_to     : String = viewnode_to_text (
+    1, &make_node (Birth::LinksTo),     &cfg ) . unwrap ();
+  // ContentOf with containers=1: hide.
+  assert! ( ! content . contains ("(containers 1)"),
+            "ContentOf should suppress containers=1: {}", content );
+  // Independent with containers=1: 1 != 0 so show.
+  assert! ( independent . contains ("(containers 1)"),
+            "Independent should show containers>=1: {}", independent );
+  // ContainerOf / LinksTo: always show.
+  assert! ( container_of . contains ("(containers 1)"),
+            "ContainerOf should always show containers: {}", container_of );
+  assert! ( links_to . contains ("(containers 1)"),
+            "LinksTo should always show containers: {}", links_to );
+  // No `containsHerald` atom on any of them.
+  for (name, s) in [("content", &content), ("independent", &independent),
+                    ("container_of", &container_of), ("links_to", &links_to)] {
+    assert! ( ! s . contains ("containsHerald"),
+              "{}: server should not emit containsHerald; got {}", name, s ); } }

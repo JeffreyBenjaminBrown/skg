@@ -472,7 +472,7 @@ fn test_empty_title_allowed_for_indefinitive_and_delete (
     |config, driver, _tantivy| Box::pin(async move {
       let input: &str =
         indoc! {"
-                * (skg (node (id indef) (source main) indefinitive))
+                * (skg (node (id indef) (source main) indef))
                 * (skg (node (id deleting) (source main) (editRequest delete)))
             "};
       let forest: Tree<UncheckedViewNode> =
@@ -560,7 +560,7 @@ fn test_definitive_request_with_content_child_is_rejected (
 
 #[test]
 fn test_edit_request_on_indefinitive_is_rejected_at_parse_time() {
-  // A phantom (indefinitive) node marked for deletion cannot be
+  // A phantom (indef) node marked for deletion cannot be
   // saved: IndefOrDef::Indefinitive has no slot for an edit_request,
   // so the parser would silently drop the user's instruction. Instead
   // we emit EditRequestOnIndefinitive so the save is rejected with a
@@ -568,7 +568,7 @@ fn test_edit_request_on_indefinitive_is_rejected_at_parse_time() {
   let input_delete: &str =
     indoc! {"
       * (skg (node (id root) (source main))) parent
-      ** (skg (node (id phantom) (source main) indefinitive (unstaged removedM) (editRequest delete))) phantom child
+      ** (skg (node (id phantom) (source main) indef (unstaged removedM) (editRequest delete))) phantom child
     "};
   let (_forest, parsing_errors)
     : (Tree<UncheckedViewNode>, Vec<BufferValidationError>)
@@ -580,14 +580,14 @@ fn test_edit_request_on_indefinitive_is_rejected_at_parse_time() {
          if id . 0 == "phantom" ))
     . collect ();
   assert_eq! ( matching . len (), 1,
-    "(editRequest delete) on an indefinitive node should produce exactly one EditRequestOnIndefinitive error. Parse errors: {:?}",
+    "(editRequest delete) on an indef node should produce exactly one EditRequestOnIndefinitive error. Parse errors: {:?}",
     parsing_errors );
 
-  // Same error for (editRequest (merge X)) on an indefinitive node.
+  // Same error for (editRequest (merge X)) on an indef node.
   let input_merge: &str =
     indoc! {"
       * (skg (node (id root) (source main))) parent
-      ** (skg (node (id phantom) (source main) indefinitive (editRequest (merge other)))) phantom child
+      ** (skg (node (id phantom) (source main) indef (editRequest (merge other)))) phantom child
     "};
   let (_forest2, parsing_errors2)
     : (Tree<UncheckedViewNode>, Vec<BufferValidationError>)
@@ -599,7 +599,7 @@ fn test_edit_request_on_indefinitive_is_rejected_at_parse_time() {
          if id . 0 == "phantom" ))
     . collect ();
   assert_eq! ( matching2 . len (), 1,
-    "(editRequest (merge X)) on an indefinitive node should also produce EditRequestOnIndefinitive. Parse errors: {:?}",
+    "(editRequest (merge X)) on an indef node should also produce EditRequestOnIndefinitive. Parse errors: {:?}",
     parsing_errors2 );
 
   // A definitive node with (editRequest delete) is legal -- no error.

@@ -6,7 +6,7 @@
 ///                   (node [(id ID)]
 ///                         [(source SOURCE)]
 ///                         [(birth independent|containerOf|linksTo)]
-///                         [indefinitive]
+///                         [indef]   ; short for "indefinitive"
 ///                         [cycle]
 ///                         [(stats [containsParent]
 ///                                 [(containers N)]
@@ -344,8 +344,14 @@ fn parse_node_sexp (
         let bare_value : String =
           atom_to_string (element) ?;
         match bare_value . as_str () {
-          "indefinitive" => metadata . indefinitive = true,
-          "notInGit"     => metadata . truenode_not_in_git = true,
+          // "indef" is the abbreviated form now emitted by the
+          // server (see org_to_text.rs). "indefinitive" is
+          // accepted for backward compatibility with hand-written
+          // buffers and older fixtures.
+          "indef" | "indefinitive" =>
+            metadata . indefinitive = true,
+          "notInGit" =>
+            metadata . truenode_not_in_git = true,
           _ => {
             return Err ( format! ( "Unknown node value: {}",
                                     bare_value )); }} },
