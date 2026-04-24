@@ -25,7 +25,7 @@ use crate::types::save::{DefineNode, Merge, SaveNode};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
 use crate::to_org::util::{mark_view_roots_independent, validate_birth_relationships};
 use crate::dbs::memory::snapshot_global;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
+use crate::types::viewnode::{IndefOrDef, ViewNode, ViewNodeKind, Scaffold};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -71,24 +71,36 @@ pub async fn update_views_after_save (
     source_diffs . as_ref()
     . map ( |d| deleted_ids_to_source (d))
     . unwrap_or_default();
-  let mut deleted_by_this_save_pids : HashSet<ID> =
+  let deleted_by_this_save_pids : HashSet<ID> =
     // PITFALL: Can overlap deleted_since_head_pid_src_map, but neither is necessarily a subset of the other. If you delete something that you added since head, it will only be here. And if you deleted something since head but not in this save, it will only be there.
+    // Merge acquirees are deliberately NOT included: post-merge they
+    // are extra-ids of their acquirers, not genuine deletions. The
+    // preprocessing pass 'resolve_extra_ids_in_viewforest' below
+    // rewrites their viewnodes to point at the acquirer before
+    // rerender runs, so the (deleted ...) path never fires for them.
     save_instructions . iter()
     . filter_map( |instr| match instr {
       DefineNode::Delete (d) => Some( d . id . clone() ),
       _ => None })
     . collect();
-  for m in merge_instructions {
-    deleted_by_this_save_pids . insert (
-      m . acquiree_to_delete . id . clone() ); }
+  // 'merge_instructions' is no longer consumed here: the graph
+  // mutation already happened upstream, the acquiree/acquirer
+  // mapping is in the in-Rust graph's extra_id_to_pid map, and
+  // resolve_extra_ids_in_viewforest consults that map. We keep the
+  // parameter for caller stability and to make the provenance of
+  // the extra-id bindings explicit at the save-handler level.
+  let _ = merge_instructions;
   // Snapshot the in-memory graph once for this save's rerender pass.
-  // Used downstream to resolve extra_ids -> primary pids when
-  // building content goal lists (so a merged-away acquiree redirects
-  // to its acquirer instead of rendering as (deleted ...)).
+  // Used both by resolve_extra_ids_in_viewforest (swap acquiree pids
+  // to acquirer pids before rerender) and by content_goal_list
+  // resolution during reconcile (neighbors' on-disk contains still
+  // point at the acquiree id).
   let graph_snap : Arc<InRustGraph> =
     conn_state . graph . load_full ();
   let mut errors : Vec<String> = Vec::new ();
   let mut saved_view_mut : Tree<ViewNode> = saved_view;
+  resolve_extra_ids_in_viewforest (
+    &mut saved_view_mut, &graph_snap ) ?;
   let saved_text : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "rerender_view (saved)" ). entered();
@@ -126,6 +138,12 @@ pub async fn update_views_after_save (
               "Collateral view {}: no viewforest found",
               curi . repr_in_client () ));
             continue; } };
+      if let Err (e) = resolve_extra_ids_in_viewforest (
+        &mut viewforest, &graph_snap )
+      { errors . push ( format! (
+          "Collateral view {}: preprocessing failed: {}",
+          curi . repr_in_client (), e ));
+        continue; }
       match { let _span : tracing::span::EnteredSpan =
                 tracing::info_span!( "rerender_view (collateral)"
                 ). entered();
@@ -231,6 +249,72 @@ pub async fn rerender_view (
   tracing::debug!("rerender_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
   result }
+
+/// For each TrueNode in VIEWFOREST whose pid is an extra_id of
+/// some *different* primary in the graph snapshot, rewrite the
+/// viewnode to carry the primary's pid, source, title, and body.
+/// The viewnode's subtree is left attached.
+///
+/// Why it's safe to leave the subtree attached: the canonical case
+/// triggering this swap is a merge, where R absorbed E. Per
+/// three_merged_nodecompletes, R's updated `contains` is
+/// [preserver] ++ R's old contains ++ E's old contains. Every child
+/// that was a content-child of E in the view is still a legitimate
+/// content-child of R, so reconcile_content_children (during the
+/// subsequent rerender) will retain them, insert any additional
+/// content-children (preserver, R's originals), and move non-content
+/// children to precede the content group. Clearing the subtree here
+/// would just make reconcile redo that work.
+///
+/// Why this exists in addition to `replace_ids_with_pids` (which
+/// runs at buffer-parse time in add_missing_info_to_viewforest):
+/// that pass runs *before* the save pipeline executes the merge.
+/// At parse time the acquiree is still its own primary pid; nothing
+/// to rewrite. The merge then creates the acquiree -> acquirer
+/// extra-id binding. This second pass catches the viewforest up to
+/// that mutation before rerender walks it.
+///
+/// Efficiency opportunity intentionally declined: we could track the
+/// specific ego_tree NodeIds of acquiree viewnodes at
+/// merge-execution time and rewrite only those. Tree size is small
+/// on human-scale views, and threading a NodeId set through the
+/// save pipeline would outweigh the savings. A full walk also
+/// naturally catches stale extra-ids left by prior merges that
+/// didn't execute in this save.
+fn resolve_extra_ids_in_viewforest (
+  viewforest : &mut Tree<ViewNode>,
+  graph_snap : &Arc<InRustGraph>,
+) -> Result<(), Box<dyn Error>> {
+  let nodeids : Vec<NodeId> =
+    viewforest . root () . descendants ()
+    . map ( |n| n . id () )
+    . collect ();
+  for nid in nodeids {
+    let swap : Option<(ID, SourceName, String, Option<String>)> = {
+      let n_ref = viewforest . get (nid)
+        . ok_or ("resolve_extra_ids_in_viewforest: node not found") ?;
+      match &n_ref . value () . kind {
+        ViewNodeKind::True (t) => {
+          match graph_snap . pid_of (&t . id) {
+            Some (primary) if primary != t . id => {
+              graph_snap . get (&primary) . map ( |r| (
+                primary . clone (),
+                r . source . clone (),
+                r . title . clone (),
+                r . body . clone () )) },
+            _ => None } },
+        _ => None } };
+    if let Some ((new_pid, new_source, new_title, new_body)) = swap {
+      let mut n_mut = viewforest . get_mut (nid)
+        . ok_or ("resolve_extra_ids_in_viewforest: node_mut failed") ?;
+      if let ViewNodeKind::True (t) = &mut n_mut . value () . kind {
+        t . id = new_pid;
+        t . source = new_source;
+        t . title = new_title;
+        if let IndefOrDef::Definitive { body, .. }
+          = &mut t . indef_or_def {
+            *body = new_body; }}}}
+  Ok (( )) }
 
 /// Reset all traces of a prior diff-view rendering so the viewforest
 /// is ready for a fresh pass. Three independent traversals today;

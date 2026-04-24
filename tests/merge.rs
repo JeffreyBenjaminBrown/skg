@@ -11,3 +11,6 @@ mod merge_container_into_content;
 
 #[path = "merge/merge_acquiree_in_sibling_subtree.rs"]
 mod merge_acquiree_in_sibling_subtree;
+
+#[path = "merge/merge_acquiree_as_independent_root.rs"]
+mod merge_acquiree_as_independent_root;

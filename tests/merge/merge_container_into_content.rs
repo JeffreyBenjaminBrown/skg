@@ -164,29 +164,36 @@ async fn merge_container_into_content_impl (
       "editRequest persists after merge execution"
       . to_string() ); }
 
-  // a should appear as a DeletedNode, not a normal TrueNode.
-  if !view . contains ("(deleted") {
+  // a should NOT appear as a DeletedNode: the preprocessing pass
+  // 'resolve_extra_ids_in_viewforest' rewrites viewnodes whose pid
+  // became an extra-id (here, a is an extra-id of aa after the
+  // merge) to carry the acquirer's pid instead. The acquiree line
+  // is displayed as a view of the acquirer, not as a tombstone.
+  if view . contains ("(deleted") {
     failures . push (
-      "acquiree 'a' not rendered as DeletedNode"
+      "acquiree 'a' was rendered as a DeletedNode; expected the \
+       viewnode to have been rewritten to (id aa)"
       . to_string() ); }
 
-  // b and c under aa should have birth = ContentOf.
+  // With the preprocessing pass, the root viewnode (originally
+  // pid=a) is rewritten to pid=aa and becomes the buffer's root
+  // headline at '* ' level. Its content children (x, b, c, plus
+  // the MERGED: a preserver) sit at '** '.
   let lines : Vec<&str> = view . lines() . collect();
   let aa_line_idx : Option<usize> =
     lines . iter() . position (
-      |line| line . contains ("(id aa)") );
+      |line| line . starts_with ("* ") && line . contains ("(id aa)") );
   if aa_line_idx . is_none() {
     failures . push (
-      "aa should be in the rendered buffer" . to_string() );
+      "aa should be the top-level headline in the rendered buffer"
+      . to_string() );
   } else {
     let aa_idx : usize = aa_line_idx . unwrap();
-    // Collect aa's direct children (*** level)
-    // until we hit ** or * or end.
     let mut aa_children_lines : Vec<&str> = Vec::new();
     for line in &lines[aa_idx + 1 ..] {
-      if line . starts_with ("*** ") {
+      if line . starts_with ("** ") {
         aa_children_lines . push (line);
-      } else if line . starts_with ("** ") || line . starts_with ("* ") {
+      } else if line . starts_with ("* ") {
         break; } }
 
     let b_under_aa : Option<&&str> =
