@@ -258,7 +258,7 @@ fn test_title_and_body_precedence() {
 
 #[test]
 fn test_last_instruction_defines_title_and_body() {
-    // Test that the LAST indefinitive instruction defines title/body
+    // Test that the LAST indef instruction defines title/body
     // when there's no defining instruction
 
     let instructions : Vec<DefineNode> = vec![
@@ -294,7 +294,7 @@ fn test_last_instruction_defines_title_and_body() {
 #[test]
 fn test_defining_instruction_takes_precedence() {
     // Test that a defining instruction (indefinitive=false)
-    // takes precedence over all indefinitive instructions
+    // takes precedence over all indef instructions
 
     let instructions : Vec<DefineNode> = vec![
       create_instruction(

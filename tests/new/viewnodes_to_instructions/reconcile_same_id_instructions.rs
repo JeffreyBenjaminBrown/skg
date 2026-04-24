@@ -87,7 +87,7 @@ fn test_defining_node_defines (
     "/tmp/tantivy-test-defining-node",
     |_config, _driver, _tantivy| Box::pin ( async move {
       let input = indoc! {"
-            * (skg (node (id 1) (source main) indefinitive)) 1 adder
+            * (skg (node (id 1) (source main) indef)) 1 adder
             Ignored body.
             ** (skg (node (id 2) (source main))) 2
             * (skg (node (id 1) (source main))) 1 definer
@@ -122,10 +122,10 @@ fn test_adding_without_definer (
     "/tmp/tantivy-test-adding-without-definer",
     |_config, _driver, _tantivy| Box::pin ( async move {
       let input = indoc! {"
-            * (skg (node (id 1) (source main) indefinitive)) 1 adder
+            * (skg (node (id 1) (source main) indef)) 1 adder
             ** (skg (node (id 2) (source main))) 2
             ** (skg (node (id 4) (source main))) 4
-            ** (skg (node (id 4) (source main) indefinitive)) 4 again
+            ** (skg (node (id 4) (source main) indef)) 4 again
         "};
       let unchecked_forest = org_to_uninterpreted_nodes (input)?. 0;
       let forest = unchecked_to_checked_tree (unchecked_forest)?;
@@ -147,7 +147,7 @@ fn test_adding_without_definer (
                    "2"); }
 
       { // id:4 has one definitive and one indefinitive
-        // The indefinitive should be filtered, only definitive kept
+        // The indef should be filtered, only definitive kept
         let id4_instruction = reduced . iter()
           . find(|instr| get_id (instr) == &ID::from ("4"))
           . expect ("Should have instruction for id:4");

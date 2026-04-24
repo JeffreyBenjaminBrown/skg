@@ -31,7 +31,7 @@ fn test_update_nodes_and_relationships2 (
     let org_text = indoc! {"
       * (skg (node (id 3) (source main) (editRequest delete))) 33
       * (skg (node (id 2) (source main))) 22
-      ** (skg (node (id 1) (source main) indefinitive)) 1
+      ** (skg (node (id 1) (source main) indef)) 1
     "};
 
     let unchecked_forest : Tree<UncheckedViewNode> =

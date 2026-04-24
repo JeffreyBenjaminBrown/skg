@@ -7,10 +7,10 @@ pub use super::super::common::*;
 pub const GIT_DIFF_VIEW: &str = "\
 * (skg (node (id 1) (source main))) 1
 ** (skg (node (id 11) (source main))) 11
-*** (skg (node (id gets-removed) (source main) indefinitive (unstaged removedX removedM))) gets-removed
+*** (skg (node (id gets-removed) (source main) indef (unstaged removedX removedM))) gets-removed
 *** (skg (node (id moves) (unstaged newM))) moves
 ** (skg (node (id 12) (source main))) 12
-*** (skg (node (id moves) (source main) indefinitive (unstaged removedM))) moves
+*** (skg (node (id moves) (source main) indef (unstaged removedM))) moves
 * (skg (node (id new) (source main))) new
 ";
 
@@ -40,9 +40,9 @@ pub fn setup_git_repo_with_fixtures_staged(
 pub const GIT_DIFF_VIEW_STAGED: &str = "\
 * (skg (node (id 1) (source main))) 1
 ** (skg (node (id 11) (source main))) 11
-*** (skg (node (id gets-removed) (source main) indefinitive (staged removedX removedM))) gets-removed
+*** (skg (node (id gets-removed) (source main) indef (staged removedX removedM))) gets-removed
 *** (skg (node (id moves) (staged newM))) moves
 ** (skg (node (id 12) (source main))) 12
-*** (skg (node (id moves) (source main) indefinitive (staged removedM))) moves
+*** (skg (node (id moves) (source main) indef (staged removedM))) moves
 * (skg (node (id new) (source main))) new
 ";

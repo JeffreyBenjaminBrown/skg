@@ -354,7 +354,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     {
       let buffer_with_inconsistent_sources: &str = indoc! {"
         * (skg (node (id pub-1) (source public))) pub-1                # definitive instance with 'public'
-        * (skg (node (id pub-1) (source private) indefinitive)) pub-1  # indefinitive instance with 'private'
+        * (skg (node (id pub-1) (source private) indef)) pub-1  # indef instance with 'private'
       "};
 
       let buffer_text: String =

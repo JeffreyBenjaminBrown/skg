@@ -16,24 +16,8 @@
 (require 'cl-lib)
 (require 'skg-sexpr-search)
 
-;; -----------------------------------------------------------------
-;; Stage-prefix coupling
-;;
-;; Tokens produced by the stage sub-rules below carry a literal
-;; "staged:" or "unstaged:" prefix. The post-pass 'heralds--merge-
-;; stage-tokens' identifies and regroups them by matching that
-;; prefix. The two sides MUST agree on the prefix strings.
-;;
-;; Centralizing them in these constants (then splicing via `) makes
-;; the coupling explicit: one value drives both the rule output and
-;; the detector. Changing a prefix updates everything in lockstep.
-(defconst heralds--stage-prefix-staged   "staged:"
-  "Prefix attached to each per-stage token emitted for the staged stage.")
-(defconst heralds--stage-prefix-unstaged "unstaged:"
-  "Prefix attached to each per-stage token emitted for the unstaged stage.")
-
 (defconst heralds--transform-rules
-  `(skg
+  '(skg
     (focused)
     (folded)
     (GREEN aliasCol "aliases")
@@ -50,28 +34,50 @@
     (RED deleted "DELETED"
       (id)
       (source))
-    (BLUE staged
-      (GREEN newM     ,(concat heralds--stage-prefix-staged "M"))
-      (RED   removedM ,(concat heralds--stage-prefix-staged "-M")))
-    (BLUE unstaged
-      (GREEN newM     ,(concat heralds--stage-prefix-unstaged "M"))
-      (RED   removedM ,(concat heralds--stage-prefix-unstaged "-M")))
-    (BLUE node
-      (ANY "◌") ;; For nodes with no ID. heralds--post-process-text removes it if there's an ID.
-      (id (ANY "●")) ;; For nodes with an ID. heralds--post-process-text removes it if there are non-default stats.
+    ;; Per-stage membership axes at the scaffold level (e.g. on
+    ;; alias, id). Each INTERC emits at most one token per matching
+    ;; stage child, e.g. "staged:-M" or "unstaged:M". Empty
+    ;; separator ("") glues the sub-rule outputs directly. The
+    ;; outer GREEN colors the `staged:' / `unstaged:' literal
+    ;; prefix; each sub-rule still supplies its own color for the
+    ;; axis suffix.
+    (GREEN INTERC "" staged "staged:"
+      (GREEN newM     "M")
+      (RED   removedM "-M"))
+    (GREEN INTERC "" unstaged "unstaged:"
+      (GREEN newM     "M")
+      (RED   removedM "-M"))
+    (node
       (source) ;; ignored
-      (RED birth
-        (independent "!{")
-        (containerOf "}")
-        (linksTo "←"))
-      (GREEN indefinitive "☮")
-      (BLUE graphStats
-        (containers)            ;; instead we show the containsHerald
-        (contents)              ;; instead we show the containsHerald
-        (containsHerald (ANY IT))
-        (linksInFromContainers) ;; instead we show the linksHerald
-        (linksInFromLeaves)     ;; instead we show the linksHerald
-        (linksHerald (ANY IT))
+      ;; Each birth variant is a first-class herald. Content-born
+      ;; nodes get a blue `{' (mirror of `}' for ContainerOf); the
+      ;; other three births are orange. There is no longer a
+      ;; standalone "this is a node" marker.
+      (birth
+        (BLUE   contentOf   "{")
+        (ORANGE independent "⊥")
+        (ORANGE containerOf "}")
+        (ORANGE linksTo     "←"))
+      ;; Indefinitive marker abuts the birth character (no space).
+      ;; Server emits the abbreviated atom `indef' (see
+      ;; org_to_text.rs); we match that here.
+      (GREEN indef ABUT "☮")
+      (graphStats
+        ;; Server emits (containers N) and (contents M) as raw
+        ;; sibling atoms here; the client INTERCs them into a
+        ;; compound herald with `{` between. Containers count is
+        ;; YELLOW per spec; contents and the separator are BLUE.
+        ;; Unlabelled INTERC: sub-rules match the current object's
+        ;; (graphStats') children directly, no wrapper needed.
+        (BLUE INTERC "{"
+          (YELLOW containers (ANY IT))
+          (BLUE   contents   (ANY IT)))
+        ;; Similarly for the links herald: raw atoms
+        ;; (linksInFromContainers N) and (linksInFromLeaves M),
+        ;; INTERCed with `→`, whole thing yellow.
+        (YELLOW INTERC "→"
+          (linksInFromContainers (ANY IT))
+          (linksInFromLeaves     (ANY IT)))
         (BLUE aliasing "A")
         (BLUE extraIDs "I")
         (BLUE overriding "O")
@@ -90,144 +96,90 @@
         (containerwardStats "req:cw-stats")
         (sourcewardView "req:sources")
         (definitiveView "req:definitive"))
-      (BLUE staged
-        (GREEN newX     ,(concat heralds--stage-prefix-staged "X"))
-        (RED   removedX ,(concat heralds--stage-prefix-staged "-X"))
-        (GREEN newM     ,(concat heralds--stage-prefix-staged "M"))
-        (RED   removedM ,(concat heralds--stage-prefix-staged "-M")))
-      (BLUE unstaged
-        (GREEN newX     ,(concat heralds--stage-prefix-unstaged "X"))
-        (RED   removedX ,(concat heralds--stage-prefix-unstaged "-X"))
-        (GREEN newM     ,(concat heralds--stage-prefix-unstaged "M"))
-        (RED   removedM ,(concat heralds--stage-prefix-unstaged "-M")))
+      ;; Per-stage axes on TrueNodes. Existence axes (X) appear
+      ;; only on TrueNodes, never on scaffolds. Outer GREEN colors
+      ;; the `staged:' / `unstaged:' prefix; sub-rules keep their
+      ;; own axis colors.
+      (GREEN INTERC "" staged "staged:"
+        (GREEN newX     "X")
+        (RED   removedX "-X")
+        (GREEN newM     "M")
+        (RED   removedM "-M"))
+      (GREEN INTERC "" unstaged "unstaged:"
+        (GREEN newX     "X")
+        (RED   removedX "-X")
+        (GREEN newM     "M")
+        (RED   removedM "-M"))
       (RED notInGit "diff:not-in-git")))
   "Rules to convert metadata sexps into herald tokens.")
 
 (defun heralds--tokens->text (tokens)
-  "Convert list of TOKENS (propertized strings) to display string.
-Tokens are propertized strings created by skg-transform-sexp-flat.
-Colons between letters are preserved (like 'req:containers').
-Colons followed by '-' or '+' are also preserved (e.g. 'staged:-M').
-Colons with a space on either side are preserved too, so literal
-prefixes from rule strings (e.g. \"text changed : \") survive.
-Structural colons added by the transform are removed (like '3:{' -> '3{').
-We detect this by checking if both sides of a colon are alphanumeric --
-treating '-', '+', and space as alphanumeric for this purpose since they
-often appear as label values (sign markers) or as literal separators.
-Multiple tokens are separated by spaces.
-Hide ID if there are other tokens present."
+  "Convert list of TOKENS (propertized strings) to a display string.
+Tokens carry `skg-color' on character ranges (single-color tokens
+propertize the whole string; GROUP-built tokens carry per-segment
+colors). Tokens separated by a space, except tokens whose position
+0 has an `skg-abut' property are joined to the preceding token
+with no separator (used to glue e.g. ☮ onto its birth character).
+Structural colons added by the transform (like `3:{' -> `3{') are
+stripped when either side is non-alphanumeric."
   (when tokens
-    (let* ((token-strings
-            (mapcar
-             (lambda (token)
-               (let* ((s token)
-                      (cleaned
-                        (replace-regexp-in-string
-                          "\\([^[:alnum:]+ -]\\):\\|:\\([^[:alnum:]+ -]\\)"
-                          "\\1\\2"
-                          s))
-                      (color (get-text-property 0 'skg-color token)))
-                 (when color
-                   (put-text-property
-                     0 (length cleaned)
-                     'face (heralds--color-to-face color)
-                     cleaned))
-                 cleaned))
-             tokens))
-           (token-strings (heralds--merge-stage-tokens token-strings))
-           (non-id-tokens
-            (cl-remove-if
-             (lambda (s)
-               (string= (substring-no-properties s) "ID"))
-             token-strings)))
-      (mapconcat #'identity
-                 (if non-id-tokens non-id-tokens token-strings)
-                 " "))))
-
-(defun heralds--stage-prefix (s)
-  "If S starts with one of the stage-prefix constants, return it
-\(e.g. \"staged:\" or \"unstaged:\"), otherwise nil.
-
-Uses the same two 'heralds--stage-prefix-*' constants that drive
-the transform rules, so the pair of sides can't drift."
-  (cond
-   ((string-prefix-p heralds--stage-prefix-staged   s) heralds--stage-prefix-staged)
-   ((string-prefix-p heralds--stage-prefix-unstaged s) heralds--stage-prefix-unstaged)
-   (t nil)))
-
-(defun heralds--merge-stage-tokens (tokens)
-  "Merge adjacent TOKENS that share a \"staged:\" or \"unstaged:\" prefix.
-Suffixes are concatenated (so \"staged:X\" + \"staged:M\" becomes
-\"staged:XM\" and \"staged:-X\" + \"staged:-M\" becomes \"staged:-X-M\").
-Adjacent stage tokens with /different/ stage prefixes (e.g. \"staged:M\"
-followed by \"unstaged:M\") get glued together by `,' rather than the
-default ` ', producing \"staged:M,unstaged:M\".
-Color: if all merged suffixes within a stage have the same face, keep
-it; if mixed, the merged token uses 'heralds-yellow-face'.
-
-The prefix strings this function groups on come from
-'heralds--stage-prefix-*' — the same constants used in
-'heralds--transform-rules'."
-  (let ((result nil)
-        (current nil)
-        (current-prefix nil)
-        (current-faces nil))
-    (cl-flet ((flush ()
-                (when current
-                  (let ((merged (mapconcat #'identity (nreverse current) "")))
-                    (when current-faces
-                      (let ((face (if (= 1 (length (delete-dups (copy-sequence current-faces))))
-                                       (car current-faces)
-                                     'heralds-yellow-face)))
-                        (put-text-property 0 (length merged) 'face face merged)))
-                    ;; If the previous result element is also a stage
-                    ;; token, glue this one onto it with ','.
-                    (let ((prev (car result)))
-                      (if (and prev (heralds--stage-prefix prev))
-                          (setcar result (concat prev "," merged))
-                        (push merged result))))
-                  (setq current nil current-prefix nil current-faces nil))))
+    (let ((out ""))
       (dolist (tok tokens)
-        (let ((p (heralds--stage-prefix tok)))
-          (cond
-           ;; Continuation of the current group: strip the prefix,
-           ;; keep just the suffix.
-           ((and p current-prefix (string= p current-prefix))
-            (push (substring tok (length p)) current)
-            (push (get-text-property 0 'face tok) current-faces))
-           ;; Start a new stage group.
-           (p
-            (flush)
-            (setq current (list tok)
-                  current-prefix p
-                  current-faces (list (get-text-property 0 'face tok))))
-           ;; Non-stage token: flush the group, then pass the token through.
-           (t
-            (flush)
-            (push tok result)))))
-      (flush))
-    (nreverse result)))
+        (let* ((abut    (get-text-property 0 'skg-abut tok))
+               (cleaned (heralds--strip-structural-colons tok))
+               (faced   (heralds--apply-faces-per-region cleaned)))
+          (setq out
+                (concat out
+                        (if (or (string-empty-p out) abut) "" " ")
+                        faced))))
+      out)))
+
+(defun heralds--strip-structural-colons (s)
+  "Return a copy of S with structural colons removed.
+A colon is structural when either the character before or after
+it is non-alphanumeric (and not `-', `+', or space, which we keep
+since they often appear as label values or separators).
+`replace-regexp-in-string' preserves text properties of the kept
+characters, which is what we need so ranges' colors survive."
+  (replace-regexp-in-string
+   "\\([^[:alnum:]+ -]\\):\\|:\\([^[:alnum:]+ -]\\)"
+   "\\1\\2"
+   s))
+
+(defun heralds--apply-faces-per-region (s)
+  "For each region in S where `skg-color' is non-nil, set `face'
+to the corresponding herald face. Works for both single-color
+tokens and per-segment-colored GROUP tokens."
+  (let ((len (length s))
+        (pos 0))
+    (while (< pos len)
+      (let* ((color (get-text-property pos 'skg-color s))
+             (next  (or (next-single-property-change pos 'skg-color s)
+                        len)))
+        (when color
+          (put-text-property pos next 'face
+                             (heralds--color-to-face color) s))
+        (setq pos next)))
+    s))
 
 (defun heralds--color-to-face
   (color-keyword)
-  "Map COLOR-KEYWORD (RED, GREEN, BLUE, YELLOW) to a face."
+  "Map COLOR-KEYWORD (RED, GREEN, BLUE, YELLOW, ORANGE) to a face."
   (cond
     ((eq color-keyword 'RED)    'heralds-red-face)
     ((eq color-keyword 'GREEN)  'heralds-green-face)
     ((eq color-keyword 'BLUE)   'heralds-blue-face)
     ((eq color-keyword 'YELLOW) 'heralds-yellow-face)
+    ((eq color-keyword 'ORANGE) 'heralds-orange-face)
     (t nil)))
 
 ;;;###autoload
 (define-minor-mode heralds-minor-mode
   "Display skg metadata as a short list of \"herald\" markers.
 Each org headline the server sends starts with `(skg ...)` metadata.
-This mode lenses that tree via `skg-transform-sexp-flat`,
-producing colored tokens that summarise view and code information.
-View-related heralds render blue, code heralds green,
-while problem markers such as `!{` and `delete` render red.
-The primary id is hidden whenever any other herald is present.
-Whitespace separates the heralds; the raw metadata is otherwise hidden."
+This mode lenses that tree via `skg-transform-sexp-flat`, producing
+coloured tokens that summarise view and code information. Every
+piece of display logic lives in `heralds--transform-rules'."
   :lighter " ⟪Y⟫"
   (if heralds-minor-mode
       (progn
@@ -318,46 +270,54 @@ buffer-local `heralds-overlays' list) are also deleted."
 
 (defun heralds-from-metadata
     (metadata-sexp) ;; Begins with '(skg ' and ends with ')'.
-  "Returns a space-separated string of herald markers.
-METADATA-SEXP should be the complete (skg ...) s-expression."
+  "Return a display-ready herald string for METADATA-SEXP.
+All composition rules live in `heralds--transform-rules'; there
+is no post-processing step. Returns nil if METADATA-SEXP doesn't
+parse as an `(skg ...)' form."
   (let* ((sexp (heralds--read-metadata metadata-sexp))
          (tokens (when (and (listp sexp)
                             (eq (car sexp) 'skg))
                    (skg-transform-sexp-flat
-                    sexp heralds--transform-rules)))
-         (heralds (heralds--tokens->text tokens)))
-    (heralds--post-process-text heralds sexp)))
+                    sexp heralds--transform-rules))))
+    (heralds--tokens->text tokens)))
 
 (defun heralds--read-metadata (metadata-sexp)
-  "Read METADATA-SEXP string into a Lisp object.
-Returns nil if parsing fails."
-  (condition-case nil
-      (car (read-from-string metadata-sexp))
-    (error nil)))
+  "Read METADATA-SEXP string into a Lisp object and normalise it.
+Returns nil if parsing fails. Normalisation currently means: if
+the sexp is an (skg (node ...)) form whose node has no explicit
+(birth ...) sub-form, insert (birth contentOf) -- the server
+leaves ContentOf implicit (see the note in org_to_text.rs), but
+the herald rules want to dispatch on all four birth variants
+explicitly."
+  (let ((parsed (condition-case nil
+                    (car (read-from-string metadata-sexp))
+                  (error nil))))
+    (heralds--inject-default-birth parsed)))
 
-(defun heralds--post-process-text
-    (herald-string sexp)
-  "Some post-processing rules for heralds:
-- Remove ◌ if id present in SEXP
-- Remove ⦿ if graphStats or viewStats present in SEXP"
-  (when herald-string
-    (let* ((heralds (split-string herald-string " " t))
-           (heralds (heralds--remove-token-if-sexp-matches-structure
-                   "◌" heralds sexp '(skg (node (id)) )) )
-           (heralds (heralds--remove-token-if-sexp-matches-structure
-                   "⦿" heralds sexp '(skg (node (graphStats)) )) )
-           (heralds (heralds--remove-token-if-sexp-matches-structure
-                   "⦿" heralds sexp '(skg (node (viewStats)) )) ))
-      (mapconcat #'identity heralds " "))))
-
-(defun heralds--remove-token-if-sexp-matches-structure
-    (token tokens sexp structure)
-  "Remove TOKEN from TOKENS if STRUCTURE is present in SEXP."
-  (if (skg-sexp-subtree-p sexp structure)
-      (cl-remove-if (lambda (part)
-                      (string= (substring-no-properties part) token))
-                    tokens)
-    tokens))
+(defun heralds--inject-default-birth (sexp)
+  "If SEXP is `(skg (node ...) ...)` and the node has no (birth ...)
+child, return a copy with `(birth contentOf)' inserted into the
+node. Otherwise return SEXP unchanged."
+  (if (and (listp sexp)
+           (eq (car-safe sexp) 'skg))
+      (cons 'skg
+            (mapcar
+             (lambda (child)
+               (if (and (listp child) (eq (car-safe child) 'node)
+                        (not (cl-some
+                              (lambda (sub)
+                                (and (listp sub)
+                                     (eq (car-safe sub) 'birth)))
+                              (cdr child))))
+                   ;; insert (birth contentOf) immediately after the
+                   ;; `node' symbol; its position in the list doesn't
+                   ;; affect matching but keeps the normalised form
+                   ;; readable if ever inspected.
+                   (cons 'node
+                         (cons '(birth contentOf) (cdr child)))
+                 child))
+             (cdr sexp)))
+    sexp))
 
 (defun heralds-overlay-valid-and-useable-p (ov)
   "Check if overlay OV is valid and usable."
@@ -376,10 +336,14 @@ Returns nil if parsing fails."
 
 (defface heralds-red-face
   '((t :foreground "white" :background "red"))
-  "White-on-red for problem markers like !{ and delete.")
+  "White-on-red for problem markers like delete.")
 
 (defface heralds-yellow-face
   '((t :foreground "black" :background "yellow"))
-  "Black-on-yellow for CYCLE.")
+  "Black-on-yellow for link-count heralds and cycle markers.")
+
+(defface heralds-orange-face
+  '((t :foreground "white" :background "#d2691e"))
+  "White-on-orange for non-content birth heralds (⊥, }, ←).")
 
 (provide 'heralds-minor-mode)

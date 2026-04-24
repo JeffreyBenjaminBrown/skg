@@ -89,13 +89,13 @@ fn test_indefinitive_foreign_node_filtered() -> Result<(), Box<dyn Error>> {
     "skg-test-foreign-indefinitive",
     CONFIG_PATH,
     |config, driver| Box::pin(async move {
-      // Save buffer with indefinitive foreign node
+      // Save buffer with indef foreign node
       let org_text: &str = indoc! {"
-        * (skg (node (id foreign3) (source foreign) indefinitive)) Foreign indefinitive node
+        * (skg (node (id foreign3) (source foreign) indef)) Foreign indef node
       "};
       let result: Result<_, _> = buffer_to_viewnode_forest_and_save_instructions(
         org_text, config, driver) . await;
-      // Should succeed - indefinitive foreign nodes are allowed but filtered
+      // Should succeed - indef foreign nodes are allowed but filtered
       assert!(result . is_ok(), "Indefinitive foreign node should be allowed");
       let (_viewnode_forest, instructions, _merge_instructions, _source_moves) = result?;
       // Indefinitive foreign nodes should be filtered out (no append)

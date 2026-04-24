@@ -38,7 +38,7 @@ fn test_definitive_view_limit_10
       let input_org_text = indoc! {"
         * (skg (node (id 1) (source main))) 1
         ** (skg (node (id 11))) 11
-        ** (skg (node (id 12) indefinitive (viewRequests definitiveView))) 12
+        ** (skg (node (id 12) indef (viewRequests definitiveView))) 12
         ** (skg (node (id 13))) 13
         * (skg (node (id 2) (source main))) 2
       "};
@@ -62,17 +62,17 @@ fn test_definitive_view_limit_10
 
       // With limit=10, all children should be expanded
       let expected = indoc! {"
-        * (skg (node (id 1) (source main) (birth independent) (graphStats (containers 0) (contents 3) (containsHerald 0{3)))) 1
+        * (skg (node (id 1) (source main) (birth independent) (graphStats (contents 3)))) 1
         ** (skg (node (id 11) (source main))) 11
-        ** (skg (node (id 12) (source main) (graphStats (contents 4) (containsHerald {4)))) 12
+        ** (skg (node (id 12) (source main) (graphStats (contents 4)))) 12
         12 body
-        *** (skg (node (id 121) (source main) (graphStats (contents 2) (containsHerald {2)))) 121
+        *** (skg (node (id 121) (source main) (graphStats (contents 2)))) 121
         121 body
         **** (skg (node (id 1211) (source main))) 1211
         1211 body
         **** (skg (node (id 1212) (source main))) 1212
         1212 body
-        *** (skg (node (id 122) (source main) (graphStats (contents 1) (containsHerald {1)))) 122
+        *** (skg (node (id 122) (source main) (graphStats (contents 1)))) 122
         122 body
         **** (skg (node (id 1221) (source main))) 1221
         1221 body
@@ -81,7 +81,7 @@ fn test_definitive_view_limit_10
         *** (skg (node (id 124) (source main))) 124
         124 body
         ** (skg (node (id 13) (source main))) 13
-        * (skg (node (id 2) (source main) (birth independent) (graphStats (containers 0) (containsHerald 0{)))) 2
+        * (skg (node (id 2) (source main) (birth independent))) 2
       "};
 
       assert_eq!(result, expected,
@@ -107,7 +107,7 @@ fn test_definitive_view_limit_5_or_6
       let input_org_text = indoc! {"
         * (skg (node (id 1) (source main))) 1
         ** (skg (node (id 11))) 11
-        ** (skg (node (id 12) indefinitive (viewRequests definitiveView))) 12
+        ** (skg (node (id 12) indef (viewRequests definitiveView))) 12
         ** (skg (node (id 13))) 13
         * (skg (node (id 2) (source main))) 2
       "};
@@ -152,19 +152,19 @@ fn test_definitive_view_limit_5_or_6
       // Both limits produce the same result because truncation
       // completes the sibling group.
       let expected = indoc! {"
-        * (skg (node (id 1) (source main) (birth independent) (graphStats (containers 0) (contents 3) (containsHerald 0{3)))) 1
+        * (skg (node (id 1) (source main) (birth independent) (graphStats (contents 3)))) 1
         ** (skg (node (id 11) (source main))) 11
-        ** (skg (node (id 12) (source main) (graphStats (contents 4) (containsHerald {4)))) 12
+        ** (skg (node (id 12) (source main) (graphStats (contents 4)))) 12
         12 body
-        *** (skg (node (id 121) (source main) (graphStats (contents 2) (containsHerald {2)))) 121
+        *** (skg (node (id 121) (source main) (graphStats (contents 2)))) 121
         121 body
-        **** (skg (node (id 1211) (source main) indefinitive)) 1211
-        **** (skg (node (id 1212) (source main) indefinitive)) 1212
-        *** (skg (node (id 122) (source main) indefinitive (graphStats (contents 1) (containsHerald {1)))) 122
-        *** (skg (node (id 123) (source main) indefinitive)) 123
-        *** (skg (node (id 124) (source main) indefinitive)) 124
+        **** (skg (node (id 1211) (source main) indef)) 1211
+        **** (skg (node (id 1212) (source main) indef)) 1212
+        *** (skg (node (id 122) (source main) indef (graphStats (contents 1)))) 122
+        *** (skg (node (id 123) (source main) indef)) 123
+        *** (skg (node (id 124) (source main) indef)) 124
         ** (skg (node (id 13) (source main))) 13
-        * (skg (node (id 2) (source main) (birth independent) (graphStats (containers 0) (containsHerald 0{)))) 2
+        * (skg (node (id 2) (source main) (birth independent))) 2
       "};
 
       assert_eq!(result_5, expected,
@@ -193,7 +193,7 @@ fn test_definitive_view_limit_1_to_4
       let input_org_text = indoc! {"
         * (skg (node (id 1) (source main))) 1
         ** (skg (node (id 11))) 11
-        ** (skg (node (id 12) indefinitive (viewRequests definitiveView))) 12
+        ** (skg (node (id 12) indef (viewRequests definitiveView))) 12
         ** (skg (node (id 13))) 13
         * (skg (node (id 2) (source main))) 2
       "};
@@ -233,16 +233,16 @@ fn test_definitive_view_limit_1_to_4
       // - Limit is hit on the first generation
       // - Sibling group is completed, all are indefinitive
       let expected = indoc! {"
-        * (skg (node (id 1) (source main) (birth independent) (graphStats (containers 0) (contents 3) (containsHerald 0{3)))) 1
+        * (skg (node (id 1) (source main) (birth independent) (graphStats (contents 3)))) 1
         ** (skg (node (id 11) (source main))) 11
-        ** (skg (node (id 12) (source main) (graphStats (contents 4) (containsHerald {4)))) 12
+        ** (skg (node (id 12) (source main) (graphStats (contents 4)))) 12
         12 body
-        *** (skg (node (id 121) (source main) indefinitive (graphStats (contents 2) (containsHerald {2)))) 121
-        *** (skg (node (id 122) (source main) indefinitive (graphStats (contents 1) (containsHerald {1)))) 122
-        *** (skg (node (id 123) (source main) indefinitive)) 123
-        *** (skg (node (id 124) (source main) indefinitive)) 124
+        *** (skg (node (id 121) (source main) indef (graphStats (contents 2)))) 121
+        *** (skg (node (id 122) (source main) indef (graphStats (contents 1)))) 122
+        *** (skg (node (id 123) (source main) indef)) 123
+        *** (skg (node (id 124) (source main) indef)) 124
         ** (skg (node (id 13) (source main))) 13
-        * (skg (node (id 2) (source main) (birth independent) (graphStats (containers 0) (containsHerald 0{)))) 2
+        * (skg (node (id 2) (source main) (birth independent))) 2
       "};
 
       assert_eq!(result_1, expected,
@@ -273,8 +273,8 @@ fn test_definitive_view_conflicting
       let input_org_text = indoc! {"
         * (skg (node (id 1) (source main))) 1
         ** (skg (node (id 12))) 12
-        *** (skg (node (id 122) indefinitive)) 122
-        * (skg (node (id 12) (source main) indefinitive (viewRequests definitiveView))) 12 copy
+        *** (skg (node (id 122) indef)) 122
+        * (skg (node (id 12) (source main) indef (viewRequests definitiveView))) 12 copy
       "};
 
       let result = {
@@ -298,18 +298,18 @@ fn test_definitive_view_conflicting
         // The second 12 (root with request) should be expanded.
         // NOTE: The first 12 redefines the children of 12 as [122]
         // rather than [121,122,123,124].
-        "* (skg (node (id 1) (source main) (birth independent) (graphStats (containers 0) (contents 1) (containsHerald 0{1)))) 1
-         ** (skg (node (id 12) (source main) indefinitive (graphStats (contents 1) (containsHerald {1)))) 12
-         *** (skg (node (id 122) (source main) indefinitive (graphStats (contents 1) (containsHerald {1)))) 122
-         * (skg (node (id 12) (source main) (birth independent) (graphStats (containers 1) (contents 1) (containsHerald {1)))) 12
-         ** (skg (node (id 122) (source main) (graphStats (contents 1) (containsHerald {1)))) 122
+        "* (skg (node (id 1) (source main) (birth independent) (graphStats (contents 1)))) 1
+         ** (skg (node (id 12) (source main) indef (graphStats (contents 1)))) 12
+         *** (skg (node (id 122) (source main) indef (graphStats (contents 1)))) 122
+         * (skg (node (id 12) (source main) (birth independent) (graphStats (containers 1) (contents 1)))) 12
+         ** (skg (node (id 122) (source main) (graphStats (contents 1)))) 122
          122 body
          *** (skg (node (id 1221) (source main))) 1221
          1221 body
       "};
 
       assert_eq!(result, expected,
-        "First definitive instance should become indefinitive when second requests definitive");
+        "First definitive instance should become indef when second requests definitive");
 
       Ok (( )) } )) }
 
@@ -329,7 +329,7 @@ fn test_definitive_view_with_cycle
       // Node a has definitive request
       // a contains b contains a (cycle)
       let input_org_text = indoc! {"
-        * (skg (node (id cyc-a) (source main) indefinitive (viewRequests definitiveView))) cyc-a
+        * (skg (node (id cyc-a) (source main) indef (viewRequests definitiveView))) cyc-a
       "};
 
       let result = {
@@ -350,11 +350,11 @@ fn test_definitive_view_with_cycle
 
       // a should expand to show b, and b's child a should be marked as cycle
       let expected = indoc! {"
-        * (skg (node (id cyc-a) (source main) (birth independent) (graphStats (containers 1) (contents 1) (containsHerald {1)))) cyc-a
+        * (skg (node (id cyc-a) (source main) (birth independent) (graphStats (containers 1) (contents 1)))) cyc-a
         cyc-a body
-        ** (skg (node (id cyc-b) (source main) (graphStats (contents 1) (containsHerald {1)) (viewStats containsParent))) cyc-b
+        ** (skg (node (id cyc-b) (source main) (graphStats (contents 1)) (viewStats containsParent))) cyc-b
         cyc-b body
-        *** (skg (node (id cyc-a) (source main) indefinitive (graphStats (contents 1) (containsHerald {1)) (viewStats cycle containsParent))) cyc-a
+        *** (skg (node (id cyc-a) (source main) indef (graphStats (contents 1)) (viewStats cycle containsParent))) cyc-a
       "};
 
       assert_eq!(result, expected,
@@ -366,7 +366,7 @@ fn test_definitive_view_with_cycle
 // Test: Definitive view expansion detects repeats
 // ===================================================
 // If a node is already visited (definitive elsewhere), it should be
-// marked indefinitive when encountered again during expansion.
+// marked indef when encountered again during expansion.
 
 #[test]
 fn test_definitive_view_with_repeat
@@ -378,7 +378,7 @@ fn test_definitive_view_with_repeat
     |config, driver, tantivy| Box::pin ( async move {
       let input_org_text = indoc! {"
         * (skg (node (id 121) (source main))) 121
-        * (skg (node (id 12) (source main) indefinitive (viewRequests definitiveView))) 12
+        * (skg (node (id 12) (source main) indef (viewRequests definitiveView))) 12
       "};
 
       let result = {
@@ -398,15 +398,15 @@ fn test_definitive_view_with_repeat
       println!("Result with repeat:\n{}", result);
 
       let expected = indoc! {
-        // Upon saving, the indefinitive view of node 12 had no effect,
+        // Upon saving, the indef view of node 12 had no effect,
         // but the definitive view of 121 deleted its children.
         // The new 121 under 12 is rendered indefinitive,
         // because it was already rendered as a sibling of 12.
-        "* (skg (node (id 121) (source main) (birth independent) (graphStats (containers 1) (containsHerald 1{)))) 121
-         * (skg (node (id 12) (source main) (birth independent) (graphStats (containers 1) (contents 4) (containsHerald {4)))) 12
+        "* (skg (node (id 121) (source main) (birth independent) (graphStats (containers 1)))) 121
+         * (skg (node (id 12) (source main) (birth independent) (graphStats (containers 1) (contents 4)))) 12
          12 body
-         ** (skg (node (id 121) (source main) indefinitive)) 121
-         ** (skg (node (id 122) (source main) (graphStats (contents 1) (containsHerald {1)))) 122
+         ** (skg (node (id 121) (source main) indef)) 121
+         ** (skg (node (id 122) (source main) (graphStats (contents 1)))) 122
          122 body
          *** (skg (node (id 1221) (source main))) 1221
          1221 body
@@ -434,7 +434,7 @@ fn test_definitive_view_request_cleared
     "/tmp/tantivy-test-definitive-view-cleared",
     |config, driver, tantivy| Box::pin ( async move {
       let input_org_text = indoc! {"
-        * (skg (node (id 12) (source main) indefinitive (viewRequests definitiveView))) 12
+        * (skg (node (id 12) (source main) indef (viewRequests definitiveView))) 12
       "};
 
       let result = {

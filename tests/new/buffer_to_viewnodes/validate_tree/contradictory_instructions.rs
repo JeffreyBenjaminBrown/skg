@@ -81,9 +81,9 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
                 Regular node with shared ID
                 * (skg (node (id duplicate))) Second defining container
                 Another regular node with the same ID
-                * (skg (node (id duplicate) indefinitive)) Repeated node (not defining)
+                * (skg (node (id duplicate) indef)) Repeated node (not defining)
                 This one is ok because indefinitive=true
-                * (skg (node (id duplicate) indefinitive)) Might contain more (not defining)
+                * (skg (node (id duplicate) indef)) Might contain more (not defining)
                 This one is also ok because indefinitive=true
                 * (skg (node (id unique))) Unique node
                 This one is fine

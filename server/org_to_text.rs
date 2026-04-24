@@ -172,10 +172,8 @@ fn true_node_metadata_to_string (
     config    : & SkgConfig,
   ) -> String {
     fn graph_stats ( true_node : & TrueNode ) -> Option < String > {
-      let herald_should_be_rooty : bool =
-        true_node . birth != Birth::ContentOf;
       graphnodestats_to_sexp (
-        & true_node . graphStats, herald_should_be_rooty ) }
+        & true_node . graphStats, true_node . birth ) }
     fn view_stats (
       true_node : & TrueNode,
       config    : & SkgConfig,
@@ -233,6 +231,12 @@ fn true_node_metadata_to_string (
       vec! [ "node" . to_string () ];
     parts . push ( format! ( "(id {})", true_node . id . 0 ));
     parts . push ( format! ( "(source {})", true_node . source ));
+    // Birth::ContentOf is left implicit in the emitted sexp (it's
+    // the default). Consumers that care about the distinction --
+    // currently only heralds-minor-mode -- normalise by injecting
+    // (birth contentOf) on their end when no (birth ...) child is
+    // present. Keeping the default implicit here avoids touching
+    // every test that asserts on rendered metadata shape.
     match true_node . birth {
       Birth::ContentOf => {},
       Birth::Independent =>
@@ -242,7 +246,12 @@ fn true_node_metadata_to_string (
       Birth::LinksTo =>
         parts . push ( "(birth linksTo)" . to_string () ) }
     if true_node . is_indefinitive () {
-      parts . push ( "indefinitive" . to_string () ); }
+      // "indef" is short for "indefinitive" -- a read-only view of
+      // a node (see IndefOrDef in types/viewnode.rs). Abbreviated
+      // in the emitted metadata so that the sexp stays compact; no
+      // machine-readable ambiguity because the only other word
+      // starting "indef..." would be a typo.
+      parts . push ( "indef" . to_string () ); }
     if let Some (s) = graph_stats (true_node)
     { parts . push (s); }
     if let Some (s) = view_stats (true_node, config)
@@ -299,29 +308,42 @@ fn deleted_scaff_metadata_to_string (
   parts . join (" ") }
 
 fn graphnodestats_to_sexp (
-  gs                     : &GraphNodeStats,
-  herald_should_be_rooty : bool,
+  gs    : &GraphNodeStats,
+  birth : Birth,
 ) -> Option < String > {
   let mut parts : Vec < String > = Vec::new ();
   if let Some (ref c) = gs . containRels {
-    if herald_should_be_rooty || c . containers != 1 {
+    // Per-birth suppression of the containers count. The client
+    // INTERCs (containers N) and (contents M) into a combined
+    // herald with `{` between them; we just decide whether each
+    // raw atom is worth emitting.
+    // - ContentOf  : hide the common case of exactly 1 container
+    //                (every content-child has at least one
+    //                container; the number only matters when it's
+    //                0 or >1).
+    // - Independent: hide the common case of 0 containers (a view
+    //                root is typically standalone).
+    // - ContainerOf / LinksTo: always show (these heralds indicate
+    //                that the node is *related* to the view root
+    //                via the graph, so the count is always
+    //                informative).
+    let show_containers : bool = match birth {
+      Birth::ContentOf                      => c . containers != 1,
+      Birth::Independent                    => c . containers != 0,
+      Birth::ContainerOf | Birth::LinksTo   => true, };
+    let show_contents : bool = c . contents != 0;
+    if show_containers {
       parts . push ( format! ("(containers {})", c . containers) ); }
-    if c . contents != 0 {
-      parts . push ( format! ("(contents {})", c . contents) ); }
-    let herald : Option<String> =
-      if herald_should_be_rooty { Some ( c . herald_for_non_content() ) }
-      else                      {        c . herald_for_content() };
-    if let Some (h) = herald {
-      parts . push ( format! ("(containsHerald {})", h) ); }}
+    if show_contents {
+      parts . push ( format! ("(contents {})", c . contents) ); } }
   if let Some (ref l) = gs . linksourceRels {
+    // Client INTERCs these two into a linksHerald via `→`.
     if l . sources_with_content != 0 {
       parts . push ( format! ("(linksInFromContainers {})",
                               l . sources_with_content) ); }
     if l . sources_without_content != 0 {
       parts . push ( format! ("(linksInFromLeaves {})",
-                              l . sources_without_content) ); }
-    if let Some (h) = l . herald() {
-      parts . push ( format! ("(linksHerald {})", h) ); }}
+                              l . sources_without_content) ); } }
   if gs . aliasing {
     parts . push ( "aliasing" . to_string () ); }
   if gs . extraIDs {

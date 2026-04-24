@@ -37,12 +37,12 @@ fn test_birth_and_indefinitive(
       "/tmp/tantivy-test-birth",
       |config, driver, _tantivy| Box::pin ( async move {
         // Simulate user saving this org buffer:
-        // Node 1 contains node 2 (which has birth=Independent and indefinitive)
+        // Node 1 contains node 2 (which has birth=Independent and indef)
         // Node 2 contains node 3 (already) and should contain node 4 (new)
         // Node 2 should NOT affect node 1 because birth=Independent
         let org_text = indoc! {"
           * (skg (node (id 1) (source main))) 1
-          ** (skg (node (id 2) (source main) (birth independent) indefinitive)) 2
+          ** (skg (node (id 2) (source main) (birth independent) indef)) 2
           *** (skg (node (id 4) (source main))) 4
         "};
         let (_viewnode_forest, save_instructions, _merge_instructions, _source_moves) =
@@ -60,7 +60,7 @@ fn test_birth_and_indefinitive(
           &[],
           config . clone(), )?;
 
-        { // verify indefinitive is treated correctly
+        { // verify indef is treated correctly
           let node2 : NodeComplete =
             nodecomplete_from_id(
               config, driver, &ID("2" . to_string() ))

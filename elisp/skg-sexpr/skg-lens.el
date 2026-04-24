@@ -117,8 +117,8 @@ Returns a string with text properties for color rendering."
 
 (defun skg--color-keyword-p
   (sym)
-  "Return t if SYM is a color keyword (RED, GREEN, BLUE, or YELLOW)."
-  (memq sym '(RED GREEN BLUE YELLOW)))
+  "Return t if SYM is a color keyword (RED, GREEN, BLUE, YELLOW, ORANGE)."
+  (memq sym '(RED GREEN BLUE YELLOW ORANGE)))
 
 (defun skg--extract-color
   (rule)
@@ -139,15 +139,32 @@ Returns a string with text properties for color rendering."
     (cadr rule)
     (car rule)))
 
-(defun skg--rule-children
+(defun skg--rule-children-raw
   (rule)
-  "Get children of RULE, skipping color keyword and label."
+  "Get children of RULE, skipping color keyword and label.
+Does NOT strip the optional ABUT marker; use `skg--rule-children'
+for that."
   (if
     (and
       (listp rule)
       (skg--color-keyword-p (car rule)))
     (cddr rule)
     (cdr rule)))
+
+(defun skg--rule-abut-p (rule)
+  "Return t if RULE carries the ABUT marker immediately after
+its color-and-label prefix. Tokens emitted by an ABUT rule join
+the preceding token with no space between them."
+  (let ((raw (skg--rule-children-raw rule)))
+    (and (consp raw) (eq (car raw) 'ABUT))))
+
+(defun skg--rule-children
+  (rule)
+  "Get children of RULE after color, label, and any ABUT marker."
+  (let ((raw (skg--rule-children-raw rule)))
+    (if (and (consp raw) (eq (car raw) 'ABUT))
+        (cdr raw)
+      raw)))
 
 (defun skg--transform-sexp-flat-from
   (object
@@ -201,12 +218,144 @@ text properties are preserved by `concat'."
   "Dispatch RULE-CHILD application to OBJECT with CURRENT-COLOR."
   (cond
     ((not (listp rule-child)) '())
+    ((skg--rule-interc-p rule-child)
+      (skg--apply-interc object rule-child current-color))
     ((skg--rule-any-leaf-p rule-child)
       (skg--apply-any-leaf object rule-child current-color))
     ((skg--rule-leaf-p rule-child)
       (skg--apply-ordinary-leaf object rule-child current-color))
     (t
       (skg--apply-non-leaf object rule-child current-color))))
+
+(defun skg--rule-interc-p (rule)
+  "Return t if RULE is an INTERC directive of the form
+([COLOR] INTERC SEP LABEL [literal-prefix...] SUB-RULES...).
+
+\"INTERC\" is short for \"intercalate\" -- the rule joins its
+sub-rule slots with SEP between them. The name is abbreviated
+because rule files get long; extending it would add visual noise
+without adding clarity.
+
+INTERC has SLOT semantics: each list sub-rule contributes
+exactly one slot whose content is the concatenation of that
+sub-rule's outputs (or empty string if the sub-rule doesn't
+fire). Slots are joined with the separator string SEP, then
+prepended with any literal-string prefix, and emitted as one
+token. If every slot is empty, no token is emitted at all (this
+is what suppresses e.g. a solitary `{' when both the containers
+and contents counts have been filtered out). Per-sub-rule colors
+are preserved on the resulting token's character ranges; the
+separator and prefix take the INTERC rule's own color."
+  (or (eq (car-safe rule) 'INTERC)
+      (and (listp rule)
+           (skg--color-keyword-p (car rule))
+           (eq (car-safe (cdr rule)) 'INTERC))))
+
+(defun skg--interc-color (rule)
+  "Extract optional COLOR from an INTERC rule.
+The color, if present, wraps the INTERC keyword."
+  (when (skg--color-keyword-p (car rule)) (car rule)))
+
+(defun skg--interc--post-color-tail (rule)
+  "Return the portion of an INTERC rule after any leading
+color directive -- always starting with INTERC."
+  (if (skg--color-keyword-p (car rule)) (cdr rule) rule))
+
+(defun skg--interc-separator (rule)
+  "Return the separator string of an INTERC rule."
+  (nth 1 (skg--interc--post-color-tail rule)))
+
+(defun skg--interc-label (rule)
+  "Return the LABEL of an INTERC rule, or nil if it has none.
+LABEL is optional: the slot that would hold it is the LABEL iff
+it's a non-color symbol. If it's a string (literal prefix) or
+list (sub-rule), LABEL is absent and the INTERC applies its
+sub-rules to the CURRENT object directly rather than to children
+matching a specific label."
+  (let ((cand (nth 2 (skg--interc--post-color-tail rule))))
+    (and (symbolp cand)
+         (not (null cand))
+         (not (skg--color-keyword-p cand))
+         cand)))
+
+(defun skg--interc-children (rule)
+  "Return the contents of an INTERC rule's slot-and-prefix
+portion: everything after INTERC, SEP, and LABEL (if present)."
+  (let ((tail (skg--interc--post-color-tail rule)))
+    (if (skg--interc-label rule)
+        (nthcdr 3 tail)
+      (nthcdr 2 tail))))
+
+(defun skg--apply-interc
+  (object rule current-color)
+  "Apply an INTERC RULE to OBJECT with CURRENT-COLOR.
+
+Two modes depending on whether the rule has a LABEL:
+
+- With LABEL: for each child of OBJECT matching that label, run
+  the sub-rules against it and emit one combined token.
+- Without LABEL: run the sub-rules against OBJECT itself and emit
+  at most one combined token. Used when the server already emits
+  the raw atoms at the current level (e.g. `(containers N)' and
+  `(contents M)' as siblings inside `(graphStats ...)') and no
+  wrapper form is needed.
+
+In both modes, each sub-rule contributes one slot; slots are
+joined with the rule's SEPARATOR; a literal-string prefix is
+prepended; the token is suppressed if every slot is empty.
+
+Colors: the separator and prefix take the rule's inherited color
+context (its own `skg--interc-color' if set, otherwise
+CURRENT-COLOR). Each slot preserves whatever colors its
+sub-rule's outputs carry, via text properties on character ranges."
+  (let* ((rule-color (skg--interc-color rule))
+         (new-color  (or rule-color current-color))
+         (sep        (skg--interc-separator rule))
+         (label      (skg--interc-label rule))
+         (rule-children (skg--interc-children rule))
+         (prefix-str (mapconcat #'identity
+                       (cl-remove-if-not #'stringp rule-children) ""))
+         (targets (if label
+                      (skg--object-children-with-label object label)
+                    (list object)))
+         (results '()))
+    (dolist (target targets)
+      (let ((slots '()))
+        (dolist (rc rule-children)
+          (when (listp rc)
+            (let ((outs (skg--transform-sexp-flat-dispatch
+                         target rc new-color)))
+              (push (apply #'concat outs) slots))))
+        (setq slots (nreverse slots))
+        (when (cl-some (lambda (s) (> (length s) 0)) slots)
+          (push (skg--interc--build-token
+                 prefix-str sep slots new-color)
+                results))))
+    (nreverse results)))
+
+(defun skg--interc--build-token (prefix sep slots color)
+  "Build an INTERC token: PREFIX + JOIN(SLOTS, SEP).
+PREFIX and SEP both carry COLOR via `skg-color'. Each slot
+string's own text properties survive the concatenation, so
+per-sub-rule colors remain visible as ranges on the final token."
+  (let ((out (skg--interc--propertize-color prefix color))
+        (first t))
+    (dolist (slot slots)
+      (unless first
+        (setq out (concat out
+                          (skg--interc--propertize-color
+                           sep color))))
+      (setq out (concat out slot))
+      (setq first nil))
+    out))
+
+(defun skg--interc--propertize-color (s color)
+  "Return a copy of S with `skg-color' set to COLOR throughout.
+If S is empty or COLOR is nil, no property is applied."
+  (let ((copy (copy-sequence s)))
+    (when (and color (> (length copy) 0))
+      (put-text-property 0 (length copy) 'skg-color color copy))
+    copy))
 
 (defun skg--rule-leaf-p
   (rule-child)
@@ -250,6 +399,7 @@ text properties are preserved by `concat'."
       ((color
          (or (skg--extract-color rule-child) current-color))
         (label (skg--extract-label rule-child))
+        (abut (skg--rule-abut-p rule-child))
         (tokens (skg--rule-children rule-child))
         (matches
           (skg--object-atomic-matches
@@ -258,9 +408,9 @@ text properties are preserved by `concat'."
     (when tokens
       (dolist
           (_ matches)
-        (setq results
-              (nconc results
-                      (list (skg--tokens->string tokens color))))))
+        (let ((tok (skg--tokens->string tokens color)))
+          (skg--maybe-mark-abut tok abut)
+          (setq results (nconc results (list tok))))))
     results))
 
 (defun skg--apply-any-leaf
@@ -271,6 +421,7 @@ text properties are preserved by `concat'."
   (let
       ((color
          (or (skg--extract-color rule-child) current-color))
+        (abut (skg--rule-abut-p rule-child))
         (tokens (skg--rule-children rule-child))
         (tail-values (cdr object))
         (results '()))
@@ -279,15 +430,22 @@ text properties are preserved by `concat'."
       ((memq 'IT tokens)
         (dolist
             (tail-value tail-values)
-          (setq results
-                (nconc results
-                        (list
-                          (skg--tokens->string
-                            (skg--replace-it tokens tail-value)
-                            color)))))
+          (let ((tok (skg--tokens->string
+                      (skg--replace-it tokens tail-value) color)))
+            (skg--maybe-mark-abut tok abut)
+            (setq results (nconc results (list tok)))))
         results)
       (t
-        (list (skg--tokens->string tokens color))))))
+        (let ((tok (skg--tokens->string tokens color)))
+          (skg--maybe-mark-abut tok abut)
+          (list tok))))))
+
+(defun skg--maybe-mark-abut (tok abut)
+  "If ABUT is non-nil and TOK is a non-empty string, set the
+`skg-abut' text property on its first character. Renderers read
+that property to decide whether to emit a separator before TOK."
+  (when (and abut (stringp tok) (> (length tok) 0))
+    (put-text-property 0 1 'skg-abut t tok)))
 
 (defun skg--replace-it
   (tokens

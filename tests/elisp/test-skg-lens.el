@@ -120,4 +120,134 @@ matching list child, not just the first."
         '(a (b "B: " (c "cc") (d "dd"))))
       '("B: cc" "B: dd"))))
 
+;;
+;; ORANGE color keyword
+;;
+
+(ert-deftest test-skg-transform-sexp-flat-orange-is-a-color ()
+  "ORANGE is accepted alongside RED/GREEN/BLUE/YELLOW."
+  (let ((out (skg-transform-sexp-flat
+              '(a b) '(a (ORANGE b "bb")))))
+    (should (equal out '("bb")))
+    (should (eq (get-text-property 0 'skg-color (car out))
+                'ORANGE))))
+
+;;
+;; ABUT marker
+;;
+
+(ert-deftest test-skg-transform-sexp-flat-abut-marks-first-char ()
+  "A rule with ABUT sets `skg-abut' on position 0 of its emitted
+token so renderers can join without a separator."
+  (let ((out (skg-transform-sexp-flat
+              '(a b) '(a (b ABUT "bb")))))
+    (should (equal out '("bb")))
+    (should (eq (get-text-property 0 'skg-abut (car out)) t))))
+
+(ert-deftest test-skg-transform-sexp-flat-abut-without-marker-is-nil ()
+  "Without ABUT, `skg-abut' is nil."
+  (let ((out (skg-transform-sexp-flat
+              '(a b) '(a (b "bb")))))
+    (should (null (get-text-property 0 'skg-abut (car out))))))
+
+;;
+;; INTERC directive
+;;
+
+(ert-deftest test-skg-transform-sexp-flat-interc-joins-slots-with-separator ()
+  "An INTERC rule emits one token per matching object child:
+each sub-rule contributes one slot, slots are joined with the
+rule's SEP, and a literal-string prefix is prepended."
+  (should (equal (skg-transform-sexp-flat
+                  '(a (pair (left 3) (right 8)))
+                  '(a (INTERC "{" pair
+                        (left  (ANY IT))
+                        (right (ANY IT)))))
+                 '("3{8"))))
+
+(ert-deftest test-skg-transform-sexp-flat-interc-missing-slot-still-emits-separator ()
+  "When one slot is empty but another is non-empty, the separator
+is still emitted between them. A solitary containsHerald-style
+`3{' comes out correctly when only the left slot fires."
+  (should (equal (skg-transform-sexp-flat
+                  '(a (pair (left 3)))
+                  '(a (INTERC "{" pair
+                        (left  (ANY IT))
+                        (right (ANY IT)))))
+                 '("3{")))
+  (should (equal (skg-transform-sexp-flat
+                  '(a (pair (right 8)))
+                  '(a (INTERC "{" pair
+                        (left  (ANY IT))
+                        (right (ANY IT)))))
+                 '("{8"))))
+
+(ert-deftest test-skg-transform-sexp-flat-interc-all-slots-empty-suppresses ()
+  "When every slot is empty for a given match, INTERC emits
+nothing for that match -- avoids displaying a naked separator."
+  (should (equal (skg-transform-sexp-flat
+                  '(a (pair (other 99)))
+                  '(a (INTERC "{" pair
+                        (left  (ANY IT))
+                        (right (ANY IT)))))
+                 '())))
+
+(ert-deftest test-skg-transform-sexp-flat-interc-skipped-if-label-absent ()
+  "If the object has no child with the INTERC's label, nothing is emitted."
+  (should (equal (skg-transform-sexp-flat
+                  '(a (otherPair))
+                  '(a (INTERC "{" pair (left (ANY IT)))))
+                 '())))
+
+(ert-deftest test-skg-transform-sexp-flat-interc-preserves-per-subrule-colors ()
+  "Colors from INTERC sub-rules are preserved per-segment on the
+output token. The separator takes the INTERC rule's own color
+context (nil here, since the outer INTERC has no color directive)."
+  (let* ((out (skg-transform-sexp-flat
+               '(a (pair (left 3) (right 8)))
+               '(a (INTERC "{" pair
+                     (YELLOW left  (ANY IT))
+                     (BLUE   right (ANY IT))))))
+         (s   (car out)))
+    (should (equal out '("3{8")))
+    (should (eq  (get-text-property 0 'skg-color s) 'YELLOW))
+    (should (null (get-text-property 1 'skg-color s))) ;; separator: no color
+    (should (eq  (get-text-property 2 'skg-color s) 'BLUE))))
+
+(ert-deftest test-skg-transform-sexp-flat-interc-with-own-color-colors-separator-and-prefix ()
+  "When INTERC carries its own color, the separator and any
+literal prefix inherit it; sub-rule colors still override."
+  (let* ((out (skg-transform-sexp-flat
+               '(a (pair (left 3) (right 8)))
+               '(a (BLUE INTERC "{" pair "P:"
+                     (YELLOW left  (ANY IT))
+                     (right        (ANY IT))))))
+         (s   (car out)))
+    (should (equal out '("P:3{8")))
+    (should (eq (get-text-property 0 'skg-color s) 'BLUE))   ;; prefix "P"
+    (should (eq (get-text-property 1 'skg-color s) 'BLUE))   ;; prefix ":"
+    (should (eq (get-text-property 2 'skg-color s) 'YELLOW)) ;; "3"
+    (should (eq (get-text-property 3 'skg-color s) 'BLUE))   ;; separator
+    (should (eq (get-text-property 4 'skg-color s) 'BLUE)))) ;; "8" via inherited
+
+(ert-deftest test-skg-transform-sexp-flat-interc-empty-separator-concatenates-slots ()
+  "An empty-string separator makes INTERC concatenate slots with
+nothing between them -- the pattern the stage-axis rules use."
+  (should (equal (skg-transform-sexp-flat
+                  '(a (stage removedX removedM))
+                  '(a (INTERC "" stage "stage:"
+                        (removedX "-X")
+                        (removedM "-M"))))
+                 '("stage:-X-M"))))
+
+(ert-deftest test-skg-transform-sexp-flat-interc-emits-per-matching-child ()
+  "If OBJECT has multiple matching children, INTERC emits one
+token per match."
+  (should (equal (skg-transform-sexp-flat
+                  '(a (stage removedX) (stage newM))
+                  '(a (INTERC "" stage "stage:"
+                        (removedX "-X")
+                        (newM     "M"))))
+                 '("stage:-X" "stage:M"))))
+
 (provide 'test-skg-lens)
