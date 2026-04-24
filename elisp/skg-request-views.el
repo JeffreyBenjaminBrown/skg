@@ -16,7 +16,7 @@
   (skg--request-view 'aliases))
 
 (defun skg-request-containerward-view ()
-  "Request containerward view and save."
+  "Request containerward view and (to apply it) save."
   (interactive)
   (skg--request-view-and-save 'containerwardView))
 
@@ -26,9 +26,9 @@
   (skg--request-view-and-save 'containerwardStats))
 
 (defun skg-request-sourceward-view ()
-  "Edit metadata to request a sourceward view for the headline at point."
+  "Request sourceward view and (to apply it) save."
   (interactive)
-  (skg--request-view 'sourcewardView))
+  (skg--request-view-and-save 'sourcewardView))
 
 (defun skg-request-definitive-view ()
   "Edit metadata to request a definitive view for the headline at point.

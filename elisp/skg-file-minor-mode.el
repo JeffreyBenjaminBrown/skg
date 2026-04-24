@@ -4,8 +4,11 @@
 ;;; Provides skg keybindings that operate on IDs (bare UUIDs,
 ;;; UUID.skg filenames, pid: lines, etc.) in the file.
 ;;; The keymap `skg-file-minor-mode-map' is defined in
-;;; skg-keymaps-and-aliases.el alongside the other skg keymaps.
+;;; skg-keymaps-and-aliases.el alongside the other skg keymaps,
+;;; so require that explicitly — the `:keymap' slot of
+;;; `define-minor-mode' below consults the variable at load time.
 
+(require 'skg-keymaps-and-aliases)
 (require 'skg-id-search)
 
 ;;;###autoload

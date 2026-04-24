@@ -52,8 +52,17 @@ and hide INTERNAL from M-x completion."
 (progn ;; Minibuffer
   (define-key minibuffer-local-map (kbd "C-c o i") #'skg-paste-id)
   (define-key minibuffer-local-map (kbd "C-c o l") #'skg-paste-link)
-  (define-key minibuffer-local-map (kbd "C-c o I") #'skg-pop-id)
-  (define-key minibuffer-local-map (kbd "C-c o L") #'skg-pop-link))
+  (define-key minibuffer-local-map (kbd "C-c O i") #'skg-pop-id)
+  (define-key minibuffer-local-map (kbd "C-c O l") #'skg-pop-link))
+
+(with-eval-after-load 'shell ;; M-x shell
+  ;; A shell buffer is writable (you can type at the prompt), so
+  ;; insert-from-stack ops make sense here, just like in the
+  ;; minibuffer.
+  (define-key shell-mode-map (kbd "C-c o i") #'skg-paste-id)
+  (define-key shell-mode-map (kbd "C-c o l") #'skg-paste-link)
+  (define-key shell-mode-map (kbd "C-c O i") #'skg-pop-id)
+  (define-key shell-mode-map (kbd "C-c O l") #'skg-pop-link))
 
 ;; Pattern used for every mode-map below: a `defvar' declares the
 ;; variable with an empty `make-sparse-keymap', and a separate
@@ -80,8 +89,8 @@ and hide INTERNAL from M-x completion."
   (define-key map (kbd "C-c i p")   #'skg-id-prev)
   (define-key map (kbd "C-c o i")   #'skg-paste-id)
   (define-key map (kbd "C-c o l")   #'skg-paste-link)
-  (define-key map (kbd "C-c o I")   #'skg-pop-id)
-  (define-key map (kbd "C-c o L")   #'skg-pop-link))
+  (define-key map (kbd "C-c O i")   #'skg-pop-id)
+  (define-key map (kbd "C-c O l")   #'skg-pop-link))
 
 (defvar skg-content-view-mode-map (make-sparse-keymap)
   "Keymap for `skg-content-view-mode'.")
@@ -126,8 +135,8 @@ and hide INTERNAL from M-x completion."
   (progn;; copy-from / pop-from the id stack
     (define-key map (kbd "C-c o i") #'skg-paste-id)
     (define-key map (kbd "C-c o l") #'skg-paste-link)
-    (define-key map (kbd "C-c o I") #'skg-pop-id)
-    (define-key map (kbd "C-c o L") #'skg-pop-link))
+    (define-key map (kbd "C-c O i") #'skg-pop-id)
+    (define-key map (kbd "C-c O l") #'skg-pop-link))
   (progn;; git add ops (only fire if the .skg file is not yet in HEAD)
     (define-key map (kbd "C-c t n") #'skg-git-add-if-new)
     (define-key map (kbd "C-c t N") #'skg-git-add-if-new-recursive)))
