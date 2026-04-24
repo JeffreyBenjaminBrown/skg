@@ -41,6 +41,16 @@ struct ChildData {
   kind   : ContentReality,
 }
 
+/// Outcome of dispatching on the TrueNode's kind and state.
+/// Stop means the node has been handled (phantom/indefinitive/
+/// deleted-by-this-save) and no further completion is needed.
+/// Continue carries the pid/source extracted once for the rest
+/// of the pipeline.
+enum TruenodeKindOutcome {
+  Stop,
+  Continue { pid : ID, source : SourceName },
+}
+
 /// TrueNode completion.
 ///
 /// INTENDED USE: Use in the first, DFS preorder (parent-first)
@@ -48,18 +58,15 @@ struct ChildData {
 /// That's because the second, DFS-postorder (child-first)
 /// pass will not be correct if any truenode is missing children.
 ///
-/// WHAT IT DOES:
-/// (Beware, this comment could easily go stale.)
-/// - Error unless it's a truenode.
-/// - make_indef_if_repeat_then_extend_defmap
-/// - If it's indefinitive:
-///   - clobberIndefinitiveViewnode
-/// - If it's definitive, run (in order):
-///   - complete_content_children
-///   - mark_erroneous_content_children_as_indep
-///   - order_children_as_scaffolds_then_ignored_then_content
-///   - maybe_prepend_subscribee_col
-///   - maybe_prepend_diff_view_scaffolds
+/// WHAT IT DOES (high-level phases):
+/// 1. resolve_truenode_kind -- phantom/indefinitive/deleted-by-save
+///    short-circuits; otherwise yields (pid, source).
+/// 2. clear_consumed_edit_request
+/// 3. Load NodeComplete; sync title/body from disk for non-saved views.
+/// 4. reconcile_content_children -- goal list + phantoms + indep-mark.
+/// 5. order_children_as_scaffolds_then_ignored_then_content
+/// 6. maybe_prepend_subscribee_col
+/// 7. maybe_prepend_diff_view_scaffolds
 pub fn complete_truenode_preorder (
   node               : NodeId,
   tree               : &mut Tree<ViewNode>,
@@ -76,71 +83,21 @@ pub fn complete_truenode_preorder (
     "complete_truenode_preorder: expected TrueNode" ) ?;
   make_indef_if_repeat_then_extend_defmap(
     tree, node, defmap ) ?;
-  let (pid, source) : (ID, SourceName) = {
-    // Handle git diff view *before* the clobber-and-early-return
-    // that happens to indefinitive nodes.
-    let is_phantom : bool =
-      // Phantoms (nodes with diff status already set, e.g. Removed,
-      // RemovedHere) are display-only placeholders created during
-      // content reconciliation. They need no further completion.
-      read_at_node_in_tree( tree, node,
-        |vn : &ViewNode| match &vn . kind {
-          ViewNodeKind::True (t) => t . is_phantom(),
-          _ => false } ) ?;
-    if is_phantom { return Ok(( )); }
-    let (pid, source) : (ID, SourceName) =
-      pid_and_source_from_treenode( tree, node,
-                                    "complete_truenode_preorder" ) ?;
-    maybe_change_node_diff_status(
-      tree, node, &pid, source_diffs, &source)?;
-    (pid, source) };
-  { let is_indefinitive : bool =
-      read_at_node_in_tree( tree, node,
-        |vn : &ViewNode| match &vn . kind {
-          ViewNodeKind::True (t) => t . is_indefinitive (),
-          _ => false } ) ?;
-    if is_indefinitive {
-      clobberIndefinitiveViewnode( tree, node, config ) ?;
-      return Ok(( )); }}
-  if deleted_by_this_save_pids . contains (&pid) {
-    mutate_truenode_to_deletednode (
-      tree, node, &pid, &source ) ?;
-    return Ok(( )); }
-  write_at_truenode_in_tree ( tree, node, |t| {
-    // Clear any edit_request present. (By now has been consumed.) Analogous to 'remove_completed_view_request' for view requests.
-    if let IndefOrDef::Definitive { edit_request, .. }
-      = &mut t . indef_or_def
-      { *edit_request = None; } } ) ?;
+  let (pid, source) : (ID, SourceName) =
+    match resolve_truenode_kind (
+      tree, node, source_diffs, config,
+      deleted_by_this_save_pids ) ?
+    { TruenodeKindOutcome::Stop => return Ok (( )),
+      TruenodeKindOutcome::Continue { pid, source } => (pid, source) };
+  clear_consumed_edit_request (tree, node) ?;
   let nodecomplete : NodeComplete =
     nodecomplete_from_memory_or_disk ( config, &pid, &source ) ?;
   if ! is_saved_view { // The saved (definitive) view of a node *defines* the title and body, but other views need those fields updated.
-    let disk_title : String = nodecomplete . title . clone ();
-    let disk_body  : Option<String> = nodecomplete . body . clone ();
-    write_at_truenode_in_tree ( tree, node, |t| {
-      t . title = disk_title;
-      if let IndefOrDef::Definitive { body, .. } = &mut t . indef_or_def {
-        *body = disk_body; } }
-    ) ?; }
-  let content_ids : Vec<ID> =
-    nodecomplete . contains . clone();
+    sync_truenode_text_from_disk (tree, node, &nodecomplete) ?; }
   let subscribes_to : Vec<ID> =
-    nodecomplete . subscribes_to . or_default() . to_vec();
-  let (staged_nc, unstaged_nc)
-    : (Option<&NodeChanges>, Option<&NodeChanges>) =
-    per_stage_node_changes_for_truenode (
-      source_diffs, &pid, &source );
-  let is_sub : bool = is_subscribee( tree, node ) ?;
-  { let (goal_list, removed_ids, apparent_content_ids) =
-      // git diff view makes a difference
-      content_goal_list(
-        tree, node, &content_ids,
-        staged_nc, unstaged_nc,
-        is_sub, config ) ?;
-    complete_content_children(
-      tree, node, &goal_list, &removed_ids,
+    reconcile_content_children (
+      tree, node, &nodecomplete, &pid, &source,
       source_diffs, config, deleted_since_head_pid_src_map ) ?;
-    mark_erroneous_content_children_as_indep(
-      tree, node, &apparent_content_ids ) ?; }
   order_children_as_scaffolds_then_ignored_then_content(
     tree, node ) ?;
   maybe_prepend_subscribee_col(
@@ -149,6 +106,113 @@ pub fn complete_truenode_preorder (
     tree, node,
     source_diffs, &pid, &source ) ?;
   Ok(( )) }
+
+/// Phase 1 of complete_truenode_preorder: phantom/indefinitive/
+/// deleted-by-this-save nodes are finalised in place here and
+/// the function returns Stop; everything else yields Continue
+/// with the (pid, source) that later phases need.
+fn resolve_truenode_kind (
+  tree                       : &mut Tree<ViewNode>,
+  node                       : NodeId,
+  source_diffs               : &Option<HashMap<SourceName, SourceDiff>>,
+  config                     : &SkgConfig,
+  deleted_by_this_save_pids  : &HashSet<ID>,
+) -> Result<TruenodeKindOutcome, Box<dyn Error>> {
+  // Handle git diff view *before* the clobber-and-early-return
+  // that happens to indefinitive nodes.
+  let is_phantom : bool =
+    // Phantoms (nodes with diff status already set, e.g. Removed,
+    // RemovedHere) are display-only placeholders created during
+    // content reconciliation. They need no further completion.
+    read_at_node_in_tree( tree, node,
+      |vn : &ViewNode| match &vn . kind {
+        ViewNodeKind::True (t) => t . is_phantom(),
+        _ => false } ) ?;
+  if is_phantom { return Ok (TruenodeKindOutcome::Stop); }
+  let (pid, source) : (ID, SourceName) =
+    pid_and_source_from_treenode( tree, node,
+                                  "resolve_truenode_kind" ) ?;
+  maybe_change_node_diff_status(
+    tree, node, &pid, source_diffs, &source) ?;
+  let is_indefinitive : bool =
+    read_at_node_in_tree( tree, node,
+      |vn : &ViewNode| match &vn . kind {
+        ViewNodeKind::True (t) => t . is_indefinitive (),
+        _ => false } ) ?;
+  if is_indefinitive {
+    clobberIndefinitiveViewnode( tree, node, config ) ?;
+    return Ok (TruenodeKindOutcome::Stop); }
+  if deleted_by_this_save_pids . contains (&pid) {
+    mutate_truenode_to_deletednode (
+      tree, node, &pid, &source ) ?;
+    return Ok (TruenodeKindOutcome::Stop); }
+  Ok (TruenodeKindOutcome::Continue { pid, source }) }
+
+/// Phase 2: clear the edit_request that this preorder visit has
+/// consumed. Analogous to 'remove_completed_view_request' for
+/// view requests.
+fn clear_consumed_edit_request (
+  tree : &mut Tree<ViewNode>,
+  node : NodeId,
+) -> Result<(), Box<dyn Error>> {
+  write_at_truenode_in_tree ( tree, node, |t| {
+    if let IndefOrDef::Definitive { edit_request, .. }
+      = &mut t . indef_or_def
+      { *edit_request = None; } } ) ?;
+  Ok (( )) }
+
+/// Phase 3 (non-saved views only): overwrite the viewnode's title
+/// and body with the fresh values from disk. The saved view is the
+/// one that *defines* those fields, so it is excluded.
+fn sync_truenode_text_from_disk (
+  tree         : &mut Tree<ViewNode>,
+  node         : NodeId,
+  nodecomplete : &NodeComplete,
+) -> Result<(), Box<dyn Error>> {
+  let disk_title : String = nodecomplete . title . clone ();
+  let disk_body  : Option<String> = nodecomplete . body . clone ();
+  write_at_truenode_in_tree ( tree, node, |t| {
+    t . title = disk_title;
+    if let IndefOrDef::Definitive { body, .. } = &mut t . indef_or_def {
+      *body = disk_body; } }
+  ) ?;
+  Ok (( )) }
+
+/// Phase 4: compute the content goal list (diff-aware), reconcile
+/// children against it, and mark any surviving non-goal children
+/// as Birth::Independent. Returns 'subscribes_to' so phase 6 can
+/// decide whether to prepend a SubscribeeCol.
+fn reconcile_content_children (
+  tree                           : &mut Tree<ViewNode>,
+  node                           : NodeId,
+  nodecomplete                   : &NodeComplete,
+  pid                            : &ID,
+  source                         : &SourceName,
+  source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
+  config                         : &SkgConfig,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+) -> Result<Vec<ID>, Box<dyn Error>> {
+  let content_ids : Vec<ID> =
+    nodecomplete . contains . clone();
+  let subscribes_to : Vec<ID> =
+    nodecomplete . subscribes_to . or_default() . to_vec();
+  let (staged_nc, unstaged_nc)
+    : (Option<&NodeChanges>, Option<&NodeChanges>) =
+    per_stage_node_changes_for_truenode (
+      source_diffs, pid, source );
+  let is_sub : bool = is_subscribee (tree, node) ?;
+  let (goal_list, removed_ids, apparent_content_ids) =
+    // git diff view makes a difference
+    content_goal_list(
+      tree, node, &content_ids,
+      staged_nc, unstaged_nc,
+      is_sub, config ) ?;
+  complete_content_children(
+    tree, node, &goal_list, &removed_ids,
+    source_diffs, config, deleted_since_head_pid_src_map ) ?;
+  mark_erroneous_content_children_as_indep(
+    tree, node, &apparent_content_ids ) ?;
+  Ok (subscribes_to) }
 
 fn mutate_truenode_to_deletednode (
   tree   : &mut Tree<ViewNode>,
