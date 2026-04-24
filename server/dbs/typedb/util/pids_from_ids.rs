@@ -19,13 +19,13 @@ use crate::dbs::typedb::util::concept_document::extract_id_from_node;
 /// Only query TypeDB for nodes not already resolvable in the in-Rust
 /// memory snapshot.
 pub async fn replace_ids_with_pids(
-  forest  : &mut Tree<UncheckedViewNode>,
+  viewforest  : &mut Tree<UncheckedViewNode>,
   root_id : NodeId,
   db_name : &str,
   driver  : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
   let mut all_ids: Vec<ID> = Vec::new();
-  collect_ids_in_tree( forest . root(),
+  collect_ids_in_tree( viewforest . root(),
                        &mut all_ids );
   let snap = snapshot_global ();
   let mut pids_from_memory: HashMap<ID, Option<ID>> =
@@ -45,7 +45,7 @@ pub async fn replace_ids_with_pids(
     pids_from_ids( db_name, driver, &unknown_ids
     ) . await?;
   pids_from_memory . extend (pids_from_typedb);
-  if let Some (root_mut) = forest . get_mut (root_id) {
+  if let Some (root_mut) = viewforest . get_mut (root_id) {
     assign_pids_throughout_tree_from_map(
       root_mut, &pids_from_memory); }
   Ok(( )) }

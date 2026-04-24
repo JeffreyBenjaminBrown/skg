@@ -6,11 +6,11 @@ use crate::types::viewnode::{ViewNode, ViewNodeKind, Birth, mk_indefinitive_view
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::HashMap;
 
-/// Insert full containerward ancestry trees into the search forest,
+/// Insert full containerward ancestry trees into the search viewforest,
 /// under each level-1 result TrueNode.
 /// Ancestry children are prepended (inserted first among siblings).
 pub(crate) fn insert_containerward_ancestries_into_search_view (
-  forest         : &mut Tree<ViewNode>,
+  viewforest         : &mut Tree<ViewNode>,
   search_results : &[ID],
   ancestry_by_id : &HashMap<ID, AncestryTree>,
   tantivy_index  : &TantivyIndex,
@@ -19,7 +19,7 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
   // Search results ("hits") are level-1 BufferRoot children.
   // Match them by ID from search_results.
   let level1_ids : Vec<(NodeId, ID)> = {
-    let root_ref : NodeRef<ViewNode> = forest . root ();
+    let root_ref : NodeRef<ViewNode> = viewforest . root ();
     root_ref . children ()
     . filter_map ( |c| match &c . value () . kind {
       ViewNodeKind::True (t) =>
@@ -37,7 +37,7 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
           // the ancestry ends up first among siblings.
           insert_containerward_ancestry_tree (
             child, *node_nid,
-            forest, tantivy_index, config ); } } } } }
+            viewforest, tantivy_index, config ); } } } } }
 
 /// Recursively insert an AncestryTree and its children
 /// as indefinitive non-content TrueNode children
@@ -45,19 +45,19 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
 fn insert_containerward_ancestry_tree(
   node          : &AncestryTree,
   parent_nid    : NodeId,
-  forest        : &mut Tree<ViewNode>,
+  viewforest        : &mut Tree<ViewNode>,
   tantivy_index : &TantivyIndex,
   config        : &SkgConfig,
 ) {
   let child_nid : NodeId =
     prepend_containing_child_from_tantivy (
       node . id (), parent_nid,
-      forest, tantivy_index, config );
+      viewforest, tantivy_index, config );
   if let AncestryTree::Inner ( _, children ) = node {
     for child in children {
       insert_containerward_ancestry_tree (
         child, child_nid,
-        forest, tantivy_index, config ); } } }
+        viewforest, tantivy_index, config ); } } }
 
 /// Looks up a node's title and source from Tantivy,
 /// prepends an indefinitive independent TrueNode child
@@ -66,7 +66,7 @@ fn insert_containerward_ancestry_tree(
 fn prepend_containing_child_from_tantivy (
   node_id       : &ID, // what to prepend
   parent_treeid : NodeId, // where to prepend
-  forest        : &mut Tree<ViewNode>,
+  viewforest        : &mut Tree<ViewNode>,
   tantivy_index : &TantivyIndex,
   _config       : &SkgConfig,
 ) -> NodeId {
@@ -79,6 +79,6 @@ fn prepend_containing_child_from_tantivy (
     mk_indefinitive_viewnode ( node_id . clone (), source, title,
                                Birth::ContainerOf );
   let mut parent_mut : NodeMut<ViewNode> =
-    forest . get_mut (parent_treeid) . unwrap ();
+    viewforest . get_mut (parent_treeid) . unwrap ();
   parent_mut . prepend (viewnode)
     . id () }

@@ -190,7 +190,7 @@ pub fn per_stage_node_changes_for_truenode<'a> (
 
 /// Union the per-stage signs for a list-field diff into a single
 /// (item, MembershipAxes) list. Order comes from whichever stage is
-/// present (prefers unstaged if both, matching apply_diff_to_forest's
+/// present (prefers unstaged if both, matching apply_diff_to_viewforest's
 /// baseline choice). Items present in only one stage's diff are
 /// included with their stage's sign and the other stage unset.
 ///

@@ -164,7 +164,7 @@ fn test_move_id_scaffolds_to_child_respawns()
 /// Same as 'test_delete_id_col_scaffold_respawns' but with the fixture
 /// transition staged (git add) rather than unstaged. The respawned IDCol
 /// children should report '(staged ...)' tags — this verifies that the
-/// save-rerender pipeline (complete_id_col + complete_viewtree) honors the
+/// save-rerender pipeline (complete_id_col + complete_viewforest) honors the
 /// staged/unstaged distinction instead of merging stages and defaulting
 /// to unstaged.
 #[test]

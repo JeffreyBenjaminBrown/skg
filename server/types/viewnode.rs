@@ -160,7 +160,7 @@ pub enum Scaffold {
   Alias { text: String, // an alias for the node's grandparent
           membership: MembershipAxes },
   AliasCol, // The node collects (as children) aliases for its parent.
-  BufferRoot, // Not rendered. Makes forests easier to process. Its children are the level-1 headlines of the org buffer.
+  BufferRoot, // Not rendered. Makes viewforests easier to process. Its children are the level-1 headlines of the org buffer.
   HiddenInSubscribeeCol, // Child of a Subscribee. Collects nodes that the subscriber hides from its subscriptions, and that are top-level content of this subscribee.
   HiddenOutsideOfSubscribeeCol, // Child of SubscribeeCol. Collects nodes that the subscriber hides from its subscriptions, but that are not top-level content of any of its subscribees.
   ID { id: ID, // an ID of the node's grandparent.
@@ -630,7 +630,7 @@ pub fn viewnode_from_scaffold ( scaffold : Scaffold ) -> ViewNode {
   }}
 
 /// Helper to create a BufferRoot ViewNode.
-pub fn forest_root_viewnode () -> ViewNode {
+pub fn viewforest_root_viewnode () -> ViewNode {
   ViewNode {
     focused     : false,
     folded      : false,

@@ -1,5 +1,5 @@
 /// PURPOSE:
-/// Add missing information to nodes in the forest. Namely:
+/// Add missing information to nodes in the viewforest. Namely:
 /// - when treatment should be Alias, make it so
 /// - add missing IDs where treatment is Content
 
@@ -22,26 +22,26 @@ use uuid::Uuid;
 /// Does not add *all* missing info.
 /// 'supplement_none_fields_from_disk_if_save' does some of that, too,
 /// although it operates on DefineNodes, downstream.
-pub async fn add_missing_info_to_forest(
-  forest  : &mut Tree<UncheckedViewNode>, // has BufferRoot at root
+pub async fn add_missing_info_to_viewforest(
+  viewforest  : &mut Tree<UncheckedViewNode>, // has BufferRoot at root
   db_name : &str,
   driver  : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
   do_everywhere_in_tree_dfs(
-    forest,
-    forest . root() . id(),
+    viewforest,
+    viewforest . root() . id(),
     &mut |mut node| {
       make_alias_if_appropriate (&mut node)?;
       inherit_parent_source_if_possible (&mut node)?;
       Ok (( )) } )?;
-  let root_id: NodeId = forest . root() . id();
+  let root_id: NodeId = viewforest . root() . id();
   replace_ids_with_pids(
-    forest, root_id, db_name, driver ) . await ?;
+    viewforest, root_id, db_name, driver ) . await ?;
   do_everywhere_in_tree_dfs(
     // Assign new IDs after PID replacement, not before,
     // so that fresh UUIDs don't trigger a pointless TypeDB lookup.
-    forest,
-    forest . root() . id(),
+    viewforest,
+    viewforest . root() . id(),
     &mut |mut node| {
       assign_new_id_if_absent (&mut node)?;
       Ok (( )) } )?;

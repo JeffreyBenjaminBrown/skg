@@ -1,11 +1,11 @@
 // cargo test merge::merge_nodes
 
 use skg::dbs::memory::InRustGraphHandle;
-use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_viewnode_forest;
+use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_viewforest;
 use skg::merge::merge_nodes;
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid, graph_handle_from_config, audit_memory_or_panic};
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SourceName};
-use skg::types::viewnode::{EditRequest, ViewNode, ViewNodeKind, TrueNode, IndefOrDef, forest_root_viewnode, default_truenode};
+use skg::types::viewnode::{EditRequest, ViewNode, ViewNodeKind, TrueNode, IndefOrDef, viewforest_root_viewnode, default_truenode};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::Merge;
 use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_source;
@@ -77,15 +77,15 @@ async fn test_merge_2_into_1_impl(
   driver: &TypeDBDriver,
   tantivy: &TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // Create viewnode forest with node 1 requesting to merge node 2
+  // Create viewnode viewforest with node 1 requesting to merge node 2
   let view_node_1 = mk_test_viewnode("1", "1", Some(EditRequest::Merge(ID::from ("2"))));
-  let mut forest: Tree<ViewNode> = Tree::new(forest_root_viewnode());
-  forest . root_mut() . append (view_node_1);
+  let mut viewforest: Tree<ViewNode> = Tree::new(viewforest_root_viewnode());
+  viewforest . root_mut() . append (view_node_1);
 
   // Generate Merge from merge request
   let merge_instructions: Vec<Merge> =
-    instructiontriples_from_the_merges_in_an_viewnode_forest(
-      &forest,
+    instructiontriples_from_the_merges_in_an_viewforest(
+      &viewforest,
       config,
       driver,
   ) . await?;
@@ -338,15 +338,15 @@ async fn test_merge_1_into_2_impl(
   driver: &TypeDBDriver,
   tantivy: &TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // Create viewnode forest with node 2 requesting to merge node 1
+  // Create viewnode viewforest with node 2 requesting to merge node 1
   let view_node_2 = mk_test_viewnode("2", "2", Some(EditRequest::Merge(ID::from ("1"))));
-  let mut forest: Tree<ViewNode> = Tree::new(forest_root_viewnode());
-  forest . root_mut() . append (view_node_2);
+  let mut viewforest: Tree<ViewNode> = Tree::new(viewforest_root_viewnode());
+  viewforest . root_mut() . append (view_node_2);
 
   // Generate Merge from merge request
   let merge_instructions: Vec<Merge> =
-    instructiontriples_from_the_merges_in_an_viewnode_forest(
-      &forest,
+    instructiontriples_from_the_merges_in_an_viewforest(
+      &viewforest,
       config,
       driver,
   ) . await?;
@@ -690,11 +690,11 @@ async fn test_memory_queries_resolve_aliases_after_merge_impl (
   let view_node_2 =
     mk_test_viewnode ("2", "2",
                       Some (EditRequest::Merge (ID::from ("1"))));
-  let mut forest : Tree<ViewNode> = Tree::new (forest_root_viewnode ());
-  forest . root_mut () . append (view_node_2);
+  let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  viewforest . root_mut () . append (view_node_2);
   let merge_instructions : Vec<Merge> =
-    instructiontriples_from_the_merges_in_an_viewnode_forest (
-      &forest, config, driver ) . await?;
+    instructiontriples_from_the_merges_in_an_viewforest (
+      &viewforest, config, driver ) . await?;
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   merge_nodes (

@@ -24,14 +24,14 @@ fn test_org_to_uninterpreted_nodes2() {
             ** bb
         "};
 
-  let forest: Tree<UncheckedViewNode> =
+  let viewforest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
 
-  let forest_roots: Vec<_> = forest . root() . children() . collect();
-  assert_eq!(forest_roots . len(), 2, "Should have exactly 2 tree roots");
+  let viewforest_roots: Vec<_> = viewforest . root() . children() . collect();
+  assert_eq!(viewforest_roots . len(), 2, "Should have exactly 2 tree roots");
 
   // Test first tree (node 'a' and its children)
-  let tree_a = &forest_roots[0];
+  let tree_a = &viewforest_roots[0];
   let node_a = tree_a . value();
   assert_eq!(node_a . title(), "a");
   assert_eq!(node_a . body(), None);
@@ -44,7 +44,7 @@ fn test_org_to_uninterpreted_nodes2() {
   assert_eq!(node_a_children[1] . value() . title(), "ab");
 
   // Test second tree (node 'b' and its children)
-  let tree_b = &forest_roots[1];
+  let tree_b = &viewforest_roots[1];
   let node_b = tree_b . value();
   assert_eq!(node_b . title(), "b");
   assert_eq!(node_b . body(), Some(&"  body of b" . to_string()));
@@ -76,11 +76,11 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
             This node has cycle flag
         "};
 
-  let forest: Tree<UncheckedViewNode> =
+  let viewforest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
 
   // Get tree roots (children of BufferRoot)
-  let tree_roots: Vec<_> = forest . root() . children() . collect();
+  let tree_roots: Vec<_> = viewforest . root() . children() . collect();
   assert_eq!(tree_roots . len(), 3, "Should have exactly 3 trees");
 
   // Test root node with metadata
@@ -118,10 +118,10 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
             * another node
         "};
 
-  let forest: Tree<UncheckedViewNode> =
+  let viewforest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
 
-  let tree_roots: Vec<_> = forest . root() . children() . collect();
+  let tree_roots: Vec<_> = viewforest . root() . children() . collect();
   assert_eq!(tree_roots . len(), 2);
 
   // Test first node - should have all default values except title and body
@@ -159,9 +159,9 @@ fn test_org_to_uninterpreted_nodes2_body_spacing() {
                 line 3 with 4 spaces
         "};
 
-  let forest: Tree<UncheckedViewNode> =
+  let viewforest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let tree_roots: Vec<_> = forest . root() . children() . collect();
+  let tree_roots: Vec<_> = viewforest . root() . children() . collect();
 
   assert_eq!(tree_roots . len(), 2);
 
@@ -187,11 +187,11 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
             Regular body
         "};
 
-  let forest: Tree<UncheckedViewNode> =
+  let viewforest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
 
   // Get tree roots (children of BufferRoot)
-  let tree_roots: Vec<_> = forest . root() . children() . collect();
+  let tree_roots: Vec<_> = viewforest . root() . children() . collect();
   assert_eq!(tree_roots . len(), 2);
 
   // Test node with metadata
@@ -212,10 +212,10 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
 #[test]
 fn test_org_to_uninterpreted_nodes2_empty_input() {
   let input = "";
-  let forest: Tree<UncheckedViewNode> =
+  let viewforest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   // BufferRoot should have no children
-  assert_eq!(forest . root() . children() . count(), 0);
+  assert_eq!(viewforest . root() . children() . count(), 0);
 
   let input2 = "   \n  \n  ";
   let trees2: Tree<UncheckedViewNode> =
@@ -232,9 +232,9 @@ fn test_org_to_uninterpreted_nodes2_only_text() {
             at all
         "};
 
-  let forest: Tree<UncheckedViewNode> =
+  let viewforest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  assert_eq!(forest . root() . children() . count(), 0,
+  assert_eq!(viewforest . root() . children() . count(), 0,
              "Should have no tree roots when there are no headlines");
 }
 

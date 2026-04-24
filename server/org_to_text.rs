@@ -5,14 +5,14 @@ use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, Tr
 use ego_tree::{NodeRef, Tree};
 use std::error::Error;
 
-/// PURPOSE: Render a "forest" -- a tree with BufferRoot at root
+/// PURPOSE: Render a "viewforest" -- a tree with BufferRoot at root
 /// -- to org-mode text.
 /// BufferRoot is not rendered; its children start at level 1.
 ///
 /// ASSUMES: metadata has already been enriched with relationship data.
 /// ERRORS: if root is not a BufferRoot.
-pub fn viewnode_forest_to_string (
-  forest : &Tree<ViewNode>,
+pub fn viewforest_to_string (
+  viewforest : &Tree<ViewNode>,
   config : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   fn render_node_subtree_to_org (
@@ -30,14 +30,14 @@ pub fn viewnode_forest_to_string (
           level + 1,
           config )? ); }
     Ok (out) }
-  let root_ref : NodeRef<ViewNode> = forest . root ();
-  let is_forest_root : bool =
+  let root_ref : NodeRef<ViewNode> = viewforest . root ();
+  let is_viewforest_root : bool =
     matches! (
       & root_ref . value () . kind,
       ViewNodeKind::Scaff (Scaffold::BufferRoot));
-  if ! is_forest_root {
+  if ! is_viewforest_root {
     return Err (
-      "viewnode_forest_to_string: root is not a BufferRoot" . into() ); }
+      "viewforest_to_string: root is not a BufferRoot" . into() ); }
   let mut result : String =
     String::new ();
   for child in root_ref . children () {

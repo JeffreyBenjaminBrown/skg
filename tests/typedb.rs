@@ -364,15 +364,15 @@ async fn test_recursive_document (
     = single_root_view (
           driver, config, &ID ( "a" . to_string () ), false
         ) . await ?;
-  let unchecked_forest : Tree<UncheckedViewNode> =
+  let unchecked_viewforest : Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes (& result_org_text)
     . map_err ( |e| format! ( "Parse error: {}", e ) ) ? . 0;
-  let result_forest : Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_forest)
+  let result_viewforest : Tree<ViewNode> =
+    unchecked_to_checked_tree (unchecked_viewforest)
     . map_err ( |e| format! ( "Check error: {}", e ) ) ?;
 
   let tree_roots : Vec<_> =
-    result_forest . root() . children() . collect();
+    result_viewforest . root() . children() . collect();
   assert_eq! ( tree_roots . len (), 1,
     "Expected exactly 1 root node" );
 

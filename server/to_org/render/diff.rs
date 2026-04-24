@@ -1,5 +1,5 @@
 /// Diff application module for git diff view.
-/// Applies diff information to a forest of ViewNodes.
+/// Applies diff information to a viewforest of ViewNodes.
 ///
 /// Each TrueNode and Scaffold is decorated with per-stage diff axes:
 ///   X (existence) describes whether the node's '.skg' file changed
@@ -22,19 +22,19 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
 
-/// Apply diff information to a forest of ViewNodes.
+/// Apply diff information to a viewforest of ViewNodes.
 /// Modifies nodes in place to add per-stage diff axes
 /// and insert phantom nodes for positions missing from worktree.
-pub fn apply_diff_to_forest (
-  forest             : &mut Tree<ViewNode>,
+pub fn apply_diff_to_viewforest (
+  viewforest             : &mut Tree<ViewNode>,
   source_diffs       : &HashMap<SourceName, SourceDiff>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let root_id : NodeId =
-    forest . root() . id();
+    viewforest . root() . id();
   do_everywhere_in_tree_dfs (
-    forest, root_id,
+    viewforest, root_id,
     &mut |node_mut| { process_node_for_diff (
                         node_mut, source_diffs,
                         deleted_since_head_pid_src_map, config ) } )?;

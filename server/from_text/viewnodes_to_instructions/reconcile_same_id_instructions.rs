@@ -1,6 +1,6 @@
 /// PITFALL: ASSUMES IDs have been replaced by PIDs
 /// in the 'id' field of every ViewNode.
-/// (Currently, 'add_missing_info_to_forest' does this.)
+/// (Currently, 'add_missing_info_to_viewforest' does this.)
 /// .
 /// THE IDEA
 /// After validation, we have:

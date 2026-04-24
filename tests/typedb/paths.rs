@@ -13,7 +13,7 @@ use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::viewnode::ViewNode;
 
-use skg::org_to_text::viewnode_forest_to_string;
+use skg::org_to_text::viewforest_to_string;
 
 use indoc::indoc;
 use ego_tree::Tree;
@@ -61,14 +61,14 @@ async fn test_multi_cycle_fork_impl(
   let input: &str = indoc! {"
     * (skg (node (id a) (source main))) a
   "};
-  let unchecked_forest = org_to_uninterpreted_nodes (input)?. 0;
-  let mut forest: Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_forest)?;
+  let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
+  let mut viewforest: Tree<ViewNode> =
+    unchecked_to_checked_tree (unchecked_viewforest)?;
   let node_a_id =
-    forest . root () . first_child () . unwrap () . id ();
+    viewforest . root () . first_child () . unwrap () . id ();
   
   build_and_integrate_containerward_path (
-    &mut forest, node_a_id, &config, driver
+    &mut viewforest, node_a_id, &config, driver
   ) . await ?;
   // Sorted branches [b, d, f] are prepended in order,
   // so visual order is reversed: f, d, b.
@@ -86,9 +86,9 @@ async fn test_multi_cycle_fork_impl(
   let expected_trees: Tree<ViewNode> =
     unchecked_to_checked_tree (expected_unchecked)?;
   let actual_str : String =
-    viewnode_forest_to_string (&forest, config)?;
+    viewforest_to_string (&viewforest, config)?;
   let expected_str : String =
-    viewnode_forest_to_string (&expected_trees, config)?;
+    viewforest_to_string (&expected_trees, config)?;
   assert_eq!(
     actual_str, expected_str,
     "Multi-cycle fork: tree structure should match" );

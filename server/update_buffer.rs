@@ -5,13 +5,13 @@ pub mod graphnodestats;
 pub mod util;
 pub mod viewnodestats;
 
-pub use complete::complete_viewtree;
-pub use graphnodestats::set_graphnodestats_in_forest;
-pub use viewnodestats::set_viewnodestats_in_forest;
+pub use complete::complete_viewforest;
+pub use graphnodestats::set_graphnodestats_in_viewforest;
+pub use viewnodestats::set_viewnodestats_in_viewforest;
 
 use crate::dbs::memory::{memory_coherent_with_save_instructions, scheduled_audit::take_pending_audit_warning};
 use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
-use crate::org_to_text::viewnode_forest_to_string;
+use crate::org_to_text::viewforest_to_string;
 use crate::serve::ConnectionState;
 use crate::serve::handlers::save_buffer::{ SaveResponse, compute_diff_for_every_source, deleted_ids_to_source};
 use crate::serve::protocol::TcpToClient;
@@ -110,7 +110,7 @@ pub async fn update_views_after_save (
           . map ( |u| u . repr_in_client () )
           . collect::<Vec<_>> ()); }
     for curi in collateral_uris { // Same rerender_view pipeline as the saved view, but with is_saved_view=false. Each rerender fetches from the in-Rust memory directly. Streamed to Emacs immediately.
-      let mut forest : Tree<ViewNode> = match
+      let mut viewforest : Tree<ViewNode> = match
         conn_state . memory . viewuri_to_view (&curi) {
           Some (f) => f . clone (),
           None => {
@@ -122,13 +122,13 @@ pub async fn update_views_after_save (
                 tracing::info_span!( "rerender_view (collateral)"
                 ). entered();
         rerender_view (
-          &mut forest,
+          &mut viewforest,
           &source_diffs, config, typedb_driver,
           &mut errors, &deleted_since_head_pid_src_map,
           &deleted_by_this_save_pids,
           false ) . await }
       { Ok (text) => {
-          conn_state . memory . update_view (&curi, forest);
+          conn_state . memory . update_view (&curi, viewforest);
           send_response_with_length_prefix (
             stream,
             & tag_sexp_response (
@@ -144,7 +144,7 @@ pub async fn update_views_after_save (
                        errors } ) }
 
 /// Given the saved ViewUri and save instructions,
-/// return the URIs of other views whose forests
+/// return the URIs of other views whose viewforests
 /// contain any changed PID. Includes search views --
 /// they are just as editable as other kinds.
 fn find_collateral_view_uris (
@@ -171,10 +171,10 @@ fn find_collateral_view_uris (
     . collect ();
   uris . into_iter () . collect () }
 
-/// Strip stale diff data, re-complete the viewtree,
+/// Strip stale diff data, re-complete the viewforest,
 /// set graph/view stats, and render to string.
 pub async fn rerender_view (
-  forest                         : &mut Tree<ViewNode>,
+  viewforest                         : &mut Tree<ViewNode>,
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   config                         : &SkgConfig,
   typedb_driver                  : &TypeDBDriver,
@@ -185,55 +185,55 @@ pub async fn rerender_view (
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
   tracing::debug!("rerender_view: starting");
-  strip_stale_diff_state (forest) ?;
+  strip_stale_diff_state (viewforest) ?;
   let mut defmap : DefinitiveMap = DefinitiveMap::new ();
-  tracing::debug!("rerender_view: starting complete_viewtree");
-  complete_viewtree (
-    forest, &mut defmap,
+  tracing::debug!("rerender_view: starting complete_viewforest");
+  complete_viewforest (
+    viewforest, &mut defmap,
     source_diffs, config, typedb_driver,
     errors, deleted_since_head_pid_src_map,
     deleted_by_this_save_pids,
     is_saved_view ) . await ?;
-  mark_view_roots_independent (forest);
+  mark_view_roots_independent (viewforest);
   if let Some (snap) = snapshot_global () {
     // Correct any birth markers whose claimed relation to the
     // parent doesn't hold in memory (e.g. user moved a
     // birth=linksTo node under a new parent it doesn't link to).
     // No-op when the global graph handle isn't initialized (tests
     // that bypass startup).
-    validate_birth_relationships (forest, &snap); }
+    validate_birth_relationships (viewforest, &snap); }
   attach_containerward_ancestries_to_removedhere_phantoms (
-    forest, config, typedb_driver ) . await ?;
-  tracing::debug!("rerender_view: complete_viewtree done ({:.3}s), starting graphnodestats",
+    viewforest, config, typedb_driver ) . await ?;
+  tracing::debug!("rerender_view: complete_viewforest done ({:.3}s), starting graphnodestats",
             t_rerender . elapsed () . as_secs_f64 ());
   let ( container_to_contents, content_to_containers ) =
-    set_graphnodestats_in_forest (
-      forest, config, typedb_driver ) . await ?;
+    set_graphnodestats_in_viewforest (
+      viewforest, config, typedb_driver ) . await ?;
   tracing::debug!("rerender_view: graphnodestats done ({:.3}s), rendering to string",
             t_rerender . elapsed () . as_secs_f64 ());
-  set_viewnodestats_in_forest (
-    forest,
+  set_viewnodestats_in_viewforest (
+    viewforest,
     &container_to_contents,
     &content_to_containers,
     config );
   let result : Result<String, Box<dyn Error>> =
-    viewnode_forest_to_string (forest, config);
+    viewforest_to_string (viewforest, config);
   tracing::debug!("rerender_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
   result }
 
-/// Reset all traces of a prior diff-view rendering so the forest
+/// Reset all traces of a prior diff-view rendering so the viewforest
 /// is ready for a fresh pass. Three independent traversals today;
 /// could be fused if traversal cost ever mattered.
 fn strip_stale_diff_state (
-  forest : &mut Tree<ViewNode>
+  viewforest : &mut Tree<ViewNode>
 ) -> Result<(), Box<dyn Error>> {
-  remove_branches_that_git_marked_removed (forest) ?;
-  remove_diff_only_scaffolds (forest) ?;
-  clear_diff_metadata (forest) ?;
+  remove_branches_that_git_marked_removed (viewforest) ?;
+  remove_diff_only_scaffolds (viewforest) ?;
+  clear_diff_metadata (viewforest) ?;
   Ok (( )) }
 
-/// Strip from the forest every branch whose root
+/// Strip from the viewforest every branch whose root
 ///   is marked as removed or removed-here.
 /// Exception: Does not strip:
 ///   - top-level branches (children of BufferRoot)
@@ -252,15 +252,15 @@ fn strip_stale_diff_state (
 /// -- it is no longer missing here.
 /// Etc. Much easier to just regenerate them at each save.
 fn remove_branches_that_git_marked_removed (
-  forest : &mut Tree<ViewNode>
+  viewforest : &mut Tree<ViewNode>
 ) -> Result<(), Box<dyn Error>> {
-  let forest_root_id : NodeId =
-    forest . root() . id();
+  let viewforest_root_id : NodeId =
+    viewforest . root() . id();
   do_everywhere_in_tree_dfs_prunable (
-    forest,
-    forest_root_id,
+    viewforest,
+    viewforest_root_id,
     &mut |mut node : NodeMut<ViewNode>| -> Result<bool, String> {
-      let is_forest_root_child : bool = {
+      let is_viewforest_root_child : bool = {
         match node . parent() {
           Some (mut p) =>
             matches! ( &p . value() . kind,
@@ -270,7 +270,7 @@ fn remove_branches_that_git_marked_removed (
         match &node . value() . kind {
           ViewNodeKind::True (t) =>
             t . is_phantom ()
-            && ! is_forest_root_child
+            && ! is_viewforest_root_child
             && ! t . parent_ignores_it(),
           _ => false };
       if should_remove {
@@ -289,13 +289,13 @@ fn remove_branches_that_git_marked_removed (
 /// diff mode) are cleaned up by complete_alias_col during the postorder
 /// pass: its goal list won't include them, so they are detached.
 fn remove_diff_only_scaffolds (
-  forest : &mut Tree<ViewNode>
+  viewforest : &mut Tree<ViewNode>
 ) -> Result<(), Box<dyn Error>> {
-  let forest_root_id : NodeId =
-    forest . root() . id();
+  let viewforest_root_id : NodeId =
+    viewforest . root() . id();
   do_everywhere_in_tree_dfs_prunable (
-    forest,
-    forest_root_id,
+    viewforest,
+    viewforest_root_id,
     &mut |mut node : NodeMut<ViewNode>| -> Result<bool, String> {
       let is_diff_scaffold : bool =
         matches! ( &node . value() . kind,
@@ -307,17 +307,17 @@ fn remove_diff_only_scaffolds (
       } else { Ok (true) } } ) ?;
   Ok (( )) }
 
-/// Clear diff metadata from all TrueNodes in the forest.
+/// Clear diff metadata from all TrueNodes in the viewforest.
 /// Diff-only scaffolds (TextChanged, IDCol) are
 /// removed by 'remove_diff_only_scaffolds' before this runs.
 fn clear_diff_metadata (
-  forest : &mut Tree<ViewNode>
+  viewforest : &mut Tree<ViewNode>
 ) -> Result<(), Box<dyn Error>> {
-  let forest_root_id : NodeId =
-    forest . root() . id();
+  let viewforest_root_id : NodeId =
+    viewforest . root() . id();
   do_everywhere_in_tree_dfs (
-    forest,
-    forest_root_id,
+    viewforest,
+    viewforest_root_id,
     &mut |mut node : NodeMut<ViewNode>| -> Result<(), String>
       { // Ignores scaffolds: some (Alias, ID) carry diff data,
         // but they are regenerated from scratch by their postorder
@@ -330,18 +330,18 @@ fn clear_diff_metadata (
         Ok (( )) } ) ?;
   Ok (( )) }
 
-/// For every RemovedHere phantom in the forest,
+/// For every RemovedHere phantom in the viewforest,
 /// fetch its containerward ancestry from TypeDB
 /// and insert it as indefinitive ContainerOf children.
 /// Short-circuits when no RemovedHere phantoms exist.
 async fn attach_containerward_ancestries_to_removedhere_phantoms (
-  forest        : &mut Tree<ViewNode>,
+  viewforest        : &mut Tree<ViewNode>,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
   let phantom_nodes : Vec<(NodeId, ID)> = {
     let mut result : Vec<(NodeId, ID)> = Vec::new ();
-    for edge in forest . root () . traverse () {
+    for edge in viewforest . root () . traverse () {
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
         if let ViewNodeKind::True (t) = &node_ref . value () . kind {
           if t . is_removedhere_phantom () {
@@ -365,6 +365,6 @@ async fn attach_containerward_ancestries_to_removedhere_phantoms (
         for child in children . iter () . rev () {
           insert_containerward_ancestry_tree_recursive (
             child, phantom_nid,
-            forest, config, typedb_driver
+            viewforest, config, typedb_driver
           ) . await ?; }} }}
   Ok (( )) }

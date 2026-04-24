@@ -17,8 +17,8 @@ use std::future::Future;
 use std::pin::Pin;
 use typedb_driver::TypeDBDriver;
 
-pub async fn complete_viewtree (
-  forest             : &mut Tree<ViewNode>,
+pub async fn complete_viewforest (
+  viewforest             : &mut Tree<ViewNode>,
   defmap             : &mut DefinitiveMap,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
@@ -28,15 +28,15 @@ pub async fn complete_viewtree (
   deleted_by_this_save_pids       : &HashSet<ID>,
   is_saved_view                   : bool,
 ) -> Result<(), Box<dyn Error>> {
-  let root_treeid : NodeId = forest . root () . id ();
+  let root_treeid : NodeId = viewforest . root () . id ();
   complete_preorder_recursive (
-    forest, root_treeid,
+    viewforest, root_treeid,
     defmap, source_diffs, config, driver,
     deleted_since_head_pid_src_map,
     deleted_by_this_save_pids,
     is_saved_view ) . await ?;
   complete_postorder_recursive (
-    forest, root_treeid,
+    viewforest, root_treeid,
     defmap, source_diffs, config, driver,
     errors, deleted_since_head_pid_src_map ) . await ?;
   Ok(( )) }

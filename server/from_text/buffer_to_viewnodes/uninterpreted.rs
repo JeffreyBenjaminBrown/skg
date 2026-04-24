@@ -4,7 +4,7 @@
 use crate::types::sexp::find_sexp_end;
 use crate::types::errors::BufferValidationError;
 use crate::serve::parse_metadata_sexp::{ parse_metadata_to_viewnodemd, default_metadata, viewnode_from_metadata, ViewnodeMetadata };
-use crate::types::unchecked_viewnode::{UncheckedViewNode, unchecked_forest_root_viewnode};
+use crate::types::unchecked_viewnode::{UncheckedViewNode, unchecked_viewforest_root_viewnode};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use regex::Regex;
@@ -23,7 +23,7 @@ struct ViewNodeLineCol {
   body: Vec<String>,
 }
 
-/// Parse org text into a "forest": a tree with a BufferRoot.
+/// Parse org text into a "viewforest": a tree with a BufferRoot.
 /// Each level-1 headline becomes a child of the BufferRoot.
 /// The result takes the org-buffer at face value,
 /// without changing the tree (e.g. without absorbing aliases
@@ -43,12 +43,12 @@ pub fn org_to_uninterpreted_nodes(
   input: &str
 ) -> Result < ( Tree<UncheckedViewNode>, Vec<BufferValidationError> ),
               String > {
-  let mut forest: Tree<UncheckedViewNode> = Tree::new(unchecked_forest_root_viewnode());
+  let mut viewforest: Tree<UncheckedViewNode> = Tree::new(unchecked_viewforest_root_viewnode());
   let mut parsing_errors: Vec<BufferValidationError> = Vec::new();
   // treeid_stack[0] is the BufferRoot, treeid_stack[1] is the current tree root, etc.
   let mut treeid_stack: Vec<NodeId> = vec![ {
-    let forest_root_treeid: NodeId = forest . root() . id();
-    forest_root_treeid } ];
+    let viewforest_root_treeid: NodeId = viewforest . root() . id();
+    viewforest_root_treeid } ];
   for view_node_line_col in & {
     let view_node_line_cols: Vec<ViewNodeLineCol> =
       divide_into_viewNodeLineCols (input)?;
@@ -71,10 +71,10 @@ pub fn org_to_uninterpreted_nodes(
       let parent_treeid: NodeId = *treeid_stack . last() . unwrap();
       let new_treeid: NodeId = {
         let mut parent_mut : NodeMut<UncheckedViewNode> =
-          forest . get_mut (parent_treeid) . unwrap();
+          viewforest . get_mut (parent_treeid) . unwrap();
         parent_mut . append (viewnode) . id() };
       new_treeid } ); }
-  Ok ( ( forest, parsing_errors ) ) }
+  Ok ( ( viewforest, parsing_errors ) ) }
 
 /// Parse input text into org node line collections.
 /// Each org node consists of a headline and its following body lines.

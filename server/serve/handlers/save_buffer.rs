@@ -1,5 +1,5 @@
 use crate::context::update_context_types_for_saved_nodes;
-use crate::from_text::buffer_to_viewnode_forest_and_save_instructions;
+use crate::from_text::buffer_to_viewforest_and_save_instructions;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
 use crate::merge::merge_nodes;
@@ -140,7 +140,7 @@ fn empty_response_sexp (
 /// COMPLEX:
 /// - Validation must happen at many stages.
 /// - Merges must follow the execution of other save instructions, because the user may have updated one of the nodes to be merged.
-/// - complete_viewtree is complex: it runs a preorder pass (completing and reconciling each node) followed by a postorder pass (populating scaffolds like IDCol, AliasCol, etc.).
+/// - complete_viewforest is complex: it runs a preorder pass (completing and reconciling each node) followed by a postorder pass (populating scaffolds like IDCol, AliasCol, etc.).
 pub async fn update_from_and_rerender_buffer (
   stream                      : &mut TcpStream,
   org_buffer_text             : &str,
@@ -157,16 +157,16 @@ pub async fn update_from_and_rerender_buffer (
     validate_no_merge_commits ( &sources, config )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
 
-  let (forest, save_instructions, merge_instructions, source_moves)
+  let (viewforest, save_instructions, merge_instructions, source_moves)
     : ( Tree<ViewNode>, Vec<DefineNode>, Vec<Merge>, Vec<SourceMove> )
     = { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-            "buffer_to_viewnode_forest_and_save_instructions"
+            "buffer_to_viewforest_and_save_instructions"
           ) . entered();
-        buffer_to_viewnode_forest_and_save_instructions (
+        buffer_to_viewforest_and_save_instructions (
           org_buffer_text, config, typedb_driver ) . await
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
-  if forest . root() . children() . next() . is_none()
+  if viewforest . root() . children() . next() . is_none()
     { return Err ( "Nothing to save found in org_buffer_text"
                    . into() ); }
 
@@ -204,7 +204,7 @@ pub async fn update_from_and_rerender_buffer (
 
   update_views_after_save (
     stream,
-    forest,
+    viewforest,
     save_instructions,
     &merge_instructions,
     diff_mode_enabled,

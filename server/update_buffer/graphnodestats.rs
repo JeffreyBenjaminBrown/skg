@@ -13,11 +13,11 @@ use std::error::Error;
 use ego_tree::{NodeId, Tree};
 use typedb_driver::TypeDBDriver;
 
-/// Enrich all nodes in a forest with graphStats from TypeDB.
+/// Enrich all nodes in a viewforest with graphStats from TypeDB.
 /// Also fetches and returns the containment maps, which callers
-/// can pass to `set_viewnodestats_in_forest`.
-pub async fn set_graphnodestats_in_forest (
-  forest : &mut Tree<ViewNode>,
+/// can pass to `set_viewnodestats_in_viewforest`.
+pub async fn set_graphnodestats_in_viewforest (
+  viewforest : &mut Tree<ViewNode>,
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result < ( HashMap < ID, HashSet < ID > >,
@@ -26,17 +26,17 @@ pub async fn set_graphnodestats_in_forest (
   let pids : Vec < ID > =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "collect_ids_from_tree" ). entered();
-      collect_ids_from_tree (forest) };
+      collect_ids_from_tree (viewforest) };
   let stats : AllGraphNodeStats =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "fetch_all_graphnodestats" ). entered();
       fetch_all_graphnodestats (
         & config . db_name, driver, & pids ) . await } ?;
-  let root_treeid : NodeId = forest . root () . id ();
+  let root_treeid : NodeId = viewforest . root () . id ();
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "set_graphnodestats_recursive" ). entered();
     set_metadata_relationships_in_node_recursive (
-      forest,
+      viewforest,
       root_treeid,
       & stats,
       config ) };

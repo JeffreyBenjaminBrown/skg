@@ -17,7 +17,7 @@
 /// Then navigate up to L's parent P,
 /// and re-render as indefinitive every node in P's generation after P.
 
-use crate::to_org::util::{stub_forest_from_root_ids, content_ids_if_definitive_else_empty, build_node_branch_minus_content, DefinitiveMap};
+use crate::to_org::util::{stub_viewforest_from_root_ids, content_ids_if_definitive_else_empty, build_node_branch_minus_content, DefinitiveMap};
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
 use crate::types::misc::{SkgConfig, ID};
 use crate::types::viewnode::ViewNode;
@@ -29,39 +29,39 @@ use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
 /// See file header comment.
-/// Returns a "forest" (tree with BufferRoot).
-pub async fn render_initial_forest_bfs (
+/// Returns a "viewforest" (tree with BufferRoot).
+pub async fn render_initial_viewforest_bfs (
   root_ids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
 ) -> Result < Tree<ViewNode>, Box<dyn Error> > {
   let mut visited : DefinitiveMap = DefinitiveMap::new();
-  let mut forest : Tree<ViewNode> =
+  let mut viewforest : Tree<ViewNode> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "stub_forest_from_root_ids" ). entered();
-      stub_forest_from_root_ids (
+        "stub_viewforest_from_root_ids" ). entered();
+      stub_viewforest_from_root_ids (
         root_ids, config, driver, &mut visited ) . await } ?;
-  let forest_root_id : NodeId = forest . root () . id ();
+  let viewforest_root_id : NodeId = viewforest . root () . id ();
   let root_nodes : Vec < NodeId > =
-    forest . root () . children ()
+    viewforest . root () . children ()
     . map ( |c| c . id () )
     . collect ();
   render_generation_and_recurse (
-    &mut forest,
+    &mut viewforest,
     root_nodes, // the last complete generation
     1,          // the last complete generation's number
     0, // nodes_rendered (BufferRoot doesn't count)
     config . initial_node_limit,
-    forest_root_id, // effective_root for truncation
+    viewforest_root_id, // effective_root for truncation
     &mut visited,
     config,
     driver,
   ) . await ?;
-  Ok (forest) }
+  Ok (viewforest) }
 
 /// Returns when the generation is empty or the limit is reached.
 fn render_generation_and_recurse<'a> (
-  forest         : &'a mut Tree<ViewNode>,
+  viewforest         : &'a mut Tree<ViewNode>,
   gen_nodeids    : Vec < NodeId >, // nodes of deepest generation rendered so far
   gen_int        : usize,          // number of deepest generation rendered so far (0 = root)
   rendered_count : usize,
@@ -79,7 +79,7 @@ fn render_generation_and_recurse<'a> (
     let rendered_count : usize = rendered_count + nodes_in_gen;
     let parent_child_rels_to_add : Vec < (NodeId, ID) > =
       collect_rels_to_children_from_generation (
-        forest, &gen_nodeids, config );
+        viewforest, &gen_nodeids, config );
     let next_gen_count : usize =
       parent_child_rels_to_add . len();
     if rendered_count + next_gen_count < limit {
@@ -88,26 +88,26 @@ fn render_generation_and_recurse<'a> (
               "add_children", gen = gen_int + 1, count = next_gen_count
             ). entered();
           add_children_and_collect_their_ids (
-            forest, parent_child_rels_to_add, visited, config, driver
+            viewforest, parent_child_rels_to_add, visited, config, driver
         ) . await } ?;
       render_generation_and_recurse (
-        forest, next_gen, gen_int + 1,
+        viewforest, next_gen, gen_int + 1,
         rendered_count, limit, effective_root,
         visited, config, driver,
       ) . await }
     else {
       add_last_generation_and_truncate_some_of_previous (
-        forest, gen_int + 1, &parent_child_rels_to_add,
+        viewforest, gen_int + 1, &parent_child_rels_to_add,
         limit - rendered_count, effective_root,
         visited, config, driver,
       ) . await ?;
       return Ok(( )); }
   } ) }
 
-/// Add children to the forest.
+/// Add children to the viewforest.
 /// Return their NodeIds.
 async fn add_children_and_collect_their_ids (
-  forest      : &mut Tree<ViewNode>,
+  viewforest      : &mut Tree<ViewNode>,
   rels_to_add : Vec < (NodeId, ID) >,
   visited     : &mut DefinitiveMap,
   config      : &SkgConfig,
@@ -116,7 +116,7 @@ async fn add_children_and_collect_their_ids (
   let mut child_treeids : Vec < NodeId > = Vec::new ();
   for (parent_treeid, child_skgid) in rels_to_add {
     let child_treeid : NodeId = build_node_branch_minus_content (
-      Some ( (&mut *forest, parent_treeid) ),
+      Some ( (&mut *viewforest, parent_treeid) ),
       &child_skgid, config, driver, visited ) . await ?;
     child_treeids . push (child_treeid); }
   Ok (child_treeids) }
@@ -126,7 +126,7 @@ async fn add_children_and_collect_their_ids (
 ///   (Indefinitive nodes' contents do not need rendering.)
 /// Returns (parent_treeid, child_skgid) tuples.
 fn collect_rels_to_children_from_generation (
-  forest       : &Tree<ViewNode>,
+  viewforest       : &Tree<ViewNode>,
   nodes_in_gen : &[NodeId],
   config       : &SkgConfig,
 ) -> Vec < (NodeId, ID) > {
@@ -134,7 +134,7 @@ fn collect_rels_to_children_from_generation (
   for treeid in nodes_in_gen {
     if let Ok (child_skgids) =
       content_ids_if_definitive_else_empty (
-        forest, *treeid, config )
+        viewforest, *treeid, config )
     { for child_skgid in child_skgids {
       children . push ( (*treeid, child_skgid) ); }} }
   children }

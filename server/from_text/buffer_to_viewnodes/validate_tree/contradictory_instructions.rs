@@ -32,13 +32,13 @@ enum WhetherToDelete {
 /// Also builds a map from IDs to count of defining containers,
 /// and a map from IDs to sets of sources. */
 pub fn find_inconsistent_instructions(
-  forest: &Tree<UncheckedViewNode>
+  viewforest: &Tree<UncheckedViewNode>
 ) -> (Vec<ID>, // IDs with inconsistent deletions across nodes
       Vec<ID>, // IDs with multiple defining nodes
       Vec<(ID, // IDs with inconsistent sources
            HashSet<SourceName>)>)
 { let (id_toDelete_instructions, id_to_definer_count, id_to_sources) =
-    collect_instructions (forest);
+    collect_instructions (viewforest);
   let mut inconsistent_deletion_ids: Vec<ID> = Vec::new();
   let mut problematic_defining_ids: Vec<ID> = Vec::new();
   let mut inconsistent_source_ids: Vec<(ID, HashSet<SourceName>)> =
@@ -65,7 +65,7 @@ pub fn find_inconsistent_instructions(
 
 /// Collect delete instructions, defining containers, and sources.
 fn collect_instructions(
-  forest: &Tree<UncheckedViewNode> // "forest" = tree with BufferRoot
+  viewforest: &Tree<UncheckedViewNode> // "viewforest" = tree with BufferRoot
 ) -> (HashMap<ID, HashSet<WhetherToDelete>>, // deletes
       HashMap<ID, usize>, // defining containers
       HashMap<ID, HashSet<SourceName>>) { // sources
@@ -120,7 +120,7 @@ fn collect_instructions(
     : HashMap<ID, HashSet<SourceName>>
     = HashMap::new();
   collect_instructions_rec(
-    forest . root(),
+    viewforest . root(),
     &mut id_toDelete_instructions,
     &mut id_to_definer_count,
     &mut id_to_sources);

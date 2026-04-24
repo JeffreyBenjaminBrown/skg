@@ -49,34 +49,34 @@ async fn test_complete_alias_col_logic (
       ** (skg alias) the above should break
     " };
 
-  let unchecked_forest =
+  let unchecked_viewforest =
     org_to_uninterpreted_nodes (org_text) ?. 0;
-  let mut forest : Tree < ViewNode > =
-    unchecked_to_checked_tree (unchecked_forest) ?;
+  let mut viewforest : Tree < ViewNode > =
+    unchecked_to_checked_tree (unchecked_viewforest) ?;
 
   // Get the first "tree root" (node "a" and its children)
   let tree_a_id : NodeId =
-    forest . root () . first_child () . unwrap () . id ();
+    viewforest . root () . first_child () . unwrap () . id ();
 
   // Find the NodeIds for the AliasCol nodes
   let aliascol_1_id : NodeId = {
-    forest . get (tree_a_id) . unwrap ()
+    viewforest . get (tree_a_id) . unwrap ()
       . first_child () . unwrap ()
       . id ()
   };
   let aliascol_2_id : NodeId = {
-    forest . get (tree_a_id) . unwrap ()
+    viewforest . get (tree_a_id) . unwrap ()
       . first_child () . unwrap ()
       . next_sibling () . unwrap ()
       . id ()
   };
 
   // Test 1: First AliasCol should have b and c (deduped, valid only, disk order)
-  complete_alias_col ( &mut forest, aliascol_1_id, &source_diffs, config )?;
+  complete_alias_col ( &mut viewforest, aliascol_1_id, &source_diffs, config )?;
 
   {
     let aliascol_1_ref =
-      forest . get (aliascol_1_id) . unwrap ();
+      viewforest . get (aliascol_1_id) . unwrap ();
     let children : Vec < String > =
       aliascol_1_ref . children () . map (
         |n| n . value() . title() . to_string() )
@@ -100,11 +100,11 @@ async fn test_complete_alias_col_logic (
   }
 
   // Test 2: Second AliasCol should have b and c, and gain focus
-  complete_alias_col ( &mut forest, aliascol_2_id, &source_diffs, config )?;
+  complete_alias_col ( &mut viewforest, aliascol_2_id, &source_diffs, config )?;
 
   {
     let aliascol_2_ref =
-      forest . get (aliascol_2_id) . unwrap ();
+      viewforest . get (aliascol_2_id) . unwrap ();
     let aliascol_2_new : &ViewNode = aliascol_2_ref . value ();
     let children : Vec < String > =
       aliascol_2_ref . children () . map (
@@ -135,13 +135,13 @@ async fn test_complete_alias_col_logic (
   // Test 3: Third AliasCol should error (no parent or parent has no ID)
   // Get the second "tree root" (AliasCol 3)
   let aliascol_3_id : NodeId =
-    forest . root () . first_child () . unwrap ()
+    viewforest . root () . first_child () . unwrap ()
     . next_sibling () . unwrap ()
     . id ();
 
   let result : Result < (), Box<dyn Error> > =
     complete_alias_col (
-      &mut forest,
+      &mut viewforest,
       aliascol_3_id,
       &source_diffs,
       config
@@ -183,22 +183,22 @@ async fn test_complete_alias_col_duplicate_aliases_different_orders_logic (
       *** (skg alias) b
     " };
 
-  let unchecked_forest =
+  let unchecked_viewforest =
     org_to_uninterpreted_nodes (org_text) ?. 0;
-  let mut forest : Tree < ViewNode > =
-    unchecked_to_checked_tree (unchecked_forest) ?;
+  let mut viewforest : Tree < ViewNode > =
+    unchecked_to_checked_tree (unchecked_viewforest) ?;
 
   let tree_root_id : NodeId =
-    forest . root () . first_child () . unwrap () . id ();
+    viewforest . root () . first_child () . unwrap () . id ();
 
   // Find the NodeIds for both AliasCol nodes
   let first_aliascol_id : NodeId = {
-    forest . get (tree_root_id) . unwrap ()
+    viewforest . get (tree_root_id) . unwrap ()
       . first_child () . unwrap ()
       . id ()
   };
   let second_aliascol_id : NodeId = {
-    forest . get (tree_root_id) . unwrap ()
+    viewforest . get (tree_root_id) . unwrap ()
       . first_child () . unwrap ()
       . next_sibling () . unwrap ()
       . id ()
@@ -206,7 +206,7 @@ async fn test_complete_alias_col_duplicate_aliases_different_orders_logic (
 
   // Test first AliasCol
   complete_alias_col (
-    &mut forest,
+    &mut viewforest,
     first_aliascol_id,
     &source_diffs,
     config
@@ -214,7 +214,7 @@ async fn test_complete_alias_col_duplicate_aliases_different_orders_logic (
 
   {
     let aliascol_ref =
-      forest . get (first_aliascol_id) . unwrap ();
+      viewforest . get (first_aliascol_id) . unwrap ();
     let aliascol_vn : &ViewNode = aliascol_ref . value ();
     let children_new : Vec < &ViewNode > =
       aliascol_ref . children ()
@@ -252,7 +252,7 @@ async fn test_complete_alias_col_duplicate_aliases_different_orders_logic (
 
   // Test second AliasCol
   complete_alias_col (
-    &mut forest,
+    &mut viewforest,
     second_aliascol_id,
     &source_diffs,
     config
@@ -260,7 +260,7 @@ async fn test_complete_alias_col_duplicate_aliases_different_orders_logic (
 
   {
     let aliascol_ref =
-      forest . get (second_aliascol_id) . unwrap ();
+      viewforest . get (second_aliascol_id) . unwrap ();
     let children : Vec < &ViewNode > =
       aliascol_ref . children ()
       . map ( |n| n . value () )

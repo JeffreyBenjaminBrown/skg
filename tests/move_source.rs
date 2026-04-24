@@ -10,7 +10,7 @@ use skg::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
-use skg::from_text::buffer_to_viewnode_forest_and_save_instructions;
+use skg::from_text::buffer_to_viewforest_and_save_instructions;
 use skg::dbs::memory::InRustGraphHandle;
 use skg::save::update_graph_minus_merges;
 use skg::test_utils::{cleanup_test_tantivy_and_typedb_dbs, graph_handle_from_config, audit_memory_or_panic};
@@ -144,8 +144,8 @@ fn test_move_node_to_another_owned_source (
       ** (skg (node (id b) (source private))) b
       *** (skg (node (id c) (source public))) c
     "};
-    let (_forest, instructions, _merges, source_moves)
-      = buffer_to_viewnode_forest_and_save_instructions (
+    let (_viewforest, instructions, _merges, source_moves)
+      = buffer_to_viewforest_and_save_instructions (
           org_text, &config, &driver
           ) . await?;
     assert_eq!(source_moves . len(), 1,
@@ -240,8 +240,8 @@ fn test_move_node_referenced_by_extra_id (
       ** (skg (node (id b-alias) (source private))) b
       *** (skg (node (id c-alias) (source public))) c
     "};
-    let (_forest, instructions, _merges, source_moves)
-      = buffer_to_viewnode_forest_and_save_instructions (
+    let (_viewforest, instructions, _merges, source_moves)
+      = buffer_to_viewforest_and_save_instructions (
           org_text, &config, &driver ) . await?;
 
     // source_moves should use the PID, not the extra_id
@@ -308,8 +308,8 @@ fn test_move_multiple_nodes (
       ** (skg (node (id b) (source private))) b
       *** (skg (node (id c) (source private))) c
     "};
-    let (_forest, instructions, _merges, source_moves)
-      = buffer_to_viewnode_forest_and_save_instructions (
+    let (_viewforest, instructions, _merges, source_moves)
+      = buffer_to_viewforest_and_save_instructions (
           org_text, &config, &driver
           ) . await?;
     assert_eq!(source_moves . len(), 2,
@@ -371,7 +371,7 @@ fn test_move_to_foreign_source_rejected (
       *** (skg (node (id c) (source public))) c
     "};
     let result =
-      buffer_to_viewnode_forest_and_save_instructions (
+      buffer_to_viewforest_and_save_instructions (
         org_text, &config, &driver
         ) . await;
     assert!(result . is_err(),
@@ -408,7 +408,7 @@ fn test_move_from_foreign_source_rejected (
       * (skg (node (id foreign-node) (source public))) foreign-node
     "};
     let result =
-      buffer_to_viewnode_forest_and_save_instructions (
+      buffer_to_viewforest_and_save_instructions (
         org_text, &config, &driver
         ) . await;
     assert!(result . is_err(),
@@ -439,7 +439,7 @@ fn test_move_and_merge_simultaneously_rejected (
       * (skg (node (id stay) (source public))) stay
     "};
     let result =
-      buffer_to_viewnode_forest_and_save_instructions (
+      buffer_to_viewforest_and_save_instructions (
         org_text, &config, &driver
         ) . await;
     assert!(result . is_err(),
@@ -474,8 +474,8 @@ fn test_no_source_change_produces_no_moves (
       ** (skg (node (id b) (source public))) b
       *** (skg (node (id c) (source public))) c
     "};
-    let (_forest, _instructions, _merges, source_moves)
-      = buffer_to_viewnode_forest_and_save_instructions (
+    let (_viewforest, _instructions, _merges, source_moves)
+      = buffer_to_viewforest_and_save_instructions (
           org_text, &config, &driver
           ) . await?;
     assert_eq!(source_moves . len(), 0,
@@ -507,8 +507,8 @@ fn test_source_only_change_with_populated_pool (
       ** (skg (node (id b) (source private))) b
       *** (skg (node (id c) (source public))) c
     "};
-    let (_forest, instructions, _merges, source_moves)
-      = buffer_to_viewnode_forest_and_save_instructions (
+    let (_viewforest, instructions, _merges, source_moves)
+      = buffer_to_viewforest_and_save_instructions (
           org_text, &config, &driver ) . await?;
 
     // The source move must be detected even with populated pool.

@@ -4,13 +4,13 @@ use skg::context::ContextOriginType;
 use skg::dbs::tantivy::context_update::update_context_origin_types;
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
-use skg::org_to_text::viewnode_forest_to_string;
+use skg::org_to_text::viewforest_to_string;
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::viewnode::Scaffold;
 use skg::dbs::init::in_fs_wipe_index_then_create_it;
 use skg::serve::handlers::text_search::{
-  group_matches_by_id, build_search_forest, SearchScope};
+  group_matches_by_id, build_search_viewforest, SearchScope};
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -74,15 +74,15 @@ fn test_text_search_org_format (
         group_matches_by_id (
           best_matches, searcher, &tantivy_index,
           &SearchScope::Everything );
-      let (forest, _search_results) =
-        build_search_forest (
+      let (viewforest, _search_results) =
+        build_search_viewforest (
           search_terms,
           &matches_by_id );
       let dummy_config : SkgConfig =
         SkgConfig::dummyFromSources (HashMap::new ());
       let result : String =
-        viewnode_forest_to_string ( &forest, &dummy_config )
-        . expect ("search forest rendering never fails");
+        viewforest_to_string ( &viewforest, &dummy_config )
+        . expect ("search viewforest rendering never fails");
       let lines : Vec < &str > =
         result . lines () . collect ();
 

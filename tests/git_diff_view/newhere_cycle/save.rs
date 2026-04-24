@@ -1,5 +1,5 @@
 /// Tests for git diff view - save pipeline with newhere cycle.
-/// The save pipeline (complete_viewtree) should mark a cycle child
+/// The save pipeline (complete_viewforest) should mark a cycle child
 /// as (diff new-here) when it was newly added to its parent's contains.
 
 use super::common::*;

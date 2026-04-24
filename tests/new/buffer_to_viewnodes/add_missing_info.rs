@@ -2,7 +2,7 @@
 
 use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_forest;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_viewforest;
 use skg::test_utils::{run_with_test_db, compare_viewnode_trees_modulo_id, compare_viewnode_trees};
 use skg::types::unchecked_viewnode::UncheckedViewNode;
 use skg::types::misc::{SkgConfig, ID};
@@ -28,7 +28,7 @@ async fn test_add_missing_info_logic (
   config : &SkgConfig,
   driver : &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
-  // Applying 'add_missing_info_to_forest' should make
+  // Applying 'add_missing_info_to_viewforest' should make
   // 'with_missing_info' equivalent to 'without_missing_info',
   // modulo the specific ID values added.
   // Also tests source inheritance from parent to children.
@@ -53,22 +53,22 @@ async fn test_add_missing_info_logic (
   let mut after_adding_missing_info: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(
       with_missing_info) . unwrap() . 0;
-  add_missing_info_to_forest(
+  add_missing_info_to_viewforest(
     &mut after_adding_missing_info,
     &config . db_name,
     driver ) . await ?;
-  let expected_forest: Tree<UncheckedViewNode> =
+  let expected_viewforest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes(
       without_missing_info ) . unwrap() . 0;
   assert_eq!(
-    expected_forest . root() . children() . count(),
+    expected_viewforest . root() . children() . count(),
     1,
-    "Expected exactly one tree in the expected forest" );
+    "Expected exactly one tree in the expected viewforest" );
   assert!(
     compare_viewnode_trees_modulo_id(
       &after_adding_missing_info,
-      &expected_forest),
-    "add_missing_info_to_forest: Forests not equivalent modulo ID." );
+      &expected_viewforest),
+    "add_missing_info_to_viewforest: Forests not equivalent modulo ID." );
 
   { let actual_root : &UncheckedViewNode =
       after_adding_missing_info . root() . first_child() . unwrap() . value();
@@ -124,19 +124,19 @@ async fn test_source_inheritance_logic (
             ** (skg (node (id 22))) _
         "};
 
-  let mut actual_forest: Tree<UncheckedViewNode> =
+  let mut actual_viewforest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  add_missing_info_to_forest(
-    &mut actual_forest,
+  add_missing_info_to_viewforest(
+    &mut actual_viewforest,
     &config . db_name,
     driver ) . await ?;
-  let expected_forest: Tree<UncheckedViewNode> =
+  let expected_viewforest: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes (expected) . unwrap() . 0;
 
   assert!(
     compare_viewnode_trees(
-      actual_forest . root(),
-      expected_forest . root()),
+      actual_viewforest . root(),
+      expected_viewforest . root()),
     "Source inheritance: Forests not equivalent.\n\
      Expected sources to inherit from parent, with explicit sources overriding." );
 

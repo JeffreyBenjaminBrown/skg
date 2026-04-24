@@ -318,7 +318,7 @@ impl UncheckedViewNode {
 // Constructor functions for unchecked types
 //
 
-pub fn unchecked_forest_root_viewnode() -> UncheckedViewNode {
+pub fn unchecked_viewforest_root_viewnode() -> UncheckedViewNode {
   UncheckedViewNode {
     focused     : false,
     folded      : false,

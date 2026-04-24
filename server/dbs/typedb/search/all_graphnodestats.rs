@@ -28,7 +28,7 @@ use typedb_driver::{
   TypeDBDriver,
 };
 
-/// Everything 'set_graphnodestats_in_forest' needs from TypeDB.
+/// Everything 'set_graphnodestats_in_viewforest' needs from TypeDB.
 pub struct AllGraphNodeStats {
   pub num_containers               : HashMap < ID, usize >,
   pub num_contents                 : HashMap < ID, usize >,

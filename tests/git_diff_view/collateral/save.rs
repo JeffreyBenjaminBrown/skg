@@ -33,7 +33,7 @@ fn test_collateral_view_preserves_diff_annotations()
 
       // 1. Get an initial diff view of "a".
       let root_ids : Vec<ID> = vec![ID("a" . to_string())];
-      let (initial_buffer, pids, forest)
+      let (initial_buffer, pids, viewforest)
         : (String, Vec<ID>, Tree<ViewNode>) =
         multi_root_view (
           &driver, &config, &root_ids, true ) . await ?;
@@ -50,13 +50,13 @@ fn test_collateral_view_preserves_diff_annotations()
         graph             : new_handle (InRustGraph::new ()) };
 
       // 3. Register buffer 1 and buffer 2,
-      //    both viewing the same forest rooted at "a".
+      //    both viewing the same viewforest rooted at "a".
       let uri_1 : ViewUri = ViewUri::ContentView ( "buffer-1" . to_string() );
       let uri_2 : ViewUri = ViewUri::ContentView ( "buffer-2" . to_string() );
       conn_state . memory . register_view (
-        uri_1 . clone (), forest . clone (), &pids );
+        uri_1 . clone (), viewforest . clone (), &pids );
       conn_state . memory . register_view (
-        uri_2 . clone (), forest . clone (), &pids );
+        uri_2 . clone (), viewforest . clone (), &pids );
 
       // 4. Save buffer 1 with a new child "c" under "a".
       //    This also updates memory and re-renders collateral views.
@@ -119,7 +119,7 @@ fn test_collateral_view_preserves_diff_annotations()
 }
 
 /// Same scenario, but with b's body change staged (git add) before
-/// the save. After save, the forest mixes stages:
+/// the save. After save, the viewforest mixes stages:
 /// - b's textChanged lives on the STAGED side (from the pre-save
 ///   git add; save didn't touch b).
 /// - c is new on the UNSTAGED side (save created it in the
@@ -152,7 +152,7 @@ fn test_collateral_view_staged_text_and_unstaged_add()
           &tantivy_folder ) . await ?;
 
       let root_ids : Vec<ID> = vec![ID("a" . to_string())];
-      let (initial_buffer, pids, forest)
+      let (initial_buffer, pids, viewforest)
         : (String, Vec<ID>, Tree<ViewNode>) =
         multi_root_view (
           &driver, &config, &root_ids, true ) . await ?;
@@ -168,9 +168,9 @@ fn test_collateral_view_staged_text_and_unstaged_add()
       let uri_1 : ViewUri = ViewUri::ContentView ( "buffer-1" . to_string() );
       let uri_2 : ViewUri = ViewUri::ContentView ( "buffer-2" . to_string() );
       conn_state . memory . register_view (
-        uri_1 . clone (), forest . clone (), &pids );
+        uri_1 . clone (), viewforest . clone (), &pids );
       conn_state . memory . register_view (
-        uri_2 . clone (), forest . clone (), &pids );
+        uri_2 . clone (), viewforest . clone (), &pids );
 
       let save_input : String = insert_after (
         &initial_buffer, "(id a)",

@@ -1,5 +1,5 @@
 use indoc::indoc;
-use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_viewnode_forest;
+use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_viewforest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, MSV, SourceName};
@@ -11,20 +11,20 @@ use std::error::Error;
 fn test_single_merge() -> Result<(), Box<dyn Error>> {
   run_with_test_db(
     "skg-test-merge-single",
-    "tests/merge/saveinstructions_from_the_merges_in_an_viewnode_forest/fixtures",
+    "tests/merge/saveinstructions_from_the_merges_in_an_viewforest/fixtures",
     "/tmp/tantivy-test-merge-single",
     |config, driver, _tantivy| {
       Box::pin(async move {
-        // Create a forest with node 1 requesting to merge node 2
+        // Create a viewforest with node 1 requesting to merge node 2
         let input = indoc! {"
           * (skg (node (id 1) (source main) (editRequest (merge 2)))) 1
         "};
 
-        let unchecked_forest = org_to_uninterpreted_nodes (input)?. 0;
-        let forest = unchecked_to_checked_tree (unchecked_forest)?;
+        let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
+        let viewforest = unchecked_to_checked_tree (unchecked_viewforest)?;
         let merge_instructions =
-        instructiontriples_from_the_merges_in_an_viewnode_forest(
-         &forest, config, driver)
+        instructiontriples_from_the_merges_in_an_viewforest(
+         &viewforest, config, driver)
         . await?;
 
         // Should produce exactly 1 MergeInstructionTriple

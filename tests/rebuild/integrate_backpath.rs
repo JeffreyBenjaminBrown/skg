@@ -10,7 +10,7 @@ use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::viewnode::{ViewNode, ViewNodeKind, Birth};
 
-use skg::org_to_text::viewnode_forest_to_string;
+use skg::org_to_text::viewforest_to_string;
 
 use ego_tree::{NodeId,Tree};
 use std::collections::HashSet;
@@ -40,13 +40,13 @@ async fn test_path_with_cycle_impl(
     *** (skg (node (id off-path) (source main))) off-path
   "};
 
-  let unchecked_forest = org_to_uninterpreted_nodes (input)?. 0;
-  let mut forest: Tree<ViewNode> = unchecked_to_checked_tree (unchecked_forest)?;
-  assert_eq!(forest . root() . children() . count(), 1,
+  let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
+  let mut viewforest: Tree<ViewNode> = unchecked_to_checked_tree (unchecked_viewforest)?;
+  assert_eq!(viewforest . root() . children() . count(), 1,
              "Should have exactly 1 tree");
 
   let tree_root_id =
-    forest . root () . first_child () . unwrap () . id ();
+    viewforest . root () . first_child () . unwrap () . id ();
   let root_id = tree_root_id;
 
   // Setup backpath data (origin-free: origin "1" is stripped)
@@ -61,7 +61,7 @@ async fn test_path_with_cycle_impl(
   // Integrate the path
   
   integrate_path_that_might_fork_or_cycle(
-    &mut forest, root_id, path, branches,
+    &mut viewforest, root_id, path, branches,
     cycle_nodes, &config, driver, Birth::ContainerOf
   ). await?;
 
@@ -77,8 +77,8 @@ async fn test_path_with_cycle_impl(
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
   let expected_trees: Tree<ViewNode> = unchecked_to_checked_tree (expected_unchecked)?;
 
-  let actual_str = viewnode_forest_to_string (&forest, config)?;
-  let expected_str = viewnode_forest_to_string (&expected_trees, config)?;
+  let actual_str = viewforest_to_string (&viewforest, config)?;
+  let expected_str = viewforest_to_string (&expected_trees, config)?;
   assert_eq!(
     actual_str, expected_str,
     "Tree structure after integrating path with cycle should match expected"
@@ -110,14 +110,14 @@ async fn test_path_with_branches_no_cycle_impl(
     **** (skg (node (id off-path) (source main))) off-path
   "};
 
-  let unchecked_forest = org_to_uninterpreted_nodes (input)?. 0;
-  let mut forest: Tree<ViewNode> = unchecked_to_checked_tree (unchecked_forest)?;
-  assert_eq!(forest . root() . children() . count(), 1,
+  let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
+  let mut viewforest: Tree<ViewNode> = unchecked_to_checked_tree (unchecked_viewforest)?;
+  assert_eq!(viewforest . root() . children() . count(), 1,
              "Should have exactly 1 tree");
 
   // Find node with id "1" (second node in the tree)
   let mut node_1_id : Option<NodeId> = None;
-  for edge in forest . root() . traverse() {
+  for edge in viewforest . root() . traverse() {
     if let ego_tree::iter::Edge::Open (node_ref) = edge {
       if let ViewNodeKind::True (t) = &node_ref . value() . kind {
         if t . id . 0 == "1" {
@@ -140,7 +140,7 @@ async fn test_path_with_branches_no_cycle_impl(
   // Integrate the path
   
   integrate_path_that_might_fork_or_cycle(
-    &mut forest, node_1_id, path, branches,
+    &mut viewforest, node_1_id, path, branches,
     cycle_nodes, &config, driver, Birth::ContainerOf
   ). await?;
 
@@ -158,8 +158,8 @@ async fn test_path_with_branches_no_cycle_impl(
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
   let expected_trees: Tree<ViewNode> = unchecked_to_checked_tree (expected_unchecked)?;
 
-  let actual_str = viewnode_forest_to_string (&forest, config)?;
-  let expected_str = viewnode_forest_to_string (&expected_trees, config)?;
+  let actual_str = viewforest_to_string (&viewforest, config)?;
+  let expected_str = viewforest_to_string (&expected_trees, config)?;
   assert_eq!(
     actual_str, expected_str,
     "Tree structure after integrating path with branches (no cycle) should match expected"
@@ -191,15 +191,15 @@ async fn test_path_with_branches_with_cycle_impl(
     **** (skg (node (id off-path) (source main))) off-path
   "};
 
-  let unchecked_forest = org_to_uninterpreted_nodes (input)?. 0;
-  let mut forest: Tree<ViewNode> = unchecked_to_checked_tree (unchecked_forest)?;
-  assert_eq!(forest . root() . children() . count(), 1,
+  let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
+  let mut viewforest: Tree<ViewNode> = unchecked_to_checked_tree (unchecked_viewforest)?;
+  assert_eq!(viewforest . root() . children() . count(), 1,
              "Should have exactly 1 tree");
 
   // Find node with id "1" (second node in the tree)
   let mut node_1_id : Option<NodeId> =
     None;
-  for edge in forest . root() . traverse() {
+  for edge in viewforest . root() . traverse() {
     if let ego_tree::iter::Edge::Open (node_ref) = edge {
       if let ViewNodeKind::True (t) = &node_ref . value() . kind {
         if t . id . 0 == "1" {
@@ -222,7 +222,7 @@ async fn test_path_with_branches_with_cycle_impl(
   // Integrate the path
   
   integrate_path_that_might_fork_or_cycle(
-    &mut forest, node_1_id, path, branches,
+    &mut viewforest, node_1_id, path, branches,
     cycle_nodes, &config, driver, Birth::ContainerOf
   ). await?;
 
@@ -240,8 +240,8 @@ async fn test_path_with_branches_with_cycle_impl(
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
   let expected_trees: Tree<ViewNode> = unchecked_to_checked_tree (expected_unchecked)?;
 
-  let actual_str = viewnode_forest_to_string (&forest, config)?;
-  let expected_str = viewnode_forest_to_string (&expected_trees, config)?;
+  let actual_str = viewforest_to_string (&viewforest, config)?;
+  let expected_str = viewforest_to_string (&expected_trees, config)?;
   assert_eq!(
     actual_str, expected_str,
     "Tree structure after integrating path with branches (with cycle) should match expected"
@@ -271,14 +271,14 @@ async fn test_fork_expansion_at_origin_impl(
   let input: &str = indoc! {"
     * (skg (node (id a11) (source main))) a11
   "};
-  let unchecked_forest = org_to_uninterpreted_nodes (input)?. 0;
-  let mut forest: Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_forest)?;
+  let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
+  let mut viewforest: Tree<ViewNode> =
+    unchecked_to_checked_tree (unchecked_viewforest)?;
   let node_a11_id : NodeId =
-    forest . root () . first_child () . unwrap () . id ();
+    viewforest . root () . first_child () . unwrap () . id ();
   
   build_and_integrate_containerward_path (
-    &mut forest, node_a11_id, &config, driver
+    &mut viewforest, node_a11_id, &config, driver
   ) . await ?;
   // Expected: a11 gets two children (a1 and a2).
   // Under a1: branches {a, a1} (sorted: a first, then a1).
@@ -299,9 +299,9 @@ async fn test_fork_expansion_at_origin_impl(
   let expected_trees: Tree<ViewNode> =
     unchecked_to_checked_tree (expected_unchecked)?;
   let actual_str : String =
-    viewnode_forest_to_string (&forest, config)?;
+    viewforest_to_string (&viewforest, config)?;
   let expected_str : String =
-    viewnode_forest_to_string (&expected_trees, config)?;
+    viewforest_to_string (&expected_trees, config)?;
   assert_eq!(
     actual_str, expected_str,
     "Fork expansion at origin should expand immediate branches" );

@@ -14,19 +14,19 @@ use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
 use std::error::Error;
 
-/// Converts a forest of ViewNodes to DefineNodes,
+/// Converts a viewforest of ViewNodes to DefineNodes,
 /// reconciling duplicates via 'reconcile_same_id_instructions'
 /// and supplementing None fields with data from disk.
 /// ASSUMES indefinitive nodes produced no instructions.
 /// (That filtering is done by 'naive_saveinstructions_from_tree'.)
-pub async fn viewnode_forest_to_nonmerge_save_instructions (
-  forest : &Tree<ViewNode>, // "forest" = tree with BufferRoot
+pub async fn viewforest_to_nonmerge_save_instructions (
+  viewforest : &Tree<ViewNode>, // "viewforest" = tree with BufferRoot
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result<(Vec<DefineNode>, Vec<SourceMove>), Box<dyn Error>> {
   let naive_instructions : Vec<DefineNode> =
     naive_saveinstructions_from_tree (
-      forest . clone( )) ?;
+      viewforest . clone( )) ?;
   let instructions_without_dups : Vec<DefineNode> =
     reconcile_same_id_instructions (naive_instructions) ?;
   let changed_instructions : Vec<DefineNode> =

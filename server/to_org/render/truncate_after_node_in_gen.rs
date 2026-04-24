@@ -51,7 +51,7 @@ pub async fn add_last_generation_and_truncate_some_of_previous (
   Ok (( )) }
 
 /// PURPOSE:
-/// Truncate after a node in a generation of a tree or forest,
+/// Truncate after a node in a generation of a tree or viewforest,
 /// possibly limiting scope to an effective branch of a tree.
 /// Truncated nodes are re-rendered using 'makeIndefinitiveAndClobber'.
 fn truncate_after_node_in_generation_in_tree (

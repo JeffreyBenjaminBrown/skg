@@ -22,20 +22,20 @@ use typedb_driver::TypeDBDriver;
 /// because this one acts on a tree of UncheckedViewNodes rather than raw text.
 /// (Namely, Alias and AliasCol should not have body text.)
 ///
-/// ASSUMES that in the "forest" (tree with BufferRoot):
+/// ASSUMES that in the "viewforest" (tree with BufferRoot):
 /// - IDs have been replaced with PIDs, per
-///   'assign_pids_throughout_forest'. (Otherwise two org nodes
+///   'assign_pids_throughout_viewforest'. (Otherwise two org nodes
 ///   might refer to the same skg node, yet appear not to.)
 /// - All nodes have sources, per 'inherit_parent_source_if_possible'.
 pub async fn find_buffer_errors_for_saving (
-  forest: &Tree<UncheckedViewNode>,
+  viewforest: &Tree<UncheckedViewNode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<BufferValidationError>,
             Box<dyn std::error::Error>>
 { // Two phases: instruction validation and structure validation.
   // Many of the first are global operations --
-  // they need to take the entire forest into account.
+  // they need to take the entire viewforest into account.
   // By contrast the second phase (local structure validation)
   // performs only local structural verifications:
   // each ID belongs to an IDCol, etc.
@@ -44,7 +44,7 @@ pub async fn find_buffer_errors_for_saving (
     let (ambiguous_deletion_ids,
          problematic_defining_ids,
          inconsistent_source_ids) =
-      find_inconsistent_instructions (forest);
+      find_inconsistent_instructions (viewforest);
     { // transfer the relevant IDs, in the appropriate constructors.
       for id in ambiguous_deletion_ids {
         errors . push (
@@ -59,25 +59,25 @@ pub async fn find_buffer_errors_for_saving (
   { // merge validation
     for error_msg in {
       let merge_errors: Vec<String> =
-        validate_merge_requests(forest, config, driver) . await?;
+        validate_merge_requests(viewforest, config, driver) . await?;
       merge_errors }
     { errors . push(
         BufferValidationError::Other (error_msg)); }}
   validate_definitive_view_requests(
-    forest, &mut errors);
+    viewforest, &mut errors);
   { // local structure validation
     let _ = do_everywhere_in_tree_dfs_readonly(
-      forest, forest . root() . id(),
+      viewforest, viewforest . root() . id(),
       &mut |node_ref| {
         if let Err (e) = local::validate_local_structure(
-               forest, node_ref . id(), config) {
+               viewforest, node_ref . id(), config) {
           errors . push(
             BufferValidationError::LocalStructureViolation(
               e . message, e . id )); }
         Ok(( )) }); }
   Ok (errors) }
 
-/// For each node in the forest, if it has a definitive view request,
+/// For each node in the viewforest, if it has a definitive view request,
 /// verify that:
 /// - The node is indefinitive.
 /// - It has no content children (TrueNode children with birth ==
@@ -87,12 +87,12 @@ pub async fn find_buffer_errors_for_saving (
 /// - No other node with the same ID has a definitive view request,
 ///   because there can only be one definitive view.
 fn validate_definitive_view_requests (
-  forest : &Tree<UncheckedViewNode>, // "forest" = tree with BufferRoot
+  viewforest : &Tree<UncheckedViewNode>, // "viewforest" = tree with BufferRoot
   errors : &mut Vec<BufferValidationError>,
 ) {
   let mut ids_with_requests : HashSet<ID> =
     HashSet::new();
-  for edge in forest . root() . traverse()
+  for edge in viewforest . root() . traverse()
   { if let Edge::Open (node_ref) = edge
     { let viewnode : &UncheckedViewNode =
         node_ref . value();

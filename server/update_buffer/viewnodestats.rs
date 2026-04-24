@@ -3,17 +3,17 @@ use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use ego_tree::{Tree, NodeId};
 use std::collections::{HashMap, HashSet};
 
-pub fn set_viewnodestats_in_forest (
-  forest                : &mut Tree<ViewNode>,
+pub fn set_viewnodestats_in_viewforest (
+  viewforest                : &mut Tree<ViewNode>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
   config                : &SkgConfig,
 ) {
   let multi_source : bool = config . sources . len () > 1;
   let mut ancestor_ids : HashSet<ID> = HashSet::new ();
-  let root_treeid : NodeId = forest . root () . id ();
+  let root_treeid : NodeId = viewforest . root () . id ();
   set_viewnodestats_recursive (
-    forest,
+    viewforest,
     root_treeid,
     None,
     multi_source,

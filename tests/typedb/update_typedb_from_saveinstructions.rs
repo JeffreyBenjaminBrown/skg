@@ -5,7 +5,7 @@ use skg::save::update_typedb_from_saveinstructions;
 use skg::dbs::typedb::search::find_related_nodes;
 use skg::dbs::typedb::nodes::which_ids_exist;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::from_text::viewnodes_to_instructions::viewnode_forest_to_nonmerge_save_instructions;
+use skg::from_text::viewnodes_to_instructions::viewforest_to_nonmerge_save_instructions;
 use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
 use skg::types::misc::ID;
 use skg::types::viewnode::ViewNode;
@@ -34,14 +34,14 @@ fn test_update_nodes_and_relationships2 (
       ** (skg (node (id 1) (source main) indef)) 1
     "};
 
-    let unchecked_forest : Tree<UncheckedViewNode> =
+    let unchecked_viewforest : Tree<UncheckedViewNode> =
       org_to_uninterpreted_nodes (org_text)?. 0;
 
     // Check for inconsistent instructions
     let ( inconsistent_deletions, multiple_definers, inconsistent_sources ) =
-      find_inconsistent_instructions (& unchecked_forest);
-    let forest : Tree<ViewNode> =
-      unchecked_to_checked_tree (unchecked_forest)?;
+      find_inconsistent_instructions (& unchecked_viewforest);
+    let viewforest : Tree<ViewNode> =
+      unchecked_to_checked_tree (unchecked_viewforest)?;
     assert!( inconsistent_deletions . is_empty (),
              "Found inconsistent deletion instructions: {:?}",
              inconsistent_deletions );
@@ -54,8 +54,8 @@ fn test_update_nodes_and_relationships2 (
 
     // Convert to instructions (adds missing info and reconciles)
     let (reconciled_instructions, _source_moves) : (Vec<DefineNode>, _) =
-      viewnode_forest_to_nonmerge_save_instructions (
-        & forest, & config, & driver ) . await ?;
+      viewforest_to_nonmerge_save_instructions (
+        & viewforest, & config, & driver ) . await ?;
 
     // Apply the update
     update_typedb_from_saveinstructions (

@@ -21,7 +21,7 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 pub async fn execute_view_requests (
-  forest        : &mut Tree<ViewNode>,
+  viewforest        : &mut Tree<ViewNode>,
   requests      : Vec < (NodeId, ViewRequest) >,
   source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
   config        : &SkgConfig,
@@ -34,24 +34,24 @@ pub async fn execute_view_requests (
     match request {
       ViewRequest::Aliases => {
         build_and_integrate_aliases_view_then_drop_request (
-          forest, node_id, config, typedb_driver, errors )
+          viewforest, node_id, config, typedb_driver, errors )
           . await ?; },
       ViewRequest::Containerward => {
         build_and_integrate_containerward_view_then_drop_request (
-          forest, node_id, config, typedb_driver, errors )
+          viewforest, node_id, config, typedb_driver, errors )
           . await ?; },
       ViewRequest::Sourceward => {
         build_and_integrate_sourceward_view_then_drop_request (
-          forest, node_id, config, typedb_driver, errors )
+          viewforest, node_id, config, typedb_driver, errors )
           . await ?; },
       ViewRequest::Definitive => {
         execute_definitive_view_request (
-          forest, node_id, source_diffs, config, typedb_driver,
+          viewforest, node_id, source_diffs, config, typedb_driver,
           visited, errors,
           deleted_since_head_pid_src_map ) . await ?; },
       ViewRequest::ContainerwardStats => {
         execute_containerwardstats_request (
-          forest, node_id, config, typedb_driver ) . await ?; }, }}
+          viewforest, node_id, config, typedb_driver ) . await ?; }, }}
   Ok (( )) }
 
 /// Compute containerward path stats for a node and store them,
@@ -93,7 +93,7 @@ async fn execute_containerwardstats_request (
 /// .
 /// PITFALL: The indefinitization step can miss things: If definitive A contains indefinitive B, and elsewhere there is a definitive B, then when one requests a definitive view of A somewhere else, it will indefinitize the earlier A, but it will not indefinitize the earlier B. This seems fine -- searching through the whole tree for duplicates of A's recursive content would be expensive, and unless the user has strange habits they will at most rarely encounter this behavior.
 async fn execute_definitive_view_request (
-  forest        : &mut Tree<ViewNode>, // "forest" = tree with BufferRoot
+  viewforest        : &mut Tree<ViewNode>, // "viewforest" = tree with BufferRoot
   node_id       : NodeId,
   source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
   config        : &SkgConfig,
@@ -103,10 +103,10 @@ async fn execute_definitive_view_request (
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result < (), Box<dyn Error> > {
   let node_pid : ID = get_id_from_treenode (
-    forest, node_id ) ?;
+    viewforest, node_id ) ?;
   let is_removed_node : bool = // for git diff view
     read_at_node_in_tree (
-      forest, node_id,
+      viewforest, node_id,
       |n| match &n . kind {
         ViewNodeKind::True (t) =>
         // The truenode's '.skg' file is gone in the worktree.
@@ -115,16 +115,16 @@ async fn execute_definitive_view_request (
         _ => false } ) ?;
   let hidden_ids : HashSet < ID > =
     // If node is a subscribee, we may need to hide some content.
-    get_hidden_ids_if_subscribee ( forest, node_id, config ) ?;
+    get_hidden_ids_if_subscribee ( viewforest, node_id, config ) ?;
   if let Some (&preexisting_node_id) =
     visited . get (& node_pid)
   { if preexisting_node_id != node_id {
-    indefinitize_content_subtree ( forest,
+    indefinitize_content_subtree ( viewforest,
                                    preexisting_node_id,
                                    visited, config ) ?; }}
   { // Remove request, mark definitive, replace title/body, add to visited.
     write_at_truenode_in_tree (
-      forest, node_id, |t| {
+      viewforest, node_id, |t| {
         t . view_requests . remove (& ViewRequest::Definitive);
         t . indef_or_def = IndefOrDef::Definitive {
           body         : None,
@@ -133,23 +133,23 @@ async fn execute_definitive_view_request (
     if is_removed_node
       { from_git_replace_title_body (
           // PITFALL: This per-node git lookup might be slow. Hard to see how to batch the lookoup, though, since it's from git.
-          forest, node_id, config ) ?; }
+          viewforest, node_id, config ) ?; }
       else { from_disk_replace_title_body_and_nodecomplete (
-               forest, node_id, config ) ?; }
+               viewforest, node_id, config ) ?; }
     visited . insert ( node_pid . clone(), node_id ); }
   if is_removed_node {
     extendDefinitiveSubtree_fromGit (
-      forest, node_id, config . initial_node_limit,
+      viewforest, node_id, config . initial_node_limit,
       visited, source_diffs, config, &hidden_ids, typedb_driver,
       deleted_since_head_pid_src_map ) . await ?; }
   else {
     extendDefinitiveSubtreeFromLeaf (
-      forest, node_id, config . initial_node_limit,
+      viewforest, node_id, config . initial_node_limit,
       visited, config, typedb_driver, &hidden_ids ) . await ?;
     if type_and_parent_type_consistent_with_subscribee (
-      forest, node_id ) ?
+      viewforest, node_id ) ?
     { maybe_add_hiddenInSubscribeeCol_branch (
-        forest, node_id, config, typedb_driver
+        viewforest, node_id, config, typedb_driver
       ) . await ?; } }
   Ok (( )) }
 
@@ -227,7 +227,7 @@ fn indefinitize_content_subtree (
 
 /// Expands content for a node using BFS with a node limit.
 ///
-/// This is similar to `render_initial_forest_bfs`
+/// This is similar to `render_initial_viewforest_bfs`
 /// but operates on an existing PairTree.
 ///
 /// The starting node is already definitive. This function:

@@ -3,10 +3,10 @@
 use indoc::indoc;
 use regex::Regex;
 use skg::test_utils::{strip_org_comments, cleanup_test_tantivy_and_typedb_dbs};
-use skg::from_text::buffer_to_viewnode_forest_and_save_instructions;
+use skg::from_text::buffer_to_viewforest_and_save_instructions;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
-use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_forest;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_viewforest;
 use skg::types::unchecked_viewnode::UncheckedViewNode;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::SkgConfig;
@@ -60,19 +60,19 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
       indoc! {"
         * (skg (node (id pub-1))) pub-1                                      # root with no source
         * (skg (node (id dub-1) (source dub))) dub-1                         # source does not exist
-        * (skg (node (id priv-1) (source public))) priv-1 # This line includes an error, mismatch between buffer and disk sources, which is not caught yet, but it is caught by 'buffer_to_viewnode_forest_and_save_instructions', as verified by 'test_reconciliation_errors'.
+        * (skg (node (id priv-1) (source public))) priv-1 # This line includes an error, mismatch between buffer and disk sources, which is not caught yet, but it is caught by 'buffer_to_viewforest_and_save_instructions', as verified by 'test_reconciliation_errors'.
         * (skg (node (id priv-1) (source private))) priv-1                   # error: multiple defining viewnodes for this id
       "};
     let buffer_text: String =
       strip_org_comments (buffer_with_errors);
-    let mut forest: Tree<UncheckedViewNode> =
+    let mut viewforest: Tree<UncheckedViewNode> =
       org_to_uninterpreted_nodes (&buffer_text)?. 0;
-    add_missing_info_to_forest(
-      &mut forest, &config . db_name, &driver
+    add_missing_info_to_viewforest(
+      &mut viewforest, &config . db_name, &driver
       ) . await?;
     let errors: Vec<BufferValidationError> =
       find_buffer_errors_for_saving(
-        &forest, &config, &driver) . await?;
+        &viewforest, &config, &driver) . await?;
 
     { // Source validation errors: one for dub-1 (nonexistent source "dub")
       // and one for pub-1 (no source at all).
@@ -173,7 +173,7 @@ fn test_foreign_node_modification_errors(
 
       let buffer_text: String =
         strip_org_comments (buffer_with_errors);
-      let result = buffer_to_viewnode_forest_and_save_instructions(
+      let result = buffer_to_viewforest_and_save_instructions(
         &buffer_text,
         &config,
         &driver,
@@ -239,7 +239,7 @@ fn test_foreign_node_modification_errors(
 
       let buffer_text: String = strip_org_comments(
         buffer_with_merges);
-      let result = buffer_to_viewnode_forest_and_save_instructions(
+      let result = buffer_to_viewforest_and_save_instructions(
         &buffer_text,
         &config,
         &driver,
@@ -331,7 +331,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       let buffer_text: String =
         strip_org_comments (buffer_with_move);
 
-      let result = buffer_to_viewnode_forest_and_save_instructions(
+      let result = buffer_to_viewforest_and_save_instructions(
         &buffer_text,
         &config,
         &driver,
@@ -341,7 +341,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
               "Source move between owned sources should succeed, got: {:?}",
               result . err());
 
-      let (_forest, _instructions, _merges, source_moves) = result?;
+      let (_viewforest, _instructions, _merges, source_moves) = result?;
       assert_eq!(source_moves . len(), 1,
                  "Expected exactly 1 source move");
       assert_eq!(source_moves[0] . pid . 0, "priv-1");
@@ -361,7 +361,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         strip_org_comments (buffer_with_inconsistent_sources);
 
       // This should fail during validation (before indefinitives are filtered)
-      let result = buffer_to_viewnode_forest_and_save_instructions(
+      let result = buffer_to_viewforest_and_save_instructions(
         &buffer_text,
         &config,
         &driver,

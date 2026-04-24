@@ -9,7 +9,7 @@
 ///    level, any `:ID:` and `:ROAM_ALIASES:` from its property drawer,
 ///    and the line range of its body text.
 ///
-/// 2. **Build a section forest.** Push sections onto a stack, popping
+/// 2. **Build a section viewforest.** Push sections onto a stack, popping
 ///    whenever a same-or-shallower headline arrives, to produce a tree
 ///    of `SectionTree` nodes that mirrors the org outline.
 ///
@@ -30,7 +30,7 @@
 /// 4. **Assign missing IDs.** Any section (original or synthetic)
 ///    that lacks an `:ID:` gets a fresh UUID.
 ///
-/// 5. **Emit NodeCompletes.** Walk the forest depth-first, converting each
+/// 5. **Emit NodeCompletes.** Walk the viewforest depth-first, converting each
 ///    `SectionTree` into a flat `NodeComplete` whose `contains` field lists
 ///    its direct children by ID.
 
@@ -79,13 +79,13 @@ pub fn parse_org_file (
   if sections . is_empty() { return vec![]; }
   // The file-level section must have an :ID:.
   if sections[0] . id . is_none() { return vec![]; }
-  let mut forest : Vec<SectionTree> =
-    build_section_forest (sections, lines . len());
-  for st in &mut forest {
+  let mut viewforest : Vec<SectionTree> =
+    build_section_viewforest (sections, lines . len());
+  for st in &mut viewforest {
     insert_super_indentation_groups (st);
     assign_missing_ids (st); }
   let mut nodes : Vec<NodeComplete> = Vec::new();
-  for st in &forest {
+  for st in &viewforest {
     collect_nodecompletes (st, &lines, &mut nodes); }
   nodes }
 
@@ -142,7 +142,7 @@ fn extract_sections (
 // Section tree building
 //
 
-fn build_section_forest (
+fn build_section_viewforest (
   sections  : Vec<OrgSection>,
   num_lines : usize,
 ) -> Vec<SectionTree> {
@@ -150,7 +150,7 @@ fn build_section_forest (
   // built SectionTree whose extent_end is not yet known.
   // When a section at same-or-higher level arrives, we pop and
   // finalize the extent_end of everything deeper.
-  let mut forest : Vec<SectionTree> = Vec::new();
+  let mut viewforest : Vec<SectionTree> = Vec::new();
   let mut stack : Vec<SectionTree> = Vec::new();
   for (idx, section) in sections . into_iter() . enumerate() {
     let level : usize = section . level;
@@ -168,7 +168,7 @@ fn build_section_forest (
       if let Some (parent) = stack . last_mut() {
         parent . children . push (popped); }
       else {
-        forest . push (popped); }}
+        viewforest . push (popped); }}
     stack . push ( SectionTree {
       section,
       extent_end : num_lines, // default; will be updated when popped
@@ -179,8 +179,8 @@ fn build_section_forest (
     if let Some (parent) = stack . last_mut() {
       parent . children . push (popped); }
     else {
-      forest . push (popped); }}
-  forest }
+      viewforest . push (popped); }}
+  viewforest }
 
 //
 // Super-indentation grouping

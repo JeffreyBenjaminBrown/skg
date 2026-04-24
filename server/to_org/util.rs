@@ -10,7 +10,7 @@ use crate::types::tree::generations::collect_generation_ids;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_nodecomplete::{pid_and_source_from_treenode, write_at_truenode_in_tree};
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, Birth, TrueNode, forest_root_viewnode, mk_definitive_viewnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, Birth, TrueNode, viewforest_root_viewnode, mk_definitive_viewnode };
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use ego_tree::iter::Edge;
@@ -22,7 +22,7 @@ use typedb_driver::TypeDBDriver;
 
 /// Tracks which IDs have been rendered definitively and where.
 /// - Key: the ID that was visited
-/// - Value: NodeId within the forest tree
+/// - Value: NodeId within the viewforest tree
 ///
 /// Uses:
 /// - prevent duplicate definitive expansions
@@ -161,39 +161,39 @@ pub fn detect_and_mark_cycle_v1 (
 // Reading and manipulating trees, esp. via IDs
 // ==============================================
 
-/// Create a forest (single tree with BufferRoot at root)
+/// Create a viewforest (single tree with BufferRoot at root)
 /// containing just "tree root" nodes (no grandchildren yet),
 /// and complete each via build_node_branch_minus_content.
-pub async fn stub_forest_from_root_ids (
+pub async fn stub_viewforest_from_root_ids (
   root_skgids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
   visited  : &mut DefinitiveMap,
 ) -> Result < Tree<ViewNode>, Box<dyn Error> > {
-  let mut forest : Tree<ViewNode> =
-    Tree::new ( forest_root_viewnode () );
-  let forest_root_treeid : NodeId = forest . root () . id ();
+  let mut viewforest : Tree<ViewNode> =
+    Tree::new ( viewforest_root_viewnode () );
+  let viewforest_root_treeid : NodeId = viewforest . root () . id ();
   for root_skgid in root_skgids {
     build_node_branch_minus_content (
-      Some ( (&mut forest, forest_root_treeid) ),
+      Some ( (&mut viewforest, viewforest_root_treeid) ),
       root_skgid, config, driver, visited
     ) . await ?; }
-  mark_view_roots_independent ( &mut forest );
-  Ok (forest) }
+  mark_view_roots_independent ( &mut viewforest );
+  Ok (viewforest) }
 
 /// Mark direct TrueNode children of BufferRoot as birth=Independent.
 /// View roots are not rendered because of a parent relationship;
 /// they are the user's chosen entry points into the graph.
 pub fn mark_view_roots_independent (
-  forest : &mut Tree<ViewNode>,
+  viewforest : &mut Tree<ViewNode>,
 ) {
-  let root_id : NodeId = forest . root () . id ();
+  let root_id : NodeId = viewforest . root () . id ();
   let child_ids : Vec<NodeId> =
-    forest . get (root_id) . unwrap ()
+    viewforest . get (root_id) . unwrap ()
     . children () . map ( |c| c . id () ) . collect ();
   for child_id in child_ids {
     let mut node_mut : NodeMut<ViewNode> =
-      forest . get_mut (child_id) . unwrap ();
+      viewforest . get_mut (child_id) . unwrap ();
     let vn : &mut ViewNode = node_mut . value ();
     if let ViewNodeKind::True ( ref mut t ) = vn . kind {
       t . birth = Birth::Independent; } } }
@@ -227,13 +227,13 @@ pub fn mark_view_roots_independent (
 /// graph before the rerender pass runs (see
 /// 'update_views_after_save').
 pub fn validate_birth_relationships (
-  forest : &mut Tree<ViewNode>,
+  viewforest : &mut Tree<ViewNode>,
   graph  : &InRustGraph,
 ) {
   // Collect correction targets in a read-only first pass so the
   // &mut Tree write phase doesn't need simultaneous read access.
   let mut to_flip : Vec<NodeId> = Vec::new ();
-  for edge in forest . root () . traverse () {
+  for edge in viewforest . root () . traverse () {
     if let Edge::Open (child_ref) = edge {
       let child_tn : &TrueNode =
         match & child_ref . value () . kind {
@@ -263,7 +263,7 @@ pub fn validate_birth_relationships (
       if ! claim_ok { to_flip . push ( child_ref . id () ); } } }
   for id in to_flip {
     let mut node_mut : NodeMut<ViewNode> =
-      forest . get_mut (id) . unwrap ();
+      viewforest . get_mut (id) . unwrap ();
     if let ViewNodeKind::True ( ref mut t )
       = node_mut . value () . kind
     { t . birth = Birth::Independent; } } }
@@ -592,10 +592,10 @@ mod validate_birth_relationships_tests {
     g }
 
   fn true_child_birth (
-    forest : &Tree<ViewNode>,
+    viewforest : &Tree<ViewNode>,
     nid    : NodeId,
   ) -> Birth {
-    match & forest . get (nid) . unwrap () . value () . kind {
+    match & viewforest . get (nid) . unwrap () . value () . kind {
       ViewNodeKind::True (t) => t . birth,
       _ => panic! ("expected TrueNode") } }
 
@@ -607,18 +607,18 @@ mod validate_birth_relationships_tests {
       mk_node ("P", &[], &[], &[]),
       mk_node ("C", &[], &[], &[]),   // textlinks_to: empty
     ]);
-    let mut forest : Tree<ViewNode> = Tree::new (forest_root_viewnode ());
-    let root : NodeId = forest . root () . id ();
-    let p_id : NodeId = forest . get_mut (root) . unwrap () . append (
+    let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = viewforest . root () . id ();
+    let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
                                 Birth::ContentOf) ) . id ();
-    let c_id : NodeId = forest . get_mut (p_id) . unwrap () . append (
+    let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
                                 Birth::LinksTo) ) . id ();
 
-    validate_birth_relationships (&mut forest, &graph);
+    validate_birth_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&forest, c_id), Birth::Independent,
+    assert_eq! (true_child_birth (&viewforest, c_id), Birth::Independent,
       "LinksTo claim with no backing textlink should flip to Independent");
   }
 
@@ -630,18 +630,18 @@ mod validate_birth_relationships_tests {
       mk_node ("P", &[], &[], &[]),
       mk_node ("C", &[], &[], &["P"]), // C textlinks to P
     ]);
-    let mut forest : Tree<ViewNode> = Tree::new (forest_root_viewnode ());
-    let root : NodeId = forest . root () . id ();
-    let p_id : NodeId = forest . get_mut (root) . unwrap () . append (
+    let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = viewforest . root () . id ();
+    let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
                                 Birth::ContentOf) ) . id ();
-    let c_id : NodeId = forest . get_mut (p_id) . unwrap () . append (
+    let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
                                 Birth::LinksTo) ) . id ();
 
-    validate_birth_relationships (&mut forest, &graph);
+    validate_birth_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&forest, c_id), Birth::LinksTo,
+    assert_eq! (true_child_birth (&viewforest, c_id), Birth::LinksTo,
       "LinksTo claim with a backing textlink must be preserved");
   }
 
@@ -653,18 +653,18 @@ mod validate_birth_relationships_tests {
       mk_node ("P", &[], &[],    &[]),
       mk_node ("C", &[], &["X"], &[]),  // C contains some other pid
     ]);
-    let mut forest : Tree<ViewNode> = Tree::new (forest_root_viewnode ());
-    let root : NodeId = forest . root () . id ();
-    let p_id : NodeId = forest . get_mut (root) . unwrap () . append (
+    let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = viewforest . root () . id ();
+    let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
                                 Birth::ContentOf) ) . id ();
-    let c_id : NodeId = forest . get_mut (p_id) . unwrap () . append (
+    let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
                                 Birth::ContainerOf) ) . id ();
 
-    validate_birth_relationships (&mut forest, &graph);
+    validate_birth_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&forest, c_id), Birth::Independent);
+    assert_eq! (true_child_birth (&viewforest, c_id), Birth::Independent);
   }
 
   #[test]
@@ -679,18 +679,18 @@ mod validate_birth_relationships_tests {
       mk_node ("P", &["P-old"], &[],        &[]),
       mk_node ("C", &[],        &["P-old"], &[]),
     ]);
-    let mut forest : Tree<ViewNode> = Tree::new (forest_root_viewnode ());
-    let root : NodeId = forest . root () . id ();
-    let p_id : NodeId = forest . get_mut (root) . unwrap () . append (
+    let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = viewforest . root () . id ();
+    let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
                                 Birth::ContentOf) ) . id ();
-    let c_id : NodeId = forest . get_mut (p_id) . unwrap () . append (
+    let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
                                 Birth::ContainerOf) ) . id ();
 
-    validate_birth_relationships (&mut forest, &graph);
+    validate_birth_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&forest, c_id), Birth::ContainerOf,
+    assert_eq! (true_child_birth (&viewforest, c_id), Birth::ContainerOf,
       "Extra_id-aliased parent pid should still satisfy the claim");
   }
 
@@ -704,18 +704,18 @@ mod validate_birth_relationships_tests {
       mk_node ("P", &["P-old"], &[],    &[]),
       mk_node ("C", &[],        &["P"], &[]),
     ]);
-    let mut forest : Tree<ViewNode> = Tree::new (forest_root_viewnode ());
-    let root : NodeId = forest . root () . id ();
-    let p_id : NodeId = forest . get_mut (root) . unwrap () . append (
+    let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = viewforest . root () . id ();
+    let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("P-old"), src (), "P" . to_string (),
                                 Birth::ContentOf) ) . id ();
-    let c_id : NodeId = forest . get_mut (p_id) . unwrap () . append (
+    let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
                                 Birth::ContainerOf) ) . id ();
 
-    validate_birth_relationships (&mut forest, &graph);
+    validate_birth_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&forest, c_id), Birth::ContainerOf,
+    assert_eq! (true_child_birth (&viewforest, c_id), Birth::ContainerOf,
       "When view parent id is the acquiree pid, the claim should \
        still hold via pid_of resolution on the parent side");
   }
@@ -728,18 +728,18 @@ mod validate_birth_relationships_tests {
       mk_node ("P", &[], &[], &[]),   // P.contains empty
       mk_node ("C", &[], &[], &[]),
     ]);
-    let mut forest : Tree<ViewNode> = Tree::new (forest_root_viewnode ());
-    let root : NodeId = forest . root () . id ();
-    let p_id : NodeId = forest . get_mut (root) . unwrap () . append (
+    let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = viewforest . root () . id ();
+    let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
                                 Birth::ContentOf) ) . id ();
-    let c_id : NodeId = forest . get_mut (p_id) . unwrap () . append (
+    let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
                                 Birth::ContentOf) ) . id ();
 
-    validate_birth_relationships (&mut forest, &graph);
+    validate_birth_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&forest, c_id), Birth::Independent);
+    assert_eq! (true_child_birth (&viewforest, c_id), Birth::Independent);
   }
 
   #[test]
@@ -751,18 +751,18 @@ mod validate_birth_relationships_tests {
       mk_node ("P", &[], &[], &[]),  // P.contains empty in memory
       mk_node ("C", &[], &[], &[]),
     ]);
-    let mut forest : Tree<ViewNode> = Tree::new (forest_root_viewnode ());
-    let root : NodeId = forest . root () . id ();
-    let p_id : NodeId = forest . get_mut (root) . unwrap () . append (
+    let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = viewforest . root () . id ();
+    let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_definitive_viewnode (id ("P"), src (),
                               "P" . to_string (), None) ) . id ();
-    let c_id : NodeId = forest . get_mut (p_id) . unwrap () . append (
+    let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
                                 Birth::ContentOf) ) . id ();
 
-    validate_birth_relationships (&mut forest, &graph);
+    validate_birth_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&forest, c_id), Birth::ContentOf,
+    assert_eq! (true_child_birth (&viewforest, c_id), Birth::ContentOf,
       "Definitive parent: ContentOf claim is never flipped here");
   }
 
@@ -773,18 +773,18 @@ mod validate_birth_relationships_tests {
       mk_node ("P", &[], &[], &[]),
       mk_node ("C", &[], &[], &[]),
     ]);
-    let mut forest : Tree<ViewNode> = Tree::new (forest_root_viewnode ());
-    let root : NodeId = forest . root () . id ();
-    let p_id : NodeId = forest . get_mut (root) . unwrap () . append (
+    let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = viewforest . root () . id ();
+    let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
                                 Birth::ContentOf) ) . id ();
-    let c_id : NodeId = forest . get_mut (p_id) . unwrap () . append (
+    let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
                                 Birth::Independent) ) . id ();
 
-    validate_birth_relationships (&mut forest, &graph);
+    validate_birth_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&forest, c_id), Birth::Independent);
+    assert_eq! (true_child_birth (&viewforest, c_id), Birth::Independent);
   }
 
   // ===== 3x2 matrix: moving a {containerOf, contentOf, linksTo}
@@ -795,7 +795,7 @@ mod validate_birth_relationships_tests {
   //   - p_old: the child's original parent (the relationship it
   //     was originally marked with).
   //   - p_new: the new parent it has been moved under.
-  //   - The view forest has the child under p_new.
+  //   - The view viewforest has the child under p_new.
   //   - The graph sometimes has a relationship from the child to
   //     p_new ("holds"), and sometimes doesn't ("no longer holds").
 
@@ -812,18 +812,18 @@ mod validate_birth_relationships_tests {
       mk_node ("p_new", &[], &[],                   &[]),
       mk_node ("C",     &[], &["p_old", "p_new"],   &[]),
     ]);
-    let mut forest : Tree<ViewNode> = Tree::new (forest_root_viewnode ());
-    let root : NodeId = forest . root () . id ();
-    let p_new_id : NodeId = forest . get_mut (root) . unwrap () . append (
+    let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = viewforest . root () . id ();
+    let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("p_new"), src (), "p_new" . to_string (),
                                 Birth::ContentOf) ) . id ();
-    let c_id : NodeId = forest . get_mut (p_new_id) . unwrap () . append (
+    let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
                                 Birth::ContainerOf) ) . id ();
 
-    validate_birth_relationships (&mut forest, &graph);
+    validate_birth_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&forest, c_id), Birth::ContainerOf,
+    assert_eq! (true_child_birth (&viewforest, c_id), Birth::ContainerOf,
       "Moved containerOf child still contains its new parent — keep");
   }
 
@@ -836,18 +836,18 @@ mod validate_birth_relationships_tests {
       mk_node ("p_new", &[], &[],        &[]),
       mk_node ("C",     &[], &["p_old"], &[]),
     ]);
-    let mut forest : Tree<ViewNode> = Tree::new (forest_root_viewnode ());
-    let root : NodeId = forest . root () . id ();
-    let p_new_id : NodeId = forest . get_mut (root) . unwrap () . append (
+    let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = viewforest . root () . id ();
+    let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("p_new"), src (), "p_new" . to_string (),
                                 Birth::ContentOf) ) . id ();
-    let c_id : NodeId = forest . get_mut (p_new_id) . unwrap () . append (
+    let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
                                 Birth::ContainerOf) ) . id ();
 
-    validate_birth_relationships (&mut forest, &graph);
+    validate_birth_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&forest, c_id), Birth::Independent,
+    assert_eq! (true_child_birth (&viewforest, c_id), Birth::Independent,
       "Moved containerOf child no longer contains new parent — flip");
   }
 
@@ -862,18 +862,18 @@ mod validate_birth_relationships_tests {
       mk_node ("p_new", &[], &["C"], &[]), // p_new really contains C
       mk_node ("C",     &[], &[],    &[]),
     ]);
-    let mut forest : Tree<ViewNode> = Tree::new (forest_root_viewnode ());
-    let root : NodeId = forest . root () . id ();
-    let p_new_id : NodeId = forest . get_mut (root) . unwrap () . append (
+    let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = viewforest . root () . id ();
+    let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("p_new"), src (), "p_new" . to_string (),
                                 Birth::ContentOf) ) . id ();
-    let c_id : NodeId = forest . get_mut (p_new_id) . unwrap () . append (
+    let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
                                 Birth::ContentOf) ) . id ();
 
-    validate_birth_relationships (&mut forest, &graph);
+    validate_birth_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&forest, c_id), Birth::ContentOf,
+    assert_eq! (true_child_birth (&viewforest, c_id), Birth::ContentOf,
       "Moved contentOf: indef p_new actually contains C — keep");
   }
 
@@ -885,18 +885,18 @@ mod validate_birth_relationships_tests {
       mk_node ("p_new", &[], &[],    &[]), // p_new doesn't contain C
       mk_node ("C",     &[], &[],    &[]),
     ]);
-    let mut forest : Tree<ViewNode> = Tree::new (forest_root_viewnode ());
-    let root : NodeId = forest . root () . id ();
-    let p_new_id : NodeId = forest . get_mut (root) . unwrap () . append (
+    let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = viewforest . root () . id ();
+    let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("p_new"), src (), "p_new" . to_string (),
                                 Birth::ContentOf) ) . id ();
-    let c_id : NodeId = forest . get_mut (p_new_id) . unwrap () . append (
+    let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
                                 Birth::ContentOf) ) . id ();
 
-    validate_birth_relationships (&mut forest, &graph);
+    validate_birth_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&forest, c_id), Birth::Independent,
+    assert_eq! (true_child_birth (&viewforest, c_id), Birth::Independent,
       "Moved contentOf: indef p_new doesn't contain C — flip");
   }
 
@@ -911,18 +911,18 @@ mod validate_birth_relationships_tests {
       mk_node ("p_new", &[], &[], &[]),
       mk_node ("C",     &[], &[], &["p_old", "p_new"]),
     ]);
-    let mut forest : Tree<ViewNode> = Tree::new (forest_root_viewnode ());
-    let root : NodeId = forest . root () . id ();
-    let p_new_id : NodeId = forest . get_mut (root) . unwrap () . append (
+    let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = viewforest . root () . id ();
+    let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("p_new"), src (), "p_new" . to_string (),
                                 Birth::ContentOf) ) . id ();
-    let c_id : NodeId = forest . get_mut (p_new_id) . unwrap () . append (
+    let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
                                 Birth::LinksTo) ) . id ();
 
-    validate_birth_relationships (&mut forest, &graph);
+    validate_birth_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&forest, c_id), Birth::LinksTo,
+    assert_eq! (true_child_birth (&viewforest, c_id), Birth::LinksTo,
       "Moved linksTo: C still links to p_new — keep");
   }
 
@@ -934,18 +934,18 @@ mod validate_birth_relationships_tests {
       mk_node ("p_new", &[], &[], &[]),
       mk_node ("C",     &[], &[], &["p_old"]),
     ]);
-    let mut forest : Tree<ViewNode> = Tree::new (forest_root_viewnode ());
-    let root : NodeId = forest . root () . id ();
-    let p_new_id : NodeId = forest . get_mut (root) . unwrap () . append (
+    let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = viewforest . root () . id ();
+    let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("p_new"), src (), "p_new" . to_string (),
                                 Birth::ContentOf) ) . id ();
-    let c_id : NodeId = forest . get_mut (p_new_id) . unwrap () . append (
+    let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
                                 Birth::LinksTo) ) . id ();
 
-    validate_birth_relationships (&mut forest, &graph);
+    validate_birth_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&forest, c_id), Birth::Independent,
+    assert_eq! (true_child_birth (&viewforest, c_id), Birth::Independent,
       "Moved linksTo: C doesn't link to p_new — flip");
   }
 }

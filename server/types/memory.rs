@@ -23,7 +23,7 @@ pub enum ViewUri {
 }
 
 /// Per-connection view bookkeeping. Each entry in 'views' is a
-/// currently-open buffer (content or search) with its forest and PID
+/// currently-open buffer (content or search) with its viewforest and PID
 /// set. 'root_ids' is the reverse lookup — which view(s) is this
 /// ID a root of.
 pub struct OpenViews {
@@ -35,11 +35,11 @@ pub struct OpenViews {
   root_ids        : ManyToMany<ID, ViewUri>, // Maps every root ID (primary + extra) ↔ ViewUri. Supports many-to-many because a view can have multiple roots, and an ID could be a root in multiple views. Maintained by register_view / update_view / unregister_view.
 }
 
-/// Invariant: all forest mutations must go through register_view /
-/// update_view, which maintain pids in sync with the forest.
-/// Direct forest mutation would make pids stale.
+/// Invariant: all viewforest mutations must go through register_view /
+/// update_view, which maintain pids in sync with the viewforest.
+/// Direct viewforest mutation would make pids stale.
 pub struct ViewState {
-  pub forest : Tree<ViewNode>,
+  pub viewforest : Tree<ViewNode>,
   pub pids   : HashSet<ID>, // all the TrueNodes (and DeletedNodes) in the buffer
 }
 
@@ -85,7 +85,7 @@ impl OpenViews {
     uri : &ViewUri,
   ) -> Option<&Tree<ViewNode>> {
     self . views . get (uri)
-      . map ( |vs| &vs . forest ) }
+      . map ( |vs| &vs . viewforest ) }
 
   /// Returns the first (if any exists) non-search buffer
   /// for which the ID is a root (level-1 headline).
@@ -100,24 +100,24 @@ impl OpenViews {
   pub fn register_view (
     &mut self,
     uri    : ViewUri,
-    forest : Tree<ViewNode>,
+    viewforest : Tree<ViewNode>,
     pids   : &[ID],
   ) { let rids : HashSet<ID> =
-        root_ids_from_forest ( &forest );
+        root_ids_from_viewforest ( &viewforest );
       for rid in &rids {
         self . root_ids . insert (
           rid . clone (), uri . clone () ); }
       let state : ViewState =
-        ViewState { forest,
+        ViewState { viewforest,
                     pids : pids . iter () . cloned () . collect () };
       self . views . insert ( uri, state ); }
 
   pub fn update_view (
     &mut self,
     uri        : &ViewUri,
-    new_forest : Tree<ViewNode>,
+    new_viewforest : Tree<ViewNode>,
   ) { let pids : HashSet<ID> =
-        new_forest . root () . descendants ()
+        new_viewforest . root () . descendants ()
         . filter_map ( |n| match &n . value () . kind {
           ViewNodeKind::True (t)    => Some ( t . id . clone () ),
           ViewNodeKind::Deleted (d) => Some ( d . id . clone () ),
@@ -125,17 +125,17 @@ impl OpenViews {
         . collect ();
       self . root_ids . remove_right (uri);
       let rids : HashSet<ID> =
-        root_ids_from_forest ( &new_forest );
+        root_ids_from_viewforest ( &new_viewforest );
       for rid in &rids {
         self . root_ids . insert (
           rid . clone (), uri . clone () ); }
       if let Some (vs)
         = self . views . get_mut (uri)
-        { vs . forest = new_forest;
+        { vs . viewforest = new_viewforest;
           vs . pids = pids; }
       else { self . views . insert (
                uri . clone (),
-               ViewState { forest : new_forest,
+               ViewState { viewforest : new_viewforest,
                            pids } ); } }
 
   pub fn unregister_view (
@@ -166,12 +166,12 @@ impl OpenViews {
 /// Extra_ids are pulled from the in-Rust memory. If memory isn't
 /// initialized (tests that bypass 'init_global_handle'), only
 /// primary ids are collected — extras aren't available.
-fn root_ids_from_forest (
-  forest : &Tree<ViewNode>,
+fn root_ids_from_viewforest (
+  viewforest : &Tree<ViewNode>,
 ) -> HashSet<ID> {
   let mut ids : HashSet<ID> = HashSet::new ();
   let memory = snapshot_global ();
-  for child in forest . root () . children () {
+  for child in viewforest . root () . children () {
     if let ViewNodeKind::True (t) = &child . value () . kind {
       ids . insert ( t . id . clone () );
       if let Some (mem) = memory . as_ref () {

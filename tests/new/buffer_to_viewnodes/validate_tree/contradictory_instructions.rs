@@ -2,7 +2,7 @@
 
 use ego_tree::Tree;
 use indoc::indoc;
-use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_forest_root_viewnode};
+use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_viewforest_root_viewnode};
 use skg::types::misc::ID;
 use skg::types::errors::BufferValidationError;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
@@ -21,10 +21,10 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg (node (id node1) (editRequest delete))) duplicate of first node (same delete instruction)
         "};
 
-  let forest_consistent: Tree<UncheckedViewNode> =
+  let viewforest_consistent: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes (input_consistent) . unwrap() . 0;
   let (inconsistent_ids_consistent, _, _) =
-    find_inconsistent_instructions (&forest_consistent);
+    find_inconsistent_instructions (&viewforest_consistent);
   assert_eq!(inconsistent_ids_consistent . len(), 0, "Should have no inconsistent IDs when all nodes with same ID have same toDelete value");
 
   // Test case with inconsistent toDelete instructions (conflicts)
@@ -37,9 +37,9 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg (node (id conflict2))) another conflict end
         "};
 
-  let forest_inconsistent: Tree<UncheckedViewNode> =
+  let viewforest_inconsistent: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes (input_inconsistent) . unwrap() . 0;
-  let (inconsistent_ids, _, _) = find_inconsistent_instructions (&forest_inconsistent);
+  let (inconsistent_ids, _, _) = find_inconsistent_instructions (&viewforest_inconsistent);
 
   assert_eq!(inconsistent_ids . len(), 2, "Should find exactly 2 conflicting IDs");
   assert!(inconsistent_ids . contains(&ID::from ("conflict1")), "Should include conflict1 ID");
@@ -53,18 +53,18 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg (node (id valid_node))) only node with id
         "};
 
-  let forest_no_ids: Tree<UncheckedViewNode> =
+  let viewforest_no_ids: Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes (input_no_ids) . unwrap() . 0;
-  let (inconsistent_no_ids, _, _) = find_inconsistent_instructions (&forest_no_ids);
+  let (inconsistent_no_ids, _, _) = find_inconsistent_instructions (&viewforest_no_ids);
   assert_eq!(inconsistent_no_ids . len(), 0, "Should have no conflicts when only one node has each ID");
 
-  // Test empty forest (just BufferRoot, no tree roots)
-  let empty_forest: Tree<UncheckedViewNode> =
-    Tree::new(unchecked_forest_root_viewnode());
+  // Test empty viewforest (just BufferRoot, no tree roots)
+  let empty_viewforest: Tree<UncheckedViewNode> =
+    Tree::new(unchecked_viewforest_root_viewnode());
   let (inconsistent_empty, _, _) =
-    find_inconsistent_instructions (&empty_forest);
+    find_inconsistent_instructions (&empty_viewforest);
   assert_eq!(inconsistent_empty . len(), 0,
-             "Should have no conflicts in empty forest");
+             "Should have no conflicts in empty viewforest");
 }
 
 #[test]
@@ -89,10 +89,10 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
                 This one is fine
             "};
 
-      let forest: Tree<UncheckedViewNode> =
+      let viewforest: Tree<UncheckedViewNode> =
         org_to_uninterpreted_nodes (input_with_multiple_defining_containers) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&forest, config, driver) . await?;
+        find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
 
       let multiple_defining_errors: Vec<&BufferValidationError> = errors . iter()
         . filter(|e| matches!(e, BufferValidationError::Multiple_Defining_Viewnodes (_)))

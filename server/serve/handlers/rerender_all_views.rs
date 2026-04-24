@@ -60,7 +60,7 @@ pub fn stream_rerender_views (
   let mut errors : Vec<String> = Vec::new ();
 
   for uri in uris {
-    let mut forest : Tree<ViewNode> = match
+    let mut viewforest : Tree<ViewNode> = match
       conn_state . memory . viewuri_to_view (&uri) {
         Some (f) => f . clone (),
         None => {
@@ -74,13 +74,13 @@ pub fn stream_rerender_views (
           "rerender_view (rerender-all)"
         ) . entered ();
       rerender_view (
-        &mut forest,
+        &mut viewforest,
         &source_diffs, config, typedb_driver,
         &mut errors, &deleted_since_head_pid_src_map,
         &deleted_by_this_save_pids,
         false ) . await } )
     { Ok (text) => {
-        conn_state . memory . update_view (&uri, forest);
+        conn_state . memory . update_view (&uri, viewforest);
         send_response_with_length_prefix (
           stream,
           & tag_sexp_response (

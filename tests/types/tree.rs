@@ -283,102 +283,102 @@ fn test_next_in_generation_with_deleted_node() {
 }
 
 #[test]
-fn test_next_in_generation_across_forest_roots() {
+fn test_next_in_generation_across_viewforest_roots() {
   // Tree A (depth 2), Tree B (depth 3), Tree C (depth 2)
-  let mut forest: Tree<String> =
-    // This 'forest root' is like BufferRoot from types::viewnode
+  let mut viewforest: Tree<String> =
+    // This 'viewforest root' is like BufferRoot from types::viewnode
     Tree::new("BufferRoot" . to_string());
 
   // Add "tree" A with children A1, A2
   let a_id: NodeId =
-    forest . root_mut() . append("A" . to_string()) . id();
-  forest . get_mut (a_id) . unwrap() . append("A1" . to_string());
-  forest . get_mut (a_id) . unwrap() . append("A2" . to_string());
+    viewforest . root_mut() . append("A" . to_string()) . id();
+  viewforest . get_mut (a_id) . unwrap() . append("A1" . to_string());
+  viewforest . get_mut (a_id) . unwrap() . append("A2" . to_string());
 
   // Add "tree" B with children B1, B2 and grandchildren B11, B21
   let b_id: NodeId =
-    forest . root_mut() . append("B" . to_string()) . id();
+    viewforest . root_mut() . append("B" . to_string()) . id();
   let b1_id: NodeId =
-    forest . get_mut (b_id) . unwrap() . append("B1" . to_string()) . id();
+    viewforest . get_mut (b_id) . unwrap() . append("B1" . to_string()) . id();
   let b2_id: NodeId =
-    forest . get_mut (b_id) . unwrap() . append("B2" . to_string()) . id();
-  forest . get_mut (b1_id) . unwrap() . append("B11" . to_string());
-  forest . get_mut (b2_id) . unwrap() . append("B21" . to_string());
+    viewforest . get_mut (b_id) . unwrap() . append("B2" . to_string()) . id();
+  viewforest . get_mut (b1_id) . unwrap() . append("B11" . to_string());
+  viewforest . get_mut (b2_id) . unwrap() . append("B21" . to_string());
 
   // Add "tree" C with children C1, C2
   let c_id: NodeId =
-    forest . root_mut() . append("C" . to_string()) . id();
-  forest . get_mut (c_id) . unwrap() . append("C1" . to_string());
-  forest . get_mut (c_id) . unwrap() . append("C2" . to_string());
+    viewforest . root_mut() . append("C" . to_string()) . id();
+  viewforest . get_mut (c_id) . unwrap() . append("C1" . to_string());
+  viewforest . get_mut (c_id) . unwrap() . append("C2" . to_string());
 
   // Test: from A2 (generation 2 from BufferRoot), next should be B1
   // A2 is at depth 2: BufferRoot -> A -> A2
   let node_a2: NodeRef<String> =
-    find_node_by_label(&forest, "A2") . unwrap();
+    find_node_by_label(&viewforest, "A2") . unwrap();
   let next: NodeRef<String> =
     next_in_generation (node_a2) . unwrap();
   assert_eq!(next . value(), "B1", "Next after A2 should be B1 (crossing to next subtree)");
 
   // Test: from B2, next should be C1
   let node_b2: NodeRef<String> =
-    find_node_by_label(&forest, "B2") . unwrap();
+    find_node_by_label(&viewforest, "B2") . unwrap();
   let next: NodeRef<String> =
     next_in_generation (node_b2) . unwrap();
   assert_eq!(next . value(), "C1", "Next after B2 should be C1");
 
   // Test: from C2 (last node at generation 2), next should be None
   let node_c2: NodeRef<String> =
-    find_node_by_label(&forest, "C2") . unwrap();
+    find_node_by_label(&viewforest, "C2") . unwrap();
   let next: Option<NodeRef<String>> =
     next_in_generation (node_c2);
-  assert!(next . is_none(), "C2 is last in forest's generation 2");
+  assert!(next . is_none(), "C2 is last in viewforest's generation 2");
 }
 
 #[test]
-fn test_first_in_generation_across_forest_roots() -> Result<(), Box<dyn Error>> {
+fn test_first_in_generation_across_viewforest_roots() -> Result<(), Box<dyn Error>> {
   // Tree A: only has depth 2 (A -> A1)
   // Tree B: has depth 4 (B -> B1 -> B11 -> B111)
   // Tree C: has depth 3 (C -> C1 -> C11)
-  let mut forest: Tree<String> =
-    // This 'forest root' is like BufferRoot from types::viewnode
+  let mut viewforest: Tree<String> =
+    // This 'viewforest root' is like BufferRoot from types::viewnode
     Tree::new("BufferRoot" . to_string());
 
   // Add "tree" A with child A1
   let a_id: NodeId =
-    forest . root_mut() . append("A" . to_string()) . id();
-  forest . get_mut (a_id) . unwrap() . append("A1" . to_string());
+    viewforest . root_mut() . append("A" . to_string()) . id();
+  viewforest . get_mut (a_id) . unwrap() . append("A1" . to_string());
 
   // Add "tree" B with deeper nesting: B -> B1 -> B11 -> B111
   let b_id: NodeId =
-    forest . root_mut() . append("B" . to_string()) . id();
+    viewforest . root_mut() . append("B" . to_string()) . id();
   let b1_id: NodeId =
-    forest . get_mut (b_id) . unwrap() . append("B1" . to_string()) . id();
+    viewforest . get_mut (b_id) . unwrap() . append("B1" . to_string()) . id();
   let b11_id: NodeId =
-    forest . get_mut (b1_id) . unwrap() . append("B11" . to_string()) . id();
-  forest . get_mut (b11_id) . unwrap() . append("B111" . to_string());
+    viewforest . get_mut (b1_id) . unwrap() . append("B11" . to_string()) . id();
+  viewforest . get_mut (b11_id) . unwrap() . append("B111" . to_string());
 
   // Add "tree" C: C -> C1 -> C11
   let c_id: NodeId =
-    forest . root_mut() . append("C" . to_string()) . id();
+    viewforest . root_mut() . append("C" . to_string()) . id();
   let c1_id: NodeId =
-    forest . get_mut (c_id) . unwrap() . append("C1" . to_string()) . id();
-  forest . get_mut (c1_id) . unwrap() . append("C11" . to_string());
+    viewforest . get_mut (c_id) . unwrap() . append("C1" . to_string()) . id();
+  viewforest . get_mut (c1_id) . unwrap() . append("C11" . to_string());
 
   // Generation 0 = BufferRoot
   let result: Option<NodeRef<String>> =
-    first_in_generation(&forest, 0)?;
+    first_in_generation(&viewforest, 0)?;
   assert_eq!(result . unwrap() . value(), "BufferRoot",
     "Generation 0 should be BufferRoot");
 
   // Generation 1 = A (first child of BufferRoot)
   let result: Option<NodeRef<String>> =
-    first_in_generation(&forest, 1)?;
+    first_in_generation(&viewforest, 1)?;
   assert_eq!(result . unwrap() . value(), "A",
     "Generation 1 should be A");
 
   // Generation 2 = A1 (first grandchild of BufferRoot)
   let result: Option<NodeRef<String>> =
-    first_in_generation(&forest, 2)?;
+    first_in_generation(&viewforest, 2)?;
   assert_eq!(result . unwrap() . value(), "A1",
     "Generation 2 should be A1");
 
@@ -389,19 +389,19 @@ fn test_first_in_generation_across_forest_roots() -> Result<(), Box<dyn Error>> 
   //   ├── B (1) -> B1 (2) -> B11 (3) -> B111 (4)
   //   └── C (1) -> C1 (2) -> C11 (3)
   let result: Option<NodeRef<String>> =
-    first_in_generation(&forest, 3)?;
+    first_in_generation(&viewforest, 3)?;
   assert_eq!(result . unwrap() . value(), "B11",
     "Generation 3 should be B11 (since A1 has no children)");
 
   // Generation 4 - should find B111
   let result: Option<NodeRef<String>> =
-    first_in_generation(&forest, 4)?;
+    first_in_generation(&viewforest, 4)?;
   assert_eq!(result . unwrap() . value(), "B111",
     "Generation 4 should be B111");
 
   // Generation 5 - no node has it
   let result: Option<NodeRef<String>> =
-    first_in_generation(&forest, 5)?;
+    first_in_generation(&viewforest, 5)?;
   assert!(result . is_none(),
     "Generation 5 should not exist");
 

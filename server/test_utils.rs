@@ -387,13 +387,13 @@ pub fn compare_viewnode_trees (
 
 /// Compares ignoring ID value but not ID presence/absence.
 pub fn compare_viewnode_trees_modulo_id(
-  forest1: &Tree<UncheckedViewNode>,
-  forest2: &Tree<UncheckedViewNode>
+  viewforest1: &Tree<UncheckedViewNode>,
+  viewforest2: &Tree<UncheckedViewNode>
 ) -> bool {
   let root1 : Vec < NodeRef < '_, UncheckedViewNode >> =
-    forest1 . root() . children() . collect();
+    viewforest1 . root() . children() . collect();
   let root2 : Vec < NodeRef < '_, UncheckedViewNode >> =
-    forest2 . root() . children() . collect();
+    viewforest2 . root() . children() . collect();
   if root1 . len() != root2 . len() {
     return false; }
   for (tree1, tree2) in root1 . iter() . zip(root2 . iter()) {

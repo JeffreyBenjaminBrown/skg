@@ -83,20 +83,20 @@ async fn test_sourceward_ancestry_impl (
   let input : &str = indoc! {"
     * (skg (node (id a) (source main))) a
   "};
-  let unchecked_forest =
+  let unchecked_viewforest =
     org_to_uninterpreted_nodes (input) ? . 0;
-  let mut forest : Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_forest) ?;
+  let mut viewforest : Tree<ViewNode> =
+    unchecked_to_checked_tree (unchecked_viewforest) ?;
   let node_a : NodeId =
-    forest . root () . first_child () . unwrap () . id ();
+    viewforest . root () . first_child () . unwrap () . id ();
 
   // Request sourceward expansion from "a".
   build_and_integrate_sourceward_path (
-    &mut forest, node_a, config, driver
+    &mut viewforest, node_a, config, driver
   ) . await ?;
 
   // --- a should have exactly 2 LinksTo children: b and d ---
-  let a_children = children_info (&forest, node_a);
+  let a_children = children_info (&viewforest, node_a);
   assert! ( a_children . contains (&("b" . into (),
                                      Birth::LinksTo)),
             "a should have LinksTo child b" );
@@ -107,9 +107,9 @@ async fn test_sourceward_ancestry_impl (
                "a should have exactly 2 children" );
 
   // --- b should have 2 children: bb (ContainerOf) and c (LinksTo) ---
-  let node_b = find_child (&forest, node_a, "b")
+  let node_b = find_child (&viewforest, node_a, "b")
     . expect ("a should have child b");
-  let b_children = children_info (&forest, node_b);
+  let b_children = children_info (&viewforest, node_b);
   assert! ( b_children . contains (&("bb" . into (),
                                      Birth::ContainerOf)),
             "b should have ContainerOf child bb" );
@@ -120,15 +120,15 @@ async fn test_sourceward_ancestry_impl (
                "b should have exactly 2 children" );
 
   // --- bb should have no children ---
-  let node_bb = find_child (&forest, node_b, "bb")
+  let node_bb = find_child (&viewforest, node_b, "bb")
     . expect ("b should have child bb");
-  assert_eq! ( children_info (&forest, node_bb) . len (), 0,
+  assert_eq! ( children_info (&viewforest, node_bb) . len (), 0,
                "bb should have no children" );
 
   // --- c should have 1 child: cc (ContainerOf) ---
-  let node_c = find_child (&forest, node_b, "c")
+  let node_c = find_child (&viewforest, node_b, "c")
     . expect ("b should have child c");
-  let c_children = children_info (&forest, node_c);
+  let c_children = children_info (&viewforest, node_c);
   assert! ( c_children . contains (&("cc" . into (),
                                  Birth::ContainerOf)),
             "c should have ContainerOf child cc" );
@@ -136,9 +136,9 @@ async fn test_sourceward_ancestry_impl (
                "c should have exactly 1 child" );
 
   // --- cc should have 2 children: ccc and d (both ContainerOf) ---
-  let node_cc = find_child (&forest, node_c, "cc")
+  let node_cc = find_child (&viewforest, node_c, "cc")
     . expect ("c should have child cc");
-  let cc_children = children_info (&forest, node_cc);
+  let cc_children = children_info (&viewforest, node_cc);
   assert! ( cc_children . contains (&("ccc" . into (),
                                       Birth::ContainerOf)),
             "cc should have child ccc (ContainerOf)" );
@@ -149,19 +149,19 @@ async fn test_sourceward_ancestry_impl (
                "cc should have exactly 2 children" );
 
   // --- ccc and d (under cc) should have no children ---
-  let node_ccc = find_child (&forest, node_cc, "ccc")
+  let node_ccc = find_child (&viewforest, node_cc, "ccc")
     . expect ("cc should have child ccc");
-  assert_eq! ( children_info (&forest, node_ccc) . len (), 0,
+  assert_eq! ( children_info (&viewforest, node_ccc) . len (), 0,
                "ccc should have no children" );
-  let node_d_ancestry = find_child (&forest, node_cc, "d")
+  let node_d_ancestry = find_child (&viewforest, node_cc, "d")
     . expect ("cc should have child d");
-  assert_eq! ( children_info (&forest, node_d_ancestry) . len (), 0,
+  assert_eq! ( children_info (&viewforest, node_d_ancestry) . len (), 0,
                "d (ancestry) should have no children" );
 
   // --- d (LinksTo, under a) should have no children ---
-  let node_d = find_child (&forest, node_a, "d")
+  let node_d = find_child (&viewforest, node_a, "d")
     . expect ("a should have child d");
-  assert_eq! ( children_info (&forest, node_d) . len (), 0,
+  assert_eq! ( children_info (&viewforest, node_d) . len (), 0,
                "d (LinksTo) should have no children" );
 
   Ok (( )) }

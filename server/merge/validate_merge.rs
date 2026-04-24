@@ -22,17 +22,17 @@ struct MergeValidationData<'a> {
   acquiree_to_acquirers : HashMap<ID, HashSet<ID>>,
   to_delete_ids         : HashSet<ID>, }
 
-/// Validates merge requests in an viewnode forest.
+/// Validates merge requests in an viewnode viewforest.
 /// Returns a vector of validation error messages,
 /// which is empty if all are valid.
 pub async fn validate_merge_requests(
-  forest: &Tree<UncheckedViewNode>,
+  viewforest: &Tree<UncheckedViewNode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<String>, Box<dyn Error>> {
   let mut errors: Vec<String> = Vec::new();
   let merge_validation_data : MergeValidationData =
-    collect_merge_validation_data (forest);
+    collect_merge_validation_data (viewforest);
   for node in merge_validation_data . acquirer_viewnodes {
     let t : &UncheckedTrueNode = match &node . kind {
       UncheckedViewNodeKind::True (t) => t,
@@ -63,13 +63,13 @@ pub async fn validate_merge_requests(
 /// To understand what this function does,
 /// it's easiest to read the definition of its return type.
 fn collect_merge_validation_data<'a>(
-  forest: &'a Tree<UncheckedViewNode>,
+  viewforest: &'a Tree<UncheckedViewNode>,
 ) -> MergeValidationData<'a> {
   let mut acquirer_viewnodes : Vec<&UncheckedViewNode> = Vec::new();
   let mut acquirer_to_acquirees : HashMap<ID, HashSet<ID>> = HashMap::new();
   let mut acquiree_to_acquirers : HashMap<ID, HashSet<ID>> = HashMap::new();
   let mut to_delete_ids : HashSet<ID> = HashSet::new();
-  for edge in forest . root() . traverse() {
+  for edge in viewforest . root() . traverse() {
     if let ego_tree::iter::Edge::Open (node_ref) = edge {
       let viewnode : &UncheckedViewNode = node_ref . value();
       if let UncheckedViewNodeKind::True (t) = &viewnode . kind {

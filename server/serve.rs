@@ -14,7 +14,7 @@ pub mod util;
 use crate::dbs::typedb::util::delete_database;
 use crate::dbs::memory::InRustGraphHandle;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use crate::org_to_text::viewnode_forest_to_string;
+use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::get_file_path::handle_get_file_path_request;
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
@@ -283,8 +283,8 @@ fn handle_snapshot_response (
                              Vec<BufferValidationError>), String>
     = org_to_uninterpreted_nodes (&buffer_text);
   let mut viewforest : Tree<ViewNode> = match parse_result {
-    Ok (( unchecked_forest, _errors )) =>
-      match unchecked_to_checked_tree (unchecked_forest) {
+    Ok (( unchecked_viewforest, _errors )) =>
+      match unchecked_to_checked_tree (unchecked_viewforest) {
         Ok (f) => f,
         Err (e) => {
           tracing::error! ("snapshot response: check failed: {}", e);
@@ -303,7 +303,7 @@ fn handle_snapshot_response (
       &payload . graphnodestats,
       config ); }
   let enriched : String =
-    viewnode_forest_to_string ( &viewforest, config )
+    viewforest_to_string ( &viewforest, config )
     . expect ("search viewforest rendering never fails");
   let enriched_sexp : String =
     mk_search_enrichment_sexp ( &terms, &enriched );

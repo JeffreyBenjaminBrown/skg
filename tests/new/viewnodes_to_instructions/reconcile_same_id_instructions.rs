@@ -27,14 +27,14 @@ fn test_inconsistent_delete() {
         * (skg (node (id 1) (source main) (editRequest delete))) 2
     "};
 
-  let unchecked_forest = org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let (inconsistent_deletes, _, _) = find_inconsistent_instructions (&unchecked_forest);
+  let unchecked_viewforest = org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let (inconsistent_deletes, _, _) = find_inconsistent_instructions (&unchecked_viewforest);
   assert!(!inconsistent_deletes . is_empty(),
           "Should detect inconsistent toDelete");
 
-  let forest = unchecked_to_checked_tree (unchecked_forest) . unwrap();
+  let viewforest = unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
   let instructions =
-    naive_saveinstructions_from_tree (forest)
+    naive_saveinstructions_from_tree (viewforest)
     . unwrap();
   assert_eq!(instructions . len(), 2);
   assert_eq!(get_id(&instructions[0]), &ID::from ("1"));
@@ -58,9 +58,9 @@ fn test_deletions_excluded (
             ** (skg (node (id 3) (source main))) 3
         "};
 
-      let unchecked_forest = org_to_uninterpreted_nodes (input)?. 0;
-      let forest = unchecked_to_checked_tree (unchecked_forest)?;
-      let instructions = naive_saveinstructions_from_tree (forest)?;
+      let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
+      let viewforest = unchecked_to_checked_tree (unchecked_viewforest)?;
+      let instructions = naive_saveinstructions_from_tree (viewforest)?;
       let reduced = reconcile_same_id_instructions (instructions)?;
 
       assert_eq!(reduced . len(), 3); // There are 3 instructions.
@@ -94,9 +94,9 @@ fn test_defining_node_defines (
             ** (skg (node (id 3) (source main))) 3
         "};
 
-      let unchecked_forest = org_to_uninterpreted_nodes (input)?. 0;
-      let forest = unchecked_to_checked_tree (unchecked_forest)?;
-      let instructions = naive_saveinstructions_from_tree (forest)?;
+      let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
+      let viewforest = unchecked_to_checked_tree (unchecked_viewforest)?;
+      let instructions = naive_saveinstructions_from_tree (viewforest)?;
       let reduced = reconcile_same_id_instructions (instructions)?;
 
       assert_eq!(reduced . len(), 3); // 3 unique ids (id 1 is dup'd)
@@ -127,9 +127,9 @@ fn test_adding_without_definer (
             ** (skg (node (id 4) (source main))) 4
             ** (skg (node (id 4) (source main) indef)) 4 again
         "};
-      let unchecked_forest = org_to_uninterpreted_nodes (input)?. 0;
-      let forest = unchecked_to_checked_tree (unchecked_forest)?;
-      let instructions = naive_saveinstructions_from_tree (forest)?;
+      let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
+      let viewforest = unchecked_to_checked_tree (unchecked_viewforest)?;
+      let instructions = naive_saveinstructions_from_tree (viewforest)?;
       let reduced = reconcile_same_id_instructions(
         instructions)?;
 

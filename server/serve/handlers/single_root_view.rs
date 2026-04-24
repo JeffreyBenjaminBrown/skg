@@ -59,11 +59,11 @@ pub fn handle_single_root_view_request (
               config,
               &node_id,
               conn_state . diff_mode_enabled ) . await
-            { Ok ( (buffer_content, pids, forest) ) => {
+            { Ok ( (buffer_content, pids, viewforest) ) => {
                 if let Ok (view_uri) = &view_uri_result {
                   conn_state . memory . register_view (
                     view_uri . clone (),
-                    forest,
+                    viewforest,
                     &pids ); }
                 let errors : Vec<String> =
                   take_pending_audit_warning ()

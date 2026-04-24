@@ -9,14 +9,14 @@ use crate::types::tree::viewnode_nodecomplete::{
 use crate::types::list::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 
-/// Converts a forest of ViewNodes to DefineNodes, 'naively' --
+/// Converts a viewforest of ViewNodes to DefineNodes, 'naively' --
 /// that is, leaving the following work to be handled elsewhere:
 /// - reconcile DefineNodes with the same ID
 /// - clobber None fields with data from disk
-/// (Its caller, 'viewnode_forest_to_nonmerge_save_instructions',
+/// (Its caller, 'viewforest_to_nonmerge_save_instructions',
 /// does those things.)
 pub fn naive_saveinstructions_from_tree (
-  mut forest: Tree<ViewNode> // "forest" = tree with BufferRoot
+  mut viewforest: Tree<ViewNode> // "viewforest" = tree with BufferRoot
 ) -> Result<Vec<DefineNode>, String> {
 
   /// May append a DefineNode to 'result', and might recurse.
@@ -69,9 +69,9 @@ pub fn naive_saveinstructions_from_tree (
     Ok(( )) }
 
   let mut result: Vec<DefineNode> = Vec::new();
-  let root_id : NodeId = forest . root() . id();
+  let root_id : NodeId = viewforest . root() . id();
   maybe_defineonenode_and_maybe_recurse (
-    &mut forest, root_id, &mut result ) ?;
+    &mut viewforest, root_id, &mut result ) ?;
   Ok (result) }
 
 /// Returns Some(Delete) or Some(Save) for definitive nodes.

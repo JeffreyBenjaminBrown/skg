@@ -11,7 +11,7 @@ use crate::context::ContextOriginType;
 use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
 use crate::dbs::typedb::search::all_graphnodestats::{ AllGraphNodeStats, fetch_all_graphnodestats};
-use crate::org_to_text::viewnode_forest_to_string;
+use crate::org_to_text::viewforest_to_string;
 use crate::serve::ConnectionState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
@@ -19,7 +19,7 @@ use crate::types::git::MembershipAxes;
 use crate::types::memory::ViewUri;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, Birth, forest_root_viewnode, mk_indefinitive_viewnode};
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, Birth, viewforest_root_viewnode, mk_indefinitive_viewnode};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use sexp::{Sexp, Atom};
@@ -117,21 +117,21 @@ pub fn handle_text_search_request (
               searcher,
               tantivy_index,
               &scope );
-          let (forest, search_results) : (Tree<ViewNode>, Vec<ID>) =
-            build_search_forest (
+          let (viewforest, search_results) : (Tree<ViewNode>, Vec<ID>) =
+            build_search_viewforest (
               &search_terms,
               &matches_by_id );
           let rendered : String =
-            // Render first, before register_view moves the forest
-            viewnode_forest_to_string ( &forest, config )
-            . expect ("search forest rendering never fails");
+            // Render first, before register_view moves the viewforest
+            viewforest_to_string ( &viewforest, config )
+            . expect ("search viewforest rendering never fails");
           let uri : ViewUri =
             ViewUri::SearchView ( search_terms . clone () );
           if conn_state . memory . views . contains_key (&uri) {
             // Replace prior search with the same terms.
             conn_state . memory . unregister_view (&uri); }
           conn_state . memory . register_view (
-            uri, forest, &search_results );
+            uri, viewforest, &search_results );
           send_response_with_length_prefix (
             // phase 1 (unenriched) tagged LP response
             stream,
@@ -324,19 +324,19 @@ pub fn group_matches_by_id (
   result_acc }
 
 /// Builds a Tree<ViewNode> representing the search results.
-/// Returns the forest and the ordered list of result IDs.
+/// Returns the viewforest and the ordered list of result IDs.
 ///
 /// Tree structure:
 ///   BufferRoot
 ///   ├── TrueNode per result (level 1, indefinitive, non-content)
 ///   │   └── AliasCol + Alias children (if aliases matched)
 ///   └── ...
-pub fn build_search_forest (
+pub fn build_search_viewforest (
   _search_terms : &str,
   matches_by_id : &MatchGroups,
 ) -> (Tree<ViewNode>, Vec<ID>) {
-  let mut forest : Tree<ViewNode> =
-    Tree::new ( forest_root_viewnode () );
+  let mut viewforest : Tree<ViewNode> =
+    Tree::new ( viewforest_root_viewnode () );
   let mut id_entries : Vec < ( &ID,
                                &SourceName,
                                &Vec < ( f32, String ) > ) > =
@@ -364,7 +364,7 @@ pub fn build_search_forest (
       let (_score, title) : &(f32, String) = sorted_matches [0];
       let result_treeid : NodeId = {
         let mut root_mut : NodeMut<ViewNode> =
-          forest . root_mut ();
+          viewforest . root_mut ();
         root_mut . append (
           mk_indefinitive_viewnode (
             (*id) . clone (),
@@ -378,7 +378,7 @@ pub fn build_search_forest (
         // in which case this makes it look like an alias.
         let aliascol_id : NodeId = {
           let mut result_mut : NodeMut<ViewNode> =
-            forest . get_mut (result_treeid) . unwrap ();
+            viewforest . get_mut (result_treeid) . unwrap ();
           result_mut . append ( ViewNode {
             focused     : false,
             folded      : true,
@@ -388,7 +388,7 @@ pub fn build_search_forest (
           . id () };
         for (_score, title) in sorted_matches . iter () . skip (1) {
           let mut aliascol_mut : NodeMut<ViewNode> =
-            forest . get_mut (aliascol_id) . unwrap ();
+            viewforest . get_mut (aliascol_id) . unwrap ();
           aliascol_mut . append ( ViewNode {
             focused     : false,
             folded      : false,
@@ -397,4 +397,4 @@ pub fn build_search_forest (
               Scaffold::Alias {
                 text       : title . clone (),
                 membership : MembershipAxes::default () } ) } ); }} }
-  (forest, search_results) }
+  (viewforest, search_results) }
