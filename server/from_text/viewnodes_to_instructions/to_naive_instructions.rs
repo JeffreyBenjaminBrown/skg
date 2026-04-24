@@ -19,14 +19,14 @@ pub fn naive_saveinstructions_from_tree (
   mut forest: Tree<ViewNode> // "forest" = tree with BufferRoot
 ) -> Result<Vec<DefineNode>, String> {
 
-  /// Might appends a DefineNode to 'result', and might recurse.
+  /// May append a DefineNode to 'result', and might recurse.
   /// Skips some nodes, because:
   /// - indefinitive nodes don't generate instructions
   /// - aliases     are handled by
   ///   'collect_grandchild_aliases_for_viewnode'
   /// - subscribees are handled by
   ///   'collect_subscribees'
-  fn mauybe_defineonenode_and_maybe_recurse (
+  fn maybe_defineonenode_and_maybe_recurse (
     tree    : &mut Tree<ViewNode>,
     node_id : NodeId,
     result  : &mut Vec<DefineNode>
@@ -43,7 +43,7 @@ pub fn naive_saveinstructions_from_tree (
             tree . get (node_id) . unwrap() . children()
             . map(|c| c . id()) . collect();
           child_treeids }
-        { mauybe_defineonenode_and_maybe_recurse(
+        { maybe_defineonenode_and_maybe_recurse(
             tree, child_treeid, result)?; }
       Ok(( )) }
 
@@ -70,7 +70,7 @@ pub fn naive_saveinstructions_from_tree (
 
   let mut result: Vec<DefineNode> = Vec::new();
   let root_id : NodeId = forest . root() . id();
-  mauybe_defineonenode_and_maybe_recurse (
+  maybe_defineonenode_and_maybe_recurse (
     &mut forest, root_id, &mut result ) ?;
   Ok (result) }
 
