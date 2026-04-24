@@ -36,10 +36,10 @@
   (setq integration-test-phase "phase-2")
   (with-current-buffer "*a*"
     (let ((inhibit-read-only t))
-      ;; Find the indefinitive c under b (the *** line)
+      ;; Find the indef c under b (the *** line)
       (goto-char (point-min))
-      (unless (re-search-forward "^\\*\\*\\* .*(skg.*indefinitive" nil t)
-        (message "✗ FAIL [phase 2]: could not find indefinitive c under b")
+      (unless (re-search-forward "^\\*\\*\\* .*(skg.* indef\\b" nil t)
+        (message "✗ FAIL [phase 2]: could not find indef c under b")
         (message "  Buffer: %S" (buffer-substring-no-properties
                                   (point-min) (point-max)))
         (kill-emacs 1))

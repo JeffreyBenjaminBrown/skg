@@ -111,12 +111,91 @@
         (GREEN newM     "M")
         (RED   removedM "-M"))
       (RED notInGit "diff:not-in-git")))
-  "Rules to convert metadata sexps into herald tokens.")
+  "Rules for lensing `(skg ...)` metadata into a line of herald tokens.
+
+This table is the single source of truth for every visual decision
+in the herald display. It is interpreted by the generic engine in
+skg-lens.el (`skg-transform-sexp-flat'), whose full semantics for
+colour directives, ANY/IT, ABUT, and INTERC are documented there.
+
+COLOUR VOCABULARY
+
+  GREEN   -- informational / structural atoms that the user scans for
+             orientation: scaffold labels (alias, id, idCol, ...), the
+             `staged:'/`unstaged:' prefixes on per-stage axes, source
+             herald values, indef marker.
+  BLUE    -- node-intrinsic, neutral counts: contents count, aliasing,
+             extraIDs, overriding, subscribing, containerwardPath,
+             cycle/containsParent markers. Also the ContentOf birth
+             glyph `{', chosen to rhyme with containerOf's `}'.
+  YELLOW  -- link-flavoured counts, in all directions: the
+             `containers' count on a node (how many contain it), plus
+             the compound `linksInFromContainers → linksInFromLeaves'.
+             Chosen because links are what make the graph a graph.
+  RED     -- user-attention markers: deletion (deletedScaffold,
+             deleted, editRequest/delete), merge requests, and the
+             `-X' / `-M' axis markers for removals in git diffs.
+  ORANGE  -- the three non-content birth variants (independent,
+             containerOf, linksTo). Distinct from BLUE so ContentOf
+             can own that slot without visual collision.
+
+SERVER-EMITTED ATOMS VS. RULE FORM
+
+The server emits metadata atoms as small labeled tuples; this rule
+table converts them 1:1 into short herald strings. A few patterns:
+
+  * Simple rules (COLOR? LABEL CHILDREN...) -- e.g.
+    `(GREEN alias \"alias\")' matches `(alias \"foo\")' and emits the
+    literal `alias' in green. Children are consumed positionally;
+    use `(ANY ...)' in a child position to match any leaf/atom.
+
+  * INTERC rules -- used when the server emits a parent whose
+    children should be glued together with a separator, preserving
+    each child's own colour. Two forms:
+
+    - Labelled: `(GREEN INTERC \"\" staged \"staged:\" ...)' matches
+      `(staged ...)' and emits `staged:-M' etc. by running each sub-
+      rule against `staged' s children and joining the results.
+    - Unlabelled: sub-rules run against the current object's
+      own children (no wrapper atom required). Used at
+      `(graphStats ...)' level to turn raw sibling atoms like
+      `(containers N)' and `(contents M)' into a single `N{M'
+      token, without needing a fake wrapper on the server side.
+
+  * ABUT marker -- `(GREEN indef ABUT \"☮\")' tells the renderer to
+    glue the `☮' onto the preceding token with no space. Used so
+    the indefinitive marker sits directly on its birth glyph.
+
+WHY SOME RULES LOOK EMPTY OR REDUNDANT
+
+  * `(focused)', `(folded)', `(node (source) ...)', `(deleted (id)
+    (source))' -- these match and emit nothing, so the atom is
+    consumed without contributing to the display. Without these the
+    default engine behaviour would reproduce the atom verbatim.
+
+  * `(RED deletedScaffold (ANY \"DELETED\" IT))' vs `(RED deleted
+    \"DELETED\" (id) (source))' -- two shapes come in from the server
+    depending on whether the deletion is on a scaffold row (like a
+    deleted aliasCol) or on a file-level node. Each gets its own
+    matcher; both render as `DELETED ...'.
+
+  * Two `(GREEN INTERC \"\" staged ...)' rules and two `(GREEN
+    INTERC \"\" unstaged ...)' -- the scaffold-level pair omits the
+    `X' / `-X' axes because existence-change markers only apply to
+    TrueNodes, not to scaffolds.
+
+NORMALISATION
+
+The server leaves ContentOf birth implicit in `(node ...)'. Before
+this table runs, `heralds--read-metadata' calls
+`heralds--inject-default-birth' to add `(birth contentOf)' when
+missing, so the `(birth (BLUE contentOf \"{\") ...)' sub-rule can
+fire uniformly for all four variants.")
 
 (defun heralds--tokens->text (tokens)
   "Convert list of TOKENS (propertized strings) to a display string.
 Tokens carry `skg-color' on character ranges (single-color tokens
-propertize the whole string; GROUP-built tokens carry per-segment
+propertize the whole string; INTERC-built tokens carry per-segment
 colors). Tokens separated by a space, except tokens whose position
 0 has an `skg-abut' property are joined to the preceding token
 with no separator (used to glue e.g. ☮ onto its birth character).
@@ -149,7 +228,7 @@ characters, which is what we need so ranges' colors survive."
 (defun heralds--apply-faces-per-region (s)
   "For each region in S where `skg-color' is non-nil, set `face'
 to the corresponding herald face. Works for both single-color
-tokens and per-segment-colored GROUP tokens."
+tokens and per-segment-colored INTERC tokens."
   (let ((len (length s))
         (pos 0))
     (while (< pos len)

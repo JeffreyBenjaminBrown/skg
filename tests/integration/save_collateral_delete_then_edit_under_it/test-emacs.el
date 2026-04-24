@@ -126,14 +126,14 @@ which takes priority over subee.skg on disk."
      "phase 3: buffer 2 initial")))
 
 (defun phase-4-delete-11-from-buffer-2 ()
-  "Remove indefinitive, add editRequest delete to 11, and save buffer 2."
+  "Remove indef, add editRequest delete to 11, and save buffer 2."
   (message "=== PHASE 4: Delete 11 from buffer 2 ===")
   (setq integration-test-phase "phase-4-delete-11")
   (with-current-buffer "*skg-test-buf2*"
     (goto-char (point-min))
     (skg-edit-metadata-at-point
-     ;; Remove 'indefinitive' and add 'editRequest delete'.
-     '(skg (node (DELETE indefinitive) (editRequest delete))))
+     ;; Remove 'indef' and add 'editRequest delete'.
+     '(skg (node (DELETE indef) (editRequest delete))))
     (message "Buffer 2 after metadata edit:\n%s"
              (buffer-substring-no-properties (point-min) (point-max)))
     (skg-request-save-buffer))
