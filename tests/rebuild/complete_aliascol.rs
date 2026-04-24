@@ -4,7 +4,7 @@ use indoc::indoc;
 use std::collections::HashMap;
 use std::error::Error;
 
-use skg::update_buffer::complete_child_first::aliascol::complete_alias_col;
+use skg::update_buffer::complete_postorder::aliascol::complete_alias_col;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
 use skg::test_utils::run_with_test_db;

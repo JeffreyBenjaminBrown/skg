@@ -1,6 +1,6 @@
 pub mod complete;
-pub mod complete_child_first;
-pub mod complete_parent_first;
+pub mod complete_postorder;
+pub mod complete_preorder;
 pub mod graphnodestats;
 pub mod util;
 pub mod viewnodestats;

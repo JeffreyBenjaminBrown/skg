@@ -128,14 +128,14 @@ async fn complete_preorder_with_limited_recursion (
         ViewNodeKind::DeletedScaff (scaffold_kind);
       return Ok(( )); }}
   if matches!( kind, ViewNodeKind::True (_)) {
-    super::complete_parent_first::truenode::
+    super::complete_preorder::truenode::
     complete_truenode_preorder (
       treeid, tree, defmap, source_diffs, config,
       deleted_since_head_pid_src_map, deleted_by_this_save_pids,
       is_saved_view ) ?;
   } else if matches!( kind,
       ViewNodeKind::Scaff (Scaffold::SubscribeeCol) ) {
-        super::complete_parent_first::subscribee_col::
+        super::complete_preorder::subscribee_col::
         complete_subscribee_col_preorder (
           treeid, tree, source_diffs, config, driver,
           deleted_since_head_pid_src_map
@@ -161,27 +161,27 @@ async fn complete_postorder_with_limited_recursion (
   let kind : ViewNodeKind =
     tree . get (treeid) . unwrap () . value () . kind . clone ();
   if matches!( kind, ViewNodeKind::True (_)) {
-    super::complete_child_first::truenode::
+    super::complete_postorder::truenode::
     complete_truenode (
       treeid, tree, defmap, source_diffs, config, driver,
       errors, deleted_since_head_pid_src_map ) . await ?;
   } else if matches!(
     kind, ViewNodeKind::Scaff (Scaffold::AliasCol)) {
-      super::complete_child_first::aliascol::
+      super::complete_postorder::aliascol::
       complete_alias_col ( tree, treeid, source_diffs, config ) ?;
   } else if matches!(
       kind, ViewNodeKind::Scaff (Scaffold::IDCol)) {
-        super::complete_child_first::id_col::
+        super::complete_postorder::id_col::
         complete_id_col ( treeid, tree, source_diffs, config ) ?;
   } else if matches!(
     kind, ViewNodeKind::Scaff (Scaffold::HiddenInSubscribeeCol)) {
-      super::complete_child_first::hiddeninsubscribee_col::
+      super::complete_postorder::hiddeninsubscribee_col::
       complete_hiddeninsubscribee_col (
         treeid, tree, source_diffs, config,
         deleted_since_head_pid_src_map ) ?;
   } else if matches!( kind,
       ViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol)) {
-        super::complete_child_first::hiddenoutsideof_subscribeecol::
+        super::complete_postorder::hiddenoutsideof_subscribeecol::
         complete_hiddenoutsideofsubscribeecol (
           treeid, tree, source_diffs, config,
           deleted_since_head_pid_src_map ) ?;
