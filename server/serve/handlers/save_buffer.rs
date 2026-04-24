@@ -2,8 +2,7 @@ use crate::context::update_context_types_for_saved_nodes;
 use crate::from_text::buffer_to_viewforest_and_save_instructions;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
-use crate::merge::merge_nodes;
-use crate::save::update_graph_minus_merges;
+use crate::save::update_graph_including_merges;
 use crate::serve::ConnectionState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
@@ -171,29 +170,14 @@ pub async fn update_from_and_rerender_buffer (
                    . into() ); }
 
   { // update the graph
-    let save_replacement : Option<TantivyIndex> =
-      { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-          "update_graph_minus_merges" ). entered();
-        update_graph_minus_merges (
-          save_instructions . clone(),
-          &source_moves,
-          config . clone(),
-          tantivy_index,
-          typedb_driver,
-          &conn_state . graph ) . await } ?;
-    if let Some (new_index) = save_replacement {
-      *tantivy_index = new_index; }
-    let merge_replacement : Option<TantivyIndex> =
-      { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-          "merge_nodes" ). entered();
-        merge_nodes (
-          &merge_instructions,
-          config . clone(),
-          tantivy_index,
-          typedb_driver,
-          &conn_state . graph ) . await } ?;
-    if let Some (new_index) = merge_replacement {
-      *tantivy_index = new_index; }
+    update_graph_including_merges (
+      save_instructions . clone(),
+      &merge_instructions,
+      &source_moves,
+      config . clone(),
+      tantivy_index,
+      typedb_driver,
+      &conn_state . graph ) . await ?;
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "update_context_types_for_saved_nodes" ). entered();
       update_context_types_for_saved_nodes (

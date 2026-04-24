@@ -2,6 +2,7 @@ use crate::dbs::filesystem::multiple_nodes::{write_all_nodes_to_fs, delete_all_n
 use crate::dbs::init::{rebuild_typedb_from_disk, rebuild_tantivy_from_disk};
 use crate::dbs::memory::{InRustGraphHandle, apply_definenodes};
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
+use crate::merge::merge_nodes;
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::nodes::delete_nodes_from_pids;
 use crate::dbs::typedb::nodes::overwrite_extra_ids_of_node;
@@ -12,7 +13,7 @@ use crate::dbs::typedb::relationships::delete_all_outbound_relationships;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::nodes::typedb::NodeTypedb;
-use crate::types::save::{DefineNode, SaveNode, DeleteNode, SourceMove};
+use crate::types::save::{DefineNode, SaveNode, DeleteNode, Merge, SourceMove};
 use crate::types::nodes::complete::NodeComplete;
 use crate::util::path_from_pid_and_source;
 
@@ -112,6 +113,38 @@ pub async fn update_graph_minus_merges (
             . into () }) ?;
         tracing::warn!("Save succeeded, but Tantivy had to be rebuilt from disk.");
         Ok (Some (new_index)) } } }
+
+/// Runs 'update_graph_minus_merges' and then 'merge_nodes' in that
+/// order, applying any Tantivy rebuild from either step to the
+/// caller's '&mut TantivyIndex'. The sole place the save pipeline
+/// should call when it has both save_instructions and
+/// merge_instructions in hand.
+pub async fn update_graph_including_merges (
+  save_instructions  : Vec<DefineNode>,
+  merge_instructions : &[Merge],
+  source_moves       : &[SourceMove],
+  config             : SkgConfig,
+  tantivy_index      : &mut TantivyIndex,
+  driver             : &TypeDBDriver,
+  graph              : &InRustGraphHandle,
+) -> Result<(), Box<dyn Error>> {
+  let save_replacement : Option<TantivyIndex> =
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "update_graph_minus_merges" ). entered();
+      update_graph_minus_merges (
+        save_instructions, source_moves, config . clone(),
+        tantivy_index, driver, graph ) . await } ?;
+  if let Some (new_index) = save_replacement {
+    *tantivy_index = new_index; }
+  let merge_replacement : Option<TantivyIndex> =
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "merge_nodes" ). entered();
+      merge_nodes (
+        merge_instructions, config,
+        tantivy_index, driver, graph ) . await } ?;
+  if let Some (new_index) = merge_replacement {
+    *tantivy_index = new_index; }
+  Ok (( )) }
 
 /// Update the DB from a batch of `DefineNode`s:
 /// 1) Delete all nodes marked Delete, using delete_nodes_from_pids
