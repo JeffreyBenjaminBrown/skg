@@ -62,6 +62,27 @@ nor clear their `skg-view-uri'. Before the fix,
                            "test-uri-*fake-skg-preserved*")))
       (when (buffer-live-p buf) (kill-buffer buf)))))
 
+(ert-deftest test-skg-reload-refreshes-keymap-bindings ()
+  "Edits to bindings in `skg-keymaps-and-aliases.el' must take
+effect on reload. Before the fix, `defvar MAP (let ((m …)) …)'
+only ran its initialiser on the first load, so bindings encoded
+in later loads of the file were silently dropped."
+  (load-file (expand-file-name
+              "../../elisp/skg-reload.el"
+              test-skg-close-all--this-dir))
+  ;; Simulate: a user held a binding in the map, then edited the
+  ;; file somehow (which we can't really do in a test). Instead:
+  ;; clobber the binding in memory, then reload, and assert the
+  ;; binding is back. This passes iff reload re-populates the
+  ;; keymap from the file on disk.
+  (define-key skg-content-view-mode-map
+    (kbd "C-c g RET") 'clobbered-sentinel)
+  (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c g RET"))
+              'clobbered-sentinel))
+  (skg-reload)
+  (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c g RET"))
+              #'skg-goto)))
+
 (ert-deftest test-skg-close-all-content-heuristic-fallback ()
   "Even if a buffer's skg-view-uri and mode are manually wiped,
 `skg-close-all-skg-buffers' must still find it via the first-line

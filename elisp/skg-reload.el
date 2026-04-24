@@ -54,6 +54,7 @@ plain `load-file' at the end instead."
             skg-test-utils
             skg-magit-titles
             skg-file-minor-mode
+            skg-git-add
             skg-show-org-ancestry
             heralds-minor-mode )))
     (dolist (feat skg-features)
