@@ -16,7 +16,6 @@ use crate::types::save::{DefineNode, SaveNode, DeleteNode, SourceMove};
 use crate::types::nodes::complete::NodeComplete;
 use crate::util::path_from_pid_and_source;
 
-use itertools::{Itertools, Either};
 use std::collections::{BTreeSet, HashSet};
 use std::error::Error;
 use std::io;
@@ -138,10 +137,7 @@ pub async fn update_typedb_from_saveinstructions (
 
   let ( to_delete, to_save )
     : ( Vec<DeleteNode>, Vec<SaveNode> )
-    = node_defs . iter() . cloned() . partition_map (
-      |instr| match instr {
-        DefineNode::Delete (d) => Either::Left (d),
-        DefineNode::Save (s)   => Either::Right (s) } );
+    = DefineNode::partition_save_and_delete (node_defs);
 
   { // delete
     let to_delete_pids : Vec<ID> =
@@ -216,10 +212,7 @@ pub fn update_fs_from_saveinstructions (
 ) -> io::Result<(usize, usize)> { // (deleted, written)
   let ( to_delete, to_save )
     : ( Vec<DeleteNode>, Vec<SaveNode> )
-    = node_defs . iter() . cloned() . partition_map(
-      |instr| match instr {
-        DefineNode::Delete (d) => Either::Left (d),
-        DefineNode::Save (s)   => Either::Right (s) } );
+    = DefineNode::partition_save_and_delete (node_defs);
   let deleted : usize = {
     let delete_targets : Vec<(ID, SourceName)> =
       to_delete . into_iter ()

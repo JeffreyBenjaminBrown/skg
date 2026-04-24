@@ -171,6 +171,18 @@ impl DefineNode {
   pub fn is_save (&self) -> bool {
     matches!(self, DefineNode::Save (_))
   }
+
+  /// Split a slice of DefineNodes into (deletes, saves),
+  /// cloning each item.
+  pub fn partition_save_and_delete (
+    node_defs : &[DefineNode]
+  ) -> ( Vec<DeleteNode>, Vec<SaveNode> ) {
+    use itertools::{Itertools, Either};
+    node_defs . iter () . cloned () . partition_map (
+      |instr| match instr {
+        DefineNode::Delete (d) => Either::Left (d),
+        DefineNode::Save (s)   => Either::Right (s) } )
+  }
 }
 
 impl From<SaveNode> for DefineNode {
