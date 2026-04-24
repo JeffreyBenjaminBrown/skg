@@ -272,10 +272,10 @@ Does not modify the stack.
 Inserts, at the cursor, a link to the node
 whose ID is at the top of the id stack.
 Does not modify the stack.
-*** C-c o I : skg-pop-id
+*** C-c O i : skg-pop-id
 Removes a node from the top of the id stack,
 and inserts its ID at the cursor.
-*** C-c o L : skg-pop-link
+*** C-c O l : skg-pop-link
 Removes a node from the top of the id stack,
 and inserts a link to that node at the cursor.
 *** C-c v s : skg-view-id-stack

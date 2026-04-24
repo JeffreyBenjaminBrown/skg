@@ -52,8 +52,8 @@ and hide INTERNAL from M-x completion."
 (progn ;; Minibuffer
   (define-key minibuffer-local-map (kbd "C-c o i") #'skg-paste-id)
   (define-key minibuffer-local-map (kbd "C-c o l") #'skg-paste-link)
-  (define-key minibuffer-local-map (kbd "C-c o I") #'skg-pop-id)
-  (define-key minibuffer-local-map (kbd "C-c o L") #'skg-pop-link))
+  (define-key minibuffer-local-map (kbd "C-c O i") #'skg-pop-id)
+  (define-key minibuffer-local-map (kbd "C-c O l") #'skg-pop-link))
 
 (defvar skg-file-minor-mode-map ;; .skg files
   ;; The minor mode itself is defined in skg-file-minor-mode.el.
@@ -66,8 +66,8 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c i p")   #'skg-id-prev)
     (define-key map (kbd "C-c o i")   #'skg-paste-id)
     (define-key map (kbd "C-c o l")   #'skg-paste-link)
-    (define-key map (kbd "C-c o I")   #'skg-pop-id)
-    (define-key map (kbd "C-c o L")   #'skg-pop-link)
+    (define-key map (kbd "C-c O i")   #'skg-pop-id)
+    (define-key map (kbd "C-c O l")   #'skg-pop-link)
     map )
   "Keymap for `skg-file-minor-mode'.")
 
@@ -111,8 +111,8 @@ and hide INTERNAL from M-x completion."
     (progn;; copy-from / pop-from the id stack
       (define-key map (kbd "C-c o i") #'skg-paste-id)
       (define-key map (kbd "C-c o l") #'skg-paste-link)
-      (define-key map (kbd "C-c o I") #'skg-pop-id)
-      (define-key map (kbd "C-c o L") #'skg-pop-link))
+      (define-key map (kbd "C-c O i") #'skg-pop-id)
+      (define-key map (kbd "C-c O l") #'skg-pop-link))
     map )
   "Keymap for `skg-content-view-mode'.")
 
