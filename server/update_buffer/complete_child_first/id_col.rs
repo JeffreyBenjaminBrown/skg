@@ -20,7 +20,7 @@ use std::error::Error;
 /// - In diff view, also build a diff-status map from NodeChanges.ids_diff
 /// - Reconcile children via complete_relevant_children_in_viewnodetree
 #[allow (non_snake_case)]
-pub fn completeIDCol (
+pub fn complete_id_col (
   idcol_node_id : NodeId,
   tree          : &mut Tree<ViewNode>,
   source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
@@ -30,16 +30,16 @@ pub fn completeIDCol (
     tree, idcol_node_id,
     |viewnode| matches!( &viewnode . kind,
                          ViewNodeKind::Scaff (Scaffold::IDCol) ),
-    "completeIDCol: Node is not an IDCol" )
+    "complete_id_col: Node is not an IDCol" )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   let (parent_pid, parent_source) : (ID, SourceName) =
     pid_and_source_from_ancestor(
       tree, idcol_node_id, 1,
-      "completeIDCol" ) ?;
+      "complete_id_col" ) ?;
   let parent_nodecomplete : NodeComplete =
     nodecomplete_from_memory_or_disk (
       config, &parent_pid, &parent_source )
-    . map_err ( |_| "completeIDCol: parent NodeComplete not found" ) ?;
+    . map_err ( |_| "complete_id_col: parent NodeComplete not found" ) ?;
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
     per_stage_node_changes_for_truenode (

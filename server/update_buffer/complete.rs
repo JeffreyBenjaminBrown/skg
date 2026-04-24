@@ -168,11 +168,11 @@ async fn complete_postorder_with_limited_recursion (
   } else if matches!(
     kind, ViewNodeKind::Scaff (Scaffold::AliasCol)) {
       super::complete_child_first::aliascol::
-      completeAliasCol ( tree, treeid, source_diffs, config ) ?;
+      complete_alias_col ( tree, treeid, source_diffs, config ) ?;
   } else if matches!(
       kind, ViewNodeKind::Scaff (Scaffold::IDCol)) {
         super::complete_child_first::id_col::
-        completeIDCol ( treeid, tree, source_diffs, config ) ?;
+        complete_id_col ( treeid, tree, source_diffs, config ) ?;
   } else if matches!(
     kind, ViewNodeKind::Scaff (Scaffold::HiddenInSubscribeeCol)) {
       super::complete_child_first::hiddeninsubscribee_col::

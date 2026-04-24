@@ -4,7 +4,7 @@ use indoc::indoc;
 use std::collections::HashMap;
 use std::error::Error;
 
-use skg::update_buffer::complete_child_first::aliascol::completeAliasCol;
+use skg::update_buffer::complete_child_first::aliascol::complete_alias_col;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
 use skg::test_utils::run_with_test_db;
@@ -16,17 +16,17 @@ use skg::types::git::SourceDiff;
 use ego_tree::{Tree, NodeId};
 
 #[test]
-fn test_completeAliasCol
+fn test_complete_alias_col
   () -> Result < (), Box<dyn Error> > {
   run_with_test_db (
     "skg-test-complete-aliascol",
     "tests/rebuild/complete_aliascol/fixtures",
     "/tmp/tantivy-test-complete-aliascol",
     |config, driver, _tantivy| Box::pin ( async move {
-      test_completeAliasCol_logic ( config, driver ) . await
+      test_complete_alias_col_logic ( config, driver ) . await
     } )) }
 
-async fn test_completeAliasCol_logic (
+async fn test_complete_alias_col_logic (
   config : &SkgConfig,
   driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
@@ -72,7 +72,7 @@ async fn test_completeAliasCol_logic (
   };
 
   // Test 1: First AliasCol should have b and c (deduped, valid only, disk order)
-  completeAliasCol ( &mut forest, aliascol_1_id, &source_diffs, config )?;
+  complete_alias_col ( &mut forest, aliascol_1_id, &source_diffs, config )?;
 
   {
     let aliascol_1_ref =
@@ -100,7 +100,7 @@ async fn test_completeAliasCol_logic (
   }
 
   // Test 2: Second AliasCol should have b and c, and gain focus
-  completeAliasCol ( &mut forest, aliascol_2_id, &source_diffs, config )?;
+  complete_alias_col ( &mut forest, aliascol_2_id, &source_diffs, config )?;
 
   {
     let aliascol_2_ref =
@@ -140,7 +140,7 @@ async fn test_completeAliasCol_logic (
     . id ();
 
   let result : Result < (), Box<dyn Error> > =
-    completeAliasCol (
+    complete_alias_col (
       &mut forest,
       aliascol_3_id,
       &source_diffs,
@@ -155,17 +155,17 @@ async fn test_completeAliasCol_logic (
   Ok (( )) }
 
 #[test]
-fn test_completeAliasCol_duplicate_aliases_different_orders
+fn test_complete_alias_col_duplicate_aliases_different_orders
   () -> Result < (), Box<dyn Error> > {
   run_with_test_db (
     "skg-test-complete-aliascol-duplicates",
     "tests/rebuild/complete_aliascol/fixtures",
     "/tmp/tantivy-test-complete-aliascol-duplicates",
     |config, driver, _tantivy| Box::pin ( async move {
-      test_completeAliasCol_duplicate_aliases_different_orders_logic (
+      test_complete_alias_col_duplicate_aliases_different_orders_logic (
         config, driver ) . await } )) }
 
-async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
+async fn test_complete_alias_col_duplicate_aliases_different_orders_logic (
   config : &SkgConfig,
   driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
@@ -205,7 +205,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   };
 
   // Test first AliasCol
-  completeAliasCol (
+  complete_alias_col (
     &mut forest,
     first_aliascol_id,
     &source_diffs,
@@ -251,7 +251,7 @@ async fn test_completeAliasCol_duplicate_aliases_different_orders_logic (
   }
 
   // Test second AliasCol
-  completeAliasCol (
+  complete_alias_col (
     &mut forest,
     second_aliascol_id,
     &source_diffs,

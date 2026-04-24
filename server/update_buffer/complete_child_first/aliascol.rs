@@ -25,7 +25,7 @@ use std::error::Error;
 /// - Among the Alias children, discard any not in 'aliases'
 /// - Create new Alias nodes for values in 'aliases' not already present
 /// - Order the final Alias children to match the order in 'aliases'
-pub fn completeAliasCol (
+pub fn complete_alias_col (
   tree             : &mut Tree<ViewNode>,
   aliascol_node_id : NodeId,
   source_diffs     : &Option<HashMap<SourceName, SourceDiff>>,
@@ -38,15 +38,15 @@ pub fn completeAliasCol (
                             ViewNodeKind::Scaff (Scaffold::AliasCol)) )
       . map_err( |e| -> Box<dyn Error> { e . into() } )?;
     if !is_aliascol { return Err(
-      "completeAliasCol: Node is not an AliasCol" . into() ); }}
+      "complete_alias_col: Node is not an AliasCol" . into() ); }}
   let (parent_pid, parent_source) : (ID, SourceName) =
     pid_and_source_from_ancestor(
       tree, aliascol_node_id, 1,
-      "completeAliasCol" ) ?;
+      "complete_alias_col" ) ?;
   let parent_nodecomplete : NodeComplete =
     nodecomplete_from_memory_or_disk (
       config, &parent_pid, &parent_source )
-    . map_err ( |_| "completeAliasCol: parent NodeComplete not found" ) ?;
+    . map_err ( |_| "complete_alias_col: parent NodeComplete not found" ) ?;
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
     per_stage_node_changes_for_truenode (
