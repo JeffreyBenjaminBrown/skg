@@ -5,6 +5,7 @@ use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeCha
 use crate::types::list::{Diff_Item, compute_interleaved_diff, itemlist_and_removedset_from_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
+use crate::dbs::memory::InRustGraph;
 use crate::types::memory::find_source_many_ways;
 use crate::types::nodes::complete::NodeComplete;
 use crate::git_ops::read_repo::nodecomplete_from_git_head;
@@ -29,6 +30,7 @@ use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 enum ContentReality {
   Real, // Real content: Exists in worktree, and parent contains it at this position.
@@ -73,6 +75,7 @@ pub fn complete_truenode_preorder (
   defmap             : &mut DefinitiveMap,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
+  graph_snap                      : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   deleted_by_this_save_pids       : &HashSet<ID>,
   is_saved_view                   : bool,
@@ -97,7 +100,8 @@ pub fn complete_truenode_preorder (
   let subscribes_to : Vec<ID> =
     reconcile_content_children (
       tree, node, &nodecomplete, &pid, &source,
-      source_diffs, config, deleted_since_head_pid_src_map ) ?;
+      source_diffs, config, graph_snap,
+      deleted_since_head_pid_src_map ) ?;
   order_children_as_scaffolds_then_ignored_then_content(
     tree, node ) ?;
   maybe_prepend_subscribee_col(
@@ -190,10 +194,22 @@ fn reconcile_content_children (
   source                         : &SourceName,
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   config                         : &SkgConfig,
+  graph_snap                     : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
+  // Resolve each id through the in-memory extra_id map so that an
+  // id appearing in a node's 'contains' after merging into another
+  // node is redirected to the acquirer's pid. Without this, the
+  // rerender would carry the raw (now deleted) acquiree through to
+  // the goal list and display it as (deleted ...) in its parent's
+  // subtree, even though the parent's containment logically points
+  // at the acquirer. (Fresh views already got this for free from
+  // 'pid_and_source_from_id'; this makes the rerender consistent.)
   let content_ids : Vec<ID> =
-    nodecomplete . contains . clone();
+    nodecomplete . contains . iter ()
+    . map ( |id| graph_snap . pid_of (id)
+                 . unwrap_or_else ( || id . clone () ))
+    . collect ();
   let subscribes_to : Vec<ID> =
     nodecomplete . subscribes_to . or_default() . to_vec();
   let (staged_nc, unstaged_nc)

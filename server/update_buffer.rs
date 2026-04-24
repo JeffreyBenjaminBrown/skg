@@ -9,7 +9,7 @@ pub use complete::complete_viewforest;
 pub use graphnodestats::set_graphnodestats_in_viewforest;
 pub use viewnodestats::set_viewnodestats_in_viewforest;
 
-use crate::dbs::memory::{memory_coherent_with_save_instructions, scheduled_audit::take_pending_audit_warning};
+use crate::dbs::memory::{InRustGraph, memory_coherent_with_save_instructions, scheduled_audit::take_pending_audit_warning};
 use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ConnectionState;
@@ -30,6 +30,7 @@ use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
+use std::sync::Arc;
 use std::time::Instant;
 use typedb_driver::TypeDBDriver;
 
@@ -80,6 +81,12 @@ pub async fn update_views_after_save (
   for m in merge_instructions {
     deleted_by_this_save_pids . insert (
       m . acquiree_to_delete . id . clone() ); }
+  // Snapshot the in-memory graph once for this save's rerender pass.
+  // Used downstream to resolve extra_ids -> primary pids when
+  // building content goal lists (so a merged-away acquiree redirects
+  // to its acquirer instead of rendering as (deleted ...)).
+  let graph_snap : Arc<InRustGraph> =
+    conn_state . graph . load_full ();
   let mut errors : Vec<String> = Vec::new ();
   let mut saved_view_mut : Tree<ViewNode> = saved_view;
   let saved_text : String =
@@ -90,6 +97,7 @@ pub async fn update_views_after_save (
         &source_diffs,
         config,
         typedb_driver,
+        &graph_snap,
         &mut errors,
         &deleted_since_head_pid_src_map,
         &deleted_by_this_save_pids,
@@ -124,6 +132,7 @@ pub async fn update_views_after_save (
         rerender_view (
           &mut viewforest,
           &source_diffs, config, typedb_driver,
+          &graph_snap,
           &mut errors, &deleted_since_head_pid_src_map,
           &deleted_by_this_save_pids,
           false ) . await }
@@ -178,6 +187,7 @@ pub async fn rerender_view (
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   config                         : &SkgConfig,
   typedb_driver                  : &TypeDBDriver,
+  graph_snap                     : &Arc<InRustGraph>,
   errors                         : &mut Vec<String>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   deleted_by_this_save_pids      : &HashSet<ID>,
@@ -190,7 +200,7 @@ pub async fn rerender_view (
   tracing::debug!("rerender_view: starting complete_viewforest");
   complete_viewforest (
     viewforest, &mut defmap,
-    source_diffs, config, typedb_driver,
+    source_diffs, config, typedb_driver, graph_snap,
     errors, deleted_since_head_pid_src_map,
     deleted_by_this_save_pids,
     is_saved_view ) . await ?;

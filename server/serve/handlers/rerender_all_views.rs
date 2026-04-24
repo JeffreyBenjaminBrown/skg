@@ -13,7 +13,9 @@ use ego_tree::Tree;
 use futures::executor::block_on;
 use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
+use std::sync::Arc;
 use typedb_driver::TypeDBDriver;
+use crate::dbs::memory::InRustGraph;
 
 pub fn handle_rerender_all_views_request (
   stream        : &mut TcpStream,
@@ -57,6 +59,8 @@ pub fn stream_rerender_views (
       . unwrap_or_default ();
   let deleted_by_this_save_pids : HashSet<ID> =
     HashSet::new ();
+  let graph_snap : Arc<InRustGraph> =
+    conn_state . graph . load_full ();
   let mut errors : Vec<String> = Vec::new ();
 
   for uri in uris {
@@ -76,6 +80,7 @@ pub fn stream_rerender_views (
       rerender_view (
         &mut viewforest,
         &source_diffs, config, typedb_driver,
+        &graph_snap,
         &mut errors, &deleted_since_head_pid_src_map,
         &deleted_by_this_save_pids,
         false ) . await } )

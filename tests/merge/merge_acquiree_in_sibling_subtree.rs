@@ -122,9 +122,8 @@ async fn merge_acquiree_in_sibling_subtree_impl (
     failures . push (
       "a not found in rendered view" . to_string() ); }
 
-  // 3. c's subtree should still show d with the MERGED: b preserver
-  //    under it, as the existing merge_container_into_content
-  //    test also verifies for its own topology.
+  // 3. d should also appear under c (same pid, definitive under
+  //    whichever root comes first in document order).
   let c_idx : Option<usize> =
     lines . iter() . position ( |l| l . contains ("(id c)") );
   if let Some (c_i) = c_idx {
@@ -137,16 +136,19 @@ async fn merge_acquiree_in_sibling_subtree_impl (
     if ! d_under_c {
       failures . push (
         "d not found under c in rendered view" . to_string() ); }
-    let preserver_under_c : bool =
-      under_c . iter() . any ( |l| l . contains ("MERGED: b") );
-    if ! preserver_under_c {
-      failures . push (
-        "text preserver 'MERGED: b' not found under c in \
-         rendered view"
-        . to_string() ); }
   } else {
     failures . push (
       "c not found in rendered view" . to_string() ); }
+
+  // 4. The MERGED: b preserver should appear somewhere in the view.
+  //    Exactly one of the two d occurrences (a's and c's) is
+  //    definitive; the other is indefinitive and won't expand its
+  //    contents. DefinitiveMap picks the first in document order.
+  if ! view . contains ("MERGED: b") {
+    failures . push (
+      "text preserver 'MERGED: b' not found anywhere in rendered \
+       view"
+      . to_string() ); }
 
   if !failures . is_empty() {
     let msg : String = format!(
