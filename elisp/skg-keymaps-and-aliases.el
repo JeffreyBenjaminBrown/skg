@@ -55,6 +55,15 @@ and hide INTERNAL from M-x completion."
   (define-key minibuffer-local-map (kbd "C-c O i") #'skg-pop-id)
   (define-key minibuffer-local-map (kbd "C-c O l") #'skg-pop-link))
 
+(with-eval-after-load 'shell ;; M-x shell
+  ;; A shell buffer is writable (you can type at the prompt), so
+  ;; insert-from-stack ops make sense here, just like in the
+  ;; minibuffer.
+  (define-key shell-mode-map (kbd "C-c o i") #'skg-paste-id)
+  (define-key shell-mode-map (kbd "C-c o l") #'skg-paste-link)
+  (define-key shell-mode-map (kbd "C-c O i") #'skg-pop-id)
+  (define-key shell-mode-map (kbd "C-c O l") #'skg-pop-link))
+
 ;; Pattern used for every mode-map below: a `defvar' declares the
 ;; variable with an empty `make-sparse-keymap', and a separate
 ;; top-level form clears-and-repopulates it. Clearing is done by
