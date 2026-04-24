@@ -185,9 +185,7 @@ pub async fn rerender_view (
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
   tracing::debug!("rerender_view: starting");
-  remove_branches_that_git_marked_removed (forest) ?;
-  remove_diff_only_scaffolds (forest) ?;
-  clear_diff_metadata (forest) ?;
+  strip_stale_diff_state (forest) ?;
   let mut defmap : DefinitiveMap = DefinitiveMap::new ();
   tracing::debug!("rerender_view: starting complete_viewtree");
   complete_viewtree (
@@ -224,6 +222,17 @@ pub async fn rerender_view (
             t_rerender . elapsed () . as_secs_f64 ());
   result }
 
+/// Reset all traces of a prior diff-view rendering so the forest
+/// is ready for a fresh pass. Three independent traversals today;
+/// could be fused if traversal cost ever mattered.
+fn strip_stale_diff_state (
+  forest : &mut Tree<ViewNode>
+) -> Result<(), Box<dyn Error>> {
+  remove_branches_that_git_marked_removed (forest) ?;
+  remove_diff_only_scaffolds (forest) ?;
+  clear_diff_metadata (forest) ?;
+  Ok (( )) }
+
 /// Strip from the forest every branch whose root
 ///   is marked as removed or removed-here.
 /// Exception: Does not strip:
@@ -242,7 +251,7 @@ pub async fn rerender_view (
 /// in which case its Removed* label is again a lie
 /// -- it is no longer missing here.
 /// Etc. Much easier to just regenerate them at each save.
-pub fn remove_branches_that_git_marked_removed (
+fn remove_branches_that_git_marked_removed (
   forest : &mut Tree<ViewNode>
 ) -> Result<(), Box<dyn Error>> {
   let forest_root_id : NodeId =
@@ -279,7 +288,7 @@ pub fn remove_branches_that_git_marked_removed (
 /// is not worth the complexity. Phantom Alias children (injected by
 /// diff mode) are cleaned up by complete_alias_col during the postorder
 /// pass: its goal list won't include them, so they are detached.
-pub fn remove_diff_only_scaffolds (
+fn remove_diff_only_scaffolds (
   forest : &mut Tree<ViewNode>
 ) -> Result<(), Box<dyn Error>> {
   let forest_root_id : NodeId =
@@ -301,7 +310,7 @@ pub fn remove_diff_only_scaffolds (
 /// Clear diff metadata from all TrueNodes in the forest.
 /// Diff-only scaffolds (TextChanged, IDCol) are
 /// removed by 'remove_diff_only_scaffolds' before this runs.
-pub fn clear_diff_metadata (
+fn clear_diff_metadata (
   forest : &mut Tree<ViewNode>
 ) -> Result<(), Box<dyn Error>> {
   let forest_root_id : NodeId =
