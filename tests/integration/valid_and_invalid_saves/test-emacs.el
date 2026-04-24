@@ -101,15 +101,15 @@
     (let ((updated-content (buffer-substring-no-properties (point-min) (point-max))))
       (message "Updated buffer content: %s" updated-content)
 
-      ;; Should contain cycle and indefinitive markers
-      ;; Note: cycle and indefinitive are inside (node ...)
+      ;; Should contain cycle and indef markers
+      ;; Note: cycle and indef are inside (node ...)
       (if (and (string-match-p "cycle" updated-content)
-               (string-match-p "indefinitive" updated-content))
+               (string-match-p "\\bindef\\b" updated-content))
           (progn
-            (message "✓ PASS: Valid save worked and showed cycle indefinitive"))
+            (message "✓ PASS: Valid save worked and showed cycle indef"))
         (progn
-          (message "✗ FAIL: Expected cycle and indefinitive markers not found")
-          (message "Expected to contain: 'cycle' and 'indefinitive'")
+          (message "✗ FAIL: Expected cycle and indef markers not found")
+          (message "Expected to contain: 'cycle' and 'indef'")
           (message "Got: %s" updated-content)
           (kill-emacs 1))))))
 
