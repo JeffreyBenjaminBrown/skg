@@ -32,3 +32,4 @@
 (require 'skg-show-org-ancestry)
 (require 'skg-magit-titles)
 (require 'skg-file-minor-mode)
+(require 'skg-git-add)

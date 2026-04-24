@@ -84,4 +84,54 @@ If there is only one owned source, return it without prompting."
         (forward-line 1))
       (nreverse sources))))
 
+(defun skg-source-paths-from-toml (file)
+  "Return an alist of (name . absolute-dir) for each [[sources]] entry
+in FILE. Relative source paths are resolved against the directory of
+FILE, matching what the server's `make_paths_absolute' does at
+config-load time."
+  (with-temp-buffer
+    (insert-file-contents file)
+    (goto-char (point-min))
+    (let* ((dir (file-name-directory file))
+           (result    '())
+           (cur-name  nil)
+           (cur-path  nil)
+           (flush (lambda ()
+                    (when (and cur-name cur-path)
+                      (push (cons cur-name
+                                  (expand-file-name cur-path dir))
+                            result)
+                      (setq cur-name nil cur-path nil)))))
+      (while (not (eobp))
+        (let ((line (string-trim
+                     (buffer-substring-no-properties
+                      (line-beginning-position)
+                      (line-end-position)))))
+          (cond
+           ((string-match "^\\[\\[sources\\]\\]" line)
+            (funcall flush))
+           ((string-match "^name[ \t]*=[ \t]*\"\\([^\"]+\\)\"" line)
+            (setq cur-name (match-string 1 line)))
+           ((string-match "^path[ \t]*=[ \t]*\"\\([^\"]+\\)\"" line)
+            (setq cur-path (match-string 1 line)))))
+        (forward-line 1))
+      (funcall flush)
+      (nreverse result))))
+
+(defun skg--source-dir (source-name)
+  "Return absolute directory for SOURCE-NAME per skgconfig.toml, or nil."
+  (when skg-config-dir
+    (let ((config-file
+           (expand-file-name "skgconfig.toml" skg-config-dir)))
+      (when (file-exists-p config-file)
+        (cdr (assoc source-name
+                    (skg-source-paths-from-toml config-file)))))))
+
+(defun skg--abs-path-for-id-and-source (id source)
+  "Return the absolute path of ID.skg within SOURCE's directory,
+or nil if SOURCE is not declared in the config."
+  (let ((dir (skg--source-dir source)))
+    (when dir
+      (expand-file-name (concat id ".skg") dir))))
+
 (provide 'skg-config)
