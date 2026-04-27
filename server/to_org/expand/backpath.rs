@@ -356,9 +356,6 @@ pub async fn prepend_indefinitive_child (
         mk_indefinitive_from_viewnode (
           child_viewnode, birth )
           . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
-      // The ancestry referenced an id that has no record. Drop in
-      // an UnknownNode placeholder rather than aborting the parent
-      // expansion.
       None => mk_unknown_viewnode (child_skgid . clone ()), };
   let new_child_treeid : NodeId =
     tree . get_mut (parent_treeid) . unwrap ()

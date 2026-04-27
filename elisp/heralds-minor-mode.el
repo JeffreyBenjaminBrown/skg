@@ -34,20 +34,8 @@
     (RED deleted "DELETED"
       (id)
       (source))
-    ;; UnknownNode: a placeholder the server emits when a referenced
-    ;; ID resolves to nothing in any db. Carries only the id; its
-    ;; subtree (if any) was attached by the BFS before the lookup
-    ;; failed and is left in place. Render the line as the orange
-    ;; herald the user sees instead of the (now-orphaned) reference.
     (ORANGE unknownNode "Parent references unknown node."
       (id))
-    ;; Per-stage membership axes at the scaffold level (e.g. on
-    ;; alias, id). Each INTERC emits at most one token per matching
-    ;; stage child, e.g. "staged:-M" or "unstaged:M". Empty
-    ;; separator ("") glues the sub-rule outputs directly. The
-    ;; outer GREEN colors the `staged:' / `unstaged:' literal
-    ;; prefix; each sub-rule still supplies its own color for the
-    ;; axis suffix.
     (GREEN INTERC "" staged "staged:"
       (GREEN newM     "M")
       (RED   removedM "-M"))
@@ -56,32 +44,18 @@
       (RED   removedM "-M"))
     (node
       (source) ;; ignored
-      ;; Each birth variant is a first-class herald. Content-born
-      ;; nodes get a blue `{' (mirror of `}' for ContainerOf); the
-      ;; other three births are orange. There is no longer a
-      ;; standalone "this is a node" marker.
       (birth
         (BLUE   contentOf   "{")
         (ORANGE independent "⊥")
         (ORANGE containerOf "}")
         (ORANGE linksTo     "←"))
-      ;; Indefinitive marker abuts the birth character (no space).
       ;; Server emits the abbreviated atom `indef' (see
       ;; org_to_text.rs); we match that here.
       (GREEN indef ABUT "☮")
       (graphStats
-        ;; Server emits (containers N) and (contents M) as raw
-        ;; sibling atoms here; the client INTERCs them into a
-        ;; compound herald with `{` between. Containers count is
-        ;; YELLOW per spec; contents and the separator are BLUE.
-        ;; Unlabelled INTERC: sub-rules match the current object's
-        ;; (graphStats') children directly, no wrapper needed.
         (BLUE INTERC "{"
           (YELLOW containers (ANY IT))
           (BLUE   contents   (ANY IT)))
-        ;; Similarly for the links herald: raw atoms
-        ;; (linksInFromContainers N) and (linksInFromLeaves M),
-        ;; INTERCed with `→`, whole thing yellow.
         (YELLOW INTERC "→"
           (linksInFromContainers (ANY IT))
           (linksInFromLeaves     (ANY IT)))
@@ -103,10 +77,6 @@
         (containerwardStats "req:cw-stats")
         (sourcewardView "req:sources")
         (definitiveView "req:definitive"))
-      ;; Per-stage axes on TrueNodes. Existence axes (X) appear
-      ;; only on TrueNodes, never on scaffolds. Outer GREEN colors
-      ;; the `staged:' / `unstaged:' prefix; sub-rules keep their
-      ;; own axis colors.
       (GREEN INTERC "" staged "staged:"
         (GREEN newX     "X")
         (RED   removedX "-X")
@@ -124,30 +94,6 @@ This table is the single source of truth for every visual decision
 in the herald display. It is interpreted by the generic engine in
 skg-lens.el (`skg-transform-sexp-flat'), whose full semantics for
 colour directives, ANY/IT, ABUT, and INTERC are documented there.
-
-COLOUR VOCABULARY
-
-  GREEN   -- informational / structural atoms that the user scans for
-             orientation: scaffold labels (alias, id, idCol, ...), the
-             `staged:'/`unstaged:' prefixes on per-stage axes, source
-             herald values, indef marker.
-  BLUE    -- node-intrinsic, neutral counts: contents count, aliasing,
-             extraIDs, overriding, subscribing, containerwardPath,
-             cycle/containsParent markers. Also the ContentOf birth
-             glyph `{', chosen to rhyme with containerOf's `}'.
-  YELLOW  -- link-flavoured counts, in all directions: the
-             `containers' count on a node (how many contain it), plus
-             the compound `linksInFromContainers → linksInFromLeaves'.
-             Chosen because links are what make the graph a graph.
-  RED     -- user-attention markers: deletion (deletedScaffold,
-             deleted, editRequest/delete), merge requests, and the
-             `-X' / `-M' axis markers for removals in git diffs.
-  ORANGE  -- the three non-content birth variants (independent,
-             containerOf, linksTo); also the dangling-reference
-             warning herald `unknownNode' (a parent's contains
-             list referenced an id that resolves to nothing).
-             Distinct from BLUE so ContentOf can own that slot
-             without visual collision.
 
 SERVER-EMITTED ATOMS VS. RULE FORM
 

@@ -440,12 +440,9 @@ pub async fn build_node_branch_minus_content (
               tree, child_treeid, visited,
               config, driver ) . await ?;
             Ok (child_treeid) },
-          None => {
-            // The id is dangling. Append an UnknownNode placeholder
-            // so the rest of the BFS can proceed, and skip the
-            // complete_branch_minus_content call (no NodeComplete to
-            // expand).
-            let viewnode : ViewNode = mk_unknown_viewnode (skgid . clone ());
+          None => { // Uknown node. Add it, don't 'complete' it.
+            let viewnode : ViewNode =
+              mk_unknown_viewnode (skgid . clone ());
             let child_treeid : NodeId =
               with_node_mut (
                 tree, parent_treeid,
@@ -466,13 +463,11 @@ pub async fn build_node_branch_minus_content (
               &mut tree, root_treeid, visited,
               config, driver ) . await ?;
             Ok (root_treeid) },
-          None => {
-            // Same fallback for the no-parent path: build a tree
-            // whose root is just an UnknownNode placeholder.
-            let viewnode : ViewNode = mk_unknown_viewnode (skgid . clone ());
+          None => { // A singleton tree with an UnknownNode.
+            let viewnode : ViewNode =
+              mk_unknown_viewnode (skgid . clone ());
             let tree : Tree<ViewNode> = Tree::new (viewnode);
-            Ok (tree . root () . id ()) }} },
-    };
+            Ok (tree . root () . id ()) }} }, };
   tracing::info!("{}: {:.3}s",
                  format! ("build_node_branch_minus_content({})", skgid),
                  t0 . elapsed () . as_secs_f64());
