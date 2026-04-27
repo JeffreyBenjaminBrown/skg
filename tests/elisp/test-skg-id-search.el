@@ -241,6 +241,12 @@ not the headline's metadata ID and title."
     (should skg-id-stack-mode)
     (kill-buffer "*skg-id-stack*") ))
 
+(ert-deftest test-skg--save-id-stack-buffer-is-a-command ()
+  "skg--save-id-stack-buffer is bound to C-x C-s in skg-id-stack-mode.
+For that binding to work, the function must satisfy `commandp'
+(i.e. it must have an `interactive' form)."
+  (should (commandp 'skg--save-id-stack-buffer)))
+
 (ert-deftest test-skg--save-id-stack-buffer ()
   "Test that saving the id-stack buffer updates skg-id-stack."
   (let (( skg-id-stack '(("old-id" "old label")) ))
