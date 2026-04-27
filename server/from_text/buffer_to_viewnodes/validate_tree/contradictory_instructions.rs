@@ -82,18 +82,18 @@ fn collect_instructions(
     let viewnode : &UncheckedViewNode = node_ref . value();
     if let UncheckedViewNodeKind::True (t) = &viewnode . kind {
       if let Some (id) = &t . id {
-        let delete_instruction : WhetherToDelete =
-          if matches!(t . edit_request (),
-                      Some (&EditRequest::Delete)) {
-            WhetherToDelete::Delete
-          } else { WhetherToDelete::DoNotDelete };
-        id_toDelete_instructions // record delete_instruction
-          . entry(id . clone())
-          . or_insert_with (HashSet::new)
-          . insert (delete_instruction);
-        if ! t . is_indefinitive () {
-          // Increment the count for this defining container
+        if ! t . is_indefinitive () { // indef nodes contribute no instructions
+          let delete_instruction : WhetherToDelete =
+            if matches!(t . edit_request (),
+                        Some (&EditRequest::Delete)) {
+              WhetherToDelete::Delete
+            } else { WhetherToDelete::DoNotDelete };
+          id_toDelete_instructions // record delete_instruction
+            . entry(id . clone())
+            . or_insert_with (HashSet::new)
+            . insert (delete_instruction);
           *id_defining_count . entry(id . clone())
+            // increment the count for this defining container
             . or_insert (0) += 1; }
         if let Some (source_str) = &t . source {
           // Collect source for this ID
