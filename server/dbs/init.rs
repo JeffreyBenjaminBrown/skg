@@ -65,31 +65,34 @@ pub fn initialize_dbs (
       &driver, &config . db_name, &marker_path,
       Path::new ( &config . tantivy_folder )
     ) . await } );
-  if can_incremental {
-    let marker_mtime : std::time::SystemTime =
-      fs::metadata (&marker_path)
-      . and_then ( |m| m . modified() )
-      . unwrap(); // safe: can_do_incremental_init confirmed it exists
-    match incremental_init (
-      config, &driver, marker_mtime )
+  let init_data : InitData =
+    if can_incremental {
+      let marker_mtime : std::time::SystemTime =
+        fs::metadata (&marker_path)
+        . and_then ( |m| m . modified() )
+        . unwrap(); // safe: can_do_incremental_init confirmed it exists
+      match incremental_init (
+        config, &driver, marker_mtime )
       { Ok (( tantivy_index )) => {
           tracing::info! ("Incremental init succeeded.");
-          touch_init_marker (&marker_path);
-          // Incremental init only reads modified files.
-          // We must read all files for the full set.
+          // The incremental step above updated TypeDB and Tantivy from only the modified .skg files, which is all those databases need. The in-memory state inside InitData (graph handle, contains maps, had_id_set, link_targets) is rebuilt from scratch on every startup, so it needs every NodeComplete. The read below is therefore a full file read, but not a full re-initialization of the databases.
           let nodes : Vec<NodeComplete> =
             read_all_skg_files_from_sources (config)
             . unwrap_or_default ();
-          return init_data_from_nodes (
-            &nodes, Arc::new (driver), tantivy_index ); }
+          init_data_from_nodes (
+            &nodes, Arc::new (driver), tantivy_index ) }
         Err (e) => {
           tracing::warn! ("Incremental init failed ({}), \
-                     falling back to full rebuild.", e); }} }
-  let init_data : InitData =
-    full_init (config, driver);
+                     falling back to full rebuild.", e);
+          full_init (config, driver) }}
+    } else {
+      full_init (config, driver) };
   touch_init_marker (&marker_path);
   init_data }
 
+/// DEAD ? See "incremental init" in is-it-dead.org.
+///
+/// PURPOSE:
 /// Checks the four preconditions for incremental init:
 /// 1. TypeDB database exists
 /// 2. Marker file exists

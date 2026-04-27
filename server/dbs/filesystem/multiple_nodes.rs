@@ -121,8 +121,8 @@ pub fn read_modified_skg_files_from_sources (
       let entry : DirEntry = entry ?;
       let path  : PathBuf  = entry . path();
       if !( path . is_file() &&
-            path . extension()
-              . map_or (false, |ext| ext == "skg") ) {
+            path . extension() . map_or (false,
+                                         |ext| ext == "skg")) {
         continue; }
       let mtime : std::time::SystemTime =
         fs::metadata (&path) ? . modified() ?;
@@ -131,8 +131,7 @@ pub fn read_modified_skg_files_from_sources (
         read_nodecomplete (&path) ?;
       validate_pid_matches_filename (&node_fs, &path) ?;
       let pid_str : String =
-        node_fs . pid
-        . to_string();
+        node_fs . pid . to_string();
       if ! seen_ids . insert (pid_str . clone()) {
         return Err ( io::Error::new (
           io::ErrorKind::InvalidData,

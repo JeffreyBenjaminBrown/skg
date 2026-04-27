@@ -288,4 +288,3 @@ fn string_field (
   doc . get_first (field)
     . and_then ( |v| v . as_str () )
     . map ( |s| s . to_string () ) }
-
