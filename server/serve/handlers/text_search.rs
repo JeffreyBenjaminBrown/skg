@@ -289,11 +289,22 @@ pub fn group_matches_by_id (
             . get_first ( tantivy_index . id_field )
             . and_then ( |v| v . as_str() )
             . map ( |s| ID::from (s) );
-        let title_opt : Option < String > =
-          retrieved_doc
+        // Prefer raw_title (un-reduced, only on is_title="true"
+        // docs) so a textlink in the title shows as
+        // `[[id:X][label]]` in search results. For alias-doc hits
+        // raw_title is empty/absent, so fall back to
+        // title_or_alias, which holds the alias literal.
+        let title_opt : Option < String > = {
+          let raw : Option<String> =
+            retrieved_doc
+              . get_first ( tantivy_index . raw_title_field )
+              . and_then ( |v| v . as_str () )
+              . map ( |s| s . to_string () )
+              . filter ( |s| ! s . is_empty () );
+          raw . or_else ( || retrieved_doc
             . get_first ( tantivy_index . title_or_alias_field )
             . and_then ( |v| v . as_str() )
-            . map ( |s| s . to_string() );
+            . map ( |s| s . to_string() )) };
         let source : SourceName =
           SourceName::from (
             retrieved_doc
