@@ -393,11 +393,9 @@ On failure, prints error message and leaves `skg-id-stack' unchanged."
 (defun skg--save-id-stack-buffer ()
   "Save handler for the id-stack buffer.
 Validates and replaces `skg-id-stack' with buffer contents.
-Rather than make this function 'interactive'
-(which would interfere with tab-completing
-'skg-save' to become 'skg-request-save-buffer'),
-it is bound to C-x C-s (which normally calls 'save-buffer')
-by 'skg-id-stack-mode'."
+Bound to C-x C-s (which normally calls `save-buffer')
+by `skg-id-stack-mode'."
+  (interactive)
   (let (( validation-result (skg-validate-id-stack-buffer) ))
     (if (eq (car validation-result) 'success)
         (progn
