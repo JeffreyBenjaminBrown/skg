@@ -15,6 +15,7 @@
 (require 'skg-request-rebuild-dbs)
 (require 'skg-request-rerender-all-views)
 (require 'skg-request-save)
+(require 'skg-search-make-link)
 (require 'skg-request-single-root-content-view)
 (require 'skg-request-verify-connection)
 (require 'skg-request-views)

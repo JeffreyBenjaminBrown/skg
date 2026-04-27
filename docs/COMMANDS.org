@@ -126,6 +126,24 @@ to MUST.
   handing the pieces to RegexQuery. A true whole-title regex
   (one pattern that matches across spaces) would need a
   separate non-tokenized =raw_title= field. Not done yet.
+*** C-c f l   : skg-search-make-link
+Search-then-link: pick a result, return here, get a link.
+
+Like =skg-search= but tailored for inserting a link to a node
+you don't yet know the ID of. The current buffer is saved
+first (so detours through the search results' links don't
+collide with unsaved edits), and the position of point is
+remembered. The same conservative search defaults as
+=skg-search= apply.
+
+In the resulting search buffer, find the result you want and
+press =C-c C-c=. The search buffer closes; you return to the
+buffer you started in, at the position you were at; and a
+=[[id:X][LABEL]]= link is inserted at point.
+
+The label is the result's title with any inline links inside
+it reduced to their labels (so the new link's label is plain
+text, never another link inside a link).
 ** going to a node
 *** C-c g RET : skg-goto
 Calling this when the cursor is on a link, a node's metadata,

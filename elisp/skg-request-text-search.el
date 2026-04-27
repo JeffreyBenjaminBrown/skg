@@ -69,6 +69,12 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
     (skg-lp-reset)
     (process-send-string tcp-proc request-s-exp)))
 
+(defvar skg--search-buffer-setup-hook nil
+  "Hook run inside a freshly populated search buffer.
+Each function is called with no arguments, with the search buffer
+as `current-buffer'. Used by `skg-search-make-link' to upgrade the
+buffer to link-creation mode.")
+
 (defun skg--display-search-phase1 (payload search-terms)
   "Display phase 1 search results (without paths).
 Sets skg-view-uri to \"search:TERMS\" and registers a
@@ -86,6 +92,7 @@ kill-buffer-hook to send close-view to the server."
           (goto-char (point-min)))
         (setq skg-view-uri view-uri)
         (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
+        (run-hooks 'skg--search-buffer-setup-hook)
         (switch-to-buffer (current-buffer)) ))))
 
 (defun skg--as-string (value)

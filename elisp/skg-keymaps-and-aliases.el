@@ -37,7 +37,8 @@ and hide INTERNAL from M-x completion."
 
 (progn ;; Global
   (global-set-key (kbd "C-c f RET") #'skg-search)
-  (global-set-key (kbd "C-c f i")   #'skg-search-interactive))
+  (global-set-key (kbd "C-c f i")   #'skg-search-interactive)
+  (global-set-key (kbd "C-c f l")   #'skg-search-make-link))
 
 (with-eval-after-load 'magit ;; Magit
   ;; Popping to the id stack would make no sense here,
@@ -103,7 +104,8 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c <backspace>") #'skg-delete))
   (progn;; text search
     (define-key map (kbd "C-c f RET") #'skg-search)
-    (define-key map (kbd "C-c f i")   #'skg-search-interactive))
+    (define-key map (kbd "C-c f i")   #'skg-search-interactive)
+    (define-key map (kbd "C-c f l")   #'skg-search-make-link))
   (progn;; goto. Capital-G variants kill the buffer they were called from.
     (define-key map (kbd "C-c g RET") #'skg-goto)
     (define-key map (kbd "C-c G RET") #'skg-goto-and-close-this)

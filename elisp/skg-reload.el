@@ -43,6 +43,7 @@ plain `load-file' at the end instead."
             skg-request-single-root-content-view
             skg-request-text-search
             skg-request-verify-connection
+            skg-search-make-link
             skg-request-views
             skg-sexpr-dsl-for-edits
             skg-sexpr-cycling

@@ -16,6 +16,17 @@
   "\\[\\[id:[^]]+\\]\\[[^]]+\\]\\]"
   "Regex matching org-mode links of the form [[id:X][label]].")
 
+(defconst skg--link-with-label-group-regex
+  "\\[\\[id:[^]]+\\]\\[\\([^]]+\\)\\]\\]"
+  "Like `skg-link-regex' but with the label captured as group 1.
+Used by `skg-replace-links-with-labels' to replace each link with its label.")
+
+(defun skg-replace-links-with-labels (text)
+  "Return TEXT with each [[id:X][LABEL]] replaced by LABEL.
+Mirrors the Rust-side `replace_each_link_with_its_label'."
+  (replace-regexp-in-string
+   skg--link-with-label-group-regex "\\1" text))
+
 (defun skg-visit-link ()
   "If point is on an org-mode link like [[id:THE_ID][label]],
 request a single root content view from that ID.

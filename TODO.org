@@ -1,10 +1,6 @@
-* ? I want the 'helps' relation.
+* food for thought
+** ? I want the 'helps' relation.
 And 'needs', surely.
-* stack push with prompt for label, for other contexts
-Even stack push, if it just prompted for a label,
-could be available from magit, shell, .skg view.
-Same keyboard shortcuts but slightly different commands,
-to prompt for label.
 * make git faster
 ** TODO commit eval
 Can ask for it for staged, unstaged or all changes.
@@ -29,9 +25,8 @@ Changes to text are reported.
 To test, compute this two ways: From disk and from dbs.
 ** TODO be able to visit ghost nodes
 ** view all changes in one buffer
-* C-c f 1 : if there's only one perfect match, go straight there
 * TODO make it comfortable
-** Privacy: Permit user to hide certain sources from view.
+** TODO Privacy: Permit user to hide certain sources from view.
 *** Figure out the diff logic for insertions when some are hidden.
 I think I see how: Just pin each thing to its last visible sibling.
 ** importing org-roam should be possible while server is running
