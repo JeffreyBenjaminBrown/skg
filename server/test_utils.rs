@@ -1,7 +1,7 @@
 mod guard;
 pub use guard::TestDbGuard;
 
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_AND_check_for_dup_ids;
 use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
 use crate::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
 use crate::dbs::memory::{InRustGraph, InRustGraphHandle, audit::{audit_memory_against_typedb, format_mismatches}, new_handle};
@@ -122,7 +122,7 @@ where
         DriverOptions::new(false, None)?,
       ). await?;
     let nodes: Vec<NodeComplete> =
-      read_all_skg_files_from_sources (&config)?;
+      read_all_skg_files_from_sources_AND_check_for_dup_ids (&config)?;
     let typedb_nodes : Vec<NodeTypedb> =
       nodes . iter ()
       . map (NodeTypedb::from_complete_parsing_textlinks)
@@ -191,7 +191,7 @@ pub fn graph_handle_from_config (
   config : &SkgConfig,
 ) -> Result<InRustGraphHandle, Box<dyn Error>> {
   let nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources (config) ?;
+    read_all_skg_files_from_sources_AND_check_for_dup_ids (config) ?;
   Ok ( new_handle ( InRustGraph::from_nodecompletes (&nodes) )) }
 
 /// Audit the given in-Rust graph handle against TypeDB; panic with a
@@ -216,7 +216,8 @@ pub async fn populate_test_db_from_fixtures (
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
   let nodes: Vec<NodeComplete> = {
-    let mut sources: HashMap<SourceName, SkgfileSource> = HashMap::new();
+    let mut sources: HashMap<SourceName, SkgfileSource> =
+      HashMap::new();
     sources . insert(
       SourceName::from ("main"),
       SkgfileSource {
@@ -224,7 +225,7 @@ pub async fn populate_test_db_from_fixtures (
         abbreviation: None,
         path: PathBuf::from (data_folder),
         user_owns_it: true, } );
-    read_all_skg_files_from_sources(
+    read_all_skg_files_from_sources_AND_check_for_dup_ids(
       &SkgConfig::dummyFromSources (sources))? };
   overwrite_new_empty_db (
     db_name, driver ) . await ?;

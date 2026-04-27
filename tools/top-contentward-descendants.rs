@@ -12,7 +12,7 @@
  */
 
 use skg::dbs::filesystem::not_nodes::load_config;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_AND_check_for_dup_ids;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::nodes::complete::NodeComplete;
 
@@ -30,7 +30,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
     else { 20 };
   let config : SkgConfig = load_config (config_path) ?;
   let nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources (&config) ?;
+    read_all_skg_files_from_sources_AND_check_for_dup_ids (&config) ?;
   // Adjacency: pid → list of pids it directly contains.
   let adj : HashMap<ID, &[ID]> =
     nodes . iter ()

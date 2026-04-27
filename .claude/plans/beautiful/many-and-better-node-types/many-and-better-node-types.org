@@ -664,7 +664,7 @@ Depends on: Plan A (for 'NodeRust') and Plan B (for uniform sink-application of 
 ** Shape
 
 - New module [[../../server/graph/][server/graph/]] holding the 'Graph' type: 'im::HashMap<ID, NodeRust>'.
-- Server-wide handle: 'Arc<ArcSwap<Arc<Graph>>>'. Built at startup by folding graph population into the existing 'read_all_skg_files_from_sources' pass.
+- Server-wide handle: 'Arc<ArcSwap<Arc<Graph>>>'. Built at startup by folding graph population into the existing 'read_all_skg_files_from_sources_AND_check_for_dup_ids' pass.
 - Readers call '.load_full()' which returns an 'Arc<Graph>'; use like a normal 'HashMap'.
 - Writers (in save): clone current via 'im''s O(log n) structural sharing, apply mutations from 'Vec<DefineNode>', atomically '.store()'.
 

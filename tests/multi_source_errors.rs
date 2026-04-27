@@ -13,7 +13,7 @@ use skg::types::misc::SkgConfig;
 use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::nodes::complete::NodeComplete;
 
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_AND_check_for_dup_ids;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
@@ -44,7 +44,7 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
 
     // Load fixtures into database
     let nodes: Vec<NodeComplete> =
-      read_all_skg_files_from_sources (&config)?;
+      read_all_skg_files_from_sources_AND_check_for_dup_ids (&config)?;
     let typedb_nodes : Vec<NodeTypedb> =
       nodes . iter ()
       . map (NodeTypedb::from_complete_parsing_textlinks)
@@ -143,7 +143,7 @@ fn test_foreign_node_modification_errors(
 
     // Load fixtures into database
     let nodes: Vec<NodeComplete> =
-      read_all_skg_files_from_sources (&config)?;
+      read_all_skg_files_from_sources_AND_check_for_dup_ids (&config)?;
     let typedb_nodes : Vec<NodeTypedb> =
       nodes . iter ()
       . map (NodeTypedb::from_complete_parsing_textlinks)
@@ -310,7 +310,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
 
     // Load fixtures into database
     let nodes: Vec<NodeComplete> =
-      read_all_skg_files_from_sources (&config)?;
+      read_all_skg_files_from_sources_AND_check_for_dup_ids (&config)?;
     let typedb_nodes : Vec<NodeTypedb> =
       nodes . iter ()
       . map (NodeTypedb::from_complete_parsing_textlinks)

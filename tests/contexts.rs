@@ -12,7 +12,7 @@ use skg::context::{
   extend_context,
   extend_contexts_for_cycles,
 };
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_AND_check_for_dup_ids;
 use skg::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
 use skg::types::nodes::complete::{FileProperty, NodeComplete, empty_node_complete};
 
@@ -234,7 +234,7 @@ fn test_full_context_pipeline () {
           path         : PathBuf::from ("tests/contexts/fixtures"),
           user_owns_it : true } )]) );
   let nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources (&config)
+    read_all_skg_files_from_sources_AND_check_for_dup_ids (&config)
     . expect ("failed to read fixture .skg files");
   // Extract data from NodeCompletes.
   let ( map_to_content, map_to_containers )

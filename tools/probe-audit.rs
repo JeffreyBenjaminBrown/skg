@@ -16,7 +16,7 @@
  * whether rebuild cleared the orphans.
  */
 
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_AND_check_for_dup_ids;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::memory::{
   audit::audit_one_node,
@@ -40,7 +40,7 @@ async fn main () -> Result<(), Box<dyn std::error::Error>> {
   let config : SkgConfig = load_config (config_path) ?;
 
   let nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources (&config) ?;
+    read_all_skg_files_from_sources_AND_check_for_dup_ids (&config) ?;
   let graph : InRustGraph = InRustGraph::from_nodecompletes (&nodes);
   let handle : InRustGraphHandle = new_handle (graph);
   init_global_handle (Arc::clone (&handle));

@@ -356,7 +356,7 @@ You're right — no reason to wait. Ran 'git grep -n "\.misc\b"' across server/ 
 
   - Construction: [[../../server/from_text/viewnodes_to_instructions/to_naive_instructions.rs][to_naive_instructions.rs]]:108, [[../../server/merge/mergeInstructionTriple.rs][mergeInstructionTriple.rs]]:220, [[../../server/test_utils.rs][test_utils.rs]]:564, [[../../server/types/memory.rs][memory.rs]]:300 (the synthesis site itself). Build sites; not reads.
   - Tantivy path: [[../../server/types/nodes/tantivy.rs][nodes/tantivy.rs]]:30 copies 'misc' into 'NodeTantivy' at indexing time. Indexing operates on NodeCompletes loaded directly from disk in the init pipeline (not via 'SkgNodeMap', not via memory), so this is fine.
-  - Context-type computation: [[../../server/context.rs][context.rs]]:473 reads 'n.misc.contains (&FileProperty::Had_ID_Before_Import)'. Runs in 'initialize_dbs' and consumes NodeCompletes from 'read_all_skg_files_from_sources' (full-disk read, not memory), so fine.
+  - Context-type computation: [[../../server/context.rs][context.rs]]:473 reads 'n.misc.contains (&FileProperty::Had_ID_Before_Import)'. Runs in 'initialize_dbs' and consumes NodeCompletes from 'read_all_skg_files_from_sources_AND_check_for_dup_ids' (full-disk read, not memory), so fine.
   - Org-roam import: [[../../server/import_org_roam.rs][import_org_roam.rs]]:99-128 mutates 'misc' during import. Import builds fresh NodeCompletes from org files; no memory path involved.
   - Test fixtures and test-only constructors: [[../../tests/contexts.rs][contexts.rs]]:47, [[../../tests/file_io.rs][file_io.rs]]:145, [[../../tests/new/viewnodes_to_instructions/reconcile_same_id_instructions/by_claude.rs][reconcile_same_id_instructions/by_claude.rs]]:32, [[../../tests/import_org_roam.rs][import_org_roam.rs]]:386-392. Test scaffolding.
 
@@ -398,7 +398,7 @@ Your proposal — move 'misc' into 'NodeRust' — is cleaner than the disk-detou
   - It unblocks the pool removal without a special-case disk roundtrip, so Step 2a (the disk-only read) disappears.
   - It lets the 'supplement_none_fields_from_disk_if_save' site keep using the new async 'skgnode_from_memory_or_disk_async' without regressing the misc-preservation invariant.
 
-Context-type computation at [[../../server/context.rs][context.rs]]:473 stays as-is — it reads NodeCompletes straight from 'read_all_skg_files_from_sources' during init, doesn't care where misc lives. Tantivy indexing at [[../../server/types/nodes/tantivy.rs][nodes/tantivy.rs]]:30 also unchanged. The only consumer that benefits is 'supplement_none_fields_from_disk_if_save'.
+Context-type computation at [[../../server/context.rs][context.rs]]:473 stays as-is — it reads NodeCompletes straight from 'read_all_skg_files_from_sources_AND_check_for_dup_ids' during init, doesn't care where misc lives. Tantivy indexing at [[../../server/types/nodes/tantivy.rs][nodes/tantivy.rs]]:30 also unchanged. The only consumer that benefits is 'supplement_none_fields_from_disk_if_save'.
 
 /Impelled change applied to the plan body/:
 

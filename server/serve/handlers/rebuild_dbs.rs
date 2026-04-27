@@ -3,7 +3,7 @@ use crate::context::{
   content_maps_from_nodes,
   had_id_set_from_nodes,
   link_targets_from_nodes};
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_AND_check_for_dup_ids;
 use crate::dbs::init::{rebuild_typedb_from_disk, rebuild_tantivy_from_disk};
 use crate::dbs::memory::InRustGraph;
 use crate::serve::ConnectionState;
@@ -35,7 +35,7 @@ pub fn handle_rebuild_dbs_request (
     *tantivy_index = new_tantivy;
     tracing::info!("Tantivy rebuilt.");
     let nodes : Vec<NodeComplete> =
-      read_all_skg_files_from_sources (config)
+      read_all_skg_files_from_sources_AND_check_for_dup_ids (config)
       . map_err ( |e| format! ("Reading .skg files for context: {}", e) ) ?;
     let had_id_set = had_id_set_from_nodes (&nodes);
     let all_node_ids = nodes . iter ()

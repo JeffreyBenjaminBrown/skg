@@ -6,7 +6,7 @@ use std::io::{Result as IoResult, Error as IoError, ErrorKind as IoErrorKind};
 use std::path::PathBuf;
 use tempfile::{tempdir, TempDir};
 
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_AND_check_for_dup_ids;
 use skg::dbs::filesystem::one_node::write_nodecomplete_to_source;
 use skg::types::misc::{SkgfileSource, SkgConfig, ID, SourceName};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
@@ -42,7 +42,7 @@ fn test_load_from_single_source() {
   write_nodecomplete_to_source(&node, &config) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
-    read_all_skg_files_from_sources (&config);
+    read_all_skg_files_from_sources_AND_check_for_dup_ids (&config);
   assert!(result . is_ok(),
           "Should successfully load from single source");
 
@@ -101,7 +101,7 @@ fn test_load_from_multiple_sources() {
   write_nodecomplete_to_source(&node3, &config) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
-    read_all_skg_files_from_sources (&config);
+    read_all_skg_files_from_sources_AND_check_for_dup_ids (&config);
   assert!(result . is_ok(), "Should successfully load from multiple sources");
 
   let nodes : Vec<NodeComplete> = result . unwrap();
@@ -162,7 +162,7 @@ fn test_duplicate_id_detection_across_sources() {
   write_nodecomplete_to_source(&node2, &config) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
-    read_all_skg_files_from_sources (&config);
+    read_all_skg_files_from_sources_AND_check_for_dup_ids (&config);
   assert!(result . is_err(), "Should fail due to duplicate ID");
 
   let err : IoError = result . unwrap_err();
@@ -218,7 +218,7 @@ fn test_node_with_multiple_ids_duplicate_detection() {
   write_nodecomplete_to_source(&node2, &config) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
-    read_all_skg_files_from_sources (&config);
+    read_all_skg_files_from_sources_AND_check_for_dup_ids (&config);
   assert!(result . is_err(), "Should fail due to overlapping ID");
 
   let err : IoError = result . unwrap_err();
@@ -242,7 +242,7 @@ fn test_load_from_empty_sources() {
         abbreviation: None,
         path: source_path,
         user_owns_it: true, } );
-    read_all_skg_files_from_sources(&test_config (sources)) };
+    read_all_skg_files_from_sources_AND_check_for_dup_ids(&test_config (sources)) };
   assert!(result . is_ok(), "Should successfully handle empty source");
 
   let nodes : Vec<NodeComplete> = result . unwrap();
@@ -291,7 +291,7 @@ fn test_source_field_set_correctly() {
   write_nodecomplete_to_source(&node_b, &config) . unwrap();
 
   let result : IoResult<Vec<NodeComplete>> =
-    read_all_skg_files_from_sources (&config);
+    read_all_skg_files_from_sources_AND_check_for_dup_ids (&config);
   assert!(result . is_ok());
 
   let nodes : Vec<NodeComplete> = result . unwrap();
@@ -355,7 +355,7 @@ fn test_many_duplicate_ids_creates_org_file() {
     write_nodecomplete_to_source(&node_b, &config) . unwrap(); }
 
   let result : IoResult<Vec<NodeComplete>> =
-    read_all_skg_files_from_sources (&config);
+    read_all_skg_files_from_sources_AND_check_for_dup_ids (&config);
   assert!(result . is_err(), "Should fail due to duplicate IDs");
 
   let err : IoError = result . unwrap_err();
@@ -444,7 +444,7 @@ fn test_unreadable_files_creates_org_file() {
       user_owns_it: true, } );
 
   let result : IoResult<Vec<NodeComplete>> =
-    read_all_skg_files_from_sources(&test_config (sources));
+    read_all_skg_files_from_sources_AND_check_for_dup_ids(&test_config (sources));
   assert!(result . is_err(), "Should fail due to unreadable source");
 
   let err : IoError = result . unwrap_err();
