@@ -1,0 +1,5 @@
+pid: subscriber
+title: subscriber
+subscribes_to:
+- victim
+- sibling

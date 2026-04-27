@@ -159,8 +159,10 @@ which takes priority over subee.skg on disk."
        (2 node "subee-1"))
      "phase 5: buffer 2 after delete"))
 
-  ;; Verify buffer 1 (collateral): 11 → DeletedNode,
-  ;; its scaffolds → DeletedScaff, standalone subee unaffected.
+  ;; Verify buffer 1 (collateral): the delete of 11 propagates to
+  ;; node 1 (which contained it). 1.skg's contains has had 11
+  ;; stripped, so on rerender the 11-subtree is gone entirely from
+  ;; buffer 1 -- no DeletedNode, no DeletedScaff descendants.
   (let ((buf1 (get-buffer "*1*")))
     (unless buf1
       (message "✗ FAIL [phase 5]: Buffer 1 no longer exists")
@@ -171,11 +173,6 @@ which takes priority over subee.skg on disk."
     (assert-headline-types-and-titles
      buf1
      '((1 node "1")
-       (2 deleted "11")
-       (3 deletedScaffold "it subscribes to these")
-       (4 node "subee")
-       (4 deletedScaffold "hidden from all subscriptions")
-       (5 node "also-hidden")
        (1 node "subee")
        (2 node "subee-1"))
      "phase 5: buffer 1 after collateral delete")))
@@ -185,10 +182,8 @@ which takes priority over subee.skg on disk."
   (message "=== PHASE 6: Add subee-2 in buffer 1 ===")
   (setq integration-test-phase "phase-6-add-subee-2")
   (with-current-buffer "*1*"
-    ;; Find the SECOND subee headline (the standalone root, which is
-    ;; definitive). The first subee is indefinitive under the deleted
-    ;; scaffold and won't update subee.skg's contains.
-    (when (goto-nth-headline-with-title "subee" 2)
+    ;; Find subee. The first match here is what used to be the second match, because the earlier first match was a child of a now-deleted scaffold.
+    (when (goto-nth-headline-with-title "subee" 1)
       (let ((subee-depth
              (let* ((line (buffer-substring-no-properties
                            (line-beginning-position) (line-end-position)))
@@ -228,11 +223,6 @@ which takes priority over subee.skg on disk."
     (assert-headline-types-and-titles
      buf1
      '((1 node "1")
-       (2 deleted "11")
-       (3 deletedScaffold "it subscribes to these")
-       (4 node "subee")
-       (4 deletedScaffold "hidden from all subscriptions")
-       (5 node "also-hidden")
        (1 node "subee")
        (2 node "subee-1")
        (2 node "subee-2"))
@@ -256,10 +246,13 @@ which takes priority over subee.skg on disk."
      "phase 7: buffer 2 after updating collateral view")))
 
 (defun phase-8-add-new-root-under-deleted-scaff ()
-  "Add new-root as a sibling of subee under the deletedScaff in buffer 1.
-Exercises saving a buffer containing Deleted/DeletedScaff nodes,
-and creating a new node under a DeletedScaff. Source metadata is
-required because the parent (DeletedScaff) has no source to inherit."
+  "Add new-root as a sibling of the standalone subee in buffer 1.
+Originally this exercised inserting a node under a DeletedScaff;
+after the delete pipeline started cleaning up references to the
+deleted node, buffer 1 no longer contains a DeletedScaff, so the
+phase now exercises adding a top-level root via metadata-only
+insertion (the BufferRoot, like a DeletedScaff, supplies no source
+to inherit, so explicit (source main) is still required)."
   (message "=== PHASE 8: Add new-root under deletedScaff in buffer 1 ===")
   (setq integration-test-phase "phase-8-add-new-root")
   (with-current-buffer "*1*"
@@ -305,15 +298,10 @@ required because the parent (DeletedScaff) has no source to inherit."
     (assert-headline-types-and-titles
      buf1
      '((1 node "1")
-       (2 deleted "11")
-       (3 deletedScaffold "it subscribes to these")
-       (4 node "subee")
-       (4 node "new-root")
-       (4 deletedScaffold "hidden from all subscriptions")
-       (5 node "also-hidden")
        (1 node "subee")
        (2 node "subee-1")
-       (2 node "subee-2"))
+       (2 node "subee-2")
+       (1 node "new-root"))
      "phase 9: buffer 1 after new-root"))
 
   ;; We could also verify that buffer 2 is unchanged, but meh.

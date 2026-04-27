@@ -1,6 +1,6 @@
 use crate::dbs::filesystem::multiple_nodes::{write_all_nodes_to_fs, delete_all_nodes_from_fs};
 use crate::dbs::init::{rebuild_typedb_from_disk, rebuild_tantivy_from_disk};
-use crate::dbs::memory::{InRustGraphHandle, apply_definenodes};
+use crate::dbs::memory::{InRustGraph, InRustGraphHandle, apply_definenodes};
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
 use crate::merge::merge_nodes;
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
@@ -10,7 +10,8 @@ use crate::dbs::typedb::nodes::update_node_source;
 use crate::dbs::typedb::nodes::which_ids_exist;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_all_outbound_relationships;
-use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
+use crate::types::misc::{ID, MSV, SkgConfig, SourceName, TantivyIndex};
+use crate::types::nodes::rust::NodeRust;
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::save::{DefineNode, SaveNode, DeleteNode, Merge, SourceMove};
@@ -20,6 +21,7 @@ use crate::util::path_from_pid_and_source;
 use std::collections::{BTreeSet, HashSet};
 use std::error::Error;
 use std::io;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tantivy::IndexWriter;
 use typedb_driver::TypeDBDriver;
@@ -31,7 +33,7 @@ use typedb_driver::TypeDBDriver;
 /// Returns `None` when all three stores updated normally.
 /// Returns `Some(new_index)` when Tantivy had to be rebuilt.
 pub async fn update_graph_minus_merges (
-  node_defs     : Vec<DefineNode>,
+  mut node_defs : Vec<DefineNode>,
   source_moves  : &[SourceMove],
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
@@ -40,6 +42,14 @@ pub async fn update_graph_minus_merges (
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
   tracing::info!("Updating FS, in-memory graph, TypeDB, and Tantivy ...");
   let db_name : &str = &config . db_name;
+
+  { // Propagate deletes: for every node still on disk that
+    // referenced a being-deleted id in any of its outbound list
+    // fields, either append a cleanup SaveNode (for nodes the user
+    // isn't already saving) or amend the user's SaveNode in place.
+    // See apply_delete_propagation_cleanup for full semantics.
+    let graph_snap : Arc<InRustGraph> = graph . load_full ();
+    apply_delete_propagation_cleanup (&mut node_defs, &graph_snap); }
 
   { // FS (source of truth)
     // TODO: Print per-source write information
@@ -237,6 +247,128 @@ pub async fn update_typedb_from_saveinstructions (
       &sm . pid, &sm . new_source ) . await ?; }
 
   Ok (( )) }
+
+/// Two-phase cleanup so deletes don't leave dangling references on
+/// disk:
+///
+/// Phase 1 (cleanup-SaveNode generation): for any node N still on
+/// disk that references a being-deleted pid in any of its out bound
+/// list fields, *maybe* append a verbatim Save(N) to NODE_DEFS
+/// so that phase 2 will rewrite N. But *don't* do that for:
+/// - nodes already in NODE_DEFS as Save. Phase 2 covers them.
+/// - nodes also being deleted (because why bother)
+///
+/// Phase 2 (strip pass): for every Save in NODE_DEFS regardless of
+/// origin (which could be Phase 1 or the save itself),
+/// remove every id in 'deleted_id_set' from the four
+/// outbound list fields (contains, subscribes_to,
+/// hides_from_its_subscriptions, overrides_view_of).
+///
+/// 'deleted_id_set' includes both the primary pid of each delete
+/// AND the extra_ids of that node from the in-memory graph.
+/// Referencers may have stored any of those ids (TypeDB resolves
+/// them all to the primary at relationship time, but the on-disk
+/// list is whatever the buffer that wrote it had); we want all of
+/// them gone.
+///
+/// Skipped fields:
+/// - extra_ids of referencers: per the data model, an id can only
+///   be an extra_id of ONE node, so a referencer cannot legitimately
+///   carry a deleted node's id in its extra_ids.
+/// - textlinks_to: lives in body text; stripping requires body
+///   rewriting. Dangling textlink targets render as UnknownNode
+///   placeholders when followed, so this is non-fatal.
+fn apply_delete_propagation_cleanup (
+  node_defs  : &mut Vec<DefineNode>,
+  graph_snap : &Arc<InRustGraph>,
+) {
+  let deleted_primary_pids : HashSet<ID> = node_defs . iter ()
+    . filter_map ( |d| match d {
+      DefineNode::Delete (dn) => Some ( dn . id . clone ()),
+      DefineNode::Save (_)    => None } )
+    . collect ();
+  if deleted_primary_pids . is_empty () { return; }
+
+  let deleted_id_set : HashSet<ID> = { // include each deleted node's extra_ids
+    let mut s : HashSet<ID> = deleted_primary_pids . clone ();
+    for pid in &deleted_primary_pids {
+      if let Some (rust) = graph_snap . get (pid) {
+        for e in &rust . extra_ids {
+          s . insert ( e . clone () ); }}}
+    s };
+
+  { // Phase 1: append "save-it-unchanged" SaveNodes for referencers not already covered by the user's instructions. As-is, these would have no effect, but phase 2 strips some IDs.
+    let user_save_pids : HashSet<ID> = node_defs . iter ()
+      . filter_map ( |d| match d {
+        DefineNode::Save (SaveNode (n)) => Some ( n . pid . clone ()),
+        DefineNode::Delete (_)          => None } )
+      . collect ();
+    let mut referencer_pids : HashSet<ID> = HashSet::new ();
+    for deleted in &deleted_primary_pids { // Inverse indexes are keyed by primary pid (id_to_pid resolves extra_ids during index construction), so iterating the primary pids of deletes is sufficient to find every referencer.
+      for inverse in [
+        &graph_snap . contained_by,
+        &graph_snap . subscribers_of,
+        &graph_snap . hiders_of,
+        &graph_snap . replacements_of, ] {
+        if let Some (set) = inverse . get (deleted) {
+          for pid in set {
+            referencer_pids . insert ( pid . clone () ); }} } }
+    referencer_pids . retain ( |p|
+      ! user_save_pids . contains (p)
+        && ! deleted_primary_pids . contains (p) );
+    let cleanup_count : usize = referencer_pids . len ();
+    for pid in referencer_pids {
+      let Some (rust) = graph_snap . get (&pid) else { continue; };
+      node_defs . push ( DefineNode::Save ( SaveNode (
+        nodecomplete_from_noderust (rust) ))); }
+    if cleanup_count > 0 {
+      tracing::info!(
+        "Adding {} cleanup save(s) to remove references to deleted nodes.",
+        cleanup_count); } }
+
+  { // Phase 2: strip every deleted id from every Save's outbound list fields, regardless of the Save's origin (Phase 1 or the save itself)
+    for nd in node_defs . iter_mut () {
+      if let DefineNode::Save ( SaveNode (nc) ) = nd {
+        nc . contains . retain ( |id|
+          ! deleted_id_set . contains (id) );
+        nc . subscribes_to = remove_from_msv (
+          &nc . subscribes_to, &deleted_id_set );
+        nc . hides_from_its_subscriptions = remove_from_msv (
+          &nc . hides_from_its_subscriptions, &deleted_id_set );
+        nc . overrides_view_of = remove_from_msv (
+          &nc . overrides_view_of, &deleted_id_set ); }} } }
+
+/// Project a NodeRust back into a NodeComplete verbatim. Stripping
+/// of deleted ids happens later, in 'apply_delete_propagation_cleanup'
+/// phase 2, and applies uniformly to all Saves.
+fn nodecomplete_from_noderust (
+  rust : &NodeRust,
+) -> NodeComplete {
+  NodeComplete {
+    pid                          : rust . pid . clone (),
+    source                       : rust . source . clone (),
+    extra_ids                    : rust . extra_ids . clone (),
+    title                        : rust . title . clone (),
+    aliases                      : rust . aliases . clone (),
+    body                         : rust . body . clone (),
+    contains                     : rust . contains . clone (),
+    subscribes_to                : rust . subscribes_to . clone (),
+    hides_from_its_subscriptions : rust . hides_from_its_subscriptions . clone (),
+    overrides_view_of            : rust . overrides_view_of . clone (),
+    misc                         : rust . misc . clone (),
+  }}
+
+fn remove_from_msv (
+  msv : &MSV<ID>,
+  exclude : &HashSet<ID>
+) -> MSV<ID> {
+  match msv {
+    MSV::Unspecified => MSV::Unspecified,
+    MSV::Specified (v) => MSV::Specified (
+      v . iter ()
+        . filter ( |id| ! exclude . contains (id) )
+        . cloned ()
+        . collect ()), } }
 
 pub fn update_fs_from_saveinstructions (
   node_defs    : &[DefineNode],

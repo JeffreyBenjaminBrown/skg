@@ -144,7 +144,12 @@ async fn complete_preorder_with_limited_recursion (
         complete_subscribee_col_preorder (
           treeid, tree, source_diffs, config, driver,
           deleted_since_head_pid_src_map
-        ) . await ?; }
+        ) . await ?;
+  } else if matches!( kind, ViewNodeKind::Unknown (_) ) {
+    // No-op: Unknown is a placeholder for an unresolvable id and
+    // has no completion to do. Listed explicitly so a reader sees
+    // the variant covered.
+  }
   // No-op for: Deleted, DeletedScaff (whose parent is not
   // Deleted/DeletedScaff -- occurs on re-save of a buffer
   // containing them).
@@ -198,6 +203,10 @@ async fn complete_postorder_with_limited_recursion (
       . children () . next () . is_some ();
     if ! has_children {
       tree . get_mut (treeid) . unwrap () . detach (); }
+  } else if matches!( kind, ViewNodeKind::Unknown (_) ) {
+    // No-op: Unknown is a placeholder for an unresolvable id and
+    // has nothing to populate post-order. Listed explicitly so a
+    // reader sees the variant covered.
   }
   // No-op for: BufferRoot, TextChanged, Alias { .. },
   // ID { .. }, SubscribeeCol.

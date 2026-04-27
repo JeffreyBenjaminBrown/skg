@@ -233,8 +233,9 @@ fn validate_truenode (
          UncheckedViewNodeKind::Scaff (Scaffold::SubscribeeCol) |
          UncheckedViewNodeKind::Scaff (Scaffold::TextChanged { .. })   |
          UncheckedViewNodeKind::Deleted (_)                     |
-         UncheckedViewNodeKind::DeletedScaff (_)               )) {
-    errors . push("TrueNode's children must include only TrueNode, AliasCol, IDCol, SubscribeeCol, TextChanged, Deleted, or DeletedScaff" . to_string()); }
+         UncheckedViewNodeKind::DeletedScaff (_)                |
+         UncheckedViewNodeKind::Unknown (_)                    )) {
+    errors . push("TrueNode's children must include only TrueNode, AliasCol, IDCol, SubscribeeCol, TextChanged, Deleted, DeletedScaff, or UnknownNode" . to_string()); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
     errors . push("TrueNode's non-ignored TrueNode children must be unique (no two sharing the same ID)." . to_string()); }
   if has_empty_title (t) {
