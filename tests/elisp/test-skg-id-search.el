@@ -106,6 +106,23 @@
           (skg-id-push)
           (should (equal (length skg-id-stack) len-before)) )) )))
 
+(ert-deftest test-skg-id-push-on-inline-link ()
+  "When point is on an inline [[id:X][label]] link inside a headline,
+skg-id-push should push the link's ID and the link's label,
+not the headline's metadata ID and title."
+  (setq skg-id-stack nil)
+  (with-temp-buffer
+    (org-mode)
+    (insert "* (skg (node (id outer-id))) outer headline with [[id:inner-id][inner label]] inside\n")
+    ;; Move point onto the inline link.
+    (goto-char (point-min))
+    (search-forward "inner label")
+    (backward-char 5) ;; somewhere inside the label
+    (skg-id-push)
+    (should (equal (length skg-id-stack) 1))
+    (should (equal (car skg-id-stack)
+                   '("inner-id" "inner label"))) ))
+
 (ert-deftest test-skg-id-push-and-view-stack ()
   "Test pushing IDs from a buffer and viewing the stack."
   (setq skg-id-stack nil)

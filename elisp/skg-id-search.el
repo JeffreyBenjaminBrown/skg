@@ -180,21 +180,29 @@ Otherwise return nil."
           (error nil) )) )))
 
 (defun skg-id-push ()
-  "Push the metadata ID from the current line to `skg-id-stack'."
+  "Push an ID and its title/label to `skg-id-stack'.
+If point is on an inline [[id:X][label]] link, push that link's
+ID and label. Otherwise push the headline's metadata ID and title."
   (interactive)
-  (let* (( headline (skg-get-current-headline-text) )
-         ( split (skg-split-as-stars-metadata-title headline) )
-         ( metadata-sexp (when split (cadr split)) )
-         ( title (when split (caddr split)) ))
-    (if (and metadata-sexp
-             (not (string-empty-p metadata-sexp)) )
-        (let (( sexp (read metadata-sexp) ))
-          (if (skg--metadata-sexp-contains-id-p sexp)
-              (let (( id (skg--extract-id-from-metadata-sexp sexp) ))
-                (push (list id title) skg-id-stack)
-                (message "pushed to stack: %s" title) )
-            (message "No ID in metadata on this line") ))
-      (message "No metadata on this line") )))
+  (let (( link-hit (skg--point-in-link-p) ))
+    (if link-hit
+        (let (( id    (car link-hit) )
+              ( label (cdr link-hit) ))
+          (push (list id label) skg-id-stack)
+          (message "pushed to stack: %s" label) )
+      (let* (( headline (skg-get-current-headline-text) )
+             ( split (skg-split-as-stars-metadata-title headline) )
+             ( metadata-sexp (when split (cadr split)) )
+             ( title (when split (caddr split)) ))
+        (if (and metadata-sexp
+                 (not (string-empty-p metadata-sexp)) )
+            (let (( sexp (read metadata-sexp) ))
+              (if (skg--metadata-sexp-contains-id-p sexp)
+                  (let (( id (skg--extract-id-from-metadata-sexp sexp) ))
+                    (push (list id title) skg-id-stack)
+                    (message "pushed to stack: %s" title) )
+                (message "No ID in metadata on this line") ))
+          (message "No metadata on this line") )) )))
 
 (defun skg--id-stack-top-or-message ()
   "If possible, return the top entry (id title) of `skg-id-stack'.
