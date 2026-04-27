@@ -86,6 +86,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         "initialize_dbs") . entered ();
       initialize_dbs (&config) };
 
+  // Hand the live driver to the signal handler. From here on,
+  // a Ctrl-C reuses this connection instead of opening a new one.
   *SHUTDOWN_DRIVER . lock () . unwrap () =
     Some ( Arc::clone (&typedb_driver) );
 
@@ -167,6 +169,18 @@ fn busysignal_accept_loop (
 static SHUTDOWN_DRIVER : std::sync::Mutex<Option<Arc<TypeDBDriver>>> =
   std::sync::Mutex::new (None);
 
+/// WEAKNESS: SIGKILL cannot be intercepted by any handler,
+///   so it still leaks the db.
+/// PURPOSE: Delete the db before ending.
+/// Safely ends upon receiving any SIGINT:
+///  -Ctrl-C
+///  -`kill
+///  -INT`/`kill -2`
+///  -SIGTERM (plain `kill`)
+///  -SIGHUP (terminal close)
+/// The `termination` feature on the `ctrlc` crate is what enables
+/// SIGTERM and SIGHUP coverage;
+/// without it, only SIGINT would be caught.
 fn install_shutdown_signal_handler (
   config : &SkgConfig,
 ) {
@@ -179,6 +193,8 @@ fn install_shutdown_signal_handler (
         db_name = %db_name_for_signal,
         "Deleting database before shutdown" );
       let driver : Arc<TypeDBDriver> =
+        // If the SIGINT arrived after initialization completed,   then the SHUTDOWN_DRIVER slot has already been populated,  and the handler reuses the driver that main holds.
+        // If the SIGINT arrived during initialization,  then the slot is still empty,  and the handler opens a fresh TypeDB connection solely to issue the delete.
         SHUTDOWN_DRIVER . lock () . unwrap () . clone ()
         . unwrap_or_else ( || Arc::new ( connect_to_typedb () ));
       futures::executor::block_on ( async {
