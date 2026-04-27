@@ -1,4 +1,3 @@
-* merge : views of acquiree should become acquirer
 * ? I want the 'helps' relation.
 And 'needs', surely.
 * stack push with prompt for label, for other contexts
@@ -55,6 +54,8 @@ skg-find-sexp-end (line 62 in this same file) counts only () and works fine.
 So Skg developers have to know to use Skg-specific sexp navigation.
 But maybe that's appropriate?
 ** some skg-request-* functions save, others don't
+** ? trying to delete an indef node should warn, not err
+That is, the save should still succeed.
 * TODO really want but can wait
 ** importing org-roam should be possible while server is running
 and automatically update the other dbs (not just disk as now)
