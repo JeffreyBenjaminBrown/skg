@@ -108,7 +108,7 @@ fn read_skg_files_from_folder (
 
 /// Like `read_all_skg_files_from_sources` but only reads files
 /// whose mtime is more recent than `since`.
-pub fn read_modified_skg_files_from_sources (
+pub fn read_recently_modified_skgfiles_from_sources (
   config : &SkgConfig,
   since  : std::time::SystemTime,
 ) -> io::Result<Vec<NodeComplete>> {

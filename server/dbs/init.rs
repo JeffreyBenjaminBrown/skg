@@ -4,7 +4,7 @@ use crate::context::{MapToContent, MapToContainers};
 use crate::context::{content_maps_from_nodes, had_id_set_from_nodes};
 use crate::context::link_targets_from_nodes;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
-use crate::dbs::filesystem::multiple_nodes::read_modified_skg_files_from_sources;
+use crate::dbs::filesystem::multiple_nodes::read_recently_modified_skgfiles_from_sources;
 use crate::dbs::tantivy::open_existing_tantivy_index;
 use crate::dbs::tantivy::write::update_index_with_nodes;
 use crate::dbs::typedb::nodes::create_all_nodes;
@@ -153,7 +153,7 @@ fn incremental_init (
       Path::new ( &config . tantivy_folder )) ?;
   tracing::info! ("Reading modified .skg files...");
   let nodes : Vec<NodeComplete> =
-    read_modified_skg_files_from_sources (
+    read_recently_modified_skgfiles_from_sources (
       config, marker_mtime ) ?;
   if nodes . is_empty() {
     tracing::info! ("No modified .skg files found.");
