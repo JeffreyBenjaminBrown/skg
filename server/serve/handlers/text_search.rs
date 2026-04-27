@@ -1,4 +1,7 @@
 pub mod render_enriched_search_buffer;
+mod coverage;
+
+use coverage::{CoverageMatcher, build_coverage_matcher, coverage_factor};
 
 /// PITFALL: Uses two layers of truncation.
 /// Tantivy truncates its search after (unimaginable) 1e5 results.
@@ -116,6 +119,8 @@ pub fn handle_text_search_request (
               best_matches,
               searcher,
               tantivy_index,
+              &search_terms,
+              &search_opts,
               &scope );
           let (viewforest, search_results) : (Tree<ViewNode>, Vec<ID>) =
             build_search_viewforest (
@@ -267,17 +272,33 @@ pub fn mk_search_enrichment_sexp (
       Sexp::Atom ( Atom::S ( content   . to_string () )), ] ),
   ] ) . to_string () }
 
-/// Groups raw Tantivy results by ID.
-/// Applies context-based score multipliers:
-/// each result's BM25 score is multiplied by the multiplier
-/// corresponding to its context_origin_type.
-/// Non-origins keep their raw score (multiplier = 1).
+/// Groups raw Tantivy results by ID, applying score adjustments
+/// in this order:
+///
+/// - Coverage multiplier: how many of the user's query terms
+///   appear in this match-doc's searchable title
+///   (title_or_alias_field), as a substring in literal mode or as
+///   a case-insensitive regex match in regex mode. Multiplied as
+///   (matched/total)^SEARCH_COVERAGE_EXPONENT, so at the default
+///   exponent of 2 a hit that covers every term gets 1x and one
+///   that covers half gets 0.25x. Skipped (factor=1) in operators
+///   mode, where the user has expressed explicit MUST/MUSTNOT
+///   semantics that don't translate cleanly to "fraction
+///   matched".
+/// - Context multiplier (Root, CycleMember, Target, HadID,
+///   MultiContained, or 1.0 for none).
+///
+/// adjusted_score = bm25_score * coverage * context_multiplier
 pub fn group_matches_by_id (
   best_matches  : Vec < (f32, tantivy::DocAddress) >,
   searcher      : Searcher,
   tantivy_index : &TantivyIndex,
+  search_terms  : &str,
+  search_opts   : &SearchOptions,
   scope         : &SearchScope,
 ) -> MatchGroups {
+  let matcher : CoverageMatcher = // pre-build once
+    build_coverage_matcher (search_terms, search_opts);
   let mut result_acc : MatchGroups =
     HashMap::new();
   for (score, doc_address) in best_matches {
@@ -305,6 +326,14 @@ pub fn group_matches_by_id (
             . get_first ( tantivy_index . title_or_alias_field )
             . and_then ( |v| v . as_str() )
             . map ( |s| s . to_string() )) };
+        // Read title_or_alias separately for coverage counting --
+        // it's the field the index actually matched against.
+        let searchable_title : String =
+          retrieved_doc
+            . get_first ( tantivy_index . title_or_alias_field )
+            . and_then ( |v| v . as_str () )
+            . map ( |s| s . to_string () )
+            . unwrap_or_default ();
         let source : SourceName =
           SourceName::from (
             retrieved_doc
@@ -323,7 +352,9 @@ pub fn group_matches_by_id (
             _ => {} } }
         let multiplier : f32 =
           origin_type . map_or ( 1.0, |t| t . multiplier() );
-        let adjusted_score : f32 = score * multiplier;
+        let coverage : f32 =
+          coverage_factor (&matcher, &searchable_title);
+        let adjusted_score : f32 = score * coverage * multiplier;
         if let (Some (id), Some (title)) = (id_opt, title_opt) {
           result_acc
             . entry (id)

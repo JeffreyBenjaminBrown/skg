@@ -52,3 +52,12 @@ pub const MULTIPLIER_CYCLE_MEMBER     : f32 =  32.0;
 pub const MULTIPLIER_TARGET           : f32 =  10.0;
 pub const MULTIPLIER_HAD_ID           : f32 =  10.0;
 pub const MULTIPLIER_MULTI_CONTAINED  : f32 =   3.2;
+
+/// Exponent applied to (matched_query_terms / total_query_terms)
+/// when computing the per-hit coverage multiplier for search.
+/// Bigger -> missing terms hurt more.
+/// k=2 (current): 4/5 of terms matched -> 0.64x, 1/5 -> 0.04x.
+/// Applied in literal and regex search modes; skipped in
+/// operators mode (where MUST/MUSTNOT semantics make "fraction
+/// matched" ill-defined).
+pub const SEARCH_COVERAGE_EXPONENT    : f32 =   2.0;
