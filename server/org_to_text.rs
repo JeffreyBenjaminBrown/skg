@@ -1,6 +1,6 @@
 use crate::types::git::MembershipAxes;
 use crate::types::misc::SkgConfig;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, EditRequest, GraphNodeStats, Birth };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, UnknownNode, EditRequest, GraphNodeStats, Birth };
 
 use ego_tree::{NodeRef, Tree};
 use std::error::Error;
@@ -101,7 +101,11 @@ pub fn viewnode_to_string (
     ViewNodeKind::DeletedScaff (kind) =>
       Ok ( deleted_scaff_metadata_to_string (
         viewnode . focused, viewnode . folded,
-        viewnode . body_folded, kind )) }}
+        viewnode . body_folded, kind )),
+    ViewNodeKind::Unknown (unknown_node) =>
+      Ok ( unknown_node_metadata_to_string (
+        viewnode . focused, viewnode . folded,
+        viewnode . body_folded, unknown_node )) }}
 
 /// Render metadata for a Scaffold:
 ///   (skg [focused] [folded] scaffoldKind)
@@ -289,6 +293,23 @@ fn deleted_node_metadata_to_string (
   parts . push ( format! ( "(deleted (id {}) (source {}))",
                             deleted_node . id . 0,
                             deleted_node . source ));
+  parts . join (" ") }
+
+/// Render metadata for an UnknownNode:
+///   (skg [focused] [folded] (unknownNode (id X)))
+/// Triggered when a referenced ID resolved to nothing in any db.
+fn unknown_node_metadata_to_string (
+  focused      : bool,
+  folded       : bool,
+  body_folded  : bool,
+  unknown_node : &UnknownNode,
+) -> String {
+  let mut parts : Vec < String > = Vec::new ();
+  if focused     { parts . push ( "focused"    . to_string () ); }
+  if folded      { parts . push ( "folded"     . to_string () ); }
+  if body_folded { parts . push ( "bodyFolded" . to_string () ); }
+  parts . push ( format! ( "(unknownNode (id {}))",
+                            unknown_node . id . 0 ));
   parts . join (" ") }
 
 /// Render metadata for a DeletedScaff:

@@ -44,6 +44,7 @@ pub enum ViewNodeKind {
   Scaff        (Scaffold),
   Deleted      (DeletedNode),
   DeletedScaff (ScaffoldKind),
+  Unknown      (UnknownNode),
 }
 
 /// A node whose .skg file was deleted by a save in another buffer.
@@ -56,6 +57,12 @@ pub struct DeletedNode {
   pub source : SourceName,
   pub title  : String,
   pub body   : Option < String >,
+}
+
+/// A node referenced by some other node's `contains` (or similar list) for which neither memory nor disk has any record -- not as a primary pid, not as an extra_id, and not recoverable through any phantom/diff-view procedure either. Distinct from DeletedNode, which knows its source and last-seen text; an UnknownNode is a dangling pointer with no metadata of its own. Carrying it as its own ViewNodeKind variant (rather than failing the whole view) is what keeps a single bad reference deep in a subtree from killing the view at the root.
+#[derive( Debug, Clone, PartialEq )]
+pub struct UnknownNode {
+  pub id : ID,
 }
 
 pub type TrueNode          = TrueNode_Generic < ID, SourceName >;
@@ -428,6 +435,11 @@ impl ViewNode {
       ViewNodeKind::Scaff   (s) => s . title (),
       ViewNodeKind::Deleted (d) => &d . title,
       ViewNodeKind::DeletedScaff (kind) => kind . default_title (),
+      // Empty: the id already appears in the metadata; surfacing it
+      // again as the org headline title would duplicate it on the
+      // line. The metadata alone is non-empty, so viewnode_to_text
+      // is satisfied.
+      ViewNodeKind::Unknown (_) => "",
     }}
 
   /// Reasonable for both TrueNodes and Scaffolds.
@@ -437,6 +449,7 @@ impl ViewNode {
       ViewNodeKind::Scaff   (_) => None,
       ViewNodeKind::Deleted (d) => d . body . as_ref (),
       ViewNodeKind::DeletedScaff (_) => None,
+      ViewNodeKind::Unknown (_) => None,
     }}
 }
 
@@ -567,6 +580,20 @@ pub fn mk_definitive_viewnode (
                               body,
                               edit_request : None },
                             HashSet::new () ) } // view_requests
+
+/// Build an UnknownNode wrapper. Use when a referenced ID resolves
+/// to nothing in memory, on disk, or via any phantom/diff procedure
+/// -- the placeholder lets the view render the line as a herald
+/// rather than aborting the whole BFS expansion.
+pub fn mk_unknown_viewnode (
+  id : ID,
+) -> ViewNode {
+  ViewNode {
+    focused     : false,
+    folded      : false,
+    body_folded : false,
+    kind        : ViewNodeKind::Unknown ( UnknownNode { id } ),
+  }}
 
 /// Create an indefinitive ViewNode from disk data.
 /// Body is always None since indefinitive nodes don't have editable content.

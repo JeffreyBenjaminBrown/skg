@@ -421,6 +421,10 @@ fn order_children_as_scaffolds_then_ignored_then_content (
         ViewNodeKind::True (t) if t . parent_ignores_it() => 1,
         ViewNodeKind::True (_)                            => 2,
         ViewNodeKind::Deleted (_)                         => 2,
+        // UnknownNode is a content-position placeholder: order it
+        // alongside the Deleted/True content children rather than as
+        // a scaffold.
+        ViewNodeKind::Unknown (_)                         => 2,
       } ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
   let empty : Vec<NodeId> = Vec::new();
   for &cid in groups . get( &0 ) . unwrap_or (&empty) . iter()

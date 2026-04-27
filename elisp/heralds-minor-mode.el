@@ -34,6 +34,13 @@
     (RED deleted "DELETED"
       (id)
       (source))
+    ;; UnknownNode: a placeholder the server emits when a referenced
+    ;; ID resolves to nothing in any db. Carries only the id; its
+    ;; subtree (if any) was attached by the BFS before the lookup
+    ;; failed and is left in place. Render the line as the orange
+    ;; herald the user sees instead of the (now-orphaned) reference.
+    (ORANGE unknownNode "Parent references unknown node."
+      (id))
     ;; Per-stage membership axes at the scaffold level (e.g. on
     ;; alias, id). Each INTERC emits at most one token per matching
     ;; stage child, e.g. "staged:-M" or "unstaged:M". Empty
@@ -136,8 +143,11 @@ COLOUR VOCABULARY
              deleted, editRequest/delete), merge requests, and the
              `-X' / `-M' axis markers for removals in git diffs.
   ORANGE  -- the three non-content birth variants (independent,
-             containerOf, linksTo). Distinct from BLUE so ContentOf
-             can own that slot without visual collision.
+             containerOf, linksTo); also the dangling-reference
+             warning herald `unknownNode' (a parent's contains
+             list referenced an id that resolves to nothing).
+             Distinct from BLUE so ContentOf can own that slot
+             without visual collision.
 
 SERVER-EMITTED ATOMS VS. RULE FORM
 

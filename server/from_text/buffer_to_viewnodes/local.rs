@@ -60,7 +60,8 @@ pub fn validate_local_structure (
         Scaffold::ID { .. } =>
           validate_idscaffold(tree, node_id), },
       UncheckedViewNodeKind::Deleted (_) => Vec::new(),
-      UncheckedViewNodeKind::DeletedScaff (_) => Vec::new() };
+      UncheckedViewNodeKind::DeletedScaff (_) => Vec::new(),
+      UncheckedViewNodeKind::Unknown (_) => Vec::new() };
 
   if errors . is_empty() {
     Ok (( ))

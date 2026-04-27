@@ -5,7 +5,7 @@ use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, TrueNode, Scaffold,
-    Birth, mk_indefinitive_from_viewnode,
+    Birth, mk_indefinitive_from_viewnode, mk_unknown_viewnode,
     viewnode_from_scaffold };
 use crate::types::unchecked_viewnode::{
     UncheckedViewNode, UncheckedViewNodeKind };
@@ -165,13 +165,14 @@ pub async fn append_indefinitive_from_disk_as_child (
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  let ( _nodecomplete, content_viewnode ) : ( NodeComplete, ViewNode ) =
+  let viewnode : ViewNode = match
     nodecomplete_and_viewnode_from_id (
-      config, driver, node_id ) . await ?;
-  let viewnode : ViewNode =
-    mk_indefinitive_from_viewnode (
-      content_viewnode, birth )
-    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+      config, driver, node_id ) . await ? {
+      Some (( _nc, content_viewnode )) =>
+        mk_indefinitive_from_viewnode (
+          content_viewnode, birth )
+          . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
+      None => mk_unknown_viewnode (node_id . clone ()), };
   with_node_mut (
     tree, parent_id,
     |mut parent_mut| {

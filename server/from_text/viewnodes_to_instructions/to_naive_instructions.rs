@@ -61,6 +61,11 @@ pub fn naive_saveinstructions_from_tree (
         recurse_on_children( tree, node_id, result )?,
       ViewNodeKind::DeletedScaff (_) =>
         recurse_on_children( tree, node_id, result )?,
+      ViewNodeKind::Unknown (_) =>
+        // Inert: an UnknownNode is a placeholder for a missing
+        // referent and generates no save instruction. Recurse so
+        // that any user-edited descendants are not silently lost.
+        recurse_on_children( tree, node_id, result )?,
       ViewNodeKind::True (t) => {
         if let Some (instruction)
           = maybe_instruction_from_treenode( tree, node_id, &t )?
@@ -137,8 +142,9 @@ fn collect_subscribees (
             ViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol) =>
               continue, // valid child of SubscribeeCol, but not a subscribee
             ViewNodeKind::Deleted (_) |
-            ViewNodeKind::DeletedScaff (_) =>
-              continue, // inert in a deleted context
+            ViewNodeKind::DeletedScaff (_) |
+            ViewNodeKind::Unknown (_) =>
+              continue, // inert in this context
             ViewNodeKind::Scaff (s) => return Err(format!( "SubscribeeCol has unexpected Scaffold child: {:?}", s)), }}
         subscribees };
       Ok( MSV::Specified(dedup_vector (subscribees)) ) }} }

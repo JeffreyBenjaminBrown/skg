@@ -14,7 +14,7 @@ use crate::to_org::util::{ get_id_from_treenode, nodecomplete_and_viewnode_from_
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::viewnode_nodecomplete::{ find_child_by_id, find_children_by_ids};
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Birth, mk_indefinitive_from_viewnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Birth, mk_indefinitive_from_viewnode, mk_unknown_viewnode };
 
 use ego_tree::{NodeId,Tree};
 use std::collections::{HashSet, HashMap};
@@ -348,14 +348,18 @@ pub async fn prepend_indefinitive_child (
   driver         : &TypeDBDriver,
   birth          : Birth,
 ) -> Result < NodeId, Box<dyn Error> > {
-  let ( _, child_viewnode ) : ( _, ViewNode ) =
+  let viewnode : ViewNode = match
     nodecomplete_and_viewnode_from_id (
       config, driver, child_skgid
-    ) . await ?;
-  let viewnode : ViewNode =
-    mk_indefinitive_from_viewnode (
-      child_viewnode, birth )
-    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+    ) . await ? {
+      Some ((_nc, child_viewnode)) =>
+        mk_indefinitive_from_viewnode (
+          child_viewnode, birth )
+          . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
+      // The ancestry referenced an id that has no record. Drop in
+      // an UnknownNode placeholder rather than aborting the parent
+      // expansion.
+      None => mk_unknown_viewnode (child_skgid . clone ()), };
   let new_child_treeid : NodeId =
     tree . get_mut (parent_treeid) . unwrap ()
     . prepend (viewnode) . id ();

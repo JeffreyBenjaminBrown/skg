@@ -10,7 +10,7 @@ use crate::types::tree::generations::collect_generation_ids;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_nodecomplete::{pid_and_source_from_treenode, write_at_truenode_in_tree};
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, Birth, TrueNode, viewforest_root_viewnode, mk_definitive_viewnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, Birth, TrueNode, viewforest_root_viewnode, mk_definitive_viewnode, mk_unknown_viewnode };
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use ego_tree::iter::Edge;
@@ -39,20 +39,26 @@ pub type DefinitiveMap =
 /// Fetch a NodeComplete from memory or disk. Resolves id→(pid,source)
 /// via 'pid_and_source_from_id', then reads. Makes a ViewNode with
 /// validated title. Returns both.
+/// Returns Ok(None) when SKGID has no record anywhere -- not as a
+/// primary pid, not as an extra_id, and not via TypeDB lookup.
+/// Callers should substitute an UnknownNode placeholder. A real
+/// query error still surfaces as Err.
 pub async fn nodecomplete_and_viewnode_from_id (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   skgid  : &ID,
-) -> Result < ( NodeComplete, ViewNode ), Box<dyn Error> > {
-  let (pid_resolved, source) : (ID, SourceName) =
+) -> Result < Option<( NodeComplete, ViewNode )>, Box<dyn Error> > {
+  let resolved : Option<(ID, SourceName)> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "nodecomplete_and_viewnode_from_id" ). entered();
       pid_and_source_from_id(
-        &config . db_name, driver, skgid) . await? }
-    . ok_or_else( || format!(
-      "ID '{}' not found in database", skgid ))?;
-  nodecomplete_and_viewnode_from_pid_and_source (
-    config, &pid_resolved, &source ) }
+        &config . db_name, driver, skgid) . await ? };
+  match resolved {
+    None => Ok (None),
+    Some ((pid_resolved, source)) =>
+      Ok ( Some (
+        nodecomplete_and_viewnode_from_pid_and_source (
+          config, &pid_resolved, &source ) ? )) } }
 
 /// Fetch a NodeComplete from memory or disk given PID and source.
 /// Makes an ViewNode with validated title. Returns both.
@@ -348,6 +354,7 @@ fn is_ancestor_id (
       |viewnode| match &viewnode . kind {
         ViewNodeKind::True (t)    => Some ( t . id . clone () ),
         ViewNodeKind::Deleted (d) => Some ( d . id . clone () ),
+        ViewNodeKind::Unknown (u) => Some ( u . id . clone () ),
         ViewNodeKind::Scaff (_) |
         ViewNodeKind::DeletedScaff (_) => None } )
     { Ok(Some (id)) if &id == target_skgid
@@ -367,6 +374,7 @@ pub fn get_id_from_treenode (
   match node_kind {
     ViewNodeKind::True (t)    => Ok ( t . id ),
     ViewNodeKind::Deleted (d) => Ok ( d . id ),
+    ViewNodeKind::Unknown (u) => Ok ( u . id ),
     ViewNodeKind::Scaff (_)   => Err ( "get_id_from_treenode: caller should not pass a Scaffold" . into() ),
     ViewNodeKind::DeletedScaff (_) => Err ( "get_id_from_treenode: caller should not pass a DeletedScaff" . into() ),
   }}
@@ -388,9 +396,11 @@ pub async fn make_and_append_child_pair (
   driver         : &TypeDBDriver,
 ) -> Result < NodeId, // the new node
               Box<dyn Error> > {
-  let (_child_nodecomplete, child_viewnode) : (NodeComplete, ViewNode) =
+  let child_viewnode : ViewNode = match
     nodecomplete_and_viewnode_from_id (
-      config, driver, child_skgid ) . await ?;
+      config, driver, child_skgid ) . await ?
+    { Some ((_nc, v)) => v,
+      None => mk_unknown_viewnode (child_skgid . clone ()) };
   let child_treeid : NodeId =
     with_node_mut ( // append child
       tree, parent_treeid,
@@ -415,30 +425,53 @@ pub async fn build_node_branch_minus_content (
   let result : Result < NodeId, Box<dyn Error> > =
     match tree_and_parent {
       Some ( (tree, parent_treeid) ) => {
-        let (_nodecomplete, viewnode) : (NodeComplete, ViewNode) =
+        let lookup : Option<(NodeComplete, ViewNode)> =
           nodecomplete_and_viewnode_from_id (
             config, driver, skgid ) . await ?;
-        let child_treeid : NodeId = // Add ViewNode to tree
-          with_node_mut (
-            tree, parent_treeid,
-            ( |mut parent_mut|
-              parent_mut . append (viewnode) . id () ))
-          . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-        complete_branch_minus_content (
-          tree, child_treeid, visited,
-          config, driver ) . await ?;
-        Ok (child_treeid) },
+        match lookup {
+          Some ((_nc, viewnode)) => {
+            let child_treeid : NodeId = // Add ViewNode to tree
+              with_node_mut (
+                tree, parent_treeid,
+                ( |mut parent_mut|
+                  parent_mut . append (viewnode) . id () ))
+              . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+            complete_branch_minus_content (
+              tree, child_treeid, visited,
+              config, driver ) . await ?;
+            Ok (child_treeid) },
+          None => {
+            // The id is dangling. Append an UnknownNode placeholder
+            // so the rest of the BFS can proceed, and skip the
+            // complete_branch_minus_content call (no NodeComplete to
+            // expand).
+            let viewnode : ViewNode = mk_unknown_viewnode (skgid . clone ());
+            let child_treeid : NodeId =
+              with_node_mut (
+                tree, parent_treeid,
+                ( |mut parent_mut|
+                  parent_mut . append (viewnode) . id () ))
+              . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+            Ok (child_treeid) }} },
       None => {
-        let (_nodecomplete, viewnode) : (NodeComplete, ViewNode) =
+        let lookup : Option<(NodeComplete, ViewNode)> =
           nodecomplete_and_viewnode_from_id (
             config, driver, skgid ) . await ?;
-        let mut tree : Tree<ViewNode> =
-          Tree::new (viewnode);
-        let root_treeid : NodeId = tree . root () . id ();
-        complete_branch_minus_content (
-          &mut tree, root_treeid, visited,
-          config, driver ) . await ?;
-        Ok (root_treeid) },
+        match lookup {
+          Some ((_nc, viewnode)) => {
+            let mut tree : Tree<ViewNode> =
+              Tree::new (viewnode);
+            let root_treeid : NodeId = tree . root () . id ();
+            complete_branch_minus_content (
+              &mut tree, root_treeid, visited,
+              config, driver ) . await ?;
+            Ok (root_treeid) },
+          None => {
+            // Same fallback for the no-parent path: build a tree
+            // whose root is just an UnknownNode placeholder.
+            let viewnode : ViewNode = mk_unknown_viewnode (skgid . clone ());
+            let tree : Tree<ViewNode> = Tree::new (viewnode);
+            Ok (tree . root () . id ()) }} },
     };
   tracing::info!("{}: {:.3}s",
                  format! ("build_node_branch_minus_content({})", skgid),
@@ -507,6 +540,7 @@ pub fn truenode_in_tree_is_indefinitive (
   match node_kind {
     ViewNodeKind::True (t)    => Ok (t . is_indefinitive ()),
     ViewNodeKind::Deleted (_) => Ok (false),
+    ViewNodeKind::Unknown (_) => Ok (false),
     ViewNodeKind::Scaff (_)   => Err ( "is_indefinitive: caller should not pass a Scaffold" . into( )),
     ViewNodeKind::DeletedScaff (_) => Err ( "is_indefinitive: caller should not pass a DeletedScaff" . into( )),
   }}

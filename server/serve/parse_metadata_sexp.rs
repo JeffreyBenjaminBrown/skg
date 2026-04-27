@@ -19,7 +19,7 @@ use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
-use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode, ContainerwardPathStats, IndefOrDef, NodeContainRels, NodeLinksourceRels, Birth};
+use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode, UnknownNode, ContainerwardPathStats, IndefOrDef, NodeContainRels, NodeLinksourceRels, Birth};
 use crate::types::unchecked_viewnode::{
     UncheckedViewNode, UncheckedViewNodeKind, UncheckedTrueNode,
 };
@@ -59,6 +59,9 @@ pub struct ViewnodeMetadata {
   pub is_deleted_node: bool,
   // When Some, this is a DeletedScaff carrying its kind.
   pub deleted_scaff_kind: Option<ScaffoldKind>,
+  // When Some, this is an UnknownNode (a placeholder for a missing
+  // referent). Carries only the id; no source/title/body apply.
+  pub unknown_node_id: Option<ID>,
 }
 
 pub fn default_metadata() -> ViewnodeMetadata {
@@ -82,7 +85,8 @@ pub fn default_metadata() -> ViewnodeMetadata {
     textchanged_staged   : false,
     textchanged_unstaged : false,
     is_deleted_node: false,
-    deleted_scaff_kind: None, }}
+    deleted_scaff_kind: None,
+    unknown_node_id: None, }}
 
 /// Create an UncheckedViewNode from parsed metadata components.
 /// This is the bridge between parsing (ViewnodeMetadata) and runtime (UncheckedViewNode).
@@ -94,7 +98,10 @@ pub fn viewnode_from_metadata (
 ) -> ( UncheckedViewNode, Option < BufferValidationError > ) {
   let (kind, error)
     : (UncheckedViewNodeKind, Option<BufferValidationError>)
-    = if let Some (kind) = metadata . deleted_scaff_kind {
+    = if let Some (ref uid) = metadata . unknown_node_id {
+        ( UncheckedViewNodeKind::Unknown (
+            UnknownNode { id: uid . clone () } ), None )
+      } else if let Some (kind) = metadata . deleted_scaff_kind {
         ( UncheckedViewNodeKind::DeletedScaff (kind), None )
       } else if metadata . is_deleted_node {
         ( UncheckedViewNodeKind::Deleted ( DeletedNode {
@@ -205,6 +212,10 @@ pub fn parse_metadata_to_viewnodemd (
           "deleted" => {
             result . is_deleted_node = true;
             parse_deleted_sexp ( &items[1..], &mut result ) ?; },
+          "unknownNode" => {
+            // (unknownNode (id X)) -- placeholder for a referenced
+            // node with no record anywhere. No source/title/body.
+            parse_unknownnode_sexp ( &items[1..], &mut result ) ?; },
           "staged" => {
             // (staged ATOMS) at top level is for Scaffolds (Alias/ID).
             apply_axis_atoms_to_membership_scaffold (
@@ -402,6 +413,29 @@ fn apply_axis_atoms_to_membership_scaffold (
       if is_staged { &mut membership . staged }
       else         { &mut membership . unstaged };
     *slot = Some (sign); }
+  Ok (( )) }
+
+/// Parse the (unknownNode (id X)) s-expression contents.
+/// Sets metadata.unknown_node_id when an id is found.
+fn parse_unknownnode_sexp (
+  items    : &[Sexp],
+  metadata : &mut ViewnodeMetadata,
+) -> Result<(), String> {
+  for element in items {
+    match element {
+      Sexp::List (subitems) if subitems . len () == 2 => {
+        let key : String =
+          atom_to_string ( &subitems[0] ) ?;
+        match key . as_str () {
+          "id" => {
+            let value : String =
+              atom_to_string ( &subitems[1] ) ?;
+            metadata . unknown_node_id =
+              Some ( ID::from (value)); },
+          _ => { return Err ( format! (
+            "Unknown unknownNode key: {}", key )); }} },
+      _ => { return Err ( "Unexpected element in unknownNode sexp"
+                           . to_string () ); }} }
   Ok (( )) }
 
 /// Parse the (deleted (id X) (source S)) s-expression contents.
