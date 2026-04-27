@@ -187,3 +187,72 @@ fn test_text_search_org_format (
     }
   }
 }
+
+/// Search results must show the full title text including
+/// `[[id:X][label]]` syntax, not the link-stripped version that
+/// Tantivy stores in `title_or_alias` for searching purposes.
+/// Otherwise a node titled "[[id:X][science]]" (a textlink whose
+/// label is "science") is indistinguishable from a node titled
+/// just "science" in the user's results listing.
+#[test]
+fn test_search_results_preserve_textlinks_in_title (
+) -> Result < (), Box < dyn std::error::Error >> {
+  let index_dir : &str =
+    "tests/serve_text_search_test/temp_index_textlinks";
+  let test_result : Result < (), Box < dyn std::error::Error >>
+    = ( || {
+      // Two nodes; both will match a search for "science".
+      // node_link's title is a textlink with label "science"; its
+      // raw title carries the link syntax.
+      let mut node_link : NodeComplete = empty_node_complete ();
+      node_link . pid = ID::new ("link_node");
+      node_link . title =
+        "[[id:other][science]]" . to_string ();
+      let mut node_plain : NodeComplete = empty_node_complete ();
+      node_plain . pid = ID::new ("plain_node");
+      node_plain . title = "science" . to_string ();
+      let nodes : Vec < NodeComplete > =
+        vec! [ node_link, node_plain ];
+      let ( tantivy_index, _ ) : ( TantivyIndex, usize ) =
+        in_fs_wipe_index_then_create_it (
+          &nodes, Path::new (index_dir) ) ?;
+      let ( best_matches, searcher ) =
+        search_index ( &tantivy_index, "science",
+                       &SearchOptions::default () ) ?;
+      let matches_by_id = group_matches_by_id (
+        best_matches, searcher, &tantivy_index,
+        &SearchScope::Everything );
+      let (viewforest, _ids) = build_search_viewforest (
+        "science", &matches_by_id );
+      let dummy_config : SkgConfig =
+        SkgConfig::dummyFromSources (HashMap::new ());
+      let result : String =
+        viewforest_to_string ( &viewforest, &dummy_config )
+        . expect ("search viewforest rendering never fails");
+      println! ("Rendered search results:\n{}", result);
+
+      // Pick out the level-1 result for link_node and confirm the
+      // displayed title is the un-reduced form.
+      let mut found_link_node_title : Option<String> = None;
+      for line in result . lines () {
+        if let Ok (( 1, Some (md), title )) = headline_to_triple (line) {
+          if md . id . as_ref () . map ( |i| i . as_str () )
+                                  == Some ("link_node") {
+            found_link_node_title = Some (title); }} }
+      let title : String = found_link_node_title
+        . expect ("link_node should appear among results");
+      assert_eq! (
+        title, "[[id:other][science]]",
+        "link_node's search-result title should preserve the \
+         textlink syntax; the bug was rendering it as 'science'." );
+      Ok (( ))
+    }) ();
+  match test_result {
+    Ok (()) => {
+      if Path::new (index_dir) . exists () {
+        fs::remove_dir_all (index_dir) ?; }
+      Ok (())
+    },
+    Err (e) => {
+      println! ( "Test failed. Preserving index directory at {} for debugging.", index_dir );
+      Err (e) }} }
