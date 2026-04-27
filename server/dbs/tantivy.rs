@@ -110,6 +110,13 @@ pub(super) fn mk_tantivy_schema() -> schema::Schema {
 /// Look up the canonical title and source for a node by its exact primary ID.
 /// Prefers the document marked is_title="true"; falls back to the
 /// first title_or_alias found if no title document exists.
+///
+/// Returns the raw_title (with textlink syntax intact) when available,
+/// so the user sees `[[id:X][label]]` rather than just `label` -- this
+/// preserves the visual distinction between a node titled "science"
+/// and one whose title links to a different node also labelled
+/// "science". Alias-doc fallback paths use 'title_or_alias' because
+/// only is_title="true" docs carry a 'raw_title'.
 pub fn title_and_source_by_id (
   tantivy_index : &TantivyIndex,
   id            : &ID,
@@ -129,7 +136,10 @@ pub fn title_and_source_by_id (
        found for ID {}. Falling back to first title_or_alias.",
       id ); }
   let title : String =
-    string_field ( &doc, tantivy_index . title_or_alias_field ) ?;
+    string_field ( &doc, tantivy_index . raw_title_field )
+      . filter ( |s| ! s . is_empty () )
+      . or_else ( || string_field (
+        &doc, tantivy_index . title_or_alias_field )) ?;
   let source : SourceName = SourceName::from (
     string_field ( &doc, tantivy_index . source_field )
       . unwrap_or_default () . as_str () );
