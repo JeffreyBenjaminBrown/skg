@@ -1,0 +1,10 @@
+* purpose
+This is to find references to nodes
+that once existed in the git history, but don't now.
+(References to nodes that were never in it
+are usually valid; they just point to data in a different repo.)
+
+These can *still* be created, because deleting a node
+does not delete links to it.
+Before <2026-04-27 Mon>, the situation was worse,
+because deletion did not update references to the deleted node.
