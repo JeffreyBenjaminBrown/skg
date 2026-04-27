@@ -17,7 +17,7 @@ pub fn read_all_skg_files_from_sources (
   config: &SkgConfig
 ) -> io::Result<Vec<NodeComplete>> {
   let mut all_nodes: Vec<NodeComplete> = Vec::new();
-  let mut seen_ids: HashMap < String,       // ID
+  let mut seen_ids: HashMap < ID,
                               Vec<String> > // source names
     // Maps each ID to all sources containing it
     = HashMap::new();
@@ -32,8 +32,7 @@ pub fn read_all_skg_files_from_sources (
         for node in &nodes {
           for id in node . all_ids() {
             // Track which sources contain each ID
-            let id_str: String = id . as_str() . to_string();
-            seen_ids . entry (id_str)
+            seen_ids . entry (id . clone())
               . or_insert_with (Vec::new)
               . push(source_name . to_string()); }}
         all_nodes . append (&mut nodes); }
@@ -45,11 +44,12 @@ pub fn read_all_skg_files_from_sources (
         )); }} }
 
   // Check for duplicate IDs (IDs in multiple sources)
-  let mut duplicate_ids: HashMap<String, Vec<String>> = HashMap::new();
+  let mut duplicate_ids: HashMap<ID, Vec<String>> =
+    HashMap::new();
   for (id, sources_list) in seen_ids . iter() {
     if sources_list . len() > 1 {
       duplicate_ids . insert( id . clone(),
-                            sources_list . clone()); }}
+                              sources_list . clone()); }}
 
   // Report errors if any were found
   let has_duplicates: bool = !duplicate_ids . is_empty();
@@ -113,7 +113,7 @@ pub fn read_recently_modified_skgfiles_from_sources (
   since  : std::time::SystemTime,
 ) -> io::Result<Vec<NodeComplete>> {
   let mut all_nodes : Vec<NodeComplete> = Vec::new();
-  let mut seen_ids  : HashSet<String> = HashSet::new();
+  let mut seen_ids  : HashSet<ID> = HashSet::new();
   for (source_name, source) in config . sources . iter() {
     let entries : ReadDir =
       fs::read_dir (&source . path) ?;
@@ -130,13 +130,13 @@ pub fn read_recently_modified_skgfiles_from_sources (
       let node_fs : NodeFS =
         read_nodecomplete (&path) ?;
       validate_pid_matches_filename (&node_fs, &path) ?;
-      let pid_str : String =
-        node_fs . pid . to_string();
-      if ! seen_ids . insert (pid_str . clone()) {
+      let pid : ID =
+        node_fs . pid . clone();
+      if ! seen_ids . insert (pid . clone()) {
         return Err ( io::Error::new (
           io::ErrorKind::InvalidData,
           format! ("Duplicate primary ID '{}' within batch",
-                   pid_str )) ); }
+                   pid )) ); }
       let nodecomplete : NodeComplete =
         node_fs . into_complete ( source_name . clone ());
       all_nodes . push (nodecomplete); }}
@@ -146,7 +146,7 @@ pub fn read_recently_modified_skgfiles_from_sources (
 /// If ≤10 duplicates: reports to stderr only.
 /// If >10 duplicates: writes to org file and reports count to stderr.
 fn report_duplicate_ids(
-  duplicates: &HashMap<String, // ID
+  duplicates: &HashMap<ID,
                        Vec<String>> // sources
 ) -> io::Result<()> {
   let count: usize = duplicates . len();
@@ -167,7 +167,7 @@ fn report_duplicate_ids(
                count));
 
     // Sort IDs for deterministic output
-    let mut sorted_ids: Vec<(&String, &Vec<String>)> =
+    let mut sorted_ids: Vec<(&ID, &Vec<String>)> =
       duplicates . iter() . collect();
     sorted_ids . sort_by_key(|(id, _)| *id);
 

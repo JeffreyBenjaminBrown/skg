@@ -158,7 +158,8 @@ fn incremental_init (
   if nodes . is_empty() {
     tracing::info! ("No modified .skg files found.");
     return Ok (tantivy_index); }
-  tracing::info! (count = nodes . len(), "Modified .skg file(s) found.");
+  tracing::info! (count = nodes . len(),
+                  "Modified .skg file(s) found.");
   let typedb_nodes : Vec<NodeTypedb> = // Convert to NodeTypedb (narrow) at the boundary. Parses textlinks from each node's title+body.
     nodes . iter ()
     . map (NodeTypedb::from_complete_parsing_textlinks)

@@ -30,7 +30,8 @@ use crate::types::save::{DefineNode, DeleteNode, SaveNode};
 /// and must fall back to whatever they were using before. That's the
 /// reason the consulting callers check and degrade gracefully rather
 /// than panicking.
-static GLOBAL_HANDLE : OnceLock<InRustGraphHandle> = OnceLock::new ();
+static GLOBAL_HANDLE : OnceLock<InRustGraphHandle> =
+  OnceLock::new ();
 
 /// Set the process-global handle. Must be called exactly once, at
 /// server startup, after the initial 'InRustGraph' has been built.
