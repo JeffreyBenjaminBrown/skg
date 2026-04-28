@@ -59,16 +59,15 @@ pub fn check_for_duplicate_ids_across_sources (
   nodes     : &[NodeComplete],
   data_root : &Path,
 ) -> io::Result<()> {
-  let mut seen_ids: HashMap < ID,
-                              Vec<String> > // source names
+  let mut seen_ids: HashMap < ID, Vec<SourceName> > =
     // Maps each ID to all sources containing it
-    = HashMap::new();
+    HashMap::new();
   for node in nodes {
     for id in node . all_ids() {
       seen_ids . entry (id . clone())
         . or_insert_with (Vec::new)
-        . push (node . source . to_string()); }}
-  let duplicate_ids: HashMap<ID, Vec<String>> =
+        . push (node . source . clone()); }}
+  let duplicate_ids: HashMap<ID, Vec<SourceName>> =
     seen_ids . into_iter()
     . filter ( |(_, sources)| sources . len() > 1 )
     . collect();
@@ -157,8 +156,7 @@ pub fn read_recently_modified_skgfiles_from_sources (
 /// For ≤10 duplicates, also lists each one on stderr.
 /// For >10 duplicates, logs only the count and the file path.
 fn report_duplicate_ids(
-  duplicates : &HashMap<ID,
-                        Vec<String>>, // sources
+  duplicates : &HashMap<ID, Vec<SourceName>>,
   data_root  : &Path,
 ) -> io::Result<()> {
   let count: usize = duplicates . len();
@@ -172,14 +170,14 @@ fn report_duplicate_ids(
     &format!("Found {} duplicate IDs across sources.\n\n",
              count));
 
-  let mut sorted_ids: Vec<(&ID, &Vec<String>)> =
+  let mut sorted_ids: Vec<(&ID, &Vec<SourceName>)> =
     // for deterministic output
     duplicates . iter() . collect();
   sorted_ids . sort_by_key(|(id, _)| *id);
 
   for (id, sources) in sorted_ids {
     content . push_str(&format!("* {}\n", id));
-    let mut sorted_sources: Vec<String> =
+    let mut sorted_sources: Vec<SourceName> =
       // for deterministic output
       sources . clone();
     sorted_sources . sort();
@@ -192,8 +190,10 @@ fn report_duplicate_ids(
       tracing::error!("Found {} duplicate ID(s) across sources:",
                 count);
       for (id, sources) in duplicates . iter() {
+        let names : Vec<String> =
+          sources . iter () . map (|s| s . to_string ()) . collect ();
         tracing::error!("  - ID '{}' in sources: {}",
-                  id, sources . join (", ")); }
+                  id, names . join (", ")); }
     } else {
       tracing::error!("Found {} duplicate ID(s) across sources.",
                 count);

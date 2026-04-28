@@ -7,7 +7,7 @@
 // indexing" TODO in the schema doc-comment.
 
 use crate::dbs::tantivy::write::commit_with_status;
-use crate::types::misc::{ID, TantivyIndex};
+use crate::types::misc::{ID, SourceName, TantivyIndex};
 
 use tantivy::{IndexReader, IndexWriter, Searcher, Term, TantivyDocument, doc};
 use tantivy::collector::TopDocs;
@@ -61,11 +61,11 @@ pub fn update_context_origin_types (
           . get_first ( tantivy_index . raw_title_field )
           . and_then ( |v| v . as_str () )
           . unwrap_or ("") . to_string ();
-      let source : String =
+      let source : SourceName =
         retrieved_doc
           . get_first ( tantivy_index . source_field )
           . and_then ( |v| v . as_str () )
-          . unwrap_or ("") . to_string ();
+          . unwrap_or ("") . into ();
       let is_title : String =
         retrieved_doc
           . get_first ( tantivy_index . is_title_field )
