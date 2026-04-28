@@ -25,10 +25,6 @@
 //!   since the last client-facing notification. Drained by the next
 //!   outbound buffer (view render or save response).
 //!
-//! Migration from the old design: the obsolete
-//! '<data_root>/last-audit.time' file (one-run-per-day stamp) is
-//! deleted on startup if present.
-//!
 //! Batch tuning constants are at the top of this file so a reviewer
 //! can see them without hunting through code.
 
@@ -114,14 +110,12 @@ fn note_new_flagged_pid (pid : ID) {
 // ---- Startup entry point ----------------------------------------
 
 /// If 'auto_audit_daily' is enabled, spawn the background audit
-/// daemon. Returns immediately. Also performs one-time migration:
-/// deletes the obsolete 'last-audit.time' file if present.
+/// daemon. Returns immediately.
 pub fn schedule_daemon (
   config : &SkgConfig,
   driver : Arc<TypeDBDriver>,
   graph  : InRustGraphHandle,
 ) {
-  migrate_remove_obsolete_stamp (config);
   if ! config . auto_audit_daily {
     return; }
   tracing::info! ("auto_audit_daily: starting paced audit daemon");
@@ -130,15 +124,6 @@ pub fn schedule_daemon (
   thread::spawn ( move || {
     set_lowest_priority ();
     daemon_loop (data_root, db_name, driver, graph); } ); }
-
-/// Old design wrote '<data_root>/last-audit.time' as a once-per-day
-/// stamp for the whole corpus. Obsolete under the per-pid store.
-fn migrate_remove_obsolete_stamp (config : &SkgConfig) {
-  let path : PathBuf = config . data_root . join ("last-audit.time");
-  if path . exists () {
-    if let Err (e) = fs::remove_file (&path) {
-      tracing::warn! (path = %path . display (), error = %e,
-        "audit migration: could not remove obsolete last-audit.time"); } } }
 
 // ---- Daemon ----------------------------------------------------
 
@@ -468,23 +453,4 @@ mod tests {
     assert_eq! (store . len (), 1);
     assert_eq! (store[0] . pid . as_str (), "a"); }
 
-  #[test]
-  fn migrate_deletes_obsolete_stamp () {
-    let tmp : TempDir = TempDir::new () . unwrap ();
-    let stamp : PathBuf = tmp . path () . join ("last-audit.time");
-    fs::write (&stamp, "2026-04-20\n") . unwrap ();
-    assert! (stamp . exists ());
-    let config : SkgConfig = SkgConfig {
-      data_root          : tmp . path () . to_path_buf (),
-      sources            : std::collections::HashMap::new (),
-      db_name            : "test" . to_string (),
-      tantivy_folder     : PathBuf::from ("/tmp/tantivy-test-scheduled-audit"),
-      port               : 0,
-      initial_node_limit : 100,
-      delete_on_quit     : false,
-      timing_log         : false,
-      auto_audit_daily   : false,
-      max_ancestry_depth : 20,
-    };
-    migrate_remove_obsolete_stamp (&config);
-    assert! (! stamp . exists ()); } }
+}
