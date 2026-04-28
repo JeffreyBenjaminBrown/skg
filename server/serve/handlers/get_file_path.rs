@@ -17,9 +17,9 @@ pub fn handle_get_file_path_request (
   request : &str,
   config  : &SkgConfig,
 ) {
-  let id : String = match value_from_request_sexp (
+  let id : ID = match value_from_request_sexp (
     "id", request ) {
-    Ok  (v) => v,
+    Ok  (v) => ID (v),
     Err (e) => {
       send_response_with_length_prefix (
         stream,
@@ -27,9 +27,9 @@ pub fn handle_get_file_path_request (
           TcpToClient::GetFilePath,
           &format! ( "Error: {}", e ) ));
       return; } };
-  let source : String = match value_from_request_sexp (
+  let source : SourceName = match value_from_request_sexp (
     "source", request ) {
-    Ok  (v) => v,
+    Ok  (v) => SourceName (v),
     Err (e) => {
       send_response_with_length_prefix (
         stream,
@@ -39,8 +39,8 @@ pub fn handle_get_file_path_request (
       return; } };
   let raw_path : String = match path_from_pid_and_source (
     config,
-    & SourceName (source),
-    ID (id) ) {
+    & source,
+    id ) {
     Ok  (p) => p,
     Err (e) => {
       send_response_with_length_prefix (
