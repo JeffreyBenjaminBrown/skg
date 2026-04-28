@@ -280,23 +280,25 @@ Every node has an ID,
 but a title can include multiple or no links.
 *** C-c i p : skg-id-prev
 See skg-id-next, above.
-*** C-c i u : skg-id-push
+*** the stack of links/ids
+C-c u for push, C-c (o|O) _ for pop
+**** C-c u : skg-id-push
 Stores, in the id stack,
 a link to the node the cursor is on.
-*** C-c o i : skg-paste-id
+**** C-c o i : skg-paste-id
 Inserts the ID at the top of the id stack at the cursor.
 Does not modify the stack.
-*** C-c o l : skg-paste-link
+**** C-c o l : skg-paste-link
 Inserts, at the cursor, a link to the node
 whose ID is at the top of the id stack.
 Does not modify the stack.
-*** C-c O i : skg-pop-id
+**** C-c O i : skg-pop-id
 Removes a node from the top of the id stack,
 and inserts its ID at the cursor.
-*** C-c O l : skg-pop-link
+**** C-c O l : skg-pop-link
 Removes a node from the top of the id stack,
 and inserts a link to that node at the cursor.
-*** C-c v s : skg-view-id-stack
+**** C-c v s : skg-view-id-stack
 repeated here; described earlier in this doc
 ** connection, reload, rebuild dbs
 Unless you're coding or troubleshooting,

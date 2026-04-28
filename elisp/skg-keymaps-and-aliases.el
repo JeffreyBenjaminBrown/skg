@@ -133,8 +133,8 @@ and hide INTERNAL from M-x completion."
   (progn;; id navigation (moving among IDs in the current buffer)
     (define-key map (kbd "C-c i n") #'skg-id-next)
     (define-key map (kbd "C-c i p") #'skg-id-prev)
-    (define-key map (kbd "C-c i u") #'skg-id-push))
-  (progn;; copy-from / pop-from the id stack
+  (progn;; id stack operations (push and pop, u and o)
+    (define-key map (kbd "C-c u") #'skg-id-push))
     (define-key map (kbd "C-c o i") #'skg-paste-id)
     (define-key map (kbd "C-c o l") #'skg-paste-link)
     (define-key map (kbd "C-c O i") #'skg-pop-id)

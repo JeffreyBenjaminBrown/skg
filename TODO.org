@@ -25,6 +25,8 @@ Changes to text are reported.
 To test, compute this two ways: From disk and from dbs.
 ** TODO be able to visit ghost nodes
 ** view all changes in one buffer
+* small, technical
+** Goto could (also?) be C-C RET.
 * TODO make it comfortable
 ** TODO Privacy: Permit user to hide certain sources from view.
 *** Figure out the diff logic for insertions when some are hidden.
@@ -64,12 +66,6 @@ link sources, containers, subscribers
 ** [[id:001d7913-c431-461c-92ae-a6a39394856c][processing]]
 * coollected while dogfooding, unassimilated
 ** interactive: try diff view on aliases, IDs
-** cleaner code
-*** motivation
-in server/serve/parse_metadata_sexp.rs,
-the first typedef, 'pub struct ViewnodeMetadata', feels unnatural.
-*** counterargument
-It's in parser code I never look at.
 * maybe : how to use AI
 Ask for criticism *before*
 asking to be asked for missing details.
