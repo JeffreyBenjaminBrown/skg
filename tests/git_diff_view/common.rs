@@ -13,7 +13,7 @@ pub use futures::executor::block_on;
 pub use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Database};
 
 pub use skg::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
-pub use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_AND_check_for_dup_ids;
+pub use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 pub use skg::dbs::typedb::nodes::create_all_nodes;
 pub use skg::dbs::typedb::relationships::create_all_relationships;
 pub use skg::to_org::render::content_view::multi_root_view;
@@ -103,7 +103,7 @@ pub async fn setup_test_dbs(
         abbreviation: None,
                                    path: PathBuf::from (source_path),
                                    user_owns_it: true, });
-    read_all_skg_files_from_sources_AND_check_for_dup_ids(
+    read_all_skg_files_from_sources(
       &SkgConfig::dummyFromSources (sources))? };
 
   let typedb_nodes : Vec<NodeTypedb> =

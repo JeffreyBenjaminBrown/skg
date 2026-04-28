@@ -11,12 +11,9 @@ use std::fs::{self, DirEntry, ReadDir};
 
 /// Reads all .skg files from all configured sources.
 /// Sets each node's source field to the appropriate source name.
-/// Delegates duplicate-ID detection across sources to
-/// 'check_for_duplicate_ids_across_sources'.
-/// If errors of either kind are found, writes detailed reports
-/// (to stderr for small counts, to org files for large ones)
-/// and returns a summary error.
-pub fn read_all_skg_files_from_sources_AND_check_for_dup_ids (
+/// If any files fail to load, writes a detailed report to an
+/// org file in the config's data_root and returns a summary error.
+pub fn read_all_skg_files_from_sources (
   config: &SkgConfig
 ) -> io::Result<Vec<NodeComplete>> {
   let mut all_nodes: Vec<NodeComplete> = Vec::new();
@@ -34,21 +31,12 @@ pub fn read_all_skg_files_from_sources_AND_check_for_dup_ids (
           source . path . display() . to_string(),
           e . to_string()
         )); }} }
-  let mut err_parts: Vec<String> = Vec::new();
-  // Duplicates are reported before load errors so that the order
-  // of stderr output matches the order of the err_parts message.
-  if let Err (e) =
-    check_for_duplicate_ids_across_sources (
-      &all_nodes, &config . data_root)
-  { err_parts . push (e . to_string()); }
   if ! load_errors . is_empty() {
     report_load_errors (&load_errors, &config . data_root) ?;
-    err_parts . push (format! (
-      "{} unreadable file(s)", load_errors . len() )); }
-  if ! err_parts . is_empty() {
     return Err (io::Error::new (
       io::ErrorKind::InvalidData,
-      err_parts . join ("; ") )); }
+      format! ("{} unreadable file(s)",
+               load_errors . len() ))); }
   Ok (all_nodes) }
 
 /// Examines each node's source and all_ids(); if any ID appears
@@ -116,7 +104,7 @@ fn read_skg_files_from_folder (
       nodes . push (nodecomplete); }}
   Ok (nodes) }
 
-/// Like `read_all_skg_files_from_sources_AND_check_for_dup_ids` but only reads files
+/// Like `read_all_skg_files_from_sources` but only reads files
 /// whose mtime is more recent than `since`.
 pub fn read_recently_modified_skgfiles_from_sources (
   config : &SkgConfig,

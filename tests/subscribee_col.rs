@@ -3,7 +3,7 @@
 use indoc::indoc;
 use skg::dbs::init::{overwrite_new_empty_db, define_schema};
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_AND_check_for_dup_ids;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::to_org::render::content_view::single_root_view;
@@ -29,7 +29,7 @@ async fn setup_multi_source_test(
     DriverOptions::new(false, None)?,
   ) . await?;
   let nodes: Vec<NodeComplete> =
-    read_all_skg_files_from_sources_AND_check_for_dup_ids (&config)?;
+    read_all_skg_files_from_sources (&config)?;
   let typedb_nodes : Vec<NodeTypedb> =
     nodes . iter ()
     . map (NodeTypedb::from_complete_parsing_textlinks)

@@ -3,7 +3,8 @@
 use crate::context::{MapToContent, MapToContainers};
 use crate::context::{content_maps_from_nodes, had_id_set_from_nodes};
 use crate::context::link_targets_from_nodes;
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_AND_check_for_dup_ids;
+use crate::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::multiple_nodes::read_recently_modified_skgfiles_from_sources;
 use crate::dbs::tantivy::open_existing_tantivy_index;
 use crate::dbs::tantivy::write::update_index_with_nodes;
@@ -77,8 +78,10 @@ pub fn initialize_dbs (
           tracing::info! ("Incremental init succeeded.");
           // The incremental step above updated TypeDB and Tantivy from only the modified .skg files, which is all those databases need. The in-memory state inside InitData (graph handle, contains maps, had_id_set, link_targets) is rebuilt from scratch on every startup, so it needs every NodeComplete. The read below is therefore a full file read, but not a full re-initialization of the databases.
           let nodes : Vec<NodeComplete> =
-            read_all_skg_files_from_sources_AND_check_for_dup_ids (config)
+            read_all_skg_files_from_sources (config)
             . unwrap_or_default ();
+          let _ = check_for_duplicate_ids_across_sources (
+            &nodes, &config . data_root);
           init_data_from_nodes (
             &nodes, Arc::new (driver), tantivy_index ) }
         Err (e) => {
@@ -235,10 +238,15 @@ fn full_init (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "read_all_skg_files" ). entered();
       tracing::info! ("Reading .skg files from all sources...");
-      read_all_skg_files_from_sources_AND_check_for_dup_ids (config)
+      read_all_skg_files_from_sources (config)
       . unwrap_or_else ( |e| {
         tracing::error! ("Failed to read .skg files: {}", e);
         std::process::exit (1); } ) };
+  check_for_duplicate_ids_across_sources (
+    &nodes, &config . data_root)
+    . unwrap_or_else ( |e| {
+      tracing::error! ("Duplicate ID check failed: {}", e);
+      std::process::exit (1); } );
   tracing::info! (files = nodes . len(),
             sources = config . sources . len(),
             ".skg files read from source(s)");
@@ -284,16 +292,17 @@ pub fn initialize_typedb_from_nodes (
   tracing::info! ("TypeDB database initialized successfully.");
   Arc::new (driver) }
 
-/// Destroys and rebuilds the TypeDB database from .skg files on disk.
+/// Destroys and rebuilds the TypeDB database from the given nodes.
 /// Uses an existing driver connection rather than creating a new one.
-pub async fn rebuild_typedb_from_disk (
+/// Callers are responsible for reading the .skg files
+/// (and, if desired, checking duplicate IDs) beforehand.
+pub async fn rebuild_typedb_from_nodes (
   config : &SkgConfig,
   driver : &TypeDBDriver,
+  nodes  : &[NodeComplete],
 ) -> Result<(), Box<dyn Error>> {
-  let nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources_AND_check_for_dup_ids (config) ?;
   populate_typedb_from_nodes (
-    config, driver, &nodes ) . await }
+    config, driver, nodes ) . await }
 
 /// Populates a TypeDB database from the given nodes:
 /// overwrites with empty db, defines schema,
@@ -344,17 +353,18 @@ fn initialize_tantivy_from_nodes (
     "Tantivy index initialized successfully.");
   tantivy_index }
 
-/// Destroys and rebuilds the Tantivy index from .skg files on disk.
+/// Destroys and rebuilds the Tantivy index from the given nodes.
 /// Returns a fresh TantivyIndex.
-pub fn rebuild_tantivy_from_disk (
+/// Callers are responsible for reading the .skg files
+/// (and, if desired, checking duplicate IDs) beforehand.
+pub fn rebuild_tantivy_from_nodes (
   config : &SkgConfig,
+  nodes  : &[NodeComplete],
 ) -> Result<TantivyIndex, Box<dyn Error>> {
-  let nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources_AND_check_for_dup_ids (config) ?;
   let (tantivy_index, _indexed_count)
     : ( TantivyIndex, usize ) =
     in_fs_wipe_index_then_create_it (
-      &nodes,
+      nodes,
       Path::new ( & config . tantivy_folder )) ?;
   Ok (tantivy_index) }
 

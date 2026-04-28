@@ -1,5 +1,9 @@
-use crate::dbs::filesystem::multiple_nodes::{write_all_nodes_to_fs, delete_all_nodes_from_fs};
-use crate::dbs::init::{rebuild_typedb_from_disk, rebuild_tantivy_from_disk};
+use crate::dbs::filesystem::multiple_nodes::{
+  check_for_duplicate_ids_across_sources,
+  delete_all_nodes_from_fs,
+  read_all_skg_files_from_sources,
+  write_all_nodes_to_fs};
+use crate::dbs::init::{rebuild_typedb_from_nodes, rebuild_tantivy_from_nodes};
 use crate::dbs::memory::{InRustGraph, InRustGraphHandle, apply_definenodes};
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
 use crate::merge::merge_nodes;
@@ -92,7 +96,17 @@ pub async fn update_graph_minus_merges (
       db_name, driver, &node_defs, source_moves ) . await }
     { tracing::error!(
         "TypeDB update failed: {}. Rebuilding from disk...", e);
-      rebuild_typedb_from_disk (&config, driver) . await
+      let nodes : Vec<NodeComplete> =
+        read_all_skg_files_from_sources (&config)
+        . map_err (|e2| -> Box<dyn Error> {
+          format!("TypeDB rebuild also failed: {}. Restart the server.", e2)
+          . into () }) ?;
+      check_for_duplicate_ids_across_sources (
+        &nodes, &config . data_root)
+        . map_err (|e2| -> Box<dyn Error> {
+          format!("TypeDB rebuild also failed: {}. Restart the server.", e2)
+          . into () }) ?;
+      rebuild_typedb_from_nodes (&config, driver, &nodes) . await
         . map_err (|e2| -> Box<dyn Error> {
           format!("TypeDB rebuild also failed: {}. Restart the server.", e2)
           . into () }) ?;
@@ -116,8 +130,18 @@ pub async fn update_graph_minus_merges (
         Ok (None) }
       Err (e) => {
         tracing::error!("Tantivy update failed: {}. Rebuilding from disk...", e);
+        let nodes : Vec<NodeComplete> =
+          read_all_skg_files_from_sources (&config)
+          . map_err (|e2| -> Box<dyn Error> {
+            format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
+            . into () }) ?;
+        check_for_duplicate_ids_across_sources (
+          &nodes, &config . data_root)
+          . map_err (|e2| -> Box<dyn Error> {
+            format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
+            . into () }) ?;
         let new_index : TantivyIndex =
-          rebuild_tantivy_from_disk (&config)
+          rebuild_tantivy_from_nodes (&config, &nodes)
           . map_err (|e2| -> Box<dyn Error> {
             format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
             . into () }) ?;

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use tantivy::schema as schema;
 use tantivy::TantivyDocument;
 use tantivy::schema::document::Value;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_AND_check_for_dup_ids;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::in_fs_wipe_index_then_create_it;
 use skg::dbs::tantivy::title_and_source_by_id;
@@ -26,7 +26,7 @@ fn test_many_tantivy_things (
 
   let config = load_config ("tests/tantivy/fixtures/skgconfig.toml")?;
   let nodes: Vec<NodeComplete> =
-    read_all_skg_files_from_sources_AND_check_for_dup_ids (&config)?;
+    read_all_skg_files_from_sources (&config)?;
 
   let (tantivy_index, indexed_count): (TantivyIndex, usize) =
     in_fs_wipe_index_then_create_it (

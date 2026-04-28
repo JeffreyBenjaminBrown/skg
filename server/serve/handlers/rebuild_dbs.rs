@@ -3,8 +3,9 @@ use crate::context::{
   content_maps_from_nodes,
   had_id_set_from_nodes,
   link_targets_from_nodes};
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_AND_check_for_dup_ids;
-use crate::dbs::init::{rebuild_typedb_from_disk, rebuild_tantivy_from_disk};
+use crate::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use crate::dbs::init::{rebuild_typedb_from_nodes, rebuild_tantivy_from_nodes};
 use crate::dbs::memory::InRustGraph;
 use crate::serve::ConnectionState;
 use crate::serve::protocol::TcpToClient;
@@ -26,17 +27,21 @@ pub fn handle_rebuild_dbs_request (
 ) {
   tracing::info!("Rebuilding databases from disk...");
   let result : Result<(), String> = (|| {
-    block_on ( rebuild_typedb_from_disk (config, typedb_driver) )
+    let nodes : Vec<NodeComplete> =
+      read_all_skg_files_from_sources (config)
+      . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
+    check_for_duplicate_ids_across_sources (
+      &nodes, &config . data_root)
+      . map_err ( |e| format! ("Duplicate ID check failed: {}", e) ) ?;
+    block_on ( rebuild_typedb_from_nodes (
+      config, typedb_driver, &nodes) )
       . map_err ( |e| format! ("TypeDB rebuild failed: {}", e) ) ?;
     tracing::info!("TypeDB rebuilt.");
     let new_tantivy : TantivyIndex =
-      rebuild_tantivy_from_disk (config)
+      rebuild_tantivy_from_nodes (config, &nodes)
       . map_err ( |e| format! ("Tantivy rebuild failed: {}", e) ) ?;
     *tantivy_index = new_tantivy;
     tracing::info!("Tantivy rebuilt.");
-    let nodes : Vec<NodeComplete> =
-      read_all_skg_files_from_sources_AND_check_for_dup_ids (config)
-      . map_err ( |e| format! ("Reading .skg files for context: {}", e) ) ?;
     let had_id_set = had_id_set_from_nodes (&nodes);
     let all_node_ids = nodes . iter ()
       . map ( |n| n . pid . clone () )
