@@ -38,10 +38,11 @@ pub fn read_all_skg_files_from_sources_AND_check_for_dup_ids (
   // Duplicates are reported before load errors so that the order
   // of stderr output matches the order of the err_parts message.
   if let Err (e) =
-    check_for_duplicate_ids_across_sources (&all_nodes)
+    check_for_duplicate_ids_across_sources (
+      &all_nodes, &config . data_root)
   { err_parts . push (e . to_string()); }
   if ! load_errors . is_empty() {
-    report_load_errors (&load_errors) ?;
+    report_load_errors (&load_errors, &config . data_root) ?;
     err_parts . push (format! (
       "{} unreadable file(s)", load_errors . len() )); }
   if ! err_parts . is_empty() {
@@ -55,7 +56,8 @@ pub fn read_all_skg_files_from_sources_AND_check_for_dup_ids (
 /// for ≤10 duplicates, to an org file otherwise) and returns a
 /// summary error. Otherwise returns Ok.
 pub fn check_for_duplicate_ids_across_sources (
-  nodes : &[NodeComplete],
+  nodes     : &[NodeComplete],
+  data_root : &Path,
 ) -> io::Result<()> {
   let mut seen_ids: HashMap < ID,
                               Vec<String> > // source names
@@ -72,7 +74,7 @@ pub fn check_for_duplicate_ids_across_sources (
     . collect();
   if duplicate_ids . is_empty() {
     return Ok (( )); }
-  report_duplicate_ids (&duplicate_ids) ?;
+  report_duplicate_ids (&duplicate_ids, data_root) ?;
   let msg: String =
     if duplicate_ids . len() <= 10 {
       // Include details in error message for small numbers
@@ -155,11 +157,14 @@ pub fn read_recently_modified_skgfiles_from_sources (
 /// For ≤10 duplicates, also lists each one on stderr.
 /// For >10 duplicates, logs only the count and the file path.
 fn report_duplicate_ids(
-  duplicates: &HashMap<ID,
-                       Vec<String>> // sources
+  duplicates : &HashMap<ID,
+                        Vec<String>>, // sources
+  data_root  : &Path,
 ) -> io::Result<()> {
   let count: usize = duplicates . len();
-  let filename: &str = "initialization-error_duplicate-ids.org";
+  // DANGER: The report path is fixed per data_root, so two tests sharing a data_root (notably any test using SkgConfig::dummyFromSources,which defaults to ".") can still clobber each other's report.
+  let report_path: PathBuf = data_root . join (
+    "initialization-error_duplicate-ids.org");
   let mut content: String = String::new();
   content . push_str ("#+title: Duplicate IDs Across Sources\n");
   content . push_str ("#+date: <generated at initialization>\n\n");
@@ -182,7 +187,7 @@ fn report_duplicate_ids(
       content . push_str(&format!("** {}\n", source)); }}
 
   if count > 0 { // otherwise nothing to report
-    fs::write(filename, content)?;
+    fs::write(&report_path, content)?;
     if count <= 10 {
       tracing::error!("Found {} duplicate ID(s) across sources:",
                 count);
@@ -192,17 +197,20 @@ fn report_duplicate_ids(
     } else {
       tracing::error!("Found {} duplicate ID(s) across sources.",
                 count);
-      tracing::error!("Details written to: {}", filename); }}
+      tracing::error!("Details written to: {}",
+                report_path . display()); }}
   Ok (( )) }
 
 /// Reports file loading errors.
 /// Always writes to org file and reports count to stderr.
 fn report_load_errors(
-  errors: &[(String, String, String)]
+  errors    : &[(String, String, String)],
+  data_root : &Path,
 ) -> io::Result<()> {
   let count: usize = errors . len();
-  let filename: &str =
-    "initialization-error_unreadable-skg-files.org";
+  let report_path: PathBuf = data_root . join ( // DANGER: The report path is fixed per data_root, so two tests sharing a data_root (notably any test using SkgConfig::dummyFromSources,which defaults to ".") can still clobber each other's report.
+
+    "initialization-error_unreadable-skg-files.org");
 
   let mut content: String = String::new();
   content . push_str ("#+title: Unreadable SKG Files\n");
@@ -221,9 +229,9 @@ fn report_load_errors(
     content . push_str(&format!("*** Error: {}\n", error_msg));
   }
 
-  fs::write(filename, content)?;
+  fs::write(&report_path, content)?;
   tracing::error!("Found {} unreadable file(s).", count);
-  tracing::error!("Details written to: {}", filename);
+  tracing::error!("Details written to: {}", report_path . display());
 
   Ok(())
 }
