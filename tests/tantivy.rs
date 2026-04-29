@@ -7,7 +7,7 @@ use tantivy::TantivyDocument;
 use tantivy::schema::document::Value;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
-use skg::dbs::init::in_fs_wipe_index_then_create_it;
+use skg::dbs::init::wipe_then_init_fs_db;
 use skg::dbs::tantivy::title_and_source_by_id;
 use skg::dbs::tantivy::escape::{escape_tantivy_intra_word, escape_tantivy_literal};
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
@@ -29,7 +29,7 @@ fn test_many_tantivy_things (
     read_all_skg_files_from_sources (&config)?;
 
   let (tantivy_index, indexed_count): (TantivyIndex, usize) =
-    in_fs_wipe_index_then_create_it (
+    wipe_then_init_fs_db (
       &nodes,
       index_path )?;
   let id_field: schema::Field =
@@ -200,7 +200,7 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
     "/tmp/tantivy-test-aliases";
 
   let (tantivy_index, _indexed_count): (TantivyIndex, usize) =
-    in_fs_wipe_index_then_create_it(
+    wipe_then_init_fs_db(
       &nodes,
       Path::new (index_dir) )?;
 
@@ -356,7 +356,7 @@ fn test_search_finds_titles_with_special_chars (
   let index_dir : &str =
     "/tmp/tantivy-test-special-chars";
   let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
-    in_fs_wipe_index_then_create_it (
+    wipe_then_init_fs_db (
       &nodes, Path::new (index_dir) ) ?;
   for (query, expected_id) in &[
     ("C++ tips",     "c_plus"),
@@ -392,7 +392,7 @@ fn test_search_body_axis (
     decoy . title = "shopping list" . to_string (); }
   let nodes : Vec<NodeComplete> = vec! [recipe, decoy];
   let (ti, _) : (TantivyIndex, usize) =
-    in_fs_wipe_index_then_create_it (
+    wipe_then_init_fs_db (
       &nodes, Path::new ("/tmp/tantivy-test-body-axis") ) ?;
   { // body=false: body content is NOT findable
     let (matches, _searcher) =
@@ -430,7 +430,7 @@ fn test_search_regex_axis (
     hello      . title = "hello" . to_string (); }
   let nodes : Vec<NodeComplete> = vec! [history, historical, hello];
   let (ti, _) : (TantivyIndex, usize) =
-    in_fs_wipe_index_then_create_it (
+    wipe_then_init_fs_db (
       &nodes, Path::new ("/tmp/tantivy-test-regex-axis") ) ?;
   { // Prefix via regex: 'histor.*' matches history, historical.
     let opts = SearchOptions { regex: true, ..SearchOptions::default () };
@@ -469,7 +469,7 @@ fn test_search_regex_multiword (
     mk ("sci",      "science"),
     mk ("bio",      "biology") ];
   let (ti, _) : (TantivyIndex, usize) =
-    in_fs_wipe_index_then_create_it (
+    wipe_then_init_fs_db (
       &nodes,
       Path::new ("/tmp/tantivy-test-regex-multiword") ) ?;
   let gather = | pattern : &str | -> Result<Vec<String>, Box<dyn std::error::Error>> {
@@ -522,7 +522,7 @@ fn test_search_regex_with_operators (
     mk ("scibio",   "science biology"),
     mk ("bio",      "biology") ];
   let (ti, _) : (TantivyIndex, usize) =
-    in_fs_wipe_index_then_create_it (
+    wipe_then_init_fs_db (
       &nodes,
       Path::new ("/tmp/tantivy-test-regex-operators") ) ?;
   let gather = | pattern : &str | -> Result<Vec<String>, Box<dyn std::error::Error>> {
@@ -584,7 +584,7 @@ fn test_title_by_id_returns_title_not_alias (
   let index_dir : &str =
     "/tmp/tantivy-test-title-by-id";
   let (tantivy_index, indexed_count) : (TantivyIndex, usize) =
-    in_fs_wipe_index_then_create_it (
+    wipe_then_init_fs_db (
       &nodes,
       Path::new (index_dir) )?;
   assert_eq! (indexed_count, 3,

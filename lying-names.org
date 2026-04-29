@@ -21,31 +21,30 @@ Total: 553 entries across ~102 files.
 ** DONE can_do_incremental_init_of_dbs (line 105)
    - True?: Yes, in spirit, though it returns bool (predicate) and additionally logs a warning when the Tantivy directory is empty, which is a side effect a pure predicate name does not promise.
    - Omits?: Hides the tracing::warn! side effect and the fact that schema.tql is read from CWD.
-** incremental_init_of_dbs (line 149)
+** DONE incremental_init_of_dbs (line 149)
    - True?: Partly. Beyond rebuilding incrementally, it logs progress, deletes stale relationships, recreates them, and updates the Tantivy index; the name suggests a single act of "init" rather than a multi-stage pipeline.
    - Omits?: Nothing major beyond the multi-stage pipeline noted above.
-** init_data_from_nodes (line 201)
+** DONE init_data_from_nodes (line 201)
    - True?: Yes — it builds an InitData from nodes — but it also clones the driver into an Arc and constructs a fresh InRustGraphHandle by calling new_handle. The latter is a side-effect-free construction so calling it "from_nodes" is fine.
    - Omits?: That it builds an inverse-index-laden InRustGraph (not just plain field copies).
-** full_init (line 232)
+** DONE full_init (line 232)
    - True?: Partly. The name says "full init" but the function additionally checks duplicate IDs, may std::process::exit on errors, and emits tracing spans for sub-steps.
    - Omits?: The std::process::exit failure mode, the duplicate-ID check, and the tracing instrumentation (which is observable behavior).
-** touch_init_marker (line 271)
+** DONE touch_init_marker (line 271)
    - True?: Yes, but the implementation overwrites the file with empty bytes via fs::write rather than performing a metadata-only "touch"; on a non-existent path it creates the file (good), but on an existing one it truncates it.
    - Omits?: That the operation is destructive (truncates) rather than merely updating mtime.
-** initialize_typedb_from_nodes (line 278)
-   - True?: Partly. The name says "initialize" but the function actually first connects to TypeDB (creating a fresh driver), then populates from nodes; on failure it std::process::exit's. It is not just initialization-from-nodes — it also opens the connection.
-   - Omits?: The std::process::exit failure mode and the new-driver-connection side effect.
-** rebuild_typedb_from_nodes (line 299)
-   - True?: Partly. Per the doc, this "Destroys and rebuilds" — but the function body just calls populate_typedb_from_nodes, whose name does not mention destruction. The doc-claimed destruction happens only because populate_typedb_from_nodes itself calls overwrite_new_empty_db. The name "rebuild" is fine, but the wrapper is a thin delegate around a name ("populate") that is gentler than what it does.
+** ONGOING rebuild_typedb_from_nodes (line 299)
+   - True?: Partly. Per the doc, this "Destroys and rebuilds" — but the function body just calls wipe_then_init_typedb_db, whose name does not mention destruction. The doc-claimed destruction happens only because wipe_then_init_typedb_db itself calls overwrite_new_empty_db. The name "rebuild" is fine, but the wrapper is a thin delegate around a name ("populate") that is gentler than what it does.
    - Omits?: Nothing that the name itself misleads about.
-** populate_typedb_from_nodes (line 310)
+** DONE renamed : was populate_typedb_from_nodes (line 310)
+is now wipe_then_init_typedb_db
    - True?: No. The function "populates" but first overwrites the database to be empty (overwrite_new_empty_db) and re-defines the schema. "Populate" implies adding to existing; this is a wipe-and-rebuild.
    - Omits?: The destruction of the existing database and the schema redefinition — both load-bearing side effects hidden by "populate".
-** initialize_tantivy_from_nodes (line 339)
-   - True?: Partly. The function creates a fresh Tantivy index but also wipes any existing index in the configured folder (via in_fs_wipe_index_then_create_it) and may std::process::exit on failure.
+** DONE renamed : was initialize_tantivy_from_nodes (line 339)
+is now: wipe_then_init_tantivy_db
+   - True?: Partly. The function creates a fresh Tantivy index but also wipes any existing index in the configured folder (via wipe_then_init_fs_db) and may std::process::exit on failure.
    - Omits?: The wipe of the existing index and the std::process::exit failure mode.
-** in_fs_wipe_index_then_create_it (line 415)
+** DONE wipe_then_init_fs_db (line 415)
    - True?: Yes — the name explicitly mentions wiping and creating, which is honest. Good name.
    - Omits?: Nothing.
 ** create_empty_tantivy_index (line 372)

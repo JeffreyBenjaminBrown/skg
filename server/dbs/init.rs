@@ -253,7 +253,7 @@ fn full_init (
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "populate_typedb" ). entered();
     block_on ( async {
-      if let Err (e) = populate_typedb_from_nodes (
+      if let Err (e) = wipe_then_init_typedb_db (
         config, &driver, &nodes
       ) . await {
         tracing::error! ("Failed to populate TypeDB: {}", e);
@@ -262,7 +262,7 @@ fn full_init (
   let tantivy_index : TantivyIndex =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "initialize_tantivy" ). entered();
-      initialize_tantivy_from_nodes (config, &nodes) };
+      wipe_then_init_tantivy_db (config, &nodes) };
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "extract_context_data_from_nodes" ). entered();
     init_data_from_nodes (
@@ -275,23 +275,6 @@ fn touch_init_marker (
     tracing::warn! ("Could not touch init marker {:?}: {}",
                path, e); } }
 
-pub fn initialize_typedb_from_nodes (
-  config : & SkgConfig,
-  nodes  : &[NodeComplete],
-) -> Arc<TypeDBDriver> {
-  // Connects to the TypeDB server,
-  // then populates it with the provided NodeCompletes.
-  tracing::info! ("Initializing TypeDB database...");
-  let driver : TypeDBDriver = connect_to_typedb();
-  block_on ( async {
-    if let Err (e) = populate_typedb_from_nodes (
-      config, &driver, nodes
-    ) . await {
-      tracing::error! ( "Failed to populate TypeDB: {}", e );
-      std::process::exit (1); }} );
-  tracing::info! ("TypeDB database initialized successfully.");
-  Arc::new (driver) }
-
 /// Destroys and rebuilds the TypeDB database from the given nodes.
 /// Uses an existing driver connection rather than creating a new one.
 /// Callers are responsible for reading the .skg files
@@ -301,13 +284,13 @@ pub async fn rebuild_typedb_from_nodes (
   driver : &TypeDBDriver,
   nodes  : &[NodeComplete],
 ) -> Result<(), Box<dyn Error>> {
-  populate_typedb_from_nodes (
+  wipe_then_init_typedb_db (
     config, driver, nodes ) . await }
 
 /// Populates a TypeDB database from the given nodes:
 /// overwrites with empty db, defines schema,
 /// creates all nodes and relationships.
-async fn populate_typedb_from_nodes (
+async fn wipe_then_init_typedb_db
   config : &SkgConfig,
   driver : &TypeDBDriver,
   nodes  : &[NodeComplete],
@@ -336,14 +319,14 @@ async fn populate_typedb_from_nodes (
   tracing::info! (elapsed_s = ?t1 . elapsed(), "TypeDB relationships created");
   Ok (( )) }
 
-fn initialize_tantivy_from_nodes (
+fn wipe_then_init_tantivy_db (
   config : & SkgConfig,
   nodes  : & [NodeComplete],
 ) -> TantivyIndex {
   tracing::info! ("Initializing Tantivy index...");
   let (tantivy_index, indexed_count)
     : ( TantivyIndex, usize ) =
-    in_fs_wipe_index_then_create_it (
+    wipe_then_init_fs_db (
       nodes,
       Path::new ( & config . tantivy_folder )
     ) . unwrap_or_else ( |e| {
@@ -363,7 +346,7 @@ pub fn rebuild_tantivy_from_nodes (
 ) -> Result<TantivyIndex, Box<dyn Error>> {
   let (tantivy_index, _indexed_count)
     : ( TantivyIndex, usize ) =
-    in_fs_wipe_index_then_create_it (
+    wipe_then_init_fs_db (
       nodes,
       Path::new ( & config . tantivy_folder )) ?;
   Ok (tantivy_index) }
@@ -412,7 +395,7 @@ pub fn create_empty_tantivy_index (
 ///
 /// PITFALL: The index is not the data it indexes.
 /// This only deletes the former.
-pub fn in_fs_wipe_index_then_create_it (
+pub fn wipe_then_init_fs_db (
   nodes      : &[NodeComplete],
   index_path : &Path,
 ) -> Result<(TantivyIndex,
