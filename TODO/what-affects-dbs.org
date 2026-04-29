@@ -7,7 +7,7 @@
 
 *** Incremental init (the fast path)
     Condition: all four of these hold
-    (checked by can_do_incremental_init in dbs/init.rs):
+    (checked by can_do_incremental_init_of_dbs in dbs/init.rs):
     1. The TypeDB database exists (queried via the driver).
     2. A marker file (.skg_init_marker in the data root) exists.
        It is touched at the end of every successful init.

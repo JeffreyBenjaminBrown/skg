@@ -1,0 +1,11 @@
+Maybe it's working.
+Even if I'm not, maybe I'll want to resucitate it.
+
+* incremental init
+(WARNING: The above title is referred to verbatim.)
+
+It might be dead. Skg always seems to reuild the db on init.
+It's not *extremely* slow;
+from (frail human) memory, maybe two minutes.
+It was written before the in-Rust memory took shape,
+and likely doesn't cover it correctly.

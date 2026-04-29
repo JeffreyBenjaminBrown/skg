@@ -62,7 +62,7 @@ pub fn initialize_dbs (
   let marker_path : PathBuf =
     config . data_root . join (".skg_init_marker");
   let can_incremental : bool = block_on ( async {
-    can_do_incremental_init (
+    can_do_incremental_init_of_dbs (
       &driver, &config . db_name, &marker_path,
       Path::new ( &config . tantivy_folder )
     ) . await } );
@@ -71,8 +71,8 @@ pub fn initialize_dbs (
       let marker_mtime : std::time::SystemTime =
         fs::metadata (&marker_path)
         . and_then ( |m| m . modified() )
-        . unwrap(); // safe: can_do_incremental_init confirmed it exists
-      match incremental_init (
+        . unwrap(); // safe: can_do_incremental_init_of_dbs confirmed it exists
+      match incremental_init_of_dbs (
         config, &driver, marker_mtime )
       { Ok (( tantivy_index )) => {
           tracing::info! ("Incremental init succeeded.");
@@ -102,7 +102,7 @@ pub fn initialize_dbs (
 /// 3. schema.tql mtime <= marker mtime
 /// 4. Tantivy index directory contains files
 ///    (guards against manual deletion of index contents)
-async fn can_do_incremental_init (
+async fn can_do_incremental_init_of_dbs (
   driver        : &TypeDBDriver,
   db_name       : &str,
   marker_path   : &Path,
@@ -146,7 +146,7 @@ async fn can_do_incremental_init (
 /// pipeline while the server is running). For manual deletions,
 /// restart with delete_on_quit = true, or delete the TypeDB database
 /// manually, to force a clean full rebuild.
-fn incremental_init (
+fn incremental_init_of_dbs (
   config       : &SkgConfig,
   driver       : &TypeDBDriver,
   marker_mtime : std::time::SystemTime,

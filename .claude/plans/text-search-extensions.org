@@ -141,7 +141,7 @@
    Schema version gate: any existing on-disk Tantivy index
    without a =body= field will fail
    'open_existing_tantivy_index'. The init path already falls
-   back to a full rebuild if 'incremental_init' pre-conditions
+   back to a full rebuild if 'incremental_init_of_dbs' pre-conditions
    fail ([[../../server/dbs/init.rs][init.rs:95]]), and that suffices — old indexes will
    wipe and rebuild automatically on first run.
 
@@ -360,7 +360,7 @@
    #+end_src
 
 ** Incremental init interaction
-   'incremental_init' ([[../../server/dbs/init.rs][init.rs:139]]) re-indexes only the
+   'incremental_init_of_dbs' ([[../../server/dbs/init.rs][init.rs:139]]) re-indexes only the
    .skg files modified since the last marker. Body-indexing
    policy there:
    - Modified nodes get their bodies indexed /inline/ as part of
@@ -370,7 +370,7 @@
    - Unmodified nodes retain their bodies from the previous
      run, which is why the =.body_index_complete= marker must
      have been present before we took the incremental path.
-   - Precondition for taking 'incremental_init' must therefore
+   - Precondition for taking 'incremental_init_of_dbs' must therefore
      include =.body_index_complete= existing. Add it as a
      fifth precondition at [[../../server/dbs/init.rs][init.rs:95]]. If absent, fall
      through to 'full_init' (which will spawn the background
@@ -383,8 +383,8 @@
    - [[../../server/serve/protocol.rs][protocol.rs]]: rename 'RequestType::TitleMatches' →
      'TextSearch'.
    - [[../../server/dbs/init.rs][init.rs]]: marker-file handling; add
-     =.body_index_complete= as a fifth 'incremental_init'
-     precondition; in 'full_init' and 'incremental_init' spawn
+     =.body_index_complete= as a fifth 'incremental_init_of_dbs'
+     precondition; in 'full_init' and 'incremental_init_of_dbs' spawn
      the background body indexer. Thread signature
      'fn background_body_indexer(nodes: Arc<[SkgNode]>, ti:
      TantivyIndex, ready: Arc<AtomicBool>, marker_path: PathBuf)'.
@@ -617,7 +617,7 @@ Be sure to add a PITFALL comment explaining why it's there,
 and what if anything could still go wrong.
 
 *** DONE Body indexer vs. incremental-init divergence
-    'incremental_init' ([[../../server/dbs/init.rs][init.rs:139]]) re-indexes only
+    'incremental_init_of_dbs' ([[../../server/dbs/init.rs][init.rs:139]]) re-indexes only
     modified nodes. If body indexing is backgrounded, we need to
     skip bodies there too, then re-run the background body
     indexer — but only for the modified subset (since everything
