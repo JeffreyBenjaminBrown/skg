@@ -14,7 +14,7 @@ Total: 553 entries across ~102 files.
    - True?: Partly. The function returns a path string only if the source is found in config; otherwise it returns an Err, but the name does not signal that fallibility.
    - Omits?: It also derives the filename by appending a hard-coded ".skg" extension, which the name does not hint at.
 
-* server/dbs/init.rs
+* DONE server/dbs/init.rs
 ** DONE initialize_dbs (line 58)
    - True?: Partly. The function does initialize TypeDB and Tantivy, but it ALSO sometimes calls the duplicate-ID check, builds the in-memory InRustGraphHandle, computes had_id_set/all_node_ids/link_targets/contains-maps, and touches a marker file.
    - Omits?: The name hides the heavy in-memory context-data extraction, the duplicate-ID check, and the marker-file side effect; and it doesn't reveal that the function may exit the process via std::process::exit on certain failures.
@@ -33,7 +33,7 @@ Total: 553 entries across ~102 files.
 ** DONE touch_init_marker (line 271)
    - True?: Yes, but the implementation overwrites the file with empty bytes via fs::write rather than performing a metadata-only "touch"; on a non-existent path it creates the file (good), but on an existing one it truncates it.
    - Omits?: That the operation is destructive (truncates) rather than merely updating mtime.
-** ONGOING rebuild_typedb_from_nodes (line 299)
+** DONE rebuild_typedb_from_nodes (line 299)
    - True?: Partly. Per the doc, this "Destroys and rebuilds" — but the function body just calls wipe_then_init_typedb_db, whose name does not mention destruction. The doc-claimed destruction happens only because wipe_then_init_typedb_db itself calls overwrite_new_empty_typedb_db. The name "rebuild" is fine, but the wrapper is a thin delegate around a name ("populate") that is gentler than what it does.
    - Omits?: Nothing that the name itself misleads about.
 ** DONE renamed : was populate_typedb_from_nodes (line 310)
@@ -41,13 +41,13 @@ is now wipe_then_init_typedb_db
    - True?: No. The function "populates" but first overwrites the database to be empty (overwrite_new_empty_typedb_db) and re-defines the schema. "Populate" implies adding to existing; this is a wipe-and-rebuild.
    - Omits?: The destruction of the existing database and the schema redefinition — both load-bearing side effects hidden by "populate".
 ** DONE renamed : was initialize_tantivy_from_nodes (line 339)
-is now: wipe_then_init_tantivy_db
-   - True?: Partly. The function creates a fresh Tantivy index but also wipes any existing index in the configured folder (via wipe_then_init_fs_db) and may std::process::exit on failure.
+is now: wipe_then_init_tantivy_db_with_logs_and_errors
+   - True?: Partly. The function creates a fresh Tantivy index but also wipes any existing index in the configured folder (via wipe_then_init_tantivy_db) and may std::process::exit on failure.
    - Omits?: The wipe of the existing index and the std::process::exit failure mode.
-** DONE wipe_then_init_fs_db (line 415)
+** DONE wipe_then_init_tantivy_db (line 415)
    - True?: Yes — the name explicitly mentions wiping and creating, which is honest. Good name.
    - Omits?: Nothing.
-** ONGOING create_empty_tantivy_index (line 372)
+** DONE create_empty_tantivy_index (line 372)
    - True?: Partly. It creates an "empty" Tantivy index after first removing any existing index directory at that path. The destructive cleanup is a load-bearing side effect that "create_empty" does not advertise.
    - Omits?: The fs::remove_dir_all of the destination if it exists.
 ** DONE overwrite_new_empty_typedb_db (line 429)
@@ -59,7 +59,7 @@ is now : read_and_use_schema
    - True?: Partly. The function reads schema.tql from disk (CWD-relative) and applies it; "define" hides that the schema source is a file lookup that can panic via .expect.
    - Omits?: That schema.tql is read from CWD with .expect (panic on missing file).
 
-* server/dbs/memory.rs
+* ONGOING server/dbs/memory.rs
 ** DONE was : init_global_handle (line 38)
 is now : init_global_handle_for_first_time_or_panic
    - True?: Partly. The function sets the global handle but panics (via .expect) if it has already been initialized. The name says "init", which suggests idempotency or first-time setup, not a hard panic on second call.
@@ -67,7 +67,9 @@ is now : init_global_handle_for_first_time_or_panic
 ** DONE snapshot_global (line 47)
    - True?: Yes. Returns Option<Arc<InRustGraph>>, and "global" plus "snapshot" together accurately describe the read.
    - Omits?: Nothing.
-** id_to_pid (line 136)
+** DONE was : id_to_pid (line 136)
+is now : id_to_pid_if_found
+
    - True?: Partly. For known extra_ids it does map id → pid; for unknown IDs the function returns the input id unchanged, which is "best-effort" behavior the name doesn't reveal. A reader might expect Option<ID>.
    - Omits?: The fallthrough that returns the raw id when the extra_id lookup misses — a "lying" silent passthrough.
 ** add_to_inverse_indexes (line 156)

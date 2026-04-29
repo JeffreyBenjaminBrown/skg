@@ -1,3 +1,7 @@
+* ONGOING expose lying function names
+* AWAITS "expose lying function names" : reading the code
+Using
+command-tree-to-read-from.org
 * food for thought
 ** ? I want the 'helps' relation.
 And 'needs', surely.

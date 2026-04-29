@@ -6,7 +6,7 @@ use skg::org_to_text::viewforest_to_string;
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::viewnode::Scaffold;
-use skg::dbs::init::wipe_then_init_fs_db;
+use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::serve::handlers::text_search::{
   group_matches_by_id, build_search_viewforest};
 
@@ -61,7 +61,7 @@ fn test_text_search_org_format (
         vec! [ node1, node2, node3 ];
 
       let ( tantivy_index, _ ) : ( TantivyIndex, usize ) =
-        wipe_then_init_fs_db (
+        wipe_then_init_tantivy_db (
           &nodes,
           Path::new (index_dir) ) ?;
       let search_terms : &str =
@@ -191,7 +191,7 @@ fn test_search_results_preserve_textlinks_in_title (
       let nodes : Vec < NodeComplete > =
         vec! [ node_link, node_plain ];
       let ( tantivy_index, _ ) : ( TantivyIndex, usize ) =
-        wipe_then_init_fs_db (
+        wipe_then_init_tantivy_db (
           &nodes, Path::new (index_dir) ) ?;
       let ( best_matches, searcher ) =
         search_index ( &tantivy_index, "science",
@@ -273,7 +273,7 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
       many . title = "axiom thesis lemma" . to_string ();
       nodes . push (many);
       let ( tantivy_index, _ ) : ( TantivyIndex, usize ) =
-        wipe_then_init_fs_db (
+        wipe_then_init_tantivy_db (
           &nodes, Path::new (index_dir) ) ?;
       let ( best_matches, searcher ) =
         search_index ( &tantivy_index, "axiom thesis lemma",

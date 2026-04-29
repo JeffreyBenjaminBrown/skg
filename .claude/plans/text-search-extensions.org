@@ -274,7 +274,7 @@
    inside 'create_documents_from_node' at init time, one pass,
    same as today. Then measure.
 
-   Instrument 'wipe_then_init_tantivy_db'
+   Instrument 'wipe_then_init_tantivy_db_with_logs_and_errors'
    ([[../../server/dbs/init.rs][init.rs:238]] already wraps it in a tracing span called
    =initialize_tantivy=). Add =body_char_count= and
    =title_char_count= as fields on that span for realistic sizing.
@@ -287,7 +287,7 @@
    The shape, modeled on the existing enrichment thread at
    [[../../server/serve/handlers/title_matches.rs][title_matches.rs:187]]:
 
-   1. /Init/: 'wipe_then_init_tantivy_db' indexes
+   1. /Init/: 'wipe_then_init_tantivy_db_with_logs_and_errors' indexes
       title+alias only (skip body in
       'create_documents_from_node' when a new flag
       'SkipBody=true' is passed).
