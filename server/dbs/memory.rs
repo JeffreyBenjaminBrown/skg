@@ -133,7 +133,7 @@ impl InRustGraph {
 /// pid. Primary pids pass through unchanged; extra_ids are mapped via
 /// 'extra_id_to_pid'. IDs unknown to memory fall through as-is, so
 /// callers can index-under-unknown without having to check first.
-fn id_to_pid (g: &InRustGraph, id: &ID) -> ID {
+fn id_to_pid_if_found (g: &InRustGraph, id: &ID) -> ID {
   g . extra_id_to_pid . get (id) . cloned ()
     . unwrap_or_else ( || id . clone () ) }
 
@@ -151,26 +151,26 @@ fn id_to_pid (g: &InRustGraph, id: &ID) -> ID {
 /// loops below see this node's newly-acquired aliases when they look
 /// up corresponding pids. This matters in a merge batch: if a
 /// subsequent neighbor Save references an acquiree pid that's now an
-/// extra_id of this node, 'id_to_pid' during that neighbor's add
+/// extra_id of this node, 'id_to_pid_if_found' during that neighbor's add
 /// maps the reference to this node's canonical pid.
 fn add_to_inverse_indexes (g: &mut InRustGraph, node: &NodeRust) {
   let pid : &ID = &node . pid;
   for extra in &node . extra_ids {
     g . extra_id_to_pid . insert ( extra . clone (), pid . clone () ); }
   for second_member in &node . contains {
-    let corresponding_pid : ID = id_to_pid (g, second_member);
+    let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
     add_to_inverse_map (&mut g . contained_by, &corresponding_pid, pid); }
   for second_member in node . subscribes_to . or_default () {
-    let corresponding_pid : ID = id_to_pid (g, second_member);
+    let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
     add_to_inverse_map (&mut g . subscribers_of, &corresponding_pid, pid); }
   for second_member in node . hides_from_its_subscriptions . or_default () {
-    let corresponding_pid : ID = id_to_pid (g, second_member);
+    let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
     add_to_inverse_map (&mut g . hiders_of, &corresponding_pid, pid); }
   for second_member in node . overrides_view_of . or_default () {
-    let corresponding_pid : ID = id_to_pid (g, second_member);
+    let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
     add_to_inverse_map (&mut g . replacements_of, &corresponding_pid, pid); }
   for second_member in &node . textlinks_to {
-    let corresponding_pid : ID = id_to_pid (g, second_member);
+    let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
     add_to_inverse_map (&mut g . textlinks_in, &corresponding_pid, pid); } }
 
 /// Remove a node's contributions from every inverse index. Used
@@ -187,19 +187,19 @@ fn add_to_inverse_indexes (g: &mut InRustGraph, node: &NodeRust) {
 fn remove_from_inverse_indexes (g: &mut InRustGraph, node: &NodeRust) {
   let pid : &ID = &node . pid;
   for second_member in &node . contains {
-    let corresponding_pid : ID = id_to_pid (g, second_member);
+    let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
     remove_from_inverse_map (&mut g . contained_by, &corresponding_pid, pid); }
   for second_member in node . subscribes_to . or_default () {
-    let corresponding_pid : ID = id_to_pid (g, second_member);
+    let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
     remove_from_inverse_map (&mut g . subscribers_of, &corresponding_pid, pid); }
   for second_member in node . hides_from_its_subscriptions . or_default () {
-    let corresponding_pid : ID = id_to_pid (g, second_member);
+    let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
     remove_from_inverse_map (&mut g . hiders_of, &corresponding_pid, pid); }
   for second_member in node . overrides_view_of . or_default () {
-    let corresponding_pid : ID = id_to_pid (g, second_member);
+    let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
     remove_from_inverse_map (&mut g . replacements_of, &corresponding_pid, pid); }
   for second_member in &node . textlinks_to {
-    let corresponding_pid : ID = id_to_pid (g, second_member);
+    let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
     remove_from_inverse_map (&mut g . textlinks_in, &corresponding_pid, pid); }
   for extra in &node . extra_ids {
     // Only remove if it still points at this pid — defensive against
@@ -288,7 +288,7 @@ fn remove_from_inverse_map (
 /// PITFALL (extra_id revocation unsupported): a Save whose new
 /// NodeRust /drops/ an extra_id that the old NodeRust had is not
 /// handled gracefully. Neighbor raw references to the dropped
-/// extra_id would fall through 'id_to_pid' (since 'id_to_pid' would
+/// extra_id would fall through 'id_to_pid_if_found' (since 'id_to_pid_if_found' would
 /// no longer know the extra_id) and land under the raw id —
 /// inconsistent with TypeDB. No production path exercises this today;
 /// if a user feature ever needs it, a dedicated migration (symmetric
