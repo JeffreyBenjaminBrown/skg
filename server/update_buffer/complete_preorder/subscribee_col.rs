@@ -1,5 +1,5 @@
 use crate::git_ops::read_repo::nodecomplete_from_git_head;
-use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data};
+use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_scaffold_children};
 use crate::types::git::SourceDiff;
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::types::memory::nodecomplete_from_memory_or_disk;
@@ -7,9 +7,8 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::{ error_unless_node_satisfies, read_at_ancestor_in_tree, write_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child, insert_scaffold_as_child};
-use crate::types::viewnode::mk_phantom_viewnode;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, Birth, mk_indefinitive_viewnode};
-use crate::update_buffer::util::{ move_child_to_end, subtree_satisfies, complete_relevant_children_in_viewnodetree};
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold};
+use crate::update_buffer::util::{ move_child_to_end, subtree_satisfies};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -77,34 +76,14 @@ pub async fn complete_subscribee_col_preorder (
     return Ok(( )); }
   if parent_indefinitive || source_diffs . is_some() { // If the parent is indefinitive, its SubscribeeCol might not reflect the truth, so we complete its children. If source_diffs is present (diff view), even a definitive parent needs reconciliation, so that removed subscribees appear as phantoms. (If the parent is definitive and the diff view is off, though, then the parent just *defined* what its children should be, so they don't need completion.)
     let child_data : HashMap<ID, ChildData> =
-      // Pre-compute child creation data so that the create_child closure argument to complete_relevant_children_in_viewnodetree captures only owned data and does not conflict with the &mut Tree borrow in complete_relevant_children_in_viewnodetree.
+      // Pre-compute child creation data so that the create_child closure inside reconcile_sharing_scaffold_children captures only owned data and does not conflict with the &mut Tree borrow.
       build_child_data(
         tree, node, &parent_skgid, &parent_source,
         &goal_list, &removed_ids,
         source_diffs, deleted_since_head_pid_src_map, config ) ?;
-    complete_relevant_children_in_viewnodetree(
-      tree, node,
-      |vn : &ViewNode| matches!( &vn . kind,
-                                 ViewNodeKind::True (t)
-                                 if !t . parent_ignores_it() ),
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::True (t) => t . id . clone(),
-        _ => panic!( "complete_subscribee_col_preorder: \
-                      relevant child not TrueNode" ) },
-      &goal_list,
-      |id : &ID| {
-        let d : &ChildData =
-          child_data . get (id) . expect(
-            "complete_subscribee_col_preorder: child data not pre-fetched" );
-        match d . phantom {
-          None =>
-            mk_indefinitive_viewnode(
-              id . clone(), d . source . clone(),
-              d . title . clone(), Birth::ContentOf ),
-          Some ((ex, mem)) =>
-            mk_phantom_viewnode(
-              id . clone(), d . source . clone(),
-              d . title . clone(), ex, mem ) } }, ) ?; }
+    reconcile_sharing_scaffold_children(
+      tree, node, &goal_list, &child_data,
+      "complete_subscribee_col_preorder" ) ?; }
   { // Ensure HiddenOutsideOfSubscribeeCol exists and is last.
     let hidden_outside : Option<NodeId> =
       unique_scaffold_child(

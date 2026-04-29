@@ -10,7 +10,8 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::types::memory::{find_source_many_ways, nodecomplete_from_memory_or_disk};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{ViewNode, ViewNodeKind};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Birth, mk_indefinitive_viewnode, mk_phantom_viewnode};
+use crate::update_buffer::util::complete_relevant_children_in_viewnodetree;
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -102,3 +103,43 @@ pub fn build_child_data (
                                     title   : skg . title . clone (),
                                     phantom : None } ); }}
   Ok (result) }
+
+/// Reconcile a sharing-scaffold's children against a goal list.
+///
+/// All three rerender-time sharing-scaffold completers
+/// (SubscribeeCol, HiddenInSubscribeeCol,
+/// HiddenOutsideOfSubscribeeCol) share the same call shape: pre-build
+/// per-child data, then call
+/// `complete_relevant_children_in_viewnodetree` with identical
+/// relevance/key/create closures. Phantom-flagged ChildData entries
+/// produce phantom viewnodes; non-phantom entries produce
+/// indefinitive ContentOf viewnodes.
+pub fn reconcile_sharing_scaffold_children (
+  tree          : &mut Tree<ViewNode>,
+  scaffold_node : NodeId,
+  goal_list     : &[ID],
+  child_data    : &HashMap<ID, ChildData>,
+  caller_label  : &'static str,
+) -> Result<(), Box<dyn Error>> {
+  complete_relevant_children_in_viewnodetree (
+    tree, scaffold_node,
+    |vn : &ViewNode| matches! ( &vn . kind,
+                                ViewNodeKind::True (t)
+                                if !t . parent_ignores_it () ),
+    |vn : &ViewNode| match &vn . kind {
+      ViewNodeKind::True (t) => t . id . clone (),
+      _ => panic! ( "{}: relevant child not TrueNode", caller_label ) },
+    goal_list,
+    |id : &ID| {
+      let d : &ChildData =
+        child_data . get (id) . unwrap_or_else (
+          || panic! ( "{}: child data not pre-fetched", caller_label ));
+      match d . phantom {
+        None =>
+          mk_indefinitive_viewnode (
+            id . clone (), d . source . clone (),
+            d . title . clone (), Birth::ContentOf ),
+        Some ((ex, mem)) =>
+          mk_phantom_viewnode (
+            id . clone (), d . source . clone (),
+            d . title . clone (), ex, mem ) } } ) }

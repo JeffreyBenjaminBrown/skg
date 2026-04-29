@@ -1,14 +1,13 @@
 use crate::git_ops::read_repo::nodecomplete_from_git_head;
-use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data};
-use crate::types::viewnode::mk_phantom_viewnode;
+use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_scaffold_children};
 use crate::types::git::{SourceDiff, NodeChanges, net_diff_from_per_stage, per_stage_node_changes_for_truenode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, write_at_ancestor_in_tree, with_node_mut};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth, mk_indefinitive_viewnode};
-use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, treat_certain_children, subtree_satisfies};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth};
+use crate::update_buffer::util::{treat_certain_children, subtree_satisfies};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -76,33 +75,14 @@ pub fn complete_hiddeninsubscribee_col (
           source_diffs, &subscribee_pid, &subscribee_source,
           &subscriber_pid, &subscriber_source,
           &subscribee_contains, &worktree_content, config ) };
-  let child_data : HashMap<ID, ChildData> = // Pre-compute this, so that the create_child closure argument to complete_relevant_children_in_viewnodetree captures only owned data and does not conflict with the &mut Tree borrow in complete_relevant_children_in_viewnodetree.
+  let child_data : HashMap<ID, ChildData> = // Pre-compute this, so that the create_child closure inside reconcile_sharing_scaffold_children captures only owned data and does not conflict with the &mut Tree borrow.
     build_child_data(
       tree, node, &subscribee_pid, &subscribee_source,
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, config ) ?;
-  complete_relevant_children_in_viewnodetree(
-    tree, node,
-    |vn : &ViewNode| matches!( &vn . kind,
-                               ViewNodeKind::True (t)
-                               if !t . parent_ignores_it() ),
-    |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::True (t) => t . id . clone(),
-      _ => panic!( "complete_hiddeninsubscribee_col: \
-                    relevant child not TrueNode" ) },
-    &goal_list,
-    |id : &ID| {
-      let d : &ChildData =
-        child_data . get (id) . expect(
-          "complete_hiddeninsubscribee_col: \
-           child data not pre-fetched" );
-      match d . phantom {
-        None => mk_indefinitive_viewnode(
-          id . clone(), d . source . clone(),
-          d . title . clone(), Birth::ContentOf ),
-        Some ((ex, mem)) => mk_phantom_viewnode(
-          id . clone(), d . source . clone(),
-          d . title . clone(), ex, mem ) }}, ) ?;
+  reconcile_sharing_scaffold_children(
+    tree, node, &goal_list, &child_data,
+    "complete_hiddeninsubscribee_col" ) ?;
   { // Change birth of erroneous content children to Independent. "Erroneous content" are TrueNode children marked birth=ContentOf that are not part of its content.
     let subscribee_contains_set : HashSet<ID> =
       subscribee_contains . iter() . cloned() . collect();
