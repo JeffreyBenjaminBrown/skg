@@ -6,7 +6,7 @@
 // 2. After saving with definitive view requests, HiddenInSubscribeeCol is shown
 
 use indoc::indoc;
-use skg::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
+use skg::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema, create_empty_tantivy_index};
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::typedb::nodes::create_all_nodes;
@@ -55,8 +55,8 @@ async fn setup_test(
     nodes . iter ()
     . map (NodeTypedb::from_complete_parsing_textlinks)
     . collect ();
-  overwrite_new_empty_db(db_name, &driver) . await?;
-  define_schema(db_name, &driver) . await?;
+  overwrite_new_empty_typedb_db(db_name, &driver) . await?;
+  read_and_use_schema(db_name, &driver) . await?;
   create_all_nodes(db_name, &driver, &typedb_nodes) . await?;
   create_all_relationships(db_name, &driver, &typedb_nodes) . await?;
   let tantivy_index: TantivyIndex =

@@ -3,7 +3,7 @@ pub use guard::TestDbGuard;
 
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
-use crate::dbs::init::{overwrite_new_empty_db, define_schema, create_empty_tantivy_index};
+use crate::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema, create_empty_tantivy_index};
 use crate::dbs::memory::{InRustGraph, InRustGraphHandle, audit::{audit_memory_against_typedb, format_mismatches}, new_handle};
 use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::dbs::typedb::nodes::create_all_nodes;
@@ -127,8 +127,8 @@ where
       nodes . iter ()
       . map (NodeTypedb::from_complete_parsing_textlinks)
       . collect ();
-    overwrite_new_empty_db(db_name, &driver) . await?;
-    define_schema(db_name, &driver) . await?;
+    overwrite_new_empty_typedb_db(db_name, &driver) . await?;
+    read_and_use_schema(db_name, &driver) . await?;
     create_all_nodes(db_name, &driver, &typedb_nodes) . await?;
     create_all_relationships(db_name, &driver, &typedb_nodes) . await?;
     guarded_test_then_cleanup(
@@ -227,9 +227,9 @@ pub async fn populate_test_db_from_fixtures (
         user_owns_it: true, } );
     read_all_skg_files_from_sources(
       &SkgConfig::dummyFromSources (sources))? };
-  overwrite_new_empty_db (
+  overwrite_new_empty_typedb_db (
     db_name, driver ) . await ?;
-  define_schema (
+  read_and_use_schema (
     db_name, driver ) . await?;
   let typedb_nodes : Vec<NodeTypedb> =
     nodes . iter ()

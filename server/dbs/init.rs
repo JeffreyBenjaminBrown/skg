@@ -295,10 +295,10 @@ async fn wipe_then_init_typedb_db
   driver : &TypeDBDriver,
   nodes  : &[NodeComplete],
 ) -> Result<(), Box<dyn Error>> {
-  overwrite_new_empty_db (
+  overwrite_new_empty_typedb_db (
     & config . db_name,
     driver ) . await ?;
-  define_schema (
+  read_and_use_schema (
     & config . db_name,
     driver ) . await ?;
   let t0 : Instant = Instant::now();
@@ -409,13 +409,12 @@ pub fn wipe_then_init_fs_db (
     update_index_with_nodes ( &tantivy_nodes, & tantivy_index )?;
   Ok (( tantivy_index, indexed_count )) }
 
-pub async fn overwrite_new_empty_db (
+pub async fn overwrite_new_empty_typedb_db (
   // Destroys the db named `db_name` if it exists,
   // then makes a new, empty one.
   db_name : &str,
   driver  : &TypeDBDriver
 ) -> Result < (), Box<dyn Error> > {
-
   let databases : &DatabaseManager = driver . databases ();
   if databases . contains (db_name) . await ? {
     tracing::info! ( db_name, "Deleting existing database" );
@@ -426,11 +425,10 @@ pub async fn overwrite_new_empty_db (
   databases . create (db_name) . await ?;
   Ok (()) }
 
-pub async fn define_schema (
+pub async fn read_and_use_schema (
   db_name : &str,
   driver  : &TypeDBDriver
 )-> Result < (), Box<dyn Error> > {
-
   let tx : Transaction =
     driver . transaction ( db_name,
                          TransactionType::Schema )

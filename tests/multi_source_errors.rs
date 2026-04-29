@@ -17,7 +17,7 @@ use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
-use skg::dbs::init::{overwrite_new_empty_db, define_schema};
+use skg::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema};
 use ego_tree::Tree;
 use std::error::Error;
 use std::path::PathBuf;
@@ -49,8 +49,8 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
       nodes . iter ()
       . map (NodeTypedb::from_complete_parsing_textlinks)
       . collect ();
-    overwrite_new_empty_db(&config . db_name, &driver) . await?;
-    define_schema(&config . db_name, &driver) . await?;
+    overwrite_new_empty_typedb_db(&config . db_name, &driver) . await?;
+    read_and_use_schema(&config . db_name, &driver) . await?;
     create_all_nodes(&config . db_name, &driver, &typedb_nodes) . await?;
     create_all_relationships(&config . db_name, &driver, &typedb_nodes) . await?;
 
@@ -148,8 +148,8 @@ fn test_foreign_node_modification_errors(
       nodes . iter ()
       . map (NodeTypedb::from_complete_parsing_textlinks)
       . collect ();
-    overwrite_new_empty_db(&config . db_name, &driver) . await?;
-    define_schema(&config . db_name, &driver) . await?;
+    overwrite_new_empty_typedb_db(&config . db_name, &driver) . await?;
+    read_and_use_schema(&config . db_name, &driver) . await?;
     create_all_nodes(&config . db_name, &driver, &typedb_nodes) . await?;
     create_all_relationships(&config . db_name, &driver, &typedb_nodes) . await?;
 
@@ -315,8 +315,8 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       nodes . iter ()
       . map (NodeTypedb::from_complete_parsing_textlinks)
       . collect ();
-    overwrite_new_empty_db(&config . db_name, &driver) . await?;
-    define_schema(&config . db_name, &driver) . await?;
+    overwrite_new_empty_typedb_db(&config . db_name, &driver) . await?;
+    read_and_use_schema(&config . db_name, &driver) . await?;
     create_all_nodes(&config . db_name, &driver, &typedb_nodes) . await?;
     create_all_relationships(&config . db_name, &driver, &typedb_nodes) . await?;
 

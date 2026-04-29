@@ -34,11 +34,11 @@ Total: 553 entries across ~102 files.
    - True?: Yes, but the implementation overwrites the file with empty bytes via fs::write rather than performing a metadata-only "touch"; on a non-existent path it creates the file (good), but on an existing one it truncates it.
    - Omits?: That the operation is destructive (truncates) rather than merely updating mtime.
 ** ONGOING rebuild_typedb_from_nodes (line 299)
-   - True?: Partly. Per the doc, this "Destroys and rebuilds" — but the function body just calls wipe_then_init_typedb_db, whose name does not mention destruction. The doc-claimed destruction happens only because wipe_then_init_typedb_db itself calls overwrite_new_empty_db. The name "rebuild" is fine, but the wrapper is a thin delegate around a name ("populate") that is gentler than what it does.
+   - True?: Partly. Per the doc, this "Destroys and rebuilds" — but the function body just calls wipe_then_init_typedb_db, whose name does not mention destruction. The doc-claimed destruction happens only because wipe_then_init_typedb_db itself calls overwrite_new_empty_typedb_db. The name "rebuild" is fine, but the wrapper is a thin delegate around a name ("populate") that is gentler than what it does.
    - Omits?: Nothing that the name itself misleads about.
 ** DONE renamed : was populate_typedb_from_nodes (line 310)
 is now wipe_then_init_typedb_db
-   - True?: No. The function "populates" but first overwrites the database to be empty (overwrite_new_empty_db) and re-defines the schema. "Populate" implies adding to existing; this is a wipe-and-rebuild.
+   - True?: No. The function "populates" but first overwrites the database to be empty (overwrite_new_empty_typedb_db) and re-defines the schema. "Populate" implies adding to existing; this is a wipe-and-rebuild.
    - Omits?: The destruction of the existing database and the schema redefinition — both load-bearing side effects hidden by "populate".
 ** DONE renamed : was initialize_tantivy_from_nodes (line 339)
 is now: wipe_then_init_tantivy_db
@@ -47,13 +47,15 @@ is now: wipe_then_init_tantivy_db
 ** DONE wipe_then_init_fs_db (line 415)
    - True?: Yes — the name explicitly mentions wiping and creating, which is honest. Good name.
    - Omits?: Nothing.
-** create_empty_tantivy_index (line 372)
+** ONGOING create_empty_tantivy_index (line 372)
    - True?: Partly. It creates an "empty" Tantivy index after first removing any existing index directory at that path. The destructive cleanup is a load-bearing side effect that "create_empty" does not advertise.
    - Omits?: The fs::remove_dir_all of the destination if it exists.
-** overwrite_new_empty_db (line 429)
+** DONE overwrite_new_empty_typedb_db (line 429)
    - True?: Yes; the name even has a useful in-line comment. The verb "overwrite" plus "new empty" is unusually honest about wiping any prior db.
    - Omits?: Nothing.
-** define_schema (line 446)
+** DONE was : define_schema  (line 446)
+is now : read_and_use_schema
+
    - True?: Partly. The function reads schema.tql from disk (CWD-relative) and applies it; "define" hides that the schema source is a file lookup that can panic via .expect.
    - Omits?: That schema.tql is read from CWD with .expect (panic on missing file).
 
