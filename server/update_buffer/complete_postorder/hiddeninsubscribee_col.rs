@@ -1,10 +1,10 @@
 use crate::git_ops::read_repo::nodecomplete_from_git_head;
+use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data};
 use crate::types::viewnode::mk_phantom_viewnode;
-use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff, NodeChanges, net_diff_from_per_stage, per_stage_node_changes_for_truenode};
+use crate::types::git::{SourceDiff, NodeChanges, net_diff_from_per_stage, per_stage_node_changes_for_truenode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::phantom::{title_for_phantom, phantom_axes};
-use crate::types::memory::{find_source_many_ways, nodecomplete_from_memory_or_disk};
+use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, write_at_ancestor_in_tree, with_node_mut};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth, mk_indefinitive_viewnode};
@@ -13,12 +13,6 @@ use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, tre
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-
-struct HiddenChildData {
-  source  : SourceName,
-  title   : String,
-  phantom : Option<(ExistenceAxes, MembershipAxes)>,
-}
 
 /// HiddenInSubscribeeCol completion (child-first / postorder pass).
 ///
@@ -82,8 +76,8 @@ pub fn complete_hiddeninsubscribee_col (
           source_diffs, &subscribee_pid, &subscribee_source,
           &subscriber_pid, &subscriber_source,
           &subscribee_contains, &worktree_content, config ) };
-  let child_data : HashMap<ID, HiddenChildData> = // Pre-compute this, so that the create_child closure argument to complete_relevant_children_in_viewnodetree captures only owned data and does not conflict with the &mut Tree borrow in complete_relevant_children_in_viewnodetree.
-    build_hidden_child_data(
+  let child_data : HashMap<ID, ChildData> = // Pre-compute this, so that the create_child closure argument to complete_relevant_children_in_viewnodetree captures only owned data and does not conflict with the &mut Tree borrow in complete_relevant_children_in_viewnodetree.
+    build_child_data(
       tree, node, &subscribee_pid, &subscribee_source,
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, config ) ?;
@@ -98,7 +92,7 @@ pub fn complete_hiddeninsubscribee_col (
                     relevant child not TrueNode" ) },
     &goal_list,
     |id : &ID| {
-      let d : &HiddenChildData =
+      let d : &ChildData =
         child_data . get (id) . expect(
           "complete_hiddeninsubscribee_col: \
            child data not pre-fetched" );
@@ -190,71 +184,3 @@ fn goallist_and_removedids_for_hiddeninsubscribeecol_with_diff (
     compute_interleaved_diff( &old_list, worktree_content );
   itemlist_and_removedset_from_diff (&diff) }
 
-/// Build a map from child ID to HiddenChildData.
-/// For each ID in goal_list, pre-compute the source, title, and
-/// phantom status so the create_child closure captures only owned data.
-fn build_hidden_child_data (
-  tree               : &Tree<ViewNode>,
-  node               : NodeId,
-  parent_skgid       : &ID,
-  parent_source      : &SourceName,
-  goal_list          : &[ID],
-  removed_ids        : &HashSet<ID>,
-  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  config             : &SkgConfig,
-) -> Result<HashMap<ID, HiddenChildData>, Box<dyn Error>> {
-  let existing_children : HashMap<ID, (SourceName, String)> =
-    { let node_ref : ego_tree::NodeRef<ViewNode> =
-        tree . get (node)
-          . ok_or ("build_hidden_child_data: node not found") ?;
-      let mut m : HashMap<ID, (SourceName, String)> = HashMap::new();
-      for child_ref in node_ref . children() {
-        if let ViewNodeKind::True (t) = &child_ref . value() . kind {
-          m . insert( t . id . clone(),
-                    ( t . source . clone(), t . title . clone() )); } }
-      m };
-  let child_sources : HashMap<ID, SourceName> =
-    existing_children . iter()
-      . map( |(id, (s, _))| (id . clone(), s . clone()) )
-      . collect();
-  let mut result : HashMap<ID, HiddenChildData> = HashMap::new();
-  for child_skgid in goal_list {
-    if result . contains_key (child_skgid) { continue; }
-    if removed_ids . contains (child_skgid) {
-      let child_src : SourceName =
-        find_source_many_ways(
-          child_skgid, &child_sources,
-          deleted_since_head_pid_src_map, config )
-        . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
-      let axes : (ExistenceAxes, MembershipAxes) =
-        phantom_axes (
-          child_skgid, &child_src,
-          parent_skgid, parent_source,
-          source_diffs . as_ref() );
-      let child_title : String =
-        title_for_phantom( child_skgid, &child_src,
-                           source_diffs . as_ref(), config );
-      result . insert( child_skgid . clone(),
-                     HiddenChildData { source: child_src,
-                                       title: child_title,
-                                       phantom: Some (axes) } );
-    } else {
-      if let Some( (s, t) ) = existing_children . get (child_skgid) {
-        result . insert( child_skgid . clone(),
-                       HiddenChildData { source: s . clone(),
-                                         title: t . clone(),
-                                         phantom: None } );
-      } else {
-        let child_src : SourceName =
-          find_source_many_ways (
-            child_skgid, &child_sources,
-            deleted_since_head_pid_src_map, config )
-          . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
-        let skg : NodeComplete = nodecomplete_from_memory_or_disk (
-          config, child_skgid, &child_src ) ?;
-        result . insert( child_skgid . clone(),
-                       HiddenChildData { source: skg . source . clone(),
-                                         title: skg . title . clone(),
-                                         phantom: None } ); } } }
-  Ok (result) }

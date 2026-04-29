@@ -1,0 +1,104 @@
+/// Shared per-child information for sharing-scaffold reconciliation.
+///
+/// Used by the rerender-time completers for SubscribeeCol,
+/// HiddenInSubscribeeCol, and HiddenOutsideOfSubscribeeCol. Each
+/// completer used to define a near-identical local copy of this
+/// struct and a near-identical `build_*_child_data` helper.
+
+use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
+use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::phantom::{title_for_phantom, phantom_axes};
+use crate::types::memory::{find_source_many_ways, nodecomplete_from_memory_or_disk};
+use crate::types::nodes::complete::NodeComplete;
+use crate::types::viewnode::{ViewNode, ViewNodeKind};
+
+use ego_tree::{NodeId, NodeRef, Tree};
+use std::collections::{HashMap, HashSet};
+use std::error::Error;
+
+/// Per-child information needed to build a viewnode for a sharing
+/// scaffold's child (subscribee, hidden-in-subscribee, or
+/// hidden-outside-of-subscribees).
+///
+/// `phantom: None` => normal indef ContentOf child.
+/// `phantom: Some(axes)` => diff-view phantom marking removal.
+pub struct ChildData {
+  pub source  : SourceName,
+  pub title   : String,
+  pub phantom : Option<(ExistenceAxes, MembershipAxes)>,
+}
+
+/// Build a map from child ID to ChildData for the create-child
+/// closure of `complete_relevant_children_in_viewnodetree`.
+/// Pre-computes everything so the closure captures only owned
+/// data, avoiding conflict with the &mut Tree borrow inside the
+/// reconciler.
+///
+/// `parent_skgid` and `parent_source` are the col's containing
+/// node (the subscribee for HiddenIn; the subscriber for
+/// SubscribeeCol and HiddenOutsideOf). They feed into
+/// `phantom_axes`'s membership-side axes.
+pub fn build_child_data (
+  tree                           : &Tree<ViewNode>,
+  scaffold_node                  : NodeId,
+  parent_skgid                   : &ID,
+  parent_source                  : &SourceName,
+  goal_list                      : &[ID],
+  removed_ids                    : &HashSet<ID>,
+  source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  config                         : &SkgConfig,
+) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
+  let existing_children : HashMap<ID, (SourceName, String)> = {
+    let node_ref : NodeRef<ViewNode> =
+      tree . get (scaffold_node)
+        . ok_or ("build_child_data: node not found") ?;
+    let mut m : HashMap<ID, (SourceName, String)> = HashMap::new ();
+    for child_ref in node_ref . children () {
+      if let ViewNodeKind::True (t) = & child_ref . value () . kind {
+        m . insert ( t . id . clone (),
+                     ( t . source . clone (),
+                       t . title . clone () )); }}
+    m };
+  let child_sources : HashMap<ID, SourceName> =
+    existing_children . iter ()
+      . map ( |(id, (s, _))| (id . clone (), s . clone ()) )
+      . collect ();
+  let mut result : HashMap<ID, ChildData> = HashMap::new ();
+  for child_skgid in goal_list {
+    if result . contains_key (child_skgid) { continue; }
+    if removed_ids . contains (child_skgid) {
+      let child_src : SourceName =
+        find_source_many_ways (
+          child_skgid, &child_sources,
+          deleted_since_head_pid_src_map, config )
+        . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+      let axes : (ExistenceAxes, MembershipAxes) =
+        phantom_axes ( child_skgid, &child_src,
+                       parent_skgid, parent_source,
+                       source_diffs . as_ref () );
+      let child_title : String =
+        title_for_phantom ( child_skgid, &child_src,
+                            source_diffs . as_ref (), config );
+      result . insert ( child_skgid . clone (),
+                        ChildData { source  : child_src,
+                                    title   : child_title,
+                                    phantom : Some (axes) } );
+    } else if let Some ( (s, t) ) = existing_children . get (child_skgid) {
+      result . insert ( child_skgid . clone (),
+                        ChildData { source  : s . clone (),
+                                    title   : t . clone (),
+                                    phantom : None } );
+    } else {
+      let child_src : SourceName =
+        find_source_many_ways (
+          child_skgid, &child_sources,
+          deleted_since_head_pid_src_map, config )
+        . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+      let skg : NodeComplete = nodecomplete_from_memory_or_disk (
+        config, child_skgid, &child_src ) ?;
+      result . insert ( child_skgid . clone (),
+                        ChildData { source  : skg . source . clone (),
+                                    title   : skg . title . clone (),
+                                    phantom : None } ); }}
+  Ok (result) }
