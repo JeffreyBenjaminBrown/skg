@@ -164,7 +164,7 @@ impl OpenViews {
 /// this does not return those.)
 ///
 /// Extra_ids are pulled from the in-Rust memory. If memory isn't
-/// initialized (tests that bypass 'init_global_handle'), only
+/// initialized (tests that bypass 'init_global_handle_for_first_time_or_panic'), only
 /// primary ids are collected — extras aren't available.
 fn root_ids_from_viewforest (
   viewforest : &Tree<ViewNode>,

@@ -24,7 +24,7 @@ use crate::types::misc::{ID, SourceName};
 /// Assumes the input is a primary ID (not an extra ID).
 /// Reads the in-Rust memory (populated at server startup). The
 /// TypeDB branch below is exercised only by tests that bypass
-/// 'init_global_handle'; in the running server the memory path is
+/// 'init_global_handle_for_first_time_or_panic'; in the running server the memory path is
 /// always taken.
 pub async fn find_container_ids_of_pid (
   db_name : &str,
@@ -64,7 +64,7 @@ pub async fn find_container_ids_of_pid (
 /// related to any of the input nodes.
 /// Reads the in-Rust memory (populated at server startup). The
 /// TypeDB branch below is exercised only by tests that bypass
-/// 'init_global_handle'; in the running server the memory path is
+/// 'init_global_handle_for_first_time_or_panic'; in the running server the memory path is
 /// always taken. The TypeDB path sends one query per input ID,
 /// bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
 pub async fn find_related_nodes (
@@ -280,7 +280,7 @@ pub(crate) async fn find_related_nodes_for_one_primary_pid_in_tx (
 ///
 /// Reads the in-Rust memory (populated at server startup). The
 /// TypeDB branch below is exercised only by tests that bypass
-/// 'init_global_handle', or on the rare case that memory is
+/// 'init_global_handle_for_first_time_or_panic', or on the rare case that memory is
 /// initialized but doesn't hold the id (normally memory contains
 /// every node across all sources). In the running server the
 /// memory path covers the hot case.

@@ -7,14 +7,16 @@
 /// Converts org-roam .org files to .skg files.
 
 use skg::context::{compute_and_store_context_types, MapToContent, MapToContainers};
+use skg::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::{InitData, initialize_dbs};
-use skg::dbs::memory::init_global_handle;
+use skg::dbs::memory::init_global_handle_for_first_time_or_panic;
 use skg::dbs::memory::scheduled_audit::schedule_daemon;
 use skg::dbs::typedb::util::{connect_to_typedb, delete_database};
 use skg::import_org_roam::import_org_roam_directory;
 use skg::serve::serve;
 use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
+use skg::types::nodes::complete::NodeComplete;
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -74,17 +76,25 @@ fn main() -> Result<(), Box<dyn Error>> {
 
   install_shutdown_signal_handler (&config);
 
-  let InitData { driver        : typedb_driver,
-                  tantivy_index,
-                  graph,
-                  had_id_set,
-                  all_node_ids,
-                  link_targets,
-                  map_to_content,
-                  map_to_containers } : InitData =
+  let ( InitData { driver        : typedb_driver,
+                    tantivy_index,
+                    graph,
+                    had_id_set,
+                    all_node_ids,
+                    link_targets,
+                    map_to_content,
+                    map_to_containers },
+        nodes )
+      : (InitData, Vec<NodeComplete>) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span! (
         "initialize_dbs") . entered ();
       initialize_dbs (&config) };
+  check_for_duplicate_ids_across_sources (
+    &nodes, &config . data_root)
+    . unwrap_or_else ( |e| {
+      tracing::error! ("Duplicate ID check failed: {}", e);
+      std::process::exit (1); } );
+  drop (nodes); // free the NodeCompletes — we kept them only for the dup check above
 
   // Hand the live driver to the signal handler. From here on,
   // a Ctrl-C reuses this connection instead of opening a new one.
@@ -94,7 +104,7 @@ fn main() -> Result<(), Box<dyn Error>> {
   // Install the process-global handle to the in-Rust memory so that
   // hot read paths (e.g. 'pid_and_source_from_id') can bypass TypeDB
   // without every caller threading a '&Graph' parameter.
-  init_global_handle ( Arc::clone (&graph) );
+  init_global_handle_for_first_time_or_panic ( Arc::clone (&graph) );
 
   schedule_daemon (
     &config, Arc::clone (&typedb_driver), Arc::clone (&graph) );

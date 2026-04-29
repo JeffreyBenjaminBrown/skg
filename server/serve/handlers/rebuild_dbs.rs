@@ -5,7 +5,7 @@ use crate::context::{
   link_targets_from_nodes};
 use crate::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
-use crate::dbs::init::{rebuild_typedb_from_nodes, rebuild_tantivy_from_nodes};
+use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
 use crate::dbs::memory::InRustGraph;
 use crate::serve::ConnectionState;
 use crate::serve::protocol::TcpToClient;
@@ -33,7 +33,7 @@ pub fn handle_rebuild_dbs_request (
     check_for_duplicate_ids_across_sources (
       &nodes, &config . data_root)
       . map_err ( |e| format! ("Duplicate ID check failed: {}", e) ) ?;
-    block_on ( rebuild_typedb_from_nodes (
+    block_on ( wipe_then_init_typedb_db (
       config, typedb_driver, &nodes) )
       . map_err ( |e| format! ("TypeDB rebuild failed: {}", e) ) ?;
     tracing::info!("TypeDB rebuilt.");

@@ -3,7 +3,6 @@
 use crate::context::{MapToContent, MapToContainers};
 use crate::context::{content_maps_from_nodes, had_id_set_from_nodes};
 use crate::context::link_targets_from_nodes;
-use crate::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::multiple_nodes::read_recently_modified_skgfiles_from_sources;
 use crate::dbs::tantivy::open_existing_tantivy_index;
@@ -54,10 +53,10 @@ pub struct InitData {
 /// it rebuilds incrementally (only re-reading modified .skg files).
 /// Otherwise rebuilds completely.
 /// Ends by touching the marker file.
-/// Returns InitData with everything needed for context computation.
+/// Returns (InitData, nodes used to create InitData).
 pub fn initialize_dbs (
   config : & SkgConfig,
-) -> InitData {
+) -> (InitData, Vec<NodeComplete>) {
   let driver : TypeDBDriver = connect_to_typedb();
   let marker_path : PathBuf =
     config . data_root . join (".skg_init_marker");
@@ -66,7 +65,7 @@ pub fn initialize_dbs (
       &driver, &config . db_name, &marker_path,
       Path::new ( &config . tantivy_folder )
     ) . await } );
-  let init_data : InitData =
+  let result : (InitData, Vec<NodeComplete>) =
     if can_incremental {
       let marker_mtime : std::time::SystemTime =
         fs::metadata (&marker_path)
@@ -80,10 +79,10 @@ pub fn initialize_dbs (
           let nodes : Vec<NodeComplete> =
             read_all_skg_files_from_sources (config)
             . unwrap_or_default ();
-          let _ = check_for_duplicate_ids_across_sources (
-            &nodes, &config . data_root);
-          init_data_from_nodes (
-            &nodes, Arc::new (driver), tantivy_index ) }
+          let init_data : InitData =
+            init_data_from_nodes (
+              &nodes, Arc::new (driver), tantivy_index );
+          (init_data, nodes) }
         Err (e) => {
           tracing::warn! ("Incremental init failed ({}), \
                      falling back to full rebuild.", e);
@@ -91,7 +90,7 @@ pub fn initialize_dbs (
     } else {
       full_init (config, driver) };
   touch_init_marker (&marker_path);
-  init_data }
+  result }
 
 /// DEAD ? See "incremental init" in is-it-dead.org.
 ///
@@ -229,10 +228,11 @@ fn init_data_from_nodes (
 /// Full rebuild: reads all .skg files, populates both databases.
 /// Also computes had_id_set and contains maps from the loaded nodes,
 /// avoiding re-reading files or querying TypeDB for context computation.
+/// Returns (the InitData, the nodes that produced the InitData).
 fn full_init (
   config : &SkgConfig,
   driver : TypeDBDriver,
-) -> InitData {
+) -> (InitData, Vec<NodeComplete>) {
   tracing::info! ("Performing full init...");
   let nodes : Vec<NodeComplete> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -242,11 +242,6 @@ fn full_init (
       . unwrap_or_else ( |e| {
         tracing::error! ("Failed to read .skg files: {}", e);
         std::process::exit (1); } ) };
-  check_for_duplicate_ids_across_sources (
-    &nodes, &config . data_root)
-    . unwrap_or_else ( |e| {
-      tracing::error! ("Duplicate ID check failed: {}", e);
-      std::process::exit (1); } );
   tracing::info! (files = nodes . len(),
             sources = config . sources . len(),
             ".skg files read from source(s)");
@@ -263,10 +258,12 @@ fn full_init (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "initialize_tantivy" ). entered();
       wipe_then_init_tantivy_db (config, &nodes) };
-  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "extract_context_data_from_nodes" ). entered();
-    init_data_from_nodes (
-      &nodes, Arc::new (driver), tantivy_index ) } }
+  let init_data : InitData =
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "extract_context_data_from_nodes" ). entered();
+      init_data_from_nodes (
+        &nodes, Arc::new (driver), tantivy_index ) };
+  (init_data, nodes) }
 
 fn touch_init_marker (
   path : &Path,
@@ -275,22 +272,13 @@ fn touch_init_marker (
     tracing::warn! ("Could not touch init marker {:?}: {}",
                path, e); } }
 
-/// Destroys and rebuilds the TypeDB database from the given nodes.
-/// Uses an existing driver connection rather than creating a new one.
-/// Callers are responsible for reading the .skg files
-/// (and, if desired, checking duplicate IDs) beforehand.
-pub async fn rebuild_typedb_from_nodes (
-  config : &SkgConfig,
-  driver : &TypeDBDriver,
-  nodes  : &[NodeComplete],
-) -> Result<(), Box<dyn Error>> {
-  wipe_then_init_typedb_db (
-    config, driver, nodes ) . await }
-
 /// Populates a TypeDB database from the given nodes:
 /// overwrites with empty db, defines schema,
 /// creates all nodes and relationships.
-async fn wipe_then_init_typedb_db
+/// Uses an existing driver connection rather than creating a new one.
+/// Callers are responsible for reading the .skg files
+/// (and, if desired, checking duplicate IDs) beforehand.
+pub async fn wipe_then_init_typedb_db (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   nodes  : &[NodeComplete],

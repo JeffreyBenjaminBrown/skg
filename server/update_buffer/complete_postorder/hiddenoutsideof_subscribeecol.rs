@@ -212,7 +212,7 @@ fn head_subscribee_contains_from_memory_and_diffs (
 
 /// Resolve a node's source: try the in-Rust memory snapshot first, fall back
 /// to scanning source directories for the matching '.skg' file. Tests that
-/// bypass 'init_global_handle' rely on the disk fallback.
+/// bypass 'init_global_handle_for_first_time_or_panic' rely on the disk fallback.
 fn snapshot_global_source (
   pid    : &ID,
   config : &SkgConfig,

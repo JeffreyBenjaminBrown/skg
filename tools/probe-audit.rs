@@ -22,7 +22,7 @@ use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::memory::{
   audit::audit_one_node,
   InRustGraph, InRustGraphHandle,
-  init_global_handle, new_handle,
+  init_global_handle_for_first_time_or_panic, new_handle,
 };
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::nodes::complete::NodeComplete;
@@ -46,7 +46,7 @@ async fn main () -> Result<(), Box<dyn std::error::Error>> {
     &nodes, &config . data_root) ?;
   let graph : InRustGraph = InRustGraph::from_nodecompletes (&nodes);
   let handle : InRustGraphHandle = new_handle (graph);
-  init_global_handle (Arc::clone (&handle));
+  init_global_handle_for_first_time_or_panic (Arc::clone (&handle));
   let snap : Arc<InRustGraph> = handle . load_full ();
   println! ("Loaded graph: {} nodes", snap . nodes . len ());
 

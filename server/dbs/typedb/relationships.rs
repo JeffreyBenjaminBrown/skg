@@ -153,7 +153,7 @@ pub async fn insert_relationship_from_list (
   // ('or { extra_id ... }') which TypeDB's planner evaluates by
   // scanning every extra_id entity — catastrophically slow on
   // a non-trivial corpus. Only the unresolved-via-memory fallback
-  // path (tests that bypass 'init_global_handle') pays that cost.
+  // path (tests that bypass 'init_global_handle_for_first_time_or_panic') pays that cost.
   let snap = snapshot_global ();
   for target_id in id_list {
     let target_pid : Option<ID> =

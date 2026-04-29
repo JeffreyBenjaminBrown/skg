@@ -4,7 +4,7 @@ pub mod validate_merge;
 use crate::dbs::filesystem::multiple_nodes::{
   check_for_duplicate_ids_across_sources,
   read_all_skg_files_from_sources};
-use crate::dbs::init::{rebuild_typedb_from_nodes, rebuild_tantivy_from_nodes};
+use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
 use crate::dbs::memory::{InRustGraphHandle, apply_definenodes};
 use crate::merge::mergeInstructionTriple::neighbor_savenodes_for_merges;
 use crate::save::{ update_fs_from_saveinstructions, update_tantivy_from_saveinstructions, update_typedb_from_saveinstructions };
@@ -88,7 +88,7 @@ pub async fn merge_nodes (
         . map_err ( |e2| -> Box<dyn Error> { format!(
            "TypeDB rebuild also failed: {}. Restart the server.", e2)
            . into () } ) ?;
-      rebuild_typedb_from_nodes (&config, driver, &nodes) . await
+      wipe_then_init_typedb_db (&config, driver, &nodes) . await
         . map_err ( |e2| -> Box<dyn Error> { format!(
            "TypeDB rebuild also failed: {}. Restart the server.", e2)
            . into () } ) ?;

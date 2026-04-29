@@ -9,13 +9,13 @@ Coverage: every .rs under server/ except test_utils*, abandoned/,
 and lib.rs.
 
 Total: 553 entries across ~102 files.
-* server/util.rs
+* DONE server/util.rs
 ** DONE path_from_pid_and_source (line 6)
    - True?: Partly. The function returns a path string only if the source is found in config; otherwise it returns an Err, but the name does not signal that fallibility.
    - Omits?: It also derives the filename by appending a hard-coded ".skg" extension, which the name does not hint at.
 
 * server/dbs/init.rs
-** ONGOING initialize_dbs (line 58)
+** DONE initialize_dbs (line 58)
    - True?: Partly. The function does initialize TypeDB and Tantivy, but it ALSO sometimes calls the duplicate-ID check, builds the in-memory InRustGraphHandle, computes had_id_set/all_node_ids/link_targets/contains-maps, and touches a marker file.
    - Omits?: The name hides the heavy in-memory context-data extraction, the duplicate-ID check, and the marker-file side effect; and it doesn't reveal that the function may exit the process via std::process::exit on certain failures.
 ** DONE can_do_incremental_init_of_dbs (line 105)
@@ -60,10 +60,11 @@ is now : read_and_use_schema
    - Omits?: That schema.tql is read from CWD with .expect (panic on missing file).
 
 * server/dbs/memory.rs
-** init_global_handle (line 38)
+** DONE was : init_global_handle (line 38)
+is now : init_global_handle_for_first_time_or_panic
    - True?: Partly. The function sets the global handle but panics (via .expect) if it has already been initialized. The name says "init", which suggests idempotency or first-time setup, not a hard panic on second call.
    - Omits?: The panic-on-double-init failure mode.
-** snapshot_global (line 47)
+** DONE snapshot_global (line 47)
    - True?: Yes. Returns Option<Arc<InRustGraph>>, and "global" plus "snapshot" together accurately describe the read.
    - Omits?: Nothing.
 ** id_to_pid (line 136)
@@ -1305,7 +1306,7 @@ is now : read_and_use_schema
    - Omits?: It omits the disk-fallback path used when diffs are absent.
 ** snapshot_global_source (line 216)
    - True?: Partly. The function has a disk-scanning fallback when the global memory snapshot is uninitialized or missing the pid; the name says "snapshot_global" but the fallback uses source_from_disk.
-   - Omits?: It omits the disk-scan fallback (relied on by tests bypassing init_global_handle).
+   - Omits?: It omits the disk-scan fallback (relied on by tests bypassing init_global_handle_for_first_time_or_panic).
 ** build_hidden_child_data (line 232)
    - True?: Partly. The function reads NodeCompletes from memory/disk for missing children — per-call I/O.
    - Omits?: It omits the per-child disk reads.

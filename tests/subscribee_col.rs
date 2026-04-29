@@ -35,7 +35,7 @@ async fn setup_multi_source_test(
     . map (NodeTypedb::from_complete_parsing_textlinks)
     . collect ();
   overwrite_new_empty_typedb_db(db_name, &driver) . await?;
-  read_and_use_schem(db_name, &driver) . await?;
+  read_and_use_schema(db_name, &driver) . await?;
   create_all_nodes(db_name, &driver, &typedb_nodes) . await?;
   create_all_relationships(db_name, &driver, &typedb_nodes) . await?;
   Ok((config, driver)) }

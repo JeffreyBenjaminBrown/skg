@@ -111,7 +111,7 @@ struct OnePidStats {
 /// in-Rust memory is initialized, otherwise to
 /// 'fetch_all_graphnodestats_from_typedb'. In the running server the
 /// memory path is always taken; the TypeDB path is exercised only by
-/// tests that bypass 'init_global_handle'.
+/// tests that bypass 'init_global_handle_for_first_time_or_panic'.
 pub async fn fetch_all_graphnodestats (
   db_name : &str,
   driver  : &TypeDBDriver,
@@ -128,7 +128,7 @@ pub async fn fetch_all_graphnodestats (
     db_name, driver, pids, &pid_set ) . await }
 
 /// TypeDB-backed implementation. Exercised only by tests that bypass
-/// 'init_global_handle'; in the running server the dispatcher routes
+/// 'init_global_handle_for_first_time_or_panic'; in the running server the dispatcher routes
 /// to 'fetch_all_graphnodestats_in_rust' instead. Uses
 /// 'buffer_unordered (TYPEDB_CONCURRENT_TRANSACTIONS)' for consistency
 /// with the rest of the TypeDB module.

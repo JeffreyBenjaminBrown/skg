@@ -21,7 +21,7 @@ use crate::types::save::{DefineNode, DeleteNode, SaveNode};
 
 /// Process-global handle to the in-Rust memory.
 ///
-/// Set once, at server startup (see 'init_global_handle'). Read-only
+/// Set once, at server startup (see 'init_global_handle_for_first_time_or_panic'). Read-only
 /// afterwards. Functions on hot read paths (notably
 /// 'pid_and_source_from_id') consult this handle to bypass TypeDB
 /// without requiring every caller to thread a '&InRustGraph' parameter.
@@ -35,13 +35,13 @@ static GLOBAL_HANDLE : OnceLock<InRustGraphHandle> =
 
 /// Set the process-global handle. Must be called exactly once, at
 /// server startup, after the initial 'InRustGraph' has been built.
-pub fn init_global_handle (handle: InRustGraphHandle) {
+pub fn init_global_handle_for_first_time_or_panic (handle: InRustGraphHandle) {
   GLOBAL_HANDLE . set (handle) . ok ()
     . expect ("GLOBAL_HANDLE initialized twice"); }
 
 /// Snap the current in-Rust memory if the global handle has been
 /// initialized; returns None otherwise. In the running server
-/// 'init_global_handle' is called during startup before any request
+/// 'init_global_handle_for_first_time_or_panic' is called during startup before any request
 /// is served, so None here indicates a test that bypassed startup
 /// (or code running before startup completes).
 pub fn snapshot_global () -> Option<Arc<InRustGraph>> {
