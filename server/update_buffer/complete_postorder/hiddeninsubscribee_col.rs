@@ -1,7 +1,6 @@
-use crate::git_ops::read_repo::nodecomplete_from_git_head;
 use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_scaffold_children};
-use crate::types::git::{SourceDiff, NodeChanges, net_diff_from_per_stage, per_stage_node_changes_for_truenode};
-use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
+use crate::to_org::complete::sharing::goal_list::goal_list_for_hiddeninsubscribee_col;
+use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::nodes::complete::NodeComplete;
@@ -58,23 +57,12 @@ pub fn complete_hiddeninsubscribee_col (
         config, &subscriber_pid, &subscriber_source ) ?;
     subscriber_nodecomplete . hides_from_its_subscriptions
       . or_default() . to_vec() };
-  let worktree_content : Vec<ID> =
-    { // Intersection of subscriber_hides and subscribee_contains,
-      // preserving order from subscriber_hides.
-      let subscribee_contains_set : HashSet<ID> =
-        subscribee_contains . iter() . cloned() . collect();
-      subscriber_hides . iter()
-        . filter( |id| subscribee_contains_set . contains (id) )
-        . cloned() . collect() };
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
-    match source_diffs {
-      None => ( worktree_content . clone(),
-                HashSet::new() ),
-      Some (_) =>
-        goallist_and_removedids_for_hiddeninsubscribeecol_with_diff(
-          source_diffs, &subscribee_pid, &subscribee_source,
-          &subscriber_pid, &subscriber_source,
-          &subscribee_contains, &worktree_content, config ) };
+    goal_list_for_hiddeninsubscribee_col(
+      &subscribee_pid, &subscribee_source,
+      &subscriber_pid, &subscriber_source,
+      &subscribee_contains, &subscriber_hides,
+      source_diffs, config );
   let child_data : HashMap<ID, ChildData> = // Pre-compute this, so that the create_child closure inside reconcile_sharing_scaffold_children captures only owned data and does not conflict with the &mut Tree borrow.
     build_child_data(
       tree, node, &subscribee_pid, &subscribee_source,
@@ -100,54 +88,4 @@ pub fn complete_hiddeninsubscribee_col (
     ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?; }
   detach_scaffold_if_empty (tree, node) ?;
   Ok(( )) }
-
-/// Reconstruct the HEAD version of hidden-in-subscribee content,
-/// diff it against the worktree version,
-/// and return the goal list and removed set.
-///
-/// Uses per-stage contains_diff (via 'net_diff_from_per_stage')
-/// rather than the merged 'node_changes_for_truenode' view, so that
-/// staged-only contains-list changes still produce phantoms.
-fn goallist_and_removedids_for_hiddeninsubscribeecol_with_diff (
-  source_diffs        : &Option<HashMap<SourceName, SourceDiff>>,
-  subscribee_pid      : &ID,
-  subscribee_source   : &SourceName,
-  subscriber_pid      : &ID,
-  subscriber_source   : &SourceName,
-  subscribee_contains : &[ID],
-  worktree_content    : &[ID],
-  config              : &SkgConfig,
-) -> (Vec<ID>, HashSet<ID>) {
-  let (staged_nc, unstaged_nc)
-    : (Option<&NodeChanges>, Option<&NodeChanges>) =
-    per_stage_node_changes_for_truenode (
-      source_diffs, subscribee_pid, subscribee_source );
-  let head_subscribee_contains : Vec<ID> =
-    if staged_nc . is_none () && unstaged_nc . is_none () {
-      subscribee_contains . to_vec ()
-    } else {
-      let net : Vec<Diff_Item<ID>> = net_diff_from_per_stage (
-        staged_nc   . map ( |c| c . contains_diff . as_slice () ),
-        unstaged_nc . map ( |c| c . contains_diff . as_slice () ));
-      net . iter () . filter_map (
-          |d| match d { // Items that were in HEAD: Unchanged or Removed.
-            Diff_Item::Unchanged (id) |
-              Diff_Item::Removed (id) => Some ( id . clone () ),
-            Diff_Item::New (_) => None } )
-        . collect () };
-  let head_subscriber_hides : Vec<ID> =
-    nodecomplete_from_git_head(
-        subscriber_pid, subscriber_source, config )
-      . ok()
-      . map( |skg| skg . hides_from_its_subscriptions . into_vec() )
-      . unwrap_or_default();
-  let old_list : Vec<ID> =
-    { let head_subscribee_contains_set : HashSet<ID> =
-        head_subscribee_contains . iter() . cloned() . collect();
-      head_subscriber_hides . iter() . filter(
-          |id| head_subscribee_contains_set . contains (id)
-        ) . cloned() . collect() };
-  let diff : Vec<Diff_Item<ID>> =
-    compute_interleaved_diff( &old_list, worktree_content );
-  itemlist_and_removedset_from_diff (&diff) }
 

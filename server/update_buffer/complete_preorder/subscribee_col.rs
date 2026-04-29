@@ -1,10 +1,8 @@
-use crate::git_ops::read_repo::nodecomplete_from_git_head;
 use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_scaffold_children};
+use crate::to_org::complete::sharing::goal_list::goal_list_for_subscribee_col;
 use crate::types::git::SourceDiff;
-use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::{ error_unless_node_satisfies, read_at_ancestor_in_tree};
 use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child, insert_scaffold_as_child};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold};
@@ -61,9 +59,9 @@ pub async fn complete_subscribee_col_preorder (
       . map ( |skg| skg . subscribes_to . or_default () . to_vec () )
       . unwrap_or_default ();
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
-    diff_aware_goal_list(
-      source_diffs, &parent_source, &parent_skgid,
-      config, &worktree_subscribees );
+    goal_list_for_subscribee_col(
+      &parent_skgid, &parent_source,
+      source_diffs, &worktree_subscribees, config );
   if goal_list . is_empty() { // delete SubscribeeCol, handling focus
     detach_scaffold_transferring_focus (tree, node) ?;
     return Ok(( )); }
@@ -89,35 +87,4 @@ pub async fn complete_subscribee_col_preorder (
                   Scaffold::HiddenOutsideOfSubscribeeCol,
                   false ) ?; }, }}
   Ok(( )) }
-
-/// Compute the goal list and removed set for subscribee children.
-/// In diff view, diffs HEAD subscribees against worktree subscribees
-/// so that removed subscriptions appear as phantoms.
-/// Outside diff view, returns the worktree subscribees unchanged.
-fn diff_aware_goal_list (
-  source_diffs          : &Option<HashMap<SourceName, SourceDiff>>,
-  parent_source         : &SourceName,
-  parent_skgid          : &ID,
-  config                : &SkgConfig,
-  worktree_subscribees  : &[ID],
-) -> (Vec<ID>, HashSet<ID>) {
-  let head_subscribees : Option<Vec<ID>> =
-    source_diffs . as_ref()
-      . and_then( |diffs| diffs . get (parent_source) )
-      . filter( |sd| sd . is_git_repo )
-      . and_then(
-         |_| { let skg : NodeComplete =
-                 nodecomplete_from_git_head(
-                   parent_skgid, parent_source, config )
-                 . ok() ?;
-               if skg . subscribes_to . is_unspecified() { None }
-               else { Some (
-                 skg . subscribes_to . into_vec() ) }} );
-  match head_subscribees {
-    None =>
-      (worktree_subscribees . to_vec(), HashSet::new()),
-    Some (head) => {
-      let diff : Vec<Diff_Item<ID>> =
-        compute_interleaved_diff( &head, worktree_subscribees );
-      itemlist_and_removedset_from_diff (&diff) } } }
 

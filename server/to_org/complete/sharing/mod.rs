@@ -1,4 +1,5 @@
 pub mod child_data;
+pub mod goal_list;
 
 use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   partition_subscribee_content_for_subscriber,
