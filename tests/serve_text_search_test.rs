@@ -1,7 +1,5 @@
 // cargo test --test serve_text_search_test
 
-use skg::context::ContextOriginType;
-use skg::dbs::tantivy::context_update::update_context_origin_types;
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
 use skg::org_to_text::viewforest_to_string;
@@ -10,7 +8,7 @@ use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::viewnode::Scaffold;
 use skg::dbs::init::in_fs_wipe_index_then_create_it;
 use skg::serve::handlers::text_search::{
-  group_matches_by_id, build_search_viewforest, SearchScope};
+  group_matches_by_id, build_search_viewforest};
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -73,8 +71,7 @@ fn test_text_search_org_format (
       let matches_by_id =
         group_matches_by_id (
           best_matches, searcher, &tantivy_index,
-          search_terms, &SearchOptions::default (),
-          &SearchScope::Everything );
+          search_terms, &SearchOptions::default () );
       let (viewforest, _search_results) =
         build_search_viewforest (
           search_terms,
@@ -147,28 +144,6 @@ fn test_text_search_org_format (
                   &"the cheese" . to_string () ),
                 "Should have 'the cheese' as an alias" );
 
-      // --- origins_only filtering ---
-      // Stamp id_1 as Root; id_2 has no origin type.
-      let mut context_types : HashMap < ID, String > =
-        HashMap::new ();
-      context_types . insert (
-        ID::new ("id_1"),
-        ContextOriginType::Root . label () . to_string () );
-      update_context_origin_types (
-        &tantivy_index, &context_types ) ?;
-
-      let ( best_matches_2, searcher_2 ) =
-        search_index ( &tantivy_index, search_terms, &SearchOptions::default () ) ?;
-      let matches_filtered =
-        group_matches_by_id (
-          best_matches_2, searcher_2, &tantivy_index,
-          search_terms, &SearchOptions::default (),
-          &SearchScope::Rooty );
-      assert_eq! ( matches_filtered . len (), 1,
-                   "origins_only should return only the Root node" );
-      assert! ( matches_filtered . contains_key ( &ID::new ("id_1") ),
-                "origins_only should keep id_1 (Root)" );
-
       println! ("✓ Org-mode format verified successfully");
       Ok ( () )
     }) ();
@@ -223,8 +198,7 @@ fn test_search_results_preserve_textlinks_in_title (
                        &SearchOptions::default () ) ?;
       let matches_by_id = group_matches_by_id (
         best_matches, searcher, &tantivy_index,
-        "science", &SearchOptions::default (),
-        &SearchScope::Everything );
+        "science", &SearchOptions::default () );
       let (viewforest, _ids) = build_search_viewforest (
         "science", &matches_by_id );
       let dummy_config : SkgConfig =
@@ -307,8 +281,7 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
       let matches_by_id = group_matches_by_id (
         best_matches, searcher, &tantivy_index,
         "axiom thesis lemma",
-        &SearchOptions::default (),
-        &SearchScope::Everything );
+        &SearchOptions::default () );
       // Both should be in the result set.
       assert! ( matches_by_id . contains_key (&ID::new ("few")),
                 "few should appear among results" );
@@ -341,8 +314,7 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
                        &regex_opts ) ?;
       let matches_re = group_matches_by_id (
         best_matches_re, searcher_re, &tantivy_index,
-        "axiom thesis lemma", &regex_opts,
-        &SearchScope::Everything );
+        "axiom thesis lemma", &regex_opts );
       assert! ( matches_re . contains_key (&ID::new ("few")),
                 "few should appear among regex results" );
       assert! ( matches_re . contains_key (&ID::new ("many")),

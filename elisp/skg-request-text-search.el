@@ -8,31 +8,28 @@
 (require 'heralds-minor-mode)
 
 (defun skg-search (search-terms)
-  "Text search with the conservative defaults: rooty scope, no regex,
-titles only, no Tantivy operator syntax."
+  "Text search with the conservative defaults: no regex, titles
+only, no Tantivy operator syntax. Searches all nodes; rooty
+ones (roots, cycle members, link targets, hadID) are bumped in
+the ranking via their context-origin multiplier."
   (interactive "sSearch terms: ")
-  (skg--request-text-search search-terms "rooty" nil nil nil))
+  (skg--request-text-search search-terms nil nil nil))
 
 (defun skg-search-interactive (search-terms)
-  "Text search with per-axis prompts for scope, regex, body, operators."
+  "Text search with per-axis prompts for regex, body, operators."
   (interactive "sSearch terms: ")
-  (let* ((rooty     (y-or-n-p "Rooty only (filter to roots/cycles/targets/hadID)? "))
-         (regex     (y-or-n-p "Regex? "))
+  (let* ((regex     (y-or-n-p "Regex? "))
          (body      (y-or-n-p "Include body text (titles are always searched)? "))
          (operators (y-or-n-p "Use operator syntax (AND/OR/NOT/+/-)? ")))
     (skg--request-text-search search-terms
-                              (if rooty "rooty" "everywhere")
-                              regex
-                              body
-                              operators)))
+                              regex body operators)))
 
 (defun skg--bool-to-string (b)
   "Serialize B as the wire-format \"true\" or \"false\"."
   (if b "true" "false"))
 
-(defun skg--request-text-search (search-terms scope regex body operators)
+(defun skg--request-text-search (search-terms regex body operators)
   "Request a text search from the Rust server.
-SCOPE is \"rooty\" or \"everywhere\".
 REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
          (clean-terms (if (stringp search-terms)
@@ -42,7 +39,6 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
           (concat (prin1-to-string
                    `((request   . "text search")
                      (terms     . ,clean-terms)
-                     (scope     . ,scope)
                      (regex     . ,(skg--bool-to-string regex))
                      (body      . ,(skg--bool-to-string body))
                      (operators . ,(skg--bool-to-string operators))))
