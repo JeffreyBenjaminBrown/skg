@@ -1,5 +1,5 @@
 use crate::types::viewnode::ViewNode;
-use crate::types::tree::generic::with_node_mut;
+use crate::types::tree::generic::{with_node_mut, write_at_ancestor_in_tree};
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -63,6 +63,39 @@ where Predicate: Fn (&Node) -> bool {
     if subtree_satisfies( tree, child_ref . id(), predicate )? {
       return Ok (true); } }
   Ok (false) }
+
+/// Detach a scaffold node, transferring focus to its parent first if
+/// the detached subtree contained the focused node. Used when a
+/// scaffold collapses (e.g. SubscribeeCol with no goal subscribees,
+/// HiddenInSubscribeeCol with no remaining hidden children).
+pub fn detach_scaffold_transferring_focus (
+  tree : &mut Tree<ViewNode>,
+  node : NodeId,
+) -> Result<(), Box<dyn Error>> {
+  let has_focus : bool =
+    subtree_satisfies ( tree, node, &|n : &ViewNode| n . focused ) ?;
+  if has_focus {
+    write_at_ancestor_in_tree (
+      tree, node, 1,
+      |vn : &mut ViewNode| { vn . focused = true; } )
+      . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
+  with_node_mut ( tree, node, |mut n| { n . detach (); } )
+    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+  Ok (()) }
+
+/// Like `detach_scaffold_transferring_focus`, but only acts if the
+/// scaffold has no children.
+pub fn detach_scaffold_if_empty (
+  tree : &mut Tree<ViewNode>,
+  node : NodeId,
+) -> Result<(), Box<dyn Error>> {
+  let has_children : bool =
+    tree . get (node)
+      . ok_or ("detach_scaffold_if_empty: node not found") ?
+      . children () . next () . is_some ();
+  if !has_children {
+    detach_scaffold_transferring_focus (tree, node) ?; }
+  Ok (()) }
 
 /// Move an existing child to the end of its parent's children list.
 /// Uses detach() + append_id() to move without cloning.

@@ -5,10 +5,10 @@ use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_
 use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::tree::generic::{ error_unless_node_satisfies, read_at_ancestor_in_tree, write_at_ancestor_in_tree, with_node_mut};
+use crate::types::tree::generic::{ error_unless_node_satisfies, read_at_ancestor_in_tree};
 use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child, insert_scaffold_as_child};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold};
-use crate::update_buffer::util::{ move_child_to_end, subtree_satisfies};
+use crate::update_buffer::util::{ detach_scaffold_transferring_focus, move_child_to_end};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -65,14 +65,7 @@ pub async fn complete_subscribee_col_preorder (
       source_diffs, &parent_source, &parent_skgid,
       config, &worktree_subscribees );
   if goal_list . is_empty() { // delete SubscribeeCol, handling focus
-    let has_focus : bool =
-      subtree_satisfies( tree, node, &|n : &ViewNode| n . focused ) ?;
-    if has_focus {
-      write_at_ancestor_in_tree( tree, node, 1,
-        |vn : &mut ViewNode| { vn . focused = true; } )
-      . map_err( |e| -> Box<dyn Error> { e . into() } ) ?; }
-    with_node_mut( tree, node, |mut n| { n . detach(); } )
-      . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
+    detach_scaffold_transferring_focus (tree, node) ?;
     return Ok(( )); }
   if parent_indefinitive || source_diffs . is_some() { // If the parent is indefinitive, its SubscribeeCol might not reflect the truth, so we complete its children. If source_diffs is present (diff view), even a definitive parent needs reconciliation, so that removed subscribees appear as phantoms. (If the parent is definitive and the diff view is off, though, then the parent just *defined* what its children should be, so they don't need completion.)
     let child_data : HashMap<ID, ChildData> =

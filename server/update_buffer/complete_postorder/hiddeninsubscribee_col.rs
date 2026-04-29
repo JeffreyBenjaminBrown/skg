@@ -5,9 +5,9 @@ use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, write_at_ancestor_in_tree, with_node_mut};
+use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth};
-use crate::update_buffer::util::{treat_certain_children, subtree_satisfies};
+use crate::update_buffer::util::{detach_scaffold_if_empty, treat_certain_children};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -98,20 +98,7 @@ pub fn complete_hiddeninsubscribee_col (
         if let ViewNodeKind::True( ref mut t ) = vn . kind {
           t . birth = Birth::Independent; } },
     ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?; }
-  { // Remove if empty.
-    let has_children : bool =
-      tree . get (node)
-        . ok_or ("complete_hiddeninsubscribee_col: node not found") ?
-        . children() . next() . is_some();
-    if !has_children {
-      let has_focus : bool =
-        subtree_satisfies( tree, node, &|n : &ViewNode| n . focused ) ?;
-      if has_focus {
-        write_at_ancestor_in_tree( tree, node, 1,
-          |vn : &mut ViewNode| { vn . focused = true; } )
-        . map_err( |e| -> Box<dyn Error> { e . into() } ) ?; }
-      with_node_mut( tree, node, |mut n| { n . detach(); } )
-        . map_err( |e| -> Box<dyn Error> { e . into() } ) ?; } }
+  detach_scaffold_if_empty (tree, node) ?;
   Ok(( )) }
 
 /// Reconstruct the HEAD version of hidden-in-subscribee content,
