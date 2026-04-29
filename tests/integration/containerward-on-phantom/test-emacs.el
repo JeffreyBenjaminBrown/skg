@@ -25,10 +25,13 @@
     (unless buf
       (message "✗ FAIL [phase 1]: buffer *a* not created")
       (kill-emacs 1))
-    ;; a -> {b -> c(indef), c}
+    ;; a -> {b -> c(indef), c}.
     (assert-headline-titles
      buf
-     '((1 . "a") (2 . "b") (3 . "c") (2 . "c"))
+     '((1 independent "a")
+       (2 contentOf   "b")
+       (3 contentOf   "c")
+       (2 contentOf   "c"))
      "phase 1: initial view")))
 
 (defun phase-2-remove-c-from-under-b-and-save ()
@@ -50,7 +53,9 @@
     ;; Buffer should now be: a -> {b, c}
     (assert-headline-titles
      (current-buffer)
-     '((1 . "a") (2 . "b") (2 . "c"))
+     '((1 independent "a")
+       (2 contentOf   "b")
+       (2 contentOf   "c"))
      "phase 2: after removing c from b")
     (skg-request-save-buffer)
     (skg-test-wait-for-response)

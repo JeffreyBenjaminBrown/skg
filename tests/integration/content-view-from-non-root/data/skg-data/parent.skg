@@ -1,0 +1,4 @@
+title: "the parent"
+pid: parent
+contains:
+- child

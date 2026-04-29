@@ -10,13 +10,12 @@ pub use graphnodestats::set_graphnodestats_in_viewforest;
 pub use viewnodestats::set_viewnodestats_in_viewforest;
 
 use crate::dbs::memory::{InRustGraph, memory_coherent_with_save_instructions, scheduled_audit::take_pending_audit_warning};
-use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ConnectionState;
 use crate::serve::handlers::save_buffer::{ SaveResponse, compute_diff_for_every_source, deleted_ids_to_source};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
-use crate::to_org::expand::backpath::insert_containerward_ancestry_tree_recursive;
+use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::memory::ViewUri;
@@ -429,36 +428,17 @@ fn clear_diff_metadata (
 /// and insert it as indefinitive ContainerOf children.
 /// Short-circuits when no RemovedHere phantoms exist.
 async fn attach_containerward_ancestries_to_removedhere_phantoms (
-  viewforest        : &mut Tree<ViewNode>,
+  viewforest    : &mut Tree<ViewNode>,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
-  let phantom_nodes : Vec<(NodeId, ID)> = {
-    let mut result : Vec<(NodeId, ID)> = Vec::new ();
+  let phantom_nodeids : Vec<NodeId> = {
+    let mut result : Vec<NodeId> = Vec::new ();
     for edge in viewforest . root () . traverse () {
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
         if let ViewNodeKind::True (t) = &node_ref . value () . kind {
           if t . is_removedhere_phantom () {
-            result . push (
-              ( node_ref . id (),
-                t . id . clone () )); }} }}
+            result . push ( node_ref . id () ); }} }}
     result };
-  if phantom_nodes . is_empty () { return Ok (( )); }
-  let ids : Vec<ID> =
-    phantom_nodes . iter ()
-    . map ( |( _, id )| id . clone () )
-    . collect ();
-  let ancestry_map : HashMap<ID, AncestryTree> =
-    ancestry_by_id_from_ids_async (
-      &ids, &config.db_name, typedb_driver,
-      config.max_ancestry_depth
-    ) . await;
-  for ( phantom_nid, pid ) in phantom_nodes {
-    if let Some (ancestry) = ancestry_map . get (&pid) {
-      if let AncestryTree::Inner ( _, children ) = ancestry {
-        for child in children . iter () . rev () {
-          insert_containerward_ancestry_tree_recursive (
-            child, phantom_nid,
-            viewforest, config, typedb_driver
-          ) . await ?; }} }}
-  Ok (( )) }
+  attach_containerward_ancestries_at_nodeids (
+    viewforest, &phantom_nodeids, config, typedb_driver ) . await }

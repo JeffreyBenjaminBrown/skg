@@ -45,20 +45,19 @@ pub async fn build_and_integrate_containerward_view_then_drop_request (
 /// and integrates the containerward path from that node.
 pub async fn build_and_integrate_containerward_path (
   tree      : &mut Tree<ViewNode>,
-
   node_id   : NodeId,
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-  build_and_integrate_backpaths (
+  let _ : Vec<ID> = build_and_integrate_backpaths (
     tree, node_id, config, driver,
     "contains", "contained", "container",
     Birth::ContainerOf
-  ) . await }
+  ) . await ?;
+  Ok (( )) }
 
 pub async fn build_and_integrate_sourceward_view_then_drop_request (
   tree          : &mut Tree<ViewNode>,
-
   node_id       : NodeId,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
@@ -77,43 +76,29 @@ pub async fn build_and_integrate_sourceward_view_then_drop_request (
 /// then attach containerward ancestry beneath each source node.
 pub async fn build_and_integrate_sourceward_path (
   tree      : &mut Tree<ViewNode>,
-
   node_id   : NodeId,
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
-
-  // --- data preparation (no tree mutation) ---
-  let terminus_pid : ID =
-    get_id_from_treenode ( tree, node_id ) ?;
-  let paths : Vec<PathToFirstNonlinearity> =
-    paths_to_first_nonlinearities (
-      &config.db_name, driver, &terminus_pid,
-      "textlinks_to", "dest", "source"
-    ) . await ?;
-  let source_pids : Vec<ID> =
-    extract_pids_from_paths ( &paths );
-  let ancestry_map : HashMap<ID, AncestryTree> =
-    ancestry_by_id_from_ids_async (
-      &source_pids, &config.db_name, driver,
-      config.max_ancestry_depth
-    ) . await;
-
-  // --- tree mutation ---
-  integrate_backpaths (
-    node_id, tree, paths, Birth::LinksTo, config, driver
-  ) . await ?;
+  let _source_pids : Vec<ID> =
+    build_and_integrate_backpaths (
+      tree, node_id, config, driver,
+      "textlinks_to", "dest", "source",
+      Birth::LinksTo ) . await ?;
   attach_containerward_ancestries_to_link_sources (
-    tree, node_id, &ancestry_map, config, driver
-  ) . await }
+    tree, node_id, config, driver ) . await }
 
 /// Plural 'backpaths' because if the origin
 /// immediately forks in the backward direction,
 /// this will generate a path at each fork.
 /// Otherwise it will only generate one path.
+///
+/// RETURNS the deduplicated set of pids that appear anywhere in
+/// the integrated paths (including branches and cycle nodes).
+/// Sourceward callers use this to fetch ancestries for each
+/// link source; containerward callers can ignore it.
 async fn build_and_integrate_backpaths (
   tree        : &mut Tree<ViewNode>,
-
   node_id     : NodeId,
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
@@ -121,7 +106,7 @@ async fn build_and_integrate_backpaths (
   input_role  : &str,
   output_role : &str,
   birth       : Birth,
-) -> Result < (), Box<dyn Error> > {
+) -> Result < Vec<ID>, Box<dyn Error> > {
   let terminus_pid : ID =
     get_id_from_treenode ( tree, node_id ) ?;
   let paths : Vec<PathToFirstNonlinearity> =
@@ -129,9 +114,12 @@ async fn build_and_integrate_backpaths (
       &config.db_name, driver, &terminus_pid,
       relation, input_role, output_role
     ) . await ?;
+  let pids : Vec<ID> =
+    extract_pids_from_paths ( &paths );
   integrate_backpaths (
     node_id, tree, paths, birth, config, driver
-  ) . await }
+  ) . await ?;
+  Ok (pids) }
 
 /// At 'node_id' in 'tree', integrate 'paths' of homogenous birth 'birth'.
 async fn integrate_backpaths (
@@ -285,33 +273,76 @@ fn extract_pids_from_paths (
 /// For each, insert its containerward ancestry as subheadlines
 /// with Birth::ContainerOf.
 async fn attach_containerward_ancestries_to_link_sources (
-  tree         : &mut Tree<ViewNode>,
-
-  node_id      : NodeId,
-  ancestry_map : &HashMap<ID, AncestryTree>,
-  config       : &SkgConfig,
-  driver       : &TypeDBDriver,
+  tree    : &mut Tree<ViewNode>,
+  node_id : NodeId,
+  config  : &SkgConfig,
+  driver  : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
   // Collect LinksTo nodes before mutating the tree.
-  let links_to_nodes : Vec<(NodeId, ID)> = {
-    let mut result : Vec<(NodeId, ID)> = Vec::new ();
+  let links_to_nodeids : Vec<NodeId> = {
+    let mut result : Vec<NodeId> = Vec::new ();
     for edge in tree . get (node_id) . unwrap () . traverse () {
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
         if let ViewNodeKind::True (t) = &node_ref . value () . kind {
           if t . birth == Birth::LinksTo {
-            result . push (
-              ( node_ref . id (),
-                t . id . clone () ) ); } } } }
+            result . push ( node_ref . id () ); }} }}
     result };
-  for ( link_node_id, pid ) in links_to_nodes {
-    if let Some (ancestry) = ancestry_map . get (&pid) {
-      if let AncestryTree::Inner ( _, children ) = ancestry {
-        for child in children . iter () . rev () {
-          insert_containerward_ancestry_tree_recursive (
-            child, link_node_id,
-            tree, config, driver
-          ) . await ?; } } } }
-  Ok (()) }
+  attach_containerward_ancestries_at_nodeids (
+    tree, &links_to_nodeids, config, driver ) . await }
+
+/// For each NodeId, look up its TrueNode pid in the tree, fetch
+/// every such pid's containerward ancestry from the graph (in
+/// parallel via `ancestry_by_id_from_ids_async`), and prepend any
+/// `Inner`-shaped ancestry under that NodeId as indefinitive
+/// `Birth::ContainerOf` children. NodeIds that aren't TrueNodes,
+/// or whose ancestry is `Root`/`Repeated`/`DepthTruncated`, are
+/// skipped.
+pub async fn attach_containerward_ancestries_at_nodeids (
+  tree    : &mut Tree<ViewNode>,
+  nodeids : &[NodeId],
+  config  : &SkgConfig,
+  driver  : &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
+  let pairs : Vec<(NodeId, ID)> =
+    nodeids . iter ()
+      . filter_map ( |nid|
+        tree . get (*nid) . and_then ( |n|
+          match & n . value () . kind {
+            ViewNodeKind::True (t) =>
+              Some ( (*nid, t . id . clone ()) ),
+            _ => None } ) )
+      . collect ();
+  if pairs . is_empty () { return Ok (( )); }
+  let ids : Vec<ID> =
+    pairs . iter () . map ( |(_, id)| id . clone () ) . collect ();
+  let ancestry_map : HashMap<ID, AncestryTree> =
+    ancestry_by_id_from_ids_async (
+      &ids, & config . db_name, driver,
+      config . max_ancestry_depth ) . await;
+  attach_containerward_ancestries_from_map (
+    tree, &pairs, &ancestry_map, config, driver ) . await }
+
+/// Inner helper: given pre-collected pairs and a pre-fetched map,
+/// prepend each pair's `Inner` ancestry. Pulled out only because
+/// `attach_containerward_ancestries_at_nodeids` and the surrounding
+/// recursive insertion both call into the same rev-prepend loop.
+async fn attach_containerward_ancestries_from_map (
+  tree         : &mut Tree<ViewNode>,
+  pairs        : &[(NodeId, ID)],
+  ancestry_map : &HashMap<ID, AncestryTree>,
+  config       : &SkgConfig,
+  driver       : &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
+  for ( treeid, pid ) in pairs {
+    let ancestry : &AncestryTree = match ancestry_map . get (pid) {
+      Some (a) => a,
+      None     => continue, };
+    if let AncestryTree::Inner ( _, children ) = ancestry {
+      for child in children . iter () . rev () {
+        insert_containerward_ancestry_tree_recursive (
+          child, *treeid,
+          tree, config, driver ) . await ?; }} }
+  Ok (( )) }
 
 /// Recursively insert an AncestryTree as indefinitive
 /// ContainerOf subheadlines under the given parent.

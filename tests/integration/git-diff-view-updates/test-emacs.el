@@ -21,7 +21,11 @@
       (kill-emacs 1))
     (assert-headline-titles
      buf
-     '((1 . "a") (2 . "b") (3 . "c") (3 . "d") (3 . "e"))
+     '((1 independent "a")
+       (2 contentOf    "b")
+       (3 contentOf    "c")
+       (3 contentOf    "d")
+       (3 contentOf    "e"))
      "phase 1: view-a initial")))
 
 ;; ─── Phase 2: Open view-b ───────────────────────────────────
@@ -35,9 +39,15 @@
     (unless buf
       (message "✗ FAIL [phase 2]: buffer *b* not created")
       (kill-emacs 1))
+    ;; multi_root_view prepends b's containerward ancestry (a) as
+    ;; b's first child before the definitive content (c, d, e).
     (assert-headline-titles
      buf
-     '((1 . "b") (2 . "c") (2 . "d") (2 . "e"))
+     '((1 independent "b")
+       (2 containerOf  "a")
+       (2 contentOf    "c")
+       (2 contentOf    "d")
+       (2 contentOf    "e"))
      "phase 2: view-b initial")))
 
 ;; ─── Phase 3: Edit view-b and save ─────────────────────────
@@ -76,7 +86,10 @@
     ;; c should be gone (deleted). d should appear under f.
     (assert-headline-titles
      buf
-     '((1 . "b") (2 . "e, edited") (2 . "f") (3 . "d"))
+     '((1 independent "b")
+       (2 contentOf   "e, edited")
+       (2 contentOf   "f")
+       (3 contentOf   "d"))
      "phase 4: view-b after save")))
 
 ;; ─── Phase 5: Toggle diff mode on ──────────────────────────
@@ -182,7 +195,10 @@
   (let ((buf-b (get-buffer "*b*")))
     (assert-headline-titles
      buf-b
-     '((1 . "b") (2 . "e, edited") (2 . "f") (3 . "d"))
+     '((1 independent "b")
+       (2 contentOf   "e, edited")
+       (2 contentOf   "f")
+       (3 contentOf   "d"))
      "phase 11: view-b clean"))
   ;; view-a should have no diff/phantom nodes
   (let* ((buf-a (get-buffer "*a*"))
@@ -191,7 +207,9 @@
     ;; a should contain b, b should contain e,f; f contains d.
     ;; The exact indefinitive markers vary, so just check titles.
     (dolist (expected-title '("a" "b" "e, edited" "f" "d"))
-      (unless (cl-find expected-title titles :key #'cdr :test #'equal)
+      (unless (cl-find expected-title titles
+                       :key (lambda (triple) (nth 2 triple))
+                       :test #'equal)
         (message "✗ FAIL [phase 11]: expected title %S in view-a" expected-title)
         (kill-emacs 1)))
     ;; Should NOT have diff markers
