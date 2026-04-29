@@ -13,9 +13,16 @@ use skg::types::misc::{SkgfileSource, SkgConfig, ID, SourceName};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
 /// Helper to create a minimal SkgConfig for tests.
-fn test_config(sources: HashMap<SourceName, SkgfileSource>
+/// `data_root` should be each test's tempdir so that any
+/// `initialization-error_*.org` reports land inside the tempdir
+/// rather than polluting the project root.
+fn test_config(
+  sources   : HashMap<SourceName, SkgfileSource>,
+  data_root : PathBuf,
 ) -> SkgConfig {
-  SkgConfig::dummyFromSources (sources) }
+  let mut cfg : SkgConfig = SkgConfig::dummyFromSources (sources);
+  cfg . data_root = data_root;
+  cfg }
 
 #[test]
 fn test_load_from_single_source() {
@@ -33,7 +40,7 @@ fn test_load_from_single_source() {
         abbreviation: None,
         path: source_path . clone(),
         user_owns_it: true, } );
-    test_config (sources) };
+    test_config (sources, temp_dir . path () . to_path_buf ()) };
 
   // Create a test node
   let mut node : NodeComplete = empty_node_complete();
@@ -79,7 +86,7 @@ fn test_load_from_multiple_sources() {
         abbreviation: None,
         path: shared_path,
         user_owns_it: false, } );
-    test_config (sources) };
+    test_config (sources, temp_dir . path () . to_path_buf ()) };
 
   // Create nodes in main source
   let mut node1 : NodeComplete = empty_node_complete();
@@ -147,7 +154,7 @@ fn test_duplicate_id_detection_across_sources() {
         abbreviation: None,
         path: shared_path,
         user_owns_it: false, } );
-    test_config (sources) };
+    test_config (sources, temp_dir . path () . to_path_buf ()) };
 
   // Create node with same ID in both sources
   let mut node1 : NodeComplete = empty_node_complete();
@@ -203,7 +210,7 @@ fn test_node_with_multiple_ids_duplicate_detection() {
         abbreviation: None,
         path: shared_path,
         user_owns_it: false, } );
-    test_config (sources) };
+    test_config (sources, temp_dir . path () . to_path_buf ()) };
 
   // Create node in main with multiple IDs
   let mut node1 : NodeComplete = empty_node_complete();
@@ -249,11 +256,15 @@ fn test_load_from_empty_sources() {
         abbreviation: None,
         path: source_path,
         user_owns_it: true, } );
-    read_all_skg_files_from_sources(&test_config (sources)) };
-  assert!(result . is_ok(), "Should successfully handle empty source");
+    read_all_skg_files_from_sources(
+      &test_config (sources,
+                    temp_dir . path () . to_path_buf () )) };
+  assert!(result . is_ok(),
+          "Should successfully handle empty source");
 
   let nodes : Vec<NodeComplete> = result . unwrap();
-  assert_eq!(nodes . len(), 0, "Should have loaded 0 nodes from empty source");
+  assert_eq!(nodes . len(), 0,
+             "Should have loaded 0 nodes from empty source");
 }
 
 #[test]
@@ -282,7 +293,7 @@ fn test_source_field_set_correctly() {
         abbreviation: None,
         path: source_b,
         user_owns_it: true, } );
-    test_config (sources) };
+    test_config (sources, temp_dir . path () . to_path_buf ()) };
 
   // Create nodes
   let mut node_a : NodeComplete = empty_node_complete();
@@ -345,7 +356,7 @@ fn test_many_duplicate_ids_creates_org_file() {
       user_owns_it: true,
     }
   );
-  let config : SkgConfig = test_config (sources);
+  let config : SkgConfig = test_config (sources, temp_dir . path () . to_path_buf ());
 
   // Create 15 nodes with duplicate IDs
   for i in 1..=15 {
@@ -374,9 +385,10 @@ fn test_many_duplicate_ids_creates_org_file() {
   assert!(err_msg . contains ("15") || err_msg . contains ("duplicate"),
           "Error should mention duplicates: {}", err_msg);
 
-  // Check that org file was created
-  let org_file_path : &str = "initialization-error_duplicate-ids.org";
-  assert!(std::path::Path::new (org_file_path) . exists(),
+  // Check that org file was created in the test's tempdir.
+  let org_file_path : PathBuf =
+    temp_dir . path () . join ("initialization-error_duplicate-ids.org");
+  assert!(org_file_path . exists(),
           "Org file should be created for >10 duplicates");
 
   // Generate expected content programmatically
@@ -398,12 +410,10 @@ fn test_many_duplicate_ids_creates_org_file() {
   }
 
   // Read and verify full org file content
-  let org_content : String = fs::read_to_string (org_file_path) . unwrap();
+  let org_content : String = fs::read_to_string (&org_file_path) . unwrap();
   assert_eq!(org_content, expected,
              "Org file content should match expected format exactly");
-
-  // Clean up
-  fs::remove_file (org_file_path) . unwrap();
+  // No explicit cleanup: temp_dir's Drop handles it.
 }
 
 #[test]
@@ -426,7 +436,9 @@ fn test_unreadable_files_creates_org_file() {
         abbreviation: None,
       path: source_good . clone(),
       user_owns_it: true, } );
-  let write_config : SkgConfig = test_config (write_sources);
+  let write_config : SkgConfig =
+    test_config (write_sources,
+                 temp_dir . path () . to_path_buf ());
 
   // Create a valid node in the good source
   let mut node : NodeComplete = empty_node_complete();
@@ -454,7 +466,9 @@ fn test_unreadable_files_creates_org_file() {
       user_owns_it: true, } );
 
   let result : IoResult<Vec<NodeComplete>> =
-    read_all_skg_files_from_sources(&test_config (sources));
+    read_all_skg_files_from_sources(
+      &test_config (sources,
+                    temp_dir . path () . to_path_buf () ));
   assert!(result . is_err(), "Should fail due to unreadable source");
 
   let err : IoError = result . unwrap_err();
@@ -463,15 +477,16 @@ fn test_unreadable_files_creates_org_file() {
   assert!(err_msg . contains ("unreadable"),
           "Error should mention unreadable files: {}", err_msg);
 
-  // Check that org file was created
-  let org_file_path : &str =
-    "initialization-error_unreadable-skg-files.org";
-  assert!(std::path::Path::new (org_file_path) . exists(),
+  // Check that org file was created in the test's tempdir.
+  let org_file_path : PathBuf =
+    temp_dir . path ()
+      . join ("initialization-error_unreadable-skg-files.org");
+  assert!(org_file_path . exists(),
           "Org file should be created for unreadable files");
 
   // Read org file content
   let org_content : String =
-    fs::read_to_string (org_file_path) . unwrap();
+    fs::read_to_string (&org_file_path) . unwrap();
 
   // Verify header and count
   assert!(org_content . starts_with ("#+title: Unreadable SKG Files\n"));
@@ -493,6 +508,5 @@ fn test_unreadable_files_creates_org_file() {
           org_content . contains ("system cannot find"),
           "Error should mention file/directory not found");
 
-  // Clean up
-  fs::remove_file (org_file_path) . unwrap();
+  // No explicit cleanup: temp_dir's Drop handles it.
 }
