@@ -25,25 +25,21 @@ as skg-delete-recursive.
 ** text search
 The 'f' is for 'find'.
 *** C-c f RET : skg-search
-Text search across titles and aliases, showing only
-"rooty" nodes, which are most likely to be of interest:
-roots, cycle members, link targets, and
-nodes that had an org-roam ID before import. Multi-contained
-nodes and nodes with no special graph role are filtered out.
+Text search across titles and aliases, returning every
+matching node. "Rooty" nodes (roots, cycle members, link
+targets, and nodes that had an org-roam ID before import)
+are bumped in the ranking via their context-origin multiplier.
 
-One prompt — the search terms. All axes take their conservative
-defaults: rooty scope, no regex, titles only (no body), no
-Tantivy operator syntax.
+Prompts for search terms. All search axes take their conservative
+defaults: no regex, titles only (no body), no Tantivy operator
+syntax.
 
 Run 'skg-goto' (below) from one of the links in the search
 results to open the view from that node.
 *** C-c f i   : skg-search-interactive
-Same as skg-search but asks for the four axis flags before
+Same as skg-search but asks for three axis flags before
 sending:
 
-- *Rooty?* — no flips scope to "everywhere" (shows all
-  Tantivy matches regardless of graph role, including the
-  humblest leaves).
 - *Regex?* — yes switches to per-token regex. Bypasses the
   query parser; the pattern is handed to Tantivy's
   'RegexQuery' verbatim.
@@ -56,7 +52,6 @@ sending:
   remains findable). In regex mode operators combine the
   per-piece RegexQueries at the document level — see the
   regex=true section below.
-
 **** Query syntax with default axes (operators=false, regex=false)
 Queries are literal. The query string is split on whitespace,
 and any word containing a Tantivy operator character
@@ -119,8 +114,9 @@ to MUST.
 - Results are ranked by BM25 times a context-origin factor
   (Root 100×, CycleMember ~32×, Target 10×, HadID 10×,
   MultiContained ~3.2×, everything else 1×). A weaker text
-  match on a root can outrank a stronger match on a leaf.
-  Use =C-c f i= with rooty=no to see everything, unfiltered.
+  match on a root can outrank a stronger match on a leaf,
+  but every match is returned — search is never filtered by
+  graph role.
 - Regex distance is tokenwise: a pattern never spans
   whitespace, because we split the query on whitespace before
   handing the pieces to RegexQuery. A true whole-title regex

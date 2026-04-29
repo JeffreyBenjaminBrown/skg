@@ -21,7 +21,7 @@
 
   ;; Phase 1: search and verify results appear
   (message "=== PHASE 1: search for 'bravo' ===")
-  (skg--request-text-search "bravo" "everywhere" nil nil nil)
+  (skg--request-text-search "bravo" nil nil nil)
   (setq integration-test-phase "search-sent")
 
   (let ((buf (skg-test-wait-for-buffer

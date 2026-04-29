@@ -34,12 +34,6 @@ use tantivy::{TantivyDocument, Searcher};
 use tantivy::schema::document::Value;
 use typedb_driver::TypeDBDriver;
 
-/// "Rooty" nodes have the most interesting graph structure:
-/// literal roots, cycle-roots, link targets,
-/// and things that had an ID when imported.
-/// The default search scope is Rooty.
-pub enum SearchScope { Rooty, Everything }
-
 /// Maps each ID to search hits (plural -- IDs can have aliases,
 /// so one ID might get multiple matches).
 /// The score incorporates a context-based multiplier:
@@ -89,12 +83,6 @@ pub fn handle_text_search_request (
       return; } };
   let search_terms : Result < String, String > =
     extract_v_from_kv_pair_in_sexp ( &sexp, "terms" );
-  let scope : SearchScope =
-    match extract_v_from_kv_pair_in_sexp ( &sexp, "scope" )
-          . unwrap_or ( "rooty" . to_string () )
-          . as_str ()
-    { "everywhere" => SearchScope::Everything,
-      _            => SearchScope::Rooty };
   let search_opts : SearchOptions =
     SearchOptions {
       regex     : bool_key ( &sexp, "regex" ),
@@ -120,8 +108,7 @@ pub fn handle_text_search_request (
               searcher,
               tantivy_index,
               &search_terms,
-              &search_opts,
-              &scope );
+              &search_opts );
           let (viewforest, search_results) : (Tree<ViewNode>, Vec<ID>) =
             build_search_viewforest (
               &search_terms,
@@ -295,7 +282,6 @@ pub fn group_matches_by_id (
   tantivy_index : &TantivyIndex,
   search_terms  : &str,
   search_opts   : &SearchOptions,
-  scope         : &SearchScope,
 ) -> MatchGroups {
   let matcher : CoverageMatcher = // pre-build once
     build_coverage_matcher (search_terms, search_opts);
@@ -345,11 +331,6 @@ pub fn group_matches_by_id (
             . get_first ( tantivy_index . context_origin_type_field )
             . and_then ( |v| v . as_str () )
             . and_then ( ContextOriginType::from_label );
-        if matches! ( scope, SearchScope::Rooty ) {
-          match origin_type {
-            None => continue,
-            Some ( ContextOriginType::MultiContained ) => continue,
-            _ => {} } }
         let multiplier : f32 =
           origin_type . map_or ( 1.0, |t| t . multiplier() );
         let coverage : f32 =
