@@ -2,6 +2,8 @@
 ** If it were fast enough it would be worth resurrecting..
 Indeed it might actually be fast enough already,
 because it was written before the in-Rust graph ('memory')
+** the commit that deleted it
+7c68b1f1ee8c3dce28cfdc1d176cab65b8ec4fb9
 ** what it did
 Once, you could request 'containerward path stats'.
 These would tell you the length of

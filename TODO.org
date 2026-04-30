@@ -51,18 +51,7 @@ if the quotation is represented as leading whitespace.
   If it becomes a mess, Haskell is easier to refactor.
   Rust could sit between TypeDB and Haskell.
 * maybe good but not sure why
-** There could only be one definitive view across all buffers.
-*** why
-When going from magit-view to a modified node,
-it's very nice if that one jump goes directly to
-the one big context where it and its brothers were made.
-*** how
-See TODO/one-definitive-view/
 * goals, by highest aim
-** TODO know how it works
-*** What does skg-show-stats do?
-*** How are source changes heralded in backward views?
-Hopefully one only ever has to read org-rootward.
 ** TODO how|what to dogfood
 *** spots to patrol
 **** git : view changes to
@@ -93,6 +82,13 @@ Should prompt for the acquiree node (ID or link).
 ** TODO legibility to user
 *** independent of parent /= contained in nothing
 so decouple these two heralds
+*** ? Have only be one definitive view across all buffers.
+**** why
+When going from magit-view to a modified node,
+it's very nice if that one jump goes directly to
+the one big context where it and its brothers were made.
+**** how
+See TODO/one-definitive-view/
 *** parentContains (deleted) does seem like valid graph data
 **** Neither seems critical.
 **** History
@@ -103,6 +99,7 @@ and interesting enough to be heralded,
 and reasonably separate from 'birth'
 (although birth might imply it sometimes).
 But maybe 'anAncestorContains' would be more useful.
+*** ? Warn user if they create a containment cycle.
 ** TODO legibility to coder
 *** ONGOING fix lying function names
 see lying-names.org
@@ -180,7 +177,6 @@ This isn't perfect, because there might be multiple headlines with the same IDs.
 *** some skg-request-* functions save, others don't
 *** ? trying to delete an indef node should warn, not err
 That is, the save should still succeed.
-* TODO Warn user if they create a containment cycle.
 * present view of node's root(like) containerward ancestors
 ** Hopefully a root, otherwise a cycle; links are ignored.
 ** Useful when checking changes
