@@ -17,7 +17,7 @@ pub mod write;
 
 use crate::types::misc::{ID, SourceName, TantivyIndex};
 
-use tantivy::{Index, Term, IndexReader, Searcher, TantivyDocument};
+use tantivy::{Index, Term, Searcher, TantivyDocument};
 use tantivy::schema::document::Value;
 use tantivy::query::Query;
 use tantivy::collector::TopDocs;
@@ -36,6 +36,8 @@ pub(crate) fn open_existing_tantivy_index (
 ) -> Result<TantivyIndex, Box<dyn Error>> {
   let index : Index =
     Index::open_in_dir (index_path) ?;
+  let reader : tantivy::IndexReader =
+    index . reader () ?;
   let schema : schema::Schema =
     index . schema();
   let id_field : schema::Field =
@@ -56,6 +58,7 @@ pub(crate) fn open_existing_tantivy_index (
     schema . get_field ("body") ?;
   Ok ( TantivyIndex {
     index              : Arc::new (index),
+    reader,
     id_field,
     title_or_alias_field,
     raw_title_field,
@@ -121,9 +124,7 @@ pub fn title_and_source_by_id (
   tantivy_index : &TantivyIndex,
   id            : &ID,
 ) -> Option < (String, SourceName) > {
-  let reader : IndexReader =
-    tantivy_index . index . reader () . ok () ?;
-  let searcher : Searcher = reader . searcher ();
+  let searcher : Searcher = tantivy_index . reader . searcher ();
   let doc_addresses : Vec<tantivy::DocAddress> =
     doc_addresses_for_id (
       tantivy_index, &searcher, id,
@@ -152,11 +153,7 @@ pub fn titles_by_ids (
   ids           : &[ID],
 ) -> HashMap<ID, String> {
   let mut result : HashMap<ID, String> = HashMap::new ();
-  let reader : IndexReader =
-    match tantivy_index . index . reader () {
-      Ok (r) => r,
-      Err (_) => return result };
-  let searcher : Searcher = reader . searcher ();
+  let searcher : Searcher = tantivy_index . reader . searcher ();
   for id in ids {
     let doc_addresses : Vec<tantivy::DocAddress> =
       match doc_addresses_for_id (
@@ -191,11 +188,7 @@ pub fn subset_with_hadid (
   tantivy_index : &TantivyIndex,
   ids           : &HashSet<ID>,
 ) -> HashSet<ID> {
-  let reader : IndexReader =
-    match tantivy_index . index . reader () {
-      Ok (r) => r,
-      Err (_) => return HashSet::new () };
-  let searcher : Searcher = reader . searcher ();
+  let searcher : Searcher = tantivy_index . reader . searcher ();
   let mut result : HashSet<ID> = HashSet::new ();
   for id in ids {
     let doc_addresses : Vec<tantivy::DocAddress> =

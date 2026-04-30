@@ -9,7 +9,7 @@
 use crate::dbs::tantivy::write::commit_with_status;
 use crate::types::misc::{ID, SourceName, TantivyIndex};
 
-use tantivy::{IndexReader, IndexWriter, Searcher, Term, TantivyDocument, doc};
+use tantivy::{IndexWriter, Searcher, Term, TantivyDocument, doc};
 use tantivy::collector::TopDocs;
 use tantivy::query::Query;
 use tantivy::schema;
@@ -23,10 +23,8 @@ pub fn update_context_origin_types (
   tantivy_index       : &TantivyIndex,
   context_types_by_id : &HashMap<ID, String>,
 ) -> Result<usize, Box<dyn Error>> {
-  let reader : IndexReader =
-    tantivy_index . index . reader () ?;
   let searcher : Searcher =
-    reader . searcher ();
+    tantivy_index . reader . searcher ();
   let mut writer : IndexWriter =
     tantivy_index . index . writer (
       crate::consts::TANTIVY_WRITER_BUFFER_BYTES) ?;
@@ -100,5 +98,5 @@ pub fn update_context_origin_types (
           body . as_str () )) ?;
       updated_count += 1; } }
   commit_with_status (
-    &mut writer, updated_count, "Context-updated") ?;
+    &mut writer, tantivy_index, updated_count, "Context-updated") ?;
   Ok (updated_count) }

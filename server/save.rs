@@ -466,5 +466,5 @@ pub(super) fn update_tantivy_from_saveinstructions (
     add_documents_to_tantivy_writer(
       & nodes_to_add, &mut writer, tantivy_index )? ;
   commit_with_status(
-    &mut writer, processed_count, "Updated")?;
+    &mut writer, tantivy_index, processed_count, "Updated")?;
   Ok (processed_count) }

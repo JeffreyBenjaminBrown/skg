@@ -102,6 +102,14 @@ pub struct SourceName ( pub String );
 pub struct TantivyIndex {
   // Associates titles and aliases to paths.
   pub index                     : Arc<Index>,
+  /// Long-lived 'IndexReader' shared across all callers. Default
+  /// 'ReloadPolicy::OnCommitWithDelay' refreshes automatically after
+  /// writes commit, so this stays current without manual
+  /// invalidation. Re-creating an 'IndexReader' on every lookup
+  /// (which 'index.reader()' does) is the dominant cost of
+  /// per-query Tantivy ID lookups, so callers should prefer this
+  /// field over '.index.reader()'.
+  pub reader                    : tantivy::IndexReader,
   pub id_field                  : Field,
   pub title_or_alias_field      : Field,
   pub raw_title_field           : Field, // Un-reduced title for is_title=true docs: preserves textlink syntax (e.g. "[[id:X][label]]") that 'title_or_alias_field' strips to bare labels. Populated only on primary-title docs; empty for alias docs. Used by the 'titles by ids' endpoint so clients can tell link-titles from plain titles.

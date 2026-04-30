@@ -30,7 +30,7 @@ pub fn update_index_with_nodes (
     add_documents_to_tantivy_writer (
       nodes, &mut writer, tantivy_index)?;
   commit_with_status(
-    &mut writer, processed_count, "Updated")?;
+    &mut writer, tantivy_index, processed_count, "Updated")?;
   Ok (processed_count) }
 
 pub fn delete_nodes_from_index<'a, I>(
@@ -131,14 +131,22 @@ fn create_documents_from_node (
   Ok (documents) }
 
 pub fn commit_with_status (
-  writer: &mut IndexWriter,
-  indexed_count: usize,
-  operation: &str,
+  writer        : &mut IndexWriter,
+  tantivy_index : &TantivyIndex,
+  indexed_count : usize,
+  operation     : &str,
 ) -> Result<(), Box<dyn Error>> {
   if indexed_count > 0 {
     tracing::info!( "{} {} documents. Committing changes...",
               operation, indexed_count );
     writer . commit () ?;
+    // Force the shared reader to see the new commit. With the
+    // default 'ReloadPolicy::OnCommitWithDelay', the reader
+    // refreshes asynchronously after a small delay, which races
+    // with code (notably tests) that searches immediately after a
+    // commit. Manual reload makes the post-commit state visible
+    // synchronously.
+    tantivy_index . reader . reload () ?;
   } else {
     tracing::debug!("No documents to process found."); }
   Ok (( )) }

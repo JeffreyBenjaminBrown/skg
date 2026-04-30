@@ -7,7 +7,7 @@
 use crate::dbs::tantivy::escape::{escape_tantivy_intra_word, escape_tantivy_literal};
 use crate::types::misc::TantivyIndex;
 
-use tantivy::{IndexReader, Searcher};
+use tantivy::Searcher;
 use tantivy::collector::TopDocs;
 use tantivy::query::{QueryParser, Query};
 use tantivy::schema;
@@ -42,10 +42,8 @@ pub fn search_index (
     body = opts . body,
     operators = opts . operators,
     "Finding matches." );
-  let searcher : Searcher = {
-    let reader : IndexReader =
-      tantivy_index . index . reader () ?;
-    reader } . searcher();
+  let searcher : Searcher =
+    tantivy_index . reader . searcher ();
   let query : Box < dyn Query > =
     if opts . regex {
       build_regex_query (

@@ -364,10 +364,13 @@ pub fn create_empty_tantivy_index (
     schema . get_field ("had_id") ?;
   let body_field: schema::Field =
     schema . get_field ("body") ?;
+  let index : Index =
+    Index::create_in_dir ( index_path, schema )?;
+  let reader : tantivy::IndexReader =
+    index . reader () ?;
   Ok ( TantivyIndex {
-    index: Arc::new ( { let index : Index =
-                          Index::create_in_dir ( index_path, schema )?;
-                        index } ),
+    index : Arc::new (index),
+    reader,
     id_field,
     title_or_alias_field,
     raw_title_field,
