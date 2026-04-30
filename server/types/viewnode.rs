@@ -169,6 +169,7 @@ pub enum Scaffold {
   BufferRoot, // Not rendered. Makes viewforests easier to process. Its children are the level-1 headlines of the org buffer.
   HiddenInSubscribeeCol, // Child of a Subscribee. Collects nodes that the subscriber hides from its subscriptions, and that are top-level content of this subscribee.
   HiddenOutsideOfSubscribeeCol, // Child of SubscribeeCol. Collects nodes that the subscriber hides from its subscriptions, but that are not top-level content of any of its subscribees.
+  // DISPLAY NOTE: Shown after all Subscribees, under the same SubscribeeCol.
   ID { id: ID, // an ID of the node's grandparent.
        membership: MembershipAxes },
   IDCol, // Collects (as children) Scaffold::IDs for its parent.

@@ -135,10 +135,10 @@ fn test_every_kind_of_col(
     let expected_initial = indoc! {
       "* (skg (node (id R) (source main) (birth independent) (graphStats (contents 1) subscribing))) R
        ** (skg subscribeeCol) it subscribes to these
-       *** (skg hiddenOutsideOfSubscribeeCol) hidden from all subscriptions
-       **** (skg (node (id hidden-for-no-reason) (source main) indef (graphStats (containers 0)))) hidden-for-no-reason
        *** (skg (node (id E1) (source main) indef (graphStats (containers 0) (contents 2) subscribing))) subscribee-1
        *** (skg (node (id E2) (source main) indef (graphStats (containers 0) (contents 2) subscribing))) subscribee-2
+       *** (skg hiddenOutsideOfSubscribeeCol) hidden from all subscriptions
+       **** (skg (node (id hidden-for-no-reason) (source main) indef (graphStats (containers 0)))) hidden-for-no-reason
        ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(initial_view, expected_initial,
@@ -291,10 +291,10 @@ fn test_hidden_without_but_none_within(
     let expected_initial = indoc! {
       "* (skg (node (id R) (source main) (birth independent) (graphStats (contents 1) subscribing))) R
        ** (skg subscribeeCol) it subscribes to these
-       *** (skg hiddenOutsideOfSubscribeeCol) hidden from all subscriptions
-       **** (skg (node (id H) (source main) indef (graphStats (containers 0)))) H
        *** (skg (node (id E1) (source main) indef (graphStats (containers 0) (contents 2) subscribing))) subscribee-1
        *** (skg (node (id E2) (source main) indef (graphStats (containers 0) subscribing))) subscribee-2
+       *** (skg hiddenOutsideOfSubscribeeCol) hidden from all subscriptions
+       **** (skg (node (id H) (source main) indef (graphStats (containers 0)))) H
        ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(initial_view, expected_initial,

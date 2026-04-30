@@ -141,10 +141,15 @@ pub async fn maybe_add_subscribeeCol_branch (
   let subscribee_col_nid : NodeId =
     insert_scaffold_as_child ( tree, node_id,
       Scaffold::SubscribeeCol, true ) ?;
-  // Order matters: HiddenOutsideOfSubscribeeCol goes first (via
-  // append to the empty col), then the subscribee children. This
-  // matches the legacy order produced by the old per-id-append loops.
+  { let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
+      build_initial_render_child_data (
+        &subscribee_ids, config, driver ) . await ?;
+    reconcile_sharing_scaffold_children (
+      tree, subscribee_col_nid,
+      SharingScaffoldKind::SubscribeeCol,
+      &goal, &data ) ?; }
   if ! hidden_outside_content . is_empty () {
+    // HiddenOutsideOfSubscribeeCol presents last, if it exists.
     let hidden_outside_col_nid : NodeId =
       insert_scaffold_as_child (
         tree, subscribee_col_nid,
@@ -157,13 +162,6 @@ pub async fn maybe_add_subscribeeCol_branch (
     reconcile_sharing_scaffold_children (
       tree, hidden_outside_col_nid,
       SharingScaffoldKind::HiddenOutsideOfSubscribeeCol,
-      &goal, &data ) ?; }
-  { let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
-      build_initial_render_child_data (
-        &subscribee_ids, config, driver ) . await ?;
-    reconcile_sharing_scaffold_children (
-      tree, subscribee_col_nid,
-      SharingScaffoldKind::SubscribeeCol,
       &goal, &data ) ?; }
   Ok (( )) }
 
