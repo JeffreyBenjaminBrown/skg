@@ -56,7 +56,7 @@ Returns nil if the field is not cycleable."
     (skg-sexp-edit--source-cycle-values field-value))
    ((string= field-name "viewRequests")
     '("none (default)"
-      "aliases" "containerwardView" "containerwardStats"
+      "aliases" "containerwardView"
       "sourcewardView" "definitiveView"))))
 
 (defun skg-sexp-edit--source-cycle-values (field-value)

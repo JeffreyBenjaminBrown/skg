@@ -19,7 +19,7 @@ use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
-use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode, UnknownNode, ContainerwardPathStats, IndefOrDef, NodeContainRels, NodeLinksourceRels, Birth};
+use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode, UnknownNode, IndefOrDef, NodeContainRels, NodeLinksourceRels, Birth};
 use crate::types::unchecked_viewnode::{
     UncheckedViewNode, UncheckedViewNodeKind, UncheckedTrueNode,
 };
@@ -518,9 +518,6 @@ fn parse_graphstats_sexp (
           "containsHerald" | "linksHerald" => {},
           // Legacy linksIn field: silently discard.
           "linksIn" => {},
-          "containerwardPath" => {
-            stats . containerwardPath =
-              ContainerwardPathStats::from_display_atom (&value); },
           _ => { return Err ( format! ( "Unknown graphStats key: {}",
                                          key )); }} },
       _ => { return Err ( "Unexpected element in graphStats"

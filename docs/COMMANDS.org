@@ -192,11 +192,6 @@ This actually works in org-mode outside of skg.
 *** C-c s s : skg-show-sourceward
 Show the nodes that the node at point links to (its textlink
 targets).
-*** C-c s t : skg-show-stats
-Computes the containerward path stats for a node
-(path length, fork count, whether it cycles)
-and saves. The stats then appear in the node's metadata
-and in the heralds view.
 ** node properties : definitive/indefinitive
 *** what those words mean
 A view of a node can be definitive or indefinitive.

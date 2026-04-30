@@ -371,11 +371,6 @@ fn graphnodestats_to_sexp (
     parts . push ( "overriding" . to_string () ); }
   if gs . subscribing {
     parts . push ( "subscribing" . to_string () ); }
-  if let Some (ref cp) = gs . containerwardPath {
-    if cp . length > 0 || cp . forks > 1 || cp . cycles {
-      parts . push (
-        format! ( "(containerwardPath {})",
-                  cp . to_display_atom () )); }}
   if parts . is_empty () { None }
   else { Some ( format! (
            "(graphStats {})", parts . join (" ") )) }}
