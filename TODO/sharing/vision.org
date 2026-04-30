@@ -142,14 +142,15 @@ so the recursive view of 'subscriber' ends up the same as before:
 ```
   * (truenode) subscriber
   ** (subscribeeCol)
+  **** (HiddenInSubscribeeCol)
+  ***** subscribee-contains-this-1
   *** (truenode) subscribee-1
-  **** subscribee-contains-this-1
   **** subscribee-contains-this-2
   ** some ordinary content of the subscriber
   * any other user-owned node
   ** subscribee-contains-this-1
 ```
-* unresolved
+* still unresolved
 ** Users need to be able to unhide nodes.
 ** fork a foreign node by "editing" it
 ** *cols for all rels in either direction

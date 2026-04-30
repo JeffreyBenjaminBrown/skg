@@ -19,8 +19,8 @@ use skg::types::nodes::complete::NodeComplete;
 use std::sync::Arc;
 
 use skg::serve::ViewsState;
-use skg::types::memory::OpenViews;
-use skg::dbs::memory::{InRustGraph, InRustGraphHandle, new_handle};
+use skg::types::views_state::OpenViews;
+use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 
 use futures::executor::block_on;
 use std::error::Error;

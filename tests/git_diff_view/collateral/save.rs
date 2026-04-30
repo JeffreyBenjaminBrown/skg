@@ -61,7 +61,7 @@ fn test_collateral_view_preserves_diff_annotations()
         uri_2 . clone (), viewforest . clone (), &pids );
 
       // 4. Save buffer 1 with a new child "c" under "a".
-      //    This also updates memory and re-renders collateral views.
+      //    This also updates the in-Rust graph and re-renders collateral views.
       let save_input : String = insert_after (
         &initial_buffer, "(id a)",
         "** (skg (node (id c))) c" );

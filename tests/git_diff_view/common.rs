@@ -19,12 +19,12 @@ pub use skg::dbs::typedb::relationships::create_all_relationships;
 pub use skg::to_org::render::content_view::multi_root_view;
 pub use skg::test_utils::{ extract_string_field_from_sexp, read_all_lp_messages, update_from_and_rerender_buffer_test as update_from_and_rerender_buffer};
 pub use skg::types::misc::{ID, SkgConfig, SkgfileSource, TantivyIndex, SourceName};
-pub use skg::dbs::memory::{InRustGraph, InRustGraphHandle, new_handle};
+pub use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 pub use skg::types::nodes::fs::NodeFS;
 pub use skg::types::nodes::typedb::NodeTypedb;
 pub use skg::types::nodes::complete::NodeComplete;
 pub use skg::serve::ViewsState;
-pub use skg::types::memory::OpenViews;
+pub use skg::types::views_state::OpenViews;
 
 //
 // Git helpers

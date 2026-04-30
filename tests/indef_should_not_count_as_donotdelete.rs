@@ -30,9 +30,9 @@ use std::sync::Arc;
 use skg::test_utils::run_with_test_db;
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
-use skg::types::memory::OpenViews;
+use skg::types::views_state::OpenViews;
 use skg::types::misc::{SkgConfig, TantivyIndex};
-use skg::dbs::memory::{InRustGraph, InRustGraphHandle, new_handle};
+use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 use typedb_driver::TypeDBDriver;
 
 #[test]

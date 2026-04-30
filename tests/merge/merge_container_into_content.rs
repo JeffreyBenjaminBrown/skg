@@ -19,12 +19,12 @@ use std::path::Path;
 use std::sync::Arc;
 
 use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_source;
-use skg::test_utils::{run_with_test_db, graph_handle_from_config, audit_memory_or_panic};
+use skg::test_utils::{run_with_test_db, graph_handle_from_config, audit_in_rust_graph_or_panic};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
-use skg::types::memory::OpenViews;
+use skg::types::views_state::OpenViews;
 
-use skg::dbs::memory::InRustGraphHandle;
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex, SourceName};
 
 use typedb_driver::TypeDBDriver;
@@ -236,5 +236,5 @@ async fn merge_container_into_content_impl (
       failures . join ("\n  - ") );
     panic!("{}", msg); }
 
-  audit_memory_or_panic (&graph, &config . db_name, driver) . await?;
+  audit_in_rust_graph_or_panic (&graph, &config . db_name, driver) . await?;
   Ok (( )) }
