@@ -6,7 +6,7 @@ use crate::types::list::{Diff_Item, compute_interleaved_diff, itemlist_and_remov
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::dbs::memory::InRustGraph;
-use crate::env::find_source_with_optional_tantivy;
+use crate::types::env::find_source_with_optional_tantivy;
 use crate::types::nodes::complete::NodeComplete;
 use crate::git_ops::read_repo::nodecomplete_from_git_head;
 use crate::types::memory::nodecomplete_from_memory_or_disk;

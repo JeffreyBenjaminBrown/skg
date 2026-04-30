@@ -10,7 +10,7 @@ use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
-use crate::env::SkgEnv;
+use crate::types::env::SkgEnv;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, HeadlineInfo};
 use crate::serve::ConnectionState;
 use crate::serve::handlers::save_buffer::{SaveResponse, update_from_and_rerender_buffer};

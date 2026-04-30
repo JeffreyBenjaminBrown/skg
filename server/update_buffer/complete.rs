@@ -5,7 +5,7 @@
 // `FnMut` closure which cannot `.await`.
 
 use crate::dbs::memory::InRustGraph;
-use crate::env::SkgEnv;
+use crate::types::env::SkgEnv;
 use crate::types::misc::{ID, SourceName};
 use crate::types::git::SourceDiff;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, ScaffoldKind};

@@ -7,7 +7,7 @@ use crate::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sourc
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
 use crate::dbs::memory::InRustGraph;
-use crate::env::SkgEnv;
+use crate::types::env::SkgEnv;
 use crate::serve::ConnectionState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_text_response};

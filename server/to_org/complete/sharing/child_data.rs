@@ -5,7 +5,7 @@
 /// completer used to define a near-identical local copy of this
 /// struct and a near-identical `build_*_child_data` helper.
 
-use crate::env::SkgEnv;
+use crate::types::env::SkgEnv;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::misc::{ID, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};

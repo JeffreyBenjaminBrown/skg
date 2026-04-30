@@ -14,7 +14,7 @@ pub mod util;
 use crate::consts::SHUTDOWN_DB_DELETE_DELAY_MS;
 use crate::dbs::typedb::util::delete_database;
 use crate::dbs::memory::InRustGraphHandle;
-use crate::env::SkgEnv;
+use crate::types::env::SkgEnv;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;

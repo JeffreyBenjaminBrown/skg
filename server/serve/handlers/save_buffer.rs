@@ -1,5 +1,5 @@
 use crate::context::update_context_types_for_saved_nodes;
-use crate::env::SkgEnv;
+use crate::types::env::SkgEnv;
 use crate::from_text::buffer_to_viewforest_and_save_instructions;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};

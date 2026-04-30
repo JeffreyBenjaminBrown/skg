@@ -16,42 +16,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use typedb_driver::TypeDBDriver;
 
-/// Free-function variant of 'SkgEnv::find_source' for callers that
-/// don't have a 'SkgEnv' on hand. Uses the process-global memory
-/// snapshot ('snapshot_global'); returns 'None' when no snapshot
-/// has been installed (e.g. tests that bypass startup).
-///
-/// Layered the same way as 'SkgEnv::find_source':
-/// memory → deletion-map → Tantivy → disk scan.
-pub fn find_source (
-  id                             : &ID,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  tantivy_index                  : &TantivyIndex,
-  config                         : &SkgConfig,
-) -> Option<SourceName> {
-  find_source_with_optional_tantivy (
-    id, deleted_since_head_pid_src_map,
-    Some (tantivy_index), config ) }
-
-/// Like 'find_source', but accepts 'None' for the Tantivy index.
-/// Tests that don't populate Tantivy (and don't need it for
-/// resolution) can pass 'None'; the lookup falls through to disk.
-pub fn find_source_with_optional_tantivy (
-  id                             : &ID,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  tantivy_index                  : Option<&TantivyIndex>,
-  config                         : &SkgConfig,
-) -> Option<SourceName> {
-  if let Some (snap) = snapshot_global () {
-    if let Some ((_pid, src)) = snap . pid_and_source (id)
-    { return Some (src); } }
-  if let Some (s) = deleted_since_head_pid_src_map . get (id)
-  { return Some (s . clone ()); }
-  if let Some (idx) = tantivy_index {
-    if let Some ((_title, src)) = title_and_source_by_id (idx, id)
-    { return Some (src); } }
-  source_from_disk (id, config) }
-
 #[derive(Clone)]
 pub struct SkgEnv {
   pub config        : SkgConfig,
@@ -95,3 +59,39 @@ impl SkgEnv {
     { return Some (src); }
     source_from_disk (id, &self . config) }
 }
+
+/// Free-function variant of 'SkgEnv::find_source' for callers that
+/// don't have a 'SkgEnv' on hand. Uses the process-global memory
+/// snapshot ('snapshot_global'); returns 'None' when no snapshot
+/// has been installed (e.g. tests that bypass startup).
+///
+/// Layered the same way as 'SkgEnv::find_source':
+/// memory → deletion-map → Tantivy → disk scan.
+pub fn find_source (
+  id                             : &ID,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  tantivy_index                  : &TantivyIndex,
+  config                         : &SkgConfig,
+) -> Option<SourceName> {
+  find_source_with_optional_tantivy (
+    id, deleted_since_head_pid_src_map,
+    Some (tantivy_index), config ) }
+
+/// Like 'find_source', but accepts 'None' for the Tantivy index.
+/// Tests that don't populate Tantivy (and don't need it for
+/// resolution) can pass 'None'; the lookup falls through to disk.
+pub fn find_source_with_optional_tantivy (
+  id                             : &ID,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  tantivy_index                  : Option<&TantivyIndex>,
+  config                         : &SkgConfig,
+) -> Option<SourceName> {
+  if let Some (snap) = snapshot_global () {
+    if let Some ((_pid, src)) = snap . pid_and_source (id)
+    { return Some (src); } }
+  if let Some (s) = deleted_since_head_pid_src_map . get (id)
+  { return Some (s . clone ()); }
+  if let Some (idx) = tantivy_index {
+    if let Some ((_title, src)) = title_and_source_by_id (idx, id)
+    { return Some (src); } }
+  source_from_disk (id, config) }
