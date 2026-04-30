@@ -4,7 +4,7 @@
 // are async, and `do_everywhere_in_tree_dfs` takes a sync
 // `FnMut` closure which cannot `.await`.
 
-use crate::dbs::memory::InRustGraph;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::env::SkgEnv;
 use crate::types::misc::{ID, SourceName};
 use crate::types::git::SourceDiff;

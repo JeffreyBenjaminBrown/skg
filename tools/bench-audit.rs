@@ -17,7 +17,7 @@
 use skg::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
-use skg::dbs::memory::{
+use skg::dbs::in_rust_graph::{
   audit::audit_one_node,
   InRustGraph, InRustGraphHandle,
   init_global_handle_for_first_time_or_panic, new_handle,

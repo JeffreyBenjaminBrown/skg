@@ -1,4 +1,4 @@
-use crate::dbs::memory::scheduled_audit::take_pending_audit_warning;
+use crate::dbs::in_rust_graph::scheduled_audit::take_pending_audit_warning;
 use crate::types::env::SkgEnv;
 use crate::serve::ViewsState;
 use crate::to_org::render::content_view::single_root_view;
@@ -11,7 +11,7 @@ use crate::serve::util::{
   tag_text_response};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::misc::ID;
-use crate::types::memory::ViewUri;
+use crate::types::views_state::ViewUri;
 
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};

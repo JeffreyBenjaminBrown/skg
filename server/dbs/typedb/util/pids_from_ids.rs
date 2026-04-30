@@ -12,12 +12,12 @@ use ego_tree::{NodeRef, NodeMut, NodeId, Tree};
 
 use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind};
 use crate::types::misc::ID;
-use crate::dbs::memory::snapshot_global;
+use crate::dbs::in_rust_graph::snapshot_global;
 use crate::dbs::typedb::util::concept_document::extract_id_from_node;
 
 /// Collect all IDs, batch-lookup their PIDs in TypeDB, then replace.
 /// Only query TypeDB for nodes not already resolvable in the in-Rust
-/// memory snapshot.
+/// in-Rust graph snapshot.
 pub async fn replace_ids_with_pids(
   viewforest  : &mut Tree<UncheckedViewNode>,
   root_id : NodeId,
@@ -28,26 +28,26 @@ pub async fn replace_ids_with_pids(
   collect_ids_in_tree( viewforest . root(),
                        &mut all_ids );
   let snap = snapshot_global ();
-  let mut pids_from_memory: HashMap<ID, Option<ID>> =
+  let mut pids_from_in_rust_graph: HashMap<ID, Option<ID>> =
     HashMap::new();
-  let mut unknown_ids: Vec<ID> = // not resolvable via memory
+  let mut unknown_ids: Vec<ID> = // not resolvable via in-Rust graph
     Vec::new();
   for id in all_ids {
     let resolved : Option<ID> =
       snap . as_deref () . and_then ( |g| g . pid_of (&id) );
     match resolved {
       Some (pid) => {
-        pids_from_memory . insert ( id, Some (pid) ); }
+        pids_from_in_rust_graph . insert ( id, Some (pid) ); }
       None => { unknown_ids . push (id); } } }
-  tracing::debug!("replace_ids_with_pids: {} from memory, {} need TypeDB query",
-            pids_from_memory . len(), unknown_ids . len());
+  tracing::debug!("replace_ids_with_pids: {} from in_rust_graph, {} need TypeDB query",
+            pids_from_in_rust_graph . len(), unknown_ids . len());
   let pids_from_typedb: HashMap<ID, Option<ID>> =
     pids_from_ids( db_name, driver, &unknown_ids
     ) . await?;
-  pids_from_memory . extend (pids_from_typedb);
+  pids_from_in_rust_graph . extend (pids_from_typedb);
   if let Some (root_mut) = viewforest . get_mut (root_id) {
     assign_pids_throughout_tree_from_map(
-      root_mut, &pids_from_memory); }
+      root_mut, &pids_from_in_rust_graph); }
   Ok(( )) }
 
 /// Collect IDs for bulk PID lookup

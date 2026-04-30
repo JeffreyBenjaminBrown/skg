@@ -1,8 +1,8 @@
-//! NodeComplete: the full in-memory node.
+//! NodeComplete: the full in-Rust-graph node.
 //!
 //! Carries every field a node has: the on-disk fields (mirrored
 //! from NodeFS) plus 'source', which is inferred from file
-//! location and held only in memory.
+//! location and held only in the in-Rust graph.
 //!
 //! NodeComplete itself is NOT Serialize/Deserialize. The on-disk
 //! round-trip goes through 'NodeFS'

@@ -1,7 +1,7 @@
 //! Opt-in scheduled consistency audit — paced daemon.
 //!
 //! When 'SkgConfig.auto_audit_daily' is true, the server runs the
-//! memory-vs-TypeDB audit in a background thread at nice(19),
+//! in-Rust-graph-vs-TypeDB audit in a background thread at nice(19),
 //! processing pids in batches of 128 with a 15-second sleep between
 //! batches. A full 29k-node corpus takes ~1 hour, during which
 //! TypeDB gets regular breathing room.
@@ -39,9 +39,9 @@ use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use typedb_driver::{Transaction, TransactionType, TypeDBDriver};
 
-use crate::dbs::memory::{InRustGraph, InRustGraphHandle};
-use crate::dbs::memory::audit::{audit_one_node, Mismatch};
-use crate::dbs::memory::audit_store::{
+use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
+use crate::dbs::in_rust_graph::audit::{audit_one_node, Mismatch};
+use crate::dbs::in_rust_graph::audit_store::{
   AuditRecord, RecordedMismatch,
   load, pids_needing_audit_today,
   prune_to_corpus, record_from_mismatch, save};
@@ -246,7 +246,7 @@ async fn audit_batch_concurrently<'a> (
 /// starts thrashing.
 const PID_CONCURRENCY : usize = 8;
 
-/// Process one batch: audit each pid, update the store in memory,
+/// Process one batch: audit each pid, update the store in in_rust_graph,
 /// persist the whole store, append discovered mismatches to
 /// audits.org, and refresh the client-facing warning slot.
 ///
@@ -339,9 +339,9 @@ fn append_mismatches_to_audits_org (
     text . push_str ( & format! ("\n* {}\n", date)); }
   for m in mismatches {
     text . push_str ( & format! (
-      "** Node '{}': {} {} mismatch\n   Memory: {:?}\n   TypeDB: {:?}\n",
+      "** Node '{}': {} {} mismatch\n   InRustGraph: {:?}\n   TypeDB: {:?}\n",
       m . pid, m . relation, m . role,
-      m . memory, m . typedb )); }
+      m . in_rust_graph, m . typedb )); }
   if let Err (e) = file . write_all (text . as_bytes ()) {
     tracing::warn! (path = %path . display (), error = %e,
       "auto_audit_daily: failed to append to audits.org"); } }

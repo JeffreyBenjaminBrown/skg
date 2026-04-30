@@ -3,7 +3,7 @@ use std::error::Error;
 use std::sync::Arc;
 use typedb_driver::TypeDBDriver;
 
-use crate::dbs::memory::{InRustGraph, snapshot_global};
+use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
 use crate::dbs::typedb::search::find_container_ids_of_pid;
 use crate::types::misc::ID;
 
@@ -50,9 +50,9 @@ pub async fn full_containerward_ancestry(
   max_depth : usize,
 ) -> Result<AncestryTree, Box<dyn Error>> {
   if let Some (graph_snap) = snapshot_global () {
-    return Ok ( full_containerward_ancestry_from_memory (
+    return Ok ( full_containerward_ancestry_from_in_rust_graph (
       &graph_snap, origin, max_depth ) ); }
-  // TypeDB fallback (used by tests that don't initialize memory):
+  // TypeDB fallback (used by tests that don't initialize in-Rust graph):
   // BFS state: for each node we've decided to expand,
   // record its containers (once queried). Leaves (Root,
   // Repeated, DepthTruncated) get no entry here.
@@ -210,10 +210,10 @@ fn assemble(
         . collect ();
       AncestryTree::Inner ( id, children ) }, } }
 
-/// In-memory containerward ancestry, walking the 'contained_by'
+/// In-Rust-graph containerward ancestry, walking the 'contained_by'
 /// inverse index. Same BFS structure as the TypeDB version but no
 /// async / no parallel queries / no frontier-batching.
-fn full_containerward_ancestry_from_memory (
+fn full_containerward_ancestry_from_in_rust_graph (
   graph     : &Arc<InRustGraph>,
   origin    : &ID,
   max_depth : usize,

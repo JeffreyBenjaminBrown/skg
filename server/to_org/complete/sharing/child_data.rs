@@ -10,7 +10,7 @@ use crate::types::env::SkgEnv;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::misc::{ID, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
-use crate::types::memory::nodecomplete_from_memory_or_disk;
+use crate::types::views_state::nodecomplete_from_in_rust_graph_or_disk;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Birth, mk_indefinitive_viewnode, mk_phantom_viewnode};
 use crate::update_buffer::util::complete_relevant_children_in_viewnodetree;
@@ -94,7 +94,7 @@ pub fn build_child_data (
         . ok_or_else ( || -> Box<dyn Error> { format! (
           "build_child_data: no source found for {}", child_skgid . 0
         ) . into () } ) ?;
-      let skg : NodeComplete = nodecomplete_from_memory_or_disk (
+      let skg : NodeComplete = nodecomplete_from_in_rust_graph_or_disk (
         &env . config, child_skgid, &child_src ) ?;
       result . insert ( child_skgid . clone (),
                         ChildData { source  : skg . source . clone (),

@@ -4,6 +4,6 @@
 
 pub mod filesystem;
 pub mod init;
-pub mod memory;
+pub mod in_rust_graph;
 pub mod tantivy;
 pub mod typedb;

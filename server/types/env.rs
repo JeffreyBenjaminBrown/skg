@@ -3,11 +3,11 @@
 //! constructed once at startup (after 'initialize_dbs') and threaded
 //! through subsystems that need access to multiple databases.
 //!
-//! Field order is by complexity: 'config' is plain data; 'memory' is
+//! Field order is by complexity: 'config' is plain data; 'in-Rust graph' is
 //! the in-process snapshot; 'tantivy_index' is in-process and indexed;
 //! 'driver' talks over the wire to TypeDB.
 
-use crate::dbs::memory::{InRustGraph, InRustGraphHandle, snapshot_global};
+use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, snapshot_global};
 use crate::dbs::tantivy::title_and_source_by_id;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::phantom::source_from_disk;
@@ -19,19 +19,19 @@ use typedb_driver::TypeDBDriver;
 #[derive(Clone)]
 pub struct SkgEnv {
   pub config        : SkgConfig,
-  pub memory        : InRustGraphHandle,
+  pub in_rust_graph : InRustGraphHandle,
   pub tantivy_index : TantivyIndex,
   pub driver        : Arc<TypeDBDriver>,
 }
 
 impl SkgEnv {
-  /// Snap the current in-Rust memory.
-  pub fn memory_snapshot (&self) -> Arc<InRustGraph> {
-    self . memory . load_full () }
+  /// Snap the current in-Rust graph.
+  pub fn in_rust_graph_snapshot (&self) -> Arc<InRustGraph> {
+    self . in_rust_graph . load_full () }
 
   /// Resolve an ID to its source by checking, in order:
   ///
-  /// 1. The in-Rust memory snapshot (freshest; reflects in-flight
+  /// 1. The in-Rust graph snapshot (freshest; reflects in-flight
   ///    edits before they reach the indexed DBs or disk).
   /// 2. The caller's 'deleted_since_head_pid_src_map' hint (only
   ///    relevant in diff view; covers IDs whose '.skg' file has been
@@ -50,7 +50,7 @@ impl SkgEnv {
     deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   ) -> Option<SourceName> {
     if let Some ((_pid, src)) =
-      self . memory_snapshot () . pid_and_source (id)
+      self . in_rust_graph_snapshot () . pid_and_source (id)
     { return Some (src); }
     if let Some (s) = deleted_since_head_pid_src_map . get (id)
     { return Some (s . clone ()); }
@@ -61,12 +61,12 @@ impl SkgEnv {
 }
 
 /// Free-function variant of 'SkgEnv::find_source' for callers that
-/// don't have a 'SkgEnv' on hand. Uses the process-global memory
+/// don't have a 'SkgEnv' on hand. Uses the process-global in-Rust graph
 /// snapshot ('snapshot_global'); returns 'None' when no snapshot
 /// has been installed (e.g. tests that bypass startup).
 ///
 /// Layered the same way as 'SkgEnv::find_source':
-/// memory → deletion-map → Tantivy → disk scan.
+/// in-Rust graph → deletion-map → Tantivy → disk scan.
 pub fn find_source (
   id                             : &ID,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,

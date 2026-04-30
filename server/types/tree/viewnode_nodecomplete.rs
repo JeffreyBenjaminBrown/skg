@@ -1,7 +1,7 @@
 /// Node access utilities for ego_tree::Tree<ViewNode> and Tree<UncheckedViewNode>
 
 use crate::to_org::util::get_id_from_treenode;
-use crate::types::memory::nodecomplete_from_memory_or_disk;
+use crate::types::views_state::nodecomplete_from_in_rust_graph_or_disk;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, TrueNode, Scaffold,
@@ -103,7 +103,7 @@ pub fn pids_for_subscriber_and_its_subscribees (
     pid_and_source_from_treenode (
       tree, node_id, "pids_for_subscriber_and_its_subscribees" ) ?;
   let nodecomplete : NodeComplete =
-    nodecomplete_from_memory_or_disk ( config, &pid, &source ) ?;
+    nodecomplete_from_in_rust_graph_or_disk ( config, &pid, &source ) ?;
   Ok (( nodecomplete . pid . clone (),
         nodecomplete . subscribes_to . or_default() . to_vec() )) }
 
@@ -133,7 +133,7 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
       tree, grandparent_ref . id (),
       "pid_for_subscribee_and_its_subscriber_grandparent" ) ?;
   let nodecomplete : NodeComplete =
-    nodecomplete_from_memory_or_disk (
+    nodecomplete_from_in_rust_graph_or_disk (
       config, &subscriber_id, &subscriber_source ) ?;
   Ok (( subscribee_pid,
         nodecomplete . pid . clone() )) }

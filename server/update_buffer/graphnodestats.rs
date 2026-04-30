@@ -4,7 +4,7 @@ use crate::dbs::typedb::search::all_graphnodestats::{
   AllGraphNodeStats};
 use crate::to_org::util::collect_ids_from_tree;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::memory::nodecomplete_from_memory_or_disk;
+use crate::types::views_state::nodecomplete_from_in_rust_graph_or_disk;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{GraphNodeStats, ViewNode, ViewNodeKind};
 
@@ -54,7 +54,7 @@ pub fn set_metadata_relationships_in_node_recursive (
       match & tree . get (treeid) . unwrap () . value () . kind {
         ViewNodeKind::True (t) => {
           let nodecomplete_opt : Option<NodeComplete> =
-            nodecomplete_from_memory_or_disk (
+            nodecomplete_from_in_rust_graph_or_disk (
               config, &t . id, &t . source
             ). ok ();
           Some ( graphnodestats_for_pid (

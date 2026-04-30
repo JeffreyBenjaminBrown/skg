@@ -5,7 +5,7 @@ use crate::dbs::filesystem::multiple_nodes::{
   check_for_duplicate_ids_across_sources,
   read_all_skg_files_from_sources};
 use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
-use crate::dbs::memory::{InRustGraphHandle, apply_definenodes};
+use crate::dbs::in_rust_graph::{InRustGraphHandle, apply_definenodes};
 use crate::merge::mergeInstructionTriple::neighbor_savenodes_for_merges;
 use crate::save::{ update_fs_from_saveinstructions, update_tantivy_from_saveinstructions, update_typedb_from_saveinstructions };
 use crate::types::misc::{SkgConfig, TantivyIndex};
@@ -17,7 +17,7 @@ use typedb_driver::TypeDBDriver;
 /// Applies Merges by fanning a single 'Vec<DefineNode>' through the
 /// four ordinary sink functions. Four sinks, in order:
 ///   1) Filesystem (source of truth)
-///   2) In-memory graph
+///   2) In-Rust graph
 ///   3) TypeDB (with recovery: rebuild from disk on failure)
 ///   4) Tantivy (with recovery: rebuild from disk on failure)
 ///
@@ -31,7 +31,7 @@ use typedb_driver::TypeDBDriver;
 /// neighbors are saved. FS, graph, and Tantivy see only the primary
 /// 3N: neighbor .skg files are unchanged (acquiree_id stays in
 /// neighbor fields, resolved to acquirer via extra_id at read time);
-/// the in-memory graph stores outbound-only references just like disk;
+/// the in-Rust graph stores outbound-only references just like disk;
 /// Tantivy indexes title+body+aliases, none of which change on a
 /// neighbor during a merge.
 pub async fn merge_nodes (
@@ -44,7 +44,7 @@ pub async fn merge_nodes (
   if merge_instructions . is_empty () {
     return Ok (None); }
   tracing::info!(
-    "Merging nodes in FS, in-memory graph, TypeDB, and Tantivy, in that order ..." );
+    "Merging nodes in FS, in-Rust graph, TypeDB, and Tantivy, in that order ..." );
   let db_name : &str = &config . db_name;
 
   let primary_definenodes : Vec<DefineNode> =
@@ -63,9 +63,9 @@ pub async fn merge_nodes (
       config . clone () ) ?;
     tracing::info!("   Filesystem merge complete."); }
 
-  { // In-memory graph.
+  { // In-Rust graph.
     apply_definenodes (graph, &primary_definenodes);
-    tracing::info!("   In-memory graph merge complete."); }
+    tracing::info!("   In-Rust graph merge complete."); }
 
   { // TypeDB: primary + neighbor SaveNodes.
     let typedb_definenodes : Vec<DefineNode> = {

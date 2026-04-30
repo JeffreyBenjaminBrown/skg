@@ -17,7 +17,7 @@ use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::nodes::complete::NodeComplete;
-use crate::dbs::memory::{InRustGraph, InRustGraphHandle, new_handle};
+use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 
 use futures::executor::block_on;
 use std::collections::HashSet;
@@ -78,7 +78,7 @@ pub fn initialize_dbs (
         config, &driver, marker_mtime )
       { Ok (( tantivy_index )) => {
           tracing::info! ("Incremental init succeeded.");
-          // The incremental step above updated TypeDB and Tantivy from only the modified .skg files, which is all those databases need. The in-memory graph (env.memory) and the InitContextHandoff (contains maps, had_id_set, link_targets) are rebuilt from scratch on every startup, so they need every NodeComplete. The read below is therefore a full file read, but not a full re-initialization of the databases.
+          // The incremental step above updated TypeDB and Tantivy from only the modified .skg files, which is all those databases need. The in-Rust graph (env.in_rust_graph) and the InitContextHandoff (contains maps, had_id_set, link_targets) are rebuilt from scratch on every startup, so they need every NodeComplete. The read below is therefore a full file read, but not a full re-initialization of the databases.
           let nodes : Vec<NodeComplete> =
             read_all_skg_files_from_sources (config)
             . unwrap_or_default ();
@@ -217,11 +217,11 @@ fn env_and_handoff_from_nodes (
   let ( map_to_content, map_to_containers )
     : ( MapToContent, MapToContainers )
     = content_maps_from_nodes (&nodes);
-  let memory : InRustGraphHandle =
+  let in_rust_graph : InRustGraphHandle =
     new_handle ( InRustGraph::from_nodecompletes (nodes) );
   ( SkgEnv {
       config : config . clone (),
-      memory,
+      in_rust_graph,
       tantivy_index,
       driver, },
     InitContextHandoff {

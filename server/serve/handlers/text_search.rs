@@ -20,7 +20,7 @@ use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
 use crate::types::git::MembershipAxes;
-use crate::types::memory::ViewUri;
+use crate::types::views_state::ViewUri;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, Birth, viewforest_root_viewnode, mk_indefinitive_viewnode};

@@ -1,7 +1,7 @@
 use std::time::Duration;
 use std::error::Error;
 
-use crate::dbs::memory::snapshot_global;
+use crate::dbs::in_rust_graph::snapshot_global;
 use crate::types::misc::ID;
 use crate::types::nodes::typedb::NodeTypedb;
 
@@ -148,11 +148,11 @@ pub async fn insert_relationship_from_list (
   tx: &typedb_driver::Transaction
 ) -> Result<(), Box<dyn Error>> {
 
-  // If memory is initialized, resolve each target_id to its
+  // If in-Rust graph is initialized, resolve each target_id to its
   // primary pid up front. Avoids the disjunctive match below
   // ('or { extra_id ... }') which TypeDB's planner evaluates by
   // scanning every extra_id entity — catastrophically slow on
-  // a non-trivial corpus. Only the unresolved-via-memory fallback
+  // a non-trivial corpus. Only the unresolved-via-in-Rust graph fallback
   // path (tests that bypass 'init_global_handle_for_first_time_or_panic') pays that cost.
   let snap = snapshot_global ();
   for target_id in id_list {

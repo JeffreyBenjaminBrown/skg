@@ -19,7 +19,7 @@ use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
 
-/// Process-global handle to the in-Rust memory.
+/// Process-global handle to the in-Rust graph.
 ///
 /// Set once, at server startup (see 'init_global_handle_for_first_time_or_panic'). Read-only
 /// afterwards. Functions on hot read paths (notably
@@ -39,7 +39,7 @@ pub fn init_global_handle_for_first_time_or_panic (handle: InRustGraphHandle) {
   GLOBAL_HANDLE . set (handle) . ok ()
     . expect ("GLOBAL_HANDLE initialized twice"); }
 
-/// Snap the current in-Rust memory if the global handle has been
+/// Snap the current in-Rust graph if the global handle has been
 /// initialized; returns None otherwise. In the running server
 /// 'init_global_handle_for_first_time_or_panic' is called during startup before any request
 /// is served, so None here indicates a test that bypassed startup
@@ -47,7 +47,7 @@ pub fn init_global_handle_for_first_time_or_panic (handle: InRustGraphHandle) {
 pub fn snapshot_global () -> Option<Arc<InRustGraph>> {
   GLOBAL_HANDLE . get () . map ( |h| h . load_full () ) }
 
-/// The in-memory projection of the graph.
+/// The in-Rust-graph projection of the graph.
 ///
 /// Values are 'NodeRust' — everything a 'NodeComplete' has except
 /// 'misc', plus 'textlinks_to' parsed from body text.
@@ -131,7 +131,7 @@ impl InRustGraph {
 
 /// Resolves any known ID (primary pid or extra_id) to the primary
 /// pid. Primary pids pass through unchanged; extra_ids are mapped via
-/// 'extra_id_to_pid'. IDs unknown to memory fall through as-is, so
+/// 'extra_id_to_pid'. IDs unknown to in-Rust graph fall through as-is, so
 /// callers can index-under-unknown without having to check first.
 fn id_to_pid_if_found (g: &InRustGraph, id: &ID) -> ID {
   g . extra_id_to_pid . get (id) . cloned ()
@@ -325,33 +325,33 @@ pub fn apply_definenodes (
         new_graph . nodes . remove (id); } } }
   graph . store ( Arc::new (new_graph) ); }
 
-/// Check that in-Rust memory reflects the expected post-apply state
+/// Check that in-Rust graph reflects the expected post-apply state
 /// for a batch of save instructions: every Save's pid is present in
-/// memory, and every Delete's id is absent. Used as a 'debug_assert!'
+/// in_rust_graph, and every Delete's id is absent. Used as a 'debug_assert!'
 /// invariant guard at the top of 'update_views_after_save' to catch
 /// pipeline-ordering regressions (someone reshuffles the pipeline so
 /// rerender runs before 'apply_definenodes'). Returns Ok (()) on
 /// coherence, Err with the offending pid's detail otherwise. Never
 /// panics — the caller wraps in 'debug_assert!' so release builds pay
 /// no cost.
-pub fn memory_coherent_with_save_instructions (
+pub fn in_rust_graph_coherent_with_save_instructions (
   save_instructions : &[DefineNode],
 ) -> Result<(), String> {
   let snap : Option<Arc<InRustGraph>> = snapshot_global ();
   let graph : &InRustGraph = match snap . as_deref () {
     Some (g) => g,
-    None     => return Ok (( )), }; // memory not yet initialized (tests); nothing to check
+    None     => return Ok (( )), }; // in-Rust graph not yet initialized (tests); nothing to check
   for instr in save_instructions {
     match instr {
       DefineNode::Save (SaveNode (node)) => {
         if ! graph . nodes . contains_key (&node . pid) {
           return Err ( format! (
-            "Save instruction pid {} absent from memory",
+            "Save instruction pid {} absent from the in-Rust graph",
             node . pid )); }}
       DefineNode::Delete (DeleteNode { id, .. }) => {
         if graph . nodes . contains_key (id) {
           return Err ( format! (
-            "Delete instruction id {} still present in memory",
+            "Delete instruction id {} still present in the in-Rust graph",
             id )); }} } }
   Ok (( )) }
 

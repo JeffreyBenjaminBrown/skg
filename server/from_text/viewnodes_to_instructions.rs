@@ -1,7 +1,7 @@
 pub mod to_naive_instructions;
 pub mod reconcile_same_id_instructions;
 
-use crate::types::memory::nodecomplete_from_memory;
+use crate::types::views_state::nodecomplete_from_in_rust_graph;
 use crate::types::misc::SkgConfig;
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use crate::types::viewnode::ViewNode;
@@ -47,9 +47,9 @@ pub async fn viewforest_to_nonmerge_save_instructions (
   Ok ((result, source_moves)) }
 
 /// Filters out Save instructions that would be no-ops,
-/// because they match the pre-save in-Rust memory entry
+/// because they match the pre-save in-Rust graph entry
 /// (nothing changed). Delete instructions and new nodes (not yet
-/// in memory) are kept.
+/// in the in-Rust graph) are kept.
 fn filter_unchanged_save_instructions (
   instructions : Vec<DefineNode>,
 ) -> Vec<DefineNode> {
@@ -58,7 +58,7 @@ fn filter_unchanged_save_instructions (
     . into_iter()
     . filter(|instr| match instr {
       DefineNode::Save(SaveNode (node)) => {
-        match nodecomplete_from_memory (&node . pid) {
+        match nodecomplete_from_in_rust_graph (&node . pid) {
           Some (pre_save) =>
             buffernode_differs_from_disknode (node, &pre_save),
           None => true, }}

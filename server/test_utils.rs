@@ -5,7 +5,7 @@ use crate::consts::TYPEDB_ADDRESS;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
 use crate::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema, create_empty_tantivy_index};
-use crate::dbs::memory::{InRustGraph, InRustGraphHandle, audit::{audit_memory_against_typedb, format_mismatches}, new_handle};
+use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, audit::{audit_in_rust_graph_against_typedb, format_mismatches}, new_handle};
 use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
@@ -15,7 +15,7 @@ use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, H
 use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{SaveResponse, update_from_and_rerender_buffer};
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
-use crate::types::memory::ViewUri;
+use crate::types::views_state::ViewUri;
 use crate::types::misc::{MSV, SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName};
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::save::{DefineNode, SaveNode};
@@ -192,7 +192,7 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), Box<dyn Error>> {
 }
 
 /// Build an in-Rust graph handle preloaded from the test config's
-/// fixtures on disk. Use this when a test needs the in-Rust memory
+/// fixtures on disk. Use this when a test needs the in-Rust graph
 /// to agree with TypeDB for auditing.
 pub fn graph_handle_from_config (
   config : &SkgConfig,
@@ -215,7 +215,7 @@ pub fn skg_env_from_parts (
 ) -> SkgEnv {
   SkgEnv {
     config        : config . clone (),
-    memory        : graph . clone (),
+    in_rust_graph : graph . clone (),
     tantivy_index : tantivy_index . clone (),
     driver, } }
 
@@ -255,13 +255,13 @@ pub async fn update_from_and_rerender_buffer_test (
 /// Audit the given in-Rust graph handle against TypeDB; panic with a
 /// detailed message if they disagree. Intended for per-test-fixture
 /// post-mutation verification.
-pub async fn audit_memory_or_panic (
+pub async fn audit_in_rust_graph_or_panic (
   handle  : &InRustGraphHandle,
   db_name : &str,
   driver  : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
   let snap : Arc<InRustGraph> = handle . load_full ();
-  let mismatches = audit_memory_against_typedb (
+  let mismatches = audit_in_rust_graph_against_typedb (
     &snap, db_name, driver ) . await ?;
   if ! mismatches . is_empty () {
     panic! ("audit failed:\n{}", format_mismatches (&mismatches)); }

@@ -18,7 +18,7 @@ use crate::types::errors::SaveError;
 use crate::types::git::{SourceDiff, GitDiffStatus};
 use crate::types::misc::{ID, SourceName, SkgConfig};
 use crate::types::save::{DefineNode, Merge, SourceMove, format_save_error_as_org};
-use crate::types::memory::ViewUri;
+use crate::types::views_state::ViewUri;
 use crate::types::viewnode::ViewNode;
 use crate::update_buffer::update_views_after_save;
 
@@ -50,7 +50,7 @@ impl SaveResponse {
 
 /// Handles save buffer requests from Emacs.
 /// - Reads the buffer content (with length prefix).
-/// - Builds an initial NodeCompleteMap from the ViewsState's memory. It can change during the save process.
+/// - Builds an initial NodeCompleteMap from the ViewsState.s open views. It can change during the save process.
 /// - 'update_from_and_rerender_buffer'
 /// - Responds to Emacs (with length prefix).
 pub fn handle_save_buffer_request (
@@ -173,7 +173,7 @@ pub async fn update_from_and_rerender_buffer (
       env . config . clone(),
       &mut env . tantivy_index,
       &env . driver,
-      &env . memory ) . await ?;
+      &env . in_rust_graph ) . await ?;
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "update_context_types_for_saved_nodes" ). entered();
       update_context_types_for_saved_nodes (

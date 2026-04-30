@@ -44,7 +44,7 @@ unlocked when the early response arrives."
         ;; Guard: refuse to save when skg-view-uri is nil.
         ;; A nil view-uri causes an unfiltered save (all instructions
         ;; sent to TypeDB even if unchanged) AND the server won't update
-        ;; its memory, so the work is both slow and wasted.
+        ;; its in-Rust graph, so the work is both slow and wasted.
         (error "Cannot save: skg-view-uri is nil in buffer '%s' (content-view-mode=%s). Re-open the view."
                (buffer-name)
                (if (derived-mode-p 'skg-content-view-mode) "on" "off")))

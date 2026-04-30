@@ -1,8 +1,8 @@
-use crate::dbs::memory::InRustGraph;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
-use crate::types::memory::nodecomplete_from_memory_or_disk;
+use crate::types::views_state::nodecomplete_from_in_rust_graph_or_disk;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
@@ -36,7 +36,7 @@ pub type DefinitiveMap =
 // Fetching, building and modifying NodeCompletes and ViewNodes
 // ======================================================
 
-/// Fetch a NodeComplete from memory or disk. Resolves id→(pid,source)
+/// Fetch a NodeComplete from the in-Rust graph or disk. Resolves id→(pid,source)
 /// via 'pid_and_source_from_id', then reads. Makes a ViewNode with
 /// validated title. Returns both.
 /// Returns Ok(None) when SKGID has no record anywhere -- not as a
@@ -60,7 +60,7 @@ pub async fn nodecomplete_and_viewnode_from_id (
         nodecomplete_and_viewnode_from_pid_and_source (
           config, &pid_resolved, &source ) ? )) } }
 
-/// Fetch a NodeComplete from memory or disk given PID and source.
+/// Fetch a NodeComplete from the in-Rust graph or disk given PID and source.
 /// Makes an ViewNode with validated title. Returns both.
 pub(super) fn nodecomplete_and_viewnode_from_pid_and_source (
   config : &SkgConfig,
@@ -68,7 +68,7 @@ pub(super) fn nodecomplete_and_viewnode_from_pid_and_source (
   source : &SourceName,
 ) -> Result < ( NodeComplete, ViewNode ), Box<dyn Error> > {
   let nodecomplete : NodeComplete =
-    nodecomplete_from_memory_or_disk ( config, pid, source )?;
+    nodecomplete_from_in_rust_graph_or_disk ( config, pid, source )?;
   let title : String = nodecomplete . title . replace ( '\n', " " );
   if title . is_empty () {
     return Err ( Box::new ( io::Error::new (
@@ -212,13 +212,13 @@ pub fn mark_view_roots_independent (
 /// Three kinds of claim are checked:
 /// - 'Birth::ContainerOf' on child C with TrueNode parent P:
 ///   claim is "C contains P". Verified against C's 'contains'
-///   list in memory.
+///   list in the in-Rust graph.
 /// - 'Birth::LinksTo' on child C with TrueNode parent P:
 ///   claim is "C's body/title links to P". Verified against C's
-///   'textlinks_to' in memory.
+///   'textlinks_to' in the in-Rust graph.
 /// - 'Birth::ContentOf' on child C with INDEFINITIVE TrueNode
 ///   parent P: claim is "C is part of P's content". Verified
-///   against P's 'contains' in memory. Definitive parents are
+///   against P's 'contains' in the in-Rust graph. Definitive parents are
 ///   skipped because the save just redefined their 'contains' to
 ///   include this very child; the check would always pass.
 ///
@@ -229,7 +229,7 @@ pub fn mark_view_roots_independent (
 /// Intended to run AFTER 'mark_view_roots_independent' so direct
 /// children of BufferRoot have already been coerced and don't
 /// fall through this check. Also relies on the save pipeline's
-/// invariant that 'apply_definenodes' has updated the in-memory
+/// invariant that 'apply_definenodes' has updated the in-Rust-graph
 /// graph before the rerender pass runs (see
 /// 'update_views_after_save').
 pub fn validate_birth_relationships (
@@ -488,7 +488,7 @@ pub(super) fn content_ids_if_definitive_else_empty (
       tree, treeid, "content_ids_if_definitive_else_empty" ) {
       Ok (p) => p,
       Err (_) => return Ok ( Vec::new () ), };
-  Ok ( nodecomplete_from_memory_or_disk ( config, &pid, &source )
+  Ok ( nodecomplete_from_in_rust_graph_or_disk ( config, &pid, &source )
     . map ( |nodecomplete| nodecomplete . contains . clone () )
     . unwrap_or_default () ) }
 
@@ -777,7 +777,7 @@ mod validate_birth_relationships_tests {
     // the graph agrees (save just redefined P's contains to match
     // the buffer, so asking the graph would be circular). Claim preserved.
     let graph : InRustGraph = graph_with (vec! [
-      mk_node ("P", &[], &[], &[]),  // P.contains empty in memory
+      mk_node ("P", &[], &[], &[]),  // P.contains empty in the in-Rust graph
       mk_node ("C", &[], &[], &[]),
     ]);
     let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());

@@ -74,7 +74,7 @@ pub type MapToContainers = HashMap<ID, Vec<ID>>;
 /// Compute context origin types for all nodes and update Tantivy.
 /// Returns the map from node ID to context origin type label.
 ///
-/// Fully in-memory: all data is pre-computed from NodeCompletes at init.
+/// Fully in-Rust-graph: all data is pre-computed from NodeCompletes at init.
 /// No TypeDB queries, no async. On a 28k-node dataset this is
 /// near-instantaneous (sub-second).
 pub fn compute_and_store_context_types (
@@ -250,10 +250,10 @@ async fn is_textlink_target (
   Ok (has_any) }
 
 //
-// Step 1: identify origins (in-memory)
+// Step 1: identify origins (using the in-Rust graph)
 //
 
-/// Build origin_types map from in-memory data + one TypeDB query result.
+/// Build origin_types map from in-Rust-graph data + one TypeDB query result.
 /// We impose priority order: If something is a Root,
 /// it doesn't matter that it's a Target, etc.
 /// Therefore higher-priority origin types are processed later.
@@ -305,10 +305,10 @@ pub fn find_roots_and_multiply_contained (
   ( roots, multi ) }
 
 //
-// Step 2: grow treelike contexts (in-memory)
+// Step 2: grow treelike contexts (using the in-Rust graph)
 //
 
-/// Grow contexts from all origins using the in-memory map.
+/// Grow contexts from all origins using the in-Rust-graph map.
 fn grow_all_contexts (
   origin_types : &HashMap<ID, ContextOriginType>,
   map_to_content : &MapToContent,
@@ -322,7 +322,7 @@ fn grow_all_contexts (
     . collect () }
 
 //
-// Step 3: handle cycles (in-memory)
+// Step 3: handle cycles (using the in-Rust graph)
 //
 
 /// The treelike contexts, grown first, might not cover all nodes.

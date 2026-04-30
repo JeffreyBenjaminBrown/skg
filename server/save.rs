@@ -5,7 +5,7 @@ use crate::dbs::filesystem::multiple_nodes::{
   read_all_skg_files_from_sources,
   write_all_nodes_to_fs};
 use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
-use crate::dbs::memory::{InRustGraph, InRustGraphHandle, apply_definenodes};
+use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, apply_definenodes};
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
 use crate::merge::merge_nodes;
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
@@ -45,7 +45,7 @@ pub async fn update_graph_minus_merges (
   driver        : &TypeDBDriver,
   graph         : &InRustGraphHandle,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
-  tracing::info!("Updating FS, in-memory graph, TypeDB, and Tantivy ...");
+  tracing::info!("Updating FS, in-Rust graph, TypeDB, and Tantivy ...");
   let db_name : &str = &config . db_name;
 
   { // Propagate deletes: for every node still on disk that
@@ -70,7 +70,7 @@ pub async fn update_graph_minus_merges (
     tracing::info!( "   Deleted {} file(s), wrote {} file(s).",
               deleted_count, written_count ); }
 
-  { // In-memory graph — atomic snapshot swap so readers see a
+  { // In-Rust graph — atomic snapshot swap so readers see a
     // view that's consistent with what just landed on disk, and
     // never a mid-save half-applied state.
     let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -290,7 +290,7 @@ pub async fn update_typedb_from_saveinstructions (
 /// hides_from_its_subscriptions, overrides_view_of).
 ///
 /// 'deleted_id_set' includes both the primary pid of each delete
-/// AND the extra_ids of that node from the in-memory graph.
+/// AND the extra_ids of that node from the in-Rust graph.
 /// Referencers may have stored any of those ids (TypeDB resolves
 /// them all to the primary at relationship time, but the on-disk
 /// list is whatever the buffer that wrote it had); we want all of

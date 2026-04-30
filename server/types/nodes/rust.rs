@@ -1,4 +1,4 @@
-//! NodeRust: the projection held in the in-memory graph.
+//! NodeRust: the projection held in the in-Rust graph.
 //!
 //! Wide enough to match everything NodeComplete carries (except
 //! derived fields), plus textlinks_to — derived from body parsing at

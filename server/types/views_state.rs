@@ -1,5 +1,5 @@
 use crate::dbs::filesystem::one_node::{nodecomplete_from_id, nodecomplete_from_pid_and_source};
-use crate::dbs::memory::snapshot_global;
+use crate::dbs::in_rust_graph::snapshot_global;
 use crate::types::many_to_many::ManyToMany;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
@@ -162,59 +162,59 @@ impl OpenViews {
 /// (There can be graph roots at other levels, via non-Content birth;
 /// this does not return those.)
 ///
-/// Extra_ids are pulled from the in-Rust memory. If memory isn't
+/// Extra_ids are pulled from the in-Rust graph. If in-Rust graph isn't
 /// initialized (tests that bypass 'init_global_handle_for_first_time_or_panic'), only
 /// primary ids are collected — extras aren't available.
 fn root_ids_from_viewforest (
   viewforest : &Tree<ViewNode>,
 ) -> HashSet<ID> {
   let mut ids : HashSet<ID> = HashSet::new ();
-  let memory = snapshot_global ();
+  let graph_snap = snapshot_global ();
   for child in viewforest . root () . children () {
     if let ViewNodeKind::True (t) = &child . value () . kind {
       ids . insert ( t . id . clone () );
-      if let Some (mem) = memory . as_ref () {
-        if let Some (pid) = mem . pid_of ( &t . id ) {
-          if let Some (node) = mem . nodes . get (&pid) {
+      if let Some (graph) = graph_snap . as_ref () {
+        if let Some (pid) = graph . pid_of ( &t . id ) {
+          if let Some (node) = graph . nodes . get (&pid) {
             ids . insert ( pid . clone () );
             for extra_id in &node . extra_ids {
               ids . insert ( extra_id . clone () ); }}}}}}
   ids }
 
-/// Memory-first NodeComplete read, disk fallback, id-based.
+/// InRustGraph-first NodeComplete read, disk fallback, id-based.
 ///
 /// Async because the id→(pid, source) resolution goes through
-/// 'nodecomplete_from_id', which consults TypeDB when memory is
+/// 'nodecomplete_from_id', which consults TypeDB when in-Rust graph is
 /// uninitialized. Callers that already have '(pid, source)' in
-/// hand should prefer the sync 'nodecomplete_from_memory_or_disk'
+/// hand should prefer the sync 'nodecomplete_from_in_rust_graph_or_disk'
 /// below.
-pub async fn nodecomplete_from_memory_or_disk_async (
+pub async fn nodecomplete_from_in_rust_graph_or_disk_async (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   id     : &ID,
 ) -> Result<NodeComplete, Box<dyn Error>> {
-  if let Some (n) = nodecomplete_from_memory (id) {
+  if let Some (n) = nodecomplete_from_in_rust_graph (id) {
     return Ok (n); }
   nodecomplete_from_id (config, driver, id) . await }
 
-/// Memory-first NodeComplete read, disk fallback, given an
+/// InRustGraph-first NodeComplete read, disk fallback, given an
 /// already-resolved '(pid, source)'. Sync — never consults TypeDB,
 /// so callers in sync contexts don't have to become async. For the
-/// id-only path use 'nodecomplete_from_memory_or_disk_async'.
-pub fn nodecomplete_from_memory_or_disk (
+/// id-only path use 'nodecomplete_from_in_rust_graph_or_disk_async'.
+pub fn nodecomplete_from_in_rust_graph_or_disk (
   config : &SkgConfig,
   pid    : &ID,
   source : &SourceName,
 ) -> Result<NodeComplete, Box<dyn Error>> {
-  if let Some (n) = nodecomplete_from_memory (pid)
+  if let Some (n) = nodecomplete_from_in_rust_graph (pid)
     { return Ok (n); }
   Ok ( nodecomplete_from_pid_and_source (
          config, pid . clone (), source ) ? ) }
 
-/// Synthesize a NodeComplete from the in-Rust memory if the id is
-/// there (primary or extra). Returns None if memory isn't
+/// Synthesize a NodeComplete from the in-Rust graph if the id is
+/// there (primary or extra). Returns None if in-Rust graph isn't
 /// initialized or doesn't have the id.
-pub fn nodecomplete_from_memory (id: &ID) -> Option<NodeComplete> {
+pub fn nodecomplete_from_in_rust_graph (id: &ID) -> Option<NodeComplete> {
   let graph_snap = snapshot_global () ?;
   let pid : ID = graph_snap . pid_of (id) ?;
   let rust = graph_snap . nodes . get (&pid) ?;
@@ -230,4 +230,3 @@ pub fn nodecomplete_from_memory (id: &ID) -> Option<NodeComplete> {
     hides_from_its_subscriptions : rust . hides_from_its_subscriptions . clone (),
     overrides_view_of            : rust . overrides_view_of . clone (),
     misc                         : rust . misc . clone (), } ) }
-

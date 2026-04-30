@@ -3,7 +3,7 @@ use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, 
 use crate::to_org::complete::sharing::goal_list::goal_list_for_subscribee_col;
 use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
 use crate::types::git::SourceDiff;
-use crate::types::memory::nodecomplete_from_memory_or_disk;
+use crate::types::views_state::nodecomplete_from_in_rust_graph_or_disk;
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::{ error_unless_node_satisfies, read_at_ancestor_in_tree};
 use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child, insert_scaffold_as_child};
@@ -53,7 +53,7 @@ pub async fn complete_subscribee_col_preorder (
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
     . ok_or ("complete_subscribee_col_preorder: parent is not a TrueNode") ?;
   let worktree_subscribees : Vec<ID> =
-    nodecomplete_from_memory_or_disk (
+    nodecomplete_from_in_rust_graph_or_disk (
       &env . config, &parent_skgid, &parent_source )
       . ok ()
       . map ( |skg| skg . subscribes_to . or_default () . to_vec () )

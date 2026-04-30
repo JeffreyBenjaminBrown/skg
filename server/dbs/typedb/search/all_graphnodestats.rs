@@ -11,7 +11,7 @@
 /// PIDs from the already-built viewnode tree.
 
 use crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS;
-use crate::dbs::memory::{InRustGraph, snapshot_global};
+use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
 use crate::dbs::typedb::util::concept_document::extract_id_from_map;
 use crate::types::misc::ID;
 use crate::types::nodes::complete::NodeComplete;
@@ -107,9 +107,9 @@ struct OnePidStats {
 }
 
 /// Dispatcher: routes to 'fetch_all_graphnodestats_in_rust' when the
-/// in-Rust memory is initialized, otherwise to
+/// in-Rust graph is initialized, otherwise to
 /// 'fetch_all_graphnodestats_from_typedb'. In the running server the
-/// memory path is always taken; the TypeDB path is exercised only by
+/// in-Rust graph path is always taken; the TypeDB path is exercised only by
 /// tests that bypass 'init_global_handle_for_first_time_or_panic'.
 pub async fn fetch_all_graphnodestats (
   db_name : &str,
@@ -189,7 +189,7 @@ async fn fetch_all_graphnodestats_from_typedb (
     content_to_containers,
   }) }
 
-/// In-memory implementation. Computes every field from NodeRust and
+/// In-Rust-graph implementation. Computes every field from NodeRust and
 /// the inverse indexes — no TypeDB round-trips.
 ///
 /// PITFALL: 'has_subscribes' and 'has_overrides' are "in either

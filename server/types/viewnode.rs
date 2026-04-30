@@ -59,7 +59,7 @@ pub struct DeletedNode {
   pub body   : Option < String >,
 }
 
-/// A node referenced by some other node's `contains` (or similar list) for which neither memory nor disk has any record -- not as a primary pid, not as an extra_id, and not recoverable through any phantom/diff-view procedure either. Distinct from DeletedNode, which knows its source and last-seen text; an UnknownNode is a dangling pointer with no metadata of its own. Carrying it as its own ViewNodeKind variant (rather than failing the whole view) is what keeps a single bad reference deep in a subtree from killing the view at the root.
+/// A node referenced by some other node's `contains` (or similar list) for which neither in-Rust graph nor disk has any record -- not as a primary pid, not as an extra_id, and not recoverable through any phantom/diff-view procedure either. Distinct from DeletedNode, which knows its source and last-seen text; an UnknownNode is a dangling pointer with no metadata of its own. Carrying it as its own ViewNodeKind variant (rather than failing the whole view) is what keeps a single bad reference deep in a subtree from killing the view at the root.
 #[derive( Debug, Clone, PartialEq )]
 pub struct UnknownNode {
   pub id : ID,
@@ -556,7 +556,7 @@ pub fn mk_definitive_viewnode (
                             HashSet::new () ) } // view_requests
 
 /// Build an UnknownNode wrapper. Use when a referenced ID resolves
-/// to nothing in memory, on disk, or via any phantom/diff procedure
+/// to nothing in in_rust_graph, on disk, or via any phantom/diff procedure
 /// -- the placeholder lets the view render the line as a herald
 /// rather than aborting the whole BFS expansion.
 pub fn mk_unknown_viewnode (

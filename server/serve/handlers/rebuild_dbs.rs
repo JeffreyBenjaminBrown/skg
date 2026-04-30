@@ -6,7 +6,7 @@ use crate::context::{
 use crate::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
-use crate::dbs::memory::InRustGraph;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::env::SkgEnv;
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
@@ -52,12 +52,12 @@ pub fn handle_rebuild_dbs_request (
       &link_targets, &map_to_content, &map_to_containers )
       . map_err ( |e| format! ("Context computation failed: {}", e) ) ?;
     tracing::info!("Context rankings recomputed.");
-    { // Rebuild the in-memory graph from disk too, so it stays in sync with the freshly repopulated TypeDB/Tantivy.
+    { // Rebuild the in-Rust graph from disk too, so it stays in sync with the freshly repopulated TypeDB/Tantivy.
       let fresh_graph : InRustGraph =
         InRustGraph::from_nodecompletes (&nodes);
-      env . memory . store (
+      env . in_rust_graph . store (
         Arc::new (fresh_graph) );
-      tracing::info!("In-memory graph rebuilt."); }
+      tracing::info!("In-Rust graph rebuilt."); }
     Ok (())
   })();
   let msg : String = match result {

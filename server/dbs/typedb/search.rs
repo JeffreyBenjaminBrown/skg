@@ -14,7 +14,7 @@ use typedb_driver::{
 };
 
 use crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS;
-use crate::dbs::memory::{InRustGraph, snapshot_global};
+use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
 use crate::dbs::typedb::util::ConceptRowStream;
 use crate::dbs::typedb::util::concept_document::extract_id_from_node;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
@@ -22,9 +22,9 @@ use crate::types::misc::{ID, SourceName};
 
 /// Fast container lookup by primary ID.
 /// Assumes the input is a primary ID (not an extra ID).
-/// Reads the in-Rust memory (populated at server startup). The
+/// Reads the in-Rust graph (populated at server startup). The
 /// TypeDB branch below is exercised only by tests that bypass
-/// 'init_global_handle_for_first_time_or_panic'; in the running server the memory path is
+/// 'init_global_handle_for_first_time_or_panic'; in the running server the in-Rust graph path is
 /// always taken.
 pub async fn find_container_ids_of_pid (
   db_name : &str,
@@ -62,9 +62,9 @@ pub async fn find_container_ids_of_pid (
 /// Generalized function to find related nodes via a specified relationship.
 /// Returns the IDs of nodes in the `output_role` position
 /// related to any of the input nodes.
-/// Reads the in-Rust memory (populated at server startup). The
+/// Reads the in-Rust graph (populated at server startup). The
 /// TypeDB branch below is exercised only by tests that bypass
-/// 'init_global_handle_for_first_time_or_panic'; in the running server the memory path is
+/// 'init_global_handle_for_first_time_or_panic'; in the running server the in-Rust graph path is
 /// always taken. The TypeDB path sends one query per input ID,
 /// bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
 pub async fn find_related_nodes (
@@ -78,7 +78,7 @@ pub async fn find_related_nodes (
   if nodes . is_empty () {
     return Ok ( HashSet::new () ); }
   if let Some (graph_snap) = snapshot_global () {
-    return Ok ( find_related_nodes_from_memory (
+    return Ok ( find_related_nodes_from_in_rust_graph (
       &graph_snap, nodes, relation, input_role, output_role ) ); }
   let relation : String    = relation    . to_string ();
   let input_role : String  = input_role  . to_string ();
@@ -95,12 +95,12 @@ pub async fn find_related_nodes (
     result . extend ( set ? ); }
   Ok (result) }
 
-/// In-memory counterpart of 'find_related_nodes'. Dispatches on
+/// In-Rust-graph counterpart of 'find_related_nodes'. Dispatches on
 /// (relation, input_role, output_role) to the appropriate forward
 /// field or inverse index on 'Graph'. Inputs are mapped to their
 /// corresponding pids (which might be themselves) via
 /// 'extra_id_to_pid' first.
-pub fn find_related_nodes_from_memory (
+pub fn find_related_nodes_from_in_rust_graph (
   graph       : &InRustGraph,
   nodes       : &[ID],
   relation    : &str,
@@ -164,7 +164,7 @@ pub fn find_related_nodes_from_memory (
   out }
 
 /// Find related nodes for a single input ID. TypeDB-backed;
-/// bypasses the in-Rust memory shortcut. Exposed at crate scope
+/// bypasses the in-Rust graph shortcut. Exposed at crate scope
 /// for the audit helper which needs the raw TypeDB answer.
 ///
 /// Opens its own read transaction. For hot loops (e.g. the paced
@@ -278,12 +278,12 @@ pub(crate) async fn find_related_nodes_for_one_primary_pid_in_tx (
 /// Returns the primary ID and source of a node, given any of its
 /// IDs (primary or extra). Returns None if not found.
 ///
-/// Reads the in-Rust memory (populated at server startup). The
+/// Reads the in-Rust graph (populated at server startup). The
 /// TypeDB branch below is exercised only by tests that bypass
-/// 'init_global_handle_for_first_time_or_panic', or on the rare case that memory is
-/// initialized but doesn't hold the id (normally memory contains
+/// 'init_global_handle_for_first_time_or_panic', or on the rare case that in-Rust graph is
+/// initialized but doesn't hold the id (normally in-Rust graph contains
 /// every node across all sources). In the running server the
-/// memory path covers the hot case.
+/// in-Rust graph path covers the hot case.
 pub async fn pid_and_source_from_id (
   db_name : &str,
   driver  : &TypeDBDriver,

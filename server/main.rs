@@ -11,8 +11,8 @@ use skg::context::{compute_and_store_context_types, MapToContent, MapToContainer
 use skg::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::{InitContextHandoff, initialize_dbs};
-use skg::dbs::memory::init_global_handle_for_first_time_or_panic;
-use skg::dbs::memory::scheduled_audit::schedule_daemon;
+use skg::dbs::in_rust_graph::init_global_handle_for_first_time_or_panic;
+use skg::dbs::in_rust_graph::scheduled_audit::schedule_daemon;
 use skg::dbs::typedb::util::{connect_to_typedb, delete_database};
 use skg::types::env::SkgEnv;
 use skg::import_org_roam::{ImportStats, import_org_roam_directory};
@@ -101,13 +101,13 @@ fn main() -> Result<(), Box<dyn Error>> {
   *SHUTDOWN_DRIVER . lock () . unwrap () =
     Some ( Arc::clone (&env . driver) );
 
-  // Install the process-global handle to the in-Rust memory so that
+  // Install the process-global handle to the in-Rust graph so that
   // hot read paths (e.g. 'pid_and_source_from_id') can bypass TypeDB
   // without every caller threading a '&Graph' parameter.
-  init_global_handle_for_first_time_or_panic ( env . memory . clone () );
+  init_global_handle_for_first_time_or_panic ( env . in_rust_graph . clone () );
 
   schedule_daemon (
-    &config, Arc::clone (&env . driver), env . memory . clone () );
+    &config, Arc::clone (&env . driver), env . in_rust_graph . clone () );
 
   compute_context_rankings (
     &env . tantivy_index, had_id_set, all_node_ids,
@@ -219,7 +219,7 @@ fn install_shutdown_signal_handler (
   } ) . expect ("Error setting Ctrl+C handler"); }
 
 /// Compute context origin types for search ranking.
-/// Fully in-memory: all data is pre-computed from NodeCompletes at init.
+/// Fully in-Rust-graph: all data is pre-computed from NodeCompletes at init.
 /// Consumes (and frees) the large lookup maps after use.
 fn compute_context_rankings (
   tantivy_index     : &TantivyIndex,

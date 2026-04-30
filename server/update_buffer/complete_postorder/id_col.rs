@@ -1,5 +1,5 @@
 use crate::types::git::{MembershipAxes, NodeChanges};
-use crate::types::memory::nodecomplete_from_memory_or_disk;
+use crate::types::views_state::nodecomplete_from_in_rust_graph_or_disk;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::git::{SourceDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_truenode};
@@ -37,7 +37,7 @@ pub fn complete_id_col (
       tree, idcol_node_id, 1,
       "complete_id_col" ) ?;
   let parent_nodecomplete : NodeComplete =
-    nodecomplete_from_memory_or_disk (
+    nodecomplete_from_in_rust_graph_or_disk (
       config, &parent_pid, &parent_source )
     . map_err ( |_| "complete_id_col: parent NodeComplete not found" ) ?;
   let (staged_nc, unstaged_nc)

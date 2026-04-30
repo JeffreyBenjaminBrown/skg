@@ -10,7 +10,7 @@ pub mod viewnode;
 pub mod unchecked_viewnode;
 pub mod nodes;
 pub mod many_to_many;
-pub mod memory;
+pub mod views_state;
 pub mod save;
 pub mod tree;
 pub mod maps;

@@ -15,7 +15,7 @@
 //! produces a single row with empty mismatch fields, and a
 //! mismatched audit produces one row per mismatch:
 //!
-//!   pid,audited_on,relation,role,memory_ids,typedb_ids
+//!   pid,audited_on,relation,role,in_rust_graph_ids,typedb_ids
 //!
 //! Fields:
 //!   - 'pid': the audited node's primary ID.
@@ -27,8 +27,8 @@
 //!     relation (e.g. "container", "subscribee"). See
 //!     [[../../typedb/relationships.rs]] 'OUTBOUND_RELATIONSHIP_TYPES'
 //!     for the (relation, role_a, role_b) triples.
-//!   - 'memory_ids': pipe-separated list of IDs (possibly empty) —
-//!     what memory said the peer set was at audit time.
+//!   - 'in_rust_graph_ids': pipe-separated list of IDs (possibly empty) —
+//!     what in-Rust graph said the peer set was at audit time.
 //!   - 'typedb_ids': same, but what TypeDB said.
 //!
 //! IDs are UUIDs or simple tokens (no commas, no pipes). If that
@@ -45,10 +45,10 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use crate::dbs::memory::audit::Mismatch;
+use crate::dbs::in_rust_graph::audit::Mismatch;
 use crate::types::misc::ID;
 
-/// One pid's in-memory record: when it was last audited, and any
+/// One pid's in-Rust-graph record: when it was last audited, and any
 /// mismatches from that audit. A clean audit has an empty 'mismatches'
 /// vec.
 #[derive (Debug, Clone)]
@@ -65,7 +65,7 @@ pub struct AuditRecord {
 pub struct RecordedMismatch {
   pub relation   : String,
   pub role       : String,
-  pub memory_ids : Vec<ID>,
+  pub in_rust_graph_ids : Vec<ID>,
   pub typedb_ids : Vec<ID>,
 }
 
@@ -75,12 +75,12 @@ impl AuditRecord {
     self . mismatches . is_empty () }
 }
 
-/// Build a RecordedMismatch from the in-memory audit output.
+/// Build a RecordedMismatch from the in-Rust-graph audit output.
 pub fn record_from_mismatch (m : &Mismatch) -> RecordedMismatch {
   RecordedMismatch {
     relation   : m . relation . to_string (),
     role       : m . role . to_string (),
-    memory_ids : m . memory . iter () . cloned () . collect (),
+    in_rust_graph_ids : m . in_rust_graph . iter () . cloned () . collect (),
     typedb_ids : m . typedb . iter () . cloned () . collect (), } }
 
 /// The path '<data_root>/.audit.csv'.
@@ -140,7 +140,7 @@ pub fn save (
             f, "{},{},{},{},{},{}",
             rec . pid, rec . audited_on,
             m . relation, m . role,
-            pipe_join (&m . memory_ids),
+            pipe_join (&m . in_rust_graph_ids),
             pipe_join (&m . typedb_ids)) ?; } } }
     f . sync_all () ?; }
   fs::rename (&tmp_path, &path) ?;
@@ -175,7 +175,7 @@ fn parse_row (
     Some ( RecordedMismatch {
       relation   : relation . to_string (),
       role       : role . to_string (),
-      memory_ids : pipe_split (parts[4]),
+      in_rust_graph_ids : pipe_split (parts[4]),
       typedb_ids : pipe_split (parts[5]), } ))) }
 
 fn pipe_join (ids : &[ID]) -> String {
@@ -239,7 +239,7 @@ mod tests {
       mismatches : vec! [ RecordedMismatch {
         relation   : relation . to_string (),
         role       : role . to_string (),
-        memory_ids : mem . iter () . map ( |s| ID::new (*s) ) . collect (),
+        in_rust_graph_ids : mem . iter () . map ( |s| ID::new (*s) ) . collect (),
         typedb_ids : db  . iter () . map ( |s| ID::new (*s) ) . collect (), } ], } }
 
   #[test]
@@ -275,7 +275,7 @@ mod tests {
     let m : &RecordedMismatch = &rec . mismatches[0];
     assert_eq! (m . relation, "contains");
     assert_eq! (m . role, "container");
-    assert_eq! (m . memory_ids . len (), 2);
+    assert_eq! (m . in_rust_graph_ids . len (), 2);
     assert_eq! (m . typedb_ids . len (), 1); }
 
   #[test]

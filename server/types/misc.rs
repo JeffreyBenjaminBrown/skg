@@ -83,7 +83,7 @@ pub struct SkgConfig {
   pub timing_log     : bool, // Write JSON log to <data_root>/logs/server.jsonl.
 
   #[serde (default)] // defaults to false
-  pub auto_audit_daily : bool, // If true, the server runs the memory-vs-TypeDB consistency audit at most once per day, backgrounded at lowest priority, and reports any mismatches via <data_root>/audits.org.
+  pub auto_audit_daily : bool, // If true, the server runs the in-Rust-graph-vs-TypeDB consistency audit at most once per day, backgrounded at lowest priority, and reports any mismatches via <data_root>/audits.org.
 
   #[serde(default = "default_max_ancestry_depth")]
   pub max_ancestry_depth : usize, // Max BFS depth for full containerward ancestry.

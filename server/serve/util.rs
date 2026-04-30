@@ -1,6 +1,6 @@
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
-use crate::types::memory::ViewUri;
+use crate::types::views_state::ViewUri;
 
 use sexp::{Sexp, Atom};
 use std::error::Error;

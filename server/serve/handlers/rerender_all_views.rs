@@ -5,7 +5,7 @@ use crate::serve::handlers::save_buffer::{ compute_diff_for_every_source, delete
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_errors_sexp, format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response, tag_text_response};
 use crate::types::git::SourceDiff;
-use crate::types::memory::ViewUri;
+use crate::types::views_state::ViewUri;
 use crate::types::misc::{ID, SourceName, SkgConfig};
 use crate::types::viewnode::ViewNode;
 use crate::update_buffer::rerender_view;
@@ -15,7 +15,7 @@ use futures::executor::block_on;
 use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
 use std::sync::Arc;
-use crate::dbs::memory::InRustGraph;
+use crate::dbs::in_rust_graph::InRustGraph;
 
 pub fn handle_rerender_all_views_request (
   stream     : &mut TcpStream,
@@ -57,7 +57,7 @@ pub fn stream_rerender_views (
   let deleted_by_this_save_pids : HashSet<ID> =
     HashSet::new ();
   let graph_snap : Arc<InRustGraph> =
-    env . memory . load_full ();
+    env . in_rust_graph . load_full ();
   let mut errors : Vec<String> = Vec::new ();
 
   for uri in uris {

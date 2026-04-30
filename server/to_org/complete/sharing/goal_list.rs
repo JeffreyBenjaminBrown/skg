@@ -5,11 +5,11 @@
 /// that should appear as phantoms (present at HEAD but absent in the
 /// worktree). Outside diff view, the second element is empty.
 
-use crate::dbs::memory::snapshot_global;
+use crate::dbs::in_rust_graph::snapshot_global;
 use crate::git_ops::read_repo::nodecomplete_from_git_head;
 use crate::types::git::{SourceDiff, NodeChanges, net_diff_from_per_stage, per_stage_node_changes_for_truenode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
-use crate::types::memory::nodecomplete_from_memory_or_disk;
+use crate::types::views_state::nodecomplete_from_in_rust_graph_or_disk;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::phantom::source_from_disk;
@@ -122,7 +122,7 @@ pub fn goal_list_for_hiddenoutsideof_subscribeecol (
       . flat_map ( |pid| {
         match snapshot_global_source (pid, config) {
           Some (src) =>
-            nodecomplete_from_memory_or_disk ( config, pid, &src )
+            nodecomplete_from_in_rust_graph_or_disk ( config, pid, &src )
               . ok ()
               . map ( |skg| skg . contains )
               . unwrap_or_default (),
@@ -145,7 +145,7 @@ pub fn goal_list_for_hiddenoutsideof_subscribeecol (
                           . into_vec () ))
         . unwrap_or_default ();
   let head_all_subscribee_content : HashSet<ID> =
-    head_subscribee_contains_from_memory_and_diffs (
+    head_subscribee_contains_from_in_rust_graph_and_diffs (
       &head_subscribees, source_diffs, config );
   let head_content : Vec<ID> =
     head_subscriber_hides . iter ()
@@ -157,13 +157,13 @@ pub fn goal_list_for_hiddenoutsideof_subscribeecol (
 
 /// From HEAD, compute the union of some subscribees' content.
 /// For each subscribee pid:
-/// - Look up its source from memory. If missing, skip.
+/// - Look up its source from the in-Rust graph. If missing, skip.
 /// - Read per-stage contains_diff via
 ///   `per_stage_node_changes_for_truenode` and compose the net
 ///   HEAD→worktree view. Items that were in HEAD are Unchanged +
 ///   Removed in the net diff. If neither stage has changes for
-///   this file, HEAD = worktree, so read contains from memory/disk.
-fn head_subscribee_contains_from_memory_and_diffs (
+///   this file, HEAD = worktree, so read contains from in-Rust graph/disk.
+fn head_subscribee_contains_from_in_rust_graph_and_diffs (
   head_subscribees : &[ID],
   source_diffs     : &Option<HashMap<SourceName, SourceDiff>>,
   config           : &SkgConfig,
@@ -179,7 +179,7 @@ fn head_subscribee_contains_from_memory_and_diffs (
       per_stage_node_changes_for_truenode (
         source_diffs, pid, &subscribee_source );
     if staged_nc . is_none () && unstaged_nc . is_none () {
-      if let Ok (skg) = nodecomplete_from_memory_or_disk (
+      if let Ok (skg) = nodecomplete_from_in_rust_graph_or_disk (
         config, pid, &subscribee_source )
       { for id in skg . contains . into_iter () {
           result . insert (id); } }
@@ -195,7 +195,7 @@ fn head_subscribee_contains_from_memory_and_diffs (
           Diff_Item::New (_) => {} } } } }
   result }
 
-/// Resolve a node's source: try the in-Rust memory snapshot first,
+/// Resolve a node's source: try the in-Rust graph snapshot first,
 /// fall back to scanning source directories for the matching '.skg'
 /// file. Tests that bypass
 /// `init_global_handle_for_first_time_or_panic` rely on the disk

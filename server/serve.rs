@@ -30,7 +30,7 @@ use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnr
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
 use crate::types::errors::BufferValidationError;
-use crate::types::memory::{OpenViews, ViewUri};
+use crate::types::views_state::{OpenViews, ViewUri};
 use crate::types::unchecked_viewnode::{UncheckedViewNode,unchecked_to_checked_tree};
 use crate::types::viewnode::ViewNode;
 use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
@@ -275,7 +275,7 @@ fn handle_snapshot_response (
     . expect ("search viewforest rendering never fails");
   let enriched_sexp : String =
     mk_search_enrichment_sexp ( &terms, &enriched );
-  { let uri : ViewUri = // update memory with enriched viewforest
+  { let uri : ViewUri = // update ViewsState with enriched viewforest
       ViewUri::SearchView ( terms . clone () );
     views_state . open_views . update_view ( &uri, viewforest ); }
   tracing::debug! (bytes = enriched_sexp . len (),

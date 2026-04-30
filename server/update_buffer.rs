@@ -9,7 +9,7 @@ pub use complete::complete_viewforest;
 pub use graphnodestats::set_graphnodestats_in_viewforest;
 pub use viewnodestats::set_viewnodestats_in_viewforest;
 
-use crate::dbs::memory::{InRustGraph, memory_coherent_with_save_instructions, scheduled_audit::take_pending_audit_warning};
+use crate::dbs::in_rust_graph::{InRustGraph, in_rust_graph_coherent_with_save_instructions, scheduled_audit::take_pending_audit_warning};
 use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
@@ -19,12 +19,12 @@ use crate::serve::util::{ format_single_view_sexp, send_response_with_length_pre
 use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
-use crate::types::memory::ViewUri;
+use crate::types::views_state::ViewUri;
 use crate::types::misc::{ID, SourceName, SkgConfig};
 use crate::types::save::{DefineNode, Merge, SaveNode};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
 use crate::to_org::util::{mark_view_roots_independent, validate_birth_relationships};
-use crate::dbs::memory::snapshot_global;
+use crate::dbs::in_rust_graph::snapshot_global;
 use crate::types::viewnode::{IndefOrDef, ViewNode, ViewNodeKind, Scaffold};
 
 use ego_tree::{Tree, NodeId, NodeMut};
@@ -38,7 +38,7 @@ use typedb_driver::TypeDBDriver;
 /// For each view affected by the save
 /// (starting, importantly, with the saved view itself,
 /// and only processing collateral views after that),
-/// this updates the view and the memory.
+/// this updates the rendered views and ViewsState.
 /// .
 /// ASSUMES:
 /// the graph was already updated.
@@ -53,14 +53,14 @@ pub async fn update_views_after_save (
   viewuri_from_request_result : &Result<ViewUri, String>,
   views_state                  : &mut ViewsState,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  // PITFALL: Memory must already reflect every Save and Delete in
+  // PITFALL: The in-Rust graph must already reflect every Save and Delete in
   // 'save_instructions' by the time this function runs. Violating
   // this invariant (e.g. by reordering the save pipeline so that
   // 'update_views_after_save' runs before 'apply_definenodes')
-  // would let the rerender read stale NodeCompletes from memory.
+  // would let the rerender read stale NodeCompletes from the in-Rust graph.
   debug_assert! (
-    memory_coherent_with_save_instructions (&save_instructions) . is_ok (),
-    "update_views_after_save: in-Rust memory not coherent with save_instructions" );
+    in_rust_graph_coherent_with_save_instructions (&save_instructions) . is_ok (),
+    "update_views_after_save: in-Rust graph not coherent with save_instructions" );
   let source_diffs
     : Option<HashMap<SourceName, SourceDiff>>
     = if diff_mode_enabled
@@ -89,13 +89,13 @@ pub async fn update_views_after_save (
   // parameter for caller stability and to make the provenance of
   // the extra-id bindings explicit at the save-handler level.
   let _ = merge_instructions;
-  // Snapshot the in-memory graph once for this save's rerender pass.
+  // Snapshot the in-Rust graph once for this save's rerender pass.
   // Used both by resolve_extra_ids_in_viewforest (swap acquiree pids
   // to acquirer pids before rerender) and by content_goal_list
   // resolution during reconcile (neighbors' on-disk contains still
   // point at the acquiree id).
   let graph_snap : Arc<InRustGraph> =
-    env . memory . load_full ();
+    env . in_rust_graph . load_full ();
   let mut errors : Vec<String> = Vec::new ();
   let mut saved_view_mut : Tree<ViewNode> = saved_view;
   resolve_extra_ids_in_viewforest (
@@ -127,7 +127,7 @@ pub async fn update_views_after_save (
         collateral_uris . iter ()
           . map ( |u| u . repr_in_client () )
           . collect::<Vec<_>> ()); }
-    for curi in collateral_uris { // Same rerender_view pipeline as the saved view, but with is_saved_view=false. Each rerender fetches from the in-Rust memory directly. Streamed to Emacs immediately.
+    for curi in collateral_uris { // Same rerender_view pipeline as the saved view, but with is_saved_view=false. Each rerender fetches from the in-Rust graph directly. Streamed to Emacs immediately.
       let mut viewforest : Tree<ViewNode> = match
         views_state . open_views . viewuri_to_view (&curi) {
           Some (f) => f . clone (),
@@ -186,7 +186,7 @@ fn find_collateral_view_uris (
         Some ( dn . id . clone () ) } )
     . collect ();
   tracing::debug!(
-    "find_collateral_view_uris: {} changed PIDs, {} views in memory",
+    "find_collateral_view_uris: {} changed PIDs, {} views in ViewsState",
     changed_pids . len (),
     views_state . open_views . views . len ());
   let uris : HashSet<ViewUri> =
@@ -222,7 +222,7 @@ pub async fn rerender_view (
   mark_view_roots_independent (viewforest);
   if let Some (snap) = snapshot_global () {
     // Correct any birth markers whose claimed relation to the
-    // parent doesn't hold in memory (e.g. user moved a
+    // parent doesn't hold in the in-Rust graph (e.g. user moved a
     // birth=linksTo node under a new parent it doesn't link to).
     // No-op when the global graph handle isn't initialized (tests
     // that bypass startup).

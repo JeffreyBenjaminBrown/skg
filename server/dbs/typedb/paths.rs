@@ -1,8 +1,8 @@
 // PERF NOTE: The functions in this module query TypeDB for container
-// relationships.  An in-memory alternative exists: 'content_maps_from_nodes'
+// relationships.  An in-Rust-graph alternative exists: 'content_maps_from_nodes'
 // (in context.rs) builds a complete MapToContainers at init time.
 // If that map were threaded to the call site, these traversals could
-// run entirely in-memory (microseconds vs seconds for large graphs).
+// run entirely in-Rust-graph (microseconds vs seconds for large graphs).
 // As of 2026-03 the TypeDB path is used because it is simpler to
 // plumb through, and performance has not been a bottleneck here.
 
