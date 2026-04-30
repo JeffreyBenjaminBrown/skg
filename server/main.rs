@@ -9,7 +9,7 @@
 use skg::context::{compute_and_store_context_types, MapToContent, MapToContainers};
 use skg::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
-use skg::dbs::init::{InitContextHandoff, InitData, initialize_dbs};
+use skg::dbs::init::{InitContextHandoff, initialize_dbs};
 use skg::dbs::memory::init_global_handle_for_first_time_or_panic;
 use skg::dbs::memory::scheduled_audit::schedule_daemon;
 use skg::dbs::typedb::util::{connect_to_typedb, delete_database};
@@ -77,16 +77,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
   install_shutdown_signal_handler (&config);
 
-  let ( InitData { driver        : typedb_driver,
-                    tantivy_index },
-        InitContextHandoff { graph,
-                             had_id_set,
+  let ( env,
+        InitContextHandoff { had_id_set,
                              all_node_ids,
                              link_targets,
                              map_to_content,
                              map_to_containers },
         nodes )
-      : (InitData, InitContextHandoff, Vec<NodeComplete>) =
+      : (SkgEnv, InitContextHandoff, Vec<NodeComplete>) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span! (
         "initialize_dbs") . entered ();
       initialize_dbs (&config) };
@@ -100,18 +98,18 @@ fn main() -> Result<(), Box<dyn Error>> {
   // Hand the live driver to the signal handler. From here on,
   // a Ctrl-C reuses this connection instead of opening a new one.
   *SHUTDOWN_DRIVER . lock () . unwrap () =
-    Some ( Arc::clone (&typedb_driver) );
+    Some ( Arc::clone (&env . driver) );
 
   // Install the process-global handle to the in-Rust memory so that
   // hot read paths (e.g. 'pid_and_source_from_id') can bypass TypeDB
   // without every caller threading a '&Graph' parameter.
-  init_global_handle_for_first_time_or_panic ( Arc::clone (&graph) );
+  init_global_handle_for_first_time_or_panic ( env . memory . clone () );
 
   schedule_daemon (
-    &config, Arc::clone (&typedb_driver), Arc::clone (&graph) );
+    &config, Arc::clone (&env . driver), env . memory . clone () );
 
   compute_context_rankings (
-    &tantivy_index, had_id_set, all_node_ids,
+    &env . tantivy_index, had_id_set, all_node_ids,
     link_targets, map_to_content, map_to_containers );
 
   init_done . store (true, Ordering::Release);
@@ -120,11 +118,6 @@ fn main() -> Result<(), Box<dyn Error>> {
   listener . set_nonblocking (false) ?;
   tracing::info! ("Server ready.");
 
-  let env : SkgEnv = SkgEnv {
-    config,
-    memory        : graph,
-    tantivy_index,
-    driver        : typedb_driver };
   serve (env, listener)
     . map_err ( |e| Box::new (e)
                  as Box<dyn Error>) ?;
