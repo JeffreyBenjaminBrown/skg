@@ -1,6 +1,7 @@
 use crate::types::env::SkgEnv;
 use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_scaffold_children};
 use crate::to_org::complete::sharing::goal_list::goal_list_for_hiddeninsubscribee_col;
+use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
 use crate::types::memory::nodecomplete_from_memory_or_disk;
@@ -70,8 +71,8 @@ pub fn complete_hiddeninsubscribee_col (
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
   reconcile_sharing_scaffold_children(
-    tree, node, &goal_list, &child_data,
-    "complete_hiddeninsubscribee_col" ) ?;
+    tree, node, SharingScaffoldKind::HiddenInSubscribeeCol,
+    &goal_list, &child_data ) ?;
   { // Change birth of erroneous content children to Independent. "Erroneous content" are TrueNode children marked birth=ContentOf that are not part of its content.
     let subscribee_contains_set : HashSet<ID> =
       subscribee_contains . iter() . cloned() . collect();

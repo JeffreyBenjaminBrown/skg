@@ -1,6 +1,7 @@
 use crate::types::env::SkgEnv;
 use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_scaffold_children};
 use crate::to_org::complete::sharing::goal_list::goal_list_for_subscribee_col;
+use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
 use crate::types::git::SourceDiff;
 use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::misc::{ID, SourceName};
@@ -72,8 +73,8 @@ pub async fn complete_subscribee_col_preorder (
         &goal_list, &removed_ids,
         source_diffs, deleted_since_head_pid_src_map, env ) ?;
     reconcile_sharing_scaffold_children(
-      tree, node, &goal_list, &child_data,
-      "complete_subscribee_col_preorder" ) ?; }
+      tree, node, SharingScaffoldKind::SubscribeeCol,
+      &goal_list, &child_data ) ?; }
   { // Ensure HiddenOutsideOfSubscribeeCol exists and is last.
     let hidden_outside : Option<NodeId> =
       unique_scaffold_child(

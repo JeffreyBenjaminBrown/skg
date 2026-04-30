@@ -5,6 +5,7 @@
 /// completer used to define a near-identical local copy of this
 /// struct and a near-identical `build_*_child_data` helper.
 
+use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
 use crate::types::env::SkgEnv;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::misc::{ID, SourceName};
@@ -114,10 +115,11 @@ pub fn build_child_data (
 pub fn reconcile_sharing_scaffold_children (
   tree          : &mut Tree<ViewNode>,
   scaffold_node : NodeId,
+  kind          : SharingScaffoldKind,
   goal_list     : &[ID],
   child_data    : &HashMap<ID, ChildData>,
-  caller_label  : &'static str,
 ) -> Result<(), Box<dyn Error>> {
+  let label : &'static str = kind . caller_label ();
   complete_relevant_children_in_viewnodetree (
     tree, scaffold_node,
     |vn : &ViewNode| matches! ( &vn . kind,
@@ -125,12 +127,12 @@ pub fn reconcile_sharing_scaffold_children (
                                 if !t . parent_ignores_it () ),
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::True (t) => t . id . clone (),
-      _ => panic! ( "{}: relevant child not TrueNode", caller_label ) },
+      _ => panic! ( "{}: relevant child not TrueNode", label ) },
     goal_list,
     |id : &ID| {
       let d : &ChildData =
         child_data . get (id) . unwrap_or_else (
-          || panic! ( "{}: child data not pre-fetched", caller_label ));
+          || panic! ( "{}: child data not pre-fetched", label ));
       match d . phantom {
         None =>
           mk_indefinitive_viewnode (

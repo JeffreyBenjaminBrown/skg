@@ -1,5 +1,6 @@
 pub mod child_data;
 pub mod goal_list;
+pub mod kind;
 
 use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   partition_subscribee_content_for_subscriber,
@@ -7,6 +8,7 @@ use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   what_nodes_contain };
 use crate::to_org::complete::sharing::child_data::{
   ChildData, reconcile_sharing_scaffold_children };
+use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
 use crate::to_org::util::nodecomplete_and_viewnode_from_id;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
@@ -153,14 +155,16 @@ pub async fn maybe_add_subscribeeCol_branch (
       build_initial_render_child_data (
         &hidden_outside_ids, config, driver ) . await ?;
     reconcile_sharing_scaffold_children (
-      tree, hidden_outside_col_nid, &goal, &data,
-      "maybe_add_subscribeeCol_branch (hidden-outside)" ) ?; }
+      tree, hidden_outside_col_nid,
+      SharingScaffoldKind::HiddenOutsideOfSubscribeeCol,
+      &goal, &data ) ?; }
   { let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
       build_initial_render_child_data (
         &subscribee_ids, config, driver ) . await ?;
     reconcile_sharing_scaffold_children (
-      tree, subscribee_col_nid, &goal,
-      &data, "maybe_add_subscribeeCol_branch" ) ?; }
+      tree, subscribee_col_nid,
+      SharingScaffoldKind::SubscribeeCol,
+      &goal, &data ) ?; }
   Ok (( )) }
 
 /// If this node is a Subscribee,
@@ -202,6 +206,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
     build_initial_render_child_data (
       &hidden_in_ids, config, driver ) . await ?;
   reconcile_sharing_scaffold_children (
-    tree, hidden_col_nid, &goal,
-    &data, "maybe_add_hiddenInSubscribeeCol_branch" ) ?;
+    tree, hidden_col_nid,
+    SharingScaffoldKind::HiddenInSubscribeeCol,
+    &goal, &data ) ?;
   Ok (( )) }

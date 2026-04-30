@@ -1,6 +1,7 @@
 use crate::types::env::SkgEnv;
 use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_scaffold_children};
 use crate::to_org::complete::sharing::goal_list::goal_list_for_hiddenoutsideof_subscribeecol;
+use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
 use crate::types::memory::nodecomplete_from_memory_or_disk;
@@ -74,8 +75,8 @@ pub fn complete_hiddenoutsideofsubscribeecol (
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
   reconcile_sharing_scaffold_children(
-    tree, node, &goal_list, &child_data,
-    "complete_hiddenoutsideofsubscribeecol" ) ?;
+    tree, node, SharingScaffoldKind::HiddenOutsideOfSubscribeeCol,
+    &goal_list, &child_data ) ?;
   { // Mark erroneous content children birth=Independent. A child is erroneous if it is a non-phantom TrueNode marked birth=Content but not in the goal_list.
     let goal_set : HashSet<ID> =
       goal_list . iter() . cloned() . collect();
