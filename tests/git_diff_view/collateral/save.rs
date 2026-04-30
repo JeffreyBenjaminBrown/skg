@@ -22,11 +22,11 @@ fn test_collateral_view_preserves_diff_annotations()
 
   let (_config, driver, _tantivy, _save_response, _initial_buffer,
        uri_2, read_end)
-    : (SkgConfig, TypeDBDriver, TantivyIndex, SaveResponse,
+    : (SkgConfig, std::sync::Arc<TypeDBDriver>, TantivyIndex, SaveResponse,
        String, ViewUri, TcpStream) =
     block_on ( async {
       let (config, driver, mut tantivy)
-        : (SkgConfig, TypeDBDriver, TantivyIndex) =
+        : (SkgConfig, std::sync::Arc<TypeDBDriver>, TantivyIndex) =
         setup_test_dbs (
           db_name, repo_path . to_str() . unwrap(),
           &tantivy_folder ) . await ?;
@@ -36,7 +36,7 @@ fn test_collateral_view_preserves_diff_annotations()
       let (initial_buffer, pids, viewforest)
         : (String, Vec<ID>, Tree<ViewNode>) =
         multi_root_view (
-          &driver, &config, &root_ids, true ) . await ?;
+          &driver, &config, None, &root_ids, true ) . await ?;
 
       // Sanity: initial view should match expected diff output.
       assert_buffer_contains(&initial_buffer, GIT_DIFF_VIEW);
@@ -142,11 +142,11 @@ fn test_collateral_view_staged_text_and_unstaged_add()
 
   let (_config, driver, _tantivy, _save_response, _initial_buffer,
        uri_2, read_end)
-    : (SkgConfig, TypeDBDriver, TantivyIndex, SaveResponse,
+    : (SkgConfig, std::sync::Arc<TypeDBDriver>, TantivyIndex, SaveResponse,
        String, ViewUri, TcpStream) =
     block_on ( async {
       let (config, driver, mut tantivy)
-        : (SkgConfig, TypeDBDriver, TantivyIndex) =
+        : (SkgConfig, std::sync::Arc<TypeDBDriver>, TantivyIndex) =
         setup_test_dbs (
           db_name, repo_path . to_str() . unwrap(),
           &tantivy_folder ) . await ?;
@@ -155,7 +155,7 @@ fn test_collateral_view_staged_text_and_unstaged_add()
       let (initial_buffer, pids, viewforest)
         : (String, Vec<ID>, Tree<ViewNode>) =
         multi_root_view (
-          &driver, &config, &root_ids, true ) . await ?;
+          &driver, &config, None, &root_ids, true ) . await ?;
 
       // Sanity: initial view has textChanged attributed to staged.
       assert_buffer_contains(&initial_buffer, GIT_DIFF_VIEW_STAGED);

@@ -5,10 +5,11 @@
 /// completer used to define a near-identical local copy of this
 /// struct and a near-identical `build_*_child_data` helper.
 
+use crate::env::SkgEnv;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
-use crate::types::memory::{find_source_many_ways, nodecomplete_from_memory_or_disk};
+use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Birth, mk_indefinitive_viewnode, mk_phantom_viewnode};
 use crate::update_buffer::util::complete_relevant_children_in_viewnodetree;
@@ -48,7 +49,7 @@ pub fn build_child_data (
   removed_ids                    : &HashSet<ID>,
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  config                         : &SkgConfig,
+  env                            : &SkgEnv,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
   let existing_children : HashMap<ID, (SourceName, String)> = {
     let node_ref : NodeRef<ViewNode> =
@@ -61,26 +62,22 @@ pub fn build_child_data (
                      ( t . source . clone (),
                        t . title . clone () )); }}
     m };
-  let child_sources : HashMap<ID, SourceName> =
-    existing_children . iter ()
-      . map ( |(id, (s, _))| (id . clone (), s . clone ()) )
-      . collect ();
   let mut result : HashMap<ID, ChildData> = HashMap::new ();
   for child_skgid in goal_list {
     if result . contains_key (child_skgid) { continue; }
     if removed_ids . contains (child_skgid) {
       let child_src : SourceName =
-        find_source_many_ways (
-          child_skgid, &child_sources,
-          deleted_since_head_pid_src_map, config )
-        . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+        env . find_source (child_skgid, deleted_since_head_pid_src_map)
+        . ok_or_else ( || -> Box<dyn Error> { format! (
+          "build_child_data: no source found for {}", child_skgid . 0
+        ) . into () } ) ?;
       let axes : (ExistenceAxes, MembershipAxes) =
         phantom_axes ( child_skgid, &child_src,
                        parent_skgid, parent_source,
                        source_diffs . as_ref () );
       let child_title : String =
         title_for_phantom ( child_skgid, &child_src,
-                            source_diffs . as_ref (), config );
+                            source_diffs . as_ref (), &env . config );
       result . insert ( child_skgid . clone (),
                         ChildData { source  : child_src,
                                     title   : child_title,
@@ -92,12 +89,12 @@ pub fn build_child_data (
                                     phantom : None } );
     } else {
       let child_src : SourceName =
-        find_source_many_ways (
-          child_skgid, &child_sources,
-          deleted_since_head_pid_src_map, config )
-        . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+        env . find_source (child_skgid, deleted_since_head_pid_src_map)
+        . ok_or_else ( || -> Box<dyn Error> { format! (
+          "build_child_data: no source found for {}", child_skgid . 0
+        ) . into () } ) ?;
       let skg : NodeComplete = nodecomplete_from_memory_or_disk (
-        config, child_skgid, &child_src ) ?;
+        &env . config, child_skgid, &child_src ) ?;
       result . insert ( child_skgid . clone (),
                         ChildData { source  : skg . source . clone (),
                                     title   : skg . title . clone (),

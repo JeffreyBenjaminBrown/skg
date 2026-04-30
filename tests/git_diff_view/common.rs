@@ -17,7 +17,7 @@ pub use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 pub use skg::dbs::typedb::nodes::create_all_nodes;
 pub use skg::dbs::typedb::relationships::create_all_relationships;
 pub use skg::to_org::render::content_view::multi_root_view;
-pub use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
+pub use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 pub use skg::types::misc::{ID, SkgConfig, SkgfileSource, TantivyIndex, SourceName};
 pub use skg::types::nodes::fs::NodeFS;
 pub use skg::types::nodes::typedb::NodeTypedb;
@@ -77,7 +77,7 @@ pub async fn setup_test_dbs(
   db_name: &str,
   source_path: &str,
   tantivy_folder: &str,
-) -> Result<(SkgConfig, TypeDBDriver, TantivyIndex), Box<dyn Error>> {
+) -> Result<(SkgConfig, std::sync::Arc<TypeDBDriver>, TantivyIndex), Box<dyn Error>> {
   let config : SkgConfig = {
     let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new();
     sources . insert(SourceName::from ("main"), SkgfileSource {
@@ -116,12 +116,12 @@ pub async fn setup_test_dbs(
   create_all_relationships(db_name, &driver, &typedb_nodes) . await?;
 
   let tantivy_index = create_empty_tantivy_index(&config . tantivy_folder)?;
-  Ok((config, driver, tantivy_index))
+  Ok((config, std::sync::Arc::new (driver), tantivy_index))
 }
 
 pub async fn cleanup_test_dbs(
   db_name: &str,
-  driver: &TypeDBDriver,
+  driver: &std::sync::Arc<TypeDBDriver>,
   tantivy_folder: Option<&Path>,
 ) -> Result<(), Box<dyn Error>> {
   let databases = driver . databases();

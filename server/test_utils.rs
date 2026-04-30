@@ -69,7 +69,7 @@ pub fn run_with_test_db<F>(
 ) -> Result<(), Box<dyn Error>>
 where
   F: for<'a>
-  FnOnce(&'a SkgConfig, &'a TypeDBDriver, &'a mut TantivyIndex)
+  FnOnce(&'a SkgConfig, &'a Arc<TypeDBDriver>, &'a mut TantivyIndex)
          -> Pin<Box<dyn Future<Output = Result
                                <(), Box<dyn Error>>> + 'a>>,
 {
@@ -89,10 +89,11 @@ where
           db_name,
           temp_fixtures . to_str() . unwrap(),
           tantivy_folder ). await?;
+    let driver_arc : Arc<TypeDBDriver> = Arc::new (driver);
     guarded_test_then_cleanup(
-      db_name, &config, &driver,
+      db_name, &config, &driver_arc,
       Some(config . tantivy_folder . clone()),
-      test_fn(&config, &driver, &mut tantivy),
+      test_fn(&config, &driver_arc, &mut tantivy),
     ). await
   } );
   if temp_fixtures . exists() { // more cleanup
@@ -109,7 +110,7 @@ pub fn run_with_test_db_from_config<F>(
 ) -> Result<(), Box<dyn Error>>
 where
   F: for<'a>
-  FnOnce(&'a SkgConfig, &'a TypeDBDriver)
+  FnOnce(&'a SkgConfig, &'a Arc<TypeDBDriver>)
          -> Pin<Box<dyn Future<Output = Result
                                <(), Box<dyn Error>>> + 'a>>,
 {
@@ -131,9 +132,10 @@ where
     read_and_use_schema(db_name, &driver) . await?;
     create_all_nodes(db_name, &driver, &typedb_nodes) . await?;
     create_all_relationships(db_name, &driver, &typedb_nodes) . await?;
+    let driver_arc : Arc<TypeDBDriver> = Arc::new (driver);
     guarded_test_then_cleanup(
-      db_name, &config, &driver, None,
-      test_fn(&config, &driver),
+      db_name, &config, &driver_arc, None,
+      test_fn(&config, &driver_arc),
     ) . await
   } )
 }
@@ -193,6 +195,56 @@ pub fn graph_handle_from_config (
   let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (config) ?;
   Ok ( new_handle ( InRustGraph::from_nodecompletes (&nodes) )) }
+
+/// Bundle a test's existing handles into a 'SkgEnv'.
+///
+/// Tests should hold their driver as 'Arc<TypeDBDriver>' to match
+/// the production shape. '&Arc<TypeDBDriver>' deref-coerces to
+/// '&TypeDBDriver' in argument position, so old-style calls
+/// continue to work unchanged.
+pub fn skg_env_from_parts (
+  config        : &SkgConfig,
+  driver        : Arc<TypeDBDriver>,
+  tantivy_index : &TantivyIndex,
+  graph         : &InRustGraphHandle,
+) -> crate::env::SkgEnv {
+  crate::env::SkgEnv {
+    config        : config . clone (),
+    memory        : graph . clone (),
+    tantivy_index : tantivy_index . clone (),
+    driver, } }
+
+/// Test shim around 'update_from_and_rerender_buffer' that accepts
+/// the four DB handles separately, builds a 'SkgEnv', and calls the
+/// underlying function. Lets pre-SkgEnv test code continue to pass
+/// '(driver, config, tantivy)' triples without change.
+///
+/// PITFALL: a SkgEnv field swap inside the call (e.g. a save's
+/// rebuild path replacing 'tantivy_index') will not propagate back
+/// out to the test's '&mut TantivyIndex' since the env clones the
+/// index. Production paths that swap the index are not exercised
+/// by these tests, so this is fine in practice.
+pub async fn update_from_and_rerender_buffer_test (
+  stream                      : &mut std::net::TcpStream,
+  org_buffer_text             : &str,
+  driver                      : &Arc<TypeDBDriver>,
+  config                      : &SkgConfig,
+  tantivy_index               : &TantivyIndex,
+  diff_mode_enabled           : bool,
+  viewuri_from_request_result : &Result<crate::types::memory::ViewUri, String>,
+  conn_state                  : &mut crate::serve::ConnectionState,
+) -> Result<crate::serve::handlers::save_buffer::SaveResponse, Box<dyn Error>> {
+  let mut env : crate::env::SkgEnv =
+    skg_env_from_parts (
+      config, Arc::clone (driver),
+      tantivy_index, &conn_state . graph );
+  crate::serve::handlers::save_buffer::update_from_and_rerender_buffer (
+    stream,
+    org_buffer_text,
+    &mut env,
+    diff_mode_enabled,
+    viewuri_from_request_result,
+    conn_state ) . await }
 
 /// Audit the given in-Rust graph handle against TypeDB; panic with a
 /// detailed message if they disagree. Intended for per-test-fixture

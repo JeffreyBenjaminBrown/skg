@@ -9,7 +9,7 @@ use std::error::Error;
 use std::net::TcpStream;
 
 use skg::test_utils::run_with_test_db;
-use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
+use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ConnectionState;
 use skg::types::memory::OpenViews;
 

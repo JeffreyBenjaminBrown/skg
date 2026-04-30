@@ -9,10 +9,10 @@
 /// Phantoms are inserted wherever some stage's parent.contains had the
 /// child but the worktree's parent.contains lacks it.
 
+use crate::env::find_source_with_optional_tantivy;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges, axes_from_per_stage_diffs};
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::phantom::title_for_phantom;
-use crate::types::memory::find_source_many_ways;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, viewnode_from_scaffold, mk_phantom_viewnode };
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::types::tree::viewnode_nodecomplete::pid_and_source_from_treenode;
@@ -26,10 +26,11 @@ use std::path::PathBuf;
 /// Modifies nodes in place to add per-stage diff axes
 /// and insert phantom nodes for positions missing from worktree.
 pub fn apply_diff_to_viewforest (
-  viewforest             : &mut Tree<ViewNode>,
-  source_diffs       : &HashMap<SourceName, SourceDiff>,
+  viewforest                     : &mut Tree<ViewNode>,
+  source_diffs                   : &HashMap<SourceName, SourceDiff>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  config             : &SkgConfig,
+  tantivy_index                  : Option<&TantivyIndex>,
+  config                         : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let root_id : NodeId =
     viewforest . root() . id();
@@ -37,32 +38,35 @@ pub fn apply_diff_to_viewforest (
     viewforest, root_id,
     &mut |node_mut| { process_node_for_diff (
                         node_mut, source_diffs,
-                        deleted_since_head_pid_src_map, config ) } )?;
+                        deleted_since_head_pid_src_map,
+                        tantivy_index, config ) } )?;
   Ok (( )) }
 
 /// Process a single node for diff markers.
 /// This is only used for de-novo views (multi_root_view).
 /// TODO : Sharing relationships (hides, overrides, subscribes) will need processing here.
 fn process_node_for_diff (
-  mut node_mut       : NodeMut<ViewNode>,
-  source_diffs       : &HashMap<SourceName, SourceDiff>,
+  mut node_mut                   : NodeMut<ViewNode>,
+  source_diffs                   : &HashMap<SourceName, SourceDiff>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  config             : &SkgConfig,
+  tantivy_index                  : Option<&TantivyIndex>,
+  config                         : &SkgConfig,
 ) -> Result<(), String> {
   match &node_mut . value() . kind . clone() {
     ViewNodeKind::True (_) =>
       process_truenode_diff (
         node_mut, source_diffs, deleted_since_head_pid_src_map,
-        config ),
+        tantivy_index, config ),
     _ => Ok (()) }}
 
 /// Decorate a TrueNode (and its scaffold/phantom children) with the
 /// per-stage axes derived from staged and unstaged NodeCompleteDiffs.
 fn process_truenode_diff (
-  mut node_mut       : NodeMut<ViewNode>,
-  source_diffs       : &HashMap<SourceName, SourceDiff>,
+  mut node_mut                   : NodeMut<ViewNode>,
+  source_diffs                   : &HashMap<SourceName, SourceDiff>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  config             : &SkgConfig,
+  tantivy_index                  : Option<&TantivyIndex>,
+  config                         : &SkgConfig,
 ) -> Result<(), String> {
   let tree_node_id : NodeId =
     node_mut . id();
@@ -132,7 +136,7 @@ fn process_truenode_diff (
   insert_phantoms_for_missing_contains (
     &mut node_mut, &merged_contains,
     source_diff, source_diffs,
-    deleted_since_head_pid_src_map, config ) ?;
+    deleted_since_head_pid_src_map, tantivy_index, config ) ?;
   Ok (( )) }
 
 /// Prepend an IDCol scaffold populated with per-id ID scaffolds.
@@ -186,23 +190,25 @@ fn mark_membership_on_existing_children (
 /// from worktree.contains. Each phantom carries the appropriate M axes
 /// (and X axes if its file is also gone in some stage).
 fn insert_phantoms_for_missing_contains (
-  node_mut           : &mut NodeMut<ViewNode>,
-  merged_contains    : &[(ID, MembershipAxes)],
-  source_diff        : &SourceDiff,
-  source_diffs       : &HashMap<SourceName, SourceDiff>,
+  node_mut                       : &mut NodeMut<ViewNode>,
+  merged_contains                : &[(ID, MembershipAxes)],
+  source_diff                    : &SourceDiff,
+  source_diffs                   : &HashMap<SourceName, SourceDiff>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  config             : &SkgConfig,
+  tantivy_index                  : Option<&TantivyIndex>,
+  config                         : &SkgConfig,
 ) -> Result<(), String> {
-  let empty_children : HashMap<ID, SourceName> = HashMap::new();
   for (id, membership) in merged_contains {
     let has_negative : bool =
       membership . staged   == Some (Sign::Minus)
       || membership . unstaged == Some (Sign::Minus);
     if ! has_negative { continue; }
     let child_source : SourceName =
-      find_source_many_ways (
-        id, &empty_children,
-        deleted_since_head_pid_src_map, config ) ?;
+      find_source_with_optional_tantivy (
+        id, deleted_since_head_pid_src_map,
+        tantivy_index, config )
+        . ok_or_else ( || format! (
+          "find_source: no source for {}", id . 0 )) ?;
     let child_existence : ExistenceAxes =
       existence_axes_for_phantom (id, &child_source, source_diff, source_diffs);
     let child_title : String =

@@ -76,7 +76,7 @@ pub fn stream_rerender_views (
         ) . entered ();
       rerender_view (
         &mut viewforest,
-        &source_diffs, &env . config, &env . driver,
+        &source_diffs, env,
         &graph_snap,
         &mut errors, &deleted_since_head_pid_src_map,
         &deleted_by_this_save_pids,

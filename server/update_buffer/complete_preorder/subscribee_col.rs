@@ -1,8 +1,9 @@
+use crate::env::SkgEnv;
 use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_scaffold_children};
 use crate::to_org::complete::sharing::goal_list::goal_list_for_subscribee_col;
 use crate::types::git::SourceDiff;
 use crate::types::memory::nodecomplete_from_memory_or_disk;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::{ error_unless_node_satisfies, read_at_ancestor_in_tree};
 use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child, insert_scaffold_as_child};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold};
@@ -11,7 +12,6 @@ use crate::update_buffer::util::{ detach_scaffold_transferring_focus, move_child
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 /// SubscribeeCol completion.
 ///
@@ -26,11 +26,10 @@ use typedb_driver::TypeDBDriver;
 /// - If parent is indefinitive: reconcile subscribee children.
 /// - Ensure HiddenOutsideOfSubscribeeCol exists and is last.
 pub async fn complete_subscribee_col_preorder (
-  node               : NodeId,
-  tree               : &mut Tree<ViewNode>,
-  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
-  config             : &SkgConfig,
-  _driver            : &TypeDBDriver,
+  node                           : NodeId,
+  tree                           : &mut Tree<ViewNode>,
+  source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
+  env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
@@ -54,14 +53,14 @@ pub async fn complete_subscribee_col_preorder (
     . ok_or ("complete_subscribee_col_preorder: parent is not a TrueNode") ?;
   let worktree_subscribees : Vec<ID> =
     nodecomplete_from_memory_or_disk (
-      config, &parent_skgid, &parent_source )
+      &env . config, &parent_skgid, &parent_source )
       . ok ()
       . map ( |skg| skg . subscribes_to . or_default () . to_vec () )
       . unwrap_or_default ();
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
     goal_list_for_subscribee_col(
       &parent_skgid, &parent_source,
-      source_diffs, &worktree_subscribees, config );
+      source_diffs, &worktree_subscribees, &env . config );
   if goal_list . is_empty() { // delete SubscribeeCol, handling focus
     detach_scaffold_transferring_focus (tree, node) ?;
     return Ok(( )); }
@@ -71,7 +70,7 @@ pub async fn complete_subscribee_col_preorder (
       build_child_data(
         tree, node, &parent_skgid, &parent_source,
         &goal_list, &removed_ids,
-        source_diffs, deleted_since_head_pid_src_map, config ) ?;
+        source_diffs, deleted_since_head_pid_src_map, env ) ?;
     reconcile_sharing_scaffold_children(
       tree, node, &goal_list, &child_data,
       "complete_subscribee_col_preorder" ) ?; }

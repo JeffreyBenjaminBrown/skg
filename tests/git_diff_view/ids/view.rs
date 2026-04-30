@@ -20,7 +20,7 @@ fn test_ids_diff_shows_id_col_scaffold()
 
     let root_ids = vec![ID("1" . to_string())];
     let (actual, _pids, _) : (String, Vec<ID>, _) =
-      multi_root_view(&driver, &config, &root_ids, true) . await?;
+      multi_root_view(&driver, &config, None, &root_ids, true) . await?;
 
     assert_buffer_contains(&actual, GIT_DIFF_VIEW);
 
@@ -50,7 +50,7 @@ fn test_ids_diff_staged_shows_staged_tag()
 
     let root_ids = vec![ID("1" . to_string())];
     let (actual, _pids, _) : (String, Vec<ID>, _) =
-      multi_root_view(&driver, &config, &root_ids, true) . await?;
+      multi_root_view(&driver, &config, None, &root_ids, true) . await?;
 
     assert_buffer_contains(&actual, GIT_DIFF_VIEW_STAGED);
 

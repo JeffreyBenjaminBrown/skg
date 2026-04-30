@@ -6,7 +6,7 @@ use crate::types::list::{Diff_Item, compute_interleaved_diff, itemlist_and_remov
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::dbs::memory::InRustGraph;
-use crate::types::memory::find_source_many_ways;
+use crate::env::find_source_with_optional_tantivy;
 use crate::types::nodes::complete::NodeComplete;
 use crate::git_ops::read_repo::nodecomplete_from_git_head;
 use crate::types::memory::nodecomplete_from_memory_or_disk;
@@ -565,9 +565,10 @@ fn build_child_creation_data (
     let is_phantom : bool = removed_ids . contains (id);
     if is_phantom {
       let phantom_source : SourceName =
-        find_source_many_ways(
-          id, &child_sources, deleted_since_head_pid_src_map, config )
-        . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
+        find_source_with_optional_tantivy (
+          id, deleted_since_head_pid_src_map, None, config )
+          . ok_or_else ( || -> Box<dyn Error> { format! (
+            "find_source: no source for {}", id . 0 ) . into () } ) ?;
       let (ex, mem) : (ExistenceAxes, MembershipAxes) =
         phantom_axes ( id, &phantom_source,
                        &parent_pid, &parent_source,
@@ -581,9 +582,10 @@ fn build_child_creation_data (
                                    kind } );
     } else {
       let child_source : SourceName =
-        find_source_many_ways( id, &child_sources,
-                     deleted_since_head_pid_src_map, config )
-        . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
+        find_source_with_optional_tantivy (
+          id, deleted_since_head_pid_src_map, None, config )
+          . ok_or_else ( || -> Box<dyn Error> { format! (
+            "find_source: no source for {}", id . 0 ) . into () } ) ?;
       let skg : NodeComplete =
         nodecomplete_from_memory_or_disk ( config, id, &child_source ) ?;
       result . insert( id . clone(),

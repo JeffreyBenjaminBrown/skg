@@ -56,6 +56,7 @@ pub fn handle_single_root_view_request (
             match single_root_view (
               &env . driver,
               &env . config,
+              Some (&env . tantivy_index),
               &node_id,
               conn_state . diff_mode_enabled ) . await
             { Ok ( (buffer_content, pids, viewforest) ) => {

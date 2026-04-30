@@ -20,7 +20,7 @@ use std::net::TcpStream;
 use skg::to_org::render::content_view::single_root_view;
 use skg::test_utils::{run_with_test_db, graph_handle_from_config};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
-use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
+use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ConnectionState;
 use skg::types::memory::OpenViews;
 use skg::dbs::memory::InRustGraphHandle;
@@ -36,7 +36,7 @@ fn test_dangling_reference_renders_unknown_node
     |config, driver, _tantivy| Box::pin ( async move {
       let (rendered, _pids, _) =
         single_root_view (
-          driver, config,
+          driver, config, None,
           &ID ( "parent" . to_string () ),
           false ) . await ?;
       println!("Rendered:\n{}", rendered);
@@ -73,7 +73,7 @@ fn test_buffer_with_unknownnode_child_saves_cleanly
 
 async fn buffer_with_unknownnode_child_saves_cleanly_impl (
   config  : &SkgConfig,
-  driver  : &TypeDBDriver,
+  driver  : &std::sync::Arc<TypeDBDriver>,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"

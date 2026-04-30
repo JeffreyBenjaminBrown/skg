@@ -16,7 +16,7 @@ use crate::types::git::SourceDiff;
 use crate::org_to_text::viewforest_to_string;
 use crate::to_org::render::diff::apply_diff_to_viewforest;
 use crate::to_org::render::initial_bfs::render_initial_viewforest_bfs;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use crate::update_buffer::graphnodestats::set_graphnodestats_in_viewforest;
 use crate::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
@@ -30,6 +30,7 @@ use typedb_driver::TypeDBDriver;
 pub async fn single_root_view (
   driver            : &TypeDBDriver,
   config            : &SkgConfig,
+  tantivy_index     : Option<&TantivyIndex>,
   root_id           : &ID,
   diff_mode_enabled : bool,
 ) -> Result < (String, Vec<ID>, Tree<ViewNode>),
@@ -37,6 +38,7 @@ pub async fn single_root_view (
   multi_root_view (
     driver,
     config,
+    tantivy_index,
     & [ root_id . clone () ],
     diff_mode_enabled ) . await }
 
@@ -44,6 +46,7 @@ pub async fn single_root_view (
 pub async fn multi_root_view (
   driver            : &TypeDBDriver,
   config            : &SkgConfig,
+  tantivy_index     : Option<&TantivyIndex>,
   root_ids          : &[ID],
   diff_mode_enabled : bool,
 ) -> Result < (String, Vec<ID>, Tree<ViewNode>),
@@ -60,7 +63,8 @@ pub async fn multi_root_view (
       deleted_ids_to_source (&source_diffs);
     apply_diff_to_viewforest (
       &mut viewforest, &source_diffs,
-      &deleted_since_head_pid_src_map, config ) ?; }
+      &deleted_since_head_pid_src_map,
+      tantivy_index, config ) ?; }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "attach_containerward_ancestries_to_view_roots" ). entered();
     attach_containerward_ancestries_to_view_roots (

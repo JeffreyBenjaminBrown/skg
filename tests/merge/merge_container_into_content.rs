@@ -19,7 +19,7 @@ use std::path::Path;
 
 use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_source;
 use skg::test_utils::{run_with_test_db, graph_handle_from_config, audit_memory_or_panic};
-use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
+use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ConnectionState;
 use skg::types::memory::OpenViews;
 
@@ -42,7 +42,7 @@ fn test_merge_container_into_content
 
 async fn merge_container_into_content_impl (
   config  : &SkgConfig,
-  driver  : &TypeDBDriver,
+  driver: &std::sync::Arc<TypeDBDriver>,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // The input buffer: a content view of 'a',

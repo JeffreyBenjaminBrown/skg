@@ -20,7 +20,7 @@ fn test_content_diff_with_moved_and_deleted_nodes()
 
     let root_ids = vec![ID("1" . to_string()), ID("new" . to_string())];
     let (actual, _pids, _) : (String, Vec<ID>, _) =
-      multi_root_view(&driver, &config, &root_ids, true) . await?;
+      multi_root_view(&driver, &config, None, &root_ids, true) . await?;
 
     assert_buffer_contains(&actual, GIT_DIFF_VIEW);
 
@@ -49,7 +49,7 @@ fn test_content_diff_staged()
 
     let root_ids = vec![ID("1" . to_string()), ID("new" . to_string())];
     let (actual, _pids, _) : (String, Vec<ID>, _) =
-      multi_root_view(&driver, &config, &root_ids, true) . await?;
+      multi_root_view(&driver, &config, None, &root_ids, true) . await?;
 
     assert_buffer_contains(&actual, GIT_DIFF_VIEW_STAGED);
 

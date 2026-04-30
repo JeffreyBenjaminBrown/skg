@@ -5,7 +5,8 @@
 // `FnMut` closure which cannot `.await`.
 
 use crate::dbs::memory::InRustGraph;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::env::SkgEnv;
+use crate::types::misc::{ID, SourceName};
 use crate::types::git::SourceDiff;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, ScaffoldKind};
 use crate::to_org::util::DefinitiveMap;
@@ -17,49 +18,46 @@ use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use typedb_driver::TypeDBDriver;
 
 pub async fn complete_viewforest (
-  viewforest             : &mut Tree<ViewNode>,
-  defmap             : &mut DefinitiveMap,
-  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
-  config             : &SkgConfig,
-  driver             : &TypeDBDriver,
+  viewforest                     : &mut Tree<ViewNode>,
+  defmap                         : &mut DefinitiveMap,
+  source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
+  env                            : &SkgEnv,
   graph_snap                     : &Arc<InRustGraph>,
-  errors             : &mut Vec<String>,
+  errors                         : &mut Vec<String>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  deleted_by_this_save_pids       : &HashSet<ID>,
-  is_saved_view                   : bool,
+  deleted_by_this_save_pids      : &HashSet<ID>,
+  is_saved_view                  : bool,
 ) -> Result<(), Box<dyn Error>> {
   let root_treeid : NodeId = viewforest . root () . id ();
   complete_preorder_recursive (
     viewforest, root_treeid,
-    defmap, source_diffs, config, driver, graph_snap,
+    defmap, source_diffs, env, graph_snap,
     deleted_since_head_pid_src_map,
     deleted_by_this_save_pids,
     is_saved_view ) . await ?;
   complete_postorder_recursive (
     viewforest, root_treeid,
-    defmap, source_diffs, config, driver,
+    defmap, source_diffs, env,
     errors, deleted_since_head_pid_src_map ) . await ?;
   Ok(( )) }
 
 fn complete_preorder_recursive<'a> (
-  tree               : &'a mut Tree<ViewNode>,
-  treeid             : NodeId,
-  defmap             : &'a mut DefinitiveMap,
-  source_diffs       : &'a Option<HashMap<SourceName, SourceDiff>>,
-  config             : &'a SkgConfig,
-  driver             : &'a TypeDBDriver,
+  tree                           : &'a mut Tree<ViewNode>,
+  treeid                         : NodeId,
+  defmap                         : &'a mut DefinitiveMap,
+  source_diffs                   : &'a Option<HashMap<SourceName, SourceDiff>>,
+  env                            : &'a SkgEnv,
   graph_snap                     : &'a Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &'a HashMap<ID, SourceName>,
   deleted_by_this_save_pids      : &'a HashSet<ID>,
-  is_saved_view                   : bool,
+  is_saved_view                  : bool,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
   // See the 'MANUAL RECURSION' comment at the top of this file.
   Box::pin ( async move {
     complete_preorder_with_limited_recursion (
-      tree, treeid, defmap, source_diffs, config, driver, graph_snap,
+      tree, treeid, defmap, source_diffs, env, graph_snap,
       deleted_since_head_pid_src_map, deleted_by_this_save_pids,
       is_saved_view
     ) . await ?;
@@ -69,20 +67,19 @@ fn complete_preorder_recursive<'a> (
     for child_treeid in child_treeids {
       complete_preorder_recursive (
         tree, child_treeid,
-        defmap, source_diffs, config, driver, graph_snap,
+        defmap, source_diffs, env, graph_snap,
         deleted_since_head_pid_src_map, deleted_by_this_save_pids,
         is_saved_view
       ) . await ?; }
     Ok(( )) }) }
 
 fn complete_postorder_recursive<'a> (
-  tree               : &'a mut Tree<ViewNode>,
-  treeid             : NodeId,
-  defmap             : &'a mut DefinitiveMap,
-  source_diffs       : &'a Option<HashMap<SourceName, SourceDiff>>,
-  config             : &'a SkgConfig,
-  driver             : &'a TypeDBDriver,
-  errors             : &'a mut Vec<String>,
+  tree                           : &'a mut Tree<ViewNode>,
+  treeid                         : NodeId,
+  defmap                         : &'a mut DefinitiveMap,
+  source_diffs                   : &'a Option<HashMap<SourceName, SourceDiff>>,
+  env                            : &'a SkgEnv,
+  errors                         : &'a mut Vec<String>,
   deleted_since_head_pid_src_map : &'a HashMap<ID, SourceName>,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
   // See the 'MANUAL RECURSION' comment at the top of this file.
@@ -93,11 +90,11 @@ fn complete_postorder_recursive<'a> (
     for child_treeid in child_treeids {
       complete_postorder_recursive (
         tree, child_treeid,
-        defmap, source_diffs, config, driver,
+        defmap, source_diffs, env,
         errors, deleted_since_head_pid_src_map
       ) . await ?; }
     complete_postorder_with_limited_recursion (
-      tree, treeid, defmap, source_diffs, config, driver,
+      tree, treeid, defmap, source_diffs, env,
       errors, deleted_since_head_pid_src_map
     ) . await ?;
     Ok(( )) }) }
@@ -106,16 +103,15 @@ fn complete_postorder_recursive<'a> (
 /// e.g. to complete a truenode, its content must all be children.
 /// But this dispatcher cannot call itself.
 async fn complete_preorder_with_limited_recursion (
-  tree               : &mut Tree<ViewNode>,
-  treeid             : NodeId,
-  defmap             : &mut DefinitiveMap,
-  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
-  config             : &SkgConfig,
-  driver             : &TypeDBDriver,
+  tree                           : &mut Tree<ViewNode>,
+  treeid                         : NodeId,
+  defmap                         : &mut DefinitiveMap,
+  source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
+  env                            : &SkgEnv,
   graph_snap                     : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   deleted_by_this_save_pids      : &HashSet<ID>,
-  is_saved_view                   : bool,
+  is_saved_view                  : bool,
 ) -> Result<(), Box<dyn Error>> {
   let kind : ViewNodeKind =
     tree . get (treeid) . unwrap () . value () . kind . clone ();
@@ -135,14 +131,14 @@ async fn complete_preorder_with_limited_recursion (
   if matches!( kind, ViewNodeKind::True (_)) {
     super::complete_preorder::truenode::
     complete_truenode_preorder (
-      treeid, tree, defmap, source_diffs, config, graph_snap,
+      treeid, tree, defmap, source_diffs, &env . config, graph_snap,
       deleted_since_head_pid_src_map, deleted_by_this_save_pids,
       is_saved_view ) ?;
   } else if matches!( kind,
       ViewNodeKind::Scaff (Scaffold::SubscribeeCol) ) {
         super::complete_preorder::subscribee_col::
         complete_subscribee_col_preorder (
-          treeid, tree, source_diffs, config, driver,
+          treeid, tree, source_diffs, env,
           deleted_since_head_pid_src_map
         ) . await ?;
   } else if matches!( kind, ViewNodeKind::Unknown (_) ) {
@@ -159,13 +155,12 @@ async fn complete_preorder_with_limited_recursion (
 /// e.g. to complete a truenode, its content must all be children.
 /// But this dispatcher cannot call itself.
 async fn complete_postorder_with_limited_recursion (
-  tree               : &mut Tree<ViewNode>,
-  treeid             : NodeId,
-  defmap             : &mut DefinitiveMap,
-  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
-  config             : &SkgConfig,
-  driver             : &TypeDBDriver,
-  errors             : &mut Vec<String>,
+  tree                           : &mut Tree<ViewNode>,
+  treeid                         : NodeId,
+  defmap                         : &mut DefinitiveMap,
+  source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
+  env                            : &SkgEnv,
+  errors                         : &mut Vec<String>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   let kind : ViewNodeKind =
@@ -173,27 +168,27 @@ async fn complete_postorder_with_limited_recursion (
   if matches!( kind, ViewNodeKind::True (_)) {
     super::complete_postorder::truenode::
     complete_truenode (
-      treeid, tree, defmap, source_diffs, config, driver,
+      treeid, tree, defmap, source_diffs, &env . config, &env . driver,
       errors, deleted_since_head_pid_src_map ) . await ?;
   } else if matches!(
     kind, ViewNodeKind::Scaff (Scaffold::AliasCol)) {
       super::complete_postorder::aliascol::
-      complete_alias_col ( tree, treeid, source_diffs, config ) ?;
+      complete_alias_col ( tree, treeid, source_diffs, &env . config ) ?;
   } else if matches!(
       kind, ViewNodeKind::Scaff (Scaffold::IDCol)) {
         super::complete_postorder::id_col::
-        complete_id_col ( treeid, tree, source_diffs, config ) ?;
+        complete_id_col ( treeid, tree, source_diffs, &env . config ) ?;
   } else if matches!(
     kind, ViewNodeKind::Scaff (Scaffold::HiddenInSubscribeeCol)) {
       super::complete_postorder::hiddeninsubscribee_col::
       complete_hiddeninsubscribee_col (
-        treeid, tree, source_diffs, config,
+        treeid, tree, source_diffs, env,
         deleted_since_head_pid_src_map ) ?;
   } else if matches!( kind,
       ViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol)) {
         super::complete_postorder::hiddenoutsideof_subscribeecol::
         complete_hiddenoutsideofsubscribeecol (
-          treeid, tree, source_diffs, config,
+          treeid, tree, source_diffs, env,
           deleted_since_head_pid_src_map ) ?;
   } else if matches!( kind, ViewNodeKind::Deleted (_)) { // no-op
   } else if matches!( kind, ViewNodeKind::DeletedScaff (_) ) {

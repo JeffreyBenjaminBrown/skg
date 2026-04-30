@@ -10,6 +10,7 @@ pub use graphnodestats::set_graphnodestats_in_viewforest;
 pub use viewnodestats::set_viewnodestats_in_viewforest;
 
 use crate::dbs::memory::{InRustGraph, memory_coherent_with_save_instructions, scheduled_audit::take_pending_audit_warning};
+use crate::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ConnectionState;
 use crate::serve::handlers::save_buffer::{ SaveResponse, compute_diff_for_every_source, deleted_ids_to_source};
@@ -48,8 +49,7 @@ pub async fn update_views_after_save (
   save_instructions           : Vec<DefineNode>,
   merge_instructions          : &[Merge],
   diff_mode_enabled           : bool,
-  config                      : &SkgConfig,
-  typedb_driver               : &TypeDBDriver,
+  env                         : &SkgEnv,
   viewuri_from_request_result : &Result<ViewUri, String>,
   conn_state                  : &mut ConnectionState,
 ) -> Result<SaveResponse, Box<dyn Error>> {
@@ -64,7 +64,7 @@ pub async fn update_views_after_save (
   let source_diffs
     : Option<HashMap<SourceName, SourceDiff>>
     = if diff_mode_enabled
-      { Some ( compute_diff_for_every_source (config)) }
+      { Some ( compute_diff_for_every_source (&env . config)) }
       else {None};
   let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
     source_diffs . as_ref()
@@ -106,8 +106,7 @@ pub async fn update_views_after_save (
       rerender_view (
         &mut saved_view_mut,
         &source_diffs,
-        config,
-        typedb_driver,
+        env,
         &graph_snap,
         &mut errors,
         &deleted_since_head_pid_src_map,
@@ -148,7 +147,7 @@ pub async fn update_views_after_save (
                 ). entered();
         rerender_view (
           &mut viewforest,
-          &source_diffs, config, typedb_driver,
+          &source_diffs, env,
           &graph_snap,
           &mut errors, &deleted_since_head_pid_src_map,
           &deleted_by_this_save_pids,
@@ -200,10 +199,9 @@ fn find_collateral_view_uris (
 /// Strip stale diff data, re-complete the viewforest,
 /// set graph/view stats, and render to string.
 pub async fn rerender_view (
-  viewforest                         : &mut Tree<ViewNode>,
+  viewforest                     : &mut Tree<ViewNode>,
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
-  config                         : &SkgConfig,
-  typedb_driver                  : &TypeDBDriver,
+  env                            : &SkgEnv,
   graph_snap                     : &Arc<InRustGraph>,
   errors                         : &mut Vec<String>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
@@ -217,7 +215,7 @@ pub async fn rerender_view (
   tracing::debug!("rerender_view: starting complete_viewforest");
   complete_viewforest (
     viewforest, &mut defmap,
-    source_diffs, config, typedb_driver, graph_snap,
+    source_diffs, env, graph_snap,
     errors, deleted_since_head_pid_src_map,
     deleted_by_this_save_pids,
     is_saved_view ) . await ?;
@@ -230,21 +228,21 @@ pub async fn rerender_view (
     // that bypass startup).
     validate_birth_relationships (viewforest, &snap); }
   attach_containerward_ancestries_to_removedhere_phantoms (
-    viewforest, config, typedb_driver ) . await ?;
+    viewforest, &env . config, &env . driver ) . await ?;
   tracing::debug!("rerender_view: complete_viewforest done ({:.3}s), starting graphnodestats",
             t_rerender . elapsed () . as_secs_f64 ());
   let ( container_to_contents, content_to_containers ) =
     set_graphnodestats_in_viewforest (
-      viewforest, config, typedb_driver ) . await ?;
+      viewforest, &env . config, &env . driver ) . await ?;
   tracing::debug!("rerender_view: graphnodestats done ({:.3}s), rendering to string",
             t_rerender . elapsed () . as_secs_f64 ());
   set_viewnodestats_in_viewforest (
     viewforest,
     &container_to_contents,
     &content_to_containers,
-    config );
+    &env . config );
   let result : Result<String, Box<dyn Error>> =
-    viewforest_to_string (viewforest, config);
+    viewforest_to_string (viewforest, &env . config);
   tracing::debug!("rerender_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
   result }

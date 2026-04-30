@@ -16,7 +16,7 @@ use crate::serve::util::{
   tag_text_response};
 use crate::types::errors::SaveError;
 use crate::types::git::{SourceDiff, GitDiffStatus};
-use crate::types::misc::{ID, SourceName, SkgConfig, TantivyIndex};
+use crate::types::misc::{ID, SourceName, SkgConfig};
 use crate::types::save::{DefineNode, Merge, SourceMove, format_save_error_as_org};
 use crate::types::memory::ViewUri;
 use crate::types::viewnode::ViewNode;
@@ -30,7 +30,6 @@ use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
 use std::path::Path;
-use typedb_driver::TypeDBDriver;
 
 /// The terminal message in the save protocol.
 /// Sent after collateral-view updates (if there are any).
@@ -80,7 +79,7 @@ pub fn handle_save_buffer_request (
           update_from_and_rerender_buffer (
             stream,
             & initial_buffer_content,
-            &env . driver, &env . config, &mut env . tantivy_index,
+            env,
             conn_state . diff_mode_enabled,
             &viewuri_from_request_result,
             conn_state ))
@@ -142,17 +141,15 @@ fn empty_response_sexp (
 pub async fn update_from_and_rerender_buffer (
   stream                      : &mut TcpStream,
   org_buffer_text             : &str,
-  typedb_driver               : &TypeDBDriver,
-  config                      : &SkgConfig,
-  tantivy_index               : &mut TantivyIndex,
+  env                         : &mut SkgEnv,
   diff_mode_enabled           : bool,
   viewuri_from_request_result : &Result<ViewUri, String>,
   conn_state                  : &mut ConnectionState,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   if diff_mode_enabled {
     let sources : Vec<SourceName> =
-      config . sources . keys() . cloned() . collect();
-    validate_no_merge_commits ( &sources, config )
+      env . config . sources . keys() . cloned() . collect();
+    validate_no_merge_commits ( &sources, &env . config )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
 
   let (viewforest, save_instructions, merge_instructions, source_moves)
@@ -161,7 +158,7 @@ pub async fn update_from_and_rerender_buffer (
             "buffer_to_viewforest_and_save_instructions"
           ) . entered();
         buffer_to_viewforest_and_save_instructions (
-          org_buffer_text, config, typedb_driver ) . await
+          org_buffer_text, &env . config, &env . driver ) . await
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
   if viewforest . root() . children() . next() . is_none()
@@ -173,15 +170,15 @@ pub async fn update_from_and_rerender_buffer (
       save_instructions . clone(),
       &merge_instructions,
       &source_moves,
-      config . clone(),
-      tantivy_index,
-      typedb_driver,
+      env . config . clone(),
+      &mut env . tantivy_index,
+      &env . driver,
       &conn_state . graph ) . await ?;
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "update_context_types_for_saved_nodes" ). entered();
       update_context_types_for_saved_nodes (
-        tantivy_index, &config . db_name,
-        typedb_driver, &save_instructions ) . await
+        &env . tantivy_index, &env . config . db_name,
+        &env . driver, &save_instructions ) . await
       . unwrap_or_else ( |e| tracing::warn! (
         "context type recomputation failed: {}", e )); } }
 
@@ -191,8 +188,7 @@ pub async fn update_from_and_rerender_buffer (
     save_instructions,
     &merge_instructions,
     diff_mode_enabled,
-    config,
-    typedb_driver,
+    env,
     viewuri_from_request_result,
     conn_state ) . await }
 

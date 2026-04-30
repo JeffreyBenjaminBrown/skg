@@ -110,7 +110,7 @@ async fn test_multi_root_view_logic (
   ];
   let (result, _pids, _)
     : (String, Vec<ID>, _)
-    = multi_root_view ( & driver, & config, & focii, false
+    = multi_root_view ( & driver, & config, None, & focii, false
                       ) . await ?;
 
   println!("Multi-root view result:\n{}", result);
@@ -136,7 +136,7 @@ fn test_single_root_view_with_cycle
       // Test with node "a" which has a cycle (a -> b -> c -> b)
       let (result, _pids, _)
         : (String, Vec<ID>, _)
-        = single_root_view ( driver, config,
+        = single_root_view ( driver, config, None,
                              &ID ( "a" . to_string () ),
                              false
                            ) . await ?;
@@ -168,7 +168,7 @@ fn test_multi_root_view_with_shared_nodes
         ID ( "2" . to_string () )
       ];
       let (result, _pids, _) : (String, Vec<ID>, _) =
-        multi_root_view ( driver, config, & focii, false
+        multi_root_view ( driver, config, None, & focii, false
                         ) . await ?;
 
       println!("Multi root view with shared nodes result:\n{}", result);
@@ -223,7 +223,7 @@ fn test_multi_root_view_with_node_limit
         ID ( "2" . to_string () )
       ];
       let (result, _pids, _) : (String, Vec<ID>, _) =
-        multi_root_view ( driver, &test_config, & focii, false
+        multi_root_view ( driver, &test_config, None, & focii, false
                         ) . await ?;
 
       println!("Multi root view with limit=3 result:\n{}", result);
@@ -283,7 +283,7 @@ fn test_limit_with_multiple_sibling_groups
       test_config . initial_node_limit = 4;
 
       let (result, _pids, _) : (String, Vec<ID>, _)
-      = single_root_view ( driver, &test_config,
+      = single_root_view ( driver, &test_config, None,
                            &ID ( "1" . to_string () ),
                            false
                          ) . await ?;

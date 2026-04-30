@@ -362,7 +362,7 @@ async fn test_recursive_document (
   let (result_org_text, _pids, _)
     : (String, Vec<ID>, _)
     = single_root_view (
-          driver, config, &ID ( "a" . to_string () ), false
+          driver, config, None, &ID ( "a" . to_string () ), false
         ) . await ?;
   let unchecked_viewforest : Tree<UncheckedViewNode> =
     org_to_uninterpreted_nodes (& result_org_text)

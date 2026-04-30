@@ -200,7 +200,7 @@ fn run_save_test<F>(db_name: &str, test_fn: F) -> Result<(), Box<dyn Error>>
 where
   F: for<'a> FnOnce(
     &'a SkgConfig,
-    &'a TypeDBDriver,
+    &'a std::sync::Arc<TypeDBDriver>,
     &'a mut TantivyIndex,
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
@@ -213,7 +213,7 @@ fn run_save_test_staged<F>(db_name: &str, test_fn: F) -> Result<(), Box<dyn Erro
 where
   F: for<'a> FnOnce(
     &'a SkgConfig,
-    &'a TypeDBDriver,
+    &'a std::sync::Arc<TypeDBDriver>,
     &'a mut TantivyIndex,
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
@@ -231,7 +231,7 @@ where
   S: FnOnce (&Path) -> Result<Repository, Box<dyn Error>>,
   F: for<'a> FnOnce(
     &'a SkgConfig,
-    &'a TypeDBDriver,
+    &'a std::sync::Arc<TypeDBDriver>,
     &'a mut TantivyIndex,
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>

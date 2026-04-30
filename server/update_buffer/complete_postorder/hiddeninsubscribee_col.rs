@@ -1,7 +1,8 @@
+use crate::env::SkgEnv;
 use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_scaffold_children};
 use crate::to_org::complete::sharing::goal_list::goal_list_for_hiddeninsubscribee_col;
 use crate::types::git::SourceDiff;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SourceName};
 use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor};
@@ -25,10 +26,10 @@ use std::error::Error;
 /// hides from its subscriptions AND that are top-level content
 /// of the subscribee.
 pub fn complete_hiddeninsubscribee_col (
-  node               : NodeId,
-  tree               : &mut Tree<ViewNode>,
-  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
-  config             : &SkgConfig,
+  node                           : NodeId,
+  tree                           : &mut Tree<ViewNode>,
+  source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
+  env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
@@ -49,12 +50,12 @@ pub fn complete_hiddeninsubscribee_col (
   let subscribee_contains : Vec<ID> = {
     let subscribee_nodecomplete : NodeComplete =
       nodecomplete_from_memory_or_disk (
-        config, &subscribee_pid, &subscribee_source ) ?;
+        &env . config, &subscribee_pid, &subscribee_source ) ?;
     subscribee_nodecomplete . contains . clone() };
   let subscriber_hides : Vec<ID> = {
     let subscriber_nodecomplete : NodeComplete =
       nodecomplete_from_memory_or_disk (
-        config, &subscriber_pid, &subscriber_source ) ?;
+        &env . config, &subscriber_pid, &subscriber_source ) ?;
     subscriber_nodecomplete . hides_from_its_subscriptions
       . or_default() . to_vec() };
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
@@ -62,12 +63,12 @@ pub fn complete_hiddeninsubscribee_col (
       &subscribee_pid, &subscribee_source,
       &subscriber_pid, &subscriber_source,
       &subscribee_contains, &subscriber_hides,
-      source_diffs, config );
+      source_diffs, &env . config );
   let child_data : HashMap<ID, ChildData> = // Pre-compute this, so that the create_child closure inside reconcile_sharing_scaffold_children captures only owned data and does not conflict with the &mut Tree borrow.
     build_child_data(
       tree, node, &subscribee_pid, &subscribee_source,
       &goal_list, &removed_ids,
-      source_diffs, deleted_since_head_pid_src_map, config ) ?;
+      source_diffs, deleted_since_head_pid_src_map, env ) ?;
   reconcile_sharing_scaffold_children(
     tree, node, &goal_list, &child_data,
     "complete_hiddeninsubscribee_col" ) ?;

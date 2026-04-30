@@ -64,7 +64,7 @@ fn test_subscribee_col_appears_for_subscribers(
     let (config, driver) =
       setup_multi_source_test (db_name) . await?;
     let (result, _pids, _) : (String, Vec<ID>, _) =
-      single_root_view( &driver, &config, &ID("1" . to_string()), false
+      single_root_view( &driver, &config, None, &ID("1" . to_string()), false
                       ) . await?;
     println!("SubscribeeCol test result:\n{}", result);
 

@@ -27,7 +27,7 @@ use std::path::Path;
 
 use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_source;
 use skg::test_utils::{run_with_test_db, graph_handle_from_config};
-use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
+use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ConnectionState;
 use skg::types::memory::OpenViews;
 
@@ -50,7 +50,7 @@ fn test_delete_strips_references_from_neighbors
 
 async fn delete_strips_references_impl (
   config  : &SkgConfig,
-  driver  : &TypeDBDriver,
+  driver: &std::sync::Arc<TypeDBDriver>,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // Single-root content view of victim with editRequest delete.
@@ -154,7 +154,7 @@ fn test_strip_pass_amends_user_supplied_savenode
 
 async fn strip_pass_amends_user_supplied_savenode_impl (
   config  : &SkgConfig,
-  driver  : &TypeDBDriver,
+  driver: &std::sync::Arc<TypeDBDriver>,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_source as load_nc;
@@ -218,7 +218,7 @@ fn test_strip_pass_handles_extra_ids
 
 async fn strip_pass_handles_extra_ids_impl (
   config  : &SkgConfig,
-  driver  : &TypeDBDriver,
+  driver: &std::sync::Arc<TypeDBDriver>,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"

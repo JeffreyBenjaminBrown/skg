@@ -11,7 +11,7 @@ use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
-use skg::serve::handlers::save_buffer::update_from_and_rerender_buffer;
+use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID, TantivyIndex};
 use skg::types::nodes::typedb::NodeTypedb;
@@ -39,7 +39,7 @@ async fn setup_test(
   db_name: &str,
   config_path: &str,
 ) -> Result<(SkgConfig,
-             TypeDBDriver,
+             std::sync::Arc<TypeDBDriver>,
              TantivyIndex),
             Box<dyn Error>> {
   let config: SkgConfig =
@@ -61,11 +61,11 @@ async fn setup_test(
   create_all_relationships(db_name, &driver, &typedb_nodes) . await?;
   let tantivy_index: TantivyIndex =
     create_empty_tantivy_index(&config . tantivy_folder)?;
-  Ok((config, driver, tantivy_index)) }
+  Ok((config, std::sync::Arc::new (driver), tantivy_index)) }
 
 async fn cleanup_test(
   db_name: &str,
-  driver: &TypeDBDriver,
+  driver: &std::sync::Arc<TypeDBDriver>,
   tantivy_folder: &std::path::Path,
 ) -> Result<(), Box<dyn Error>> {
   if driver . databases() . contains (db_name) . await? {
@@ -125,7 +125,7 @@ fn test_every_kind_of_col(
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
       = single_root_view(
-          &driver, &config,
+          &driver, &config, None,
           &ID("R" . to_string()), // Initial view from R ("subscribeR")
           false ) . await?;
     println!("Initial view from R:\n{}", initial_view);
@@ -204,7 +204,7 @@ fn test_hidden_within_but_none_without(
       db_name, "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml" ) . await?;
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
-      = single_root_view( &driver, &config,
+      = single_root_view( &driver, &config, None,
                           &ID("R" . to_string()), // the root
                           false ) . await?;
     println!("Initial view from R:\n{}", initial_view);
@@ -280,7 +280,7 @@ fn test_hidden_without_but_none_within(
                  "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within/skgconfig.toml") . await?;
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
-      = single_root_view( &driver, &config,
+      = single_root_view( &driver, &config, None,
                           &ID("R" . to_string()), // origin of the view
                           false ) . await?;
     println!("Initial view from R:\n{}", initial_view);
@@ -354,7 +354,7 @@ fn test_overlapping_hidden_within(
                  "tests/hidden_from_subscriptions/fixtures-overlapping-hidden-within/skgconfig.toml") . await?;
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
-      = single_root_view( &driver, &config,
+      = single_root_view( &driver, &config, None,
                           &ID("R" . to_string()), // root of the view
                           false ) . await?;
     println!("Initial view from R:\n{}", initial_view);

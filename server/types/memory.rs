@@ -4,7 +4,6 @@ use crate::types::many_to_many::ManyToMany;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use super::misc::{ID, SkgConfig, SourceName};
-use super::phantom::source_from_disk;
 
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
@@ -232,28 +231,3 @@ pub fn nodecomplete_from_memory (id: &ID) -> Option<NodeComplete> {
     overrides_view_of            : rust . overrides_view_of . clone (),
     misc                         : rust . misc . clone (), } ) }
 
-/// Lookup a node's source by trying, in order:
-/// - sources_from_siblings
-/// - deleted_since_head_pid_src_map
-/// - in-Rust memory (handles nodes created in this save that have
-///   no disk file yet)
-/// - disk (scan source directories for a matching .skg filename)
-pub fn find_source_many_ways (
-  id                             : &ID,
-  sources_from_siblings          : &HashMap<ID, SourceName>, // When 'find_source_many_ways' is called from a parent, the parent's child viewnodes can be scanned for IDs and put here. If that's not done and this is empty, the source will still probably be found.
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>, // built by deleted_ids_to_source
-  config                         : &SkgConfig,
-) -> Result<SourceName, String> {
-  if let Some (s) = sources_from_siblings . get (id)
-    { return Ok ( s . clone () ); }
-  if let Some (s) = deleted_since_head_pid_src_map . get (id)
-    { return Ok ( s . clone () ); }
-  if let Some (( _pid, src )) =
-    snapshot_global ()
-      . as_deref () . and_then ( |g| g . pid_and_source (id) )
-    { return Ok (src); }
-  let source : SourceName =
-    source_from_disk ( id, config )
-    . ok_or_else ( || format! (
-      "find_source_many_ways: no source found for {}", id . 0 )) ?;
-  Ok (source) }
