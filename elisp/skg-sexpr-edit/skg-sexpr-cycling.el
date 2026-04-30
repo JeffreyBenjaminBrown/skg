@@ -91,11 +91,6 @@ Dispatch is based on the parent headline text."
                    parent field-value)))
       (cond
        (values
-        (when (string= parent "source")
-          (message
-           (concat "Warning: if this node already exists in the graph"
-                   " with a distinct source, changing it here will"
-                   " probably cause problems.")))
         (let ((new-val (skg-sexp-edit--cycle-through
                         field-value values direction)))
           (org-edit-headline new-val)
@@ -105,10 +100,6 @@ Dispatch is based on the parent headline text."
               (org-edit-headline (concat "merge " id))))))
        ;; source with no config: prompt
        ((string= parent "source")
-        (message
-         (concat "Warning: if this node already exists in the graph"
-                 " with a distinct source, changing it here will"
-                 " probably cause problems."))
         (org-edit-headline (read-string "Source: " field-value)))
        (t
         (user-error "Field '%s' is not cycleable" parent))))))
