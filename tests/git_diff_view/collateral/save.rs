@@ -4,6 +4,7 @@
 /// retain diff annotations (textChanged, new-here, etc.).
 
 use super::common::*;
+use std::sync::Arc;
 
 use std::io::BufReader;
 
@@ -22,11 +23,11 @@ fn test_collateral_view_preserves_diff_annotations()
 
   let (_config, driver, _tantivy, _save_response, _initial_buffer,
        uri_2, read_end)
-    : (SkgConfig, std::sync::Arc<TypeDBDriver>, TantivyIndex, SaveResponse,
+    : (SkgConfig, Arc<TypeDBDriver>, TantivyIndex, SaveResponse,
        String, ViewUri, TcpStream) =
     block_on ( async {
       let (config, driver, mut tantivy)
-        : (SkgConfig, std::sync::Arc<TypeDBDriver>, TantivyIndex) =
+        : (SkgConfig, Arc<TypeDBDriver>, TantivyIndex) =
         setup_test_dbs (
           db_name, repo_path . to_str() . unwrap(),
           &tantivy_folder ) . await ?;
@@ -142,11 +143,11 @@ fn test_collateral_view_staged_text_and_unstaged_add()
 
   let (_config, driver, _tantivy, _save_response, _initial_buffer,
        uri_2, read_end)
-    : (SkgConfig, std::sync::Arc<TypeDBDriver>, TantivyIndex, SaveResponse,
+    : (SkgConfig, Arc<TypeDBDriver>, TantivyIndex, SaveResponse,
        String, ViewUri, TcpStream) =
     block_on ( async {
       let (config, driver, mut tantivy)
-        : (SkgConfig, std::sync::Arc<TypeDBDriver>, TantivyIndex) =
+        : (SkgConfig, Arc<TypeDBDriver>, TantivyIndex) =
         setup_test_dbs (
           db_name, repo_path . to_str() . unwrap(),
           &tantivy_folder ) . await ?;

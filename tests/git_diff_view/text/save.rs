@@ -2,6 +2,7 @@
 /// TextChanged scaffolds should be disregarded during save.
 
 use super::common::*;
+use std::sync::Arc;
 
 /// Deleting a textChanged scaffold should be a no-op.
 /// The scaffold respawns in the returned buffer.
@@ -199,7 +200,7 @@ fn run_save_test<F>(db_name: &str, test_fn: F) -> Result<(), Box<dyn Error>>
 where
   F: for<'a> FnOnce(
     &'a SkgConfig,
-    &'a std::sync::Arc<TypeDBDriver>,
+    &'a Arc<TypeDBDriver>,
     &'a mut TantivyIndex,
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>

@@ -1,0 +1,328 @@
+* Sharing — current state of view & edit
+
+Three TypeDB relations participate in sharing
+(see [[file:schema.tql][schema.tql]] and
+[[file:docs/sharing-model.md][docs/sharing-model.md]]):
+
+  - =subscribes= — subscriber → subscribee
+  - =hides_from_its_subscriptions= — hider → hidden
+  - =overrides_view_of= — replacement → replaced
+
+Below: what the user sees, how to make them see it, and how
+much they can edit.
+
+** Summary table
+
+| relation              | shown in views?                | how the user gets to see it        | editable from buffer?       |
+|-----------------------+--------------------------------+------------------------------------+-----------------------------|
+| =subscribes_to=       | yes (=SubscribeeCol= scaffold) | automatic for any subscriber       | YES — via the SubscribeeCol |
+| =hides_from_its_subs= | yes (two scaffolds, see below) | automatic, beneath each subscribee | NO — read-only display      |
+| =overrides_view_of=   | only as a herald flag          | enable heralds (~C-c v h~)         | NO — invisible structure    |
+
+** =subscribes_to= — fully implemented (read + edit)
+
+*** What the user sees
+
+If a node N subscribes to anything, every viewnode of N gets
+a =SubscribeeCol= scaffold prepended as its first child:
+
+#+begin_src
+  * (skg (node (id N) ...) subscribing) N
+  ** (skg subscribeeCol) it subscribes to these
+  *** (skg (node (id S1) ... ) indef ...)) S1
+  *** (skg (node (id S2) ... ) indef ...)) S2
+#+end_src
+
+The header text "it subscribes to these" comes from
+=ScaffoldKind::SubscribeeCol= in
+[[file:server/types/viewnode.rs][server/types/viewnode.rs]]
+(line ~349). Each subscribee is rendered as an indefinitive
+TrueNode child.
+
+The herald flag =subscribing= (visible when heralds-mode is on)
+fires when the node is *either* a subscriber *or* a subscribee
+of something — see [[file:server/types/viewnode.rs][types/viewnode.rs]]
+=GraphNodeStats::subscribing=.
+
+*** What triggers the SubscribeeCol
+
+Three places inject or complete it:
+
+  1. [[file:server/to_org/complete/sharing.rs][to_org/complete/sharing.rs]]
+     =maybe_add_subscribeeCol_branch=. Used by =complete_branch_minus_content=
+     during initial-render and =extendDefinitiveSubtreeFromLeaf=.
+     Reads disk, populates subscribee children + a HiddenOutsideOf
+     scaffold if needed.
+
+  2. [[file:server/update_buffer/complete_preorder/truenode.rs][update_buffer/complete_preorder/truenode.rs]]
+     =maybe_prepend_subscribee_col=. Used by =complete_truenode_preorder=
+     during a save's rerender. Prepends an empty =SubscribeeCol=;
+     the postorder pass below fills it.
+
+  3. [[file:server/update_buffer/complete_preorder/subscribee_col.rs][update_buffer/complete_preorder/subscribee_col.rs]]
+     =complete_subscribee_col_preorder=. Reconciles an existing
+     SubscribeeCol against disk for indefinitive parents and for
+     diff-view; deletes the col if there are no subscribees.
+
+The first path is for opening a new view (no existing buffer
+to reconcile). The second + third are for re-rendering a saved
+buffer where any SubscribeeCol the user already typed must be
+respected and merged with disk truth.
+
+*** How the user edits
+
+[[file:server/from_text/viewnodes_to_instructions/to_naive_instructions.rs][to_naive_instructions.rs]]
+=collect_subscribees= walks the SubscribeeCol's TrueNode
+children at save time and writes them out as the node's new
+=subscribes_to= list. So:
+
+  - To *add* a subscription: place a child under the node's
+    =SubscribeeCol= with =(skg (node (id <pid>)))= metadata,
+    then save.
+  - To *remove* a subscription: delete the corresponding child
+    of the SubscribeeCol, then save.
+  - To *clear all* subscriptions: delete the whole =SubscribeeCol=.
+
+** =hides_from_its_subscriptions= — read-only display
+
+*** What the user sees
+
+Two scaffolds, both inside a SubscribeeCol's subtree:
+
+  1. =HiddenInSubscribeeCol= — child of each *individual*
+     subscribee. Lists IDs that the subscriber hides AND that
+     the subscribee contains. Header text "hidden from this
+     subscription".
+
+  2. =HiddenOutsideOfSubscribeeCol= — child of the
+     =SubscribeeCol= itself (sibling of the subscribees).
+     Lists IDs the subscriber hides that aren't contained by
+     any subscribee. Header text "hidden from all
+     subscriptions".
+
+Tree shape:
+
+#+begin_src
+  * (skg ...) N (subscriber)
+  ** (skg subscribeeCol) it subscribes to these
+  *** (skg ...) S1 (subscribee)
+  **** (skg hiddenInSubscribeeCol) hidden from this subscription
+  ***** (skg ...) H1 (hidden under S1)
+  *** (skg ...) S2
+  *** (skg hiddenOutsideOfSubscribeeCol) hidden from all subscriptions
+  **** (skg ...) H2 (hidden but in no subscribee)
+#+end_src
+
+*** What triggers them
+
+  - Initial render path:
+    [[file:server/to_org/complete/sharing.rs][to_org/complete/sharing.rs]]
+    =maybe_add_subscribeeCol_branch= adds the
+    HiddenOutsideOfSubscribeeCol;
+    =maybe_add_hiddenInSubscribeeCol_branch=
+    (called from =extendDefinitiveSubtreeFromLeaf= when the
+    target *is* a Subscribee) adds the HiddenInSubscribeeCol.
+
+  - Rerender path (after save):
+    [[file:server/update_buffer/complete_postorder/hiddeninsubscribee_col.rs][hiddeninsubscribee_col.rs]]
+    =complete_hiddeninsubscribee_col=, and
+    [[file:server/update_buffer/complete_postorder/hiddenoutsideof_subscribeecol.rs][hiddenoutsideof_subscribeecol.rs]]
+    =complete_hiddenoutsideofsubscribeecol=. Both reconcile
+    against disk.
+
+*** How the user edits
+
+They don't. At save time,
+[[file:server/from_text/viewnodes_to_instructions/to_naive_instructions.rs][to_naive_instructions.rs]]
+hardcodes:
+
+#+begin_src rust
+hides_from_its_subscriptions: MSV::Unspecified,
+#+end_src
+
+— meaning "the buffer expresses no opinion". Then
+[[file:server/from_text/supplement_from_disk.rs][supplement_from_disk.rs]]
+fills the field from the on-disk node:
+
+#+begin_src rust
+if from_buffer.hides_from_its_subscriptions.is_unspecified() {
+  from_buffer.hides_from_its_subscriptions =
+    disk_node.hides_from_its_subscriptions;
+}
+#+end_src
+
+So edits to a HiddenInSubscribeeCol's children — adding a
+hide, removing one — are *silently discarded* on save. The
+only mutations the system makes to this list are:
+
+  - merge ([[file:server/merge/mergeInstructionTriple.rs][merge/mergeInstructionTriple.rs]]: combining two nodes' hides),
+  - delete-propagation ([[file:server/save.rs][save.rs]] =apply_delete_propagation_cleanup=
+    strips deleted ids from the list).
+
+There is no command — server-side or elisp-side — to add a
+new hide.
+
+** =overrides_view_of= — data layer only, no UI
+
+*** What the user sees
+
+Almost nothing. There is no scaffold for overrides. The only
+surface is the herald flag =overriding=, set when the node
+*either* overrides something *or* is overridden by something —
+see =GraphNodeStats::overriding= in
+[[file:server/types/viewnode.rs][types/viewnode.rs]]:
+
+#+begin_quote
+overriding : bool, // overrides *or* overridden, anywhere
+#+end_quote
+
+The user can't tell, from the herald, which side of the
+relation they're on, or *what* the other side is.
+
+*** What the data layer does have
+
+End-to-end plumbing — the relation is fully persisted:
+
+  - field on =NodeFS=, =NodeRust=, =NodeTypedb=, =NodeComplete=
+  - serialized to/from the YAML =overrides_view_of:= field
+  - TypeDB relation defined ([[file:schema.tql][schema.tql]]) and indexed
+  - in-memory inverse index =replacements_of= in
+    [[file:server/dbs/memory.rs][dbs/memory.rs]]
+  - audit framework knows about it ([[file:server/dbs/memory/audit.rs][dbs/memory/audit.rs]])
+  - delete-propagation cleanup strips deleted ids
+    ([[file:server/save.rs][save.rs]] line 362)
+
+What's *missing*: any rendering pass, any scaffold, any
+parse step that lets the user add or remove an override
+entry. Save instructions hardcode =MSV::Unspecified= just like
+hides:
+
+#+begin_src rust
+overrides_view_of: MSV::Unspecified,
+#+end_src
+
+— so even if the user *did* type a metadata field for
+overrides, save would not honor it.
+
+** TODO Things that look duplicative, inelegant, confusing, or undesirable
+
+*** TODO Two parallel "complete the SubscribeeCol" implementations
+
+  - =to_org/complete/sharing.rs::maybe_add_subscribeeCol_branch=
+    is for the *initial-render* path (no existing user buffer
+    to merge with). It also adds the HiddenOutsideOf scaffold
+    inline.
+  - =update_buffer/complete_preorder/subscribee_col.rs::complete_subscribee_col_preorder=
+    is for the *save-rerender* path (must respect what the
+    user typed and merge with disk). It also handles diff-view
+    phantom subscribees.
+  - And =update_buffer/complete_preorder/truenode.rs::maybe_prepend_subscribee_col=
+    is the third place that decides "should there be a
+    SubscribeeCol here?"
+
+The two completers don't share code. The PITFALL comment at
+[[file:server/to_org/complete/sharing.rs::64][sharing.rs:64]]
+even acknowledges this: "If this code were used in the
+save-buffer pathway, we could not assume the existing
+SubscribeeCol is correct, and would instead have to
+'integrate' it, as happens elsewhere for something similar."
+The "elsewhere" is the second completer above. They could
+plausibly be merged — both end up driving the same target
+shape — but doing so would require teaching the
+initial-render path how to integrate (currently a no-op
+because there's nothing to merge with).
+
+*** TODO Two parallel "complete the HiddenIn/OutsideOf scaffolds"
+
+Same shape:
+
+  - initial-render: =maybe_add_hiddenInSubscribeeCol_branch=
+    plus inline code in =maybe_add_subscribeeCol_branch=.
+  - rerender: =complete_hiddeninsubscribee_col= and
+    =complete_hiddenoutsideofsubscribeecol=, both ~150 lines
+    each, with diff-view phantom logic.
+
+The TODO at
+[[file:server/to_org/complete/sharing.rs::126][sharing.rs:126]]
+flags the same fragility: "TODO: This assumes the existing
+Col is correct. Should instead 'integrate' it, as is done
+somewhere else for something similar."
+
+*** DONE IGNORING for now : Asymmetric editability
+
+The user *sees* HiddenIn/OutsideOf scaffolds populated with
+hidden nodes, exactly as they see SubscribeeCol populated
+with subscribees. But edits to the former are silently
+discarded; edits to the latter persist. Nothing in the buffer
+warns about this. A reasonable user would assume: "I add
+something here, I save, it sticks." That assumption is
+wrong, with no feedback.
+
+This is the most user-hostile aspect of the current state.
+
+*** DONE is feature not bug : =overriding= and =subscribing= herald flags conflate two roles
+
+Both flags fire on either side of the relation. From the
+herald alone you can't tell:
+
+  - is this node a subscriber or a subscribee (or both)?
+  - is it the override-replacement or the replaced (or both)?
+
+For a user trying to understand a graph this loses
+information that the schema cleanly distinguishes.
+
+*** TODO huh ? Tree-position-based parsing is fragile
+
+[[file:server/from_text/viewnodes_to_instructions/to_naive_instructions.rs][to_naive_instructions.rs]]
+=collect_subscribees= identifies subscribees as "TrueNode
+children of a SubscribeeCol scaffold." It silently skips a
+HiddenOutsideOfSubscribeeCol child of the same SubscribeeCol;
+it /also/ silently skips Deleted, DeletedScaff, and Unknown
+nodes; and it errors on any other Scaffold variant.
+
+If the user accidentally creates two SubscribeeCol scaffolds
+under the same node, behavior depends on
+=unique_scaffold_child= — which returns =None= (or errors)
+in that case. Not obvious from the parsing code.
+
+The HiddenInSubscribeeCol lives at a different tree depth
+(child of a Subscribee, not of a SubscribeeCol), and is not
+inspected by =collect_subscribees= or any sibling pass — so
+if the user moves it sideways, nothing catches the
+displacement.
+
+*** TODO No command for "I want to start subscribing"
+
+=maybe_prepend_subscribee_col= only injects a SubscribeeCol
+when the node *already* subscribes to something. A node that
+doesn't yet subscribe has no col to add subscribees into.
+
+The workaround is to type the metadata sexp =(skg
+subscribeeCol)= manually, then add subscribee TrueNode
+children with their own metadata. That's tedious and
+error-prone — there should be a command.
+
+*** =overrides_view_of= is dead weight in current usage
+
+Plumbed through every layer (FS, Rust, TypeDB, Tantivy
+context-types, audit, delete-propagation), but the user can
+neither see *what* a node overrides / is overridden by, nor
+add or remove such a relationship. Its presence in the data
+model without UI is a project-architecture inconsistency:
+either delete it or surface it.
+
+** What's NOT implemented
+
+  - any way to add or remove a hide
+  - any way to view, add, or remove an override
+  - any rank/visual distinction between "I subscribe to X" vs.
+    "X subscribes to me" in the herald
+  - any rank/visual distinction between "I override X" vs.
+    "X overrides me"
+  - any indication, in the buffer, that a HiddenIn/OutsideOf
+    scaffold is read-only display rather than editable like
+    its SubscribeeCol cousin
+  - any keymap entry under =C-c s= or elsewhere for sharing
+    operations (the only sharing-related thing in
+    [[file:elisp/skg-keymaps-and-aliases.el][skg-keymaps-and-aliases.el]]
+    is the herald color for "subscribees")

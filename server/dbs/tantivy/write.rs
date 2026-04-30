@@ -3,6 +3,7 @@
 // doc per alias), and the shared `commit_with_status` used by both
 // this module and `context_update`.
 
+use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
 use crate::types::misc::{ID, TantivyIndex};
 use crate::types::nodes::complete::FileProperty;
 use crate::types::nodes::tantivy::NodeTantivy;
@@ -22,7 +23,7 @@ pub fn update_index_with_nodes (
 
   let mut writer: IndexWriter =
     tantivy_index . index . writer (
-      crate::consts::TANTIVY_WRITER_BUFFER_BYTES)?;
+      TANTIVY_WRITER_BUFFER_BYTES)?;
   delete_nodes_from_index(
     // Delete those IDs from the index. (They'll come back.)
     nodes . iter(), &mut writer, tantivy_index)?;

@@ -33,6 +33,7 @@
 use indoc::indoc;
 use std::error::Error;
 use std::net::TcpStream;
+use std::sync::Arc;
 
 use skg::test_utils::{run_with_test_db, graph_handle_from_config, audit_memory_or_panic};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
@@ -58,7 +59,7 @@ fn test_merge_acquiree_as_independent_root
 
 async fn merge_acquiree_as_independent_root_impl (
   config  : &SkgConfig,
-  driver: &std::sync::Arc<TypeDBDriver>,
+  driver: &Arc<TypeDBDriver>,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"

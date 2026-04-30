@@ -16,6 +16,7 @@ use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID, TantivyIndex};
 use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::nodes::complete::NodeComplete;
+use std::sync::Arc;
 
 use skg::serve::ConnectionState;
 use skg::types::memory::OpenViews;
@@ -39,7 +40,7 @@ async fn setup_test(
   db_name: &str,
   config_path: &str,
 ) -> Result<(SkgConfig,
-             std::sync::Arc<TypeDBDriver>,
+             Arc<TypeDBDriver>,
              TantivyIndex),
             Box<dyn Error>> {
   let config: SkgConfig =
@@ -61,11 +62,11 @@ async fn setup_test(
   create_all_relationships(db_name, &driver, &typedb_nodes) . await?;
   let tantivy_index: TantivyIndex =
     create_empty_tantivy_index(&config . tantivy_folder)?;
-  Ok((config, std::sync::Arc::new (driver), tantivy_index)) }
+  Ok((config, Arc::new (driver), tantivy_index)) }
 
 async fn cleanup_test(
   db_name: &str,
-  driver: &std::sync::Arc<TypeDBDriver>,
+  driver: &Arc<TypeDBDriver>,
   tantivy_folder: &std::path::Path,
 ) -> Result<(), Box<dyn Error>> {
   if driver . databases() . contains (db_name) . await? {

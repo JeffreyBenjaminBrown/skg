@@ -2,6 +2,7 @@
 /// See fixtures/README.md for the test scenario.
 
 use super::common::*;
+use std::sync::Arc;
 
 /// Deleting a 'removed' node (deleted from disk) should be a no-op.
 /// The node respawns in the returned buffer.
@@ -182,7 +183,7 @@ fn run_save_test<F>(db_name: &str, test_fn: F) -> Result<(), Box<dyn Error>>
 where
   F: for<'a> FnOnce(
     &'a SkgConfig,
-    &'a std::sync::Arc<TypeDBDriver>,
+    &'a Arc<TypeDBDriver>,
     &'a mut TantivyIndex,
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>

@@ -1,0 +1,153 @@
+In the following, I may have gotten wrong
+the order of some special scaffold nodes relative to their siblings.
+I don't think that obscures my meaning;
+if it does, please call me out.
+* a note on language
+A node can be a subscribee but not viewed as such.
+In the following:
+```
+  * subscriber
+  ** (subscribeeCol)
+  *** subscribee
+```
+'subscribee' is shown *as* a subscribee --
+that is, as a truenode child of a subscribeeCol.
+But it might be reached by other means,
+e.g. as a view root:
+```
+  * subscribee
+```
+
+In this case it's still a subscribee,
+but it's not being viewed *as* a subscribee.
+* current situation
+Currently a user can conjure
+(provided the graph relations it depicts exist) like this:
+```
+  * (truenode) subscriber
+  ** (subscribeeCol)
+  *** (truenode) subscribee-1
+  **** (HiddenInSubscribeeCol)
+  ***** something-hidden-from-subscribee-1-by-subscriber
+  ***** ...
+  **** content-1b
+  **** content-1c
+  **** ...
+  *** (truenode) subscribee-2
+  *** ...
+  *** (hiddenOutsideOfSubscribeeCol)
+  **** senselessly-hidden-1
+  **** senselessly-hidden-2
+  **** ...
+```
+
+The user can add or delete subscribees (usually foreign nodes).
+There's no current way, however, to edit what the subscriber
+* proposal: deleting a subscriber's content hides that content
+The HiddenInSubscribeeCol Scaffold will continue to be read-only,
+and foreign subscribees (like all nodes)
+will continue to be read-only.
+However, the user will be able to
+delete things from the view of a subscribee
+(when it is shown *as* a subscribee),
+and such deletions will result in a hide relationship.
+
+** Examples
+In each of the following examples,
+suppose the user begins from a view of a subscriber containing one node,
+which subscribes to a subscribee that contains two more nodes:
+``` (the intial buffer)
+  * (truenode) subscriber
+  ** (subscribeeCol)
+  *** (truenode) subscribee-1
+  **** subscribee-contains-this-1
+  **** subscribee-contains-this-2
+  ** some ordinary content of the subscriber
+```
+*** example 1: simple deletion
+If the user deletes subscribee-contains-this-1 from the view --
+literally cutting the text from the buffer, saving this:
+``` (from emacs to server after edit 1)
+  * (truenode) subscriber
+  ** (subscribeeCol)
+  *** (truenode) subscribee-1
+  **** subscribee-contains-this-2
+  ** some ordinary content of the subscriber
+```
+
+then subscribee-contains-this-1 becomes hidden by subscriber:
+``` (from server to emacs after edit 1)
+  * (truenode) subscriber
+  ** (subscribeeCol)
+  *** (truenode) subscribee-1
+  **** (HiddenInSubscribeeCol)
+  ***** subscribee-contains-this-1
+  **** subscribee-contains-this-2
+  ** some ordinary content of the subscriber
+```
+*** example 2: "move" subscribee content to subscriber content
+Alternatively, the user could move it
+to become ordinary content of the subscriber:
+``` (from emacs to server after edit 2)
+  * (truenode) subscriber
+  ** (subscribeeCol)
+  *** (truenode) subscribee-1
+  **** subscribee-contains-this-2
+  ** subscribee-contains-this-1
+  ** some ordinary content of the subscriber
+```
+
+In that case it does not gain a hidden relationship,
+because hiding something one contains would be silly.
+(Or rather, I believe hiding one's own content
+is prevented at the data validation stage;
+please tell me if it's not.
+I also believe that the rendering rules will,
+in this example, no longer show subscribee-contains-this-1
+under the view of subscribee-1 as a subscription,
+because the subscriber's content is filtered
+from the content of its subscribees;
+again please tell me if that's wrong.)
+
+Therefore the server's response would look just like what emacs had sent it
+``` (from server to emacs after edit 2)
+  * (truenode) subscriber
+  ** (subscribeeCol)
+  *** (truenode) subscribee-1
+  **** subscribee-contains-this-2
+  ** subscribee-contains-this-1
+  ** some ordinary content of the subscriber
+```
+*** example 3: "move" subscribee content to some other owned node
+Yet another alternative is
+for the user to move the subscribee content
+to be content of some other (user-owned) node,
+distinct from the subscriber:
+``` (from server to emacs after edit 3)
+  * (truenode) subscriber
+  ** (subscribeeCol)
+  *** (truenode) subscribee-1
+  **** subscribee-contains-this-2
+  ** some ordinary content of the subscriber
+  * any other user-owned node
+  ** subscribee-contains-this-1
+```
+
+In the subscriber's recursive content, this third case is,
+by the server, treated just like the first.
+Again subscribee-contains-this-1 has been
+deleted from the as-a-subscribee view of subscribee-1,
+and it remains not contained by the subscriber,
+so the recursive view of 'subscriber' ends up the same as before:
+```
+  * (truenode) subscriber
+  ** (subscribeeCol)
+  *** (truenode) subscribee-1
+  **** subscribee-contains-this-1
+  **** subscribee-contains-this-2
+  ** some ordinary content of the subscriber
+  * any other user-owned node
+  ** subscribee-contains-this-1
+```
+** Still left open
+Users need to be able to unhide nodes.

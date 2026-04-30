@@ -15,6 +15,7 @@ pub mod escape;
 pub mod search;
 pub mod write;
 
+use crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT;
 use crate::types::misc::{ID, SourceName, TantivyIndex};
 
 use tantivy::{Index, Term, Searcher, TantivyDocument};
@@ -128,7 +129,7 @@ pub fn title_and_source_by_id (
   let doc_addresses : Vec<tantivy::DocAddress> =
     doc_addresses_for_id (
       tantivy_index, &searcher, id,
-      crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT ) ?;
+      TANTIVY_PER_ID_LOOKUP_LIMIT ) ?;
   let (doc, was_fallback) : (TantivyDocument, bool) =
     pick_title_doc ( tantivy_index, &searcher, id, &doc_addresses ) ?;
   if was_fallback {
@@ -158,7 +159,7 @@ pub fn titles_by_ids (
     let doc_addresses : Vec<tantivy::DocAddress> =
       match doc_addresses_for_id (
         tantivy_index, &searcher, id,
-        crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT )
+        TANTIVY_PER_ID_LOOKUP_LIMIT )
       { Some (a) => a,
         None     => continue };
     let (doc, was_fallback) : (TantivyDocument, bool) =

@@ -11,6 +11,7 @@ pub mod parse_metadata_sexp;
 pub mod protocol;
 pub mod util;
 
+use crate::consts::SHUTDOWN_DB_DELETE_DELAY_MS;
 use crate::dbs::typedb::util::delete_database;
 use crate::dbs::memory::InRustGraphHandle;
 use crate::env::SkgEnv;
@@ -313,7 +314,7 @@ fn cleanup_and_shutdown (env : &SkgEnv) {
     // This helps ensure the database isn't marked as "in use".
     std::thread::sleep (
       std::time::Duration::from_millis (
-        crate::consts::SHUTDOWN_DB_DELETE_DELAY_MS ) );
+        SHUTDOWN_DB_DELETE_DELAY_MS ) );
 
     futures::executor::block_on ( async {
       if let Err (e) =

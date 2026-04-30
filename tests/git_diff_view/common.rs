@@ -77,7 +77,7 @@ pub async fn setup_test_dbs(
   db_name: &str,
   source_path: &str,
   tantivy_folder: &str,
-) -> Result<(SkgConfig, std::sync::Arc<TypeDBDriver>, TantivyIndex), Box<dyn Error>> {
+) -> Result<(SkgConfig, Arc<TypeDBDriver>, TantivyIndex), Box<dyn Error>> {
   let config : SkgConfig = {
     let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new();
     sources . insert(SourceName::from ("main"), SkgfileSource {
@@ -116,12 +116,12 @@ pub async fn setup_test_dbs(
   create_all_relationships(db_name, &driver, &typedb_nodes) . await?;
 
   let tantivy_index = create_empty_tantivy_index(&config . tantivy_folder)?;
-  Ok((config, std::sync::Arc::new (driver), tantivy_index))
+  Ok((config, Arc::new (driver), tantivy_index))
 }
 
 pub async fn cleanup_test_dbs(
   db_name: &str,
-  driver: &std::sync::Arc<TypeDBDriver>,
+  driver: &Arc<TypeDBDriver>,
   tantivy_folder: Option<&Path>,
 ) -> Result<(), Box<dyn Error>> {
   let databases = driver . databases();

@@ -16,6 +16,7 @@
 use indoc::indoc;
 use std::error::Error;
 use std::net::TcpStream;
+use std::sync::Arc;
 
 use skg::to_org::render::content_view::single_root_view;
 use skg::test_utils::{run_with_test_db, graph_handle_from_config};
@@ -73,7 +74,7 @@ fn test_buffer_with_unknownnode_child_saves_cleanly
 
 async fn buffer_with_unknownnode_child_saves_cleanly_impl (
   config  : &SkgConfig,
-  driver  : &std::sync::Arc<TypeDBDriver>,
+  driver  : &Arc<TypeDBDriver>,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"

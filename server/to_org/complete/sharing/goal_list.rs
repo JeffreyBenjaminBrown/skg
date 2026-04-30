@@ -5,12 +5,14 @@
 /// that should appear as phantoms (present at HEAD but absent in the
 /// worktree). Outside diff view, the second element is empty.
 
+use crate::dbs::memory::snapshot_global;
 use crate::git_ops::read_repo::nodecomplete_from_git_head;
 use crate::types::git::{SourceDiff, NodeChanges, net_diff_from_per_stage, per_stage_node_changes_for_truenode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
+use crate::types::phantom::source_from_disk;
 
 use std::collections::{HashMap, HashSet};
 
@@ -203,8 +205,8 @@ fn snapshot_global_source (
   config : &SkgConfig,
 ) -> Option<SourceName> {
   if let Some (s) =
-    crate::dbs::memory::snapshot_global ()
+    snapshot_global ()
       . as_deref ()
       . and_then ( |g| g . pid_and_source (pid) . map ( |(_, s)| s ) )
   { return Some (s); }
-  crate::types::phantom::source_from_disk (pid, config) }
+  source_from_disk (pid, config) }

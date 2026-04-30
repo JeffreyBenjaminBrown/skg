@@ -1,6 +1,7 @@
 mod guard;
 pub use guard::TestDbGuard;
 
+use crate::consts::TYPEDB_ADDRESS;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
 use crate::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema, create_empty_tantivy_index};
@@ -9,8 +10,12 @@ use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
+use crate::env::SkgEnv;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, HeadlineInfo};
+use crate::serve::ConnectionState;
+use crate::serve::handlers::save_buffer::{SaveResponse, update_from_and_rerender_buffer};
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
+use crate::types::memory::ViewUri;
 use crate::types::misc::{MSV, SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName};
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::save::{DefineNode, SaveNode};
@@ -118,7 +123,7 @@ where
     let config: SkgConfig =
       load_config_with_overrides(config_path, Some (db_name), &[])?;
     let driver: TypeDBDriver = TypeDBDriver::new(
-        crate::consts::TYPEDB_ADDRESS,
+        TYPEDB_ADDRESS,
         Credentials::new("admin", "password"),
         DriverOptions::new(false, None)?,
       ). await?;
@@ -207,8 +212,8 @@ pub fn skg_env_from_parts (
   driver        : Arc<TypeDBDriver>,
   tantivy_index : &TantivyIndex,
   graph         : &InRustGraphHandle,
-) -> crate::env::SkgEnv {
-  crate::env::SkgEnv {
+) -> SkgEnv {
+  SkgEnv {
     config        : config . clone (),
     memory        : graph . clone (),
     tantivy_index : tantivy_index . clone (),
@@ -231,14 +236,14 @@ pub async fn update_from_and_rerender_buffer_test (
   config                      : &SkgConfig,
   tantivy_index               : &TantivyIndex,
   diff_mode_enabled           : bool,
-  viewuri_from_request_result : &Result<crate::types::memory::ViewUri, String>,
-  conn_state                  : &mut crate::serve::ConnectionState,
-) -> Result<crate::serve::handlers::save_buffer::SaveResponse, Box<dyn Error>> {
-  let mut env : crate::env::SkgEnv =
+  viewuri_from_request_result : &Result<ViewUri, String>,
+  conn_state                  : &mut ConnectionState,
+) -> Result<SaveResponse, Box<dyn Error>> {
+  let mut env : SkgEnv =
     skg_env_from_parts (
       config, Arc::clone (driver),
       tantivy_index, &conn_state . graph );
-  crate::serve::handlers::save_buffer::update_from_and_rerender_buffer (
+  update_from_and_rerender_buffer (
     stream,
     org_buffer_text,
     &mut env,
@@ -322,7 +327,7 @@ pub async fn setup_test_tantivy_and_typedb_dbs (
     SkgConfig::fromSourcesAndDbName (
       sources, db_name, tantivy_folder ) };
   let driver: TypeDBDriver = TypeDBDriver::new(
-    crate::consts::TYPEDB_ADDRESS,
+    TYPEDB_ADDRESS,
     Credentials::new("admin", "password"),
     DriverOptions::new(false, None)?
   ) . await ?;

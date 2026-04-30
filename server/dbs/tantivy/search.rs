@@ -4,6 +4,7 @@
 // (score, DocAddress) pairs plus the Searcher so callers can fetch
 // stored fields.
 
+use crate::consts::TANTIVY_SEARCH_LIMIT;
 use crate::dbs::tantivy::escape::{escape_tantivy_intra_word, escape_tantivy_literal};
 use crate::types::misc::TantivyIndex;
 
@@ -55,7 +56,7 @@ pub fn search_index (
     let best_matches : Vec < ( f32, tantivy::DocAddress ) > =
       searcher . search (
         &query, &TopDocs::with_limit (
-          crate::consts::TANTIVY_SEARCH_LIMIT )
+          TANTIVY_SEARCH_LIMIT )
           . order_by_score () )?;
     best_matches },
        searcher )) }

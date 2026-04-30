@@ -14,6 +14,7 @@ use crate::context::ContextOriginType;
 use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
 use crate::dbs::typedb::search::all_graphnodestats::{ AllGraphNodeStats, fetch_all_graphnodestats};
+use crate::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ConnectionState;
 use crate::serve::protocol::TcpToClient;
@@ -61,7 +62,7 @@ pub struct SearchEnrichmentPayload {
 pub fn handle_text_search_request (
   stream           : &mut TcpStream,
   request          : &str,
-  env              : &crate::env::SkgEnv,
+  env              : &SkgEnv,
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
   conn_state       : &mut ConnectionState,

@@ -6,6 +6,7 @@
 // visible and clearly motivates the "compute origin types before
 // indexing" TODO in the schema doc-comment.
 
+use crate::consts::{TANTIVY_PER_ID_LOOKUP_LIMIT, TANTIVY_WRITER_BUFFER_BYTES};
 use crate::dbs::tantivy::write::commit_with_status;
 use crate::types::misc::{ID, SourceName, TantivyIndex};
 
@@ -27,7 +28,7 @@ pub fn update_context_origin_types (
     tantivy_index . reader . searcher ();
   let mut writer : IndexWriter =
     tantivy_index . index . writer (
-      crate::consts::TANTIVY_WRITER_BUFFER_BYTES) ?;
+      TANTIVY_WRITER_BUFFER_BYTES) ?;
   let mut updated_count : usize = 0;
   for (pid, context_type) in context_types_by_id {
     let query : Box < dyn Query > =
@@ -39,7 +40,7 @@ pub fn update_context_origin_types (
     let results : Vec < (f32, tantivy::DocAddress) > =
       searcher . search (
         &query, &TopDocs::with_limit (
-          crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT )
+          TANTIVY_PER_ID_LOOKUP_LIMIT )
           . order_by_score () ) ?;
     if results . is_empty () { continue; }
     writer . delete_term ( // Delete all documents for this ID.

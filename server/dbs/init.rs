@@ -5,7 +5,7 @@ use crate::context::{content_maps_from_nodes, had_id_set_from_nodes};
 use crate::context::link_targets_from_nodes;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::multiple_nodes::read_recently_modified_skgfiles_from_sources;
-use crate::dbs::tantivy::open_existing_tantivy_index;
+use crate::dbs::tantivy::{mk_tantivy_schema, open_existing_tantivy_index};
 use crate::dbs::tantivy::write::update_index_with_nodes;
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
@@ -184,7 +184,7 @@ fn incremental_init_of_dbs (
     tracing::info! (created, elapsed_s = ?t0 . elapsed(),
               "New nodes created");
     let t1 : Instant = Instant::now();
-    let pids : Vec<crate::types::misc::ID> =
+    let pids : Vec<ID> =
       nodes . iter()
       . map ( |n| n . pid . clone() )
       . collect();
@@ -356,7 +356,7 @@ pub fn create_empty_tantivy_index (
     std::fs::remove_dir_all (index_path) ?; }
   std::fs::create_dir_all (index_path)?;
   let schema : schema::Schema =
-    crate::dbs::tantivy::mk_tantivy_schema();
+    mk_tantivy_schema();
   let id_field: schema::Field =
     schema . get_field ("id") ?;
   let title_or_alias_field: schema::Field =

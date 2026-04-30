@@ -25,6 +25,7 @@
 use indoc::indoc;
 use std::error::Error;
 use std::net::TcpStream;
+use std::sync::Arc;
 
 use skg::test_utils::{run_with_test_db, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
@@ -48,7 +49,7 @@ fn test_indef_should_not_count_as_donotdelete
 
 async fn indef_should_not_count_as_donotdelete_impl (
   config  : &SkgConfig,
-  driver: &std::sync::Arc<TypeDBDriver>,
+  driver: &Arc<TypeDBDriver>,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"

@@ -1,3 +1,4 @@
+use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
 use crate::dbs::filesystem::multiple_nodes::{
   check_for_duplicate_ids_across_sources,
   delete_all_nodes_from_fs,
@@ -444,7 +445,7 @@ pub(super) fn update_tantivy_from_saveinstructions (
 
   let mut writer: IndexWriter =
     tantivy_index . index . writer (
-      crate::consts::TANTIVY_WRITER_BUFFER_BYTES)?;
+      TANTIVY_WRITER_BUFFER_BYTES)?;
   delete_nodes_by_id_from_index(
     // Delete all IDs, be they from Saves or Deletes.
     // (The entry for each Save is then recreated.)
