@@ -6,6 +6,7 @@
 /// Subcommand: import-org-roam <org-dir> <skg-output-dir> <source-name>
 /// Converts org-roam .org files to .skg files.
 
+use skg::consts::{BUSYSIGNAL_POLL_INTERVAL_MS, BUSYSIGNAL_READ_TIMEOUT_MS};
 use skg::context::{compute_and_store_context_types, MapToContent, MapToContainers};
 use skg::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
@@ -14,7 +15,7 @@ use skg::dbs::memory::init_global_handle_for_first_time_or_panic;
 use skg::dbs::memory::scheduled_audit::schedule_daemon;
 use skg::dbs::typedb::util::{connect_to_typedb, delete_database};
 use skg::types::env::SkgEnv;
-use skg::import_org_roam::import_org_roam_directory;
+use skg::import_org_roam::{ImportStats, import_org_roam_directory};
 use skg::serve::serve;
 use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use skg::types::nodes::complete::NodeComplete;
@@ -145,7 +146,7 @@ fn busysignal_accept_loop (
         // if init finishes while we're mid-read.
         stream . set_read_timeout (
           Some (std::time::Duration::from_millis (
-            skg::consts::BUSYSIGNAL_READ_TIMEOUT_MS )) )
+            BUSYSIGNAL_READ_TIMEOUT_MS )) )
           . ok ();
         let mut reader: BufReader<std::net::TcpStream> =
           BufReader::new (
@@ -165,7 +166,7 @@ fn busysignal_accept_loop (
            == std::io::ErrorKind::WouldBlock => {
           std::thread::sleep (
             std::time::Duration::from_millis (
-              skg::consts::BUSYSIGNAL_POLL_INTERVAL_MS ) ); }
+              BUSYSIGNAL_POLL_INTERVAL_MS ) ); }
       Err (e) => {
         tracing::warn! ("Busysignal accept error: {}", e); } } } }
 
@@ -253,7 +254,7 @@ fn run_import (
   let org_dir    : &Path       = Path::new (&args[2]);
   let output_dir : &Path       = Path::new (&args[3]);
   let source     : SourceName  = SourceName::from (&args[4]);
-  let stats : skg::import_org_roam::ImportStats =
+  let stats : ImportStats =
     import_org_roam_directory (org_dir, output_dir, &source)?;
   tracing::info! ("{}", stats);
   for err in &stats . errors {

@@ -17,8 +17,8 @@ fn test_delete_id_col_scaffold_respawns()
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "skg id");
 
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -58,8 +58,8 @@ fn test_delete_id_scaffolds_respawns()
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "(skg id)");
 
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -93,8 +93,8 @@ fn test_edit_id_scaffold_respawns()
       let input = GIT_DIFF_VIEW . replace(
         "(unstaged newM)) 2'", "(unstaged newM)) 2-modified");
 
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -137,8 +137,8 @@ fn test_move_id_scaffolds_to_child_respawns()
 **** (skg id) 3
 ";
 
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -182,8 +182,8 @@ fn test_delete_id_col_scaffold_respawns_staged()
       let input = without_lines_containing(
         GIT_DIFF_VIEW_STAGED, "skg id");
 
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};

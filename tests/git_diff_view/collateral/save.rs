@@ -45,8 +45,8 @@ fn test_collateral_view_preserves_diff_annotations()
       // 2. Build a ViewsState with diff_mode_enabled.
       // (Fixture nodes are on disk via setup_git_repo_with_fixtures;
       // the rerender pipeline reads them as needed.)
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -161,8 +161,8 @@ fn test_collateral_view_staged_text_and_unstaged_add()
       // Sanity: initial view has textChanged attributed to staged.
       assert_buffer_contains(&initial_buffer, GIT_DIFF_VIEW_STAGED);
 
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};

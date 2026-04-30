@@ -20,6 +20,7 @@ use std::sync::Arc;
 
 use skg::serve::ViewsState;
 use skg::types::memory::OpenViews;
+use skg::dbs::memory::{InRustGraph, InRustGraphHandle, new_handle};
 
 use futures::executor::block_on;
 use std::error::Error;
@@ -147,8 +148,8 @@ fn test_every_kind_of_col(
       let modified_view : String =
         add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}", modified_view);
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views            : OpenViews::new (),};
@@ -224,8 +225,8 @@ fn test_hidden_within_but_none_without(
       let modified_view : String =
         add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}", modified_view);
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views            : OpenViews::new (),};
@@ -302,8 +303,8 @@ fn test_hidden_without_but_none_within(
       let modified_view : String =
         add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}", modified_view);
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views            : OpenViews::new (),};
@@ -376,8 +377,8 @@ fn test_overlapping_hidden_within(
         add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}",
                modified_view);
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views            : OpenViews::new (),};

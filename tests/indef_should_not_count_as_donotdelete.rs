@@ -32,6 +32,7 @@ use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rer
 use skg::serve::ViewsState;
 use skg::types::memory::OpenViews;
 use skg::types::misc::{SkgConfig, TantivyIndex};
+use skg::dbs::memory::{InRustGraph, InRustGraphHandle, new_handle};
 use typedb_driver::TypeDBDriver;
 
 #[test]
@@ -57,8 +58,8 @@ async fn indef_should_not_count_as_donotdelete_impl (
     ** (skg (node (id via) (source main))) via
     *** (skg (node (id victim) (source main) indef)) victim
   "};
-  let graph : skg::dbs::memory::InRustGraphHandle =
-    skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+  let graph : InRustGraphHandle =
+    new_handle (InRustGraph::new ());
   let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views            : OpenViews::new (),

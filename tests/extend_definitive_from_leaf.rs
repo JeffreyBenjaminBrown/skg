@@ -8,11 +8,11 @@ use indoc::indoc;
 use std::error::Error;
 use std::net::TcpStream;
 
+use skg::dbs::memory::{InRustGraph, InRustGraphHandle, new_handle};
 use skg::test_utils::run_with_test_db;
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::memory::OpenViews;
-
 
 
 fn mk_test_tcp_stream ()
@@ -46,8 +46,8 @@ fn test_definitive_view_limit_10
       let result = {
         let mut config = config . clone();
         config . initial_node_limit = 10;
-        let graph : skg::dbs::memory::InRustGraphHandle =
-          skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+        let graph : InRustGraphHandle =
+          new_handle (InRustGraph::new ());
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
@@ -116,8 +116,8 @@ fn test_definitive_view_limit_5_or_6
       let result_5 = {
         let mut config5 = config . clone();
         config5 . initial_node_limit = 5;
-        let graph : skg::dbs::memory::InRustGraphHandle =
-          skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+        let graph : InRustGraphHandle =
+          new_handle (InRustGraph::new ());
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
@@ -131,8 +131,8 @@ fn test_definitive_view_limit_5_or_6
       let result_6 = {
         let mut config6 = config . clone();
         config6 . initial_node_limit = 6;
-        let graph : skg::dbs::memory::InRustGraphHandle =
-          skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+        let graph : InRustGraphHandle =
+          new_handle (InRustGraph::new ());
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
@@ -204,8 +204,8 @@ fn test_definitive_view_limit_1_to_4
       let result_1 = {
         let mut config1 = config . clone();
         config1 . initial_node_limit = 1;
-        let graph : skg::dbs::memory::InRustGraphHandle =
-          skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+        let graph : InRustGraphHandle =
+          new_handle (InRustGraph::new ());
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
@@ -218,8 +218,8 @@ fn test_definitive_view_limit_1_to_4
       let result_4 = {
         let mut config4 = config . clone();
         config4 . initial_node_limit = 4;
-        let graph : skg::dbs::memory::InRustGraphHandle =
-          skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+        let graph : InRustGraphHandle =
+          new_handle (InRustGraph::new ());
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
@@ -285,8 +285,8 @@ fn test_definitive_view_conflicting
       let result = {
         let mut config = config . clone();
         config . initial_node_limit = 100;
-        let graph : skg::dbs::memory::InRustGraphHandle =
-          skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+        let graph : InRustGraphHandle =
+          new_handle (InRustGraph::new ());
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
@@ -341,8 +341,8 @@ fn test_definitive_view_with_cycle
       let result = {
         let mut config = config . clone();
         config . initial_node_limit = 100;
-        let graph : skg::dbs::memory::InRustGraphHandle =
-          skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+        let graph : InRustGraphHandle =
+          new_handle (InRustGraph::new ());
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
@@ -391,8 +391,8 @@ fn test_definitive_view_with_repeat
       let result = {
         let mut config = config . clone();
         config . initial_node_limit = 100;
-        let graph : skg::dbs::memory::InRustGraphHandle =
-          skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+        let graph : InRustGraphHandle =
+          new_handle (InRustGraph::new ());
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
@@ -448,8 +448,8 @@ fn test_definitive_view_request_cleared
       let result = {
         let mut config = config . clone();
         config . initial_node_limit = 100;
-        let graph : skg::dbs::memory::InRustGraphHandle =
-          skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+        let graph : InRustGraphHandle =
+          new_handle (InRustGraph::new ());
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};

@@ -27,8 +27,8 @@ fn test_newhere_cycle_survives_save()
       multi_root_view(&driver, &config, None, &root_ids, true) . await?;
 
     // Round-trip through the save pipeline.
-    let graph : skg::dbs::memory::InRustGraphHandle =
-      skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+    let graph : InRustGraphHandle =
+      new_handle (InRustGraph::new ());
     let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};

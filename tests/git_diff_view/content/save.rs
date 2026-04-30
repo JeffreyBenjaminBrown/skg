@@ -16,8 +16,8 @@ fn test_delete_removed_node_respawns()
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "gets-removed");
 
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -57,8 +57,8 @@ fn test_delete_removed_here_node_respawns()
       let input =
         without_lines_containing(GIT_DIFF_VIEW, "(unstaged removedM)");
 
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -96,8 +96,8 @@ fn test_delete_new_here_updates_disk()
       // The "moves under 11" line is the new-here phantom (membership added).
       let input = without_lines_containing(GIT_DIFF_VIEW, "(unstaged newM)");
 
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -141,8 +141,8 @@ fn test_add_new_child_creates_on_disk()
         GIT_DIFF_VIEW, "(id 12)",
         "*** (skg (node (id newer))) newer");
 
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};

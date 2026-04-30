@@ -17,8 +17,8 @@ fn test_delete_text_changed_scaffold_respawns()
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "textChanged");
 
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -55,8 +55,8 @@ fn test_edit_text_changed_node_updates_disk()
       let input = GIT_DIFF_VIEW . replace(
         "1 has a new title.", "1 has an even newer title.");
 
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -94,8 +94,8 @@ fn test_edit_text_changed_scaffold_respawns()
         "** (skg (textChanged unstaged))",
         "** (skg (textChanged unstaged)) User edited this scaffold.");
 
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -135,8 +135,8 @@ fn test_move_text_changed_scaffold_respawns()
 ** (skg (textChanged unstaged))
 ";
 
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
@@ -171,8 +171,8 @@ fn test_move_text_changed_to_unedited_node_respawns()
       let input = insert_after(&input, "(id 12)",
         "*** (skg (textChanged unstaged))");
 
-      let graph : skg::dbs::memory::InRustGraphHandle =
-        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};

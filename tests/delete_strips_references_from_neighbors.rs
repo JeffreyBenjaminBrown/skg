@@ -26,14 +26,19 @@ use std::net::TcpStream;
 use std::path::Path;
 use std::sync::Arc;
 
-use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_source;
+use skg::dbs::filesystem::one_node::{
+  nodecomplete_from_pid_and_source,
+  nodecomplete_from_pid_and_source as load_nc};
 use skg::dbs::memory::InRustGraphHandle;
+use skg::save::update_graph_minus_merges;
 use skg::test_utils::{run_with_test_db, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::memory::OpenViews;
-
 use skg::types::misc::{ID, SkgConfig, TantivyIndex, SourceName};
+use skg::types::nodes::complete::NodeComplete;
+use skg::types::save::{DefineNode, SaveNode, DeleteNode};
+use skg::util::path_from_pid_and_source;
 
 use typedb_driver::TypeDBDriver;
 
@@ -79,14 +84,14 @@ async fn delete_strips_references_impl (
 
   // 1. victim.skg deleted.
   let victim_path : String =
-    skg::util::path_from_pid_and_source (
+    path_from_pid_and_source (
       config, &main, ID::from ("victim") ) ?;
   if Path::new (&victim_path) . exists () {
     failures . push (
       "victim.skg should have been deleted" . to_string ()); }
 
   // 2. container.skg's contains has only sibling now.
-  let container : skg::types::nodes::complete::NodeComplete =
+  let container : NodeComplete =
     nodecomplete_from_pid_and_source (
       config, ID::from ("container"), &main ) ?;
   if container . contains . contains (&ID::from ("victim")) {
@@ -99,7 +104,7 @@ async fn delete_strips_references_impl (
       container . contains )); }
 
   // 3. subscriber.skg's subscribes_to has only sibling.
-  let subscriber : skg::types::nodes::complete::NodeComplete =
+  let subscriber : NodeComplete =
     nodecomplete_from_pid_and_source (
       config, ID::from ("subscriber"), &main ) ?;
   let sub_vec : Vec<ID> =
@@ -114,7 +119,7 @@ async fn delete_strips_references_impl (
       sub_vec )); }
 
   // 4. sibling.skg unchanged.
-  let sibling : skg::types::nodes::complete::NodeComplete =
+  let sibling : NodeComplete =
     nodecomplete_from_pid_and_source (
       config, ID::from ("sibling"), &main ) ?;
   if sibling . title != "sibling" {
@@ -158,14 +163,11 @@ async fn strip_pass_amends_user_supplied_savenode_impl (
   driver: &Arc<TypeDBDriver>,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_source as load_nc;
-  use skg::save::update_graph_minus_merges;
-  use skg::types::save::{DefineNode, SaveNode, DeleteNode};
   let main : SourceName = SourceName::from ("main");
   // Build the SaveNode for container by reading the on-disk node
   // verbatim -- contents are still [victim] -- and pair with a
   // DeleteNode for victim.
-  let container_nc : skg::types::nodes::complete::NodeComplete =
+  let container_nc : NodeComplete =
     load_nc ( config, ID::from ("container"), &main ) ?;
   assert! ( container_nc . contains . contains (&ID::from ("victim")),
             "fixture precondition: container should reference victim" );
@@ -179,13 +181,13 @@ async fn strip_pass_amends_user_supplied_savenode_impl (
   update_graph_minus_merges (
     node_defs, &[], config . clone (), tantivy, driver, &graph
   ) . await ?;
-  let container : skg::types::nodes::complete::NodeComplete =
+  let container : NodeComplete =
     load_nc ( config, ID::from ("container"), &main ) ?;
   if container . contains . contains (&ID::from ("victim")) {
     panic! ("container.contains still has victim after strip pass: {:?}",
             container . contains ); }
   let victim_path : String =
-    skg::util::path_from_pid_and_source (
+    path_from_pid_and_source (
       config, &main, ID::from ("victim") ) ?;
   if Path::new (&victim_path) . exists () {
     panic! ("victim.skg should have been deleted"); }
@@ -240,7 +242,7 @@ async fn strip_pass_handles_extra_ids_impl (
     input_org_text, driver, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state ) . await ?;
   let main : SourceName = SourceName::from ("main");
-  let referencer : skg::types::nodes::complete::NodeComplete =
+  let referencer : NodeComplete =
     nodecomplete_from_pid_and_source (
       config, ID::from ("referencer"), &main ) ?;
   if referencer . contains . contains (&ID::from ("aliased_alt")) {
@@ -250,7 +252,7 @@ async fn strip_pass_handles_extra_ids_impl (
   if referencer . contains . contains (&ID::from ("aliased")) {
     panic! ("referencer.contains has aliased (primary pid of deleted node)"); }
   let aliased_path : String =
-    skg::util::path_from_pid_and_source (
+    path_from_pid_and_source (
       config, &main, ID::from ("aliased") ) ?;
   if Path::new (&aliased_path) . exists () {
     panic! ("aliased.skg should have been deleted"); }

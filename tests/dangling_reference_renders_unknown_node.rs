@@ -24,6 +24,7 @@ use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::memory::OpenViews;
+use skg::dbs::memory::{InRustGraph, InRustGraphHandle, new_handle};
 use typedb_driver::TypeDBDriver;
 
 #[test]
@@ -80,8 +81,8 @@ async fn buffer_with_unknownnode_child_saves_cleanly_impl (
     * (skg (node (id parent) (source main))) parent
     ** (skg (unknownNode (id ghost)))
   "};
-  let graph : skg::dbs::memory::InRustGraphHandle =
-    skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+  let graph : InRustGraphHandle =
+    new_handle (InRustGraph::new ());
   let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views            : OpenViews::new (),
