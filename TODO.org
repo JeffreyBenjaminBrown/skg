@@ -1,12 +1,126 @@
-* ONGOING expose lying function names
-* AWAITS "expose lying function names" : reading the code
+* TODO I want this todo list in Skg.
+Git review after reshaping it is hell.
+* references
+** how to import from org-roam
+*** automatically
+./bash/import-org-roam.sh public-copy/ data/public/ public
+*** manually
+**** remove the .skg files and .git
+**** cargo run --bin skg -- import-org-roam public/ data/public/ public
+**** git init & initial commit
+initial import from org-roam
+**** restart the server
+so it has time to ingest the data
+** DONE ? not using lately
+*** [[./next.org]] might be in progress
+*** For minimalism, remember [[id:b6747d36-711b-42e7-aa80-b9b2be53fe6c][my Skg priorities]].
+*** commit history
+top is latest
+**** UNREVIEWED : the Rust-v-Typedb audit code
+ad9b84c8ad476b93b911c0513107ab70df15c449..34b23094fc839224dc6accdbffcd4adf58eebc51
+**** 'many-and-better-node-types' : some terminus commits
+***** plan began
+d4dd2e850b449aa4ff92820f9dd66aad48cd6b0b
+***** plan part A complete
+656d66e7ea52a070ec23e26e7cc54b10364ae6a8
+***** plan ended
+f6664360241ec9de0c89a0934445eeb37d147a87
+**** TODO review commit 7dacceadcee6ea260ae19625bc8e7da1c77986d1
+which was to fix test db accumulation
+* merge & export these notes
+** DONE "TODO" items in this repo
+** [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skg]]
+** [[id:627da2c2-2f34-46ac-a6d3-9c625c4ff31d][AI]]
+** [[id:001d7913-c431-461c-92ae-a6a39394856c][processing]]
+* food for thought
+** ? I wanted the 'helps' relation.
+And 'needs', surely.
+** Where to use overlapping containment?
+** maybe : how to use AI
+*** Maybe ask for criticism *before*
+before asking to be asked for missing details.
+** DONE ?
+*** Have Claude report bugs.
+*** an important constraint on any graph serialization format
+Deleting a node file should make sense.
+*** Report bugs about Claude.
+**** whitespace for distinct org domains: illegible
+It doesn't understand nested one org passage quoted in another org document,
+if the quotation is represented as leading whitespace.
+*** if needed, convert to haskell
+  If it becomes a mess, Haskell is easier to refactor.
+  Rust could sit between TypeDB and Haskell.
+* maybe good but not sure why
+** There could only be one definitive view across all buffers.
+*** why
+When going from magit-view to a modified node,
+it's very nice if that one jump goes directly to
+the one big context where it and its brothers were made.
+*** how
+See TODO/one-definitive-view/
+* goals, by highest aim
+** TODO know how it works
+*** How are source changes heralded in backward views?
+Hopefully one only ever has to read org-rootward.
+** TODO how|what to dogfood
+*** spots to patrol
+**** move something to a different repo
+**** multi-contain
+**** commit to git
+**** merge
+**** delete
+**** DONE visit things
+**** DONE request view changes
+**** interactive: try diff view on aliases, IDs
+*** It is valid to dogfood even as only reading.
+*** internalized
+**** Dogfood and develop in separate places on disk.
+That way I can keep investigating the latest usable commit
+while a new one is being developed.
+*** why to do a complete patrol
+  If a neighborhood of implemented feature space
+  is left unused|unexplored,
+  that neighborhood becomes more likely to
+  become ensnared in structural chamges
+  that would have been thought better of in the neighborhood's light.
+** TODO easily worth it now
+*** dired should offer skg-goto shortcuts
+** TODO legibility to user
+*** independent of parent /= contained in nothing
+so decouple these two heralds
+*** parentContains (deleted) does seem like valid graph data
+**** Neither seems critical.
+**** History
+It was part of the graphnodestats, until just after commit
+2e02c90013f17459f8251f32d1564b69ca36bda2
+**** debate
+and interesting enough to be heralded,
+and reasonably separate from 'birth'
+(although birth might imply it sometimes).
+But maybe 'anAncestorContains' would be more useful.
+** TODO legibility to coder
+*** ONGOING fix lying function names
+see lying-names.org
+*** ONGOING read the code
 Using
 command-tree-to-read-from.org
-* food for thought
-** ? I want the 'helps' relation.
-And 'needs', surely.
-* make git faster
-** TODO commit eval
+*** "incremental init" might be garbage
+see TODO/what-affects-dbs.org
+but that was before some tremendous improvements in performance
+on <2026-04-22 Wed> and before and maybe after
+*** eliminate some 'tracing' commands
+  Anything that's blazing fast can be safely removed.
+** speed
+*** in reading ancestries
+**** ? "any rel" ought to be what a single backward view shows
+link sources, containers, subscribers
+(but not overriders or hiders -- those should be more obscure)
+*** in making links
+If there is exactly one node in the search results
+that exactly matches each (possibly regex)
+term in the search query, go straight there.
+*** in git
+**** TODO commit eval
 Can ask for it for staged, unstaged or all changes.
 
 If a node is new, it's fine as long as it's valid.
@@ -27,20 +141,23 @@ A new content is fine if _.
 Changes to text are reported.
 
 To test, compute this two ways: From disk and from dbs.
-** TODO be able to visit ghost nodes
-** view all changes in one buffer
-* small, technical
-** Goto could (also?) be C-C RET.
-* TODO make it comfortable
-** TODO Privacy: Permit user to hide certain sources from view.
-*** Figure out the diff logic for insertions when some are hidden.
+**** TODO be able to visit ghost nodes
+**** view all changes in one buffer
+**** theoretically faster : auto-stage some nodes for code
+***** not sure much of the user experience is here
+***** the idea
+****** or mark in a way that identifies node as probably stageable
+If a new or deleted node, it (is still in the graph and) has a parent.
+*** shortcuts
+**** Goto could (also?) be C-C RET.
+** privacy
+*** TODO Privacy: Permit user to hide certain sources from view.
+**** Figure out the diff logic for insertions when some are hidden.
 I think I see how: Just pin each thing to its last visible sibling.
-** importing org-roam should be possible while server is running
+** convenience | comfort
+*** importing org-roam should be possible while server is running
 and automatically update the other dbs (not just disk as now)
-** ? "any rel" ought to be what a single backward view shows
-  link sources, containers, subscribers
-    (but not overriders or hiders -- those should be more obscure)
-** AWAITS saving while narrowed
+*** saving from a narrowed buffer
 When the buffer is narrowed, if the user saves, skg should walk backward from the first character until it finds the start of a headline. It's likely the first character *is* the start of a headline, but maybe not -- the user might be lookoing, e.g., at a proper subset of a body.
 
 Similarly, on the other side, skg should search forward until it finds the first character of a new headline (or the end of the buffer), and truncate right before that character (or including it, if it's the end of the buffer). Again it's likely that the very next character is the start of a new headline, but not neecessarily.
@@ -48,157 +165,10 @@ Similarly, on the other side, skg should search forward until it finds the first
 Then skg can just restore the narrowed window so that it starts and ends at those two points. This way, even if things change outside the context, it will know exactly where to start and end.
 
 This isn't perfect, because there might be multiple headlines with the same IDs. If there are, screw it, skg should just report that duplicative IDs are interfering with its ability to save while narrowed, and let the user worry about it.
-** save should work even when view is narrowed
-** having to start and stop the server is annoying
-** bug ? forward-sexp chokes on {
-skg-find-sexp-end (line 62 in this same file) counts only () and works fine.
-So Skg developers have to know to use Skg-specific sexp navigation.
-But maybe that's appropriate?
-** some skg-request-* functions save, others don't
-** ? trying to delete an indef node should warn, not err
+*** having to start and stop the server is annoying
+*** some skg-request-* functions save, others don't
+*** ? trying to delete an indef node should warn, not err
 That is, the save should still succeed.
-* TODO really want but can wait
-** importing org-roam should be possible while server is running
-and automatically update the other dbs (not just disk as now)
-** ? "any rel" ought to be what a single backward view shows
-link sources, containers, subscribers
-(but not overriders or hiders -- those should be more obscure)
-* TODO merge & export these notes
-** DONE "TODO" items in this repo
-** [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skg]]
-** [[id:627da2c2-2f34-46ac-a6d3-9c625c4ff31d][AI]]
-** [[id:001d7913-c431-461c-92ae-a6a39394856c][processing]]
-* coollected while dogfooding, unassimilated
-** interactive: try diff view on aliases, IDs
-* maybe : how to use AI
-Ask for criticism *before*
-asking to be asked for missing details.
-* commit history
-** UNREVIEWED : the Rust-v-Typedb audit code
-ad9b84c8ad476b93b911c0513107ab70df15c449..34b23094fc839224dc6accdbffcd4adf58eebc51
-** 'many-and-better-node-types' : some terminus commits
-*** plan began
-d4dd2e850b449aa4ff92820f9dd66aad48cd6b0b
-*** plan part A complete
-656d66e7ea52a070ec23e26e7cc54b10364ae6a8
-*** plan ended
-f6664360241ec9de0c89a0934445eeb37d147a87
-* considering
-** There should only be one definitive view across all buffers.
-*** why
-When going from magit-view to a modified node,
-it's very nice if that one jump goes directly to
-the one big context where it and its brothers were made.
-*** how
-See TODO/one-definitive-view/
-* bug ?? M-S <right> to indent subtree
-** worked but gave this warning
-⛔ Warning (org-element): org-element--cache: Unregistered buffer modifications detected (39030 != 36493). Resetting.
-If this warning appears regularly, please report the warning text to Org mode mailing list (M-x org-submit-bug-report).
-The buffer is: *using written knowledge*
- Current command: org-shiftmetaright
- Backtrace:
-"  backtrace-to-string(nil)
-  org-element--cache-sync(#<buffer *using written knowledge*> 1723)
-  org-element-at-point()
-  org-end-of-subtree(t)
-  org-demote-subtree()
-  funcall-interactively(org-demote-subtree)
-  org-shiftmetaright()
-  funcall-interactively(org-shiftmetaright)
-  command-execute(org-shiftmetaright)
-"
-* ongoing Claude instances
-** a TypeDB expert
-claude --resume 29b4f070-12d2-4211-85da-a7f28929e08b
-* semi-permanent
-** [[./next.org]] might be in progress
-** For minimalism, remember [[id:b6747d36-711b-42e7-aa80-b9b2be53fe6c][my Skg priorities]].
-** how to import from org-roam
-*** automatically
-./bash/import-org-roam.sh public-copy/ data/public/ public
-*** manually
-**** remove the .skg files and .git
-**** cargo run --bin skg -- import-org-roam public/ data/public/ public
-**** git init & initial commit
-initial import from org-roam
-**** restart the server
-so it has time to ingest the data
-** when dogfooding
-*** spots to patrol
-**** make edits
-***** move something to a different repo
-***** write
-***** move
-***** multi-contain
-**** commit to git
-**** ? read git history
-**** merge
-**** delete
-**** DONE visit things
-**** DONE request view changes
-*** It is valid to dogfood even as only reading.
-* an important constraint on any graph serialization format
-Deleting a node file should make sense.
-* incremental init seemed like garbage
-see TODO/what-affects-dbs.org
-but that was before some tremendous improvements in performance
-on <2026-04-22 Wed> and before and maybe after
-* TODO ?
-** Links to links are currently annoying. Are they important?
-** ignorable ? parentContains does seem like valid graph data
-*** Neither seems critical.
-*** History
-It was part of the graphnodestats, until just after commit
-2e02c90013f17459f8251f32d1564b69ca36bda2
-*** debate
-and interesting enough to be heralded,
-and reasonably separate from 'birth'
-(although birth might imply it sometimes).
-But maybe 'anAncestorContains' would be more useful.
-** theoretically faster : auto-stage some nodes for code
-*** not sure much of the user experience is here
-*** the idea
-**** or mark in a way that identifies node as probably stageable
-If a new or deleted node, it (is still in the graph and) has a parent.
-* TODO cleaner code
-** avoid redundant enum checks
-There are, I suspect, a lot of functions doing redundant checks for enums.
-An example is 'has_empty_title': It can only be called from a truenode,
-yet it still checks whether its input is a truenode.
-* DONE ? bugs that vanished but were never addressed
-** bug : losing a headline on source change
-*** the problem
-Bring up a view.
-Edit its metadata to change source.
-Save the buffer.
-Problem: The first headline disappears. The buffer also gets mangled in ways that are hard to describe because of invisible text.
-*** TODO Try to reproduce this with some new test code.
-The new test code can run on the data in data/public/, if that's convenient.
-** bug : lose top headline on source change
-Bring up a view.
-Edit its metadata to change source.
-Save the buffer.
-Problem: The first headline disappears.
-* TODO review commit 7dacceadcee6ea260ae19625bc8e7da1c77986d1
-which was to fix test db accumulation
-* Have Claude report bugs.
-* Report bugs about Claude.
-** whitespace for distinct org domains: illegible
-It doesn't understand nested one org passage quoted in another org document,
-if the quotation is represented as leading whitespace.
-* Dogfood and develop in separate places on disk.
-That way I can keep investigating the latest usable commit
-while a new one is being developed.
-* eliminate some 'tracing' commands
-  Anything that's blazing fast can be safely removed.
-* if needed, convert to haskell
-  If it becomes a mess, Haskell is easier to refactor.
-  Rust could sit between TypeDB and Haskell.
-* why to do a complete patrol when dogfooding
-  If a neighborhood of implemented feature space is left unused|unexplored,
-  it becomes more likely to embark on structural chamges
-  that would have been thought better of in the neighborhood's light.
 * move data to another source
 * TODO get containerward view within link sourceward view
   for every link that is not a root
