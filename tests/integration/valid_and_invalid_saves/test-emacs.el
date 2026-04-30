@@ -83,7 +83,7 @@
   (with-current-buffer "*skg-content-view*"
     (goto-char (point-min))
     (search-forward "** (skg (node (id 1))) 1")
-    (replace-match "** (skg (node (id 1) indefinitive)) 1")
+    (replace-match "** (skg (node (id 1) indef)) 1")
     (message "✓ Amended previously invalid content to use indefinitive, so it is now valid"))
 
   ;; Switch to buffer to make it current

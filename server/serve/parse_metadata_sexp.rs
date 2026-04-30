@@ -355,11 +355,9 @@ fn parse_node_sexp (
         let bare_value : String =
           atom_to_string (element) ?;
         match bare_value . as_str () {
-          // "indef" is the abbreviated form now emitted by the
-          // server (see org_to_text.rs). "indefinitive" is
-          // accepted for backward compatibility with hand-written
-          // buffers and older fixtures.
-          "indef" | "indefinitive" =>
+          // "indef" is short for "indefinitive". The server emits
+          // and accepts only the abbreviated form (see org_to_text.rs).
+          "indef" =>
             metadata . indefinitive = true,
           "notInGit" =>
             metadata . truenode_not_in_git = true,

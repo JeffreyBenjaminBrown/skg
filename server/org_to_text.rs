@@ -251,10 +251,8 @@ fn true_node_metadata_to_string (
         parts . push ( "(birth linksTo)" . to_string () ) }
     if true_node . is_indefinitive () {
       // "indef" is short for "indefinitive" -- a read-only view of
-      // a node (see IndefOrDef in types/viewnode.rs). Abbreviated
-      // in the emitted metadata so that the sexp stays compact; no
-      // machine-readable ambiguity because the only other word
-      // starting "indef..." would be a typo.
+      // a node (see IndefOrDef in types/viewnode.rs). The metadata
+      // sexp uses only this short form on both emission and parsing.
       parts . push ( "indef" . to_string () ); }
     if let Some (s) = graph_stats (true_node)
     { parts . push (s); }

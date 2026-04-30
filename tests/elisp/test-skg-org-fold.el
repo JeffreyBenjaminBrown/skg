@@ -12,7 +12,7 @@
 1 body
 ** 11
 *** (skg folded (node (id 1))) 111
-*** (skg folded (node (id 2) indefinitive)) 112
+*** (skg folded (node (id 2) indef)) 112
 ** 12
 12 body
 *** (skg folded (node (id 3))) 121
@@ -38,7 +38,7 @@
 1 body
 ** 11
 *** (skg (node (id 1)) folded) 111
-*** (skg (node (id 2) indefinitive) folded) 112
+*** (skg (node (id 2) indef) folded) 112
 ** 12
 12 body
 *** (skg (node (id 3)) folded) 121

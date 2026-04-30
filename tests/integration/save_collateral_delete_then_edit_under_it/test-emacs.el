@@ -110,7 +110,7 @@ which takes priority over subee.skg on disk."
       (erase-buffer)
       (org-mode)
       (setq skg-view-uri (org-id-uuid))
-      (insert "* (skg (node (id 11) (source main) indefinitive)) 11\n")
+      (insert "* (skg (node (id 11) (source main) indef)) 11\n")
       (insert "* (skg (node (id subee) (source main))) subee\n")
       (insert "** (skg (node (id subee-1) (source main))) subee-1")
       (skg-request-save-buffer))

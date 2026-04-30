@@ -21,7 +21,7 @@ The test simulates saving this buffer:
 
 ```org
 * (skg (node (id 1) (source main))) 1
-** (skg (node (id 2) (source main) (birth independent) indefinitive)) 2
+** (skg (node (id 2) (source main) (birth independent) indef)) 2
 *** (skg (node (id 4) (source main))) 4
 ```
 

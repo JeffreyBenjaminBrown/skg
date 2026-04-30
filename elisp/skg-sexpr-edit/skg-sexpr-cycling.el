@@ -46,7 +46,7 @@ Returns the new value. If FIELD-VALUE is not in VALUES, starts at index 0."
 FIELD-VALUE is the current headline text, needed for source defaulting.
 Returns nil if the field is not cycleable."
   (cond
-   ((string= field-name "indefinitive")
+   ((string= field-name "indef")
     '("false (default)" "true"))
    ((string= field-name "birth")
     '("contentOf (default)" "independent" "containerOf" "linksTo"))

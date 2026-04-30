@@ -74,7 +74,7 @@ Returns the parsed s-expression or nil if not found."
     (skg-make-indefinitive)
     (let ((result (test-skg--extract-metadata-sexp)))
       ;; Verify indefinitive is in node section
-      (should (skg-sexp-subtree-p result '(skg (node indefinitive))))
+      (should (skg-sexp-subtree-p result '(skg (node indef))))
       ;; Verify id is preserved
       (should (skg-sexp-subtree-p result '(skg (node (id 1)))))))
 
@@ -86,7 +86,7 @@ Returns the parsed s-expression or nil if not found."
     (skg-make-indefinitive)
     (let ((result (test-skg--extract-metadata-sexp)))
       ;; Verify indefinitive is in node section
-      (should (skg-sexp-subtree-p result '(skg (node indefinitive))))
+      (should (skg-sexp-subtree-p result '(skg (node indef))))
       ;; Verify id is preserved
       (should (skg-sexp-subtree-p result '(skg (node (id 2)))))))
 
@@ -98,6 +98,6 @@ Returns the parsed s-expression or nil if not found."
     (skg-make-indefinitive)
     (let ((result (test-skg--extract-metadata-sexp)))
       ;; Verify indefinitive is in node section
-      (should (skg-sexp-subtree-p result '(skg (node indefinitive)))))))
+      (should (skg-sexp-subtree-p result '(skg (node indef)))))))
 
 (provide 'test-skg-metadata)

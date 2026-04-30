@@ -11,7 +11,7 @@ with an indefinitive TrueNode (no ID yet) and a placeholder title."
   (let* ((source (skg--prompt-for-owned-source))
          (org-text
           (format
-           "* (skg (node (source %s) indefinitive)) life, the universe and everything\n"
+           "* (skg (node (source %s) indef)) life, the universe and everything\n"
            source)))
     (skg-open-org-buffer-from-text
      nil org-text (skg-content-view-buffer-name org-text))))

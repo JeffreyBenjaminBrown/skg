@@ -234,7 +234,7 @@ Also at top level, for the TextChanged scaffold:
 Examples:
 ```
 (skg (node (id 7) (source main) (unstaged newX newM)))
-(skg (node (id 9) (source main) indefinitive (staged removedM) (unstaged newM)))
+(skg (node (id 9) (source main) indef (staged removedM) (unstaged newM)))
 (skg alias (staged newM))
 (skg id (unstaged removedM))
 (skg (textChanged staged unstaged))

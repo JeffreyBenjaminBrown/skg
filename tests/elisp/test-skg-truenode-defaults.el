@@ -43,11 +43,11 @@
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     ;; Should have: skg, node, id, abc, source, jeff,
-    ;; indefinitive, false (default), birth, contentOf (default),
+    ;; indef, false (default), birth, contentOf (default),
     ;; editRequest, none (default), viewRequests, none (default)
     (should (= (length headlines) 14))
     ;; Check default fields are present
-    (should (cl-find "indefinitive" headlines
+    (should (cl-find "indef" headlines
                      :key #'cdr :test #'string=))
     (should (cl-find "false (default)" headlines
                      :key #'cdr :test #'string=))
@@ -62,12 +62,12 @@
 
 (ert-deftest test-expand-with-indefinitive ()
   "Expanding a sexp with bare indefinitive shows 'true' child."
-  (let* ((sexp '(skg (node (id abc) (source jeff) indefinitive)))
+  (let* ((sexp '(skg (node (id abc) (source jeff) indef)))
          (org-text (sexp-to-org sexp))
          (expanded (skg-truenode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
-         (indef-idx (cl-position "indefinitive" headlines
+         (indef-idx (cl-position "indef" headlines
                                  :key #'cdr :test #'string=)))
     ;; The next headline after indefinitive should be "true"
     (should indef-idx)
@@ -115,7 +115,7 @@
                            "**** abc\n"
                            "*** source\n"
                            "**** jeff\n"
-                           "*** indefinitive\n"
+                           "*** indef\n"
                            "**** true\n"
                            "*** birth\n"
                            "**** contentOf (default)\n"
@@ -125,7 +125,7 @@
                            "**** none (default)"))
          (stripped (skg-truenode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
-    (should (equal result '(skg (node (id abc) (source jeff) indefinitive))))))
+    (should (equal result '(skg (node (id abc) (source jeff) indef))))))
 
 ;;
 ;; Strip: accepts bare 'false' (without '(default)') as the default value
@@ -139,7 +139,7 @@
                            "**** abc\n"
                            "*** source\n"
                            "**** jeff\n"
-                           "*** indefinitive\n"
+                           "*** indef\n"
                            "**** false\n"
                            "*** birth\n"
                            "**** contentOf\n"
@@ -166,7 +166,7 @@
 
 (ert-deftest test-round-trip-with-indefinitive ()
   "Round-trip: expand then strip preserves bare indefinitive."
-  (let* ((sexp '(skg (node (id abc) (source jeff) indefinitive)))
+  (let* ((sexp '(skg (node (id abc) (source jeff) indef)))
          (org-text (sexp-to-org sexp))
          (expanded (skg-truenode-expand-defaults-in-org org-text))
          (stripped (skg-truenode-strip-defaults-from-org expanded))
@@ -197,7 +197,7 @@
 
 (ert-deftest test-canonical-ordering ()
   "Fields appear in canonical order after expansion."
-  (let* ((sexp '(skg (node (source jeff) (graphStats 42) (id abc) indefinitive)))
+  (let* ((sexp '(skg (node (source jeff) (graphStats 42) (id abc) indef)))
          (org-text (sexp-to-org sexp))
          (expanded (skg-truenode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
@@ -206,10 +206,10 @@
                           (cl-remove-if-not
                            (lambda (hl) (= (car hl) 3))
                            headlines))))
-    ;; Order should be: id, source, indefinitive, birth,
+    ;; Order should be: id, source, indef, birth,
     ;; editRequest, viewRequests, graphStats
     (should (equal level-3
-                   '("id" "source" "indefinitive" "birth"
+                   '("id" "source" "indef" "birth"
                      "editRequest" "viewRequests" "graphStats")))))
 
 ;;
@@ -402,7 +402,7 @@ preserves source and all fields."
     (should (cl-find "source" headlines :key #'cdr :test #'string=))
     (should (cl-find "public" headlines :key #'cdr :test #'string=))
     ;; All editable defaults must be present
-    (should (cl-find "indefinitive" headlines :key #'cdr :test #'string=))
+    (should (cl-find "indef" headlines :key #'cdr :test #'string=))
     (should (cl-find "birth" headlines :key #'cdr :test #'string=))
     (should (cl-find "editRequest" headlines :key #'cdr :test #'string=))
     ;; graphStats must be preserved

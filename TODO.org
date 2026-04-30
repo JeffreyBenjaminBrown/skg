@@ -60,18 +60,20 @@ the one big context where it and its brothers were made.
 See TODO/one-definitive-view/
 * goals, by highest aim
 ** TODO know how it works
+*** What does skg-show-stats do?
 *** How are source changes heralded in backward views?
 Hopefully one only ever has to read org-rootward.
 ** TODO how|what to dogfood
 *** spots to patrol
+**** git : view changes to
+***** a source move
+***** merge
+***** delete
+***** aliases
 **** move something to a different repo
+**** merge, delete
 **** multi-contain
-**** commit to git
-**** merge
-**** delete
-**** DONE visit things
-**** DONE request view changes
-**** interactive: try diff view on aliases, IDs
+**** views : id stack, metadata, diff, heralds
 *** It is valid to dogfood even as only reading.
 *** internalized
 **** Dogfood and develop in separate places on disk.
@@ -85,6 +87,9 @@ while a new one is being developed.
   that would have been thought better of in the neighborhood's light.
 ** TODO easily worth it now
 *** dired should offer skg-goto shortcuts
+*** skg-move-node (and -recursive)
+*** skg-merge-here
+Should prompt for the acquiree node (ID or link).
 ** TODO legibility to user
 *** independent of parent /= contained in nothing
 so decouple these two heralds
@@ -110,6 +115,12 @@ but that was before some tremendous improvements in performance
 on <2026-04-22 Wed> and before and maybe after
 *** eliminate some 'tracing' commands
   Anything that's blazing fast can be safely removed.
+*** let user promote and demote a node in another's backlinks
+  Whichever means explicitly labeling fewer link sources.
+  e.g. relationship nodes like 'instances'
+  should promote a few nodes that are actually about the node
+  'instances'
+  vs. a lot that use it as a relationship label
 ** speed
 *** in reading ancestries
 **** ? "any rel" ought to be what a single backward view shows
@@ -169,16 +180,6 @@ This isn't perfect, because there might be multiple headlines with the same IDs.
 *** some skg-request-* functions save, others don't
 *** ? trying to delete an indef node should warn, not err
 That is, the save should still succeed.
-* move data to another source
-* TODO get containerward view within link sourceward view
-  for every link that is not a root
-* promote and demote in backlinks
-  Whichever means explicitly labeling fewer link sources.
-  e.g. relationship nodes like 'instances'
-  should promote a few nodes that are actually about the node
-  'instances'
-  vs. a lot that use it as a relationship label
-* What does skg-show-stats do?
 * TODO Warn user if they create a containment cycle.
 * present view of node's root(like) containerward ancestors
 ** Hopefully a root, otherwise a cycle; links are ignored.

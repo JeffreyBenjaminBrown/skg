@@ -1,0 +1,139 @@
+* moving nodes across data sources
+
+** what "moving nodes across sources" means
+
+The user's 'skgconfig.toml' file should list some 'sources'.
+A source is just a folder on disk.
+Skg lets you keep multiple sources so you can treat them differently
+-- e.g. some of yours might be public, and others private.
+(All of mine are git repositories, for safety.)
+
+Moving a node across repos just means
+changing which source directory holds its file.
+It has to be done *from within the app*.
+If you just move the file, Skg won't know that you did that,
+and its databases will now contain the lie
+that the moved node is in the old place.
+
+** how to do it
+Open a metadata buffer view of the node ('skg-view-metadata').
+Go to the node that specifies its source --
+it's the only child of a node that says simply 'source'.
+"Rotate" the value, using shift-left or shift-right,
+until it shows the source where you want the node to be.
+Save that work and exit the metadata view (C-c C-c).
+Now save the buffer.
+The buffer will be rebuilt,
+and the source change will now be visible.
+
+** pitfalls
+
+*** Foreign sources are rejected on either end
+=user_owns_it = false= sources (foreign repos lensed in via
+subscriptions) are read-only. Trying to move a node *into* or *out
+of* a foreign source produces
+=BufferValidationError::CannotMoveToOrFromForeignSource=
+(=server/from_text/supplement_from_disk.rs:56=). The buffer save
+fails entirely, and nothing is written. If you need data from a
+foreign source in a source you own, the model is to subscribe and
+override, not move.
+
+*** Cannot move and merge a node in the same save
+If a single save tries both to move a node's source *and* to merge
+it (acquirer or acquiree), skg refuses with
+=CannotMoveAndMergeSimultaneously=
+(=server/from_text/validate.rs:151=,
+=tests/move_source.rs::test_move_and_merge_simultaneously_rejected=).
+Do them in two separate saves.
+
+*** Both source names must already exist in =skgconfig.toml=
+The move uses the source name to look up the directory. If the new
+source name isn't in =[[sources]]=, you'll get a "source not found"
+error, not a "move failed" error, and no =.skg= file will be moved.
+Add the source first and restart the server before doing the move.
+
+*** Containment, subscriptions, textlinks: all unaffected
+All graph relationships are by ID, not =(ID, source)=. The set of
+edges to/from the moved node is invariant under a source move.
+Don't expect anything related to graph topology to change.
+
+*** Foreign-source files are never written by skg
+This is more general but bears repeating in the move context: skg
+will never write to a source dir whose =user_owns_it = false=. If
+you accidentally try to move a foreign node *out* by editing it
+locally, the save fails before any FS change. The original foreign
+file stays put.
+** what skg does internally
+*** the metadata representation
+There is no dedicated "move" command. Moves are inferred from a
+buffer save: if you change the =(source ...)= entry inside a node's
+metadata sexp and save, skg detects the change and performs the move.
+
+For example, given a node whose =.skg= file currently lives in =public/=:
+
+#+begin_src org
+  * (skg (node (id b) (source public))) b
+#+end_src
+
+You change the metadata to:
+
+#+begin_src org
+  * (skg (node (id b) (source private))) b
+#+end_src
+
+When you save, skg compares the buffer's =source= field for =b= to
+the value on disk. If they differ, skg generates a =SourceMove= and
+applies it. (See =server/from_text/supplement_from_disk.rs:23=,
+=supplement_none_fields_from_disk_if_save=.)
+
+Both =public= and =private= must be sources defined in your
+=skgconfig.toml=, and both must have =user_owns_it = true=. A move
+to or from a foreign source is rejected (see Pitfalls below).
+
+The buffer can reference a node by any of its IDs — primary or
+extra — and the move still works correctly. The source-move's =pid=
+is always resolved to the primary ID before the move is applied
+(=tests/move_source.rs::test_move_node_referenced_by_extra_id=).
+
+*** how the databases are updated
+The save pipeline collects =SourceMove= records alongside the
+ordinary =DefineNode= save and delete instructions. The applied
+order is:
+
+**** 1. FS (=server/save.rs::update_fs_from_saveinstructions=)
+The new =.skg= file is written to the new source directory first
+(via =write_all_nodes_to_fs=). Then, for each =SourceMove=, the
+*old* file is removed via =std::fs::remove_file=. "Write first,
+then delete" is intentional: if the process crashes between these
+two steps, the data still exists, just at the new location, and the
+old location's file is at worst stale.
+
+If the old file is already missing (=ErrorKind::NotFound=), the
+removal is a silent no-op rather than an error.
+
+**** 2. In-memory graph (=apply_definenodes=)
+The new source is reflected in the in-memory =NodeRust= via the
+ordinary =SaveNode=, which carries the new source field. There is
+no separate move step in memory — the save is sufficient.
+
+**** 3. TypeDB (=update_typedb_from_saveinstructions=)
+The save instruction phase rebuilds the node's outbound
+relationships, but does *not* touch the =source= attribute. After
+that phase, =update_node_source= is called once per =SourceMove=
+to update the =source= attribute on the existing TypeDB node. The
+node itself is not deleted and recreated; only the attribute
+changes.
+
+**** 4. Tantivy
+Tantivy is not given the =SourceMove= list at all. Source moves are
+applied implicitly: the index update is "delete every doc by ID,
+then re-add docs for every save," and the =SaveNode= carries the
+new =source= field, so the re-added document has the correct source.
+
+*** how 'extra_id's are handled
+If another node references the moved node by an extra_id, that
+reference does not need updating: the in-memory =extra_id_to_pid=
+map and TypeDB's =has_extra_id= relation both resolve through the
+primary ID, which doesn't change on a move. References by primary
+ID are also unaffected. So no other =.skg= files need to be
+touched. (The test suite confirms this for the extra-id case.)

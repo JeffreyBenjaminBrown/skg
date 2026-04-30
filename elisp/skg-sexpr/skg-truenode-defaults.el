@@ -19,11 +19,11 @@
 
 (defconst skg-truenode--canonical-field-order
   '("id" "source"
-    "indefinitive" "birth" "editRequest" "viewRequests")
+    "indef" "birth" "editRequest" "viewRequests")
   "Canonical order for node fields. Fields not in this list go last.")
 
 (defconst skg-truenode--editable-defaults
-  '(("indefinitive"  . "false (default)")
+  '(("indef"  . "false (default)")
     ("birth"         . "contentOf (default)")
     ("editRequest"   . "none (default)")
     ("viewRequests"  . "none (default)"))
@@ -191,7 +191,7 @@ Returns the group, possibly with a value child added or modified."
   (cond
    ;; Bare boolean atom: expand to have 'true' child
    ((and (= (length group) 1)
-         (string= field-name "indefinitive"))
+         (string= field-name "indef"))
     (list (car group)
           (cons (1+ child-level) "true")))
    ;; Source field: mark with (default) if it matches
@@ -251,7 +251,7 @@ CHILD-LEVEL is the level of the field headline."
          (when (> (length group) 1)
            (string-trim (cdr (nth 1 group))))))
     (cond
-     ((string= field-name "indefinitive") ;; Boolean field
+     ((string= field-name "indef") ;; Boolean field
       (cond
        ((or (null value-text)
             (skg-truenode--default-false-p value-text))
