@@ -9,7 +9,7 @@
 use skg::context::{compute_and_store_context_types, MapToContent, MapToContainers};
 use skg::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
-use skg::dbs::init::{InitData, initialize_dbs};
+use skg::dbs::init::{InitContextHandoff, InitData, initialize_dbs};
 use skg::dbs::memory::init_global_handle_for_first_time_or_panic;
 use skg::dbs::memory::scheduled_audit::schedule_daemon;
 use skg::dbs::typedb::util::{connect_to_typedb, delete_database};
@@ -77,15 +77,15 @@ fn main() -> Result<(), Box<dyn Error>> {
   install_shutdown_signal_handler (&config);
 
   let ( InitData { driver        : typedb_driver,
-                    tantivy_index,
-                    graph,
-                    had_id_set,
-                    all_node_ids,
-                    link_targets,
-                    map_to_content,
-                    map_to_containers },
+                    tantivy_index },
+        InitContextHandoff { graph,
+                             had_id_set,
+                             all_node_ids,
+                             link_targets,
+                             map_to_content,
+                             map_to_containers },
         nodes )
-      : (InitData, Vec<NodeComplete>) =
+      : (InitData, InitContextHandoff, Vec<NodeComplete>) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span! (
         "initialize_dbs") . entered ();
       initialize_dbs (&config) };

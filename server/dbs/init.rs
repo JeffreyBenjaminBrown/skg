@@ -34,15 +34,24 @@ use typedb_driver::{
   TypeDBDriver,
 };
 
-/// Computed during init. Needed by context computation,
-/// to avoid re-reading .skg files or re-querying TypeDB.
+/// Long-lived database handles produced by 'initialize_dbs'.
+/// Survives the full life of the server.
 pub struct InitData {
   pub driver        : Arc<TypeDBDriver>,
   pub tantivy_index : TantivyIndex,
-  pub graph         : InRustGraphHandle,
-  pub had_id_set    : HashSet<ID>,
-  pub all_node_ids  : HashSet<ID>,
-  pub link_targets  : HashSet<ID>,
+}
+
+/// One-shot init handoff. Holds derived data needed exactly once
+/// after startup: 'graph' is consumed to install the process-global
+/// memory handle; the rest is fed to 'compute_context_origin_types'
+/// and discarded. Splitting these out of 'InitData' keeps the
+/// long-lived bundle small and makes it impossible to keep the
+/// init-derived sets around past their freshness window.
+pub struct InitContextHandoff {
+  pub graph             : InRustGraphHandle,
+  pub had_id_set        : HashSet<ID>,
+  pub all_node_ids      : HashSet<ID>,
+  pub link_targets      : HashSet<ID>,
   pub map_to_content    : MapToContent,
   pub map_to_containers : MapToContainers,
 }
@@ -53,10 +62,11 @@ pub struct InitData {
 /// it rebuilds incrementally (only re-reading modified .skg files).
 /// Otherwise rebuilds completely.
 /// Ends by touching the marker file.
-/// Returns (InitData, nodes used to create InitData).
+/// Returns (long-lived InitData, init handoff for context-computation,
+/// nodes used to create them).
 pub fn initialize_dbs (
   config : & SkgConfig,
-) -> (InitData, Vec<NodeComplete>) {
+) -> (InitData, InitContextHandoff, Vec<NodeComplete>) {
   let driver : TypeDBDriver = connect_to_typedb();
   let marker_path : PathBuf =
     config . data_root . join (".skg_init_marker");
@@ -65,7 +75,7 @@ pub fn initialize_dbs (
       &driver, &config . db_name, &marker_path,
       Path::new ( &config . tantivy_folder )
     ) . await } );
-  let result : (InitData, Vec<NodeComplete>) =
+  let result : (InitData, InitContextHandoff, Vec<NodeComplete>) =
     if can_incremental {
       let marker_mtime : std::time::SystemTime =
         fs::metadata (&marker_path)
@@ -75,14 +85,14 @@ pub fn initialize_dbs (
         config, &driver, marker_mtime )
       { Ok (( tantivy_index )) => {
           tracing::info! ("Incremental init succeeded.");
-          // The incremental step above updated TypeDB and Tantivy from only the modified .skg files, which is all those databases need. The in-memory state inside InitData (graph handle, contains maps, had_id_set, link_targets) is rebuilt from scratch on every startup, so it needs every NodeComplete. The read below is therefore a full file read, but not a full re-initialization of the databases.
+          // The incremental step above updated TypeDB and Tantivy from only the modified .skg files, which is all those databases need. The InitContextHandoff (graph handle, contains maps, had_id_set, link_targets) is rebuilt from scratch on every startup, so it needs every NodeComplete. The read below is therefore a full file read, but not a full re-initialization of the databases.
           let nodes : Vec<NodeComplete> =
             read_all_skg_files_from_sources (config)
             . unwrap_or_default ();
-          let init_data : InitData =
+          let (init_data, handoff) : (InitData, InitContextHandoff) =
             init_data_from_nodes (
               &nodes, Arc::new (driver), tantivy_index );
-          (init_data, nodes) }
+          (init_data, handoff, nodes) }
         Err (e) => {
           tracing::warn! ("Incremental init failed ({}), \
                      falling back to full rebuild.", e);
@@ -201,7 +211,7 @@ fn init_data_from_nodes (
   nodes         : &[NodeComplete],
   driver        : Arc<TypeDBDriver>,
   tantivy_index : TantivyIndex,
-) -> InitData {
+) -> (InitData, InitContextHandoff) {
   let had_id_set : HashSet<ID> =
     had_id_set_from_nodes (&nodes);
   let all_node_ids : HashSet<ID> =
@@ -215,24 +225,23 @@ fn init_data_from_nodes (
     = content_maps_from_nodes (&nodes);
   let graph : InRustGraphHandle =
     new_handle ( InRustGraph::from_nodecompletes (nodes) );
-  InitData {
-    driver,
-    tantivy_index,
-    graph,
-    had_id_set,
-    all_node_ids,
-    link_targets,
-    map_to_content,
-    map_to_containers }}
+  ( InitData { driver, tantivy_index },
+    InitContextHandoff {
+      graph,
+      had_id_set,
+      all_node_ids,
+      link_targets,
+      map_to_content,
+      map_to_containers } ) }
 
 /// Full rebuild: reads all .skg files, populates both databases.
 /// Also computes had_id_set and contains maps from the loaded nodes,
 /// avoiding re-reading files or querying TypeDB for context computation.
-/// Returns (the InitData, the nodes that produced the InitData).
+/// Returns (long-lived InitData, init handoff, nodes that produced them).
 fn full_init (
   config : &SkgConfig,
   driver : TypeDBDriver,
-) -> (InitData, Vec<NodeComplete>) {
+) -> (InitData, InitContextHandoff, Vec<NodeComplete>) {
   tracing::info! ("Performing full init...");
   let nodes : Vec<NodeComplete> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -258,12 +267,12 @@ fn full_init (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "initialize_tantivy" ). entered();
       wipe_then_init_tantivy_db_with_logs_and_errors (config, &nodes) };
-  let init_data : InitData =
+  let (init_data, handoff) : (InitData, InitContextHandoff) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "extract_context_data_from_nodes" ). entered();
       init_data_from_nodes (
         &nodes, Arc::new (driver), tantivy_index ) };
-  (init_data, nodes) }
+  (init_data, handoff, nodes) }
 
 fn touch_init_marker (
   path : &Path,
