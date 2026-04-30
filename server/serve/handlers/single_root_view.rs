@@ -1,4 +1,5 @@
 use crate::dbs::memory::scheduled_audit::take_pending_audit_warning;
+use crate::env::SkgEnv;
 use crate::serve::ConnectionState;
 use crate::to_org::render::content_view::single_root_view;
 use crate::serve::protocol::TcpToClient;
@@ -9,13 +10,12 @@ use crate::serve::util::{
   tag_sexp_response,
   tag_text_response};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
-use crate::types::misc::{SkgConfig, ID};
+use crate::types::misc::ID;
 use crate::types::memory::ViewUri;
 
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
 use std::net::TcpStream; // handles two-way communication
-use typedb_driver::TypeDBDriver;
 
 /// Gets a node id from the request,
 /// generates an org view of that id's content (recursively),
@@ -24,11 +24,10 @@ use typedb_driver::TypeDBDriver;
 /// If the requested ID is already a root of an open view,
 /// returns ((switch-to-view "VIEW_URI")) instead of rendering.
 pub fn handle_single_root_view_request (
-  stream        : &mut TcpStream,
-  request       : &str,
-  typedb_driver : &TypeDBDriver,
-  config        : &SkgConfig,
-  conn_state    : &mut ConnectionState,
+  stream     : &mut TcpStream,
+  request    : &str,
+  env        : &SkgEnv,
+  conn_state : &mut ConnectionState,
 ) {
   let view_uri_result : Result<ViewUri, String> =
     view_uri_from_request (request);
@@ -55,8 +54,8 @@ pub fn handle_single_root_view_request (
           tracing::info_span!( "single_root_view" ). entered();
         block_on ( async {
             match single_root_view (
-              typedb_driver,
-              config,
+              &env . driver,
+              &env . config,
               &node_id,
               conn_state . diff_mode_enabled ) . await
             { Ok ( (buffer_content, pids, viewforest) ) => {

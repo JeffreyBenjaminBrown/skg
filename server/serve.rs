@@ -13,6 +13,7 @@ pub mod util;
 
 use crate::dbs::typedb::util::delete_database;
 use crate::dbs::memory::InRustGraphHandle;
+use crate::env::SkgEnv;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
@@ -30,7 +31,6 @@ use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
 use crate::types::errors::BufferValidationError;
 use crate::types::memory::{OpenViews, ViewUri};
-use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::unchecked_viewnode::{UncheckedViewNode,unchecked_to_checked_tree};
 use crate::types::viewnode::ViewNode;
 use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
@@ -44,7 +44,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::Duration;
-use typedb_driver::TypeDBDriver;
 
 /// Per-connection ("global") state.
 pub struct ConnectionState {
@@ -56,10 +55,7 @@ pub struct ConnectionState {
 
 /// Pipes TCP input from Emacs into handle_emacs.
 pub fn serve (
-  config         : SkgConfig,
-  typedb_driver  : Arc<TypeDBDriver>,
-  tantivy_index  : TantivyIndex,
-  graph          : InRustGraphHandle,
+  env            : SkgEnv,
   emacs_listener : TcpListener,
 ) -> std::io::Result<()> {
 
@@ -67,21 +63,9 @@ pub fn serve (
     match stream_res {
       Ok (stream) => {
         let stream : TcpStream = stream; // for type sig
-        let typedb_driver_clone : Arc<TypeDBDriver> =
-          Arc::clone (&typedb_driver); // Cloning permits the main thread to keep the driver and index. If they were passed here instead of cloned, their ownership would be moved into the first spawned thread, making them unavailable for the next connection.
-        let tantivy_index_clone : TantivyIndex =
-          tantivy_index . clone ();
-        let graph_clone : InRustGraphHandle =
-          Arc::clone (&graph);
-        let config_clone : SkgConfig =
-          config        . clone ();
+        let env_clone : SkgEnv = env . clone (); // Cloning permits the main thread to keep the env. If it were moved here, ownership would transfer into the first spawned thread, making it unavailable for the next connection.
         thread::spawn ( move || {
-          handle_emacs (
-            stream,
-            typedb_driver_clone,
-            tantivy_index_clone,
-            graph_clone,
-            & config_clone, ) } ); }
+          handle_emacs (stream, env_clone) } ); }
       Err (e) => {
         tracing::error!(error = %e, "Connection failed"); }} }
   Ok (( )) }
@@ -91,17 +75,14 @@ pub fn serve (
 ///   handle_text_search_request
 /// API: See /api.md
 fn handle_emacs (
-  mut stream        : TcpStream,
-  typedb_driver     : Arc<TypeDBDriver>,
-  mut tantivy_index : TantivyIndex,
-  graph             : InRustGraphHandle,
-  config            : &SkgConfig,
+  mut stream : TcpStream,
+  mut env    : SkgEnv,
 ) {
   let mut conn_state : ConnectionState =
     ConnectionState {
       diff_mode_enabled : false,
       memory            : OpenViews::new (),
-      graph             : graph . clone (), };
+      graph             : env . memory . clone (), };
 
   let enrichment_slot // To update search results once the 'enrichment' (containerward paths + graphnodestats) has been computed.
     : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
@@ -132,8 +113,7 @@ fn handle_emacs (
             handle_single_root_view_request (
               &mut stream,
               &request_header,
-              &typedb_driver,
-              config,
+              &env,
               &mut conn_state ),
           Ok (RequestType::SaveBuffer) =>
             // PITFALL: Uses the same BufReader that read the request,
@@ -142,9 +122,7 @@ fn handle_emacs (
               &mut reader,
               &mut stream,
               &request_header,
-              &typedb_driver,
-              config,
-              &mut tantivy_index,
+              &mut env,
               &mut conn_state ),
           Ok (RequestType::CloseView) =>
             handle_close_view_request (
@@ -158,8 +136,7 @@ fn handle_emacs (
               &mut stream,
               &request_header,
               &enrichment_slot,
-              &tantivy_index,
-              config,
+              &env,
               &mut conn_state ); }
           Ok (RequestType::TextSearch) => {
             // Cancel any in-flight background search
@@ -168,9 +145,7 @@ fn handle_emacs (
             handle_text_search_request (
               &mut stream,
               &request_header,
-              &tantivy_index,
-              &typedb_driver,
-              config,
+              &env,
               &enrichment_slot,
               &search_cancelled,
               &mut conn_state ); }
@@ -179,33 +154,27 @@ fn handle_emacs (
               &mut stream ),
           Ok (RequestType::Shutdown) =>
             // Never returns - exits process
-            handle_shutdown_request ( &mut stream,
-                                      &typedb_driver,
-                                      config ),
+            handle_shutdown_request ( &mut stream, &env ),
           Ok (RequestType::GetFilePath) =>
             handle_get_file_path_request ( &mut stream,
                                            &request_header,
-                                           config ),
+                                           &env . config ),
           Ok (RequestType::TitlesByIds) =>
             handle_titles_by_ids_request (
-              &mut stream, &request_header, &tantivy_index ),
+              &mut stream, &request_header, &env . tantivy_index ),
           Ok (RequestType::GitDiffModeToggle) =>
             handle_git_diff_toggle_and_rerender (
               &mut stream,
-              &typedb_driver,
-              config,
+              &env,
               &mut conn_state ),
           Ok (RequestType::RebuildDbs) =>
             handle_rebuild_dbs_request ( &mut stream,
-                                         &typedb_driver,
-                                         config,
-                                         &mut tantivy_index,
+                                         &mut env,
                                          &mut conn_state ),
           Ok (RequestType::RerenderAllViews) =>
             handle_rerender_all_views_request (
               &mut stream,
-              &typedb_driver,
-              config,
+              &env,
               &mut conn_state ),
           Err (err) => {
             tracing::error!(error = %err, "Error determining request type");
@@ -253,8 +222,7 @@ fn handle_snapshot_response (
   stream          : &mut TcpStream,
   request         : &str,
   enrichment_slot : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
-  tantivy_index   : &TantivyIndex,
-  config          : &SkgConfig,
+  env             : &SkgEnv,
   conn_state      : &mut ConnectionState,
 ) {
   let terms : String
@@ -294,16 +262,16 @@ fn handle_snapshot_response (
       return; }};
   insert_containerward_ancestries_into_search_view (
     &mut viewforest, &payload . search_results,
-    &payload . ancestry_by_id, tantivy_index,
-    config );
+    &payload . ancestry_by_id, &env . tantivy_index,
+    &env . config );
   { let root_treeid : NodeId =
       viewforest . root () . id ();
     set_metadata_relationships_in_node_recursive (
       &mut viewforest, root_treeid,
       &payload . graphnodestats,
-      config ); }
+      &env . config ); }
   let enriched : String =
-    viewforest_to_string ( &viewforest, config )
+    viewforest_to_string ( &viewforest, &env . config )
     . expect ("search viewforest rendering never fails");
   let enriched_sexp : String =
     mk_search_enrichment_sexp ( &terms, &enriched );
@@ -324,26 +292,21 @@ fn handle_verify_connection_request (
       "This is the skg server verifying the connection." )); }
 
 fn handle_shutdown_request (
-  stream        : &mut std::net::TcpStream,
-  typedb_driver : &Arc<TypeDBDriver>,
-  config        : &SkgConfig,
+  stream : &mut std::net::TcpStream,
+  env    : &SkgEnv,
 ) {
   send_response_with_length_prefix (
     stream,
     & tag_text_response (
       TcpToClient::Shutdown, "Server shutting down..." ));
-  cleanup_and_shutdown (
-    typedb_driver, config ); }
+  cleanup_and_shutdown (env); }
 
 /// Performs cleanup before server shutdown.
 /// Deletes the database if delete_on_quit is configured, then exits.
-fn cleanup_and_shutdown (
-  typedb_driver : &Arc<TypeDBDriver>,
-  config        : &SkgConfig,
-) {
-  if config . delete_on_quit {
+fn cleanup_and_shutdown (env : &SkgEnv) {
+  if env . config . delete_on_quit {
     tracing::info! (
-      db_name = %config . db_name,
+      db_name = %env . config . db_name,
       "Deleting database before shutdown" );
 
     // Wait briefly to allow any pending operations to complete.
@@ -355,7 +318,7 @@ fn cleanup_and_shutdown (
     futures::executor::block_on ( async {
       if let Err (e) =
         delete_database (
-          typedb_driver, & config . db_name )
+          &env . driver, & env . config . db_name )
         . await {
           tracing::error! ( error = %e, "Failed to delete database" );
         }} ); }

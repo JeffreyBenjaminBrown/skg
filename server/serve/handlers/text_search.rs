@@ -61,9 +61,7 @@ pub struct SearchEnrichmentPayload {
 pub fn handle_text_search_request (
   stream           : &mut TcpStream,
   request          : &str,
-  tantivy_index    : &TantivyIndex,
-  typedb_driver    : &Arc<TypeDBDriver>,
-  config           : &SkgConfig,
+  env              : &crate::env::SkgEnv,
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
   conn_state       : &mut ConnectionState,
@@ -91,7 +89,7 @@ pub fn handle_text_search_request (
   match search_terms {
     Ok (search_terms) => {
       // --- Phase 1: immediate results without paths ---
-      match search_index ( tantivy_index,
+      match search_index ( &env . tantivy_index,
                            &search_terms,
                            &search_opts ) {
         Ok (( best_matches, searcher )) => {
@@ -106,7 +104,7 @@ pub fn handle_text_search_request (
             group_matches_by_id (
               best_matches,
               searcher,
-              tantivy_index,
+              &env . tantivy_index,
               &search_terms,
               &search_opts );
           let (viewforest, search_results) : (Tree<ViewNode>, Vec<ID>) =
@@ -115,7 +113,7 @@ pub fn handle_text_search_request (
               &matches_by_id );
           let rendered : String =
             // Render first, before register_view moves the viewforest
-            viewforest_to_string ( &viewforest, config )
+            viewforest_to_string ( &viewforest, &env . config )
             . expect ("search viewforest rendering never fails");
           let uri : ViewUri =
             ViewUri::SearchView ( search_terms . clone () );
@@ -132,7 +130,7 @@ pub fn handle_text_search_request (
           spawn_enrichment_thread (
             // phase 2 (enriched) search results, backgrounded
             enrichment_slot, search_cancelled,
-            typedb_driver, config,
+            &env . driver, &env . config,
             &search_terms, &search_results ); },
         Err (e) => {
           send_response_with_length_prefix (

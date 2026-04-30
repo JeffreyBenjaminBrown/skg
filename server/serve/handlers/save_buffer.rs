@@ -1,4 +1,5 @@
 use crate::context::update_context_types_for_saved_nodes;
+use crate::env::SkgEnv;
 use crate::from_text::buffer_to_viewforest_and_save_instructions;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
@@ -54,13 +55,11 @@ impl SaveResponse {
 /// - 'update_from_and_rerender_buffer'
 /// - Responds to Emacs (with length prefix).
 pub fn handle_save_buffer_request (
-  reader        : &mut BufReader <TcpStream>,
-  stream        : &mut TcpStream, // PITFALL: writes to the same TCP stream as 'reader'
-  request       : &str,
-  typedb_driver : &TypeDBDriver,
-  config        : &SkgConfig,
-  tantivy_index : &mut TantivyIndex,
-  conn_state    : &mut ConnectionState,
+  reader     : &mut BufReader <TcpStream>,
+  stream     : &mut TcpStream, // PITFALL: writes to the same TCP stream as 'reader'
+  request    : &str,
+  env        : &mut SkgEnv,
+  conn_state : &mut ConnectionState,
 ) {
   let viewuri_from_request_result : Result<ViewUri, String> =
     view_uri_from_request (request);
@@ -81,7 +80,7 @@ pub fn handle_save_buffer_request (
           update_from_and_rerender_buffer (
             stream,
             & initial_buffer_content,
-            typedb_driver, config, tantivy_index,
+            &env . driver, &env . config, &mut env . tantivy_index,
             conn_state . diff_mode_enabled,
             &viewuri_from_request_result,
             conn_state ))

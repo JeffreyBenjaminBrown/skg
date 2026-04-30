@@ -1,3 +1,4 @@
+use crate::env::SkgEnv;
 use crate::git_ops::read_repo::open_repo;
 use crate::serve::ConnectionState;
 use crate::serve::handlers::save_buffer::{ compute_diff_for_every_source, deleted_ids_to_source};
@@ -14,27 +15,23 @@ use futures::executor::block_on;
 use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
 use std::sync::Arc;
-use typedb_driver::TypeDBDriver;
 use crate::dbs::memory::InRustGraph;
 
 pub fn handle_rerender_all_views_request (
-  stream        : &mut TcpStream,
-  typedb_driver : &TypeDBDriver,
-  config        : &SkgConfig,
-  conn_state    : &mut ConnectionState,
+  stream     : &mut TcpStream,
+  env        : &SkgEnv,
+  conn_state : &mut ConnectionState,
 ) {
-  stream_rerender_views (
-    stream, typedb_driver, config, conn_state ); }
+  stream_rerender_views (stream, env, conn_state); }
 
 /// Stream re-rendered views to Emacs.
 /// Sends: rerender-lock → rerender-view* → rerender-done.
 /// Shared by 'handle_rerender_all_views_request' and (in Change 3)
 /// 'handle_git_diff_toggle_and_rerender'.
 pub fn stream_rerender_views (
-  stream        : &mut TcpStream,
-  typedb_driver : &TypeDBDriver,
-  config        : &SkgConfig,
-  conn_state    : &mut ConnectionState,
+  stream     : &mut TcpStream,
+  env        : &SkgEnv,
+  conn_state : &mut ConnectionState,
 ) {
   let uris : Vec<ViewUri> =
     conn_state . memory . views . keys () . cloned () . collect ();
@@ -50,7 +47,7 @@ pub fn stream_rerender_views (
   let source_diffs
     : Option<HashMap<SourceName, SourceDiff>>
     = if conn_state . diff_mode_enabled
-      { Some ( compute_diff_for_every_source (config)) }
+      { Some ( compute_diff_for_every_source (&env . config)) }
       else { None };
   let deleted_since_head_pid_src_map
     : HashMap<ID, SourceName>
@@ -79,7 +76,7 @@ pub fn stream_rerender_views (
         ) . entered ();
       rerender_view (
         &mut viewforest,
-        &source_diffs, config, typedb_driver,
+        &source_diffs, &env . config, &env . driver,
         &graph_snap,
         &mut errors, &deleted_since_head_pid_src_map,
         &deleted_by_this_save_pids,
@@ -107,20 +104,18 @@ pub fn stream_rerender_views (
 /// Toggles diff mode, sends the GitDiffMode response with warnings,
 /// then streams re-rendered views.
 pub fn handle_git_diff_toggle_and_rerender (
-  stream        : &mut TcpStream,
-  typedb_driver : &TypeDBDriver,
-  config        : &SkgConfig,
-  conn_state    : &mut ConnectionState,
+  stream     : &mut TcpStream,
+  env        : &SkgEnv,
+  conn_state : &mut ConnectionState,
 ) {
   conn_state . diff_mode_enabled = ! conn_state . diff_mode_enabled;
   let msg : String =
-    git_diff_mode_message (conn_state . diff_mode_enabled, config);
+    git_diff_mode_message (conn_state . diff_mode_enabled, &env . config);
   tracing::info! ( msg = %msg, "Git diff mode toggled" );
   send_response_with_length_prefix (
     stream,
     & tag_text_response ( TcpToClient::GitDiffMode, &msg ));
-  stream_rerender_views (
-    stream, typedb_driver, config, conn_state ); }
+  stream_rerender_views (stream, env, conn_state); }
 
 /// Build the human-readable message for a diff-mode toggle,
 /// including warnings for sources not tracked in git.
