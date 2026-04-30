@@ -27,12 +27,12 @@ use std::path::Path;
 use std::sync::Arc;
 
 use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_source;
+use skg::dbs::memory::InRustGraphHandle;
 use skg::test_utils::{run_with_test_db, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
-use skg::serve::ConnectionState;
+use skg::serve::ViewsState;
 use skg::types::memory::OpenViews;
 
-use skg::dbs::memory::InRustGraphHandle;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex, SourceName};
 
 use typedb_driver::TypeDBDriver;
@@ -61,18 +61,18 @@ async fn delete_strips_references_impl (
 
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
-  let mut conn_state : ConnectionState = ConnectionState {
+  let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
-        memory            : OpenViews::new (),
-        graph             : graph . clone () };
+        open_views            : OpenViews::new (),
+        };
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
   let mut stream : TcpStream =
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let _response = update_from_and_rerender_buffer (
     &mut stream,
-    input_org_text, driver, config, tantivy, false,
-    &Err ( String::new () ), &mut conn_state ) . await ?;
+    input_org_text, driver, config, tantivy, &graph, false,
+    &Err ( String::new () ), &mut views_state ) . await ?;
 
   let mut failures : Vec<String> = Vec::new ();
   let main : SourceName = SourceName::from ("main");
@@ -227,18 +227,18 @@ async fn strip_pass_handles_extra_ids_impl (
   "};
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
-  let mut conn_state : ConnectionState = ConnectionState {
+  let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
-        memory            : OpenViews::new (),
-        graph             : graph . clone () };
+        open_views            : OpenViews::new (),
+        };
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
   let mut stream : TcpStream =
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let _response = update_from_and_rerender_buffer (
     &mut stream,
-    input_org_text, driver, config, tantivy, false,
-    &Err ( String::new () ), &mut conn_state ) . await ?;
+    input_org_text, driver, config, tantivy, &graph, false,
+    &Err ( String::new () ), &mut views_state ) . await ?;
   let main : SourceName = SourceName::from ("main");
   let referencer : skg::types::nodes::complete::NodeComplete =
     nodecomplete_from_pid_and_source (

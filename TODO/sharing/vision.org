@@ -44,15 +44,15 @@ Currently a user can conjure
 The user can add or delete subscribees (usually foreign nodes).
 There's no current way, however, to edit what the subscriber
 * proposal: deleting a subscriber's content hides that content
+** the idea
 The HiddenInSubscribeeCol Scaffold will continue to be read-only,
-and foreign subscribees (like all nodes)
+and foreign subscribees (like all foreign nodes)
 will continue to be read-only.
 However, the user will be able to
 delete things from the view of a subscribee
 (when it is shown *as* a subscribee),
 and such deletions will result in a hide relationship.
-
-** Examples
+** examples
 In each of the following examples,
 suppose the user begins from a view of a subscriber containing one node,
 which subscribes to a subscribee that contains two more nodes:
@@ -149,5 +149,9 @@ so the recursive view of 'subscriber' ends up the same as before:
   * any other user-owned node
   ** subscribee-contains-this-1
 ```
-** Still left open
-Users need to be able to unhide nodes.
+* unresolved
+** Users need to be able to unhide nodes.
+** fork a foreign node by "editing" it
+** *cols for all rels in either direction
+** make overriding obvious; permit visiting the replaced
+** How to show a subscribee's subscribees?

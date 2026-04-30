@@ -1,6 +1,6 @@
 use crate::dbs::memory::scheduled_audit::take_pending_audit_warning;
 use crate::types::env::SkgEnv;
-use crate::serve::ConnectionState;
+use crate::serve::ViewsState;
 use crate::to_org::render::content_view::single_root_view;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
@@ -27,14 +27,14 @@ pub fn handle_single_root_view_request (
   stream     : &mut TcpStream,
   request    : &str,
   env        : &SkgEnv,
-  conn_state : &mut ConnectionState,
+  views_state : &mut ViewsState,
 ) {
   let view_uri_result : Result<ViewUri, String> =
     view_uri_from_request (request);
   match node_id_from_single_root_view_request (request) {
     Ok (node_id) => {
       if let Some (existing_uri)
-        = conn_state . memory
+        = views_state . open_views
           . content_view_uri_for_root_id ( &node_id )
         { let switch_sexp : String =
             Sexp::List ( vec! [
@@ -58,10 +58,10 @@ pub fn handle_single_root_view_request (
               &env . config,
               Some (&env . tantivy_index),
               &node_id,
-              conn_state . diff_mode_enabled ) . await
+              views_state . diff_mode_enabled ) . await
             { Ok ( (buffer_content, pids, viewforest) ) => {
                 if let Ok (view_uri) = &view_uri_result {
-                  conn_state . memory . register_view (
+                  views_state . open_views . register_view (
                     view_uri . clone (),
                     viewforest,
                     &pids ); }

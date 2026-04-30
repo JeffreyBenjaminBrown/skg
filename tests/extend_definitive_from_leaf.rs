@@ -10,10 +10,10 @@ use std::net::TcpStream;
 
 use skg::test_utils::run_with_test_db;
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
-use skg::serve::ConnectionState;
+use skg::serve::ViewsState;
 use skg::types::memory::OpenViews;
 
-use skg::dbs::memory::{InRustGraph, new_handle};
+
 
 fn mk_test_tcp_stream ()
   -> TcpStream
@@ -46,16 +46,17 @@ fn test_definitive_view_limit_10
       let result = {
         let mut config = config . clone();
         config . initial_node_limit = 10;
-        let mut conn_state : ConnectionState = ConnectionState {
+        let graph : skg::dbs::memory::InRustGraphHandle =
+          skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+        let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          memory            : OpenViews::new (),
-          graph             : new_handle (InRustGraph::new ()) };
+          open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config, tantivy, false,
+          input_org_text, driver, &config, tantivy, &graph, false,
 
-          &Err ( String::new () ), &mut conn_state ) . await ?;
+          &Err ( String::new () ), &mut views_state ) . await ?;
         response . saved_view };
 
       println!("Result with limit=10:\n{}", result);
@@ -115,30 +116,32 @@ fn test_definitive_view_limit_5_or_6
       let result_5 = {
         let mut config5 = config . clone();
         config5 . initial_node_limit = 5;
-        let mut conn_state : ConnectionState = ConnectionState {
+        let graph : skg::dbs::memory::InRustGraphHandle =
+          skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+        let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          memory            : OpenViews::new (),
-          graph             : new_handle (InRustGraph::new ()) };
+          open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_5 = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config5, tantivy, false,
+          input_org_text, driver, &config5, tantivy, &graph, false,
 
-          &Err ( String::new () ), &mut conn_state ) . await ?;
+          &Err ( String::new () ), &mut views_state ) . await ?;
         response_5 . saved_view };
       let result_6 = {
         let mut config6 = config . clone();
         config6 . initial_node_limit = 6;
-        let mut conn_state : ConnectionState = ConnectionState {
+        let graph : skg::dbs::memory::InRustGraphHandle =
+          skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+        let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          memory            : OpenViews::new (),
-          graph             : new_handle (InRustGraph::new ()) };
+          open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_6 = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config6, tantivy, false,
+          input_org_text, driver, &config6, tantivy, &graph, false,
 
-          &Err ( String::new () ), &mut conn_state ) . await ?;
+          &Err ( String::new () ), &mut views_state ) . await ?;
         response_6 . saved_view };
 
       println!("Result with limit=5:\n{}", result_5);
@@ -201,28 +204,30 @@ fn test_definitive_view_limit_1_to_4
       let result_1 = {
         let mut config1 = config . clone();
         config1 . initial_node_limit = 1;
-        let mut conn_state : ConnectionState = ConnectionState {
+        let graph : skg::dbs::memory::InRustGraphHandle =
+          skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+        let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          memory            : OpenViews::new (),
-          graph             : new_handle (InRustGraph::new ()) };
+          open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_1 = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config1, tantivy, false,
-          &Err ( String::new () ), &mut conn_state ) . await ?;
+          input_org_text, driver, &config1, tantivy, &graph, false,
+          &Err ( String::new () ), &mut views_state ) . await ?;
         response_1 . saved_view };
       let result_4 = {
         let mut config4 = config . clone();
         config4 . initial_node_limit = 4;
-        let mut conn_state : ConnectionState = ConnectionState {
+        let graph : skg::dbs::memory::InRustGraphHandle =
+          skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+        let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          memory            : OpenViews::new (),
-          graph             : new_handle (InRustGraph::new ()) };
+          open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_4 = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config4, tantivy, false,
-          &Err ( String::new () ), &mut conn_state ) . await ?;
+          input_org_text, driver, &config4, tantivy, &graph, false,
+          &Err ( String::new () ), &mut views_state ) . await ?;
         response_4 . saved_view };
 
       println!("Result with limit=1:\n{}", result_1);
@@ -280,15 +285,16 @@ fn test_definitive_view_conflicting
       let result = {
         let mut config = config . clone();
         config . initial_node_limit = 100;
-        let mut conn_state : ConnectionState = ConnectionState {
+        let graph : skg::dbs::memory::InRustGraphHandle =
+          skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+        let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          memory            : OpenViews::new (),
-          graph             : new_handle (InRustGraph::new ()) };
+          open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config, tantivy, false,
-          &Err ( String::new () ), &mut conn_state ) . await ?;
+          input_org_text, driver, &config, tantivy, &graph, false,
+          &Err ( String::new () ), &mut views_state ) . await ?;
         response . saved_view };
 
       println!("Result with conflict:\n{}", result);
@@ -335,15 +341,16 @@ fn test_definitive_view_with_cycle
       let result = {
         let mut config = config . clone();
         config . initial_node_limit = 100;
-        let mut conn_state : ConnectionState = ConnectionState {
+        let graph : skg::dbs::memory::InRustGraphHandle =
+          skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+        let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          memory            : OpenViews::new (),
-          graph             : new_handle (InRustGraph::new ()) };
+          open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config, tantivy, false,
-          &Err ( String::new () ), &mut conn_state ) . await ?;
+          input_org_text, driver, &config, tantivy, &graph, false,
+          &Err ( String::new () ), &mut views_state ) . await ?;
         response . saved_view };
 
       println!("Result with cycle:\n{}", result);
@@ -384,15 +391,16 @@ fn test_definitive_view_with_repeat
       let result = {
         let mut config = config . clone();
         config . initial_node_limit = 100;
-        let mut conn_state : ConnectionState = ConnectionState {
+        let graph : skg::dbs::memory::InRustGraphHandle =
+          skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+        let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          memory            : OpenViews::new (),
-          graph             : new_handle (InRustGraph::new ()) };
+          open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config, tantivy, false,
-          &Err ( String::new () ), &mut conn_state ) . await ?;
+          input_org_text, driver, &config, tantivy, &graph, false,
+          &Err ( String::new () ), &mut views_state ) . await ?;
         response . saved_view };
 
       println!("Result with repeat:\n{}", result);
@@ -440,15 +448,16 @@ fn test_definitive_view_request_cleared
       let result = {
         let mut config = config . clone();
         config . initial_node_limit = 100;
-        let mut conn_state : ConnectionState = ConnectionState {
+        let graph : skg::dbs::memory::InRustGraphHandle =
+          skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+        let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
-          memory            : OpenViews::new (),
-          graph             : new_handle (InRustGraph::new ()) };
+          open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config, tantivy, false,
-          &Err ( String::new () ), &mut conn_state ) . await ?;
+          input_org_text, driver, &config, tantivy, &graph, false,
+          &Err ( String::new () ), &mut views_state ) . await ?;
         response . saved_view };
 
       println!("Result:\n{}", result);

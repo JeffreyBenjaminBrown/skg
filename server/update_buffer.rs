@@ -12,7 +12,7 @@ pub use viewnodestats::set_viewnodestats_in_viewforest;
 use crate::dbs::memory::{InRustGraph, memory_coherent_with_save_instructions, scheduled_audit::take_pending_audit_warning};
 use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
-use crate::serve::ConnectionState;
+use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{ SaveResponse, compute_diff_for_every_source, deleted_ids_to_source};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
@@ -51,7 +51,7 @@ pub async fn update_views_after_save (
   diff_mode_enabled           : bool,
   env                         : &SkgEnv,
   viewuri_from_request_result : &Result<ViewUri, String>,
-  conn_state                  : &mut ConnectionState,
+  views_state                  : &mut ViewsState,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   // PITFALL: Memory must already reflect every Save and Delete in
   // 'save_instructions' by the time this function runs. Violating
@@ -95,7 +95,7 @@ pub async fn update_views_after_save (
   // resolution during reconcile (neighbors' on-disk contains still
   // point at the acquiree id).
   let graph_snap : Arc<InRustGraph> =
-    conn_state . graph . load_full ();
+    env . memory . load_full ();
   let mut errors : Vec<String> = Vec::new ();
   let mut saved_view_mut : Tree<ViewNode> = saved_view;
   resolve_extra_ids_in_viewforest (
@@ -113,11 +113,11 @@ pub async fn update_views_after_save (
         &deleted_by_this_save_pids,
         true ) . await } ?;
   if let Ok (uri) = viewuri_from_request_result {
-    conn_state . memory . update_view (
+    views_state . open_views . update_view (
       uri, saved_view_mut);
     let collateral_uris : Vec<ViewUri> =
       find_collateral_view_uris (
-        uri, &save_instructions, conn_state);
+        uri, &save_instructions, views_state);
     if collateral_uris . is_empty () {
       tracing::debug!("update_views_after_save: no collateral views");
     } else {
@@ -129,7 +129,7 @@ pub async fn update_views_after_save (
           . collect::<Vec<_>> ()); }
     for curi in collateral_uris { // Same rerender_view pipeline as the saved view, but with is_saved_view=false. Each rerender fetches from the in-Rust memory directly. Streamed to Emacs immediately.
       let mut viewforest : Tree<ViewNode> = match
-        conn_state . memory . viewuri_to_view (&curi) {
+        views_state . open_views . viewuri_to_view (&curi) {
           Some (f) => f . clone (),
           None => {
             errors . push ( format! (
@@ -153,7 +153,7 @@ pub async fn update_views_after_save (
           &deleted_by_this_save_pids,
           false ) . await }
       { Ok (text) => {
-          conn_state . memory . update_view (&curi, viewforest);
+          views_state . open_views . update_view (&curi, viewforest);
           send_response_with_length_prefix (
             stream,
             & tag_sexp_response (
@@ -175,7 +175,7 @@ pub async fn update_views_after_save (
 fn find_collateral_view_uris (
   saved_uri         : &ViewUri,
   save_instructions : &[DefineNode],
-  conn_state        : &ConnectionState,
+  views_state        : &ViewsState,
 ) -> Vec<ViewUri> {
   let changed_pids : HashSet<ID> =
     save_instructions . iter ()
@@ -188,10 +188,10 @@ fn find_collateral_view_uris (
   tracing::debug!(
     "find_collateral_view_uris: {} changed PIDs, {} views in memory",
     changed_pids . len (),
-    conn_state . memory . views . len ());
+    views_state . open_views . views . len ());
   let uris : HashSet<ViewUri> =
     changed_pids . iter ()
-    . flat_map ( |pid| conn_state . memory . views_containing (pid) )
+    . flat_map ( |pid| views_state . open_views . views_containing (pid) )
     . filter ( |uri| uri != saved_uri )
     . collect ();
   uris . into_iter () . collect () }

@@ -16,7 +16,7 @@ use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async}
 use crate::dbs::typedb::search::all_graphnodestats::{ AllGraphNodeStats, fetch_all_graphnodestats};
 use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
-use crate::serve::ConnectionState;
+use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
 use crate::types::git::MembershipAxes;
@@ -65,7 +65,7 @@ pub fn handle_text_search_request (
   env              : &SkgEnv,
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
-  conn_state       : &mut ConnectionState,
+  views_state       : &mut ViewsState,
 ) {
   let parsed_sexp : Result < Sexp, String > =
     sexp::parse (request)
@@ -118,10 +118,10 @@ pub fn handle_text_search_request (
             . expect ("search viewforest rendering never fails");
           let uri : ViewUri =
             ViewUri::SearchView ( search_terms . clone () );
-          if conn_state . memory . views . contains_key (&uri) {
+          if views_state . open_views . views . contains_key (&uri) {
             // Replace prior search with the same terms.
-            conn_state . memory . unregister_view (&uri); }
-          conn_state . memory . register_view (
+            views_state . open_views . unregister_view (&uri); }
+          views_state . open_views . register_view (
             uri, viewforest, &search_results );
           send_response_with_length_prefix (
             // phase 1 (unenriched) tagged LP response

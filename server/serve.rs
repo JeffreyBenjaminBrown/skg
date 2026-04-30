@@ -13,7 +13,6 @@ pub mod util;
 
 use crate::consts::SHUTDOWN_DB_DELETE_DELAY_MS;
 use crate::dbs::typedb::util::delete_database;
-use crate::dbs::memory::InRustGraphHandle;
 use crate::types::env::SkgEnv;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use crate::org_to_text::viewforest_to_string;
@@ -46,12 +45,13 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::Duration;
 
-/// Per-connection ("global") state.
-pub struct ConnectionState {
+/// Per-connection state for the Emacs client. The in-Rust graph
+/// handle is in 'SkgEnv', which is also per-connection (cloned at
+/// connection acceptance), so it doesn't appear here.
+pub struct ViewsState {
   pub diff_mode_enabled : bool,
-  pub memory            : OpenViews,
-  pub graph             : InRustGraphHandle,
-  // If Emacs crashes or the TCP connection drops without sending close-view messages, OpenViews is still freed, because ConnectionState is owned by handle_emacs and dropped when the connection loop exits (n == 0). There's no leak.
+  pub open_views        : OpenViews,
+  // If Emacs crashes or the TCP connection drops without sending close-view messages, OpenViews is still freed, because ViewsState is owned by handle_emacs and dropped when the connection loop exits (n == 0). There's no leak.
 }
 
 /// Pipes TCP input from Emacs into handle_emacs.
@@ -79,11 +79,10 @@ fn handle_emacs (
   mut stream : TcpStream,
   mut env    : SkgEnv,
 ) {
-  let mut conn_state : ConnectionState =
-    ConnectionState {
+  let mut views_state : ViewsState =
+    ViewsState {
       diff_mode_enabled : false,
-      memory            : OpenViews::new (),
-      graph             : env . memory . clone (), };
+      open_views        : OpenViews::new (), };
 
   let enrichment_slot // To update search results once the 'enrichment' (containerward paths + graphnodestats) has been computed.
     : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
@@ -115,7 +114,7 @@ fn handle_emacs (
               &mut stream,
               &request_header,
               &env,
-              &mut conn_state ),
+              &mut views_state ),
           Ok (RequestType::SaveBuffer) =>
             // PITFALL: Uses the same BufReader that read the request,
             // so that any already-buffered header/payload are visible.
@@ -124,12 +123,12 @@ fn handle_emacs (
               &mut stream,
               &request_header,
               &mut env,
-              &mut conn_state ),
+              &mut views_state ),
           Ok (RequestType::CloseView) =>
             handle_close_view_request (
               &mut stream,
               &request_header,
-              &mut conn_state ),
+              &mut views_state ),
           Ok (RequestType::SnapshotResponse) => {
             snapshot_requested = false;
             handle_snapshot_response (
@@ -138,7 +137,7 @@ fn handle_emacs (
               &request_header,
               &enrichment_slot,
               &env,
-              &mut conn_state ); }
+              &mut views_state ); }
           Ok (RequestType::TextSearch) => {
             // Cancel any in-flight background search
             search_cancelled . store (true, Ordering::SeqCst);
@@ -149,7 +148,7 @@ fn handle_emacs (
               &env,
               &enrichment_slot,
               &search_cancelled,
-              &mut conn_state ); }
+              &mut views_state ); }
           Ok (RequestType::VerifyConnection) =>
             handle_verify_connection_request (
               &mut stream ),
@@ -167,16 +166,16 @@ fn handle_emacs (
             handle_git_diff_toggle_and_rerender (
               &mut stream,
               &env,
-              &mut conn_state ),
+              &mut views_state ),
           Ok (RequestType::RebuildDbs) =>
             handle_rebuild_dbs_request ( &mut stream,
                                          &mut env,
-                                         &mut conn_state ),
+                                         &mut views_state ),
           Ok (RequestType::RerenderAllViews) =>
             handle_rerender_all_views_request (
               &mut stream,
               &env,
-              &mut conn_state ),
+              &mut views_state ),
           Err (err) => {
             tracing::error!(error = %err, "Error determining request type");
             send_response_with_length_prefix (
@@ -224,7 +223,7 @@ fn handle_snapshot_response (
   request         : &str,
   enrichment_slot : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   env             : &SkgEnv,
-  conn_state      : &mut ConnectionState,
+  views_state      : &mut ViewsState,
 ) {
   let terms : String
     = match value_from_request_sexp ("terms", request)
@@ -278,7 +277,7 @@ fn handle_snapshot_response (
     mk_search_enrichment_sexp ( &terms, &enriched );
   { let uri : ViewUri = // update memory with enriched viewforest
       ViewUri::SearchView ( terms . clone () );
-    conn_state . memory . update_view ( &uri, viewforest ); }
+    views_state . open_views . update_view ( &uri, viewforest ); }
   tracing::debug! (bytes = enriched_sexp . len (),
                    "snapshot response: sending enrichment");
   send_response_with_length_prefix (

@@ -1,4 +1,4 @@
-use crate::serve::ConnectionState;
+use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   view_uri_from_request,
@@ -10,11 +10,11 @@ use std::net::TcpStream;
 pub fn handle_close_view_request (
   stream     : &mut TcpStream,
   request    : &str,
-  conn_state : &mut ConnectionState,
+  views_state : &mut ViewsState,
 ) {
   match view_uri_from_request (request) {
     Ok (uri) => {
-      conn_state . memory . unregister_view (&uri);
+      views_state . open_views . unregister_view (&uri);
       send_response_with_length_prefix (
         stream,
         & tag_text_response (

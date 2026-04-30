@@ -4,7 +4,7 @@ use crate::from_text::buffer_to_viewforest_and_save_instructions;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
 use crate::save::update_graph_including_merges;
-use crate::serve::ConnectionState;
+use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   view_uri_from_request,
@@ -50,7 +50,7 @@ impl SaveResponse {
 
 /// Handles save buffer requests from Emacs.
 /// - Reads the buffer content (with length prefix).
-/// - Builds an initial NodeCompleteMap from the ConnectionState's memory. It can change during the save process.
+/// - Builds an initial NodeCompleteMap from the ViewsState's memory. It can change during the save process.
 /// - 'update_from_and_rerender_buffer'
 /// - Responds to Emacs (with length prefix).
 pub fn handle_save_buffer_request (
@@ -58,7 +58,7 @@ pub fn handle_save_buffer_request (
   stream     : &mut TcpStream, // PITFALL: writes to the same TCP stream as 'reader'
   request    : &str,
   env        : &mut SkgEnv,
-  conn_state : &mut ConnectionState,
+  views_state : &mut ViewsState,
 ) {
   let viewuri_from_request_result : Result<ViewUri, String> =
     view_uri_from_request (request);
@@ -67,7 +67,7 @@ pub fn handle_save_buffer_request (
       { // Send early lock message before the expensive pipeline.
         let uris_to_lock : Vec<ViewUri> =
           uris_of_views_to_lock (
-            &viewuri_from_request_result, conn_state );
+            &viewuri_from_request_result, views_state );
         let lock_sexp : String =
           format_lock_views_sexp ( &uris_to_lock );
         send_response_with_length_prefix (
@@ -80,9 +80,9 @@ pub fn handle_save_buffer_request (
             stream,
             & initial_buffer_content,
             env,
-            conn_state . diff_mode_enabled,
+            views_state . diff_mode_enabled,
             &viewuri_from_request_result,
-            conn_state ))
+            views_state ))
         { Ok (save_response) => {
             send_response_with_length_prefix (
               stream,
@@ -144,7 +144,7 @@ pub async fn update_from_and_rerender_buffer (
   env                         : &mut SkgEnv,
   diff_mode_enabled           : bool,
   viewuri_from_request_result : &Result<ViewUri, String>,
-  conn_state                  : &mut ConnectionState,
+  views_state                  : &mut ViewsState,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   if diff_mode_enabled {
     let sources : Vec<SourceName> =
@@ -173,7 +173,7 @@ pub async fn update_from_and_rerender_buffer (
       env . config . clone(),
       &mut env . tantivy_index,
       &env . driver,
-      &conn_state . graph ) . await ?;
+      &env . memory ) . await ?;
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "update_context_types_for_saved_nodes" ). entered();
       update_context_types_for_saved_nodes (
@@ -190,7 +190,7 @@ pub async fn update_from_and_rerender_buffer (
     diff_mode_enabled,
     env,
     viewuri_from_request_result,
-    conn_state ) . await }
+    views_state ) . await }
 
 /// Check if any source's HEAD is a merge commit.
 /// Returns an error message if so,
@@ -258,16 +258,16 @@ pub fn deleted_ids_to_source (
 /// too many buffers briefly is harmless; missing one could lose edits.
 fn uris_of_views_to_lock (
   viewuri_from_request_result : &Result<ViewUri, String>,
-  conn_state                  : &ConnectionState,
+  views_state                  : &ViewsState,
 ) -> Vec<ViewUri> {
   let saved_uri : &ViewUri = match viewuri_from_request_result {
     Ok (uri) => uri,
     Err (_)  => return Vec::new () };
   let pids : Vec<ID> =
-    conn_state . memory . viewuri_to_pids (saved_uri);
+    views_state . open_views . viewuri_to_pids (saved_uri);
   let mut collateral_views : HashSet<ViewUri> = HashSet::new ();
   for pid in &pids {
-    for uri in conn_state . memory . views_containing (pid) {
+    for uri in views_state . open_views . views_containing (pid) {
       if &uri != saved_uri
       { collateral_views . insert (uri); } } }
   collateral_views . into_iter () . collect () }

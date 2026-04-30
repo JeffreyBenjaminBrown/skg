@@ -17,15 +17,16 @@ fn test_delete_id_col_scaffold_respawns()
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "skg id");
 
-      let mut conn_state : ConnectionState = ConnectionState {
+      let graph : skg::dbs::memory::InRustGraphHandle =
+        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        memory            : OpenViews::new (),
-        graph             : new_handle (InRustGraph::new ()) };
+        open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, true,
-        &Err ( String::new () ), &mut conn_state ) . await?;
+        &input, driver, config, tantivy, &graph, true,
+        &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: 1.skg should still have the worktree ids
       let node_1 = read_nodecomplete(repo_path, "1")?;
@@ -57,15 +58,16 @@ fn test_delete_id_scaffolds_respawns()
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "(skg id)");
 
-      let mut conn_state : ConnectionState = ConnectionState {
+      let graph : skg::dbs::memory::InRustGraphHandle =
+        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        memory            : OpenViews::new (),
-        graph             : new_handle (InRustGraph::new ()) };
+        open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, true,
-        &Err ( String::new () ), &mut conn_state ) . await?;
+        &input, driver, config, tantivy, &graph, true,
+        &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: 1.skg should still have the worktree ids
       let node_1 = read_nodecomplete(repo_path, "1")?;
@@ -91,15 +93,16 @@ fn test_edit_id_scaffold_respawns()
       let input = GIT_DIFF_VIEW . replace(
         "(unstaged newM)) 2'", "(unstaged newM)) 2-modified");
 
-      let mut conn_state : ConnectionState = ConnectionState {
+      let graph : skg::dbs::memory::InRustGraphHandle =
+        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        memory            : OpenViews::new (),
-        graph             : new_handle (InRustGraph::new ()) };
+        open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, true,
-        &Err ( String::new () ), &mut conn_state ) . await?;
+        &input, driver, config, tantivy, &graph, true,
+        &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: 1.skg should still have the original worktree ids
       let node_1 = read_nodecomplete(repo_path, "1")?;
@@ -134,15 +137,16 @@ fn test_move_id_scaffolds_to_child_respawns()
 **** (skg id) 3
 ";
 
-      let mut conn_state : ConnectionState = ConnectionState {
+      let graph : skg::dbs::memory::InRustGraphHandle =
+        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        memory            : OpenViews::new (),
-        graph             : new_handle (InRustGraph::new ()) };
+        open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, true,
-        &Err ( String::new () ), &mut conn_state ) . await?;
+        &input, driver, config, tantivy, &graph, true,
+        &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: child.skg should not have any new ids
       let node_child = read_nodecomplete(repo_path, "child")?;
@@ -178,15 +182,16 @@ fn test_delete_id_col_scaffold_respawns_staged()
       let input = without_lines_containing(
         GIT_DIFF_VIEW_STAGED, "skg id");
 
-      let mut conn_state : ConnectionState = ConnectionState {
+      let graph : skg::dbs::memory::InRustGraphHandle =
+        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        memory            : OpenViews::new (),
-        graph             : new_handle (InRustGraph::new ()) };
+        open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, true,
-        &Err ( String::new () ), &mut conn_state ) . await?;
+        &input, driver, config, tantivy, &graph, true,
+        &Err ( String::new () ), &mut views_state ) . await?;
 
       assert_buffer_contains(
         &response . saved_view, GIT_DIFF_VIEW_STAGED);

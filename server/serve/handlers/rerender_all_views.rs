@@ -1,6 +1,6 @@
 use crate::types::env::SkgEnv;
 use crate::git_ops::read_repo::open_repo;
-use crate::serve::ConnectionState;
+use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{ compute_diff_for_every_source, deleted_ids_to_source};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_errors_sexp, format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response, tag_text_response};
@@ -20,9 +20,9 @@ use crate::dbs::memory::InRustGraph;
 pub fn handle_rerender_all_views_request (
   stream     : &mut TcpStream,
   env        : &SkgEnv,
-  conn_state : &mut ConnectionState,
+  views_state : &mut ViewsState,
 ) {
-  stream_rerender_views (stream, env, conn_state); }
+  stream_rerender_views (stream, env, views_state); }
 
 /// Stream re-rendered views to Emacs.
 /// Sends: rerender-lock → rerender-view* → rerender-done.
@@ -31,10 +31,10 @@ pub fn handle_rerender_all_views_request (
 pub fn stream_rerender_views (
   stream     : &mut TcpStream,
   env        : &SkgEnv,
-  conn_state : &mut ConnectionState,
+  views_state : &mut ViewsState,
 ) {
   let uris : Vec<ViewUri> =
-    conn_state . memory . views . keys () . cloned () . collect ();
+    views_state . open_views . views . keys () . cloned () . collect ();
 
   // 1. Send lock message with all URIs.
   send_response_with_length_prefix (
@@ -46,7 +46,7 @@ pub fn stream_rerender_views (
   // 2. Compute diffs once, then stream each view.
   let source_diffs
     : Option<HashMap<SourceName, SourceDiff>>
-    = if conn_state . diff_mode_enabled
+    = if views_state . diff_mode_enabled
       { Some ( compute_diff_for_every_source (&env . config)) }
       else { None };
   let deleted_since_head_pid_src_map
@@ -57,12 +57,12 @@ pub fn stream_rerender_views (
   let deleted_by_this_save_pids : HashSet<ID> =
     HashSet::new ();
   let graph_snap : Arc<InRustGraph> =
-    conn_state . graph . load_full ();
+    env . memory . load_full ();
   let mut errors : Vec<String> = Vec::new ();
 
   for uri in uris {
     let mut viewforest : Tree<ViewNode> = match
-      conn_state . memory . viewuri_to_view (&uri) {
+      views_state . open_views . viewuri_to_view (&uri) {
         Some (f) => f . clone (),
         None => {
           errors . push ( format! (
@@ -82,7 +82,7 @@ pub fn stream_rerender_views (
         &deleted_by_this_save_pids,
         false ) . await } )
     { Ok (text) => {
-        conn_state . memory . update_view (&uri, viewforest);
+        views_state . open_views . update_view (&uri, viewforest);
         send_response_with_length_prefix (
           stream,
           & tag_sexp_response (
@@ -106,16 +106,16 @@ pub fn stream_rerender_views (
 pub fn handle_git_diff_toggle_and_rerender (
   stream     : &mut TcpStream,
   env        : &SkgEnv,
-  conn_state : &mut ConnectionState,
+  views_state : &mut ViewsState,
 ) {
-  conn_state . diff_mode_enabled = ! conn_state . diff_mode_enabled;
+  views_state . diff_mode_enabled = ! views_state . diff_mode_enabled;
   let msg : String =
-    git_diff_mode_message (conn_state . diff_mode_enabled, &env . config);
+    git_diff_mode_message (views_state . diff_mode_enabled, &env . config);
   tracing::info! ( msg = %msg, "Git diff mode toggled" );
   send_response_with_length_prefix (
     stream,
     & tag_text_response ( TcpToClient::GitDiffMode, &msg ));
-  stream_rerender_views (stream, env, conn_state); }
+  stream_rerender_views (stream, env, views_state); }
 
 /// Build the human-readable message for a diff-mode toggle,
 /// including warnings for sources not tracked in git.

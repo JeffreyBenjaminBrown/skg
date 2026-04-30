@@ -8,7 +8,7 @@ use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
 use crate::dbs::memory::InRustGraph;
 use crate::types::env::SkgEnv;
-use crate::serve::ConnectionState;
+use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_text_response};
 use crate::types::misc::TantivyIndex;
@@ -21,7 +21,7 @@ use std::sync::Arc;
 pub fn handle_rebuild_dbs_request (
   stream     : &mut TcpStream,
   env        : &mut SkgEnv,
-  conn_state : &mut ConnectionState,
+  views_state : &mut ViewsState,
 ) {
   tracing::info!("Rebuilding databases from disk...");
   let result : Result<(), String> = (|| {
@@ -55,14 +55,14 @@ pub fn handle_rebuild_dbs_request (
     { // Rebuild the in-memory graph from disk too, so it stays in sync with the freshly repopulated TypeDB/Tantivy.
       let fresh_graph : InRustGraph =
         InRustGraph::from_nodecompletes (&nodes);
-      conn_state . graph . store (
+      env . memory . store (
         Arc::new (fresh_graph) );
       tracing::info!("In-memory graph rebuilt."); }
     Ok (())
   })();
   let msg : String = match result {
     Ok (()) => {
-      conn_state . memory . clear ();
+      views_state . open_views . clear ();
       "Databases rebuilt successfully." . to_string () },
     Err (e) => {
       tracing::error!("Rebuild failed: {}", e);

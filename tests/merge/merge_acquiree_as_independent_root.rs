@@ -37,7 +37,7 @@ use std::sync::Arc;
 
 use skg::test_utils::{run_with_test_db, graph_handle_from_config, audit_memory_or_panic};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
-use skg::serve::ConnectionState;
+use skg::serve::ViewsState;
 use skg::types::memory::OpenViews;
 
 use skg::dbs::memory::InRustGraphHandle;
@@ -69,18 +69,18 @@ async fn merge_acquiree_as_independent_root_impl (
 
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
-  let mut conn_state : ConnectionState = ConnectionState {
+  let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
-        memory            : OpenViews::new (),
-        graph             : graph . clone () };
+        open_views            : OpenViews::new (),
+        };
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
   let mut stream : TcpStream =
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
-    input_org_text, driver, config, tantivy, false,
-    &Err ( String::new () ), &mut conn_state ) . await ?;
+    input_org_text, driver, config, tantivy, &graph, false,
+    &Err ( String::new () ), &mut views_state ) . await ?;
 
   println!("Rendered buffer after merge:\n{}", response . saved_view);
   if !response . errors . is_empty() {

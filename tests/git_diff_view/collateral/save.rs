@@ -42,21 +42,22 @@ fn test_collateral_view_preserves_diff_annotations()
       // Sanity: initial view should match expected diff output.
       assert_buffer_contains(&initial_buffer, GIT_DIFF_VIEW);
 
-      // 2. Build a ConnectionState with diff_mode_enabled.
+      // 2. Build a ViewsState with diff_mode_enabled.
       // (Fixture nodes are on disk via setup_git_repo_with_fixtures;
       // the rerender pipeline reads them as needed.)
-      let mut conn_state : ConnectionState = ConnectionState {
+      let graph : skg::dbs::memory::InRustGraphHandle =
+        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        memory            : OpenViews::new (),
-        graph             : new_handle (InRustGraph::new ()) };
+        open_views            : OpenViews::new (),};
 
       // 3. Register buffer 1 and buffer 2,
       //    both viewing the same viewforest rooted at "a".
       let uri_1 : ViewUri = ViewUri::ContentView ( "buffer-1" . to_string() );
       let uri_2 : ViewUri = ViewUri::ContentView ( "buffer-2" . to_string() );
-      conn_state . memory . register_view (
+      views_state . open_views . register_view (
         uri_1 . clone (), viewforest . clone (), &pids );
-      conn_state . memory . register_view (
+      views_state . open_views . register_view (
         uri_2 . clone (), viewforest . clone (), &pids );
 
       // 4. Save buffer 1 with a new child "c" under "a".
@@ -68,10 +69,9 @@ fn test_collateral_view_preserves_diff_annotations()
       let save_response : SaveResponse =
         update_from_and_rerender_buffer (
           &mut stream,
-          &save_input, &driver, &config, &mut tantivy,
-          true,
+          &save_input, &driver, &config, &mut tantivy, &graph, true,
           &Ok ( uri_1 . clone () ),
-          &mut conn_state ) . await ?;
+          &mut views_state ) . await ?;
 
       Result::<_, Box<dyn Error>>::Ok ((
         config, driver, tantivy, save_response,
@@ -161,16 +161,17 @@ fn test_collateral_view_staged_text_and_unstaged_add()
       // Sanity: initial view has textChanged attributed to staged.
       assert_buffer_contains(&initial_buffer, GIT_DIFF_VIEW_STAGED);
 
-      let mut conn_state : ConnectionState = ConnectionState {
+      let graph : skg::dbs::memory::InRustGraphHandle =
+        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        memory            : OpenViews::new (),
-        graph             : new_handle (InRustGraph::new ()) };
+        open_views            : OpenViews::new (),};
 
       let uri_1 : ViewUri = ViewUri::ContentView ( "buffer-1" . to_string() );
       let uri_2 : ViewUri = ViewUri::ContentView ( "buffer-2" . to_string() );
-      conn_state . memory . register_view (
+      views_state . open_views . register_view (
         uri_1 . clone (), viewforest . clone (), &pids );
-      conn_state . memory . register_view (
+      views_state . open_views . register_view (
         uri_2 . clone (), viewforest . clone (), &pids );
 
       let save_input : String = insert_after (
@@ -180,10 +181,9 @@ fn test_collateral_view_staged_text_and_unstaged_add()
       let save_response : SaveResponse =
         update_from_and_rerender_buffer (
           &mut stream,
-          &save_input, &driver, &config, &mut tantivy,
-          true,
+          &save_input, &driver, &config, &mut tantivy, &graph, true,
           &Ok ( uri_1 . clone () ),
-          &mut conn_state ) . await ?;
+          &mut views_state ) . await ?;
 
       Result::<_, Box<dyn Error>>::Ok ((
         config, driver, tantivy, save_response,

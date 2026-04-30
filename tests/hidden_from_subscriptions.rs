@@ -18,9 +18,9 @@ use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::nodes::complete::NodeComplete;
 use std::sync::Arc;
 
-use skg::serve::ConnectionState;
+use skg::serve::ViewsState;
 use skg::types::memory::OpenViews;
-use skg::dbs::memory::{InRustGraph, new_handle};
+
 use futures::executor::block_on;
 use std::error::Error;
 use std::net::TcpStream;
@@ -147,16 +147,17 @@ fn test_every_kind_of_col(
       let modified_view : String =
         add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}", modified_view);
-      let mut conn_state : ConnectionState = ConnectionState {
+      let graph : skg::dbs::memory::InRustGraphHandle =
+        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
-        memory            : OpenViews::new (),
-        graph             : new_handle (InRustGraph::new ()) };
+        open_views            : OpenViews::new (),};
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
           &mut stream,
-          &modified_view, &driver, &config, &mut tantivy, false,
+          &modified_view, &driver, &config, &mut tantivy, &graph, false,
 
-          &Err ( String::new () ), &mut conn_state
+          &Err ( String::new () ), &mut views_state
         ) . await ?;
       response . saved_view };
     println!("View from R after save with definitive view requests:\n{}", expanded);
@@ -223,16 +224,17 @@ fn test_hidden_within_but_none_without(
       let modified_view : String =
         add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}", modified_view);
-      let mut conn_state : ConnectionState = ConnectionState {
+      let graph : skg::dbs::memory::InRustGraphHandle =
+        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
-        memory            : OpenViews::new (),
-        graph             : new_handle (InRustGraph::new ()) };
+        open_views            : OpenViews::new (),};
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
           &mut stream,
-          &modified_view, &driver, &config, &mut tantivy, false,
+          &modified_view, &driver, &config, &mut tantivy, &graph, false,
 
-          &Err ( String::new () ), &mut conn_state
+          &Err ( String::new () ), &mut views_state
         ) . await ?;
       response . saved_view };
     println!("View from R after save with definitive view requests:\n{}", expanded);
@@ -300,16 +302,17 @@ fn test_hidden_without_but_none_within(
       let modified_view : String =
         add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}", modified_view);
-      let mut conn_state : ConnectionState = ConnectionState {
+      let graph : skg::dbs::memory::InRustGraphHandle =
+        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
-        memory            : OpenViews::new (),
-        graph             : new_handle (InRustGraph::new ()) };
+        open_views            : OpenViews::new (),};
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
         &mut stream,
-        &modified_view, &driver, &config, &mut tantivy, false,
+        &modified_view, &driver, &config, &mut tantivy, &graph, false,
 
-        &Err ( String::new () ), &mut conn_state ) . await ?;
+        &Err ( String::new () ), &mut views_state ) . await ?;
       response . saved_view };
     println!("View from R after save with definitive view requests:\n{}",
              with_subscribees_expanded);
@@ -373,16 +376,17 @@ fn test_overlapping_hidden_within(
         add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}",
                modified_view);
-      let mut conn_state : ConnectionState = ConnectionState {
+      let graph : skg::dbs::memory::InRustGraphHandle =
+        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
-        memory            : OpenViews::new (),
-        graph             : new_handle (InRustGraph::new ()) };
+        open_views            : OpenViews::new (),};
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
         &mut stream,
-        &modified_view, &driver, &config, &mut tantivy, false,
+        &modified_view, &driver, &config, &mut tantivy, &graph, false,
 
-        &Err ( String::new () ), &mut conn_state ) . await ?;
+        &Err ( String::new () ), &mut views_state ) . await ?;
       response . saved_view };
     println!("View from R after save with definitive view requests:\n{}", expanded);
     let expected_expanded = indoc! {

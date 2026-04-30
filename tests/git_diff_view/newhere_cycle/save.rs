@@ -27,15 +27,16 @@ fn test_newhere_cycle_survives_save()
       multi_root_view(&driver, &config, None, &root_ids, true) . await?;
 
     // Round-trip through the save pipeline.
-    let mut conn_state : ConnectionState = ConnectionState {
+    let graph : skg::dbs::memory::InRustGraphHandle =
+      skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+    let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        memory            : OpenViews::new (),
-        graph             : new_handle (InRustGraph::new ()) };
+        open_views            : OpenViews::new (),};
     let (mut stream, _) = mk_test_tcp_stream_pair ();
     let response = update_from_and_rerender_buffer(
       &mut stream,
-      &initial_view, &driver, &config, &mut tantivy, true,
-      &Err ( String::new () ), &mut conn_state ) . await?;
+      &initial_view, &driver, &config, &mut tantivy, &graph, true,
+      &Err ( String::new () ), &mut views_state ) . await?;
 
     assert_buffer_contains( &response . saved_view,
                             GIT_DIFF_VIEW);

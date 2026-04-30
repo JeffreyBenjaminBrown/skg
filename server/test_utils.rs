@@ -12,7 +12,7 @@ use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::types::env::SkgEnv;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, HeadlineInfo};
-use crate::serve::ConnectionState;
+use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{SaveResponse, update_from_and_rerender_buffer};
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
 use crate::types::memory::ViewUri;
@@ -222,7 +222,7 @@ pub fn skg_env_from_parts (
 /// Test shim around 'update_from_and_rerender_buffer' that accepts
 /// the four DB handles separately, builds a 'SkgEnv', and calls the
 /// underlying function. Lets pre-SkgEnv test code continue to pass
-/// '(driver, config, tantivy)' triples without change.
+/// '(driver, config, tantivy, graph)' tuples without change.
 ///
 /// PITFALL: a SkgEnv field swap inside the call (e.g. a save's
 /// rebuild path replacing 'tantivy_index') will not propagate back
@@ -235,21 +235,22 @@ pub async fn update_from_and_rerender_buffer_test (
   driver                      : &Arc<TypeDBDriver>,
   config                      : &SkgConfig,
   tantivy_index               : &TantivyIndex,
+  graph                       : &InRustGraphHandle,
   diff_mode_enabled           : bool,
   viewuri_from_request_result : &Result<ViewUri, String>,
-  conn_state                  : &mut ConnectionState,
+  views_state                 : &mut ViewsState,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut env : SkgEnv =
     skg_env_from_parts (
       config, Arc::clone (driver),
-      tantivy_index, &conn_state . graph );
+      tantivy_index, graph );
   update_from_and_rerender_buffer (
     stream,
     org_buffer_text,
     &mut env,
     diff_mode_enabled,
     viewuri_from_request_result,
-    conn_state ) . await }
+    views_state ) . await }
 
 /// Audit the given in-Rust graph handle against TypeDB; panic with a
 /// detailed message if they disagree. Intended for per-test-fixture

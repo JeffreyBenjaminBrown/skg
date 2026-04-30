@@ -1,11 +1,10 @@
 /// Node access utilities for ego_tree::Tree<ViewNode> and Tree<UncheckedViewNode>
 
-use crate::to_org::util::{nodecomplete_and_viewnode_from_id, get_id_from_treenode};
+use crate::to_org::util::get_id_from_treenode;
 use crate::types::memory::nodecomplete_from_memory_or_disk;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, TrueNode, Scaffold,
-    Birth, mk_indefinitive_from_viewnode, mk_unknown_viewnode,
     viewnode_from_scaffold };
 use crate::types::unchecked_viewnode::{
     UncheckedViewNode, UncheckedViewNodeKind };
@@ -16,7 +15,6 @@ use super::generic::{write_at_node_in_tree, with_node_mut};
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 /// Apply a mutating function to the TrueNode at the given tree position.
 /// Errors if the node is not found or is not a TrueNode.

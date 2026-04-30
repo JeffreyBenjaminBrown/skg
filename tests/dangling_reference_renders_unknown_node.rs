@@ -19,12 +19,11 @@ use std::net::TcpStream;
 use std::sync::Arc;
 
 use skg::to_org::render::content_view::single_root_view;
-use skg::test_utils::{run_with_test_db, graph_handle_from_config};
+use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
-use skg::serve::ConnectionState;
+use skg::serve::ViewsState;
 use skg::types::memory::OpenViews;
-use skg::dbs::memory::InRustGraphHandle;
 use typedb_driver::TypeDBDriver;
 
 #[test]
@@ -81,20 +80,20 @@ async fn buffer_with_unknownnode_child_saves_cleanly_impl (
     * (skg (node (id parent) (source main))) parent
     ** (skg (unknownNode (id ghost)))
   "};
-  let graph : InRustGraphHandle =
-    graph_handle_from_config (config) ?;
-  let mut conn_state : ConnectionState = ConnectionState {
+  let graph : skg::dbs::memory::InRustGraphHandle =
+    skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+  let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
-        memory            : OpenViews::new (),
-        graph             : graph . clone () };
+        open_views            : OpenViews::new (),
+        };
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
   let mut stream : TcpStream =
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
-    input_org_text, driver, config, tantivy, false,
-    &Err ( String::new () ), &mut conn_state ) . await ?;
+    input_org_text, driver, config, tantivy, &graph, false,
+    &Err ( String::new () ), &mut views_state ) . await ?;
   if ! response . errors . is_empty () {
     panic! ("save returned errors instead of completing: {:?}",
             response . errors); }

@@ -16,15 +16,16 @@ fn test_delete_removed_node_respawns()
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "gets-removed");
 
-      let mut conn_state : ConnectionState = ConnectionState {
+      let graph : skg::dbs::memory::InRustGraphHandle =
+        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        memory            : OpenViews::new (),
-        graph             : new_handle (InRustGraph::new ()) };
+        open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
           &mut stream,
-          &input, driver, config, tantivy, true,
-          &Err ( String::new () ), &mut conn_state
+          &input, driver, config, tantivy, &graph, true,
+          &Err ( String::new () ), &mut views_state
         ) . await?;
 
       // DISK: gets-removed.skg should still not exist
@@ -56,15 +57,16 @@ fn test_delete_removed_here_node_respawns()
       let input =
         without_lines_containing(GIT_DIFF_VIEW, "(unstaged removedM)");
 
-      let mut conn_state : ConnectionState = ConnectionState {
+      let graph : skg::dbs::memory::InRustGraphHandle =
+        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        memory            : OpenViews::new (),
-        graph             : new_handle (InRustGraph::new ()) };
+        open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, true,
-        &Err ( String::new () ), &mut conn_state
+        &input, driver, config, tantivy, &graph, true,
+        &Err ( String::new () ), &mut views_state
       ) . await?;
 
       // DISK: 12.skg should still have empty contains
@@ -94,15 +96,16 @@ fn test_delete_new_here_updates_disk()
       // The "moves under 11" line is the new-here phantom (membership added).
       let input = without_lines_containing(GIT_DIFF_VIEW, "(unstaged newM)");
 
-      let mut conn_state : ConnectionState = ConnectionState {
+      let graph : skg::dbs::memory::InRustGraphHandle =
+        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        memory            : OpenViews::new (),
-        graph             : new_handle (InRustGraph::new ()) };
+        open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, true,
-        &Err ( String::new () ), &mut conn_state
+        &input, driver, config, tantivy, &graph, true,
+        &Err ( String::new () ), &mut views_state
       ) . await?;
 
       // DISK: 11.skg should no longer contain moves
@@ -138,15 +141,16 @@ fn test_add_new_child_creates_on_disk()
         GIT_DIFF_VIEW, "(id 12)",
         "*** (skg (node (id newer))) newer");
 
-      let mut conn_state : ConnectionState = ConnectionState {
+      let graph : skg::dbs::memory::InRustGraphHandle =
+        skg::dbs::memory::new_handle (skg::dbs::memory::InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
-        memory            : OpenViews::new (),
-        graph             : new_handle (InRustGraph::new ()) };
+        open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, true,
-        &Err ( String::new () ), &mut conn_state
+        &input, driver, config, tantivy, &graph, true,
+        &Err ( String::new () ), &mut views_state
       ) . await?;
 
       // DISK: newer.skg should be created with correct id and title
