@@ -1,0 +1,50 @@
+* merging nodes
+** what merging nodes means
+You might discover that two of your nodes
+are so similar in nature and/or content
+that they ought to be a single node.
+
+A problematic solution is
+to copy all the content from one to the other,
+and then delete the other.
+The problem with that approach
+is that other nodes might have linked to,
+or been in other relationships with,
+the node that you deleted. (You copied the content,
+but content is just one of many kinds of relationship.)
+
+Merging two nodes solves this problem.
+Any relationship that either node was in,
+after the two become one,
+is now a relationship that applies to the one.
+
+** how to merge two nodes
+Steps:
+
+*** Put point on one of the nodes.
+We call this node the 'acquiree'.
+
+*** "Get" that node's ID.
+It's easiest to use 'skg-id-push'.
+
+You could, however, also do this "manually",
+by visiting a metadata buffer for the node ('skg-view-metadata')
+and copying the ID yourself,
+or by disablling the heralds view (toggled by 'skg-view-heralds-mode')
+and manually copying the ID from the node's metadata.
+
+*** Go to the other node, and add a merge request to its metadata.
+We call this other node the 'acquirer'.
+
+Currently this has to be done "manually":
+Open the acquirer's metadata ('skg-view-metadata'),
+go to the "None" under "editRequests",
+and use shift-left or shift-right to cycle through possible values,
+until reaching 'merge'. You will be prompted for a node.
+Paste a link to, or the raw ID of,
+the node at the top of the id stack --
+see 'skg-paste-link' and similar commands.
+
+*** Save the buffer.
+This causes the server to act on the merge request
+and rebuild the buffer.

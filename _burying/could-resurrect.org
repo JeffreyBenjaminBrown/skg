@@ -1,0 +1,68 @@
+* containerward paths
+** If it were fast enough it would be worth resurrecting..
+Indeed it might actually be fast enough already,
+because it was written before the in-Rust graph ('memory')
+** the commit that deleted it
+7c68b1f1ee8c3dce28cfdc1d176cab65b8ec4fb9
+** what it did
+Once, you could request 'containerward path stats'.
+These would tell you the length of
+the containerward path to first nonlinearity,
+the number of forks at that nonlinearity,
+and whether the path cycled.
+
+But it was too expensive to compute by default,
+and since the user can request a containerward history,
+which is strictly more information and just as easy,
+I decided to remove this.
+** the code
+/// Compute containerward path stats for a node and store them,
+/// then remove the view request.
+async fn execute_containerwardstats_request (
+  tree          : &mut Tree<ViewNode>,
+  node_id       : NodeId,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+) -> Result < (), Box<dyn Error> > {
+  let node_pid : ID =
+    get_id_from_treenode ( tree, node_id ) ?;
+  let cp_map : HashMap<ID, ContainerwardPathStats> =
+    containerward_path_stats_bulk (
+      & config . db_name, typedb_driver,
+      & [ node_pid . clone () ] ) . await ?;
+  let cp : ContainerwardPathStats =
+    cp_map . get (& node_pid)
+    . cloned ()
+    . unwrap_or ( ContainerwardPathStats {
+      length : 0,
+      forks  : 1,
+      cycles : false } );
+  write_at_truenode_in_tree (
+    tree, node_id, |t| {
+      t . graphStats . containerwardPath = Some (cp);
+      t . view_requests . remove (& ViewRequest::ContainerwardStats); } )
+    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+  Ok (( )) }
+
+
+impl ContainerwardPathStats {
+  pub fn to_display_atom (&self) -> String {
+    let sep : &str =
+      if self . cycles { "↻" } else { "⤊" };
+    if self . forks <= 1
+      { format! ( "{}{}", sep, self . length ) }
+    else
+      { format! ( "{}{}{}", self . forks, sep, self . length ) } }
+  pub fn from_display_atom (s: &str) -> Option<Self> {
+    // Parse "2⤊5", "⤊3", "2↻5", "↻3"
+    let (before, after, cycles) : (&str, &str, bool) =
+      if let Some (pos) = s . find ('⤊')
+        { ( &s[..pos], &s[pos + '⤊' . len_utf8 ()..], false ) }
+      else if let Some (pos) = s . find ('↻')
+        { ( &s[..pos], &s[pos + '↻' . len_utf8 ()..], true ) }
+      else { return None; };
+    let length : usize = after . parse () . ok () ?;
+    let forks : usize =
+      if before . is_empty () { 1 }
+      else { before . parse () . ok () ? };
+    Some ( ContainerwardPathStats { length, forks, cycles } ) } }

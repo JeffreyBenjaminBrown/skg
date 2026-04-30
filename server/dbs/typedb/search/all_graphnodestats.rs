@@ -91,8 +91,7 @@ pub fn graphnodestats_for_pid (
     overriding     : stats . has_overrides  . contains (pid),
     subscribing    : stats . has_subscribes . contains (pid),
     containRels    : contain_rels,
-    linksourceRels : linksource_rels,
-    containerwardPath : None, }}
+    linksourceRels : linksource_rels, }}
 
 /// Stats for a single PID, returned by 'fetch_one_pid_stats'.
 struct OnePidStats {

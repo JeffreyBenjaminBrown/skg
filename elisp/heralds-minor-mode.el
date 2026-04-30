@@ -62,8 +62,7 @@
         (BLUE aliasing "A")
         (BLUE extraIDs "I")
         (BLUE overriding "O")
-        (BLUE subscribing "S")
-        (BLUE containerwardPath (ANY IT)))
+        (BLUE subscribing "S"))
       (BLUE viewStats
         (BLUE cycle "⟳")
         (containsParent "}")
@@ -74,7 +73,6 @@
       (GREEN viewRequests
         (aliases "req:aliases")
         (containerwardView "req:containers")
-        (containerwardStats "req:cw-stats")
         (sourcewardView "req:sources")
         (definitiveView "req:definitive"))
       (GREEN INTERC "" staged "staged:"

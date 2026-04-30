@@ -508,7 +508,7 @@ fn test_definitive_request_with_only_non_content_children_is_allowed (
     |config, driver, _tantivy| Box::pin (async move {
       let input : &str =
         indoc! {"
-                * (skg (node (id parent) (source main) indefinitive (viewRequests definitiveView))) parent
+                * (skg (node (id parent) (source main) indef (viewRequests definitiveView))) parent
                 ** (skg (node (id ancestor) (source main) (birth containerOf))) non-content child
             "};
       let viewforest : Tree<UncheckedViewNode> =
@@ -538,7 +538,7 @@ fn test_definitive_request_with_content_child_is_rejected (
     |config, driver, _tantivy| Box::pin (async move {
       let input : &str =
         indoc! {"
-                * (skg (node (id parent) (source main) indefinitive (viewRequests definitiveView))) parent
+                * (skg (node (id parent) (source main) indef (viewRequests definitiveView))) parent
                 ** (skg (node (id c) (source main))) content child
             "};
       let viewforest : Tree<UncheckedViewNode> =

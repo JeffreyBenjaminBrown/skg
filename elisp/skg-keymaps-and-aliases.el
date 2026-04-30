@@ -119,8 +119,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c s a") #'skg-show-aliases)
     (define-key map (kbd "C-c s c") #'skg-show-containerward)
     (define-key map (kbd "C-c s n") #'skg-show-org-ancestry)
-    (define-key map (kbd "C-c s s") #'skg-show-sourceward)
-    (define-key map (kbd "C-c s t") #'skg-show-stats))
+    (define-key map (kbd "C-c s s") #'skg-show-sourceward))
   (progn;; properties
     (define-key map (kbd "C-c p d") #'skg-make-definitive)
     (define-key map (kbd "C-c p i") #'skg-make-indefinitive))

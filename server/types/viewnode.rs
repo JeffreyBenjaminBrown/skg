@@ -145,7 +145,6 @@ pub struct GraphNodeStats {
   pub subscribing       : bool, // subscriber *or* subscribee, anywhere
   pub containRels       : Option<NodeContainRels>,
   pub linksourceRels    : Option<NodeLinksourceRels>,
-  pub containerwardPath : Option<ContainerwardPathStats>,
 }
 
 /// View-specific statistics about a node.
@@ -209,7 +208,6 @@ pub enum EditRequest {
 pub enum ViewRequest {
   Aliases,
   Containerward,
-  ContainerwardStats,
   Sourceward,
   Definitive,
 }
@@ -291,28 +289,6 @@ impl NodeLinksourceRels {
     herald_from_pair ( self . sources_with_content,    0,
                        self . sources_without_content, 0,
                        "→" ) } }
-
-impl ContainerwardPathStats {
-  pub fn to_display_atom (&self) -> String {
-    let sep : &str =
-      if self . cycles { "↻" } else { "⤊" };
-    if self . forks <= 1
-      { format! ( "{}{}", sep, self . length ) }
-    else
-      { format! ( "{}{}{}", self . forks, sep, self . length ) } }
-  pub fn from_display_atom (s: &str) -> Option<Self> {
-    // Parse "2⤊5", "⤊3", "2↻5", "↻3"
-    let (before, after, cycles) : (&str, &str, bool) =
-      if let Some (pos) = s . find ('⤊')
-        { ( &s[..pos], &s[pos + '⤊' . len_utf8 ()..], false ) }
-      else if let Some (pos) = s . find ('↻')
-        { ( &s[..pos], &s[pos + '↻' . len_utf8 ()..], true ) }
-      else { return None; };
-    let length : usize = after . parse () . ok () ?;
-    let forks : usize =
-      if before . is_empty () { 1 }
-      else { before . parse () . ok () ? };
-    Some ( ContainerwardPathStats { length, forks, cycles } ) } }
 
 impl ScaffoldKind {
   /// Single source of truth for ScaffoldKind <-> Emacs string bijection.
@@ -400,7 +376,6 @@ impl ViewRequest {
   const REPRS_IN_CLIENT: &'static [(&'static str, ViewRequest)] = &[
     ("aliases",            ViewRequest::Aliases),
     ("containerwardView",  ViewRequest::Containerward),
-    ("containerwardStats", ViewRequest::ContainerwardStats),
     ("sourcewardView",     ViewRequest::Sourceward),
     ("definitiveView",     ViewRequest::Definitive),
   ];
@@ -511,7 +486,6 @@ impl Default for GraphNodeStats {
       linksourceRels    : Some ( NodeLinksourceRels {
         sources_with_content    : 0,
         sources_without_content : 0 } ),
-      containerwardPath : None,
     }} }
 
 impl Default for ViewNodeStats {

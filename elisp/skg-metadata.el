@@ -45,10 +45,10 @@ call `skg-request-save-buffer' afterward."
 
 (defun skg-make-indefinitive ()
   "Mark the headline at point as indefinitive.
-Edits the metadata to include `indefinitive` in the `node` section.
+Edits the metadata to include `indef` in the `node` section.
 Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive)
-  (skg-edit-metadata-at-point '(skg (node indefinitive))))
+  (skg-edit-metadata-at-point '(skg (node indef))))
 
 (defun skg-parse-headline-metadata (headline-text)
   "Parse skg metadata from HEADLINE-TEXT after org bullets.

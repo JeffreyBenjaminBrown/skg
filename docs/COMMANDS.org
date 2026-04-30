@@ -192,13 +192,8 @@ This actually works in org-mode outside of skg.
 *** C-c s s : skg-show-sourceward
 Show the nodes that the node at point links to (its textlink
 targets).
-*** C-c s t : skg-show-stats
-Computes the containerward path stats for a node
-(path length, fork count, whether it cycles)
-and saves. The stats then appear in the node's metadata
-and in the heralds view.
-** node properties
-*** C-c p d : skg-make-definitive
+** node properties : definitive/indefinitive
+*** what those words mean
 A view of a node can be definitive or indefinitive.
 Typically the first place in the buffer that depicts a node
 is the definitive view of it. So that other views of that node
@@ -206,7 +201,19 @@ cannot contradict it, they are 'indefinitive': Edits to them
 cannot affect the node they depict. They are also truncated --
 that is, shown without content --
 in order to prevent the view from becoming redundant and huge.
+*** PITFALL: Don't make something 'definitive' by directly editing its metadata.
+Instead, use skg-make-definitive, below.
+That's because Skg has to make other instances of it
+(in this same buffer -- and maybe in the future other buffers too)
+indefinitive. That's because a buffer can only be saved
+if it has at most one definitive instance of a node.
+Otherwise, two definitive nodes could contradict each other.
 
+This same caveat does not apply to making a node indefinitive.
+While there does exist a command for that (skg-make-indefinitive)
+you can also 'do it yourself'
+by visiting a metadata buffer for the node (skg-view-metadata).
+*** C-c p d : skg-make-definitive
 If you want to see the definitive view of that node
 from a place where it is currently shown in an indefinitive form,
 call this function. It will make the current definitive view

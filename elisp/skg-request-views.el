@@ -1,7 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; Functions for requesting views (aliases, containerward, sourceward, definitive)
-;;; and stats (containerward stats)
 ;;; by adding metadata to the current headline and saving the buffer,
 ;;; allowing Rust to process the request during completion.
 
@@ -19,11 +18,6 @@
   "Request containerward view and (to apply it) save."
   (interactive)
   (skg--request-view-and-save 'containerwardView))
-
-(defun skg-show-stats ()
-  "Request containerward path stats and save."
-  (interactive)
-  (skg--request-view-and-save 'containerwardStats))
 
 (defun skg-request-sourceward-view ()
   "Request sourceward view and (to apply it) save."

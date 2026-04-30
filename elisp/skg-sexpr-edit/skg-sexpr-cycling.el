@@ -46,7 +46,7 @@ Returns the new value. If FIELD-VALUE is not in VALUES, starts at index 0."
 FIELD-VALUE is the current headline text, needed for source defaulting.
 Returns nil if the field is not cycleable."
   (cond
-   ((string= field-name "indefinitive")
+   ((string= field-name "indef")
     '("false (default)" "true"))
    ((string= field-name "birth")
     '("contentOf (default)" "independent" "containerOf" "linksTo"))
@@ -56,7 +56,7 @@ Returns nil if the field is not cycleable."
     (skg-sexp-edit--source-cycle-values field-value))
    ((string= field-name "viewRequests")
     '("none (default)"
-      "aliases" "containerwardView" "containerwardStats"
+      "aliases" "containerwardView"
       "sourcewardView" "definitiveView"))))
 
 (defun skg-sexp-edit--source-cycle-values (field-value)
@@ -91,11 +91,6 @@ Dispatch is based on the parent headline text."
                    parent field-value)))
       (cond
        (values
-        (when (string= parent "source")
-          (message
-           (concat "Warning: if this node already exists in the graph"
-                   " with a distinct source, changing it here will"
-                   " probably cause problems.")))
         (let ((new-val (skg-sexp-edit--cycle-through
                         field-value values direction)))
           (org-edit-headline new-val)
@@ -105,10 +100,6 @@ Dispatch is based on the parent headline text."
               (org-edit-headline (concat "merge " id))))))
        ;; source with no config: prompt
        ((string= parent "source")
-        (message
-         (concat "Warning: if this node already exists in the graph"
-                 " with a distinct source, changing it here will"
-                 " probably cause problems."))
         (org-edit-headline (read-string "Source: " field-value)))
        (t
         (user-error "Field '%s' is not cycleable" parent))))))
