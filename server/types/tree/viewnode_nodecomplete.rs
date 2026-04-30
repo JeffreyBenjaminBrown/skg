@@ -156,30 +156,6 @@ pub fn insert_scaffold_as_child (
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (col_id) }
 
-/// Fetch a node from disk and append it as an indefinitive child.
-pub async fn append_indefinitive_from_disk_as_child (
-  tree      : &mut Tree<ViewNode>,
-  parent_id : NodeId,
-  node_id   : &ID,
-  birth     : Birth,
-  config    : &SkgConfig,
-  driver    : &TypeDBDriver,
-) -> Result < (), Box<dyn Error> > {
-  let viewnode : ViewNode = match
-    nodecomplete_and_viewnode_from_id (
-      config, driver, node_id ) . await ? {
-      Some (( _nc, content_viewnode )) =>
-        mk_indefinitive_from_viewnode (
-          content_viewnode, birth )
-          . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
-      None => mk_unknown_viewnode (node_id . clone ()), };
-  with_node_mut (
-    tree, parent_id,
-    |mut parent_mut| {
-      parent_mut . append (viewnode); } )
-    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  Ok (( )) }
-
 /// Collect aliases for a node:
 /// - find the unique AliasCol child (error if multiple)
 /// - for each Alias child of the AliasCol, collect its title

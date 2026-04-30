@@ -5,20 +5,67 @@ use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   partition_subscribee_content_for_subscriber,
   what_node_hides,
   what_nodes_contain };
-use crate::types::misc::{ID, SkgConfig};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth};
+use crate::to_org::complete::sharing::child_data::{
+  ChildData, reconcile_sharing_scaffold_children };
+use crate::to_org::util::nodecomplete_and_viewnode_from_id;
+use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::nodes::complete::NodeComplete;
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
 use crate::types::tree::viewnode_nodecomplete::{
-  append_indefinitive_from_disk_as_child,
   insert_scaffold_as_child,
   pids_for_subscriber_and_its_subscribees,
   pid_for_subscribee_and_its_subscriber_grandparent,
   unique_scaffold_child };
 
 use ego_tree::{NodeId, NodeRef, Tree};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
+
+/// Resolve each goal-list id to its primary-pid form (so extra_ids
+/// collapse to their primary pid), keeping the original input order
+/// and de-duplicating, and build a 'ChildData' for each.
+///
+/// Uses 'nodecomplete_and_viewnode_from_id' (TypeDB-aware) so
+/// cross-source IDs and extra_id-to-primary resolution both work,
+/// matching the source-resolution behavior of the per-id append
+/// loops this code replaced.
+///
+/// Returns '(resolved_pids, child_data)': the resolved goal list
+/// and the per-pid data map that 'reconcile_sharing_scaffold_children'
+/// expects.
+///
+/// 'phantom' is always 'None' on initial render: there is no diff
+/// view, no removed children, and no notion of a node that "used
+/// to be here" from a previous state.
+async fn build_initial_render_child_data (
+  ids    : &[ID],
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+) -> Result<(Vec<ID>, HashMap<ID, ChildData>), Box<dyn Error>> {
+  let mut goal     : Vec<ID>                = Vec::with_capacity (ids . len ());
+  let mut resolved : HashMap<ID, ChildData> = HashMap::new ();
+  for id in ids {
+    let lookup : Option<(NodeComplete, ViewNode)> =
+      nodecomplete_and_viewnode_from_id (config, driver, id) . await ?;
+    let (primary_pid, source, title) : (ID, SourceName, String) = match lookup {
+      Some ((nc, _vn)) =>
+        ( nc . pid . clone (),
+          nc . source . clone (),
+          nc . title . clone () ),
+      None => // No record anywhere; 'reconcile' will still need an
+              // entry, but downstream rendering would treat this as
+              // an UnknownNode case. We pass the raw id through with
+              // a sentinel source/title so the reconcile call can
+              // still run.
+        ( id . clone (), SourceName::from (""), String::new () ), };
+    if resolved . contains_key (&primary_pid) { continue; }
+    goal . push (primary_pid . clone ());
+    resolved . insert (
+      primary_pid,
+      ChildData { source, title, phantom : None } ); }
+  Ok ((goal, resolved)) }
 
 /// Check if a node's type and parent type are consistent with being a Subscribee.
 /// A Subscribee is a TrueNode whose parent is a SubscribeeCol scaffold.
@@ -92,23 +139,28 @@ pub async fn maybe_add_subscribeeCol_branch (
   let subscribee_col_nid : NodeId =
     insert_scaffold_as_child ( tree, node_id,
       Scaffold::SubscribeeCol, true ) ?;
-
-  { // mutate the tree
-    if ! hidden_outside_content . is_empty () {
-      let hidden_outside_col_nid : NodeId =
-        insert_scaffold_as_child (
-          tree, subscribee_col_nid,
-          Scaffold::HiddenOutsideOfSubscribeeCol, false ) ?;
-      for hidden_id in hidden_outside_content {
-        append_indefinitive_from_disk_as_child (
-          tree, hidden_outside_col_nid, & hidden_id,
-          Birth::ContentOf, config, driver
-        ) . await ?; }}
-    for subscribee_id in subscribee_ids {
-      append_indefinitive_from_disk_as_child (
-        tree, subscribee_col_nid, & subscribee_id,
-        Birth::ContentOf, config, driver
-      ) . await ?; }}
+  // Order matters: HiddenOutsideOfSubscribeeCol goes first (via
+  // append to the empty col), then the subscribee children. This
+  // matches the legacy order produced by the old per-id-append loops.
+  if ! hidden_outside_content . is_empty () {
+    let hidden_outside_col_nid : NodeId =
+      insert_scaffold_as_child (
+        tree, subscribee_col_nid,
+        Scaffold::HiddenOutsideOfSubscribeeCol, false ) ?;
+    let hidden_outside_ids : Vec<ID> =
+      hidden_outside_content . into_iter () . collect ();
+    let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
+      build_initial_render_child_data (
+        &hidden_outside_ids, config, driver ) . await ?;
+    reconcile_sharing_scaffold_children (
+      tree, hidden_outside_col_nid, &goal, &data,
+      "maybe_add_subscribeeCol_branch (hidden-outside)" ) ?; }
+  { let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
+      build_initial_render_child_data (
+        &subscribee_ids, config, driver ) . await ?;
+    reconcile_sharing_scaffold_children (
+      tree, subscribee_col_nid, &goal,
+      &data, "maybe_add_subscribeeCol_branch" ) ?; }
   Ok (( )) }
 
 /// If this node is a Subscribee,
@@ -140,13 +192,16 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
         & subscriber_pid, & subscribee_pid ) . await ?;
   if hidden_in_content . is_empty () {
     return Ok (( )); }
+  let hidden_in_ids : Vec<ID> =
+    hidden_in_content . into_iter () . collect ();
   let hidden_col_nid : NodeId =
     insert_scaffold_as_child (
       tree, subscribee_treeid,
       Scaffold::HiddenInSubscribeeCol, true ) ?;
-  for hidden_id in hidden_in_content {
-    // populate the collection
-    append_indefinitive_from_disk_as_child (
-      tree, hidden_col_nid, & hidden_id,
-      Birth::ContentOf, config, driver ) . await ?; }
+  let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
+    build_initial_render_child_data (
+      &hidden_in_ids, config, driver ) . await ?;
+  reconcile_sharing_scaffold_children (
+    tree, hidden_col_nid, &goal,
+    &data, "maybe_add_hiddenInSubscribeeCol_branch" ) ?;
   Ok (( )) }
