@@ -178,6 +178,30 @@ fn test_org_to_uninterpreted_nodes2_body_spacing() {
 }
 
 #[test]
+fn test_org_to_uninterpreted_nodes2_indented_star_is_body_text() {
+  let input: &str =
+    indoc! {"
+            * (skg (node (id afff132a-e822-46cb-aed4-5725b7d1b0c5) (source public) (birth independent))) [#A] pressing*
+              * = org-roam transplant first needs
+            ** dogfood it
+        "};
+
+  let viewforest: Tree<UncheckedViewNode> =
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let tree_roots: Vec<_> = viewforest . root() . children() . collect();
+  let root = tree_roots[0] . value();
+  let root_children: Vec<_> = tree_roots[0] . children() . collect();
+
+  assert_eq! (tree_roots . len(), 1);
+  assert_eq! (root . title(), "[#A] pressing*");
+  assert_eq! (
+    root . body(),
+    Some (&"  * = org-roam transplant first needs" . to_string()));
+  assert_eq! (root_children . len(), 1);
+  assert_eq! (root_children[0] . value() . title(), "dogfood it");
+}
+
+#[test]
 fn test_org_to_uninterpreted_nodes2_basic_metadata() {
   let input: &str =
     indoc! {"
