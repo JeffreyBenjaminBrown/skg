@@ -4,7 +4,7 @@ use crate::to_org::complete::sharing::goal_list::goal_list_for_hiddeninsubscribe
 use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
-use crate::types::views_state::nodecomplete_from_in_rust_graph_or_disk;
+use crate::types::views_state::nodecomplete_from_inrustgraph_or_disk;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth};
@@ -50,12 +50,12 @@ pub fn complete_hiddeninsubscribee_col (
       "complete_hiddeninsubscribee_col" ) ?;
   let subscribee_contains : Vec<ID> = {
     let subscribee_nodecomplete : NodeComplete =
-      nodecomplete_from_in_rust_graph_or_disk (
+      nodecomplete_from_inrustgraph_or_disk (
         &env . config, &subscribee_pid, &subscribee_source ) ?;
     subscribee_nodecomplete . contains . clone() };
   let subscriber_hides : Vec<ID> = {
     let subscriber_nodecomplete : NodeComplete =
-      nodecomplete_from_in_rust_graph_or_disk (
+      nodecomplete_from_inrustgraph_or_disk (
         &env . config, &subscriber_pid, &subscriber_source ) ?;
     subscriber_nodecomplete . hides_from_its_subscriptions
       . or_default() . to_vec() };
@@ -90,4 +90,3 @@ pub fn complete_hiddeninsubscribee_col (
     ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?; }
   detach_scaffold_if_empty (tree, node) ?;
   Ok(( )) }
-

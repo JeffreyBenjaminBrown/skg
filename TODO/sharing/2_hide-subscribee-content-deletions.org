@@ -1,0 +1,451 @@
+* Plan: deleting as-a-subscribee content creates hides
+
+This plan addresses [[./vision.org][TODO/sharing/vision.org]].
+
+The narrow feature is:
+
+- When a node is shown as a subscribee, deleting one of its direct
+  content children from that as-a-subscribee view should add that
+  child to the subscriber's 'hides_from_its_subscriptions'.
+- Moving that child into the subscriber's ordinary content should not
+  add a hide.
+- Moving that child elsewhere, outside the subscriber's ordinary
+  content, should add a hide.
+- The existing HiddenInSubscribeeCol and HiddenOutsideOfSubscribeeCol
+  renderers should then show the result.
+
+The main implementation belongs in the save pipeline, not in the
+renderer. Rendering already knows how to hide subscribee content:
+'content_goal_list' filters a subscribee's direct content by the
+grandparent subscriber's 'hides_from_its_subscriptions', and the
+hidden-column goal-list functions already derive HiddenIn and
+HiddenOutside from that field.
+
+* Current code shape
+
+The save path is:
+
+- [[../../server/from_text.rs][from_text.rs]] 'buffer_to_viewforest_and_save_instructions'
+- [[../../server/from_text/viewnodes_to_instructions.rs][viewnodes_to_instructions.rs]] 'viewforest_to_nonmerge_save_instructions'
+- [[../../server/from_text/viewnodes_to_instructions/to_naive_instructions.rs][to_naive_instructions.rs]] 'naive_saveinstructions_from_tree'
+- [[../../server/from_text/supplement_from_disk.rs][supplement_from_disk.rs]] 'supplement_none_fields_from_disk_if_save'
+- [[../../server/from_text/validate.rs][validate.rs]] 'validate_and_filter_foreign_instructions'
+- [[../../server/save.rs][save.rs]] 'update_graph_including_merges'
+- [[../../server/update_buffer.rs][update_buffer.rs]] 'update_views_after_save'
+
+The current blocker is in
+[[../../server/from_text/viewnodes_to_instructions/to_naive_instructions.rs][to_naive_instructions.rs]]:
+'maybe_instruction_from_treenode' always emits
+'hides_from_its_subscriptions: MSV::Unspecified'. Then
+'supplement_none_fields_from_disk_if_save' restores the old on-disk
+hide list. So cutting a child out of a subscribee view is currently
+interpreted as a proposed edit to the subscribee's 'contains', not as
+a new hide on the subscriber.
+
+The current renderer already has most of the desired behavior:
+
+- [[../../server/update_buffer/complete_preorder/truenode.rs][truenode.rs]]
+  'content_goal_list' computes visible content for a node viewed as a
+  subscribee by subtracting the subscriber's hide list.
+- [[../../server/to_org/complete/sharing/goal_list.rs][goal_list.rs]]
+  'goal_list_for_hiddeninsubscribee_col' computes
+  hidden = subscriber.hides ∩ subscribee.contains.
+- [[../../server/to_org/complete/sharing/goal_list.rs][goal_list.rs]]
+  'goal_list_for_hiddenoutsideof_subscribeecol' computes
+  hidden = subscriber.hides - union(subscribee.contains).
+- [[../../server/to_org/complete/sharing/child_data.rs][child_data.rs]]
+  'reconcile_sharing_scaffold_children' reconciles those goal lists
+  into the actual scaffold children.
+
+* Target behavior
+
+On save, for each subscriber S in the buffer, inspect each expanded
+subscribee E shown under S's SubscribeeCol.
+
+For each direct child C in E's pre-save 'contains':
+
+- If C is still visible as a non-ignored direct child of E in the
+  as-a-subscribee view, do not add a hide.
+- If C is no longer visible under E, but C is now ordinary direct
+  content of S, do not add a hide.
+- If C is no longer visible under E and C is not ordinary direct
+  content of S, add C to S's 'hides_from_its_subscriptions'.
+
+The comparison should be direct-content only. Hiding grandchildren
+should happen only when their immediate subscribee parent is shown as
+a subscribee and the grandchild was removed from that direct child
+list. This matches the current rendering semantics, which filter only
+top-level subscribed content at each expanded subscribee node.
+
+* Implementation
+
+** Add a hide-inference pass after naive instructions
+
+Add a module under
+[[../../server/from_text/viewnodes_to_instructions/][viewnodes_to_instructions/]],
+probably
+[[../../server/from_text/viewnodes_to_instructions/hides_from_subscribee_edits.rs][hides_from_subscribee_edits.rs]].
+
+It should expose a function like:
+
+'apply_hides_inferred_from_subscribee_deletions'
+
+Inputs:
+
+- the checked 'Tree<ViewNode>'
+- the current 'Vec<DefineNode>'
+- 'SkgConfig'
+
+Output:
+
+- a new 'Vec<DefineNode>' with subscriber SaveNodes updated.
+
+Call it in
+[[../../server/from_text/viewnodes_to_instructions.rs][viewnodes_to_instructions.rs]]
+after 'reconcile_same_id_instructions' and before
+'filter_unchanged_save_instructions'.
+
+That position matters:
+
+- It sees one reconciled Save instruction per node.
+- It runs before 'filter_unchanged_save_instructions', so a node whose
+  only edit is a newly inferred hide will not be discarded as
+  unchanged.
+- It runs before 'supplement_none_fields_from_disk_if_save', so it can
+  deliberately set 'hides_from_its_subscriptions' to 'MSV::Specified'.
+
+** Traverse subscriber contexts
+
+The new pass should find every TrueNode S that has a SubscribeeCol
+child. For each S:
+
+- Get S's pid and source.
+- Skip S if its source is not user-owned.
+- Find S's unique SubscribeeCol child with 'unique_scaffold_child'.
+- Collect S's ordinary direct content from the buffer with the same
+  effective rule as 'collect_contents_to_save_from_children':
+  non-ignored TrueNode children, excluding phantoms and nodes marked
+  for deletion.
+- Walk non-ignored TrueNode children of the SubscribeeCol. These are
+  the subscribees shown as subscribees.
+
+For each subscribee E:
+
+- Skip E if it is still indefinitive. An indefinitive subscribee leaf
+  does not express an opinion about its content; otherwise saving an
+  unexpanded subscribee could hide everything.
+- Load E's pre-save NodeComplete with
+  'nodecomplete_from_inrustgraph_or_disk'.
+- Let 'pre_save_contains' be E's current 'contains'.
+- Let 'visible_in_buffer' be E's non-ignored, non-phantom, non-delete
+  direct TrueNode children, excluding scaffold children such as
+  HiddenInSubscribeeCol.
+- For every ID in 'pre_save_contains' that is absent from
+  'visible_in_buffer' and absent from S's ordinary content, infer a
+  hide by S.
+
+This pass should preserve order by starting from S's pre-save hide
+list and appending newly inferred IDs in encounter order, with
+deduplication. Use 'dedup_vector' or a small local HashSet-backed
+collector.
+
+** Merge inferred hides into subscriber SaveNodes
+
+For each subscriber S with inferred hides:
+
+- Find the existing 'DefineNode::Save' for S.
+- Set its 'hides_from_its_subscriptions' to the final
+  'MSV::Specified' list.
+- If there is no SaveNode for S, synthesize one by loading S's
+  pre-save NodeComplete and replacing only
+  'hides_from_its_subscriptions'. This should be rare, because a
+  definitive subscriber normally already emits a SaveNode, but
+  synthesizing makes the function robust.
+
+Do not directly modify the subscribee's SaveNode here. The inferred
+hide belongs to the subscriber. The subscribee's graph data remains
+unchanged.
+
+** Avoid treating as-a-subscribee edits as foreign graph edits
+
+This is the subtle part. If E is foreign and definitive, cutting one
+of E's children currently makes E's generated SaveNode differ from
+disk in its 'contains', so 'validate_and_filter_foreign_instructions'
+will reject the save before S's hide can land.
+
+Add a second helper in the same new module:
+
+'discard_readonly_as_subscribee_content_edits'
+
+It should run after inferred hides have been merged and before
+'filter_unchanged_save_instructions'.
+
+For each SaveNode whose corresponding ViewNode is a TrueNode shown as
+a subscribee:
+
+- If the node's source is foreign and its only difference from
+  pre-save data is direct-content membership in that as-a-subscribee
+  position, drop that SaveNode.
+- If title/body/source/aliases/subscribes/hides/overrides differ,
+  keep the SaveNode so existing foreign-node validation reports an
+  error.
+
+This keeps the feature narrow: physical removal from the view becomes
+a hide, but editing a foreign node's real text or metadata still
+fails.
+
+For owned subscribees shown as subscribees, choose the conservative
+same behavior at first: do not let their as-a-subscribee child list
+define their actual 'contains'. If the user wants to edit an owned
+subscribee's real content, they can view it directly, where it is not
+shown as a subscribee. This avoids having the same visual action mean
+two different graph mutations depending on source ownership.
+
+** Keep HiddenInSubscribeeCol read-only
+
+Do not infer hides by reading children of HiddenInSubscribeeCol or
+HiddenOutsideOfSubscribeeCol. The vision explicitly leaves unhiding
+unresolved, and the current local validation treats those scaffold
+children as display rows, not edit commands.
+
+For this feature, the only edit surface is the direct content children
+of a definitive TrueNode shown as a subscribee.
+
+** Rerendering should mostly fall out
+
+After the inferred hide is persisted on S:
+
+- 'update_graph_including_merges' writes S to disk, TypeDB, Tantivy,
+  and InRustGraph.
+- 'update_views_after_save' rerenders from the updated InRustGraph.
+- 'content_goal_list' filters E's content under S.
+- 'goal_list_for_hiddeninsubscribee_col' and
+  'goal_list_for_hiddenoutsideof_subscribeecol' populate the hidden
+  columns.
+
+So the planned save change should not need a new rendering algorithm.
+
+* Tests
+
+** Unit tests for inference
+
+Add focused tests near the new module, or under
+[[../../tests/save/][tests/save/]] if the helpers need fixture data.
+
+Cover:
+
+- Unexpanded indefinitive subscribee: no inferred hides.
+- Expanded subscribee with one pre-save child removed: S gains that
+  child's ID in 'hides_from_its_subscriptions'.
+- Removed child moved to S's ordinary content: no inferred hide.
+- Removed child moved to a different owned node: S gains the hide.
+- Existing hides are preserved and new hides append without duplicate
+  IDs.
+- HiddenInSubscribeeCol children are ignored by the inference pass.
+
+** Integration tests with rerender
+
+Extend [[../../tests/hidden_from_subscriptions.rs][hidden_from_subscriptions.rs]]
+or add a sibling test file.
+
+Use a fixture where S is owned and E is foreign, because that is the
+important sharing case. Exercise:
+
+- Initial view from S.
+- Request a definitive view for E.
+- Physically remove one direct child from E's as-a-subscribee content.
+- Save.
+- Assert that S's saved '.skg' now includes that ID in
+  'hides_from_its_subscriptions'.
+- Assert the returned buffer shows the child under
+  HiddenInSubscribeeCol, not under E's visible direct content.
+
+Also test the "move to S ordinary content" case:
+
+- Move the child out from under E and into S's direct content.
+- Save.
+- Assert S's hide list did not gain that ID.
+- Assert E's as-a-subscribee view no longer shows that ID under the
+  subscription, because S's own content is filtered from subscribed
+  content.
+
+** Regression tests for foreign edit validation
+
+Add a test that edits the title or body of a foreign node shown as a
+subscribee. It should still fail with 'ModifiedForeignNode'. This
+guards the read-only-as-subscribee filtering from becoming too broad.
+
+* Suggested commit order
+
+** Test setup cleanup
+
+Update stale imports in affected tests from 'dbs::memory' and
+'types::memory' to 'dbs::in_rust_graph' and 'types::views_state'.
+
+This can be a tiny prerequisite commit, because otherwise new
+integration tests in this area will be hard to run.
+
+** Add read-only as-a-subscribee classification
+
+Add helper functions that can answer:
+
+- Is this tree node a TrueNode shown as a subscribee?
+- What subscriber owns this as-a-subscribee position?
+- What direct content IDs are visible under this tree node?
+
+Prefer putting them near the new save-pass module, not in the renderer.
+They are about interpreting a saved buffer, not about building one.
+
+** Infer and merge hides
+
+Implement 'apply_hides_inferred_from_subscribee_deletions' and wire it
+into 'viewforest_to_nonmerge_save_instructions'.
+
+At this point, tests for owned subscribees should pass. Foreign tests
+may still fail if foreign subscribee SaveNodes are rejected.
+
+** Drop content-only as-a-subscribee SaveNodes
+
+Implement 'discard_readonly_as_subscribee_content_edits'. Wire it into
+the same spot in 'viewforest_to_nonmerge_save_instructions', after
+hide inference and before unchanged filtering.
+
+Then add the foreign-source integration test.
+
+** Verify rerender and collateral behavior
+
+Run:
+
+- 'cargo check'
+- 'cargo test --test hidden_from_subscriptions -- --nocapture'
+- the new save/integration test
+- if TypeDB is running and time allows, 'cargo nextest run'
+
+* problems
+
+** (likely solved): Moving to some other owned node still means hidden from this subscriber
+
+The corrected example 3 makes the rule clear: if the removed child is
+not direct ordinary content of the subscriber S, add a hide by S, even
+if some other owned node contains it.
+
+** (likely solved): Unexpanded subscribees must express no opinion
+
+If E is an indefinitive leaf under SubscribeeCol, its missing children
+must not be interpreted as deletions. Otherwise every save of a normal
+subscriber view could hide all content of all unexpanded subscribees.
+
+The planned inference pass skips indefinitive as-a-subscribee nodes.
+
+** (likely solved): Foreign subscribees currently turn this into a validation error
+
+The feature is mostly about foreign subscribees, but a definitive
+foreign subscribee with a child removed currently generates a SaveNode
+whose 'contains' differs from disk, so
+'validate_and_filter_foreign_instructions' rejects it.
+
+The plan handles this by dropping SaveNodes for content-only edits
+made in as-a-subscribee positions, while preserving validation errors
+for title/body/metadata edits.
+
+** (likely solved): Moving into the subscriber should not add a hide
+
+The plan explicitly subtracts the subscriber's direct ordinary content
+from the inferred hide set. That matches the existing model in
+[[../../docs/sharing-model.md][sharing-model.md]], where ordinary integrated content implicitly hides
+subscribed content from the subscription display.
+
+** (likely solved): Existing hides must not be lost
+
+Because 'hides_from_its_subscriptions' is an MSV field, setting it to
+'MSV::Specified' replaces the old disk value. The inference pass must
+therefore start from the pre-save hide list and append inferred hides,
+not create a list from inferred hides alone.
+
+** What does "delete" mean in the UI?
+
+The vision examples describe physically cutting text from the buffer.
+The command 'skg-delete' means "delete this graph node", and on a
+foreign subscribee child it should not silently become "hide from this
+subscription" without an explicit design choice.
+
+I would implement physical removal first. If 'skg-delete' should mean
+"hide" in this context, that should be a separate UI decision and
+probably an elisp change.
+
+** Owned subscribees shown as subscribees are semantically ambiguous
+
+If the subscribee E is owned, editing E directly would be legal. But
+when E is shown as a subscribee under S, the same child removal could
+mean either "remove C from E's actual contains" or "hide C from S's
+view of E".
+
+The plan chooses the lens interpretation for all as-a-subscribee
+positions, owned or foreign, and leaves real edits to E for views
+where E is not shown as a subscribee. That is consistent and easier
+to explain, but it is a policy choice.
+
+** Unhiding remains intentionally out of scope
+
+Deleting from subscribee visible content can add hides. Removing a
+child from HiddenInSubscribeeCol or HiddenOutsideOfSubscribeeCol will
+still not remove hides. The vision lists unhide as unresolved, and
+this plan leaves it unresolved.
+
+** Multiple views can express conflicting lens edits
+
+If the same subscriber appears more than once in one saved buffer,
+the existing duplicate-instruction reconciliation has to decide one
+SaveNode. The new inferred-hide pass should run after
+'reconcile_same_id_instructions', or else it must merge hide deltas
+across duplicates itself.
+
+The plan runs after duplicate reconciliation and appends inferred
+hides to the surviving subscriber SaveNode. If two definitive
+subscriber views disagree about the same hidden child, the current
+"one definitive node per buffer" validation should prevent the worst
+case, but this is worth testing.
+
+** Diff view might complicate inference
+
+Phantom children represent HEAD/worktree differences, not current
+user intent to hide. The inference pass should ignore phantoms when
+collecting visible children and should not infer hides from removed
+phantoms.
+
+The first implementation should probably test with diff mode off. A
+small follow-up test can confirm diff-view phantoms do not create
+spurious hides.
+
+* problems, out of scope
+
+** The initial-render and rerender sharing paths are still partly duplicated
+
+The current code has already extracted 'ChildData',
+'reconcile_sharing_scaffold_children', 'SharingScaffoldKind', and the
+goal-list functions. But [[../../server/to_org/complete/sharing/mod.rs][sharing/mod.rs]] still has initial-render
+logic separate from the rerender completers under
+[[../../server/update_buffer/complete_preorder/][complete_preorder/]] and
+[[../../server/update_buffer/complete_postorder/][complete_postorder/]].
+
+This feature can be implemented without finishing that refactor, but
+the save-side inference will add another sharing-specific pass. It
+would be worth keeping its helpers narrow so they do not deepen the
+duplication.
+
+*** TODO is that something we planned for?
+That is, is there something described in
+TODO/sharing/done/plan_dedup-sharing-rel-completion.org
+that hasn't in fact been done yet?
+
+** Foreign read-only semantics are scattered
+
+Foreign-node protection lives in
+[[../../server/from_text/validate.rs][validate.rs]] 'validate_and_filter_foreign_instructions', but the
+meaning of "this edit is not really an edit to the foreign node; it
+is a lens edit on the subscriber" belongs to the save parser. That
+boundary is reasonable, but easy to get wrong.
+
+A future architecture improvement would make lens-edit extraction an
+explicit stage before graph SaveNodes are produced, so foreign-node
+validation only sees real graph edits.

@@ -3,7 +3,7 @@
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_viewforest;
 use skg::merge::merge_nodes;
-use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid, graph_handle_from_config, audit_in_rust_graph_or_panic};
+use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SourceName};
 use skg::types::viewnode::{EditRequest, ViewNode, ViewNodeKind, TrueNode, IndefOrDef, viewforest_root_viewnode, default_truenode};
 use skg::types::nodes::complete::NodeComplete;
@@ -112,7 +112,7 @@ async fn test_merge_2_into_1_impl(
     config, &merge_instructions)?;
   verify_tantivy_after_merge_2_into_1(
     tantivy, &merge_instructions )?;
-  audit_in_rust_graph_or_panic (&graph, &config . db_name, driver) . await?;
+  audit_inrustgraph_or_panic (&graph, &config . db_name, driver) . await?;
   Ok(( )) }
 
 async fn verify_typedb_after_merge_2_into_1 (
@@ -373,7 +373,7 @@ async fn test_merge_1_into_2_impl(
     config, &merge_instructions)?;
   verify_tantivy_after_merge_1_into_2(
     tantivy, &merge_instructions)?;
-  audit_in_rust_graph_or_panic (&graph, &config . db_name, driver) . await?;
+  audit_inrustgraph_or_panic (&graph, &config . db_name, driver) . await?;
   Ok(( )) }
 
 async fn verify_typedb_after_merge_1_into_2 (
@@ -659,7 +659,7 @@ fn verify_tantivy_after_merge_1_into_2(
 // fallback has always returned canonical pids. This test locks in
 // the in-Rust graph path's canonicalized behavior.
 #[test]
-fn test_in_rust_graph_queries_resolve_aliases_after_merge()
+fn test_inrustgraph_queries_resolve_aliases_after_merge()
   -> Result<(), Box<dyn Error>>
 { let fixtures_path = PathBuf::from ("tests/merge/merge_nodes/fixtures");
   let temp_fixtures_path = PathBuf::from ("/tmp/merge-test-aliases-after-merge-fixtures");
@@ -675,13 +675,13 @@ fn test_in_rust_graph_queries_resolve_aliases_after_merge()
       "/tmp/merge-test-aliases-after-merge-fixtures",
       "/tmp/tantivy-test-merge-aliases-after-merge",
       |config, driver, tantivy| Box::pin ( async move {
-        test_in_rust_graph_queries_resolve_aliases_after_merge_impl (
+        test_inrustgraph_queries_resolve_aliases_after_merge_impl (
           config, driver, tantivy ) . await } ));
   if temp_fixtures_path . exists() {
     fs::remove_dir_all (&temp_fixtures_path)?; }
   result }
 
-async fn test_in_rust_graph_queries_resolve_aliases_after_merge_impl (
+async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
   tantivy : &TantivyIndex,

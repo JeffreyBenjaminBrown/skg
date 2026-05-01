@@ -96,7 +96,7 @@ pub struct Mismatch {
 ///   through 'pid_of' to its corresponding pid (which might be the
 ///   id itself) before comparing to TypeDB's answer (which already
 ///   reflects has_extra_id lookups).
-pub async fn audit_in_rust_graph_against_typedb (
+pub async fn audit_inrustgraph_against_typedb (
   graph   : &InRustGraph,
   db_name : &str,
   driver  : &TypeDBDriver,
@@ -117,7 +117,7 @@ pub async fn audit_in_rust_graph_against_typedb (
 /// Takes '&Transaction' (not '&TypeDBDriver') so callers can
 /// amortize transaction setup across many pids — opening a tx per
 /// pid would dominate query cost. Used by the paced scheduled audit
-/// (which opens one tx per batch) and by 'audit_in_rust_graph_against_typedb'
+/// (which opens one tx per batch) and by 'audit_inrustgraph_against_typedb'
 /// (which opens one tx per whole corpus pass).
 pub async fn audit_one_node (
   graph : &InRustGraph,

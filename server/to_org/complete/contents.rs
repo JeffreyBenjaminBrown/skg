@@ -1,6 +1,6 @@
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::views_state::nodecomplete_from_in_rust_graph_or_disk;
+use crate::types::views_state::nodecomplete_from_inrustgraph_or_disk;
 use crate::types::viewnode::ViewNode;
 use crate::types::tree::viewnode_nodecomplete::{ pid_and_source_from_treenode, write_at_truenode_in_tree };
 
@@ -22,7 +22,7 @@ pub fn clobberIndefinitiveViewnode (
     pid_and_source_from_treenode (
       tree, treeid, "clobberIndefinitiveViewnode" ) ?;
   let nodecomplete : NodeComplete =
-    nodecomplete_from_in_rust_graph_or_disk ( config, &node_id, &source ) ?;
+    nodecomplete_from_inrustgraph_or_disk ( config, &node_id, &source ) ?;
   let title : String = nodecomplete . title . clone();
   let source : SourceName = nodecomplete . source . clone();
   write_at_truenode_in_tree ( tree, treeid, |t| {

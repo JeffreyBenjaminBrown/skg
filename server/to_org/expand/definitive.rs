@@ -10,7 +10,7 @@ use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_ex
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, IndefOrDef, Birth, mk_indefinitive_viewnode };
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::views_state::nodecomplete_from_in_rust_graph_or_disk;
+use crate::types::views_state::nodecomplete_from_inrustgraph_or_disk;
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::viewnode_nodecomplete::{write_at_truenode_in_tree, pid_and_source_from_treenode};
 
@@ -149,7 +149,7 @@ fn get_hidden_ids_if_subscribee (
         tree, subscriber . id(),
         "get_hidden_ids_if_subscribee" ) ?;
     let nodecomplete : NodeComplete =
-      nodecomplete_from_in_rust_graph_or_disk (
+      nodecomplete_from_inrustgraph_or_disk (
         config, &subscriber_id, &subscriber_source ) ?;
     let hidden_ids : HashSet < ID > =
       nodecomplete . hides_from_its_subscriptions
@@ -272,7 +272,7 @@ fn from_disk_replace_title_body_and_nodecomplete (
   let (pid, src) : (ID, SourceName) =
     pid_and_source_from_treenode ( tree, node_id,
       "from_disk_replace_title_body_and_nodecomplete" ) ?;
-  let nodecomplete : NodeComplete = nodecomplete_from_in_rust_graph_or_disk (
+  let nodecomplete : NodeComplete = nodecomplete_from_inrustgraph_or_disk (
     config, &pid, &src ) ?;
   let title : String = nodecomplete . title . clone();
   if title . is_empty () {

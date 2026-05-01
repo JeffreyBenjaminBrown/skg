@@ -1,5 +1,9 @@
+* TODO/sharing/1_dedup-sharing-rel-completion.org
+* TODO/sharing/2_hide-subscribee-content-deletions.org
 * TODO I want this todo list in Skg.
 Git review after reshaping it is hell.
+* INTERNALIZE: Use lightweight models for easy but wordy things.
+Like fixing interior imports.
 * references
 ** how to import from org-roam
 *** automatically

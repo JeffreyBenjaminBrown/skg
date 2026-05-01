@@ -13,7 +13,7 @@ use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::from_text::buffer_to_viewforest_and_save_instructions;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::save::update_graph_minus_merges;
-use skg::test_utils::{cleanup_test_tantivy_and_typedb_dbs, graph_handle_from_config, audit_in_rust_graph_or_panic};
+use skg::test_utils::{cleanup_test_tantivy_and_typedb_dbs, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::errors::{SaveError, BufferValidationError};
 
 use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
@@ -163,7 +163,7 @@ fn test_move_node_to_another_owned_source (
         &graph ) . await?;
     if let Some (new_idx) = replacement {
       tantivy_index = new_idx; }
-    audit_in_rust_graph_or_panic (&graph, &config . db_name, &driver) . await?;
+    audit_inrustgraph_or_panic (&graph, &config . db_name, &driver) . await?;
 
     { // FS: old file should be gone, new file should exist
       let old_path : PathBuf =
@@ -259,7 +259,7 @@ fn test_move_node_referenced_by_extra_id (
         &graph ) . await?;
     if let Some (new_idx) = replacement {
       tantivy_index = new_idx; }
-    audit_in_rust_graph_or_panic (&graph, &config . db_name, &driver) . await?;
+    audit_inrustgraph_or_panic (&graph, &config . db_name, &driver) . await?;
 
     { // FS: old file gone, new file present
       let old_path : PathBuf =
@@ -329,7 +329,7 @@ fn test_move_multiple_nodes (
         &graph ) . await?;
     if let Some (new_idx) = replacement {
       _tantivy_index = new_idx; }
-    audit_in_rust_graph_or_panic (&graph, &config . db_name, &driver) . await?;
+    audit_inrustgraph_or_panic (&graph, &config . db_name, &driver) . await?;
 
     { // FS
       assert!( ! temp_fixtures . join ("public/b.skg") . exists() );
@@ -534,7 +534,7 @@ fn test_source_only_change_with_populated_pool (
         &graph ) . await?;
     if let Some (new_idx) = replacement {
       tantivy_index = new_idx; }
-    audit_in_rust_graph_or_panic (&graph, &config . db_name, &driver) . await?;
+    audit_inrustgraph_or_panic (&graph, &config . db_name, &driver) . await?;
 
     { // FS: old file gone, new file present
       assert!( ! temp_fixtures . join ("public/b.skg") . exists(),

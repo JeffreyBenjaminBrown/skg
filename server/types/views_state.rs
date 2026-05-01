@@ -186,9 +186,9 @@ fn root_ids_from_viewforest (
 /// Async because the id→(pid, source) resolution goes through
 /// 'nodecomplete_from_id', which consults TypeDB when in-Rust graph is
 /// uninitialized. Callers that already have '(pid, source)' in
-/// hand should prefer the sync 'nodecomplete_from_in_rust_graph_or_disk'
+/// hand should prefer the sync 'nodecomplete_from_inrustgraph_or_disk'
 /// below.
-pub async fn nodecomplete_from_in_rust_graph_or_disk_async (
+pub async fn nodecomplete_from_inrustgraph_or_disk_async (
   config : &SkgConfig,
   driver : &TypeDBDriver,
   id     : &ID,
@@ -200,8 +200,8 @@ pub async fn nodecomplete_from_in_rust_graph_or_disk_async (
 /// InRustGraph-first NodeComplete read, disk fallback, given an
 /// already-resolved '(pid, source)'. Sync — never consults TypeDB,
 /// so callers in sync contexts don't have to become async. For the
-/// id-only path use 'nodecomplete_from_in_rust_graph_or_disk_async'.
-pub fn nodecomplete_from_in_rust_graph_or_disk (
+/// id-only path use 'nodecomplete_from_inrustgraph_or_disk_async'.
+pub fn nodecomplete_from_inrustgraph_or_disk (
   config : &SkgConfig,
   pid    : &ID,
   source : &SourceName,
