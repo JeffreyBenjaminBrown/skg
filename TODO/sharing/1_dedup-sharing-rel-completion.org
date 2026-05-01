@@ -1,10 +1,16 @@
-* Open: integrate-or-reframe the early-return guards
+* Open: rewrite the misleading PITFALL/TODO comments
 
-Two early-return guards in =server/to_org/complete/sharing/mod.rs=
-remain flagged as "should integrate" — a PITFALL at line 116
-inside 'maybe_add_subscribeeCol_branch', and a TODO at line 183
-inside 'maybe_add_hiddenInSubscribeeCol_branch'. Both have the
-same shape:
+This section supersedes my prior write-up, which was based on
+a wrong premise (that the two functions are only reachable
+from initial-render). They aren't — and a more careful
+investigation changed the conclusion.
+
+Two early-return guards in 'server/to_org/complete/sharing/mod.rs'
+carry comments saying the existing scaffold might be incorrect
+and should instead be 'integrated' — a PITFALL at line 116
+inside 'maybe_add_subscribeeCol_branch', and a TODO at line
+183 inside 'maybe_add_hiddenInSubscribeeCol_branch'.
+Both guards have the same shape:
 
 #+begin_src rust
   if unique_scaffold_child (
@@ -12,84 +18,143 @@ same shape:
   { return Ok (( )); }
 #+end_src
 
-The comments say (paraphrased): /if this code were ever called
-on a tree that already has the scaffold present, we'd have to
-'integrate' the existing scaffold rather than trust it; today
-we just skip./
+** What the call graph actually shows
 
-** Why the comments exist
+Using the project's call-graph tool ('tools/introspect/call-graph/db/calls.csv'),
+both functions trace back to *all four* server entry points,
+not just initial render:
 
-When the plan was written, "integrate an existing scaffold" was
-something only the rerender side knew how to do. Initial render
-walked a flat list of ids and appended TrueNode children one by
-one — there was no primitive for "merge a goal-list into an
-existing scaffold's children". So the only honest thing was to
-early-return when a scaffold was already present and document
-the gap.
+  - 'maybe_add_subscribeeCol_branch' is reachable from
+    'handle_single_root_view_request' (initial render) AND
+    from 'handle_save_buffer_request',
+    'handle_git_diff_toggle_and_rerender', and
+    'handle_rerender_all_views_request' (rerender), via the
+    chain
+    'complete_truenode' → 'execute_view_requests' →
+    'execute_definitive_view_request' →
+    'extendDefinitiveSubtreeFromLeaf' →
+    'build_node_branch_minus_content' →
+    'complete_branch_minus_content' →
+    'maybe_add_subscribeeCol_branch'.
+  - 'maybe_add_hiddenInSubscribeeCol_branch' is reached
+    *only* from rerender paths, via the chain
+    'complete_truenode' → 'execute_view_requests' →
+    'execute_definitive_view_request' →
+    'maybe_add_hiddenInSubscribeeCol_branch'.
 
-Since Step 5 (commit 11c21eed), that's no longer true. The
-shared 'reconcile_sharing_scaffold_children' primitive handles
-exactly this: given a goal-list and an existing scaffold's
-NodeId, it adds missing children, removes extras, reorders to
-match. The initial-render entry points already call it for the
-common case (scaffold absent → create + populate); they just
-don't reach for it in the "scaffold present" branch.
+So the structural premise of the PITFALL ("if this code were
+used in the save-buffer pathway") is already false: the
+save-buffer pathway IS a caller. My earlier claim that these
+were initial-render-only was wrong; see the postscript at the
+end of this section.
 
-** Today's call sites are all initial-render
+** What instrumentation shows
 
-Both functions are reached only from the initial-render path:
+I added 'eprintln!' tracing at both guard sites and at
+'execute_view_requests', then ran:
 
-  - 'maybe_add_subscribeeCol_branch' is called from
-    'complete_branch_minus_content' in =server/to_org/util.rs=,
-    used by 'render_initial_viewforest_bfs' /
-    'stub_viewforest_from_root_ids'.
-  - 'maybe_add_hiddenInSubscribeeCol_branch' is called from
-    'extendDefinitiveSubtreeFromLeaf' in
-    =server/to_org/expand/definitive.rs=, also part of initial
-    render.
+  - 'cargo nextest run --no-capture -j1' (all 331 tests)
+  - 'bash/integration-tests.sh' (~25 server-driven tests)
+  - 'bash/emacs-tests.sh' (169 elisp tests; client-only,
+    irrelevant here but ran for completeness)
 
-Initial render starts from a fresh tree that no caller has
-seeded with sharing scaffolds. So the early-return branch is
-unreachable today; the comments document a precondition, not a
-live bug.
+Results across all 525 tests:
 
-** Three honest options
+  - 'execute_view_requests' fired 22 times (16 nextest +
+    6 integration), all dispatching 'Definitive' requests.
+    So the rerender path *does* exercise the chain into
+    these injectors.
+  - 'maybe_add_subscribeeCol_branch' was entered 158 times.
+  - The two early-return guards fired *zero* times.
 
-  1. *Resolve by integrating.* Drop the early returns. When
-     'unique_scaffold_child' returns 'Some(nid)', skip the
-     'insert_scaffold_as_child' call and call
-     'reconcile_sharing_scaffold_children' on that 'nid'.
-     Symmetrical between SubscribeeCol and HiddenIn; reuses
-     existing primitives; deletes the PITFALL/TODO truthfully.
-     Cost: changes runtime behavior on a code path that today
-     is unreachable, so it's testable only by adding a synthetic
-     caller. Low real risk, but the diff carries a "behavior
-     change to dead branch" smell.
+The instrumentation is now reverted; 'git diff server/' is
+clean.
 
-  2. *Resolve by reframing.* Replace the PITFALL/TODO with a
-     precondition note, e.g. "Caller must pass a tree with no
-     existing such scaffold under 'node_id'." Drop the
-     'unique_scaffold_child' guard entirely and let
-     'insert_scaffold_as_child' do the work — or keep the guard
-     and turn it into a 'debug_assert!' / proper error. Says:
-     /this is a contract, not a deficiency/. Cheapest; matches
-     reality; doesn't pretend the comments will be acted on
-     later. Cost: future callers from a non-initial-render
-     context now have to satisfy the contract themselves.
+** Why the guards never fire — even with the rerender path live
 
-  3. *Leave alone.* Keep the comments. They cost nothing at
-     runtime and remain honest about a real architectural
-     asymmetry (the rerender path integrates; this path
-     doesn't). Cost: a permanent TODO is its own kind of
-     cruft, and the dedup work since Step 5 means the
-     integration is no longer hard, just unwired.
+  - *SubscribeeCol guard.* Every reaching call site of
+    'maybe_add_subscribeeCol_branch' goes through
+    'build_node_branch_minus_content', which always *freshly
+    appends* a 'ViewNode' to the tree before calling
+    'complete_branch_minus_content'. The freshly-appended
+    node has no children. So 'unique_scaffold_child(node_id,
+    SubscribeeCol)' is always 'None'. The guard is
+    structurally dead: not just empirically, but by the
+    contract of the only call paths.
 
-My recommendation is (2): the asymmetry the comments flag has
-become a precondition rather than a defect, and saying so
-plainly is more useful to future readers than carrying an
-aspirational TODO. (1) is also fine if you'd rather have the
-two paths fully symmetric on principle. (3) wastes the work
-already done in Step 5.
+  - *HiddenInSubscribeeCol guard.* Reached only with
+    'subscribee_treeid' = effective_root of a Definitive
+    view request. That node *can* have a pre-existing
+    HiddenInSubscribeeCol child carried over from the saved
+    buffer. But the postorder pass visits *children before
+    parents*: by the time 'complete_truenode' runs on the
+    Subscribee and triggers
+    'maybe_add_hiddenInSubscribeeCol_branch', that child has
+    already been reconciled by 'complete_hiddeninsubscribee_col'
+    (or detached if it ended up empty). If the guard *did*
+    fire, it would correctly defer to a scaffold that's
+    already in its final state.
+
+** Implication: the comments are misleading, not just stale
+
+The PITFALL/TODO say (paraphrased) "we cannot assume the
+existing col is correct, should integrate it." That's wrong
+on the merits:
+
+  - For SubscribeeCol: there is no live call path where an
+    existing SubscribeeCol can be present. There's nothing
+    to integrate because the guard can't fire.
+  - For HiddenInSubscribeeCol: when an existing scaffold
+    *is* present, it has already been integrated by a
+    different completer (the postorder reconciler), one
+    step earlier in the same pass. Re-integrating here
+    would be redundant work, not a missed obligation.
+
+So option (1) "resolve by integrating" from my prior
+write-up isn't right either — it would duplicate work the
+postorder pass already does, on the only path where the
+guard can fire.
+
+** Recommended action
+
+Replace both comments with accurate ones describing the
+defensive nature of the guards. Sketch:
+
+  - Above the SubscribeeCol guard: "Defensive: every
+    current call path appends 'node_id' freshly via
+    'build_node_branch_minus_content', so this branch is
+    not reached today. Kept so a future caller can't
+    accidentally double-create a SubscribeeCol."
+  - Above the HiddenInSubscribeeCol guard: "If a
+    HiddenInSubscribeeCol already exists, it has been
+    reconciled by 'complete_hiddeninsubscribee_col' earlier
+    in the postorder pass; nothing more to do here."
+
+No code change is needed. Build clean; 331 nextest tests
+pass on main as of this writing.
+
+** Postscript: how I got the call graph wrong the first time
+
+Worth recording so the same failure doesn't recur:
+
+  - I greped for direct callers and stopped one level up. I
+    saw 'maybe_add_subscribeeCol_branch' had a single direct
+    caller and traced one more level — which kept me inside
+    'to_org/' (initial-render territory) — then stopped.
+  - I treated server-log evidence (only
+    'render_initial_viewforest_bfs:...' span breadcrumbs in
+    the integration logs) as proof the function is
+    initial-render-only. It was sample, not proof.
+  - I anchored on the dichotomy in 'status-before-plan.org'
+    that frames these functions as "the initial-render
+    path's injectors." True about their primary purpose;
+    false about the structural call graph.
+  - I never used 'tools/introspect/call-graph/'. Running it
+    or doing a reverse query against
+    'tools/introspect/call-graph/db/calls.csv' would have
+    surfaced the rerender chain in seconds. Going forward,
+    "before claiming a branch is unreachable, do the
+    reverse-callers query."
 
 * Status as of 2026-05-01
 
@@ -111,7 +176,7 @@ in the section above. Build clean; all 331 nextest tests pass.
   side) or adding an 'Unknown' variant to 'ChildData', the
   commit added a sibling helper
   'build_initial_render_child_data' (in
-  =server/to_org/complete/sharing/mod.rs=) that walks a
+  'server/to_org/complete/sharing/mod.rs') that walks a
   goal-list of ids, calls 'nodecomplete_and_viewnode_from_id'
   (TypeDB-aware: extra_id-to-primary resolution and
   cross-source lookup both work), and produces the
@@ -130,7 +195,7 @@ in the section above. Build clean; all 331 nextest tests pass.
   the magic 'caller_label' string at the five call sites of
   'reconcile_sharing_scaffold_children' with a
   'SharingScaffoldKind' enum in a new file
-  =server/to_org/complete/sharing/kind.rs=, exposing
+  'server/to_org/complete/sharing/kind.rs', exposing
   'caller_label()' and 'scaffold()' methods. The commit
   explicitly chose not to do the full step-6 collapse of the
   three completers into one parameterised function, with the
@@ -215,12 +280,12 @@ pass.
   HiddenInSubscribeeCol, HiddenOutsideOfSubscribeeCol) each
   defined a near-byte-identical local 'ChildData' struct and
   'build_*_child_data' helper. Hoisted both into the new
-  module =server/to_org/complete/sharing/child_data.rs=.
+  module 'server/to_org/complete/sharing/child_data.rs'.
 - *Step 2 (commit 92e08dc7): extract reconcile primitive.*
   Each rerender completer made an identical 25-line call to
   'complete_relevant_children_in_viewnodetree' with the same
   relevance/key/create-child closures. Hoisted into
-  'reconcile_sharing_scaffold_children' in =child_data.rs=
+  'reconcile_sharing_scaffold_children' in 'child_data.rs'
   (parameterised only by a caller_label string for panic
   messages).
 - *Step 3 (commit a26575b4): extract delete-if-empty.* Each
@@ -228,13 +293,13 @@ pass.
   detach pattern. Subscribee_col's "if goal_list empty,
   delete this col" branch was the same shape minus the
   emptiness check. Hoisted to two helpers in
-  =update_buffer/util.rs=:
+  'update_buffer/util.rs':
   'detach_scaffold_transferring_focus' and
   'detach_scaffold_if_empty'.
 - *Step 4 (commit a3fc2fa5): extract goal-list computers.*
   Each completer inlined the worktree-edge fetch + optional
   HEAD-diff + intersection/difference logic. Pulled into
-  =server/to_org/complete/sharing/goal_list.rs=, one
+  'server/to_org/complete/sharing/goal_list.rs', one
   function per scaffold kind. Two helpers
   ('head_subscribee_contains_from_memory_and_diffs',
   'snapshot_global_source') moved over with them.
@@ -252,7 +317,7 @@ loops in 'maybe_add_subscribeeCol_branch' and
 'maybe_add_hiddenInSubscribeeCol_branch' with
 'build_child_data' + 'reconcile_sharing_scaffold_children'.
 Build was clean, but 'test_multi_root_view_with_shared_nodes'
-failed with =find_source_many_ways: no source found for 44=.
+failed with 'find_source_many_ways: no source found for 44'.
 
 Why: the two paths resolve a child's source differently.
 
@@ -263,7 +328,7 @@ Why: the two paths resolve a child's source differently.
     to 'mk_unknown_viewnode'.
   - Rerender's 'build_child_data' calls
     'find_source_many_ways', which checks sibling sources →
-    =deleted_since_head_pid_src_map= → in-Rust memory
+    'deleted_since_head_pid_src_map' → in-Rust memory
     snapshot → disk scan. No TypeDB. No graceful unknown
     fallback — it just errors.
 
@@ -316,10 +381,10 @@ jobs across two code paths:
 
 |                          | initial render                             | save rerender                                |
 |--------------------------+--------------------------------------------+----------------------------------------------|
-| inject SubscribeeCol     | inline in =maybe_add_subscribeeCol_branch= | =maybe_prepend_subscribee_col= (truenode.rs) |
-| populate SubscribeeCol   | inline in =maybe_add_subscribeeCol_branch= | =complete_subscribee_col_preorder=           |
-| populate HiddenIn        | =maybe_add_hiddenInSubscribeeCol_branch=   | =complete_hiddeninsubscribee_col=            |
-| populate HiddenOutsideOf | inline in =maybe_add_subscribeeCol_branch= | =complete_hiddenoutsideofsubscribeecol=      |
+| inject SubscribeeCol     | inline in 'maybe_add_subscribeeCol_branch' | 'maybe_prepend_subscribee_col' (truenode.rs) |
+| populate SubscribeeCol   | inline in 'maybe_add_subscribeeCol_branch' | 'complete_subscribee_col_preorder'           |
+| populate HiddenIn        | 'maybe_add_hiddenInSubscribeeCol_branch'   | 'complete_hiddeninsubscribee_col'            |
+| populate HiddenOutsideOf | inline in 'maybe_add_subscribeeCol_branch' | 'complete_hiddenoutsideofsubscribeecol'      |
 
 The synergy that makes this worth doing as one refactor rather
 than two: *all three scaffolds share the same "reconcile a
@@ -342,8 +407,8 @@ The shape, abstractly:
 The two code paths differ in:
 
   - *Source of truth.* Initial render reads disk
-    (=nodecomplete_from_memory_or_disk=) and TypeDB
-    (=what_node_hides=, =what_nodes_contain=). Rerender uses
+    ('nodecomplete_from_memory_or_disk') and TypeDB
+    ('what_node_hides', 'what_nodes_contain'). Rerender uses
     in-memory graph plus per-stage diff data.
   - *Diff-view phantoms.* Rerender supports phantoms (a
     removed-since-HEAD subscribee shown as a removedM marker);
@@ -356,7 +421,7 @@ These differences are parameters, not different algorithms.
 
 ** Target shape
 
-A single module — call it =to_org/sharing/scaffold.rs= — with
+A single module — call it 'to_org/sharing/scaffold.rs' — with
 one core function and three thin wrappers:
 
 #+begin_src rust
@@ -375,21 +440,21 @@ one core function and three thin wrappers:
 
 Where:
 
-  - =SharingScaffoldKind= is =SubscribeeCol | HiddenIn |
-    HiddenOutside=. Encapsulates: ancestor-distance to the
+  - 'SharingScaffoldKind' is 'SubscribeeCol | HiddenIn |
+    HiddenOutside'. Encapsulates: ancestor-distance to the
     subscriber, the parent-must-be-X check, the per-stage
     NodeChanges field that drives diff-view phantoms (or its
     absence for HiddenIn/HiddenOutside).
-  - =SourceOfTruth= is =DiskAndTypedb | MemoryWithDiff(...)=.
+  - 'SourceOfTruth' is 'DiskAndTypedb | MemoryWithDiff(...)'.
     Encapsulates: the goal-list computer (memoised closure or
     function pointer), and whether to support diff-view.
 
 Each call site collapses to one call:
 
-  - initial render: =reconcile_sharing_scaffold(tree, nid,
-    SubscribeeCol, DiskAndTypedb, ...)= (and similarly for
+  - initial render: 'reconcile_sharing_scaffold(tree, nid,
+    SubscribeeCol, DiskAndTypedb, ...)' (and similarly for
     HiddenIn and HiddenOutside).
-  - rerender: same call with =MemoryWithDiff(diff)=.
+  - rerender: same call with 'MemoryWithDiff(diff)'.
 
 ** Step-by-step refactor
 
@@ -402,17 +467,17 @@ can be bisected to a single commit.
 Currently the goal-list logic for each kind is inlined in
 its rerender-time completer. Extract three pure functions:
 
-  - =subscribee_col_goal_list (parent, source_of_truth) -> (Vec<ID>, RemovedSet)=
-  - =hidden_in_goal_list      (subscriber, subscribee, source_of_truth) -> (Vec<ID>, RemovedSet)=
-  - =hidden_outside_goal_list (subscriber, source_of_truth) -> (Vec<ID>, RemovedSet)=
+  - 'subscribee_col_goal_list (parent, source_of_truth) -> (Vec<ID>, RemovedSet)'
+  - 'hidden_in_goal_list      (subscriber, subscribee, source_of_truth) -> (Vec<ID>, RemovedSet)'
+  - 'hidden_outside_goal_list (subscriber, source_of_truth) -> (Vec<ID>, RemovedSet)'
 
-Each returns =(visible_ids, removed_ids)=. =removed_ids= is
-empty when =source_of_truth= is =DiskAndTypedb=; that's how
+Each returns '(visible_ids, removed_ids)'. 'removed_ids' is
+empty when 'source_of_truth' is 'DiskAndTypedb'; that's how
 "no phantoms in initial render" falls out for free.
 
-The existing =diff_aware_goal_list=,
-=net_diff_from_per_stage=, and
-=itemlist_and_removedset_from_diff= already do the heavy
+The existing 'diff_aware_goal_list',
+'net_diff_from_per_stage', and
+'itemlist_and_removedset_from_diff' already do the heavy
 lifting for SubscribeeCol; the same pattern applies to
 HiddenIn and HiddenOutside (which currently roll their own
 near-identical logic).
@@ -423,11 +488,11 @@ reconcile loop but call into a unified goal-list source.
 *** Step 2 — extract the reconcile-children primitive
 
 [[file:server/update_buffer/util.rs][update_buffer/util.rs]]
-=complete_relevant_children_in_viewnodetree= already does
+'complete_relevant_children_in_viewnodetree' already does
 goal-list-based child reconciliation — used today by
-=complete_truenode_preorder= and
-=complete_subscribee_col_preorder=. Audit it against the two
-=for_each child …= loops in the HiddenIn and HiddenOutside
+'complete_truenode_preorder' and
+'complete_subscribee_col_preorder'. Audit it against the two
+'for_each child …' loops in the HiddenIn and HiddenOutside
 postorder completers; if they match its contract, switch
 those completers to use it. (They probably need a tiny widening
 to accept "the goal list is for the col's *children*, all of
@@ -439,10 +504,10 @@ delegate to the same primitive.
 *** Step 3 — fold the initial-render code into the same primitive
 
 Initial render currently does an
-=append_indefinitive_from_disk_as_child= in a loop. That's
+'append_indefinitive_from_disk_as_child' in a loop. That's
 just "create children matching this list of IDs"; it's a
 strict subset of what
-=complete_relevant_children_in_viewnodetree= does (the case
+'complete_relevant_children_in_viewnodetree' does (the case
 where the existing child list is empty).
 
 Move
@@ -458,21 +523,21 @@ primitive does, and starting from empty is just one input.
 
 There are currently two inject sites:
 
-  - =maybe_prepend_subscribee_col= in truenode.rs (preorder,
+  - 'maybe_prepend_subscribee_col' in truenode.rs (preorder,
     one-liner: "if subscribes_to non-empty and no col, insert
     empty col").
-  - Inline in =maybe_add_subscribeeCol_branch= ("if
+  - Inline in 'maybe_add_subscribeeCol_branch' ("if
     subscribee_ids non-empty, insert col, fill it").
 
 After step 3, "fill it" is the primitive. "Insert if missing
 and non-empty desired" is two lines. Make those two lines a
-helper =ensure_scaffold_present_or_absent (tree, parent,
-kind, desired_is_empty)= that *both* injects when needed and
-deletes when the col would be empty. =complete_subscribee_col_preorder='s
+helper 'ensure_scaffold_present_or_absent (tree, parent,
+kind, desired_is_empty)' that *both* injects when needed and
+deletes when the col would be empty. 'complete_subscribee_col_preorder''s
 "delete the col when empty, handling focus" branch goes in
 here too.
 
-*** Step 5 — define =SharingScaffoldKind=
+*** Step 5 — define 'SharingScaffoldKind'
 
 Now the three jobs (Subscribee, HiddenIn, HiddenOutside) look
 identical except for:
@@ -482,25 +547,25 @@ identical except for:
   - which two on-disk fields drive the goal list,
   - whether the col supports diff-view phantoms.
 
-Bundle these into =SharingScaffoldKind=. With it, the two
-top-level wrappers (=reconcile_sharing_scaffold= for the
+Bundle these into 'SharingScaffoldKind'. With it, the two
+top-level wrappers ('reconcile_sharing_scaffold' for the
 initial-render side and the existing dispatcher in
-=complete.rs= for the rerender side) become small switches
+'complete.rs' for the rerender side) become small switches
 on this enum.
 
 *** Step 6 — collapse the call sites
 
-  - In =complete_branch_minus_content=, replace the call to
-    =maybe_add_subscribeeCol_branch= with three calls to
-    =reconcile_sharing_scaffold= (one per kind), or one call
+  - In 'complete_branch_minus_content', replace the call to
+    'maybe_add_subscribeeCol_branch' with three calls to
+    'reconcile_sharing_scaffold' (one per kind), or one call
     that internally fans out. Same for
-    =extendDefinitiveSubtreeFromLeaf='s call to
-    =maybe_add_hiddenInSubscribeeCol_branch=.
+    'extendDefinitiveSubtreeFromLeaf''s call to
+    'maybe_add_hiddenInSubscribeeCol_branch'.
   - In the rerender dispatcher
     ([[file:server/update_buffer/complete.rs][complete.rs]]),
     keep the per-scaffold dispatch but route each branch into
     the single reconciler.
-  - Delete =to_org/complete/sharing.rs= entirely; its
+  - Delete 'to_org/complete/sharing.rs' entirely; its
     functions are now the wrappers above.
   - The hidden-in/out files
     ([[file:server/update_buffer/complete_postorder/][complete_postorder/]])
@@ -511,15 +576,15 @@ on this enum.
 
   - The "must this kind of scaffold sit under that kind of
     parent?" predicate currently lives in three different
-    =error_unless_node_satisfies= calls with three different
-    error strings. =SharingScaffoldKind= holds the predicate;
+    'error_unless_node_satisfies' calls with three different
+    error strings. 'SharingScaffoldKind' holds the predicate;
     the wrappers ask it.
   - Every completer currently re-derives the subscriber pid by
-    hand-rolling =read_at_ancestor_in_tree=. The kind enum
+    hand-rolling 'read_at_ancestor_in_tree'. The kind enum
     exposes the ancestor distance, so a single helper pulls
     the subscriber pid+source.
   - The "is this a real subscribee?" check
-    (=type_and_parent_type_consistent_with_subscribee=) and
+    ('type_and_parent_type_consistent_with_subscribee') and
     its TODO at sharing.rs:126 ("assumes the existing Col is
     correct") both go away — the predicate is in the kind
     enum, and the integration is in the reconciler.
@@ -527,29 +592,29 @@ on this enum.
 ** Edge cases & risks
 
   - *Diff-view phantom IDs in the initial-render path.*
-    =SourceOfTruth::DiskAndTypedb= guarantees no phantoms,
+    'SourceOfTruth::DiskAndTypedb' guarantees no phantoms,
     but a future caller could pass diff data into the
     initial-render path. That's fine — the primitive already
     handles it.
   - *Cycle handling in the initial-render path.* Initial
-    render uses =append_indefinitive_from_disk_as_child=,
-    which threads through =DefinitiveMap= for repeats and
+    render uses 'append_indefinitive_from_disk_as_child',
+    which threads through 'DefinitiveMap' for repeats and
     cycles. The rerender primitive
-    (=complete_relevant_children_in_viewnodetree=) does its
+    ('complete_relevant_children_in_viewnodetree') does its
     own repeat detection. Need to verify they agree on what
     counts as a repeat, and that the unified primitive accepts
-    a =DefinitiveMap= when one is in scope.
+    a 'DefinitiveMap' when one is in scope.
   - *Subscribee body & alias clobbering.* The initial-render
-    path goes through =append_indefinitive_from_disk_as_child=
+    path goes through 'append_indefinitive_from_disk_as_child'
     which loads disk titles and bodies; the rerender primitive
-    relies on subsequent =clobberIndefinitiveViewnode= calls
-    in =complete_truenode_preorder=. The unified primitive
+    relies on subsequent 'clobberIndefinitiveViewnode' calls
+    in 'complete_truenode_preorder'. The unified primitive
     should call clobber unconditionally for newly-created
     children, matching today's rerender semantics.
   - *Focus handling on empty-col deletion.*
-    =complete_subscribee_col_preorder= today transfers focus
+    'complete_subscribee_col_preorder' today transfers focus
     to the col's parent before detaching the col. That logic
-    needs to live in =ensure_scaffold_present_or_absent= or
+    needs to live in 'ensure_scaffold_present_or_absent' or
     the col-deletion path of the primitive.
   - *Test surface.* All current sharing tests assume the two
     paths exist as separate functions. The integration tests

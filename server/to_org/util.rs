@@ -17,6 +17,7 @@ use ego_tree::iter::Edge;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io;
+use std::time;
 use typedb_driver::TypeDBDriver;
 
 
@@ -421,7 +422,7 @@ pub async fn build_node_branch_minus_content (
   driver          : &TypeDBDriver,
   visited         : &mut DefinitiveMap,
 ) -> Result < NodeId, Box<dyn Error> > {
-  let t0 : std::time::Instant = std::time::Instant::now();
+  let t0 : time::Instant = time::Instant::now();
   let result : Result < NodeId, Box<dyn Error> > =
     match tree_and_parent {
       Some ( (tree, parent_treeid) ) => {
