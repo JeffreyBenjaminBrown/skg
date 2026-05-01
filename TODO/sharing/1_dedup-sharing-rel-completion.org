@@ -1,3 +1,206 @@
+* Open: integrate-or-reframe the early-return guards
+
+Two early-return guards in =server/to_org/complete/sharing/mod.rs=
+remain flagged as "should integrate" — a PITFALL at line 116
+inside 'maybe_add_subscribeeCol_branch', and a TODO at line 183
+inside 'maybe_add_hiddenInSubscribeeCol_branch'. Both have the
+same shape:
+
+#+begin_src rust
+  if unique_scaffold_child (
+    tree, node_id, &Scaffold::SubscribeeCol )? . is_some ()
+  { return Ok (( )); }
+#+end_src
+
+The comments say (paraphrased): /if this code were ever called
+on a tree that already has the scaffold present, we'd have to
+'integrate' the existing scaffold rather than trust it; today
+we just skip./
+
+** Why the comments exist
+
+When the plan was written, "integrate an existing scaffold" was
+something only the rerender side knew how to do. Initial render
+walked a flat list of ids and appended TrueNode children one by
+one — there was no primitive for "merge a goal-list into an
+existing scaffold's children". So the only honest thing was to
+early-return when a scaffold was already present and document
+the gap.
+
+Since Step 5 (commit 11c21eed), that's no longer true. The
+shared 'reconcile_sharing_scaffold_children' primitive handles
+exactly this: given a goal-list and an existing scaffold's
+NodeId, it adds missing children, removes extras, reorders to
+match. The initial-render entry points already call it for the
+common case (scaffold absent → create + populate); they just
+don't reach for it in the "scaffold present" branch.
+
+** Today's call sites are all initial-render
+
+Both functions are reached only from the initial-render path:
+
+  - 'maybe_add_subscribeeCol_branch' is called from
+    'complete_branch_minus_content' in =server/to_org/util.rs=,
+    used by 'render_initial_viewforest_bfs' /
+    'stub_viewforest_from_root_ids'.
+  - 'maybe_add_hiddenInSubscribeeCol_branch' is called from
+    'extendDefinitiveSubtreeFromLeaf' in
+    =server/to_org/expand/definitive.rs=, also part of initial
+    render.
+
+Initial render starts from a fresh tree that no caller has
+seeded with sharing scaffolds. So the early-return branch is
+unreachable today; the comments document a precondition, not a
+live bug.
+
+** Three honest options
+
+  1. *Resolve by integrating.* Drop the early returns. When
+     'unique_scaffold_child' returns 'Some(nid)', skip the
+     'insert_scaffold_as_child' call and call
+     'reconcile_sharing_scaffold_children' on that 'nid'.
+     Symmetrical between SubscribeeCol and HiddenIn; reuses
+     existing primitives; deletes the PITFALL/TODO truthfully.
+     Cost: changes runtime behavior on a code path that today
+     is unreachable, so it's testable only by adding a synthetic
+     caller. Low real risk, but the diff carries a "behavior
+     change to dead branch" smell.
+
+  2. *Resolve by reframing.* Replace the PITFALL/TODO with a
+     precondition note, e.g. "Caller must pass a tree with no
+     existing such scaffold under 'node_id'." Drop the
+     'unique_scaffold_child' guard entirely and let
+     'insert_scaffold_as_child' do the work — or keep the guard
+     and turn it into a 'debug_assert!' / proper error. Says:
+     /this is a contract, not a deficiency/. Cheapest; matches
+     reality; doesn't pretend the comments will be acted on
+     later. Cost: future callers from a non-initial-render
+     context now have to satisfy the contract themselves.
+
+  3. *Leave alone.* Keep the comments. They cost nothing at
+     runtime and remain honest about a real architectural
+     asymmetry (the rerender path integrates; this path
+     doesn't). Cost: a permanent TODO is its own kind of
+     cruft, and the dedup work since Step 5 means the
+     integration is no longer hard, just unwired.
+
+My recommendation is (2): the asymmetry the comments flag has
+become a precondition rather than a defect, and saying so
+plainly is more useful to future readers than carrying an
+aspirational TODO. (1) is also fine if you'd rather have the
+two paths fully symmetric on principle. (3) wastes the work
+already done in Step 5.
+
+* Status as of 2026-05-01
+
+The dedup work from this plan is essentially done. Two more
+commits landed since the 2026-04-29 status (11c21eed, a96c6439)
+covering the deferred Step 5 and a deliberately-scoped-down
+Step 6. All 6 plan steps are now addressed in some form.
+Items 1 and 2 of the original "what's left" list (below) have
+since been done as a follow-up cleanup on top of Step 6's
+enum, leaving only the integration-vs-reframe question covered
+in the section above. Build clean; all 331 nextest tests pass.
+
+** What landed since 2026-04-29
+
+- *Step 5 (commit 11c21eed): fold initial-render path through
+  the shared reconcile primitive.* Took a third path beyond
+  the two options listed in the prior status. Instead of
+  threading '&TypeDBDriver' into 'build_child_data' (rerender
+  side) or adding an 'Unknown' variant to 'ChildData', the
+  commit added a sibling helper
+  'build_initial_render_child_data' (in
+  =server/to_org/complete/sharing/mod.rs=) that walks a
+  goal-list of ids, calls 'nodecomplete_and_viewnode_from_id'
+  (TypeDB-aware: extra_id-to-primary resolution and
+  cross-source lookup both work), and produces the
+  '(resolved_pids, ChildData map)' pair the shared
+  'reconcile_sharing_scaffold_children' consumes. Phantom is
+  always 'None' on initial render. The two
+  'maybe_add_*_branch' functions now use this helper.
+  'append_indefinitive_from_disk_as_child' is deleted.
+  PITFALL preserved at the call site: HiddenOutsideOf
+  scaffold is inserted *after* the subscribee children, since
+  'reconcile_sharing_scaffold_children' only manages TrueNode
+  children — scaffolds are out of scope.
+
+- *Step 6 (commit a96c6439): introduce SharingScaffoldKind
+  discriminator (smaller than originally planned).* Replaced
+  the magic 'caller_label' string at the five call sites of
+  'reconcile_sharing_scaffold_children' with a
+  'SharingScaffoldKind' enum in a new file
+  =server/to_org/complete/sharing/kind.rs=, exposing
+  'caller_label()' and 'scaffold()' methods. The commit
+  explicitly chose not to do the full step-6 collapse of the
+  three completers into one parameterised function, with the
+  reasoning that their differences (preorder vs postorder,
+  the col-deletion + ensure-HiddenOutside-last logic specific
+  to SubscribeeCol's preorder completer, the different
+  birth-fixup sets in the two postorder completers) are real,
+  and a unified function would just push 'match kind' arms
+  into the body.
+
+** Net effect
+
+Six functions over four jobs collapsed to a shared
+primitive set: 'build_child_data' /
+'build_initial_render_child_data' for child-data assembly,
+'reconcile_sharing_scaffold_children' for the
+goal-list-driven reconcile, three 'goal_list_for_*' functions
+for goal-list computation, and the
+'detach_scaffold_transferring_focus' /
+'detach_scaffold_if_empty' helpers for empty-col cleanup.
+The three rerender-side completers are now ~90 lines each
+(down from ~280); the two initial-render entry points
+('maybe_add_subscribeeCol_branch',
+'maybe_add_hiddenInSubscribeeCol_branch') each call the
+same primitive once or twice instead of running their own
+per-id append loops.
+
+** Follow-up cleanups since this section was first written
+
+  1. *DONE: moved the three guard strings to
+     'SharingScaffoldKind'.* Added
+     'SharingScaffoldKind::error_unless_node_is_this_kind' on
+     the enum, which wraps 'error_unless_node_satisfies' with
+     a Box<dyn Error> result and a per-kind error string of
+     the form "<caller_label>: expected <Scaffold>". Each of
+     the three rerender-side completers
+     ('complete_subscribee_col_preorder',
+     'complete_hiddeninsubscribee_col',
+     'complete_hiddenoutsideofsubscribeecol') now binds
+     'let kind = SharingScaffoldKind::<variant>;' once at the
+     top of the function and calls
+     'kind.error_unless_node_is_this_kind(tree, node)?'
+     instead of an inlined matches!/format! block. The same
+     'kind' value is then reused at the
+     'reconcile_sharing_scaffold_children' call site, so the
+     enum variant is now spelled once per function instead of
+     twice.
+
+  2. *DONE: hoisted the ancestor-distance lookup.* Added
+     'SharingScaffoldKind::correct_subscriber_ancestor_distance'
+     returning 1/3/2 for SubscribeeCol, HiddenInSubscribeeCol,
+     HiddenOutsideOfSubscribeeCol respectively. The three
+     completers' subscriber-pid lookups now read
+     'kind.correct_subscriber_ancestor_distance()' instead of
+     a literal 1/2/3, with the per-kind tree-shape diagram
+     centralised in 'kind.rs'. The HiddenInSubscribeeCol
+     completer's distance-1 subscribee lookup remains a
+     literal — only the subscriber distance is shared.
+
+  3. *Open: PITFALL at sharing/mod.rs:116 and TODO at
+     sharing/mod.rs:183.* See the new top section
+     "Open: integrate-or-reframe the early-return guards"
+     above for the full discussion.
+
+  4. *Declined: full Step 6 collapse.* Folding the three
+     completers into one parameterised function was
+     deliberately declined in commit a96c6439. The prior
+     reasoning still stands: the per-kind differences are
+     structural, not incidental.
+
 * Status as of 2026-04-29
 
 Four of six steps landed (commits c739f649, 92e08dc7,

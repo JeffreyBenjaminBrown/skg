@@ -6,7 +6,7 @@ use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
 use crate::types::views_state::nodecomplete_from_inrustgraph_or_disk;
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree};
+use crate::types::tree::generic::{pid_and_source_from_ancestor, read_at_ancestor_in_tree};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth};
 use crate::update_buffer::util::{detach_scaffold_if_empty, treat_certain_children};
 
@@ -33,16 +33,10 @@ pub fn complete_hiddenoutsideofsubscribeecol (
   env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
-  { // verify node and parent are the right kinds
-    error_unless_node_satisfies(
-        tree, node,
-        |vn : &ViewNode| matches!(
-          &vn . kind,
-          ViewNodeKind::Scaff(
-            Scaffold::HiddenOutsideOfSubscribeeCol )),
-        "complete_hiddenoutsideofsubscribeecol: \
-         expected HiddenOutsideOfSubscribeeCol"
-      ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
+  let kind : SharingScaffoldKind =
+    SharingScaffoldKind::HiddenOutsideOfSubscribeeCol;
+  kind . error_unless_node_is_this_kind (tree, node) ?;
+  { // verify ancestor 1 is a SubscribeeCol scaffold
     read_at_ancestor_in_tree(
         tree, node, 1,
         |vn : &ViewNode| match &vn . kind {
@@ -53,8 +47,8 @@ pub fn complete_hiddenoutsideofsubscribeecol (
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?; }
   let (subscriber_pid, subscriber_source) : (ID, SourceName) =
     pid_and_source_from_ancestor(
-      tree, node, 2,
-      "complete_hiddenoutsideofsubscribeecol" ) ?;
+      tree, node, kind . correct_subscriber_ancestor_distance (),
+      kind . caller_label () ) ?;
   let wt_subscriber_nodecomplete : NodeComplete =
     nodecomplete_from_inrustgraph_or_disk (
       &env . config, &subscriber_pid, &subscriber_source ) ?;
@@ -75,7 +69,7 @@ pub fn complete_hiddenoutsideofsubscribeecol (
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
   reconcile_sharing_scaffold_children(
-    tree, node, SharingScaffoldKind::HiddenOutsideOfSubscribeeCol,
+    tree, node, kind,
     &goal_list, &child_data ) ?;
   { // Mark erroneous content children birth=Independent. A child is erroneous if it is a non-phantom TrueNode marked birth=Content but not in the goal_list.
     let goal_set : HashSet<ID> =

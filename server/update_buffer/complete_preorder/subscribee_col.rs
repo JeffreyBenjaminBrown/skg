@@ -5,7 +5,7 @@ use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
 use crate::types::git::SourceDiff;
 use crate::types::views_state::nodecomplete_from_inrustgraph_or_disk;
 use crate::types::misc::{ID, SourceName};
-use crate::types::tree::generic::{ error_unless_node_satisfies, read_at_ancestor_in_tree};
+use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child, insert_scaffold_as_child};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold};
 use crate::update_buffer::util::{ detach_scaffold_transferring_focus, move_child_to_end};
@@ -33,17 +33,12 @@ pub async fn complete_subscribee_col_preorder (
   env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
-  error_unless_node_satisfies(
-      tree, node,
-      |vn : &ViewNode| matches!( &vn . kind,
-                                 ViewNodeKind::Scaff(
-                                   Scaffold::SubscribeeCol )),
-      "complete_subscribee_col_preorder: expected SubscribeeCol"
-    ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
+  let kind : SharingScaffoldKind = SharingScaffoldKind::SubscribeeCol;
+  kind . error_unless_node_is_this_kind (tree, node) ?;
   let (parent_skgid, parent_source, parent_indefinitive)
     : (ID, SourceName, bool)
     = read_at_ancestor_in_tree(
-      tree, node, 1,
+      tree, node, kind . correct_subscriber_ancestor_distance (),
       |vn : &ViewNode| match &vn . kind {
         ViewNodeKind::True (t) =>
           Some(( t . id . clone(),
@@ -73,7 +68,7 @@ pub async fn complete_subscribee_col_preorder (
         &goal_list, &removed_ids,
         source_diffs, deleted_since_head_pid_src_map, env ) ?;
     reconcile_sharing_scaffold_children(
-      tree, node, SharingScaffoldKind::SubscribeeCol,
+      tree, node, kind,
       &goal_list, &child_data ) ?; }
   { // Ensure HiddenOutsideOfSubscribeeCol exists and is last.
     let hidden_outside : Option<NodeId> =
