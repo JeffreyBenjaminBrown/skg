@@ -150,7 +150,7 @@ pub fn headline_to_triple (
   static HEADLINE_REGEX
     : LazyLock<Regex>
     = LazyLock::new(|| {
-      Regex::new(r"^\s*(\*+)\s+(.+)") . unwrap()
+      Regex::new(r"^(\*+)\s+(.+)") . unwrap()
     });
   if let Some (captures) = HEADLINE_REGEX . captures (headline) {
     let asterisks: &str = captures . get (1) . unwrap() . as_str();
