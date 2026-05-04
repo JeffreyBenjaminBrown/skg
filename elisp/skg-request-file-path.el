@@ -4,7 +4,7 @@
 ;;; and open a magit view navigated to an appropriate location.
 
 (require 'skg-id-search)
-(require 'skg-magit-titles)
+(require 'skg-readable-ids)
 (require 'skg-state)
 (require 'skg-length-prefix)
 
@@ -137,7 +137,7 @@ Returns nil (after a user message) on error or missing path."
              ( repo-root (magit-toplevel default-directory) )
              ( rel-path  (file-relative-name resolved-path repo-root) ))
         (magit-status-setup-buffer default-directory)
-        (skg-magit-titles-mode 1)
+        (skg-readable-ids-mode 1)
         (magit-section-show-level-2-all)
         (let (( sections
                 (delq

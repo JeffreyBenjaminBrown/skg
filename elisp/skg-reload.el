@@ -53,7 +53,7 @@ plain `load-file' at the end instead."
             skg-truenode-defaults
             skg-state
             skg-test-utils
-            skg-magit-titles
+            skg-readable-ids
             skg-file-minor-mode
             skg-git-add
             skg-show-org-ancestry

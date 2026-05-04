@@ -1,3 +1,7 @@
+* bug, no time
+In git diff view, phantom nodes become completely unfolded
+whenever the buffer is saved.
+Probably because they are regenerated.
 * TODO/sharing/1_dedup-sharing-rel-completion.org
 * TODO/sharing/2_hide-subscribee-content-deletions.org
 * TODO I want this todo list in Skg.
@@ -37,6 +41,7 @@ which was to fix test db accumulation
 ** [[id:627da2c2-2f34-46ac-a6d3-9c625c4ff31d][AI]]
 ** [[id:001d7913-c431-461c-92ae-a6a39394856c][processing]]
 * food for thought
+** Skg projects graph relationships into trees.
 ** ? I wanted the 'helps' relation.
 And 'needs', surely.
 ** Where to use overlapping containment?

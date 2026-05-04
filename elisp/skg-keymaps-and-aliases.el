@@ -140,7 +140,8 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c O l") #'skg-pop-link))
   (progn;; git add ops (only fire if the .skg file is not yet in HEAD)
     (define-key map (kbd "C-c t n") #'skg-git-add-if-new)
-    (define-key map (kbd "C-c t N") #'skg-git-add-if-new-recursive)))
+    (define-key map (kbd "C-c t A") #'skg-git-add-if-new-recursive)
+    (define-key map (kbd "C-c t a") #'skg-git-add-if-new-recursive-preview)))
 
 (defvar skg-id-stack-mode-map (make-sparse-keymap)
   "Keymap for `skg-id-stack-mode'.")

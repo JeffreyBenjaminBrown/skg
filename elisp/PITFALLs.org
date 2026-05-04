@@ -86,7 +86,7 @@ All of these use =skg-find-sexp-end= rather than =forward-sexp=.
 
 They are gibberish outside Emacs.
 
-* skg-magit-titles overlays break home/end navigation when lines are truncated
+* skg-readable-ids overlays break home/end navigation when lines are truncated
 
 =after-string= overlays (used to show titles after UUIDs) add
 invisible-to-git text that makes lines visually longer. When the
@@ -96,7 +96,7 @@ return point to column 0.
 
 ** Mitigation in place
 
-- =skg-magit-titles-mode= sets =truncate-lines= to =nil=
+- =skg-readable-ids-mode= sets =truncate-lines= to =nil=
   (lines wrap to the next screen line). With wrapping enabled,
   =home= works correctly.
 

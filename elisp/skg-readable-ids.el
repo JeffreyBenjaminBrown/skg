@@ -15,20 +15,20 @@
   '((t :foreground "cornflower blue"))
   "Face for skg title annotations in magit buffers.")
 
-(defvar-local skg-magit-titles--positions nil
+(defvar-local skg-readable-ids--positions nil
   "List of (start end id-string) triples from the last scan.")
 
-(defvar-local skg-magit-titles--generation 0
+(defvar-local skg-readable-ids--generation 0
   "Counter incremented on each annotation request.
 The response handler drops stale responses.")
 
-(defun skg-magit-titles--clear-overlays ()
+(defun skg-readable-ids--clear-overlays ()
   "Remove all skg-magit-title overlays from the buffer."
   (dolist (ov (overlays-in (point-min) (point-max)))
     (when (overlay-get ov 'skg-magit-title)
       (delete-overlay ov))))
 
-(defun skg-magit-titles--collect-ids ()
+(defun skg-readable-ids--collect-ids ()
   "Scan the buffer for UUID v4 patterns.
 Returns a list of (start end id-string) triples."
   (let ((positions nil))
@@ -41,24 +41,24 @@ Returns a list of (start end id-string) triples."
               positions)))
     (nreverse positions)))
 
-(defun skg-magit-titles--annotate-buffer ()
+(defun skg-readable-ids--annotate-buffer ()
   "Clear overlays, scan for IDs, shorten their display, and request titles from the server."
-  (skg-magit-titles--clear-overlays)
-  (let ((positions (skg-magit-titles--collect-ids)))
+  (skg-readable-ids--clear-overlays)
+  (let ((positions (skg-readable-ids--collect-ids)))
     (when positions
-      (setq skg-magit-titles--positions positions)
-      (skg-magit-titles--shorten-id-overlays positions)
+      (setq skg-readable-ids--positions positions)
+      (skg-readable-ids--shorten-id-overlays positions)
       (let* ((generation
-              (setq skg-magit-titles--generation
-                    (1+ skg-magit-titles--generation)))
+              (setq skg-readable-ids--generation
+                    (1+ skg-readable-ids--generation)))
              (unique-ids
               (delete-dups
                (mapcar (lambda (p) (nth 2 p)) positions)))
              (buf (current-buffer)))
-        (skg-magit-titles--request-titles
+        (skg-readable-ids--request-titles
          unique-ids generation buf)))))
 
-(defun skg-magit-titles--shorten-id-overlays (positions)
+(defun skg-readable-ids--shorten-id-overlays (positions)
   "Put a display overlay over each id's tail (chars 9 onward) so
 only the first 8 chars are shown, followed by an ellipsis. The
 underlying buffer text is unchanged, so copy-paste still yields
@@ -75,7 +75,7 @@ the full id. POSITIONS is a list of (start end id-string) triples."
                        (propertize "…"
                                    'face 'skg-magit-title-face)))))))
 
-(defun skg-magit-titles--request-titles (ids generation buf)
+(defun skg-readable-ids--request-titles (ids generation buf)
   "Send a titles-by-ids request for IDS.
 GENERATION and BUF are captured for the response handler."
   (condition-case err
@@ -83,7 +83,7 @@ GENERATION and BUF are captured for the response handler."
         (skg-register-response-handler
          'titles-by-ids
          (lambda (_tcp-proc payload)
-           (skg-magit-titles--handle-response
+           (skg-readable-ids--handle-response
             payload generation buf))
          t)
         (skg-lp-reset)
@@ -99,17 +99,17 @@ GENERATION and BUF are captured for the response handler."
                  "\n")))
           (process-send-string tcp-proc request-sexp)))
     (error
-     (message "skg-magit-titles: server not connected: %s"
+     (message "skg-readable-ids: server not connected: %s"
               (error-message-string err)))))
 
-(defun skg-magit-titles--handle-response (payload generation buf)
+(defun skg-readable-ids--handle-response (payload generation buf)
   "Handle the titles-by-ids response.
 PAYLOAD is the tagged LP response. GENERATION is checked
 against the buffer's current generation to drop stale responses.
 BUF is the magit buffer to annotate."
   (when (buffer-live-p buf)
     (with-current-buffer buf
-      (when (= generation skg-magit-titles--generation)
+      (when (= generation skg-readable-ids--generation)
         (let* ((response (read payload))
                (content  (cadr (assoc 'content response)))
                (title-map (make-hash-table :test 'equal)))
@@ -118,14 +118,14 @@ BUF is the magit buffer to annotate."
               (puthash (format "%s" (car pair))
                        (format "%s" (cdr pair))
                        title-map)))
-          (dolist (pos skg-magit-titles--positions)
+          (dolist (pos skg-readable-ids--positions)
             (let* ((start  (nth 0 pos))
                    (end    (nth 1 pos))
                    (id-str (nth 2 pos))
                    (title  (gethash id-str title-map)))
               (when title
                 (let* ((display-title
-                        (skg-magit-titles--format-title title))
+                        (skg-readable-ids--format-title title))
                        (ov (make-overlay start end nil t nil)))
                   (overlay-put ov 'skg-magit-title t)
                   (overlay-put ov 'evaporate t)
@@ -134,7 +134,7 @@ BUF is the magit buffer to annotate."
                                 (concat " " display-title)
                                 'face 'skg-magit-title-face)))))))))))
 
-(defun skg-magit-titles--format-title (title)
+(defun skg-readable-ids--format-title (title)
   "Return the display form of TITLE for annotation.
 Every '[[id:X][LABEL]]' sub-expression in TITLE is replaced
 by '[[LABEL]]', so link-bearing titles render as links without
@@ -145,17 +145,17 @@ exposing the id. Plain titles pass through unchanged."
    title))
 
 ;;;###autoload
-(define-minor-mode skg-magit-titles-mode
+(define-minor-mode skg-readable-ids-mode
   "Annotate skg IDs in magit buffers with their titles."
   :lighter " skg-titles"
-  (if skg-magit-titles-mode
+  (if skg-readable-ids-mode
       (progn
         (setq-local truncate-lines nil)
-        (skg-magit-titles--annotate-buffer)
+        (skg-readable-ids--annotate-buffer)
         (add-hook 'magit-post-refresh-hook
-                  #'skg-magit-titles--annotate-buffer nil t))
+                  #'skg-readable-ids--annotate-buffer nil t))
     (remove-hook 'magit-post-refresh-hook
-                 #'skg-magit-titles--annotate-buffer t)
-    (skg-magit-titles--clear-overlays)))
+                 #'skg-readable-ids--annotate-buffer t)
+    (skg-readable-ids--clear-overlays)))
 
-(provide 'skg-magit-titles)
+(provide 'skg-readable-ids)

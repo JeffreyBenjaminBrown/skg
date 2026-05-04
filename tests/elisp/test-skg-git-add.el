@@ -92,6 +92,21 @@ IDS-AND-CHILDREN is a list of (id . children-ids)."
       (goto-char (point-min)))
     buf))
 
+(defun test-skg-git-add--make-diff-view ()
+  "Create a skg content-view buffer with mixed git-diff metadata."
+  (let ((buf (get-buffer-create "*test-skg-git-add-view*")))
+    (with-current-buffer buf
+      (erase-buffer)
+      (insert
+       "* (skg (node (id new) (source main) (unstaged newX newM))) new\n"
+       "body\n"
+       "** (skg (node (id child) (source main) (unstaged newX newM))) child\n"
+       "** (skg (node (id old) (source main) (unstaged newM))) old\n"
+       "* (skg (node (id staged) (source main) (staged newX))) staged\n")
+      (skg-content-view-mode)
+      (goto-char (point-min)))
+    buf))
+
 (defun test-skg-git-add--teardown ()
   (when (and test-skg-git-add--data-root
              (file-directory-p test-skg-git-add--data-root))
@@ -160,19 +175,91 @@ the user's unrelated edits."
           (should (string= staged-hash-before staged-hash-after))))
     (test-skg-git-add--teardown)))
 
-(ert-deftest test-skg-git-add-if-new-recursive-covers-descendants ()
-  "The recursive form adds the node at point AND each descendant."
+(ert-deftest test-skg-git-add-if-new-recursive-runs-previewed-command ()
+  "The recursive executor stages the same newX subtree files as the preview."
   (unwind-protect
       (let* ((root (test-skg-git-add--setup))
              (src  (expand-file-name "main" root))
-             (buf  (test-skg-git-add--make-view '(("new" "child")))))
+             (buf  (test-skg-git-add--make-diff-view)))
         (should-not (test-skg-git-add--in-index-p src "new.skg"))
         (should-not (test-skg-git-add--in-index-p src "child.skg"))
         (with-current-buffer buf
           (goto-char (point-min))
           (skg-git-add-if-new-recursive))
         (should (test-skg-git-add--in-index-p src "new.skg"))
-        (should (test-skg-git-add--in-index-p src "child.skg")))
+        (should (test-skg-git-add--in-index-p src "child.skg"))
+        (let ((staged-hash
+               (test-skg-git-add--staged-blob-hash src "staged.skg")))
+          (with-temp-file (expand-file-name "staged.skg" src)
+            (insert "title: staged-MODIFIED\npid: staged\n"))
+          (with-current-buffer buf
+            (goto-char (point-min))
+            (re-search-forward "^\\* .* staged$")
+            (skg-git-add-if-new-recursive))
+          (should
+           (string=
+            staged-hash
+            (test-skg-git-add--staged-blob-hash src "staged.skg")))))
+    (test-skg-git-add--teardown)))
+
+(ert-deftest test-skg-git-add-preview-collects-only-unstaged-new-files ()
+  "The preview collector uses newX, not membership-only newM or staged newX."
+  (unwind-protect
+      (progn
+        (test-skg-git-add--setup)
+        (let ((buf (test-skg-git-add--make-diff-view)))
+          (with-current-buffer buf
+            (goto-char (point-min))
+            (should
+             (equal
+              (skg--subtree-unstaged-new-file-id-and-source-pairs)
+              '(("new" . "main")
+                ("child" . "main")))))))
+    (test-skg-git-add--teardown)))
+
+(ert-deftest test-skg-git-add-preview-works-from-body ()
+  "Calling from body text still uses that body's owning subtree."
+  (unwind-protect
+      (progn
+        (test-skg-git-add--setup)
+        (let ((buf (test-skg-git-add--make-diff-view)))
+          (with-current-buffer buf
+            (goto-char (point-min))
+            (search-forward "body")
+            (should
+             (equal
+              (skg--subtree-unstaged-new-file-id-and-source-pairs)
+              '(("new" . "main")
+                ("child" . "main")))))))
+    (test-skg-git-add--teardown)))
+
+(ert-deftest test-skg-git-add-preview-command-does-not_touch_git ()
+  "The preview command creates a buffer but does not stage anything."
+  (unwind-protect
+      (let* ((root (test-skg-git-add--setup))
+             (src  (expand-file-name "main" root))
+             (buf  (test-skg-git-add--make-diff-view)))
+        (should-not (test-skg-git-add--in-index-p src "new.skg"))
+        (should-not (test-skg-git-add--in-index-p src "child.skg"))
+        (cl-letf (((symbol-function 'skg-readable-ids-mode)
+                   (lambda (&optional _arg) nil)))
+          (with-current-buffer buf
+            (goto-char (point-min))
+            (skg-git-add-if-new-recursive-preview)))
+        (should-not (test-skg-git-add--in-index-p src "new.skg"))
+        (should-not (test-skg-git-add--in-index-p src "child.skg"))
+        (with-current-buffer "*skg git add new files*"
+          (let ((text (buffer-string)))
+            (should (string-match-p "ls-files" text))
+            (should (string-match-p "git\" nil \"\\*skg-git-add-output\\*\" t" text))
+            (should (string-match-p "\"add\" \"--\" file" text))
+            (should (string-match-p "\"new.skg\"" text))
+            (should (string-match-p "\"child.skg\"" text))
+            (should-not (string-match-p "\"old.skg\"" text))
+            (should-not (string-match-p "\"staged.skg\"" text)))))
+    (when (get-buffer "*skg git add new files*")
+      (let ((kill-buffer-query-functions nil))
+        (kill-buffer "*skg git add new files*")))
     (test-skg-git-add--teardown)))
 
 (provide 'test-skg-git-add)

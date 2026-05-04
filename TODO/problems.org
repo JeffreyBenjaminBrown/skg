@@ -205,3 +205,8 @@
    '(skg (node (id)))'. Fix candidates: stripper should use
    DELETE-only instructions, or short-circuit when the target lacks
    '(node ...)' to begin with.
+
+** 'coding-advice/ai-agents.org' refers to a missing file
+   It says to see 'coding-advice/good-refactors.md', but that file
+   does not exist in the repository. Either the file was renamed or
+   the reference is stale.

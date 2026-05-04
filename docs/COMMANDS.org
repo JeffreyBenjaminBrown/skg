@@ -172,6 +172,20 @@ the first line in that section containing this node's ID.
 Warns if the ID appears multiple times, or if the parent
 appears in multiple sections.
 *** C-c G M   : skg-goto-in-magit-parent-and-close-this
+** git
+*** C-c t a         : skg-git-add-if-new-recursive-preview
+Brings up a buffer with the text of a command which,
+if executed (C-x C-e), runs 'git add' on some nodes.
+The nodes should consist only of nodes new to git,
+and only of nodes in the recursive content (inclusive)
+of the node from which skg-git-add-if-new-recursive-preview
+was called. The buffer uses skg-readable-ids-mode.
+*** C-c t A         : skg-git-add-if-new-recursive
+Like skg-git-add-if-new-recursive-preview,
+but it doesn't show you the command;
+it instead runs that command for you.
+*** C-c (g|G) (m|M) : skg-goto-in-magit-*
+These four commands are described elsewhere in this document.
 ** showing more information about a node
 These commands don't edit the graph. Each inserts a request
 into the metadata of the node at point that, on save, causes
@@ -254,6 +268,15 @@ Note that some properties don't make sense to edit,
 like the count of how many contents it has.
 (If you want to change how much content a node has,
 don't change the node's metadata; change its children in the view.)
+*** C-c v i : skg-readable-ids-mode
+This changes how node IDs are displayed.
+The ID itself is a kind of special random gibberish called UUID v4.
+When skg-readable-ids-mode is on,
+only the first 8 characters of the ID are shown,
+and they are followed by the title of the node with that ID,
+if Skg can figure it out.
+(It doesn't yet know how to read the git history
+to find titles for deleted files.)
 *** C-c v s : skg-view-id-stack
 View and maybe edit the set of links you've stored.
 (See "the linkstack" below.)
