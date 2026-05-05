@@ -14,8 +14,9 @@
 ///    of `SectionTree` nodes that mirrors the org outline.
 ///
 /// 3. **Insert super-indentation groups.**
-///    (The test 'test_super_indentation_creates_grouping_nodes'
-///    is probably clearer than this explanatino.)
+///    (This is described in more detail in ./super-indentation-rules.org .)
+///    The test 'test_super_indentation_creates_grouping_nodes'
+///    might be clearer than any explanatino.)
 ///    Org-roam allows "super-indentation": a headline like `*** c` directly under
 ///    `* a`, skipping level 2. When a node's direct children span
 ///    more than one headline level, we wrap them in **synthetic

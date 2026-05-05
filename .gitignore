@@ -23,6 +23,7 @@
 /tests/results
 /tests/results
 Cargo.lock
+org-roam/
 TAGS
 __pycache__
 temp-*
