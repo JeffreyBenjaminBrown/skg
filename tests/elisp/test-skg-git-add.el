@@ -1,4 +1,4 @@
-;;; test-skg-git-add.el --- Tests for skg-git-add-if-new.
+;;; test-skg-git-add.el --- Tests for recursive skg git-add commands.
 
 ;;; Sets up a throwaway git repo and skgconfig.toml in /tmp, runs the
 ;;; two user commands, then asserts against the repo's state.
@@ -63,35 +63,6 @@ Returns the absolute data-root path."
     (zerop (call-process "git" nil nil nil
                          "ls-files" "--error-unmatch" file))))
 
-(defun test-skg-git-add--in-head-p (source-dir file)
-  "Return t if FILE is present in HEAD of SOURCE-DIR."
-  (let ((default-directory source-dir))
-    (zerop (call-process "git" nil nil nil
-                         "cat-file" "-e" (concat "HEAD:" file)))))
-
-(defun test-skg-git-add--head-count (source-dir)
-  "Return the number of commits reachable from HEAD in SOURCE-DIR."
-  (with-temp-buffer
-    (let ((default-directory source-dir))
-      (call-process "git" nil t nil "rev-list" "--count" "HEAD"))
-    (string-to-number (string-trim (buffer-string)))))
-
-(defun test-skg-git-add--make-view (ids-and-children)
-  "Create a skg content-view buffer shaped like IDS-AND-CHILDREN.
-IDS-AND-CHILDREN is a list of (id . children-ids)."
-  (let ((buf (get-buffer-create "*test-skg-git-add-view*")))
-    (with-current-buffer buf
-      (erase-buffer)
-      (dolist (pair ids-and-children)
-        (let ((id       (car pair))
-              (children (cdr pair)))
-          (insert (format "* (skg (node (id %s) (source main))) %s\n" id id))
-          (dolist (cid children)
-            (insert (format "** (skg (node (id %s) (source main))) %s\n" cid cid)))))
-      (skg-content-view-mode)
-      (goto-char (point-min)))
-    buf))
-
 (defun test-skg-git-add--make-diff-view ()
   "Create a skg content-view buffer with mixed git-diff metadata."
   (let ((buf (get-buffer-create "*test-skg-git-add-view*")))
@@ -117,63 +88,12 @@ IDS-AND-CHILDREN is a list of (id . children-ids)."
     (let ((kill-buffer-query-functions nil))
       (kill-buffer "*test-skg-git-add-view*"))))
 
-(ert-deftest test-skg-git-add-if-new-adds-untracked ()
-  "On an untracked node, the command stages just that file."
-  (unwind-protect
-      (let* ((root (test-skg-git-add--setup))
-             (src  (expand-file-name "main" root))
-             (buf  (test-skg-git-add--make-view '(("new")))))
-        (should-not (test-skg-git-add--in-index-p src "new.skg"))
-        (with-current-buffer buf
-          (goto-char (point-min))
-          (skg-git-add-if-new))
-        (should (test-skg-git-add--in-index-p src "new.skg"))
-        (should-not (test-skg-git-add--in-head-p src "new.skg")))
-    (test-skg-git-add--teardown)))
-
-(ert-deftest test-skg-git-add-if-new-skips-in-head ()
-  "A file already in HEAD is left alone; no change to the repo."
-  (unwind-protect
-      (let* ((root (test-skg-git-add--setup))
-             (src  (expand-file-name "main" root))
-             (buf  (test-skg-git-add--make-view '(("old"))))
-             (commits-before (test-skg-git-add--head-count src)))
-        (with-current-buffer buf
-          (goto-char (point-min))
-          (skg-git-add-if-new))
-        (should (= commits-before (test-skg-git-add--head-count src))))
-    (test-skg-git-add--teardown)))
-
 (defun test-skg-git-add--staged-blob-hash (source-dir file)
   "Return the git hash of FILE's current staged blob in SOURCE-DIR."
   (with-temp-buffer
     (let ((default-directory source-dir))
       (call-process "git" nil t nil "ls-files" "-s" file))
     (string-trim (buffer-string))))
-
-(ert-deftest test-skg-git-add-if-new-skips-already-staged ()
-  "A file already in the index must not be re-staged, even when
-the worktree copy has been modified since the original `git add'.
-This is the contract that keeps `C-c t n' from silently promoting
-the user's unrelated edits."
-  (unwind-protect
-      (let* ((root (test-skg-git-add--setup))
-             (src  (expand-file-name "main" root))
-             (buf  (test-skg-git-add--make-view '(("staged"))))
-             (staged-hash-before
-              (test-skg-git-add--staged-blob-hash src "staged.skg")))
-        ;; Modify the worktree copy after staging: the staged blob and
-        ;; the worktree now differ. A naive `git add' would silently
-        ;; stage these modifications; the command must not.
-        (with-temp-file (expand-file-name "staged.skg" src)
-          (insert "title: staged-MODIFIED\npid: staged\n"))
-        (with-current-buffer buf
-          (goto-char (point-min))
-          (skg-git-add-if-new))
-        (let ((staged-hash-after
-               (test-skg-git-add--staged-blob-hash src "staged.skg")))
-          (should (string= staged-hash-before staged-hash-after))))
-    (test-skg-git-add--teardown)))
 
 (ert-deftest test-skg-git-add-if-new-recursive-runs-previewed-command ()
   "The recursive executor stages the same newX subtree files as the preview."
@@ -257,6 +177,48 @@ the user's unrelated edits."
             (should (string-match-p "\"child.skg\"" text))
             (should-not (string-match-p "\"old.skg\"" text))
             (should-not (string-match-p "\"staged.skg\"" text)))))
+    (when (get-buffer "*skg git add new files*")
+      (let ((kill-buffer-query-functions nil))
+        (kill-buffer "*skg git add new files*")))
+    (test-skg-git-add--teardown)))
+
+(ert-deftest test-skg-git-add-preview-ignores-print-length ()
+  "The preview must print a complete executable form even when
+`print-length' is non-nil. Otherwise Emacs prints `...' into the
+quoted filename list, and evaluating the preview later passes that
+ellipsis object to `call-process' instead of a string."
+  (unwind-protect
+      (let* ((root (test-skg-git-add--setup))
+             (src  (expand-file-name "main" root))
+             (buf  (get-buffer-create "*test-skg-git-add-view*"))
+             (ids  nil))
+        (dotimes (i 11)
+          (let ((id (format "new-%02d" i)))
+            (push id ids)
+            (with-temp-file (expand-file-name (concat id ".skg") src)
+              (insert "title: " id "\nids:\n  - " id "\n"))))
+        (setq ids (nreverse ids))
+        (with-current-buffer buf
+          (erase-buffer)
+          (insert "* (skg (node (id old) (source main) (unstaged newM))) old\n")
+          (dolist (id ids)
+            (insert (format "** (skg (node (id %s) (source main) (unstaged newX newM))) %s\n"
+                            id id)))
+          (skg-content-view-mode)
+          (goto-char (point-min)))
+        (cl-letf (((symbol-function 'skg-readable-ids-mode)
+                   (lambda (&optional _arg) nil)))
+          (let ((print-length 10))
+            (with-current-buffer buf
+              (skg-git-add-if-new-recursive-preview))))
+        (with-current-buffer "*skg git add new files*"
+          (let ((text (buffer-string)))
+            (should-not (string-match-p "\\.\\.\\." text))
+            (should (string-match-p "\"new-10.skg\"" text))
+            (eval (read text) t)))
+        (dolist (id ids)
+          (should (test-skg-git-add--in-index-p
+                   src (concat id ".skg")))))
     (when (get-buffer "*skg git add new files*")
       (let ((kill-buffer-query-functions nil))
         (kill-buffer "*skg git add new files*")))
