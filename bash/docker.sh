@@ -1,3 +1,5 @@
+# PITFALL: Run this from the project root.
+
 # Reads the port from data/skgconfig.toml by default,
 # but the user can specify another path.
 SKG_CONFIG="${1:-data/skgconfig.toml}"
@@ -14,8 +16,12 @@ docker run --name "$CONTAINER_NAME" -it -d               \
   --user 1000:1000                       \
   --dns 8.8.8.8 --dns 1.1.1.1            \
   --ulimit nofile=524288:524288          \
-  -v "$HOST":/home/ubuntu                \
+  -w /home/ubuntu/host                   \
+  -v "$HOST":/home/ubuntu/host           \
   jeffreybbrown/hode:latest
+  # PITFALL: Do not mount over /home/ubuntu itself. That hides the
+  #   image-provided ~/.bashrc and the writable ~/.local/npm-global
+  #   prefix used by Codex and Claude bootstrap/update logic.
   # --ulimit raises the file-descriptor cap for every process in the
   #   container. The default of 1024 is too low for TypeDB under
   #   concurrent test load: each RocksDB database opens many handles,
