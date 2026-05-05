@@ -5,13 +5,14 @@ use crate::context::{
   link_targets_from_nodes};
 use crate::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use crate::dbs::filesystem::not_nodes::load_config;
 use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::env::SkgEnv;
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_text_response};
-use crate::types::misc::TantivyIndex;
+use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::nodes::complete::NodeComplete;
 
 use futures::executor::block_on;
@@ -25,19 +26,26 @@ pub fn handle_rebuild_dbs_request (
 ) {
   tracing::info!("Rebuilding databases from disk...");
   let result : Result<(), String> = (|| {
+    let config_path : String =
+      env . config . config_path . display () . to_string ();
+    let fresh_config : SkgConfig =
+      load_config (&config_path)
+      . map_err ( |e| format! (
+        "Reloading config from {}: {}", config_path, e) ) ?;
     let nodes : Vec<NodeComplete> =
-      read_all_skg_files_from_sources (&env . config)
+      read_all_skg_files_from_sources (&fresh_config)
       . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
     check_for_duplicate_ids_across_sources (
-      &nodes, &env . config . data_root)
+      &nodes, &fresh_config . data_root)
       . map_err ( |e| format! ("Duplicate ID check failed: {}", e) ) ?;
     block_on ( wipe_then_init_typedb_db (
-      &env . config, &env . driver, &nodes) )
+      &fresh_config, &env . driver, &nodes) )
       . map_err ( |e| format! ("TypeDB rebuild failed: {}", e) ) ?;
     tracing::info!("TypeDB rebuilt.");
     let new_tantivy : TantivyIndex =
-      rebuild_tantivy_from_nodes (&env . config, &nodes)
+      rebuild_tantivy_from_nodes (&fresh_config, &nodes)
       . map_err ( |e| format! ("Tantivy rebuild failed: {}", e) ) ?;
+    env . config = fresh_config;
     env . tantivy_index = new_tantivy;
     tracing::info!("Tantivy rebuilt.");
     let had_id_set = had_id_set_from_nodes (&nodes);

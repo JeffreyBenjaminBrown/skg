@@ -63,6 +63,9 @@ impl SkgfileSource {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct SkgConfig {
   #[serde (skip)]
+  pub config_path    : PathBuf, // Path to skgconfig.toml. Used to reload config without changing which file governs this server.
+
+  #[serde (skip)]
   pub data_root      : PathBuf, // Directory containing skgconfig.toml. Other relative paths (tantivy_folder, source paths) are resolved against this at load time.
 
   #[serde ( deserialize_with = "deserialize_sources" )]
@@ -267,6 +270,7 @@ impl SkgConfig {
     sources : HashMap<SourceName, SkgfileSource>
   ) -> Self {
     SkgConfig {
+      config_path        : PathBuf::from (""),
       data_root          : PathBuf::from ("."),
       sources,
       db_name            : "unused" . to_string(),
@@ -286,6 +290,7 @@ impl SkgConfig {
     tantivy_folder : &str,
   ) -> Self {
     SkgConfig {
+      config_path        : PathBuf::from (""),
       data_root          : PathBuf::from ("."),
       sources,
       db_name            : db_name . to_string(),

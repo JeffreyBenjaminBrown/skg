@@ -35,6 +35,9 @@ pub fn load_config (
   let mut config: SkgConfig = {
     let contents: String = fs::read_to_string (path) ?;
     toml::from_str (&contents) ? };
+  config . config_path =
+    fs::canonicalize (path)
+    . unwrap_or_else ( |_| PathBuf::from (path) );
   config . data_root = {
     // Canonicalized so that downstream joins (make_paths_absolute,
     // path_from_pid_and_source, strip_prefix in get_file_path) yield
@@ -91,6 +94,9 @@ pub fn load_config_with_overrides (
   let mut config: SkgConfig = {
     let contents: String = fs::read_to_string (path)?;
     toml::from_str (&contents)? };
+  config . config_path =
+    fs::canonicalize (path)
+    . unwrap_or_else ( |_| PathBuf::from (path) );
   config . data_root = {
     // See load_config above for why canonicalize is necessary here.
     let raw : PathBuf = Path::new (path)
