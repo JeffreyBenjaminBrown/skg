@@ -172,7 +172,9 @@ Returns the absolute data-root path."
           (let ((text (buffer-string)))
             (should (string-match-p "ls-files" text))
             (should (string-match-p "git\" nil \"\\*skg-git-add-output\\*\" t" text))
-            (should (string-match-p "\"add\" \"--\" file" text))
+            (should
+             ;; `pp-to-string' line-wrapping is Emacs-version-sensitive. This regex is robust to those variations.
+             (string-match-p "\"add\"[[:space:]\n]+\"--\"[[:space:]\n]+file" text))
             (should (string-match-p "\"new.skg\"" text))
             (should (string-match-p "\"child.skg\"" text))
             (should-not (string-match-p "\"old.skg\"" text))
