@@ -18,6 +18,10 @@
 
 SKG_CONFIG="${SKG_CONFIG:-data/skgconfig.toml}"
 DATA_ROOT="$(dirname "$SKG_CONFIG")"
+TYPEDB_DATA_DIR="/opt/typedb/server/data"
+if [ ! -e "$TYPEDB_DATA_DIR" ]; then
+  TYPEDB_DATA_DIR="/opt/typedb/core/server/data"
+fi
 
 # Raise the soft file-descriptor limit before launching TypeDB.
 # The container's default soft limit is 1024, but TypeDB opens many
@@ -62,7 +66,7 @@ start_typedb() {
   # disk. TypeDB reopens every database at startup, so leaks compound
   # across runs until TypeDB panics on "Too many open files". Clearing
   # them here turns recovery into a no-op.
-  rm -rf /opt/typedb/core/server/data/skg-test* 2>/dev/null || true
+  rm -rf "$TYPEDB_DATA_DIR"/skg-test* 2>/dev/null || true
   echo ""
   echo "Starting TypeDB server..."
   mkdir -p "$DATA_ROOT/logs"
