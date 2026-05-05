@@ -3,6 +3,7 @@
 /**/.index.tantivy
 /.bash_history
 /.cache
+/.cargo
 /.claude*
 /.claude/settings.json
 /.codex
@@ -22,6 +23,7 @@
 /target
 /tests/results
 /tests/results
+/worktree-specific
 
 Cargo.lock
 TAGS

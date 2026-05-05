@@ -1,5 +1,12 @@
-* Codex with Nix-Docker context
-codex resume 019df905-446b-7b03-a18a-c5f4e613ad59
+* update TypeDB in Dockerfile
+* change source recursively
+* If I move a file in one view, will its source update in another?
+* Is it a misfeature to let config_path differ from data_root?
+Why would you split up your skg stuff?
+* duplicate IDs silently kill the server, and it only reports the first
+* strip IDs from passage
+so I can copy a whole subtree of new nodes --
+e.g. in 'regular payments'
 * bug, no time
 In git diff view, phantom nodes become completely unfolded
 whenever the buffer is saved.
@@ -130,10 +137,13 @@ on <2026-04-22 Wed> and before and maybe after
   'instances'
   vs. a lot that use it as a relationship label
 ** speed
-*** in reading ancestries
+*** in reading backward
 **** ? "any rel" ought to be what a single backward view shows
 link sources, containers, subscribers
 (but not overriders or hiders -- those should be more obscure)
+**** absorb a link source org-child into a herald
+if it has text identical to the target's,
+i.e. is just a link to the target with the target's title as label
 *** in making links
 If there is exactly one node in the search results
 that exactly matches each (possibly regex)
@@ -168,8 +178,8 @@ To test, compute this two ways: From disk and from dbs.
 ****** or mark in a way that identifies node as probably stageable
 If a new or deleted node, it (is still in the graph and) has a parent.
 *** shortcuts
-**** Goto could (also?) be C-C RET.
-** privacy
+**** Goto could (also?) be C-C RET.*
+* privacy
 *** TODO Privacy: Permit user to hide certain sources from view.
 **** Figure out the diff logic for insertions when some are hidden.
 I think I see how: Just pin each thing to its last visible sibling.

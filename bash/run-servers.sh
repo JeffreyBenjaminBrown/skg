@@ -97,8 +97,9 @@ start_skg_with_restart() {
 
   echo "cargo-watch starting..."
   echo "Server logs go to $DATA_ROOT/logs/server-to-user.log and $DATA_ROOT/logs/server.jsonl"
+  echo "cargo-watch/stdout-stderr go to $DATA_ROOT/logs/cargo-watch.log"
   cargo watch -w server/ -x "run --bin skg -- $SKG_CONFIG" \
-    > /dev/null 2>&1 # "-w server/" says "only watch server/"
+    >> "$DATA_ROOT/logs/cargo-watch.log" 2>&1 # "-w server/" says "only watch server/"
 }
 
 cleanup() { # trap handler for graceful shutdown
