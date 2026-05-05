@@ -1,0 +1,36 @@
+* PURPOSE (Jeff speaking)
+
+This is to compare the collection of .skg files that results
+from an org-roam import to the original org-roam data,
+to be sure nothing was lost.
+
+Like the import code, this verification code was written by an AI,
+but it did not have access to the import code when it did so.
+
+* compare-org-roam-import (Codex speaking)
+
+Compare committed org-roam data against committed Skg import data.
+
+Run from the repository root:
+
+#+begin_src sh
+cargo run --manifest-path tools/compare-org-roam-import/Cargo.toml --release
+#+end_src
+
+The default report path is =compare-org-roam-import-report.org=.
+Pass another path as the first argument if desired:
+
+#+begin_src sh
+cargo run --manifest-path tools/compare-org-roam-import/Cargo.toml --release -- temp/import-report.org
+#+end_src
+
+For a quick back-of-the-envelope count, run:
+
+#+begin_src sh
+tools/compare-org-roam-import/quick-counts.sh
+#+end_src
+
+It writes =tools/compare-org-roam-import/output.org=.
+The table compares each data repo's first-commit =.skg= count
+with the corresponding org repo's current =.org= file count plus
+headline count, where headlines are lines matching =^\*+ =.

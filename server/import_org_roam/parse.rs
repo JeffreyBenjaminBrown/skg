@@ -15,8 +15,8 @@
 ///
 /// 3. **Insert super-indentation groups.**
 ///    (This is described in more detail in ./super-indentation-rules.org .)
-///    The test 'test_super_indentation_creates_grouping_nodes'
-///    might be clearer than any explanatino.)
+///    And the test 'test_super_indentation_creates_grouping_nodes'
+///    might be clearer than any explanation.)
 ///    Org-roam allows "super-indentation": a headline like `*** c` directly under
 ///    `* a`, skipping level 2. When a node's direct children span
 ///    more than one headline level, we wrap them in **synthetic

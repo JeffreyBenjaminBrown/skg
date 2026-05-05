@@ -22,13 +22,15 @@
 /target
 /tests/results
 /tests/results
+
 Cargo.lock
-org-roam/
 TAGS
 __pycache__
+org-roam/
 temp-*
 temp/
 thoughts/
+tools/validate-org-roam-import/output.org
 tools/introspect/call-graph/db/
 tools/introspect/call-graph/output/
 tools/introspect/code-map/code-map.org
