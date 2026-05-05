@@ -22,6 +22,12 @@
   "Counter incremented on each annotation request.
 The response handler drops stale responses.")
 
+(defvar skg-readable-ids--pending-title-requests nil
+  "FIFO queue of pending titles-by-ids requests.
+Each entry is (GENERATION BUFFER). The server responds on the
+same TCP connection in request order, so a response is matched to
+the oldest pending request.")
+
 (defun skg-readable-ids--clear-overlays ()
   "Remove all skg-magit-title overlays from the buffer."
   (dolist (ov (overlays-in (point-min) (point-max)))
@@ -79,13 +85,8 @@ the full id. POSITIONS is a list of (start end id-string) triples."
   "Send a titles-by-ids request for IDS.
 GENERATION and BUF are captured for the response handler."
   (condition-case err
-      (progn
-        (skg-register-response-handler
-         'titles-by-ids
-         (lambda (_tcp-proc payload)
-           (skg-readable-ids--handle-response
-            payload generation buf))
-         t)
+      (let ((entry (list generation buf)))
+        (skg-readable-ids--ensure-title-response-handler)
         (skg-lp-reset)
         (let* ((tcp-proc (skg-tcp-connect-to-rust))
                (id-list
@@ -97,10 +98,35 @@ GENERATION and BUF are captured for the response handler."
                  (format "((request . \"titles by ids\") (ids %s))"
                          id-list)
                  "\n")))
+          (setq skg-readable-ids--pending-title-requests
+                (append skg-readable-ids--pending-title-requests
+                        (list entry)))
+          (setq skg-lp--pending-count
+                (1+ skg-lp--pending-count))
           (process-send-string tcp-proc request-sexp)))
     (error
      (message "skg-readable-ids: server not connected: %s"
               (error-message-string err)))))
+
+(defun skg-readable-ids--ensure-title-response-handler ()
+  "Install the shared titles-by-ids response handler."
+  (skg-register-response-handler
+   'titles-by-ids
+   (lambda (_tcp-proc payload)
+     (skg-readable-ids--handle-next-response payload))
+   nil))
+
+(defun skg-readable-ids--handle-next-response (payload)
+  "Handle PAYLOAD for the oldest pending titles-by-ids request."
+  (let ((entry (pop skg-readable-ids--pending-title-requests)))
+    (if (not entry)
+        (message "skg-readable-ids: titles-by-ids response without pending request")
+      (setq skg-lp--pending-count
+            (max 0 (1- skg-lp--pending-count)))
+      (skg-readable-ids--handle-response
+       payload
+       (nth 0 entry)
+       (nth 1 entry)))))
 
 (defun skg-readable-ids--handle-response (payload generation buf)
   "Handle the titles-by-ids response.

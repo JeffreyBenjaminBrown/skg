@@ -210,3 +210,12 @@
    It says to see 'coding-advice/good-refactors.md', but that file
    does not exist in the repository. Either the file was renamed or
    the reference is stale.
+
+** Long-running SKG server can hide code/protocol fixes
+   On 2026-05-04, the server process listening on port 1730 was still
+   an older / already-running binary. It accepted 'titles by ids'
+   requests and logged them, but did not send responses, while the
+   current source-level handler test sent a parseable response. This
+   makes client bugs look nondeterministic after code changes. A small
+   version/build-id endpoint, or logging the executable build hash at
+   startup, would make stale-server cases obvious.
