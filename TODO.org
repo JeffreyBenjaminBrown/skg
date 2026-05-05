@@ -1,3 +1,5 @@
+* Codex with Nix-Docker context
+codex resume 019df905-446b-7b03-a18a-c5f4e613ad59
 * bug, no time
 In git diff view, phantom nodes become completely unfolded
 whenever the buffer is saved.
