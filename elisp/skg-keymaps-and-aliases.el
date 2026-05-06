@@ -21,13 +21,13 @@ and hide INTERNAL from M-x completion."
 ;;
 
 (skg-alias skg-save                  skg-request-save-buffer)
-(skg-alias skg-show-aliases          skg-request-aliases-view)
-(skg-alias skg-show-containerward    skg-request-containerward-view)
-(skg-alias skg-show-sourceward       skg-request-sourceward-view)
-(skg-alias skg-show-link-sourceward
+(skg-alias skg-reveal-aliases          skg-request-aliases-view)
+(skg-alias skg-reveal-containerward    skg-request-containerward-view)
+(skg-alias skg-reveal-sourceward       skg-request-sourceward-view)
+(skg-alias skg-reveal-link-sourceward
            ;; For if someone forgets "source" but remembers "link".
            skg-request-sourceward-view)
-(skg-alias skg-make-definitive       skg-request-definitive-view)
+(skg-alias skg-set-definitive       skg-request-definitive-view)
 (skg-alias skg-view-heralds-mode     heralds-minor-mode)
 (skg-alias skg-view-metadata         skg-edit-metadata)
 
@@ -116,19 +116,20 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c g M")   #'skg-goto-in-magit-parent)
     (define-key map (kbd "C-c G M")   #'skg-goto-in-magit-parent-and-close-this))
   (progn;; show (requests that server render a local change to the view)
-    (define-key map (kbd "C-c s a") #'skg-show-aliases)
-    (define-key map (kbd "C-c s c") #'skg-show-containerward)
-    (define-key map (kbd "C-c s n") #'skg-show-org-ancestry)
-    (define-key map (kbd "C-c s s") #'skg-show-sourceward))
+    (define-key map (kbd "C-c r a") #'skg-reveal-aliases)
+    (define-key map (kbd "C-c r c") #'skg-reveal-containerward)
+    (define-key map (kbd "C-c r s") #'skg-reveal-sourceward))
   (progn;; properties
-    (define-key map (kbd "C-c p d") #'skg-make-definitive)
-    (define-key map (kbd "C-c p i") #'skg-make-indefinitive)
-    (define-key map (kbd "C-c p s") #'skg-change-source))
+    (define-key map (kbd "C-c s d") #'skg-set-definitive)
+    (define-key map (kbd "C-c s i") #'skg-set-indefinitive)
+    (define-key map (kbd "C-c s s") #'skg-set-source)
+    (define-key map (kbd "C-c s S") #'skg-set-source-recursive))
   (progn;; view (buffer-level view state)
     (define-key map (kbd "C-c v d") #'skg-view-diff-mode)
     (define-key map (kbd "C-c v e") #'skg-view-new-empty)
     (define-key map (kbd "C-c v h") #'skg-view-heralds-mode)
     (define-key map (kbd "C-c v m") #'skg-view-metadata)
+    (define-key map (kbd "C-c v o") #'skg-view-org-ancestry)
     (define-key map (kbd "C-c v s") #'skg-view-id-stack))
   (progn;; id navigation (moving among IDs in the current buffer)
     (define-key map (kbd "C-c i n") #'skg-id-next)

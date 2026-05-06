@@ -190,24 +190,18 @@ These four commands are described elsewhere in this document.
 These commands don't edit the graph. Each inserts a request
 into the metadata of the node at point that, on save, causes
 the server to render additional information into the view.
-*** C-c s a : skg-show-aliases
+*** C-c r a : skg-reveal-aliases
 See what other text you could search for to find this node.
 You can always search for its title.
 Most nodes have a title and no aliases.
-*** C-c s c : skg-show-containerward
+*** C-c r c : skg-reveal-containerward
 Show the nodes that contain the node at point (its parents
 in the containment graph, one step out).
-*** C-c s n : skg-show-org-ancestry
-If you're at a headline so deep in the tree
-that you can't remember where it came from,
-this brings you to a new view showing only that ancestry.
-This actually works in org-mode outside of skg.
-(skg uses org-mode, but org-mode can be used without skg.)
-*** C-c s s : skg-show-sourceward
+*** C-c r s : skg-reveal-sourceward
 Show the nodes that the node at point links to (its textlink
 targets).
-** node properties : definitive/indefinitive
-*** what those words mean
+** setting node properties
+*** first some vocab: 'definitive' and 'indefinitive'
 A view of a node can be definitive or indefinitive.
 Typically the first place in the buffer that depicts a node
 is the definitive view of it. So that other views of that node
@@ -216,7 +210,7 @@ cannot affect the node they depict. They are also truncated --
 that is, shown without content --
 in order to prevent the view from becoming redundant and huge.
 *** PITFALL: Don't make something 'definitive' by directly editing its metadata.
-Instead, use skg-make-definitive, below.
+Instead, use skg-set-definitive, below.
 That's because Skg has to make other instances of it
 (in this same buffer -- and maybe in the future other buffers too)
 indefinitive. That's because a buffer can only be saved
@@ -224,15 +218,15 @@ if it has at most one definitive instance of a node.
 Otherwise, two definitive nodes could contradict each other.
 
 This same caveat does not apply to making a node indefinitive.
-While there does exist a command for that (skg-make-indefinitive)
+While there does exist a command for that (skg-set-indefinitive)
 you can also 'do it yourself'
 by visiting a metadata buffer for the node (skg-view-metadata).
-*** C-c p d : skg-make-definitive
+*** C-c s d : skg-set-definitive
 If you want to see the definitive view of that node
 from a place where it is currently shown in an indefinitive form,
 call this function. It will make the current definitive view
 (if it exists) indefinitive, and then draw a definitive view here.
-*** C-c p i : skg-make-indefinitive
+*** C-c s i : skg-set-indefinitive
 This marks a node as 'indefinitive',
 as described above.
 In brief, it means edits to its title, body or
@@ -240,7 +234,7 @@ In brief, it means edits to its title, body or
 will not affect it
   (although edits to its children will affect those children,
   unless they are also indefinitive).
-*** C-c p s : skg-change-source
+*** C-c s s : skg-set-source
 Changes the source of the node at point.
 The prompt starts with the current source as editable minibuffer text.
 You can type the new source name directly,
@@ -251,8 +245,8 @@ with that source's path as the headline body.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the move.
-*** C-u C-c p s : skg-change-source recursively
-Like 'skg-change-source', but it also
+*** C-c s S : skg-set-source-recursive
+Like 'skg-set-source', but it also
 changes the source of every content descendent of the node at point
 whose source matches the original source of the node at point.
 Descendents whose Birth is not ContentOf are not traversed.
@@ -296,6 +290,12 @@ to find titles for deleted files.)
 *** C-c v s : skg-view-id-stack
 View and maybe edit the set of links you've stored.
 (See "the linkstack" below.)
+*** C-c v o : skg-view-org-ancestry
+If you're at a headline so deep in the tree
+that you can't remember where it came from,
+this brings you to a new view showing only that ancestry.
+This actually works in org-mode outside of skg.
+(skg uses org-mode, but org-mode can be used without skg.)
 ** IDs, links and the linkstack
 *** some background
 **** IDs are mostly invisible, but good to know about.

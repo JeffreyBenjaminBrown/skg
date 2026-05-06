@@ -29,7 +29,7 @@
 (require 'skg-request-views)
 (require 'skg-sexpr-edit)
 (require 'skg-sexpr-search)
-(require 'skg-show-org-ancestry)
+(require 'skg-view-org-ancestry)
 (require 'skg-readable-ids)
 (require 'skg-file-minor-mode)
 (require 'skg-git-add)

@@ -44,7 +44,7 @@ call `skg-request-save-buffer' afterward."
         (outline-next-heading))))
   (message "This change will only be applied when you save the buffer."))
 
-(defun skg-make-indefinitive ()
+(defun skg-set-indefinitive ()
   "Mark the headline at point as indefinitive.
 Edits the metadata to include `indef` in the `node` section.
 Does NOT save; call `skg-request-save-buffer' afterward."
@@ -71,7 +71,7 @@ Does NOT save; call `skg-request-save-buffer' afterward."
       (user-error "Node has no source"))
     (format "%s" (car source-values))))
 
-(defun skg-change-source (&optional recursive)
+(defun skg-set-source (&optional recursive)
   "Prompt for and change the source of the node at point.
 Starts with the current source as minibuffer text.  S-left/S-right cycle
 through owned sources, C-? displays all configured sources and
@@ -98,6 +98,15 @@ Does NOT save; call `skg-request-save-buffer' afterward."
                    new-source
                    changed-count
                    (if (= changed-count 1) "" "s")))))))
+
+(defun skg-set-source-recursive ()
+  "Prompt for and recursively change the source of the node at point.
+This is the recursive form of `skg-set-source': it changes every
+content-descendent whose source matches the source at point.
+Descendents whose birth is not contentOf are not traversed.
+Does NOT save; call `skg-request-save-buffer' afterward."
+  (interactive)
+  (skg-set-source t))
 
 (defun skg--validate-source-name (source)
   "Signal an error if SOURCE cannot be represented in skg metadata."

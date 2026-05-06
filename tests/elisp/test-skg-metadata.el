@@ -89,14 +89,14 @@ Returns the parsed s-expression or nil if not found."
             (list (intern id))))
    (test-skg--all-metadata-sexps)))
 
-(ert-deftest test-skg-make-indefinitive ()
-  "Test skg-make-indefinitive adds indefinitive to node section."
+(ert-deftest test-skg-set-indefinitive ()
+  "Test skg-set-indefinitive adds indefinitive to node section."
   ;; Test adding indefinitive to headline with id
   (with-temp-buffer
     (org-mode)
     (insert "* (skg (node (id 1))) title")
     (goto-char (point-min))
-    (skg-make-indefinitive)
+    (skg-set-indefinitive)
     (let ((result (test-skg--extract-metadata-sexp)))
       ;; Verify indefinitive is in node section
       (should (skg-sexp-subtree-p result '(skg (node indef))))
@@ -108,7 +108,7 @@ Returns the parsed s-expression or nil if not found."
     (org-mode)
     (insert "* (skg (node (id 2))) title")
     (goto-char (point-min))
-    (skg-make-indefinitive)
+    (skg-set-indefinitive)
     (let ((result (test-skg--extract-metadata-sexp)))
       ;; Verify indefinitive is in node section
       (should (skg-sexp-subtree-p result '(skg (node indef))))
@@ -120,13 +120,13 @@ Returns the parsed s-expression or nil if not found."
     (org-mode)
     (insert "* plain title")
     (goto-char (point-min))
-    (skg-make-indefinitive)
+    (skg-set-indefinitive)
     (let ((result (test-skg--extract-metadata-sexp)))
       ;; Verify indefinitive is in node section
       (should (skg-sexp-subtree-p result '(skg (node indef)))))))
 
-(ert-deftest test-skg-change-source ()
-  "Test skg-change-source replaces the node source field."
+(ert-deftest test-skg-set-source ()
+  "Test skg-set-source replaces the node source field."
   (with-temp-buffer
     (org-mode)
     (insert "* (skg (node (id 1) (source public))) title")
@@ -135,7 +135,7 @@ Returns the parsed s-expression or nil if not found."
                (lambda (current-source)
                  (should (equal current-source "public"))
                  "private")))
-      (skg-change-source))
+      (skg-set-source))
     (let ((result (test-skg--extract-metadata-sexp)))
       (should (skg-sexp-subtree-p
                result
@@ -147,8 +147,8 @@ Returns the parsed s-expression or nil if not found."
                    result
                    '(skg (node (source public))))))))
 
-(ert-deftest test-skg-change-source-updates-displayed-source-herald ()
-  "Test skg-change-source changes the source herald for the current node."
+(ert-deftest test-skg-set-source-updates-displayed-source-herald ()
+  "Test skg-set-source changes the source herald for the current node."
   (with-temp-buffer
     (org-mode)
     (insert "* (skg (node (id 1) (source public) (viewStats (sourceHerald ⌂:public)))) title")
@@ -157,7 +157,7 @@ Returns the parsed s-expression or nil if not found."
     (cl-letf (((symbol-function 'skg--prompt-for-source-change)
                (lambda (_current-source)
                  "private")))
-      (skg-change-source))
+      (skg-set-source))
     (let* ((metadata-start (save-excursion
                              (goto-char (point-min))
                              (search-forward "(skg")
@@ -170,7 +170,7 @@ Returns the parsed s-expression or nil if not found."
         (should (string-match-p "⌂private" display-text))
         (should-not (string-match-p "⌂public" display-text))))))
 
-(ert-deftest test-skg-change-source-recursive-prunes-non-content-births ()
+(ert-deftest test-skg-set-source-recursive-prunes-non-content-births ()
   "Test recursive source change follows only contentOf org relationships."
   (with-temp-buffer
     (org-mode)
@@ -190,7 +190,7 @@ Returns the parsed s-expression or nil if not found."
                (lambda (current-source)
                  (should (equal current-source "public"))
                  "private")))
-      (skg-change-source t))
+      (skg-set-source-recursive))
     (dolist (id '("root"
                   "content-child"
                   "content-grandchild"

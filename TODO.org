@@ -220,7 +220,7 @@ That is, the save should still succeed.
     See what other text you could search for to find this node.
     You can always search for its title.
     Most nodes have a title and no aliases.
-*** TODO skg-show-stats
+*** TODO skg-reveal-stats
     Computes the containerward path stats for a node
     (path length, fork count, whether it cycles)
     and saves. The stats then appear in the node's metadata
