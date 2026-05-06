@@ -29,6 +29,16 @@
           "user_owns_it = true\n")
   "Config text with two owned sources: public and private.")
 
+(defvar test--config-with-foreign-source
+  (concat test--config-public-and-private
+          "\n[[sources]]\n"
+          "name = \"foreign\"\n"
+          "path = \"" (expand-file-name
+                       "test-skg-insert-heading-source-prompt/foreign"
+                       (file-name-directory load-file-name)) "\"\n"
+          "user_owns_it = false\n")
+  "Config text with two owned sources and one foreign source.")
+
 (defun test--with-skg-content-view (org-text config-text body-fn)
   "Run BODY-FN in a temp skg content-view buffer with ORG-TEXT.
 CONFIG-TEXT is written to a temporary skgconfig.toml so that
@@ -185,5 +195,51 @@ open the sexp-edit buffer (not prompt in minibuffer)."
              (buffer-list))))
        (should edit-buf)
        (kill-buffer edit-buf)))))
+
+(ert-deftest test-view-source-list-includes-all-sources ()
+  "skg-view-source-list should list every configured source and path."
+  (test--with-skg-content-view
+   "* (skg (node (id x) (source public))) x\n"
+   test--config-with-foreign-source
+   (lambda ()
+     (unwind-protect
+         (progn
+           (skg-view-source-list)
+           (let ((source-buffer (get-buffer "*skg-sources*")))
+             (should source-buffer)
+             (with-current-buffer source-buffer
+               (should (derived-mode-p 'org-mode))
+               (let ((content (buffer-substring-no-properties
+                               (point-min) (point-max))))
+                 (should (string-match-p "^\\* public$" content))
+                 (should (string-match-p "^\\* private$" content))
+                 (should (string-match-p "^\\* foreign$" content))
+                 (should (string-match-p "/public" content))
+                 (should (string-match-p "/private" content))
+                 (should (string-match-p "/foreign" content))))))
+       (when (get-buffer "*skg-sources*")
+         (kill-buffer "*skg-sources*"))))))
+
+(ert-deftest test-source-change-prompt-starts-with-current-source ()
+  "skg--prompt-for-source-change should put current source in editable text."
+  (test--with-skg-content-view
+   "* (skg (node (id x) (source public))) x\n"
+   test--config-public-and-private
+   (lambda ()
+     (cl-letf (((symbol-function 'completing-read)
+                (lambda (prompt collection predicate require-match
+                         initial-input &optional hist def
+                         inherit-input-method)
+                  (should-not (string-match-p "current public" prompt))
+                  (should (equal collection '("public" "private")))
+                  (should (null predicate))
+                  (should (null require-match))
+                  (should (equal initial-input "public"))
+                  (should (null hist))
+                  (should (null def))
+                  (should (null inherit-input-method))
+                  "private")))
+       (should (equal (skg--prompt-for-source-change "public")
+                      "private"))))))
 
 (provide 'test-skg-insert-heading-source-prompt)

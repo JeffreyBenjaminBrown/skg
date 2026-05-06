@@ -219,3 +219,46 @@
    makes client bugs look nondeterministic after code changes. A small
    version/build-id endpoint, or logging the executable build hash at
    startup, would make stale-server cases obvious.
+
+** Emacs client can hold stale TCP state after server/data replacement
+   Observed 2026-05-06 after stopping the server, replacing data/,
+   and restarting. The Rust server was listening on 1730 and a fresh
+   batch Emacs process could run 'skg-connection-verify', but the live
+   user session could not.
+
+   Likely recovery is 'M-x skg-connection-end' followed by
+   'M-x skg-connection-verify' or re-running 'skg-client-init'.
+   The client could be more robust if request send failures forced
+   'skg-rust-tcp-proc' to nil and retried once.
+
+   Related: 'skg-client-init' uses '(defvar skg-port ...)' rather than
+   '(setq skg-port ...)', so reinitializing with a replaced config will
+   not update an already-bound port variable. That is harmless when the
+   port stays 1730, but surprising when switching configs.
+
+** Initialization warning files can be easy to miss
+   On 2026-05-06, startup completed and logged "Server ready", but
+   data/ also contained:
+
+   - initialization-error_duplicate-ids.org: duplicate id
+     0a6dcf44-6c2c-432a-90a7-babfbb3e0b7d in pers-deprecated and public.
+   - initialization-error_unreadable-skg-files.org: unreadable
+     /home/ubuntu/data/private for source private.
+
+   These did not block connection verification, but they are important
+   enough that the client should probably surface them after init.
+
+** Replacing data/skgconfig.toml can leave server and client on different ports
+   Observed 2026-05-06: data/skgconfig.toml said 'port = 1731',
+   but the already-running server process was still listening on 1730.
+   'cargo-watch watch -w server/ ... data/skgconfig.toml' watches
+   server/ only, so replacing data/ or editing skgconfig.toml does
+   not restart the server with the new config.
+
+   The result is confusing because '(skg-client-init "../data/skgconfig.toml")'
+   correctly points Emacs at the new config port, while the live Rust
+   process remains bound to the old one.
+
+   Possible fixes: watch the config file too, log the active port and
+   config path in a user-visible way, or add a client diagnostic that
+   explicitly says "config wants port X but no server is listening".

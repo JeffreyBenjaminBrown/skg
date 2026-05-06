@@ -4,6 +4,7 @@
 
 (require 'org)
 (require 'org-fold-core)
+(require 'skg-config)
 (require 'skg-sexpr-search)
 
 (defun skg-delete (&optional recursive)
@@ -49,6 +50,52 @@ Edits the metadata to include `indef` in the `node` section.
 Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive)
   (skg-edit-metadata-at-point '(skg (node indef))))
+
+(defun skg--current-headline-metadata-sexp ()
+  "Return the parsed skg metadata sexp for the headline at point."
+  (unless (org-at-heading-p)
+    (user-error "Not on a headline"))
+  (let* ((headline (skg-get-current-headline-text))
+         (split (skg-split-as-stars-metadata-title headline))
+         (metadata-str (and split (cadr split))))
+    (unless (and metadata-str
+                 (not (string-empty-p metadata-str)))
+      (user-error "Headline has no skg metadata"))
+    (read metadata-str)))
+
+(defun skg--current-node-source ()
+  "Return the source string for the TrueNode headline at point."
+  (let* ((sexp (skg--current-headline-metadata-sexp))
+         (source-values (skg-sexp-cdr-at-path sexp '(skg node source))))
+    (unless source-values
+      (user-error "Node has no source"))
+    (format "%s" (car source-values))))
+
+(defun skg-change-source ()
+  "Prompt for and change the source of the node at point.
+Starts with the current source as minibuffer text.  S-left/S-right cycle
+through owned sources, C-? displays all configured sources and
+their paths, and typed source names are accepted directly.
+Does NOT save; call `skg-request-save-buffer' afterward."
+  (interactive)
+  (let* ((current-source (skg--current-node-source))
+         (new-source (string-trim
+                      (skg--prompt-for-source-change current-source))))
+    (unless (string-empty-p new-source)
+      (when (string-match-p "[[:space:]]" new-source)
+        (user-error "Source names cannot contain whitespace"))
+      (if (string= current-source new-source)
+          (message "Source unchanged: %s" current-source)
+        (skg-edit-metadata-at-point
+         `(skg (node (ENSURE (source ,(intern new-source)))
+                     (viewStats))))
+        (skg-edit-metadata-at-point
+         `(skg (node (viewStats
+                      (ENSURE
+                       (sourceHerald ,(intern
+                                        (format "⌂:%s" new-source))))))))
+        (message "Source changed from %s to %s. Save to apply."
+                 current-source new-source)))))
 
 (defun skg-parse-headline-metadata (headline-text)
   "Parse skg metadata from HEADLINE-TEXT after org bullets.

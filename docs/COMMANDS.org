@@ -240,6 +240,17 @@ In brief, it means edits to its title, body or
 will not affect it
   (although edits to its children will affect those children,
   unless they are also indefinitive).
+*** C-c p s : skg-change-source
+Changes the source of the node at point.
+The prompt shows the current source.
+You can type the new source name directly,
+or use shift-left / shift-right to cycle through owned sources.
+Press C-? from the prompt to open an org buffer listing every
+configured source name as a headline,
+with that source's path as the headline body.
+
+The command only edits the node's metadata in the current buffer.
+Save the view afterward to apply the move.
 ** view-level commands
 *** C-c v d : skg-view-diff-mode
 If you use git to manage your data,

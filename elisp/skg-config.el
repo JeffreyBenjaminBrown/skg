@@ -2,6 +2,9 @@
 ;;;
 ;;; PURPOSE: Read configuration from skgconfig.toml.
 
+(require 'cl-lib)
+(require 'org)
+
 (require
  ;; PITFALL:
  ;; A tiny bit of config-related code is found outside this module:
@@ -9,6 +12,14 @@
  ;; is defined in skg-state.el, alongside the other global state.
  ;; It is set once, by `skg-client-init'.
  'skg-state)
+
+(defun skg-config-file ()
+  "Return the skgconfig.toml path for `skg-config-dir', or nil."
+  (when skg-config-dir
+    (let ((config-file
+           (expand-file-name "skgconfig.toml" skg-config-dir)))
+      (when (file-exists-p config-file)
+        config-file))))
 
 (defun skg--prompt-for-owned-source ()
   "Prompt the user to choose an owned source, with S-left/S-right cycling.
@@ -33,13 +44,70 @@ If there is only one owned source, return it without prompting."
               (local-set-key (kbd "S-<right>") (funcall cycle  1)))
           (completing-read "Source: " owned-sources nil t))))))
 
+(defun skg--prompt-for-source-change (current-source)
+  "Prompt for a source to replace CURRENT-SOURCE.
+S-left/S-right cycle through owned sources, and C-? displays every
+configured source with its path.  The user may also type a source
+name directly."
+  (let ((owned-sources (skg--owned-sources))
+        (source-names (skg--source-names)))
+    (let ((cycle (lambda (dir)
+                   (lambda ()
+                     (interactive)
+                     (let* ((cur (minibuffer-contents))
+                            (idx (or (cl-position cur owned-sources
+                                                  :test #'string=)
+                                     (cl-position current-source owned-sources
+                                                  :test #'string=)
+                                     0))
+                            (new (nth (mod (+ idx dir)
+                                           (length owned-sources))
+                                      owned-sources)))
+                       (delete-minibuffer-contents)
+                       (insert new))))))
+      (minibuffer-with-setup-hook
+          (lambda ()
+            (when owned-sources
+              (local-set-key (kbd "S-<left>")  (funcall cycle -1))
+              (local-set-key (kbd "S-<right>") (funcall cycle  1)))
+            (local-set-key (kbd "C-?") #'skg-view-source-list))
+        (completing-read
+         "Source (S-left/right cycle; press C-? for a list of sources): "
+         source-names nil nil current-source)))))
+
+(defun skg--source-paths ()
+  "Return an alist of (source-name . absolute-path) from skgconfig.toml."
+  (let ((config-file (skg-config-file)))
+    (when config-file
+      (skg-source-paths-from-toml config-file))))
+
+(defun skg--source-names ()
+  "Return the configured source names from skgconfig.toml."
+  (mapcar #'car (skg--source-paths)))
+
+(defun skg-view-source-list ()
+  "Display an org buffer listing configured sources and their paths."
+  (interactive)
+  (let ((source-paths (skg--source-paths)))
+    (unless source-paths
+      (user-error "No skg sources found"))
+    (let ((buffer (get-buffer-create "*skg-sources*")))
+      (with-current-buffer buffer
+        (let ((inhibit-read-only t))
+          (erase-buffer)
+          (dolist (source-path source-paths)
+            (insert (format "* %s\n%s\n"
+                            (car source-path)
+                            (cdr source-path)))))
+        (org-mode)
+        (goto-char (point-min)))
+      (display-buffer buffer))))
+
 (defun skg--owned-sources ()
   "Return the list of owned source names from skgconfig.toml, or nil."
-  (when skg-config-dir
-    (let ((config-file
-           (expand-file-name "skgconfig.toml" skg-config-dir)))
-      (when (file-exists-p config-file)
-        (skg-owned-sources-from-toml config-file)))))
+  (let ((config-file (skg-config-file)))
+    (when config-file
+      (skg-owned-sources-from-toml config-file))))
 
 (defun skg--default-source ()
   "Return the first owned source name from config, or nil."
@@ -120,12 +188,7 @@ config-load time."
 
 (defun skg--source-dir (source-name)
   "Return absolute directory for SOURCE-NAME per skgconfig.toml, or nil."
-  (when skg-config-dir
-    (let ((config-file
-           (expand-file-name "skgconfig.toml" skg-config-dir)))
-      (when (file-exists-p config-file)
-        (cdr (assoc source-name
-                    (skg-source-paths-from-toml config-file)))))))
+  (cdr (assoc source-name (skg--source-paths))))
 
 (defun skg--abs-path-for-id-and-source (id source)
   "Return the absolute path of ID.skg within SOURCE's directory,

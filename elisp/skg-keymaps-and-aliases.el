@@ -122,7 +122,8 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c s s") #'skg-show-sourceward))
   (progn;; properties
     (define-key map (kbd "C-c p d") #'skg-make-definitive)
-    (define-key map (kbd "C-c p i") #'skg-make-indefinitive))
+    (define-key map (kbd "C-c p i") #'skg-make-indefinitive)
+    (define-key map (kbd "C-c p s") #'skg-change-source))
   (progn;; view (buffer-level view state)
     (define-key map (kbd "C-c v d") #'skg-view-diff-mode)
     (define-key map (kbd "C-c v e") #'skg-view-new-empty)

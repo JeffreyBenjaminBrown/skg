@@ -2,7 +2,9 @@
 
 (load-file (expand-file-name "../../elisp/skg-test-utils.el"
                              (file-name-directory load-file-name)))
+(require 'cl-lib)
 (require 'ert)
+(require 'heralds-minor-mode)
 (require 'org)
 (require 'skg-metadata)
 (require 'skg-compare-sexpr)
@@ -99,5 +101,50 @@ Returns the parsed s-expression or nil if not found."
     (let ((result (test-skg--extract-metadata-sexp)))
       ;; Verify indefinitive is in node section
       (should (skg-sexp-subtree-p result '(skg (node indef)))))))
+
+(ert-deftest test-skg-change-source ()
+  "Test skg-change-source replaces the node source field."
+  (with-temp-buffer
+    (org-mode)
+    (insert "* (skg (node (id 1) (source public))) title")
+    (goto-char (point-min))
+    (cl-letf (((symbol-function 'skg--prompt-for-source-change)
+               (lambda (current-source)
+                 (should (equal current-source "public"))
+                 "private")))
+      (skg-change-source))
+    (let ((result (test-skg--extract-metadata-sexp)))
+      (should (skg-sexp-subtree-p
+               result
+               '(skg (node (id 1) (source private)))))
+      (should (skg-sexp-subtree-p
+               result
+               '(skg (node (viewStats (sourceHerald ⌂:private))))))
+      (should-not (skg-sexp-subtree-p
+                   result
+                   '(skg (node (source public))))))))
+
+(ert-deftest test-skg-change-source-updates-displayed-source-herald ()
+  "Test skg-change-source changes the source herald for the current node."
+  (with-temp-buffer
+    (org-mode)
+    (insert "* (skg (node (id 1) (source public) (viewStats (sourceHerald ⌂:public)))) title")
+    (goto-char (point-min))
+    (heralds-minor-mode 1)
+    (cl-letf (((symbol-function 'skg--prompt-for-source-change)
+               (lambda (_current-source)
+                 "private")))
+      (skg-change-source))
+    (let* ((metadata-start (save-excursion
+                             (goto-char (point-min))
+                             (search-forward "(skg")
+                             (match-beginning 0)))
+           (display-overlay
+            (cl-find-if (lambda (ov) (overlay-get ov 'display))
+                        (overlays-at metadata-start))))
+      (should display-overlay)
+      (let ((display-text (overlay-get display-overlay 'display)))
+        (should (string-match-p "⌂private" display-text))
+        (should-not (string-match-p "⌂public" display-text))))))
 
 (provide 'test-skg-metadata)
