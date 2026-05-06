@@ -71,31 +71,112 @@ Does NOT save; call `skg-request-save-buffer' afterward."
       (user-error "Node has no source"))
     (format "%s" (car source-values))))
 
-(defun skg-change-source ()
+(defun skg-change-source (&optional recursive)
   "Prompt for and change the source of the node at point.
 Starts with the current source as minibuffer text.  S-left/S-right cycle
 through owned sources, C-? displays all configured sources and
 their paths, and typed source names are accepted directly.
+With a prefix argument RECURSIVE, changes every content-descendent
+whose source matches the source at point.  Descendents whose birth
+is not contentOf are not traversed.
 Does NOT save; call `skg-request-save-buffer' afterward."
-  (interactive)
+  (interactive "P")
   (let* ((current-source (skg--current-node-source))
          (new-source (string-trim
                       (skg--prompt-for-source-change current-source))))
     (unless (string-empty-p new-source)
-      (when (string-match-p "[[:space:]]" new-source)
-        (user-error "Source names cannot contain whitespace"))
+      (skg--validate-source-name new-source)
       (if (string= current-source new-source)
           (message "Source unchanged: %s" current-source)
-        (skg-edit-metadata-at-point
-         `(skg (node (ENSURE (source ,(intern new-source)))
-                     (viewStats))))
-        (skg-edit-metadata-at-point
-         `(skg (node (viewStats
-                      (ENSURE
-                       (sourceHerald ,(intern
-                                        (format "⌂:%s" new-source))))))))
-        (message "Source changed from %s to %s. Save to apply."
-                 current-source new-source)))))
+        (let ((changed-count
+               (if recursive
+                   (skg--change-source-recursive current-source
+                                                new-source)
+                 (skg--change-source-at-point new-source))))
+          (message "Source changed from %s to %s on %d node%s. Save to apply."
+                   current-source
+                   new-source
+                   changed-count
+                   (if (= changed-count 1) "" "s")))))))
+
+(defun skg--validate-source-name (source)
+  "Signal an error if SOURCE cannot be represented in skg metadata."
+  (when (string-match-p "[[:space:]]" source)
+    (user-error "Source names cannot contain whitespace")))
+
+(defun skg--change-source-recursive (old-source new-source)
+  "Change OLD-SOURCE to NEW-SOURCE in this content subtree.
+Returns the number of changed nodes.  The root node is inclusive;
+descendents whose birth is not contentOf are not traversed."
+  (save-excursion
+    (let ((changed-count 0)
+          (start-level (org-outline-level)))
+      (setq changed-count
+            (+ changed-count
+               (skg--change-source-at-point new-source)))
+      (outline-next-heading)
+      (while (and (not (eobp))
+                  (> (org-outline-level) start-level))
+        (let ((metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
+          (if (not (and (skg--truenode-sexp-p metadata-sexp)
+                        (skg--node-birth-content-of-p metadata-sexp)))
+              (skg--goto-next-heading-after-subtree)
+            (when (equal (skg--node-source metadata-sexp) old-source)
+              (setq changed-count
+                    (+ changed-count
+                       (skg--change-source-at-point new-source))))
+            (outline-next-heading))))
+      changed-count)))
+
+(defun skg--goto-next-heading-after-subtree ()
+  "Move to the next heading after the current subtree."
+  (let ((prune-level (org-outline-level)))
+    (outline-next-heading)
+    (while (and (not (eobp))
+                (> (org-outline-level) prune-level))
+      (outline-next-heading))))
+
+(defun skg--metadata-sexp-at-point-or-nil ()
+  "Return the parsed skg metadata sexp for the headline at point, or nil."
+  (when (org-at-heading-p)
+    (let* ((headline (skg-get-current-headline-text))
+           (split (skg-split-as-stars-metadata-title headline))
+           (metadata-str (and split (cadr split))))
+      (when (and metadata-str
+                 (not (string-empty-p metadata-str)))
+        (read metadata-str)))))
+
+(defun skg--truenode-sexp-p (metadata-sexp)
+  "Return non-nil if METADATA-SEXP describes a TrueNode."
+  (and metadata-sexp
+       (skg-sexp-subtree-p metadata-sexp '(skg (node)))))
+
+(defun skg--node-birth-content-of-p (metadata-sexp)
+  "Return non-nil if METADATA-SEXP has implicit or explicit contentOf birth."
+  (let ((birth-values (skg-sexp-cdr-at-path metadata-sexp
+                                            '(skg node birth))))
+    (or (not birth-values)
+        (eq (car birth-values) 'contentOf))))
+
+(defun skg--node-source (metadata-sexp)
+  "Return METADATA-SEXP's node source as a string, or nil."
+  (let ((source-values (skg-sexp-cdr-at-path metadata-sexp
+                                             '(skg node source))))
+    (when source-values
+      (format "%s" (car source-values)))))
+
+(defun skg--change-source-at-point (new-source)
+  "Set the source at point to NEW-SOURCE.
+Returns 1 if the current line was edited."
+  (skg-edit-metadata-at-point
+   `(skg (node (ENSURE (source ,(intern new-source)))
+               (viewStats))))
+  (skg-edit-metadata-at-point
+   `(skg (node (viewStats
+                (ENSURE
+                 (sourceHerald ,(intern
+                                  (format "⌂:%s" new-source))))))))
+  1)
 
 (defun skg-parse-headline-metadata (headline-text)
   "Parse skg metadata from HEADLINE-TEXT after org bullets.

@@ -66,6 +66,29 @@ Returns the parsed s-expression or nil if not found."
         (when end-pos
           (read (substring text 0 end-pos)))))))
 
+(defun test-skg--all-metadata-sexps ()
+  "Return every parsed (skg ...) metadata sexp in the current buffer."
+  (let (result)
+    (save-excursion
+      (goto-char (point-min))
+      (while (re-search-forward "(skg" nil t)
+        (let* ((start (- (point) 4))
+               (text (buffer-substring-no-properties start
+                                                      (line-end-position)))
+               (end-pos (skg-find-sexp-end text)))
+          (when end-pos
+            (push (read (substring text 0 end-pos))
+                  result)))))
+    (nreverse result)))
+
+(defun test-skg--metadata-sexp-by-id (id)
+  "Return the first metadata sexp whose node id is ID."
+  (cl-find-if
+   (lambda (sexp)
+     (equal (skg-sexp-cdr-at-path sexp '(skg node id))
+            (list (intern id))))
+   (test-skg--all-metadata-sexps)))
+
 (ert-deftest test-skg-make-indefinitive ()
   "Test skg-make-indefinitive adds indefinitive to node section."
   ;; Test adding indefinitive to headline with id
@@ -146,5 +169,52 @@ Returns the parsed s-expression or nil if not found."
       (let ((display-text (overlay-get display-overlay 'display)))
         (should (string-match-p "⌂private" display-text))
         (should-not (string-match-p "⌂public" display-text))))))
+
+(ert-deftest test-skg-change-source-recursive-prunes-non-content-births ()
+  "Test recursive source change follows only contentOf org relationships."
+  (with-temp-buffer
+    (org-mode)
+    (insert
+     (concat
+      "* (skg (node (id root) (source public) (birth independent))) root\n"
+      "** (skg (node (id content-child) (source public))) content child\n"
+      "*** (skg (node (id content-grandchild) (source public))) content grandchild\n"
+      "** (skg (node (id mismatched-content) (source foreign))) mismatched content\n"
+      "*** (skg (node (id public-under-mismatch) (source public))) public under mismatch\n"
+      "** (skg (node (id link-child) (source public) (birth linksTo))) link child\n"
+      "*** (skg (node (id under-link) (source public))) under link\n"
+      "** (skg aliasCol) aliases\n"
+      "*** (skg (node (id under-scaffold) (source public))) under scaffold\n"))
+    (goto-char (point-min))
+    (cl-letf (((symbol-function 'skg--prompt-for-source-change)
+               (lambda (current-source)
+                 (should (equal current-source "public"))
+                 "private")))
+      (skg-change-source t))
+    (dolist (id '("root"
+                  "content-child"
+                  "content-grandchild"
+                  "public-under-mismatch"))
+      (should (skg-sexp-subtree-p
+               (test-skg--metadata-sexp-by-id id)
+               '(skg (node (source private)))))
+      (should (skg-sexp-subtree-p
+               (test-skg--metadata-sexp-by-id id)
+               '(skg (node (viewStats (sourceHerald ⌂:private)))))))
+    (should (skg-sexp-subtree-p
+             (test-skg--metadata-sexp-by-id "mismatched-content")
+             '(skg (node (source foreign)))))
+    (should-not (skg-sexp-subtree-p
+                 (test-skg--metadata-sexp-by-id "mismatched-content")
+                 '(skg (node (source private)))))
+    (dolist (id '("link-child"
+                  "under-link"
+                  "under-scaffold"))
+      (should (skg-sexp-subtree-p
+               (test-skg--metadata-sexp-by-id id)
+               '(skg (node (source public)))))
+      (should-not (skg-sexp-subtree-p
+                   (test-skg--metadata-sexp-by-id id)
+                   '(skg (node (source private))))))))
 
 (provide 'test-skg-metadata)

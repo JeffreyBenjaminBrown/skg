@@ -242,7 +242,7 @@ will not affect it
   unless they are also indefinitive).
 *** C-c p s : skg-change-source
 Changes the source of the node at point.
-The prompt shows the current source.
+The prompt starts with the current source as editable minibuffer text.
 You can type the new source name directly,
 or use shift-left / shift-right to cycle through owned sources.
 Press C-? from the prompt to open an org buffer listing every
@@ -251,6 +251,11 @@ with that source's path as the headline body.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the move.
+*** C-u C-c p s : skg-change-source recursively
+Like 'skg-change-source', but it also
+changes the source of every content descendent of the node at point
+whose source matches the original source of the node at point.
+Descendents whose Birth is not ContentOf are not traversed.
 ** view-level commands
 *** C-c v d : skg-view-diff-mode
 If you use git to manage your data,
