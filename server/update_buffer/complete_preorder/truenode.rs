@@ -86,7 +86,7 @@ pub fn complete_truenode_preorder (
     "complete_truenode_preorder: expected TrueNode" ) ?;
   make_indef_if_repeat_then_extend_defmap(
     tree, node, defmap ) ?;
-  let (pid, source) : (ID, SourceName) =
+  let (pid, initial_source) : (ID, SourceName) =
     match resolve_truenode_kind (
       tree, node, source_diffs, config,
       deleted_by_this_save_pids ) ?
@@ -94,9 +94,11 @@ pub fn complete_truenode_preorder (
       TruenodeKindOutcome::Continue { pid, source } => (pid, source) };
   clear_consumed_edit_request (tree, node) ?;
   let nodecomplete : NodeComplete =
-    nodecomplete_from_inrustgraph_or_disk ( config, &pid, &source ) ?;
-  if ! is_saved_view { // The saved (definitive) view of a node *defines* the title and body, but other views need those fields updated.
-    sync_truenode_text_from_disk (tree, node, &nodecomplete) ?; }
+    nodecomplete_from_inrustgraph_or_disk ( config, &pid, &initial_source ) ?;
+  let source : SourceName =
+    nodecomplete . source . clone ();
+  if ! is_saved_view { // The saved (definitive) view of a node *defines* the title, body, and source, but other views need those fields updated.
+    sync_truenode_from_disk (tree, node, &nodecomplete) ?; }
   let subscribes_to : Vec<ID> =
     reconcile_content_children (
       tree, node, &nodecomplete, &pid, &source,
@@ -168,15 +170,17 @@ fn clear_consumed_edit_request (
 /// Phase 3 (non-saved views only): overwrite the viewnode's title
 /// and body with the fresh values from disk. The saved view is the
 /// one that *defines* those fields, so it is excluded.
-fn sync_truenode_text_from_disk (
+fn sync_truenode_from_disk (
   tree         : &mut Tree<ViewNode>,
   node         : NodeId,
   nodecomplete : &NodeComplete,
 ) -> Result<(), Box<dyn Error>> {
   let disk_title : String = nodecomplete . title . clone ();
   let disk_body  : Option<String> = nodecomplete . body . clone ();
+  let disk_source : SourceName = nodecomplete . source . clone ();
   write_at_truenode_in_tree ( tree, node, |t| {
     t . title = disk_title;
+    t . source = disk_source;
     if let IndefOrDef::Definitive { body, .. } = &mut t . indef_or_def {
       *body = disk_body; } }
   ) ?;
