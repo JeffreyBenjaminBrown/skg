@@ -19,6 +19,7 @@ docker run --name "$CONTAINER_NAME" -it -d               \
   -w /home/ubuntu/host                   \
   -v "$HOST":/home/ubuntu/host           \
   jeffreybbrown/hode:latest
+
   # PITFALL: Do not mount over /home/ubuntu itself. That hides the
   #   image-provided ~/.bashrc and the writable ~/.local/npm-global
   #   prefix used by Codex and Claude bootstrap/update logic.

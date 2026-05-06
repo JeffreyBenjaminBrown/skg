@@ -1,3 +1,8 @@
+* server should whistle when ready
+* strategy for moving source
+Commit all uncommitted changes from both sources.
+Do the move.
+Compare the state of both sources.
 * update TypeDB in Dockerfile
 * change source recursively
 * If I move a file in one view, will its source update in another?

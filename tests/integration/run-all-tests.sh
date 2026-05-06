@@ -83,7 +83,11 @@ declare -a pids=()
 declare -a test_results=()
 
 for test_dir in "${TEST_DIRS[@]}"; do
-  nice -n 15 ionice -c 3 bash -c "$(declare -f run_single_test); INTEGRATION_DIR='$INTEGRATION_DIR' run_single_test '$test_dir'" &
+  if command -v ionice >/dev/null 2>&1; then
+    nice -n 15 ionice -c 3 bash -c "$(declare -f run_single_test); INTEGRATION_DIR='$INTEGRATION_DIR' run_single_test '$test_dir'" &
+  else
+    nice -n 15 bash -c "$(declare -f run_single_test); INTEGRATION_DIR='$INTEGRATION_DIR' run_single_test '$test_dir'" &
+  fi
   pids+=($!)
 
   # Throttle: when we hit MAX_PARALLEL, wait for one to finish.

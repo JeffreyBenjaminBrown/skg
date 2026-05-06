@@ -43,7 +43,7 @@
     ;; b's first child before the definitive content (c, d, e).
     (assert-headline-titles
      buf
-     '((1 independent "b")
+     '((1 contentOf "b")
        (2 containerOf  "a")
        (2 contentOf    "c")
        (2 contentOf    "d")

@@ -1,9 +1,9 @@
 ;;; Integration test: opening a content view of `child', whose
 ;;; parent contains it, should render the buffer with `parent'
 ;;; prepended as the first child of `child' (Birth::ContainerOf
-;;; indefinitive). The view-root's metadata
-;;; `(graphStats (containers 1))' makes the count visible to the
-;;; user; no separate notice is sent.
+;;; indefinitive). Because `child' is contained in the graph, the
+;;; view-root is born as contentOf; that default is implicit in
+;;; emitted metadata.
 
 (load-file "../../../elisp/skg-init.el")
 (load-file "../../../elisp/skg-test-utils.el")
@@ -30,14 +30,19 @@
       (message "Buffer:\n%s" text)
       (unless (string-match-p "^\\* (skg (node (id child)" text)
         (fail "view-root not as expected; got:\n%s" text))
-      ;; The view-root's graphStats should expose the container count
-      ;; — that's the "explanation" the user sees, in lieu of any
-      ;; separate notice.
-      (unless (string-match-p
-               "^\\* (skg (node (id child)[^)]*)[^)]*)[^)]*(graphStats[^)]*(containers 1)"
-               text)
-        (fail "view-root metadata does not show (containers 1); got:\n%s"
-              text))
+      (let ((root-line (and (string-match "^\\* (skg (node (id child).*$" text)
+                            (match-string 0 text))))
+        (unless root-line
+          (fail "no view-root headline for child; buffer:\n%s" text))
+        (when (string-match-p "(birth independent)" root-line)
+          (fail "contained view-root should be content, not independent; line: %S"
+                root-line))
+        (when (string-match-p "(birth containerOf)" root-line)
+          (fail "contained view-root should be content, not containerOf; line: %S"
+                root-line))
+        (when (string-match-p "(birth linksTo)" root-line)
+          (fail "contained view-root should be content, not line: %S"
+                root-line)))
       (let ((line (and (string-match
                         "^\\*\\* (skg (node (id parent).*$" text)
                        (match-string 0 text))))

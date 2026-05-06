@@ -14,7 +14,7 @@ use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, Birth, TrueNod
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use ego_tree::iter::Edge;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::io;
 use std::time;
@@ -185,12 +185,35 @@ pub async fn stub_viewforest_from_root_ids (
       Some ( (&mut viewforest, viewforest_root_treeid) ),
       root_skgid, config, driver, visited
     ) . await ?; }
-  mark_view_roots_independent ( &mut viewforest );
   Ok (viewforest) }
 
+/// Mark direct TrueNode children of BufferRoot according to graph
+/// containment. A view-root with graph containers is still content in
+/// the graph; a view-root with no graph containers is independent.
+pub fn set_view_root_births_from_containers (
+  viewforest           : &mut Tree<ViewNode>,
+  content_to_containers : &HashMap<ID, HashSet<ID>>,
+) {
+  let root_id : NodeId = viewforest . root () . id ();
+  let child_ids : Vec<NodeId> =
+    viewforest . get (root_id) . unwrap ()
+    . children () . map ( |c| c . id () ) . collect ();
+  for child_id in child_ids {
+    let mut node_mut : NodeMut<ViewNode> =
+      viewforest . get_mut (child_id) . unwrap ();
+    let vn : &mut ViewNode = node_mut . value ();
+    if let ViewNodeKind::True ( ref mut t ) = vn . kind {
+      t . birth =
+        if content_to_containers
+          . get (&t . id)
+          . map_or ( false, |containers| ! containers . is_empty () )
+        { Birth::ContentOf }
+        else { Birth::Independent }; } } }
+
 /// Mark direct TrueNode children of BufferRoot as birth=Independent.
-/// View roots are not rendered because of a parent relationship;
-/// they are the user's chosen entry points into the graph.
+/// Used when rerendering an arbitrary saved buffer, whose top-level
+/// headlines are not necessarily being created by a content-view
+/// request.
 pub fn mark_view_roots_independent (
   viewforest : &mut Tree<ViewNode>,
 ) {
@@ -227,9 +250,8 @@ pub fn mark_view_roots_independent (
 /// so extra_id aliasing (typically a merge side-effect) doesn't
 /// produce false mismatches.
 ///
-/// Intended to run AFTER 'mark_view_roots_independent' so direct
-/// children of BufferRoot have already been coerced and don't
-/// fall through this check. Also relies on the save pipeline's
+/// Direct children of BufferRoot have no TrueNode parent and therefore
+/// do not fall through this check. Also relies on the save pipeline's
 /// invariant that 'apply_definenodes' has updated the in-Rust-graph
 /// graph before the rerender pass runs (see
 /// 'update_views_after_save').
@@ -253,9 +275,7 @@ pub fn validate_birth_relationships (
           ViewNodeKind::True (t) => t,
           // A non-TrueNode parent (BufferRoot, Scaffold, Deleted,
           // DeletedScaff) is not a legitimate subject for any of
-          // these relational claims; skip without correcting. The
-          // top-level BufferRoot case is handled by
-          // 'mark_view_roots_independent'.
+          // these relational claims; skip without correcting.
           _ => continue };
       let claim_ok : bool = match child_tn . birth {
         Birth::ContainerOf =>

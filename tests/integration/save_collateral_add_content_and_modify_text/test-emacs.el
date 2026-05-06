@@ -31,7 +31,7 @@
       (kill-emacs 1))
     (assert-headline-structure
      buf
-     '((1 independent "a")
+     '((1 contentOf "a")
        (2 containerOf  "b")
        (3 containerOf  "a")
        (2 contentOf    "b")
@@ -50,7 +50,7 @@
       (kill-emacs 1))
     (assert-headline-structure
      buf
-     '((1 independent "b")
+     '((1 contentOf "b")
        (2 containerOf  "a")
        (3 containerOf  "b")
        (2 contentOf    "a")
@@ -65,7 +65,7 @@
     ;; Verify pre-edit structure
     (assert-headline-titles
      buf
-     '((1 independent "b")
+     '((1 contentOf "b")
        (2 containerOf  "a")
        (3 containerOf  "b")
        (2 contentOf    "a")
@@ -86,7 +86,7 @@
     ;; Verify post-edit structure
     (assert-headline-titles
      buf
-     '((1 independent "b")
+     '((1 contentOf "b")
        (2 containerOf  "a")
        (3 containerOf  "b")
        (2 contentOf    "Node a was given this longer title")
