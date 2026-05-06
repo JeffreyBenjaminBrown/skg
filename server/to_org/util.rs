@@ -14,7 +14,7 @@ use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, Birth, TrueNod
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use ego_tree::iter::Edge;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 use std::io;
 use std::time;
@@ -187,12 +187,11 @@ pub async fn stub_viewforest_from_root_ids (
     ) . await ?; }
   Ok (viewforest) }
 
-/// Mark direct TrueNode children of BufferRoot according to graph
-/// containment. A view-root with graph containers is still content in
+/// Mark direct TrueNode children of BufferRoot according to their
+/// graphStats. A view-root with graph containers is still content in
 /// the graph; a view-root with no graph containers is independent.
-pub fn set_view_root_births_from_containers (
-  viewforest           : &mut Tree<ViewNode>,
-  content_to_containers : &HashMap<ID, HashSet<ID>>,
+pub fn set_view_root_births_from_graphstats (
+  viewforest : &mut Tree<ViewNode>,
 ) {
   let root_id : NodeId = viewforest . root () . id ();
   let child_ids : Vec<NodeId> =
@@ -203,12 +202,13 @@ pub fn set_view_root_births_from_containers (
       viewforest . get_mut (child_id) . unwrap ();
     let vn : &mut ViewNode = node_mut . value ();
     if let ViewNodeKind::True ( ref mut t ) = vn . kind {
-      t . birth =
-        if content_to_containers
-          . get (&t . id)
-          . map_or ( false, |containers| ! containers . is_empty () )
-        { Birth::ContentOf }
-        else { Birth::Independent }; } } }
+      let container_count : usize =
+        t . graphStats . containRels . as_ref ()
+        . map ( |c| c . containers )
+        . unwrap_or (0);
+      t . birth = if container_count > 0
+                  { Birth::ContentOf }
+                  else { Birth::Independent }; } } }
 
 /// Mark direct TrueNode children of BufferRoot as birth=Independent.
 /// Used when rerendering an arbitrary saved buffer, whose top-level

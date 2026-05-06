@@ -11,6 +11,29 @@
 
 (defvar integration-test-phase "starting")
 
+(defun search-root-line (content)
+  (and (string-match "^\\* (skg (node (id leaf-b).*$" content)
+       (match-string 0 content)))
+
+(defun assert-leaf-b-root-is-content (content phase)
+  (let ((line (search-root-line content)))
+    (unless line
+      (message "✗ FAIL: leaf-b search root not found during %s" phase)
+      (message "Buffer content:\n%s" content)
+      (kill-emacs 1))
+    (when (string-match-p "(birth independent)" line)
+      (message "✗ FAIL: leaf-b search root is independent during %s: %S"
+               phase line)
+      (kill-emacs 1))
+    (when (string-match-p "(birth containerOf)" line)
+      (message "✗ FAIL: leaf-b search root is containerOf during %s: %S"
+               phase line)
+      (kill-emacs 1))
+    (when (string-match-p "(birth linksTo)" line)
+      (message "✗ FAIL: leaf-b search root is linksTo during %s: %S"
+               phase line)
+      (kill-emacs 1))))
+
 (defun integration-test-search-enrichment ()
   (message "=== SKG Search Enrichment Integration Test ===")
 
@@ -29,6 +52,10 @@
     (unless buf
       (message "✗ FAIL: search buffer never created")
       (kill-emacs 1))
+    (with-current-buffer buf
+      (assert-leaf-b-root-is-content
+       (buffer-substring-no-properties (point-min) (point-max))
+       "immediate search results"))
     (message "✓ search buffer created")
     (setq integration-test-phase "phase1-done"))
 
@@ -54,6 +81,9 @@
         (message "✗ FAIL: containerward path 'container alpha' not found after 30s")
         (message "Buffer content:\n%s" content)
         (kill-emacs 1))
+      (assert-leaf-b-root-is-content
+       content
+       "enriched search results")
       (message "✓ containerward path enrichment arrived")
       ;; Phase 3: verify graphnodestats in enriched results.
       ;; container-a is a root with 1 content,

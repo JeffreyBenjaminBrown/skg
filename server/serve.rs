@@ -13,26 +13,25 @@ pub mod util;
 
 use crate::consts::SHUTDOWN_DB_DELETE_DELAY_MS;
 use crate::dbs::typedb::util::delete_database;
-use crate::types::env::SkgEnv;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::get_file_path::handle_get_file_path_request;
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
-use crate::serve::handlers::rerender_all_views::{
-  handle_git_diff_toggle_and_rerender,
-  handle_rerender_all_views_request};
+use crate::serve::handlers::rerender_all_views::{ handle_git_diff_toggle_and_rerender, handle_rerender_all_views_request};
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
-use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request;
 use crate::serve::handlers::text_search::render_enriched_search_buffer::insert_containerward_ancestries_into_search_view;
 use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
+use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request;
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
+use crate::to_org::util::set_view_root_births_from_graphstats;
+use crate::types::env::SkgEnv;
 use crate::types::errors::BufferValidationError;
-use crate::types::views_state::{OpenViews, ViewUri};
 use crate::types::unchecked_viewnode::{UncheckedViewNode,unchecked_to_checked_tree};
 use crate::types::viewnode::ViewNode;
+use crate::types::views_state::{OpenViews, ViewUri};
 use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
 
 use ego_tree::{NodeId, Tree};
@@ -270,6 +269,8 @@ fn handle_snapshot_response (
       &mut viewforest, root_treeid,
       &payload . graphnodestats,
       &env . config ); }
+  set_view_root_births_from_graphstats (
+    &mut viewforest );
   let enriched : String =
     viewforest_to_string ( &viewforest, &env . config )
     . expect ("search viewforest rendering never fails");
