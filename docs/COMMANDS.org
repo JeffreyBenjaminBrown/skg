@@ -10,7 +10,7 @@ For this reason the client will warn you
 if you have unsaved edits in one view
 and beegin to edit another one.
 It won't stop you, but the results could be bad.
-** deletion
+** C-c <backspace> : deletion
 ***     C-c <backspace> : skg-delete
 Marks the node at point for deletion from the graph.
 Upon saving the view, it will vanish not just from this view,
@@ -22,7 +22,7 @@ of the node at point. Descendent headlines that are not truenodes
 
 Prefix-arg variant of skg-delete; callable directly via M-x
 as skg-delete-recursive.
-** text search
+** C-c f : text search
 The 'f' is for 'find'.
 *** C-c f RET : skg-search
 Text search across titles and aliases, returning every
@@ -140,7 +140,7 @@ buffer you started in, at the position you were at; and a
 The label is the result's title with any inline links inside
 it reduced to their labels (so the new link's label is plain
 text, never another link inside a link).
-** going to a node
+** C-c g : going to a node
 *** C-c g RET : skg-goto
 Calling this when the cursor is on a link, a node's metadata,
 a bare UUID, or a .skg filename
@@ -172,7 +172,7 @@ the first line in that section containing this node's ID.
 Warns if the ID appears multiple times, or if the parent
 appears in multiple sections.
 *** C-c G M   : skg-goto-in-magit-parent-and-close-this
-** git
+** C-c t : git operations
 *** C-c t a         : skg-git-add-if-new-recursive-preview
 Brings up a buffer with the text of a command which,
 if executed (C-x C-e), runs 'git add' on some nodes.
@@ -186,7 +186,7 @@ but it doesn't show you the command;
 it instead runs that command for you.
 *** C-c (g|G) (m|M) : skg-goto-in-magit-*
 These four commands are described elsewhere in this document.
-** showing more information about a node
+** C-c r : showing more information about a node
 These commands don't edit the graph. Each inserts a request
 into the metadata of the node at point that, on save, causes
 the server to render additional information into the view.
@@ -200,7 +200,7 @@ in the containment graph, one step out).
 *** C-c r s : skg-reveal-sourceward
 Show the nodes that the node at point links to (its textlink
 targets).
-** setting node properties
+** C-c s : setting node properties
 *** first some vocab: 'definitive' and 'indefinitive'
 A view of a node can be definitive or indefinitive.
 Typically the first place in the buffer that depicts a node
@@ -250,7 +250,26 @@ Like 'skg-set-source', but it also
 changes the source of every content descendent of the node at point
 whose source matches the original source of the node at point.
 Descendents whose Birth is not ContentOf are not traversed.
-** view-level commands
+** C-c m : other graph modifications
+*** C-c m l : skg-replace-content-with-link
+Replace the branch at point with a link to the node that used to
+be there, then save the buffer.
+
+Point can be on the headline or in the node body.
+The command uses the headline either way.
+
+The node being replaced must be an existing truenode with an ID,
+and an org-child of a definitive truenode whose source is
+owned in =skgconfig.toml=. The command acts locally,
+replacing only this occurrence in the current buffer:
+the headline at point and all of its org-descendents,
+including scaffolds and phantoms,
+are removed from the view and replaced by a same-level headline
+whose title is an =[[id:...][...]]= link to the original node.
+
+If the original headline title already contains a link, the
+command asks "Are you sure?" before proceeding.
+** C-c v : view-level commands
 *** C-c v d : skg-view-diff-mode
 If you use git to manage your data,
 enable this view to see what you've changed since your last commit,
@@ -302,7 +321,7 @@ but with the '(skg ...)' metadata stripped from every headline.
 If no region is active, it does nothing.
 This is useful for copying a read-only projection of some data
 into another application.
-** IDs, links and the linkstack
+** C-c {i|u|o} : IDs, links and the linkstack
 *** some background
 **** IDs are mostly invisible, but good to know about.
 Every node has an ID,

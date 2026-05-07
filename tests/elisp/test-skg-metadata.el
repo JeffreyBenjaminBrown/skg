@@ -7,6 +7,7 @@
 (require 'heralds-minor-mode)
 (require 'org)
 (require 'skg-metadata)
+(require 'skg-modify-graph)
 (require 'skg-compare-sexpr)
 
 (ert-deftest test-skg-parse-headline-metadata ()
@@ -265,5 +266,142 @@ Returns the parsed s-expression or nil if not found."
       (should-not (skg-sexp-subtree-p
                    (test-skg--metadata-sexp-by-id id)
                    '(skg (node (source private))))))))
+
+(ert-deftest test-skg-replace-content-with-link-from-body ()
+  "Test replacing the current branch from point in the node body."
+  (with-temp-buffer
+    (org-mode)
+    (insert
+     (concat
+      "* (skg (node (id r) (source public))) R\n"
+      "** (skg (node (id p) (source public))) P\n"
+      "body point starts here\n"
+      "*** (skg aliasCol) aliases\n"
+      "*** (skg (node (id c) (source public) indef)) child\n"
+      "** (skg (node (id p) (source public) indef)) P elsewhere\n"))
+    (goto-char (point-min))
+    (search-forward "body point")
+    (let ((save-count 0))
+      (cl-letf (((symbol-function 'skg--owned-sources)
+                 (lambda () '("public")))
+                ((symbol-function 'skg-request-save-buffer)
+                 (lambda () (setq save-count (1+ save-count)))))
+        (skg-replace-content-with-link))
+      (should (= save-count 1))
+      (should
+       (equal
+        (buffer-string)
+        (concat
+         "* (skg (node (id r) (source public))) R\n"
+         "** [[id:p][P]]\n"
+         "** (skg (node (id p) (source public) indef)) P elsewhere\n"))))))
+
+(ert-deftest test-skg-replace-content-with-link-confirms-linked-headline ()
+  "Test link-bearing headlines ask for confirmation and simplify labels."
+  (with-temp-buffer
+    (org-mode)
+    (insert
+     (concat
+      "* (skg (node (id r) (source public))) R\n"
+      "** (skg (node (id p) (source public))) P has [[https://x][X]] and [[id:y]]\n"))
+    (goto-char (point-min))
+    (forward-line 1)
+    (let ((save-count 0))
+      (cl-letf (((symbol-function 'skg--owned-sources)
+                 (lambda () '("public")))
+                ((symbol-function 'skg-request-save-buffer)
+                 (lambda () (setq save-count (1+ save-count))))
+                ((symbol-function 'y-or-n-p)
+                 (lambda (prompt)
+                   (should (equal prompt "Are you sure? "))
+                   t)))
+        (skg-replace-content-with-link))
+      (should (= save-count 1))
+      (should
+       (equal
+        (buffer-string)
+        (concat
+         "* (skg (node (id r) (source public))) R\n"
+         "** [[id:p][P has X and id:y]]\n"))))))
+
+(ert-deftest test-skg-replace-content-with-link-cancel-linked-headline ()
+  "Test declining the confirmation leaves the buffer untouched."
+  (with-temp-buffer
+    (org-mode)
+    (let ((original
+           (concat
+            "* (skg (node (id r) (source public))) R\n"
+            "** (skg (node (id p) (source public))) P has [[id:x][X]]\n")))
+      (insert original)
+      (goto-char (point-min))
+      (forward-line 1)
+      (let ((save-count 0))
+        (cl-letf (((symbol-function 'skg--owned-sources)
+                   (lambda () '("public")))
+                  ((symbol-function 'skg-request-save-buffer)
+                   (lambda () (setq save-count (1+ save-count))))
+                  ((symbol-function 'y-or-n-p)
+                   (lambda (_prompt) nil)))
+          (should-error (skg-replace-content-with-link)
+                        :type 'user-error))
+        (should (= save-count 0))
+        (should (equal (buffer-string) original))))))
+
+(ert-deftest test-skg-replace-content-with-link-rejects-missing-id ()
+  "Test replacing a new node fails because it has no link target ID."
+  (with-temp-buffer
+    (org-mode)
+    (insert
+     (concat
+      "* (skg (node (id r) (source public))) R\n"
+      "** (skg (node (source public))) P\n"))
+    (goto-char (point-min))
+    (forward-line 1)
+    (let ((save-count 0))
+      (cl-letf (((symbol-function 'skg--owned-sources)
+                 (lambda () '("public")))
+                ((symbol-function 'skg-request-save-buffer)
+                 (lambda () (setq save-count (1+ save-count)))))
+        (should-error (skg-replace-content-with-link)
+                      :type 'user-error))
+      (should (= save-count 0)))))
+
+(ert-deftest test-skg-replace-content-with-link-rejects-foreign-container ()
+  "Test replacement fails under a container source not owned by the user."
+  (with-temp-buffer
+    (org-mode)
+    (insert
+     (concat
+      "* (skg (node (id r) (source foreign))) R\n"
+      "** (skg (node (id p) (source public))) P\n"))
+    (goto-char (point-min))
+    (forward-line 1)
+    (let ((save-count 0))
+      (cl-letf (((symbol-function 'skg--owned-sources)
+                 (lambda () '("public")))
+                ((symbol-function 'skg-request-save-buffer)
+                 (lambda () (setq save-count (1+ save-count)))))
+        (should-error (skg-replace-content-with-link)
+                      :type 'user-error))
+      (should (= save-count 0)))))
+
+(ert-deftest test-skg-replace-content-with-link-rejects-indef-container ()
+  "Test replacement fails under an indefinitive container."
+  (with-temp-buffer
+    (org-mode)
+    (insert
+     (concat
+      "* (skg (node (id r) (source public) indef)) R\n"
+      "** (skg (node (id p) (source public))) P\n"))
+    (goto-char (point-min))
+    (forward-line 1)
+    (let ((save-count 0))
+      (cl-letf (((symbol-function 'skg--owned-sources)
+                 (lambda () '("public")))
+                ((symbol-function 'skg-request-save-buffer)
+                 (lambda () (setq save-count (1+ save-count)))))
+        (should-error (skg-replace-content-with-link)
+                      :type 'user-error))
+      (should (= save-count 0)))))
 
 (provide 'test-skg-metadata)

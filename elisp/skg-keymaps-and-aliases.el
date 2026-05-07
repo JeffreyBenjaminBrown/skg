@@ -124,6 +124,8 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c s i") #'skg-set-indefinitive)
     (define-key map (kbd "C-c s s") #'skg-set-source)
     (define-key map (kbd "C-c s S") #'skg-set-source-recursive))
+  (progn;; graph modifications
+    (define-key map (kbd "C-c m l") #'skg-replace-content-with-link))
   (progn;; view (buffer-level view state)
     (define-key map (kbd "C-c v d") #'skg-view-diff-mode)
     (define-key map (kbd "C-c v e") #'skg-view-new-empty)

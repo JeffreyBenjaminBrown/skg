@@ -212,6 +212,17 @@ descendents whose birth is not contentOf are not traversed."
     (when source-values
       (format "%s" (car source-values)))))
 
+(defun skg--node-id (metadata-sexp)
+  "Return METADATA-SEXP's node ID as a string, or nil."
+  (let ((id-values (skg-sexp-cdr-at-path metadata-sexp
+                                         '(skg node id))))
+    (when id-values
+      (format "%s" (car id-values)))))
+
+(defun skg--node-indefinitive-p (metadata-sexp)
+  "Return non-nil if METADATA-SEXP has the bare TrueNode indef marker."
+  (skg-sexp-subtree-p metadata-sexp '(skg (node indef))))
+
 (defun skg--change-source-at-point (new-source)
   "Set the source at point to NEW-SOURCE.
 Returns 1 if the current line was edited."

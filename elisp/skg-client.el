@@ -9,6 +9,7 @@
 (require 'skg-length-prefix)
 (require 'skg-lock-buffers)
 (require 'skg-metadata)
+(require 'skg-modify-graph)
 (require 'skg-view-new-empty)
 (require 'skg-request-file-path)
 (require 'skg-request-git-diff-mode)
