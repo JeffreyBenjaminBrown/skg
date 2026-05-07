@@ -1,4 +1,5 @@
 * server should whistle when ready
+* show title in metadata view
 * strategy for moving source
 Commit all uncommitted changes from both sources.
 Do the move.

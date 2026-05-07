@@ -14,7 +14,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 RESULTS_DIR="$PROJECT_ROOT/tests/results"
-BEEP="$PROJECT_ROOT/../sound/play-beep.sh"
+BEEP="$PROJECT_ROOT/../sound/play-beep.sh beep-soothing"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
