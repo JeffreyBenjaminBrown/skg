@@ -194,6 +194,14 @@ open the sexp-edit buffer (not prompt in minibuffer)."
                (buffer-local-value 'skg-sexp-edit--source-buffer b))
              (buffer-list))))
        (should edit-buf)
+       (with-current-buffer edit-buf
+         (goto-char (point-min))
+         (outline-next-heading)
+         (should (looking-at "^\\* title$"))
+         (should (get-text-property (point) 'read-only))
+         (outline-next-heading)
+         (should (looking-at "^\\*\\* x$"))
+         (should (get-text-property (point) 'read-only)))
        (kill-buffer edit-buf)))))
 
 (ert-deftest test-view-source-list-includes-all-sources ()

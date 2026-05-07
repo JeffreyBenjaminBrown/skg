@@ -26,6 +26,7 @@ use std::env;
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::path::Path;
+use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tracing_subscriber::layer::SubscriberExt;
@@ -118,6 +119,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     . expect ("busysignal thread panicked");
   listener . set_nonblocking (false) ?;
   tracing::info! ("Server ready.");
+  play_ready_sound_in_background ();
 
   serve (env, listener)
     . map_err ( |e| Box::new (e)
@@ -169,6 +171,29 @@ fn busysignal_accept_loop (
               BUSYSIGNAL_POLL_INTERVAL_MS ) ); }
       Err (e) => {
         tracing::warn! ("Busysignal accept error: {}", e); } } } }
+
+fn play_ready_sound_in_background (
+) {
+  const READY_SOUND : &str =
+    "/home/sound/glorious-beep.wav";
+  if ! Path::new (READY_SOUND) . exists () {
+    tracing::debug! (
+      sound = READY_SOUND,
+      "Ready sound not found; skipping playback" );
+    return; }
+  std::thread::spawn ( || {
+    let result : Result<std::process::ExitStatus, std::io::Error> =
+      Command::new ("pw-play")
+      . arg (READY_SOUND)
+      . stdin (Stdio::null ())
+      . stdout (Stdio::null ())
+      . stderr (Stdio::null ())
+      . status ();
+    if let Err (e) = result {
+      tracing::debug! (
+        error = %e,
+        "Ready sound playback failed" ); } } );
+}
 
 /// Installed BEFORE initialize_dbs,
 /// so that a kill during init still cleans up the database.

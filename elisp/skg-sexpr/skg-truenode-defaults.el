@@ -54,19 +54,34 @@
 ;; Expand
 ;;
 
-(defun skg-truenode-expand-defaults-in-org (org-text &optional default-source)
+(defun skg-truenode-expand-defaults-in-org
+    (org-text &optional default-source display-title)
   "Expand default fields in ORG-TEXT for TrueNode metadata editing.
 Parses org text to headlines, finds the ** node section,
 reorders fields to canonical order, inserts missing editable
 fields with defaults, and expands bare boolean atoms to have
 a value child.
 If DEFAULT-SOURCE is non-nil, insert it as the source default
-and mark existing source values that match it with '(default)'."
+and mark existing source values that match it with '(default)'.
+If DISPLAY-TITLE is non-nil and non-empty, prepend a read-only
+title display group."
   (let* ((lines (split-string org-text "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
          (expanded (skg-truenode--expand-headlines
-                    headlines default-source)))
-    (skg-headlines-to-org expanded)))
+                    headlines default-source))
+         (with-title
+          (skg-truenode--maybe-prepend-title
+           expanded display-title)))
+    (skg-headlines-to-org with-title)))
+
+(defun skg-truenode--maybe-prepend-title (headlines display-title)
+  "Maybe prepend the read-only DISPLAY-TITLE group to HEADLINES."
+  (if (and display-title
+           (not (string-empty-p (string-trim display-title))))
+      (append (list (cons 1 "title")
+                    (cons 2 display-title))
+              headlines)
+    headlines))
 
 (defun skg-truenode--expand-headlines (headlines &optional default-source)
   "Expand HEADLINES by reordering fields and inserting defaults.
@@ -221,17 +236,30 @@ true values back to bare atoms."
 
 (defun skg-truenode--strip-headlines (headlines)
   "Strip default-valued fields from HEADLINES. Returns new headline list."
-  (let* ((node-idx (skg-truenode--find-node-headline headlines))
-         (node-level (car (nth node-idx headlines)))
+  (let* ((metadata-headlines
+          (skg-truenode--remove-title-headlines headlines))
+         (node-idx (skg-truenode--find-node-headline metadata-headlines))
+         (node-level (car (nth node-idx metadata-headlines)))
          (child-level (1+ node-level))
-         (before-node (cl-subseq headlines 0 (1+ node-idx)))
-         (after-node (cl-subseq headlines (1+ node-idx)))
+         (before-node (cl-subseq metadata-headlines 0 (1+ node-idx)))
+         (after-node (cl-subseq metadata-headlines (1+ node-idx)))
          (groups (skg-truenode--group-children after-node child-level))
          (children (car groups))
          (remainder (cdr groups))
          (stripped-children
           (skg-truenode--strip-children children child-level)))
     (append before-node stripped-children remainder)))
+
+(defun skg-truenode--remove-title-headlines (headlines)
+  "Remove the display-only title group from HEADLINES, if present."
+  (if (and headlines
+           (= (caar headlines) 1)
+           (string= (string-trim (cdar headlines)) "title"))
+      (let ((rest (cdr headlines)))
+        (while (and rest (> (caar rest) 1))
+          (setq rest (cdr rest)))
+        rest)
+    headlines))
 
 (defun skg-truenode--strip-children (children child-level)
   "Strip default values from CHILDREN. Returns flat headline list."
