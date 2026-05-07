@@ -51,6 +51,44 @@ Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive)
   (skg-edit-metadata-at-point '(skg (node indef))))
 
+(defun skg-view-without-metadata ()
+  "Copy the active region to a new org buffer, stripping skg metadata.
+If there is no active region, do nothing."
+  (interactive)
+  (when (use-region-p)
+    (let ((buffer (generate-new-buffer "*skg-without-metadata*"))
+          (text
+           (skg-strip-metadata-from-org-text
+            (buffer-substring-no-properties
+             (region-beginning)
+             (region-end)))))
+      (with-current-buffer buffer
+        (insert text)
+        (org-mode)
+        (setq-local org-adapt-indentation nil)
+        (set-buffer-modified-p nil)
+        (goto-char (point-min)))
+      (switch-to-buffer buffer))))
+
+(defun skg-strip-metadata-from-org-text (org-text)
+  "Return ORG-TEXT with all skg headline metadata removed."
+  (with-temp-buffer
+    (insert org-text)
+    (goto-char (point-min))
+    (while (not (eobp))
+      (let* ((line-start (line-beginning-position))
+             (line-end (line-end-position))
+             (line-text
+              (buffer-substring-no-properties line-start line-end))
+             (parts (skg-split-as-stars-metadata-title line-text)))
+        (when (and parts
+                   (not (string-empty-p (nth 1 parts))))
+          (delete-region line-start line-end)
+          (insert (concat (nth 0 parts)
+                          (nth 2 parts)))))
+      (forward-line 1))
+    (buffer-string)))
+
 (defun skg--current-headline-metadata-sexp ()
   "Return the parsed skg metadata sexp for the headline at point."
   (unless (org-at-heading-p)

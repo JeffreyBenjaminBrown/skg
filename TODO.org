@@ -1,9 +1,7 @@
-* Unify the three skg instances?
+* unify the three skg instances
+See TODO/docker-unification-strategies.org
 * IDs should not be writeable in the metadata view
 And what about extra-ids?
-* strip IDs from passage
-so I can copy a whole subtree of new nodes --
-e.g. in 'regular payments'
 * duplicate IDs silently kill the server, and it only reports the first
 * strategy for moving source
 Commit all uncommitted changes from both sources.

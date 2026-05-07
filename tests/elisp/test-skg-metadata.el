@@ -125,6 +125,55 @@ Returns the parsed s-expression or nil if not found."
       ;; Verify indefinitive is in node section
       (should (skg-sexp-subtree-p result '(skg (node indef)))))))
 
+(ert-deftest test-skg-strip-metadata-from-org-text ()
+  "Test stripping skg metadata from every headline in org text."
+  (should
+   (equal
+    (skg-strip-metadata-from-org-text
+     (concat
+      "* (skg (node (id 1) (source public))) root\n"
+      "body line\n"
+      "** (skg alias (staged newM)) alias title\n"
+      "** plain child\n"))
+    (concat
+     "* root\n"
+     "body line\n"
+     "** alias title\n"
+     "** plain child\n"))))
+
+(ert-deftest test-skg-view-without-metadata-does-nothing-without-region ()
+  "Test skg-view-without-metadata does not open a buffer without a region."
+  (with-temp-buffer
+    (let ((before (buffer-list)))
+      (insert "* (skg (node (id 1))) root")
+      (goto-char (point-min))
+      (skg-view-without-metadata)
+      (should (equal before (buffer-list))))))
+
+(ert-deftest test-skg-view-without-metadata-opens-stripped-region ()
+  "Test skg-view-without-metadata opens a new buffer with stripped text."
+  (let ((source-buffer (generate-new-buffer " *skg-test-source*"))
+        (projection-buffer nil))
+    (unwind-protect
+        (with-current-buffer source-buffer
+          (switch-to-buffer source-buffer)
+          (insert
+           (concat
+            "* (skg (node (id 1))) root\n"
+            "** (skg (node (id 2))) child\n"))
+          (goto-char (point-min))
+          (push-mark (point-max) nil t)
+          (activate-mark)
+          (skg-view-without-metadata)
+          (setq projection-buffer (current-buffer))
+          (should (equal (buffer-string)
+                         "* root\n** child\n"))
+          (should (derived-mode-p 'org-mode)))
+      (when (buffer-live-p projection-buffer)
+        (kill-buffer projection-buffer))
+      (when (buffer-live-p source-buffer)
+        (kill-buffer source-buffer)))))
+
 (ert-deftest test-skg-set-source ()
   "Test skg-set-source replaces the node source field."
   (with-temp-buffer

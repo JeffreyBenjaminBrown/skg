@@ -278,7 +278,13 @@ Note that some properties don't make sense to edit,
 like the count of how many contents it has.
 (If you want to change how much content a node has,
 don't change the node's metadata; change its children in the view.)
-*** C-c v i : skg-readable-ids-mode
+*** C-c v o : skg-view-org-ancestry
+If you're at a headline so deep in the tree
+that you can't remember where it came from,
+this brings you to a new view showing only that ancestry.
+This actually works in org-mode outside of skg.
+(skg uses org-mode, but org-mode can be used without skg.)
+*** C-c v r : skg-readable-ids-mode
 This changes how node IDs are displayed.
 The ID itself is a kind of special random gibberish called UUID v4.
 When skg-readable-ids-mode is on,
@@ -290,12 +296,12 @@ to find titles for deleted files.)
 *** C-c v s : skg-view-id-stack
 View and maybe edit the set of links you've stored.
 (See "the linkstack" below.)
-*** C-c v o : skg-view-org-ancestry
-If you're at a headline so deep in the tree
-that you can't remember where it came from,
-this brings you to a new view showing only that ancestry.
-This actually works in org-mode outside of skg.
-(skg uses org-mode, but org-mode can be used without skg.)
+*** C-c v w : skg-view-without-metadata
+If a region is active, opens a new org buffer containing that region,
+but with the '(skg ...)' metadata stripped from every headline.
+If no region is active, it does nothing.
+This is useful for copying a read-only projection of some data
+into another application.
 ** IDs, links and the linkstack
 *** some background
 **** IDs are mostly invisible, but good to know about.
