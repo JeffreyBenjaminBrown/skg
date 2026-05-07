@@ -215,7 +215,7 @@ echo ""
 echo -e "${DIM}Logs: $RESULTS_DIR/${NC}"
 
 # Beep
-[ -x "$BEEP" ] && "$BEEP" 2>/dev/null
+[ -x "$BEEP" ] && "$BEEP" beep-harsh 2>/dev/null
 
 T_TOTAL=$((SECONDS - T_START))
 

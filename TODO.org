@@ -1,17 +1,16 @@
-* server should whistle when ready
+* Unify the three skg instances?
+* IDs should not be writeable in the metadata view
+And what about extra-ids?
+* strip IDs from passage
+so I can copy a whole subtree of new nodes --
+e.g. in 'regular payments'
+* duplicate IDs silently kill the server, and it only reports the first
 * strategy for moving source
 Commit all uncommitted changes from both sources.
 Do the move.
 Compare the state of both sources.
-* update TypeDB in Dockerfile
-* change source recursively
-* If I move a file in one view, will its source update in another?
 * Is it a misfeature to let config_path differ from data_root?
 Why would you split up your skg stuff?
-* duplicate IDs silently kill the server, and it only reports the first
-* strip IDs from passage
-so I can copy a whole subtree of new nodes --
-e.g. in 'regular payments'
 * bug, no time
 In git diff view, phantom nodes become completely unfolded
 whenever the buffer is saved.
