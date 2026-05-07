@@ -1,0 +1,314 @@
+* Docker unification strategies
+
+The goal is to stop paying for three independent Rust build trees while
+keeping the three Skg instances from touching each other's runtime state.
+
+The important distinction is:
+
+- The Rust build cache can be shared.
+- The Skg API port must be distinct per instance.
+- The TypeDB database name must be distinct per instance if all instances
+  talk to one TypeDB server.
+- The Tantivy folder and data root should stay distinct per instance.
+- The working copy and data files should stay distinct for coding sessions
+  that must not clobber each other.
+
+The current container image supports the first part well: Cargo is available
+inside the image, and a shared =CARGO_TARGET_DIR= can deduplicate most of the
+24G =target/= tree I see in this container. The current scripts need some
+process-management changes before the most unified version is comfortable.
+
+* The option I would choose
+
+Use one long-lived development container, mount each Skg checkout at a
+different path, and set one shared Cargo target directory for all of them.
+Run one TypeDB server inside that container. Run one Skg server per instance,
+each from its own checkout and config file.
+
+For example, conceptually:
+
+#+begin_src sh
+  /work/skg-prod
+  /work/skg-dev-a
+  /work/skg-dev-b
+  /work/cargo-target
+#+end_src
+
+and inside the container:
+
+#+begin_src sh
+  export CARGO_TARGET_DIR=/work/cargo-target/skg
+#+end_src
+
+Each instance's =data/skgconfig.toml= should then use a unique pair:
+
+#+begin_src toml
+  # production
+  db_name = "skg-real-prod"
+  port = 1730
+  tantivy_folder = ".index.tantivy"
+
+  # coding session A
+  db_name = "skg-real-dev-a"
+  port = 1731
+  tantivy_folder = ".index.tantivy"
+
+  # coding session B
+  db_name = "skg-real-dev-b"
+  port = 1732
+  tantivy_folder = ".index.tantivy"
+#+end_src
+
+=tantivy_folder= can keep the same relative string in each config if each
+config lives in a different data root. It should not point at one shared
+absolute directory.
+
+** Pros
+
+- One TypeDB process, one AI/editor/dev environment, and one shared Cargo
+  target directory.
+- Good deduplication: the biggest repeated thing, =target/=, becomes one
+  tree.
+- Coding sessions still have separate git worktrees and separate data roots.
+- TypeDB isolation is simple if =db_name= is unique per instance.
+- The existing Skg code already expects many Skg servers to talk to one
+  TypeDB server on =127.0.0.1:1729=; tests do this with unique database
+  names.
+
+** Cons
+
+- =bash/run-servers.sh= currently is not safe for multiple Skg servers in
+  one container. It uses broad =pkill= patterns for =cargo watch.*skg= and
+  =cargo run --bin skg=, so starting or stopping one instance can kill the
+  others.
+- Simultaneous =cargo build= / =cargo run= commands in different checkouts
+  will contend on the shared target directory. Cargo handles locking, but
+  one session might wait for another.
+- The production instance is no longer protected by a container boundary.
+  Unique ports and database names protect the ordinary state, but broad
+  process-kill commands or accidental shell commands remain shared-container
+  risks.
+- Rust incremental artifacts can still grow when different branches,
+  features, or dependency versions are active. This deduplicates a lot, not
+  perfectly.
+
+** Script changes I would make first
+
+- Make =bash/run-servers.sh= instance-aware. It should track PIDs under
+  =$DATA_ROOT/logs= or =$DATA_ROOT/run= and kill only the matching
+  =cargo-watch= process group on shutdown.
+- Do not run =pkill -f "cargo watch.*skg"= or =pkill -f "cargo run --bin skg"=
+  in a shared container.
+- Keep TypeDB management separate from Skg server management. Starting a
+  second Skg server should not restart TypeDB if TypeDB is healthy.
+- Consider a wrapper like =bash/run-one-skg.sh CONFIG= that assumes TypeDB is
+  already running, plus a separate =bash/run-typedb.sh=.
+- Make =bash/docker.sh= a generic "start the dev container" script rather
+  than one script per instance. The container name should stop carrying the
+  =skg2= identity; the mounted worktree paths should carry identity instead.
+
+* Lower-risk transition
+
+Keep separate containers for now, but bind-mount the same host directory or
+Docker volume as =target= in all of them. Also give each instance a unique
+=db_name=.
+
+Example shape:
+
+#+begin_src sh
+  -v /home/rust/shared-skg-target:/home/ubuntu/host/target
+#+end_src
+
+or, better if the three repos are mounted at different paths:
+
+#+begin_src sh
+  -e CARGO_TARGET_DIR=/home/ubuntu/shared-target/skg
+  -v /home/rust/shared-skg-target:/home/ubuntu/shared-target
+#+end_src
+
+** Pros
+
+- Smallest change from the current model.
+- Container boundaries still protect the production instance from broad
+  =pkill= commands in a coding container.
+- You get most of the disk deduplication benefit.
+
+** Cons
+
+- You still have three containers, and possibly three TypeDB servers.
+- If all three containers keep private TypeDB stores, TypeDB disk use is not
+  deduplicated.
+- If the target directory is mounted directly at each checkout's =target/=,
+  the setup is a little magical: each checkout appears to own the same
+  directory.
+- Simultaneous builds still contend on Cargo locks.
+
+This is a good intermediate step if you want the target deduplication before
+rewriting process management.
+
+* More isolated single-container variant
+
+Run one container, one shared =CARGO_TARGET_DIR=, and one TypeDB server, but
+make production less exposed operationally:
+
+- production Skg runs from a production checkout and config;
+- coding sessions run from separate worktrees;
+- production is started by a script that writes its own PID file;
+- coding helper scripts are forbidden from killing all Skg processes;
+- production uses a clearly named database like =skg-real-prod=.
+
+** Pros
+
+- Same disk savings as the recommended option.
+- Production still benefits from the same container image and TypeDB process.
+- The separation is explicit in paths, config names, ports, and PID files.
+
+** Cons
+
+- It is still one Unix process namespace. A reckless =pkill= or =killall= can
+  affect production.
+- Requires some discipline in scripts and shell habits.
+
+I would use this only after the startup/shutdown scripts stop using broad
+process matching.
+
+* Maximum isolation with shared build cache
+
+Use one dedicated TypeDB container and one or more Skg dev containers, all
+using a shared Cargo target volume. Each Skg server connects to the TypeDB
+container over a Docker network.
+
+This would require making the TypeDB address configurable in Skg; today it is
+hardcoded as =127.0.0.1:1729= in =server/consts.rs=. Without that code change,
+the Skg server expects TypeDB to be in the same network namespace.
+
+** Pros
+
+- TypeDB state can be centralized.
+- Skg coding containers can still be isolated from each other.
+- Cleaner production safety story than one fully shared container.
+
+** Cons
+
+- Requires a Skg code/config change for =typedb_address=.
+- More Docker plumbing than the current scripts.
+- Does not meet the simplest reading of "single docker environment" as well
+  as one long-lived container does.
+
+This is attractive later if production safety becomes more important than
+simplicity.
+
+* What must be unique
+
+** API ports
+
+The =port= field is the Rust-to-Emacs TCP port. These must be different for
+servers running at the same time in the same network namespace.
+
+Current example:
+
+#+begin_src toml
+  port = 1731
+#+end_src
+
+Use a small fixed convention, e.g.:
+
+#+begin_src toml
+  prod: 1730
+  dev-a: 1731
+  dev-b: 1732
+#+end_src
+
+** TypeDB database names
+
+If the instances share one TypeDB server, =db_name= must be unique. If two
+running Skg servers use =db_name = "skg-real"= against the same TypeDB server,
+they can overwrite and rebuild the same derived database.
+
+Suggested names:
+
+#+begin_src toml
+  db_name = "skg-real-prod"
+  db_name = "skg-real-dev-a"
+  db_name = "skg-real-dev-b"
+#+end_src
+
+** Tantivy folders
+
+Tantivy is also derived state. Keep it per instance. A relative
+=tantivy_folder = ".index.tantivy"= is fine if each config has a different
+data root. Do not share one absolute Tantivy path across instances.
+
+** Data roots and source folders
+
+The production notes and each coding session should have separate files on
+disk unless you are deliberately working on the same data. TypeDB and Tantivy
+are derived caches; the =.skg= files are the source of truth.
+
+* What can be shared
+
+** Cargo target directory
+
+The Cargo build cache is the best thing to share:
+
+#+begin_src sh
+  export CARGO_TARGET_DIR=/work/cargo-target/skg
+#+end_src
+
+This should be a bind mount or Docker volume outside any one checkout.
+
+** Docker image and tool installation
+
+The image, Rust toolchain, TypeDB executable, Emacs, Codex, Claude, and shell
+tools can all be shared by one container.
+
+** One TypeDB server process
+
+One TypeDB server can hold many databases. The isolation boundary is the
+database name. This matches the way the test suite already avoids races:
+tests use separate =skg-test-*= database names.
+
+* Things I would not do
+
+** Do not share =db_name=
+
+The current repeated =db_name = "skg-real"= is acceptable only because the
+instances currently live behind separate TypeDB servers in separate
+containers. In one TypeDB server, it is a collision.
+
+** Do not share one data checkout for two coding sessions
+
+Git branches do not protect uncommitted working tree changes from another
+process editing the same files. Separate worktrees or separate clones are the
+right boundary.
+
+** Do not rely only on port separation
+
+Different API ports keep Emacs clients from talking to the wrong Skg server.
+They do not protect TypeDB databases, Tantivy indices, or files on disk.
+
+* Suggested migration order
+
+1. Give every existing instance a unique =db_name= now. This is harmless even
+   while they are still in separate containers, and it makes later unification
+   safer.
+2. Try a shared =CARGO_TARGET_DIR= while keeping separate containers. This
+   proves the disk-space win without changing process topology.
+3. Refactor =bash/run-servers.sh= so Skg process management is per-instance.
+4. Start one long-lived container with all three worktrees mounted.
+5. Start one TypeDB server, then start each Skg server from its own checkout
+   and config.
+6. Once stable, simplify =bash/docker.sh= so it starts the environment, not
+   one numbered Skg instance.
+
+* Open questions
+
+- Do you want production to run in the same process namespace as coding
+  sessions? If not, keep production in its own container and share only the
+  Cargo target cache across coding containers.
+- Are the three instances separate clones, git worktrees, or copied
+  directories? A shared target directory works for all three, but a
+  worktree-based layout is usually cleaner than ad hoc copies.
+- Should =typedb_address= become a config field? It is not needed for the
+  simplest one-container design, but it would make TypeDB-in-its-own-container
+  possible.

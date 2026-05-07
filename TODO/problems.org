@@ -191,6 +191,22 @@
    multi-second first-render latency.
 * Other problems
 
+** 'bash/run-servers.sh' process management is not safe for multiple Skg servers in one container
+   Found while writing docker-unification-strategies.org.
+
+   'start_skg_with_restart' runs broad process kills:
+   - 'pkill -f "cargo watch.*skg"'
+   - cleanup runs 'pkill -f "cargo watch.*skg"' and
+     'pkill -f "cargo run --bin skg"'
+
+   That is fine-ish when each Skg instance has its own container, but in a
+   unified container it means starting or stopping one instance can kill the
+   production server or another coding session.
+
+   Fix direction: manage Skg processes per config/data-root, probably with
+   PID files under the data root's logs/run directory, and split TypeDB
+   lifecycle management from Skg server lifecycle management.
+
 ** 'skg-first-sexpr-on-line' fabricates a (node ...) child
    elisp/skg-sexpr/skg-sexpr-search.el / skg-strip-heralds-from-sexp.
    The stripper calls 'skg-edit-nested-sexp' with instructions
