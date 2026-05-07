@@ -423,4 +423,44 @@ preserves source and all fields."
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
+;;
+;; Display-only title group
+;;
+
+(ert-deftest test-expand-prepends-display-title ()
+  "Expanding with a display title prepends the title group."
+  (let* ((sexp '(skg (node (id abc) (source jeff))))
+         (org-text (sexp-to-org sexp))
+         (expanded
+          (skg-truenode-expand-defaults-in-org
+           org-text nil "actual title"))
+         (lines (split-string expanded "\n"))
+         (headlines (org-to-sexp--extract-headlines lines)))
+    (should (equal (cl-subseq headlines 0 4)
+                   '((1 . "title")
+                     (2 . "actual title")
+                     (1 . "skg")
+                     (2 . "node"))))))
+
+(ert-deftest test-expand-with-empty-display-title-does-not-prepend ()
+  "Expanding with an empty display title leaves metadata first."
+  (let* ((sexp '(skg (node (id abc) (source jeff))))
+         (org-text (sexp-to-org sexp))
+         (expanded
+          (skg-truenode-expand-defaults-in-org org-text nil ""))
+         (lines (split-string expanded "\n"))
+         (headlines (org-to-sexp--extract-headlines lines)))
+    (should (equal (car headlines) '(1 . "skg")))))
+
+(ert-deftest test-strip-removes-display-title ()
+  "Stripping removes the display-only title group before conversion."
+  (let* ((sexp '(skg (node (id abc) (source jeff))))
+         (org-text (sexp-to-org sexp))
+         (expanded
+          (skg-truenode-expand-defaults-in-org
+           org-text nil "actual title"))
+         (stripped (skg-truenode-strip-defaults-from-org expanded))
+         (result (org-to-sexp stripped)))
+    (should (equal result sexp))))
+
 (provide 'test-skg-truenode-defaults)

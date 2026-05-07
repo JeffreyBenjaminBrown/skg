@@ -51,7 +51,8 @@ Kill the buffer to cancel without saving."
 (defun skg-sexp-edit--commit ()
   "Save changes from sexp-edit buffer back to the source sexp."
   (interactive)
-  (let* ((org-text (buffer-substring-no-properties (point-min) (point-max)))
+  (let* ((org-text (buffer-substring-no-properties
+                    (point-min) (point-max)))
          (final-org ;; last version of the org text in the sexp-edit buffer
           (if skg-sexp-edit--is-truenode
               (skg-truenode-strip-defaults-from-org org-text)
@@ -82,15 +83,39 @@ SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER."
     (insert org-text)
     (skg--org-mode-with-options)
     (org-fold-show-all)
+    (when is-truenode
+      (skg-sexp-edit--make-title-headlines-read-only))
     (goto-char (point-min))
-    (progn ;; skip past help text and 'skg', land at viewnode kind
+    (progn ;; move point
       (outline-next-heading)
+      (when (looking-at "^\\* title$")
+        (outline-next-heading)
+        (outline-next-heading))
       (outline-next-heading))
     (skg-sexp-edit-mode 1)
     (setq-local skg-sexp-edit--source-buffer source-buffer)
     (setq-local skg-sexp-edit--start sexp-start)
     (setq-local skg-sexp-edit--end sexp-end)
     (setq-local skg-sexp-edit--is-truenode is-truenode)))
+
+(defun skg-sexp-edit--make-title-headlines-read-only ()
+  "Make the display-only title group read-only, if it is present."
+  (save-excursion
+    (goto-char (point-min))
+    (outline-next-heading)
+    (when (looking-at "^\\* title$")
+      (let ((start (line-beginning-position))
+            (end (save-excursion
+                   (forward-line 1)
+                   (if (looking-at "^\\*\\* .+$")
+                       (progn
+                         (forward-line 1)
+                         (point))
+                     (line-end-position)))))
+        (add-text-properties
+         start end
+         '(read-only t
+           rear-nonsticky (read-only)))))))
 
 (defun skg-sexp-edit--goto-field-value (field-name)
   "Navigate point to the first child headline under FIELD-NAME."
@@ -151,10 +176,11 @@ Kill the buffer to cancel without saving."
                (sexp-start (+ (line-beginning-position)
                               (length (car split))) )
                (sexp-end (+ sexp-start (length metadata-str)) )
+               (title (caddr split))
                (org-text (let ((sexp-as-org (sexp-to-org sexp)))
                            (if is-truenode
                                (skg-truenode-expand-defaults-in-org
-                                sexp-as-org nil)
+                                sexp-as-org nil title)
                              sexp-as-org)) ))
           (skg-sexp-edit--open-edit-buffer
            org-text source-buffer sexp-start sexp-end is-truenode)
