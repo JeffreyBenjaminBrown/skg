@@ -155,6 +155,7 @@ Pass its path as a command-line argument (default: `data/skgconfig.toml`) when s
 | `delete_on_quit`     | no       | false   | Delete the TypeDB database on server shutdown. Mainly for tests. |
 | `timing_log`         | no       | false   | When true, writes a JSON log to `<data_root>/logs/server.jsonl`. |
 | `auto_audit_daily`   | no       | false   | When true, audits the in-Rust memory against TypeDB at most once per day, backgrounded at lowest priority. Mismatches are appended to `<data_root>/audits.org` and flagged to the client on the next outbound buffer. |
+| `beep_when_server_becomes_available` | no | true | When true, plays a local sound after server initialization finishes. |
 
 ## Sources
 

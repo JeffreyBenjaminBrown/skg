@@ -119,7 +119,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     . expect ("busysignal thread panicked");
   listener . set_nonblocking (false) ?;
   tracing::info! ("Server ready.");
-  play_ready_sound_in_background ();
+  if config . beep_when_server_becomes_available {
+    play_ready_sound_in_background (); }
 
   serve (env, listener)
     . map_err ( |e| Box::new (e)

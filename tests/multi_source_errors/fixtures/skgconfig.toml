@@ -1,6 +1,7 @@
 db_name = "skg-test-multi-source-errors"
 tantivy_folder = "/tmp/tantivy-test-multi-source-errors"
 port = 1730
+beep_when_server_becomes_available = false
 
 [[sources]]
 name = "public"

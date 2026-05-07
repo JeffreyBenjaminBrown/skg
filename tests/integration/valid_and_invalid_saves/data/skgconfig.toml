@@ -1,6 +1,7 @@
 db_name = "skg-test-valid-invalid-saves"
 tantivy_folder = ".index.tantivy"
 port = 1731
+beep_when_server_becomes_available = false
 
 [[sources]]
 name = "main"
