@@ -1,20 +1,25 @@
 use crate::dbs::tantivy::titles_by_ids;
+use crate::serve::handlers::save_buffer::compute_diff_for_every_source;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::send_response_with_length_prefix;
-use crate::types::misc::{ID, TantivyIndex};
+use crate::types::git::SourceDiff;
+use crate::types::misc::{ID, SourceName, SkgConfig, TantivyIndex};
 use crate::types::sexp::extract_string_list_from_sexp;
 
 use sexp::{Sexp, Atom};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
 
 /// Handle a "titles by ids" request from Emacs.
-/// Parses the ID list, performs a bulk Tantivy lookup,
+/// Parses the ID list, performs a bulk Tantivy lookup, supplements
+/// deleted-node titles from git diff data when needed,
 /// and returns an alist of (id . title) pairs.
 pub fn handle_titles_by_ids_request (
-  stream        : &mut TcpStream,
-  request       : &str,
-  tantivy_index : &TantivyIndex,
+  stream            : &mut TcpStream,
+  request           : &str,
+  tantivy_index     : &TantivyIndex,
+  config            : &SkgConfig,
+  diff_mode_enabled : bool,
 ) {
   let parsed : Sexp =
     match sexp::parse (request) {
@@ -38,8 +43,14 @@ pub fn handle_titles_by_ids_request (
     id_strings . into_iter ()
     . map (ID)
     . collect ();
-  let title_map : HashMap<ID, String> =
+  let mut title_map : HashMap<ID, String> =
     titles_by_ids (tantivy_index, &ids);
+  if diff_mode_enabled
+     || title_map . len () < ids . len () {
+    let source_diffs : HashMap<SourceName, SourceDiff> =
+      compute_diff_for_every_source (config);
+    add_deleted_node_titles_by_ids (
+      &mut title_map, &ids, &source_diffs ); }
   let content_pairs : Vec<Sexp> =
     title_map . iter ()
     . map ( |(id, title)|
@@ -64,6 +75,21 @@ pub fn handle_titles_by_ids_request (
         Sexp::List ( content_pairs ), ] ),
     ] ) . to_string ();
   send_response_with_length_prefix (stream, &response); }
+
+pub fn add_deleted_node_titles_by_ids (
+  title_map    : &mut HashMap<ID, String>,
+  ids          : &[ID],
+  source_diffs : &HashMap<SourceName, SourceDiff>,
+) {
+  let requested_ids : HashSet<ID> =
+    ids . iter () . cloned () . collect ();
+  for source_diff in source_diffs . values () {
+    for node in source_diff . deleted_nodes . values () {
+      for id in node . all_ids () {
+        if requested_ids . contains (id) {
+          title_map
+            . entry (id . clone ())
+            . or_insert_with (|| node . title . clone ()); }}} }}
 
 fn send_error_response (
   stream : &mut TcpStream,

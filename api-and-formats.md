@@ -94,7 +94,9 @@ So far there are these endpoints:
 ## Titles by ids
   - Request: ((request . "titles by ids") (ids "uuid1" "uuid2" ...))
   - Response: LP response-type "titles-by-ids" with `((response-type "titles-by-ids") (content ((uuid1 . "title1") (uuid2 . "title2") ...)))`.
-  - IDs not found in Tantivy are simply absent from the response.
+  - IDs not found in Tantivy are simply absent from the response, except
+    that deleted `.skg` files visible in the current git diff can also
+    supply titles.
   - Used by `skg-readable-ids-mode` to annotate UUIDs in magit buffers with their titles.
 
 ## Shutdown server
