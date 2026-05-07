@@ -160,7 +160,9 @@ fn handle_emacs (
                                            &env . config ),
           Ok (RequestType::TitlesByIds) =>
             handle_titles_by_ids_request (
-              &mut stream, &request_header, &env . tantivy_index ),
+              &mut stream, &request_header,
+              &env . tantivy_index, &env . config,
+              views_state . diff_mode_enabled ),
           Ok (RequestType::GitDiffModeToggle) =>
             handle_git_diff_toggle_and_rerender (
               &mut stream,
