@@ -62,6 +62,7 @@ cat > "$TEMP_CONFIG" << EOF
 db_name = "$DB_NAME"
 tantivy_folder = "$TEST_DIR/data/.index.tantivy"
 port = $AVAILABLE_PORT
+beep_when_server_becomes_available = false
 delete_on_quit = true
 
 [[sources]]

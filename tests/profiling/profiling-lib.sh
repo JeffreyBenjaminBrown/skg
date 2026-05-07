@@ -51,6 +51,7 @@ run_profiling_test() {
 db_name = "$DB_NAME"
 tantivy_folder = "$TANTIVY_DIR"
 port = $AVAILABLE_PORT
+beep_when_server_becomes_available = false
 delete_on_quit = true
 initial_node_limit = 5000
 timing_log = true

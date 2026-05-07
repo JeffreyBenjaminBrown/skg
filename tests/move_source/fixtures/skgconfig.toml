@@ -1,6 +1,7 @@
 db_name = "skg-test-move-source"
 tantivy_folder = "/tmp/tantivy-test-move-source"
 port = 1730
+beep_when_server_becomes_available = false
 
 [[sources]]
 name = "public"
