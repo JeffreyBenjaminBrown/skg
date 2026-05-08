@@ -404,4 +404,135 @@ Returns the parsed s-expression or nil if not found."
                       :type 'user-error))
       (should (= save-count 0)))))
 
+(ert-deftest test-skg-replace-link-with-content-from-body ()
+  "Test replacing a link leaf from point in the body."
+  (with-temp-buffer
+    (org-mode)
+    (insert
+     (concat
+      "* (skg (node (id r) (source public))) R\n"
+      "** note\n"
+      "see [[id:p][P]]\n"
+      "** (skg (node (id s) (source public))) sibling\n"))
+    (goto-char (point-min))
+    (search-forward "[[id:p][P]]")
+    (let ((save-count 0))
+      (cl-letf (((symbol-function 'skg--owned-sources)
+                 (lambda () '("public")))
+                ((symbol-function 'skg-request-save-buffer)
+                 (lambda () (setq save-count (1+ save-count)))))
+        (skg-replace-link-with-content))
+      (should (= save-count 1))
+      (should
+       (equal
+        (buffer-string)
+        (concat
+         "* (skg (node (id r) (source public))) R\n"
+         "** (skg (node (id p) indef (viewRequests definitiveView))) P\n"
+         "** (skg (node (id s) (source public))) sibling\n"))))))
+
+(ert-deftest test-skg-replace-link-with-content-warns-for-existing-node ()
+  "Test replacing an existing node warns because it might orphan it."
+  (with-temp-buffer
+    (org-mode)
+    (insert
+     (concat
+      "* (skg (node (id r) (source public))) R\n"
+      "** (skg (node (id old) (source public))) see [[id:p][P]]\n"))
+    (goto-char (point-min))
+    (forward-line 1)
+    (let ((save-count 0)
+          (messages nil))
+      (cl-letf (((symbol-function 'skg--owned-sources)
+                 (lambda () '("public")))
+                ((symbol-function 'skg-request-save-buffer)
+                 (lambda () (setq save-count (1+ save-count))))
+                ((symbol-function 'message)
+                 (lambda (format-string &rest args)
+                   (push (apply #'format format-string args) messages))))
+        (skg-replace-link-with-content))
+      (should (= save-count 1))
+      (should
+       (member
+        "Warning: replacing existing node old may have created an orphan"
+        messages)))))
+
+(ert-deftest test-skg-replace-link-with-content-rejects-multiple-links ()
+  "Test replacement requires exactly one link in title plus body."
+  (with-temp-buffer
+    (org-mode)
+    (insert
+     (concat
+      "* (skg (node (id r) (source public))) R\n"
+      "** [[id:a][A]]\n"
+      "[[id:b][B]]\n"))
+    (goto-char (point-min))
+    (forward-line 1)
+    (let ((save-count 0))
+      (cl-letf (((symbol-function 'skg--owned-sources)
+                 (lambda () '("public")))
+                ((symbol-function 'skg-request-save-buffer)
+                 (lambda () (setq save-count (1+ save-count)))))
+        (should-error (skg-replace-link-with-content)
+                      :type 'user-error))
+      (should (= save-count 0)))))
+
+(ert-deftest test-skg-replace-link-with-content-rejects-non-id-link ()
+  "Test replacement requires the single link to be an id link."
+  (with-temp-buffer
+    (org-mode)
+    (insert
+     (concat
+      "* (skg (node (id r) (source public))) R\n"
+      "** [[https://example.com][web]]\n"))
+    (goto-char (point-min))
+    (forward-line 1)
+    (let ((save-count 0))
+      (cl-letf (((symbol-function 'skg--owned-sources)
+                 (lambda () '("public")))
+                ((symbol-function 'skg-request-save-buffer)
+                 (lambda () (setq save-count (1+ save-count)))))
+        (should-error (skg-replace-link-with-content)
+                      :type 'user-error))
+      (should (= save-count 0)))))
+
+(ert-deftest test-skg-replace-link-with-content-rejects-descendents ()
+  "Test replacement requires a leaf node."
+  (with-temp-buffer
+    (org-mode)
+    (insert
+     (concat
+      "* (skg (node (id r) (source public))) R\n"
+      "** [[id:p][P]]\n"
+      "*** child\n"))
+    (goto-char (point-min))
+    (forward-line 1)
+    (let ((save-count 0))
+      (cl-letf (((symbol-function 'skg--owned-sources)
+                 (lambda () '("public")))
+                ((symbol-function 'skg-request-save-buffer)
+                 (lambda () (setq save-count (1+ save-count)))))
+        (should-error (skg-replace-link-with-content)
+                      :type 'user-error))
+      (should (= save-count 0)))))
+
+(ert-deftest test-skg-replace-link-with-content-rejects-indef-container ()
+  "Test replacement requires a definitive container."
+  (with-temp-buffer
+    (org-mode)
+    (insert
+     (concat
+      "* (skg (node (id r) (source public) indef)) R\n"
+      "** [[id:p][P]]\n"))
+    (goto-char (point-min))
+    (forward-line 1)
+    (let ((save-count 0))
+      (cl-letf (((symbol-function 'skg--owned-sources)
+                 (lambda () '("public")))
+                ((symbol-function 'skg-request-save-buffer)
+                 (lambda () (setq save-count (1+ save-count)))))
+        (should-error (skg-replace-link-with-content)
+                      :type 'user-error))
+      (should (= save-count 0)))))
+
 (provide 'test-skg-metadata)
