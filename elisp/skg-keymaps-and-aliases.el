@@ -109,6 +109,7 @@ and hide INTERNAL from M-x completion."
   (progn;; goto. Capital-G variants kill the buffer they were called from.
     (define-key map (kbd "C-c g RET") #'skg-goto)
     (define-key map (kbd "C-c G RET") #'skg-goto-and-close-this)
+    (define-key map (kbd "C-c g b")   #'skg-goto-biggest-branch)
     (define-key map (kbd "C-c g i")   #'skg-goto-by-id)
     (define-key map (kbd "C-c G i")   #'skg-goto-by-id-and-close-this)
     (define-key map (kbd "C-c g m")   #'skg-goto-in-magit)

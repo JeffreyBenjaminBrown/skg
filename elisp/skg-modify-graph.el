@@ -7,6 +7,101 @@
 (require 'skg-config)
 (require 'skg-metadata)
 
+(defun skg-goto-biggest-branch ()
+  "Go to the sibling, or child, with the most org-descendents.
+If the node at point has siblings, consider the node itself and
+all of those siblings.  If it has no siblings, consider its
+immediate org-children instead.  This is intentionally an org
+outline heuristic, not a precise graph-content query."
+  (interactive)
+  (let* ((candidates (skg--biggest-branch-candidates))
+         (winner (skg--biggest-branch-max-by-descendents candidates))
+         (pos (car winner))
+         (descendent-count (cdr winner)))
+    (goto-char pos)
+    (message "Biggest branch has %d org-descendent(s)."
+             descendent-count)))
+
+(defun skg--biggest-branch-candidates ()
+  "Return candidate headline positions for `skg-goto-biggest-branch'."
+  (save-excursion
+    (skg--back-to-current-heading)
+    (let ((same-level-headlines
+           (skg--same-level-headlines-in-parent-subtree)))
+      (if (> (length same-level-headlines) 1)
+          same-level-headlines
+        (let ((children (skg--immediate-org-children)))
+          (unless children
+            (user-error "This branch has no siblings or children"))
+          children)))))
+
+(defun skg--biggest-branch-max-by-descendents (positions)
+  "Return (POSITION . DESCENDENT-COUNT) with greatest count in POSITIONS."
+  (let ((best-pos nil)
+        (best-count -1))
+    (dolist (pos positions)
+      (let ((count (skg--org-descendent-count pos)))
+        (when (> count best-count)
+          (setq best-pos pos
+                best-count count))))
+    (cons best-pos best-count)))
+
+(defun skg--same-level-headlines-in-parent-subtree ()
+  "Return headline positions at the current heading's org level."
+  (let* ((level (org-current-level))
+         (bounds (skg--parent-subtree-or-buffer-bounds)))
+    (skg--heading-positions-with-level level
+                                       (car bounds)
+                                       (cdr bounds))))
+
+(defun skg--parent-subtree-or-buffer-bounds ()
+  "Return bounds for current heading's parent subtree, or whole buffer."
+  (save-excursion
+    (if (org-up-heading-safe)
+        (cons (line-beginning-position)
+              (save-excursion (org-end-of-subtree t t)))
+      (cons (point-min) (point-max)))))
+
+(defun skg--immediate-org-children ()
+  "Return positions of the current heading's immediate org-children."
+  (let* ((child-level (1+ (org-current-level)))
+         (start (line-beginning-position))
+         (end (save-excursion (org-end-of-subtree t t))))
+    (skg--heading-positions-with-level child-level start end)))
+
+(defun skg--heading-positions-with-level (level start end)
+  "Return headline positions of org LEVEL between START and END."
+  (let ((positions nil))
+    (save-excursion
+      (goto-char start)
+      (while (re-search-forward org-heading-regexp end t)
+        (beginning-of-line)
+        (when (= (org-current-level) level)
+          (push (point) positions))
+        (forward-line 1)))
+    (nreverse positions)))
+
+(defun skg--org-descendent-count (pos)
+  "Return number of org-descendent headlines under POS."
+  (save-excursion
+    (goto-char pos)
+    (let ((start (line-beginning-position))
+          (end (save-excursion (org-end-of-subtree t t)))
+          (count 0))
+      (goto-char start)
+      (while (re-search-forward org-heading-regexp end t)
+        (beginning-of-line)
+        (unless (= (point) start)
+          (setq count (1+ count)))
+        (forward-line 1))
+      count)))
+
+(defun skg--back-to-current-heading ()
+  "Move to the heading containing point, or signal a user error."
+  (condition-case nil
+      (org-back-to-heading t)
+    (error (user-error "Not in an org headline or body"))))
+
 (defun skg-replace-content-with-link ()
   "Replace the branch at point with a link to its former root.
 Point may be on the headline or in its body.  The root must be an

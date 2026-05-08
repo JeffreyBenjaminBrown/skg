@@ -153,6 +153,18 @@ use skg-id-next and skg-id-prev
 to identify where those are.
 *** C-c G RET : skg-goto-and-close-this
 Like skg-goto, but also closes the buffer it was called from.
+*** C-c g b   : skg-goto-biggest-branch
+Go to the branch near point with the most recursive content,
+estimated by counting org-descendents in the current buffer.
+
+If the node at point has siblings, this considers that sibling
+set. If it has no siblings, it considers the node's immediate
+children instead.
+
+This can help when a view is loading slowly:
+replacing the content relationship to its biggest branch
+with a link relationship (C-c m l)
+reduces the view's demands on the server.
 *** C-c g i   : skg-goto-by-id
 'skg-goto' is usually more convenient.
 
