@@ -251,6 +251,24 @@ changes the source of every content descendent of the node at point
 whose source matches the original source of the node at point.
 Descendents whose Birth is not ContentOf are not traversed.
 ** C-c m : other graph modifications
+*** C-c m c : skg-replace-link-with-content
+Replace the leaf at point with a content relationship to the
+node it links to, then save the buffer.
+
+Point can be on the headline or in the node body. The node at
+point can be new or already in the graph. If it already has an
+ID, the command warns that the old node might become an orphan.
+
+The headline title plus body must contain exactly one org bracket
+link, and that link must be an =id:= link. The node must have no
+org-descendents. Its org-parent must be a definitive truenode
+whose source is owned in =skgconfig.toml=.
+
+The command replaces the whole leaf with a same-level
+indefinitive truenode for the link target. The parent is
+definitive, so saving records the target as content of the
+parent; the replacement child is indefinitive, so its own text is
+not rewritten from the link label.
 *** C-c m l : skg-replace-content-with-link
 Replace the branch at point with a link to the node that used to
 be there, then save the buffer.
