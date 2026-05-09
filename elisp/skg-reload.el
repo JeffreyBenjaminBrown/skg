@@ -34,6 +34,7 @@ plain `load-file' at the end instead."
             skg-lens
             skg-lock-buffers
             skg-metadata
+            skg-modify-graph
             skg-view-new-empty
             skg-org-fold
             skg-request-file-path
