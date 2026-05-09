@@ -51,30 +51,36 @@ pub fn handle_titles_by_ids_request (
       compute_diff_for_every_source (config);
     add_deleted_node_titles_by_ids (
       &mut title_map, &ids, &source_diffs ); }
-  let content_pairs : Vec<Sexp> =
+  let content_pairs : Vec<String> =
     title_map . iter ()
     . map ( |(id, title)|
-      Sexp::List ( vec! [
-        Sexp::Atom ( Atom::S ( id . as_str ()
-                               . to_string () )),
-        Sexp::Atom ( Atom::S ( "." . to_string () )),
-        Sexp::Atom ( Atom::S ( title . clone () )),
-      ] ) )
+      format! (
+        "({} . {})",
+        elisp_string_literal (id . as_str ()),
+        elisp_string_literal (title)) )
     . collect ();
   let response : String =
-    Sexp::List ( vec! [
-      Sexp::List ( vec! [
-        Sexp::Atom ( Atom::S (
-          "response-type" . to_string () )),
-        Sexp::Atom ( Atom::S (
-          TcpToClient::TitlesByIds
-          . repr_in_client () . to_string () )), ] ),
-      Sexp::List ( vec! [
-        Sexp::Atom ( Atom::S (
-          "content" . to_string () )),
-        Sexp::List ( content_pairs ), ] ),
-    ] ) . to_string ();
+    format! (
+      "((response-type {}) (content ({})))",
+      TcpToClient::TitlesByIds . repr_in_client (),
+      content_pairs . join (" ") );
   send_response_with_length_prefix (stream, &response); }
+
+fn elisp_string_literal (
+  s : &str,
+) -> String {
+  let mut result : String =
+    String::from ("\"");
+  for ch in s . chars () {
+    match ch {
+      '\\' => result . push_str ("\\\\"),
+      '"'  => result . push_str ("\\\""),
+      '\n' => result . push_str ("\\n"),
+      '\r' => result . push_str ("\\r"),
+      '\t' => result . push_str ("\\t"),
+      _    => result . push (ch), }}
+  result . push ('"');
+  result }
 
 pub fn add_deleted_node_titles_by_ids (
   title_map    : &mut HashMap<ID, String>,

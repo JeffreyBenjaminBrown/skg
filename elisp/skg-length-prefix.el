@@ -98,7 +98,10 @@ Returns one of:
 
 (defun skg-lp-append-chunk (buf chunk)
   "Return BUF with CHUNK (UTF-8 encoded bytes) appended."
-  (let ((bytes (encode-coding-string chunk 'utf-8)) )
+  (let ((bytes
+         (if (multibyte-string-p chunk)
+             (encode-coding-string chunk 'utf-8)
+           chunk)) )
     (concat buf bytes)) )
 
 (defun skg-lp-try-parse-header (response)

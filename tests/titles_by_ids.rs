@@ -22,14 +22,22 @@ fn titles_by_ids_handler_sends_parseable_titles (
   node . pid =
     ID::new ("11111111-1111-4111-8111-111111111111");
   node . title =
-    "The Real Title, with spaces" . to_string ();
+    "?" . to_string ();
   node . aliases =
     MSV::Specified (vec!["Alias One" . to_string ()]);
   node . source =
     SourceName::from ("main");
+  let mut spaced_title_node : NodeComplete =
+    empty_node_complete ();
+  spaced_title_node . pid =
+    ID::new ("44444444-4444-4444-8444-444444444444");
+  spaced_title_node . title =
+    "The Real Title, with spaces" . to_string ();
+  spaced_title_node . source =
+    SourceName::from ("main");
   let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
-      &vec![node],
+      &vec![node, spaced_title_node],
       Path::new ("/tmp/tantivy-test-titles-by-ids-handler"))?;
   let listener : TcpListener =
     TcpListener::bind ("127.0.0.1:0")?;
@@ -41,7 +49,8 @@ fn titles_by_ids_handler_sends_parseable_titles (
     listener . accept ()?;
   let request : &str =
     "((request . \"titles by ids\") \
-      (ids \"11111111-1111-4111-8111-111111111111\"))";
+      (ids \"11111111-1111-4111-8111-111111111111\" \
+           \"44444444-4444-4444-8444-444444444444\"))";
   handle_titles_by_ids_request (
     &mut server,
     request,
@@ -62,8 +71,16 @@ fn titles_by_ids_handler_sends_parseable_titles (
     "response should be tagged as titles-by-ids: {}",
     response_text );
   assert! (
-    response_text . contains ("The Real Title, with spaces"),
+    response . contains ("\"?\""),
+    "response should quote titles that are not valid Emacs symbols: {}",
+    response );
+  assert! (
+    response_text . contains ("?"),
     "response should preserve the title: {}",
+    response_text );
+  assert! (
+    response_text . contains ("The Real Title, with spaces"),
+    "response should preserve titles with spaces: {}",
     response_text );
   Ok (( )) }
 
