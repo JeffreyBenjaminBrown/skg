@@ -10,11 +10,15 @@ use crate::types::tree::viewnode_nodecomplete::{ collect_grandchild_aliases_for_
 use crate::types::list::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 
-struct NodeEditIntent {
+enum NodeEditIntent {
+  Save   (NodeSaveIntent),
+  Delete (NodeDeleteIntent),
+}
+
+struct NodeSaveIntent {
   pid                          : ID,
   source                       : SourceName,
-  delete                       : bool,
-  title                        : Option<String>,
+  title                        : String,
   body                         : Option<String>,
   contains                     : Vec<ID>,
   aliases                      : MSV<String>,
@@ -23,32 +27,36 @@ struct NodeEditIntent {
   overrides_view_of            : MSV<ID>,
 }
 
+struct NodeDeleteIntent {
+  pid    : ID,
+  source : SourceName,
+}
+
 impl NodeEditIntent {
   fn into_define_node (
     self,
   ) -> Result<DefineNode, String> {
-    if self . delete {
-      return Ok (DefineNode::Delete (DeleteNode {
-        id     : self . pid,
-        source : self . source,
-      })); }
-    let title : String =
-      self . title . ok_or (
-        "NodeEditIntent save is missing title")?;
-    Ok (DefineNode::Save (SaveNode (NodeComplete {
-      title,
-      aliases                      : self . aliases,
-      source                       : self . source,
-      pid                          : self . pid,
-      extra_ids                    : vec![],
-      body                         : self . body,
-      contains                     : self . contains,
-      subscribes_to                : self . subscribes_to,
-      hides_from_its_subscriptions :
-        self . hides_from_its_subscriptions,
-      overrides_view_of            : self . overrides_view_of,
-      misc                         : Vec::new(),
-    } ))) }
+    match self {
+      NodeEditIntent::Delete (intent) =>
+        Ok (DefineNode::Delete (DeleteNode {
+          id     : intent . pid,
+          source : intent . source,
+        })),
+      NodeEditIntent::Save (intent) =>
+        Ok (DefineNode::Save (SaveNode (NodeComplete {
+          title                        : intent . title,
+          aliases                      : intent . aliases,
+          source                       : intent . source,
+          pid                          : intent . pid,
+          extra_ids                    : vec![],
+          body                         : intent . body,
+          contains                     : intent . contains,
+          subscribes_to                : intent . subscribes_to,
+          hides_from_its_subscriptions :
+            intent . hides_from_its_subscriptions,
+          overrides_view_of            : intent . overrides_view_of,
+          misc                         : Vec::new(),
+        }))) }}
 }
 
 /// Converts a viewforest of ViewNodes to preliminary DefineNodes.
@@ -155,26 +163,17 @@ fn maybe_intent_from_treenode (
     IndefOrDef::Indefinitive => return Ok (None),
     IndefOrDef::Definitive { body, edit_request } => {
       if *edit_request == Some (EditRequest::Delete) {
-        return Ok(Some(NodeEditIntent {
-          pid                          : t . id . clone(),
-          source                       : t . source . clone(),
-          delete                       : true,
-          title                        : None,
-          body                         : None,
-          contains                     : Vec::new(),
-          aliases                      : MSV::Unspecified,
-          subscribes_to                : MSV::Unspecified,
-          hides_from_its_subscriptions : MSV::Unspecified,
-          overrides_view_of            : MSV::Unspecified,
-        } )); }
+        return Ok(Some(NodeEditIntent::Delete(NodeDeleteIntent {
+          pid    : t . id . clone(),
+          source : t . source . clone(),
+        }))); }
       let node_ref : NodeRef<ViewNode> =
         tree . get (node_id) . ok_or(
           "maybe_intent_from_treenode: node not found")?;
-      Ok(Some(NodeEditIntent {
+      Ok(Some(NodeEditIntent::Save(NodeSaveIntent {
         pid           : t . id . clone(),
         source        : t . source . clone(),
-        delete        : false,
-        title         : Some (t . title . clone()),
+        title         : t . title . clone(),
         body          : body . clone(),
         contains      :
           collect_contents_to_save_from_children (&node_ref, roles),
@@ -184,7 +183,7 @@ fn maybe_intent_from_treenode (
           collect_subscribees( tree, node_id, roles )?,
         hides_from_its_subscriptions : MSV::Unspecified,
         overrides_view_of            : MSV::Unspecified,
-      })) }}}
+      }))) }}}
 
 /// Treats the input tree as the source of truth; does not read dbs.
 /// Returns None if no SubscribeeCol found,

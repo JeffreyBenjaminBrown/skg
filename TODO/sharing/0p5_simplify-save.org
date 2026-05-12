@@ -473,6 +473,40 @@ matched zero tests in this harness, so the broader
 'cargo fmt --check' still could not be run in this environment
 because 'cargo fmt' / 'rustfmt' was not installed.
 
+** DONE Split NodeEditIntent into save/delete variants
+
+'NodeEditIntent' is now structurally typed:
+
+#+begin_src text
+NodeEditIntent
+  -> Save(NodeSaveIntent)
+  -> Delete(NodeDeleteIntent)
+#+end_src
+
+This removes the temporary 'delete: bool' representation and the
+save-only optional fields from delete intents. A save intent now has
+required save fields, while a delete intent carries only 'pid' and
+'source'.
+
+Behavior is unchanged. The intents are still converted immediately
+into the same 'DefineNode' values, and no fork edits are inferred
+yet.
+
+Verification run:
+
+#+begin_src text
+cargo check
+cargo test --test new classify -- --nocapture
+cargo test --test new viewnodes_to_instructions -- --nocapture
+#+end_src
+
+'cargo test --test new reconcile_same_id_instructions -- --nocapture'
+ran 19 tests: 16 passed, and 3 existing DB-backed tests failed with
+TypeDB connection refused.
+
+'cargo fmt --check' still could not be run in this environment
+because 'cargo fmt' / 'rustfmt' was not installed.
+
 ** Add fork-edit inference as a pure pass
 
 After the prerequisite save-intent shape is in place, add a pass that
@@ -604,6 +638,7 @@ the new feature:
 - DONE add role classification;
 - DONE route existing SaveNode extraction through it;
 - DONE add a behavior-preserving NodeEditIntent layer;
+- DONE split NodeEditIntent into save/delete variants;
 - split extraction into fuller intent-oriented passes;
 - preserve raw-buffer edits separately from graph edits beyond the
   current immediate NodeEditIntent-to-DefineNode conversion;
