@@ -2,27 +2,33 @@
 
 use std::error::Error;
 
-use skg::from_text::supplement_from_disk::
-  supplement_none_fields_from_disk_if_save;
+use skg::dbs::filesystem::one_node::optnodecomplete_from_id;
+use skg::from_text::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, MSV, SkgConfig};
-use skg::types::save::{DefineNode, SaveNode};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
+use skg::types::save::SourceMove;
 
 
-async fn supplement_none_fields_from_disk_if_save_THEN_extract_nodecomplete (
+async fn supplement_from_disk_then_extract_nodecomplete (
   config    : &SkgConfig,
   driver    : &typedb_driver::TypeDBDriver,
   user_node : NodeComplete
 ) -> Result<NodeComplete, Box<dyn Error>> {
-  let (result, _source_move) =
-    supplement_none_fields_from_disk_if_save (
-      config, driver,
-      DefineNode::Save(SaveNode (user_node)) ) . await ?;
-  match result {
-    DefineNode::Save(SaveNode (node)) => Ok (node),
-    DefineNode::Delete (_) =>
-      Err("Expected Save, got Delete" . into()) }}
+  let pid : ID = user_node . pid . clone();
+  let disk_node : NodeComplete =
+    optnodecomplete_from_id (config, driver, &pid) . await ?
+      . ok_or ("Expected node on disk") ?;
+  let canonicalized : NodeComplete =
+    canonicalize_ids_from_disk (user_node, &disk_node) ?;
+  let _source_move : Option<SourceMove> =
+    detect_source_move (
+      config,
+      &pid,
+      &canonicalized . source,
+      &disk_node . source) ?;
+  Ok (supplement_unspecified_fields_from_disk (
+    canonicalized, &disk_node)) }
 
 #[test]
 fn test_none_aliases_get_replaced_with_disk_aliases (
@@ -46,7 +52,7 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
       user_node . pid     = ID::new ("test_node");
       user_node . aliases = MSV::Unspecified; }
     let result : NodeComplete =
-      supplement_none_fields_from_disk_if_save_THEN_extract_nodecomplete (
+      supplement_from_disk_then_extract_nodecomplete (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . aliases,
@@ -59,7 +65,7 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
       user_node . pid     = ID::new ("test_node");
       user_node . aliases = MSV::Specified ( vec![] ); }
     let result : NodeComplete =
-      supplement_none_fields_from_disk_if_save_THEN_extract_nodecomplete (
+      supplement_from_disk_then_extract_nodecomplete (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . aliases,
@@ -71,7 +77,7 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
       user_node . pid     = ID::new ("test_node");
       user_node . aliases = MSV::Specified ( vec![ "new alias" . to_string () ] ); }
     let result : NodeComplete =
-      supplement_none_fields_from_disk_if_save_THEN_extract_nodecomplete (
+      supplement_from_disk_then_extract_nodecomplete (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . aliases,
@@ -102,7 +108,7 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
       user_node . pid     = ID::new ("test_node");
       user_node . subscribes_to = MSV::Unspecified; }
     let result : NodeComplete =
-      supplement_none_fields_from_disk_if_save_THEN_extract_nodecomplete (
+      supplement_from_disk_then_extract_nodecomplete (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . subscribes_to,
@@ -115,7 +121,7 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
       user_node . pid     = ID::new ("test_node");
       user_node . subscribes_to = MSV::Specified ( vec![] ); }
     let result : NodeComplete =
-      supplement_none_fields_from_disk_if_save_THEN_extract_nodecomplete (
+      supplement_from_disk_then_extract_nodecomplete (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . subscribes_to,
@@ -127,7 +133,7 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
       user_node . pid     = ID::new ("test_node");
       user_node . subscribes_to = MSV::Specified ( vec![ ID::new ("new_sub") ] ); }
     let result : NodeComplete =
-      supplement_none_fields_from_disk_if_save_THEN_extract_nodecomplete (
+      supplement_from_disk_then_extract_nodecomplete (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . subscribes_to,
@@ -158,7 +164,7 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
       user_node . pid     = ID::new ("test_node");
       user_node . hides_from_its_subscriptions = MSV::Unspecified; }
     let result : NodeComplete =
-      supplement_none_fields_from_disk_if_save_THEN_extract_nodecomplete (
+      supplement_from_disk_then_extract_nodecomplete (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . hides_from_its_subscriptions,
@@ -170,7 +176,7 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
       user_node . pid     = ID::new ("test_node");
       user_node . hides_from_its_subscriptions = MSV::Specified ( vec![] ); }
     let result : NodeComplete =
-      supplement_none_fields_from_disk_if_save_THEN_extract_nodecomplete (
+      supplement_from_disk_then_extract_nodecomplete (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . hides_from_its_subscriptions,
@@ -182,7 +188,7 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
       user_node . pid     = ID::new ("test_node");
       user_node . hides_from_its_subscriptions = MSV::Specified ( vec![ ID::new ("new_hide") ] ); }
     let result : NodeComplete =
-      supplement_none_fields_from_disk_if_save_THEN_extract_nodecomplete (
+      supplement_from_disk_then_extract_nodecomplete (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . hides_from_its_subscriptions,
@@ -213,7 +219,7 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
       user_node . pid     = ID::new ("test_node");
       user_node . overrides_view_of = MSV::Unspecified; }
     let result : NodeComplete =
-      supplement_none_fields_from_disk_if_save_THEN_extract_nodecomplete (
+      supplement_from_disk_then_extract_nodecomplete (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . overrides_view_of,
@@ -227,7 +233,7 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
       user_node . pid     = ID::new ("test_node");
       user_node . overrides_view_of = MSV::Specified ( vec![] ); }
     let result : NodeComplete =
-      supplement_none_fields_from_disk_if_save_THEN_extract_nodecomplete (
+      supplement_from_disk_then_extract_nodecomplete (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . overrides_view_of,
@@ -239,7 +245,7 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
       user_node . pid     = ID::new ("test_node");
       user_node . overrides_view_of = MSV::Specified ( vec![ ID::new ("new_override") ] ); }
     let result : NodeComplete =
-      supplement_none_fields_from_disk_if_save_THEN_extract_nodecomplete (
+      supplement_from_disk_then_extract_nodecomplete (
         &config, &driver, user_node ) . await ?;
     assert_eq! (
       result . overrides_view_of,

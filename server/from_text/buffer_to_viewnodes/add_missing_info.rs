@@ -20,7 +20,7 @@ use uuid::Uuid;
 /// .
 /// PITFALL:
 /// Does not add *all* missing info.
-/// 'supplement_none_fields_from_disk_if_save' does some of that, too,
+/// 'supplement_unspecified_fields_from_disk' does some of that, too,
 /// although it operates on DefineNodes, downstream.
 pub async fn add_missing_info_to_viewforest(
   viewforest  : &mut Tree<UncheckedViewNode>, // has BufferRoot at root

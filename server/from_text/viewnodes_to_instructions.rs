@@ -1,18 +1,20 @@
 pub mod to_naive_instructions;
 pub mod reconcile_same_id_instructions;
 
-use crate::types::views_state::nodecomplete_from_in_rust_graph;
-use crate::types::misc::SkgConfig;
+use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
+use crate::types::misc::{ID, SkgConfig};
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use crate::types::viewnode::ViewNode;
-
-use to_naive_instructions::naive_saveinstructions_from_tree;
+use crate::types::views_state::nodecomplete_from_in_rust_graph;
 use reconcile_same_id_instructions::reconcile_same_id_instructions;
+use super::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
 use super::validate::buffernode_differs_from_disknode;
-use super::supplement_from_disk::supplement_none_fields_from_disk_if_save;
+use to_naive_instructions::naive_saveinstructions_from_tree;
+
 use ego_tree::Tree;
-use typedb_driver::TypeDBDriver;
 use std::error::Error;
+use typedb_driver::TypeDBDriver;
 
 /// Converts a viewforest of ViewNodes to DefineNodes,
 /// reconciling duplicates via 'reconcile_same_id_instructions'
@@ -32,18 +34,38 @@ pub async fn viewforest_to_nonmerge_save_instructions (
   let changed_instructions : Vec<DefineNode> =
     filter_unchanged_save_instructions (
       instructions_without_dups );
-  let mut result : Vec<DefineNode> = // Mapping supplement_none_fields_from_disk_if_save over changed_instructions would be simpler, but async functions can't be mapped.
+  let mut result : Vec<DefineNode> =
     Vec::with_capacity ( changed_instructions . len() );
   let mut source_moves : Vec<SourceMove> = Vec::new();
   for instr in changed_instructions {
-    let (supplemented, maybe_move)
-      : (DefineNode, Option<SourceMove>)
-      = supplement_none_fields_from_disk_if_save (
-          config, driver, instr
-        ) . await ?;
-    result . push (supplemented);
-    if let Some (sm) = maybe_move {
-      source_moves . push (sm); }}
+    let instr : DefineNode = instr;
+    match instr {
+      DefineNode::Delete (_) =>
+        result . push (instr),
+      DefineNode::Save (SaveNode (from_buffer)) => {
+        let from_buffer : NodeComplete = from_buffer;
+        let pid : ID =
+          from_buffer . pid . clone();
+        let from_disk : Option<NodeComplete> =
+          optnodecomplete_from_id (config, driver, &pid) . await ?;
+        match from_disk {
+          None => result . push (
+            DefineNode::Save (SaveNode (from_buffer))),
+          Some (disk_node) => {
+            let disk_node : NodeComplete = disk_node;
+            let canonicalized : NodeComplete =
+              canonicalize_ids_from_disk (from_buffer, &disk_node) ?;
+            let maybe_move : Option<SourceMove> =
+              detect_source_move ( config,  &pid,
+                                   &canonicalized . source,
+                                   &disk_node . source) ?;
+            let supplemented : NodeComplete =
+              supplement_unspecified_fields_from_disk (
+                canonicalized, &disk_node);
+            result . push (DefineNode::Save (SaveNode (supplemented)));
+            if let Some (sm) = maybe_move {
+              let sm : SourceMove = sm;
+              source_moves . push (sm); }}} }}}
   Ok ((result, source_moves)) }
 
 /// Filters out Save instructions that would be no-ops,

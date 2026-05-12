@@ -28,7 +28,7 @@ pub enum FileProperty {
 pub struct NodeComplete {
   // There is a 1-to-1 correspondence between NodeCompletes and actual .skg files. A file can be read into a NodeFS, then given a source to produce a NodeComplete; a NodeComplete can be converted to NodeFS and written back. The files are the only permanent data. NodeComplete is the format used to initialize the TypeDB and Tantivy databases (via narrowing conversions to NodeTypedb / NodeTantivy at their boundaries).
   // Tantivy receives some of this data, and TypeDB some other subset. Tantivy associates IDs with titles. TypeDB represents all the connections between nodes (see 'schema.tql' for how). At least one field, `body`, is known to neither database; it is instead read directly from the files on disk when Rust builds a document for Emacs.
-  // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/misc.rs) distinguishes 'Unspecified' ("user didn't mention this field") from 'Specified(vec![...])' ("user wants it to be this value, even if empty"). This matters when reconciling multiple NodeCompletes (e.g. 'reconcile_same_id_instructions' and supplement_none_fields_from_disk_if_save'). On disk the distinction is not needed: both 'Unspecified' and Specified(vec![])' are rendered as a missing field.
+  // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/misc.rs) distinguishes 'Unspecified' ("user didn't mention this field") from 'Specified(vec![...])' ("user wants it to be this value, even if empty"). This matters when reconciling multiple NodeCompletes (e.g. 'reconcile_same_id_instructions' and supplement_unspecified_fields_from_disk). On disk the distinction is not needed: both 'Unspecified' and Specified(vec![])' are rendered as a missing field.
 
   pub title: String,
 
