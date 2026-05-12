@@ -11,7 +11,10 @@ use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+use skg::test_utils::{
+  TestDbGuard,
+  cleanup_test_tantivy_and_typedb_dbs,
+  update_from_and_rerender_buffer_test as update_from_and_rerender_buffer };
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID, TantivyIndex};
 use skg::types::nodes::typedb::NodeTypedb;
@@ -72,11 +75,8 @@ async fn cleanup_test(
   driver: &Arc<TypeDBDriver>,
   tantivy_folder: &std::path::Path,
 ) -> Result<(), Box<dyn Error>> {
-  if driver . databases() . contains (db_name) . await? {
-    driver . databases() . get (db_name) . await?. delete() . await?; }
-  if tantivy_folder . exists() {
-    std::fs::remove_dir_all (tantivy_folder)?; }
-  Ok (( )) }
+  cleanup_test_tantivy_and_typedb_dbs (
+    db_name, driver, Some (tantivy_folder) ) . await }
 
 /// Add (viewRequests definitiveView) to all subscribee nodes in org text.
 /// Modifies the node section of each subscribee to request a definitive view.
@@ -213,6 +213,8 @@ fn test_deleting_foreign_subscribee_content_infers_hide(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
     let db_name = "skg-test-delete-subscribee-content-infers-hide";
+    let mut guard : TestDbGuard =
+      TestDbGuard::new (db_name, None);
     let (config, driver, mut tantivy, temp_fixture_dir) =
       setup_temp_test (
         db_name,
@@ -245,6 +247,7 @@ fn test_deleting_foreign_subscribee_content_infers_hide(
     assert_hides_e1_in_subscribee_col (&rerendered);
     cleanup_test (
       db_name, &driver, &config . tantivy_folder ) . await?;
+    guard . disarm ();
     if temp_fixture_dir . exists() {
       fs::remove_dir_all (temp_fixture_dir)?; }
     Ok (( )) }) }
@@ -254,6 +257,8 @@ fn test_moving_foreign_subscribee_content_to_subscriber_does_not_hide(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
     let db_name = "skg-test-move-subscribee-content-to-subscriber";
+    let mut guard : TestDbGuard =
+      TestDbGuard::new (db_name, None);
     let (config, driver, mut tantivy, temp_fixture_dir) =
       setup_temp_test (
         db_name,
@@ -291,6 +296,7 @@ fn test_moving_foreign_subscribee_content_to_subscriber_does_not_hide(
       rerendered );
     cleanup_test (
       db_name, &driver, &config . tantivy_folder ) . await?;
+    guard . disarm ();
     if temp_fixture_dir . exists() {
       fs::remove_dir_all (temp_fixture_dir)?; }
     Ok (( )) }) }
@@ -300,6 +306,8 @@ fn test_moving_foreign_subscribee_content_elsewhere_still_hides(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
     let db_name = "skg-test-move-subscribee-content-elsewhere";
+    let mut guard : TestDbGuard =
+      TestDbGuard::new (db_name, None);
     let (config, driver, mut tantivy, temp_fixture_dir) =
       setup_temp_test (
         db_name,
@@ -337,6 +345,7 @@ fn test_moving_foreign_subscribee_content_elsewhere_still_hides(
       rerendered );
     cleanup_test (
       db_name, &driver, &config . tantivy_folder ) . await?;
+    guard . disarm ();
     if temp_fixture_dir . exists() {
       fs::remove_dir_all (temp_fixture_dir)?; }
     Ok (( )) }) }
@@ -359,6 +368,8 @@ fn test_every_kind_of_col(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
     let db_name = "skg-test-hidden-every-kind-of-col";
+    let mut guard : TestDbGuard =
+      TestDbGuard::new (db_name, None);
     let (config, driver, mut tantivy) = setup_test(
       db_name,
       "tests/hidden_from_subscriptions/fixtures-every-kind-of-col/skgconfig.toml"
@@ -426,6 +437,7 @@ fn test_every_kind_of_col(
       &driver,
       &config . tantivy_folder,
     ) . await?;
+    guard . disarm ();
     Ok (( )) } ) }
 
 /// Hidden within but none hidden without:
@@ -443,6 +455,8 @@ fn test_hidden_within_but_none_without(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
     let db_name = "skg-test-hidden-within-but-none-without";
+    let mut guard : TestDbGuard =
+      TestDbGuard::new (db_name, None);
     let (config, driver, mut tantivy) = setup_test(
       db_name, "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml" ) . await?;
     let (initial_view, _pids, _)
@@ -500,6 +514,7 @@ fn test_hidden_within_but_none_without(
       &driver,
       &config . tantivy_folder,
     ) . await?;
+    guard . disarm ();
     Ok (( )) } ) }
 
 /// Hidden without but none hidden within:
@@ -519,6 +534,8 @@ fn test_hidden_without_but_none_within(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
     let db_name = "skg-test-hidden-without-but-none-within";
+    let mut guard : TestDbGuard =
+      TestDbGuard::new (db_name, None);
     let (config, driver, mut tantivy) =
       setup_test(db_name,
                  "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within/skgconfig.toml") . await?;
@@ -577,6 +594,7 @@ fn test_hidden_without_but_none_within(
       &driver,
       &config . tantivy_folder,
     ) . await?;
+    guard . disarm ();
     Ok (( )) } ) }
 
 /// Overlapping hidden within:
@@ -594,6 +612,8 @@ fn test_overlapping_hidden_within(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
     let db_name = "skg-test-overlapping-hidden-within";
+    let mut guard : TestDbGuard =
+      TestDbGuard::new (db_name, None);
     let (config, driver, mut tantivy) =
       setup_test(db_name,
                  "tests/hidden_from_subscriptions/fixtures-overlapping-hidden-within/skgconfig.toml") . await?;
@@ -648,4 +668,5 @@ fn test_overlapping_hidden_within(
       &driver,
       &config . tantivy_folder,
     ) . await?;
+    guard . disarm ();
     Ok (( )) } ) }
