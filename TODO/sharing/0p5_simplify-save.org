@@ -710,6 +710,10 @@ installed in this toolchain.
 
 ** Add subscribee visibility inference as a pure pass
 
+Update: the raw-intent extraction precursor is done. See the next
+DONE section. What remains here is the actual comparison against disk
+and subscriber hides to infer hide/unhide deltas.
+
 After the prerequisite save-intent shape is in place, add a pass that
 interprets direct child-list edits under AsSubscribee positions as
 subscriber visibility edits, not SaveNodes for the subscribee.
@@ -745,6 +749,66 @@ the subscriber's current 'hides_from_its_subscriptions':
 This pass should be unit-tested before it is wired into saving. This
 is the first feature-specific stage; it should not start until the
 preceding simplification stages are complete.
+
+** DONE Extract raw as-subscribee visibility intents
+
+Added a behavior-preserving raw extraction pass:
+
+#+begin_src text
+server/from_text/viewnodes_to_instructions/subscribee_visibility_intents.rs
+#+end_src
+
+The pass records the direct child-list signal under each direct
+'AsSubscribee' position before graph-save construction erases it:
+
+#+begin_src rust
+pub struct SubscribeeVisibilityIntent {
+  pub subscriber: ID,
+  pub subscribee: ID,
+  pub visible_content: Vec<ID>,
+}
+#+end_src
+
+The extractor is pure and does not read disk:
+
+#+begin_src rust
+pub fn subscribee_visibility_intents_from_tree(
+  viewforest: &Tree<ViewNode>,
+  roles: &SaveRoleMap,
+) -> Result<Vec<SubscribeeVisibilityIntent>, String>
+#+end_src
+
+Current behavior is unchanged:
+
+- no hide inference;
+- no unhide inference;
+- no invalid insertion policy;
+- no folding into subscriber 'hides_from_its_subscriptions';
+- no change to 'DefineNode' output;
+- the current restore-from-disk guardrail for direct as-subscribee
+  'contains' remains in place.
+
+The raw intent includes only direct visible content children:
+
+- child TrueNodes with role 'OrdinaryTrueNode';
+- excluding non-content births, phantoms, and delete-request children;
+- ignoring scaffolds, hidden scaffold contents, deleted/unknown nodes,
+  and recursive descendants.
+
+Tests cover direct visible children, multiple subscribees in tree
+order, recursive descendants, independent/delete/phantom exclusions,
+and HiddenIn/HiddenOutside scaffold contents.
+
+Verification run:
+
+#+begin_src text
+cargo check
+cargo test --test new classify -- --nocapture
+cargo test --test new viewnodes_to_instructions -- --nocapture
+cargo test --test new reconcile_same_id_instructions -- --nocapture
+#+end_src
+
+All four commands passed in this environment.
 
 ** Fold subscribee visibility edits into owned subscriber intents
 
@@ -873,6 +937,8 @@ the new feature:
 - DONE split save-field collection into explicit passes;
 - DONE neutralize direct as-subscribee child-list edits so they do
   not become graph 'contains' edits for the subscribee;
+- DONE extract raw direct as-subscribee visibility intents without
+  interpreting them yet;
 - preserve raw-buffer edits separately from graph edits beyond the
   current immediate NodeEditIntent-to-DefineNode conversion;
 - move unchanged filtering later, or make it intent-aware;

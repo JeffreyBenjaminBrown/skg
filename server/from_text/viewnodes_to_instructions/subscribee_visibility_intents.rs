@@ -1,0 +1,67 @@
+use crate::from_text::viewnodes_to_instructions::classify::{
+  SaveRole, SaveRoleMap };
+use crate::types::misc::ID;
+use crate::types::viewnode::{EditRequest, ViewNode, ViewNodeKind};
+
+use ego_tree::{NodeRef, Tree};
+
+/// Raw user-authored child-list signal from a direct subscribee branch.
+///
+/// This is not a graph `contains` edit. Later save stages can compare
+/// it with disk `subscribee.contains` and subscriber hides to infer
+/// hide/unhide edits on the subscriber.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SubscribeeVisibilityIntent {
+  pub subscriber      : ID,
+  pub subscribee      : ID,
+  pub visible_content : Vec<ID>,
+}
+
+pub fn subscribee_visibility_intents_from_tree (
+  viewforest : &Tree<ViewNode>,
+  roles      : &SaveRoleMap,
+) -> Result<Vec<SubscribeeVisibilityIntent>, String> {
+  let mut result : Vec<SubscribeeVisibilityIntent> =
+    Vec::new();
+  for node_ref in viewforest . nodes() {
+    let subscriber : ID =
+      match roles . get (&node_ref . id()) {
+        Some (SaveRole::AsSubscribee { subscriber }) =>
+          subscriber . clone(),
+        _ => continue,
+      };
+    let subscribee : ID =
+      match &node_ref . value() . kind {
+        ViewNodeKind::True (t) => t . id . clone(),
+        _ => return Err (
+          "AsSubscribee role assigned to non-TrueNode" . to_string()),
+      };
+    result . push (SubscribeeVisibilityIntent {
+      subscriber,
+      subscribee,
+      visible_content :
+        collect_direct_visible_content (&node_ref, roles),
+    }); }
+  Ok (result) }
+
+fn collect_direct_visible_content (
+  node_ref : &NodeRef<ViewNode>,
+  roles    : &SaveRoleMap,
+) -> Vec<ID> {
+  let mut result : Vec<ID> = Vec::new();
+  for child_ref in node_ref . children() {
+    let child : &ViewNode = child_ref . value();
+    match &child . kind {
+      ViewNodeKind::True (t) => {
+        if matches!(
+             roles . get (&child_ref . id()),
+             Some (SaveRole::OrdinaryTrueNode))
+           && ! t . parent_ignores_it()
+           && ! t . is_phantom()
+           && ! matches!(
+             t . edit_request(),
+             Some (&EditRequest::Delete))
+        { result . push (t . id . clone()); }},
+      _ => continue,
+    }}
+  result }

@@ -1,6 +1,7 @@
 pub mod to_naive_instructions;
 pub mod reconcile_same_id_instructions;
 pub mod classify;
+pub mod subscribee_visibility_intents;
 
 use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
 use crate::types::misc::{ID, SkgConfig};

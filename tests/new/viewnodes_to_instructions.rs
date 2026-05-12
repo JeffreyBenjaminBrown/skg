@@ -8,16 +8,20 @@ use ego_tree::Tree;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_viewforest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::validate::validate_and_filter_foreign_instructions;
+use skg::from_text::viewnodes_to_instructions::classify::classify_save_roles;
+use skg::from_text::viewnodes_to_instructions::subscribee_visibility_intents::{
+  subscribee_visibility_intents_from_tree, SubscribeeVisibilityIntent };
 use skg::from_text::viewnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_tree;
 use skg::from_text::viewnodes_to_instructions::viewforest_to_nonmerge_save_instructions;
 use skg::test_utils::extract_nodecomplete_if_save_else_error;
 use skg::test_utils::run_with_test_db_from_config;
 use skg::types::errors::BufferValidationError;
+use skg::types::git::Sign;
 use skg::types::misc::{ID, MSV};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
-use skg::types::viewnode::{ViewNode, viewforest_root_viewnode};
+use skg::types::viewnode::{ViewNode, ViewNodeKind, viewforest_root_viewnode};
 use std::error::Error;
 
 const SUBSCRIBEE_EDIT_CONFIG: &str =
@@ -40,6 +44,43 @@ fn saved_node_by_id<'a> (
       if node . pid == ID::from (id) {
         return node; }}}
   panic! ("SaveNode not found: {}", id) }
+
+fn checked_viewforest_from_org (
+  input : &str,
+) -> Tree<ViewNode> {
+  let unchecked_viewforest : Tree<UncheckedViewNode> =
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  unchecked_to_checked_tree (unchecked_viewforest) . unwrap() }
+
+fn visibility_intents_from_org (
+  input : &str,
+) -> Vec<SubscribeeVisibilityIntent> {
+  let viewforest : Tree<ViewNode> =
+    checked_viewforest_from_org (input);
+  let roles =
+    classify_save_roles (&viewforest) . unwrap();
+  subscribee_visibility_intents_from_tree (
+    &viewforest, &roles) . unwrap() }
+
+fn set_membership_unstaged_minus (
+  tree : &mut Tree<ViewNode>,
+  id   : &str,
+) {
+  let mut target_id = None;
+  for node_ref in tree . nodes() {
+    let is_target : bool =
+      match &node_ref . value() . kind {
+        ViewNodeKind::True (t) => t . id == ID::from (id),
+        _ => false,
+      };
+    if is_target {
+      target_id = Some (node_ref . id());
+      break; }}
+  let target_id = target_id . unwrap_or_else (||
+    panic! ("node not found: {}", id));
+  if let ViewNodeKind::True (t) =
+    &mut tree . get_mut (target_id) . unwrap() . value() . kind
+  { t . membership . unstaged = Some (Sign::Minus); }}
 
 async fn save_instructions_from_org_with_disk (
   org_text : &str,
@@ -328,6 +369,126 @@ fn role_aware_extraction_collects_subscribees_without_hidden_branches (
   assert_eq!(
     saved_node_by_id (&instructions, "subscribee") . contains,
     vec![ID::from ("subscribee-content")]); }
+
+#[test]
+fn subscribee_visibility_intent_collects_direct_visible_content (
+) {
+  let input : &str =
+    indoc! {"
+            * (skg (node (id subscriber) (source main))) subscriber
+            ** (skg subscribeeCol) subscribees
+            *** (skg (node (id subscribee) (source main))) subscribee
+            **** (skg (node (id a) (source main))) a
+            **** (skg (node (id b) (source main))) b
+            "};
+
+  assert_eq!(
+    visibility_intents_from_org (input),
+    vec![SubscribeeVisibilityIntent {
+      subscriber      : ID::from ("subscriber"),
+      subscribee      : ID::from ("subscribee"),
+      visible_content : vec![ID::from ("a"), ID::from ("b")],
+    }]); }
+
+#[test]
+fn subscribee_visibility_intents_preserve_subscribee_tree_order (
+) {
+  let input : &str =
+    indoc! {"
+            * (skg (node (id subscriber) (source main))) subscriber
+            ** (skg subscribeeCol) subscribees
+            *** (skg (node (id first) (source main))) first
+            **** (skg (node (id first-child) (source main))) first child
+            *** (skg (node (id second) (source main))) second
+            **** (skg (node (id second-child) (source main))) second child
+            "};
+
+  assert_eq!(
+    visibility_intents_from_org (input),
+    vec![
+      SubscribeeVisibilityIntent {
+        subscriber      : ID::from ("subscriber"),
+        subscribee      : ID::from ("first"),
+        visible_content : vec![ID::from ("first-child")],
+      },
+      SubscribeeVisibilityIntent {
+        subscriber      : ID::from ("subscriber"),
+        subscribee      : ID::from ("second"),
+        visible_content : vec![ID::from ("second-child")],
+      }]); }
+
+#[test]
+fn subscribee_visibility_intent_uses_only_direct_children (
+) {
+  let input : &str =
+    indoc! {"
+            * (skg (node (id subscriber) (source main))) subscriber
+            ** (skg subscribeeCol) subscribees
+            *** (skg (node (id subscribee) (source main))) subscribee
+            **** (skg (node (id child) (source main))) child
+            ***** (skg (node (id grandchild) (source main))) grandchild
+            "};
+
+  assert_eq!(
+    visibility_intents_from_org (input),
+    vec![SubscribeeVisibilityIntent {
+      subscriber      : ID::from ("subscriber"),
+      subscribee      : ID::from ("subscribee"),
+      visible_content : vec![ID::from ("child")],
+    }]); }
+
+#[test]
+fn subscribee_visibility_intent_excludes_non_content_delete_and_phantom_children (
+) {
+  let input : &str =
+    indoc! {"
+            * (skg (node (id subscriber) (source main))) subscriber
+            ** (skg subscribeeCol) subscribees
+            *** (skg (node (id subscribee) (source main))) subscribee
+            **** (skg (node (id keep) (source main))) keep
+            **** (skg (node (id independent) (source main) (birth independent))) independent
+            **** (skg (node (id delete-me) (source main) (editRequest delete))) delete me
+            **** (skg (node (id phantom) (source main))) phantom
+            "};
+  let mut viewforest : Tree<ViewNode> =
+    checked_viewforest_from_org (input);
+  set_membership_unstaged_minus (&mut viewforest, "phantom");
+  let roles =
+    classify_save_roles (&viewforest) . unwrap();
+  let intents : Vec<SubscribeeVisibilityIntent> =
+    subscribee_visibility_intents_from_tree (
+      &viewforest, &roles) . unwrap();
+
+  assert_eq!(
+    intents,
+    vec![SubscribeeVisibilityIntent {
+      subscriber      : ID::from ("subscriber"),
+      subscribee      : ID::from ("subscribee"),
+      visible_content : vec![ID::from ("keep")],
+    }]); }
+
+#[test]
+fn subscribee_visibility_intent_ignores_hidden_scaffold_contents (
+) {
+  let input : &str =
+    indoc! {"
+            * (skg (node (id subscriber) (source main))) subscriber
+            ** (skg subscribeeCol) subscribees
+            *** (skg (node (id subscribee) (source main))) subscribee
+            **** (skg hiddenInSubscribeeCol) hidden in
+            ***** (skg (node (id hidden-in) (source main))) hidden in child
+            **** (skg (node (id visible) (source main))) visible
+            *** (skg hiddenOutsideOfSubscribeeCol) hidden outside
+            **** (skg (node (id hidden-outside) (source main))) hidden outside child
+            "};
+
+  assert_eq!(
+    visibility_intents_from_org (input),
+    vec![SubscribeeVisibilityIntent {
+      subscriber      : ID::from ("subscriber"),
+      subscribee      : ID::from ("subscribee"),
+      visible_content : vec![ID::from ("visible")],
+    }]); }
 
 #[test]
 fn intent_layer_preserves_mixed_naive_instruction_shape (
