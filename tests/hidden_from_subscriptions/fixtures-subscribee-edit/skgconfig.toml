@@ -1,0 +1,14 @@
+db_name = "placeholder"
+tantivy_folder = "/tmp/placeholder"
+port = 1730
+beep_when_server_becomes_available = false
+
+[[sources]]
+name = "owned"
+path = "owned"
+user_owns_it = true
+
+[[sources]]
+name = "foreign"
+path = "foreign"
+user_owns_it = false

@@ -1,4 +1,18 @@
 * Problems found during herald overhaul research
+** Save rerender may not insert missing HiddenInSubscribeeCol
+   While experimenting with the "delete as-a-subscribee content
+   implies hide" feature, I saw a case where the subscriber's
+   'hides_from_its_subscriptions' list had gained the hidden child,
+   but the returned saved view still did not show a
+   HiddenInSubscribeeCol under the subscribee.
+
+   The likely reason is that the save rerender path completes an
+   existing HiddenInSubscribeeCol in postorder, but a buffer that
+   initially had no hidden children also has no scaffold to complete.
+   The eventual feature implementation probably needs to ensure that
+   a HiddenInSubscribeeCol is inserted when the updated hide list
+   intersects a subscribee's direct content.
+
 ** 'mk_indefinitive_from_viewnode' silently drops fields
    server/types/viewnode.rs line 538.
    It rebuilds a fresh viewnode via 'mk_indefinitive_viewnode',

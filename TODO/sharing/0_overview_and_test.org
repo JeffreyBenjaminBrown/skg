@@ -1,0 +1,178 @@
+This is Jeff writing about my understanding of
+the current state of the code
+and the two plans 1_*.org and 2_*.org in this document.
+
+Currently, when the user saves a buffer,
+it seems like subscribee content is largely regenerated?
+I'm not sure about that. But if it's true,
+it might be problematic, because we are about to introduce
+the capacity to (better? for the first time?)
+edit the subscribee content.
+Of course subscribees are usually not owned data,
+so we don't really edit those nodes.
+Instead, what *feels* to the user like editing that content
+actually edits the way the user's own data connects to it.
+
+A lot of the save-buffer execution path is dedicated to 'completion'.
+This is messy, perhaps because I optimized prematurely:
+I did not want to traverse the view (buffer) tree more than necessary,
+so the completion routine does a lot of things at each node.
+That code might deserve to be broken up into separate passes.
+
+I think the first thing we'll need,
+before we code anything in server/,
+is a failing test in tests/integration that pins down the behavior.
+Here's a sketch of that:
+
+* a test spec
+
+** initial graph
+(Bear in mind I might have some branch orders wrong --
+I don't remember whether the hiddeninsubscribeecol
+presents before or after the ordinary content of a subscribee, etc.)
+
+All of the following integration tests start from this graph.
+(I have depicted this graph as a skg buffer,
+but we don't actually need this skg buffer;
+we just need a graph from which it could be projected.)
+```
+  * r // the subscriber
+  ** (subscribeeCol) // I'll only mention the interesting bits of metadata in this sketch, omitting most of it
+  *** e // a subscribee. None of the e* nodes are owned; the rest are.
+  **** e1
+  ***** e11
+  **** e2
+  ***** e12
+  ** r1
+  ** r2
+  * a
+```
+** test: delete e1 from e => hide e1 in r
+If the user saves this:
+```
+  * r
+  ** (subscribeeCol)
+  *** e
+  **** e2
+  ***** e12
+  ** r1
+  ** r2
+  * a
+```
+
+then the graph should be updated accordingly,
+and the server should return this:
+```
+  * r
+  ** (subscribeeCol)
+  *** e
+  **** (hiddeninsubscribeecol)
+  ***** (indef) e1
+  **** e2
+  ***** e12
+  ** r1
+  ** r2
+  * a
+```
+
+We don't actually need to test the graph content itself,
+because if this is the buffer the server returns,
+we know that e1 has been hidden in r.
+
+Roughly the same effect should obtain
+if e2 has not been content-unfolded yet:
+If the user saves this:
+```
+  * r
+  ** (subscribeeCol)
+  *** e
+  **** (indef) e2
+  ** r1
+  ** r2
+  * a
+```
+
+should return
+```
+  * r
+  ** (subscribeeCol)
+  *** e
+  **** (hiddeninsubscribeecol)
+  ***** (indef) e1
+  **** (indef) e2
+  ** r1
+  ** r2
+  * a
+```
+** test: delete e1 from e but make it content of r => no new hide
+If the user saves this:
+```
+  * r
+  ** (subscribeeCol)
+  *** e
+  **** e2
+  ***** e12
+  ** e1 (indef)
+  ** r1
+  ** r2
+  * a
+```
+
+then the graph should be updated accordingly,
+and the server should return this:
+```
+  * r
+  ** (subscribeeCol)
+  *** e
+  **** e2
+  ***** e12
+  ** e1 (indef)
+  ** r1
+  ** r2
+  * a
+```
+
+Again, we don't actually need to test the graph content itself,
+beyond the content of that buffer.
+Even though r does not hide e1,
+we do not see e1 in e's content,
+because all content of a subscriber is filtered
+from the view of its subscribees.
+** test: delete e1 from e but make it content of a => hide e1 in r
+If the user saves this:
+```
+  * r
+  ** (subscribeeCol)
+  *** e
+  **** e2
+  ***** e12
+  ** r1
+  ** r2
+  * a
+  ** e1
+```
+
+then the graph should be updated accordingly,
+and the server should return this:
+```
+  * r
+  ** (subscribeeCol)
+  *** e
+  **** (hiddeninsubscribeecol)
+  ***** (indef) e1
+  **** e2
+  ***** e12
+  ** r1
+  ** r2
+  * a
+  ** e1
+```
+
+Again, no need to test the graph changes;
+the buffer from the server should be a complete indicator.
+
+* request
+
+Please read this document and its two siblings (1_*.org and 2_*.org).
+Determine if the test I have described is consistent with them.
+If it is, implement it; if not, please push back.
