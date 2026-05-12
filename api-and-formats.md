@@ -130,7 +130,7 @@ Any such string is valid metadata
 (although much of it might be ignored by Emacs),
 if and only if it adheres to the following:
 
-## parentheses
+- parentheses
   - The metadata starts with "(skg" and ends with ")".
   - Key-value pairs are wrapped in their own parens: "(key value)".
 - whitespace

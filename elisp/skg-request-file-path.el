@@ -131,6 +131,8 @@ Returns nil (after a user message) on error or missing path."
      ((not path) (message "No path received") nil)
      ((string-prefix-p "Error" path) (message "%s" path) nil)
      (t
+      (unless (require 'magit nil t)
+        (user-error "Magit is not installed or loadable"))
       (let* (( resolved-path    (expand-file-name path skg-config-dir) )
              ( default-directory ;; PITFALL: magit reads this implicitly to find the git repo via magit-toplevel. The .skg source dir is its own repo, separate from the outer project repo.
                (file-name-directory resolved-path) )
