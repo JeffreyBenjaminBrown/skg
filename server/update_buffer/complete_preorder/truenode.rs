@@ -103,7 +103,8 @@ pub fn complete_truenode_preorder (
     reconcile_content_children (
       tree, node, &nodecomplete, &pid, &source,
       source_diffs, config, graph_snap,
-      deleted_since_head_pid_src_map ) ?;
+      deleted_since_head_pid_src_map,
+      is_saved_view ) ?;
   order_children_as_scaffolds_then_ignored_then_content(
     tree, node ) ?;
   maybe_prepend_subscribee_col(
@@ -200,6 +201,7 @@ fn reconcile_content_children (
   config                         : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  is_saved_view                  : bool,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
   // Resolve each id through the in-Rust-graph extra_id map so that an
   // id appearing in a node's 'contains' after merging into another
@@ -221,6 +223,9 @@ fn reconcile_content_children (
     per_stage_node_changes_for_truenode (
       source_diffs, pid, source );
   let is_sub : bool = is_subscribee (tree, node) ?;
+  if should_preserve_saved_as_subscribee_branch (
+      is_saved_view, source_diffs, is_sub )
+    { return Ok (subscribes_to); }
   let (goal_list, removed_ids, apparent_content_ids) =
     // git diff view makes a difference
     content_goal_list(
@@ -233,6 +238,24 @@ fn reconcile_content_children (
   mark_erroneous_content_children_as_indep(
     tree, node, &apparent_content_ids ) ?;
   Ok (subscribes_to) }
+
+/// A definitive TrueNode child of a SubscribeeCol is an
+/// editable visibility surface in the saved buffer. Its direct
+/// children are user-authored signal for later hide/unhide
+/// inference, so saved-view completion must not regenerate that
+/// child list from disk before the branch can be interpreted.
+///
+/// This is intentionally saved-view-only. Collateral views should
+/// still refresh from the graph, and diff view should still compute
+/// phantom/removed children from the source diff.
+fn should_preserve_saved_as_subscribee_branch (
+  is_saved_view : bool,
+  source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
+  is_subscribee : bool,
+) -> bool {
+  is_saved_view
+    && source_diffs . is_none() // TODO: This should not be necessary.
+    && is_subscribee }
 
 fn mutate_truenode_to_deletednode (
   tree   : &mut Tree<ViewNode>,

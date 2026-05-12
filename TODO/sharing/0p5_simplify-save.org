@@ -1004,7 +1004,7 @@ the new feature:
 - move unchanged filtering later, or make it intent-aware;
 - DONE simplify sharing completion by replacing traversal-minimizing
   control flow with small explicit read/compute/mutate passes;
-- define and test SubscribeeCol completion preservation.
+- DONE define and test SubscribeeCol completion preservation.
 
 Only then implement the feature as:
 
@@ -1015,7 +1015,6 @@ Only then implement the feature as:
 - fork foreign content-relationship edits based on ownership,
   independent of whether the foreign node is below a subscribee
   branch;
-- define and test SubscribeeCol completion preservation;
 - fix HiddenInSubscribeeCol insertion in rerender if the failing test
   proves it is needed.
 
@@ -1067,3 +1066,49 @@ Results:
   here: 'test_deleting_foreign_subscribee_content_infers_hide' and
   'test_moving_foreign_subscribee_content_elsewhere_still_hides'
   expected 'e1' under HiddenInSubscribeeCol after save.
+
+* Update 2026-05-12: SubscribeeCol preservation done
+
+Saved-view completion now preserves direct visible children of a
+definitive TrueNode directly under SubscribeeCol instead of
+regenerating that child list from disk. This keeps user-authored
+as-subscribee branch edits in the returned saved view, so the later
+hide/unhide inference work has a stable surface to interpret.
+
+The rule is intentionally narrow:
+
+- only saved-view rerender;
+- only direct subscribees under SubscribeeCol;
+- only normal non-diff mode;
+- collateral views and diff views still reconcile from graph/diff
+  data.
+
+Added regression:
+
+#+begin_src text
+cargo test --test hidden_from_subscriptions test_deleting_foreign_subscribee_content_preserves_branch_edit -- --nocapture
+#+end_src
+
+Verification run:
+
+#+begin_src text
+cargo check
+cargo test --test hidden_from_subscriptions test_deleting_foreign_subscribee_content_preserves_branch_edit -- --nocapture
+cargo test --test subscribee_col -- --nocapture
+cargo test --test new viewnodes_to_instructions -- --nocapture
+cargo test --test hidden_from_subscriptions -- --nocapture
+#+end_src
+
+Results:
+
+- 'cargo check' passed.
+- The new preservation regression passed.
+- 'cargo test --test subscribee_col -- --nocapture' passed: 1
+  passed.
+- 'cargo test --test new viewnodes_to_instructions -- --nocapture'
+  passed: 24 passed, 53 filtered out.
+- Full 'cargo test --test hidden_from_subscriptions -- --nocapture'
+  now has the preservation regression passing and no TypeDB cleanup
+  failure. It still fails on the two future hide-inference assertions:
+  'test_deleting_foreign_subscribee_content_infers_hide' and
+  'test_moving_foreign_subscribee_content_elsewhere_still_hides'.

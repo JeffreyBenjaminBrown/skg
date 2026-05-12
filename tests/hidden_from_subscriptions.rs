@@ -208,6 +208,62 @@ fn assert_does_not_hide_e1 (
     "Expected no HiddenInSubscribeeCol for e1:\n{}",
     buffer ); }
 
+fn assert_e1_removed_from_visible_subscribee_branch (
+  buffer : &str,
+) {
+  assert! (
+    ! buffer . contains ("**** (skg (node (id e1)"),
+    "Expected e1 not to be regenerated as direct subscribee content:\n{}",
+    buffer );
+  assert! (
+    buffer . contains ("**** (skg (node (id e2)"),
+    "Expected unrelated direct subscribee content e2 to remain visible:\n{}",
+    buffer ); }
+
+#[test]
+fn test_deleting_foreign_subscribee_content_preserves_branch_edit(
+) -> Result<(), Box<dyn Error>> {
+  block_on(async {
+    let db_name = "skg-test-delete-subscribee-content-preserves-branch";
+    let mut guard : TestDbGuard =
+      TestDbGuard::new (db_name, None);
+    let (config, driver, mut tantivy, temp_fixture_dir) =
+      setup_temp_test (
+        db_name,
+        "tests/hidden_from_subscriptions/fixtures-subscribee-edit"
+      ) . await?;
+    let graph : InRustGraphHandle =
+      new_handle (InRustGraph::new ());
+    let mut views_state : ViewsState = ViewsState {
+      diff_mode_enabled : false,
+      open_views        : OpenViews::new (),};
+
+    let (initial_view, _pids, _)
+      : (String, Vec<ID>, _)
+      = single_root_view(
+          &driver, &config, None,
+          &ID ("r" . to_string()),
+          false ) . await?;
+    let expanded : String =
+      save_buffer_for_hidden_subscriptions_test (
+        &add_definitive_view_request_to_subscribees (&initial_view),
+        &driver, &config, &mut tantivy, &graph, &mut views_state
+      ) . await?;
+    let edited : String =
+      expanded_subscribee_edit_view (&expanded, "delete");
+    let rerendered : String =
+      save_buffer_for_hidden_subscriptions_test (
+        &edited, &driver, &config, &mut tantivy, &graph, &mut views_state
+      ) . await?;
+
+    assert_e1_removed_from_visible_subscribee_branch (&rerendered);
+    cleanup_test (
+      db_name, &driver, &config . tantivy_folder ) . await?;
+    guard . disarm ();
+    if temp_fixture_dir . exists() {
+      fs::remove_dir_all (temp_fixture_dir)?; }
+    Ok (( )) }) }
+
 #[test]
 fn test_deleting_foreign_subscribee_content_infers_hide(
 ) -> Result<(), Box<dyn Error>> {
