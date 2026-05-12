@@ -438,6 +438,20 @@ fn subscribee_visibility_intent_uses_only_direct_children (
     }]); }
 
 #[test]
+fn subscribee_visibility_intent_ignores_indefinitive_subscribee (
+) {
+  let input : &str =
+    indoc! {"
+            * (skg (node (id subscriber) (source main))) subscriber
+            ** (skg subscribeeCol) subscribees
+            *** (skg (node (id subscribee) (source main) indef (viewRequests definitiveView))) subscribee
+            "};
+
+  assert_eq!(
+    visibility_intents_from_org (input),
+    Vec::<SubscribeeVisibilityIntent>::new()); }
+
+#[test]
 fn subscribee_visibility_intent_excludes_non_content_delete_and_phantom_children (
 ) {
   let input : &str =
@@ -604,6 +618,59 @@ fn direct_as_subscribee_child_list_removal_keeps_disk_contains (
       assert_eq!(
         saved_node_by_id (&instructions, "e") . contains,
         vec![ID::from ("e1"), ID::from ("e2")]);
+      Ok (()) })) }
+
+#[test]
+fn direct_as_subscribee_child_list_removal_infers_subscriber_hide (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db_from_config (
+    "skg-test-direct-as-subscribee-infers-hide",
+    SUBSCRIBEE_EDIT_CONFIG,
+    |config, driver| Box::pin (async move {
+      let input : &str =
+        indoc! {"
+                * (skg (node (id r) (source owned))) r
+                ** (skg subscribeeCol) subscribees
+                *** (skg (node (id e) (source foreign))) subscribee-e
+                **** (skg (node (id e2) (source foreign))) e2
+                "};
+      let instructions : Vec<DefineNode> =
+        save_instructions_from_org_with_disk (
+          input, config, driver) . await?;
+      assert_eq!(
+        saved_node_by_id (&instructions, "r")
+          . hides_from_its_subscriptions,
+        MSV::Specified (vec![ID::from ("e1")]));
+      assert_eq!(
+        saved_node_by_id (&instructions, "e") . contains,
+        vec![ID::from ("e1"), ID::from ("e2")]);
+      Ok (()) })) }
+
+#[test]
+fn moving_direct_as_subscribee_child_to_subscriber_does_not_hide (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db_from_config (
+    "skg-test-direct-as-subscribee-move-to-subscriber-no-hide",
+    SUBSCRIBEE_EDIT_CONFIG,
+    |config, driver| Box::pin (async move {
+      let input : &str =
+        indoc! {"
+                * (skg (node (id r) (source owned))) r
+                ** (skg subscribeeCol) subscribees
+                *** (skg (node (id e) (source foreign))) subscribee-e
+                **** (skg (node (id e2) (source foreign))) e2
+                ** (skg (node (id e1) (source foreign) indef)) e1
+                "};
+      let instructions : Vec<DefineNode> =
+        save_instructions_from_org_with_disk (
+          input, config, driver) . await?;
+      assert_eq!(
+        saved_node_by_id (&instructions, "r")
+          . hides_from_its_subscriptions,
+        MSV::Unspecified);
+      assert_eq!(
+        saved_node_by_id (&instructions, "r") . contains,
+        vec![ID::from ("e1")]);
       Ok (()) })) }
 
 #[test]

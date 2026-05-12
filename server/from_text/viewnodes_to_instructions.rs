@@ -3,14 +3,15 @@ pub mod reconcile_same_id_instructions;
 pub mod classify;
 pub mod subscribee_visibility_intents;
 
+use classify::{classify_save_roles, SaveRole, SaveRoleMap};
 use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::{ID, MSV, SkgConfig};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use crate::types::views_state::nodecomplete_from_in_rust_graph;
-use classify::{classify_save_roles, SaveRole, SaveRoleMap};
 use reconcile_same_id_instructions::reconcile_same_id_instructions;
+use subscribee_visibility_intents::{ SubscribeeVisibilityIntent, subscribee_visibility_intents_from_tree, };
 use super::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
 use super::validate::buffernode_differs_from_disknode;
 use to_naive_instructions::naive_saveinstructions_from_tree;
@@ -32,8 +33,14 @@ pub async fn viewforest_to_nonmerge_save_instructions (
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result<(Vec<DefineNode>, Vec<SourceMove>), Box<dyn Error>> {
+  let roles : SaveRoleMap =
+    classify_save_roles (viewforest) ?;
   let direct_as_subscribee_save_pids : HashSet<ID> =
-    direct_as_subscribee_save_pids (viewforest) ?;
+    direct_as_subscribee_save_pids_from_roles (viewforest, &roles) ?;
+  let visibility_intents : Vec<SubscribeeVisibilityIntent> =
+    subscribee_visibility_intents_from_tree (
+      viewforest, &roles )
+    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   let naive_instructions : Vec<DefineNode> =
     naive_saveinstructions_from_tree (
       viewforest . clone( )) ?;
@@ -77,6 +84,9 @@ pub async fn viewforest_to_nonmerge_save_instructions (
             if let Some (sm) = maybe_move {
               let sm : SourceMove = sm;
               source_moves . push (sm); }}} }}}
+  let result : Vec<DefineNode> =
+    add_hiderels_from_subscribees (
+      result, &visibility_intents, config, driver ) . await ?;
   let changed_instructions : Vec<DefineNode> =
     filter_unchanged_save_instructions (result);
   Ok ((changed_instructions, source_moves)) }
@@ -93,6 +103,12 @@ pub fn direct_as_subscribee_save_pids (
 ) -> Result<HashSet<ID>, Box<dyn Error>> {
   let roles : SaveRoleMap =
     classify_save_roles (viewforest) ?;
+  direct_as_subscribee_save_pids_from_roles (viewforest, &roles) }
+
+fn direct_as_subscribee_save_pids_from_roles (
+  viewforest : &Tree<ViewNode>,
+  roles      : &SaveRoleMap,
+) -> Result<HashSet<ID>, Box<dyn Error>> {
   let mut result : HashSet<ID> = HashSet::new();
   for node_ref in viewforest . nodes() {
     if ! matches!(
@@ -102,6 +118,123 @@ pub fn direct_as_subscribee_save_pids (
     if let ViewNodeKind::True (t) = &node_ref . value() . kind {
       result . insert (t . id . clone()); }}
   Ok (result) }
+
+/// Interpret direct child-list edits under definitive AsSubscribee
+/// branches as subscriber visibility edits.
+///
+/// At this point ordinary graph SaveNodes have already been built,
+/// reconciled, and supplemented from disk, but filtering
+/// unchanged (no-op) instructions has not run yet.
+/// That lets this pass add a real (does-op)
+/// `hides_from_its_subscriptions` change to the owned subscriber
+/// before the subscriber would otherwise be filtered out as a no-op.
+///
+/// For each `(subscriber, subscribee, visible_content)` intent, any
+/// pre-save direct content of the subscribee that is absent from
+/// `visible_content` becomes hidden from that subscriber, unless the
+/// same ID was moved into the subscriber's ordinary direct content.
+///
+/// This is hide-only for now. Unhide inference will need the inverse
+/// comparison against existing subscriber hides.
+async fn add_hiderels_from_subscribees (
+  mut instructions : Vec<DefineNode>,
+  intents          : &[SubscribeeVisibilityIntent],
+  config           : &SkgConfig,
+  driver           : &TypeDBDriver,
+) -> Result<Vec<DefineNode>, Box<dyn Error>> {
+  for intent in intents {
+    let Some (subscribee_from_disk) =
+      optnodecomplete_from_id (
+        config, driver, &intent . subscribee ) . await ?
+    else { continue; };
+    let Some (subscriber_from_disk) =
+      optnodecomplete_from_id (
+        config, driver, &intent . subscriber ) . await ?
+    else { continue; };
+    if ! source_is_owned (config, &subscriber_from_disk . source) {
+      continue; }
+
+    let subscriber_contains : HashSet<ID> =
+      subscriber_will_contain_after_save (
+        &instructions, &subscriber_from_disk );
+    let visible_content : HashSet<ID> =
+      intent . visible_content . iter() . cloned() . collect();
+    let inferred_hides : Vec<ID> =
+      subscribee_from_disk . contains . iter()
+      . filter ( |id| ! visible_content . contains (*id) )
+      . filter ( |id| ! subscriber_contains . contains (*id) )
+      . cloned()
+      . collect();
+    if inferred_hides . is_empty() { continue; }
+
+    let subscriber_node : &mut NodeComplete =
+      ensure_subscriber_save_instruction (
+        &mut instructions, subscriber_from_disk );
+    append_hides_to_subscriber (
+      subscriber_node, &inferred_hides ); }
+  Ok (instructions) }
+
+fn source_is_owned (
+  config : &SkgConfig,
+  source : &crate::types::misc::SourceName,
+) -> bool {
+  config . sources . get (source)
+    . map ( |s| s . user_owns_it )
+    . unwrap_or (false) }
+
+fn subscriber_will_contain_after_save (
+  instructions          : &[DefineNode],
+  subscriber_from_disk  : &NodeComplete,
+) -> HashSet<ID> {
+  instructions . iter()
+    . find_map ( |instr| match instr {
+      DefineNode::Save (SaveNode (node))
+        if node . pid == subscriber_from_disk . pid =>
+          Some (node . contains . iter() . cloned() . collect()),
+      _ => None })
+    . unwrap_or_else ( ||
+      subscriber_from_disk . contains . iter() . cloned() . collect()) }
+
+/// Return the subscriber SaveNode that should receive inferred
+/// `hides_from_its_subscriptions` edits.
+///
+/// If the save already includes an instruction for the subscriber, reuse
+/// that mutable node so inferred hides compose with same-save edits.
+/// Otherwise, create a SaveNode from the current disk value; the added
+/// hide relation is what makes that otherwise unchanged subscriber
+/// instruction worth keeping.
+fn ensure_subscriber_save_instruction (
+  instructions         : &mut Vec<DefineNode>,
+  subscriber_from_disk : NodeComplete,
+) -> &mut NodeComplete {
+  if let Some (index) =
+    instructions . iter() . position (
+      |instr| match instr {
+        DefineNode::Save (SaveNode (node)) =>
+          node . pid == subscriber_from_disk . pid,
+        _ => false } )
+  { match instructions . get_mut (index) . unwrap() {
+      DefineNode::Save (SaveNode (node)) => node,
+      _ => unreachable!(), }
+  } else {
+    instructions . push (
+      DefineNode::Save (SaveNode (subscriber_from_disk)));
+    match instructions . last_mut() . unwrap() {
+      DefineNode::Save (SaveNode (node)) => node,
+      _ => unreachable!(), }}}
+
+fn append_hides_to_subscriber (
+  subscriber     : &mut NodeComplete,
+  inferred_hides : &[ID],
+) {
+  let mut hides : Vec<ID> =
+    subscriber . hides_from_its_subscriptions
+    . or_default() . to_vec();
+  for id in inferred_hides {
+    if ! hides . contains (id) {
+      hides . push (id . clone()); }}
+  subscriber . hides_from_its_subscriptions =
+    MSV::Specified (hides); }
 
 fn restore_direct_as_subscribee_contains_from_disk (
   mut from_buffer                  : NodeComplete,

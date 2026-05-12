@@ -1008,7 +1008,7 @@ the new feature:
 
 Only then implement the feature as:
 
-- infer fork hide deltas from roles;
+- DONE infer fork hide deltas from roles;
 - infer unhide deltas from direct AsSubscribee buffer children that
   are disk content of the subscribee;
 - fold them into subscriber edits;
@@ -1112,3 +1112,52 @@ Results:
   failure. It still fails on the two future hide-inference assertions:
   'test_deleting_foreign_subscribee_content_infers_hide' and
   'test_moving_foreign_subscribee_content_elsewhere_still_hides'.
+
+* Update 2026-05-12: direct as-subscribee hide inference done
+
+The first hide-inference feature slice is implemented:
+
+- direct, definitive AsSubscribee branches now produce visibility
+  intents;
+- missing direct subscribee content is folded into the owned
+  subscriber's 'hides_from_its_subscriptions';
+- if the missing child was moved to become ordinary direct content
+  of the subscriber, no hide is inferred;
+- direct AsSubscribee child-list edits still do not become graph
+  'contains' edits for the subscribee;
+- saved-view rerender now inserts HiddenInSubscribeeCol under
+  expanded subscribees when the updated subscriber hides intersect
+  the subscribee's direct content.
+
+Indefinitive subscribees with a pending definitive-view request do
+not produce visibility intents. That prevents the expansion request
+itself from being misread as "hide every child I have not expanded
+yet."
+
+Verification run:
+
+#+begin_src text
+cargo check
+cargo test --test hidden_from_subscriptions -- --nocapture
+cargo test --test new viewnodes_to_instructions -- --nocapture
+cargo test --test subscribee_col -- --nocapture
+cargo run --bin cleanup-test-dbs
+#+end_src
+
+Results:
+
+- 'cargo check' passed.
+- 'cargo test --test hidden_from_subscriptions -- --nocapture'
+  passed: 8 passed.
+- 'cargo test --test new viewnodes_to_instructions -- --nocapture'
+  passed: 27 passed, 53 filtered out.
+- 'cargo test --test subscribee_col -- --nocapture' passed: 1
+  passed.
+- 'cargo run --bin cleanup-test-dbs' found no leftover test
+  databases.
+
+Remaining feature work: infer unhide deltas from direct
+AsSubscribee buffer children that are disk content of the subscribee.
+When that lands, clean up the "for now" language in the header
+comment for 'add_hiderels_from_subscribees' so it describes the final
+hide/unhide behavior instead of the temporary hide-only slice.

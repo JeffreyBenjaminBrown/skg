@@ -32,7 +32,9 @@ pub fn subscribee_visibility_intents_from_tree (
       };
     let subscribee : ID =
       match &node_ref . value() . kind {
-        ViewNodeKind::True (t) => t . id . clone(),
+        ViewNodeKind::True (t) => {
+          if t . is_indefinitive() { continue; }
+          t . id . clone() },
         _ => return Err (
           "AsSubscribee role assigned to non-TrueNode" . to_string()),
       };

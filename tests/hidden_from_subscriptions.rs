@@ -196,7 +196,8 @@ fn assert_hides_e1_in_subscribee_col (
     "Expected e1 to be rendered under HiddenInSubscribeeCol:\n{}",
     buffer );
   assert! (
-    ! buffer . contains ("**** (skg (node (id e1)"),
+    ! buffer . lines() . any ( |line|
+      line . starts_with ("**** (skg (node (id e1)") ),
     "Expected e1 not to remain visible as direct subscribee content:\n{}",
     buffer ); }
 
@@ -212,7 +213,8 @@ fn assert_e1_removed_from_visible_subscribee_branch (
   buffer : &str,
 ) {
   assert! (
-    ! buffer . contains ("**** (skg (node (id e1)"),
+    ! buffer . lines() . any ( |line|
+      line . starts_with ("**** (skg (node (id e1)") ),
     "Expected e1 not to be regenerated as direct subscribee content:\n{}",
     buffer );
   assert! (

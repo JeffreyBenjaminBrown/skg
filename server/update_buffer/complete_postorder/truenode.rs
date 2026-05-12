@@ -1,9 +1,11 @@
+use crate::to_org::complete::sharing::{ maybe_add_hiddenInSubscribeeCol_branch, type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::expand::definitive::execute_view_requests;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest};
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest};
+
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -31,11 +33,33 @@ pub async fn complete_truenode (
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   let requests : Vec<(NodeId, ViewRequest)> =
     extract_view_requests_definitive_first( tree, node ) ?;
-  if requests . is_empty() { return Ok(( )); }
-  execute_view_requests(
-    tree, requests, source_diffs, config, driver,
-    visited, errors, deleted_since_head_pid_src_map ) . await ?;
+  if ! requests . is_empty() {
+    execute_view_requests(
+      tree, requests, source_diffs, config, driver,
+      visited, errors, deleted_since_head_pid_src_map ) . await ?; }
+  maybe_add_hiddenincol_under_definitive_subscribee (
+    tree, node, config, driver ) . await ?;
   Ok(( )) }
+
+async fn maybe_add_hiddenincol_under_definitive_subscribee (
+  tree   : &mut Tree<ViewNode>,
+  node   : NodeId,
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
+  let is_subscribee : bool =
+    type_and_parent_type_consistent_with_subscribee (
+      tree, node ) ?;
+  if ! is_subscribee { return Ok (( )); }
+  let is_indefinitive : bool =
+    read_at_node_in_tree( tree, node,
+      |vn : &ViewNode| match &vn . kind {
+        ViewNodeKind::True (t) => t . is_indefinitive (),
+        _ => false } )
+    . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
+  if is_indefinitive { return Ok (( )); }
+  maybe_add_hiddenInSubscribeeCol_branch (
+    tree, node, config, driver ) . await }
 
 /// Read the node's view_requests set and return them as a Vec
 /// with Definitive first (if present), then the rest.
