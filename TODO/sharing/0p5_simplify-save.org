@@ -1002,7 +1002,7 @@ the new feature:
 - preserve raw-buffer edits separately from graph edits beyond the
   current immediate NodeEditIntent-to-DefineNode conversion;
 - move unchanged filtering later, or make it intent-aware;
-- simplify sharing completion by replacing traversal-minimizing
+- DONE simplify sharing completion by replacing traversal-minimizing
   control flow with small explicit read/compute/mutate passes;
 - define and test SubscribeeCol completion preservation.
 
@@ -1022,3 +1022,48 @@ Only then implement the feature as:
 This is more tree traversal, but it removes a much more expensive
 kind of complexity: late reinterpretation of SaveNodes that were
 already built with the wrong semantics.
+
+* Update 2026-05-12: sharing completion simplification done
+
+The traversal-minimization unwind for the sharing completion path is
+done as a behavior-preserving refactor. The three completion shells
+now separate the phases more explicitly:
+
+- validate the scaffold kind and structural context;
+- read ancestor / graph facts into small local context structs;
+- compute the goal list and removed IDs;
+- build ChildData before mutation;
+- reconcile scaffold children;
+- run the existing cleanup mutations.
+
+Behavior is intended unchanged. This did not add hide/unhide
+inference, SubscribeeCol preservation, new validation policy, or any
+rendered-output change.
+
+Completion preservation and the actual hide/unhide feature work
+remain future work.
+
+Verification run:
+
+#+begin_src text
+cargo check
+cargo test --test hidden_from_subscriptions -- --nocapture
+cargo test --test subscribee_col -- --nocapture
+cargo test --test new viewnodes_to_instructions -- --nocapture
+#+end_src
+
+Results:
+
+- 'cargo check' passed.
+- 'cargo test --test subscribee_col -- --nocapture' passed: 1
+  passed.
+- 'cargo test --test new viewnodes_to_instructions -- --nocapture'
+  passed: 24 passed, 53 filtered out.
+- 'cargo test --test hidden_from_subscriptions -- --nocapture' did
+  not pass in this checkout: 4 passed and 3 failed. One failure was
+  environmental TypeDB cleanup:
+  '[DBD2] Cannot delete database since it is in use.' The other two
+  failed assertions are the future hide-inference behavior tracked
+  here: 'test_deleting_foreign_subscribee_content_infers_hide' and
+  'test_moving_foreign_subscribee_content_elsewhere_still_hides'
+  expected 'e1' under HiddenInSubscribeeCol after save.

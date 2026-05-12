@@ -14,6 +14,15 @@ use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
+struct HiddenInContext {
+  subscriber_pid      : ID,
+  subscriber_source   : SourceName,
+  subscribee_pid      : ID,
+  subscribee_source   : SourceName,
+  subscribee_contains : Vec<ID>,
+  subscriber_hides    : Vec<ID>,
+}
+
 /// HiddenInSubscribeeCol completion (child-first / postorder pass).
 ///
 /// Tree structure:
@@ -36,6 +45,31 @@ pub fn complete_hiddeninsubscribee_col (
   let kind : SharingScaffoldKind =
     SharingScaffoldKind::HiddenInSubscribeeCol;
   kind . error_unless_node_is_this_kind (tree, node) ?;
+
+  let context : HiddenInContext =
+    read_hiddenin_context (tree, node, kind, env) ?;
+  let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
+    compute_hiddenin_goal (&context, source_diffs, env);
+  let child_data : HashMap<ID, ChildData> =
+    build_hiddenin_child_data (
+      tree, node, &context,
+      &goal_list, &removed_ids,
+      source_diffs, deleted_since_head_pid_src_map, env ) ?;
+
+  reconcile_sharing_scaffold_children(
+    tree, node, kind,
+    &goal_list, &child_data ) ?;
+  mark_non_subscribee_content_independent (
+    tree, node, &context . subscribee_contains ) ?;
+  detach_scaffold_if_empty (tree, node) ?;
+  Ok(( )) }
+
+fn read_hiddenin_context (
+  tree : &Tree<ViewNode>,
+  node : NodeId,
+  kind : SharingScaffoldKind,
+  env  : &SkgEnv,
+) -> Result<HiddenInContext, Box<dyn Error>> {
   let (subscribee_pid, subscribee_source) : (ID, SourceName) =
     pid_and_source_from_ancestor(
       tree, node, 1, kind . caller_label () ) ?;
@@ -54,34 +88,61 @@ pub fn complete_hiddeninsubscribee_col (
         &env . config, &subscriber_pid, &subscriber_source ) ?;
     subscriber_nodecomplete . hides_from_its_subscriptions
       . or_default() . to_vec() };
+  Ok (HiddenInContext {
+    subscriber_pid,
+    subscriber_source,
+    subscribee_pid,
+    subscribee_source,
+    subscribee_contains,
+    subscriber_hides }) }
+
+fn compute_hiddenin_goal (
+  context      : &HiddenInContext,
+  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  env          : &SkgEnv,
+) -> (Vec<ID>, HashSet<ID>) {
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
     goal_list_for_hiddeninsubscribee_col(
-      &subscribee_pid, &subscribee_source,
-      &subscriber_pid, &subscriber_source,
-      &subscribee_contains, &subscriber_hides,
+      &context . subscribee_pid, &context . subscribee_source,
+      &context . subscriber_pid, &context . subscriber_source,
+      &context . subscribee_contains, &context . subscriber_hides,
       source_diffs, &env . config );
-  let child_data : HashMap<ID, ChildData> = // Pre-compute this, so that the create_child closure inside reconcile_sharing_scaffold_children captures only owned data and does not conflict with the &mut Tree borrow.
-    build_child_data(
-      tree, node, &subscribee_pid, &subscribee_source,
-      &goal_list, &removed_ids,
-      source_diffs, deleted_since_head_pid_src_map, env ) ?;
-  reconcile_sharing_scaffold_children(
-    tree, node, kind,
-    &goal_list, &child_data ) ?;
-  { // Change birth of erroneous content children to Independent. "Erroneous content" are TrueNode children marked birth=ContentOf that are not part of its content.
-    let subscribee_contains_set : HashSet<ID> =
-      subscribee_contains . iter() . cloned() . collect();
-    treat_certain_children(
-      tree, node,
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::True (t) =>
-          ! t . parent_ignores_it()
-          && ! subscribee_contains_set . contains( &t . id )
-          && ! t . is_phantom(),
-        _ => false },
-      |vn : &mut ViewNode| {
-        if let ViewNodeKind::True( ref mut t ) = vn . kind {
-          t . birth = Birth::Independent; } },
-    ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?; }
-  detach_scaffold_if_empty (tree, node) ?;
-  Ok(( )) }
+  (goal_list, removed_ids) }
+
+fn build_hiddenin_child_data (
+  tree                           : &Tree<ViewNode>,
+  node                           : NodeId,
+  context                        : &HiddenInContext,
+  goal_list                      : &[ID],
+  removed_ids                    : &HashSet<ID>,
+  source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  env                            : &SkgEnv,
+) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
+  // Build child data after the read phase and before mutation, so the
+  // completion steps stay auditable as read, compute, then reconcile.
+  build_child_data(
+    tree, node, &context . subscribee_pid, &context . subscribee_source,
+    goal_list, removed_ids,
+    source_diffs, deleted_since_head_pid_src_map, env ) }
+
+fn mark_non_subscribee_content_independent (
+  tree                : &mut Tree<ViewNode>,
+  node                : NodeId,
+  subscribee_contains : &[ID],
+) -> Result<(), Box<dyn Error>> {
+  let subscribee_contains_set : HashSet<ID> =
+    subscribee_contains . iter() . cloned() . collect();
+  treat_certain_children(
+    tree, node,
+    |vn : &ViewNode| match &vn . kind {
+      ViewNodeKind::True (t) =>
+        ! t . parent_ignores_it()
+        && ! subscribee_contains_set . contains( &t . id )
+        && ! t . is_phantom(),
+      _ => false },
+    |vn : &mut ViewNode| {
+      if let ViewNodeKind::True( ref mut t ) = vn . kind {
+        t . birth = Birth::Independent; } },
+  ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
+  Ok (( )) }

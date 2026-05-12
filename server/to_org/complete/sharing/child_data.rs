@@ -33,9 +33,9 @@ pub struct ChildData {
 
 /// Build a map from child ID to ChildData for the create-child
 /// closure of `complete_relevant_children_in_viewnodetree`.
-/// Pre-computes everything so the closure captures only owned
-/// data, avoiding conflict with the &mut Tree borrow inside the
-/// reconciler.
+/// The sharing completers build this before mutation so their flow
+/// stays explicit: read tree and graph facts, compute the goal list,
+/// prepare child data, then reconcile scaffold children.
 ///
 /// `parent_skgid` and `parent_source` are the col's containing
 /// node (the subscribee for HiddenIn; the subscriber for
@@ -106,8 +106,8 @@ pub fn build_child_data (
 ///
 /// All three rerender-time sharing-scaffold completers
 /// (SubscribeeCol, HiddenInSubscribeeCol,
-/// HiddenOutsideOfSubscribeeCol) share the same call shape: pre-build
-/// per-child data, then call
+/// HiddenOutsideOfSubscribeeCol) share the same call shape: build
+/// per-child data before mutation, then call
 /// `complete_relevant_children_in_viewnodetree` with identical
 /// relevance/key/create closures. Phantom-flagged ChildData entries
 /// produce phantom viewnodes; non-phantom entries produce

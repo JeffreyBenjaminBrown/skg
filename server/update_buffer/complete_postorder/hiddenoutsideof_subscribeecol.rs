@@ -14,6 +14,13 @@ use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
+struct HiddenOutsideContext {
+  subscriber_pid      : ID,
+  subscriber_source   : SourceName,
+  subscriber_hides    : Vec<ID>,
+  subscribees         : Vec<ID>,
+}
+
 /// HiddenOutsideOfSubscribeeCol completion (child-first / postorder pass).
 ///
 /// Tree structure:
@@ -36,15 +43,46 @@ pub fn complete_hiddenoutsideofsubscribeecol (
   let kind : SharingScaffoldKind =
     SharingScaffoldKind::HiddenOutsideOfSubscribeeCol;
   kind . error_unless_node_is_this_kind (tree, node) ?;
-  { // verify ancestor 1 is a SubscribeeCol scaffold
-    read_at_ancestor_in_tree(
-        tree, node, 1,
-        |vn : &ViewNode| match &vn . kind {
-          ViewNodeKind::Scaff (Scaffold::SubscribeeCol) => Ok(( )),
-          _ => Err( "complete_hiddenoutsideofsubscribeecol: \
-                     ancestor 1 is not a SubscribeeCol" ) } )
-      . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
-      . map_err( |e| -> Box<dyn Error> { e . into() } ) ?; }
+
+  validate_hiddenoutside_parent (tree, node) ?;
+  let context : HiddenOutsideContext =
+    read_hiddenoutside_context (tree, node, kind, env) ?;
+  let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
+    compute_hiddenoutside_goal (&context, source_diffs, env);
+  let child_data : HashMap<ID, ChildData> =
+    build_hiddenoutside_child_data (
+      tree, node, &context,
+      &goal_list, &removed_ids,
+      source_diffs, deleted_since_head_pid_src_map, env ) ?;
+
+  reconcile_sharing_scaffold_children(
+    tree, node, kind,
+    &goal_list, &child_data ) ?;
+  mark_children_outside_goal_independent (
+    tree, node, &goal_list ) ?;
+  detach_scaffold_if_empty (tree, node) ?;
+  Ok(( )) }
+
+fn validate_hiddenoutside_parent (
+  tree : &Tree<ViewNode>,
+  node : NodeId,
+) -> Result<(), Box<dyn Error>> {
+  read_at_ancestor_in_tree(
+      tree, node, 1,
+      |vn : &ViewNode| match &vn . kind {
+        ViewNodeKind::Scaff (Scaffold::SubscribeeCol) => Ok(( )),
+        _ => Err( "complete_hiddenoutsideofsubscribeecol: \
+                   ancestor 1 is not a SubscribeeCol" ) } )
+    . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
+    . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
+  Ok (( )) }
+
+fn read_hiddenoutside_context (
+  tree : &Tree<ViewNode>,
+  node : NodeId,
+  kind : SharingScaffoldKind,
+  env  : &SkgEnv,
+) -> Result<HiddenOutsideContext, Box<dyn Error>> {
   let (subscriber_pid, subscriber_source) : (ID, SourceName) =
     pid_and_source_from_ancestor(
       tree, node, kind . correct_subscriber_ancestor_distance (),
@@ -58,33 +96,58 @@ pub fn complete_hiddenoutsideofsubscribeecol (
   let wt_subscribees : Vec<ID> =
     wt_subscriber_nodecomplete . subscribes_to
       . or_default() . to_vec();
+  Ok (HiddenOutsideContext {
+    subscriber_pid,
+    subscriber_source,
+    subscriber_hides : wt_subscriber_hides,
+    subscribees      : wt_subscribees }) }
+
+fn compute_hiddenoutside_goal (
+  context      : &HiddenOutsideContext,
+  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  env          : &SkgEnv,
+) -> (Vec<ID>, HashSet<ID>) {
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
     goal_list_for_hiddenoutsideof_subscribeecol(
-      &subscriber_pid, &subscriber_source,
-      &wt_subscriber_hides, &wt_subscribees,
+      &context . subscriber_pid, &context . subscriber_source,
+      &context . subscriber_hides, &context . subscribees,
       source_diffs, &env . config );
-  let child_data : HashMap<ID, ChildData> = // Pre-compute this, so that the create_child closure inside reconcile_sharing_scaffold_children captures only owned data and does not conflict with the &mut Tree borrow.
-    build_child_data(
-      tree, node, &subscriber_pid, &subscriber_source,
-      &goal_list, &removed_ids,
-      source_diffs, deleted_since_head_pid_src_map, env ) ?;
-  reconcile_sharing_scaffold_children(
-    tree, node, kind,
-    &goal_list, &child_data ) ?;
-  { // Mark erroneous content children birth=Independent. A child is erroneous if it is a non-phantom TrueNode marked birth=Content but not in the goal_list.
-    let goal_set : HashSet<ID> =
-      goal_list . iter() . cloned() . collect();
-    treat_certain_children(
-      tree, node,
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::True (t) =>
-          !t . parent_ignores_it()
-          && !goal_set . contains( &t . id )
-          && !t . is_phantom(),
-        _ => false },
-      |vn : &mut ViewNode| {
-        if let ViewNodeKind::True( ref mut t ) = vn . kind {
-          t . birth = Birth::Independent; } },
-    ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?; }
-  detach_scaffold_if_empty (tree, node) ?;
-  Ok(( )) }
+  (goal_list, removed_ids) }
+
+fn build_hiddenoutside_child_data (
+  tree                           : &Tree<ViewNode>,
+  node                           : NodeId,
+  context                        : &HiddenOutsideContext,
+  goal_list                      : &[ID],
+  removed_ids                    : &HashSet<ID>,
+  source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
+  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  env                            : &SkgEnv,
+) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
+  // Build child data after the read phase and before mutation, so the
+  // completion steps stay auditable as read, compute, then reconcile.
+  build_child_data(
+    tree, node, &context . subscriber_pid, &context . subscriber_source,
+    goal_list, removed_ids,
+    source_diffs, deleted_since_head_pid_src_map, env ) }
+
+fn mark_children_outside_goal_independent (
+  tree      : &mut Tree<ViewNode>,
+  node      : NodeId,
+  goal_list : &[ID],
+) -> Result<(), Box<dyn Error>> {
+  let goal_set : HashSet<ID> =
+    goal_list . iter() . cloned() . collect();
+  treat_certain_children(
+    tree, node,
+    |vn : &ViewNode| match &vn . kind {
+      ViewNodeKind::True (t) =>
+        !t . parent_ignores_it()
+        && !goal_set . contains( &t . id )
+        && !t . is_phantom(),
+      _ => false },
+    |vn : &mut ViewNode| {
+      if let ViewNodeKind::True( ref mut t ) = vn . kind {
+        t . birth = Birth::Independent; } },
+  ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
+  Ok (( )) }
