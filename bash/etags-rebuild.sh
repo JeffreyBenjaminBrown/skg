@@ -38,6 +38,9 @@ PRUNE_DIRS=(
   .cache
   .claude
   .config
+  .cargo
+  .codex
+  .emacs.d
   .git
   .local
   .npm

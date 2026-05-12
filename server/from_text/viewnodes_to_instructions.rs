@@ -6,14 +6,16 @@ use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
-use crate::types::viewnode::ViewNode;
+use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use crate::types::views_state::nodecomplete_from_in_rust_graph;
+use classify::{classify_save_roles, SaveRole, SaveRoleMap};
 use reconcile_same_id_instructions::reconcile_same_id_instructions;
 use super::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
 use super::validate::buffernode_differs_from_disknode;
 use to_naive_instructions::naive_saveinstructions_from_tree;
 
 use ego_tree::Tree;
+use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
@@ -29,6 +31,8 @@ pub async fn viewforest_to_nonmerge_save_instructions (
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result<(Vec<DefineNode>, Vec<SourceMove>), Box<dyn Error>> {
+  let direct_as_subscribee_save_pids : HashSet<ID> =
+    direct_as_subscribee_save_pids (viewforest) ?;
   let naive_instructions : Vec<DefineNode> =
     naive_saveinstructions_from_tree (
       viewforest . clone( )) ?;
@@ -62,6 +66,12 @@ pub async fn viewforest_to_nonmerge_save_instructions (
             let supplemented : NodeComplete =
               supplement_unspecified_fields_from_disk (
                 canonicalized, &disk_node);
+            let supplemented : NodeComplete =
+              restore_direct_as_subscribee_contains_from_disk (
+                // PITFALL | TODO: This is just a temporary guardrail, to prevent bogus edits to (usually foreign) subscribees being shown as subscribees.
+                supplemented,
+                &disk_node,
+                &direct_as_subscribee_save_pids);
             result . push (DefineNode::Save (SaveNode (supplemented)));
             if let Some (sm) = maybe_move {
               let sm : SourceMove = sm;
@@ -69,6 +79,40 @@ pub async fn viewforest_to_nonmerge_save_instructions (
   let changed_instructions : Vec<DefineNode> =
     filter_unchanged_save_instructions (result);
   Ok ((changed_instructions, source_moves)) }
+
+/// PIDs for TrueNodes shown directly as subscribees in a SubscribeeCol
+/// branch. Their buffer children are meaningful, but not as graph
+/// `contains` edits for the subscribee; later they should become
+/// subscriber hide/unhide intent. Until that pass exists, these PIDs
+/// are used only as a guardrail to block bogus subscribee `contains`
+/// saves. A subscribee's descendants are not treated specially
+/// -- just the subscribee itself.
+pub fn direct_as_subscribee_save_pids (
+  viewforest : &Tree<ViewNode>,
+) -> Result<HashSet<ID>, Box<dyn Error>> {
+  let roles : SaveRoleMap =
+    classify_save_roles (viewforest) ?;
+  let mut result : HashSet<ID> = HashSet::new();
+  for node_ref in viewforest . nodes() {
+    if ! matches!(
+      roles . get (&node_ref . id()),
+      Some (SaveRole::AsSubscribee { .. }))
+    { continue; }
+    if let ViewNodeKind::True (t) = &node_ref . value() . kind {
+      result . insert (t . id . clone()); }}
+  Ok (result) }
+
+fn restore_direct_as_subscribee_contains_from_disk (
+  mut from_buffer                  : NodeComplete,
+  disk_node                        : &NodeComplete,
+  direct_as_subscribee_save_pids   : &HashSet<ID>,
+) -> NodeComplete {
+  // Transitional guardrail: direct AsSubscribee child lists should
+  // not define graph `contains`, but future hide/unhide inference
+  // will need to read them before this value is restored.
+  if direct_as_subscribee_save_pids . contains (&from_buffer . pid) {
+    from_buffer . contains = disk_node . contains . clone(); }
+  from_buffer }
 
 /// Filters out Save instructions that would be no-ops,
 /// because they match the pre-save in-Rust graph entry

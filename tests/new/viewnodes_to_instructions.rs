@@ -4,15 +4,24 @@
 // so revising these tests feels low-priority.)
 
 use indoc::indoc;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
-use skg::from_text::viewnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_tree;
-use skg::test_utils::extract_nodecomplete_if_save_else_error;
-use skg::types::viewnode::{ViewNode, viewforest_root_viewnode};
-use skg::types::misc::{ID, MSV};
-use skg::types::save::{DefineNode, SaveNode, DeleteNode};
-use skg::types::nodes::complete::NodeComplete;
 use ego_tree::Tree;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_viewforest;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::validate::validate_and_filter_foreign_instructions;
+use skg::from_text::viewnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_tree;
+use skg::from_text::viewnodes_to_instructions::viewforest_to_nonmerge_save_instructions;
+use skg::test_utils::extract_nodecomplete_if_save_else_error;
+use skg::test_utils::run_with_test_db_from_config;
+use skg::types::errors::BufferValidationError;
+use skg::types::misc::{ID, MSV};
+use skg::types::nodes::complete::NodeComplete;
+use skg::types::save::{DefineNode, SaveNode, DeleteNode};
+use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
+use skg::types::viewnode::{ViewNode, viewforest_root_viewnode};
+use std::error::Error;
+
+const SUBSCRIBEE_EDIT_CONFIG: &str =
+  "tests/hidden_from_subscriptions/fixtures-subscribee-edit/skgconfig.toml";
 
 fn save_ids (
   instructions : &[DefineNode],
@@ -31,6 +40,22 @@ fn saved_node_by_id<'a> (
       if node . pid == ID::from (id) {
         return node; }}}
   panic! ("SaveNode not found: {}", id) }
+
+async fn save_instructions_from_org_with_disk (
+  org_text : &str,
+  config   : &skg::types::misc::SkgConfig,
+  driver   : &typedb_driver::TypeDBDriver,
+) -> Result<Vec<DefineNode>, Box<dyn Error>> {
+  let (mut unchecked_viewforest, _parsing_errors) =
+    org_to_uninterpreted_nodes (org_text) ?;
+  add_missing_info_to_viewforest (
+    &mut unchecked_viewforest, &config . db_name, driver) . await?;
+  let viewforest : Tree<ViewNode> =
+    unchecked_to_checked_tree (unchecked_viewforest) ?;
+  let (instructions, _source_moves) =
+    viewforest_to_nonmerge_save_instructions (
+      &viewforest, config, driver) . await?;
+  Ok (instructions) }
 
 #[test]
 fn test_viewforest_to_nonmerge_save_instructions_basic() {
@@ -397,6 +422,102 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
     instructions . last(),
     Some (DefineNode::Delete (DeleteNode { id, .. }))
       if id == &ID::from ("doomed"))); }
+
+#[test]
+fn direct_as_subscribee_child_list_removal_keeps_disk_contains (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db_from_config (
+    "skg-test-direct-as-subscribee-keeps-contains",
+    SUBSCRIBEE_EDIT_CONFIG,
+    |config, driver| Box::pin (async move {
+      let input : &str =
+        indoc! {"
+                * (skg (node (id r) (source owned))) r
+                ** (skg subscribeeCol) subscribees
+                *** (skg (node (id e) (source foreign))) subscribee-e
+                **** (skg (node (id e2) (source foreign))) e2
+                "};
+      let instructions : Vec<DefineNode> =
+        save_instructions_from_org_with_disk (
+          input, config, driver) . await?;
+      assert_eq!(
+        saved_node_by_id (&instructions, "e") . contains,
+        vec![ID::from ("e1"), ID::from ("e2")]);
+      Ok (()) })) }
+
+#[test]
+fn ordinary_owned_child_list_edit_still_changes_contains (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db_from_config (
+    "skg-test-ordinary-owned-keeps-contains-edit",
+    SUBSCRIBEE_EDIT_CONFIG,
+    |config, driver| Box::pin (async move {
+      let input : &str =
+        indoc! {"
+                * (skg (node (id r) (source owned))) r
+                ** (skg (node (id r1) (source owned))) r1
+                "};
+      let instructions : Vec<DefineNode> =
+        save_instructions_from_org_with_disk (
+          input, config, driver) . await?;
+      assert_eq!(
+        saved_node_by_id (&instructions, "r") . contains,
+        vec![ID::from ("r1")]);
+      Ok (()) })) }
+
+#[test]
+fn recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db_from_config (
+    "skg-test-subscribee-descendant-keeps-contains-edit",
+    SUBSCRIBEE_EDIT_CONFIG,
+    |config, driver| Box::pin (async move {
+      let input : &str =
+        indoc! {"
+                * (skg (node (id r) (source owned))) r
+                ** (skg subscribeeCol) subscribees
+                *** (skg (node (id e) (source foreign))) subscribee-e
+                **** (skg (node (id e2) (source foreign))) e2
+                "};
+      let instructions : Vec<DefineNode> =
+        save_instructions_from_org_with_disk (
+          input, config, driver) . await?;
+      assert_eq!(
+        saved_node_by_id (&instructions, "e") . contains,
+        vec![ID::from ("e1"), ID::from ("e2")]);
+      assert_eq!(
+        saved_node_by_id (&instructions, "e2") . contains,
+        Vec::<ID>::new());
+      Ok (()) })) }
+
+#[test]
+fn foreign_direct_as_subscribee_title_edit_reaches_validation (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db_from_config (
+    "skg-test-subscribee-title-edit-validation",
+    SUBSCRIBEE_EDIT_CONFIG,
+    |config, driver| Box::pin (async move {
+      let input : &str =
+        indoc! {"
+                * (skg (node (id r) (source owned))) r
+                ** (skg subscribeeCol) subscribees
+                *** (skg (node (id e) (source foreign))) changed title
+                **** (skg (node (id e2) (source foreign))) e2
+                "};
+      let instructions : Vec<DefineNode> =
+        save_instructions_from_org_with_disk (
+          input, config, driver) . await?;
+      let errors : Vec<BufferValidationError> =
+        validate_and_filter_foreign_instructions (
+          instructions, config, driver) . await . unwrap_err();
+      assert!(
+        errors . iter() . any (|error| matches!(
+          error,
+          BufferValidationError::ModifiedForeignNode (id, source)
+            if id == &ID::from ("e") && source . as_str() == "foreign")),
+        "expected ModifiedForeignNode for e, got {:?}",
+        errors);
+      Ok (()) })) }
 
 #[test]
 fn test_viewforest_to_nonmerge_save_instructions_deep_nesting() {

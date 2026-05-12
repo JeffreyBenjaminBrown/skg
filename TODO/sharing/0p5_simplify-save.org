@@ -40,10 +40,12 @@ The required order is:
 4. DONE Begin splitting save extraction into explicit intent-oriented
    passes by introducing an internal NodeEditIntent layer.
 5. PARTIAL Move unchanged filtering later, or make it intent-aware.
-6. Define a stricter completion contract for SubscribeeCol branches:
+6. DONE Neutralize direct as-subscribee child-list edits so they do
+   not become graph 'contains' edits for the subscribee.
+7. Define a stricter completion contract for SubscribeeCol branches:
    preserve user-authored branch edits, and reconcile only the parts
    that are generated display.
-7. Only then add fork-edit extraction for as-a-subscribee content
+8. Only then add fork-edit extraction for as-a-subscribee content
    deletions as another explicit pass over the same interpreted
    structure.
 
@@ -623,10 +625,94 @@ All of those passed in this environment. 'cargo fmt --check' was
 attempted but this toolchain does not have the 'cargo fmt' subcommand
 installed.
 
-** Add fork-edit inference as a pure pass
+** DONE Guard against direct as-subscribee contains edits after disk supplementation
+
+The current DefineNode pipeline now has a focused prerequisite for
+future fork-edit work: a SaveNode for a node whose own buffer position
+is directly under SubscribeeCol no longer uses that position's child
+list as the node's real graph 'contains' list. This is a guardrail,
+not the final semantics for that child list.
+
+Implemented in:
+
+#+begin_src text
+server/from_text/viewnodes_to_instructions.rs
+tests/new/viewnodes_to_instructions.rs
+#+end_src
+
+The new helper 'direct_as_subscribee_save_pids' classifies the checked
+viewforest with 'SaveRole' and records only TrueNodes whose own role
+is 'AsSubscribee'. During
+'viewforest_to_nonmerge_save_instructions', after ID canonicalization
+and disk supplementation, those direct as-subscribee SaveNodes get
+their 'contains' restored from the pre-save disk node.
+
+Important correction: the buffer child list under a direct subscribee
+is not meaningless and should not be discarded conceptually. It is
+user input whose eventual meaning is subscriber visibility:
+
+- if a disk child of the subscribee is absent from the buffer branch,
+  that can mean "hide this child from this subscriber";
+- if a disk child of the subscribee was previously hidden and appears
+  in the buffer branch, that can mean "unhide this child for this
+  subscriber";
+- order in the buffer branch should be ignored for save semantics,
+  because completion can redraw visible subscribee content in graph
+  order.
+
+So the current restore-from-disk step is only a temporary way to
+prevent the wrong graph edit, namely saving the buffer branch as
+'subscribee.contains'. The later fork/visibility pass must read the
+buffer child list before this guardrail erases it from the final
+SaveNode.
+
+This is intentionally narrow:
+
+- it is not hide inference;
+- it does not yet implement unhide inference;
+- it does not reinterpret recursive descendants below the subscribee
+  branch;
+- title and body edits on the same SaveNode still flow through and
+  can still be rejected by foreign validation;
+- aliases and 'subscribes_to' behavior are unchanged;
+- ordinary node positions still define real graph 'contains'.
+
+Added tests prove:
+
+- removing a direct child from a direct as-subscribee branch restores
+  the subscribee's disk 'contains';
+- an ordinary owned node's child-list edit still changes its
+  'contains';
+- a recursive descendant under the subscribee keeps its own
+  child-list edit;
+- a foreign direct-as-subscribee title edit remains visible to
+  'validate_and_filter_foreign_instructions'.
+
+Future rule recorded separately: editing a foreign node's content
+relationships should fork the edited foreign node based on ownership,
+whether or not that node appears below a subscribee branch. That later
+fork behavior should not depend on detecting "descendent of
+subscribee"; ownership is enough.
+
+Verification run:
+
+#+begin_src text
+cargo check
+cargo test --test new classify -- --nocapture
+cargo test --test new viewnodes_to_instructions -- --nocapture
+cargo test --test new reconcile_same_id_instructions -- --nocapture
+#+end_src
+
+All four commands passed in this environment.
+
+'cargo fmt' and 'rustfmt' were attempted, but neither formatter is
+installed in this toolchain.
+
+** Add subscribee visibility inference as a pure pass
 
 After the prerequisite save-intent shape is in place, add a pass that
-produces only inferred hide deltas, not SaveNodes.
+interprets direct child-list edits under AsSubscribee positions as
+subscriber visibility edits, not SaveNodes for the subscribee.
 Inputs:
 
 - checked tree;
@@ -636,17 +722,35 @@ Inputs:
 Output:
 
 #+begin_src rust
-HashMap<ID, Vec<ID>>  // subscriber pid -> hide IDs to append
+struct SubscribeeVisibilityEdit {
+  subscriber: ID,
+  subscribee: ID,
+  visible_content: Vec<ID>,
+}
 #+end_src
+
+The pass should compare the buffer's visible direct children under
+the subscribee against the subscribee's pre-save graph 'contains' and
+the subscriber's current 'hides_from_its_subscriptions':
+
+- disk children absent from the buffer branch become hide intent;
+- disk children present in the buffer branch become unhide intent if
+  they were hidden;
+- buffer children that are not disk children of the subscribee are
+  not containment insertions. They should be rejected, ignored, or
+  normalized by an explicit policy, but never saved as
+  'subscribee.contains';
+- child order is not meaningful for save semantics.
 
 This pass should be unit-tested before it is wired into saving. This
 is the first feature-specific stage; it should not start until the
 preceding simplification stages are complete.
 
-** Fold fork edits into owned subscriber intents
+** Fold subscribee visibility edits into owned subscriber intents
 
-After graph intents and fork intents exist separately, fold
-ForkEditIntent into the subscriber's NodeEditIntent. If the
+After graph intents and subscribee visibility intents exist
+separately, fold the visibility edits into the subscriber's
+NodeEditIntent by updating 'hides_from_its_subscriptions'. If the
 subscriber has no graph edit intent yet, synthesize one from pre-save
 data.
 
@@ -659,9 +763,19 @@ When a node is shown as a subscribee, its child-list edit should not
 define its real 'contains'. That is true even if the subscribee is
 owned, per plan 2's conservative policy.
 
-So the construction of graph intents should not use children of
-'AsSubscribee' positions as real content in the first place. This is
-cleaner than producing an incorrect SaveNode and later discarding it.
+But the construction path still must preserve those buffer children
+long enough for subscribee visibility inference. The rule is:
+
+#+begin_src text
+direct AsSubscribee child list
+  -> hide/unhide intent for the subscriber
+  -> never a graph contains edit for the subscribee
+#+end_src
+
+This is cleaner than producing an incorrect SaveNode and later
+restoring its 'contains' from disk. The current restore-from-disk
+guardrail should eventually disappear or move behind the visibility
+inference pass.
 
 Title/body edits to a foreign as-a-subscribee node should still be
 reported as foreign edits. Title/body edits to an owned
@@ -757,6 +871,8 @@ the new feature:
 - DONE split NodeEditIntent into save/delete variants;
 - DONE split candidate traversal from intent construction;
 - DONE split save-field collection into explicit passes;
+- DONE neutralize direct as-subscribee child-list edits so they do
+  not become graph 'contains' edits for the subscribee;
 - preserve raw-buffer edits separately from graph edits beyond the
   current immediate NodeEditIntent-to-DefineNode conversion;
 - move unchanged filtering later, or make it intent-aware;
@@ -765,9 +881,12 @@ the new feature:
 Only then implement the feature as:
 
 - infer fork hide deltas from roles;
+- infer unhide deltas from direct AsSubscribee buffer children that
+  are disk content of the subscribee;
 - fold them into subscriber edits;
-- prevent as-a-subscribee child-list edits from becoming graph
-  'contains' edits;
+- fork foreign content-relationship edits based on ownership,
+  independent of whether the foreign node is below a subscribee
+  branch;
 - define and test SubscribeeCol completion preservation;
 - fix HiddenInSubscribeeCol insertion in rerender if the failing test
   proves it is needed.
