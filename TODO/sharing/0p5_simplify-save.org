@@ -25,20 +25,25 @@ and the current save-buffer path through:
 
 * Executive recommendation
 
-I would simplify the save side before implementing
-[[./2_hide-subscribee-content-deletions.org][2_hide-subscribee-content-deletions.org]], but I would keep the refactor
-narrow:
+Finish the save-pipeline simplifications before implementing
+[[./2_hide-subscribee-content-deletions.org][2_hide-subscribee-content-deletions.org]] or any other new sharing-save
+feature. The simplifications in this document are prerequisites, not
+optional cleanup to defer around the feature work.
 
-1. Introduce an explicit "interpreted buffer" pass that classifies
+The required order is:
+
+1. DONE Split source-move detection out of disk supplementation.
+2. Introduce an explicit "interpreted buffer" pass that classifies
    each checked ViewNode by edit role.
-2. Build save instructions from that interpreted structure.
-3. Add fork-edit extraction for as-a-subscribee content deletions as
-   another explicit pass over the same interpreted structure.
-4. Define a stricter completion contract for SubscribeeCol branches:
+3. Build save instructions from that interpreted structure.
+4. Split save extraction into explicit intent-oriented passes.
+5. Move unchanged filtering later, or make it intent-aware.
+6. Define a stricter completion contract for SubscribeeCol branches:
    preserve user-authored branch edits, and reconcile only the parts
    that are generated display.
-5. Leave broad rerender-completer cleanup for later, but do the
-   SubscribeeCol preservation work before relying on the new feature.
+7. Only then add fork-edit extraction for as-a-subscribee content
+   deletions as another explicit pass over the same interpreted
+   structure.
 
 The current temptation is to add another function after
 'reconcile_same_id_instructions'. That can work, but it makes the
@@ -67,9 +72,9 @@ Update after discussion: the rerender/completion side cannot stay
 entirely out of scope. Once edits inside SubscribeeCol branches
 matter, completion must stop treating those branches as disposable
 rendered projections. The report still stands in recommending that
-save-role classification come first, but the feature also needs a
-clear SubscribeeCol reconciliation contract before implementation is
-complete.
+save-role classification come first, and the SubscribeeCol
+reconciliation contract is also a prerequisite before feature work
+begins.
 
 * The main problem
 
@@ -234,10 +239,14 @@ The exact position of foreign validation needs care. It should happen
 after content-only as-a-subscribee edits have been removed from the
 foreign node's graph intent, but before writing anything.
 
-** Put source moves in their own pass
+** DONE Put source moves in their own pass
 
-'supplement_none_fields_from_disk_if_save' currently does several
-things:
+This has been done. The old
+'supplement_none_fields_from_disk_if_save' orchestration function was
+removed, and the existing-save path now calls focused helpers at the
+caller.
+
+The old function had several responsibilities:
 
 - fills unspecified MSV fields from disk;
 - canonicalizes pid / extra_ids from disk;
@@ -245,18 +254,18 @@ things:
 - validates source moves involving foreign sources;
 - preserves misc from disk.
 
-That is too much for a function with "supplement" in its name. I
-would split it into:
+That was too much for a function with "supplement" in its name. It
+has been split into:
 
-- 'canonicalize_existing_node_ids';
+- 'canonicalize_ids_from_disk';
 - 'detect_source_move';
 - 'supplement_unspecified_fields_from_disk';
 
-This is not required for the sharing feature, but it is an easy
-clarity win and reduces the chance that adding fork edits changes
-source-move behavior.
+This reduces the chance that adding fork edits changes source-move
+behavior. The remaining simplifications should preserve this explicit
+source-move path.
 
-* What I would not do yet
+* What remains intentionally out of scope
 
 ** Do not rewrite the whole rerender completer first
 
@@ -267,8 +276,9 @@ It also handles real complications: definitive/indefinitive nodes,
 phantoms, diff view, deleted nodes, extra-id resolution, content
 reconciliation, scaffold insertion, graph stats, view stats.
 
-I would not try to fold all of that into the save-intent refactor. A
-general cleanup of rerender completion is a separate project.
+Do not fold all of that into the save-intent refactor. A general
+cleanup of rerender completion is a separate project and is not one
+of the prerequisite simplifications meant by this document.
 
 However, the SubscribeeCol branch is not just ordinary generated
 display anymore. If user edits inside it define fork edits, then
@@ -307,7 +317,7 @@ That suggests a narrower completion contract:
 
 So the rule is not "leave rerender alone"; it is "avoid a broad
 rerender rewrite, but make SubscribeeCol completion preservation an
-explicit part of the feature."
+explicit prerequisite before implementing the feature."
 
 The one exception is directly relevant to this feature:
 the save rerender path should ensure HiddenInSubscribeeCol exists
@@ -319,8 +329,9 @@ does not appear to have an equivalent insertion step for a newly
 needed HiddenInSubscribeeCol.
 
 That should be handled as a focused renderer fix after the save-intent
-side is clear, alongside tests that prove user edits inside
-SubscribeeCol branches are not lost by completion.
+side is clear and before the feature is considered ready, alongside
+tests that prove user edits inside SubscribeeCol branches are not lost
+by completion.
 
 ** Do not collapse all sharing completers into one function
 
@@ -345,6 +356,11 @@ pipeline should ignore edits inside those scaffolds except perhaps to
 preserve or rerender them.
 
 * A concrete staged refactor
+
+Do every simplification stage in this section before implementing new
+sharing-save features. The source-move split is already complete; the
+remaining simplification stages should be treated as the pre-feature
+queue. The first feature-specific stage is marked below.
 
 ** Add role classification and tests
 
@@ -376,7 +392,8 @@ Expected behavior should remain unchanged. Existing tests should pass.
 
 ** Add fork-edit inference as a pure pass
 
-Add a pass that produces only inferred hide deltas, not SaveNodes.
+After the prerequisite save-intent shape is in place, add a pass that
+produces only inferred hide deltas, not SaveNodes.
 Inputs:
 
 - checked tree;
@@ -389,7 +406,9 @@ Output:
 HashMap<ID, Vec<ID>>  // subscriber pid -> hide IDs to append
 #+end_src
 
-This pass should be unit-tested before it is wired into saving.
+This pass should be unit-tested before it is wired into saving. This
+is the first feature-specific stage; it should not start until the
+preceding simplification stages are complete.
 
 ** Fold fork edits into owned subscriber intents
 
@@ -468,10 +487,10 @@ semantics while adding the classifier.
 
 ** Source moves
 
-Source moves are detected late today, during disk supplementation.
-If final SaveNode construction changes, source-move tests should be
-run. The function is already carrying more responsibility than its
-name suggests.
+Source moves are now detected by an explicit helper called from the
+existing-save path, separate from unspecified-field supplementation.
+If final SaveNode construction changes, source-move tests should
+still be run to preserve the current behavior.
 
 ** Foreign validation
 
@@ -495,13 +514,18 @@ hide."
 
 * Bottom line
 
-I would do one small architecture pass before the feature:
+Do all save-pipeline simplifications described above before starting
+the new feature:
 
+- DONE split source moves out of disk supplementation;
 - add role classification;
 - route existing SaveNode extraction through it;
-- keep behavior unchanged.
+- split extraction into explicit intent-oriented passes;
+- preserve raw-buffer edits separately from graph edits;
+- move unchanged filtering later, or make it intent-aware;
+- define and test SubscribeeCol completion preservation.
 
-Then implement the feature as:
+Only then implement the feature as:
 
 - infer fork hide deltas from roles;
 - fold them into subscriber edits;
