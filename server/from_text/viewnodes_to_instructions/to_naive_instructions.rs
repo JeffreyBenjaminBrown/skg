@@ -66,49 +66,67 @@ impl NodeEditIntent {
 /// extraction itself may still use interpreted save roles and
 /// internal edit intents.
 pub fn naive_saveinstructions_from_tree (
-  mut viewforest: Tree<ViewNode> // "viewforest" = tree with BufferRoot
+  viewforest: Tree<ViewNode> // "viewforest" = tree with BufferRoot
 ) -> Result<Vec<DefineNode>, String> {
   let roles : SaveRoleMap =
     classify_save_roles (&viewforest)?;
   let intents : Vec<NodeEditIntent> =
-    naive_node_edit_intents_from_tree (&mut viewforest, &roles)?;
+    naive_node_edit_intents_from_tree (&viewforest, &roles)?;
   intents
     . into_iter()
     . map (NodeEditIntent::into_define_node)
     . collect() }
 
 fn naive_node_edit_intents_from_tree (
-  viewforest : &mut Tree<ViewNode>,
+  viewforest : &Tree<ViewNode>,
   roles      : &SaveRoleMap,
 ) -> Result<Vec<NodeEditIntent>, String> {
+  let candidate_ids : Vec<NodeId> =
+    collect_preliminary_intent_candidate_ids (
+      viewforest, roles)?;
+  let mut result : Vec<NodeEditIntent> =
+    Vec::new();
+  for candidate_id in candidate_ids {
+    let true_node : TrueNode =
+      read_at_node_in_tree (
+        viewforest,
+        candidate_id,
+        |node| match &node . kind {
+          ViewNodeKind::True (t) => Ok (t . clone()),
+          _ => Err (
+            "preliminary intent candidate was not a TrueNode"
+              . to_string()),
+        })??;
+    if let Some (intent) =
+      maybe_intent_from_treenode (
+        viewforest, candidate_id, roles, &true_node)?
+    { result . push (intent); }}
+  Ok (result) }
 
-  /// May append a NodeEditIntent to 'result', and might recurse.
-  /// Skips some nodes, because:
-  /// - indefinitive nodes don't generate intents
-  /// - aliases     are handled by
-  ///   'collect_grandchild_aliases_for_viewnode'
-  /// - subscribees are handled by
-  ///   'collect_subscribees'
-  fn maybe_defineonenode_and_maybe_recurse (
-    tree    : &mut Tree<ViewNode>,
+fn collect_preliminary_intent_candidate_ids (
+  tree  : &Tree<ViewNode>,
+  roles : &SaveRoleMap,
+) -> Result<Vec<NodeId>, String> {
+  fn maybe_collect_candidate_and_recurse (
+    tree    : &Tree<ViewNode>,
     node_id : NodeId,
     roles   : &SaveRoleMap,
-    result  : &mut Vec<NodeEditIntent>
+    result  : &mut Vec<NodeId>
   ) -> Result<(), String> {
 
     /// Defined separately because it's called in two places.
     fn recurse_on_children (
-      tree: &mut Tree<ViewNode>,
+      tree: &Tree<ViewNode>,
       node_id: NodeId,
       roles: &SaveRoleMap,
-      result: &mut Vec<NodeEditIntent>
+      result: &mut Vec<NodeId>
     ) -> Result<(), String> {
       for child_treeid in
         { let child_treeids: Vec<NodeId> =
             tree . get (node_id) . unwrap() . children()
             . map(|c| c . id()) . collect();
           child_treeids }
-        { maybe_defineonenode_and_maybe_recurse(
+        { maybe_collect_candidate_and_recurse(
             tree, child_treeid, roles, result)?; }
       Ok(( )) }
 
@@ -135,20 +153,17 @@ fn naive_node_edit_intents_from_tree (
         // referent and generates no save instruction. Recurse so
         // that any user-edited descendants are not silently lost.
         recurse_on_children( tree, node_id, roles, result )?,
-      ViewNodeKind::True (t) => {
+      ViewNodeKind::True (_) => {
         if role == SaveRole::OrdinaryTrueNode
            || matches! (role, SaveRole::AsSubscribee { .. })
-        { if let Some (intent)
-            = maybe_intent_from_treenode (
-                tree, node_id, roles, &t )?
-            { result . push (intent); }
+        { result . push (node_id);
           recurse_on_children( tree, node_id, roles, result )?; }}}
     Ok(( )) }
 
-  let mut result: Vec<NodeEditIntent> = Vec::new();
-  let root_id : NodeId = viewforest . root() . id();
-  maybe_defineonenode_and_maybe_recurse (
-    viewforest, root_id, roles, &mut result ) ?;
+  let mut result: Vec<NodeId> = Vec::new();
+  let root_id : NodeId = tree . root() . id();
+  maybe_collect_candidate_and_recurse (
+    tree, root_id, roles, &mut result ) ?;
   Ok (result) }
 
 /// Returns Some(delete intent) or Some(save intent) for definitive nodes.

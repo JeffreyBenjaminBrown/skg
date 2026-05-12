@@ -507,6 +507,44 @@ TypeDB connection refused.
 'cargo fmt --check' still could not be run in this environment
 because 'cargo fmt' / 'rustfmt' was not installed.
 
+** DONE Split candidate traversal from intent construction
+
+The preliminary extraction now has one more internal boundary:
+
+#+begin_src text
+checked tree + SaveRoleMap
+  -> Vec<NodeId> candidate TrueNode positions
+  -> Vec<NodeEditIntent>
+  -> Vec<DefineNode>
+#+end_src
+
+The candidate pass owns only traversal policy: which roles recurse
+and which TrueNode positions can produce preliminary intents. Intent
+construction then maps those candidates through the existing
+'maybe_intent_from_treenode' logic.
+
+Behavior is unchanged:
+
+- candidate order preserves preorder output;
+- indefinitive candidates are still skipped when intents are built;
+- definitive 'OrdinaryTrueNode' and 'AsSubscribee' positions still
+  produce intents as before;
+- aliases, 'contains', and 'subscribes_to' still use the same
+  role-aware helper logic;
+- intents still convert immediately into 'DefineNode' values.
+
+Verification run:
+
+#+begin_src text
+cargo check
+cargo test --test new classify -- --nocapture
+cargo test --test new viewnodes_to_instructions -- --nocapture
+cargo test --test new reconcile_same_id_instructions -- --nocapture
+#+end_src
+
+'cargo fmt --check' still could not be run in this environment
+because 'cargo fmt' / 'rustfmt' was not installed.
+
 ** Add fork-edit inference as a pure pass
 
 After the prerequisite save-intent shape is in place, add a pass that
@@ -639,6 +677,7 @@ the new feature:
 - DONE route existing SaveNode extraction through it;
 - DONE add a behavior-preserving NodeEditIntent layer;
 - DONE split NodeEditIntent into save/delete variants;
+- DONE split candidate traversal from intent construction;
 - split extraction into fuller intent-oriented passes;
 - preserve raw-buffer edits separately from graph edits beyond the
   current immediate NodeEditIntent-to-DefineNode conversion;

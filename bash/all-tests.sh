@@ -15,6 +15,37 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 RESULTS_DIR="$PROJECT_ROOT/tests/results"
 BEEP="$PROJECT_ROOT/../sound/play-beep.sh beep-soothing"
+SOUND=1
+
+usage () {
+  cat <<EOF
+Usage: $0 [--no-sound]
+
+Runs Emacs, nextest, and integration tests in parallel.
+
+Options:
+  --no-sound   Do not play the completion sound.
+  -h, --help   Show this help.
+EOF
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --no-sound)
+      SOUND=0
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -215,7 +246,9 @@ echo ""
 echo -e "${DIM}Logs: $RESULTS_DIR/${NC}"
 
 # Beep
-[ -x "$BEEP" ] && "$BEEP" beep-harsh 2>/dev/null
+if [ "$SOUND" -eq 1 ]; then
+  [ -x "$BEEP" ] && "$BEEP" beep-harsh 2>/dev/null
+fi
 
 T_TOTAL=$((SECONDS - T_START))
 
