@@ -45,7 +45,9 @@ The required order is:
 7. Define a stricter completion contract for SubscribeeCol branches:
    preserve user-authored branch edits, and reconcile only the parts
    that are generated display.
-8. Only then add fork-edit extraction for as-a-subscribee content
+8. Simplify the sharing completion code by allowing extra cheap tree
+   traversals instead of preserving tightly coupled one-pass logic.
+9. Only then add fork-edit extraction for as-a-subscribee content
    deletions as another explicit pass over the same interpreted
    structure.
 
@@ -358,6 +360,33 @@ That suggests a narrower completion contract:
 So the rule is not "leave rerender alone"; it is "avoid a broad
 rerender rewrite, but make SubscribeeCol completion preservation an
 explicit prerequisite before implementing the feature."
+
+Update after revisiting the completion code: we are not ready for
+feature implementation. The save-side role/intent work is not enough.
+The sharing completion code was written under pressure to minimize
+tree traversals, and that premise should be explicitly discarded
+before adding subscribee-edit behavior. A few extra passes over an
+ego_tree buffer are cheap compared to TypeDB, disk, git diff,
+Tantivy, and rendering work; using multiple small traversals is a
+better tradeoff than preserving dense traversal/borrow choreography.
+
+Before implementing hide/unhide, add a bite-sized completion
+simplification pass that makes the SubscribeeCol / HiddenIn /
+HiddenOutside code easier to reason about:
+
+- separate "read current tree facts" from "mutate the tree";
+- precompute goal lists, child data, existing scaffold children, and
+  erroneous children with straightforward traversals;
+- then perform focused mutation passes such as reconcile children,
+  insert/move scaffolds, mark erroneous content independent, and
+  detach empty scaffolds;
+- keep behavior unchanged, including diff-mode phantom handling and
+  existing generated-scaffold ordering.
+
+This is not a request to rewrite all rerender completion. It is a
+targeted unwinding of premature traversal optimization in the sharing
+completion path, so the later preservation contract can be added
+without threading new semantics through already-dense code.
 
 The one exception is directly relevant to this feature:
 the save rerender path should ensure HiddenInSubscribeeCol exists
@@ -848,6 +877,37 @@ should happen when the node is viewed directly, not as a subscribee.
 I would enforce that consistently unless you decide otherwise.
 Jeff speaking: Agreed.
 
+** Simplify sharing completion before feature work
+
+Do this before implementing hide/unhide inference. The immediate goal
+is behavior-preserving clarity, not new sharing behavior.
+
+The sharing completion path should stop treating extra tree traversal
+as expensive. A 500-node ego_tree traversal should be tiny relative
+to the rest of save/rerender, so the code should prefer several
+explicit passes over one dense pass that tries to read, classify,
+build, reconcile, and mutate in the same control flow.
+
+The bite-sized version:
+
+- for SubscribeeCol, split the current preorder function into small
+  helpers that first read parent/subscription facts and compute goals,
+  then separately reconcile child subscribees, then separately ensure
+  HiddenOutside exists and is last;
+- for HiddenInSubscribeeCol and HiddenOutsideOfSubscribeeCol, split
+  "compute goal/removed IDs and child data" from "reconcile scaffold
+  children" from "mark erroneous content independent" from "detach if
+  empty";
+- keep the existing shared helpers like
+  'reconcile_sharing_scaffold_children', but do not contort callers
+  merely to avoid traversing the tree again;
+- add regression tests that prove output is unchanged for existing
+  hidden-in, hidden-outside, and subscribee-col scenarios.
+
+This should make the later preservation rule easier: completion can
+first snapshot the user-authored SubscribeeCol branch edits, then
+perform generated-display reconciliation around them.
+
 ** Then fix SubscribeeCol rerender preservation
 
 Once the save instructions really persist the hide, run the failing
@@ -942,6 +1002,8 @@ the new feature:
 - preserve raw-buffer edits separately from graph edits beyond the
   current immediate NodeEditIntent-to-DefineNode conversion;
 - move unchanged filtering later, or make it intent-aware;
+- simplify sharing completion by replacing traversal-minimizing
+  control flow with small explicit read/compute/mutate passes;
 - define and test SubscribeeCol completion preservation.
 
 Only then implement the feature as:
