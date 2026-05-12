@@ -3,8 +3,8 @@
 This report reviews:
 
 - [[./0_DONE_overview-and-test.org][0_DONE_overview-and-test.org]]
-- [[./1_dedup-sharing-rel-completion.org][1_dedup-sharing-rel-completion.org]]
-- [[./2_hide-subscribee-content-deletions.org][2_hide-subscribee-content-deletions.org]]
+- [[./1_DONE_dedup-sharing-rel-completion.org][1_DONE_dedup-sharing-rel-completion.org]]
+- [[./2_DONE_hide-subscribee-content-deletions.org][2_DONE_hide-subscribee-content-deletions.org]]
 
 and the current save-buffer path through:
 
@@ -26,7 +26,7 @@ and the current save-buffer path through:
 * Executive recommendation
 
 Finish the save-pipeline simplifications before implementing
-[[./2_hide-subscribee-content-deletions.org][2_hide-subscribee-content-deletions.org]] or any other new sharing-save
+[[./2_DONE_hide-subscribee-content-deletions.org][2_DONE_hide-subscribee-content-deletions.org]] or any other new sharing-save
 feature. The simplifications in this document are prerequisites, not
 optional cleanup to defer around the feature work.
 

@@ -1,3 +1,8 @@
+* TODO continue TODO/sharing/ at 3_*.org
+* further subdivide the completion logic
+Traversing a 500 node tree in ego_tree takes about 10 microseconds,
+says ChatGPT, so I could do that a hundred times and only add 1 milisecond
+to the time it takes to save a buffer.
 * What's the second blue { in the herald for?
 Saw it looking at 'address', common to Valentina and Maps.
 * unify the three skg instances
