@@ -39,7 +39,7 @@ The required order is:
    interpreted structure.
 4. DONE Begin splitting save extraction into explicit intent-oriented
    passes by introducing an internal NodeEditIntent layer.
-5. Move unchanged filtering later, or make it intent-aware.
+5. PARTIAL Move unchanged filtering later, or make it intent-aware.
 6. Define a stricter completion contract for SubscribeeCol branches:
    preserve user-authored branch edits, and reconcile only the parts
    that are generated display.
@@ -218,7 +218,7 @@ folded into owned subscriber edits. That avoids the current failure
 mode where a foreign subscribee's content-only view edit becomes a
 'ModifiedForeignNode' before the subscriber hide can be considered.
 
-** Move unchanged filtering later, or make it intent-aware
+** PARTIAL Move unchanged filtering later, or make it intent-aware
 
 Currently:
 
@@ -248,6 +248,34 @@ raw edit intents
 The exact position of foreign validation needs care. It should happen
 after content-only as-a-subscribee edits have been removed from the
 foreign node's graph intent, but before writing anything.
+
+Update: the current DefineNode pipeline now runs unchanged filtering
+after same-ID reconciliation, ID canonicalization, source-move
+detection, and disk supplementation. Deletes still bypass disk
+supplementation and remain kept by the filter; new saves without a
+disk node also remain kept. Existing saves have unspecified MSV fields
+filled from disk before comparison, so omitted non-definitive fields
+continue to behave as no-ops.
+
+This is only partial for the larger sharing-save plan. Future fork
+edits still need to be represented and folded into node edits before
+filtering once ForkEditIntent exists; the filter is still
+DefineNode-based and still compares against the pre-save in-Rust graph
+via nodecomplete_from_in_rust_graph.
+
+Verification:
+
+#+begin_src text
+cargo check
+cargo test --test new classify -- --nocapture
+cargo test --test new viewnodes_to_instructions -- --nocapture
+cargo test --test new reconcile_same_id_instructions -- --nocapture
+cargo nextest run --test move_source
+cargo test none_node_fields_are_noops -- --nocapture
+#+end_src
+
+'cargo fmt --check' was attempted but this toolchain does not have the
+'cargo fmt' subcommand installed.
 
 ** DONE Put source moves in their own pass
 

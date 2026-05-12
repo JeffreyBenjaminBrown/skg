@@ -23,7 +23,7 @@ use typedb_driver::TypeDBDriver;
 /// ASSUMES indefinitive nodes produced no instructions.
 /// The initial extraction is called "naive" because its output
 /// is preliminary: it has not yet gone through same-ID reconciliation,
-/// unchanged filtering, or disk supplementation.
+/// disk supplementation, or unchanged filtering.
 pub async fn viewforest_to_nonmerge_save_instructions (
   viewforest : &Tree<ViewNode>, // "viewforest" = tree with BufferRoot
   config : &SkgConfig,
@@ -34,13 +34,10 @@ pub async fn viewforest_to_nonmerge_save_instructions (
       viewforest . clone( )) ?;
   let instructions_without_dups : Vec<DefineNode> =
     reconcile_same_id_instructions (naive_instructions) ?;
-  let changed_instructions : Vec<DefineNode> =
-    filter_unchanged_save_instructions (
-      instructions_without_dups );
   let mut result : Vec<DefineNode> =
-    Vec::with_capacity ( changed_instructions . len() );
+    Vec::with_capacity ( instructions_without_dups . len() );
   let mut source_moves : Vec<SourceMove> = Vec::new();
-  for instr in changed_instructions {
+  for instr in instructions_without_dups {
     let instr : DefineNode = instr;
     match instr {
       DefineNode::Delete (_) =>
@@ -69,12 +66,16 @@ pub async fn viewforest_to_nonmerge_save_instructions (
             if let Some (sm) = maybe_move {
               let sm : SourceMove = sm;
               source_moves . push (sm); }}} }}}
-  Ok ((result, source_moves)) }
+  let changed_instructions : Vec<DefineNode> =
+    filter_unchanged_save_instructions (result);
+  Ok ((changed_instructions, source_moves)) }
 
 /// Filters out Save instructions that would be no-ops,
 /// because they match the pre-save in-Rust graph entry
 /// (nothing changed). Delete instructions and new nodes (not yet
-/// in the in-Rust graph) are kept.
+/// in the in-Rust graph) are kept. This runs after disk
+/// supplementation so unspecified fields have already been restored
+/// to their disk values before comparison.
 fn filter_unchanged_save_instructions (
   instructions : Vec<DefineNode>,
 ) -> Vec<DefineNode> {
