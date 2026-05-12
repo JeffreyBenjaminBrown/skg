@@ -573,6 +573,56 @@ cargo test --test new reconcile_same_id_instructions -- --nocapture
 'cargo fmt --check' still could not be run in this environment
 because 'cargo fmt' / 'rustfmt' was not installed.
 
+** DONE Split save-field collection into explicit passes
+
+The preliminary extraction now separates candidate traversal from the
+field collection used to assemble save/delete intents:
+
+#+begin_src text
+checked tree + SaveRoleMap
+  -> Vec<NodeId> candidate TrueNode positions
+  -> NodeEditMinimal by candidate
+  -> contains / aliases / subscribes_to by save candidate
+  -> Vec<NodeEditIntent>
+  -> Vec<DefineNode>
+#+end_src
+
+This is still behavior-preserving and still internal to
+'to_naive_instructions.rs'. It does not infer fork edits, does not
+change filtering, and does not change the immediate conversion from
+'NodeEditIntent' to 'DefineNode'.
+
+The split makes the remaining fork-edit work less awkward because
+ordinary graph fields are now collected in named passes rather than
+inside one recursive function. Current behavior is preserved:
+
+- candidate order still determines preorder output;
+- indefinitive candidates still produce no intent;
+- delete intents still carry only 'pid' and 'source';
+- definitive 'OrdinaryTrueNode' and 'AsSubscribee' positions still
+  produce save intents;
+- 'contains', aliases, and 'subscribes_to' use the existing
+  role-aware rules;
+- 'hides_from_its_subscriptions' and 'overrides_view_of' remain
+  'MSV::Unspecified'.
+
+Added a mixed regression test covering ordinary content, independent
+content exclusion, alias collection, SubscribeeCol 'subscribes_to',
+and delete output across the split extraction passes.
+
+Verification run:
+
+#+begin_src text
+cargo check
+cargo test --test new classify -- --nocapture
+cargo test --test new viewnodes_to_instructions -- --nocapture
+cargo test --test new reconcile_same_id_instructions -- --nocapture
+#+end_src
+
+All of those passed in this environment. 'cargo fmt --check' was
+attempted but this toolchain does not have the 'cargo fmt' subcommand
+installed.
+
 ** Add fork-edit inference as a pure pass
 
 After the prerequisite save-intent shape is in place, add a pass that
@@ -706,7 +756,7 @@ the new feature:
 - DONE add a behavior-preserving NodeEditIntent layer;
 - DONE split NodeEditIntent into save/delete variants;
 - DONE split candidate traversal from intent construction;
-- split extraction into fuller intent-oriented passes;
+- DONE split save-field collection into explicit passes;
 - preserve raw-buffer edits separately from graph edits beyond the
   current immediate NodeEditIntent-to-DefineNode conversion;
 - move unchanged filtering later, or make it intent-aware;

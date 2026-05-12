@@ -9,6 +9,7 @@ use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::viewnode_nodecomplete::{ collect_grandchild_aliases_for_viewnode, unique_scaffold_child };
 use crate::types::list::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
+use std::collections::HashMap;
 
 enum NodeEditIntent {
   Save   (NodeSaveIntent),
@@ -30,6 +31,20 @@ struct NodeSaveIntent {
 struct NodeDeleteIntent {
   pid    : ID,
   source : SourceName,
+}
+
+struct NodeEditMinimal {
+  pid    : ID,
+  source : SourceName,
+  kind   : NodeEditMinimalAction,
+}
+
+enum NodeEditMinimalAction {
+  Save {
+    title : String,
+    body  : Option<String>,
+  },
+  Delete,
 }
 
 impl NodeEditIntent {
@@ -84,24 +99,34 @@ fn naive_node_edit_intents_from_tree (
   let candidate_ids : Vec<NodeId> =
     collect_preliminary_intent_candidate_ids (
       viewforest, roles)?;
-  let mut result : Vec<NodeEditIntent> =
-    Vec::new();
-  for candidate_id in candidate_ids {
-    let true_node : TrueNode =
-      read_at_node_in_tree (
-        viewforest,
-        candidate_id,
-        |node| match &node . kind {
-          ViewNodeKind::True (t) => Ok (t . clone()),
-          _ => Err (
-            "preliminary intent candidate was not a TrueNode"
-              . to_string()),
-        })??;
-    if let Some (intent) =
-      maybe_intent_from_treenode (
-        viewforest, candidate_id, roles, &true_node)?
-    { result . push (intent); }}
-  Ok (result) }
+  let basics_by_node_id : HashMap<NodeId, NodeEditMinimal> =
+    collect_node_edit_basics (viewforest, &candidate_ids)?;
+  let save_candidate_ids : Vec<NodeId> =
+    candidate_ids . iter()
+    . filter_map (|candidate_id| {
+      basics_by_node_id . get (candidate_id)
+        . and_then (|basics| match basics . kind {
+          NodeEditMinimalAction::Save { .. } =>
+            Some (*candidate_id),
+          NodeEditMinimalAction::Delete =>
+            None,
+        })})
+    . collect();
+  let contains_by_node_id : HashMap<NodeId, Vec<ID>> =
+    collect_contains_by_node_id (
+      viewforest, &save_candidate_ids, roles)?;
+  let aliases_by_node_id : HashMap<NodeId, MSV<String>> =
+    collect_aliases_by_node_id (
+      viewforest, &save_candidate_ids)?;
+  let subscribees_by_node_id : HashMap<NodeId, MSV<ID>> =
+    collect_subscribees_by_node_id (
+      viewforest, &save_candidate_ids, roles)?;
+  assemble_node_edit_intents (
+    candidate_ids,
+    basics_by_node_id,
+    contains_by_node_id,
+    aliases_by_node_id,
+    subscribees_by_node_id) }
 
 fn collect_preliminary_intent_candidate_ids (
   tree  : &Tree<ViewNode>,
@@ -166,39 +191,130 @@ fn collect_preliminary_intent_candidate_ids (
     tree, root_id, roles, &mut result ) ?;
   Ok (result) }
 
-/// Returns Some(delete intent) or Some(save intent) for definitive nodes.
-/// Returns None for indefinitive nodes.
-fn maybe_intent_from_treenode (
-  tree    : &Tree<ViewNode>,
-  node_id : NodeId,
-  roles   : &SaveRoleMap,
-  t       : &TrueNode
-) -> Result<Option<NodeEditIntent>, String> {
+fn collect_node_edit_basics (
+  tree          : &Tree<ViewNode>,
+  candidate_ids : &[NodeId],
+) -> Result<HashMap<NodeId, NodeEditMinimal>, String> {
+  let mut result : HashMap<NodeId, NodeEditMinimal> =
+    HashMap::new();
+  for candidate_id in candidate_ids {
+    let true_node : TrueNode =
+      read_at_node_in_tree (
+        tree,
+        *candidate_id,
+        |node| match &node . kind {
+          ViewNodeKind::True (t) => Ok (t . clone()),
+          _ => Err (
+            "preliminary intent candidate was not a TrueNode"
+              . to_string()),
+        })??;
+    if let Some (basics) =
+      node_edit_basics_from_treenode (&true_node)
+    { result . insert (*candidate_id, basics); }}
+  Ok (result) }
+
+fn node_edit_basics_from_treenode (
+  t : &TrueNode
+) -> Option<NodeEditMinimal> {
   match &t . indef_or_def {
-    IndefOrDef::Indefinitive => return Ok (None),
+    IndefOrDef::Indefinitive =>
+      None,
     IndefOrDef::Definitive { body, edit_request } => {
       if *edit_request == Some (EditRequest::Delete) {
-        return Ok(Some(NodeEditIntent::Delete(NodeDeleteIntent {
+        return Some (NodeEditMinimal {
           pid    : t . id . clone(),
           source : t . source . clone(),
-        }))); }
-      let node_ref : NodeRef<ViewNode> =
-        tree . get (node_id) . ok_or(
-          "maybe_intent_from_treenode: node not found")?;
-      Ok(Some(NodeEditIntent::Save(NodeSaveIntent {
-        pid           : t . id . clone(),
-        source        : t . source . clone(),
-        title         : t . title . clone(),
-        body          : body . clone(),
-        contains      :
-          collect_contents_to_save_from_children (&node_ref, roles),
-        aliases       : collect_grandchild_aliases_for_viewnode(
-          tree, node_id)?,
-        subscribes_to :
-          collect_subscribees( tree, node_id, roles )?,
+          kind   : NodeEditMinimalAction::Delete,
+        }); }
+      Some (NodeEditMinimal {
+        pid    : t . id . clone(),
+        source : t . source . clone(),
+        kind   : NodeEditMinimalAction::Save {
+          title : t . title . clone(),
+          body  : body . clone(),
+        },
+      }) }}}
+
+fn collect_contains_by_node_id (
+  tree               : &Tree<ViewNode>,
+  save_candidate_ids : &[NodeId],
+  roles              : &SaveRoleMap,
+) -> Result<HashMap<NodeId, Vec<ID>>, String> {
+  let mut result : HashMap<NodeId, Vec<ID>> =
+    HashMap::new();
+  for candidate_id in save_candidate_ids {
+    let node_ref : NodeRef<ViewNode> =
+      tree . get (*candidate_id) . ok_or(
+        "collect_contains_by_node_id: node not found")?;
+    result . insert (
+      *candidate_id,
+      collect_contents_to_save_from_children (&node_ref, roles)); }
+  Ok (result) }
+
+fn collect_aliases_by_node_id (
+  tree               : &Tree<ViewNode>,
+  save_candidate_ids : &[NodeId],
+) -> Result<HashMap<NodeId, MSV<String>>, String> {
+  let mut result : HashMap<NodeId, MSV<String>> =
+    HashMap::new();
+  for candidate_id in save_candidate_ids {
+    result . insert (
+      *candidate_id,
+      collect_grandchild_aliases_for_viewnode (tree, *candidate_id)?); }
+  Ok (result) }
+
+fn collect_subscribees_by_node_id (
+  tree               : &Tree<ViewNode>,
+  save_candidate_ids : &[NodeId],
+  roles              : &SaveRoleMap,
+) -> Result<HashMap<NodeId, MSV<ID>>, String> {
+  let mut result : HashMap<NodeId, MSV<ID>> =
+    HashMap::new();
+  for candidate_id in save_candidate_ids {
+    result . insert (
+      *candidate_id,
+      collect_subscribees (tree, *candidate_id, roles)?); }
+  Ok (result) }
+
+fn assemble_node_edit_intents (
+  candidate_ids          : Vec<NodeId>,
+  mut basics_by_node_id  : HashMap<NodeId, NodeEditMinimal>,
+  mut contains_by_node_id : HashMap<NodeId, Vec<ID>>,
+  mut aliases_by_node_id : HashMap<NodeId, MSV<String>>,
+  mut subscribees_by_node_id : HashMap<NodeId, MSV<ID>>,
+) -> Result<Vec<NodeEditIntent>, String> {
+  let mut result : Vec<NodeEditIntent> =
+    Vec::new();
+  for candidate_id in candidate_ids {
+    let Some (basics) =
+      basics_by_node_id . remove (&candidate_id)
+    else { continue; };
+    match basics . kind {
+      NodeEditMinimalAction::Delete =>
+        result . push (NodeEditIntent::Delete (NodeDeleteIntent {
+          pid    : basics . pid,
+          source : basics . source,
+        })),
+      NodeEditMinimalAction::Save { title, body } =>
+        result . push (NodeEditIntent::Save (NodeSaveIntent {
+          pid                          : basics . pid,
+          source                       : basics . source,
+          title,
+          body,
+          contains                     :
+            contains_by_node_id . remove (&candidate_id) . ok_or (
+              "assemble_node_edit_intents: missing contains")?,
+          aliases                      :
+            aliases_by_node_id . remove (&candidate_id) . ok_or (
+              "assemble_node_edit_intents: missing aliases")?,
+          subscribes_to                :
+            subscribees_by_node_id . remove (&candidate_id) . ok_or (
+              "assemble_node_edit_intents: missing subscribees")?,
         hides_from_its_subscriptions : MSV::Unspecified,
         overrides_view_of            : MSV::Unspecified,
-      }))) }}}
+        })),
+    }}
+  Ok (result) }
 
 /// Treats the input tree as the source of truth; does not read dbs.
 /// Returns None if no SubscribeeCol found,
