@@ -14,6 +14,24 @@ use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::nodes::complete::NodeComplete;
 use ego_tree::Tree;
 
+fn save_ids (
+  instructions : &[DefineNode],
+) -> Vec<ID> {
+  instructions . iter() . map (|instruction| match instruction {
+    DefineNode::Save (SaveNode (node)) => node . pid . clone(),
+    DefineNode::Delete (DeleteNode { id, .. }) => id . clone(),
+  }) . collect() }
+
+fn saved_node_by_id<'a> (
+  instructions : &'a [DefineNode],
+  id           : &str,
+) -> &'a NodeComplete {
+  for instruction in instructions {
+    if let DefineNode::Save (SaveNode (node)) = instruction {
+      if node . pid == ID::from (id) {
+        return node; }}}
+  panic! ("SaveNode not found: {}", id) }
+
 #[test]
 fn test_viewforest_to_nonmerge_save_instructions_basic() {
   let input: &str =
@@ -193,6 +211,98 @@ fn test_viewforest_to_nonmerge_save_instructions_mixed_relations() {
   assert_eq!(root_skg . aliases, MSV::Specified(vec!["my alias" . to_string()]));
   assert_eq!(root_skg . contains, vec![ID::from ("content1"), ID::from ("content2")]); // Only Content relations
 }
+
+#[test]
+fn role_aware_extraction_preserves_content_and_independent_children (
+) {
+  let input: &str =
+    indoc! {"
+            * (skg (node (id root) (source main))) root
+            ** (skg (node (id ordinary) (source main))) ordinary
+            ** (skg (node (id independent) (source main) (birth independent))) independent
+        "};
+
+  let unchecked_viewforest : Tree<UncheckedViewNode> =
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let viewforest: Tree<ViewNode> =
+    unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
+  let instructions: Vec<DefineNode> =
+    naive_saveinstructions_from_tree (viewforest) . unwrap();
+
+  assert_eq!(
+    save_ids (&instructions),
+    vec![ID::from ("root"), ID::from ("ordinary"), ID::from ("independent")]);
+  assert_eq!(
+    saved_node_by_id (&instructions, "root") . contains,
+    vec![ID::from ("ordinary")]); }
+
+#[test]
+fn role_aware_extraction_skips_alias_and_id_display_nodes (
+) {
+  let input: &str =
+    indoc! {"
+            * (skg (node (id root) (source main))) root
+            ** (skg aliasCol) aliases
+            *** (skg alias) alias text
+            ** (skg idCol) IDs
+            *** (skg id) extra-id
+            ** (skg (node (id child) (source main))) child
+        "};
+
+  let unchecked_viewforest : Tree<UncheckedViewNode> =
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let viewforest: Tree<ViewNode> =
+    unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
+  let instructions: Vec<DefineNode> =
+    naive_saveinstructions_from_tree (viewforest) . unwrap();
+
+  assert_eq!(
+    save_ids (&instructions),
+    vec![ID::from ("root"), ID::from ("child")]);
+  assert_eq!(
+    saved_node_by_id (&instructions, "root") . aliases,
+    MSV::Specified (vec!["alias text" . to_string()]));
+  assert_eq!(
+    saved_node_by_id (&instructions, "root") . contains,
+    vec![ID::from ("child")]); }
+
+#[test]
+fn role_aware_extraction_collects_subscribees_without_hidden_branches (
+) {
+  let input: &str =
+    indoc! {"
+            * (skg (node (id subscriber) (source main))) subscriber
+            ** (skg subscribeeCol) subscribees
+            *** (skg (node (id subscribee) (source main))) subscribee
+            **** (skg hiddenInSubscribeeCol) hidden in
+            ***** (skg (node (id hidden-in) (source main))) hidden in child
+            **** (skg (node (id subscribee-content) (source main))) subscribee content
+            *** (skg hiddenOutsideOfSubscribeeCol) hidden outside
+            **** (skg (node (id hidden-outside) (source main))) hidden outside child
+        "};
+
+  let unchecked_viewforest : Tree<UncheckedViewNode> =
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let viewforest: Tree<ViewNode> =
+    unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
+  let instructions: Vec<DefineNode> =
+    naive_saveinstructions_from_tree (viewforest) . unwrap();
+
+  assert_eq!(
+    save_ids (&instructions),
+    vec![
+      ID::from ("subscriber"),
+      ID::from ("subscribee"),
+      ID::from ("subscribee-content")]);
+  assert_eq!(
+    saved_node_by_id (&instructions, "subscriber") . subscribes_to,
+    MSV::Specified (vec![ID::from ("subscribee")]));
+  assert_eq!(
+    saved_node_by_id (&instructions, "subscriber") . contains,
+    vec![]);
+  assert_eq!(
+    saved_node_by_id (&instructions, "subscribee") . contains,
+    vec![ID::from ("subscribee-content")]); }
 
 #[test]
 fn test_viewforest_to_nonmerge_save_instructions_deep_nesting() {

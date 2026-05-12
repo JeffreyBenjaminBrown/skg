@@ -1,11 +1,12 @@
+use crate::from_text::viewnodes_to_instructions::classify::{
+  classify_save_roles, SaveRole, SaveRoleMap };
 use crate::types::viewnode::EditRequest;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, TrueNode, IndefOrDef};
 use crate::types::misc::{ID, MSV};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 use crate::types::tree::generic::read_at_node_in_tree;
-use crate::types::tree::viewnode_nodecomplete::{
-  collect_grandchild_aliases_for_viewnode, unique_scaffold_child };
+use crate::types::tree::viewnode_nodecomplete::{ collect_grandchild_aliases_for_viewnode, unique_scaffold_child };
 use crate::types::list::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 
@@ -18,6 +19,8 @@ use ego_tree::{NodeId, NodeRef, Tree};
 pub fn naive_saveinstructions_from_tree (
   mut viewforest: Tree<ViewNode> // "viewforest" = tree with BufferRoot
 ) -> Result<Vec<DefineNode>, String> {
+  let roles : SaveRoleMap =
+    classify_save_roles (&viewforest)?;
 
   /// May append a DefineNode to 'result', and might recurse.
   /// Skips some nodes, because:
@@ -29,6 +32,7 @@ pub fn naive_saveinstructions_from_tree (
   fn maybe_defineonenode_and_maybe_recurse (
     tree    : &mut Tree<ViewNode>,
     node_id : NodeId,
+    roles   : &SaveRoleMap,
     result  : &mut Vec<DefineNode>
   ) -> Result<(), String> {
 
@@ -36,6 +40,7 @@ pub fn naive_saveinstructions_from_tree (
     fn recurse_on_children (
       tree: &mut Tree<ViewNode>,
       node_id: NodeId,
+      roles: &SaveRoleMap,
       result: &mut Vec<DefineNode>
     ) -> Result<(), String> {
       for child_treeid in
@@ -44,39 +49,46 @@ pub fn naive_saveinstructions_from_tree (
             . map(|c| c . id()) . collect();
           child_treeids }
         { maybe_defineonenode_and_maybe_recurse(
-            tree, child_treeid, result)?; }
+            tree, child_treeid, roles, result)?; }
       Ok(( )) }
 
     let node_kind: ViewNodeKind = read_at_node_in_tree(
         tree, node_id, |node| node . kind . clone())?;
+    let role : SaveRole =
+      roles . get (&node_id) . ok_or (
+        "maybe_defineonenode_and_maybe_recurse: node has no SaveRole")?
+      . clone();
     match node_kind {
       ViewNodeKind::Scaff (Scaffold::BufferRoot) =>
-        recurse_on_children( tree, node_id, result )?,
+        recurse_on_children( tree, node_id, roles, result )?,
       ViewNodeKind::Scaff (Scaffold::SubscribeeCol) =>
-        recurse_on_children( tree, node_id, result )?,
+        recurse_on_children( tree, node_id, roles, result )?,
       ViewNodeKind::Scaff (_) => {
         // TODO ? Recurse into more Scaffolds.
       },
       ViewNodeKind::Deleted (_) =>
-        recurse_on_children( tree, node_id, result )?,
+        recurse_on_children( tree, node_id, roles, result )?,
       ViewNodeKind::DeletedScaff (_) =>
-        recurse_on_children( tree, node_id, result )?,
+        recurse_on_children( tree, node_id, roles, result )?,
       ViewNodeKind::Unknown (_) =>
         // Inert: an UnknownNode is a placeholder for a missing
         // referent and generates no save instruction. Recurse so
         // that any user-edited descendants are not silently lost.
-        recurse_on_children( tree, node_id, result )?,
+        recurse_on_children( tree, node_id, roles, result )?,
       ViewNodeKind::True (t) => {
-        if let Some (instruction)
-          = maybe_instruction_from_treenode( tree, node_id, &t )?
-          { result . push (instruction); }
-        recurse_on_children( tree, node_id, result )?; }}
+        if role == SaveRole::OrdinaryTrueNode
+           || matches! (role, SaveRole::AsSubscribee { .. })
+        { if let Some (instruction)
+            = maybe_instruction_from_treenode (
+                tree, node_id, roles, &t )?
+            { result . push (instruction); }
+          recurse_on_children( tree, node_id, roles, result )?; }}}
     Ok(( )) }
 
   let mut result: Vec<DefineNode> = Vec::new();
   let root_id : NodeId = viewforest . root() . id();
   maybe_defineonenode_and_maybe_recurse (
-    &mut viewforest, root_id, &mut result ) ?;
+    &mut viewforest, root_id, &roles, &mut result ) ?;
   Ok (result) }
 
 /// Returns Some(Delete) or Some(Save) for definitive nodes.
@@ -84,6 +96,7 @@ pub fn naive_saveinstructions_from_tree (
 fn maybe_instruction_from_treenode (
   tree    : &Tree<ViewNode>,
   node_id : NodeId,
+  roles   : &SaveRoleMap,
   t       : &TrueNode
 ) -> Result<Option<DefineNode>, String> {
   match &t . indef_or_def {
@@ -105,9 +118,9 @@ fn maybe_instruction_from_treenode (
         extra_ids: vec![],
         body:    body . clone(),
         contains:
-          collect_contents_to_save_from_children (&node_ref),
+          collect_contents_to_save_from_children (&node_ref, roles),
         subscribes_to:
-          collect_subscribees( tree, node_id )?,
+          collect_subscribees( tree, node_id, roles )?,
         hides_from_its_subscriptions: MSV::Unspecified,
         overrides_view_of: MSV::Unspecified,
         misc: Vec::new () } )) )) }}}
@@ -121,6 +134,7 @@ fn maybe_instruction_from_treenode (
 fn collect_subscribees (
   tree: &Tree<ViewNode>,
   node_id: NodeId,
+  roles: &SaveRoleMap,
 ) -> Result<MSV<ID>, String> {
   let subscribee_col_id : Option<NodeId> =
     unique_scaffold_child (
@@ -137,8 +151,11 @@ fn collect_subscribees (
           let child_node : &ViewNode = subscribeecol_child . value();
           match &child_node . kind {
             ViewNodeKind::True (t) => {
-              if !t . parent_ignores_it() {
-                subscribees . push(t . id . clone()); }},
+              if matches!(
+                   roles . get (&subscribeecol_child . id()),
+                   Some (SaveRole::AsSubscribee { .. }))
+                 && !t . parent_ignores_it()
+              { subscribees . push(t . id . clone()); }},
             ViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol) =>
               continue, // valid child of SubscribeeCol, but not a subscribee
             ViewNodeKind::Deleted (_) |
@@ -155,7 +172,8 @@ fn collect_subscribees (
 /// - any phantom content ('Removed' or 'RemovedHere')
 /// - anything about to be deleted
 fn collect_contents_to_save_from_children<'a> (
-  node_ref: &NodeRef<'a, ViewNode>
+  node_ref: &NodeRef<'a, ViewNode>,
+  roles: &SaveRoleMap,
 ) -> Vec<ID> {
   let mut contents: Vec<ID> =
     Vec::new();
@@ -164,7 +182,10 @@ fn collect_contents_to_save_from_children<'a> (
     match &child . kind {
       ViewNodeKind::True (t) => {
         // In diff view, skip phantom nodes.
-        if ! t . parent_ignores_it()
+        if matches!(
+             roles . get (&child_ref . id()),
+             Some (SaveRole::OrdinaryTrueNode))
+           && ! t . parent_ignores_it()
            && ! t . is_phantom ()
            && ! matches!( t . edit_request (),
                           Some (&EditRequest::Delete))

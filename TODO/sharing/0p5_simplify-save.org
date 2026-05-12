@@ -35,7 +35,8 @@ The required order is:
 1. DONE Split source-move detection out of disk supplementation.
 2. DONE Introduce an explicit read-only pass that classifies each
    checked ViewNode by save role.
-3. Build save instructions from that interpreted structure.
+3. DONE Route existing SaveNode construction through that
+   interpreted structure.
 4. Split save extraction into explicit intent-oriented passes.
 5. Move unchanged filtering later, or make it intent-aware.
 6. Define a stricter completion contract for SubscribeeCol branches:
@@ -72,9 +73,10 @@ Update after discussion: the rerender/completion side cannot stay
 entirely out of scope. Once edits inside SubscribeeCol branches
 matter, completion must stop treating those branches as disposable
 rendered projections. The save-role classifier now exists as a
-read-only pass; the next save-side step is to route SaveNode
-construction through it. The SubscribeeCol reconciliation contract is
-also a prerequisite before feature work begins.
+read-only pass, and ordinary SaveNode construction now consults it
+for traversal, 'contains', and 'subscribes_to'. The SubscribeeCol
+reconciliation contract is still a prerequisite before feature work
+begins.
 
 * The main problem
 
@@ -89,10 +91,11 @@ The save pipeline currently conflates three ideas:
 That conflation is visible in
 [[../../server/from_text/viewnodes_to_instructions/to_naive_instructions.rs][to_naive_instructions.rs]]:
 
-- 'maybe_instruction_from_treenode' always treats a definitive
-  TrueNode's non-ignored TrueNode children as the node's real
-  'contains'.
-- 'collect_subscribees' treats SubscribeeCol children specially.
+- 'maybe_instruction_from_treenode' still builds full SaveNodes in
+  the first extraction pass.
+- 'collect_contents_to_save_from_children' and 'collect_subscribees'
+  now use 'SaveRole', but the output is still final graph
+  instructions rather than explicit intermediate intents.
 - 'hides_from_its_subscriptions' is hardcoded to 'MSV::Unspecified'.
 - most scaffolds are skipped entirely.
 
@@ -126,8 +129,9 @@ facts like:
   delete request.
 
 This stayed intentionally small: a 'HashMap<NodeId, SaveRole>' and a
-public 'classify_save_roles' function. It is not wired into SaveNode
-construction yet.
+public 'classify_save_roles' function. It has since been wired into
+ordinary SaveNode extraction, while the larger intent-oriented split
+remains future work.
 
 Implemented role shape:
 
@@ -383,19 +387,43 @@ cover:
 The test target 'cargo test --test new classify -- --nocapture'
 passes.
 
-** Refactor ordinary SaveNode construction to use roles
+** DONE Refactor ordinary SaveNode construction to use roles
 
-Change 'naive_saveinstructions_from_tree' so it no longer decides
-what to recurse into and what children count as content by ad hoc
-matching alone. It should use the classifier:
+'naive_saveinstructions_from_tree' now computes 'SaveRoleMap' once
+and uses it so it no longer decides what children count as content by
+ad hoc matching alone:
 
 - ordinary graph nodes produce Save/Delete instructions;
 - ordinary content roles feed 'contains';
 - SubscribeeCol roles feed 'subscribes_to';
-- Alias roles feed 'aliases';
+- alias/id display roles do not produce ordinary graph SaveNodes;
 - hidden scaffold roles are display-only.
 
-Expected behavior should remain unchanged. Existing tests should pass.
+This bite intentionally preserves existing behavior: definitive
+'AsSubscribee' TrueNodes still produce SaveNodes for now, while
+'HiddenInSubscribeeCol' and 'HiddenOutsideOfSubscribeeCol' children
+do not become ordinary graph saves or parent 'contains' entries.
+
+Added tests cover:
+
+- ordinary content still produces 'contains';
+- 'birth independent' children still produce their own SaveNodes but
+  are excluded from the parent's 'contains';
+- alias and ID display scaffolds do not produce SaveNodes;
+- SubscribeeCol children still populate 'subscribes_to';
+- HiddenInSubscribeeCol and HiddenOutsideOfSubscribeeCol children do
+  not become ordinary graph saves.
+
+Verification run:
+
+#+begin_src text
+cargo check
+cargo test --test new classify -- --nocapture
+cargo test --test new viewnodes_to_instructions -- --nocapture
+#+end_src
+
+'cargo fmt --check' could not be run in that environment because
+'cargo fmt' / 'rustfmt' was not installed.
 
 ** Add fork-edit inference as a pure pass
 
@@ -526,7 +554,7 @@ the new feature:
 
 - DONE split source moves out of disk supplementation;
 - DONE add role classification;
-- route existing SaveNode extraction through it;
+- DONE route existing SaveNode extraction through it;
 - split extraction into explicit intent-oriented passes;
 - preserve raw-buffer edits separately from graph edits;
 - move unchanged filtering later, or make it intent-aware;
