@@ -15,6 +15,9 @@ mod add_missing_info;
 #[path = "new/viewnodes_to_instructions.rs"]
 mod viewnodes_to_instructions;
 
+#[path = "new/viewnodes_to_instructions/classify.rs"]
+mod classify;
+
 #[path = "new/viewnodes_to_instructions/reconcile_same_id_instructions.rs"]
 mod reconcile_same_id_instructions;
 

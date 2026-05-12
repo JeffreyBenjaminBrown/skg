@@ -33,8 +33,8 @@ optional cleanup to defer around the feature work.
 The required order is:
 
 1. DONE Split source-move detection out of disk supplementation.
-2. Introduce an explicit "interpreted buffer" pass that classifies
-   each checked ViewNode by edit role.
+2. DONE Introduce an explicit read-only pass that classifies each
+   checked ViewNode by save role.
 3. Build save instructions from that interpreted structure.
 4. Split save extraction into explicit intent-oriented passes.
 5. Move unchanged filtering later, or make it intent-aware.
@@ -71,10 +71,10 @@ view position mean on save?" explicit and testable.
 Update after discussion: the rerender/completion side cannot stay
 entirely out of scope. Once edits inside SubscribeeCol branches
 matter, completion must stop treating those branches as disposable
-rendered projections. The report still stands in recommending that
-save-role classification come first, and the SubscribeeCol
-reconciliation contract is also a prerequisite before feature work
-begins.
+rendered projections. The save-role classifier now exists as a
+read-only pass; the next save-side step is to route SaveNode
+construction through it. The SubscribeeCol reconciliation contract is
+also a prerequisite before feature work begins.
 
 * The main problem
 
@@ -105,16 +105,16 @@ representation.
 
 * What looks worth doing first
 
-** Add a buffer-role classifier
+** DONE Add a buffer-role classifier
 
-Add a small module near
-[[../../server/from_text/viewnodes_to_instructions/][viewnodes_to_instructions]], perhaps:
+Added:
 
 #+begin_src text
 server/from_text/viewnodes_to_instructions/classify.rs
+tests/new/viewnodes_to_instructions/classify.rs
 #+end_src
 
-Its job would be to traverse the checked 'Tree<ViewNode>' and produce
+The classifier traverses the checked 'Tree<ViewNode>' and produces
 facts like:
 
 - this TrueNode is ordinary graph content of its parent;
@@ -125,15 +125,15 @@ facts like:
 - this TrueNode is ignored content because of birth / phantom /
   delete request.
 
-I would not make this an elaborate new tree type at first. A
-'HashMap<NodeId, SaveRole>' plus a few query helpers is probably
-enough.
+This stayed intentionally small: a 'HashMap<NodeId, SaveRole>' and a
+public 'classify_save_roles' function. It is not wired into SaveNode
+construction yet.
 
-Example enum sketch:
+Implemented role shape:
 
 #+begin_src rust
 enum SaveRole {
-  BufferRoot, // Jeff speaking: I imagine this should be ViewRoot. The term BufferRoot is already used to mean the invisible-to-the-user node of which every visible root is a child. But also it's not clear to me that this needs to be distinguished (yet?) from OrdinaryTrueNode.
+  BufferRoot,
   OrdinaryTrueNode,
   AsSubscribee { subscriber: ID },
   HiddenInSubscribeeCol { subscriber: ID, subscribee: ID },
@@ -147,6 +147,11 @@ enum SaveRole {
 This is worth doing because the new feature's core question is not
 "what children does this node have?" It is "what does this position
 mean?"
+
+Tests currently cover ordinary TrueNodes, independent births,
+SubscribeeCol positions, HiddenIn/HiddenOutside positions, alias/id
+display scaffolds, deleted/deleted-scaffold/unknown nodes, and error
+handling for invalid HiddenIn context.
 
 ** Split extraction into several passes
 
@@ -358,23 +363,25 @@ preserve or rerender them.
 * A concrete staged refactor
 
 Do every simplification stage in this section before implementing new
-sharing-save features. The source-move split is already complete; the
-remaining simplification stages should be treated as the pre-feature
-queue. The first feature-specific stage is marked below.
+sharing-save features. The source-move split and read-only role
+classifier are already complete; the remaining simplification stages
+should be treated as the pre-feature queue. The first
+feature-specific stage is marked below.
 
-** Add role classification and tests
+** DONE Add role classification and tests
 
-Implement the classifier without changing save behavior. Unit-test
-tree shapes:
+The classifier was implemented without changing save behavior. Tests
+cover:
 
 - ordinary content;
 - SubscribeeCol child;
 - HiddenInSubscribeeCol child;
 - HiddenOutsideOfSubscribeeCol child;
-- phantoms and deleted nodes;
+- deleted, deleted-scaffold, unknown, alias/id display nodes;
 - roots and independent births.
 
-This is a low-risk first step because it can be read-only.
+The test target 'cargo test --test new classify -- --nocapture'
+passes.
 
 ** Refactor ordinary SaveNode construction to use roles
 
@@ -518,7 +525,7 @@ Do all save-pipeline simplifications described above before starting
 the new feature:
 
 - DONE split source moves out of disk supplementation;
-- add role classification;
+- DONE add role classification;
 - route existing SaveNode extraction through it;
 - split extraction into explicit intent-oriented passes;
 - preserve raw-buffer edits separately from graph edits;
