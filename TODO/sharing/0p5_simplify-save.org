@@ -1009,9 +1009,9 @@ the new feature:
 Only then implement the feature as:
 
 - DONE infer fork hide deltas from roles;
-- infer unhide deltas from direct AsSubscribee buffer children that
+- DONE infer unhide deltas from direct AsSubscribee buffer children that
   are disk content of the subscribee;
-- fold them into subscriber edits;
+- DONE fold hide/unhide deltas into subscriber edits;
 - fork foreign content-relationship edits based on ownership,
   independent of whether the foreign node is below a subscribee
   branch;
@@ -1156,8 +1156,47 @@ Results:
 - 'cargo run --bin cleanup-test-dbs' found no leftover test
   databases.
 
-Remaining feature work: infer unhide deltas from direct
-AsSubscribee buffer children that are disk content of the subscribee.
-When that lands, clean up the "for now" language in the header
-comment for 'add_hiderels_from_subscribees' so it describes the final
-hide/unhide behavior instead of the temporary hide-only slice.
+* Update 2026-05-12: direct as-subscribee unhide inference done
+
+The inverse visibility edit is implemented. Direct, definitive
+AsSubscribee children that are disk content of the subscribee now
+remove matching IDs from the owned subscriber's
+'hides_from_its_subscriptions'. Unrelated hides are preserved, and the
+direct AsSubscribee child list still does not become a graph
+'contains' edit for the subscribee.
+
+The old hide-only helper was renamed from
+'add_hiderels_from_subscribees' to
+'apply_hiderels_from_subscribee_visibility', and its header comment no
+longer describes the feature as temporary hide-only behavior.
+
+Added regressions:
+
+- save-instruction test for visible direct subscribee content removing
+  an existing subscriber hide;
+- save-instruction test proving unrelated existing hides survive an
+  unhide edit;
+- end-to-end hidden-subscription rerender test moving a node out of
+  HiddenInSubscribeeCol into visible subscribee content.
+
+Verification run:
+
+#+begin_src text
+cargo check
+cargo test --test hidden_from_subscriptions -- --nocapture
+cargo test --test new viewnodes_to_instructions -- --nocapture
+cargo test --test subscribee_col -- --nocapture
+cargo run --bin cleanup-test-dbs
+#+end_src
+
+Results:
+
+- 'cargo check' passed.
+- 'cargo test --test hidden_from_subscriptions -- --nocapture'
+  passed: 9 passed.
+- 'cargo test --test new viewnodes_to_instructions -- --nocapture'
+  passed: 29 passed, 53 filtered out.
+- 'cargo test --test subscribee_col -- --nocapture' passed: 1
+  passed.
+- 'cargo run --bin cleanup-test-dbs' found no leftover test
+  databases.

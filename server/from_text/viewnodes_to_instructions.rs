@@ -85,7 +85,7 @@ pub async fn viewforest_to_nonmerge_save_instructions (
               let sm : SourceMove = sm;
               source_moves . push (sm); }}} }}}
   let result : Vec<DefineNode> =
-    add_hiderels_from_subscribees (
+    apply_hiderels_from_subscribee_visibility (
       result, &visibility_intents, config, driver ) . await ?;
   let changed_instructions : Vec<DefineNode> =
     filter_unchanged_save_instructions (result);
@@ -129,14 +129,14 @@ fn direct_as_subscribee_save_pids_from_roles (
 /// `hides_from_its_subscriptions` change to the owned subscriber
 /// before the subscriber would otherwise be filtered out as a no-op.
 ///
-/// For each `(subscriber, subscribee, visible_content)` intent, any
-/// pre-save direct content of the subscribee that is absent from
-/// `visible_content` becomes hidden from that subscriber, unless the
-/// same ID was moved into the subscriber's ordinary direct content.
+/// For each `(subscriber, subscribee, visible_content)` intent:
 ///
-/// This is hide-only for now. Unhide inference will need the inverse
-/// comparison against existing subscriber hides.
-async fn add_hiderels_from_subscribees (
+/// - any pre-save direct content of the subscribee that is absent from
+///   `visible_content` becomes hidden from that subscriber, unless the
+///   same ID was moved into the subscriber's ordinary direct content;
+/// - any pre-save direct content of the subscribee that is present in
+///   `visible_content` is removed from that subscriber's hides.
+async fn apply_hiderels_from_subscribee_visibility (
   mut instructions : Vec<DefineNode>,
   intents          : &[SubscribeeVisibilityIntent],
   config           : &SkgConfig,
@@ -165,13 +165,19 @@ async fn add_hiderels_from_subscribees (
       . filter ( |id| ! subscriber_contains . contains (*id) )
       . cloned()
       . collect();
-    if inferred_hides . is_empty() { continue; }
-
+    let inferred_unhides : Vec<ID> =
+      subscribee_from_disk . contains . iter()
+      . filter ( |id| visible_content . contains (*id) )
+      . filter ( |id| subscriber_from_disk . hides_from_its_subscriptions
+                      . or_default() . contains (*id) )
+      . cloned() . collect();
+    if inferred_hides . is_empty() && inferred_unhides . is_empty()
+      { continue; }
     let subscriber_node : &mut NodeComplete =
       ensure_subscriber_save_instruction (
         &mut instructions, subscriber_from_disk );
-    append_hides_to_subscriber (
-      subscriber_node, &inferred_hides ); }
+    apply_hiderel_delta_to_subscriber (
+      subscriber_node, &inferred_hides, &inferred_unhides ); }
   Ok (instructions) }
 
 fn source_is_owned (
@@ -223,13 +229,15 @@ fn ensure_subscriber_save_instruction (
       DefineNode::Save (SaveNode (node)) => node,
       _ => unreachable!(), }}}
 
-fn append_hides_to_subscriber (
+fn apply_hiderel_delta_to_subscriber (
   subscriber     : &mut NodeComplete,
   inferred_hides : &[ID],
+  inferred_unhides : &[ID],
 ) {
   let mut hides : Vec<ID> =
     subscriber . hides_from_its_subscriptions
     . or_default() . to_vec();
+  hides . retain ( |id| ! inferred_unhides . contains (id) );
   for id in inferred_hides {
     if ! hides . contains (id) {
       hides . push (id . clone()); }}

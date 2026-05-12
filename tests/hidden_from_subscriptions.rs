@@ -209,6 +209,21 @@ fn assert_does_not_hide_e1 (
     "Expected no HiddenInSubscribeeCol for e1:\n{}",
     buffer ); }
 
+fn move_h_from_hiddenin_col_to_visible_subscribee_content (
+  buffer : &str,
+) -> String {
+  buffer
+    . lines()
+    . filter_map ( |line| {
+      if line . contains ("(skg hiddenInSubscribeeCol)") {
+        None
+      } else if line . contains ("(id H)") {
+        Some (line . replacen ("***** ", "**** ", 1))
+      } else {
+        Some (line . to_string()) }})
+    . collect::<Vec<_>>()
+    . join ("\n") + "\n" }
+
 fn assert_e1_removed_from_visible_subscribee_branch (
   buffer : &str,
 ) {
@@ -574,6 +589,61 @@ fn test_hidden_within_but_none_without(
     ) . await?;
     guard . disarm ();
     Ok (( )) } ) }
+
+#[test]
+fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide(
+) -> Result<(), Box<dyn Error>> {
+  block_on(async {
+    let db_name =
+      "skg-test-visible-subscribee-content-infers-unhide";
+    let mut guard : TestDbGuard =
+      TestDbGuard::new (db_name, None);
+    let (config, driver, mut tantivy, temp_fixture_dir) =
+      setup_temp_test (
+        db_name,
+        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without"
+      ) . await?;
+    let graph : InRustGraphHandle =
+      new_handle (InRustGraph::new ());
+    let mut views_state : ViewsState = ViewsState {
+      diff_mode_enabled : false,
+      open_views        : OpenViews::new (),};
+
+    let (initial_view, _pids, _)
+      : (String, Vec<ID>, _)
+      = single_root_view(
+          &driver, &config, None,
+          &ID ("R" . to_string()),
+          false ) . await?;
+    let expanded : String =
+      save_buffer_for_hidden_subscriptions_test (
+        &add_definitive_view_request_to_subscribees (&initial_view),
+        &driver, &config, &mut tantivy, &graph, &mut views_state
+      ) . await?;
+    let edited : String =
+      move_h_from_hiddenin_col_to_visible_subscribee_content (
+        &expanded );
+    let rerendered : String =
+      save_buffer_for_hidden_subscriptions_test (
+        &edited, &driver, &config, &mut tantivy, &graph, &mut views_state
+      ) . await?;
+
+    assert! (
+      ! rerendered . contains ("hiddenInSubscribeeCol"),
+      "Expected no HiddenInSubscribeeCol after unhiding H:\n{}",
+      rerendered );
+    assert! (
+      rerendered . lines() . any ( |line|
+        line . starts_with ("**** (skg (node (id H)") ),
+      "Expected H to be visible direct subscribee content:\n{}",
+      rerendered );
+
+    cleanup_test (
+      db_name, &driver, &config . tantivy_folder ) . await?;
+    guard . disarm ();
+    if temp_fixture_dir . exists() {
+      fs::remove_dir_all (temp_fixture_dir)?; }
+    Ok (( )) }) }
 
 /// Hidden without but none hidden within:
 /// - R subscribes to E1, E2

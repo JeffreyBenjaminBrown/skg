@@ -674,6 +674,62 @@ fn moving_direct_as_subscribee_child_to_subscriber_does_not_hide (
       Ok (()) })) }
 
 #[test]
+fn direct_as_subscribee_visible_child_removes_subscriber_hide (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db_from_config (
+    "skg-test-direct-as-subscribee-infers-unhide",
+    "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml",
+    |config, driver| Box::pin (async move {
+      let input : &str =
+        indoc! {"
+                * (skg (node (id R) (source main))) R
+                ** (skg subscribeeCol) subscribees
+                *** (skg (node (id E1) (source main))) subscribee-1
+                **** (skg (node (id E11) (source main))) E11
+                **** (skg (node (id H) (source main))) H
+                **** (skg (node (id E12) (source main))) E12
+                "};
+      let instructions : Vec<DefineNode> =
+        save_instructions_from_org_with_disk (
+          input, config, driver) . await?;
+      assert_eq!(
+        saved_node_by_id (&instructions, "R")
+          . hides_from_its_subscriptions,
+        MSV::Specified (vec![]));
+      assert_eq!(
+        saved_node_by_id (&instructions, "E1") . contains,
+        vec![ID::from ("E11"), ID::from ("H"), ID::from ("E12")]);
+      Ok (()) })) }
+
+#[test]
+fn direct_as_subscribee_unhide_preserves_unrelated_hides (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db_from_config (
+    "skg-test-direct-as-subscribee-unhide-keeps-unrelated",
+    "tests/hidden_from_subscriptions/fixtures-every-kind-of-col/skgconfig.toml",
+    |config, driver| Box::pin (async move {
+      let input : &str =
+        indoc! {"
+                * (skg (node (id R) (source main))) R
+                ** (skg subscribeeCol) subscribees
+                *** (skg (node (id E1) (source main))) subscribee-1
+                **** (skg (node (id hidden-in-E1) (source main))) hidden-in-E1
+                **** (skg (node (id E11) (source main))) E11
+                *** (skg (node (id E2) (source main))) subscribee-2
+                **** (skg (node (id E21) (source main))) E21
+                "};
+      let instructions : Vec<DefineNode> =
+        save_instructions_from_org_with_disk (
+          input, config, driver) . await?;
+      assert_eq!(
+        saved_node_by_id (&instructions, "R")
+          . hides_from_its_subscriptions,
+        MSV::Specified (
+          vec![ID::from ("hidden-in-E2"),
+               ID::from ("hidden-for-no-reason")]));
+      Ok (()) })) }
+
+#[test]
 fn ordinary_owned_child_list_edit_still_changes_contains (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db_from_config (
