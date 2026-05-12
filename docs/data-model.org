@@ -54,13 +54,13 @@ Each parent-child relationship in an initial view like the one above is the 'con
 The third and fourth view-nodes represent graph-nodes that link to the first. The second view-node *does not represent a graph-node* at all; it just introduces the 'hyperlinks' relationships from nodes 3 and 4 to node 1.
 
 It bears repeating that in the graph, there is no concept of parent or child. There are instead explicit relationships: the contains relationship from container to content, the hyperlink relationship from source to target, etc. Parent and child only mean something in a tree view. The relationship from parent to child is containment unless otherwise indicated.
-** Lenses onto foreign data require three more relationships.
+** Forks of foreign data require three more relationships.
 The three relationships are called 'subscribes', 'hides-from-its-subscriptions' and 'overrides'.
 
-When I "edit" a node of yours, I don't change anything for you. I instead create a lens onto your node. That lens is a node very much like yours: it has the same text and the same content, except to the extent that I edited those.
+When I "edit" a node of yours, I don't change anything for you. I instead create a fork of your node. That fork is a node very much like yours: it has the same text and the same content, except to the extent that I edited those.
 
-But the lens is created with some new relationships. For one, the lens 'overrides' your node. This means that whenever I build a view involving your node, I will in place of your node see my lens onto it. For another, the lens 'subscribes' to your node. The subscription means that if you add content to your node, it will be visible to me.
+But the fork is created with some new relationships. For one, the fork 'overrides' your node. This means that whenever I build a view involving your node, I will in place of your node see my fork of it. For another, the fork 'subscribes' to your node. The subscription means that if you add content to your node, it will be visible to me.
 
 (A node can subscribe to and override multiple other nodes, but let's ignore that for now.)
 
-If I delete a node from your node's content, that creates a 'hides' relationship from my lens to the deleted node. In my subscription to your node, I only see things your node contains that my node neither contains nor hides.
+If I delete a node from your node's content, that creates a 'hides' relationship from my fork to the deleted node. In my subscription to your node, I only see things your node contains that my node neither contains nor hides.

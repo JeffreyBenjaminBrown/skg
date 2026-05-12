@@ -28,7 +28,7 @@ to get excited about this idea:
 - Skg's data model and user experience
   - Trees and textlinks: [Some simple but important definitions](docs/vocabulary.md)
   - [TextLinks can point to any part of a document.](docs/hyperlinks.md)
-  - ["Lenses": Subscription and overriding in detail](docs/lenses.md)
+  - ["Forks": Subscription and overriding in detail](docs/forks.md)
   - [The data model](docs/data-model-skg-extensions.md).
   - [The sharing model](docs/sharing-model.md).
 - [What's done, and what's left to do](docs/progress.md)

@@ -95,7 +95,7 @@ There are three ways to test the code:
 
   Graph relationships (all ID-based, source-independent):
   - contains: parent -> child ordering (Vec<ID>, order matters)
-  - subscribes: subscriber -> subscribee (lensing into foreign data)
+  - subscribes: subscriber -> subscribee (forking foreign data)
   - hides_from_its_subscriptions: filtering within subscriptions
   - overrides_view_of: replacing a node in views (not yet fully implemented)
   - textlinks_to: org-roam style [[id:...]] hyperlinks

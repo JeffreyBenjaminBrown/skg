@@ -1,0 +1,516 @@
+* Simplify the save-buffer pipeline before adding subscribee-edit hides
+
+This report reviews:
+
+- [[./0_DONE_overview-and-test.org][0_DONE_overview-and-test.org]]
+- [[./1_dedup-sharing-rel-completion.org][1_dedup-sharing-rel-completion.org]]
+- [[./2_hide-subscribee-content-deletions.org][2_hide-subscribee-content-deletions.org]]
+
+and the current save-buffer path through:
+
+- [[../../server/serve/handlers/save_buffer.rs][server/serve/handlers/save_buffer.rs]]
+- [[../../server/from_text.rs][server/from_text.rs]]
+- [[../../server/from_text/viewnodes_to_instructions.rs][server/from_text/viewnodes_to_instructions.rs]]
+- [[../../server/from_text/viewnodes_to_instructions/to_naive_instructions.rs][server/from_text/viewnodes_to_instructions/to_naive_instructions.rs]]
+- [[../../server/from_text/supplement_from_disk.rs][server/from_text/supplement_from_disk.rs]]
+- [[../../server/from_text/validate.rs][server/from_text/validate.rs]]
+- [[../../server/save.rs][server/save.rs]]
+- [[../../server/update_buffer.rs][server/update_buffer.rs]]
+- [[../../server/update_buffer/complete.rs][server/update_buffer/complete.rs]]
+- [[../../server/update_buffer/complete_preorder/truenode.rs][server/update_buffer/complete_preorder/truenode.rs]]
+- the sharing completers under
+  [[../../server/update_buffer/complete_preorder/][complete_preorder/]],
+  [[../../server/update_buffer/complete_postorder/][complete_postorder/]], and
+  [[../../server/to_org/complete/sharing/][to_org/complete/sharing/]].
+
+* Executive recommendation
+
+I would simplify the save side before implementing
+[[./2_hide-subscribee-content-deletions.org][2_hide-subscribee-content-deletions.org]], but I would keep the refactor
+narrow:
+
+1. Introduce an explicit "interpreted buffer" pass that classifies
+   each checked ViewNode by edit role.
+2. Build save instructions from that interpreted structure.
+3. Add fork-edit extraction for as-a-subscribee content deletions as
+   another explicit pass over the same interpreted structure.
+4. Define a stricter completion contract for SubscribeeCol branches:
+   preserve user-authored branch edits, and reconcile only the parts
+   that are generated display.
+5. Leave broad rerender-completer cleanup for later, but do the
+   SubscribeeCol preservation work before relying on the new feature.
+
+The current temptation is to add another function after
+'reconcile_same_id_instructions'. That can work, but it makes the
+pipeline harder to reason about because the code still has to infer
+semantics from raw tree position at a late stage, after the naive
+SaveNodes already encoded the wrong interpretation.
+
+The better shape is:
+
+#+begin_src text
+org text
+  -> unchecked tree
+  -> checked tree
+  -> interpreted save tree / node roles
+  -> graph edit intents
+  -> save instructions
+  -> validation
+  -> graph write
+  -> rerender
+#+end_src
+
+The important change is not performance. It is making "what does this
+view position mean on save?" explicit and testable.
+
+Update after discussion: the rerender/completion side cannot stay
+entirely out of scope. Once edits inside SubscribeeCol branches
+matter, completion must stop treating those branches as disposable
+rendered projections. The report still stands in recommending that
+save-role classification come first, but the feature also needs a
+clear SubscribeeCol reconciliation contract before implementation is
+complete.
+
+* The main problem
+
+The save pipeline currently conflates three ideas:
+
+- graph edits, like "R contains [A, B]" or "delete node X";
+- view/fork edits, like "subscriber S no longer wants to see C under
+  subscribee E";
+- display scaffolding, like HiddenInSubscribeeCol and
+  HiddenOutsideOfSubscribeeCol.
+
+That conflation is visible in
+[[../../server/from_text/viewnodes_to_instructions/to_naive_instructions.rs][to_naive_instructions.rs]]:
+
+- 'maybe_instruction_from_treenode' always treats a definitive
+  TrueNode's non-ignored TrueNode children as the node's real
+  'contains'.
+- 'collect_subscribees' treats SubscribeeCol children specially.
+- 'hides_from_its_subscriptions' is hardcoded to 'MSV::Unspecified'.
+- most scaffolds are skipped entirely.
+
+This is simple for ordinary content editing, but it breaks down for
+as-a-subscribee editing. Removing E1 from under foreign subscribee E
+is first encoded as "E.contains changed". Only later would another
+pass have to reinterpret that as "S.hides gains E1" and suppress the
+foreign-node edit. That is the right behavior fighting the current
+representation.
+
+* What looks worth doing first
+
+** Add a buffer-role classifier
+
+Add a small module near
+[[../../server/from_text/viewnodes_to_instructions/][viewnodes_to_instructions]], perhaps:
+
+#+begin_src text
+server/from_text/viewnodes_to_instructions/classify.rs
+#+end_src
+
+Its job would be to traverse the checked 'Tree<ViewNode>' and produce
+facts like:
+
+- this TrueNode is ordinary graph content of its parent;
+- this TrueNode is shown as a subscribee under subscriber S;
+- this TrueNode is inside HiddenInSubscribeeCol;
+- this TrueNode is inside HiddenOutsideOfSubscribeeCol;
+- this TrueNode is a top-level root;
+- this TrueNode is ignored content because of birth / phantom /
+  delete request.
+
+I would not make this an elaborate new tree type at first. A
+'HashMap<NodeId, SaveRole>' plus a few query helpers is probably
+enough.
+
+Example enum sketch:
+
+#+begin_src rust
+enum SaveRole {
+  BufferRoot, // Jeff speaking: I imagine this should be ViewRoot. The term BufferRoot is already used to mean the invisible-to-the-user node of which every visible root is a child. But also it's not clear to me that this needs to be distinguished (yet?) from OrdinaryTrueNode.
+  OrdinaryTrueNode,
+  AsSubscribee { subscriber: ID },
+  HiddenInSubscribeeCol { subscriber: ID, subscribee: ID },
+  HiddenOutsideOfSubscribeeCol { subscriber: ID },
+  AliasText,
+  IdDisplay,
+  DisplayOnly,
+}
+#+end_src
+
+This is worth doing because the new feature's core question is not
+"what children does this node have?" It is "what does this position
+mean?"
+
+** Split extraction into several passes
+
+The current 'naive_saveinstructions_from_tree' recursively walks and
+builds full SaveNodes in one pass. It is compact, but it has become
+the place where too many policies meet.
+
+I would split it into intentionally boring traversals:
+
+- collect definitive graph-node candidates;
+- collect ordinary content children for graph-node candidates;
+- collect aliases;
+- collect subscriptions;
+- collect edit requests / deletions;
+- collect fork edits.
+
+Each pass can traverse the tree. That is fine. The tree is small
+compared to TypeDB, filesystem, Tantivy, git diff, and rendering
+costs. The current one-pass shape saves little and costs clarity.
+
+The payoff is that the as-a-subscribee feature becomes a normal pass:
+
+#+begin_src text
+For each AsSubscribee(E under subscriber S):
+  if E is definitive:
+    compare E's pre-save direct contains to visible direct children
+    subtract S's ordinary direct content
+    append the remainder to S.hides_from_its_subscriptions
+#+end_src
+
+** Preserve the distinction between raw buffer edits and graph edits
+
+Before producing final 'DefineNode's, introduce an intermediate
+intent type. It can be small:
+
+#+begin_src rust
+struct NodeEditIntent {
+  pid: ID,
+  source: SourceName,
+  title: Option<String>,
+  body: Option<Option<String>>,
+  contains: Option<Vec<ID>>,
+  aliases: MSV<String>,
+  subscribes_to: MSV<ID>,
+  hides_from_its_subscriptions: MSV<ID>,
+  overrides_view_of: MSV<ID>,
+  delete: bool,
+}
+
+struct ForkEditIntent {
+  subscriber: ID,
+  hide_from_subscriptions: Vec<ID>,
+}
+#+end_src
+
+The exact fields can differ, but the separation matters. Foreign-node
+validation should receive only graph edits. Fork edits should first be
+folded into owned subscriber edits. That avoids the current failure
+mode where a foreign subscribee's content-only view edit becomes a
+'ModifiedForeignNode' before the subscriber hide can be considered.
+
+** Move unchanged filtering later, or make it intent-aware
+
+Currently:
+
+#+begin_src text
+naive instructions
+  -> reconcile duplicates
+  -> filter unchanged
+  -> supplement MSV fields from disk
+#+end_src
+
+The new feature wants to add hides before filtering, because a
+subscriber whose only change is an inferred hide would otherwise look
+unchanged.
+
+That suggests a clearer order:
+
+#+begin_src text
+raw edit intents
+  -> fork edit inference
+  -> fold fork edits into node intents
+  -> reconcile duplicate node intents
+  -> supplement from disk / construct complete NodeComplete
+  -> filter unchanged
+  -> foreign validation
+#+end_src
+
+The exact position of foreign validation needs care. It should happen
+after content-only as-a-subscribee edits have been removed from the
+foreign node's graph intent, but before writing anything.
+
+** Put source moves in their own pass
+
+'supplement_none_fields_from_disk_if_save' currently does several
+things:
+
+- fills unspecified MSV fields from disk;
+- canonicalizes pid / extra_ids from disk;
+- detects source moves;
+- validates source moves involving foreign sources;
+- preserves misc from disk.
+
+That is too much for a function with "supplement" in its name. I
+would split it into:
+
+- 'canonicalize_existing_node_ids';
+- 'detect_source_move';
+- 'supplement_unspecified_fields_from_disk';
+
+This is not required for the sharing feature, but it is an easy
+clarity win and reduces the chance that adding fork edits changes
+source-move behavior.
+
+* What I would not do yet
+
+** Do not rewrite the whole rerender completer first
+
+The rerender side is complex, especially
+[[../../server/update_buffer/complete_preorder/truenode.rs][complete_preorder/truenode.rs]], but it is already split into
+preorder and postorder passes with reasonably named internal phases.
+It also handles real complications: definitive/indefinitive nodes,
+phantoms, diff view, deleted nodes, extra-id resolution, content
+reconciliation, scaffold insertion, graph stats, view stats.
+
+I would not try to fold all of that into the save-intent refactor. A
+general cleanup of rerender completion is a separate project.
+
+However, the SubscribeeCol branch is not just ordinary generated
+display anymore. If user edits inside it define fork edits, then
+rerender completion must preserve those user-authored edits long
+enough for the save pipeline to interpret them, and after saving it
+must reconcile generated display around the edited branch without
+blindly regenerating the whole branch from scratch.
+
+That suggests a narrower completion contract:
+
+- SubscribeeCol children that are subscribee TrueNodes are an editable
+  surface for subscriptions and fork edits.
+
+  Jeff speaking: Only somewhat editable. The user can delete
+  a content child from a subscribee (to create a hides relationship)
+  or replace it if it was hidden (to delete the hides relationship,
+  but even in that case it will not display under the subscribee
+  if it is content of the subscriber).
+  They can't change order, edit text,
+  or edit anything at all beyond the first generation
+  of the subscribee's content.
+  (Deeper layers would not be its 'content',
+  but they are its 'recursive content'.)
+  Any impossible edits (e.g. changing subscribee content order)
+  not caught by the validation step
+  will still have no effect; those non-editable things
+  will respawn during completion to be as they were before.
+- A definitive subscribee shown under SubscribeeCol has user-edited
+  visible children whose absence/presence matters for fork inference.
+- HiddenInSubscribeeCol and HiddenOutsideOfSubscribeeCol remain
+  generated display for now.
+- Completion may insert missing generated scaffolds and missing
+  generated children, and may mark erroneous children independent,
+  but it should not erase or normalize away as-a-subscribee branch
+  edits before the save-intent pass has consumed them.
+
+So the rule is not "leave rerender alone"; it is "avoid a broad
+rerender rewrite, but make SubscribeeCol completion preservation an
+explicit part of the feature."
+
+The one exception is directly relevant to this feature:
+the save rerender path should ensure HiddenInSubscribeeCol exists
+when a subscriber's updated hides intersect a subscribee's direct
+content. Right now HiddenInSubscribeeCol completion only runs if the
+scaffold is present; the initial-render path has
+'maybe_add_hiddenInSubscribeeCol_branch', but the save-rerender path
+does not appear to have an equivalent insertion step for a newly
+needed HiddenInSubscribeeCol.
+
+That should be handled as a focused renderer fix after the save-intent
+side is clear, alongside tests that prove user edits inside
+SubscribeeCol branches are not lost by completion.
+
+** Do not collapse all sharing completers into one function
+
+Plan 1 already records why this was declined. I agree with that
+decision. The common helpers now seem useful:
+
+- 'SharingScaffoldKind'
+- 'goal_list_for_*'
+- 'build_child_data'
+- 'reconcile_sharing_scaffold_children'
+- empty-scaffold detach helpers
+
+The remaining differences between SubscribeeCol, HiddenIn, and
+HiddenOutside are real. Collapsing the shells would likely move
+complexity into matches rather than remove it.
+
+** Do not make HiddenInSubscribeeCol editable as part of this
+
+Plan 2 is right to keep HiddenIn/HiddenOutside read-only for now.
+Unhiding is a separate UX and data-semantics decision. The save
+pipeline should ignore edits inside those scaffolds except perhaps to
+preserve or rerender them.
+
+* A concrete staged refactor
+
+** Add role classification and tests
+
+Implement the classifier without changing save behavior. Unit-test
+tree shapes:
+
+- ordinary content;
+- SubscribeeCol child;
+- HiddenInSubscribeeCol child;
+- HiddenOutsideOfSubscribeeCol child;
+- phantoms and deleted nodes;
+- roots and independent births.
+
+This is a low-risk first step because it can be read-only.
+
+** Refactor ordinary SaveNode construction to use roles
+
+Change 'naive_saveinstructions_from_tree' so it no longer decides
+what to recurse into and what children count as content by ad hoc
+matching alone. It should use the classifier:
+
+- ordinary graph nodes produce Save/Delete instructions;
+- ordinary content roles feed 'contains';
+- SubscribeeCol roles feed 'subscribes_to';
+- Alias roles feed 'aliases';
+- hidden scaffold roles are display-only.
+
+Expected behavior should remain unchanged. Existing tests should pass.
+
+** Add fork-edit inference as a pure pass
+
+Add a pass that produces only inferred hide deltas, not SaveNodes.
+Inputs:
+
+- checked tree;
+- role map;
+- pre-save node lookup.
+
+Output:
+
+#+begin_src rust
+HashMap<ID, Vec<ID>>  // subscriber pid -> hide IDs to append
+#+end_src
+
+This pass should be unit-tested before it is wired into saving.
+
+** Fold fork edits into owned subscriber intents
+
+After graph intents and fork intents exist separately, fold
+ForkEditIntent into the subscriber's NodeEditIntent. If the
+subscriber has no graph edit intent yet, synthesize one from pre-save
+data.
+
+Only after this fold should final 'DefineNode::Save' values be
+constructed.
+
+** Drop graph edits from as-a-subscribee content positions
+
+When a node is shown as a subscribee, its child-list edit should not
+define its real 'contains'. That is true even if the subscribee is
+owned, per plan 2's conservative policy.
+
+So the construction of graph intents should not use children of
+'AsSubscribee' positions as real content in the first place. This is
+cleaner than producing an incorrect SaveNode and later discarding it.
+
+Title/body edits to a foreign as-a-subscribee node should still be
+reported as foreign edits. Title/body edits to an owned
+as-a-subscribee node are a policy choice; plan 2 says real edits
+should happen when the node is viewed directly, not as a subscribee.
+I would enforce that consistently unless you decide otherwise.
+Jeff speaking: Agreed.
+
+** Then fix SubscribeeCol rerender preservation
+
+Once the save instructions really persist the hide, run the failing
+integration test. If the returned buffer still does not show
+HiddenInSubscribeeCol, add a narrow rerender pass or preorder helper
+that inserts HiddenInSubscribeeCol under expanded subscribees when
+needed.
+
+Also add a test that demonstrates the broader preservation contract:
+an edited SubscribeeCol branch should not be regenerated from scratch
+before the save pipeline has interpreted the edit. The important
+thing is that completion should reconcile around user intent, not
+erase it and then infer from the erased result.
+
+This is intentionally after the save-intent work, because otherwise
+the renderer can obscure whether the graph mutation happened.
+
+* Why more traversals are probably the right tradeoff
+
+The expensive parts of save are not walking the buffer tree:
+
+- TypeDB lookups and writes;
+- filesystem writes;
+- Tantivy updates;
+- git diff computation;
+- graph stats after rerender;
+- rendering and collateral view updates.
+
+The buffer tree traversal cost is small. Multiple clear traversals
+would be easier to test and safer than one traversal that builds
+SaveNodes, handles scaffolds, applies policy, and encodes absences
+as 'MSV::Unspecified' all at once.
+
+For this feature, the clarity benefit is large because "missing from
+E's children" can mean different things depending on whether E is
+ordinary content, a subscribee, a hidden display child, or a phantom.
+That is exactly the sort of distinction a role pass should make
+explicit.
+
+* Risks and constraints
+
+** Duplicate definitive nodes
+
+The existing validation and 'reconcile_same_id_instructions' logic
+prevent or reconcile duplicate definitions. A role-based refactor
+must preserve that behavior. I would avoid changing duplicate
+semantics while adding the classifier.
+
+** Source moves
+
+Source moves are detected late today, during disk supplementation.
+If final SaveNode construction changes, source-move tests should be
+run. The function is already carrying more responsibility than its
+name suggests.
+
+** Foreign validation
+
+Foreign validation should get simpler, not broader. The goal is not
+to weaken 'validate_and_filter_foreign_instructions'; it is to make
+sure fork edits never masquerade as foreign graph edits.
+
+** Diff mode phantoms
+
+Diff mode should probably be explicitly out of scope for the first
+sharing-save implementation, except for ensuring phantoms do not
+infer hides. Add one regression test later.
+
+** Rerender behavior can hide save bugs
+
+The overview says that checking the returned buffer can be enough to
+infer the graph changed. Usually true, but during implementation I
+would still assert the saved '.skg' hide list in at least one test.
+That separates "save persisted the hide" from "rerender displayed the
+hide."
+
+* Bottom line
+
+I would do one small architecture pass before the feature:
+
+- add role classification;
+- route existing SaveNode extraction through it;
+- keep behavior unchanged.
+
+Then implement the feature as:
+
+- infer fork hide deltas from roles;
+- fold them into subscriber edits;
+- prevent as-a-subscribee child-list edits from becoming graph
+  'contains' edits;
+- define and test SubscribeeCol completion preservation;
+- fix HiddenInSubscribeeCol insertion in rerender if the failing test
+  proves it is needed.
+
+This is more tree traversal, but it removes a much more expensive
+kind of complexity: late reinterpretation of SaveNodes that were
+already built with the wrong semantics.

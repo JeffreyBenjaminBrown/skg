@@ -8,4 +8,4 @@ All of the original content is considered "integrated" into the clone. Branches 
 
 If, later, the other author adds content to their note, it will be visible from the clone, thanks to its subscription to the original, as "unintegrated subscribed content". You can if you wish proceed to incorporate that content into yours, too.
 
-Because nodes in Skg are represented as flat files, this way of lensing onto foreign data duplicates very little of it. For instance, if the original had two branches when the clone was made, the clone would only need to `contain` two IDs. None of the descendents of those IDs need to be mentioned, unless and until one of them is also modified.
+Because nodes in Skg are represented as flat files, this way of forking foreign data duplicates very little of it. For instance, if the original had two branches when the clone was made, the clone would only need to `contain` two IDs. None of the descendents of those IDs need to be mentioned, unless and until one of them is also modified.

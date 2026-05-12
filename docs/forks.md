@@ -1,6 +1,6 @@
-# Lenses
+# Forks
 
-## "Lenses": Subscription and overriding in detail
+## "Forks": Subscription and overriding in detail
 
 TODO: These examples are goofy. I intend to use more plausible ones.
 

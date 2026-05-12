@@ -29,7 +29,7 @@ and the source change will now be visible.
 ** pitfalls
 
 *** Foreign sources are rejected on either end
-=user_owns_it = false= sources (foreign repos lensed in via
+=user_owns_it = false= sources (foreign repos forked in via
 subscriptions) are read-only. Trying to move a node *into* or *out
 of* a foreign source produces
 =BufferValidationError::CannotMoveToOrFromForeignSource=

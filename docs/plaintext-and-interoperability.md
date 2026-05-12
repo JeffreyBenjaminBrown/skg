@@ -19,4 +19,4 @@ In Skg every node in a tree has an ID, whereas in org-mode, a node generally onl
 
 The Skg containment relationship is identical to the org-mode relationship from a headline to one of its subheadlines. (I might rename it "shows" or "presents" or something, to make clear that it is the relationship that defines a "document" or a "view".)
 
-What's different is their representation on disk. Skg represents each node of a document with a separate file in order to  enable sharing. I can't link to one of your nodes unless every node has an ID. And creating a lens onto one of your nodes would have a prohibitive memory cost if the node has many descendents.
+What's different is their representation on disk. Skg represents each node of a document with a separate file in order to  enable sharing. I can't link to one of your nodes unless every node has an ID. And creating a fork of one of your nodes would have a prohibitive memory cost if the node has many descendents.

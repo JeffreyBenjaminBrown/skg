@@ -20,7 +20,7 @@ Skg will be like academia, but rewarding (if you count views) generality, not sp
 ** Quantum (as in Schrodinger's cat) information can overcome the dictator problem.
 A loud minority of humans avoid and resent Wikipedia for dictating a single truth around a given topic. Whether that criticism is fair can be debated, but the criticism cannot apply to Skg.
 
-In Skg there is room for all knowledge, multiply categorized. Different writers can testify to different things. Nobody dictates "the" article on anything; there are only views onto the collective information. You curate what you see, can promote and render invisible (to yourself and anyone who wants your lens) whole people or person-topic pairs, however you wish. The result will be comprehensible and navigable, due to two innovations: (1) graphs, and (2) letting the user, not an alien invisible algorithm, choose what to see.
+In Skg there is room for all knowledge, multiply categorized. Different writers can testify to different things. Nobody dictates "the" article on anything; there are only views onto the collective information. You curate what you see, can promote and render invisible (to yourself and anyone who wants your fork) whole people or person-topic pairs, however you wish. The result will be comprehensible and navigable, due to two innovations: (1) graphs, and (2) letting the user, not an alien invisible algorithm, choose what to see.
 ** Knowledge is a linked forest.
 Everyone naturally writes (at least sometimes) tree-shaped documents: They write some text, then divide it into sections, divide some sections into subsections, etc. Dividing it makes it a tree. Multiple such documents are called a forest. Every physical library of paper books is, in this sense, a forest.
 
@@ -28,6 +28,6 @@ A forest becomes a linked forest when it includes [[https://en.wikipedia.org/wik
 
 Skg uses the linked forest model, too, but extends it with a few new relationships needed to facilitate sharing. See 'the data model' below.
 ** Integrate your linked forest with others'.
-Hopefully some people will share some of their trees (documents, knowledge), and you will find some trees by other people interesting. If so, Skg will let you do what *feels like* editing their data -- reordering branches, hiding branches, plugging branches from their tree into branches of your own trees. You're not actually changing their data; you're creating a lens onto it. When the original author edits those branches, you'll receive their changes.
+Hopefully some people will share some of their trees (documents, knowledge), and you will find some trees by other people interesting. If so, Skg will let you do what *feels like* editing their data -- reordering branches, hiding branches, plugging branches from their tree into branches of your own trees. You're not actually changing their data; you're creating a fork of it. When the original author edits those branches, you'll receive their changes.
 
 If someone integrates your data into theirs, and they share the* context they integrated it into, and you look, you might learn more about the topic. You can thereby both learn from each other, without either having to teach -- just reading and writing for understanding.

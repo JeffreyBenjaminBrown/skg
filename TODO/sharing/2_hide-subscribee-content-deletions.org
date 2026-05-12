@@ -380,7 +380,7 @@ when E is shown as a subscribee under S, the same child removal could
 mean either "remove C from E's actual contains" or "hide C from S's
 view of E".
 
-The plan chooses the lens interpretation for all as-a-subscribee
+The plan chooses the fork interpretation for all as-a-subscribee
 positions, owned or foreign, and leaves real edits to E for views
 where E is not shown as a subscribee. That is consistent and easier
 to explain, but it is a policy choice.
@@ -392,7 +392,7 @@ child from HiddenInSubscribeeCol or HiddenOutsideOfSubscribeeCol will
 still not remove hides. The vision lists unhide as unresolved, and
 this plan leaves it unresolved.
 
-** Multiple views can express conflicting lens edits
+** Multiple views can express conflicting fork edits
 
 If the same subscriber appears more than once in one saved buffer,
 the existing duplicate-instruction reconciliation has to decide one
@@ -443,9 +443,9 @@ that hasn't in fact been done yet?
 Foreign-node protection lives in
 [[../../server/from_text/validate.rs][validate.rs]] 'validate_and_filter_foreign_instructions', but the
 meaning of "this edit is not really an edit to the foreign node; it
-is a lens edit on the subscriber" belongs to the save parser. That
+is a fork edit on the subscriber" belongs to the save parser. That
 boundary is reasonable, but easy to get wrong.
 
-A future architecture improvement would make lens-edit extraction an
+A future architecture improvement would make fork-edit extraction an
 explicit stage before graph SaveNodes are produced, so foreign-node
 validation only sees real graph edits.
