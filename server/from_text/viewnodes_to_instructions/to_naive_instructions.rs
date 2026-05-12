@@ -2,7 +2,7 @@ use crate::from_text::viewnodes_to_instructions::classify::{
   classify_save_roles, SaveRole, SaveRoleMap };
 use crate::types::viewnode::EditRequest;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, TrueNode, IndefOrDef};
-use crate::types::misc::{ID, MSV};
+use crate::types::misc::{ID, MSV, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 use crate::types::tree::generic::read_at_node_in_tree;
@@ -10,21 +10,73 @@ use crate::types::tree::viewnode_nodecomplete::{ collect_grandchild_aliases_for_
 use crate::types::list::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 
-/// Converts a viewforest of ViewNodes to DefineNodes, 'naively' --
-/// that is, leaving the following work to be handled elsewhere:
-/// - reconcile DefineNodes with the same ID
-/// - clobber None fields with data from disk
-/// (Its caller, 'viewforest_to_nonmerge_save_instructions',
-/// does those things.)
+struct NodeEditIntent {
+  pid                          : ID,
+  source                       : SourceName,
+  delete                       : bool,
+  title                        : Option<String>,
+  body                         : Option<String>,
+  contains                     : Vec<ID>,
+  aliases                      : MSV<String>,
+  subscribes_to                : MSV<ID>,
+  hides_from_its_subscriptions : MSV<ID>,
+  overrides_view_of            : MSV<ID>,
+}
+
+impl NodeEditIntent {
+  fn into_define_node (
+    self,
+  ) -> Result<DefineNode, String> {
+    if self . delete {
+      return Ok (DefineNode::Delete (DeleteNode {
+        id     : self . pid,
+        source : self . source,
+      })); }
+    let title : String =
+      self . title . ok_or (
+        "NodeEditIntent save is missing title")?;
+    Ok (DefineNode::Save (SaveNode (NodeComplete {
+      title,
+      aliases                      : self . aliases,
+      source                       : self . source,
+      pid                          : self . pid,
+      extra_ids                    : vec![],
+      body                         : self . body,
+      contains                     : self . contains,
+      subscribes_to                : self . subscribes_to,
+      hides_from_its_subscriptions :
+        self . hides_from_its_subscriptions,
+      overrides_view_of            : self . overrides_view_of,
+      misc                         : Vec::new(),
+    } ))) }
+}
+
+/// Converts a viewforest of ViewNodes to preliminary DefineNodes.
+///
+/// "Naive" means the instructions are not yet reconciled with
+/// same-ID duplicates and are not supplemented from disk. The
+/// extraction itself may still use interpreted save roles and
+/// internal edit intents.
 pub fn naive_saveinstructions_from_tree (
   mut viewforest: Tree<ViewNode> // "viewforest" = tree with BufferRoot
 ) -> Result<Vec<DefineNode>, String> {
   let roles : SaveRoleMap =
     classify_save_roles (&viewforest)?;
+  let intents : Vec<NodeEditIntent> =
+    naive_node_edit_intents_from_tree (&mut viewforest, &roles)?;
+  intents
+    . into_iter()
+    . map (NodeEditIntent::into_define_node)
+    . collect() }
 
-  /// May append a DefineNode to 'result', and might recurse.
+fn naive_node_edit_intents_from_tree (
+  viewforest : &mut Tree<ViewNode>,
+  roles      : &SaveRoleMap,
+) -> Result<Vec<NodeEditIntent>, String> {
+
+  /// May append a NodeEditIntent to 'result', and might recurse.
   /// Skips some nodes, because:
-  /// - indefinitive nodes don't generate instructions
+  /// - indefinitive nodes don't generate intents
   /// - aliases     are handled by
   ///   'collect_grandchild_aliases_for_viewnode'
   /// - subscribees are handled by
@@ -33,7 +85,7 @@ pub fn naive_saveinstructions_from_tree (
     tree    : &mut Tree<ViewNode>,
     node_id : NodeId,
     roles   : &SaveRoleMap,
-    result  : &mut Vec<DefineNode>
+    result  : &mut Vec<NodeEditIntent>
   ) -> Result<(), String> {
 
     /// Defined separately because it's called in two places.
@@ -41,7 +93,7 @@ pub fn naive_saveinstructions_from_tree (
       tree: &mut Tree<ViewNode>,
       node_id: NodeId,
       roles: &SaveRoleMap,
-      result: &mut Vec<DefineNode>
+      result: &mut Vec<NodeEditIntent>
     ) -> Result<(), String> {
       for child_treeid in
         { let child_treeids: Vec<NodeId> =
@@ -78,52 +130,61 @@ pub fn naive_saveinstructions_from_tree (
       ViewNodeKind::True (t) => {
         if role == SaveRole::OrdinaryTrueNode
            || matches! (role, SaveRole::AsSubscribee { .. })
-        { if let Some (instruction)
-            = maybe_instruction_from_treenode (
+        { if let Some (intent)
+            = maybe_intent_from_treenode (
                 tree, node_id, roles, &t )?
-            { result . push (instruction); }
+            { result . push (intent); }
           recurse_on_children( tree, node_id, roles, result )?; }}}
     Ok(( )) }
 
-  let mut result: Vec<DefineNode> = Vec::new();
+  let mut result: Vec<NodeEditIntent> = Vec::new();
   let root_id : NodeId = viewforest . root() . id();
   maybe_defineonenode_and_maybe_recurse (
-    &mut viewforest, root_id, &roles, &mut result ) ?;
+    viewforest, root_id, roles, &mut result ) ?;
   Ok (result) }
 
-/// Returns Some(Delete) or Some(Save) for definitive nodes.
+/// Returns Some(delete intent) or Some(save intent) for definitive nodes.
 /// Returns None for indefinitive nodes.
-fn maybe_instruction_from_treenode (
+fn maybe_intent_from_treenode (
   tree    : &Tree<ViewNode>,
   node_id : NodeId,
   roles   : &SaveRoleMap,
   t       : &TrueNode
-) -> Result<Option<DefineNode>, String> {
+) -> Result<Option<NodeEditIntent>, String> {
   match &t . indef_or_def {
     IndefOrDef::Indefinitive => return Ok (None),
     IndefOrDef::Definitive { body, edit_request } => {
       if *edit_request == Some (EditRequest::Delete) {
-        return Ok(Some(DefineNode::Delete(DeleteNode {
-          id     : t . id    . clone(),
-          source : t . source . clone() } )) ); }
+        return Ok(Some(NodeEditIntent {
+          pid                          : t . id . clone(),
+          source                       : t . source . clone(),
+          delete                       : true,
+          title                        : None,
+          body                         : None,
+          contains                     : Vec::new(),
+          aliases                      : MSV::Unspecified,
+          subscribes_to                : MSV::Unspecified,
+          hides_from_its_subscriptions : MSV::Unspecified,
+          overrides_view_of            : MSV::Unspecified,
+        } )); }
       let node_ref : NodeRef<ViewNode> =
         tree . get (node_id) . ok_or(
-          "maybe_instruction_from_treenode: node not found")?;
-      Ok(Some(DefineNode::Save(SaveNode(NodeComplete {
-        title:   t . title . clone(),
-        aliases: collect_grandchild_aliases_for_viewnode(
-          tree, node_id)?,
-        source:  t . source . clone(),
-        pid:     t . id . clone(),
-        extra_ids: vec![],
-        body:    body . clone(),
-        contains:
+          "maybe_intent_from_treenode: node not found")?;
+      Ok(Some(NodeEditIntent {
+        pid           : t . id . clone(),
+        source        : t . source . clone(),
+        delete        : false,
+        title         : Some (t . title . clone()),
+        body          : body . clone(),
+        contains      :
           collect_contents_to_save_from_children (&node_ref, roles),
-        subscribes_to:
+        aliases       : collect_grandchild_aliases_for_viewnode(
+          tree, node_id)?,
+        subscribes_to :
           collect_subscribees( tree, node_id, roles )?,
-        hides_from_its_subscriptions: MSV::Unspecified,
-        overrides_view_of: MSV::Unspecified,
-        misc: Vec::new () } )) )) }}}
+        hides_from_its_subscriptions : MSV::Unspecified,
+        overrides_view_of            : MSV::Unspecified,
+      })) }}}
 
 /// Treats the input tree as the source of truth; does not read dbs.
 /// Returns None if no SubscribeeCol found,

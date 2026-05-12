@@ -21,7 +21,9 @@ use typedb_driver::TypeDBDriver;
 /// reconciling duplicates via 'reconcile_same_id_instructions'
 /// and supplementing None fields with data from disk.
 /// ASSUMES indefinitive nodes produced no instructions.
-/// (That filtering is done by 'naive_saveinstructions_from_tree'.)
+/// The initial extraction is called "naive" because its output
+/// is preliminary: it has not yet gone through same-ID reconciliation,
+/// unchanged filtering, or disk supplementation.
 pub async fn viewforest_to_nonmerge_save_instructions (
   viewforest : &Tree<ViewNode>, // "viewforest" = tree with BufferRoot
   config : &SkgConfig,

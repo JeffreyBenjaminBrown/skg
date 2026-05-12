@@ -305,6 +305,51 @@ fn role_aware_extraction_collects_subscribees_without_hidden_branches (
     vec![ID::from ("subscribee-content")]); }
 
 #[test]
+fn intent_layer_preserves_mixed_naive_instruction_shape (
+) {
+  let input: &str =
+    indoc! {"
+            * (skg (node (id root) (source main))) root
+            Root body
+            ** (skg aliasCol) aliases
+            *** (skg alias) root alias
+            ** (skg (node (id child) (source main))) child
+            Child body
+            ** (skg subscribeeCol) subscribees
+            *** (skg (node (id subscribee) (source main))) subscribee
+            * (skg (node (id doomed) (source main) (editRequest delete))) doomed
+            Doomed body
+        "};
+
+  let unchecked_viewforest : Tree<UncheckedViewNode> =
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let viewforest: Tree<ViewNode> =
+    unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
+  let instructions: Vec<DefineNode> =
+    naive_saveinstructions_from_tree (viewforest) . unwrap();
+
+  assert_eq!(
+    save_ids (&instructions),
+    vec![
+      ID::from ("root"),
+      ID::from ("child"),
+      ID::from ("subscribee"),
+      ID::from ("doomed")]);
+  let root : &NodeComplete =
+    saved_node_by_id (&instructions, "root");
+  assert_eq!(root . title, "root");
+  assert_eq!(root . body, Some ("Root body" . to_string()));
+  assert_eq!(root . aliases, MSV::Specified (vec![
+    "root alias" . to_string()]));
+  assert_eq!(root . contains, vec![ID::from ("child")]);
+  assert_eq!(root . subscribes_to, MSV::Specified (vec![
+    ID::from ("subscribee")]));
+  assert!(matches!(
+    instructions . last(),
+    Some (DefineNode::Delete (DeleteNode { id, .. }))
+      if id == &ID::from ("doomed"))); }
+
+#[test]
 fn test_viewforest_to_nonmerge_save_instructions_deep_nesting() {
   let input: &str =
     indoc! {"

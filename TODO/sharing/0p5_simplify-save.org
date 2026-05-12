@@ -37,7 +37,8 @@ The required order is:
    checked ViewNode by save role.
 3. DONE Route existing SaveNode construction through that
    interpreted structure.
-4. Split save extraction into explicit intent-oriented passes.
+4. DONE Begin splitting save extraction into explicit intent-oriented
+   passes by introducing an internal NodeEditIntent layer.
 5. Move unchanged filtering later, or make it intent-aware.
 6. Define a stricter completion contract for SubscribeeCol branches:
    preserve user-authored branch edits, and reconcile only the parts
@@ -425,6 +426,53 @@ cargo test --test new viewnodes_to_instructions -- --nocapture
 'cargo fmt --check' could not be run in that environment because
 'cargo fmt' / 'rustfmt' was not installed.
 
+** DONE Add a behavior-preserving NodeEditIntent layer
+
+'naive_saveinstructions_from_tree' now has an internal
+'NodeEditIntent' boundary. The current extraction path is:
+
+#+begin_src text
+checked tree + SaveRoleMap
+  -> Vec<NodeEditIntent>
+  -> Vec<DefineNode>
+#+end_src
+
+This is intentionally only the first split. The intents are still
+converted immediately into final 'DefineNode' values, and no fork
+edits are inferred yet.
+
+Behavior is unchanged:
+
+- ordinary definitive nodes and definitive 'AsSubscribee' nodes still
+  produce instructions;
+- delete requests still become 'DefineNode::Delete';
+- save intents still become 'NodeComplete' values with
+  'extra_ids: vec![]', 'misc: Vec::new()', and hide/override fields
+  left as 'MSV::Unspecified';
+- aliases, 'contains', and 'subscribes_to' still use the same
+  role-aware helper logic as before.
+
+Added a mixed regression test covering ordinary save, delete request,
+alias, content, and SubscribeeCol extraction across the intent
+conversion boundary.
+
+Verification run:
+
+#+begin_src text
+cargo check
+cargo test --test new classify -- --nocapture
+cargo test --test new viewnodes_to_instructions -- --nocapture
+cargo test --test new reconcile_same_id_instructions -- --nocapture
+#+end_src
+
+The exact path filter
+'cargo test --test new viewnodes_to_instructions::reconcile_same_id_instructions -- --nocapture'
+matched zero tests in this harness, so the broader
+'reconcile_same_id_instructions' filter was used.
+
+'cargo fmt --check' still could not be run in this environment
+because 'cargo fmt' / 'rustfmt' was not installed.
+
 ** Add fork-edit inference as a pure pass
 
 After the prerequisite save-intent shape is in place, add a pass that
@@ -555,8 +603,10 @@ the new feature:
 - DONE split source moves out of disk supplementation;
 - DONE add role classification;
 - DONE route existing SaveNode extraction through it;
-- split extraction into explicit intent-oriented passes;
-- preserve raw-buffer edits separately from graph edits;
+- DONE add a behavior-preserving NodeEditIntent layer;
+- split extraction into fuller intent-oriented passes;
+- preserve raw-buffer edits separately from graph edits beyond the
+  current immediate NodeEditIntent-to-DefineNode conversion;
 - move unchanged filtering later, or make it intent-aware;
 - define and test SubscribeeCol completion preservation.
 
