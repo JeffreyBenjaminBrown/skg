@@ -1,5 +1,15 @@
+* after a big edit to the CS for econ course notes, C-c t A took forever
+I had created a big tree of new nodes.
+* Why does saving this buffer set the node's birth to 'independent'?
+** this buffer
+```
+  * (skg (node (id 6fcd1f14-3d3a-4967-9215-52eba5403149) (source public) (birth independent) indef (graphStats (containers 1)) (viewStats (sourceHerald ⌂:public)))) bio for course at La Nacho
+```
+** it loads with the right herald initially
+But after that saving sets it to independent.
 * What's the second blue { in the herald for?
 Saw it looking at 'address', common to Valentina and Maps.
+* request containerward paths, excluding the view-rootward one
 * unify the three skg instances
 See TODO/docker-unification-strategies.org
 * IDs should not be writeable in the metadata view

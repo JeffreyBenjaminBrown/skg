@@ -278,3 +278,17 @@
    Possible fixes: watch the config file too, log the active port and
    config path in a user-visible way, or add a client diagnostic that
    explicitly says "config wants port X but no server is listening".
+
+** One TypeDB process has a fixed idle CPU tax
+   Investigated on 2026-05-14;
+   see 'TODO/typedb-performance-research.org'.
+   After Skg is ready and no requests are arriving, TypeDB CE 3.10.3
+   still keeps TypeDB-owned threads waking from timer sleeps and using
+   a few percent of a CPU. This continues after shutting Skg down, so
+   it is not a Skg request loop or the live Rust driver connection.
+
+   The practical issue is multiplicative: three independent Skg
+   containers mean three TypeDB server processes and roughly three
+   fixed idle taxes. The likely mitigation is one shared TypeDB server
+   with distinct database names per Skg instance, plus separate Skg
+   ports/configs.

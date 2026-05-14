@@ -6,13 +6,15 @@ The narrow feature is:
 
 - When a node is shown as a subscribee, deleting one of its direct
   content children from that as-a-subscribee view should add that
-  child to the subscriber's 'hides_from_its_subscriptions'.
-- Moving that child into the subscriber's ordinary content should not
-  add a hide.
-- Moving that child elsewhere, outside the subscriber's ordinary
-  content, should add a hide.
+  child to the subscriber's 'hides_from_its_subscriptions' --
+  unless it is now a content-child of the subscriber,
+  because in that case the user wants to see it there.
+- Moving the child to be contentelsewhere,
+  outside the subscriber's ordinary content,
+  should hide it in the subscriber.
 - The existing HiddenInSubscribeeCol and HiddenOutsideOfSubscribeeCol
-  renderers should then show the result.
+  renderers should update accordingly,
+   because what is hidden has changed.
 
 The main implementation belongs in the save pipeline, not in the
 renderer. Rendering already knows how to hide subscribee content:
