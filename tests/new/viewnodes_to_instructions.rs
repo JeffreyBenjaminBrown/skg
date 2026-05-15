@@ -917,6 +917,73 @@ fn foreign_direct_as_subscribee_title_edit_reaches_validation (
       Ok (()) })) }
 
 #[test]
+fn owned_as_subscribee_title_edit_is_rejected (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db_from_config (
+    "skg-test-owned-as-subscribee-title-edit-rejected",
+    SUBSCRIBEE_EDIT_CONFIG,
+    |config, driver| Box::pin (async move {
+      let input : &str =
+        indoc! {"
+                * (skg (node (id a) (source owned))) a
+                ** (skg subscribeeCol) subscribees
+                *** (skg (node (id r) (source owned))) changed title
+                **** (skg (node (id r1) (source owned))) r1
+                "};
+      let result : Result<Vec<DefineNode>, Box<dyn Error>> =
+        save_instructions_from_org_with_disk (
+          input, config, driver) . await;
+      let error : Box<dyn Error> =
+        result . unwrap_err();
+      let buffer_error : &BufferValidationError =
+        error . downcast_ref::<BufferValidationError>()
+        . expect ("expected BufferValidationError::Other");
+      assert!(
+        matches!(
+          buffer_error,
+          BufferValidationError::Other (msg)
+            if msg . contains ("Cannot edit title/body")
+               && msg . contains ("subscribee-as-such")
+               && msg . contains ("r")),
+        "expected owned subscribee-as-such title edit rejection, got {:?}",
+        buffer_error);
+      Ok (()) })) }
+
+#[test]
+fn owned_as_subscribee_body_edit_is_rejected (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db_from_config (
+    "skg-test-owned-as-subscribee-body-edit-rejected",
+    SUBSCRIBEE_EDIT_CONFIG,
+    |config, driver| Box::pin (async move {
+      let input : &str =
+        indoc! {"
+                * (skg (node (id a) (source owned))) a
+                ** (skg subscribeeCol) subscribees
+                *** (skg (node (id r) (source owned))) r
+                body text that should not be accepted here
+                **** (skg (node (id r1) (source owned))) r1
+                "};
+      let result : Result<Vec<DefineNode>, Box<dyn Error>> =
+        save_instructions_from_org_with_disk (
+          input, config, driver) . await;
+      let error : Box<dyn Error> =
+        result . unwrap_err();
+      let buffer_error : &BufferValidationError =
+        error . downcast_ref::<BufferValidationError>()
+        . expect ("expected BufferValidationError::Other");
+      assert!(
+        matches!(
+          buffer_error,
+          BufferValidationError::Other (msg)
+            if msg . contains ("Cannot edit title/body")
+               && msg . contains ("subscribee-as-such")
+               && msg . contains ("r")),
+        "expected owned subscribee-as-such body edit rejection, got {:?}",
+        buffer_error);
+      Ok (()) })) }
+
+#[test]
 fn test_viewforest_to_nonmerge_save_instructions_deep_nesting() {
   let input: &str =
     indoc! {"

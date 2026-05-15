@@ -1,0 +1,138 @@
+* Plan: decide owned subscribee-as-such title/body policy
+
+This plan executes item d in
+[[./3_what-remains.org][3_what-remains.org]].
+
+The goal is to pin the save behavior when an owned node is edited in
+subscribee-as-such position, meaning a definitive =AsSubscribee=
+branch under a subscriber's subscribee collection.
+
+* Current issue
+
+Foreign title/body edits in this position already reach foreign-node
+validation, and a regression exists for that behavior.
+
+Owned title/body edits are less clear. The current extraction path
+still creates a =SubscribeeEdit= intent for the =AsSubscribee=
+occurrence, with =contains= left unspecified. That protects the
+subscribee's graph-content from the displayed view-child list, but it
+can still let title/body edits on an owned subscribee become real
+graph edits.
+
+The likely product policy is stricter: title/body edits to a
+subscribee should happen when viewing that node as itself, not when it
+is shown as someone else's subscribee.
+
+* Proposed policy
+
+Reject owned title/body edits in subscribee-as-such position with a
+focused validation error.
+
+This is deliberately not a silent normalization. Dropping typed edits
+without an error would make a save appear successful while losing the
+user's text. Allowing the edit keeps the current behavior but leaves
+two edit surfaces for title/body, one of which is visually dominated
+by subscriber visibility semantics.
+
+Keep the existing foreign-node validation behavior unless the smallest
+implementation naturally reports the same new validation for foreign
+and owned nodes. If that happens, update the foreign regression only
+if the new error is a clearly better product-facing boundary.
+
+* Work
+
+** 1. Characterize the current owned behavior
+
+Add a focused regression for an owned subscribee shown under another
+owned node's subscribee collection.
+
+First write the test to expose current behavior:
+
+- edit the subscribee's title in subscribee-as-such position;
+- edit the subscribee's body in subscribee-as-such position;
+- assert that the save is rejected once the policy is implemented.
+
+The test should live near the existing foreign
+=foreign_direct_as_subscribee_title_edit_reaches_validation= coverage
+unless a better nearby module already exists.
+
+** 2. Add the validation boundary
+
+Add the smallest validation pass that can distinguish an
+=AsSubscribee= occurrence whose title/body differs from disk.
+
+Preferred location: after role classification and before final
+=DefineNode= construction, while the code still knows that the
+occurrence came from =SaveRole::AsSubscribee=.
+
+The validation should:
+
+- load the disk node for the =AsSubscribee= occurrence;
+- skip nodes that do not exist on disk, letting existing new-node
+  handling decide those cases;
+- skip foreign nodes if preserving the current =ModifiedForeignNode=
+  test requires that;
+- reject an owned node if title or body differs from disk;
+- use wording that points the user toward editing the node as itself,
+  not through a subscribee-as-such branch.
+
+** 3. Keep child-list semantics untouched
+
+Do not change the visibility pipeline in this increment.
+
+The existing policy remains:
+
+- view-children under the subscribee-as-such branch express
+  subscriber visibility only when they are graph-content of the
+  subscribee;
+- extra view-children are normalized to =Birth=Independent= by saved
+  completion;
+- the subscribee's graph-content is not saved from this branch.
+
+** 4. Update the roadmap
+
+If the policy is implemented and covered, mark item d complete in
+=3_what-remains.org= with a short status note.
+
+Rename this file to =3pD_DONE.org= after execution.
+
+* Tests
+
+Run the focused test first, likely:
+
+#+begin_src text
+cargo test --test new owned_as_subscribee
+#+end_src
+
+Then run:
+
+#+begin_src text
+cargo check
+#+end_src
+
+If the implementation changes the foreign validation boundary, also
+run the existing foreign subscribee-as-such validation test.
+
+* Acceptance criteria
+
+- Owned title/body edits in subscribee-as-such position are covered by
+  a focused regression.
+- The chosen policy is explicit in code behavior, not merely implied
+  by the current intent shape.
+- Foreign title/body validation remains covered.
+- Subscriber visibility and graph-content child-list semantics are
+  unchanged.
+- Item d in =3_what-remains.org= points to the executed plan, and the
+  plan is renamed =3pD_DONE.org= after execution.
+
+* Outcome
+
+Complete. Owned title/body edits in subscribee-as-such position are
+rejected before save-intent extraction loses the =AsSubscribee= role
+context.
+
+The validation skips foreign nodes, so the existing foreign
+=ModifiedForeignNode= behavior remains intact.
+
+Added focused title and body regressions in
+=tests/new/viewnodes_to_instructions.rs=.

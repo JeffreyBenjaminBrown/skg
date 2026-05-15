@@ -114,9 +114,9 @@ the subscribee to =Birth=Independent= and orders graph-content
 view-children by the subscribee's graph-content order. Foreign and
 owned regression tests cover the behavior.
 
-** d. Decide owned direct-=AsSubscribee= title/body policy
+** DONE d. Decide owned subscribee-as-such title/body policy
 
-Foreign title/body edits in direct =AsSubscribee= position currently
+Foreign title/body edits in subscribee-as-such position currently
 reach foreign-node validation, which is covered by tests.
 
 The intended product policy may be stricter for owned nodes: real
@@ -126,6 +126,12 @@ that node directly, not when it is shown as someone else's subscribee.
 Suggested next step: add a focused test for owned direct
 =AsSubscribee= title/body edits and decide whether to allow, reject,
 or normalize them.
+
+Execution plan: [[./3pD_DONE.org][3pD_DONE.org]].
+
+Status: complete. Owned title/body edits in subscribee-as-such
+position are rejected with a focused validation error. The existing
+foreign-node validation behavior is preserved.
 
 ** e. Document direct-only visibility semantics for users
 

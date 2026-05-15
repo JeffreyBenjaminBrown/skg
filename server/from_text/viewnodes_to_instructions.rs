@@ -3,13 +3,13 @@ pub mod reconcile_same_id_instructions;
 pub mod classify;
 pub mod subscribee_visibility_intents;
 
-use classify::{ viewforest_with_saveroles, ViewNode_in_Role };
+use classify::{ SaveRole, viewforest_with_saveroles, ViewNode_in_Role };
 use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
-use crate::types::viewnode::ViewNode;
+use crate::types::viewnode::{ IndefOrDef, ViewNode, ViewNodeKind };
 use crate::types::views_state::nodecomplete_from_in_rust_graph;
 use subscribee_visibility_intents::{ SubscribeeVisibilityIntent, subscribee_visibility_intents_from_tree, };
 use super::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
@@ -69,6 +69,8 @@ pub async fn viewforest_to_nonmerge_save_instructions (
 ) -> Result<(Vec<DefineNode>, Vec<SourceMove>), Box<dyn Error>> {
   let role_viewforest : Tree<ViewNode_in_Role> =
     viewforest_with_saveroles (viewforest) ?;
+  validate_no_owned_title_or_body_edit_in_as_subscribee (
+    &role_viewforest, config, driver ) . await ?;
   let extracted : SaveExtraction =
     extract_save_intents (&role_viewforest)?;
   let intents_without_dups : SameIdReconciledNodeEditIntents =
@@ -102,6 +104,35 @@ fn extract_save_intents (
     node_edit_intents,
     visibility_intents,
   }) }
+
+async fn validate_no_owned_title_or_body_edit_in_as_subscribee (
+  role_viewforest : &Tree<ViewNode_in_Role>,
+  config          : &SkgConfig,
+  driver          : &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
+  for node_ref in role_viewforest . nodes() {
+    if ! matches!(
+      node_ref . value() . role,
+      SaveRole::AsSubscribee { .. })
+    { continue; }
+    let ViewNodeKind::True (t) =
+      &node_ref . value() . viewnode . kind
+    else { continue; };
+    let IndefOrDef::Definitive { body, .. } =
+      &t . indef_or_def
+    else { continue; };
+    let Some (from_disk) =
+      optnodecomplete_from_id (
+        config, driver, &t . id) . await ?
+    else { continue; };
+    if ! source_is_owned (config, &from_disk . source) {
+      continue; }
+    if t . title != from_disk . title || *body != from_disk . body {
+      return Err (Box::new (BufferValidationError::Other (
+        format!(
+          "Cannot edit title/body for node {} in subscribee-as-such position. View the node as itself to edit title/body.",
+          t . id )))); }}
+  Ok (( )) }
 
 async fn build_disk_supplemented_define_nodes (
   intents : Vec<NodeEditIntent>,
