@@ -1,0 +1,144 @@
+* Jeff's preconception
+Suppose:
+- R is a subscriber
+- C, view-child of R, is a subscribee collection
+- E, view-child of C, is a subscribee
+
+If N is a view-child of E with Birth=ContentOf,
+there are two cases:
+- If N is *not* graph-content of E,
+  N's Birth should become Independent.
+- If N *is* graph-content of E,
+  then N should be unhidden from R.
+
+If N is graph-content of E,
+and no view-child of E has the ID of N and Birth=ContentOf,
+and N is not graph-content of R after the save,
+then N should be hidden from R.
+Otherwise, no effect.
+
+After the above changes, the Birth=ContentOf children of E
+should be reordered to match their order as E's graph-content.
+
+Conclusion: this answers the design question. Extra view-children are
+not rejected and are not saved as graph-content of E. If they are not
+graph-content of E, they should be normalized to Birth=Independent.
+Only graph-content of E participates in hide/unhide inference.
+* Plan: define extra view-child policy under AsSubscribee
+
+This plan executes item c in
+[[./3_what-remains.org][3_what-remains.org]].
+
+The goal is to pin the behavior for view-children placed under a
+definitive =AsSubscribee= node when those children were not pre-save
+graph-content of the subscribee.
+
+* Current issue
+
+The core invariant is already protected: children of an
+=AsSubscribee= branch are not saved as the subscribee's graph
+=contains=.
+
+The user policy is now settled in [[*Jeff's preconception][Jeff's preconception]]. If a user
+inserts a new view-child under a subscribee-in-subscription position,
+that child is not part of the subscribee's pre-save graph-content, so
+it should be normalized to Birth=Independent and should not itself
+mean hide or unhide for that subscribee relationship.
+
+Current code shape suggests this behavior:
+
+- =collect_contains= returns =MSV::Unspecified= for
+  =SaveRole::AsSubscribee=, so the subscribee's =contains= is not
+  edited from that branch;
+- =subscribee_visibility_intents_from_tree= includes qualifying
+  view-children in =visible_content=;
+- =apply_hiderels_from_subscribee_visibility= compares
+  =visible_content= only against the subscribee's disk =contains=, so
+  extra IDs are ignored for hide/unhide;
+- the extra view-child itself may still have save semantics if it is
+  a save candidate and validation/source ownership allow it.
+
+* Work
+
+** 1. Characterize current behavior with focused tests
+
+Add tests for inserting a new view-child under a definitive
+=AsSubscribee= branch:
+
+- one where the subscribee is foreign;
+- one where the subscribee is owned.
+
+The tests should assert both sides of the policy boundary:
+
+- the subscribee's saved =contains= does not gain the extra view-child;
+- the extra view-child does not create a hide/unhide effect merely by
+  appearing in =visible_content=.
+
+If current behavior saves the extra view-child as an independent node,
+assert that explicitly only if that is already established by the
+existing save rules. Otherwise, keep this increment focused on the
+subscribee/visibility boundary.
+
+** 2. Implement or verify the normalization policy
+
+If current behavior already matches the policy, keep it and rely on
+the tests.
+
+If not, make the smallest change needed so that:
+
+- view-children of E with Birth=ContentOf that are not graph-content
+  of E become Birth=Independent;
+- graph-content view-children of E are ordered to match E's
+  graph-content order;
+- only graph-content of E participates in hide/unhide inference.
+
+Do not implement a broad UI policy in this increment.
+
+** 3. Update plan 3
+
+When behavior is pinned by tests and, if needed, code/docs, mark item
+c complete in =3_what-remains.org= and add a short status note.
+
+Rename this file to =3pC_DONE.org= after execution.
+
+* Tests
+
+Run the focused test first.
+
+Then run whichever suite receives the tests, likely:
+
+#+begin_src text
+cargo test --test hidden_from_subscriptions
+#+end_src
+
+Also run:
+
+#+begin_src text
+cargo check
+#+end_src
+
+* Acceptance criteria
+
+- Foreign and owned =AsSubscribee= extra-child cases are covered.
+- Tests prove extra view-children do not become subscribee
+  =contains= edits.
+- Tests prove extras that are not graph-content of E do not affect
+  hide/unhide inference.
+- Tests prove extras are normalized to Birth=Independent and
+  graph-content view-children are ordered by E's graph-content order.
+- No unrelated behavior changes.
+
+* Outcome
+
+Complete. The policy is documented at
+=apply_hiderels_from_subscribee_visibility=.
+
+Saved =AsSubscribee= completion now normalizes view-children that are
+not graph-content of the subscribee to =Birth=Independent= and orders
+graph-content view-children by the subscribee's graph-content order.
+
+Added foreign and owned regressions in
+=tests/hidden_from_subscriptions.rs=. They verify that extra
+view-children do not become subscribee =contains= edits, do not affect
+hide/unhide inference, become =Birth=Independent= in the saved view,
+and leave graph-content view-children in graph-content order.

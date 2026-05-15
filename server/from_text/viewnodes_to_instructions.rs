@@ -173,21 +173,27 @@ async fn supplement_saveintent_from_disk (
         source_move : maybe_move,
       }) }}}
 
-/// Interpret direct child-list edits under definitive AsSubscribee
-/// branches as subscriber visibility edits.
+/// Interpret view-children under definitive AsSubscribee branches as
+/// subscriber visibility edits.
 ///
 /// At this point graph edit intents have been same-ID reconciled, but
 /// have not yet been converted to DefineNodes or supplemented from
-/// disk. That lets inferred hides become ordinary subscriber node
-/// intents before final save instruction construction.
+/// disk. That lets inferred hides become subscriber node intents
+/// before final save instruction construction.
 ///
-/// For each `(subscriber, subscribee, visible_content)` intent:
+/// Policy for subscriber R viewing subscribee E:
 ///
-/// - any pre-save direct content of the subscribee that is absent from
-///   `visible_content` becomes hidden from that subscriber, unless the
-///   same ID was moved into the subscriber's ordinary direct content;
-/// - any pre-save direct content of the subscribee that is present in
-///   `visible_content` is removed from that subscriber's hides.
+/// - If N is graph-content of subscribee E,
+///   and E has a view-child with ID N and Birth=ContentOf,
+///   then N is visible through this subscription
+///   and is removed from the hides of subscriber R.
+/// - If N is graph-content of E, E has no view-child with ID N and
+///   Birth=ContentOf, and N is not graph-content of R after the save,
+///   then N is hidden from R.
+/// - If N is a Birth=ContentOf view-child of E but is not
+///   graph-content of E, then it is not a visibility signal.
+///   This does not touch it. The completion/rerender pipeline
+///   will change it to Independent.
 async fn apply_hiderels_from_subscribee_visibility (
   mut node_edit_intents : SameIdReconciledNodeEditIntents,
   vis_intents     : &[SubscribeeVisibilityIntent],

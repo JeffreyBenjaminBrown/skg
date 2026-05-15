@@ -225,7 +225,9 @@ fn reconcile_content_children (
   let is_sub : bool = is_subscribee (tree, node) ?;
   if should_preserve_saved_as_subscribee_branch (
       is_saved_view, source_diffs, is_sub )
-    { return Ok (subscribes_to); }
+    { correct_the_viewChildren_of_subscribee (
+        tree, node, &content_ids ) ?;
+      return Ok (subscribes_to); }
   let (goal_list, removed_ids, apparent_content_ids) =
     // git diff view makes a difference
     content_goal_list(
@@ -239,11 +241,41 @@ fn reconcile_content_children (
     tree, node, &apparent_content_ids ) ?;
   Ok (subscribes_to) }
 
-/// A definitive TrueNode child of a SubscribeeCol is an
-/// editable visibility surface in the saved buffer. Its direct
-/// children are user-authored signal for later hide/unhide
-/// inference, so saved-view completion must not regenerate that
-/// child list from disk before the branch can be interpreted.
+/// Changes the Births of non-content children to Independent,
+/// and reorders the remaining content to match what's on disk.
+/// (The visible content is likely a subset of that on-disk content.)
+fn correct_the_viewChildren_of_subscribee (
+  tree        : &mut Tree<ViewNode>,
+  node        : NodeId,
+  content_ids : &[ID],
+) -> Result<(), Box<dyn Error>> {
+  mark_erroneous_content_children_as_indep (
+    tree, node, content_ids ) ?;
+  let content_id_set : HashSet<ID> =
+    content_ids . iter() . cloned() . collect();
+  let content_child_ids : Vec<(ID, NodeId)> =
+    tree . get (node) . unwrap()
+    . children()
+    . filter_map ( |child| match &child . value() . kind {
+      ViewNodeKind::True (t)
+        if !t . parent_ignores_it()
+           && !t . is_phantom()
+           && content_id_set . contains (&t . id) =>
+        Some ((t . id . clone(), child . id())),
+      _ => None,
+    })
+    . collect();
+  for content_id in content_ids {
+    for (_id, child_id) in content_child_ids . iter()
+      . filter ( |(id, _)| id == content_id )
+    { move_child_to_end (tree, node, *child_id) ?; }}
+  Ok (( )) }
+
+/// A definitive TrueNode child of a SubscribeeCol is an editable
+/// visibility surface in the saved buffer. Its view-children are
+/// user-authored signal for later hide/unhide inference, so saved-view
+/// completion must not regenerate that child list from disk before the
+/// branch can be interpreted.
 ///
 /// This is intentionally saved-view-only. Collateral views should
 /// still refresh from the graph, and diff view should still compute
@@ -254,7 +286,7 @@ fn should_preserve_saved_as_subscribee_branch (
   is_subscribee : bool,
 ) -> bool {
   is_saved_view
-    // In diff mode, AsSubscribee children include generated phantom/removed state that must be regenerated from 'source_diffs', not preserved as user-authored manipulation of hide relationships.
+    // In diff mode, AsSubscribee view-children include generated phantom/removed state that must be regenerated from 'source_diffs', not preserved as user-authored manipulation of hide relationships.
     && source_diffs . is_none()
     && is_subscribee }
 

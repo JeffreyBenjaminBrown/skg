@@ -237,6 +237,68 @@ fn assert_e1_removed_from_visible_subscribee_branch (
     "Expected unrelated direct subscribee content e2 to remain visible:\n{}",
     buffer ); }
 
+fn remove_e1_and_e2_subtrees (
+  buffer : &str,
+) -> String {
+  buffer
+    . lines()
+    . filter ( |line| {
+      ! line . contains ("(id e1)")
+      && ! line . contains ("(id e11)")
+      && ! line . contains ("(id e2)")
+      && ! line . contains ("(id e12)") })
+    . collect::<Vec<_>>()
+    . join ("\n") + "\n" }
+
+fn insert_after_line_containing (
+  buffer     : &str,
+  needle     : &str,
+  insertion  : &str,
+) -> String {
+  let mut result : Vec<String> = Vec::new();
+  for line in buffer . lines() {
+    result . push (line . to_string());
+    if line . contains (needle) {
+      result . extend (
+        insertion . lines() . map ( |l| l . to_string() )); }}
+  result . join ("\n") + "\n" }
+
+fn assert_line_contains_all (
+  buffer : &str,
+  parts  : &[&str],
+) {
+  assert!(
+    buffer . lines() . any ( |line|
+      parts . iter() . all ( |part| line . contains (part) )),
+    "Expected a line containing {:?}:\n{}",
+    parts, buffer ); }
+
+fn assert_line_order (
+  buffer : &str,
+  earlier : &str,
+  later   : &str,
+) {
+  let earlier_pos : usize =
+    buffer . find (earlier) . unwrap_or_else (||
+      panic! ("Expected {:?} in:\n{}", earlier, buffer));
+  let later_pos : usize =
+    buffer . find (later) . unwrap_or_else (||
+      panic! ("Expected {:?} in:\n{}", later, buffer));
+  assert!(
+    earlier_pos < later_pos,
+    "Expected {:?} before {:?} in:\n{}",
+    earlier, later, buffer ); }
+
+fn node_from_disk (
+  config : &SkgConfig,
+  pid    : &str,
+) -> Result<NodeComplete, Box<dyn Error>> {
+  let id : ID = ID::from (pid);
+  read_all_skg_files_from_sources (config)?
+    . into_iter()
+    . find ( |node| node . pid == id )
+    . ok_or_else ( || format! ("node not found on disk: {}", pid) . into() ) }
+
 #[test]
 fn test_deleting_foreign_subscribee_content_preserves_branch_edit(
 ) -> Result<(), Box<dyn Error>> {
@@ -416,6 +478,119 @@ fn test_moving_foreign_subscribee_content_elsewhere_still_hides(
         "** (skg (node (id e1) (source foreign) indef" ),
       "Expected e1 to remain content of a:\n{}",
       rerendered );
+    cleanup_test (
+      db_name, &driver, &config . tantivy_folder ) . await?;
+    guard . disarm ();
+    if temp_fixture_dir . exists() {
+      fs::remove_dir_all (temp_fixture_dir)?; }
+    Ok (( )) }) }
+
+#[test]
+fn test_extra_view_child_under_foreign_subscribee_is_independent(
+) -> Result<(), Box<dyn Error>> {
+  block_on(async {
+    let db_name = "skg-test-extra-foreign-subscribee-child-independent";
+    let mut guard : TestDbGuard =
+      TestDbGuard::new (db_name, None);
+    let (config, driver, mut tantivy, temp_fixture_dir) =
+      setup_temp_test (
+        db_name,
+        "tests/hidden_from_subscriptions/fixtures-subscribee-edit"
+      ) . await?;
+    let graph : InRustGraphHandle =
+      new_handle (InRustGraph::new ());
+    let mut views_state : ViewsState = ViewsState {
+      diff_mode_enabled : false,
+      open_views        : OpenViews::new (),};
+
+    let (initial_view, _pids, _)
+      : (String, Vec<ID>, _)
+      = single_root_view(
+          &driver, &config, None,
+          &ID ("r" . to_string()),
+          false ) . await?;
+    let expanded : String =
+      save_buffer_for_hidden_subscriptions_test (
+        &add_definitive_view_request_to_subscribees (&initial_view),
+        &driver, &config, &mut tantivy, &graph, &mut views_state
+      ) . await?;
+    let edited : String =
+      insert_after_line_containing (
+        &remove_e1_and_e2_subtrees (&expanded),
+        "(id e)",
+        "**** (skg (node (id e2) (source foreign) indef)) e2\n\
+         **** (skg (node (id a) (source owned) indef)) a\n\
+         **** (skg (node (id e1) (source foreign) indef)) e1" );
+    let rerendered : String =
+      save_buffer_for_hidden_subscriptions_test (
+        &edited, &driver, &config, &mut tantivy, &graph, &mut views_state
+      ) . await?;
+
+    assert_line_contains_all (
+      &rerendered,
+      &["(id a)", "(birth independent)"]);
+    assert_line_order (&rerendered, "(id e1)", "(id e2)");
+    assert_does_not_hide_e1 (&rerendered);
+    let e_skg : NodeComplete =
+      node_from_disk (&config, "e")?;
+    assert!(
+      ! e_skg . contains . contains (&ID::from ("a")),
+      "Extra view-child should not become graph-content of e: {:?}",
+      e_skg . contains );
+
+    cleanup_test (
+      db_name, &driver, &config . tantivy_folder ) . await?;
+    guard . disarm ();
+    if temp_fixture_dir . exists() {
+      fs::remove_dir_all (temp_fixture_dir)?; }
+    Ok (( )) }) }
+
+#[test]
+fn test_extra_view_child_under_owned_subscribee_is_independent(
+) -> Result<(), Box<dyn Error>> {
+  block_on(async {
+    let db_name = "skg-test-extra-owned-subscribee-child-independent";
+    let mut guard : TestDbGuard =
+      TestDbGuard::new (db_name, None);
+    let (config, driver, mut tantivy, temp_fixture_dir) =
+      setup_temp_test (
+        db_name,
+        "tests/hidden_from_subscriptions/fixtures-subscribee-edit"
+      ) . await?;
+    let graph : InRustGraphHandle =
+      new_handle (InRustGraph::new ());
+    let mut views_state : ViewsState = ViewsState {
+      diff_mode_enabled : false,
+      open_views        : OpenViews::new (),};
+    let edited : String =
+      indoc! {"
+              * (skg (node (id a) (source owned))) a
+              ** (skg subscribeeCol) subscribees
+              *** (skg (node (id r) (source owned))) r
+              **** (skg (node (id r2) (source owned) indef)) r2
+              **** (skg (node (id e) (source foreign) indef)) subscribee-e
+              **** (skg (node (id r1) (source owned) indef)) r1
+              "} . to_string();
+    let rerendered : String =
+      save_buffer_for_hidden_subscriptions_test (
+        &edited, &driver, &config, &mut tantivy, &graph, &mut views_state
+      ) . await?;
+
+    assert_line_contains_all (
+      &rerendered,
+      &["(id e)", "(birth independent)"]);
+    assert_line_order (&rerendered, "(id r1)", "(id r2)");
+    assert!(
+      ! rerendered . contains ("hiddenInSubscribeeCol"),
+      "Extra view-child should not infer a hide:\n{}",
+      rerendered );
+    let r_skg : NodeComplete =
+      node_from_disk (&config, "r")?;
+    assert!(
+      ! r_skg . contains . contains (&ID::from ("e")),
+      "Extra view-child should not become graph-content of r: {:?}",
+      r_skg . contains );
+
     cleanup_test (
       db_name, &driver, &config . tantivy_folder ) . await?;
     guard . disarm ();

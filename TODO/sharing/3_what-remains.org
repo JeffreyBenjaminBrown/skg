@@ -87,23 +87,32 @@ that a direct =AsSubscribee= branch regenerates phantom/removed
 children from =source_diffs= instead of preserving a stale direct
 child list. The misleading TODO was replaced with that rationale.
 
-** c. Define policy for extra direct children under =AsSubscribee=
+** DONE c. Define policy for extra view-children under =AsSubscribee=
 
-The current save path satisfies the crucial invariant: extra children
-under a direct =AsSubscribee= branch are never saved as the subscribee's
-graph =contains=.
+The current save path satisfies the crucial invariant: extra
+view-children under an =AsSubscribee= branch are never saved as the
+subscribee's graph =contains=.
 
-What is not explicitly settled is the user policy for a direct child
-that is not pre-save direct content of the subscribee:
+What is not explicitly settled is the user policy for a view-child
+that is not pre-save graph-content of the subscribee:
 
 - reject the save;
-- ignore it as visibility signal while allowing its own ordinary edit
-  semantics where applicable;
+- ignore it as visibility signal while allowing its own save semantics
+  where applicable;
 - normalize it into a different edit surface.
 
-Suggested next step: add tests for inserting a new child under a
-foreign direct =AsSubscribee= branch and under an owned direct
-=AsSubscribee= branch, then document or enforce the chosen policy.
+Suggested next step: add tests for inserting a new view-child under a
+foreign =AsSubscribee= branch and under an owned =AsSubscribee=
+branch, then document or enforce the chosen policy.
+
+Execution plan: [[./3pC_DONE.org][3pC_DONE.org]].
+
+Status: complete. The policy is documented in
+=apply_hiderels_from_subscribee_visibility=. Saved =AsSubscribee=
+completion now normalizes view-children that are not graph-content of
+the subscribee to =Birth=Independent= and orders graph-content
+view-children by the subscribee's graph-content order. Foreign and
+owned regression tests cover the behavior.
 
 ** d. Decide owned direct-=AsSubscribee= title/body policy
 
@@ -195,7 +204,7 @@ display or editing.
 
 The code and planning docs use several implementation terms:
 
-- subscribee;
+- subscribee
 - shown as a subscribee;
 - direct =AsSubscribee= branch;
 - visibility intent;
@@ -205,6 +214,10 @@ The code and planning docs use several implementation terms:
 User-facing commands and docs should probably say something closer to
 "hide this subscribed item from this view" and "show this subscribed
 item again", rather than "edit direct =AsSubscribee= child lists."
+
+*** Jeff prefers
+"subscribee-as-such"
+[this list is not complete]
 
 * Probably done; do not reopen without new evidence
 
