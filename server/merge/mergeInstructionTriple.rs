@@ -77,8 +77,6 @@ pub async fn neighbor_savenodes_for_merges (
 /// - acquiree_text_preserver: new node containing the acquiree's title and body
 /// - updated_acquirer: acquirer node with modified contents and extra IDs
 /// - acquiree_to_delete: acquiree marked for deletion
-///
-/// TODO ? This is slightly inefficient, walking the viewforest yet again. It would be faster, but more complex, to collect a list of viewnodes with merge instructions during one of the other walks of the viewforest.
 pub async fn instructiontriples_from_the_merges_in_an_viewforest(
   viewforest: &Tree<ViewNode>,
   config: &SkgConfig,

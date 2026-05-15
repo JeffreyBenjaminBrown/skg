@@ -26,6 +26,11 @@ struct SaveExtraction {
   visibility_intents : Vec<SubscribeeVisibilityIntent>,
 }
 
+pub struct NonmergeSavePlan {
+  pub define_nodes : Vec<DefineNode>,
+  pub source_moves : Vec<SourceMove>,
+}
+
 struct Definenodes_with_Sourcemoves {
   instructions : Vec<DefineNode>,
   source_moves : Vec<SourceMove>,
@@ -62,11 +67,13 @@ impl Definenodes_with_Sourcemoves {
 /// The initial extraction is called "naive" because its output
 /// is preliminary: it has not yet gone through same-ID reconciliation,
 /// disk supplementation, or unchanged filtering.
-pub async fn viewforest_to_nonmerge_save_instructions (
+pub async fn extract_nonmerge_save_plan (
   viewforest : &Tree<ViewNode>, // "viewforest" = tree with BufferRoot
   config : &SkgConfig,
   driver : &TypeDBDriver,
-) -> Result<(Vec<DefineNode>, Vec<SourceMove>), Box<dyn Error>> {
+) -> Result<NonmergeSavePlan, Box<dyn Error>> {
+  let _span : tracing::span::EnteredSpan = tracing::info_span!(
+    "extract_nonmerge_save_plan" ). entered();
   let role_viewforest : Tree<ViewNode_in_Role> =
     viewforest_with_saveroles (viewforest) ?;
   validate_no_owned_title_or_body_edit_in_as_subscribee (
@@ -89,7 +96,10 @@ pub async fn viewforest_to_nonmerge_save_instructions (
       driver ) . await ?;
   let changed_instructions : Vec<DefineNode> =
     filter_wouldbe_noop_definenodes (with_disk . instructions);
-  Ok ((changed_instructions, with_disk . source_moves)) }
+  Ok (NonmergeSavePlan {
+    define_nodes : changed_instructions,
+    source_moves : with_disk . source_moves,
+  }) }
 
 fn extract_save_intents (
   role_viewforest : &Tree<ViewNode_in_Role>,

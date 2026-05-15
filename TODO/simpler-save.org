@@ -34,7 +34,7 @@ At the top level, save now has a reasonably legible sequence:
 10. rerender the saved view and collateral views.
 
 The cleanest part is now
-=viewforest_to_nonmerge_save_instructions=:
+=extract_nonmerge_save_plan=:
 
 #+begin_src text
 classify roles
@@ -138,12 +138,12 @@ behavior, but it now first classifies each instruction as keep,
 invalid, or filter-unchanged-foreign-save. Validation and filtering
 then run as separate named steps over that classification.
 
-** c. Make merge extraction another explicit save-intent phase
+** DONE c. Make merge extraction another explicit save-intent phase
 
 Merge handling is now outside non-merge extraction:
 
 #+begin_src text
-viewforest_to_nonmerge_save_instructions
+extract_nonmerge_save_plan
 instructiontriples_from_the_merges_in_an_viewforest
 #+end_src
 
@@ -169,6 +169,13 @@ Suggested increment:
   in =mergeInstructionTriple.rs= so it no longer suggests bundling
   traversals as an optimization;
 - keep merge validation separate.
+
+Status: complete. =from_text.rs= now has
+=extract_nonmerge_save_plan= and =extract_merge_save_plan= phases.
+The merge helper still owns the merge mechanics, but the top-level
+save preparation no longer calls it by its raw mechanical name. The
+merge traversal comment now explains that a separate walk is
+intentional.
 
 ** d. Split graph mutation planning from store updates
 
@@ -368,25 +375,25 @@ validation/filtering first; unify later only if the result is simpler.
 
 * Suggested next plan
 
-Items a and b are complete. The best next incremental plan is
-probably item c:
+Items a, b, and c are complete. The best next incremental plan is
+probably item d:
 
-** Make merge extraction another explicit save-intent phase
+** Split graph mutation planning from store updates
 
-Goal: keep current merge behavior, but make merge extraction read as a
-peer save-planning phase next to non-merge extraction.
+Goal: make delete-propagation cleanup a named instruction-rewrite
+phase before persistence, rather than a hidden mutation inside
+=update_graph_minus_merges=.
 
 Why next:
 
 - item a made the central save-plan boundary explicit;
 - item b clarified the next validation/filtering boundary;
-- item c continues the same pattern by making merge extraction a
-  clearly named phase instead of a side note about another tree walk.
+- item c made merge extraction a clearly named phase;
+- item d applies the same pattern to persistence preparation.
 
 Acceptance criteria:
 
-- merge extraction remains behavior-preserving;
-- the top-level save preparation reads as non-merge extraction plus
-  merge extraction;
-- comments no longer imply that combining tree walks is desirable;
-- merge validation remains separate.
+- delete-propagation cleanup has a named phase;
+- callers can see which define nodes are being prepared for stores;
+- filesystem, graph, TypeDB, and Tantivy behavior is unchanged;
+- focused delete-propagation and save tests still pass.

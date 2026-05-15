@@ -5,12 +5,11 @@ use skg::save::update_typedb_from_saveinstructions;
 use skg::dbs::typedb::search::find_related_nodes;
 use skg::dbs::typedb::nodes::which_ids_exist;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::from_text::viewnodes_to_instructions::viewforest_to_nonmerge_save_instructions;
+use skg::from_text::viewnodes_to_instructions::extract_nonmerge_save_plan;
 use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
 use skg::types::misc::ID;
 use skg::types::viewnode::ViewNode;
 use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
-use skg::types::save::DefineNode;
 
 use ego_tree::Tree;
 use indoc::indoc;
@@ -53,15 +52,15 @@ fn test_update_nodes_and_relationships2 (
              inconsistent_sources );
 
     // Convert to instructions (adds missing info and reconciles)
-    let (reconciled_instructions, _source_moves) : (Vec<DefineNode>, _) =
-      viewforest_to_nonmerge_save_instructions (
+    let nonmerge_plan =
+      extract_nonmerge_save_plan (
         & viewforest, & config, & driver ) . await ?;
 
     // Apply the update
     update_typedb_from_saveinstructions (
       & config . db_name,
       & driver,
-      & reconciled_instructions,
+      & nonmerge_plan . define_nodes,
       &[] ). await ?;
 
     // Node 3 should not exist (deleted)
