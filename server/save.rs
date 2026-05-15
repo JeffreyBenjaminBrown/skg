@@ -31,7 +31,7 @@ use std::time::{Duration, Instant};
 use tantivy::IndexWriter;
 use typedb_driver::TypeDBDriver;
 
-/// Updates **everything** from the given `DefineNode`s, in order:
+/// Updates **everything** from already prepared `DefineNode`s, in order:
 ///   1) Filesystem (source of truth)
 ///   2) TypeDB (with recovery: rebuild from disk on failure)
 ///   3) Tantivy (with recovery: rebuild from disk on failure)
@@ -46,15 +46,25 @@ pub async fn update_graph_minus_merges (
   graph         : &InRustGraphHandle,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
   tracing::info!("Updating FS, in-Rust graph, TypeDB, and Tantivy ...");
-  let db_name : &str = &config . db_name;
+  let graph_snap : Arc<InRustGraph> = graph . load_full ();
+  apply_delete_propagation_cleanup (&mut node_defs,
+                                    &graph_snap);
+  apply_define_nodes_to_stores ( node_defs,
+                                 source_moves,
+                                 config,
+                                 tantivy_index,
+                                 driver,
+                                 graph ). await }
 
-  { // Propagate deletes: for every node still on disk that
-    // referenced a being-deleted id in any of its outbound list
-    // fields, either append a cleanup SaveNode (for nodes the user
-    // isn't already saving) or amend the user's SaveNode in place.
-    // See apply_delete_propagation_cleanup for full semantics.
-    let graph_snap : Arc<InRustGraph> = graph . load_full ();
-    apply_delete_propagation_cleanup (&mut node_defs, &graph_snap); }
+async fn apply_define_nodes_to_stores (
+  node_defs     : Vec<DefineNode>,
+  source_moves  : &[SourceMove],
+  config        : SkgConfig,
+  tantivy_index : &TantivyIndex,
+  driver        : &TypeDBDriver,
+  graph         : &InRustGraphHandle,
+) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
+  let db_name : &str = &config . db_name;
 
   { // FS (source of truth)
     // TODO: Print per-source write information

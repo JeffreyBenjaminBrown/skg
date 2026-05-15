@@ -177,7 +177,7 @@ save preparation no longer calls it by its raw mechanical name. The
 merge traversal comment now explains that a separate walk is
 intentional.
 
-** d. Split graph mutation planning from store updates
+** DONE d. Split graph mutation planning from store updates
 
 =update_graph_minus_merges= is a big function because it owns the
 whole persistence story:
@@ -209,8 +209,7 @@ callers pass one list, but stores receive an amended list.
 Suggested split:
 
 #+begin_src text
-prepare_define_nodes_for_persistence(node_defs, graph_snap)
-  -> PersistenceDefineNodes
+apply_delete_propagation_cleanup(&mut node_defs, graph_snap)
 
 apply_define_nodes_to_stores(prepared, source_moves, ...)
 #+end_src
@@ -219,6 +218,12 @@ This would be a meaningful simplification because it turns a hidden
 mutation into a named save-plan rewrite. It would also make tests for
 delete propagation cheaper: they could assert the prepared
 instructions without exercising filesystem/TypeDB/Tantivy.
+
+Status: partial. The store-writing body now lives behind
+=apply_define_nodes_to_stores=, so persistence effects are separated
+from the top-level orchestration. Delete-propagation cleanup still
+runs in =update_graph_minus_merges= immediately before that call; it
+is not yet exposed as a separate testable preparation API.
 
 ** e. Give rerender a request/result object
 
@@ -375,25 +380,27 @@ validation/filtering first; unify later only if the result is simpler.
 
 * Suggested next plan
 
-Items a, b, and c are complete. The best next incremental plan is
-probably item d:
+Items a, b, c, and d are complete. The best next incremental plan is
+probably item e:
 
-** Split graph mutation planning from store updates
+** Give rerender a request/result object
 
-Goal: make delete-propagation cleanup a named instruction-rewrite
-phase before persistence, rather than a hidden mutation inside
-=update_graph_minus_merges=.
+Goal: make the rerender-after-save pipeline easier to inspect by
+grouping its long argument lists into named request/context/result
+types.
 
 Why next:
 
 - item a made the central save-plan boundary explicit;
 - item b clarified the next validation/filtering boundary;
 - item c made merge extraction a clearly named phase;
-- item d applies the same pattern to persistence preparation.
+- item d made persistence preparation a named phase;
+- item e applies the same pattern to rerender completion.
 
 Acceptance criteria:
 
-- delete-propagation cleanup has a named phase;
-- callers can see which define nodes are being prepared for stores;
-- filesystem, graph, TypeDB, and Tantivy behavior is unchanged;
-- focused delete-propagation and save tests still pass.
+- rerender context has a named type;
+- collateral rerender output has a named type if it simplifies the
+  flow;
+- saved-view and collateral-view behavior is unchanged;
+- focused rerender/save tests still pass.
