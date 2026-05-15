@@ -1,0 +1,238 @@
+* Plan: split 'viewforest_to_nonmerge_save_instructions' into named phases
+
+This plan addresses item a in
+[[./2p5_simplify-save.org][2p5_simplify-save.org]].
+
+The goal is a behavior-preserving extraction. Do not change the TCP
+API, file format, validation semantics, source-move policy, or
+subscribee visibility behavior. The win is that the top-level save
+instruction builder should read as a sequence of named policies rather
+than as one mixed loop.
+
+* Current shape
+
+The target function is
+[[../../server/from_text/viewnodes_to_instructions.rs][viewnodes_to_instructions.rs]]
+'viewforest_to_nonmerge_save_instructions'.
+
+It currently does all of these jobs inline or nearly inline:
+
+- classify the checked view tree into save roles;
+- extract direct subscribee visibility intents;
+- extract preliminary graph edit intents;
+- reconcile repeated IDs;
+- convert intents into 'DefineNode';
+- canonicalize IDs from disk;
+- detect source moves;
+- supplement unspecified fields from disk;
+- restore direct-as-subscribee 'contains' from disk via
+  'children_affect_only_hiding';
+- fold subscribee visibility intents into subscriber hide relations;
+- filter unchanged saves.
+
+Some of these are already factored in submodules. The missing piece is
+that the top-level function still interleaves phase boundaries: role
+annotation happens twice, conversion and disk supplementation happen in
+one loop, and subscribee-position policy is hidden in the same loop as
+ordinary disk supplementation.
+
+* Target top-level shape
+
+After this pass, 'viewforest_to_nonmerge_save_instructions' should
+look roughly like:
+
+#+begin_src rust
+let role_viewforest =
+  viewforest_with_save_roles (viewforest)?;
+let extracted =
+  extract_save_intents (&role_viewforest)?;
+let reconciled =
+  reconcile_save_intents (extracted)?;
+let with_disk =
+  build_disk_supplemented_define_nodes (
+    reconciled, config, driver ) . await?;
+let with_visibility =
+  apply_hiderels_from_subscribee_visibility (
+    with_disk.instructions,
+    &with_disk.visibility_intents,
+    config,
+    driver ) . await?;
+let changed =
+  filter_unchanged_save_instructions (with_visibility);
+Ok ((changed, with_disk.source_moves))
+#+end_src
+
+Names can differ, but the function should expose those phases in that
+order. Policy details should move behind helpers whose names say what
+phase they implement.
+
+* Implementation steps
+
+** 1. Stop classifying roles twice
+
+Change the naive-intent extraction path so it can consume a
+'Tree<ViewNode_in_Role>' directly.
+
+Keep the existing public or test-facing entry points working:
+
+- 'naive_node_edit_intents_from_viewforest' can remain as a wrapper
+  that classifies and delegates.
+- Add a lower-level helper such as
+  'naive_node_edit_intents_from_role_viewforest'.
+
+Then 'viewforest_to_nonmerge_save_instructions' can classify once and
+pass the role tree to both:
+
+- 'subscribee_visibility_intents_from_tree';
+- the graph edit intent extractor.
+
+This is a pure extraction if the role tree is copied exactly as today.
+
+** 2. Introduce a small extraction result type
+
+Add a local struct in 'viewnodes_to_instructions.rs' or a focused
+submodule:
+
+#+begin_src rust
+struct SaveExtraction {
+  node_edit_intents  : Vec<NodeEditIntent>,
+  visibility_intents : Vec<SubscribeeVisibilityIntent>,
+}
+#+end_src
+
+Use it for a helper such as 'extract_save_intents'. That helper should
+only read the role tree and should not read disk, TypeDB, Tantivy, or
+the in-Rust graph.
+
+This gives a clean boundary:
+
+- input: checked and role-annotated view tree;
+- output: user-authored edit intent signals.
+
+** 3. Name same-ID reconciliation as its own phase
+
+Wrap the existing 'reconcile_nodeEditIntents' call in a phase helper
+with a save-pipeline name, for example 'reconcile_save_intents'.
+
+Do not change its current rules in this item. The later items in
+[[./2p5_simplify-save.org][2p5_simplify-save.org]] can split the intent shape and tighten
+same-ID behavior. This item should only make the existing rule visible
+in the pipeline.
+
+** 4. Extract conversion plus disk supplementation
+
+Move the current loop over reconciled 'NodeEditIntent' values into a
+helper, probably returning:
+
+#+begin_src rust
+struct DiskSupplementedDefineNodes {
+  instructions : Vec<DefineNode>,
+  source_moves : Vec<SourceMove>,
+}
+#+end_src
+
+A reasonable helper name is
+'build_disk_supplemented_define_nodes'.
+
+Preserve the exact current order inside that helper:
+
+1. remember 'children_affect_only_hiding';
+2. convert the intent with 'into_define_node';
+3. pass deletes through unchanged;
+4. for saves, load the disk node with 'optnodecomplete_from_id';
+5. if absent, keep the buffer node as a new save;
+6. if present, canonicalize IDs from disk;
+7. detect source moves;
+8. supplement unspecified fields from disk;
+9. if 'children_affect_only_hiding', restore 'contains' from disk;
+10. append any 'SourceMove'.
+
+This helper is still policy-mixed, especially step 9. That is okay for
+item a. The important improvement is that the awkward policy is now
+named and isolated, making items b and f easier.
+
+** 5. Leave visibility folding and unchanged filtering in place
+
+Keep 'apply_hiderels_from_subscribee_visibility' after disk
+supplementation and before 'filter_unchanged_save_instructions'.
+
+That position matters because a subscriber whose only edit is an
+inferred hide must survive no-op filtering. Moving the phase belongs
+to item c of 2p5, not this plan.
+
+** 6. Prefer mechanical movement over redesign
+
+Use existing types and helpers. Avoid changing:
+
+- 'NodeEditIntent';
+- 'NodeSaveIntent';
+- 'children_affect_only_hiding';
+- 'SubscribeeVisibilityIntent';
+- 'DefineNode';
+- 'SaveNode';
+- validation modules.
+
+If a helper needs a new name, choose one that describes the current
+behavior, not the desired future behavior.
+
+* Suggested file changes
+
+- [[../../server/from_text/viewnodes_to_instructions.rs][viewnodes_to_instructions.rs]]
+  should hold the top-level pipeline and the phase helpers that need
+  disk or driver access.
+- [[../../server/from_text/viewnodes_to_instructions/to_naive_instructions.rs][to_naive_instructions.rs]]
+  should expose a role-tree-consuming extraction helper so role
+  annotation is not duplicated.
+- No changes should be needed in 'supplement_from_disk.rs',
+  'validate.rs', 'save.rs', or the renderer.
+
+If the disk-supplementation helper feels too large, create a submodule
+such as 'disk_supplemented_define_nodes.rs'. Do that only if it makes
+the phase boundary easier to read; a local helper is enough for this
+item.
+
+* Tests
+
+This should be mostly covered by existing behavior tests. Run at least:
+
+#+begin_src text
+cargo check
+cargo test --test new viewnodes_to_instructions -- --nocapture
+cargo test --test new reconcile_same_id_instructions -- --nocapture
+#+end_src
+
+If TypeDB is running, also run the save-instruction test that calls the
+target function through the typedb fixture:
+
+#+begin_src text
+cargo test --test typedb update_typedb_from_saveinstructions -- --nocapture
+#+end_src
+
+Add a regression only if the extraction reveals an uncovered boundary.
+The highest-value candidate would assert that a single save with both
+ordinary and direct-as-subscribee occurrences still preserves the
+ordinary occurrence's 'contains' edit while not saving the direct
+subscribee branch as subscribee 'contains'. If that behavior is
+already covered, do not add another near-duplicate.
+
+* Acceptance criteria
+
+- 'viewforest_to_nonmerge_save_instructions' reads as a short ordered
+  pipeline of named phases.
+- The role-annotated tree is constructed once in that pipeline.
+- Disk supplementation and source-move collection are isolated behind
+  one helper and return both instructions and source moves explicitly.
+- Subscribee visibility folding remains after disk supplementation and
+  before unchanged filtering.
+- Existing direct-subscribee, foreign-node, source-move, same-ID, and
+  unchanged-filtering behavior is unchanged.
+- The tests listed above pass, or any environmental blocker is
+  recorded with the command that hit it.
+
+* Non-goals
+
+- Do not move visibility folding before 'DefineNode' construction.
+- Do not replace 'children_affect_only_hiding'.
+- Do not split 'NodeEditIntent' into graph and visibility variants.
+- Do not change same-ID reconciliation policy.
+- Do not change validation or rerender completion semantics.

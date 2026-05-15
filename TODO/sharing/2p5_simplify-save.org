@@ -33,7 +33,7 @@ checked view tree
 
 * Ranked opportunities
 
-** 1. Split 'viewforest_to_nonmerge_save_instructions' into named phases
+** a. Split 'viewforest_to_nonmerge_save_instructions' into named phases
 
 This is the highest-priority cleanup. The function currently performs
 role annotation, visibility extraction, graph-intent extraction,
@@ -50,9 +50,42 @@ This is not primarily about shortening a function. It is about making
 the order of save policies explicit enough that the next sharing
 change does not have to rediscover the whole pipeline.
 
-** 2. Move subscribee visibility folding before final =DefineNode= construction
+** b. Simplify 'build_disk_supplemented_define_nodes'
 
-This is tied with the first item for importance.
+Item a should leave behind a helper shaped roughly like
+'build_disk_supplemented_define_nodes'. That helper will be an
+improvement over the current top-level tangle, but it should not
+become the new place where unrelated save policies hide.
+
+The next cleanup should make that helper boring and locally readable.
+It should separate these concerns behind names:
+
+- convert a reconciled 'NodeEditIntent' into a preliminary
+  'DefineNode';
+- pass delete instructions through without disk supplementation;
+- load the disk node for saves;
+- canonicalize IDs from disk;
+- detect source moves;
+- supplement unspecified fields from disk;
+- apply the temporary direct-subscribee =contains= restoration
+  guardrail;
+- collect 'SourceMove' values.
+
+This can still be behavior-preserving. The point is not yet to remove
+the direct-subscribee guardrail or move visibility folding; that comes
+later. The point is to make the helper's internal sequence explicit
+enough that the later policy changes have one obvious edit point.
+
+Acceptance criterion: after this item, both
+'viewforest_to_nonmerge_save_instructions' and
+'build_disk_supplemented_define_nodes' should read as short named
+pipelines, and the only remaining obviously policy-specific wrinkle in
+the disk phase should be a clearly named temporary helper for restoring
+direct-as-subscribee 'contains' from disk.
+
+** c. Move subscribee visibility folding before final =DefineNode= construction
+
+This is tied with item a for importance.
 
 The current representation still does this:
 
@@ -77,7 +110,7 @@ guardrail during disk supplementation. It would also make visibility
 edits less sensitive to the fact that they currently run after graph
 =SaveNode= construction.
 
-** 3. Replace =children_affect_only_hiding= with an explicit intent shape
+** d. Replace =children_affect_only_hiding= with an explicit intent shape
 
 The boolean is a useful bridge, but it makes =NodeSaveIntent= carry a
 role-position policy as if it were a graph-save property.
@@ -90,10 +123,10 @@ subscribee children as graph =contains=:
 - a small enum such as
   =DirectChildrenMeaning::{GraphContains, SubscriberVisibility}=.
 
-If item 2 lands first, separate variants will probably be clearer than
+If item c lands first, separate variants will probably be clearer than
 an enum field.
 
-** 4. Make subscriber visibility edits first-class through reconciliation
+** e. Make subscriber visibility edits first-class through reconciliation
 
 =SubscribeeVisibilityIntent= already exists, but the save path still
 folds it late by mutating completed =DefineNode= values. That helper
@@ -109,7 +142,7 @@ This would also give same-ID reconciliation a clearer input: graph
 edits and visibility-surface edits would be distinct things, not
 ordinary-looking saves with a policy boolean attached.
 
-** 5. Keep disk supplementation policy-neutral
+** f. Keep disk supplementation policy-neutral
 
 Disk supplementation should restore unspecified fields and detect
 source moves. It should not need to know that a node appeared as a
@@ -126,7 +159,7 @@ supplementation phase can become boring again:
 That is an important simplification because supplementation is already
 cross-cutting enough without also carrying view-position policy.
 
-** 6. Tighten same-ID reconciliation around intent variants
+** g. Tighten same-ID reconciliation around intent variants
 
 The current same-ID reconciliation now happens at the
 =NodeEditIntent= layer, which is the right direction. After the intent
@@ -143,7 +176,7 @@ This should preserve the existing regression where the same ID appears
 both in a direct subscribee position and as an ordinary definitive
 node, and the ordinary node's =contains= edit survives.
 
-** 7. Revisit validation once save roles are stable
+** h. Revisit validation once save roles are stable
 
 Keep pre-save validation unchanged for now. That boundary was useful
 for making the direct-subscribee fix narrow.
@@ -154,7 +187,7 @@ traversal, and direct-subscribee visibility policy all use the same
 positional facts. This is lower priority because moving validation too
 early risks mixing this cleanup with a larger behavior change.
 
-** 8. Document the remaining rerender/completion boundary
+** i. Document the remaining rerender/completion boundary
 
 The save extraction path is now clearer than the rerender path that
 feeds it. The remaining completion contract should be written down
