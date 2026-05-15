@@ -6,7 +6,7 @@ use crate::types::git::SourceDiff;
 use crate::types::views_state::nodecomplete_from_inrustgraph_or_disk;
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::read_at_ancestor_in_tree;
-use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child, insert_scaffold_as_child};
+use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child_of_viewnode, insert_scaffold_as_child};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold};
 use crate::update_buffer::util::{ detach_scaffold_transferring_focus, move_child_to_end};
 
@@ -127,7 +127,7 @@ fn ensure_hiddenoutsideofsubscribeecol_is_last (
   node : NodeId,
 ) -> Result<(), Box<dyn Error>> {
   let hidden_outside : Option<NodeId> =
-    unique_scaffold_child(
+    unique_scaffold_child_of_viewnode(
       tree, node, &Scaffold::HiddenOutsideOfSubscribeeCol ) ?;
   match hidden_outside {
     Some (child) => { move_child_to_end(

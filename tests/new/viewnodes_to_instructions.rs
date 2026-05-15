@@ -8,7 +8,8 @@ use ego_tree::Tree;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_viewforest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::validate::validate_and_filter_foreign_instructions;
-use skg::from_text::viewnodes_to_instructions::classify::classify_save_roles;
+use skg::from_text::viewnodes_to_instructions::classify::{
+  viewforest_with_save_roles, ViewNode_in_Role };
 use skg::from_text::viewnodes_to_instructions::subscribee_visibility_intents::{
   subscribee_visibility_intents_from_tree, SubscribeeVisibilityIntent };
 use skg::from_text::viewnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_tree;
@@ -57,10 +58,10 @@ fn visibility_intents_from_org (
 ) -> Vec<SubscribeeVisibilityIntent> {
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
-  let roles =
-    classify_save_roles (&viewforest) . unwrap();
+  let role_viewforest : Tree<ViewNode_in_Role> =
+    viewforest_with_save_roles (&viewforest) . unwrap();
   subscribee_visibility_intents_from_tree (
-    &viewforest, &roles) . unwrap() }
+    &role_viewforest) . unwrap() }
 
 fn set_membership_unstaged_minus (
   tree : &mut Tree<ViewNode>,
@@ -467,11 +468,11 @@ fn subscribee_visibility_intent_excludes_non_content_delete_and_phantom_children
   let mut viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
   set_membership_unstaged_minus (&mut viewforest, "phantom");
-  let roles =
-    classify_save_roles (&viewforest) . unwrap();
+  let role_viewforest : Tree<ViewNode_in_Role> =
+    viewforest_with_save_roles (&viewforest) . unwrap();
   let intents : Vec<SubscribeeVisibilityIntent> =
     subscribee_visibility_intents_from_tree (
-      &viewforest, &roles) . unwrap();
+      &role_viewforest) . unwrap();
 
   assert_eq!(
     intents,
@@ -621,6 +622,35 @@ fn direct_as_subscribee_child_list_removal_keeps_disk_contains (
       Ok (()) })) }
 
 #[test]
+fn direct_as_subscribee_child_removal_is_not_foreign_contains_edit (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db_from_config (
+    "skg-test-direct-as-subscribee-removal-not-foreign-edit",
+    SUBSCRIBEE_EDIT_CONFIG,
+    |config, driver| Box::pin (async move {
+      let input : &str =
+        indoc! {"
+                * (skg (node (id r) (source owned))) r
+                ** (skg subscribeeCol) subscribees
+                *** (skg (node (id e) (source foreign))) subscribee-e
+                **** (skg (node (id e2) (source foreign))) e2
+                "};
+      let instructions : Vec<DefineNode> =
+        save_instructions_from_org_with_disk (
+          input, config, driver) . await?;
+      let errors : Vec<BufferValidationError> =
+        validate_and_filter_foreign_instructions (
+          instructions, config, driver) . await . unwrap_err();
+      assert!(
+        ! errors . iter() . any (|error| matches!(
+          error,
+          BufferValidationError::ModifiedForeignNode (id, _)
+            if id == &ID::from ("e"))),
+        "direct subscribee should not be reported as a contains edit: {:?}",
+        errors);
+      Ok (()) })) }
+
+#[test]
 fn direct_as_subscribee_child_list_removal_infers_subscriber_hide (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db_from_config (
@@ -730,6 +760,38 @@ fn direct_as_subscribee_unhide_preserves_unrelated_hides (
       Ok (()) })) }
 
 #[test]
+fn overlapping_subscribee_visibility_conflict_rejects_save (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db_from_config (
+    "skg-test-overlapping-subscribee-visibility-conflict",
+    "tests/hidden_from_subscriptions/fixtures-overlapping-subscribees/skgconfig.toml",
+    |config, driver| Box::pin (async move {
+      let input : &str =
+        indoc! {"
+                * (skg (node (id R) (source main))) R
+                ** (skg subscribeeCol) subscribees
+                *** (skg (node (id E1) (source main))) E1
+                **** (skg (node (id shared) (source main))) shared
+                *** (skg (node (id E2) (source main))) E2
+                "};
+      let result : Result<Vec<DefineNode>, Box<dyn Error>> =
+        save_instructions_from_org_with_disk (
+          input, config, driver) . await;
+      let error : Box<dyn Error> =
+        result . unwrap_err();
+      let buffer_error : &BufferValidationError =
+        error . downcast_ref::<BufferValidationError>()
+        . expect ("expected BufferValidationError::Other");
+      assert!(
+        matches!(
+          buffer_error,
+          BufferValidationError::Other (msg)
+            if msg . contains ("Conflicting subscribee visibility edits")),
+        "expected overlapping visibility conflict, got {:?}",
+        buffer_error);
+      Ok (()) })) }
+
+#[test]
 fn ordinary_owned_child_list_edit_still_changes_contains (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db_from_config (
@@ -748,6 +810,57 @@ fn ordinary_owned_child_list_edit_still_changes_contains (
         saved_node_by_id (&instructions, "r") . contains,
         vec![ID::from ("r1")]);
       Ok (()) })) }
+
+#[test]
+fn ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_subscribee (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db_from_config (
+    "skg-test-same-id-ordinary-keeps-contains-with-as-subscribee",
+    SUBSCRIBEE_EDIT_CONFIG,
+    |config, driver| Box::pin (async move {
+      let input : &str =
+        indoc! {"
+                * (skg (node (id r) (source owned))) r
+                ** (skg subscribeeCol) subscribees
+                *** (skg (node (id e) (source foreign))) subscribee-e
+                **** (skg (node (id e2) (source foreign))) e2
+                * (skg (node (id e) (source foreign))) subscribee-e
+                ** (skg (node (id e1) (source foreign))) e1
+                "};
+      let instructions : Vec<DefineNode> =
+        save_instructions_from_org_with_disk (
+          input, config, driver) . await?;
+      assert_eq!(
+        saved_node_by_id (&instructions, "e") . contains,
+        vec![ID::from ("e1")]);
+      assert_eq!(
+        saved_node_by_id (&instructions, "r")
+          . hides_from_its_subscriptions,
+        MSV::Specified (vec![ID::from ("e1")]));
+      Ok (()) })) }
+
+#[test]
+fn display_only_scaffold_children_do_not_become_save_instructions (
+) {
+  let input : &str =
+    indoc! {"
+            * (skg (node (id root) (source main))) root
+            ** (skg idCol) ids
+            *** (skg (node (id display-child) (source main))) display child
+            ** (skg (node (id real-child) (source main))) real child
+            "};
+
+  let viewforest : Tree<ViewNode> =
+    checked_viewforest_from_org (input);
+  let instructions: Vec<DefineNode> =
+    naive_saveinstructions_from_tree (viewforest) . unwrap();
+
+  assert_eq!(
+    save_ids (&instructions),
+    vec![ID::from ("root"), ID::from ("real-child")]);
+  assert_eq!(
+    saved_node_by_id (&instructions, "root") . contains,
+    vec![ID::from ("real-child")]); }
 
 #[test]
 fn recursive_descendant_under_as_subscribee_keeps_own_contains_edit (

@@ -10,7 +10,7 @@ use crate::types::unchecked_viewnode::{
     UncheckedViewNode, UncheckedViewNodeKind };
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::list::dedup_vector;
-use super::generic::{write_at_node_in_tree, with_node_mut};
+use super::generic::{ unique_scaffold_child, write_at_node_in_tree, with_node_mut };
 
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
@@ -70,27 +70,20 @@ pub fn id_from_self_or_nearest_ancestor (
 /// Returns None if no child has the kind,
 /// Some(child_id) if exactly one does,
 /// or an error if multiple children have it.
-pub fn unique_scaffold_child (
+pub fn unique_scaffold_child_of_viewnode (
   tree          : &Tree<ViewNode>,
   node_id       : NodeId,
   scaffold_kind : &Scaffold,
 ) -> Result<Option<NodeId>, Box<dyn Error>> {
-  let node_ref : NodeRef<ViewNode> =
-    tree . get (node_id) . ok_or(
-      "unique_scaffold_child: node not found")?;
-  let matches : Vec<NodeId> = node_ref . children()
-    . filter(|c| matches!(&c . value() . kind,
-                         ViewNodeKind::Scaff (s)
-                         if s . matches_kind (scaffold_kind)) )
-    . map(|c| c . id())
-    . collect();
-  match matches . len() {
-    0 => Ok (None),
-    1 => Ok(Some(matches[0])),
-    n => Err(format!(
-      "Expected at most one {:?} child, found {}", scaffold_kind, n) . into()),
-  }
-}
+  unique_scaffold_child (
+    tree,
+    node_id,
+    scaffold_kind,
+    |child : &ViewNode| match &child . kind {
+      ViewNodeKind::Scaff (s) => Some (s),
+      _ => None,
+    })
+  . map_err (|e| -> Box<dyn Error> { e . into() }) }
 
 /// Extract PIDs for the subscriber and its subscribees.
 pub fn pids_for_subscriber_and_its_subscribees (
@@ -165,7 +158,7 @@ pub fn collect_grandchild_aliases_for_viewnode (
   node_id: NodeId,
 ) -> Result<MSV<String>, String> {
   let alias_col_id : Option<NodeId> =
-    unique_scaffold_child (
+    unique_scaffold_child_of_viewnode (
       tree, node_id, &Scaffold::AliasCol )
     . map_err ( |e| e . to_string() ) ?;
   match alias_col_id {

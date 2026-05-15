@@ -4,7 +4,7 @@ use crate::types::git::MembershipAxes;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{ViewNode, ViewRequest, Scaffold};
 use crate::types::tree::viewnode_nodecomplete::{
-  insert_scaffold_as_child, unique_scaffold_child};
+  insert_scaffold_as_child, unique_scaffold_child_of_viewnode};
 
 use ego_tree::Tree;
 use std::error::Error;
@@ -46,7 +46,7 @@ pub async fn build_and_integrate_aliases (
 ) -> Result < (), Box<dyn Error> > {
   let node_id_val : ID =
     get_id_from_treenode ( tree, node_id ) ?;
-  if unique_scaffold_child (
+  if unique_scaffold_child_of_viewnode (
     tree, node_id, &Scaffold::AliasCol )? . is_some ()
   { // If it already has an AliasCol child,
     // then complete_alias_col (in update_buffer) already handled it.

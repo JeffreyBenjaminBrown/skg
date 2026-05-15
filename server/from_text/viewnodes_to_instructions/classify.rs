@@ -1,6 +1,6 @@
 use crate::types::misc::ID;
 use crate::types::viewnode::{Scaffold, ViewNode, ViewNodeKind};
-use ego_tree::{NodeId, NodeRef, Tree};
+use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::HashMap;
 
 pub type SaveRoleMap = HashMap<NodeId, SaveRole>;
@@ -17,6 +17,13 @@ pub enum SaveRole {
   DisplayOnly,
 }
 
+#[allow(non_camel_case_types)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct ViewNode_in_Role {
+  pub viewnode : ViewNode,
+  pub role     : SaveRole,
+}
+
 pub fn classify_save_roles (
   viewforest : &Tree<ViewNode>,
 ) -> Result<SaveRoleMap, String> {
@@ -26,6 +33,53 @@ pub fn classify_save_roles (
     let role : SaveRole = classify_node (node_ref) ?;
     roles . insert (node_id, role); }
   Ok (roles) }
+
+pub fn viewforest_with_save_roles (
+  viewforest : &Tree<ViewNode>,
+) -> Result<Tree<ViewNode_in_Role>, String> {
+  let root_ref : NodeRef<ViewNode> =
+    viewforest . root();
+  let mut result : Tree<ViewNode_in_Role> =
+    // Right after this, 'result' only corresponds to the root of 'viewforest'.
+    Tree::new (ViewNode_in_Role {
+      viewnode : root_ref . value() . clone(),
+      role     : classify_node (root_ref)?,
+    });
+  let target_root_id : NodeId =
+    result . root() . id();
+  copy_role_children_recursive (
+    // Right after this, they entirely correspond.
+    viewforest,
+    &mut result,
+    root_ref . id(),
+    target_root_id)?;
+  Ok (result) }
+
+fn copy_role_children_recursive (
+  source          : &Tree<ViewNode>,
+  target          : &mut Tree<ViewNode_in_Role>,
+  source_parent   : NodeId,
+  target_parent   : NodeId,
+) -> Result<(), String> {
+  let child_ids : Vec<NodeId> =
+    source . get (source_parent) . unwrap()
+    . children()
+    . map (|child| child . id())
+    . collect();
+  for child_id in child_ids {
+    let child_id : NodeId = child_id;
+    let child_ref : NodeRef<ViewNode> =
+      source . get (child_id) . unwrap();
+    let target_child_id : NodeId =
+      { let mut target_parent_mut : NodeMut<ViewNode_in_Role> =
+          target . get_mut (target_parent) . unwrap();
+        target_parent_mut . append (ViewNode_in_Role {
+          viewnode : child_ref . value() . clone(),
+          role     : classify_node (child_ref)?,
+        }) . id() };
+    copy_role_children_recursive (
+      source, target, child_id, target_child_id)?; }
+  Ok (()) }
 
 fn classify_node (
   node_ref : NodeRef<ViewNode>,

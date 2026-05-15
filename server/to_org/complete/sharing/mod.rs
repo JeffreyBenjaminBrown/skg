@@ -18,7 +18,7 @@ use crate::types::tree::viewnode_nodecomplete::{
   insert_scaffold_as_child,
   pids_for_subscriber_and_its_subscribees,
   pid_for_subscribee_and_its_subscriber_grandparent,
-  unique_scaffold_child };
+  unique_scaffold_child_of_viewnode };
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -114,7 +114,7 @@ pub async fn maybe_add_subscribeeCol_branch (
     if is_indefinitive { return Ok(( )); } }
   { // Skip if there already is one.
     // PITFALL: If this code were used in the save-buffer pathway, we could not assume the existing SubscribeeCol is correct, and would instead have to 'integrate' it, as happens elsewhere for something similar. But so far it is only used for creating a new buffer, not updating one.
-    if unique_scaffold_child (
+    if unique_scaffold_child_of_viewnode (
       tree, node_id, &Scaffold::SubscribeeCol )? . is_some ()
     { return Ok (( )); }}
   let ( subscriber_pid, subscribee_ids ) : ( ID, Vec < ID > ) =
@@ -179,7 +179,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   if ! type_and_parent_type_consistent_with_subscribee (
     tree, subscribee_treeid )?
   { return Err ( "maybe_add_hiddenInSubscribeeCol_branch called on non-subscribee" . into ( )); }
-  if unique_scaffold_child (
+  if unique_scaffold_child_of_viewnode (
        // TODO: This assumes the existing Col is correct. Should instead 'integrate' it, as is done somewhere else for something similar.
        tree, subscribee_treeid, &Scaffold::HiddenInSubscribeeCol
      )? . is_some ()

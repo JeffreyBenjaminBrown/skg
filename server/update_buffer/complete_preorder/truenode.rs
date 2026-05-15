@@ -18,7 +18,7 @@ use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_fr
 use crate::types::tree::viewnode_nodecomplete::{
     pid_and_source_from_treenode,
     write_at_truenode_in_tree,
-    unique_scaffold_child,
+    unique_scaffold_child_of_viewnode,
     insert_scaffold_as_child};
 use crate::update_buffer::util::{
     complete_relevant_children_in_viewnodetree,
@@ -469,7 +469,7 @@ fn maybe_prepend_subscribee_col (
   subscribes_to : &[ID],
 ) -> Result<(), Box<dyn Error>> {
   if !subscribes_to . is_empty() {
-    if unique_scaffold_child(
+    if unique_scaffold_child_of_viewnode(
       tree, node, &Scaffold::SubscribeeCol
     ) ?. is_none() {
       insert_scaffold_as_child(
@@ -503,7 +503,7 @@ fn maybe_prepend_diff_view_scaffolds (
   let staged_text   : bool = staged_nc   . map ( |nc| nc . text_changed ) . unwrap_or (false);
   let unstaged_text : bool = unstaged_nc . map ( |nc| nc . text_changed ) . unwrap_or (false);
   if staged_text || unstaged_text {
-    if unique_scaffold_child(
+    if unique_scaffold_child_of_viewnode(
       tree, node,
       &Scaffold::TextChanged { staged: false, unstaged: false }
     ) ?. is_none() {
@@ -517,7 +517,7 @@ fn maybe_prepend_diff_view_scaffolds (
       staged_nc   . map ( |nc| nc . ids_diff . as_slice () ),
       unstaged_nc . map ( |nc| nc . ids_diff . as_slice () ) );
   if ids_changed {
-    if unique_scaffold_child(
+    if unique_scaffold_child_of_viewnode(
       tree, node, &Scaffold::IDCol
     ) ?. is_none() {
       insert_scaffold_as_child(
@@ -527,7 +527,7 @@ fn maybe_prepend_diff_view_scaffolds (
       staged_nc   . map ( |nc| nc . aliases_diff . as_slice () ),
       unstaged_nc . map ( |nc| nc . aliases_diff . as_slice () ) );
   if aliases_changed {
-    if unique_scaffold_child(
+    if unique_scaffold_child_of_viewnode(
       tree, node, &Scaffold::AliasCol
     ) ?. is_none() {
       insert_scaffold_as_child(

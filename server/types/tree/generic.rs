@@ -1,5 +1,5 @@
 use crate::types::misc::{ID, SourceName};
-use crate::types::viewnode::{ViewNode, ViewNodeKind};
+use crate::types::viewnode::{Scaffold, ViewNode, ViewNodeKind};
 
 use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
 use std::error::Error;
@@ -39,6 +39,35 @@ where F: FnOnce (&T) -> R, {
     node_ref = node_ref . parent()
       . ok_or ("cannot climb that many generations")?; }
   Ok(f(node_ref . value() )) }
+
+/// Find the unique child that matches `scaffold_kind`.
+pub fn unique_scaffold_child<T, F> (
+  tree          : &Tree<T>,
+  node_id       : NodeId,
+  scaffold_kind : &Scaffold,
+  scaffold_from_node : F,
+) -> Result<Option<NodeId>, String>
+where
+  F : for<'a> Fn (&'a T) -> Option<&'a Scaffold>,
+{
+  let node_ref : NodeRef<T> =
+    tree . get (node_id) . ok_or (
+      "unique_scaffold_child: node not found")?;
+  let matches : Vec<NodeId> =
+    node_ref . children()
+    . filter (|child|
+      scaffold_from_node (child . value())
+      . map (|scaffold| scaffold . matches_kind (scaffold_kind))
+      . unwrap_or (false))
+    . map (|child| child . id())
+    . collect();
+  match matches . len() {
+    0 => Ok (None),
+    1 => Ok (Some (matches[0])),
+    n => Err (format!(
+      "Expected at most one {:?} child, found {}",
+      scaffold_kind, n)),
+  }}
 
 /// Write to an ancestor of a node in a tree, applying a mutating function to it.
 /// The `generation` parameter specifies how many generations to climb up:

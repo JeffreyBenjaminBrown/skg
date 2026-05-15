@@ -30,57 +30,66 @@ pub async fn complete_viewforest (
   deleted_by_this_save_pids      : &HashSet<ID>,
   is_saved_view                  : bool,
 ) -> Result<(), Box<dyn Error>> {
-  let root_treeid : NodeId = viewforest . root () . id ();
-  complete_preorder_recursive (
-    viewforest, root_treeid,
-    defmap, source_diffs, env, graph_snap,
+  let mut context : CompletionContext = CompletionContext {
+    defmap,
+    source_diffs,
+    env,
+    graph_snap,
+    errors,
     deleted_since_head_pid_src_map,
     deleted_by_this_save_pids,
-    is_saved_view ) . await ?;
-  complete_postorder_recursive (
-    viewforest, root_treeid,
-    defmap, source_diffs, env,
-    errors, deleted_since_head_pid_src_map ) . await ?;
-  Ok(( )) }
+    is_saved_view,
+  };
+  complete_viewforest_with_context (viewforest, &mut context) . await }
 
-fn complete_preorder_recursive<'a> (
-  tree                           : &'a mut Tree<ViewNode>,
-  treeid                         : NodeId,
+struct CompletionContext<'a> {
   defmap                         : &'a mut DefinitiveMap,
   source_diffs                   : &'a Option<HashMap<SourceName, SourceDiff>>,
   env                            : &'a SkgEnv,
   graph_snap                     : &'a Arc<InRustGraph>,
+  errors                         : &'a mut Vec<String>,
   deleted_since_head_pid_src_map : &'a HashMap<ID, SourceName>,
   deleted_by_this_save_pids      : &'a HashSet<ID>,
   is_saved_view                  : bool,
+}
+
+async fn complete_viewforest_with_context (
+  viewforest : &mut Tree<ViewNode>,
+  context    : &mut CompletionContext<'_>,
+) -> Result<(), Box<dyn Error>> {
+  let root_treeid : NodeId = viewforest . root () . id ();
+  resolve_truenode_state_and_expand_content (
+    viewforest, root_treeid, context ) . await ?;
+  insert_and_reconcile_generated_scaffolds (
+    viewforest, root_treeid, context ) . await ?;
+  Ok(( )) }
+
+/// Parent-first pass. Completes TrueNodes while their parent context
+/// is fresh, expands definitive content, performs saved-view request
+/// effects, and reconciles SubscribeeCol direct children.
+fn resolve_truenode_state_and_expand_content<'a> (
+  tree    : &'a mut Tree<ViewNode>,
+  treeid  : NodeId,
+  context : &'a mut CompletionContext<'_>,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
   // See the 'MANUAL RECURSION' comment at the top of this file.
   Box::pin ( async move {
-    complete_preorder_with_limited_recursion (
-      tree, treeid, defmap, source_diffs, env, graph_snap,
-      deleted_since_head_pid_src_map, deleted_by_this_save_pids,
-      is_saved_view
-    ) . await ?;
+    complete_parent_first_at_node (tree, treeid, context) . await ?;
     let child_treeids : Vec<NodeId> =
       tree . get (treeid) . unwrap ()
       . children () . map ( |c| c . id () ) . collect ();
     for child_treeid in child_treeids {
-      complete_preorder_recursive (
-        tree, child_treeid,
-        defmap, source_diffs, env, graph_snap,
-        deleted_since_head_pid_src_map, deleted_by_this_save_pids,
-        is_saved_view
-      ) . await ?; }
+      resolve_truenode_state_and_expand_content (
+        tree, child_treeid, context ) . await ?; }
     Ok(( )) }) }
 
-fn complete_postorder_recursive<'a> (
-  tree                           : &'a mut Tree<ViewNode>,
-  treeid                         : NodeId,
-  defmap                         : &'a mut DefinitiveMap,
-  source_diffs                   : &'a Option<HashMap<SourceName, SourceDiff>>,
-  env                            : &'a SkgEnv,
-  errors                         : &'a mut Vec<String>,
-  deleted_since_head_pid_src_map : &'a HashMap<ID, SourceName>,
+/// Child-first pass. Once generated content is present, populate and
+/// order display scaffolds, reconcile sharing scaffolds, and detach
+/// empty deleted scaffolds.
+fn insert_and_reconcile_generated_scaffolds<'a> (
+  tree    : &'a mut Tree<ViewNode>,
+  treeid  : NodeId,
+  context : &'a mut CompletionContext<'_>,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
   // See the 'MANUAL RECURSION' comment at the top of this file.
   Box::pin ( async move {
@@ -88,30 +97,18 @@ fn complete_postorder_recursive<'a> (
       tree . get (treeid) . unwrap ()
       . children () . map ( |c| c . id () ) . collect ();
     for child_treeid in child_treeids {
-      complete_postorder_recursive (
-        tree, child_treeid,
-        defmap, source_diffs, env,
-        errors, deleted_since_head_pid_src_map
-      ) . await ?; }
-    complete_postorder_with_limited_recursion (
-      tree, treeid, defmap, source_diffs, env,
-      errors, deleted_since_head_pid_src_map
-    ) . await ?;
+      insert_and_reconcile_generated_scaffolds (
+        tree, child_treeid, context ) . await ?; }
+    complete_child_first_at_node (tree, treeid, context) . await ?;
     Ok(( )) }) }
 
 /// Dispatches to functions that might descend a few layers --
 /// e.g. to complete a truenode, its content must all be children.
 /// But this dispatcher cannot call itself.
-async fn complete_preorder_with_limited_recursion (
-  tree                           : &mut Tree<ViewNode>,
-  treeid                         : NodeId,
-  defmap                         : &mut DefinitiveMap,
-  source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
-  env                            : &SkgEnv,
-  graph_snap                     : &Arc<InRustGraph>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  deleted_by_this_save_pids      : &HashSet<ID>,
-  is_saved_view                  : bool,
+async fn complete_parent_first_at_node (
+  tree    : &mut Tree<ViewNode>,
+  treeid  : NodeId,
+  context : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
   let kind : ViewNodeKind =
     tree . get (treeid) . unwrap () . value () . kind . clone ();
@@ -131,15 +128,17 @@ async fn complete_preorder_with_limited_recursion (
   if matches!( kind, ViewNodeKind::True (_)) {
     super::complete_preorder::truenode::
     complete_truenode_preorder (
-      treeid, tree, defmap, source_diffs, &env . config, graph_snap,
-      deleted_since_head_pid_src_map, deleted_by_this_save_pids,
-      is_saved_view ) ?;
+      treeid, tree, context . defmap, context . source_diffs,
+      &context . env . config, context . graph_snap,
+      context . deleted_since_head_pid_src_map,
+      context . deleted_by_this_save_pids,
+      context . is_saved_view ) ?;
   } else if matches!( kind,
       ViewNodeKind::Scaff (Scaffold::SubscribeeCol) ) {
         super::complete_preorder::subscribee_col::
         complete_subscribee_col_preorder (
-          treeid, tree, source_diffs, env,
-          deleted_since_head_pid_src_map
+          treeid, tree, context . source_diffs, context . env,
+          context . deleted_since_head_pid_src_map
         ) . await ?;
   } else if matches!( kind, ViewNodeKind::Unknown (_) ) {
     // No-op: Unknown is a placeholder for an unresolvable id and
@@ -154,42 +153,47 @@ async fn complete_preorder_with_limited_recursion (
 /// Dispatches to functions that might descend a few layers --
 /// e.g. to complete a truenode, its content must all be children.
 /// But this dispatcher cannot call itself.
-async fn complete_postorder_with_limited_recursion (
-  tree                           : &mut Tree<ViewNode>,
-  treeid                         : NodeId,
-  defmap                         : &mut DefinitiveMap,
-  source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
-  env                            : &SkgEnv,
-  errors                         : &mut Vec<String>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+async fn complete_child_first_at_node (
+  tree    : &mut Tree<ViewNode>,
+  treeid  : NodeId,
+  context : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
   let kind : ViewNodeKind =
     tree . get (treeid) . unwrap () . value () . kind . clone ();
   if matches!( kind, ViewNodeKind::True (_)) {
     super::complete_postorder::truenode::
-    complete_truenode (
-      treeid, tree, defmap, source_diffs, &env . config, &env . driver,
-      errors, deleted_since_head_pid_src_map ) . await ?;
+    complete_truenode ( treeid,
+                        tree,
+                        context . defmap,
+                        context . source_diffs,
+                        &context . env . config,
+                        &context . env . driver,
+                        context . errors,
+                        context . deleted_since_head_pid_src_map )
+    . await ?;
   } else if matches!(
     kind, ViewNodeKind::Scaff (Scaffold::AliasCol)) {
       super::complete_postorder::aliascol::
-      complete_alias_col ( tree, treeid, source_diffs, &env . config ) ?;
+      complete_alias_col (
+        tree, treeid, context . source_diffs, &context . env . config ) ?;
   } else if matches!(
       kind, ViewNodeKind::Scaff (Scaffold::IDCol)) {
         super::complete_postorder::id_col::
-        complete_id_col ( treeid, tree, source_diffs, &env . config ) ?;
+        complete_id_col (
+          treeid, tree, context . source_diffs,
+          &context . env . config ) ?;
   } else if matches!(
     kind, ViewNodeKind::Scaff (Scaffold::HiddenInSubscribeeCol)) {
       super::complete_postorder::hiddeninsubscribee_col::
       complete_hiddeninsubscribee_col (
-        treeid, tree, source_diffs, env,
-        deleted_since_head_pid_src_map ) ?;
+        treeid, tree, context . source_diffs, context . env,
+        context . deleted_since_head_pid_src_map ) ?;
   } else if matches!( kind,
       ViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol)) {
         super::complete_postorder::hiddenoutsideof_subscribeecol::
         complete_hiddenoutsideofsubscribeecol (
-          treeid, tree, source_diffs, env,
-          deleted_since_head_pid_src_map ) ?;
+          treeid, tree, context . source_diffs, context . env,
+          context . deleted_since_head_pid_src_map ) ?;
   } else if matches!( kind, ViewNodeKind::Deleted (_)) { // no-op
   } else if matches!( kind, ViewNodeKind::DeletedScaff (_) ) {
     // Detach self if no children remain.

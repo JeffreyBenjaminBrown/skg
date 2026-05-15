@@ -1,5 +1,5 @@
 use crate::from_text::viewnodes_to_instructions::classify::{
-  SaveRole, SaveRoleMap };
+  SaveRole, ViewNode_in_Role };
 use crate::types::misc::ID;
 use crate::types::viewnode::{EditRequest, ViewNode, ViewNodeKind};
 
@@ -18,20 +18,19 @@ pub struct SubscribeeVisibilityIntent {
 }
 
 pub fn subscribee_visibility_intents_from_tree (
-  viewforest : &Tree<ViewNode>,
-  roles      : &SaveRoleMap,
+  viewforest : &Tree<ViewNode_in_Role>,
 ) -> Result<Vec<SubscribeeVisibilityIntent>, String> {
   let mut result : Vec<SubscribeeVisibilityIntent> =
     Vec::new();
   for node_ref in viewforest . nodes() {
     let subscriber : ID =
-      match roles . get (&node_ref . id()) {
-        Some (SaveRole::AsSubscribee { subscriber }) =>
+      match &node_ref . value() . role {
+        SaveRole::AsSubscribee { subscriber } =>
           subscriber . clone(),
         _ => continue,
       };
     let subscribee : ID =
-      match &node_ref . value() . kind {
+      match &node_ref . value() . viewnode . kind {
         ViewNodeKind::True (t) => {
           if t . is_indefinitive() { continue; }
           t . id . clone() },
@@ -42,22 +41,22 @@ pub fn subscribee_visibility_intents_from_tree (
       subscriber,
       subscribee,
       visible_content :
-        collect_direct_visible_content (&node_ref, roles),
+        collect_direct_visible_content (&node_ref),
     }); }
   Ok (result) }
 
 fn collect_direct_visible_content (
-  node_ref : &NodeRef<ViewNode>,
-  roles    : &SaveRoleMap,
+  node_ref : &NodeRef<ViewNode_in_Role>,
 ) -> Vec<ID> {
   let mut result : Vec<ID> = Vec::new();
   for child_ref in node_ref . children() {
-    let child : &ViewNode = child_ref . value();
+    let child_ref : NodeRef<ViewNode_in_Role> = child_ref;
+    let child : &ViewNode = &child_ref . value() . viewnode;
     match &child . kind {
       ViewNodeKind::True (t) => {
         if matches!(
-             roles . get (&child_ref . id()),
-             Some (SaveRole::OrdinaryTrueNode))
+             child_ref . value() . role,
+             SaveRole::OrdinaryTrueNode)
            && ! t . parent_ignores_it()
            && ! t . is_phantom()
            && ! matches!(
