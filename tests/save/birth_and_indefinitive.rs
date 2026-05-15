@@ -45,7 +45,7 @@ fn test_birth_and_indefinitive(
           ** (skg (node (id 2) (source main) (birth independent) indef)) 2
           *** (skg (node (id 4) (source main))) 4
         "};
-        let (_viewforest, save_instructions, _merge_instructions, _source_moves) =
+        let save_plan =
           buffer_to_viewforest_and_save_instructions(
             org_text,
             config,
@@ -53,10 +53,10 @@ fn test_birth_and_indefinitive(
         update_typedb_from_saveinstructions(
           &config . db_name,
           driver,
-          &save_instructions,
+          &save_plan . define_nodes,
           &[], ). await?;
         update_fs_from_saveinstructions(
-          &save_instructions,
+          &save_plan . define_nodes,
           &[],
           config . clone(), )?;
 

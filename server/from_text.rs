@@ -26,15 +26,19 @@ use validate::{validate_and_filter_foreign_instructions, validate_merges_involve
 use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
 
+#[derive(Debug)]
+pub struct SavePlan {
+  pub viewforest         : Tree<ViewNode>,
+  pub define_nodes       : Vec<DefineNode>,
+  pub merge_instructions : Vec<Merge>,
+  pub source_moves       : Vec<SourceMove>,
+}
+
 pub async fn buffer_to_viewforest_and_save_instructions (
   buffer_text : &str,
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
-) -> Result< ( Tree<ViewNode>,    // the view
-               Vec<DefineNode>,   // instructions
-               Vec<Merge>,        // instructions
-               Vec<SourceMove> ), // instructions
-             SaveError> {
+) -> Result<SavePlan, SaveError> {
   let ( mut unchecked_viewforest, parsing_errors )
     : ( Tree<UncheckedViewNode>, Vec<BufferValidationError> )
     = { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -95,7 +99,7 @@ pub async fn buffer_to_viewforest_and_save_instructions (
     &source_moves, &merge_instructions )
     . map_err (SaveError::BufferValidationErrors) ?;
 
-  Ok ((viewforest,
-       nonmerge_instructions,
-       merge_instructions,
-       source_moves)) }
+  Ok (SavePlan { viewforest,
+                 define_nodes : nonmerge_instructions,
+                 merge_instructions,
+                 source_moves } ) }

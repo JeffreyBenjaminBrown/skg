@@ -1,0 +1,388 @@
+* Simpler save pipeline
+
+The recent sharing work mostly turned "implement sharing" into
+"make the save pipeline understandable". The major enabling idea was
+that view trees are small enough that extra traversals are cheap.
+That let us stop using one traversal to discover roles, extract graph
+edits, infer subscriber visibility, supplement from disk, filter
+no-ops, and preserve saved-view child lists all at once.
+
+This report looks for the same smell elsewhere in save:
+
+- one pass doing unrelated work because it already has the tree;
+- one function mixing policy decisions with storage effects;
+- one data structure carrying state from too many conceptual phases;
+- a validation step that would be clearer as a named phase.
+
+The save pipeline is much better than it was. The remaining
+opportunities are smaller and more architectural than emergency
+cleanup.
+
+* Current shape
+
+At the top level, save now has a reasonably legible sequence:
+
+1. parse org text into unchecked viewnodes;
+2. fill missing IDs/sources from disk/DB;
+3. validate buffer structure and global edit requests;
+4. convert to checked viewnodes;
+5. extract non-merge save instructions;
+6. validate/filter foreign instructions;
+7. extract merge instructions;
+8. validate merge/source-move interactions;
+9. update filesystem, in-Rust graph, TypeDB, and Tantivy;
+10. rerender the saved view and collateral views.
+
+The cleanest part is now
+=viewforest_to_nonmerge_save_instructions=:
+
+#+begin_src text
+classify roles
+validate owned subscribee-as-such title/body policy
+extract graph edit intents + subscriber visibility intents
+same-ID reconcile graph edit intents
+fold visibility into subscriber hide relations
+supplement from disk + detect source moves
+filter would-be no-op DefineNodes
+#+end_src
+
+That is the pattern to mine further: make each phase named, make the
+data crossing the phase boundary explicit, and prefer another walk
+over another hidden side effect.
+
+* Ranked opportunities
+
+** DONE a. Split save preparation into an explicit plan object
+
+=buffer_to_viewforest_and_save_instructions= used to return a tuple:
+
+#+begin_src rust
+(Tree<ViewNode>, Vec<DefineNode>, Vec<Merge>, Vec<SourceMove>)
+#+end_src
+
+That tuple is accurate but underdescribed. The function actually
+builds a save plan:
+
+- the parsed checked viewforest that should be rerendered after save;
+- non-merge graph mutations;
+- merge mutations;
+- source moves discovered during disk supplementation.
+
+A named type makes later phases easier to read:
+
+#+begin_src rust
+struct SavePlan {
+  viewforest: Tree<ViewNode>,
+  define_nodes: Vec<DefineNode>,
+  merge_instructions: Vec<Merge>,
+  source_moves: Vec<SourceMove>,
+}
+#+end_src
+
+This is not just cosmetic. It would give names to phase boundaries
+that currently live in tuple position, and it would make it easier to
+add future plan-level validation without threading another parallel
+return value through the pipeline.
+
+Executed increment:
+
+- introduce =SavePlan= in =from_text.rs=;
+- have =buffer_to_viewforest_and_save_instructions= return it;
+- update the few callers/tests mechanically;
+- do not change behavior.
+
+Status: complete. =SavePlan= now names the saved viewforest,
+=define_nodes=, =merge_instructions=, and =source_moves=. Callers use
+field names rather than tuple positions.
+
+** b. Separate "validate" from "filter" for foreign instructions
+
+=validate_and_filter_foreign_instructions= does two things:
+
+- rejects attempted modification/deletion/creation of foreign nodes;
+- drops unchanged foreign saves because there is no reason to write
+  them.
+
+Those are related historically, but conceptually different. The first
+is validation. The second is no-op filtering over a subset of
+instructions.
+
+The current name is honest, so this is not urgent. But it keeps a
+small bundle alive: a function that sounds like a validator also
+chooses which instructions continue downstream.
+
+Possible split:
+
+#+begin_src text
+validate_foreign_instructions(instructions) -> Result<(), errors>
+filter_unchanged_foreign_saves(instructions) -> instructions
+#+end_src
+
+That would also make the relationship with
+=filter_wouldbe_noop_definenodes= clearer. Today no-op filtering
+happens once during disk-supplemented define-node construction and
+again, specifically for unchanged foreign nodes, during foreign
+validation.
+
+Suggested increment:
+
+- preserve current ordering and behavior;
+- extract an internal helper that classifies each foreign instruction
+  as =Changed=, =Unchanged=, or =Invalid=;
+- then split validation from filtering only if the helper makes the
+  call site simpler.
+
+** c. Make merge extraction another explicit save-intent phase
+
+Merge handling is now outside non-merge extraction:
+
+#+begin_src text
+viewforest_to_nonmerge_save_instructions
+instructiontriples_from_the_merges_in_an_viewforest
+#+end_src
+
+That is good. But the merge extractor still has a comment saying it
+walks the viewforest again and could be merged into another walk. The
+new rule of thumb says the opposite: the extra walk is fine; the
+separate responsibility is worth more than avoiding traversal.
+
+What remains bundled is mostly naming and staging. At the
+=from_text.rs= level, merge extraction is a peer phase to non-merge
+extraction, but the names do not line up:
+
+- non-merge extraction produces =DefineNode= and =SourceMove=;
+- merge extraction produces =Merge=;
+- validation is interleaved around them.
+
+Suggested increment:
+
+- rename or wrap merge extraction so the top-level reads as
+  =extract_nonmerge_save_plan= and =extract_merge_save_plan=, or
+  similar;
+- remove or rewrite the "slightly inefficient, walking again" comment
+  in =mergeInstructionTriple.rs= so it no longer suggests bundling
+  traversals as an optimization;
+- keep merge validation separate.
+
+** d. Split graph mutation planning from store updates
+
+=update_graph_minus_merges= is a big function because it owns the
+whole persistence story:
+
+1. apply delete-propagation cleanup to the instruction list;
+2. write filesystem;
+3. update in-Rust graph;
+4. update TypeDB with rebuild fallback;
+5. update Tantivy with rebuild fallback.
+
+Some of that sequencing is essential. The filesystem is the source of
+truth, and the in-Rust graph must be coherent before rerender. But
+delete-propagation cleanup is not a store update. It is another
+instruction-rewriting phase.
+
+That cleanup is currently hidden inside persistence:
+
+#+begin_src text
+update_graph_minus_merges(mut node_defs, ...)
+  apply_delete_propagation_cleanup(&mut node_defs, graph_snap)
+  write fs
+  update in-rust graph
+  update typedb/tantivy
+#+end_src
+
+This makes the actual saved instruction set slightly surprising:
+callers pass one list, but stores receive an amended list.
+
+Suggested split:
+
+#+begin_src text
+prepare_define_nodes_for_persistence(node_defs, graph_snap)
+  -> PersistenceDefineNodes
+
+apply_define_nodes_to_stores(prepared, source_moves, ...)
+#+end_src
+
+This would be a meaningful simplification because it turns a hidden
+mutation into a named save-plan rewrite. It would also make tests for
+delete propagation cheaper: they could assert the prepared
+instructions without exercising filesystem/TypeDB/Tantivy.
+
+** e. Give rerender a request/result object
+
+=update_views_after_save= and =rerender_view= both take long argument
+lists. The arguments are mostly coherent, but there are several
+different concepts mixed together:
+
+- what changed in this save (=save_instructions=,
+  =merge_instructions=, deleted-by-this-save IDs);
+- ambient view mode (=diff_mode_enabled=, source diffs);
+- graph/database access (=env=, graph snapshot);
+- output transport (=stream= for collateral messages);
+- state mutation (=views_state=);
+- accumulated warnings/errors.
+
+The function is correct, but the signature does not reveal the
+sub-phases:
+
+1. compute rerender context from save results and diff mode;
+2. rerender saved view with =is_saved_view=true=;
+3. update =ViewsState= for the saved view;
+4. discover collateral view URIs;
+5. rerender each collateral view with =is_saved_view=false=;
+6. stream collateral updates.
+
+Suggested increment:
+
+- introduce =RerenderAfterSaveContext= for source diffs, deleted ID
+  maps, graph snapshot, and errors;
+- introduce a small =RenderedCollateralView { uri, text, viewforest }=
+  result so rerendering collateral views is separated from streaming
+  them;
+- leave behavior unchanged.
+
+This is probably more useful than splitting =rerender_view= itself
+right away.
+
+** f. Split TrueNode completion by mode before splitting by mechanics
+
+=complete_truenode_preorder= is now documented in phases, which helps
+a lot. The remaining bundle is that one function has to understand
+several modes at once:
+
+- saved view vs collateral/fresh view;
+- diff view vs non-diff view;
+- subscribee-as-such branch vs normal content branch;
+- phantom/deleted/indefinitive nodes vs normal definitive nodes.
+
+Some of this is real domain complexity. But the mode checks are where
+future surprises are likely, because a small predicate can preserve a
+user-authored saved-view branch in one mode while regenerating it in
+another.
+
+The best next split is probably not "make each helper smaller". It is
+to name the mode decision:
+
+#+begin_src text
+CompletionMode {
+  saved_view: bool,
+  diff_view: bool,
+  subscribee_as_such: bool,
+}
+#+end_src
+
+or a richer enum if the states are mutually meaningful:
+
+#+begin_src text
+SavedNormalSubscribee
+SavedNormalGraphContent
+SavedDiff
+Collateral
+Fresh
+#+end_src
+
+Then predicates like =should_preserve_saved_as_subscribee_branch=
+become methods on the mode, and tests can target mode behavior
+without building as much surrounding machinery.
+
+Suggested increment:
+
+- introduce a small mode/context value inside
+  =complete_truenode_preorder=;
+- move =should_preserve_saved_as_subscribee_branch= onto it;
+- do not otherwise split completion yet.
+
+** g. Make validation phases match data maturity
+
+There are several validation moments:
+
+- raw parse validation in =org_to_uninterpreted_nodes=;
+- unchecked-tree structural validation in
+  =find_buffer_errors_for_saving=;
+- role-aware validation in
+  =validate_no_owned_title_or_body_edit_in_as_subscribee=;
+- disk-supplemented foreign validation;
+- merge validation;
+- simultaneous move/merge validation.
+
+This is not inherently wrong. Each validation needs different data.
+But the top-level code does not name the data maturity stages clearly
+enough, so the reason a validation lives where it lives is not always
+obvious.
+
+Suggested documentation-only increment:
+
+- add a short section near =buffer_to_viewforest_and_save_instructions=
+  explaining the maturity stages:
+
+  - unchecked, metadata-filled tree;
+  - checked role-aware viewforest;
+  - preliminary edit intents;
+  - disk-supplemented DefineNodes;
+  - merge/source-move plan;
+
+- for each validator, say which stage it requires.
+
+This would help future work avoid moving a validator earlier than its
+required facts.
+
+* Probably not worth doing soon
+
+** Combining tree walks
+
+The code still has several independent tree walks:
+
+- role classification;
+- visibility extraction;
+- graph edit candidate collection;
+- merge extraction;
+- buffer validation;
+- completion passes.
+
+That is good. Combining them again would save little and make the
+save semantics less inspectable.
+
+If a future profile shows traversal cost matters, prefer caching
+small derived facts behind named types over merging responsibilities
+into one pass.
+
+** Splitting every helper in =complete_truenode_preorder=
+
+That file is complex, but it is complex because rendering completion
+has many real modes. The header now gives a useful phase list. The
+next useful simplification is mode/context naming, not arbitrary
+function fragmentation.
+
+** Moving all no-op filtering to one global place immediately
+
+It is tempting to unify =filter_wouldbe_noop_definenodes= and the
+unchanged-foreign filtering. That might be right eventually, but the
+foreign validator also needs disk reads to distinguish harmless
+unchanged foreign views from forbidden foreign edits. Split
+validation/filtering first; unify later only if the result is simpler.
+
+* Suggested next plan
+
+Item a is complete. The best next incremental plan is probably item b:
+
+** Split foreign validation from unchanged-foreign filtering
+
+Goal: keep the current behavior but separate the two responsibilities
+inside =validate_and_filter_foreign_instructions=:
+
+- rejecting invalid foreign writes;
+- dropping unchanged foreign saves.
+
+Why next:
+
+- item a made the central save-plan boundary explicit;
+- this would clarify the next validation/filtering boundary;
+- the current function name is honest, so this can stay incremental
+  and behavior-preserving.
+
+Acceptance criteria:
+
+- foreign invalid writes are still rejected;
+- unchanged foreign saves are still filtered out;
+- the call site makes validation vs filtering visible;
+- behavior and tests are unchanged;
+- no new validation or persistence behavior is introduced.

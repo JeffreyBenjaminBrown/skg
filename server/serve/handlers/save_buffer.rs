@@ -1,6 +1,8 @@
 use crate::context::update_context_types_for_saved_nodes;
 use crate::types::env::SkgEnv;
-use crate::from_text::buffer_to_viewforest_and_save_instructions;
+use crate::from_text::{
+  SavePlan,
+  buffer_to_viewforest_and_save_instructions};
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
 use crate::save::update_graph_including_merges;
@@ -17,12 +19,10 @@ use crate::serve::util::{
 use crate::types::errors::SaveError;
 use crate::types::git::{SourceDiff, GitDiffStatus};
 use crate::types::misc::{ID, SourceName, SkgConfig};
-use crate::types::save::{DefineNode, Merge, SourceMove, format_save_error_as_org};
+use crate::types::save::format_save_error_as_org;
 use crate::types::views_state::ViewUri;
-use crate::types::viewnode::ViewNode;
 use crate::update_buffer::update_views_after_save;
 
-use ego_tree::Tree;
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
 use std::collections::{HashMap, HashSet};
@@ -152,22 +152,27 @@ pub async fn update_from_and_rerender_buffer (
     validate_no_merge_commits ( &sources, &env . config )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
 
-  let (viewforest, save_instructions, merge_instructions, source_moves)
-    : ( Tree<ViewNode>, Vec<DefineNode>, Vec<Merge>, Vec<SourceMove> )
-    = { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+  let save_plan : SavePlan =
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
             "buffer_to_viewforest_and_save_instructions"
           ) . entered();
         buffer_to_viewforest_and_save_instructions (
           org_buffer_text, &env . config, &env . driver ) . await
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
-  if viewforest . root() . children() . next() . is_none()
+  if save_plan . viewforest . root() . children() . next() . is_none()
     { return Err ( "Nothing to save found in org_buffer_text"
                    . into() ); }
+  let SavePlan {
+    viewforest,
+    define_nodes,
+    merge_instructions,
+    source_moves,
+  } = save_plan;
 
   { // update the graph
     update_graph_including_merges (
-      save_instructions . clone(),
+      define_nodes . clone(),
       &merge_instructions,
       &source_moves,
       env . config . clone(),
@@ -178,14 +183,14 @@ pub async fn update_from_and_rerender_buffer (
         "update_context_types_for_saved_nodes" ). entered();
       update_context_types_for_saved_nodes (
         &env . tantivy_index, &env . config . db_name,
-        &env . driver, &save_instructions ) . await
+        &env . driver, &define_nodes ) . await
       . unwrap_or_else ( |e| tracing::warn! (
         "context type recomputation failed: {}", e )); } }
 
   update_views_after_save (
     stream,
     viewforest,
-    save_instructions,
+    define_nodes,
     &merge_instructions,
     diff_mode_enabled,
     env,

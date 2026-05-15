@@ -144,21 +144,21 @@ fn test_move_node_to_another_owned_source (
       ** (skg (node (id b) (source private))) b
       *** (skg (node (id c) (source public))) c
     "};
-    let (_viewforest, instructions, _merges, source_moves)
+    let save_plan
       = buffer_to_viewforest_and_save_instructions (
           org_text, &config, &driver
           ) . await?;
-    assert_eq!(source_moves . len(), 1,
+    assert_eq!(save_plan . source_moves . len(), 1,
                "Expected exactly 1 source move");
-    assert_eq!(source_moves[0] . pid . 0, "b");
-    assert_eq!(source_moves[0] . old_source . as_str(), "public");
-    assert_eq!(source_moves[0] . new_source . as_str(), "private");
+    assert_eq!(save_plan . source_moves[0] . pid . 0, "b");
+    assert_eq!(save_plan . source_moves[0] . old_source . as_str(), "public");
+    assert_eq!(save_plan . source_moves[0] . new_source . as_str(), "private");
 
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
       update_graph_minus_merges (
-        instructions, &source_moves,
+        save_plan . define_nodes, &save_plan . source_moves,
         config . clone(), &tantivy_index, &driver,
         &graph ) . await?;
     if let Some (new_idx) = replacement {
@@ -240,21 +240,21 @@ fn test_move_node_referenced_by_extra_id (
       ** (skg (node (id b-alias) (source private))) b
       *** (skg (node (id c-alias) (source public))) c
     "};
-    let (_viewforest, instructions, _merges, source_moves)
+    let save_plan
       = buffer_to_viewforest_and_save_instructions (
           org_text, &config, &driver ) . await?;
 
     // source_moves should use the PID, not the extra_id
-    assert_eq!(source_moves . len(), 1,
+    assert_eq!(save_plan . source_moves . len(), 1,
                "Expected exactly 1 source move");
-    assert_eq!(source_moves[0] . pid . 0, "b",
+    assert_eq!(save_plan . source_moves[0] . pid . 0, "b",
                "SourceMove should use PID, not extra_id");
 
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
       update_graph_minus_merges (
-        instructions, &source_moves,
+        save_plan . define_nodes, &save_plan . source_moves,
         config . clone(), &tantivy_index, &driver,
         &graph ) . await?;
     if let Some (new_idx) = replacement {
@@ -308,15 +308,16 @@ fn test_move_multiple_nodes (
       ** (skg (node (id b) (source private))) b
       *** (skg (node (id c) (source private))) c
     "};
-    let (_viewforest, instructions, _merges, source_moves)
+    let save_plan
       = buffer_to_viewforest_and_save_instructions (
           org_text, &config, &driver
           ) . await?;
-    assert_eq!(source_moves . len(), 2,
+    assert_eq!(save_plan . source_moves . len(), 2,
                "Expected 2 source moves");
 
     let move_pids : Vec<&str> =
-      source_moves . iter() . map (|sm| sm . pid . 0 . as_str()) . collect();
+      save_plan . source_moves . iter()
+      . map (|sm| sm . pid . 0 . as_str()) . collect();
     assert!(move_pids . contains (&"b"), "Should move b");
     assert!(move_pids . contains (&"c"), "Should move c");
 
@@ -324,7 +325,7 @@ fn test_move_multiple_nodes (
       graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
       update_graph_minus_merges (
-        instructions, &source_moves,
+        save_plan . define_nodes, &save_plan . source_moves,
         config . clone(), &_tantivy_index, &driver,
         &graph ) . await?;
     if let Some (new_idx) = replacement {
@@ -474,11 +475,11 @@ fn test_no_source_change_produces_no_moves (
       ** (skg (node (id b) (source public))) b
       *** (skg (node (id c) (source public))) c
     "};
-    let (_viewforest, _instructions, _merges, source_moves)
+    let save_plan
       = buffer_to_viewforest_and_save_instructions (
           org_text, &config, &driver
           ) . await?;
-    assert_eq!(source_moves . len(), 0,
+    assert_eq!(save_plan . source_moves . len(), 0,
                "No source changes => no source moves");
 
     teardown (db_name, &driver, &config, &temp_fixtures) . await?;
@@ -507,18 +508,18 @@ fn test_source_only_change_with_populated_pool (
       ** (skg (node (id b) (source private))) b
       *** (skg (node (id c) (source public))) c
     "};
-    let (_viewforest, instructions, _merges, source_moves)
+    let save_plan
       = buffer_to_viewforest_and_save_instructions (
           org_text, &config, &driver ) . await?;
 
     // The source move must be detected even with populated pool.
-    assert_eq!(source_moves . len(), 1,
+    assert_eq!(save_plan . source_moves . len(), 1,
                "Source-only change should produce a SourceMove");
-    assert_eq!(source_moves[0] . pid . 0, "b");
+    assert_eq!(save_plan . source_moves[0] . pid . 0, "b");
 
     // The save instruction for b must not have been filtered out.
     let b_in_instructions : bool =
-      instructions . iter() . any (|i| match i {
+      save_plan . define_nodes . iter() . any (|i| match i {
         DefineNode::Save (skg::types::save::SaveNode (n)) =>
           n . pid . 0 == "b",
         _ => false });
@@ -529,7 +530,7 @@ fn test_source_only_change_with_populated_pool (
       graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
       update_graph_minus_merges (
-        instructions, &source_moves,
+        save_plan . define_nodes, &save_plan . source_moves,
         config . clone(), &tantivy_index, &driver,
         &graph ) . await?;
     if let Some (new_idx) = replacement {
