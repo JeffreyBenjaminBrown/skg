@@ -12,8 +12,9 @@ use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::HashMap;
 
 pub(crate) enum NodeEditIntent {
-  Save   (NodeSaveIntent),
-  Delete (NodeDeleteIntent),
+  GraphSave      (NodeSaveIntent),
+  SubscribeeEdit (NodeSaveIntent),
+  Delete         (NodeDeleteIntent),
 }
 
 pub(crate) struct NodeSaveIntent {
@@ -21,9 +22,8 @@ pub(crate) struct NodeSaveIntent {
   source                       : SourceName,
   title                        : String,
   body                         : Option<String>,
-  pub(crate) contains          : Vec<ID>,
+  pub(crate) contains          : MSV<ID>,
   extra_ids                    : Vec<ID>,
-  pub(crate) children_affect_only_hiding : bool, // Usually false. True for subscribees (where they appear *as* subscribees, i.e. as a child of a SubscribeeCol). When this is true, the node's children are treated as a set (order is ignored). Anything the subscribee contains that is absent here will be hidden from the subscriber (unless it is content of the subscriber, because nothing should hide its own content). Anything present here that the subscriber does not contain is invalid -- even if the user owns the subscribee, they can't edit it where it appears *as* a subscribee -- so their relationship to this node will be changed to Independent.
   aliases                      : MSV<String>,
   subscribes_to                : MSV<ID>,
   hides_from_its_subscriptions : MSV<ID>,
@@ -55,17 +55,10 @@ impl NodeEditIntent {
     &self,
   ) -> &ID {
     match self {
-      NodeEditIntent::Save (intent) => &intent . pid,
+      NodeEditIntent::GraphSave (intent) => &intent . pid,
+      NodeEditIntent::SubscribeeEdit (intent) =>
+        &intent . pid,
       NodeEditIntent::Delete (intent) => &intent . pid,
-    }}
-
-  pub(crate) fn children_affect_only_hiding (
-    &self,
-  ) -> bool {
-    match self {
-      NodeEditIntent::Save (intent) =>
-        intent . children_affect_only_hiding,
-      NodeEditIntent::Delete (_) => false,
     }}
 
   pub(crate) fn apply_hiderel_delta (
@@ -75,23 +68,22 @@ impl NodeEditIntent {
     inferred_unhides : &[ID],
   ) {
     match self {
-      NodeEditIntent::Save (intent) =>
-          intent . apply_hiderel_delta (
-            base_hides, inferred_hides, inferred_unhides),
-      NodeEditIntent::Delete (_) => {},
-    }}
+      NodeEditIntent::GraphSave (intent)
+        | NodeEditIntent::SubscribeeEdit (intent)
+        => intent . apply_hiderel_delta (
+             base_hides, inferred_hides, inferred_unhides),
+      NodeEditIntent::Delete (_) => {}, }}
 
-  pub(crate) fn save_from_nodecomplete (
+  pub(crate) fn graph_save_from_nodecomplete (
     node : NodeComplete,
   ) -> NodeEditIntent {
-    NodeEditIntent::Save (NodeSaveIntent {
+    NodeEditIntent::GraphSave (NodeSaveIntent {
       pid                          : node . pid,
       source                       : node . source,
       title                        : node . title,
       body                         : node . body,
-      contains                     : node . contains,
+      contains                     : MSV::Specified (node . contains),
       extra_ids                    : node . extra_ids,
-      children_affect_only_hiding  : false,
       aliases                      : node . aliases,
       subscribes_to                : node . subscribes_to,
       hides_from_its_subscriptions :
@@ -100,33 +92,59 @@ impl NodeEditIntent {
       misc                         : node . misc,
     }) }
 
+  pub(crate) fn save_intent (
+    self,
+  ) -> Result<NodeSaveIntent, String> {
+    match self {
+      NodeEditIntent::GraphSave (intent)
+      | NodeEditIntent::SubscribeeEdit (intent) =>
+        Ok (intent),
+      NodeEditIntent::Delete (_) =>
+        Err ("Delete intent does not contain a SaveNode" . to_string()),
+    }}
+
   pub(crate) fn into_define_node (
     self,
   ) -> Result<DefineNode, String> {
     match self {
-      NodeEditIntent::Delete (intent) =>
-        Ok (DefineNode::Delete (DeleteNode {
+      NodeEditIntent::Delete (intent)
+        => Ok (DefineNode::Delete (DeleteNode {
           id     : intent . pid,
-          source : intent . source,
-        })),
-      NodeEditIntent::Save (intent) =>
-        Ok (DefineNode::Save (SaveNode (NodeComplete {
-          title                        : intent . title,
-          aliases                      : intent . aliases,
-          source                       : intent . source,
-          pid                          : intent . pid,
-          extra_ids                    : intent . extra_ids,
-          body                         : intent . body,
-          contains                     : intent . contains,
-          subscribes_to                : intent . subscribes_to,
-          hides_from_its_subscriptions :
-            intent . hides_from_its_subscriptions,
-          overrides_view_of            : intent . overrides_view_of,
-          misc                         : intent . misc,
-        }))) }}
+          source : intent . source, } )),
+      NodeEditIntent::GraphSave (intent)
+        | NodeEditIntent::SubscribeeEdit (intent)
+        => Ok (DefineNode::Save (SaveNode (
+          intent . into_nodecomplete() ))) }}
 }
 
 impl NodeSaveIntent {
+  pub(crate) fn fill_unspecified_contains (
+    &mut self,
+    contains : &[ID],
+  ) {
+    if self . contains . is_unspecified() {
+      self . contains =
+        MSV::Specified (contains . to_vec()); }}
+
+  pub(crate) fn into_nodecomplete (
+    self,
+  ) -> NodeComplete {
+    NodeComplete {
+      title                        : self . title,
+      aliases                      : self . aliases,
+      source                       : self . source,
+      pid                          : self . pid,
+      extra_ids                    : self . extra_ids,
+      body                         : self . body,
+      contains                     :
+        self . contains . or_default() . to_vec(),
+      subscribes_to                : self . subscribes_to,
+      hides_from_its_subscriptions :
+        self . hides_from_its_subscriptions,
+      overrides_view_of            : self . overrides_view_of,
+      misc                         : self . misc,
+    }}
+
   fn apply_hiderel_delta (
     &mut self,
     base_hides       : &MSV<ID>,
@@ -240,19 +258,18 @@ fn reconcile_nodeEditIntents_with_same_ID (
   for intent in intents {
     let intent : NodeEditIntent = intent;
     match intent {
-      NodeEditIntent::Save (_) => {
-        if intent . children_affect_only_hiding() {
+      NodeEditIntent::GraphSave (_) => {
+        if ordinary_save . is_some() {
+          return Err (
+            "Multiple ordinary save instructions for same ID"
+              . to_string()); }
+        ordinary_save = Some (intent); },
+      NodeEditIntent::SubscribeeEdit (_) => {
           if visibility_save . is_some() {
             return Err (
               "Multiple direct AsSubscribee save instructions for same ID"
                 . to_string()); }
-          visibility_save = Some (intent);
-        } else {
-          if ordinary_save . is_some() {
-            return Err (
-              "Multiple ordinary save instructions for same ID"
-                . to_string()); }
-          ordinary_save = Some (intent); }},
+          visibility_save = Some (intent); },
       NodeEditIntent::Delete (_) => {
         if delete . is_none() {
           delete = Some (intent); }}}}
@@ -419,11 +436,11 @@ fn collect_subscribees_by_node_id (
   Ok (result) }
 
 fn assemble_node_edit_intents (
-  tree                   : &Tree<ViewNode_in_Role>,
-  candidate_ids          : Vec<NodeId>,
-  mut basics_by_node_id  : HashMap<NodeId, NodeEditMinimal>,
-  mut contains_by_node_id : HashMap<NodeId, Vec<ID>>,
-  mut aliases_by_node_id : HashMap<NodeId, MSV<String>>,
+  tree                       : &Tree<ViewNode_in_Role>,
+  candidate_ids              : Vec<NodeId>,
+  mut basics_by_node_id      : HashMap<NodeId, NodeEditMinimal>,
+  mut contains_by_node_id    : HashMap<NodeId, Vec<ID>>,
+  mut aliases_by_node_id     : HashMap<NodeId, MSV<String>>,
   mut subscribees_by_node_id : HashMap<NodeId, MSV<ID>>,
 ) -> Result<Vec<NodeEditIntent>, String> {
   let mut result : Vec<NodeEditIntent> =
@@ -431,39 +448,56 @@ fn assemble_node_edit_intents (
   for candidate_id in candidate_ids {
     let Some (basics) =
       basics_by_node_id . remove (&candidate_id)
-    else { continue; };
+      else { continue; };
     match basics . kind {
       NodeEditMinimalAction::Delete =>
         result . push (NodeEditIntent::Delete (NodeDeleteIntent {
           pid    : basics . pid,
-          source : basics . source,
-        })),
+          source : basics . source, } )),
       NodeEditMinimalAction::Save { title, body } =>
-        result . push (NodeEditIntent::Save (NodeSaveIntent {
-          pid                          : basics . pid,
-          source                       : basics . source,
-          title,
-          body,
-          contains                     :
-            contains_by_node_id . remove (&candidate_id) . ok_or (
-              "assemble_node_edit_intents: missing contains")?,
-          extra_ids                    : vec![],
-          children_affect_only_hiding :
-            matches!(
-              tree . get (candidate_id) . unwrap() . value() . role,
-              SaveRole::AsSubscribee { .. }),
-          aliases                      :
-            aliases_by_node_id . remove (&candidate_id) . ok_or (
-              "assemble_node_edit_intents: missing aliases")?,
-          subscribes_to                :
-            subscribees_by_node_id . remove (&candidate_id) . ok_or (
-              "assemble_node_edit_intents: missing subscribees")?,
-        hides_from_its_subscriptions : MSV::Unspecified,
-        overrides_view_of            : MSV::Unspecified,
-        misc                         : Vec::new(),
-        })),
+        { let intent : NodeSaveIntent =
+            NodeSaveIntent {
+              pid                          : basics . pid,
+              source                       : basics . source,
+              title,
+              body,
+              contains                     :
+                contains_for_save_intent (
+                  tree, candidate_id, &mut contains_by_node_id)?,
+              extra_ids                    : vec![],
+              aliases                      :
+                aliases_by_node_id . remove (&candidate_id) . ok_or (
+                  "assemble_node_edit_intents: missing aliases")?,
+              subscribes_to                :
+                subscribees_by_node_id . remove (&candidate_id) . ok_or (
+                  "assemble_node_edit_intents: missing subscribees")?,
+              hides_from_its_subscriptions : MSV::Unspecified,
+              overrides_view_of            : MSV::Unspecified,
+              misc                         : Vec::new(),
+            };
+          if matches!(
+               tree . get (candidate_id) . unwrap() . value() . role,
+               SaveRole::AsSubscribee { .. })
+          { result . push (
+              NodeEditIntent::SubscribeeEdit (intent)); }
+          else {
+            result . push (NodeEditIntent::GraphSave (intent)); }},
     }}
   Ok (result) }
+
+fn contains_for_save_intent (
+  tree                    : &Tree<ViewNode_in_Role>,
+  candidate_id            : NodeId,
+  contains_by_node_id     : &mut HashMap<NodeId, Vec<ID>>,
+) -> Result<MSV<ID>, String> {
+  let contains : Vec<ID> =
+    contains_by_node_id . remove (&candidate_id) . ok_or (
+      "assemble_node_edit_intents: missing contains")?;
+  if matches!(
+       tree . get (candidate_id) . unwrap() . value() . role,
+       SaveRole::AsSubscribee { .. })
+  { Ok (MSV::Unspecified) }
+  else { Ok (MSV::Specified (contains)) }}
 
 /// Treats the input tree as the source of truth; does not read dbs.
 /// Returns None if no SubscribeeCol found,

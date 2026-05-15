@@ -14,7 +14,7 @@ use crate::types::views_state::nodecomplete_from_in_rust_graph;
 use subscribee_visibility_intents::{ SubscribeeVisibilityIntent, subscribee_visibility_intents_from_tree, };
 use super::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
 use super::validate::buffernode_differs_from_disknode;
-use to_naive_instructions::{ naive_node_edit_intents_from_role_viewforest, reconcile_nodeEditIntents, NodeEditIntent, };
+use to_naive_instructions::{ naive_node_edit_intents_from_role_viewforest, reconcile_nodeEditIntents, NodeEditIntent, NodeSaveIntent, };
 
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
@@ -109,45 +109,34 @@ async fn build_disk_supplemented_define_nodes (
   let mut result : Definenodes_with_Sourcemoves =
     Definenodes_with_Sourcemoves::with_capacity (intents . len());
   for intent in intents {
-    let children_affect_only_hiding : bool =
-      intent . children_affect_only_hiding();
-    let define_node : DefineNode =
-      intent . into_define_node()
-      . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     let supplemented : Definenode_with_Opt_Sourcemove =
-      supplement_definenode_from_disk (
-        define_node,
-        children_affect_only_hiding,
-        config,
-        driver ) . await ?;
+      supplement_nodeeditintent_from_disk (
+        intent, config, driver ) . await ?;
     result . push (supplemented); }
   Ok (result) }
 
-async fn supplement_definenode_from_disk (
-  define_node                  : DefineNode,
-  children_affect_only_hiding  : bool,
-  config                       : &SkgConfig,
-  driver                       : &TypeDBDriver,
+async fn supplement_nodeeditintent_from_disk (
+  intent : NodeEditIntent,
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
 ) -> Result<Definenode_with_Opt_Sourcemove, Box<dyn Error>> {
-  match define_node {
-    DefineNode::Delete (_) =>
+  match intent {
+    NodeEditIntent::Delete (_) =>
       Ok (Definenode_with_Opt_Sourcemove {
-        instruction : define_node,
+        instruction : intent . into_define_node()
+          . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
         source_move : None,
       }),
-    DefineNode::Save (SaveNode (from_buffer)) =>
-      supplement_savenode_from_disk (
-        from_buffer,
-        children_affect_only_hiding,
-        config,
-        driver ) . await,
+    _ => supplement_saveintent_from_disk (
+      intent . save_intent()
+        . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
+      config, driver ) . await,
   }}
 
-async fn supplement_savenode_from_disk (
-  from_buffer                 : NodeComplete,
-  children_affect_only_hiding : bool,
-  config                      : &SkgConfig,
-  driver                      : &TypeDBDriver,
+async fn supplement_saveintent_from_disk (
+  from_buffer : NodeSaveIntent,
+  config      : &SkgConfig,
+  driver      : &TypeDBDriver,
 ) -> Result<Definenode_with_Opt_Sourcemove, Box<dyn Error>> {
   let pid : ID =
     from_buffer . pid . clone();
@@ -156,11 +145,18 @@ async fn supplement_savenode_from_disk (
   match from_disk {
     None =>
       Ok (Definenode_with_Opt_Sourcemove {
-        instruction : DefineNode::Save (SaveNode (from_buffer)),
+        instruction :
+          NodeEditIntent::GraphSave (from_buffer) . into_define_node()
+          . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
         source_move : None,
       }),
     Some (disk_node) => {
       let disk_node : NodeComplete = disk_node;
+      let mut from_buffer : NodeSaveIntent = from_buffer;
+      from_buffer . fill_unspecified_contains (
+        &disk_node . contains);
+      let from_buffer : NodeComplete =
+        from_buffer . into_nodecomplete();
       let canonicalized : NodeComplete =
         canonicalize_ids_from_disk (from_buffer, &disk_node) ?;
       let maybe_move : Option<SourceMove> =
@@ -170,23 +166,10 @@ async fn supplement_savenode_from_disk (
       let supplemented : NodeComplete =
         supplement_unspecified_fields_from_disk (
           canonicalized, &disk_node);
-      let supplemented : NodeComplete =
-        restore_subscribee_content_from_disk_if_needed (
-          supplemented, &disk_node, children_affect_only_hiding);
       Ok (Definenode_with_Opt_Sourcemove {
         instruction : DefineNode::Save (SaveNode (supplemented)),
         source_move : maybe_move,
       }) }}}
-
-/// TODO | TEMP: The children of subscribees (shown as subscribees) affect only subscriber hide relationships, not the subscribee's content relationships. This temporary guardrail restores the graph field until visibility folding moves earlier.
-fn restore_subscribee_content_from_disk_if_needed (
-  mut supplemented             : NodeComplete,
-  disk_node                    : &NodeComplete,
-  children_affect_only_hiding  : bool,
-) -> NodeComplete {
-  if children_affect_only_hiding {
-    supplemented . contains = disk_node . contains . clone(); }
-  supplemented }
 
 /// Interpret direct child-list edits under definitive AsSubscribee
 /// branches as subscriber visibility edits.
@@ -297,10 +280,9 @@ fn subscriber_will_contain_after_save (
     pid    : &ID,
   ) -> Option<Vec<ID>> {
     match intent {
-      NodeEditIntent::Save (intent)
-        if intent . pid == *pid
-           && ! intent . children_affect_only_hiding =>
-        Some (intent . contains . clone()),
+      NodeEditIntent::GraphSave (intent)
+        if intent . pid == *pid =>
+        Some (intent . contains . or_default() . to_vec()),
       _ => None,
     }}
 
@@ -323,7 +305,9 @@ fn apply_hiderel_delta_to_subscriber_intent (
     pid               : &ID,
   ) -> Option<&'a mut NodeEditIntent> {
     node_edit_intents . iter_mut()
-      . find ( |intent| intent . pid() == pid ) }
+      . find ( |intent| matches!(
+          intent,
+          NodeEditIntent::GraphSave (save) if save . pid == *pid)) }
 
   if let Some (intent) =
     nodeeditintent_for_pid_mut (
@@ -335,7 +319,7 @@ fn apply_hiderel_delta_to_subscriber_intent (
       inferred_unhides );
     return; }
   let mut intent : NodeEditIntent =
-    NodeEditIntent::save_from_nodecomplete (subscriber . clone());
+    NodeEditIntent::graph_save_from_nodecomplete (subscriber . clone());
   intent . apply_hiderel_delta (
     &subscriber . hides_from_its_subscriptions,
     inferred_hides,

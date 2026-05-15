@@ -369,7 +369,7 @@ fn role_aware_extraction_collects_subscribees_without_hidden_branches (
     vec![]);
   assert_eq!(
     saved_node_by_id (&instructions, "subscribee") . contains,
-    vec![ID::from ("subscribee-content")]); }
+    vec![]); }
 
 #[test]
 fn subscribee_visibility_intent_collects_direct_visible_content (

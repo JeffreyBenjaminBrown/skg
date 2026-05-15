@@ -1,0 +1,198 @@
+* Plan: introduce keyed reconciled node edit intents
+
+This plan addresses the next practical slice of items e and g in
+[[./2p5_simplify-save.org][2p5_simplify-save.org]].
+
+The goal is to stop treating a reconciled =Vec<NodeEditIntent>= as a
+little database. After same-ID reconciliation, the save path wants an
+explicit invariant: at most one node edit intent is addressable for a
+given graph ID, while output order remains predictable.
+
+* Current shape
+
+The save path currently does this:
+
+#+begin_src text
+naive Vec<NodeEditIntent>
+  -> reconcile_nodeEditIntents -> Vec<NodeEditIntent>
+  -> apply_hiderels_from_subscribee_visibility scans the Vec by PID
+  -> build_disk_supplemented_define_nodes iterates the Vec
+#+end_src
+
+That works, but the vector is carrying two responsibilities:
+
+- ordered output;
+- keyed lookup while folding subscriber hide/unhide deltas.
+
+The smell shows up in local helpers such as
+=nodeeditintent_for_pid_mut= and =subscriber_will_contain_after_save=,
+which scan for "the graph save for this PID" even though
+reconciliation is supposed to have established that invariant already.
+
+* Target shape
+
+Introduce a small collection:
+
+#+begin_src rust
+pub(crate) struct ReconciledNodeEditIntents {
+  order  : Vec<ID>,
+  by_pid : HashMap<ID, NodeEditIntent>,
+}
+#+end_src
+
+The exact field visibility is flexible; prefer private fields with
+small methods unless direct crate-local access is clearly simpler.
+
+The collection should provide named operations for the things the save
+pipeline actually does:
+
+- construct from naive =NodeEditIntent= values by applying the current
+  same-ID reconciliation rules;
+- look up a graph-save intent by PID;
+- insert a synthesized graph-save intent for an owned subscriber when
+  a visibility delta changes hides but the subscriber had no existing
+  graph save;
+- compute the subscriber's post-save =contains= set without scanning a
+  raw vector;
+- consume itself into ordered =NodeEditIntent= values for disk
+  supplementation.
+
+* Implementation steps
+
+** 1. Add =ReconciledNodeEditIntents=
+
+Put the type near =reconcile_nodeEditIntents= in
+[[../../server/from_text/viewnodes_to_instructions/to_naive_instructions.rs][to_naive_instructions.rs]]
+unless the imports become awkward.
+
+Preserve the current public entry point temporarily if that keeps the
+patch smaller:
+
+#+begin_src rust
+pub(crate) fn reconcile_nodeEditIntents (
+  intents : Vec<NodeEditIntent>,
+) -> Result<ReconciledNodeEditIntents, String>
+#+end_src
+
+or add a new constructor and update callers. The important result is
+that callers no longer receive a plain =Vec<NodeEditIntent>= after
+same-ID reconciliation.
+
+** 2. Preserve current reconciliation behavior first
+
+Do not broaden behavior in this item unless tests force it.
+
+Current behavior to preserve:
+
+- duplicate =GraphSave= intents for the same ID conflict;
+- duplicate =DirectSubscribeeEdit= intents for the same ID conflict;
+- save/delete conflicts reject;
+- if a =GraphSave= and =DirectSubscribeeEdit= share an ID, the
+  ordinary graph save wins for final graph output;
+- delete output remains possible and ordered.
+
+This is narrower than the fuller item-e language about visibility
+surface reconciliation. That broader behavior belongs after this
+collection exists, because then the code has a natural place for it.
+
+** 3. Preserve deterministic order
+
+Do not keep the current =HashMap= iteration order behavior.
+
+Track order explicitly while grouping or inserting:
+
+- first appearance of an ID establishes its output slot;
+- if same-ID reconciliation chooses a different variant for that ID,
+  keep the original slot;
+- synthesized subscriber graph-save intents appended by visibility
+  folding should appear at the end, matching the current mutation
+  behavior.
+
+If existing tests depend on a different order, prefer updating the
+tests to the explicit order unless user-visible behavior would change.
+
+** 4. Move visibility folding onto the keyed collection
+
+Change
+=apply_hiderels_from_subscribee_visibility= in
+[[../../server/from_text/viewnodes_to_instructions.rs][viewnodes_to_instructions.rs]]
+to accept and return =ReconciledNodeEditIntents=.
+
+Replace the local vector scan helpers with collection methods, for
+example:
+
+#+begin_src rust
+intents.subscriber_contains_after_save (&subscriber_from_disk)
+intents.apply_hiderel_delta_to_subscriber (
+  subscriber_from_disk,
+  &inferred_hides,
+  &inferred_unhides)
+#+end_src
+
+The method names do not matter as much as the ownership boundary: code
+outside the collection should not scan through a raw vector looking
+for a PID.
+
+** 5. Keep disk supplementation boring
+
+=build_disk_supplemented_define_nodes= can still iterate ordered
+=NodeEditIntent= values, but the conversion from keyed collection to
+ordered values should happen at the boundary:
+
+#+begin_src text
+ReconciledNodeEditIntents
+  -> into_ordered_intents()
+  -> build_disk_supplemented_define_nodes
+#+end_src
+
+Do not mix disk supplementation with collection lookup policy.
+
+** 6. Update roadmap status
+
+After implementation, update item e in
+=2p5_simplify-save.org= to say that the keyed reconciled collection is
+done, but broader first-class visibility-surface reconciliation remains
+for a later item if still needed.
+
+Item g may also be partially complete if the reconciliation rules are
+clearer, but do not mark it fully done unless duplicate visibility
+surface semantics are actually addressed.
+
+* Tests
+
+Run:
+
+#+begin_src text
+cargo check
+cargo test --test new viewnodes_to_instructions -- --nocapture
+cargo test --test new reconcile_same_id_instructions -- --nocapture
+cargo test --test typedb update_typedb_from_saveinstructions -- --nocapture
+#+end_src
+
+Add or adjust one focused regression if the new collection changes
+ordering or exposes an untested invariant. Useful assertions:
+
+- same-ID ordinary =GraphSave= still wins over a direct
+  =AsSubscribee= edit surface;
+- synthesized subscriber hide/unhide saves are appended when no
+  subscriber graph save already exists;
+- visibility folding updates an existing subscriber graph save by
+  direct PID lookup.
+
+* Acceptance criteria
+
+- No post-reconciliation code treats =Vec<NodeEditIntent>= as a
+  lookup table.
+- Subscriber hide/unhide folding uses a keyed reconciled collection.
+- Output order is explicit and deterministic.
+- Existing direct-subscribee behavior remains unchanged.
+- The planned tests pass.
+
+* Non-goals
+
+- Do not move validation onto the role-annotated tree.
+- Do not change rerender or completion behavior.
+- Do not introduce a new dependency unless the local collection is
+  clearly worse than using an existing ordered-map dependency.
+- Do not broaden duplicate direct-subscribee edit semantics unless a
+  current test or obvious bug requires it.
