@@ -1,0 +1,215 @@
+* Plan: replace 'children_affect_only_hiding' with explicit intent shape
+
+This plan addresses item d in
+[[./2p5_simplify-save.org][2p5_simplify-save.org]].
+
+The goal is to stop encoding direct =AsSubscribee= child-list edits as
+ordinary-looking graph saves. A direct subscribee branch is a
+visibility edit surface for the subscriber, not a graph =contains=
+edit for the subscribee.
+
+* Current shape
+
+The current save extraction has two parallel signals for direct
+=AsSubscribee= branches:
+
+- 'subscribee_visibility_intents_from_tree' extracts
+  'SubscribeeVisibilityIntent { subscriber, subscribee,
+  visible_content }'.
+- 'naive_node_edit_intents_from_role_viewforest' also emits a
+  'NodeEditIntent::Save' for the same direct subscribee node, with
+  'children_affect_only_hiding = true' and a temporary 'contains'
+  list taken from the displayed children.
+
+That boolean protects behavior, but the representation is wrong:
+
+- same-ID reconciliation has to distinguish ordinary saves from
+  visibility-looking saves;
+- disk supplementation has to carry
+  'restore_subscribee_content_from_disk_if_needed';
+- 'NodeSaveIntent' exposes role-position policy as if it were graph
+  save data.
+
+After item c, visibility folding already happens before =DefineNode=
+construction. What remains is to stop producing the misleading graph
+save for direct subscribee branches.
+
+* Target representation
+
+Prefer explicit variants:
+
+#+begin_src rust
+pub(crate) enum NodeEditIntent {
+  GraphSave (NodeSaveIntent),
+  Delete (NodeDeleteIntent),
+  SubscribeeVisibilitySurface (SubscribeeVisibilityIntent),
+}
+#+end_src
+
+If the module split makes that awkward, an equivalent separate
+intermediate is acceptable:
+
+#+begin_src rust
+struct SaveExtraction {
+  graph_edit_intents : Vec<NodeEditIntent>,
+  visibility_surfaces : Vec<SubscribeeVisibilityIntent>,
+}
+#+end_src
+
+But the invariant should be the same: direct =AsSubscribee= child
+lists must not be stored in 'NodeSaveIntent.contains'.
+
+* Implementation steps
+
+** 1. Rename ordinary save intent to make its graph meaning explicit
+
+Change 'NodeEditIntent::Save' to either:
+
+- 'NodeEditIntent::GraphSave'; or
+- a separate 'GraphEditIntent::Save' if the enum split is cleaner.
+
+The point is to make every graph-save variant mean that its 'contains'
+field is real graph =contains= data.
+
+Update helper names as needed:
+
+- 'save_from_nodecomplete' should become something like
+  'graph_save_from_nodecomplete';
+- 'into_define_node' should only accept graph save/delete variants, or
+  should error if called on a visibility surface.
+
+** 2. Stop collecting direct subscribee nodes as graph-save candidates
+
+In
+[[../../server/from_text/viewnodes_to_instructions/to_naive_instructions.rs][to_naive_instructions.rs]],
+change candidate collection so a node whose own save role is
+=AsSubscribee= does not produce a graph-save intent for that occurrence.
+
+Be careful to keep recursing through its children. Recursive ordinary
+descendants below a subscribee branch can still be real graph edits if
+their own role is ordinary.
+
+Current behavior to preserve:
+
+- ordinary definitive nodes still save title/body/content/aliases and
+  subscribees;
+- direct =AsSubscribee= title/body edits on a foreign node still reach
+  validation as foreign edits if that is currently intended by tests;
+- recursive descendants under a direct subscribee still keep their own
+  ordinary graph-save behavior.
+
+If title/body edits on a direct subscribee need to keep reaching
+foreign validation, represent that explicitly rather than smuggling the
+direct child list through 'contains'. For instance, a direct
+=AsSubscribee= occurrence could produce a graph save with no opinion
+about 'contains' plus a separate visibility surface. Do not let the
+displayed child list become graph =contains=.
+
+** 3. Make visibility surfaces first-class extraction output
+
+Keep 'SubscribeeVisibilityIntent' as the visibility-surface shape
+unless a better name is obviously worth it.
+
+The extraction phase should return graph edit intents and visibility
+surfaces separately, or a single enum whose variants keep them
+separate. The top-level save pipeline should make the distinction
+obvious.
+
+The existing 'subscribee_visibility_intents_from_tree' already collects
+the right visible child-list signal. Prefer reusing it over rebuilding
+that traversal inside graph intent extraction.
+
+** 4. Remove 'children_affect_only_hiding'
+
+Delete:
+
+- the field on 'NodeSaveIntent';
+- 'NodeEditIntent::children_affect_only_hiding';
+- every branch that tests it;
+- comments explaining that a graph save's children can affect only
+  hiding.
+
+After this item, if a value is a graph save, its children affect graph
+content. If a value is a visibility surface, its children affect
+subscriber visibility.
+
+** 5. Delete the disk supplementation guardrail
+
+Delete 'restore_subscribee_content_from_disk_if_needed' and remove the
+corresponding argument flow through:
+
+- 'build_disk_supplemented_define_nodes';
+- 'supplement_definenode_from_disk';
+- 'supplement_savenode_from_disk'.
+
+Disk supplementation should no longer know about direct subscribee
+position policy. It should only canonicalize IDs, detect source moves,
+supplement unspecified fields, and pass the result onward.
+
+** 6. Preserve current visibility folding behavior
+
+Keep the item-c timing:
+
+#+begin_src text
+role-annotated tree
+  -> graph edit intents + visibility surfaces
+  -> reconcile graph edits
+  -> fold visibility surfaces into subscriber graph-save intents
+  -> DefineNode construction
+  -> disk supplementation / source moves
+  -> no-op filtering
+#+end_src
+
+Do not introduce the keyed 'ReconciledNodeEditIntents' collection in
+this item unless it is clearly necessary. That belongs naturally to
+item e. A local vector scan is acceptable for this item if the intent
+shape is fixed.
+
+* Tests
+
+Run:
+
+#+begin_src text
+cargo check
+cargo test --test new viewnodes_to_instructions -- --nocapture
+cargo test --test new reconcile_same_id_instructions -- --nocapture
+cargo test --test typedb update_typedb_from_saveinstructions -- --nocapture
+#+end_src
+
+Existing tests that must keep passing:
+
+- child removal under a direct subscribee infers subscriber hide;
+- child restoration under a direct subscribee infers subscriber unhide;
+- child-list edits in subscribee position do not become foreign
+  subscribee =contains= edits;
+- foreign title/body edits still report =ModifiedForeignNode=;
+- overlapping subscribee visibility conflicts reject save;
+- ordinary same-ID occurrence keeps its graph =contains= edit when
+  another occurrence is direct =AsSubscribee=;
+- recursive descendant under direct =AsSubscribee= keeps its own graph
+  =contains= edit.
+
+Add or adjust a focused test if no existing assertion proves that
+direct =AsSubscribee= extraction no longer creates a graph-save
+=contains= value.
+
+* Acceptance criteria
+
+- 'NodeSaveIntent' has no 'children_affect_only_hiding' field.
+- Direct =AsSubscribee= displayed children never enter
+  'NodeSaveIntent.contains'.
+- The disk supplementation path has no direct-subscribee guardrail and
+  no role-position policy parameter.
+- Same-ID behavior still permits an ordinary graph save and a direct
+  subscribee visibility surface for the same graph ID to coexist.
+- Current direct-subscribee hide/unhide behavior is unchanged.
+- The tests above pass.
+
+* Non-goals
+
+- Do not introduce a broad keyed reconciled-intent collection unless
+  the explicit intent split makes it unavoidable.
+- Do not change validation semantics beyond what is needed to avoid
+  using direct subscribee child lists as graph =contains=.
+- Do not change rerender/completion behavior.
+- Do not change API, schema, or =.skg= format.

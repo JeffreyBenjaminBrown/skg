@@ -83,7 +83,7 @@ pipelines, and the only remaining obviously policy-specific wrinkle in
 the disk phase should be a clearly named temporary helper for restoring
 direct-as-subscribee 'contains' from disk.
 
-** c. PARTLY DONE Move subscribee visibility folding before final =DefineNode= construction
+** c. DONE Move subscribee visibility folding before final =DefineNode= construction
 
 This is tied with item a for importance.
 
@@ -110,20 +110,19 @@ guardrail during disk supplementation. It would also make visibility
 edits less sensitive to the fact that they currently run after graph
 =SaveNode= construction.
 
-Status after the first item-c pass: visibility folding now happens at
+Status: visibility folding now happens at
 the =NodeEditIntent= layer, before =DefineNode= construction and before
 disk supplementation. That removed the late mutation of completed
 =DefineNode= values.
 
-What remains: a direct =AsSubscribee= node still carries its displayed
-child list as a temporary =NodeSaveIntent.contains= value. Because that
-still looks like a graph =contains= edit until later, disk
-supplementation must still call the temporary guardrail that restores
-the subscribee's =contains= from disk.
-
-So item c is not complete until direct-as-subscribee child lists never
-enter the graph-save intent as =contains= in the first place. That
-remaining work should be handled by item d's explicit intent shape.
+The fuller target above also says that the direct =AsSubscribee= child
+list should never become a graph =contains= edit for the subscribee.
+That part is now owned by item d's explicit intent shape and item f's
+policy-neutral disk supplementation. Until then, a direct
+=AsSubscribee= node still carries its displayed child list as a
+temporary =NodeSaveIntent.contains= value, and disk supplementation
+still needs the temporary guardrail that restores the subscribee's
+=contains= from disk.
 
 ** d. Replace =children_affect_only_hiding= with an explicit intent shape
 
@@ -141,9 +140,9 @@ subscribee children as graph =contains=:
 If item c lands first, separate variants will probably be clearer than
 an enum field.
 
-After the partial item-c pass, this item is the next required cleanup.
-It should split the direct =AsSubscribee= branch out before graph-save
-=contains= is built:
+This item owns the remaining direct-subscribee part of item c's fuller
+target. It should split the direct =AsSubscribee= branch out before
+graph-save =contains= is built:
 
 - ordinary definitive nodes should produce graph-save intents whose
   direct children mean graph =contains=;
@@ -167,10 +166,9 @@ becomes a subscribee graph =contains= edit.
 needs clearer reconciliation rules once direct =AsSubscribee= branches
 are no longer encoded as ordinary-looking saves.
 
-After the partial item-c pass, visibility edits are folded into
-=NodeEditIntent= before =DefineNode= construction. That is an
-improvement, but visibility surfaces still are not reconciled as their
-own intent class.
+Visibility edits are now folded into =NodeEditIntent= before
+=DefineNode= construction, but visibility surfaces still are not
+reconciled as their own intent class.
 
 Once item d introduces an explicit visibility-surface intent, same-ID
 reconciliation should consume graph edits and visibility surfaces as
