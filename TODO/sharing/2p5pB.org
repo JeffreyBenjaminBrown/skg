@@ -1,0 +1,249 @@
+* Plan: simplify 'build_disk_supplemented_define_nodes'
+
+This plan addresses item b in
+[[./2p5_simplify-save.org][2p5_simplify-save.org]].
+
+Item a has already extracted
+'build_disk_supplemented_define_nodes' from
+[[../../server/from_text/viewnodes_to_instructions.rs][viewnodes_to_instructions.rs]].
+The goal here is still behavior-preserving: make that helper read as a
+small pipeline of named disk-related phases, without changing save
+semantics.
+
+* Current shape
+
+'viewforest_to_nonmerge_save_instructions' now has a clear top-level
+sequence:
+
+- build a role-annotated viewforest;
+- extract graph edit intents and subscribee visibility intents;
+- reconcile duplicate graph edit intents;
+- call 'build_disk_supplemented_define_nodes';
+- fold subscribee visibility into subscriber hide relations;
+- call 'filter_wouldbe_noop_definenodes'.
+
+The remaining dense part is inside
+'build_disk_supplemented_define_nodes'. For each reconciled
+'NodeEditIntent', it currently:
+
+- remembers whether children affect only hiding;
+- converts the intent into 'DefineNode';
+- pushes deletes unchanged;
+- loads the disk node for saves;
+- treats missing disk nodes as new saves;
+- canonicalizes IDs from disk;
+- detects source moves;
+- supplements unspecified fields from disk;
+- restores direct-as-subscribee 'contains' from disk when
+  'children_affect_only_hiding' is true;
+- pushes any 'SourceMove'.
+
+That is the correct behavior for now, but it is too much policy to
+hide in one loop.
+
+* Target shape
+
+After this pass, 'build_disk_supplemented_define_nodes' should read
+roughly like:
+
+#+begin_src rust
+let mut result =
+  DiskSupplementedDefineNodes::with_capacity (intents . len());
+for intent in intents {
+  let children_affect_only_hiding =
+    intent . children_affect_only_hiding();
+  let define_node =
+    definenode_from_intent (intent)?;
+  let maybe_supplemented =
+    supplement_definenode_from_disk (
+      define_node,
+      children_affect_only_hiding,
+      config,
+      driver ) . await?;
+  result . push (maybe_supplemented);
+}
+Ok (result)
+#+end_src
+
+Names can differ. The important point is that the helper should expose
+the per-intent sequence, and the save-vs-delete and disk-present-vs-new
+branches should move behind named helpers.
+
+* Implementation steps
+
+** 1. Give 'DiskSupplementedDefineNodes' tiny methods
+
+Keep the struct local unless moving it is necessary. Add only boring
+helpers such as:
+
+- 'with_capacity';
+- 'push_instruction';
+- 'push_source_move' or 'push_source_move_if_some'.
+
+This should eliminate repeated manual mutation of both output vectors
+inside the main loop. Avoid adding methods with policy hidden behind
+vague names.
+
+** 2. Extract intent conversion
+
+Move the 'intent.into_define_node()' plus error conversion into a
+helper such as:
+
+'definenode_from_intent'
+
+Input:
+
+- 'NodeEditIntent'
+
+Output:
+
+- 'Result<DefineNode, Box<dyn Error>>'
+
+This helper is intentionally thin. Its purpose is to keep
+'build_disk_supplemented_define_nodes' from mixing pipeline structure
+with error-conversion mechanics.
+
+** 3. Extract per-'DefineNode' disk supplementation
+
+Add a helper such as:
+
+'supplement_definenode_from_disk'
+
+Inputs:
+
+- the preliminary 'DefineNode';
+- 'children_affect_only_hiding';
+- 'SkgConfig';
+- 'TypeDBDriver'.
+
+Output:
+
+- a small result struct, for instance:
+
+#+begin_src rust
+struct DiskSupplementedDefineNode {
+  instruction : DefineNode,
+  source_move : Option<SourceMove>,
+}
+#+end_src
+
+Behavior:
+
+- 'DefineNode::Delete' returns itself with no source move;
+- 'DefineNode::Save' delegates to a save-specific helper.
+
+This keeps delete handling explicit and prevents the save-only disk
+logic from visually swallowing the whole loop.
+
+** 4. Extract save-specific disk supplementation
+
+Add a helper such as:
+
+'supplement_savenode_from_disk'
+
+Inputs:
+
+- 'NodeComplete' from the buffer;
+- 'children_affect_only_hiding';
+- 'SkgConfig';
+- 'TypeDBDriver'.
+
+Output:
+
+- 'DiskSupplementedDefineNode'.
+
+Preserve the current behavior exactly:
+
+1. clone the buffer pid;
+2. load 'optnodecomplete_from_id';
+3. if no disk node exists, return the buffer node as
+   'DefineNode::Save' and no source move;
+4. if a disk node exists, canonicalize IDs from disk;
+5. detect source moves using the same pid/source arguments as now;
+6. supplement unspecified fields from disk;
+7. if 'children_affect_only_hiding', restore 'contains' from the disk
+   node;
+8. return the supplemented save plus the optional source move.
+
+Do not change the order. In particular, keep source-move detection
+after ID canonicalization and before the final instruction is returned,
+as it is today.
+
+** 5. Name the temporary direct-subscribee guardrail
+
+Move this line into a tiny helper:
+
+#+begin_src rust
+supplemented . contains = disk_node . contains . clone();
+#+end_src
+
+A clear name would be:
+
+'restore_subscribee_content_from_disk_if_needed'
+
+The helper should take:
+
+- the supplemented 'NodeComplete';
+- the disk 'NodeComplete';
+- 'children_affect_only_hiding'.
+
+It should return the possibly modified 'NodeComplete'.
+
+Keep the current comment, but move it to the helper. The comment should
+make clear that this is temporary policy: direct as-subscribee child
+lists are subscriber visibility input, not subscribee graph
+'contains' edits. Item c/f can later remove this from disk
+supplementation once visibility folding happens earlier.
+
+** 6. Keep item c/f out of this patch
+
+Do not:
+
+- move subscribee visibility folding before 'DefineNode' construction;
+- remove 'children_affect_only_hiding';
+- split 'NodeEditIntent' variants;
+- change same-ID reconciliation;
+- make disk supplementation policy-neutral yet.
+
+This item only names the existing internal phases of
+'build_disk_supplemented_define_nodes'.
+
+* Suggested file changes
+
+Only
+[[../../server/from_text/viewnodes_to_instructions.rs][viewnodes_to_instructions.rs]]
+should need code changes.
+
+If the helper set feels too large for that file, create a submodule
+under
+[[../../server/from_text/viewnodes_to_instructions/][viewnodes_to_instructions/]],
+but prefer keeping this pass local unless readability clearly worsens.
+
+* Tests
+
+Run:
+
+#+begin_src text
+cargo check
+cargo test --test new viewnodes_to_instructions -- --nocapture
+cargo test --test new reconcile_same_id_instructions -- --nocapture
+cargo test --test typedb update_typedb_from_saveinstructions -- --nocapture
+#+end_src
+
+Because this is a pure extraction, do not add tests unless the refactor
+exposes an uncovered behavior. The existing direct-subscribee and
+source-move tests are the important guards.
+
+* Acceptance criteria
+
+- 'build_disk_supplemented_define_nodes' reads as a short named
+  per-intent pipeline.
+- Delete handling is visibly separate from save disk supplementation.
+- New saves, existing saves, source moves, disk field supplementation,
+  and direct-subscribee 'contains' restoration each have named
+  boundaries.
+- The temporary direct-subscribee guardrail remains behaviorally
+  unchanged and is clearly named as such.
+- No validation, rendering, API, file format, or same-ID behavior
+  changes.
+- The tests above pass.
