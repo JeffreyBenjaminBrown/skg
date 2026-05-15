@@ -53,6 +53,46 @@ enum TruenodeKindOutcome {
   Continue { pid : ID, source : SourceName },
 }
 
+#[derive(Clone, Copy)]
+struct CompletionMode {
+  saved_view : bool, // false => collateral buffer
+  diff_view  : bool,
+}
+
+impl CompletionMode {
+  fn new (
+    is_saved_view : bool,
+    source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
+  ) -> CompletionMode {
+    CompletionMode {
+      saved_view : is_saved_view,
+      diff_view  : source_diffs . is_some(),
+    }}
+
+  fn should_sync_truenode_from_disk (
+    self,
+  ) -> bool {
+    ! self . saved_view }
+
+  /// A subscribee-as-such -- that is, a definitive TrueNode child
+  /// of a SubscribeeCol -- is editable,
+  /// but only in the sense that those edits let a user modify what the
+  /// subscriber hides. Saved-view completion must not regenerate
+  /// that child list from disk before the branch can be interpreted.
+  ///
+  /// This applies only to a saved-view axis, and only when diff view is off.
+  /// Collateral views and new buffer completion should refresh from the graph.
+  /// Diff completions, whether saved or collateral,
+  /// must regenerate phantom/removed children from source_diffs.
+  fn should_preserve_saved_as_subscribee_branch (
+    self,
+    is_subscribee : bool,
+  ) -> bool {
+    self . saved_view
+      && ! self . diff_view
+      && is_subscribee }
+}
+
 /// TrueNode completion.
 ///
 /// INTENDED USE: Use in the first, DFS preorder (parent-first)
@@ -84,6 +124,8 @@ pub fn complete_truenode_preorder (
     tree, node, |vn : &ViewNode| matches!( &vn . kind,
                                            ViewNodeKind::True (_)),
     "complete_truenode_preorder: expected TrueNode" ) ?;
+  let mode : CompletionMode =
+    CompletionMode::new (is_saved_view, source_diffs);
   make_indef_if_repeat_then_extend_defmap(
     tree, node, defmap ) ?;
   let (pid, initial_source) : (ID, SourceName) =
@@ -97,14 +139,14 @@ pub fn complete_truenode_preorder (
     nodecomplete_from_inrustgraph_or_disk ( config, &pid, &initial_source ) ?;
   let source : SourceName =
     nodecomplete . source . clone ();
-  if ! is_saved_view { // The saved (definitive) view of a node *defines* the title, body, and source, but other views need those fields updated.
+  if mode . should_sync_truenode_from_disk () { // The saved (definitive) view of a node *defines* the title, body, and source, but other views need those fields updated.
     sync_truenode_from_disk (tree, node, &nodecomplete) ?; }
   let subscribes_to : Vec<ID> =
     reconcile_content_children (
       tree, node, &nodecomplete, &pid, &source,
       source_diffs, config, graph_snap,
       deleted_since_head_pid_src_map,
-      is_saved_view ) ?;
+      mode ) ?;
   order_children_as_scaffolds_then_ignored_then_content(
     tree, node ) ?;
   maybe_prepend_subscribee_col(
@@ -201,7 +243,7 @@ fn reconcile_content_children (
   config                         : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  is_saved_view                  : bool,
+  mode                           : CompletionMode,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
   // Resolve each id through the in-Rust-graph extra_id map so that an
   // id appearing in a node's 'contains' after merging into another
@@ -223,8 +265,7 @@ fn reconcile_content_children (
     per_stage_node_changes_for_truenode (
       source_diffs, pid, source );
   let is_sub : bool = is_subscribee (tree, node) ?;
-  if should_preserve_saved_as_subscribee_branch (
-      is_saved_view, source_diffs, is_sub )
+  if mode . should_preserve_saved_as_subscribee_branch (is_sub)
     { correct_the_viewChildren_of_subscribee (
         tree, node, &content_ids ) ?;
       return Ok (subscribes_to); }
@@ -270,25 +311,6 @@ fn correct_the_viewChildren_of_subscribee (
       . filter ( |(id, _)| id == content_id )
     { move_child_to_end (tree, node, *child_id) ?; }}
   Ok (( )) }
-
-/// A definitive TrueNode child of a SubscribeeCol is an editable
-/// visibility surface in the saved buffer. Its view-children are
-/// user-authored signal for later hide/unhide inference, so saved-view
-/// completion must not regenerate that child list from disk before the
-/// branch can be interpreted.
-///
-/// This is intentionally saved-view-only. Collateral views should
-/// still refresh from the graph, and diff view should still compute
-/// phantom/removed children from the source diff.
-fn should_preserve_saved_as_subscribee_branch (
-  is_saved_view : bool,
-  source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
-  is_subscribee : bool,
-) -> bool {
-  is_saved_view
-    // In diff mode, AsSubscribee view-children include generated phantom/removed state that must be regenerated from 'source_diffs', not preserved as user-authored manipulation of hide relationships.
-    && source_diffs . is_none()
-    && is_subscribee }
 
 fn mutate_truenode_to_deletednode (
   tree   : &mut Tree<ViewNode>,

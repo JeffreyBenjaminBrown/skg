@@ -268,7 +268,7 @@ the environment, and accumulated errors. Collateral rerendering now
 returns a =RenderedCollateralView= before the caller updates
 =ViewsState= and streams it to Emacs.
 
-** f. Split TrueNode completion by mode before splitting by mechanics
+** DONE f. Split TrueNode completion by mode before splitting by mechanics
 
 =complete_truenode_preorder= is now documented in phases, which helps
 a lot. The remaining bundle is that one function has to understand
@@ -315,6 +315,12 @@ Suggested increment:
   =complete_truenode_preorder=;
 - move =should_preserve_saved_as_subscribee_branch= onto it;
 - do not otherwise split completion yet.
+
+Status: complete. =complete_truenode_preorder= now constructs a
+small =CompletionMode= that names saved-view and diff-view state.
+The saved-as-subscribee preservation rule and saved-view disk-sync
+rule now live on that mode value. The completion mechanics themselves
+were left intact.
 
 ** g. Make validation phases match data maturity
 
@@ -387,15 +393,14 @@ validation/filtering first; unify later only if the result is simpler.
 
 * Suggested next plan
 
-Items a, b, c, and e are complete. Item d has the store-application
-split but not a standalone preparation API. The best next incremental
-plan is probably item f:
+Items a, b, c, e, and f are complete. Item d has the
+store-application split but not a standalone preparation API. The
+best next incremental plan is probably item g:
 
-** Split TrueNode completion by mode before splitting by mechanics
+** Make validation phases match data maturity
 
-Goal: name the completion mode decisions so saved-view,
-collateral/fresh-view, diff-view, and subscribee-as-such behavior are
-easier to reason about.
+Goal: document and, where cheap, align each validation with the data
+maturity stage it actually requires.
 
 Why next:
 
@@ -405,11 +410,12 @@ Why next:
 - item d separated store application from the surrounding save
   orchestration;
 - item e grouped rerender context and collateral output;
-- item f applies the same naming pressure to completion modes.
+- item f named the completion mode predicates;
+- item g applies that same phase-boundary clarity to validation.
 
 Acceptance criteria:
 
-- completion mode has a named type or equivalent named predicates;
-- existing saved/collateral/diff behavior is unchanged;
-- no broad helper fragmentation unless it clarifies mode behavior;
-- focused completion and save tests still pass.
+- each save validation phase has a short maturity-stage explanation;
+- no validator moves earlier than its required inputs;
+- behavior is unchanged unless a clearly dead validation call is found;
+- focused save validation tests still pass.
