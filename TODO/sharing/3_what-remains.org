@@ -52,26 +52,22 @@ Status: complete. The two guard comments now point to rerender
 sharing-scaffold completion as the path that reconciles existing
 generated sharing branches.
 
-** b. Resolve the diff-mode saved-view preservation TODO
+** DONE b. Resolve the diff-mode saved-view preservation TODO
 
-Current code:
+At planning time, the code in:
 
 #+begin_src text
 server/update_buffer/complete_preorder/truenode.rs
 should_preserve_saved_as_subscribee_branch
 #+end_src
 
-The predicate is:
+used this predicate:
 
 #+begin_src rust
 is_saved_view && source_diffs.is_none() && is_subscribee
 #+end_src
 
-with:
-
-#+begin_src rust
-// TODO: This should not be necessary.
-#+end_src
+and carried a TODO questioning the =source_diffs.is_none()= clause.
 
 This is still a real boundary question. Normal saved views must
 preserve direct =AsSubscribee= child lists long enough for save
@@ -84,7 +80,12 @@ removed children do not infer hide/unhide intent, then decide whether
 =source_diffs.is_none()= remains the right guard or should be replaced
 by a more direct distinction.
 
-Execution plan: [[./3pB.org][3pB.org]].
+Execution plan: [[./3pB_DONE.org][3pB_DONE.org]].
+
+Status: complete. A focused git-diff saved-view regression now proves
+that a direct =AsSubscribee= branch regenerates phantom/removed
+children from =source_diffs= instead of preserving a stale direct
+child list. The misleading TODO was replaced with that rationale.
 
 ** c. Define policy for extra direct children under =AsSubscribee=
 

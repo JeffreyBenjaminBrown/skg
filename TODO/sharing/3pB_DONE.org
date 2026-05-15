@@ -9,19 +9,16 @@ diff-mode behavior.
 
 * Current issue
 
-=server/update_buffer/complete_preorder/truenode.rs= currently
-preserves direct =AsSubscribee= children only when all of these are
-true:
+At planning time,
+=server/update_buffer/complete_preorder/truenode.rs= preserved direct
+=AsSubscribee= children only when all of these were true:
 
 #+begin_src rust
 is_saved_view && source_diffs.is_none() && is_subscribee
 #+end_src
 
-The =source_diffs.is_none()= clause has:
-
-#+begin_src rust
-// TODO: This should not be necessary.
-#+end_src
+The =source_diffs.is_none()= clause carried a TODO questioning
+whether it should be necessary.
 
 That TODO is now misleading. The branch preservation rule exists so
 normal saved views can carry direct =AsSubscribee= child-list edits
@@ -111,3 +108,15 @@ cargo test --test new viewnodes_to_instructions
 - The replacement comment names the saved-view/diff-mode distinction.
 - No unrelated behavior changes.
 - Focused tests and =cargo check= pass.
+
+* Outcome
+
+Complete. Added a focused =git_diff_view= regression with a one-source
+subscriber/subscribee fixture. The test saves a diff-mode view where
+the direct =AsSubscribee= branch is missing a generated removed child,
+then asserts that saved-view completion regenerates that phantom from
+=source_diffs=.
+
+Kept the =source_diffs.is_none()= guard and replaced the stale TODO
+with a comment explaining why diff-mode =AsSubscribee= children must
+be regenerated rather than preserved.

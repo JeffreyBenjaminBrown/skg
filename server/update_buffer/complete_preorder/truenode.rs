@@ -254,7 +254,8 @@ fn should_preserve_saved_as_subscribee_branch (
   is_subscribee : bool,
 ) -> bool {
   is_saved_view
-    && source_diffs . is_none() // TODO: This should not be necessary.
+    // In diff mode, AsSubscribee children include generated phantom/removed state that must be regenerated from 'source_diffs', not preserved as user-authored manipulation of hide relationships.
+    && source_diffs . is_none()
     && is_subscribee }
 
 fn mutate_truenode_to_deletednode (

@@ -179,6 +179,41 @@ fn test_add_new_child_creates_on_disk()
   })
 }
 
+#[test]
+fn test_diff_mode_as_subscribee_regenerates_phantom_children()
+  -> Result<(), Box<dyn Error>>
+{
+  run_save_test_with_setup(
+    "skg-test-save-diff-as-subscribee-regenerates",
+    setup_git_repo_with_subscribee_fixtures,
+    |config, driver, tantivy, _repo_path| { Box::pin(async move {
+      let input = "\
+* (skg (node (id 1) (source main))) 1
+** (skg subscribeeCol) it subscribes to these
+*** (skg (node (id 11) (source main))) 11
+**** (skg (node (id moves) (unstaged newM))) moves
+";
+
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
+        diff_mode_enabled : true,
+        open_views            : OpenViews::new (),};
+      let (mut stream, _) = mk_test_tcp_stream_pair ();
+      let response = update_from_and_rerender_buffer(
+        &mut stream,
+        input, driver, config, tantivy, &graph, true,
+        &Err ( String::new () ), &mut views_state
+      ) . await?;
+
+      assert_buffer_contains(
+        &response . saved_view,
+        "*** (skg (node (id 11) (source main))) 11\n\
+         **** (skg (node (id gets-removed) (source main) indef (unstaged removedX removedM))) gets-removed\n\
+         **** (skg (node (id moves) (source main))) moves" );
+      Ok (( )) }) })
+}
+
 //
 // Test runner helper
 //
@@ -192,11 +227,29 @@ where
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
 {
+  run_save_test_with_setup(
+    db_name, setup_git_repo_with_fixtures, test_fn)
+}
+
+fn run_save_test_with_setup<S, F>(
+  db_name: &str,
+  setup: S,
+  test_fn: F,
+) -> Result<(), Box<dyn Error>>
+where
+  S: FnOnce(&Path) -> Result<Repository, Box<dyn Error>>,
+  F: for<'a> FnOnce(
+    &'a SkgConfig,
+    &'a Arc<TypeDBDriver>,
+    &'a mut TantivyIndex,
+    &'a Path
+  ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
+{
   let tantivy_folder = format!("/tmp/tantivy-{}", db_name);
 
   let temp_dir = TempDir::new()?;
   let repo_path = temp_dir . path();
-  setup_git_repo_with_fixtures (repo_path)?;
+  setup (repo_path)?;
 
   block_on(async {
     let (config, driver, mut tantivy) =
