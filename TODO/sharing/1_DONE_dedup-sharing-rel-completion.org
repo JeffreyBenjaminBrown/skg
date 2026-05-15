@@ -388,8 +388,8 @@ jobs across two code paths:
 
 The synergy that makes this worth doing as one refactor rather
 than two: *all three scaffolds share the same "reconcile a
-column" shape*, and *both code paths differ only in a few
-axes*. So a single reconcile-a-column abstraction handles
+collection" shape*, and *both code paths differ only in a few
+axes*. So a single reconcile-a-collection abstraction handles
 both halves of both duplications.
 
 The shape, abstractly:

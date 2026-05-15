@@ -22,7 +22,7 @@ The items below are the remaining work that still looks real.
 
 * Ranked opportunities
 
-** a. Replace stale sharing-completion comments
+** DONE a. Replace stale sharing-completion comments
 
 The comments in
 [[../../server/to_org/complete/sharing/mod.rs][server/to_org/complete/sharing/mod.rs]]
@@ -42,11 +42,15 @@ The current story is narrower:
 - the =SubscribeeCol= guard is structurally defensive because current
   call paths append a fresh branch before reaching it;
 - the =HiddenInSubscribeeCol= guard can be reached after postorder
-  sharing-scaffold reconciliation, so an existing column has already
+  sharing-scaffold reconciliation, so an existing collection has already
   been handled.
 
 No behavior change is implied. This is a comment cleanup to keep
 future refactors pointed at the right code path.
+
+Status: complete. The two guard comments now point to rerender
+sharing-scaffold completion as the path that reconciles existing
+generated sharing branches.
 
 ** b. Resolve the diff-mode saved-view preservation TODO
 
@@ -79,6 +83,8 @@ Suggested next step: add a diff-mode regression proving phantom or
 removed children do not infer hide/unhide intent, then decide whether
 =source_diffs.is_none()= remains the right guard or should be replaced
 by a more direct distinction.
+
+Execution plan: [[./3pB.org][3pB.org]].
 
 ** c. Define policy for extra direct children under =AsSubscribee=
 
@@ -124,12 +130,12 @@ definitive =AsSubscribee= node:
 This should be written in user-facing terms before the feature is
 presented as complete.
 
-** f. Decide whether HiddenIn/HiddenOutside columns are editable
+** f. Decide whether HiddenIn/HiddenOutside collections are editable
 
 The current hide/unhide edit surface is direct =AsSubscribee= visible
 content. =HiddenInSubscribeeCol= and
 =HiddenOutsideOfSubscribeeCol= are display-derived scaffolds, not
-general editable relation columns.
+general editable relation collections.
 
 Open product questions:
 
@@ -137,7 +143,7 @@ Open product questions:
 - Should adding a row to =HiddenOutsideOfSubscribeeCol= mean hide
   from all subscriptions?
 - Should these scaffolds visibly communicate that they are generated
-  display, not normal editable relation columns?
+  display, not normal editable relation collections?
 
 This is product behavior, not save-path cleanup.
 
@@ -177,9 +183,9 @@ side of the relation a node is on or to edit it.
 This is outside direct subscribee hide/unhide, but it remains a
 sharing-model gap.
 
-** k. Generalize relationship columns
+** k. Generalize relationship collections
 
-=vision.org= still points toward columns for all relation directions.
+=vision.org= still points toward collections for all relation directions.
 The current work improves one relation surface: subscriber visibility
 over direct subscribee content. It does not generalize relation
 display or editing.

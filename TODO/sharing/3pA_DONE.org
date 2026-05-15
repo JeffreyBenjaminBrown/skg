@@ -43,7 +43,7 @@ The expected replacement comments should say:
   completion, not this helper;
 - the =HiddenInSubscribeeCol= existing-child guard can be reached only
   after the rerender/postorder path has already reconciled an existing
-  hidden-in column, or during initial render when preserving an
+  hidden-in collection, or during initial render when preserving an
   existing branch is the right no-op.
 
 * Implementation steps
@@ -88,3 +88,9 @@ No broader test suite is required unless code changes.
   reconciliation as the place existing generated branches are handled.
 - No behavior changes.
 - =cargo check= passes.
+
+* Outcome
+
+Complete. The two stale comments in
+=server/to_org/complete/sharing/mod.rs= were replaced. No behavior
+changed.

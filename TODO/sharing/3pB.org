@@ -1,0 +1,113 @@
+* Plan: pin diff-mode saved-view preservation behavior
+
+This plan executes item b in
+[[./3_what-remains.org][3_what-remains.org]].
+
+The goal is to resolve the =source_diffs.is_none()= TODO in
+=should_preserve_saved_as_subscribee_branch= without weakening
+diff-mode behavior.
+
+* Current issue
+
+=server/update_buffer/complete_preorder/truenode.rs= currently
+preserves direct =AsSubscribee= children only when all of these are
+true:
+
+#+begin_src rust
+is_saved_view && source_diffs.is_none() && is_subscribee
+#+end_src
+
+The =source_diffs.is_none()= clause has:
+
+#+begin_src rust
+// TODO: This should not be necessary.
+#+end_src
+
+That TODO is now misleading. The branch preservation rule exists so
+normal saved views can carry direct =AsSubscribee= child-list edits
+through to save extraction. Diff-mode saved views are different:
+their child lists include generated phantom/removed state, and those
+display nodes must be regenerated from diff data rather than
+preserved as user-authored visibility intent.
+
+* Work
+
+** 1. Confirm the relevant path
+
+Read:
+
+- =reconcile_content_children=;
+- =should_preserve_saved_as_subscribee_branch=;
+- =content_goal_list= and =complete_content_children= enough to see
+  where diff-mode phantom/removed children are generated;
+- existing diff-view save tests in =tests/git_diff_view=;
+- existing subscribee visibility tests in
+  =tests/new/viewnodes_to_instructions.rs=.
+
+** 2. Add a focused regression
+
+Add the narrowest test that proves a diff-mode saved view containing a
+direct =AsSubscribee= branch does not preserve a stale direct child
+list.
+
+Preferred shape:
+
+- build or reuse a small fixture with a subscriber, a subscribee, and
+  a diff-mode content change under the subscribee;
+- run saved-view completion with =is_saved_view = true= and
+  =source_diffs = Some(...)=;
+- assert that diff-generated phantom/removed children are present
+  after completion, instead of being skipped by the saved-view
+  preservation rule.
+
+If that is too heavy for the existing test harness, use the closest
+lower-level completion test that directly exercises
+=complete_viewforest= with =source_diffs = Some(...)= and an
+=AsSubscribee= node.
+
+** 3. Replace the TODO with an accurate comment
+
+If the regression confirms current behavior is correct, keep the
+=source_diffs.is_none()= guard and replace the TODO with a comment
+explaining that diff-mode views must regenerate phantom/removed
+children from =source_diffs=.
+
+If the regression exposes a cleaner predicate than
+=source_diffs.is_none()=, make the smallest code change that expresses
+that predicate and keep the same behavioral boundary.
+
+** 4. Update the roadmap
+
+Mark item b in =3_what-remains.org= done only if the regression lands
+and the TODO is removed or replaced.
+
+Rename this file to =3pB_DONE.org= after execution.
+
+* Tests
+
+Run the focused test first.
+
+Then run:
+
+#+begin_src text
+cargo check
+#+end_src
+
+If the focused test touches the git-diff or hidden-subscription suite,
+also run the relevant test binary, probably one of:
+
+#+begin_src text
+cargo test --test git_diff_view
+cargo test --test hidden_from_subscriptions
+cargo test --test new viewnodes_to_instructions
+#+end_src
+
+* Acceptance criteria
+
+- There is a regression proving diff-mode saved-view completion does
+  not preserve stale direct =AsSubscribee= child lists.
+- =should_preserve_saved_as_subscribee_branch= no longer contains the
+  misleading TODO.
+- The replacement comment names the saved-view/diff-mode distinction.
+- No unrelated behavior changes.
+- Focused tests and =cargo check= pass.

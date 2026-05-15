@@ -9,7 +9,7 @@ Buffer 1 is the one the user saves:
 
 #+begin_src org
 * subscriber {id: S, source: main}
-** subscribee column {kind: subscribeeCol}
+** subscribee collection {kind: subscribeeCol}
 *** old target {id: A, source: main, definitive: false}
 *** new target {id: B, source: main, definitive: false}
 #+end_src
@@ -18,7 +18,7 @@ Buffer 2 is another open view containing the same subscriber:
 
 #+begin_src org
 * subscriber {id: S, source: main}
-** subscribee column {kind: subscribeeCol}
+** subscribee collection {kind: subscribeeCol}
 *** old target {id: A, source: main, definitive: false}
 #+end_src
 
@@ -32,7 +32,7 @@ The collateral rerender of Buffer 2 should become:
 
 #+begin_src org
 * subscriber {id: S, source: main}
-** subscribee column {kind: subscribeeCol}
+** subscribee collection {kind: subscribeeCol}
 *** new target {id: B, source: main, definitive: false}
 #+end_src
 

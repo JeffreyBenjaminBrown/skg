@@ -14,6 +14,10 @@ The TypeDB graph contains a number of relationships -- 'contains', 'textlinks to
 
 The reason for this is that the map from the child-parent relationship in an Emacs buffer to the corresponding relationship, if any, in TypeDB depends on context. Usually, if an org headline P has a child headline C, they will correspond to a TypeDB node Outer that 'contains' a TypeDB node Inner, where Outer corresponds to P and Inner to C. But that does not always hold: see, for instance, the discussion of alias nodes in [the architecture documentation](coding-advice/architecture.md).
 
+## "col" is short for "collection"
+
+in some type definitions or enum varieties.
+
 ## ephem = ephemeral
 
 Some data regarding a node is ephemeral --

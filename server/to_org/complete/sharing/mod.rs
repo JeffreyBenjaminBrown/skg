@@ -112,8 +112,7 @@ pub async fn maybe_add_subscribeeCol_branch (
                         ViewNodeKind::True (t) if t . is_indefinitive () ) )
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_indefinitive { return Ok(( )); } }
-  { // Skip if there already is one.
-    // PITFALL: If this code were used in the save-buffer pathway, we could not assume the existing SubscribeeCol is correct, and would instead have to 'integrate' it, as happens elsewhere for something similar. But so far it is only used for creating a new buffer, not updating one.
+  { // Pre-existing SubscribeeCol children are reconciled by the rerender pipeline's 'resolve_truenode_state_and_expand_content', which dispatches to 'complete_subscribee_col_preorder'.
     if unique_scaffold_child_of_viewnode (
       tree, node_id, &Scaffold::SubscribeeCol )? . is_some ()
     { return Ok (( )); }}
@@ -180,7 +179,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
     tree, subscribee_treeid )?
   { return Err ( "maybe_add_hiddenInSubscribeeCol_branch called on non-subscribee" . into ( )); }
   if unique_scaffold_child_of_viewnode (
-       // TODO: This assumes the existing Col is correct. Should instead 'integrate' it, as is done somewhere else for something similar.
+      // Pre-existing HiddenIn collections are instead reconciled by the rerender pipeline's 'insert_and_reconcile_generated_scaffolds', which dispatches to 'complete_hiddeninsubscribee_col'.
        tree, subscribee_treeid, &Scaffold::HiddenInSubscribeeCol
      )? . is_some ()
   { return Ok (( )); }

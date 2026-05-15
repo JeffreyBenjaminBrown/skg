@@ -18,7 +18,7 @@ The main implementation belongs in the save pipeline, not in the
 renderer. Rendering already knows how to hide subscribee content:
 'content_goal_list' filters a subscribee's direct content by the
 grandparent subscriber's 'hides_from_its_subscriptions', and the
-hidden-column goal-list functions already derive HiddenIn and
+hidden-collection goal-list functions already derive HiddenIn and
 HiddenOutside from that field.
 
 * Current code shape
@@ -221,7 +221,7 @@ After the inferred hide is persisted on S:
 - 'content_goal_list' filters E's content under S.
 - 'goal_list_for_hiddeninsubscribee_col' and
   'goal_list_for_hiddenoutsideof_subscribeecol' populate the hidden
-  columns.
+  collections.
 
 So the planned save change should not need a new rendering algorithm.
 
