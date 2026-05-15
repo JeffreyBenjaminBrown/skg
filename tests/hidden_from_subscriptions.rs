@@ -14,6 +14,8 @@ use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::test_utils::{
   TestDbGuard,
   cleanup_test_tantivy_and_typedb_dbs,
+  extract_string_field_from_sexp,
+  read_all_lp_messages,
   update_from_and_rerender_buffer_test as update_from_and_rerender_buffer };
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID, TantivyIndex};
@@ -24,11 +26,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use skg::serve::ViewsState;
-use skg::types::views_state::OpenViews;
+use skg::types::views_state::{OpenViews, ViewUri};
 use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 
 use futures::executor::block_on;
 use std::error::Error;
+use std::io::BufReader;
 use std::net::TcpStream;
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
 
@@ -41,6 +44,18 @@ fn mk_test_tcp_stream ()
   let write_end : TcpStream =
     TcpStream::connect (addr) . unwrap ();
   write_end }
+
+fn mk_test_tcp_stream_pair ()
+  -> (TcpStream, TcpStream)
+{ let listener : std::net::TcpListener =
+    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
+  let addr : std::net::SocketAddr =
+    listener . local_addr () . unwrap ();
+  let write_end : TcpStream =
+    TcpStream::connect (addr) . unwrap ();
+  let (read_end, _) =
+    listener . accept () . unwrap ();
+  (write_end, read_end) }
 
 async fn setup_test(
   db_name: &str,
@@ -154,6 +169,37 @@ async fn save_buffer_for_hidden_subscriptions_test (
   ) . await ?;
   Ok (response . saved_view) }
 
+async fn save_buffer_and_read_collateral_views (
+  buffer      : &str,
+  uri         : &ViewUri,
+  driver      : &Arc<TypeDBDriver>,
+  config      : &SkgConfig,
+  tantivy     : &mut TantivyIndex,
+  graph       : &InRustGraphHandle,
+  views_state : &mut ViewsState,
+) -> Result<(String, Vec<String>), Box<dyn Error>> {
+  let (mut stream, read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
+  let response =
+    update_from_and_rerender_buffer (
+      &mut stream,
+      buffer, driver, config, tantivy, graph, false,
+      &Ok (uri . clone ()), views_state
+    ) . await ?;
+  drop (stream);
+  let mut reader : BufReader<TcpStream> =
+    BufReader::new (read_end);
+  let collateral_views : Vec<String> =
+    read_all_lp_messages (&mut reader)
+    . into_iter()
+    . map ( |msg|
+      extract_string_field_from_sexp (&msg, "content")
+      . unwrap_or_else (||
+        panic! ("content field not found in collateral-view sexp: {}",
+                msg)) )
+    . collect();
+  Ok ((response . saved_view, collateral_views)) }
+
 fn remove_e1_subtree (
   buffer : &str,
 ) -> String {
@@ -223,6 +269,25 @@ fn move_h_from_hiddenin_col_to_visible_subscribee_content (
         Some (line . to_string()) }})
     . collect::<Vec<_>>()
     . join ("\n") + "\n" }
+
+fn remove_hiddenin_branch (
+  buffer : &str,
+) -> String {
+  buffer
+    . lines()
+    . filter ( |line|
+      ! line . contains ("(skg hiddenInSubscribeeCol)")
+      && ! line . contains ("(id H)") )
+    . collect::<Vec<_>>()
+    . join ("\n") + "\n" }
+
+fn add_e11_to_hiddenoutside_col (
+  buffer : &str,
+) -> String {
+  insert_after_line_containing (
+    buffer,
+    "(skg hiddenOutsideOfSubscribeeCol)",
+    "**** (skg (node (id E11) (source main) indef)) E11" ) }
 
 fn assert_e1_removed_from_visible_subscribee_branch (
   buffer : &str,
@@ -380,6 +445,84 @@ fn test_deleting_foreign_subscribee_content_infers_hide(
       ) . await?;
 
     assert_hides_e1_in_subscribee_col (&rerendered);
+    let r_skg : NodeComplete =
+      node_from_disk (&config, "r")?;
+    assert_eq!(
+      r_skg . hides_from_its_subscriptions . or_default(),
+      &[ID::from ("e1")],
+      "Expected inferred hide to be persisted in r.skg: {:?}",
+      r_skg . hides_from_its_subscriptions );
+    cleanup_test (
+      db_name, &driver, &config . tantivy_folder ) . await?;
+    guard . disarm ();
+    if temp_fixture_dir . exists() {
+      fs::remove_dir_all (temp_fixture_dir)?; }
+    Ok (( )) }) }
+
+#[test]
+fn test_collateral_view_reflects_newly_hidden_subscribee_content(
+) -> Result<(), Box<dyn Error>> {
+  block_on(async {
+    let db_name = "skg-test-collateral-subscribee-hide";
+    let mut guard : TestDbGuard =
+      TestDbGuard::new (db_name, None);
+    let (config, driver, mut tantivy, temp_fixture_dir) =
+      setup_temp_test (
+        db_name,
+        "tests/hidden_from_subscriptions/fixtures-subscribee-edit"
+      ) . await?;
+    let graph : InRustGraphHandle =
+      new_handle (InRustGraph::new ());
+    let mut views_state : ViewsState = ViewsState {
+      diff_mode_enabled : false,
+      open_views        : OpenViews::new (),};
+    let saved_uri : ViewUri =
+      ViewUri::ContentView (
+        "collateral-hide-saved" . to_string());
+    let collateral_uri : ViewUri =
+      ViewUri::ContentView (
+        "collateral-hide-other" . to_string());
+
+    let (initial_view, pids, viewforest) =
+      single_root_view(
+        &driver, &config, None,
+        &ID ("r" . to_string()),
+        false ) . await?;
+    views_state . open_views . register_view (
+      saved_uri . clone(), viewforest, &pids);
+
+    let (expanded, collateral_views) =
+      save_buffer_and_read_collateral_views (
+        &add_definitive_view_request_to_subscribees (&initial_view),
+        &saved_uri, &driver, &config, &mut tantivy, &graph,
+        &mut views_state ) . await?;
+    assert!(
+      collateral_views . is_empty(),
+      "No collateral view should be registered yet: {:?}",
+      collateral_views);
+
+    let expanded_viewforest =
+      views_state . open_views . viewuri_to_view (&saved_uri)
+      . expect ("saved view should be registered")
+      . clone();
+    let expanded_pids : Vec<ID> =
+      views_state . open_views . viewuri_to_pids (&saved_uri);
+    views_state . open_views . register_view (
+      collateral_uri, expanded_viewforest, &expanded_pids);
+
+    let edited : String =
+      expanded_subscribee_edit_view (&expanded, "delete");
+    let (_saved_view, collateral_views) =
+      save_buffer_and_read_collateral_views (
+        &edited, &saved_uri, &driver, &config, &mut tantivy, &graph,
+        &mut views_state ) . await?;
+
+    assert_eq!(
+      collateral_views . len(), 1,
+      "Expected one collateral view:\n{:?}",
+      collateral_views);
+    assert_hides_e1_in_subscribee_col (&collateral_views[0]);
+
     cleanup_test (
       db_name, &driver, &config . tantivy_folder ) . await?;
     guard . disarm ();
@@ -812,6 +955,150 @@ fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide(
         line . starts_with ("**** (skg (node (id H)") ),
       "Expected H to be visible direct subscribee content:\n{}",
       rerendered );
+    let r_skg : NodeComplete =
+      node_from_disk (&config, "R")?;
+    assert!(
+      ! r_skg . hides_from_its_subscriptions
+        . or_default()
+        . contains (&ID::from ("H")),
+      "Expected inferred unhide to be persisted in R.skg: {:?}",
+      r_skg . hides_from_its_subscriptions );
+
+    cleanup_test (
+      db_name, &driver, &config . tantivy_folder ) . await?;
+    guard . disarm ();
+    if temp_fixture_dir . exists() {
+      fs::remove_dir_all (temp_fixture_dir)?; }
+    Ok (( )) }) }
+
+#[test]
+fn test_collateral_view_reflects_newly_unhidden_subscribee_content(
+) -> Result<(), Box<dyn Error>> {
+  block_on(async {
+    let db_name =
+      "skg-test-collateral-subscribee-unhide";
+    let mut guard : TestDbGuard =
+      TestDbGuard::new (db_name, None);
+    let (config, driver, mut tantivy, temp_fixture_dir) =
+      setup_temp_test (
+        db_name,
+        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without"
+      ) . await?;
+    let graph : InRustGraphHandle =
+      new_handle (InRustGraph::new ());
+    let mut views_state : ViewsState = ViewsState {
+      diff_mode_enabled : false,
+      open_views        : OpenViews::new (),};
+    let saved_uri : ViewUri =
+      ViewUri::ContentView (
+        "collateral-unhide-saved" . to_string());
+    let collateral_uri : ViewUri =
+      ViewUri::ContentView (
+        "collateral-unhide-other" . to_string());
+
+    let (initial_view, pids, viewforest) =
+      single_root_view(
+        &driver, &config, None,
+        &ID ("R" . to_string()),
+        false ) . await?;
+    views_state . open_views . register_view (
+      saved_uri . clone(), viewforest, &pids);
+
+    let (expanded, collateral_views) =
+      save_buffer_and_read_collateral_views (
+        &add_definitive_view_request_to_subscribees (&initial_view),
+        &saved_uri, &driver, &config, &mut tantivy, &graph,
+        &mut views_state ) . await?;
+    assert!(
+      collateral_views . is_empty(),
+      "No collateral view should be registered yet: {:?}",
+      collateral_views);
+
+    let expanded_viewforest =
+      views_state . open_views . viewuri_to_view (&saved_uri)
+      . expect ("saved view should be registered")
+      . clone();
+    let expanded_pids : Vec<ID> =
+      views_state . open_views . viewuri_to_pids (&saved_uri);
+    views_state . open_views . register_view (
+      collateral_uri, expanded_viewforest, &expanded_pids);
+
+    let edited : String =
+      move_h_from_hiddenin_col_to_visible_subscribee_content (
+        &expanded );
+    let (_saved_view, collateral_views) =
+      save_buffer_and_read_collateral_views (
+        &edited, &saved_uri, &driver, &config, &mut tantivy, &graph,
+        &mut views_state ) . await?;
+
+    assert_eq!(
+      collateral_views . len(), 1,
+      "Expected one collateral view:\n{:?}",
+      collateral_views);
+    assert!(
+      ! collateral_views[0] . contains ("hiddenInSubscribeeCol"),
+      "Expected collateral view to remove HiddenInSubscribeeCol:\n{}",
+      collateral_views[0]);
+    assert! (
+      collateral_views[0] . lines() . any ( |line|
+        line . starts_with ("**** (skg (node (id H)") ),
+      "Expected H to be visible direct subscribee content in collateral view:\n{}",
+      collateral_views[0] );
+
+    cleanup_test (
+      db_name, &driver, &config . tantivy_folder ) . await?;
+    guard . disarm ();
+    if temp_fixture_dir . exists() {
+      fs::remove_dir_all (temp_fixture_dir)?; }
+    Ok (( )) }) }
+
+#[test]
+fn test_deleting_from_hiddenin_col_does_not_unhide(
+) -> Result<(), Box<dyn Error>> {
+  block_on(async {
+    let db_name =
+      "skg-test-hiddenin-col-delete-is-read-only";
+    let mut guard : TestDbGuard =
+      TestDbGuard::new (db_name, None);
+    let (config, driver, mut tantivy, temp_fixture_dir) =
+      setup_temp_test (
+        db_name,
+        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without"
+      ) . await?;
+    let graph : InRustGraphHandle =
+      new_handle (InRustGraph::new ());
+    let mut views_state : ViewsState = ViewsState {
+      diff_mode_enabled : false,
+      open_views        : OpenViews::new (),};
+
+    let (initial_view, _pids, _)
+      : (String, Vec<ID>, _)
+      = single_root_view(
+          &driver, &config, None,
+          &ID ("R" . to_string()),
+          false ) . await?;
+    let expanded : String =
+      save_buffer_for_hidden_subscriptions_test (
+        &add_definitive_view_request_to_subscribees (&initial_view),
+        &driver, &config, &mut tantivy, &graph, &mut views_state
+      ) . await?;
+    let edited : String =
+      remove_hiddenin_branch (&expanded);
+    let rerendered : String =
+      save_buffer_for_hidden_subscriptions_test (
+        &edited, &driver, &config, &mut tantivy, &graph, &mut views_state
+      ) . await?;
+
+    assert! (
+      rerendered . contains (
+        "**** (skg hiddenInSubscribeeCol) hidden from this subscription\n***** (skg (node (id H)"),
+      "Expected H to be regenerated under HiddenInSubscribeeCol:\n{}",
+      rerendered );
+    assert! (
+      ! rerendered . lines() . any ( |line|
+        line . starts_with ("**** (skg (node (id H)") ),
+      "Expected deleting from HiddenInSubscribeeCol not to unhide H:\n{}",
+      rerendered );
 
     cleanup_test (
       db_name, &driver, &config . tantivy_folder ) . await?;
@@ -899,6 +1186,55 @@ fn test_hidden_without_but_none_within(
     ) . await?;
     guard . disarm ();
     Ok (( )) } ) }
+
+#[test]
+fn test_adding_to_hiddenoutside_col_does_not_hide(
+) -> Result<(), Box<dyn Error>> {
+  block_on(async {
+    let db_name =
+      "skg-test-hiddenoutside-col-add-is-read-only";
+    let mut guard : TestDbGuard =
+      TestDbGuard::new (db_name, None);
+    let (config, driver, mut tantivy, temp_fixture_dir) =
+      setup_temp_test (
+        db_name,
+        "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within"
+      ) . await?;
+    let graph : InRustGraphHandle =
+      new_handle (InRustGraph::new ());
+    let mut views_state : ViewsState = ViewsState {
+      diff_mode_enabled : false,
+      open_views        : OpenViews::new (),};
+
+    let (initial_view, _pids, _)
+      : (String, Vec<ID>, _)
+      = single_root_view(
+          &driver, &config, None,
+          &ID ("R" . to_string()),
+          false ) . await?;
+    let edited : String =
+      add_e11_to_hiddenoutside_col (&initial_view);
+    let rerendered : String =
+      save_buffer_for_hidden_subscriptions_test (
+        &edited, &driver, &config, &mut tantivy, &graph, &mut views_state
+      ) . await?;
+
+    assert! (
+      rerendered . contains (
+        "*** (skg hiddenOutsideOfSubscribeeCol) hidden from all subscriptions\n**** (skg (node (id H)"),
+      "Expected original hidden-outside row H to remain:\n{}",
+      rerendered );
+    assert! (
+      ! rerendered . contains ("**** (skg (node (id E11)"),
+      "Expected adding to HiddenOutsideOfSubscribeeCol not to hide E11:\n{}",
+      rerendered );
+
+    cleanup_test (
+      db_name, &driver, &config . tantivy_folder ) . await?;
+    guard . disarm ();
+    if temp_fixture_dir . exists() {
+      fs::remove_dir_all (temp_fixture_dir)?; }
+    Ok (( )) }) }
 
 /// Overlapping hidden within:
 /// - R subscribes to E1, E2

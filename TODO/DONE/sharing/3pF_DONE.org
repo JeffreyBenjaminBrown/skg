@@ -1,0 +1,139 @@
+* Plan: pin HiddenIn/HiddenOutside editability policy
+
+This plan executes item f in
+[[./3_what-remains.org][3_what-remains.org]].
+
+The goal is to make the status of =HiddenInSubscribeeCol= and
+=HiddenOutsideOfSubscribeeCol= explicit. They are generated display
+collections, not editable hide-relation command surfaces.
+
+* Current issue
+
+The save path already mostly treats these scaffolds as display-only:
+
+- role classification gives them distinct roles;
+- graph edit extraction does not recurse through display-only
+  scaffolds;
+- hide/unhide inference reads the immediate visible graph-content
+  children of a subscribee-as-such branch, not the children of
+  =HiddenInSubscribeeCol= or =HiddenOutsideOfSubscribeeCol=.
+
+Older planning docs also state the intended policy:
+
+- =TODO/sharing/vision.org= says =HiddenInSubscribeeCol= remains
+  read-only;
+- =TODO/sharing/2_DONE_hide-subscribee-content-deletions.org= says
+  the only edit surface for this feature is the direct content
+  children of a definitive node shown as a subscribee;
+- =TODO/sharing/status-before-plan.org= records that edits to these
+  hidden collections were silently discarded and that the UI did not
+  communicate their read-only status.
+
+The remaining risk is that this behavior is implicit. A future change
+could accidentally treat these generated collections as editable, or
+a user-facing doc could imply that deleting from =HiddenIn= means
+unhide.
+
+* Policy
+
+Keep =HiddenInSubscribeeCol= and =HiddenOutsideOfSubscribeeCol=
+read-only/generated.
+
+Do not infer hides or unhides from edits inside those collections:
+
+- deleting a row from =HiddenInSubscribeeCol= does not unhide;
+- adding a row to =HiddenOutsideOfSubscribeeCol= does not hide from
+  all subscriptions;
+- moving a hidden row into the visible graph-content children of the
+  subscribee-as-such branch remains the supported unhide operation.
+
+This increment should not build a new editable hide collection UI.
+
+* Work
+
+** 1. Add focused regressions
+
+Add save-path regressions that prove the read-only boundary:
+
+- Removing a generated row from =HiddenInSubscribeeCol= does not
+  remove the subscriber's hide.
+- Adding a row under =HiddenOutsideOfSubscribeeCol= does not add a
+  hide to the subscriber.
+
+Prefer existing hidden-subscription fixtures and helpers. Keep the
+assertions on returned save instructions or rerendered output,
+whichever is already least noisy for this behavior.
+
+If there is already equivalent coverage, point item f at it instead
+of duplicating tests.
+
+** 2. Improve user-facing documentation
+
+Update =docs/sharing-model.md= near the subscribed-content editing
+section to say that the "hidden from this subscription" and "hidden
+from all subscriptions" collections are generated read-only displays.
+
+The docs should name the supported actions:
+
+- remove visible subscribed graph-content to hide it;
+- restore it directly under the subscribed node in the subscription
+  view to unhide it;
+- do not edit the hidden collections themselves.
+
+** 3. Improve code comments only if needed
+
+If the existing extraction comment is sufficient, leave code alone.
+
+If not, add a short comment at the save extraction boundary explaining
+that =HiddenInSubscribeeCol= and =HiddenOutsideOfSubscribeeCol= are
+ignored as command surfaces because visibility edits are read from
+subscribee-as-such visible children.
+
+Do not add broad comments for their own sake.
+
+** 4. Update the roadmap
+
+When tests/docs are complete, mark item f complete in
+=3_what-remains.org= with a short status note.
+
+Rename this file to =3pF_DONE.org= after execution.
+
+* Tests
+
+Run the focused test first, likely one of:
+
+#+begin_src text
+cargo test --test new hidden
+cargo test --test hidden_from_subscriptions hidden
+#+end_src
+
+Then run:
+
+#+begin_src text
+cargo check
+#+end_src
+
+* Acceptance criteria
+
+- The read-only/generated policy for =HiddenInSubscribeeCol= and
+  =HiddenOutsideOfSubscribeeCol= is documented for users.
+- Regressions prove edits inside those scaffolds do not create
+  hide/unhide commands.
+- Existing subscribee-as-such hide/unhide behavior remains the only
+  edit surface for subscriber visibility.
+- Item f in =3_what-remains.org= points to the executed plan, and the
+  plan is renamed =3pF_DONE.org= after execution.
+
+* Outcome
+
+Complete. =HiddenInSubscribeeCol= and
+=HiddenOutsideOfSubscribeeCol= remain generated read-only displays.
+
+Added regressions in =tests/hidden_from_subscriptions.rs= proving
+that deleting a generated row from =HiddenInSubscribeeCol= does not
+unhide, and adding a row to =HiddenOutsideOfSubscribeeCol= does not
+hide.
+
+Updated =docs/sharing-model.md= to tell users to hide/unhide by
+editing the subscribee-as-such visible graph-content children, not the
+generated hidden collections.

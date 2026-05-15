@@ -133,7 +133,7 @@ Status: complete. Owned title/body edits in subscribee-as-such
 position are rejected with a focused validation error. The existing
 foreign-node validation behavior is preserved.
 
-** e. Document direct-only visibility semantics for users
+** DONE e. Document direct-only visibility semantics for users
 
 The implemented visibility intent reads only direct children under a
 definitive =AsSubscribee= node:
@@ -146,7 +146,14 @@ definitive =AsSubscribee= node:
 This should be written in user-facing terms before the feature is
 presented as complete.
 
-** f. Decide whether HiddenIn/HiddenOutside collections are editable
+Status: complete. =docs/sharing-model.md= now documents that immediate
+view-children of subscribed content control subscriber visibility,
+that deeper descendants keep their own edit semantics, that extra
+children become independent rather than graph-content of the
+subscribed node, and that title/body edits belong to the node's own
+view.
+
+** DONE f. Decide whether HiddenIn/HiddenOutside collections are editable
 
 The current hide/unhide edit surface is direct =AsSubscribee= visible
 content. =HiddenInSubscribeeCol= and
@@ -163,7 +170,14 @@ Open product questions:
 
 This is product behavior, not save-path cleanup.
 
-** g. Add persistence assertions for hide/unhide
+Execution plan: [[./3pF_DONE.org][3pF_DONE.org]].
+
+Status: complete. These collections are documented as generated
+read-only displays. Regressions prove deleting from
+=HiddenInSubscribeeCol= does not unhide, and adding to
+=HiddenOutsideOfSubscribeeCol= does not hide.
+
+** DONE g. Add persistence assertions for hide/unhide
 
 Save-instruction tests already assert
 =hides_from_its_subscriptions= before writing. It may still be useful
@@ -173,7 +187,20 @@ after a hide and after an unhide.
 This would distinguish "the returned/rerendered buffer looked right"
 from "the filesystem write persisted the relationship."
 
-** h. Add collateral-view behavior coverage
+*** DONE Jeff adds
+Rather than a new integration test,
+let's just extend one of the existing tests to do this too.
+That might mean making a unit test into an integration test,
+but maybe it could even remain a unit test.
+Or maybe the only nearby test to cannibalize is already an integration test;
+whatever.
+
+Status: complete. The existing hidden-subscription hide and unhide
+tests now inspect the temp fixture files after save. The hide test
+asserts the inferred hide is persisted in =r.skg=; the unhide test
+asserts the removed hide is absent from =R.skg=.
+
+** DONE h. Add collateral-view behavior coverage
 
 The saved-view preservation rule is intentionally saved-view-only.
 Collateral views should refresh from graph state after save.
@@ -181,7 +208,13 @@ Collateral views should refresh from graph state after save.
 Suggested next step: open/save one view and verify a collateral
 subscriber view reflects newly hidden or unhidden content.
 
-** i. Add UI support for starting a subscription
+Status: complete. Hidden-subscription tests now register a saved view
+and a collateral view, save hide and unhide edits through the saved
+view, and assert the streamed collateral view reflects the updated
+subscriber visibility.
+
+** DEFERRING
+*** i. Add UI support for starting a subscription
 
 If a node has no subscriptions, no =SubscribeeCol= is automatically
 present. The user can type the scaffold by hand, but this is tedious
@@ -190,7 +223,7 @@ and error-prone.
 A command should insert a =SubscribeeCol= and probably help choose or
 insert the first subscribee.
 
-** j. Build an overrides edit/view surface
+*** j. Build an overrides edit/view surface
 
 =overrides_view_of= is still in the data model but has no real
 view/edit surface. The herald flag is not enough to explain which
@@ -199,14 +232,14 @@ side of the relation a node is on or to edit it.
 This is outside direct subscribee hide/unhide, but it remains a
 sharing-model gap.
 
-** k. Generalize relationship collections
+*** k. Generalize relationship collections
 
 =vision.org= still points toward collections for all relation directions.
 The current work improves one relation surface: subscriber visibility
 over direct subscribee content. It does not generalize relation
 display or editing.
 
-** l. Settle user-facing language
+*** l. Settle user-facing language
 
 The code and planning docs use several implementation terms:
 
@@ -221,7 +254,7 @@ User-facing commands and docs should probably say something closer to
 "hide this subscribed item from this view" and "show this subscribed
 item again", rather than "edit direct =AsSubscribee= child lists."
 
-*** Jeff prefers
+**** Jeff prefers
 "subscribee-as-such"
 [this list is not complete]
 

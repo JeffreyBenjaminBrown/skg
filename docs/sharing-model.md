@@ -9,3 +9,21 @@ All of the original content is considered "integrated" into the clone. Branches 
 If, later, the other author adds content to their note, it will be visible from the clone, thanks to its subscription to the original, as "unintegrated subscribed content". You can if you wish proceed to incorporate that content into yours, too.
 
 Because nodes in Skg are represented as flat files, this way of forking foreign data duplicates very little of it. For instance, if the original had two branches when the clone was made, the clone would only need to `contain` two IDs. None of the descendents of those IDs need to be mentioned, unless and until one of them is also modified.
+
+## Editing subscribed content in a view
+
+The view-children of a subscribee-as-such can be edited (in limited ways) to control what the subscriber hides from the subscribee.
+
+Let's call the subscriber R and the subscribee E.
+
+If N is graph-content of E, and you delete N as a view-child of E, you have indicated to Skg that you would like to hide N from R's view of E. Skg obliges by creating a hides relationship from R to N. This does *not* change what E graph-contains; it just changes how R views E. (Remember, it's likely that E is not even something you own.)
+
+If you later put that same child back directly under the subscribed node in the subscription view and save, the hide is removed.
+
+This rule only applies to the subscribee's children. Edits to deeper descendants have the usual effect, subject to ownership.
+
+If E does not contain N, and you make N a view-child of E, N will persist in your view but have no effect on E or R.
+
+Title and body edits to E should be made from some view that does not present E as a subscriber. (C-c g RET from E will open such a view.) Skg rejects title/body edits to subscribees-as-such, regardless of who owns the subscribee.
+
+The generated "hidden from this subscription" and "hidden from all subscriptions" collections are read-only displays. They show what R currently hides, but editing those collections is not how you hide or unhide subscribed content. To hide something, remove it from E's immediate visible graph-content in the subscription view. To unhide it, put it back there.
