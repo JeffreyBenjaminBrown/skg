@@ -1,0 +1,197 @@
+* Motivation, and a little history
+
+The save-buffer path is too complex.
+Some of that is because I (Jeff) initially tried to minimize tree traversals,
+and bundled many operations that are more easily understood separately.
+Some of that has recently (since branching from main) been improved.
+This plan after this paragraph was written by Codex, <2026-05-14 Thu>,
+to describe other opportunities for simplification.
+
+* Simplify the save-buffer path after direct subscribee visibility
+
+The recent role-tree work fixed the direct =AsSubscribee= hazard: role
+context now travels with each view-tree occurrence, and a subscribee
+shown in subscribee position no longer globally suppresses ordinary
+=contains= edits for the same graph ID elsewhere.
+
+That leaves the save path much better, but still transitional. The
+remaining opportunities are mostly about making each phase say what it
+means directly, instead of briefly encoding one interpretation and then
+correcting it later.
+
+Desired shape:
+
+#+begin_src text
+checked view tree
+  -> role-annotated tree
+  -> graph edit intents + subscriber visibility intents
+  -> reconciled owned-node intents
+  -> DefineNode instructions
+  -> disk supplementation / source moves
+  -> unchanged filtering
+#+end_src
+
+* Ranked opportunities
+
+** 1. Split 'viewforest_to_nonmerge_save_instructions' into named phases
+
+This is the highest-priority cleanup. The function currently performs
+role annotation, visibility extraction, graph-intent extraction,
+same-ID reconciliation, conversion to =DefineNode=, disk
+supplementation, source-move detection, direct-subscribee =contains=
+restoration, visibility folding, and unchanged filtering.
+
+The behavior is now covered by tests, so the next pass should be a
+behavior-preserving extraction into named helpers. The top-level
+function should read like a save pipeline, with policy details pushed
+behind names that describe the phase.
+
+This is not primarily about shortening a function. It is about making
+the order of save policies explicit enough that the next sharing
+change does not have to rediscover the whole pipeline.
+
+** 2. Move subscribee visibility folding before final =DefineNode= construction
+
+This is tied with the first item for importance.
+
+The current representation still does this:
+
+#+begin_src text
+direct AsSubscribee child list
+  -> apparent subscribee.contains edit
+  -> restore subscribee.contains from disk
+  -> separately infer subscriber hide/unhide intent
+#+end_src
+
+The cleaner target is:
+
+#+begin_src text
+direct AsSubscribee child list
+  -> subscriber visibility intent
+  -> fold into the subscriber's node intent
+  -> never becomes a graph contains edit for the subscribee
+#+end_src
+
+That would remove the need for the direct-subscribee =contains=
+guardrail during disk supplementation. It would also make visibility
+edits less sensitive to the fact that they currently run after graph
+=SaveNode= construction.
+
+** 3. Replace =children_affect_only_hiding= with an explicit intent shape
+
+The boolean is a useful bridge, but it makes =NodeSaveIntent= carry a
+role-position policy as if it were a graph-save property.
+
+Prefer a representation that cannot accidentally treat direct
+subscribee children as graph =contains=:
+
+- separate variants such as =NodeEditIntent::GraphSave= and
+  =NodeEditIntent::SubscribeeVisibilitySurface=; or
+- a small enum such as
+  =DirectChildrenMeaning::{GraphContains, SubscriberVisibility}=.
+
+If item 2 lands first, separate variants will probably be clearer than
+an enum field.
+
+** 4. Make subscriber visibility edits first-class through reconciliation
+
+=SubscribeeVisibilityIntent= already exists, but the save path still
+folds it late by mutating completed =DefineNode= values. That helper
+has to load disk nodes, inspect current instructions, synthesize a
+subscriber save instruction if missing, and directly update
+=hides_from_its_subscriptions=.
+
+Instead, visibility edits should stay as first-class save
+intermediates until they are folded into owned subscriber node intents.
+Only after that should the code construct final =DefineNode= values.
+
+This would also give same-ID reconciliation a clearer input: graph
+edits and visibility-surface edits would be distinct things, not
+ordinary-looking saves with a policy boolean attached.
+
+** 5. Keep disk supplementation policy-neutral
+
+Disk supplementation should restore unspecified fields and detect
+source moves. It should not need to know that a node appeared as a
+direct subscribee or that its =contains= must be restored from disk.
+
+Once visibility folding happens before =DefineNode= construction, the
+supplementation phase can become boring again:
+
+- canonicalize IDs from disk;
+- detect source moves;
+- supplement unspecified fields;
+- pass the result onward.
+
+That is an important simplification because supplementation is already
+cross-cutting enough without also carrying view-position policy.
+
+** 6. Tighten same-ID reconciliation around intent variants
+
+The current same-ID reconciliation now happens at the
+=NodeEditIntent= layer, which is the right direction. After the intent
+shape is split, the rules can be stated more directly:
+
+- ordinary graph save wins over a direct-subscribee visibility surface
+  for the same graph ID;
+- duplicate ordinary graph saves conflict;
+- save/delete conflicts reject;
+- duplicate visibility surfaces conflict only when they express
+  incompatible visibility for the same subscriber/content pair.
+
+This should preserve the existing regression where the same ID appears
+both in a direct subscribee position and as an ordinary definitive
+node, and the ordinary node's =contains= edit survives.
+
+** 7. Revisit validation once save roles are stable
+
+Keep pre-save validation unchanged for now. That boundary was useful
+for making the direct-subscribee fix narrow.
+
+Later, consider whether validation should consume the role-annotated
+tree too. That would let foreign-node validation, display-only
+traversal, and direct-subscribee visibility policy all use the same
+positional facts. This is lower priority because moving validation too
+early risks mixing this cleanup with a larger behavior change.
+
+** 8. Document the remaining rerender/completion boundary
+
+The save extraction path is now clearer than the rerender path that
+feeds it. The remaining completion contract should be written down
+before broadening edit behavior inside subscribee branches:
+
+- saved direct =AsSubscribee= branches must preserve user-authored
+  child-list signal long enough for save extraction;
+- generated display scaffolds must not become graph edits;
+- diff-mode phantom or removed children must not accidentally infer
+  hide/unhide intent.
+
+This is not a blocker for the save-path cleanup above, but it is the
+next place where inappropriate bundling can reappear.
+
+* Test expectations
+
+Each simplification should keep the current direct-subscribee behavior
+covered:
+
+- child removal under a direct subscribee infers subscriber hide;
+- child restoration under a direct subscribee infers subscriber unhide;
+- child-list edits in subscribee position do not become foreign
+  subscribee =contains= edits;
+- foreign title/body edits still report =ModifiedForeignNode=;
+- overlapping subscribee visibility conflicts reject save;
+- an ordinary definitive occurrence of the same graph ID still saves
+  its own =contains= edit.
+
+Add one focused regression with each structural change rather than
+waiting for a large end-to-end rewrite.
+
+* Assumptions
+
+- No TCP API, Emacs protocol, TypeDB schema, or =.skg= format change.
+- Start with save extraction only; broader rerender and validation
+  role annotation can follow once this pipeline is simpler.
+- Prefer extra clear tree traversals over tightly coupled one-pass
+  extraction.
+- Preserve current user-visible save behavior while changing internal
+  representation.
