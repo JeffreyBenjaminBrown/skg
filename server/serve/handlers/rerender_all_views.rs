@@ -1,21 +1,16 @@
-use crate::types::env::SkgEnv;
 use crate::git_ops::read_repo::open_repo;
 use crate::serve::ViewsState;
-use crate::serve::handlers::save_buffer::{ compute_diff_for_every_source, deleted_ids_to_source};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_errors_sexp, format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response, tag_text_response};
-use crate::types::git::SourceDiff;
-use crate::types::views_state::ViewUri;
-use crate::types::misc::{ID, SourceName, SkgConfig};
+use crate::types::env::SkgEnv;
+use crate::types::misc::SkgConfig;
 use crate::types::viewnode::ViewNode;
-use crate::update_buffer::rerender_view;
+use crate::types::views_state::ViewUri;
+use crate::update_buffer::{rerender_view, RerenderAfterSaveContext};
 
 use ego_tree::Tree;
 use futures::executor::block_on;
-use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
-use std::sync::Arc;
-use crate::dbs::in_rust_graph::InRustGraph;
 
 pub fn handle_rerender_all_views_request (
   stream     : &mut TcpStream,
@@ -43,29 +38,17 @@ pub fn stream_rerender_views (
       TcpToClient::RerenderLock,
       & format_lock_views_sexp (&uris) ));
 
-  // 2. Compute diffs once, then stream each view.
-  let source_diffs
-    : Option<HashMap<SourceName, SourceDiff>>
-    = if views_state . diff_mode_enabled
-      { Some ( compute_diff_for_every_source (&env . config)) }
-      else { None };
-  let deleted_since_head_pid_src_map
-    : HashMap<ID, SourceName>
-    = source_diffs . as_ref ()
-      . map ( |d| deleted_ids_to_source (d))
-      . unwrap_or_default ();
-  let deleted_by_this_save_pids : HashSet<ID> =
-    HashSet::new ();
-  let graph_snap : Arc<InRustGraph> =
-    env . in_rust_graph . load_full ();
-  let mut errors : Vec<String> = Vec::new ();
+  // 2. Compute rerender context once, then stream each view.
+  let mut context : RerenderAfterSaveContext =
+    RerenderAfterSaveContext::without_save (
+      env, views_state . diff_mode_enabled );
 
   for uri in uris {
     let mut viewforest : Tree<ViewNode> = match
       views_state . open_views . viewuri_to_view (&uri) {
         Some (f) => f . clone (),
         None => {
-          errors . push ( format! (
+          context . errors . push ( format! (
             "View {}: no viewforest found",
             uri . repr_in_client () ));
           continue; } };
@@ -76,10 +59,7 @@ pub fn stream_rerender_views (
         ) . entered ();
       rerender_view (
         &mut viewforest,
-        &source_diffs, env,
-        &graph_snap,
-        &mut errors, &deleted_since_head_pid_src_map,
-        &deleted_by_this_save_pids,
+        &mut context,
         false ) . await } )
     { Ok (text) => {
         views_state . open_views . update_view (&uri, viewforest);
@@ -89,7 +69,7 @@ pub fn stream_rerender_views (
             TcpToClient::RerenderView,
             & format_single_view_sexp (&uri, &text) )); },
       Err (e) => {
-        errors . push ( format! (
+        context . errors . push ( format! (
           "View {}: {}",
           uri . repr_in_client (), e )); }} }
 
@@ -98,7 +78,7 @@ pub fn stream_rerender_views (
     stream,
     & tag_sexp_response (
       TcpToClient::RerenderDone,
-      & format_errors_sexp (&errors) )); }
+      & format_errors_sexp (&context . errors) )); }
 
 /// Handle "git diff mode toggle" request.
 /// Toggles diff mode, sends the GitDiffMode response with warnings,

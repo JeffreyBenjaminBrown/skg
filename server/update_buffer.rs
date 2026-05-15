@@ -34,6 +34,63 @@ use std::sync::Arc;
 use std::time::Instant;
 use typedb_driver::TypeDBDriver;
 
+pub struct RerenderAfterSaveContext<'a> {
+  pub env          : &'a SkgEnv,
+  pub source_diffs : Option<HashMap<SourceName, SourceDiff>>,
+  pub graph_snap   : Arc<InRustGraph>,
+  pub errors       : Vec<String>,
+  /// Files deleted since HEAD, keyed by pid, for diff-mode rendering.
+  pub deleted_since_head_pid_src_map : HashMap<ID, SourceName>,
+  /// Pids deleted by this save; not necessarily a subset of git deletes.
+  pub deleted_by_this_save_pids      : HashSet<ID>,
+}
+
+impl<'a> RerenderAfterSaveContext<'a> {
+  fn for_save (
+    env               : &'a SkgEnv,
+    diff_mode_enabled : bool,
+    save_instructions : &[DefineNode],
+  ) -> RerenderAfterSaveContext<'a> {
+    let source_diffs
+      : Option<HashMap<SourceName, SourceDiff>>
+      = if diff_mode_enabled
+        { Some ( compute_diff_for_every_source (&env . config)) }
+        else {None};
+    let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
+      source_diffs . as_ref()
+      . map ( |d| deleted_ids_to_source (d))
+      . unwrap_or_default();
+    let deleted_by_this_save_pids : HashSet<ID> =
+      // PITFALL: Can overlap deleted_since_head_pid_src_map, but neither is necessarily a subset of the other. If you delete something that you added since head, it will only be here. And if you deleted something since head but not in this save, it will only be there.
+      // Merge acquirees are deliberately NOT included: post-merge they are extra-ids of their acquirers, not genuine deletions. The preprocessing pass 'resolve_extra_ids_in_viewforest' below rewrites their viewnodes to point at the acquirer before rerender runs, so the (deleted ...) path never fires for them.
+      save_instructions . iter()
+      . filter_map( |instr| match instr {
+        DefineNode::Delete (d) => Some( d . id . clone() ),
+        _ => None })
+      . collect();
+    RerenderAfterSaveContext {
+      env,
+      source_diffs,
+      graph_snap : env . in_rust_graph . load_full (),
+      errors : Vec::new (),
+      deleted_since_head_pid_src_map,
+      deleted_by_this_save_pids,
+    }}
+
+  pub fn without_save (
+    env               : &'a SkgEnv,
+    diff_mode_enabled : bool,
+  ) -> RerenderAfterSaveContext<'a> {
+    RerenderAfterSaveContext::for_save (
+      env, diff_mode_enabled, &[] ) }
+}
+
+struct RenderedCollateralView {
+  uri        : ViewUri,
+  text       : String,
+  viewforest : Tree<ViewNode>,
+}
+
 /// PURPOSE:
 /// For each view affected by the save
 /// (starting, importantly, with the saved view itself,
@@ -61,27 +118,6 @@ pub async fn update_views_after_save (
   debug_assert! (
     in_rust_graph_coherent_with_save_instructions (&save_instructions) . is_ok (),
     "update_views_after_save: in-Rust graph not coherent with save_instructions" );
-  let source_diffs
-    : Option<HashMap<SourceName, SourceDiff>>
-    = if diff_mode_enabled
-      { Some ( compute_diff_for_every_source (&env . config)) }
-      else {None};
-  let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
-    source_diffs . as_ref()
-    . map ( |d| deleted_ids_to_source (d))
-    . unwrap_or_default();
-  let deleted_by_this_save_pids : HashSet<ID> =
-    // PITFALL: Can overlap deleted_since_head_pid_src_map, but neither is necessarily a subset of the other. If you delete something that you added since head, it will only be here. And if you deleted something since head but not in this save, it will only be there.
-    // Merge acquirees are deliberately NOT included: post-merge they
-    // are extra-ids of their acquirers, not genuine deletions. The
-    // preprocessing pass 'resolve_extra_ids_in_viewforest' below
-    // rewrites their viewnodes to point at the acquirer before
-    // rerender runs, so the (deleted ...) path never fires for them.
-    save_instructions . iter()
-    . filter_map( |instr| match instr {
-      DefineNode::Delete (d) => Some( d . id . clone() ),
-      _ => None })
-    . collect();
   // 'merge_instructions' is no longer consumed here: the graph
   // mutation already happened upstream, the acquiree/acquirer
   // mapping is in the in-Rust graph's extra_id_to_pid map, and
@@ -94,23 +130,18 @@ pub async fn update_views_after_save (
   // to acquirer pids before rerender) and by content_goal_list
   // resolution during reconcile (neighbors' on-disk contains still
   // point at the acquiree id).
-  let graph_snap : Arc<InRustGraph> =
-    env . in_rust_graph . load_full ();
-  let mut errors : Vec<String> = Vec::new ();
+  let mut context : RerenderAfterSaveContext =
+    RerenderAfterSaveContext::for_save (
+      env, diff_mode_enabled, &save_instructions );
   let mut saved_view_mut : Tree<ViewNode> = saved_view;
   resolve_extra_ids_in_viewforest (
-    &mut saved_view_mut, &graph_snap ) ?;
+    &mut saved_view_mut, &context . graph_snap ) ?;
   let saved_text : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "rerender_view (saved)" ). entered();
       rerender_view (
         &mut saved_view_mut,
-        &source_diffs,
-        env,
-        &graph_snap,
-        &mut errors,
-        &deleted_since_head_pid_src_map,
-        &deleted_by_this_save_pids,
+        &mut context,
         true ) . await } ?;
   if let Ok (uri) = viewuri_from_request_result {
     views_state . open_views . update_view (
@@ -127,46 +158,56 @@ pub async fn update_views_after_save (
         collateral_uris . iter ()
           . map ( |u| u . repr_in_client () )
           . collect::<Vec<_>> ()); }
-    for curi in collateral_uris { // Same rerender_view pipeline as the saved view, but with is_saved_view=false. Each rerender fetches from the in-Rust graph directly. Streamed to Emacs immediately.
-      let mut viewforest : Tree<ViewNode> = match
-        views_state . open_views . viewuri_to_view (&curi) {
-          Some (f) => f . clone (),
-          None => {
-            errors . push ( format! (
-              "Collateral view {}: no viewforest found",
-              curi . repr_in_client () ));
-            continue; } };
-      if let Err (e) = resolve_extra_ids_in_viewforest (
-        &mut viewforest, &graph_snap )
-      { errors . push ( format! (
-          "Collateral view {}: preprocessing failed: {}",
-          curi . repr_in_client (), e ));
-        continue; }
-      match { let _span : tracing::span::EnteredSpan =
-                tracing::info_span!( "rerender_view (collateral)"
-                ). entered();
-        rerender_view (
-          &mut viewforest,
-          &source_diffs, env,
-          &graph_snap,
-          &mut errors, &deleted_since_head_pid_src_map,
-          &deleted_by_this_save_pids,
-          false ) . await }
-      { Ok (text) => {
-          views_state . open_views . update_view (&curi, viewforest);
+    for curi in collateral_uris {
+      match rerender_collateral_view (
+        curi, views_state, &mut context ) . await
+      { Ok (rendered) => {
+          views_state . open_views . update_view (
+            &rendered . uri, rendered . viewforest);
           send_response_with_length_prefix (
             stream,
             & tag_sexp_response (
               TcpToClient::CollateralView,
-              & format_single_view_sexp (&curi, &text) )); },
-        Err (e) => {
-          errors . push ( format! (
-            "Collateral view {}: {}",
-            curi . repr_in_client (), e )); }} }}
+              & format_single_view_sexp (
+                &rendered . uri, &rendered . text) )); },
+        Err (e) => { context . errors . push (e); }} }}
   if let Some (w) = take_pending_audit_warning () {
-    errors . insert (0, w); }
+    context . errors . insert (0, w); }
   Ok ( SaveResponse { saved_view : saved_text,
-                       errors } ) }
+                       errors : context . errors } ) }
+
+async fn rerender_collateral_view (
+  uri         : ViewUri,
+  views_state : &ViewsState,
+  context     : &mut RerenderAfterSaveContext<'_>,
+) -> Result<RenderedCollateralView, String> {
+  let mut viewforest : Tree<ViewNode> = match
+    views_state . open_views . viewuri_to_view (&uri) {
+      Some (f) => f . clone (),
+      None => {
+        return Err ( format! (
+          "Collateral view {}: no viewforest found",
+          uri . repr_in_client () )); } };
+  if let Err (e) = resolve_extra_ids_in_viewforest (
+    &mut viewforest, &context . graph_snap )
+  { return Err ( format! (
+      "Collateral view {}: preprocessing failed: {}",
+      uri . repr_in_client (), e )); }
+  let text : String =
+    { let _span : tracing::span::EnteredSpan =
+        tracing::info_span!( "rerender_view (collateral)" ). entered();
+      rerender_view (
+        &mut viewforest,
+        context,
+        false
+      ) . await . map_err (
+        |e| format!( "Collateral view {}: {}",
+                      uri . repr_in_client (), e)) ? };
+  Ok (RenderedCollateralView {
+    uri,
+    text,
+    viewforest,
+  }) }
 
 /// Given the saved ViewUri and save instructions,
 /// return the URIs of other views whose viewforests
@@ -199,14 +240,9 @@ fn find_collateral_view_uris (
 /// Strip stale diff data, re-complete the viewforest,
 /// set graph/view stats, and render to string.
 pub async fn rerender_view (
-  viewforest                     : &mut Tree<ViewNode>,
-  source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
-  env                            : &SkgEnv,
-  graph_snap                     : &Arc<InRustGraph>,
-  errors                         : &mut Vec<String>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  deleted_by_this_save_pids      : &HashSet<ID>,
-  is_saved_view                  : bool,
+  viewforest    : &mut Tree<ViewNode>,
+  context       : &mut RerenderAfterSaveContext<'_>,
+  is_saved_view : bool,
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
   tracing::debug!("rerender_view: starting");
@@ -215,9 +251,9 @@ pub async fn rerender_view (
   tracing::debug!("rerender_view: starting complete_viewforest");
   complete_viewforest (
     viewforest, &mut defmap,
-    source_diffs, env, graph_snap,
-    errors, deleted_since_head_pid_src_map,
-    deleted_by_this_save_pids,
+    &context . source_diffs, context . env, &context . graph_snap,
+    &mut context . errors, &context . deleted_since_head_pid_src_map,
+    &context . deleted_by_this_save_pids,
     is_saved_view ) . await ?;
   mark_view_roots_independent (viewforest);
   if let Some (snap) = snapshot_global () {
@@ -228,21 +264,24 @@ pub async fn rerender_view (
     // that bypass startup).
     validate_birth_relationships (viewforest, &snap); }
   attach_containerward_ancestries_to_removedhere_phantoms (
-    viewforest, &env . config, &env . driver ) . await ?;
+    viewforest, &context . env . config,
+    &context . env . driver ) . await ?;
   tracing::debug!("rerender_view: complete_viewforest done ({:.3}s), starting graphnodestats",
             t_rerender . elapsed () . as_secs_f64 ());
   let ( container_to_contents, content_to_containers ) =
     set_graphnodestats_in_viewforest (
-      viewforest, &env . config, &env . driver ) . await ?;
+      viewforest,
+      &context . env . config,
+      &context . env . driver ) . await ?;
   tracing::debug!("rerender_view: graphnodestats done ({:.3}s), rendering to string",
             t_rerender . elapsed () . as_secs_f64 ());
   set_viewnodestats_in_viewforest (
     viewforest,
     &container_to_contents,
     &content_to_containers,
-    &env . config );
+    &context . env . config );
   let result : Result<String, Box<dyn Error>> =
-    viewforest_to_string (viewforest, &env . config);
+    viewforest_to_string (viewforest, &context . env . config);
   tracing::debug!("rerender_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
   result }
