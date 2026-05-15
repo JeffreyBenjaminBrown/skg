@@ -9,7 +9,6 @@ use std::collections::{HashMap, HashSet};
 
 /// An entry in a list representing
 /// the diff of a 'new' list against an 'old' list.
-#[allow (non_camel_case_types)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Diff_Item<T> {
   /// It exists in both old and new in same relative position.

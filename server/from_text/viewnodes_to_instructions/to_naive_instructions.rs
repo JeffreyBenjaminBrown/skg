@@ -9,7 +9,7 @@ use crate::types::tree::generic::{
   read_at_node_in_tree, unique_scaffold_child };
 use crate::types::list::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub(crate) enum NodeEditIntent {
   GraphSave      (NodeSaveIntent),
@@ -34,6 +34,15 @@ pub(crate) struct NodeSaveIntent {
 pub(crate) struct NodeDeleteIntent {
   pid    : ID,
   source : SourceName,
+}
+
+/// Node edit intents for the entire saved buffer,
+/// after reconcile_nodeEditIntents.
+/// PITFALL: There's a later step also called reconciliation:
+/// reconcile_same_id_instructions.
+pub(crate) struct ReconciledNodeEditIntents {
+  order  : Vec<ID>,
+  by_pid : HashMap<ID, NodeEditIntent>,
 }
 
 struct NodeEditMinimal {
@@ -164,6 +173,69 @@ impl NodeSaveIntent {
     self . hides_from_its_subscriptions =
       MSV::Specified (hides); }}
 
+impl ReconciledNodeEditIntents {
+  fn from_groups (
+    order  : Vec<ID>,
+    mut groups : HashMap<ID, Vec<NodeEditIntent>>,
+  ) -> Result<ReconciledNodeEditIntents, String> {
+    let mut by_pid : HashMap<ID, NodeEditIntent> =
+      HashMap::new();
+    for pid in &order {
+      let group : Vec<NodeEditIntent> =
+        groups . remove (pid)
+        . ok_or (
+          "ReconciledNodeEditIntents::from_groups: missing group"
+          . to_string())?;
+      by_pid . insert (
+        pid . clone(),
+        reconcile_nodeEditIntents_with_same_ID (group)?); }
+    Ok (ReconciledNodeEditIntents { order, by_pid }) }
+
+  pub(crate) fn into_ordered_intents (
+    self,
+  ) -> Vec<NodeEditIntent> {
+    let ReconciledNodeEditIntents { order, mut by_pid, }
+      = self;
+    order . into_iter()
+      . filter_map ( |pid| by_pid . remove (&pid) )
+      . collect() }
+
+  pub(crate) fn subscriber_contains_after_save (
+    &self,
+    subscriber_from_disk : &NodeComplete,
+  ) -> HashSet<ID> {
+    match self . by_pid . get (&subscriber_from_disk . pid) {
+      Some (NodeEditIntent::GraphSave (intent)) =>
+        intent . contains . or_default() . iter() . cloned() . collect(),
+      _ =>
+        subscriber_from_disk . contains . iter() . cloned() . collect(),
+    }}
+
+  pub(crate) fn apply_hiderel_delta_to_subscriber (
+    &mut self,
+    subscriber        : NodeComplete,
+    inferred_hides   : &[ID],
+    inferred_unhides : &[ID],
+  ) {
+    if let Some (intent) =
+      self . by_pid . get_mut (&subscriber . pid)
+    { intent . apply_hiderel_delta (
+        &subscriber . hides_from_its_subscriptions,
+        inferred_hides,
+        inferred_unhides);
+      return; }
+    let mut intent : NodeEditIntent =
+      NodeEditIntent::graph_save_from_nodecomplete (
+        subscriber . clone());
+    intent . apply_hiderel_delta (
+      &subscriber . hides_from_its_subscriptions,
+      inferred_hides,
+      inferred_unhides);
+    let pid : ID =
+      subscriber . pid;
+    self . order . push (pid . clone());
+    self . by_pid . insert (pid, intent); }}
+
 /// Converts a viewforest of ViewNodes to preliminary DefineNodes.
 ///
 /// "Naive" means the instructions are not yet reconciled with
@@ -229,23 +301,21 @@ pub(crate) fn naive_node_edit_intents_from_role_viewforest (
 #[allow(non_snake_case)]
 pub(crate) fn reconcile_nodeEditIntents (
   intents : Vec<NodeEditIntent>,
-) -> Result<Vec<NodeEditIntent>, String> {
+) -> Result<ReconciledNodeEditIntents, String> {
   let mut grouped : HashMap<ID, Vec<NodeEditIntent>> =
     HashMap::new();
+  let mut order : Vec<ID> =
+    Vec::new();
   for intent in intents {
     let intent : NodeEditIntent = intent;
-    grouped
-      . entry (intent . pid() . clone())
+    let pid : ID =
+      intent . pid() . clone();
+    if ! grouped . contains_key (&pid) {
+      order . push (pid . clone()); }
+    grouped . entry (pid)
       . or_insert_with (Vec::new)
       . push (intent); }
-  let mut result : Vec<NodeEditIntent> =
-    Vec::new();
-  for (pid, group) in grouped {
-    let _pid : ID = pid;
-    let group : Vec<NodeEditIntent> = group;
-    result . push (
-      reconcile_nodeEditIntents_with_same_ID (group)?); }
-  Ok (result) }
+  ReconciledNodeEditIntents::from_groups (order, grouped) }
 
 /// ASSUMES the inputs all share an ID.
 #[allow(non_snake_case)]

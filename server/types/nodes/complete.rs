@@ -17,7 +17,6 @@ use crate::types::misc::{ID, MSV, SourceName};
 
 /// This could be extended.
 /// A .skg file can have any number of associated FileProperties.
-#[allow(non_camel_case_types)]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum FileProperty {
   Had_ID_Before_Import, // Node had an :ID: property before org-roam import.

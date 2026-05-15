@@ -17,7 +17,6 @@ pub enum SaveRole {
   DisplayOnly,
 }
 
-#[allow(non_camel_case_types)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct ViewNode_in_Role {
   pub viewnode : ViewNode,

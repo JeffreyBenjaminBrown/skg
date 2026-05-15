@@ -19,7 +19,6 @@ pub enum SaveError {
 /// If the user attempts to save a buffer
 /// with any of these properties, the server should refuse.
 #[derive(Debug, Clone, PartialEq)]
-#[allow (non_camel_case_types)]
 pub enum BufferValidationError {
   Body_of_Scaffold               (String,   // Title from buffer
                                   String),  // Scaffold kind (e.g. "aliasCol", "alias")

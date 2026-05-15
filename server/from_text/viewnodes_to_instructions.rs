@@ -14,7 +14,7 @@ use crate::types::views_state::nodecomplete_from_in_rust_graph;
 use subscribee_visibility_intents::{ SubscribeeVisibilityIntent, subscribee_visibility_intents_from_tree, };
 use super::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
 use super::validate::buffernode_differs_from_disknode;
-use to_naive_instructions::{ naive_node_edit_intents_from_role_viewforest, reconcile_nodeEditIntents, NodeEditIntent, NodeSaveIntent, };
+use to_naive_instructions::{ naive_node_edit_intents_from_role_viewforest, reconcile_nodeEditIntents, NodeEditIntent, NodeSaveIntent, ReconciledNodeEditIntents, };
 
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
@@ -71,10 +71,10 @@ pub async fn viewforest_to_nonmerge_save_instructions (
     viewforest_with_saveroles (viewforest) ?;
   let extracted : SaveExtraction =
     extract_save_intents (&role_viewforest)?;
-  let intents_without_dups : Vec<NodeEditIntent> =
+  let intents_without_dups : ReconciledNodeEditIntents =
     reconcile_nodeEditIntents (extracted . node_edit_intents)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  let intents_with_visibility : Vec<NodeEditIntent> =
+  let intents_with_visibility : ReconciledNodeEditIntents =
     apply_hiderels_from_subscribee_visibility (
       intents_without_dups,
       &extracted . visibility_intents,
@@ -82,7 +82,9 @@ pub async fn viewforest_to_nonmerge_save_instructions (
       driver ) . await ?;
   let with_disk : Definenodes_with_Sourcemoves =
     build_disk_supplemented_define_nodes (
-      intents_with_visibility, config, driver ) . await ?;
+      intents_with_visibility . into_ordered_intents(),
+      config,
+      driver ) . await ?;
   let changed_instructions : Vec<DefineNode> =
     filter_wouldbe_noop_definenodes (with_disk . instructions);
   Ok ((changed_instructions, with_disk . source_moves)) }
@@ -187,11 +189,11 @@ async fn supplement_saveintent_from_disk (
 /// - any pre-save direct content of the subscribee that is present in
 ///   `visible_content` is removed from that subscriber's hides.
 async fn apply_hiderels_from_subscribee_visibility (
-  mut node_edit_intents : Vec<NodeEditIntent>,
+  mut node_edit_intents : ReconciledNodeEditIntents,
   vis_intents     : &[SubscribeeVisibilityIntent],
   config          : &SkgConfig,
   driver          : &TypeDBDriver,
-) -> Result<Vec<NodeEditIntent>, Box<dyn Error>> {
+) -> Result<ReconciledNodeEditIntents, Box<dyn Error>> {
   validate_no_overlapping_subscribee_visibility_conflicts (
     vis_intents, config, driver ) . await ?;
   for intent in vis_intents {
@@ -207,8 +209,8 @@ async fn apply_hiderels_from_subscribee_visibility (
       continue; }
 
     let subscriber_contains : HashSet<ID> =
-      subscriber_will_contain_after_save (
-        &node_edit_intents, &subscriber_from_disk );
+      node_edit_intents . subscriber_contains_after_save (
+        &subscriber_from_disk );
     let visible_content : HashSet<ID> =
       intent . visible_content . iter() . cloned() . collect();
     let inferred_hides : Vec<ID> =
@@ -225,8 +227,7 @@ async fn apply_hiderels_from_subscribee_visibility (
       . cloned() . collect();
     if inferred_hides . is_empty() && inferred_unhides . is_empty()
       { continue; }
-    apply_hiderel_delta_to_subscriber_intent (
-      &mut node_edit_intents,
+    node_edit_intents . apply_hiderel_delta_to_subscriber (
       subscriber_from_disk,
       &inferred_hides,
       &inferred_unhides ); }
@@ -270,61 +271,6 @@ fn source_is_owned (
   config . sources . get (source)
     . map ( |s| s . user_owns_it )
     . unwrap_or (false) }
-
-fn subscriber_will_contain_after_save (
-  node_edit_intents     : &[NodeEditIntent],
-  subscriber_from_disk  : &NodeComplete,
-) -> HashSet<ID> {
-  fn content_if_children_affect_content (
-    intent : &NodeEditIntent,
-    pid    : &ID,
-  ) -> Option<Vec<ID>> {
-    match intent {
-      NodeEditIntent::GraphSave (intent)
-        if intent . pid == *pid =>
-        Some (intent . contains . or_default() . to_vec()),
-      _ => None,
-    }}
-
-  node_edit_intents . iter()
-    . find_map ( |intent|
-      content_if_children_affect_content (
-        intent, &subscriber_from_disk . pid ))
-    . map ( |contains| contains . into_iter() . collect())
-    . unwrap_or_else ( ||
-      subscriber_from_disk . contains . iter() . cloned() . collect()) }
-
-fn apply_hiderel_delta_to_subscriber_intent (
-  node_edit_intents : &mut Vec<NodeEditIntent>,
-  subscriber        : NodeComplete,
-  inferred_hides : &[ID],
-  inferred_unhides : &[ID],
-) {
-  fn nodeeditintent_for_pid_mut<'a> (
-    node_edit_intents : &'a mut Vec<NodeEditIntent>,
-    pid               : &ID,
-  ) -> Option<&'a mut NodeEditIntent> {
-    node_edit_intents . iter_mut()
-      . find ( |intent| matches!(
-          intent,
-          NodeEditIntent::GraphSave (save) if save . pid == *pid)) }
-
-  if let Some (intent) =
-    nodeeditintent_for_pid_mut (
-      node_edit_intents, &subscriber . pid )
-  {
-    intent . apply_hiderel_delta (
-      &subscriber . hides_from_its_subscriptions,
-      inferred_hides,
-      inferred_unhides );
-    return; }
-  let mut intent : NodeEditIntent =
-    NodeEditIntent::graph_save_from_nodecomplete (subscriber . clone());
-  intent . apply_hiderel_delta (
-    &subscriber . hides_from_its_subscriptions,
-    inferred_hides,
-    inferred_unhides );
-  node_edit_intents . push (intent); }
 
 /// Filters out Save instructions that would be no-ops,
 /// because they match the pre-save in-Rust graph entry

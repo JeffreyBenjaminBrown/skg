@@ -210,6 +210,12 @@ The important properties are:
 - visibility surfaces remain first-class until their deltas are folded
   into owned subscriber graph-save intents.
 
+Status: the keyed collection slice is complete.
+=ReconciledNodeEditIntents= now owns post-reconciliation ordering and
+PID lookup, and subscriber hide/unhide folding no longer scans a raw
+=Vec<NodeEditIntent>=. Broader visibility-surface reconciliation is
+still future work if it remains useful.
+
 ** DONE f. Keep disk supplementation policy-neutral
 
 Disk supplementation should restore unspecified fields and detect
@@ -257,6 +263,11 @@ shape is split, the rules can be stated more directly:
 This should preserve the existing regression where the same ID appears
 both in a direct subscribee position and as an ordinary definitive
 node, and the ordinary node's =contains= edit survives.
+
+Status: partially complete. Same-ID reconciliation now returns a keyed
+=ReconciledNodeEditIntents= collection with explicit output order, and
+the current variant rules are centralized there. Duplicate
+visibility-surface semantics have not been broadened yet.
 
 ** h. Revisit validation once save roles are stable
 

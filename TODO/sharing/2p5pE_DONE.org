@@ -85,9 +85,9 @@ Do not broaden behavior in this item unless tests force it.
 Current behavior to preserve:
 
 - duplicate =GraphSave= intents for the same ID conflict;
-- duplicate =DirectSubscribeeEdit= intents for the same ID conflict;
+- duplicate =SubscribeeEdit= intents for the same ID conflict;
 - save/delete conflicts reject;
-- if a =GraphSave= and =DirectSubscribeeEdit= share an ID, the
+- if a =GraphSave= and =SubscribeeEdit= share an ID, the
   ordinary graph save wins for final graph output;
 - delete output remains possible and ordered.
 

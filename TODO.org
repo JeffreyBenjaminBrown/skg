@@ -1,4 +1,5 @@
 * ONGOING continue TODO/sharing/ at 2p5_simplify-save.org
+* TODO too many things are called reconciliation
 * further subdivide the completion logic
 Traversing a 500 node tree in ego_tree takes about 10 microseconds,
 says ChatGPT, so I could do that a hundred times and only add 1 milisecond
