@@ -1,0 +1,185 @@
+* Plan: evaluate role-aware validation
+
+This plan addresses item h in
+[[./2p5_simplify-save.org][2p5_simplify-save.org]].
+
+The goal is to decide whether pre-save validation should consume the
+role-annotated view tree, and if so make the smallest behavior-preserving
+change that removes duplicate positional reasoning from validation.
+
+This should be treated as a validation-boundary cleanup, not as a new
+save behavior feature.
+
+* Current shape
+
+The save path now builds a role-annotated tree before extracting node
+edit intents and subscribee visibility intents:
+
+#+begin_src text
+checked view tree
+  -> role-annotated tree
+  -> save extraction
+#+end_src
+
+Validation still mostly reasons from the checked =ViewNode= tree and
+its own traversal rules. That means some concepts now exist in two
+places:
+
+- save extraction uses =SaveRole= to distinguish ordinary content,
+  direct =AsSubscribee= surfaces, display scaffolds, aliases, ID
+  display, and hidden-subscribee scaffolds;
+- validation has separate logic for foreign edits, duplicate
+  definitions, display-only scaffolds, and source consistency.
+
+This duplication is risky because direct subscribee behavior depends
+on position. The role classifier already captures that position.
+
+* Questions to answer first
+
+Before editing validation, inspect current validation flow and answer:
+
+- Which validation functions currently traverse =ViewNode= trees?
+- Which validation rules depend on positional facts already represented
+  by =SaveRole=?
+- Which validation rules intentionally run before save-role
+  classification and should stay independent?
+- Which tests cover foreign direct =AsSubscribee= title/body edits,
+  display-only scaffolds, duplicate definitions, and conflicting
+  visibility?
+
+If the answer is that validation has little duplicated role logic, stop
+after documenting that. Do not create churn just to make validation
+"more modern".
+
+* Target
+
+Prefer one of these outcomes:
+
+1. No code change: document that validation should remain on checked
+   =ViewNode= trees because the role facts do not simplify it enough.
+2. Narrow code change: add a role-aware validation entry point for only
+   the rule(s) that currently duplicate save-role position logic.
+3. Larger follow-up plan: if validation needs a real boundary shift,
+   write a new plan rather than doing it inside this item.
+
+The likely narrow target, if useful, is:
+
+#+begin_src text
+checked view tree
+  -> role-annotated tree
+  -> validation rules that need position facts
+  -> save extraction
+#+end_src
+
+* Implementation steps
+
+** 1. Map validation entry points
+
+Find the save-buffer validation path from the handler down to the
+functions that produce =BufferValidationError=.
+
+Record:
+
+- which function is the public validation entry point;
+- where =validate_and_filter_foreign_instructions= runs relative to
+  save instruction construction;
+- which validation still happens before =viewforest_to_nonmerge_save_instructions=.
+
+** 2. Compare validation traversal with =SaveRole=
+
+For each validation rule that traverses a tree, decide whether it
+would become simpler or safer if it received =Tree<ViewNode_in_Role>=.
+
+Pay special attention to:
+
+- foreign node title/body edits in direct =AsSubscribee= position;
+- direct =AsSubscribee= child-list edits, which should not be treated
+  as foreign subscribee =contains= edits;
+- display-only scaffolds such as alias/id/hidden scaffolds;
+- definitive duplicate checks.
+
+** 3. Choose the smallest outcome
+
+If role-aware validation is not clearly valuable, update
+=2p5_simplify-save.org= with that conclusion and leave code alone.
+
+If one rule clearly benefits, introduce a narrow helper that accepts
+=Tree<ViewNode_in_Role>= and keep all other validation untouched.
+
+If multiple validation rules want role facts, stop and write a follow-up
+implementation plan instead of mixing them.
+
+** 4. Preserve save behavior
+
+Do not change user-visible save behavior in this item unless an
+existing test shows the current behavior is wrong.
+
+Current behavior to preserve:
+
+- foreign title/body edits still report =ModifiedForeignNode=;
+- direct =AsSubscribee= child-list edits do not report a foreign
+  subscribee =contains= edit;
+- duplicate definitive definitions are still rejected;
+- conflicting subscribee visibility edits are still rejected;
+- display scaffolds do not become graph edits.
+
+** 5. Update roadmap
+
+When finished, update item h in =2p5_simplify-save.org= with one of:
+
+- validation remains intentionally pre-role;
+- a narrow role-aware validation helper was introduced;
+- a broader validation migration needs its own future plan.
+
+* Tests
+
+Run at least:
+
+#+begin_src text
+cargo check
+cargo test --test new viewnodes_to_instructions -- --nocapture
+cargo test --test new reconcile_same_id_instructions -- --nocapture
+#+end_src
+
+If validation code changes, also run targeted validation-related tests
+found during step 1. Likely candidates include:
+
+#+begin_src text
+cargo test --test multi_source_errors -- --nocapture
+#+end_src
+
+* Acceptance criteria
+
+- The validation boundary is explicitly documented.
+- Any code change is narrow and justified by removed duplicate
+  positional reasoning.
+- Existing direct-subscribee and foreign-edit behavior is preserved.
+- The planned tests pass.
+
+* Non-goals
+
+- Do not change save instruction shape.
+- Do not change rerender/completion behavior.
+- Do not change TypeDB schema, TCP API, Emacs protocol, or =.skg=
+  file format.
+- Do not broaden validation semantics without a dedicated follow-up
+  plan.
+
+* Outcome
+
+No code change was made.
+
+The validation boundary should remain where it is for now:
+
+- =find_buffer_errors_for_saving= runs on =UncheckedViewNode= before
+  =unchecked_to_checked_tree= and therefore before role annotation is
+  available;
+- local structural validation is about legal input-tree shape, not
+  save-role interpretation;
+- =validate_and_filter_foreign_instructions= runs after save
+  instruction construction, so it sees the already-corrected
+  instruction shape where direct =AsSubscribee= child-list edits are
+  not foreign subscribee =contains= edits.
+
+Moving validation onto =Tree<ViewNode_in_Role>= would require a larger
+pipeline boundary shift and is not justified by the current duplication.

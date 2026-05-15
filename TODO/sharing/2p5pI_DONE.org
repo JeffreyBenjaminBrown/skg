@@ -1,0 +1,35 @@
+* Outcome: document rerender/completion boundary
+
+This completes item i in
+[[./2p5_simplify-save.org][2p5_simplify-save.org]].
+
+No code change was needed. The relevant code already has local
+comments at the important boundaries:
+
+- =should_preserve_saved_as_subscribee_branch= in
+  [[../../server/update_buffer/complete_preorder/truenode.rs][complete_preorder/truenode.rs]]
+  explains why saved-view completion must not regenerate direct
+  =AsSubscribee= child lists before save extraction reads them.
+- =reconcile_sharing_scaffold_children= in
+  [[../../server/to_org/complete/sharing/child_data.rs][sharing/child_data.rs]]
+  explains the rerender-time sharing scaffold reconciliation path.
+- =subscribee_visibility_intents_from_tree= in
+  [[../../server/from_text/viewnodes_to_instructions/subscribee_visibility_intents.rs][subscribee_visibility_intents.rs]]
+  owns save-time extraction of direct =AsSubscribee= visible-child
+  signal.
+
+The boundary is:
+
+- save extraction owns interpretation of user-authored direct
+  =AsSubscribee= child lists as subscriber visibility edits;
+- saved-view completion preserves definitive direct =AsSubscribee=
+  child lists until save extraction can interpret them;
+- collateral-view completion and diff-mode completion may regenerate
+  branches from graph/diff facts, because they are not the saved
+  buffer's pending user edit surface;
+- generated display scaffolds may be reconciled during rerender, but
+  save extraction must continue treating them as display-only;
+- diff-mode phantom/removed nodes are display state and must not become
+  hide/unhide signal.
+
+No tests were run because this was documentation only.

@@ -1,369 +1,221 @@
-* What remains after direct as-subscribee hide/unhide
+* What remains after 2p5
 
-This report reviews all current files in =TODO/sharing/= and the
-branch diff from =main= through commit =b3191269=. The recent branch
-does the important feature slice: direct definitive AsSubscribee
-child-list edits now infer subscriber hide/unhide relations, the
-saved-view rerender preserves the edited subscribee branch long
-enough for save-intent extraction, and hidden-in columns are inserted
-after the new hides land.
+This report supersedes the earlier =3_what-remains.org= text, which
+was written before the 2p5 cleanup completed.
 
-The items below are what still looks left on the table.
+The direct =AsSubscribee= hide/unhide feature now has the important
+save-path shape:
 
-* Highest priority
+- direct =AsSubscribee= child-list removals no longer become
+  subscribee graph =contains= edits;
+- direct =AsSubscribee= visible children are extracted as
+  =SubscribeeVisibilityIntent= values;
+- visibility folding happens before =DefineNode= construction;
+- disk supplementation is policy-neutral and no longer has a
+  direct-subscribee =contains= restoration guardrail;
+- post-=reconcile_nodeEditIntents= lookup is keyed by
+  =SameIdReconciledNodeEditIntents=;
+- validation and rerender/completion boundaries are documented in
+  [[./2p5_simplify-save.org][2p5_simplify-save.org]].
 
-** Resolve the diff-mode preservation TODO
+The items below are the remaining work that still looks real.
+
+* Ranked opportunities
+
+** a. Replace stale sharing-completion comments
+
+The comments in
+[[../../server/to_org/complete/sharing/mod.rs][server/to_org/complete/sharing/mod.rs]]
+still describe older worries about save-buffer integration:
+
+- =maybe_add_subscribeeCol_branch= says an existing =SubscribeeCol=
+  would need to be integrated if this code ran during save-buffer;
+- =maybe_add_hiddenInSubscribeeCol_branch= says an existing
+  =HiddenInSubscribeeCol= should be integrated.
+
+The current story is narrower:
+
+- these helpers are initial-render helpers, not the saved-view
+  rerender reconciliation path;
+- saved-view/collateral rerender uses the preorder/postorder
+  completion path and =reconcile_sharing_scaffold_children=;
+- the =SubscribeeCol= guard is structurally defensive because current
+  call paths append a fresh branch before reaching it;
+- the =HiddenInSubscribeeCol= guard can be reached after postorder
+  sharing-scaffold reconciliation, so an existing column has already
+  been handled.
+
+No behavior change is implied. This is a comment cleanup to keep
+future refactors pointed at the right code path.
+
+** b. Resolve the diff-mode saved-view preservation TODO
 
 Current code:
 
 #+begin_src text
-server/update_buffer/complete_preorder/truenode.rs:251
+server/update_buffer/complete_preorder/truenode.rs
 should_preserve_saved_as_subscribee_branch
 #+end_src
 
-The key predicate is:
+The predicate is:
 
 #+begin_src rust
 is_saved_view && source_diffs.is_none() && is_subscribee
 #+end_src
 
-with the comment:
+with:
 
 #+begin_src rust
 // TODO: This should not be necessary.
 #+end_src
 
-This means SubscribeeCol branch preservation is explicitly disabled
-when =source_diffs= is present. That may be correct as a first
-boundary, but it is not a settled invariant. The desired behavior
-needs a focused decision:
+This is still a real boundary question. Normal saved views must
+preserve direct =AsSubscribee= child lists long enough for save
+extraction to interpret them as visibility edits. Diff views also
+contain generated phantom/removed children, and those display nodes
+must not infer hides or unhides.
 
-- In normal saved views, direct AsSubscribee children are user-authored
-  visibility signal and must not be regenerated before extraction.
-- In diff views, phantom/removed children are generated display and
-  should not be mistaken for hide/unhide intent.
-- The TODO says the code should eventually distinguish those two facts
-  directly, instead of using =source_diffs.is_none()= as a coarse
-  escape hatch.
+Suggested next step: add a diff-mode regression proving phantom or
+removed children do not infer hide/unhide intent, then decide whether
+=source_diffs.is_none()= remains the right guard or should be replaced
+by a more direct distinction.
 
-Suggested next step: add a diff-mode regression proving that phantoms
-do not infer hides/unhides, then see whether preservation can remain
-enabled for the non-phantom direct children in a saved diff view.
+** c. Define policy for extra direct children under =AsSubscribee=
 
-** Replace the transitional direct-AsSubscribee contains guardrail
+The current save path satisfies the crucial invariant: extra children
+under a direct =AsSubscribee= branch are never saved as the subscribee's
+graph =contains=.
 
-Current code:
+What is not explicitly settled is the user policy for a direct child
+that is not pre-save direct content of the subscribee:
 
-#+begin_src text
-server/from_text/viewnodes_to_instructions.rs:77
-server/from_text/viewnodes_to_instructions.rs:247
-#+end_src
-
-The pipeline still builds a SaveNode for a direct AsSubscribee node,
-supplements it from disk, then restores its =contains= from disk:
-
-#+begin_src rust
-restore_direct_as_subscribee_contains_from_disk(...)
-#+end_src
-
-The comments correctly call this a temporary guardrail. The feature
-now reads the raw visibility intent before restoration, so behavior is
-covered, but the representation is still backwards:
-
-#+begin_src text
-direct AsSubscribee child list
-  -> first becomes an apparent subscribee.contains edit
-  -> then gets restored from disk
-  -> separately becomes subscriber hide/unhide intent
-#+end_src
-
-The cleaner target from =0p5_DONE_simplify-save.org= is still not done:
-
-#+begin_src text
-direct AsSubscribee child list
-  -> hide/unhide intent for the subscriber
-  -> never a graph contains edit for the subscribee
-#+end_src
-
-Suggested next step: move visibility folding earlier, before final
-=DefineNode::Save= construction, or add an explicit graph-intent layer
-that never puts direct AsSubscribee =contains= into a subscribee
-SaveNode at all.
-
-** Make fork/visibility edits first-class instead of late DefineNode mutation
-
-The branch introduced a small internal =NodeEditIntent= layer, but it
-is still converted immediately to =DefineNode=. Visibility edits are
-then folded later by mutating completed SaveNodes in:
-
-#+begin_src text
-server/from_text/viewnodes_to_instructions.rs:139
-apply_hiderels_from_subscribee_visibility
-#+end_src
-
-This works, but it preserves the architectural debt called out in
-=0p5_DONE_simplify-save.org=: fork edits are still not first-class. The
-late helper must load disk nodes, inspect current completed
-instructions, synthesize a subscriber SaveNode if missing, and then
-update =hides_from_its_subscriptions= directly.
-
-This is the main reason the guardrail above still exists.
-
-Suggested next step: introduce a real save-intermediate shape, e.g.
-=GraphNodeIntent= plus =SubscriberVisibilityIntent=, fold visibility
-into owned subscriber node intents, and only then construct
-=DefineNode= values.
-
-** Define the conflict semantics for overlapping subscribees
-
-The current algorithm applies each
-=SubscribeeVisibilityIntent= sequentially. It computes inferred
-unhides from the subscriber's disk hide list, and inferred hides from
-the current visible list plus projected subscriber content.
-
-This leaves an edge case untested: the same content ID can be direct
-content of multiple subscribees for the same subscriber. One edited
-AsSubscribee branch might imply "hide X", while another visible branch
-might imply "unhide X". Since the hide relation is subscriber-wide,
-not per-subscribee, that conflict needs a defined policy.
-
-Possible policies:
-
-- "visible anywhere wins": if any expanded subscribee branch shows X,
-  remove X from the subscriber's hides.
-- "absence anywhere wins": if any expanded subscribee branch omits X,
-  add X to the subscriber's hides.
-- "conflicting visibility edits are invalid": report a save error.
-
-The current implementation may be order-sensitive for same-save
-hide/unhide conflicts because unhide detection consults disk hides,
-not the current accumulated hide list.
-
-Suggested next step: add a fixture with two subscribees sharing one
-content node, then test the chosen policy.
-
-* Comments and stale code notes to clean up
-
-** Rewrite the two stale guard comments in sharing/mod.rs
-
-=1_DONE_dedup-sharing-rel-completion.org= already explains that these
-comments are misleading:
-
-#+begin_src text
-server/to_org/complete/sharing/mod.rs:116
-server/to_org/complete/sharing/mod.rs:183
-#+end_src
-
-The comments still say, roughly, that if these paths were used during
-save-buffer then they would need integration. The investigation in
-=1_DONE_dedup-sharing-rel-completion.org= found a more precise story:
-
-- the SubscribeeCol guard is structurally defensive because current
-  call paths append a fresh node before reaching it;
-- the HiddenIn guard can be reached after postorder reconciliation,
-  so an existing column has already been handled.
-
-No behavior change is implied. This is a comment cleanup, but it is
-worth doing because the current comments point future readers toward
-the wrong refactor.
-
-** Revisit =to_naive_instructions.rs= scaffold recursion
-
-Current code:
-
-#+begin_src text
-server/from_text/viewnodes_to_instructions/to_naive_instructions.rs:169
-// TODO ? Recurse into more Scaffolds.
-#+end_src
-
-The role-aware candidate traversal recurses through =BufferRoot=,
-=SubscribeeCol=, =Deleted=, =DeletedScaff=, and =Unknown=, but not
-through arbitrary scaffolds. That is probably intentional for display
-scaffolds such as HiddenIn/HiddenOutside, AliasCol, IDCol, and
-TextChanged. The comment should become a real policy statement:
-
-- either "only these scaffolds may contain save-producing descendants";
-- or a widened traversal with role checks proving display children
-  remain inert.
-
-Suggested next step: replace the TODO with a comment describing the
-chosen invariant, or add tests for any scaffold that should recurse.
-
-* Semantics still intentionally narrow
-
-** Direct only; recursive subscribee content is not a visibility surface
-
-The implemented visibility intent reads only direct children under a
-definitive AsSubscribee node. That matches the current plan, but it is
-still a user-facing constraint:
-
-- deleting a direct child from a subscribee branch can hide it;
-- replacing a direct hidden child can unhide it;
-- editing deeper recursive descendants under that subscribee remains
-  ordinary graph editing for those descendant nodes, not subscriber
-  visibility editing.
-
-This should probably be documented in user-facing terms before the
-feature is presented as complete.
-
-** HiddenIn/HiddenOutside columns are still not directly editable
-
-The branch enables an unhide gesture by moving a hidden item out of
-=HiddenInSubscribeeCol= into visible direct subscribee content. It
-does not make HiddenInSubscribeeCol or HiddenOutsideOfSubscribeeCol
-themselves general editable relation columns.
-
-That is consistent with the current plan, but leaves open UX
-questions:
-
-- Should deleting a row from HiddenInSubscribeeCol mean unhide?
-- Should adding a row to HiddenOutsideOfSubscribeeCol mean hide from
-  all subscriptions?
-- Should these scaffolds advertise that they are display-derived, not
-  normal editable relation columns?
-
-For now, direct AsSubscribee visible content is the only hide/unhide
-edit surface.
-
-** Unknown/extra buffer children under AsSubscribee need an explicit policy
-
-=0p5_DONE_simplify-save.org= says buffer children under a direct
-AsSubscribee branch that are not disk children of the subscribee
-should be rejected, ignored, or normalized by explicit policy, but
-never saved as =subscribee.contains=.
-
-The branch satisfies the "never saved as subscribee.contains" part via
-the guardrail, but it does not appear to expose an explicit validation
-or warning policy for extra direct children. Those extra children may
-still be meaningful as ordinary graph nodes depending on their role
-and source, but they are not subscribee visibility edits.
+- reject the save;
+- ignore it as visibility signal while allowing its own ordinary edit
+  semantics where applicable;
+- normalize it into a different edit surface.
 
 Suggested next step: add tests for inserting a new child under a
-foreign direct AsSubscribee branch and under an owned direct
-AsSubscribee branch. Decide whether the save should reject, ignore,
-or normalize that edit.
+foreign direct =AsSubscribee= branch and under an owned direct
+=AsSubscribee= branch, then document or enforce the chosen policy.
 
-** Owned AsSubscribee title/body edits remain a policy choice
+** d. Decide owned direct-=AsSubscribee= title/body policy
 
-The plan says real edits to an owned subscribee should happen when the
-node is viewed directly, not as a subscribee, and Jeff agreed. The
-current tests guard that foreign title edits still reach foreign-node
-validation. I did not see an equivalent test that owned direct
-AsSubscribee title/body edits are rejected or normalized according to
-that policy.
+Foreign title/body edits in direct =AsSubscribee= position currently
+reach foreign-node validation, which is covered by tests.
 
-Suggested next step: add one test for owned direct AsSubscribee
-title/body edits and either enforce the policy or document that owned
-metadata edits are still allowed there.
+The intended product policy may be stricter for owned nodes: real
+title/body edits to a subscribee should probably happen when viewing
+that node directly, not when it is shown as someone else's subscribee.
 
-* Test coverage still worth adding
+Suggested next step: add a focused test for owned direct
+=AsSubscribee= title/body edits and decide whether to allow, reject,
+or normalize them.
 
-** Diff-mode phantom regression
+** e. Document direct-only visibility semantics for users
 
-The planning docs repeatedly call this out. Phantoms should not infer
-hides or unhides. The current implementation filters phantom direct
-children out of visible-content collection, but without a diff-mode
-test this is easy to regress or misunderstand.
+The implemented visibility intent reads only direct children under a
+definitive =AsSubscribee= node:
 
-** Persistence assertions for hide/unhide
+- removing a direct child can hide that content from the subscriber;
+- restoring a direct hidden child can unhide it;
+- editing deeper descendants remains ordinary graph editing for those
+  descendant nodes, not subscriber visibility editing.
 
-The end-to-end tests primarily assert returned buffers. The
-save-instruction tests assert =hides_from_its_subscriptions= before
-the write path, which is useful. It may still be worth adding one
-integration-style assertion against the temp fixture's saved =.skg=
-file after a hide and after an unhide. That separates "rerender showed
-the right thing" from "filesystem persistence wrote the right field."
+This should be written in user-facing terms before the feature is
+presented as complete.
 
-** Multiple subscriber views / duplicate-definition conflict
+** f. Decide whether HiddenIn/HiddenOutside columns are editable
 
-The docs note that multiple appearances of the same subscriber in one
-saved buffer could express conflicting visibility edits. Existing
-duplicate-definition validation probably prevents the worst cases,
-but there is no focused sharing test proving the failure mode is
-clean.
+The current hide/unhide edit surface is direct =AsSubscribee= visible
+content. =HiddenInSubscribeeCol= and
+=HiddenOutsideOfSubscribeeCol= are display-derived scaffolds, not
+general editable relation columns.
 
-** Collateral view behavior
+Open product questions:
 
-The preservation rule is saved-view-only. Collateral views are
-expected to refresh from the graph. A regression that opens/saves one
-view and verifies a collateral subscriber view updates hidden content
-would guard that boundary.
+- Should deleting a row from =HiddenInSubscribeeCol= mean unhide?
+- Should adding a row to =HiddenOutsideOfSubscribeeCol= mean hide
+  from all subscriptions?
+- Should these scaffolds visibly communicate that they are generated
+  display, not normal editable relation columns?
 
-* Broader product work still open
+This is product behavior, not save-path cleanup.
 
-** Starting a subscription still needs a command
+** g. Add persistence assertions for hide/unhide
+
+Save-instruction tests already assert
+=hides_from_its_subscriptions= before writing. It may still be useful
+to add an integration-style assertion against the saved fixture file
+after a hide and after an unhide.
+
+This would distinguish "the returned/rerendered buffer looked right"
+from "the filesystem write persisted the relationship."
+
+** h. Add collateral-view behavior coverage
+
+The saved-view preservation rule is intentionally saved-view-only.
+Collateral views should refresh from graph state after save.
+
+Suggested next step: open/save one view and verify a collateral
+subscriber view reflects newly hidden or unhidden content.
+
+** i. Add UI support for starting a subscription
 
 If a node has no subscriptions, no =SubscribeeCol= is automatically
-present. The user can still type the scaffold by hand, but
-=status-before-plan.org= correctly calls this tedious and
-error-prone. A command should insert a SubscribeeCol and probably help
-choose/insert the first subscribee.
+present. The user can type the scaffold by hand, but this is tedious
+and error-prone.
 
-** Overrides remain data-layer-only
+A command should insert a =SubscribeeCol= and probably help choose or
+insert the first subscribee.
 
-=overrides_view_of= is still plumbed through the data model but has no
-real view/edit surface. The herald flag is not enough to tell which
-side of the relation a node is on, much less edit it. This is outside
-the direct subscribee hide/unhide feature, but still a sharing-model
-gap.
+** j. Build an overrides edit/view surface
 
-** Relationship columns for all directions remain aspirational
+=overrides_view_of= is still in the data model but has no real
+view/edit surface. The herald flag is not enough to explain which
+side of the relation a node is on or to edit it.
 
-=vision.org= still lists "cols for all rels in either direction" and
-"How to show a subscribee's subscribees?" The current work improves
-one relation surface: subscriber visibility over direct subscribee
-content. It does not generalize relation display/editing.
+This is outside direct subscribee hide/unhide, but it remains a
+sharing-model gap.
 
-** User-facing language is not settled
+** k. Generalize relationship columns
 
-The code and docs now use several related phrases:
+=vision.org= still points toward columns for all relation directions.
+The current work improves one relation surface: subscriber visibility
+over direct subscribee content. It does not generalize relation
+display or editing.
+
+** l. Settle user-facing language
+
+The code and planning docs use several implementation terms:
 
 - subscribee;
 - shown as a subscribee;
-- direct AsSubscribee branch;
+- direct =AsSubscribee= branch;
 - visibility intent;
 - hiderel;
-- HiddenInSubscribeeCol.
+- =HiddenInSubscribeeCol=.
 
-The implementation distinction is important, but a user command or
-manual should probably describe the action as something like "hide
-this subscribed item from this view" / "show this subscribed item
-again", not as "edit AsSubscribee direct child lists."
+User-facing commands and docs should probably say something closer to
+"hide this subscribed item from this view" and "show this subscribed
+item again", rather than "edit direct =AsSubscribee= child lists."
 
 * Probably done; do not reopen without new evidence
-
-The following older plan items appear to be complete enough for this
-feature slice:
 
 - source-move detection is split out of disk supplementation;
 - role classification exists and save extraction uses it;
 - naive save extraction is split into candidates, minimal node data,
   field collection, and intent conversion;
-- direct AsSubscribee child-list removals no longer become
+- direct =AsSubscribee= child-list removals no longer become
   subscribee graph =contains= edits;
-- raw direct AsSubscribee visibility intents are extracted before the
-  guardrail restores =contains= from disk;
+- direct =AsSubscribee= visible-child signal is extracted before
+  final =DefineNode= construction;
 - direct hide and unhide inference both have save-instruction tests;
-- saved-view SubscribeeCol branch preservation is implemented for
+- overlapping subscribee visibility conflicts are rejected by
+  =validate_no_overlapping_subscribee_visibility_conflicts=;
+- saved-view =SubscribeeCol= branch preservation is implemented for
   normal non-diff saved views;
 - saved-view rerender inserts =HiddenInSubscribeeCol= when newly
   inferred hides require it;
 - the TypeDB cleanup problem in =hidden_from_subscriptions= has a
-  shared guarded cleanup path.
-
-These may still be refactored as part of the architectural cleanups
-above, but they are not missing behavior for the narrow direct
-hide/unhide feature.
-
-* Suggested next sequence
-
-1. Replace the stale comments in =server/to_org/complete/sharing/mod.rs=.
-2. Add the overlapping-subscribees conflict test and decide the policy.
-3. Add the diff-mode phantom regression and resolve the
-   =source_diffs.is_none()= preservation TODO.
-4. Add explicit tests for extra direct children under AsSubscribee and
-   owned AsSubscribee title/body edits.
-5. Refactor the late =DefineNode= mutation/contains-restoration
-   guardrail into a first-class visibility/fork intent stage.
-6. Only after that, move on to UI commands: start subscribing,
-   user-facing hide/unhide gestures, and eventually overrides.
+  shared guarded cleanup path;
+- the 2p5 save-path architecture cleanup is complete.

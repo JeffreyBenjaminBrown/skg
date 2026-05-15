@@ -14,7 +14,7 @@ use crate::types::views_state::nodecomplete_from_in_rust_graph;
 use subscribee_visibility_intents::{ SubscribeeVisibilityIntent, subscribee_visibility_intents_from_tree, };
 use super::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
 use super::validate::buffernode_differs_from_disknode;
-use to_naive_instructions::{ naive_node_edit_intents_from_role_viewforest, reconcile_nodeEditIntents, NodeEditIntent, NodeSaveIntent, ReconciledNodeEditIntents, };
+use to_naive_instructions::{ naive_node_edit_intents_from_role_viewforest, reconcile_nodeEditIntents, NodeEditIntent, NodeSaveIntent, SameIdReconciledNodeEditIntents, };
 
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
@@ -71,10 +71,10 @@ pub async fn viewforest_to_nonmerge_save_instructions (
     viewforest_with_saveroles (viewforest) ?;
   let extracted : SaveExtraction =
     extract_save_intents (&role_viewforest)?;
-  let intents_without_dups : ReconciledNodeEditIntents =
+  let intents_without_dups : SameIdReconciledNodeEditIntents =
     reconcile_nodeEditIntents (extracted . node_edit_intents)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  let intents_with_visibility : ReconciledNodeEditIntents =
+  let intents_with_visibility : SameIdReconciledNodeEditIntents =
     apply_hiderels_from_subscribee_visibility (
       intents_without_dups,
       &extracted . visibility_intents,
@@ -189,11 +189,11 @@ async fn supplement_saveintent_from_disk (
 /// - any pre-save direct content of the subscribee that is present in
 ///   `visible_content` is removed from that subscriber's hides.
 async fn apply_hiderels_from_subscribee_visibility (
-  mut node_edit_intents : ReconciledNodeEditIntents,
+  mut node_edit_intents : SameIdReconciledNodeEditIntents,
   vis_intents     : &[SubscribeeVisibilityIntent],
   config          : &SkgConfig,
   driver          : &TypeDBDriver,
-) -> Result<ReconciledNodeEditIntents, Box<dyn Error>> {
+) -> Result<SameIdReconciledNodeEditIntents, Box<dyn Error>> {
   validate_no_overlapping_subscribee_visibility_conflicts (
     vis_intents, config, driver ) . await ?;
   for intent in vis_intents {

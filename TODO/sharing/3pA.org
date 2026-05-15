@@ -1,0 +1,90 @@
+* Plan: replace stale sharing-completion comments
+
+This plan executes item a in
+[[./3_what-remains.org][3_what-remains.org]].
+
+The goal is to correct stale comments in
+[[../../server/to_org/complete/sharing/mod.rs][server/to_org/complete/sharing/mod.rs]]
+without changing behavior.
+
+* Current issue
+
+Two comments still describe older worries about save-buffer
+integration:
+
+- in =maybe_add_subscribeeCol_branch=, the "Skip if there already is
+  one" guard says that if this code were used during save-buffer, the
+  existing =SubscribeeCol= could not be assumed correct and would need
+  integration;
+- in =maybe_add_hiddenInSubscribeeCol_branch=, the guard before an
+  existing =HiddenInSubscribeeCol= says it should instead be
+  integrated.
+
+Those comments point readers toward the wrong modern boundary.
+
+* Current code-path understanding
+
+The relevant distinction is:
+
+- =server/to_org/complete/sharing/mod.rs= contains initial-render
+  helpers that may add sharing scaffolds to a fresh view;
+- saved-view and collateral rerender go through
+  =complete_viewforest=, whose preorder/postorder passes call the
+  sharing scaffold completers and =reconcile_sharing_scaffold_children=;
+- direct =AsSubscribee= saved-view preservation happens in
+  =should_preserve_saved_as_subscribee_branch= before save extraction,
+  not in these initial-render helpers.
+
+The expected replacement comments should say:
+
+- the =SubscribeeCol= existing-child guard is defensive for initial
+  render because current callers create this branch only when absent;
+- existing =SubscribeeCol= reconciliation belongs to rerender
+  completion, not this helper;
+- the =HiddenInSubscribeeCol= existing-child guard can be reached only
+  after the rerender/postorder path has already reconciled an existing
+  hidden-in column, or during initial render when preserving an
+  existing branch is the right no-op.
+
+* Implementation steps
+
+** 1. Read nearby comments and call sites
+
+Inspect:
+
+- =maybe_add_subscribeeCol_branch=;
+- =maybe_add_hiddenInSubscribeeCol_branch=;
+- callers in =to_org/complete= and =update_buffer/complete= if needed.
+
+Confirm that no code behavior needs to change.
+
+** 2. Replace only the stale comments
+
+Edit the two guard comments in =sharing/mod.rs=.
+
+Keep the comments short and specific. Avoid restating the whole 2p5
+history in code.
+
+** 3. Update the roadmap
+
+Mark item a in =3_what-remains.org= done and add a short status note.
+Rename this file to =3pA_DONE.org= after execution.
+
+* Tests
+
+Run:
+
+#+begin_src text
+cargo check
+#+end_src
+
+No broader test suite is required unless code changes.
+
+* Acceptance criteria
+
+- The two stale comments no longer suggest that these initial-render
+  helpers are the save-buffer integration point.
+- The replacement comments point to rerender sharing-scaffold
+  reconciliation as the place existing generated branches are handled.
+- No behavior changes.
+- =cargo check= passes.

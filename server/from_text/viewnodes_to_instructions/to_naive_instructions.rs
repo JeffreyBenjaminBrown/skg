@@ -40,7 +40,7 @@ pub(crate) struct NodeDeleteIntent {
 /// after reconcile_nodeEditIntents.
 /// PITFALL: There's a later step also called reconciliation:
 /// reconcile_same_id_instructions.
-pub(crate) struct ReconciledNodeEditIntents {
+pub(crate) struct SameIdReconciledNodeEditIntents {
   order  : Vec<ID>,
   by_pid : HashMap<ID, NodeEditIntent>,
 }
@@ -173,28 +173,28 @@ impl NodeSaveIntent {
     self . hides_from_its_subscriptions =
       MSV::Specified (hides); }}
 
-impl ReconciledNodeEditIntents {
+impl SameIdReconciledNodeEditIntents {
   fn from_groups (
     order  : Vec<ID>,
     mut groups : HashMap<ID, Vec<NodeEditIntent>>,
-  ) -> Result<ReconciledNodeEditIntents, String> {
+  ) -> Result<SameIdReconciledNodeEditIntents, String> {
     let mut by_pid : HashMap<ID, NodeEditIntent> =
       HashMap::new();
     for pid in &order {
       let group : Vec<NodeEditIntent> =
         groups . remove (pid)
         . ok_or (
-          "ReconciledNodeEditIntents::from_groups: missing group"
+          "SameIdReconciledNodeEditIntents::from_groups: missing group"
           . to_string())?;
       by_pid . insert (
         pid . clone(),
         reconcile_nodeEditIntents_with_same_ID (group)?); }
-    Ok (ReconciledNodeEditIntents { order, by_pid }) }
+    Ok (SameIdReconciledNodeEditIntents { order, by_pid }) }
 
   pub(crate) fn into_ordered_intents (
     self,
   ) -> Vec<NodeEditIntent> {
-    let ReconciledNodeEditIntents { order, mut by_pid, }
+    let SameIdReconciledNodeEditIntents { order, mut by_pid, }
       = self;
     order . into_iter()
       . filter_map ( |pid| by_pid . remove (&pid) )
@@ -301,7 +301,7 @@ pub(crate) fn naive_node_edit_intents_from_role_viewforest (
 #[allow(non_snake_case)]
 pub(crate) fn reconcile_nodeEditIntents (
   intents : Vec<NodeEditIntent>,
-) -> Result<ReconciledNodeEditIntents, String> {
+) -> Result<SameIdReconciledNodeEditIntents, String> {
   let mut grouped : HashMap<ID, Vec<NodeEditIntent>> =
     HashMap::new();
   let mut order : Vec<ID> =
@@ -315,7 +315,7 @@ pub(crate) fn reconcile_nodeEditIntents (
     grouped . entry (pid)
       . or_insert_with (Vec::new)
       . push (intent); }
-  ReconciledNodeEditIntents::from_groups (order, grouped) }
+  SameIdReconciledNodeEditIntents::from_groups (order, grouped) }
 
 /// ASSUMES the inputs all share an ID.
 #[allow(non_snake_case)]

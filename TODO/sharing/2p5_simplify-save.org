@@ -33,7 +33,7 @@ checked view tree
 
 * Ranked opportunities
 
-** a. Split 'viewforest_to_nonmerge_save_instructions' into named phases
+** DONE a. Split 'viewforest_to_nonmerge_save_instructions' into named phases
 
 This is the highest-priority cleanup. The function currently performs
 role annotation, visibility extraction, graph-intent extraction,
@@ -50,7 +50,12 @@ This is not primarily about shortening a function. It is about making
 the order of save policies explicit enough that the next sharing
 change does not have to rediscover the whole pipeline.
 
-** b. Simplify 'build_disk_supplemented_define_nodes'
+Status: complete. The top-level function now reads as a named save
+pipeline: role annotation and extraction, same-ID node-edit
+reconciliation, subscribee visibility folding, disk supplementation,
+and unchanged filtering are separate phases.
+
+** DONE b. Simplify 'build_disk_supplemented_define_nodes'
 
 Item a should leave behind a helper shaped roughly like
 'build_disk_supplemented_define_nodes'. That helper will be an
@@ -67,8 +72,6 @@ It should separate these concerns behind names:
 - canonicalize IDs from disk;
 - detect source moves;
 - supplement unspecified fields from disk;
-- apply the temporary direct-subscribee =contains= restoration
-  guardrail;
 - collect 'SourceMove' values.
 
 This can still be behavior-preserving. The point is not yet to remove
@@ -79,9 +82,12 @@ enough that the later policy changes have one obvious edit point.
 Acceptance criterion: after this item, both
 'viewforest_to_nonmerge_save_instructions' and
 'build_disk_supplemented_define_nodes' should read as short named
-pipelines, and the only remaining obviously policy-specific wrinkle in
-the disk phase should be a clearly named temporary helper for restoring
-direct-as-subscribee 'contains' from disk.
+pipelines.
+
+Status: complete. Disk supplementation now has explicit save/delete
+paths, loads disk state only for saves, fills unspecified fields,
+canonicalizes IDs, detects source moves, and collects source moves.
+The temporary direct-subscribee guardrail was removed by item f.
 
 ** DONE c. Move subscribee visibility folding before final =DefineNode= construction
 
@@ -162,7 +168,7 @@ Status: complete. =NodeEditIntent= now distinguishes ordinary
 =NodeSaveIntent.contains= is unspecified for direct =AsSubscribee=
 occurrences. The old =children_affect_only_hiding= field is gone.
 
-** e. Reconcile visibility surfaces explicitly
+** DONE e. Reconcile visibility surfaces explicitly
 
 =SubscribeeVisibilityIntent= already exists, but the save path still
 needs clearer reconciliation rules once direct =AsSubscribee= branches
@@ -196,7 +202,7 @@ invariant is already at most one graph edit per PID. Prefer a
 structure along these lines:
 
 #+begin_src rust
-struct ReconciledNodeEditIntents {
+struct SameIdReconciledNodeEditIntents {
   order  : Vec<ID>,
   by_pid : HashMap<ID, NodeEditIntent>,
 }
@@ -210,11 +216,13 @@ The important properties are:
 - visibility surfaces remain first-class until their deltas are folded
   into owned subscriber graph-save intents.
 
-Status: the keyed collection slice is complete.
-=ReconciledNodeEditIntents= now owns post-reconciliation ordering and
-PID lookup, and subscriber hide/unhide folding no longer scans a raw
-=Vec<NodeEditIntent>=. Broader visibility-surface reconciliation is
-still future work if it remains useful.
+Status: complete. =SubscribeeVisibilityIntent= remains a separate
+visibility-surface extraction result rather than being folded into
+same-ID node-edit reconciliation. Overlapping visibility surfaces are
+validated by subscriber/content visibility, and compatible duplicates
+are allowed. Hide/unhide deltas are then folded into the keyed
+=SameIdReconciledNodeEditIntents= collection, which owns
+post-=reconcile_nodeEditIntents= ordering and PID lookup.
 
 ** DONE f. Keep disk supplementation policy-neutral
 
@@ -247,7 +255,7 @@ fills unspecified =contains= from disk, canonicalizes IDs, detects
 source moves, and supplements unspecified fields. It no longer carries
 a direct-subscribee restoration guardrail or role-position flag.
 
-** g. Tighten same-ID reconciliation around intent variants
+** DONE g. Tighten same-ID reconciliation around intent variants
 
 The current same-ID reconciliation now happens at the
 =NodeEditIntent= layer, which is the right direction. After the intent
@@ -264,12 +272,14 @@ This should preserve the existing regression where the same ID appears
 both in a direct subscribee position and as an ordinary definitive
 node, and the ordinary node's =contains= edit survives.
 
-Status: partially complete. Same-ID reconciliation now returns a keyed
-=ReconciledNodeEditIntents= collection with explicit output order, and
-the current variant rules are centralized there. Duplicate
-visibility-surface semantics have not been broadened yet.
+Status: complete. Same-ID node-edit reconciliation now returns a
+keyed =SameIdReconciledNodeEditIntents= collection with explicit
+output order, and the current variant rules are centralized there.
+Duplicate visibility-surface semantics are handled outside same-ID
+node-edit reconciliation by =SubscribeeVisibilityIntent= overlap
+validation.
 
-** h. Revisit validation once save roles are stable
+** DONE h. Revisit validation once save roles are stable
 
 Keep pre-save validation unchanged for now. That boundary was useful
 for making the direct-subscribee fix narrow.
@@ -280,7 +290,23 @@ traversal, and direct-subscribee visibility policy all use the same
 positional facts. This is lower priority because moving validation too
 early risks mixing this cleanup with a larger behavior change.
 
-** i. Document the remaining rerender/completion boundary
+Status: complete as an evaluation. Validation should not move onto the
+role-annotated tree right now.
+
+The current validation boundary is intentional:
+
+- raw-text and unchecked-tree validation run before
+  =unchecked_to_checked_tree=, so they cannot consume =SaveRole=
+  without moving a much larger boundary;
+- local structural validation checks what shapes are legal in the
+  input tree, which is distinct from save-role interpretation;
+- foreign-node validation runs after save instruction construction,
+  where direct =AsSubscribee= child-list edits have already avoided
+  becoming foreign subscribee =contains= edits.
+
+No narrow role-aware validation helper was justified.
+
+** DONE i. Document the remaining rerender/completion boundary
 
 The save extraction path is now clearer than the rerender path that
 feeds it. The remaining completion contract should be written down
@@ -294,6 +320,29 @@ before broadening edit behavior inside subscribee branches:
 
 This is not a blocker for the save-path cleanup above, but it is the
 next place where inappropriate bundling can reappear.
+
+Status: complete. The boundary is:
+
+- save extraction owns interpretation of user-authored direct
+  =AsSubscribee= child lists as subscriber visibility edits;
+- saved-view completion must preserve definitive direct
+  =AsSubscribee= child lists until save extraction can interpret them;
+- collateral-view completion and diff-mode completion may regenerate
+  branches from graph/diff facts, because they are not the saved
+  buffer's pending user edit surface;
+- generated display scaffolds may be reconciled during rerender, but
+  save extraction must continue treating them as display-only;
+- diff-mode phantom/removed nodes are display state and must not become
+  hide/unhide signal.
+
+Code references:
+
+- =should_preserve_saved_as_subscribee_branch= documents the saved-view
+  guard that keeps direct =AsSubscribee= child-list signal intact;
+- =reconcile_sharing_scaffold_children= documents rerender-time
+  sharing scaffold reconciliation and phantom child construction;
+- =subscribee_visibility_intents_from_tree= owns the save-time
+  interpretation of direct =AsSubscribee= visible children.
 
 * Test expectations
 
