@@ -83,11 +83,11 @@ pipelines, and the only remaining obviously policy-specific wrinkle in
 the disk phase should be a clearly named temporary helper for restoring
 direct-as-subscribee 'contains' from disk.
 
-** c. Move subscribee visibility folding before final =DefineNode= construction
+** c. PARTLY DONE Move subscribee visibility folding before final =DefineNode= construction
 
 This is tied with item a for importance.
 
-The current representation still does this:
+The current representation used to do this:
 
 #+begin_src text
 direct AsSubscribee child list
@@ -110,6 +110,21 @@ guardrail during disk supplementation. It would also make visibility
 edits less sensitive to the fact that they currently run after graph
 =SaveNode= construction.
 
+Status after the first item-c pass: visibility folding now happens at
+the =NodeEditIntent= layer, before =DefineNode= construction and before
+disk supplementation. That removed the late mutation of completed
+=DefineNode= values.
+
+What remains: a direct =AsSubscribee= node still carries its displayed
+child list as a temporary =NodeSaveIntent.contains= value. Because that
+still looks like a graph =contains= edit until later, disk
+supplementation must still call the temporary guardrail that restores
+the subscribee's =contains= from disk.
+
+So item c is not complete until direct-as-subscribee child lists never
+enter the graph-save intent as =contains= in the first place. That
+remaining work should be handled by item d's explicit intent shape.
+
 ** d. Replace =children_affect_only_hiding= with an explicit intent shape
 
 The boolean is a useful bridge, but it makes =NodeSaveIntent= carry a
@@ -126,21 +141,74 @@ subscribee children as graph =contains=:
 If item c lands first, separate variants will probably be clearer than
 an enum field.
 
-** e. Make subscriber visibility edits first-class through reconciliation
+After the partial item-c pass, this item is the next required cleanup.
+It should split the direct =AsSubscribee= branch out before graph-save
+=contains= is built:
+
+- ordinary definitive nodes should produce graph-save intents whose
+  direct children mean graph =contains=;
+- direct =AsSubscribee= nodes should produce visibility-surface
+  intents whose direct children mean subscriber-visible subscribee
+  content;
+- recursive ordinary descendants below a direct subscribee should still
+  be allowed to produce ordinary graph-save intents;
+- a direct subscribee occurrence and an ordinary occurrence for the
+  same graph ID should no longer reconcile as two ordinary-looking
+  saves with a boolean distinction.
+
+Acceptance criterion: after this item, there should be no need for a
+direct-subscribee =contains= restoration guardrail during disk
+supplementation, because no direct-subscribee visibility surface ever
+becomes a subscribee graph =contains= edit.
+
+** e. Reconcile visibility surfaces explicitly
 
 =SubscribeeVisibilityIntent= already exists, but the save path still
-folds it late by mutating completed =DefineNode= values. That helper
-has to load disk nodes, inspect current instructions, synthesize a
-subscriber save instruction if missing, and directly update
-=hides_from_its_subscriptions=.
+needs clearer reconciliation rules once direct =AsSubscribee= branches
+are no longer encoded as ordinary-looking saves.
 
-Instead, visibility edits should stay as first-class save
-intermediates until they are folded into owned subscriber node intents.
-Only after that should the code construct final =DefineNode= values.
+After the partial item-c pass, visibility edits are folded into
+=NodeEditIntent= before =DefineNode= construction. That is an
+improvement, but visibility surfaces still are not reconciled as their
+own intent class.
 
-This would also give same-ID reconciliation a clearer input: graph
-edits and visibility-surface edits would be distinct things, not
-ordinary-looking saves with a policy boolean attached.
+Once item d introduces an explicit visibility-surface intent, same-ID
+reconciliation should consume graph edits and visibility surfaces as
+distinct inputs:
+
+- duplicate ordinary graph saves for the same ID still conflict;
+- ordinary graph saves and direct-subscribee visibility surfaces for
+  the same graph ID can coexist;
+- duplicate visibility surfaces conflict only when they express
+  incompatible visibility for the same subscriber/content pair;
+- subscriber hide/unhide deltas should be folded into the owned
+  subscriber's graph-save intent before final =DefineNode=
+  construction.
+
+This item should remove the need for visibility-specific special cases
+inside ordinary graph-save reconciliation.
+
+It should also replace the current =Vec<NodeEditIntent>=-as-database
+pattern with an explicitly addressable reconciled collection. The code
+now sometimes scans a vector looking for "the save intent for this
+PID"; that is a smell because after same-ID reconciliation the intended
+invariant is already at most one graph edit per PID. Prefer a
+structure along these lines:
+
+#+begin_src rust
+struct ReconciledNodeEditIntents {
+  order  : Vec<ID>,
+  by_pid : HashMap<ID, NodeEditIntent>,
+}
+#+end_src
+
+or an =IndexMap= if that dependency already exists or is justified.
+The important properties are:
+
+- lookup by PID is direct when folding subscriber hide/unhide deltas;
+- output order remains stable enough for tests and review;
+- visibility surfaces remain first-class until their deltas are folded
+  into owned subscriber graph-save intents.
 
 ** f. Keep disk supplementation policy-neutral
 
@@ -148,13 +216,22 @@ Disk supplementation should restore unspecified fields and detect
 source moves. It should not need to know that a node appeared as a
 direct subscribee or that its =contains= must be restored from disk.
 
-Once visibility folding happens before =DefineNode= construction, the
-supplementation phase can become boring again:
+Visibility folding now happens before =DefineNode= construction, but
+that alone was not enough to make disk supplementation policy-neutral.
+Disk supplementation can become boring only after item d stops direct
+=AsSubscribee= child lists from becoming graph-save =contains= values.
+
+After that, the supplementation phase should do only this:
 
 - canonicalize IDs from disk;
 - detect source moves;
 - supplement unspecified fields;
 - pass the result onward.
+
+Acceptance criterion: delete
+='restore_subscribee_content_from_disk_if_needed' or its equivalent.
+No disk-supplementation helper should inspect direct-subscribee role
+policy, =children_affect_only_hiding=, or any replacement field.
 
 That is an important simplification because supplementation is already
 cross-cutting enough without also carrying view-position policy.

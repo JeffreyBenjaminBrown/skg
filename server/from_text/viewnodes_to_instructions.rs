@@ -6,7 +6,7 @@ pub mod subscribee_visibility_intents;
 use classify::{ viewforest_with_saveroles, ViewNode_in_Role };
 use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, MSV, SkgConfig};
+use crate::types::misc::{ID, SkgConfig};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use crate::types::viewnode::ViewNode;
@@ -74,17 +74,17 @@ pub async fn viewforest_to_nonmerge_save_instructions (
   let intents_without_dups : Vec<NodeEditIntent> =
     reconcile_nodeEditIntents (extracted . node_edit_intents)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  let with_disk : Definenodes_with_Sourcemoves =
-    build_disk_supplemented_define_nodes (
-      intents_without_dups, config, driver ) . await ?;
-  let with_visibility : Vec<DefineNode> =
+  let intents_with_visibility : Vec<NodeEditIntent> =
     apply_hiderels_from_subscribee_visibility (
-      with_disk . instructions,
+      intents_without_dups,
       &extracted . visibility_intents,
       config,
       driver ) . await ?;
+  let with_disk : Definenodes_with_Sourcemoves =
+    build_disk_supplemented_define_nodes (
+      intents_with_visibility, config, driver ) . await ?;
   let changed_instructions : Vec<DefineNode> =
-    filter_wouldbe_noop_definenodes (with_visibility);
+    filter_wouldbe_noop_definenodes (with_disk . instructions);
   Ok ((changed_instructions, with_disk . source_moves)) }
 
 fn extract_save_intents (
@@ -191,12 +191,10 @@ fn restore_subscribee_content_from_disk_if_needed (
 /// Interpret direct child-list edits under definitive AsSubscribee
 /// branches as subscriber visibility edits.
 ///
-/// At this point ordinary graph SaveNodes have already been built,
-/// reconciled, and supplemented from disk, but filtering
-/// unchanged (no-op) instructions has not run yet.
-/// That lets this pass add a real (does-op)
-/// `hides_from_its_subscriptions` change to the owned subscriber
-/// before the subscriber would otherwise be filtered out as a no-op.
+/// At this point graph edit intents have been same-ID reconciled, but
+/// have not yet been converted to DefineNodes or supplemented from
+/// disk. That lets inferred hides become ordinary subscriber node
+/// intents before final save instruction construction.
 ///
 /// For each `(subscriber, subscribee, visible_content)` intent:
 ///
@@ -206,11 +204,11 @@ fn restore_subscribee_content_from_disk_if_needed (
 /// - any pre-save direct content of the subscribee that is present in
 ///   `visible_content` is removed from that subscriber's hides.
 async fn apply_hiderels_from_subscribee_visibility (
-  mut defineNodes : Vec<DefineNode>,
+  mut node_edit_intents : Vec<NodeEditIntent>,
   vis_intents     : &[SubscribeeVisibilityIntent],
   config          : &SkgConfig,
   driver          : &TypeDBDriver,
-) -> Result<Vec<DefineNode>, Box<dyn Error>> {
+) -> Result<Vec<NodeEditIntent>, Box<dyn Error>> {
   validate_no_overlapping_subscribee_visibility_conflicts (
     vis_intents, config, driver ) . await ?;
   for intent in vis_intents {
@@ -227,7 +225,7 @@ async fn apply_hiderels_from_subscribee_visibility (
 
     let subscriber_contains : HashSet<ID> =
       subscriber_will_contain_after_save (
-        &defineNodes, &subscriber_from_disk );
+        &node_edit_intents, &subscriber_from_disk );
     let visible_content : HashSet<ID> =
       intent . visible_content . iter() . cloned() . collect();
     let inferred_hides : Vec<ID> =
@@ -244,12 +242,12 @@ async fn apply_hiderels_from_subscribee_visibility (
       . cloned() . collect();
     if inferred_hides . is_empty() && inferred_unhides . is_empty()
       { continue; }
-    let subscriber_node : &mut NodeComplete =
-      ensure_subscriber_save_instruction (
-        &mut defineNodes, subscriber_from_disk );
-    apply_hiderel_delta_to_subscriber (
-      subscriber_node, &inferred_hides, &inferred_unhides ); }
-  Ok (defineNodes) }
+    apply_hiderel_delta_to_subscriber_intent (
+      &mut node_edit_intents,
+      subscriber_from_disk,
+      &inferred_hides,
+      &inferred_unhides ); }
+  Ok (node_edit_intents) }
 
 async fn validate_no_overlapping_subscribee_visibility_conflicts (
   intents : &[SubscribeeVisibilityIntent],
@@ -291,60 +289,58 @@ fn source_is_owned (
     . unwrap_or (false) }
 
 fn subscriber_will_contain_after_save (
-  instructions          : &[DefineNode],
+  node_edit_intents     : &[NodeEditIntent],
   subscriber_from_disk  : &NodeComplete,
 ) -> HashSet<ID> {
-  instructions . iter()
-    . find_map ( |instr| match instr {
-      DefineNode::Save (SaveNode (node))
-        if node . pid == subscriber_from_disk . pid =>
-          Some (node . contains . iter() . cloned() . collect()),
-      _ => None })
+  fn content_if_children_affect_content (
+    intent : &NodeEditIntent,
+    pid    : &ID,
+  ) -> Option<Vec<ID>> {
+    match intent {
+      NodeEditIntent::Save (intent)
+        if intent . pid == *pid
+           && ! intent . children_affect_only_hiding =>
+        Some (intent . contains . clone()),
+      _ => None,
+    }}
+
+  node_edit_intents . iter()
+    . find_map ( |intent|
+      content_if_children_affect_content (
+        intent, &subscriber_from_disk . pid ))
+    . map ( |contains| contains . into_iter() . collect())
     . unwrap_or_else ( ||
       subscriber_from_disk . contains . iter() . cloned() . collect()) }
 
-/// Return the subscriber SaveNode that should receive inferred
-/// `hides_from_its_subscriptions` edits.
-///
-/// If the save already includes an instruction for the subscriber, reuse
-/// that mutable node so inferred hides compose with same-save edits.
-/// Otherwise, create a SaveNode from the current disk value; the added
-/// hide relation is what makes that otherwise unchanged subscriber
-/// instruction worth keeping.
-fn ensure_subscriber_save_instruction (
-  instructions         : &mut Vec<DefineNode>,
-  subscriber_from_disk : NodeComplete,
-) -> &mut NodeComplete {
-  if let Some (index) =
-    instructions . iter() . position (
-      |instr| match instr {
-        DefineNode::Save (SaveNode (node)) =>
-          node . pid == subscriber_from_disk . pid,
-        _ => false } )
-  { match instructions . get_mut (index) . unwrap() {
-      DefineNode::Save (SaveNode (node)) => node,
-      _ => unreachable!(), }
-  } else {
-    instructions . push (
-      DefineNode::Save (SaveNode (subscriber_from_disk)));
-    match instructions . last_mut() . unwrap() {
-      DefineNode::Save (SaveNode (node)) => node,
-      _ => unreachable!(), }}}
-
-fn apply_hiderel_delta_to_subscriber (
-  subscriber     : &mut NodeComplete,
+fn apply_hiderel_delta_to_subscriber_intent (
+  node_edit_intents : &mut Vec<NodeEditIntent>,
+  subscriber        : NodeComplete,
   inferred_hides : &[ID],
   inferred_unhides : &[ID],
 ) {
-  let mut hides : Vec<ID> =
-    subscriber . hides_from_its_subscriptions
-    . or_default() . to_vec();
-  hides . retain ( |id| ! inferred_unhides . contains (id) );
-  for id in inferred_hides {
-    if ! hides . contains (id) {
-      hides . push (id . clone()); }}
-  subscriber . hides_from_its_subscriptions =
-    MSV::Specified (hides); }
+  fn nodeeditintent_for_pid_mut<'a> (
+    node_edit_intents : &'a mut Vec<NodeEditIntent>,
+    pid               : &ID,
+  ) -> Option<&'a mut NodeEditIntent> {
+    node_edit_intents . iter_mut()
+      . find ( |intent| intent . pid() == pid ) }
+
+  if let Some (intent) =
+    nodeeditintent_for_pid_mut (
+      node_edit_intents, &subscriber . pid )
+  {
+    intent . apply_hiderel_delta (
+      &subscriber . hides_from_its_subscriptions,
+      inferred_hides,
+      inferred_unhides );
+    return; }
+  let mut intent : NodeEditIntent =
+    NodeEditIntent::save_from_nodecomplete (subscriber . clone());
+  intent . apply_hiderel_delta (
+    &subscriber . hides_from_its_subscriptions,
+    inferred_hides,
+    inferred_unhides );
+  node_edit_intents . push (intent); }
 
 /// Filters out Save instructions that would be no-ops,
 /// because they match the pre-save in-Rust graph entry

@@ -3,7 +3,7 @@ use crate::from_text::viewnodes_to_instructions::classify::{
 use crate::types::viewnode::EditRequest;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, TrueNode, IndefOrDef};
 use crate::types::misc::{ID, MSV, SourceName};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 use crate::types::tree::generic::{
   read_at_node_in_tree, unique_scaffold_child };
@@ -17,16 +17,18 @@ pub(crate) enum NodeEditIntent {
 }
 
 pub(crate) struct NodeSaveIntent {
-  pid                          : ID,
+  pub(crate) pid               : ID,
   source                       : SourceName,
   title                        : String,
   body                         : Option<String>,
-  contains                     : Vec<ID>,
+  pub(crate) contains          : Vec<ID>,
+  extra_ids                    : Vec<ID>,
   pub(crate) children_affect_only_hiding : bool, // Usually false. True for subscribees (where they appear *as* subscribees, i.e. as a child of a SubscribeeCol). When this is true, the node's children are treated as a set (order is ignored). Anything the subscribee contains that is absent here will be hidden from the subscriber (unless it is content of the subscriber, because nothing should hide its own content). Anything present here that the subscriber does not contain is invalid -- even if the user owns the subscribee, they can't edit it where it appears *as* a subscribee -- so their relationship to this node will be changed to Independent.
   aliases                      : MSV<String>,
   subscribes_to                : MSV<ID>,
   hides_from_its_subscriptions : MSV<ID>,
   overrides_view_of            : MSV<ID>,
+  misc                         : Vec<FileProperty>,
 }
 
 pub(crate) struct NodeDeleteIntent {
@@ -66,6 +68,38 @@ impl NodeEditIntent {
       NodeEditIntent::Delete (_) => false,
     }}
 
+  pub(crate) fn apply_hiderel_delta (
+    &mut self,
+    base_hides       : &MSV<ID>,
+    inferred_hides   : &[ID],
+    inferred_unhides : &[ID],
+  ) {
+    match self {
+      NodeEditIntent::Save (intent) =>
+          intent . apply_hiderel_delta (
+            base_hides, inferred_hides, inferred_unhides),
+      NodeEditIntent::Delete (_) => {},
+    }}
+
+  pub(crate) fn save_from_nodecomplete (
+    node : NodeComplete,
+  ) -> NodeEditIntent {
+    NodeEditIntent::Save (NodeSaveIntent {
+      pid                          : node . pid,
+      source                       : node . source,
+      title                        : node . title,
+      body                         : node . body,
+      contains                     : node . contains,
+      extra_ids                    : node . extra_ids,
+      children_affect_only_hiding  : false,
+      aliases                      : node . aliases,
+      subscribes_to                : node . subscribes_to,
+      hides_from_its_subscriptions :
+        node . hides_from_its_subscriptions,
+      overrides_view_of            : node . overrides_view_of,
+      misc                         : node . misc,
+    }) }
+
   pub(crate) fn into_define_node (
     self,
   ) -> Result<DefineNode, String> {
@@ -81,16 +115,36 @@ impl NodeEditIntent {
           aliases                      : intent . aliases,
           source                       : intent . source,
           pid                          : intent . pid,
-          extra_ids                    : vec![],
+          extra_ids                    : intent . extra_ids,
           body                         : intent . body,
           contains                     : intent . contains,
           subscribes_to                : intent . subscribes_to,
           hides_from_its_subscriptions :
             intent . hides_from_its_subscriptions,
           overrides_view_of            : intent . overrides_view_of,
-          misc                         : Vec::new(),
+          misc                         : intent . misc,
         }))) }}
 }
+
+impl NodeSaveIntent {
+  fn apply_hiderel_delta (
+    &mut self,
+    base_hides       : &MSV<ID>,
+    inferred_hides   : &[ID],
+    inferred_unhides : &[ID],
+  ) {
+    let mut hides : Vec<ID> =
+      if self . hides_from_its_subscriptions . is_unspecified() {
+        base_hides . or_default() . to_vec()
+      } else {
+        self . hides_from_its_subscriptions . or_default() . to_vec()
+      };
+    hides . retain ( |id| ! inferred_unhides . contains (id) );
+    for id in inferred_hides {
+      if ! hides . contains (id) {
+        hides . push (id . clone()); }}
+    self . hides_from_its_subscriptions =
+      MSV::Specified (hides); }}
 
 /// Converts a viewforest of ViewNodes to preliminary DefineNodes.
 ///
@@ -393,6 +447,7 @@ fn assemble_node_edit_intents (
           contains                     :
             contains_by_node_id . remove (&candidate_id) . ok_or (
               "assemble_node_edit_intents: missing contains")?,
+          extra_ids                    : vec![],
           children_affect_only_hiding :
             matches!(
               tree . get (candidate_id) . unwrap() . value() . role,
@@ -405,6 +460,7 @@ fn assemble_node_edit_intents (
               "assemble_node_edit_intents: missing subscribees")?,
         hides_from_its_subscriptions : MSV::Unspecified,
         overrides_view_of            : MSV::Unspecified,
+        misc                         : Vec::new(),
         })),
     }}
   Ok (result) }
