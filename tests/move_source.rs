@@ -486,7 +486,7 @@ fn test_no_source_change_produces_no_moves (
 
 /// Reproduces the bug: changing only the source (nothing else)
 /// with a populated pool caused the instruction to be filtered out
-/// by filter_unchanged_save_instructions (which didn't compare source).
+/// by filter_wouldbe_noop_definenodes (which didn't compare source).
 #[test]
 fn test_source_only_change_with_populated_pool (
 ) -> Result<(), Box<dyn Error>> {

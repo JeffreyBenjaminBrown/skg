@@ -1,5 +1,5 @@
 use crate::from_text::viewnodes_to_instructions::classify::{
-  viewforest_with_save_roles, SaveRole, ViewNode_in_Role };
+  viewforest_with_saveroles, SaveRole, ViewNode_in_Role };
 use crate::types::viewnode::EditRequest;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, TrueNode, IndefOrDef};
 use crate::types::misc::{ID, MSV, SourceName};
@@ -112,12 +112,18 @@ pub(crate) fn naive_node_edit_intents_from_viewforest (
   viewforest : &Tree<ViewNode>,
 ) -> Result<Vec<NodeEditIntent>, String> {
   let role_viewforest : Tree<ViewNode_in_Role> =
-    viewforest_with_save_roles (viewforest)?;
+    viewforest_with_saveroles (viewforest)?;
+  naive_node_edit_intents_from_role_viewforest (
+    &role_viewforest) }
+
+pub(crate) fn naive_node_edit_intents_from_role_viewforest (
+  role_viewforest : &Tree<ViewNode_in_Role>,
+) -> Result<Vec<NodeEditIntent>, String> {
   let candidate_ids : Vec<NodeId> =
     collect_preliminary_intent_candidate_ids (
-      &role_viewforest)?;
+      role_viewforest)?;
   let basics_by_node_id : HashMap<NodeId, NodeEditMinimal> =
-    collect_node_edit_basics (&role_viewforest, &candidate_ids)?;
+    collect_node_edit_basics (role_viewforest, &candidate_ids)?;
   let save_candidate_ids : Vec<NodeId> =
     candidate_ids . iter()
     . filter_map (|candidate_id| {
@@ -126,20 +132,19 @@ pub(crate) fn naive_node_edit_intents_from_viewforest (
           NodeEditMinimalAction::Save { .. } =>
             Some (*candidate_id),
           NodeEditMinimalAction::Delete =>
-            None,
-        })})
+            None, } ) } )
     . collect();
   let contains_by_node_id : HashMap<NodeId, Vec<ID>> =
     collect_contains_by_node_id (
-      &role_viewforest, &save_candidate_ids)?;
+      role_viewforest, &save_candidate_ids)?;
   let aliases_by_node_id : HashMap<NodeId, MSV<String>> =
     collect_aliases_by_node_id (
-      &role_viewforest, &save_candidate_ids)?;
+      role_viewforest, &save_candidate_ids)?;
   let subscribees_by_node_id : HashMap<NodeId, MSV<ID>> =
     collect_subscribees_by_node_id (
-      &role_viewforest, &save_candidate_ids)?;
+      role_viewforest, &save_candidate_ids)?;
   assemble_node_edit_intents (
-    &role_viewforest,
+    role_viewforest,
     candidate_ids,
     basics_by_node_id,
     contains_by_node_id,

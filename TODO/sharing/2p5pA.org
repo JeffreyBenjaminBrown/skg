@@ -43,7 +43,7 @@ look roughly like:
 
 #+begin_src rust
 let role_viewforest =
-  viewforest_with_save_roles (viewforest)?;
+  viewforest_with_saveroles (viewforest)?;
 let extracted =
   extract_save_intents (&role_viewforest)?;
 let reconciled =
@@ -58,7 +58,7 @@ let with_visibility =
     config,
     driver ) . await?;
 let changed =
-  filter_unchanged_save_instructions (with_visibility);
+  filter_wouldbe_noop_definenodes (with_visibility);
 Ok ((changed, with_disk.source_moves))
 #+end_src
 
@@ -154,7 +154,7 @@ named and isolated, making items b and f easier.
 ** 5. Leave visibility folding and unchanged filtering in place
 
 Keep 'apply_hiderels_from_subscribee_visibility' after disk
-supplementation and before 'filter_unchanged_save_instructions'.
+supplementation and before 'filter_wouldbe_noop_definenodes'.
 
 That position matters because a subscriber whose only edit is an
 inferred hide must survive no-op filtering. Moving the phase belongs

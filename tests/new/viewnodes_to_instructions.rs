@@ -9,7 +9,7 @@ use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_v
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::validate::validate_and_filter_foreign_instructions;
 use skg::from_text::viewnodes_to_instructions::classify::{
-  viewforest_with_save_roles, ViewNode_in_Role };
+  viewforest_with_saveroles, ViewNode_in_Role };
 use skg::from_text::viewnodes_to_instructions::subscribee_visibility_intents::{
   subscribee_visibility_intents_from_tree, SubscribeeVisibilityIntent };
 use skg::from_text::viewnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_tree;
@@ -59,7 +59,7 @@ fn visibility_intents_from_org (
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
   let role_viewforest : Tree<ViewNode_in_Role> =
-    viewforest_with_save_roles (&viewforest) . unwrap();
+    viewforest_with_saveroles (&viewforest) . unwrap();
   subscribee_visibility_intents_from_tree (
     &role_viewforest) . unwrap() }
 
@@ -469,7 +469,7 @@ fn subscribee_visibility_intent_excludes_non_content_delete_and_phantom_children
     checked_viewforest_from_org (input);
   set_membership_unstaged_minus (&mut viewforest, "phantom");
   let role_viewforest : Tree<ViewNode_in_Role> =
-    viewforest_with_save_roles (&viewforest) . unwrap();
+    viewforest_with_saveroles (&viewforest) . unwrap();
   let intents : Vec<SubscribeeVisibilityIntent> =
     subscribee_visibility_intents_from_tree (
       &role_viewforest) . unwrap();

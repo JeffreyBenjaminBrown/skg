@@ -3,7 +3,7 @@ pub mod reconcile_same_id_instructions;
 pub mod classify;
 pub mod subscribee_visibility_intents;
 
-use classify::{ viewforest_with_save_roles, ViewNode_in_Role };
+use classify::{ viewforest_with_saveroles, ViewNode_in_Role };
 use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig};
@@ -14,12 +14,22 @@ use crate::types::views_state::nodecomplete_from_in_rust_graph;
 use subscribee_visibility_intents::{ SubscribeeVisibilityIntent, subscribee_visibility_intents_from_tree, };
 use super::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
 use super::validate::buffernode_differs_from_disknode;
-use to_naive_instructions::{ naive_node_edit_intents_from_viewforest, reconcile_nodeEditIntents, NodeEditIntent, };
+use to_naive_instructions::{ naive_node_edit_intents_from_role_viewforest, reconcile_nodeEditIntents, NodeEditIntent, };
 
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
+
+struct SaveExtraction {
+  node_edit_intents  : Vec<NodeEditIntent>,
+  visibility_intents : Vec<SubscribeeVisibilityIntent>,
+}
+
+struct DiskSupplementedDefineNodes {
+  instructions : Vec<DefineNode>,
+  source_moves : Vec<SourceMove>,
+}
 
 /// Converts a viewforest of ViewNodes to DefineNodes,
 /// reconciling duplicates via 'reconcile_same_id_instructions'
@@ -34,20 +44,48 @@ pub async fn viewforest_to_nonmerge_save_instructions (
   driver : &TypeDBDriver,
 ) -> Result<(Vec<DefineNode>, Vec<SourceMove>), Box<dyn Error>> {
   let role_viewforest : Tree<ViewNode_in_Role> =
-    viewforest_with_save_roles (viewforest) ?;
-  let visibility_intents : Vec<SubscribeeVisibilityIntent> =
-    subscribee_visibility_intents_from_tree (&role_viewforest)
-      . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  let naive_intents : Vec<NodeEditIntent> =
-    naive_node_edit_intents_from_viewforest (viewforest)
-    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+    viewforest_with_saveroles (viewforest) ?;
+  let extracted : SaveExtraction =
+    extract_save_intents (&role_viewforest)?;
   let intents_without_dups : Vec<NodeEditIntent> =
-    reconcile_nodeEditIntents (naive_intents)
+    reconcile_nodeEditIntents (extracted . node_edit_intents)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+  let with_disk : DiskSupplementedDefineNodes =
+    build_disk_supplemented_define_nodes (
+      intents_without_dups, config, driver ) . await ?;
+  let with_visibility : Vec<DefineNode> =
+    apply_hiderels_from_subscribee_visibility (
+      with_disk . instructions,
+      &extracted . visibility_intents,
+      config,
+      driver ) . await ?;
+  let changed_instructions : Vec<DefineNode> =
+    filter_wouldbe_noop_definenodes (with_visibility);
+  Ok ((changed_instructions, with_disk . source_moves)) }
+
+fn extract_save_intents (
+  role_viewforest : &Tree<ViewNode_in_Role>,
+) -> Result<SaveExtraction, Box<dyn Error>> {
+  let visibility_intents : Vec<SubscribeeVisibilityIntent> =
+    subscribee_visibility_intents_from_tree (role_viewforest)
+    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+  let node_edit_intents : Vec<NodeEditIntent> =
+    naive_node_edit_intents_from_role_viewforest (role_viewforest)
+    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+  Ok (SaveExtraction {
+    node_edit_intents,
+    visibility_intents,
+  }) }
+
+async fn build_disk_supplemented_define_nodes (
+  intents : Vec<NodeEditIntent>,
+  config  : &SkgConfig,
+  driver  : &TypeDBDriver,
+) -> Result<DiskSupplementedDefineNodes, Box<dyn Error>> {
   let mut result : Vec<DefineNode> =
-    Vec::with_capacity ( intents_without_dups . len() );
+    Vec::with_capacity ( intents . len() );
   let mut source_moves : Vec<SourceMove> = Vec::new();
-  for intent in intents_without_dups {
+  for intent in intents {
     let children_affect_only_hiding : bool =
       intent . children_affect_only_hiding();
     let instr_dn : DefineNode =
@@ -82,12 +120,10 @@ pub async fn viewforest_to_nonmerge_save_instructions (
             if let Some (sm) = maybe_move {
               let sm : SourceMove = sm;
               source_moves . push (sm); }}} }}}
-  let result : Vec<DefineNode> =
-    apply_hiderels_from_subscribee_visibility (
-      result, &visibility_intents, config, driver ) . await ?;
-  let changed_instructions : Vec<DefineNode> =
-    filter_unchanged_save_instructions (result);
-  Ok ((changed_instructions, source_moves)) }
+  Ok (DiskSupplementedDefineNodes {
+    instructions : result,
+    source_moves,
+  }) }
 
 /// Interpret direct child-list edits under definitive AsSubscribee
 /// branches as subscriber visibility edits.
@@ -107,14 +143,14 @@ pub async fn viewforest_to_nonmerge_save_instructions (
 /// - any pre-save direct content of the subscribee that is present in
 ///   `visible_content` is removed from that subscriber's hides.
 async fn apply_hiderels_from_subscribee_visibility (
-  mut instructions : Vec<DefineNode>,
-  intents          : &[SubscribeeVisibilityIntent],
-  config           : &SkgConfig,
-  driver           : &TypeDBDriver,
+  mut defineNodes : Vec<DefineNode>,
+  vis_intents     : &[SubscribeeVisibilityIntent],
+  config          : &SkgConfig,
+  driver          : &TypeDBDriver,
 ) -> Result<Vec<DefineNode>, Box<dyn Error>> {
   validate_no_overlapping_subscribee_visibility_conflicts (
-    intents, config, driver ) . await ?;
-  for intent in intents {
+    vis_intents, config, driver ) . await ?;
+  for intent in vis_intents {
     let Some (subscribee_from_disk) =
       optnodecomplete_from_id (
         config, driver, &intent . subscribee ) . await ?
@@ -128,7 +164,7 @@ async fn apply_hiderels_from_subscribee_visibility (
 
     let subscriber_contains : HashSet<ID> =
       subscriber_will_contain_after_save (
-        &instructions, &subscriber_from_disk );
+        &defineNodes, &subscriber_from_disk );
     let visible_content : HashSet<ID> =
       intent . visible_content . iter() . cloned() . collect();
     let inferred_hides : Vec<ID> =
@@ -147,10 +183,10 @@ async fn apply_hiderels_from_subscribee_visibility (
       { continue; }
     let subscriber_node : &mut NodeComplete =
       ensure_subscriber_save_instruction (
-        &mut instructions, subscriber_from_disk );
+        &mut defineNodes, subscriber_from_disk );
     apply_hiderel_delta_to_subscriber (
       subscriber_node, &inferred_hides, &inferred_unhides ); }
-  Ok (instructions) }
+  Ok (defineNodes) }
 
 async fn validate_no_overlapping_subscribee_visibility_conflicts (
   intents : &[SubscribeeVisibilityIntent],
@@ -253,7 +289,7 @@ fn apply_hiderel_delta_to_subscriber (
 /// in the in-Rust graph) are kept. This runs after disk
 /// supplementation so unspecified fields have already been restored
 /// to their disk values before comparison.
-fn filter_unchanged_save_instructions (
+fn filter_wouldbe_noop_definenodes (
   instructions : Vec<DefineNode>,
 ) -> Vec<DefineNode> {
   let initial_count : usize = instructions . len();
@@ -268,7 +304,7 @@ fn filter_unchanged_save_instructions (
       DefineNode::Delete (_) => true, })
     . collect();
   let removed_count : usize = initial_count - filtered . len();
-  tracing::debug!("filter_unchanged_save_instructions: \
+  tracing::debug!("filter_wouldbe_noop_definenodes: \
              kept {} of {} instructions ({} unchanged filtered out)",
             filtered . len(), initial_count, removed_count);
   filtered }

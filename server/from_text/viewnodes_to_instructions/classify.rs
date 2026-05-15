@@ -30,11 +30,11 @@ pub fn classify_save_roles (
   let mut roles : SaveRoleMap = HashMap::new();
   for node_ref in viewforest . nodes() {
     let node_id : NodeId = node_ref . id();
-    let role : SaveRole = classify_node (node_ref) ?;
+    let role : SaveRole = saverole_for_node (node_ref) ?;
     roles . insert (node_id, role); }
   Ok (roles) }
 
-pub fn viewforest_with_save_roles (
+pub fn viewforest_with_saveroles (
   viewforest : &Tree<ViewNode>,
 ) -> Result<Tree<ViewNode_in_Role>, String> {
   let root_ref : NodeRef<ViewNode> =
@@ -43,7 +43,7 @@ pub fn viewforest_with_save_roles (
     // Right after this, 'result' only corresponds to the root of 'viewforest'.
     Tree::new (ViewNode_in_Role {
       viewnode : root_ref . value() . clone(),
-      role     : classify_node (root_ref)?,
+      role     : saverole_for_node (root_ref)?,
     });
   let target_root_id : NodeId =
     result . root() . id();
@@ -75,13 +75,13 @@ fn copy_role_children_recursive (
           target . get_mut (target_parent) . unwrap();
         target_parent_mut . append (ViewNode_in_Role {
           viewnode : child_ref . value() . clone(),
-          role     : classify_node (child_ref)?,
+          role     : saverole_for_node (child_ref)?,
         }) . id() };
     copy_role_children_recursive (
       source, target, child_id, target_child_id)?; }
   Ok (()) }
 
-fn classify_node (
+fn saverole_for_node (
   node_ref : NodeRef<ViewNode>,
 ) -> Result<SaveRole, String> {
   match &node_ref . value() . kind {

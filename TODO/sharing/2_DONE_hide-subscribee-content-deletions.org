@@ -103,12 +103,12 @@ Output:
 Call it in
 [[../../server/from_text/viewnodes_to_instructions.rs][viewnodes_to_instructions.rs]]
 after 'reconcile_same_id_instructions' and before
-'filter_unchanged_save_instructions'.
+'filter_wouldbe_noop_definenodes'.
 
 That position matters:
 
 - It sees one reconciled Save instruction per node.
-- It runs before 'filter_unchanged_save_instructions', so a node whose
+- It runs before 'filter_wouldbe_noop_definenodes', so a node whose
   only edit is a newly inferred hide will not be discarded as
   unchanged.
 - It runs before 'supplement_none_fields_from_disk_if_save', so it can
@@ -178,7 +178,7 @@ Add a second helper in the same new module:
 'discard_readonly_as_subscribee_content_edits'
 
 It should run after inferred hides have been merged and before
-'filter_unchanged_save_instructions'.
+'filter_wouldbe_noop_definenodes'.
 
 For each SaveNode whose corresponding ViewNode is a TrueNode shown as
 a subscribee:
