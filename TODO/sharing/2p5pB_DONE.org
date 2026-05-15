@@ -48,7 +48,7 @@ roughly like:
 
 #+begin_src rust
 let mut result =
-  DiskSupplementedDefineNodes::with_capacity (intents . len());
+  Definenodes_with_Sourcemoves::with_capacity (intents . len());
 for intent in intents {
   let children_affect_only_hiding =
     intent . children_affect_only_hiding();
@@ -71,7 +71,7 @@ branches should move behind named helpers.
 
 * Implementation steps
 
-** 1. Give 'DiskSupplementedDefineNodes' tiny methods
+** 1. Give 'Definenodes_with_Sourcemoves' tiny methods
 
 Keep the struct local unless moving it is necessary. Add only boring
 helpers such as:
@@ -121,7 +121,7 @@ Output:
 - a small result struct, for instance:
 
 #+begin_src rust
-struct DiskSupplementedDefineNode {
+struct Definenode_with_Opt_Sourcemove {
   instruction : DefineNode,
   source_move : Option<SourceMove>,
 }
@@ -150,7 +150,7 @@ Inputs:
 
 Output:
 
-- 'DiskSupplementedDefineNode'.
+- 'Definenode_with_Opt_Sourcemove'.
 
 Preserve the current behavior exactly:
 

@@ -125,7 +125,7 @@ Move the current loop over reconciled 'NodeEditIntent' values into a
 helper, probably returning:
 
 #+begin_src rust
-struct DiskSupplementedDefineNodes {
+struct Definenodes_with_Sourcemoves {
   instructions : Vec<DefineNode>,
   source_moves : Vec<SourceMove>,
 }
