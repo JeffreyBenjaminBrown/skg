@@ -133,6 +133,9 @@ fn format_buffer_validation_error (
     BufferValidationError::ModifiedForeignNode(id, source) => {
       format!("Cannot modify node from foreign (read-only) source:\n- ID: {}\n- Source: {}\n- Foreign sources can only be viewed, not modified.\n",
               id . 0, source) },
+    BufferValidationError::CreatedForeignNode(id, source) => {
+      format!("Cannot create node in foreign (read-only) source:\n- ID: {}\n- Source: {}\n- Foreign sources can only be viewed, not modified.\n",
+              id . 0, source) },
     BufferValidationError::CannotMoveToOrFromForeignSource(id, disk_source, buffer_source) => {
       format!("Cannot move node between sources:\n- ID: {}\n- Source on disk: {}\n- Source from buffer: {}\n- One or both sources are foreign (read-only).\n",
               id . 0, disk_source, buffer_source) },

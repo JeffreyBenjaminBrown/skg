@@ -27,6 +27,7 @@ pub enum BufferValidationError {
   DuplicatedContent              (ID), // A node has multiple Content children with the same ID
   InconsistentSources            (ID, HashSet<SourceName>), // Multiple viewnodes with same ID have different sources
   ModifiedForeignNode            (ID, SourceName), // Attempted to modify a node from a foreign (read-only) source - (node_id, source_name)
+  CreatedForeignNode             (ID, SourceName), // Attempted to create a node in a foreign (read-only) source - (node_id, source_name)
   CannotMoveToOrFromForeignSource (ID,
                                    SourceName, // disk source
                                    SourceName), // buffer source
@@ -82,6 +83,8 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Multiple viewnodes with ID {:?} have inconsistent sources: {:?}", id, source_list) },
       BufferValidationError::ModifiedForeignNode(id, source) =>
         write!(f, "Cannot modify node {:?} from foreign (read-only) source '{}'", id, source),
+      BufferValidationError::CreatedForeignNode(id, source) =>
+        write!(f, "Cannot create node {:?} in foreign (read-only) source '{}'", id, source),
       BufferValidationError::CannotMoveToOrFromForeignSource(id, disk_source, buffer_source) =>
         write!(f, "Cannot move node {:?} between sources '{}' and '{}': one or both are foreign (read-only)", id, disk_source, buffer_source),
       BufferValidationError::CannotMoveAndMergeSimultaneously(id) =>

@@ -167,13 +167,13 @@ fn test_new_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
       "};
       let result: Result<_, _> = buffer_to_viewforest_and_save_instructions(
         org_text, config, driver ) . await;
-      // Should fail with ModifiedForeignNode error
+      // Should fail with CreatedForeignNode error
       assert!(result . is_err(), "Creating new foreign node should be rejected");
       match result . unwrap_err() {
         SaveError::BufferValidationErrors (errors) => {
           assert!(errors . iter() . any(|e| matches!(
-            e, BufferValidationError::ModifiedForeignNode(_, _))),
-            "Should have ModifiedForeignNode error"); }
+            e, BufferValidationError::CreatedForeignNode(_, _))),
+            "Should have CreatedForeignNode error"); }
         other => panic!("Expected BufferValidationErrors, got {:?}", other), }
       Ok(())
     } ))

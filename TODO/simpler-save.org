@@ -95,9 +95,10 @@ Status: complete. =SavePlan= now names the saved viewforest,
 =define_nodes=, =merge_instructions=, and =source_moves=. Callers use
 field names rather than tuple positions.
 
-** b. Separate "validate" from "filter" for foreign instructions
+** DONE b. Separate "validate" from "filter" for foreign instructions
 
-=validate_and_filter_foreign_instructions= does two things:
+=validate_and_filter_foreign_instructions= used to do two things in
+one loop:
 
 - rejects attempted modification/deletion/creation of foreign nodes;
 - drops unchanged foreign saves because there is no reason to write
@@ -131,6 +132,11 @@ Suggested increment:
   as =Changed=, =Unchanged=, or =Invalid=;
 - then split validation from filtering only if the helper makes the
   call site simpler.
+
+Status: complete. The public function still has the same name and
+behavior, but it now first classifies each instruction as keep,
+invalid, or filter-unchanged-foreign-save. Validation and filtering
+then run as separate named steps over that classification.
 
 ** c. Make merge extraction another explicit save-intent phase
 
@@ -362,27 +368,25 @@ validation/filtering first; unify later only if the result is simpler.
 
 * Suggested next plan
 
-Item a is complete. The best next incremental plan is probably item b:
+Items a and b are complete. The best next incremental plan is
+probably item c:
 
-** Split foreign validation from unchanged-foreign filtering
+** Make merge extraction another explicit save-intent phase
 
-Goal: keep the current behavior but separate the two responsibilities
-inside =validate_and_filter_foreign_instructions=:
-
-- rejecting invalid foreign writes;
-- dropping unchanged foreign saves.
+Goal: keep current merge behavior, but make merge extraction read as a
+peer save-planning phase next to non-merge extraction.
 
 Why next:
 
 - item a made the central save-plan boundary explicit;
-- this would clarify the next validation/filtering boundary;
-- the current function name is honest, so this can stay incremental
-  and behavior-preserving.
+- item b clarified the next validation/filtering boundary;
+- item c continues the same pattern by making merge extraction a
+  clearly named phase instead of a side note about another tree walk.
 
 Acceptance criteria:
 
-- foreign invalid writes are still rejected;
-- unchanged foreign saves are still filtered out;
-- the call site makes validation vs filtering visible;
-- behavior and tests are unchanged;
-- no new validation or persistence behavior is introduced.
+- merge extraction remains behavior-preserving;
+- the top-level save preparation reads as non-merge extraction plus
+  merge extraction;
+- comments no longer imply that combining tree walks is desirable;
+- merge validation remains separate.

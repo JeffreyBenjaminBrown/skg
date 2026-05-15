@@ -19,47 +19,102 @@ pub async fn validate_and_filter_foreign_instructions(
   driver: &TypeDBDriver,
 ) -> Result<Vec<DefineNode>,
             Vec<BufferValidationError>> {
-  let mut errors: Vec<BufferValidationError> = Vec::new();
-  let mut filtered: Vec<DefineNode> = Vec::new();
-  for instr in instructions {
-    match &instr {
-      DefineNode::Delete(DeleteNode { id, source }) => {
-        let is_foreign: bool = config . sources . get (source)
-                               . map(|s| !s . user_owns_it)
-                               . unwrap_or (false);
-        if is_foreign { // Cannot delete foreign nodes
-          errors . push(BufferValidationError::ModifiedForeignNode(
+  let mut outcomes : Vec<ForeignPolicyOutcome> =
+    Vec::new();
+  for instruction in &instructions {
+    outcomes . push (
+      apply_foreign_policy(
+        instruction, config, driver
+      ) . await? ); }
+  collect_foreign_policy_outcomes (&outcomes)?;
+  Ok ( filter_unchanged_foreign_saves ( instructions,
+                                        &outcomes )) }
+
+/// PITFALL: This is applied to every node -- owned as well as foreign.
+enum ForeignPolicyOutcome {
+  Keep, // Safe to pass through to persistence.
+  DropUnchangedForeignSave, // Safe to drop because the buffer expresses no change from disk.
+  Reject(BufferValidationError), // Must reject before persistence.
+}
+
+async fn apply_foreign_policy(
+  instr: &DefineNode,
+  config: &SkgConfig,
+  driver: &TypeDBDriver,
+) -> Result<ForeignPolicyOutcome,
+            Vec<BufferValidationError>> {
+  match instr {
+    DefineNode::Delete(DeleteNode { id, source }) => {
+      if source_is_foreign (config, source) {
+        // can't delete foreign nodes
+        Ok (ForeignPolicyOutcome::Reject(
+          BufferValidationError::ModifiedForeignNode(
             id . clone(),
-            source . clone() ));
-        } else { filtered . push (instr); }}
-      DefineNode::Save(SaveNode (node)) => {
-        let is_foreign: bool = config . sources . get(&node . source)
-                               . map(|s| !s . user_owns_it)
-                               . unwrap_or (false);
-        if !is_foreign { // nothing to worry about; move on
-          filtered . push (instr);
-          continue; }
-        let primary_id : &ID = &node . pid;
-        match optnodecomplete_from_id(
-          config, driver, primary_id
-        ) . await {
-          Ok(Some (disk_node)) => {
-            if buffernode_differs_from_disknode(node, &disk_node) {
-              errors . push(BufferValidationError::ModifiedForeignNode(
-                primary_id . clone(),
-                node . source . clone() )); }
-            // If unchanged, filter out (no need to write)
-          }
-          Ok (None) => { // 'Foreign' node not found on disk.
-            errors . push(BufferValidationError::ModifiedForeignNode(
-              primary_id . clone(),
-              node . source . clone() )); }
-          Err (e) => { // Other error reading from disk
-            return Err(vec![BufferValidationError::Other(
-              format!("Error reading foreign node {}: {}",
-                      primary_id . as_str(), e)) ] ); }} }} }
-  if errors . is_empty() { Ok (filtered)
+            source . clone() )))
+      } else { Ok (ForeignPolicyOutcome::Keep) }}
+    DefineNode::Save(SaveNode (node)) => {
+      if !source_is_foreign (config, &node . source) {
+        // not foreign, so keep
+        return Ok (ForeignPolicyOutcome::Keep); }
+      match optnodecomplete_from_id(
+        config, driver, &node . pid
+      ) . await {
+        Ok(Some (disk_node)) => {
+          if buffernode_differs_from_disknode(node, &disk_node) {
+            // can't edit foreign nodes
+            Ok (ForeignPolicyOutcome::Reject(
+              BufferValidationError::ModifiedForeignNode(
+                node . pid . clone(),
+                node . source . clone() )))
+          } else {
+            // drop a non-edit to a foreign node
+            Ok (ForeignPolicyOutcome::DropUnchangedForeignSave)
+          }}
+        Ok (None) =>
+          // Foreign source & PID not found
+          // => trying to create a foreign node. Not allowed.
+          Ok (ForeignPolicyOutcome::Reject(
+            BufferValidationError::CreatedForeignNode(
+              node . pid . clone(),
+              node . source . clone() ))),
+        Err (e) =>
+          Err (vec![BufferValidationError::Other(
+            format!("Error reading foreign node {}: {}",
+                    node . pid . as_str(), e)) ] ) }}}
+}
+
+fn collect_foreign_policy_outcomes(
+  outcomes: &[ForeignPolicyOutcome],
+) -> Result<(), Vec<BufferValidationError>> {
+  let mut errors: Vec<BufferValidationError> = Vec::new();
+  for outcome in outcomes {
+    if let ForeignPolicyOutcome::Reject (error) =
+      outcome {
+        errors . push (error . clone()); }}
+  if errors . is_empty() { Ok (())
   } else { Err (errors) }}
+
+fn filter_unchanged_foreign_saves(
+  instructions: Vec<DefineNode>,
+  outcomes: &[ForeignPolicyOutcome],
+) -> Vec<DefineNode> {
+  instructions . into_iter()
+    . zip (outcomes)
+    . filter_map (|(instruction, outcome)| {
+      match outcome {
+        ForeignPolicyOutcome::DropUnchangedForeignSave =>
+          None,
+        _ => Some (instruction) }})
+    . collect()
+}
+
+fn source_is_foreign(
+  config: &SkgConfig,
+  source: &SourceName,
+) -> bool {
+  config . sources . get (source)
+    . map(|s| !s . user_owns_it)
+    . unwrap_or (false)}
 
 /// Validates that merge instructions involve no foreign nodes.
 /// A merge modifies the acquirer and deletes the acquiree,

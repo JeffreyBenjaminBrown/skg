@@ -188,24 +188,31 @@ fn test_foreign_node_modification_errors(
             println!("{}: {:?}", i + 1, error);
           }
 
-          // Check for ModifiedForeignNode errors
+          // Check for foreign write errors
           let modified_foreign_errors: Vec<&BufferValidationError> =
             errors . iter()
             . filter(|e| matches!(e, BufferValidationError::ModifiedForeignNode(_, _)))
             . collect();
+          let created_foreign_errors: Vec<&BufferValidationError> =
+            errors . iter()
+            . filter(|e| matches!(e, BufferValidationError::CreatedForeignNode(_, _)))
+            . collect();
 
           println!("\nModifiedForeignNode errors: {}",
                    modified_foreign_errors . len());
+          println!("\nCreatedForeignNode errors: {}",
+                   created_foreign_errors . len());
 
-          assert_eq!(modified_foreign_errors . len(), 7, // namely:
+          assert_eq!(modified_foreign_errors . len(), 6, // namely:
                      // ext-1 (aliases modified)
                      // ext-2 (title modified)
                      // ext-3 (body modified)
                      // ext-4 (content modified)
-                     // ext-new (new node)
                      // ext-6 (deletion)
                      // ext-7 (deletion)
-                     "Expected exactly 7 ModifiedForeignNode errors");
+                     "Expected exactly 6 ModifiedForeignNode errors");
+          assert_eq!(created_foreign_errors . len(), 1,
+                     "Expected exactly 1 CreatedForeignNode error");
 
           let error_ids: Vec<String> = modified_foreign_errors . iter()
             . filter_map(|e| {
@@ -220,9 +227,12 @@ fn test_foreign_node_modification_errors(
           assert!(error_ids . contains(&"ext-2" . to_string()), "Expected error for ext-2 (title)");
           assert!(error_ids . contains(&"ext-3" . to_string()), "Expected error for ext-3 (body)");
           assert!(error_ids . contains(&"ext-4" . to_string()), "Expected error for ext-4 (content)");
-          assert!(error_ids . contains(&"ext-new" . to_string()), "Expected error for ext-new (new node)");
           assert!(error_ids . contains(&"ext-6" . to_string()), "Expected error for ext-6 (deletion)");
           assert!(error_ids . contains(&"ext-7" . to_string()), "Expected error for ext-7 (deletion)");
+          assert!(created_foreign_errors . iter() . any (|e| matches!(
+            e, BufferValidationError::CreatedForeignNode(id, _)
+              if id . 0 == "ext-new")),
+            "Expected error for ext-new (new node)");
         } else {
           panic!("Expected SaveError::BufferValidationErrors, got: {:?}", e);
         }
