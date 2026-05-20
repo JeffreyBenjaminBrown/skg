@@ -7,7 +7,7 @@ pub mod git;
 pub mod list;
 pub mod phantom;
 pub mod viewnode;
-pub mod unchecked_viewnode;
+pub mod maybe_placed_viewnode;
 pub mod nodes;
 pub mod many_to_many;
 pub mod views_state;

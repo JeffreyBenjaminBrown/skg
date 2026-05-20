@@ -20,8 +20,8 @@ use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
 use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode, UnknownNode, IndefOrDef, NodeContainRels, NodeLinksourceRels, Birth};
-use crate::types::unchecked_viewnode::{
-    UncheckedViewNode, UncheckedViewNodeKind, UncheckedTrueNode,
+use crate::types::maybe_placed_viewnode::{
+    MaybePlacedViewnode, MaybePlacedViewnodeKind, MaybePlacedTruenode,
 };
 
 use sexp::Sexp;
@@ -88,23 +88,23 @@ pub fn default_metadata() -> ViewnodeMetadata {
     deleted_scaff_kind: None,
     unknown_node_id: None, }}
 
-/// Create an UncheckedViewNode from parsed metadata components.
-/// This is the bridge between parsing (ViewnodeMetadata) and runtime (UncheckedViewNode).
-/// Returns (UncheckedViewNode, Option<BufferValidationError>) - error if Scaffold has body.
+/// Create an MaybePlacedViewnode from parsed metadata components.
+/// This is the bridge between parsing (ViewnodeMetadata) and runtime (MaybePlacedViewnode).
+/// Returns (MaybePlacedViewnode, Option<BufferValidationError>) - error if Scaffold has body.
 pub fn viewnode_from_metadata (
   metadata : &ViewnodeMetadata,
   title    : String,
   body     : Option < String >,
-) -> ( UncheckedViewNode, Option < BufferValidationError > ) {
+) -> ( MaybePlacedViewnode, Option < BufferValidationError > ) {
   let (kind, error)
-    : (UncheckedViewNodeKind, Option<BufferValidationError>)
+    : (MaybePlacedViewnodeKind, Option<BufferValidationError>)
     = if let Some (ref uid) = metadata . unknown_node_id {
-        ( UncheckedViewNodeKind::Unknown (
+        ( MaybePlacedViewnodeKind::Unknown (
             UnknownNode { id: uid . clone () } ), None )
       } else if let Some (kind) = metadata . deleted_scaff_kind {
-        ( UncheckedViewNodeKind::DeletedScaff (kind), None )
+        ( MaybePlacedViewnodeKind::DeletedScaff (kind), None )
       } else if metadata . is_deleted_node {
-        ( UncheckedViewNodeKind::Deleted ( DeletedNode {
+        ( MaybePlacedViewnodeKind::Deleted ( DeletedNode {
             id     : metadata . id . clone ()
                        . unwrap_or_else ( || ID::from ("")),
             source : metadata . source . clone ()
@@ -131,9 +131,9 @@ pub fn viewnode_from_metadata (
                               staged   : metadata . textchanged_staged,
                               unstaged : metadata . textchanged_unstaged },
           other => other . clone () };
-        ( UncheckedViewNodeKind::Scaff (scaffold_with_title), error )
+        ( MaybePlacedViewnodeKind::Scaff (scaffold_with_title), error )
       } else {
-      // UncheckedTrueNode
+      // MaybePlacedTruenode
       { let indef_or_def : IndefOrDef =
           if metadata . indefinitive
           { IndefOrDef::Indefinitive }
@@ -154,7 +154,7 @@ pub fn viewnode_from_metadata (
           { metadata . id . clone ()
             . map ( BufferValidationError::EditRequestOnIndefinitive ) }
           else { None };
-        ( UncheckedViewNodeKind::True ( UncheckedTrueNode {
+        ( MaybePlacedViewnodeKind::True ( MaybePlacedTruenode {
             title,
             id               : metadata . id . clone (),
             source           : metadata . source . clone (),
@@ -168,7 +168,7 @@ pub fn viewnode_from_metadata (
             indef_or_def, } ),
           error ) }
     };
-  ( UncheckedViewNode { focused     : metadata . focused,
+  ( MaybePlacedViewnode { focused     : metadata . focused,
                        folded      : metadata . folded,
                        body_folded : metadata . body_folded,
                        kind },

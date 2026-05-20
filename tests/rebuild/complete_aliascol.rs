@@ -6,7 +6,7 @@ use std::error::Error;
 
 use skg::update_buffer::complete_postorder::aliascol::complete_alias_col;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
+use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::viewnode::ViewNode;
 use skg::types::misc::SkgConfig;
@@ -52,7 +52,7 @@ async fn test_complete_alias_col_logic (
   let unchecked_viewforest =
     org_to_uninterpreted_nodes (org_text) ?. 0;
   let mut viewforest : Tree < ViewNode > =
-    unchecked_to_checked_tree (unchecked_viewforest) ?;
+    maybePlaced_to_placed_tree (unchecked_viewforest) ?;
 
   // Get the first "tree root" (node "a" and its children)
   let tree_a_id : NodeId =
@@ -186,7 +186,7 @@ async fn test_complete_alias_col_duplicate_aliases_different_orders_logic (
   let unchecked_viewforest =
     org_to_uninterpreted_nodes (org_text) ?. 0;
   let mut viewforest : Tree < ViewNode > =
-    unchecked_to_checked_tree (unchecked_viewforest) ?;
+    maybePlaced_to_placed_tree (unchecked_viewforest) ?;
 
   let tree_root_id : NodeId =
     viewforest . root () . first_child () . unwrap () . id ();

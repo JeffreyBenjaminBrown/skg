@@ -1,4 +1,4 @@
-/// Node access utilities for ego_tree::Tree<ViewNode> and Tree<UncheckedViewNode>
+/// Node access utilities for ego_tree::Tree<ViewNode> and Tree<MaybePlacedViewnode>
 
 use crate::to_org::util::get_id_from_treenode;
 use crate::types::views_state::nodecomplete_from_inrustgraph_or_disk;
@@ -6,8 +6,8 @@ use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, TrueNode, Scaffold,
     viewnode_from_scaffold };
-use crate::types::unchecked_viewnode::{
-    UncheckedViewNode, UncheckedViewNodeKind };
+use crate::types::maybe_placed_viewnode::{
+    MaybePlacedViewnode, MaybePlacedViewnodeKind };
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::list::dedup_vector;
 use super::generic::{ unique_scaffold_child, write_at_node_in_tree, with_node_mut };
@@ -49,18 +49,18 @@ pub fn pid_and_source_from_treenode (
                          caller_name ) . into() ),
   }}
 
-/// Get the ID from this node if it's an UncheckedTrueNode with an ID,
+/// Get the ID from this node if it's an MaybePlacedTruenode with an ID,
 /// otherwise recursively try ancestors.
 /// Returns an error if no ancestor has an ID (e.g., reached BufferRoot).
 pub fn id_from_self_or_nearest_ancestor (
-  tree    : &Tree<UncheckedViewNode>,
+  tree    : &Tree<MaybePlacedViewnode>,
   node_id : NodeId,
 ) -> Result<ID, String> {
-  let mut node : NodeRef<UncheckedViewNode> =
+  let mut node : NodeRef<MaybePlacedViewnode> =
     tree . get (node_id)
     . ok_or ("id_from_self_or_nearest_ancestor: node not found")?;
   loop {
-    if let UncheckedViewNodeKind::True (t) = &node . value() . kind {
+    if let MaybePlacedViewnodeKind::True (t) = &node . value() . kind {
       if let Some (id) = &t . id {
         return Ok(id . clone()); }}
     node = node . parent()
@@ -217,13 +217,13 @@ pub fn find_children_by_ids (
 /// Negative generations = ancestors; positive = descendants.
 /// If skip_non_content, excludes TrueNodes with birth != ContentOf.
 pub fn generation_includes_only<F> (
-  tree                : &Tree<UncheckedViewNode>,
+  tree                : &Tree<MaybePlacedViewnode>,
   node_id             : NodeId,
   generation          : i32,
   skip_non_content    : bool,
   predicate           : F,
 ) -> bool
-where F: Fn (&UncheckedViewNode) -> bool
+where F: Fn (&MaybePlacedViewnode) -> bool
 { collect_generation( tree, node_id, generation, skip_non_content )
     . iter()
     . all ( |&id| predicate(
@@ -233,13 +233,13 @@ where F: Fn (&UncheckedViewNode) -> bool
 /// Negative generations = ancestors; positive = descendants.
 /// If skip_non_content, excludes TrueNodes with birth != ContentOf.
 pub fn generation_exists_and_includes<F> (
-  tree                : &Tree<UncheckedViewNode>,
+  tree                : &Tree<MaybePlacedViewnode>,
   node_id             : NodeId,
   generation          : i32,
   skip_non_content    : bool,
   predicate           : F,
 ) -> bool
-where F: Fn (&UncheckedViewNode) -> bool
+where F: Fn (&MaybePlacedViewnode) -> bool
 { let nodes = collect_generation(
     tree, node_id, generation, skip_non_content);
   !nodes . is_empty() &&
@@ -251,7 +251,7 @@ where F: Fn (&UncheckedViewNode) -> bool
 /// Negative generations = ancestors; positive = descendants.
 /// If skip_non_content, excludes TrueNodes with birth != ContentOf.
 pub fn generation_does_not_exist (
-  tree                : &Tree<UncheckedViewNode>,
+  tree                : &Tree<MaybePlacedViewnode>,
   node_id             : NodeId,
   generation          : i32,
   skip_non_content    : bool,
@@ -266,7 +266,7 @@ pub fn generation_does_not_exist (
 /// If 'skip_non_content' is true and generation > 0,
 ///   then we exclude TrueNodes with birth != ContentOf.
 fn collect_generation (
-  tree               : &Tree<UncheckedViewNode>,
+  tree               : &Tree<MaybePlacedViewnode>,
   node_id            : NodeId,
   generation         : i32,
   skip_non_content   : bool,
@@ -276,7 +276,7 @@ fn collect_generation (
   let Some (node_ref) = tree . get (node_id)
     else { return vec![]; };
   if generation <= 0 {
-    let mut current : NodeRef<'_, UncheckedViewNode> =
+    let mut current : NodeRef<'_, MaybePlacedViewnode> =
       node_ref;
     for _ in 0..(-generation) {
       match current . parent() {
@@ -295,7 +295,7 @@ fn collect_generation (
             n . children()
               . filter(|c| !skip_non_content ||
                           !matches!(&c . value() . kind,
-                                    UncheckedViewNodeKind::True (t)
+                                    MaybePlacedViewnodeKind::True (t)
                                     if t . parent_ignores_it() ))
               . map(|c| c . id()) ); }}
       current_gen = next_gen; }
@@ -306,11 +306,11 @@ fn collect_generation (
 /// or if the predicate returns false for all siblings.
 /// Short-circuits on the first sibling where the predicate returns true.
 pub fn siblings_cannot_include<F> (
-  tree      : &Tree<UncheckedViewNode>,
+  tree      : &Tree<MaybePlacedViewnode>,
   node_id   : NodeId,
   predicate : F,
 ) -> bool
-where F: Fn (&UncheckedViewNode) -> bool
+where F: Fn (&MaybePlacedViewnode) -> bool
 { let Some (node_ref) = tree . get (node_id)
     else { return true; };
   let Some (parent_ref) = node_ref . parent()

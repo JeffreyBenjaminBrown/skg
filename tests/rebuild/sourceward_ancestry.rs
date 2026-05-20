@@ -29,7 +29,7 @@
 use indoc::indoc;
 use skg::to_org::expand::backpath::build_and_integrate_sourceward_path;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
+use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::SkgConfig;
 use skg::types::viewnode::{ViewNode, ViewNodeKind, Birth};
@@ -86,7 +86,7 @@ async fn test_sourceward_ancestry_impl (
   let unchecked_viewforest =
     org_to_uninterpreted_nodes (input) ? . 0;
   let mut viewforest : Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_viewforest) ?;
+    maybePlaced_to_placed_tree (unchecked_viewforest) ?;
   let node_a : NodeId =
     viewforest . root () . first_child () . unwrap () . id ();
 

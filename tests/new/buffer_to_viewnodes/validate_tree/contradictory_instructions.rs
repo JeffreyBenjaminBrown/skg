@@ -2,7 +2,7 @@
 
 use ego_tree::Tree;
 use indoc::indoc;
-use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_viewforest_root_viewnode};
+use skg::types::maybe_placed_viewnode::{MaybePlacedViewnode, maybePlaced_viewforest_root_viewnode};
 use skg::types::misc::ID;
 use skg::types::errors::BufferValidationError;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
@@ -21,7 +21,7 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg (node (id node1) (editRequest delete))) duplicate of first node (same delete instruction)
         "};
 
-  let viewforest_consistent: Tree<UncheckedViewNode> =
+  let viewforest_consistent: Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input_consistent) . unwrap() . 0;
   let (inconsistent_ids_consistent, _, _) =
     find_inconsistent_instructions (&viewforest_consistent);
@@ -37,7 +37,7 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg (node (id conflict2))) another conflict end
         "};
 
-  let viewforest_inconsistent: Tree<UncheckedViewNode> =
+  let viewforest_inconsistent: Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input_inconsistent) . unwrap() . 0;
   let (inconsistent_ids, _, _) = find_inconsistent_instructions (&viewforest_inconsistent);
 
@@ -53,14 +53,14 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg (node (id valid_node))) only node with id
         "};
 
-  let viewforest_no_ids: Tree<UncheckedViewNode> =
+  let viewforest_no_ids: Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input_no_ids) . unwrap() . 0;
   let (inconsistent_no_ids, _, _) = find_inconsistent_instructions (&viewforest_no_ids);
   assert_eq!(inconsistent_no_ids . len(), 0, "Should have no conflicts when only one node has each ID");
 
   // Test empty viewforest (just BufferRoot, no tree roots)
-  let empty_viewforest: Tree<UncheckedViewNode> =
-    Tree::new(unchecked_viewforest_root_viewnode());
+  let empty_viewforest: Tree<MaybePlacedViewnode> =
+    Tree::new(maybePlaced_viewforest_root_viewnode());
   let (inconsistent_empty, _, _) =
     find_inconsistent_instructions (&empty_viewforest);
   assert_eq!(inconsistent_empty . len(), 0,
@@ -89,7 +89,7 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
                 This one is fine
             "};
 
-      let viewforest: Tree<UncheckedViewNode> =
+      let viewforest: Tree<MaybePlacedViewnode> =
         org_to_uninterpreted_nodes (input_with_multiple_defining_containers) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config, driver) . await?;

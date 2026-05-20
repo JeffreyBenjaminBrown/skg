@@ -214,7 +214,7 @@ pub(crate) fn flatten_ms<T: Clone>(
 /// Requires both completed non-merge extraction and merge extraction:
 /// source moves are detected during disk supplementation of
 /// DefineNodes, while merge acquiree/acquirer ids come from merge
-/// requests in the checked viewforest.
+/// requests in the "placed" (i.e. no longer "maybePlaced") viewforest.
 pub(super) fn validate_no_simultaneous_move_and_merge (
   source_moves       : &[SourceMove],
   merge_instructions : &[Merge],

@@ -1,10 +1,10 @@
-/// Unchecked variants of ViewNode and ViewNodeKind,
-/// plus conversions between checked and unchecked trees.
-/// 'Unchecked' means id and source might be absent.
+/// MaybePlaced variants of ViewNode and ViewNodeKind,
+/// plus conversions between placed and maybePlaced trees.
+/// 'MaybePlaced' means id and source might be absent.
 /// Only needed briefly after parsing a buffer from the client;
-/// after validation, converted to checked types.
+/// after validation, converted to placed types.
 
-pub use super::viewnode::UncheckedTrueNode;
+pub use super::viewnode::MaybePlacedTruenode;
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::git::{ExistenceAxes, MembershipAxes};
@@ -17,20 +17,22 @@ use std::collections::{HashMap, HashSet};
 // Type declarations
 //
 
-/// Unchecked version of ViewNode - for parsing/validation phase.
+/// Every ViewNode has an ID and a source.
+/// In MaybePlacedViewnode, those two fields are optional.
+/// That's the only difference.
 #[derive(Debug, Clone, PartialEq)]
-pub struct UncheckedViewNode {
+pub struct MaybePlacedViewnode {
   pub focused     : bool,
   pub folded      : bool,
   pub body_folded : bool,
-  pub kind        : UncheckedViewNodeKind,
+  pub kind        : MaybePlacedViewnodeKind,
 }
 
-// UncheckedTrueNode is defined in viewnode.rs.
+// MaybePlacedTruenode is defined in viewnode.rs.
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum UncheckedViewNodeKind {
-  True         (UncheckedTrueNode),
+pub enum MaybePlacedViewnodeKind {
+  True         (MaybePlacedTruenode),
   Scaff        (Scaffold),  // Scaffold is shared - scaffolds never have IDs
   Deleted      (DeletedNode),
   DeletedScaff (ScaffoldKind),
@@ -41,10 +43,10 @@ pub enum UncheckedViewNodeKind {
 // Conversion implementations
 //
 
-impl TryFrom<UncheckedTrueNode> for TrueNode {
+impl TryFrom<MaybePlacedTruenode> for TrueNode {
   type Error = String;
 
-  fn try_from(u: UncheckedTrueNode) -> Result<Self, Self::Error> {
+  fn try_from(u: MaybePlacedTruenode) -> Result<Self, Self::Error> {
     let id = u . id . ok_or_else(
       || format!("Node '{}' has no ID", u . title))?;
     let source = u . source . ok_or_else(
@@ -65,27 +67,27 @@ impl TryFrom<UncheckedTrueNode> for TrueNode {
   }
 }
 
-impl TryFrom<UncheckedViewNodeKind> for ViewNodeKind {
+impl TryFrom<MaybePlacedViewnodeKind> for ViewNodeKind {
   type Error = String;
 
-  fn try_from(u: UncheckedViewNodeKind) -> Result<Self, Self::Error> {
+  fn try_from(u: MaybePlacedViewnodeKind) -> Result<Self, Self::Error> {
     match u {
-      UncheckedViewNodeKind::True (t) =>
+      MaybePlacedViewnodeKind::True (t) =>
         Ok(ViewNodeKind::True(TrueNode::try_from (t)?)),
-      UncheckedViewNodeKind::Scaff (s) =>
+      MaybePlacedViewnodeKind::Scaff (s) =>
         Ok(ViewNodeKind::Scaff (s)),
-      UncheckedViewNodeKind::Deleted (d) =>
+      MaybePlacedViewnodeKind::Deleted (d) =>
         Ok(ViewNodeKind::Deleted (d)),
-      UncheckedViewNodeKind::DeletedScaff (kind) =>
+      MaybePlacedViewnodeKind::DeletedScaff (kind) =>
         Ok (ViewNodeKind::DeletedScaff (kind)),
-      UncheckedViewNodeKind::Unknown (u) =>
+      MaybePlacedViewnodeKind::Unknown (u) =>
         Ok (ViewNodeKind::Unknown (u)) }}
 }
 
-impl TryFrom<UncheckedViewNode> for ViewNode {
+impl TryFrom<MaybePlacedViewnode> for ViewNode {
   type Error = String;
 
-  fn try_from(u: UncheckedViewNode) -> Result<Self, Self::Error> {
+  fn try_from(u: MaybePlacedViewnode) -> Result<Self, Self::Error> {
     Ok(ViewNode {
       focused     : u . focused,
       folded      : u . folded,
@@ -95,11 +97,11 @@ impl TryFrom<UncheckedViewNode> for ViewNode {
   }
 }
 
-// Infallible conversions from checked to unchecked types.
+// Infallible conversions from placed to maybePlaced types.
 
-impl From<TrueNode> for UncheckedTrueNode {
+impl From<TrueNode> for MaybePlacedTruenode {
   fn from(t: TrueNode) -> Self {
-    UncheckedTrueNode {
+    MaybePlacedTruenode {
       title          : t . title,
       id             : Some(t . id),
       source         : Some(t . source),
@@ -115,42 +117,42 @@ impl From<TrueNode> for UncheckedTrueNode {
   }
 }
 
-impl From<ViewNodeKind> for UncheckedViewNodeKind {
+impl From<ViewNodeKind> for MaybePlacedViewnodeKind {
   fn from(k: ViewNodeKind) -> Self {
     match k {
       ViewNodeKind::True (t) =>
-        UncheckedViewNodeKind::True(UncheckedTrueNode::from (t)),
+        MaybePlacedViewnodeKind::True(MaybePlacedTruenode::from (t)),
       ViewNodeKind::Scaff (s) =>
-        UncheckedViewNodeKind::Scaff (s),
+        MaybePlacedViewnodeKind::Scaff (s),
       ViewNodeKind::Deleted (d) =>
-        UncheckedViewNodeKind::Deleted (d),
+        MaybePlacedViewnodeKind::Deleted (d),
       ViewNodeKind::DeletedScaff (kind) =>
-        UncheckedViewNodeKind::DeletedScaff (kind),
+        MaybePlacedViewnodeKind::DeletedScaff (kind),
       ViewNodeKind::Unknown (u) =>
-        UncheckedViewNodeKind::Unknown (u) }}
+        MaybePlacedViewnodeKind::Unknown (u) }}
 }
 
-impl From<ViewNode> for UncheckedViewNode {
+impl From<ViewNode> for MaybePlacedViewnode {
   fn from(o: ViewNode) -> Self {
-    UncheckedViewNode {
+    MaybePlacedViewnode {
       focused     : o . focused,
       folded      : o . folded,
       body_folded : o . body_folded,
-      kind        : UncheckedViewNodeKind::from(o . kind),
+      kind        : MaybePlacedViewnodeKind::from(o . kind),
     }
   }
 }
 
 /// PURPOSE:
 /// Builds a Tree<ViewNode> isomorphic to the input tree.
-/// In the unchecked (input) type, id and source are optional;
+/// In the maybePlaced (input) type, id and source are optional;
 /// in the output, they are mandatory.
 /// .
 /// ERROR CONDITIONS:
 /// Errs if any TrueNode is missing either field.
 /// Since validation happens before this, it shouldn't err.
-pub fn unchecked_to_checked_tree (
-  unchecked: Tree<UncheckedViewNode>
+pub fn maybePlaced_to_placed_tree (
+  unchecked: Tree<MaybePlacedViewnode>
 ) -> Result<Tree<ViewNode>, String> {
   let unchecked_root_id: NodeId =
     unchecked . root() . id();
@@ -186,14 +188,14 @@ pub fn unchecked_to_checked_tree (
       Ok (( )) } )?;
   Ok (checked) }
 
-/// Convert a checked ViewNode tree to an UncheckedViewNode tree.
-/// Infallible since checked types always satisfy unchecked requirements.
-pub fn checked_to_unchecked_tree(
+/// Convert a placed ViewNode tree to an MaybePlacedViewnode tree.
+/// Infallible since checked types always satisfy maybePlaced requirements.
+pub fn placed_to_maybePlaced_tree(
   checked: &Tree<ViewNode>
-) -> Tree<UncheckedViewNode> {
+) -> Tree<MaybePlacedViewnode> {
   fn convert_children(
     checked_tree   : &Tree<ViewNode>,
-    unchecked_tree : &mut Tree<UncheckedViewNode>,
+    unchecked_tree : &mut Tree<MaybePlacedViewnode>,
     checked_id     : NodeId,
     unchecked_id   : NodeId,
   ) {
@@ -211,11 +213,11 @@ pub fn checked_to_unchecked_tree(
         . get (checked_child_id)
         . unwrap()
         . value();
-      let unchecked_child : UncheckedViewNode =
-        UncheckedViewNode::from(checked_child . clone());
+      let unchecked_child : MaybePlacedViewnode =
+        MaybePlacedViewnode::from(checked_child . clone());
 
       let unchecked_child_id : NodeId =
-        { let mut parent_mut : NodeMut<UncheckedViewNode> =
+        { let mut parent_mut : NodeMut<MaybePlacedViewnode> =
            unchecked_tree . get_mut (unchecked_id) . unwrap();
          parent_mut . append (unchecked_child) . id() };
 
@@ -229,9 +231,9 @@ pub fn checked_to_unchecked_tree(
 
   let root_checked : &ViewNode =
     checked . root() . value();
-  let root_unchecked : UncheckedViewNode =
-    UncheckedViewNode::from(root_checked . clone());
-  let mut unchecked : Tree<UncheckedViewNode> =
+  let root_unchecked : MaybePlacedViewnode =
+    MaybePlacedViewnode::from(root_checked . clone());
+  let mut unchecked : Tree<MaybePlacedViewnode> =
     Tree::new (root_unchecked);
 
   let checked_root_id : NodeId =
@@ -247,9 +249,9 @@ pub fn checked_to_unchecked_tree(
 // Defaults
 //
 
-impl Default for UncheckedTrueNode {
+impl Default for MaybePlacedTruenode {
   fn default() -> Self {
-    UncheckedTrueNode {
+    MaybePlacedTruenode {
       title          : String::new(),
       id             : None,
       source         : None,
@@ -267,13 +269,13 @@ impl Default for UncheckedTrueNode {
   }
 }
 
-impl Default for UncheckedViewNode {
+impl Default for MaybePlacedViewnode {
   fn default() -> Self {
-    UncheckedViewNode {
+    MaybePlacedViewnode {
       focused     : false,
       folded      : false,
       body_folded : false,
-      kind        : UncheckedViewNodeKind::True(UncheckedTrueNode::default()),
+      kind        : MaybePlacedViewnodeKind::True(MaybePlacedTruenode::default()),
     }
   }
 }
@@ -282,62 +284,62 @@ impl Default for UncheckedViewNode {
 // Helper methods
 //
 
-impl UncheckedViewNode {
+impl MaybePlacedViewnode {
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn title (&self) -> &str {
     match &self . kind {
-      UncheckedViewNodeKind::True (t)    => &t . title,
-      UncheckedViewNodeKind::Scaff (s)   => s . title(),
-      UncheckedViewNodeKind::Deleted (d) => &d . title,
-      UncheckedViewNodeKind::DeletedScaff (kind) =>
+      MaybePlacedViewnodeKind::True (t)    => &t . title,
+      MaybePlacedViewnodeKind::Scaff (s)   => s . title(),
+      MaybePlacedViewnodeKind::Deleted (d) => &d . title,
+      MaybePlacedViewnodeKind::DeletedScaff (kind) =>
         kind . default_title (),
-      UncheckedViewNodeKind::Unknown (_) => "", }}
+      MaybePlacedViewnodeKind::Unknown (_) => "", }}
 
   /// A distinguishable label for error messages.
   pub fn error_label (&self) -> String {
     match &self . kind {
-      UncheckedViewNodeKind::True (t)    => t . title . clone(),
-      UncheckedViewNodeKind::Scaff (s)   => s . error_label(),
-      UncheckedViewNodeKind::Deleted (d) =>
+      MaybePlacedViewnodeKind::True (t)    => t . title . clone(),
+      MaybePlacedViewnodeKind::Scaff (s)   => s . error_label(),
+      MaybePlacedViewnodeKind::Deleted (d) =>
         format!("deleted:{}", d . id . 0),
-      UncheckedViewNodeKind::DeletedScaff (kind) =>
+      MaybePlacedViewnodeKind::DeletedScaff (kind) =>
         format!("deletedScaffold:{}", kind . repr_in_client ()),
-      UncheckedViewNodeKind::Unknown (u) =>
+      MaybePlacedViewnodeKind::Unknown (u) =>
         format!("unknown:{}", u . id . 0), }}
 
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn body (&self) -> Option<&String> {
     match &self . kind {
-      UncheckedViewNodeKind::True (t)    => t . body (),
-      UncheckedViewNodeKind::Scaff (_)   => None,
-      UncheckedViewNodeKind::Deleted (d) => d . body . as_ref(),
-      UncheckedViewNodeKind::DeletedScaff (_) => None,
-      UncheckedViewNodeKind::Unknown (_) => None, }}
+      MaybePlacedViewnodeKind::True (t)    => t . body (),
+      MaybePlacedViewnodeKind::Scaff (_)   => None,
+      MaybePlacedViewnodeKind::Deleted (d) => d . body . as_ref(),
+      MaybePlacedViewnodeKind::DeletedScaff (_) => None,
+      MaybePlacedViewnodeKind::Unknown (_) => None, }}
 
   /// PITFALL: Don't let this convince you a Scaff can have an ID.
   pub fn id_opt (&self) -> Option<&ID> {
     match &self . kind {
-      UncheckedViewNodeKind::True (t)    => t . id . as_ref(),
-      UncheckedViewNodeKind::Scaff (_)   => None,
-      UncheckedViewNodeKind::Deleted (d) => Some(&d . id),
-      UncheckedViewNodeKind::DeletedScaff (_) => None,
-      UncheckedViewNodeKind::Unknown (u) => Some(&u . id), }}
+      MaybePlacedViewnodeKind::True (t)    => t . id . as_ref(),
+      MaybePlacedViewnodeKind::Scaff (_)   => None,
+      MaybePlacedViewnodeKind::Deleted (d) => Some(&d . id),
+      MaybePlacedViewnodeKind::DeletedScaff (_) => None,
+      MaybePlacedViewnodeKind::Unknown (u) => Some(&u . id), }}
 }
 
 //
-// Constructor functions for unchecked types
+// Constructor functions for maybePlaced types
 //
 
-pub fn unchecked_viewforest_root_viewnode() -> UncheckedViewNode {
-  UncheckedViewNode {
+pub fn maybePlaced_viewforest_root_viewnode() -> MaybePlacedViewnode {
+  MaybePlacedViewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind        : UncheckedViewNodeKind::Scaff (Scaffold::BufferRoot), }}
+    kind        : MaybePlacedViewnodeKind::Scaff (Scaffold::BufferRoot), }}
 
-pub fn unchecked_viewnode_from_scaffold(scaffold: Scaffold) -> UncheckedViewNode {
-  UncheckedViewNode {
+pub fn maybe_placed_viewnode_from_scaffold(scaffold: Scaffold) -> MaybePlacedViewnode {
+  MaybePlacedViewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind        : UncheckedViewNodeKind::Scaff (scaffold), }}
+    kind        : MaybePlacedViewnodeKind::Scaff (scaffold), }}

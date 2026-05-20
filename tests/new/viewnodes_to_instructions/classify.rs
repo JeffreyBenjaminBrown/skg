@@ -6,7 +6,7 @@ use skg::from_text::viewnodes_to_instructions::classify::{
 };
 use skg::types::git::MembershipAxes;
 use skg::types::misc::{ID, SourceName};
-use skg::types::unchecked_viewnode::{unchecked_to_checked_tree, UncheckedViewNode};
+use skg::types::maybe_placed_viewnode::{maybePlaced_to_placed_tree, MaybePlacedViewnode};
 use skg::types::viewnode::{
   mk_definitive_viewnode,
   mk_unknown_viewnode,
@@ -22,9 +22,9 @@ use skg::types::viewnode::{
 fn checked_viewforest_from_org (
   input : &str,
 ) -> Tree<ViewNode> {
-  let unchecked_viewforest : Tree<UncheckedViewNode> =
+  let unchecked_viewforest : Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  unchecked_to_checked_tree (unchecked_viewforest) . unwrap() }
+  maybePlaced_to_placed_tree (unchecked_viewforest) . unwrap() }
 
 fn role_for_title (
   tree  : &Tree<ViewNode>,

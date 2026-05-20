@@ -296,7 +296,7 @@ role-annotated tree right now.
 The current validation boundary is intentional:
 
 - raw-text and unchecked-tree validation run before
-  =unchecked_to_checked_tree=, so they cannot consume =SaveRole=
+  =maybePlaced_to_placed_tree=, so they cannot consume =SaveRole=
   without moving a much larger boundary;
 - local structural validation checks what shapes are legal in the
   input tree, which is distinct from save-role interpretation;

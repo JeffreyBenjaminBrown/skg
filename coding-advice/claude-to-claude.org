@@ -69,7 +69,7 @@ There are three ways to test the code:
   2. Enriches with missing IDs/sources ('add_missing_info_to_forest')
      - New nodes get UUIDs; sourceless nodes inherit parent's source
   3. Validates tree structure ('find_buffer_errors_for_saving')
-  4. Converts to checked types ('unchecked_to_checked_tree')
+  4. Converts to placed types ('maybePlaced_to_placed_tree')
   5. Generates save instructions ('viewnode_forest_to_nonmerge_save_instructions')
      - Sub-steps: naive -> reconcile same-ID -> filter unchanged -> supplement from disk
   6. Validates foreign nodes ('validate_and_filter_foreign_instructions')
@@ -79,7 +79,7 @@ There are three ways to test the code:
   9. Re-renders saved view and collateral views ('update_views_after_save')
 
   Key entry point: 'handle_save_buffer_request' in server/serve/handlers/save_buffer.rs.
-  Key data flow: buffer text -> UncheckedViewNode -> ViewNode -> DefineNode (Save|Delete) -> FS/TypeDB/Tantivy.
+  Key data flow: buffer text -> MaybePlacedViewnode -> ViewNode -> DefineNode (Save|Delete) -> FS/TypeDB/Tantivy.
 
 * Source (SourceName)
 

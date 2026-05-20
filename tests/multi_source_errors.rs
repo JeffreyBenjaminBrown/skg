@@ -7,7 +7,7 @@ use skg::from_text::buffer_to_viewforest_and_save_instructions;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_viewforest;
-use skg::types::unchecked_viewnode::UncheckedViewNode;
+use skg::types::maybe_placed_viewnode::MaybePlacedViewnode;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::SkgConfig;
 use skg::types::nodes::typedb::NodeTypedb;
@@ -65,7 +65,7 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
       "};
     let buffer_text: String =
       strip_org_comments (buffer_with_errors);
-    let mut viewforest: Tree<UncheckedViewNode> =
+    let mut viewforest: Tree<MaybePlacedViewnode> =
       org_to_uninterpreted_nodes (&buffer_text)?. 0;
     add_missing_info_to_viewforest(
       &mut viewforest, &config . db_name, &driver

@@ -120,7 +120,7 @@ async fn validate_no_title_or_body_edit_in_subscribeeAsSuch (
   config          : &SkgConfig,
   driver          : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
-  // Requires a checked, role-classified viewforest: only then do we
+  // Requires a placed, role-classified viewforest: only then do we
   // know which definitive nodes are being edited as subscribees.
   for node_ref in role_viewforest . nodes() {
     if ! matches!(

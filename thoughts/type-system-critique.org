@@ -91,9 +91,9 @@ pub extra_ids : Vec<ID>,
 Or use a nonempty-vec crate. Either way, ~primary_id()~ becomes
 infallible.
 
-* DONE UncheckedTrueNode: everything optional, but some fields always present
+* DONE MaybePlacedTruenode: everything optional, but some fields always present
 
-~UncheckedTrueNode~ makes ~id_opt~ and ~source_opt~ optional
+~MaybePlacedTruenode~ makes ~id_opt~ and ~source_opt~ optional
 (the whole point of "unchecked"). But it also carries
 ~graphStats~, ~viewStats~, ~edit_request~, ~view_requests~, and
 ~diff~, all of which are always present in the checked version

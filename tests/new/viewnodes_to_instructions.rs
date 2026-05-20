@@ -21,7 +21,7 @@ use skg::types::git::Sign;
 use skg::types::misc::{ID, MSV};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
-use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
+use skg::types::maybe_placed_viewnode::{MaybePlacedViewnode, maybePlaced_to_placed_tree};
 use skg::types::viewnode::{ViewNode, ViewNodeKind, viewforest_root_viewnode};
 use std::error::Error;
 
@@ -49,9 +49,9 @@ fn saved_node_by_id<'a> (
 fn checked_viewforest_from_org (
   input : &str,
 ) -> Tree<ViewNode> {
-  let unchecked_viewforest : Tree<UncheckedViewNode> =
+  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  unchecked_to_checked_tree (unchecked_viewforest) . unwrap() }
+  maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap() }
 
 fn hiderel_intents_from_org (
   input : &str,
@@ -88,12 +88,12 @@ async fn save_instructions_from_org_with_disk (
   config   : &skg::types::misc::SkgConfig,
   driver   : &typedb_driver::TypeDBDriver,
 ) -> Result<Vec<DefineNode>, Box<dyn Error>> {
-  let (mut unchecked_viewforest, _parsing_errors) =
+  let (mut maybePlaced_viewforest, _parsing_errors) =
     org_to_uninterpreted_nodes (org_text) ?;
   add_missing_info_to_viewforest (
-    &mut unchecked_viewforest, &config . db_name, driver) . await?;
+    &mut maybePlaced_viewforest, &config . db_name, driver) . await?;
   let viewforest : Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_viewforest) ?;
+    maybePlaced_to_placed_tree (maybePlaced_viewforest) ?;
   let save_plan =
     extract_nonmerge_save_plan (
       &viewforest, config, driver) . await?;
@@ -111,10 +111,10 @@ fn test_extract_nonmerge_save_plan_basic() {
             Root 2 body
         "};
 
-  let unchecked_viewforest : Tree<UncheckedViewNode> =
+  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
+    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_tree (viewforest) . unwrap();
 
@@ -164,10 +164,10 @@ fn test_extract_nonmerge_save_plan_with_aliases() {
             Content body
         "};
 
-  let unchecked_viewforest : Tree<UncheckedViewNode> =
+  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
+    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_tree (viewforest) . unwrap();
 
@@ -205,10 +205,10 @@ fn test_extract_nonmerge_save_plan_no_aliases() {
             Child body
         "};
 
-  let unchecked_viewforest : Tree<UncheckedViewNode> =
+  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
+    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_tree (viewforest) . unwrap();
 
@@ -236,10 +236,10 @@ fn test_extract_nonmerge_save_plan_multiple_alias_cols() {
             ** (skg (node (id content1) (source main))) content node
         "};
 
-  let unchecked_viewforest : Tree<UncheckedViewNode> =
+  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
+    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let result : Result<Vec<DefineNode>, String> =
     naive_saveinstructions_from_tree (viewforest);
 
@@ -260,10 +260,10 @@ fn test_extract_nonmerge_save_plan_mixed_relations() {
             ** (skg (node (id unrelated2) (source main) (birth independent))) another unrelated child
         "};
 
-  let unchecked_viewforest : Tree<UncheckedViewNode> =
+  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
+    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_tree (viewforest) . unwrap();
 
@@ -289,10 +289,10 @@ fn role_aware_extraction_preserves_content_and_independent_children (
             ** (skg (node (id independent) (source main) (birth independent))) independent
         "};
 
-  let unchecked_viewforest : Tree<UncheckedViewNode> =
+  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
+    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_tree (viewforest) . unwrap();
 
@@ -316,10 +316,10 @@ fn role_aware_extraction_skips_alias_and_id_display_nodes (
             ** (skg (node (id child) (source main))) child
         "};
 
-  let unchecked_viewforest : Tree<UncheckedViewNode> =
+  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
+    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_tree (viewforest) . unwrap();
 
@@ -348,10 +348,10 @@ fn role_aware_extraction_collects_subscribees_without_hidden_branches (
             **** (skg (node (id hidden-outside) (source main))) hidden outside child
         "};
 
-  let unchecked_viewforest : Tree<UncheckedViewNode> =
+  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
+    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_tree (viewforest) . unwrap();
 
@@ -522,10 +522,10 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
             Doomed body
         "};
 
-  let unchecked_viewforest : Tree<UncheckedViewNode> =
+  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
+    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_tree (viewforest) . unwrap();
 
@@ -567,10 +567,10 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
             Doomed body
         "};
 
-  let unchecked_viewforest : Tree<UncheckedViewNode> =
+  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
+    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_tree (viewforest) . unwrap();
 
@@ -994,10 +994,10 @@ fn test_extract_nonmerge_save_plan_deep_nesting() {
             ** (skg (node (id level2b) (source main))) level 2b
         "};
 
-  let unchecked_viewforest : Tree<UncheckedViewNode> =
+  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
+    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_tree (viewforest) . unwrap();
 
@@ -1033,11 +1033,11 @@ fn test_extract_nonmerge_save_plan_error_missing_id() {
             * node without ID
         "};
 
-  let unchecked_viewforest : Tree<UncheckedViewNode> =
+  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let result : Result<Tree<ViewNode>, String> =
     // This conversion fails because of missing ID
-    unchecked_to_checked_tree (unchecked_viewforest);
+    maybePlaced_to_placed_tree (maybePlaced_viewforest);
 
   assert!(result . is_err(), "Should return error for missing ID");
   let error_msg : String = result . unwrap_err();
@@ -1064,10 +1064,10 @@ fn test_extract_nonmerge_save_plan_only_aliases() {
             *** (skg alias) alias two
         "};
 
-  let unchecked_viewforest : Tree<UncheckedViewNode> =
+  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
+    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_tree (viewforest) . unwrap();
 
@@ -1097,10 +1097,10 @@ fn test_extract_nonmerge_save_plan_complex_scenario() {
             * (skg (node (id doc2) (source main))) Document 2
             ** (skg (node (id ref_section) (source main) (birth independent))) Reference Section
         "};
-  let unchecked_viewforest : Tree<UncheckedViewNode> =
+  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
+    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_tree (viewforest) . unwrap();
 

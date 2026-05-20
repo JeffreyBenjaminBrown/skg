@@ -4,7 +4,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nod
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, MSV, SourceName};
 use skg::types::save::SaveNode;
-use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
+use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use std::error::Error;
 
 #[test]
@@ -21,7 +21,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
         "};
 
         let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
-        let viewforest = unchecked_to_checked_tree (unchecked_viewforest)?;
+        let viewforest = maybePlaced_to_placed_tree (unchecked_viewforest)?;
         let merge_instructions =
         instructiontriples_from_the_merges_in_an_viewforest(
          &viewforest, config, driver)

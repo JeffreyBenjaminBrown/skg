@@ -2,7 +2,7 @@
 /// These check structural properties of individual nodes
 /// without requiring global context.
 
-use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind, UncheckedTrueNode};
+use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind, MaybePlacedTruenode};
 use crate::types::viewnode::{Scaffold, EditRequest, IndefOrDef};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::viewnode_nodecomplete::{
@@ -26,7 +26,7 @@ pub struct LocalStructureError {
 /// Validate the local structure of a node.
 /// Returns Ok(()) if valid, or Err with the error details.
 pub fn validate_local_structure (
-  tree    : &Tree<UncheckedViewNode>,
+  tree    : &Tree<MaybePlacedViewnode>,
   node_id : NodeId,
   config  : &SkgConfig,
 ) -> Result<(), LocalStructureError> {
@@ -38,9 +38,9 @@ pub fn validate_local_structure (
 
   let errors : Vec<String> =
     match &node_ref . value() . kind
-    { UncheckedViewNodeKind::True (t) =>
+    { MaybePlacedViewnodeKind::True (t) =>
         validate_truenode(tree, node_id, t, config),
-      UncheckedViewNodeKind::Scaff (s) => match s {
+      MaybePlacedViewnodeKind::Scaff (s) => match s {
         Scaffold::BufferRoot =>
           validate_buffer_root(tree, node_id),
         Scaffold::Alias { .. } =>
@@ -59,9 +59,9 @@ pub fn validate_local_structure (
           validate_idcol(tree, node_id),
         Scaffold::ID { .. } =>
           validate_idscaffold(tree, node_id), },
-      UncheckedViewNodeKind::Deleted (_) => Vec::new(),
-      UncheckedViewNodeKind::DeletedScaff (_) => Vec::new(),
-      UncheckedViewNodeKind::Unknown (_) => Vec::new() };
+      MaybePlacedViewnodeKind::Deleted (_) => Vec::new(),
+      MaybePlacedViewnodeKind::DeletedScaff (_) => Vec::new(),
+      MaybePlacedViewnodeKind::Unknown (_) => Vec::new() };
 
   if errors . is_empty() {
     Ok (( ))
@@ -75,7 +75,7 @@ pub fn validate_local_structure (
     } ) }}
 
 fn validate_buffer_root (
-  tree    : &Tree<UncheckedViewNode>,
+  tree    : &Tree<MaybePlacedViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
@@ -85,138 +85,138 @@ fn validate_buffer_root (
   if !generation_includes_only(
     tree, node_id, 1, false,
     |node| matches!(&node . kind,
-                    UncheckedViewNodeKind::True (_) |
-                    UncheckedViewNodeKind::Deleted (_) ))
+                    MaybePlacedViewnodeKind::True (_) |
+                    MaybePlacedViewnodeKind::Deleted (_) ))
  { errors . push("BufferRoot's children must be TrueNodes."
                 . to_string() ); }
   errors }
 
 fn validate_alias (
-  tree    : &Tree<UncheckedViewNode>,
+  tree    : &Tree<MaybePlacedViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_does_not_exist(tree, node_id, 1, true) {
     errors . push("Alias must have no (non-ignored) children." . to_string()); }
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node . kind, UncheckedViewNodeKind::Scaff (Scaffold::AliasCol))) {
+       matches!(&node . kind, MaybePlacedViewnodeKind::Scaff (Scaffold::AliasCol))) {
     errors . push("Alias must have an AliasCol parent." . to_string()); }
   errors }
 
 fn validate_aliascol (
-  tree    : &Tree<UncheckedViewNode>,
+  tree    : &Tree<MaybePlacedViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_includes_only(tree, node_id, 1, true, |node|
-       matches!(&node . kind, UncheckedViewNodeKind::Scaff(Scaffold::Alias { .. }))) {
+       matches!(&node . kind, MaybePlacedViewnodeKind::Scaff(Scaffold::Alias { .. }))) {
     errors . push("AliasCol's (non-ignored) children must include only Aliases."
                 . to_string()); }
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node . kind, UncheckedViewNodeKind::True (_))) {
+       matches!(&node . kind, MaybePlacedViewnodeKind::True (_))) {
     errors . push("AliasCol must have a TrueNode parent." . to_string()); }
   if !siblings_cannot_include(tree, node_id, |node|
-       matches!(&node . kind, UncheckedViewNodeKind::Scaff (Scaffold::AliasCol))) {
+       matches!(&node . kind, MaybePlacedViewnodeKind::Scaff (Scaffold::AliasCol))) {
     errors . push("AliasCol must be unique among its siblings." . to_string()); }
   errors }
 
 fn validate_hidden_in_subscribee_col (
-  tree    : &Tree<UncheckedViewNode>,
+  tree    : &Tree<MaybePlacedViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node . kind, UncheckedViewNodeKind::True (_))) {
+       matches!(&node . kind, MaybePlacedViewnodeKind::True (_))) {
     errors . push("HiddenInSubscribeeCol must have a TrueNode parent (the subscribee)" . to_string()); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
-       matches!(&node . kind, UncheckedViewNodeKind::True (_))) {
+       matches!(&node . kind, MaybePlacedViewnodeKind::True (_))) {
     errors . push("HiddenInSubscribeeCol's (non-ignored) children must include only TrueNodes (they are what's hidden)." . to_string()); }
   if !siblings_cannot_include(tree, node_id, |node|
-       matches!(&node . kind, UncheckedViewNodeKind::Scaff (Scaffold::HiddenInSubscribeeCol))) {
+       matches!(&node . kind, MaybePlacedViewnodeKind::Scaff (Scaffold::HiddenInSubscribeeCol))) {
     errors . push("HiddenInSubscribeeCol must be unique among its siblings." . to_string()); }
   errors }
 
 fn validate_hidden_outside_of_subscribee_col (
-  tree    : &Tree<UncheckedViewNode>,
+  tree    : &Tree<MaybePlacedViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node . kind, UncheckedViewNodeKind::Scaff (Scaffold::SubscribeeCol))) {
+       matches!(&node . kind, MaybePlacedViewnodeKind::Scaff (Scaffold::SubscribeeCol))) {
     errors . push("HiddenOutsideOfSubscribeeCol must have a SubscribeeCol parent." . to_string()); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
-       matches!(&node . kind, UncheckedViewNodeKind::True (_))) {
+       matches!(&node . kind, MaybePlacedViewnodeKind::True (_))) {
     errors . push("HiddenOutsideOfSubscribeeCol's (non-ignored) children must include only TrueNodes." . to_string()); }
   if !siblings_cannot_include(tree, node_id, |node|
-       matches!(&node . kind, UncheckedViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol))) {
+       matches!(&node . kind, MaybePlacedViewnodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol))) {
     errors . push("HiddenOutsideOfSubscribeeCol must be unique among its siblings." . to_string()); }
   errors }
 
 fn validate_subscribeecol (
-  tree    : &Tree<UncheckedViewNode>,
+  tree    : &Tree<MaybePlacedViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node . kind, UncheckedViewNodeKind::True (_))) {
+       matches!(&node . kind, MaybePlacedViewnodeKind::True (_))) {
     errors . push("SubscribeeCol must have a TrueNode parent." . to_string()); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
        matches!(&node . kind,
-         UncheckedViewNodeKind::True (_) |
-         UncheckedViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol))) {
+         MaybePlacedViewnodeKind::True (_) |
+         MaybePlacedViewnodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol))) {
     errors . push("SubscribeeCol's children must include only TrueNodes or HiddenOutsideOfSubscribeeCol." . to_string()); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
     errors . push("SubscribeeCol must not have duplicate TrueNode children." . to_string()); }
   errors }
 
 fn validate_text_changed (
-  tree    : &Tree<UncheckedViewNode>,
+  tree    : &Tree<MaybePlacedViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node . kind, UncheckedViewNodeKind::True (_))) {
+       matches!(&node . kind, MaybePlacedViewnodeKind::True (_))) {
     errors . push("TextChanged must have a TrueNode parent." . to_string()); }
   if !generation_does_not_exist(tree, node_id, 1, true) {
     errors . push("TextChanged must have no (non-ignroed) children." . to_string()); }
   if !siblings_cannot_include(tree, node_id, |node|
-       matches!(&node . kind, UncheckedViewNodeKind::Scaff (Scaffold::TextChanged { .. }))) {
+       matches!(&node . kind, MaybePlacedViewnodeKind::Scaff (Scaffold::TextChanged { .. }))) {
     errors . push("TextChanged must be unique among its siblings." . to_string()); }
   errors }
 
 fn validate_idcol (
-  tree    : &Tree<UncheckedViewNode>,
+  tree    : &Tree<MaybePlacedViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node . kind, UncheckedViewNodeKind::True (_))) {
+       matches!(&node . kind, MaybePlacedViewnodeKind::True (_))) {
     errors . push("IDCol must have a TrueNode parent." . to_string()); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
-       matches!(&node . kind, UncheckedViewNodeKind::Scaff(Scaffold::ID { .. } )) ) {
+       matches!(&node . kind, MaybePlacedViewnodeKind::Scaff(Scaffold::ID { .. } )) ) {
     errors . push("IDCol's (non-ignored) children can only be ID scaffolds."
                 . to_string() ); }
   if !siblings_cannot_include(tree, node_id, |node|
-       matches!(&node . kind, UncheckedViewNodeKind::Scaff (Scaffold::IDCol))) {
+       matches!(&node . kind, MaybePlacedViewnodeKind::Scaff (Scaffold::IDCol))) {
     errors . push("IDCol must be unique among its siblings." . to_string()); }
   errors }
 
 fn validate_idscaffold (
-  tree    : &Tree<UncheckedViewNode>,
+  tree    : &Tree<MaybePlacedViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_does_not_exist(tree, node_id, 1, true) {
     errors . push("ID scaffold must have no (non-ignored) children." . to_string()); }
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node . kind, UncheckedViewNodeKind::Scaff (Scaffold::IDCol))) {
+       matches!(&node . kind, MaybePlacedViewnodeKind::Scaff (Scaffold::IDCol))) {
     errors . push("ID scaffold must have an IDCol parent." . to_string()); }
   errors }
 
 fn validate_truenode (
-  tree    : &Tree<UncheckedViewNode>,
+  tree    : &Tree<MaybePlacedViewnode>,
   node_id : NodeId,
-  t       : &UncheckedTrueNode,
+  t       : &MaybePlacedTruenode,
   config  : &SkgConfig,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
@@ -227,14 +227,14 @@ fn validate_truenode (
                 . to_string() ); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
        matches!(&node . kind,
-         UncheckedViewNodeKind::True (_)                        |
-         UncheckedViewNodeKind::Scaff (Scaffold::AliasCol)      |
-         UncheckedViewNodeKind::Scaff (Scaffold::IDCol)         |
-         UncheckedViewNodeKind::Scaff (Scaffold::SubscribeeCol) |
-         UncheckedViewNodeKind::Scaff (Scaffold::TextChanged { .. })   |
-         UncheckedViewNodeKind::Deleted (_)                     |
-         UncheckedViewNodeKind::DeletedScaff (_)                |
-         UncheckedViewNodeKind::Unknown (_)                    )) {
+         MaybePlacedViewnodeKind::True (_)                        |
+         MaybePlacedViewnodeKind::Scaff (Scaffold::AliasCol)      |
+         MaybePlacedViewnodeKind::Scaff (Scaffold::IDCol)         |
+         MaybePlacedViewnodeKind::Scaff (Scaffold::SubscribeeCol) |
+         MaybePlacedViewnodeKind::Scaff (Scaffold::TextChanged { .. })   |
+         MaybePlacedViewnodeKind::Deleted (_)                     |
+         MaybePlacedViewnodeKind::DeletedScaff (_)                |
+         MaybePlacedViewnodeKind::Unknown (_)                    )) {
     errors . push("TrueNode's children must include only TrueNode, AliasCol, IDCol, SubscribeeCol, TextChanged, Deleted, DeletedScaff, or UnknownNode" . to_string()); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
     errors . push("TrueNode's non-ignored TrueNode children must be unique (no two sharing the same ID)." . to_string()); }
@@ -242,13 +242,13 @@ fn validate_truenode (
     errors . push("Definitive node has an empty title." . to_string()); }
   errors }
 
-/// Check if an UncheckedTrueNode has an ID.
-pub fn has_id ( t : &UncheckedTrueNode ) -> bool {
+/// Check if an MaybePlacedTruenode has an ID.
+pub fn has_id ( t : &MaybePlacedTruenode ) -> bool {
   t . id . is_some() }
 
-/// Check if an UncheckedTrueNode has a source and it exists in the config.
+/// Check if an MaybePlacedTruenode has a source and it exists in the config.
 pub fn has_valid_source (
-  t      : &UncheckedTrueNode,
+  t      : &MaybePlacedTruenode,
   config : &SkgConfig,
 ) -> bool {
   t . source . as_ref()
@@ -256,7 +256,7 @@ pub fn has_valid_source (
 
 /// A definitive node (not marked for deletion) must have a non-empty title.
 /// Nodes that are indefinitive or carry a delete request are exempt.
-fn has_empty_title ( t : &UncheckedTrueNode ) -> bool {
+fn has_empty_title ( t : &MaybePlacedTruenode ) -> bool {
   let is_definitive : bool =
     matches! ( &t . indef_or_def, IndefOrDef::Definitive { .. } );
   let is_delete : bool =
@@ -271,14 +271,14 @@ fn has_empty_title ( t : &UncheckedTrueNode ) -> bool {
 /// Returns true if all such children have distinct IDs,
 /// or if there are no such children.
 pub fn nonignored_children_have_distinct_ids (
-  tree    : &Tree<UncheckedViewNode>,
+  tree    : &Tree<MaybePlacedViewnode>,
   node_id : NodeId,
 ) -> bool {
   let Some (node_ref) = tree . get (node_id)
     else { return true; };
   let mut seen : HashSet<ID> = HashSet::new();
   for child in node_ref . children() {
-    if let UncheckedViewNodeKind::True (t) = &child . value() . kind {
+    if let MaybePlacedViewnodeKind::True (t) = &child . value() . kind {
       if !t . parent_ignores_it() && !t . is_phantom () {
         if let Some (id) = &t . id {
           if !seen . insert(id . clone()) {

@@ -8,7 +8,7 @@ use skg::dbs::typedb::paths::{
   PathToFirstNonlinearity};
 use skg::to_org::expand::backpath::build_and_integrate_containerward_path;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
+use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::viewnode::ViewNode;
@@ -63,10 +63,10 @@ async fn test_multi_cycle_fork_impl(
   "};
   let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
   let mut viewforest: Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_viewforest)?;
+    maybePlaced_to_placed_tree (unchecked_viewforest)?;
   let node_a_id =
     viewforest . root () . first_child () . unwrap () . id ();
-  
+
   build_and_integrate_containerward_path (
     &mut viewforest, node_a_id, &config, driver
   ) . await ?;
@@ -84,7 +84,7 @@ async fn test_multi_cycle_fork_impl(
   "};
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
   let expected_trees: Tree<ViewNode> =
-    unchecked_to_checked_tree (expected_unchecked)?;
+    maybePlaced_to_placed_tree (expected_unchecked)?;
   let actual_str : String =
     viewforest_to_string (&viewforest, config)?;
   let expected_str : String =

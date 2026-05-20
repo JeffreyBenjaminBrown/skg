@@ -4,7 +4,7 @@ use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_viewforest;
 use skg::test_utils::{run_with_test_db, compare_viewnode_trees_modulo_id, compare_viewnode_trees};
-use skg::types::unchecked_viewnode::UncheckedViewNode;
+use skg::types::maybe_placed_viewnode::MaybePlacedViewnode;
 use skg::types::misc::{SkgConfig, ID};
 
 use ego_tree::Tree;
@@ -50,14 +50,14 @@ async fn test_add_missing_info_logic (
             ** (skg (node (id unpredictable) (source main))) no id
             *** (skg (node (id unpredictable) (source main))) also no id
         "};
-  let mut after_adding_missing_info: Tree<UncheckedViewNode> =
+  let mut after_adding_missing_info: Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes(
       with_missing_info) . unwrap() . 0;
   add_missing_info_to_viewforest(
     &mut after_adding_missing_info,
     &config . db_name,
     driver ) . await ?;
-  let expected_viewforest: Tree<UncheckedViewNode> =
+  let expected_viewforest: Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes(
       without_missing_info ) . unwrap() . 0;
   assert_eq!(
@@ -70,7 +70,7 @@ async fn test_add_missing_info_logic (
       &expected_viewforest),
     "add_missing_info_to_viewforest: Forests not equivalent modulo ID." );
 
-  { let actual_root : &UncheckedViewNode =
+  { let actual_root : &MaybePlacedViewnode =
       after_adding_missing_info . root() . first_child() . unwrap() . value();
     let actual_root_id : &ID =
       actual_root . id_opt() . unwrap();
@@ -124,13 +124,13 @@ async fn test_source_inheritance_logic (
             ** (skg (node (id 22))) _
         "};
 
-  let mut actual_viewforest: Tree<UncheckedViewNode> =
+  let mut actual_viewforest: Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   add_missing_info_to_viewforest(
     &mut actual_viewforest,
     &config . db_name,
     driver ) . await ?;
-  let expected_viewforest: Tree<UncheckedViewNode> =
+  let expected_viewforest: Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (expected) . unwrap() . 0;
 
   assert!(

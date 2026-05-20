@@ -700,29 +700,29 @@ is now : id_to_pid_if_found
    - True?: Yes — name explicit.
    - Omits?: Nothing.
 
-* server/types/unchecked_viewnode.rs
-** unchecked_to_checked_tree (line 152)
+* server/types/maybe_placed_viewnode.rs
+** maybePlaced_to_placed_tree (line 152)
    - True?: Yes.
    - Omits?: Nothing.
-** checked_to_unchecked_tree (line 191)
+** placed_to_maybePlaced_tree (line 191)
    - True?: Yes.
    - Omits?: Nothing.
-** UncheckedViewNode::title (line 287)
+** MaybePlacedViewnode::title (line 287)
    - True?: Partly. The name is "title" but for some kinds (Scaffold, Deleted, DeletedScaff, Unknown) the function returns the scaffold's title/default-title, and Unknown returns "" — that's a reasonable union, but the name implies a node-level title, not a polymorphic dispatcher.
    - Omits?: The empty-string fallback for Unknown nodes.
-** UncheckedViewNode::error_label (line 297)
+** MaybePlacedViewnode::error_label (line 297)
    - True?: Yes.
    - Omits?: Nothing.
-** UncheckedViewNode::body (line 309)
+** MaybePlacedViewnode::body (line 309)
    - True?: Yes (returns Option).
    - Omits?: Nothing.
-** UncheckedViewNode::id_opt (line 318)
+** MaybePlacedViewnode::id_opt (line 318)
    - True?: Yes.
    - Omits?: Nothing.
-** unchecked_viewforest_root_viewnode (line 331)
+** maybePlaced_viewforest_root_viewnode (line 331)
    - True?: Yes.
    - Omits?: Nothing.
-** unchecked_viewnode_from_scaffold (line 338)
+** maybe_placed_viewnode_from_scaffold (line 338)
    - True?: Yes.
    - Omits?: Nothing.
 
@@ -925,7 +925,7 @@ is now : id_to_pid_if_found
    - True?: Partly. The name says "treenode" but the function actually accepts both TrueNode and Deleted kinds; for Scaffold and other kinds it errors. The name implies a more uniform extraction.
    - Omits?: That Deleted is also accepted (a non-obvious second case).
 ** id_from_self_or_nearest_ancestor (line 57)
-   - True?: Partly. The function only walks UncheckedTrueNode kinds — Scaffolds and Deleted nodes are stepped over silently. Also, "nearest ancestor" suggests "an ancestor"; if no ancestor has an ID, the function errs.
+   - True?: Partly. The function only walks MaybePlacedTruenode kinds — Scaffolds and Deleted nodes are stepped over silently. Also, "nearest ancestor" suggests "an ancestor"; if no ancestor has an ID, the function errs.
    - Omits?: The True-kind-only filter.
 ** unique_scaffold_child (line 75)
    - True?: Partly. The function returns Ok(None) when no child matches but Err when more than one matches. The "unique" name suggests uniqueness is enforced; in practice "0 or 1" is allowed and "2+" errors.
@@ -1045,7 +1045,7 @@ is now : id_to_pid_if_found
    - True?: Partly. "Default" is misleading because two fields, birth (Birth::ContentOf) and viewStats/graphStats, encode meaningful defaults rather than null/zero values; this function is the canonical empty-buffer-state seed, not a Default impl analog.
    - Omits?: It omits that birth defaults to ContentOf rather than the more "nothing" choice of Independent.
 ** viewnode_from_metadata (line 94)
-   - True?: Partly. The function also synthesizes BufferValidationErrors for two cases (Scaffold-with-body and EditRequestOnIndefinitive); the name says "viewnode_from" but the function returns a tuple of (UncheckedViewNode, Option<BufferValidationError>).
+   - True?: Partly. The function also synthesizes BufferValidationErrors for two cases (Scaffold-with-body and EditRequestOnIndefinitive); the name says "viewnode_from" but the function returns a tuple of (MaybePlacedViewnode, Option<BufferValidationError>).
    - Omits?: It omits the validation-error generation that happens alongside conversion.
 ** parse_metadata_to_viewnodemd (line 180)
    - True?: Yes.
@@ -1910,7 +1910,7 @@ is now : id_to_pid_if_found
    - Omits?: Nothing material.
 
 ** linecol_to_viewnode (line 121)
-   - True?: Partly. The name says "to viewnode", but the function returns (level, UncheckedViewNode, Option<BufferValidationError>) — three values, including an error.
+   - True?: Partly. The name says "to viewnode", but the function returns (level, MaybePlacedViewnode, Option<BufferValidationError>) — three values, including an error.
    - Omits?: It omits that the function also returns the level and a possible validation error.
 
 ** headline_to_triple (line 146)

@@ -1,4 +1,5 @@
 * ONGOING continue TODO/sharing/ at 3_*.org
+* rename 'placed' to 'addressed'
 * TODO too many things are called reconciliation
 * further subdivide the completion logic
 Traversing a 500 node tree in ego_tree takes about 10 microseconds,

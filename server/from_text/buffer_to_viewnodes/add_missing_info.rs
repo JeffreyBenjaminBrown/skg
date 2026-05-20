@@ -4,7 +4,7 @@
 /// - add missing IDs where treatment is Content
 
 use crate::types::git::MembershipAxes;
-use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind};
+use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
 use crate::types::viewnode::Scaffold;
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
@@ -23,78 +23,72 @@ use uuid::Uuid;
 /// 'supplement_unspecified_fields_from_disk' does some of that, too,
 /// although it operates on DefineNodes, downstream.
 pub async fn add_missing_info_to_viewforest(
-  viewforest  : &mut Tree<UncheckedViewNode>, // has BufferRoot at root
+  viewforest  : &mut Tree<MaybePlacedViewnode>, // has BufferRoot at root
   db_name : &str,
   driver  : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
-  do_everywhere_in_tree_dfs(
-    viewforest,
-    viewforest . root() . id(),
-    &mut |mut node| {
-      make_alias_if_appropriate (&mut node)?;
-      inherit_parent_source_if_possible (&mut node)?;
-      Ok (( )) } )?;
   let root_id: NodeId = viewforest . root() . id();
   replace_ids_with_pids(
     viewforest, root_id, db_name, driver ) . await ?;
   do_everywhere_in_tree_dfs(
-    // Assign new IDs after PID replacement, not before,
-    // so that fresh UUIDs don't trigger a pointless TypeDB lookup.
     viewforest,
-    viewforest . root() . id(),
+    root_id,
     &mut |mut node| {
-      assign_new_id_if_absent (&mut node)?;
+      make_alias_if_appropriate (&mut node)?;
+      inherit_parent_source_if_possible (&mut node)?;
+      assign_new_id_if_absent (&mut node)?; // Do this *after* PID replacement, so that fresh UUIDs don't trigger a pointless TypeDB lookup.
       Ok (( )) } )?;
   Ok (( )) }
 
-/// Make this a Scaffold::Alias
-/// if this is a TrueNode
-///    and its parent is an AliasCol,
+/// Make it a Scaffold::Alias if both:
+/// - it is a TrueNode
+/// - its parent is an AliasCol
 fn make_alias_if_appropriate(
-  node: &mut NodeMut<UncheckedViewNode>
+  node: &mut NodeMut<MaybePlacedViewnode>
 ) -> Result<(), String> {
-  if let UncheckedViewNodeKind::True (_) = &node . value() . kind {
-    // It's a TrueNode.
+  if let MaybePlacedViewnodeKind::True (_) = &node . value() . kind {
+    // It is a TrueNode.
     let parent_is_aliascol : bool =
       node . parent()
-      . map(|mut p| matches!(&p . value() . kind,
-                            UncheckedViewNodeKind::Scaff (Scaffold::AliasCol)))
+      . map(|mut p|
+            matches!(&p . value() . kind,
+                     MaybePlacedViewnodeKind::Scaff (Scaffold::AliasCol)))
       . unwrap_or (false);
     if parent_is_aliascol { // Make it an Alias.
-      let org : &mut UncheckedViewNode = node . value();
-      let UncheckedViewNodeKind::True (t) : &UncheckedViewNodeKind = &org . kind
+      let org : &mut MaybePlacedViewnode = node . value();
+      let MaybePlacedViewnodeKind::True (t) : &MaybePlacedViewnodeKind = &org . kind
         else { unreachable!() };
-      org . kind = UncheckedViewNodeKind::Scaff(
+      org . kind = MaybePlacedViewnodeKind::Scaff(
         Scaffold::Alias { text: t . title . clone(),
                           membership: MembershipAxes::default () } ); }}
   Ok (( )) }
 
-/// Inherit parent's source
-/// if this node is a sourceless TrueNode
-///    and the parent is a TrueNode with a source.
+/// Inherit parent's source if both:
+/// - this is a sourceless TrueNode
+/// - its parent is a TrueNode with a source
 fn inherit_parent_source_if_possible(
-  node: &mut NodeMut<UncheckedViewNode>
+  node: &mut NodeMut<MaybePlacedViewnode>
 ) -> Result<(), String> {
   let needs_source : bool =
     match &node . value() . kind {
-      UncheckedViewNodeKind::True (t) => t . source . is_none(),
+      MaybePlacedViewnodeKind::True (t) => t . source . is_none(),
       _ => false, };
   if needs_source {
     let parent_source : Option<SourceName> =
       node . parent() . and_then(|mut p| {
         match &p . value() . kind {
-          UncheckedViewNodeKind::True (pt) => pt . source . clone(),
+          MaybePlacedViewnodeKind::True (pt) => pt . source . clone(),
           _ => None, }} );
     if let Some (source) = parent_source {
-      if let UncheckedViewNodeKind::True (t) = &mut node . value() . kind {
+      if let MaybePlacedViewnodeKind::True (t) = &mut node . value() . kind {
         t . source = Some (source); }} }
   Ok (( )) }
 
 /// Assign a new UUID to a TrueNode if it doesn't have an ID.
 fn assign_new_id_if_absent(
-  node: &mut NodeMut<UncheckedViewNode>
+  node: &mut NodeMut<MaybePlacedViewnode>
 ) -> Result<(), String> {
-  if let UncheckedViewNodeKind::True (t) = &mut node . value() . kind {
+  if let MaybePlacedViewnodeKind::True (t) = &mut node . value() . kind {
     if t . id . is_none() {
       let new_id : String = Uuid::new_v4() . to_string();
       t . id = Some(ID (new_id)); }}

@@ -25,7 +25,7 @@ use skg::types::misc::{ID, SkgConfig};
 
 use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
-use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
+use skg::types::maybe_placed_viewnode::{MaybePlacedViewnode, maybePlaced_to_placed_tree};
 use skg::types::viewnode::{ViewNode, ViewNodeKind};
 
 use futures::StreamExt;
@@ -364,11 +364,11 @@ async fn test_recursive_document (
     = single_root_view (
           driver, config, None, &ID ( "a" . to_string () ), false
         ) . await ?;
-  let unchecked_viewforest : Tree<UncheckedViewNode> =
+  let unchecked_viewforest : Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (& result_org_text)
     . map_err ( |e| format! ( "Parse error: {}", e ) ) ? . 0;
   let result_viewforest : Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_viewforest)
+    maybePlaced_to_placed_tree (unchecked_viewforest)
     . map_err ( |e| format! ( "Check error: {}", e ) ) ?;
 
   let tree_roots : Vec<_> =

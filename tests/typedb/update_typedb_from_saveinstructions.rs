@@ -9,7 +9,7 @@ use skg::from_text::viewnodes_to_instructions::extract_nonmerge_save_plan;
 use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
 use skg::types::misc::ID;
 use skg::types::viewnode::ViewNode;
-use skg::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
+use skg::types::maybe_placed_viewnode::{MaybePlacedViewnode, maybePlaced_to_placed_tree};
 
 use ego_tree::Tree;
 use indoc::indoc;
@@ -30,17 +30,16 @@ fn test_update_nodes_and_relationships2 (
     let org_text = indoc! {"
       * (skg (node (id 3) (source main) (editRequest delete))) 33
       * (skg (node (id 2) (source main))) 22
-      ** (skg (node (id 1) (source main) indef)) 1
-    "};
+      ** (skg (node (id 1) (source main) indef)) 1 "};
 
-    let unchecked_viewforest : Tree<UncheckedViewNode> =
+    let unchecked_viewforest : Tree<MaybePlacedViewnode> =
       org_to_uninterpreted_nodes (org_text)?. 0;
 
     // Check for inconsistent instructions
     let ( inconsistent_deletions, multiple_definers, inconsistent_sources ) =
       find_inconsistent_instructions (& unchecked_viewforest);
     let viewforest : Tree<ViewNode> =
-      unchecked_to_checked_tree (unchecked_viewforest)?;
+      maybePlaced_to_placed_tree (unchecked_viewforest)?;
     assert!( inconsistent_deletions . is_empty (),
              "Found inconsistent deletion instructions: {:?}",
              inconsistent_deletions );

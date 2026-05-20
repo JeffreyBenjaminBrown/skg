@@ -66,7 +66,7 @@ pub struct UnknownNode {
 }
 
 pub type TrueNode          = TrueNode_Generic < ID, SourceName >;
-pub type UncheckedTrueNode = TrueNode_Generic < Option < ID >,
+pub type MaybePlacedTruenode = TrueNode_Generic < Option < ID >,
                                                 Option < SourceName >>;
 
 /// A ViewNode that corresponds to a NodeComplete.

@@ -11,7 +11,7 @@ use skg::from_text::viewnodes_to_instructions::reconcile_same_id_instructions::r
 use skg::test_utils::{run_with_test_db, extract_nodecomplete_if_save_else_error};
 use skg::types::misc::ID;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
-use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
+use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use std::error::Error;
 
 /// Get the primary ID from any DefineNode variant.
@@ -32,7 +32,7 @@ fn test_inconsistent_delete() {
   assert!(!inconsistent_deletes . is_empty(),
           "Should detect inconsistent toDelete");
 
-  let viewforest = unchecked_to_checked_tree (unchecked_viewforest) . unwrap();
+  let viewforest = maybePlaced_to_placed_tree (unchecked_viewforest) . unwrap();
   let instructions =
     naive_saveinstructions_from_tree (viewforest)
     . unwrap();
@@ -59,7 +59,7 @@ fn test_deletions_excluded (
         "};
 
       let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
-      let viewforest = unchecked_to_checked_tree (unchecked_viewforest)?;
+      let viewforest = maybePlaced_to_placed_tree (unchecked_viewforest)?;
       let instructions = naive_saveinstructions_from_tree (viewforest)?;
       let reduced = reconcile_same_id_instructions (instructions)?;
 
@@ -95,7 +95,7 @@ fn test_defining_node_defines (
         "};
 
       let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
-      let viewforest = unchecked_to_checked_tree (unchecked_viewforest)?;
+      let viewforest = maybePlaced_to_placed_tree (unchecked_viewforest)?;
       let instructions = naive_saveinstructions_from_tree (viewforest)?;
       let reduced = reconcile_same_id_instructions (instructions)?;
 
@@ -128,7 +128,7 @@ fn test_adding_without_definer (
             ** (skg (node (id 4) (source main) indef)) 4 again
         "};
       let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
-      let viewforest = unchecked_to_checked_tree (unchecked_viewforest)?;
+      let viewforest = maybePlaced_to_placed_tree (unchecked_viewforest)?;
       let instructions = naive_saveinstructions_from_tree (viewforest)?;
       let reduced = reconcile_same_id_instructions(
         instructions)?;

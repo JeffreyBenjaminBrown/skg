@@ -1,5 +1,5 @@
 use crate::types::viewnode::EditRequest;
-use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind};
+use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
 use crate::types::misc::{ID, SourceName};
 
 use ego_tree::{Tree,NodeRef};
@@ -32,7 +32,7 @@ enum WhetherToDelete {
 /// Also builds a map from IDs to count of defining containers,
 /// and a map from IDs to sets of sources. */
 pub fn find_inconsistent_instructions(
-  viewforest: &Tree<UncheckedViewNode>
+  viewforest: &Tree<MaybePlacedViewnode>
 ) -> (Vec<ID>, // IDs with inconsistent deletions across nodes
       Vec<ID>, // IDs with multiple defining nodes
       Vec<(ID, // IDs with inconsistent sources
@@ -65,13 +65,13 @@ pub fn find_inconsistent_instructions(
 
 /// Collect delete instructions, defining containers, and sources.
 fn collect_instructions(
-  viewforest: &Tree<UncheckedViewNode> // "viewforest" = tree with BufferRoot
+  viewforest: &Tree<MaybePlacedViewnode> // "viewforest" = tree with BufferRoot
 ) -> (HashMap<ID, HashSet<WhetherToDelete>>, // deletes
       HashMap<ID, usize>, // defining containers
       HashMap<ID, HashSet<SourceName>>) { // sources
 
   fn collect_instructions_rec(
-    node_ref: NodeRef<UncheckedViewNode>,
+    node_ref: NodeRef<MaybePlacedViewnode>,
     id_toDelete_instructions: &mut
       HashMap<ID, HashSet<WhetherToDelete>>,
     id_defining_count: &mut
@@ -79,8 +79,8 @@ fn collect_instructions(
     id_to_sources: &mut
       HashMap<ID, HashSet<SourceName>>
   ) {
-    let viewnode : &UncheckedViewNode = node_ref . value();
-    if let UncheckedViewNodeKind::True (t) = &viewnode . kind {
+    let viewnode : &MaybePlacedViewnode = node_ref . value();
+    if let MaybePlacedViewnodeKind::True (t) = &viewnode . kind {
       if let Some (id) = &t . id {
         if ! t . is_indefinitive () { // indef nodes contribute no instructions
           let delete_instruction : WhetherToDelete =

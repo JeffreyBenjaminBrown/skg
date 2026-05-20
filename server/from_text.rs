@@ -14,7 +14,7 @@ use crate::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::SkgConfig;
 use crate::types::save::{Merge, DefineNode, SourceMove};
-use crate::types::unchecked_viewnode::{UncheckedViewNode, unchecked_to_checked_tree};
+use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, maybePlaced_to_placed_tree};
 use crate::types::viewnode::ViewNode;
 
 use buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
@@ -37,8 +37,8 @@ pub struct SavePlan {
 /// Save preparation deliberately validates at several
 /// data-maturity stages:
 /// - raw org parse: errors only visible before tree construction;
-/// - metadata-filled unchecked tree: global/local buffer structure;
-/// - checked role-aware viewforest: saved-view role policy;
+/// - metadata-filled maybePlaced tree: global/local buffer structure;
+/// - placed, role-aware viewforest: saved-view role policy;
 /// - disk-supplemented DefineNodes: foreign write policy;
 /// - non-merge plus merge plan: cross-plan source-move/merge policy.
 pub async fn buffer_to_viewforest_and_save_instructions (
@@ -46,26 +46,26 @@ pub async fn buffer_to_viewforest_and_save_instructions (
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
 ) -> Result<SavePlan, SaveError> {
-  let ( mut unchecked_viewforest, parsing_errors )
-    : ( Tree<UncheckedViewNode>, Vec<BufferValidationError> )
+  let ( mut maybePlaced_viewforest, parsing_errors )
+    : ( Tree<MaybePlacedViewnode>, Vec<BufferValidationError> )
     = { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "org_to_uninterpreted_nodes" ). entered();
         org_to_uninterpreted_nodes (buffer_text) }
       . map_err (SaveError::ParseError) ?;
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "add_missing_info_to_viewforest" ). entered();
-    // Metadata filling must precede unchecked-tree validation:
-    // those validators compare nodes by pid and expect sources to be
-    // inherited/resolved.
+    // Metadata filling must precede maybePlaced-tree validation,
+    // because those validators compare nodes by pid,
+    // and expect sources to be inherited/resolved.
     add_missing_info_to_viewforest (
-      & mut unchecked_viewforest, & config . db_name, driver )
+      & mut maybePlaced_viewforest, & config . db_name, driver )
     . await } . map_err (SaveError::DatabaseError) ?;
   { // If saving is impossible, don't.
     let mut validation_errors : Vec<BufferValidationError> =
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "find_buffer_errors_for_saving" ). entered();
         find_buffer_errors_for_saving (
-          & unchecked_viewforest, config, driver )
+          & maybePlaced_viewforest, config, driver )
         . await } . map_err (SaveError::DatabaseError) ?;
     validation_errors . extend (parsing_errors);
     if ! validation_errors . is_empty () {
@@ -73,8 +73,8 @@ pub async fn buffer_to_viewforest_and_save_instructions (
         validation_errors ) ); }}
   let viewforest : Tree<ViewNode> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "unchecked_to_checked_tree" ). entered();
-      unchecked_to_checked_tree (unchecked_viewforest) }
+        "maybePlaced_to_placed_tree" ). entered();
+      maybePlaced_to_placed_tree (maybePlaced_viewforest) }
         . map_err ( |e| SaveError::ParseError (e) ) ?;
   let nonmerge_plan : NonmergeSavePlan =
     extract_nonmerge_save_plan (

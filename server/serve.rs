@@ -29,7 +29,7 @@ use crate::serve::util::{ read_length_prefixed_content, request_type_from_reques
 use crate::to_org::util::set_view_root_births_from_graphstats;
 use crate::types::env::SkgEnv;
 use crate::types::errors::BufferValidationError;
-use crate::types::unchecked_viewnode::{UncheckedViewNode,unchecked_to_checked_tree};
+use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode,maybePlaced_to_placed_tree};
 use crate::types::viewnode::ViewNode;
 use crate::types::views_state::{OpenViews, ViewUri};
 use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
@@ -248,12 +248,12 @@ fn handle_snapshot_response (
     tracing::warn! ("snapshot response: terms mismatch ('{}' vs '{}')",
                     payload . terms, terms);
     return; }
-  let parse_result : Result<(Tree<UncheckedViewNode>,
+  let parse_result : Result<(Tree<MaybePlacedViewnode>,
                              Vec<BufferValidationError>), String>
     = org_to_uninterpreted_nodes (&buffer_text);
   let mut viewforest : Tree<ViewNode> = match parse_result {
-    Ok (( unchecked_viewforest, _errors )) =>
-      match unchecked_to_checked_tree (unchecked_viewforest) {
+    Ok (( maybePlaced_viewforest, _errors )) =>
+      match maybePlaced_to_placed_tree (maybePlaced_viewforest) {
         Ok (f) => f,
         Err (e) => {
           tracing::error! ("snapshot response: check failed: {}", e);

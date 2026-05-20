@@ -5,7 +5,7 @@ use skg::to_org::expand::backpath::{
   integrate_path_that_might_fork_or_cycle,
   build_and_integrate_containerward_path};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::unchecked_viewnode::unchecked_to_checked_tree;
+use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::viewnode::{ViewNode, ViewNodeKind, Birth};
@@ -41,7 +41,7 @@ async fn test_path_with_cycle_impl(
   "};
 
   let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
-  let mut viewforest: Tree<ViewNode> = unchecked_to_checked_tree (unchecked_viewforest)?;
+  let mut viewforest: Tree<ViewNode> = maybePlaced_to_placed_tree (unchecked_viewforest)?;
   assert_eq!(viewforest . root() . children() . count(), 1,
              "Should have exactly 1 tree");
 
@@ -59,7 +59,7 @@ async fn test_path_with_cycle_impl(
   let cycle_nodes = HashSet::from([ID::from ("1")]);
 
   // Integrate the path
-  
+
   integrate_path_that_might_fork_or_cycle(
     &mut viewforest, root_id, path, branches,
     cycle_nodes, &config, driver, Birth::ContainerOf
@@ -75,7 +75,7 @@ async fn test_path_with_cycle_impl(
   "};
 
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
-  let expected_trees: Tree<ViewNode> = unchecked_to_checked_tree (expected_unchecked)?;
+  let expected_trees: Tree<ViewNode> = maybePlaced_to_placed_tree (expected_unchecked)?;
 
   let actual_str = viewforest_to_string (&viewforest, config)?;
   let expected_str = viewforest_to_string (&expected_trees, config)?;
@@ -111,7 +111,7 @@ async fn test_path_with_branches_no_cycle_impl(
   "};
 
   let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
-  let mut viewforest: Tree<ViewNode> = unchecked_to_checked_tree (unchecked_viewforest)?;
+  let mut viewforest: Tree<ViewNode> = maybePlaced_to_placed_tree (unchecked_viewforest)?;
   assert_eq!(viewforest . root() . children() . count(), 1,
              "Should have exactly 1 tree");
 
@@ -138,7 +138,7 @@ async fn test_path_with_branches_no_cycle_impl(
   let cycle_nodes = HashSet::new();
 
   // Integrate the path
-  
+
   integrate_path_that_might_fork_or_cycle(
     &mut viewforest, node_1_id, path, branches,
     cycle_nodes, &config, driver, Birth::ContainerOf
@@ -156,7 +156,7 @@ async fn test_path_with_branches_no_cycle_impl(
   "};
 
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
-  let expected_trees: Tree<ViewNode> = unchecked_to_checked_tree (expected_unchecked)?;
+  let expected_trees: Tree<ViewNode> = maybePlaced_to_placed_tree (expected_unchecked)?;
 
   let actual_str = viewforest_to_string (&viewforest, config)?;
   let expected_str = viewforest_to_string (&expected_trees, config)?;
@@ -192,7 +192,7 @@ async fn test_path_with_branches_with_cycle_impl(
   "};
 
   let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
-  let mut viewforest: Tree<ViewNode> = unchecked_to_checked_tree (unchecked_viewforest)?;
+  let mut viewforest: Tree<ViewNode> = maybePlaced_to_placed_tree (unchecked_viewforest)?;
   assert_eq!(viewforest . root() . children() . count(), 1,
              "Should have exactly 1 tree");
 
@@ -220,7 +220,7 @@ async fn test_path_with_branches_with_cycle_impl(
   let cycle_nodes = HashSet::from([ID::from ("1")]);
 
   // Integrate the path
-  
+
   integrate_path_that_might_fork_or_cycle(
     &mut viewforest, node_1_id, path, branches,
     cycle_nodes, &config, driver, Birth::ContainerOf
@@ -238,7 +238,7 @@ async fn test_path_with_branches_with_cycle_impl(
   "};
 
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
-  let expected_trees: Tree<ViewNode> = unchecked_to_checked_tree (expected_unchecked)?;
+  let expected_trees: Tree<ViewNode> = maybePlaced_to_placed_tree (expected_unchecked)?;
 
   let actual_str = viewforest_to_string (&viewforest, config)?;
   let expected_str = viewforest_to_string (&expected_trees, config)?;
@@ -273,10 +273,10 @@ async fn test_fork_expansion_at_origin_impl(
   "};
   let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
   let mut viewforest: Tree<ViewNode> =
-    unchecked_to_checked_tree (unchecked_viewforest)?;
+    maybePlaced_to_placed_tree (unchecked_viewforest)?;
   let node_a11_id : NodeId =
     viewforest . root () . first_child () . unwrap () . id ();
-  
+
   build_and_integrate_containerward_path (
     &mut viewforest, node_a11_id, &config, driver
   ) . await ?;
@@ -297,7 +297,7 @@ async fn test_fork_expansion_at_origin_impl(
   "};
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
   let expected_trees: Tree<ViewNode> =
-    unchecked_to_checked_tree (expected_unchecked)?;
+    maybePlaced_to_placed_tree (expected_unchecked)?;
   let actual_str : String =
     viewforest_to_string (&viewforest, config)?;
   let expected_str : String =

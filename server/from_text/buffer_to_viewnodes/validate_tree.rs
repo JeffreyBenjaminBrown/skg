@@ -2,7 +2,7 @@ pub mod contradictory_instructions;
 
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{Birth, ViewRequest};
-use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind};
+use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::errors::BufferValidationError;
 use crate::merge::validate_merge::validate_merge_requests;
@@ -19,7 +19,7 @@ use typedb_driver::TypeDBDriver;
 /// SHARES RESPONSIBILITY for error detection
 /// with 'org_to_uninterpreted_nodes',
 /// which runs earlier and detects a few errors that this one can't,
-/// because this one acts on a tree of UncheckedViewNodes rather than raw text.
+/// because this one acts on a tree of MaybePlacedViewnodes rather than raw text.
 /// (Namely, Alias and AliasCol should not have body text.)
 ///
 /// ASSUMES that in the "viewforest" (tree with BufferRoot):
@@ -28,11 +28,11 @@ use typedb_driver::TypeDBDriver;
 ///   might refer to the same skg node, yet appear not to.)
 /// - All nodes have sources, per 'inherit_parent_source_if_possible'.
 ///
-/// This is the unchecked-tree validation stage: metadata is complete,
+/// This is the maybePlaced tree validation stage: metadata is complete,
 /// but role classification, save-intent extraction, and disk
 /// supplementation have not happened yet.
 pub async fn find_buffer_errors_for_saving (
-  viewforest: &Tree<UncheckedViewNode>,
+  viewforest: &Tree<MaybePlacedViewnode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<BufferValidationError>,
@@ -91,16 +91,16 @@ pub async fn find_buffer_errors_for_saving (
 /// - No other node with the same ID has a definitive view request,
 ///   because there can only be one definitive view.
 fn validate_definitive_view_requests (
-  viewforest : &Tree<UncheckedViewNode>, // "viewforest" = tree with BufferRoot
+  viewforest : &Tree<MaybePlacedViewnode>, // "viewforest" = tree with BufferRoot
   errors : &mut Vec<BufferValidationError>,
 ) {
   let mut ids_with_requests : HashSet<ID> =
     HashSet::new();
   for edge in viewforest . root() . traverse()
   { if let Edge::Open (node_ref) = edge
-    { let viewnode : &UncheckedViewNode =
+    { let viewnode : &MaybePlacedViewnode =
         node_ref . value();
-      if let UncheckedViewNodeKind::True (t) = &viewnode . kind
+      if let MaybePlacedViewnodeKind::True (t) = &viewnode . kind
       { if t . view_requests . contains (&ViewRequest::Definitive)
         { if let Some (id) = &t . id {
           { // Error: must be indefinitive
@@ -110,7 +110,7 @@ fn validate_definitive_view_requests (
             let has_content_children : bool =
               node_ref . children () . any ( |child| matches! (
                 &child . value () . kind,
-                UncheckedViewNodeKind::True (ct)
+                MaybePlacedViewnodeKind::True (ct)
                   if ct . birth == Birth::ContentOf ));
             if has_content_children
             { errors . push( BufferValidationError::DefinitiveRequestOnNodeWithContentChildren( id . clone() )); }}

@@ -10,7 +10,7 @@ use typedb_driver::{
 use futures::stream::{self, StreamExt};
 use ego_tree::{NodeRef, NodeMut, NodeId, Tree};
 
-use crate::types::unchecked_viewnode::{UncheckedViewNode, UncheckedViewNodeKind};
+use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
 use crate::types::misc::ID;
 use crate::dbs::in_rust_graph::snapshot_global;
 use crate::dbs::typedb::util::concept_document::extract_id_from_node;
@@ -19,7 +19,7 @@ use crate::dbs::typedb::util::concept_document::extract_id_from_node;
 /// Only query TypeDB for nodes not already resolvable in the in-Rust
 /// in-Rust graph snapshot.
 pub async fn replace_ids_with_pids(
-  viewforest  : &mut Tree<UncheckedViewNode>,
+  viewforest  : &mut Tree<MaybePlacedViewnode>,
   root_id : NodeId,
   db_name : &str,
   driver  : &TypeDBDriver,
@@ -52,10 +52,10 @@ pub async fn replace_ids_with_pids(
 
 /// Collect IDs for bulk PID lookup
 pub fn collect_ids_in_tree (
-  node_ref : NodeRef < UncheckedViewNode >,
+  node_ref : NodeRef < MaybePlacedViewnode >,
   ids_to_lookup : & mut Vec < ID >
 ) {
-  if let UncheckedViewNodeKind::True (t) =
+  if let MaybePlacedViewnodeKind::True (t) =
     &node_ref . value () . kind
   { if let Some (id) = &t . id
     { ids_to_lookup . push ( id . clone () ); }}
@@ -65,10 +65,10 @@ pub fn collect_ids_in_tree (
       ids_to_lookup ); } }
 
 pub fn assign_pids_throughout_tree_from_map (
-  mut node_ref : NodeMut < UncheckedViewNode >,
+  mut node_ref : NodeMut < MaybePlacedViewnode >,
   pid_map : & HashMap < ID, Option < ID > >
 ) {
-  if let UncheckedViewNodeKind::True (t)
+  if let MaybePlacedViewnodeKind::True (t)
     = &mut node_ref . value() . kind
     { let pid_opt : Option < ID > = t . id . as_ref ()
         . and_then ( |id| pid_map . get (id) )
@@ -79,7 +79,7 @@ pub fn assign_pids_throughout_tree_from_map (
     for child_treeid in {
       let treeid : NodeId = node_ref . id ();
       let child_treeids : Vec < NodeId > = {
-        let tree : &Tree<UncheckedViewNode> = node_ref . tree ();
+        let tree : &Tree<MaybePlacedViewnode> = node_ref . tree ();
         tree . get (treeid) . unwrap ()
           . children () . map ( | child | child . id () )
           . collect () };
