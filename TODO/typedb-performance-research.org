@@ -1,0 +1,254 @@
+* Question
+Why does a just-started Skg make TypeDB sit at roughly 4-5% CPU after
+Skg says initialization is done?
+
+This matters because running three independent Skg/TypeDB environments
+turns a small idle cost into a noticeable machine-wide cost, especially
+when tests start doing real TypeDB work.
+
+* Orientation read
+I read:
+
+- 'coding-advice/ORIENTATION.org'
+- the directly referenced local project docs: 'README.org',
+  'api-and-formats.md', 'schema.tql', 'glossary.md',
+  'coding-advice/architecture.md', 'coding-advice/development-process.md',
+  'coding-advice/ai-agents.org', 'coding-advice/for-ai.md',
+  'coding-advice/common-gotchas.md', 'coding-advice/formatting.org',
+  'coding-advice/pitfall-bytes-vs-characters.org',
+  'coding-advice/some-good-refactors.md',
+  'coding-advice/claude-to-claude.org', 'docs/data-model.org',
+  'docs/setup.org', and 'TODO.org'.
+
+Relevant orientation:
+
+- TypeDB and Tantivy are derived caches; the filesystem is the durable
+  source of truth.
+- Skg keeps one long-lived 'TypeDBDriver' in 'SkgEnv'.
+- 'auto_audit_daily' can spawn a background TypeDB audit daemon, but
+  'data/skgconfig.toml' does not enable it.
+- 'TODO/docker-unification-strategies.org' already anticipates a
+  likely direction: one TypeDB server can hold many databases, so
+  running one TypeDB process per Skg instance multiplies fixed server
+  costs.
+
+* Runtime facts from the first live process
+The live processes after startup were:
+
+- TypeDB: '/opt/typedb/server/typedb_server_bin', around 4.8% CPU in
+  process-lifetime 'ps' output.
+- Skg: 'target/debug/skg data/skgconfig.toml', initially around 3-4%
+  in process-lifetime 'ps' output.
+
+The Skg config:
+
+- 'db_name = "skg-real"'
+- 'timing_log = true'
+- no 'auto_audit_daily', so the audit daemon should not exist.
+
+The Skg logs after 'Server ready.' showed no user request loop and no
+audit activity. The only established TypeDB connection was Skg's driver
+connection to port 1729.
+
+Per-thread 'top -H' changed the interpretation:
+
+- Skg was essentially idle after initialization. The earlier 'ps %CPU'
+  was mostly a lifetime average that included initialization.
+- TypeDB was still doing current work in TypeDB-owned threads.
+- The hot TypeDB threads slept in 'hrtimer_nanosleep' and woke very
+  frequently. '/proc/114/task/*/status' showed hundreds of thousands of
+  voluntary context switches in a few minutes.
+
+Pitfall: 'ps %CPU' is a lifetime average. For idle diagnosis, use
+'top -H' over several intervals, or compute deltas from '/proc'.
+
+* Hypotheses tested
+** Skg request handling or busy-signal loop
+Evidence against:
+
+- Skg logs had no requests after startup.
+- 'top -H -p <skg-pid>' showed no meaningful current CPU after init.
+- The server accept thread was sleeping in 'inet_csk_accept'.
+
+Conclusion: the idle TypeDB CPU is not caused by a Skg request loop.
+
+** 'auto_audit_daily'
+Evidence against:
+
+- 'data/skgconfig.toml' does not set 'auto_audit_daily'.
+- 'schedule_daemon' returns immediately when the flag is false.
+- Logs contained no 'auto_audit_daily' messages.
+
+Conclusion: not the cause in this run.
+
+** A live Skg driver connection keeps TypeDB busy
+Method:
+
+- Sent Skg a shutdown request over port 1730.
+- Verified with 'ss' that the Skg-to-TypeDB TCP connection disappeared.
+- Sampled TypeDB again.
+
+Result:
+
+- TypeDB continued at about the same idle CPU, with no Skg connection.
+
+Conclusion: a live Skg TypeDB driver connection is not required for the
+idle TypeDB CPU.
+
+** TypeDB diagnostics monitoring/reporting
+Method:
+
+- Restarted TypeDB with:
+  '--diagnostics.monitoring.enabled false'
+  '--diagnostics.reporting.metrics false'
+  '--diagnostics.reporting.errors false'
+- Kept the parent shell alive while sampling, because short-lived
+  launch shells made TypeDB exit soon after 'Ready!'.
+
+Result:
+
+- The diagnostics monitoring port disappeared, but the polling TypeDB
+  threads and idle CPU remained.
+
+Conclusion: diagnostics are not the main cause.
+
+** HTTP endpoint
+Method:
+
+- Started TypeDB on alternate ports with an empty data directory,
+  diagnostics disabled, and '--server.http.enabled false'.
+
+Result:
+
+- Idle TypeDB CPU still remained in a TypeDB thread.
+
+Conclusion: HTTP is not the main cause.
+
+** Skg's real database contents
+Method:
+
+- Started a separate TypeDB on alternate ports with a fresh empty data
+  directory and diagnostics disabled.
+
+Result:
+
+- Empty TypeDB still showed a TypeDB-owned idle CPU baseline.
+- The empty server tended to show one polling TypeDB thread at roughly
+  1-3%.
+- The real 'skg-real' store tended to show two polling TypeDB threads
+  totaling roughly 4-5%.
+
+Conclusion: database contents can change the size of the idle tax, but
+the phenomenon exists even with an empty TypeDB store. It is not created
+by Skg data or Skg queries.
+
+* Pitfalls encountered
+** Short-lived TypeDB launches
+Starting TypeDB from a short-lived shell in this environment can produce
+'Ready!' and then disappear shortly after. The original long-running
+setup had TypeDB as a background process under a long-lived shell. For
+restoration I used Python's 'subprocess.Popen' with 'preexec_fn=os.setsid'
+so TypeDB became an orphan owned by PID 1 and kept running.
+
+This is investigation infrastructure, not a Skg code change.
+
+** 'pgrep -f typedb_server_bin' can match the command doing the grep
+I saw one sampling command accidentally point 'top' at the sampling
+process rather than at TypeDB. Prefer reading 'ps' output directly or
+using a captured PID from process creation.
+
+** 'strace', 'perf', 'jstack', 'jcmd', 'gdb' and 'lsof' were unavailable
+That limited attribution to thread names, kernel wait channels, TypeDB
+config, sockets, logs, and controlled restarts. The best next
+instrumentation would be a real profiler or TypeDB-maintainer guidance.
+
+* Current best explanation
+Skg is not making TypeDB do hidden Skg work after initialization.
+
+Instead, starting TypeDB brings a fixed TypeDB server idle cost. In this
+environment, TypeDB CE 3.10.3 keeps one or more internal TypeDB threads
+waking frequently from timer sleeps even when:
+
+- Skg is shut down,
+- no Skg-to-TypeDB TCP connection exists,
+- diagnostics monitoring/reporting are disabled,
+- HTTP is disabled, and
+- the data directory is empty.
+
+The real 'skg-real' data store makes the idle cost somewhat larger than
+the empty-store baseline, but the baseline itself is TypeDB server
+behavior, not Skg request behavior.
+
+* Practical implications
+The most direct mitigation is probably not a Skg query optimization.
+It is process topology:
+
+- Avoid running three TypeDB server processes if one TypeDB server can
+  hold three distinct Skg databases.
+- Keep one TypeDB process and run multiple Skg servers against distinct
+  'db_name' values and distinct Rust/Emacs ports.
+- This matches the direction already discussed in
+  'TODO/docker-unification-strategies.org'.
+
+If separate containers remain necessary, the fixed TypeDB idle tax will
+probably remain multiplied by the number of containers.
+
+* Possible next experiments
+- Install/use 'perf' or another sampler to identify the exact TypeDB
+  code behind the timer wakeups.
+- Ask TypeDB upstream whether the observed 1-5% idle CPU from sleeping
+  TypeDB threads is expected in CE 3.10.3.
+- Test a newer TypeDB version if available.
+- Run one shared TypeDB process with three Skg databases and measure
+  whether total idle CPU is close to one TypeDB baseline rather than
+  three.
+- Test whether TypeDB has an undocumented/configurable background
+  scheduler interval affecting these polling threads.
+
+* Online check
+I did this after the first writeup, because Jeff asked whether I had
+looked online. I had not, which was a gap.
+
+Searches:
+
+- "TypeDB 3.10 idle CPU background threads hrtimer_nanosleep"
+- "TypeDB server high idle CPU diagnostics monitoring metrics"
+- "TypeDB 3.10.3 idle CPU issue GitHub"
+- "site:github.com/typedb/typedb idle CPU"
+- "site:github.com/typedb/typedb high CPU idle"
+- "site:forum.typedb.com idle CPU TypeDB"
+
+Findings:
+
+- I did not find a matching public TypeDB issue or forum thread about
+  idle CPU.
+- The official TypeDB server configuration docs confirm the diagnostics
+  knobs tested locally: 'diagnostics.monitoring.enabled',
+  'diagnostics.reporting.metrics', and
+  'diagnostics.reporting.errors'.
+- The TypeDB GitHub/release pages show that TypeDB 3.10.4 exists, while
+  this environment is running 3.10.3. That makes "try 3.10.4" a
+  reasonable low-cost follow-up, though I did not find release-note
+  evidence that it fixes idle CPU.
+
+Sources:
+
+- https://typedb.com/docs/manual/configure/server
+- https://github.com/typedb/typedb
+- https://github.com/vaticle/typedb/releases
+
+Interpretation after checking online:
+
+The local conclusion still looks plausible, but it is not corroborated
+by a known upstream idle-CPU bug report. The most accurate phrasing is:
+"I reproduced an idle TypeDB CPU baseline locally even without Skg or a
+nonempty database; I did not find an upstream explanation for it."
+
+* Restoration state
+After the investigation, I restored TypeDB on port 1729 and restarted
+Skg through the existing cargo-watch process. At restoration time:
+
+- TypeDB was listening on 1729.
+- Skg was listening on 1730.
+- Skg had an established TCP connection to TypeDB.
+- Skg logs reported 'Server ready.'
