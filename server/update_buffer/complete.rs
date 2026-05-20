@@ -10,7 +10,9 @@ use crate::types::misc::{ID, SourceName};
 use crate::types::git::SourceDiff;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, ScaffoldKind};
 use crate::to_org::util::DefinitiveMap;
-use crate::types::tree::generic::read_at_ancestor_in_tree;
+use crate::types::tree::generic::{
+  do_everywhere_in_tree_dfs,
+  do_everywhere_in_tree_dfs_readonly};
 
 use ego_tree::{Tree, NodeId};
 use std::collections::{HashMap, HashSet};
@@ -58,73 +60,75 @@ async fn complete_viewforest_with_context (
   context    : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
   let root_treeid : NodeId = viewforest . root () . id ();
-  resolve_truenode_state_and_expand_content (
+  mark_scaffolds_under_deleted_branches (viewforest) ?;
+  expand_true_content_until_stable (
     viewforest, root_treeid, context ) . await ?;
-  insert_and_reconcile_generated_scaffolds (
-    viewforest, root_treeid, context ) . await ?;
+  mark_scaffolds_under_deleted_branches (viewforest) ?;
+  ensure_diff_scaffolds (viewforest, context) ?;
+  let postorder_true_nodes : Vec<NodeId> =
+    collect_matching_nodeids (
+      viewforest, false,
+      |vn| matches! ( &vn . kind, ViewNodeKind::True (_) )) ?;
+  execute_truenode_view_requests (
+    viewforest, context, &postorder_true_nodes ) . await ?;
+  ensure_hiddenin_cols_under_definitive_subscribees (
+    viewforest, context, &postorder_true_nodes ) . await ?;
+  reconcile_alias_cols (viewforest, context) ?;
+  reconcile_id_cols (viewforest, context) ?;
+  reconcile_hiddenin_cols (viewforest, context) ?;
+  reconcile_hiddenoutside_cols (viewforest, context) ?;
+  remove_empty_deleted_scaffolds (viewforest) ?;
   Ok(( )) }
 
-/// Parent-first pass. Completes TrueNodes while their parent context
-/// is fresh, expands definitive content, performs saved-view request
-/// effects, and reconciles SubscribeeCol direct children.
-fn resolve_truenode_state_and_expand_content<'a> (
+fn mark_scaffolds_under_deleted_branches (
+  tree : &mut Tree<ViewNode>,
+) -> Result<(), Box<dyn Error>> {
+  let root_treeid : NodeId = tree . root () . id ();
+  do_everywhere_in_tree_dfs (
+    tree, root_treeid, true,
+    &mut |mut node| -> Result<(), String> {
+      let scaffold_kind : Option<ScaffoldKind> =
+        match &node . value () . kind {
+          ViewNodeKind::Scaff (s) => Some (s . kind ()),
+          _ => None };
+      if let Some (kind) = scaffold_kind {
+        let parent_is_deleted : bool =
+          node . parent ()
+          . map ( |mut p| matches! ( &p . value () . kind,
+            ViewNodeKind::Deleted (_) |
+            ViewNodeKind::DeletedScaff (_) ))
+          . unwrap_or (false);
+        if parent_is_deleted {
+          node . value () . kind = ViewNodeKind::DeletedScaff (kind); }}
+      Ok (( )) } )
+    . map_err ( |e| -> Box<dyn Error> { e . into () } ) }
+
+/// Parent-first content expansion. This remains a narrow manual async
+/// recursion because a parent can insert content or subscribee children
+/// that must be completed before later passes run.
+fn expand_true_content_until_stable<'a> (
   tree    : &'a mut Tree<ViewNode>,
   treeid  : NodeId,
   context : &'a mut CompletionContext<'_>,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
   // See the 'MANUAL RECURSION' comment at the top of this file.
   Box::pin ( async move {
-    complete_parent_first_at_node (tree, treeid, context) . await ?;
+    expand_true_content_at_node (tree, treeid, context) . await ?;
     let child_treeids : Vec<NodeId> =
       tree . get (treeid) . unwrap ()
       . children () . map ( |c| c . id () ) . collect ();
     for child_treeid in child_treeids {
-      resolve_truenode_state_and_expand_content (
+      expand_true_content_until_stable (
         tree, child_treeid, context ) . await ?; }
     Ok(( )) }) }
 
-/// Child-first pass. Once generated content is present, populate and
-/// order display scaffolds, reconcile sharing scaffolds, and detach
-/// empty deleted scaffolds.
-fn insert_and_reconcile_generated_scaffolds<'a> (
-  tree    : &'a mut Tree<ViewNode>,
-  treeid  : NodeId,
-  context : &'a mut CompletionContext<'_>,
-) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
-  // See the 'MANUAL RECURSION' comment at the top of this file.
-  Box::pin ( async move {
-    let child_treeids : Vec<NodeId> =
-      tree . get (treeid) . unwrap ()
-      . children () . map ( |c| c . id () ) . collect ();
-    for child_treeid in child_treeids {
-      insert_and_reconcile_generated_scaffolds (
-        tree, child_treeid, context ) . await ?; }
-    complete_child_first_at_node (tree, treeid, context) . await ?;
-    Ok(( )) }) }
-
-/// Dispatches to functions that might descend a few layers --
-/// e.g. to complete a truenode, its content must all be children.
-/// But this dispatcher cannot call itself.
-async fn complete_parent_first_at_node (
+async fn expand_true_content_at_node (
   tree    : &mut Tree<ViewNode>,
   treeid  : NodeId,
   context : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
   let kind : ViewNodeKind =
     tree . get (treeid) . unwrap () . value () . kind . clone ();
-  if let ViewNodeKind::Scaff (ref s) = kind {
-    // Scaff under Deleted or DeletedScaff parent becomes DeletedScaff.
-    let scaffold_kind : ScaffoldKind = s . kind ();
-    let parent_is_deleted : bool =
-      read_at_ancestor_in_tree ( tree, treeid, 1,
-        |vn : &ViewNode| matches! ( &vn . kind,
-          ViewNodeKind::Deleted (_) |
-          ViewNodeKind::DeletedScaff (_) ))
-      . unwrap_or (false);
-    if parent_is_deleted {
-      tree . get_mut (treeid) . unwrap () . value () . kind =
-        ViewNodeKind::DeletedScaff (scaffold_kind);
-      return Ok(( )); }}
   if matches!( kind, ViewNodeKind::True (_)) {
     super::complete_preorder::truenode::
     complete_truenode_preorder (
@@ -150,66 +154,142 @@ async fn complete_parent_first_at_node (
   // containing them).
   Ok(( )) }
 
-/// Dispatches to functions that might descend a few layers --
-/// e.g. to complete a truenode, its content must all be children.
-/// But this dispatcher cannot call itself.
-async fn complete_child_first_at_node (
+fn ensure_diff_scaffolds (
   tree    : &mut Tree<ViewNode>,
-  treeid  : NodeId,
   context : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
-  let kind : ViewNodeKind =
-    tree . get (treeid) . unwrap () . value () . kind . clone ();
-  if matches!( kind, ViewNodeKind::True (_)) {
+  let true_nodes : Vec<NodeId> =
+    collect_matching_nodeids (
+      tree, true,
+      |vn| matches! ( &vn . kind, ViewNodeKind::True (_) )) ?;
+  for treeid in true_nodes {
+    super::complete_preorder::truenode::
+    ensure_diff_scaffolds_for_truenode (
+      treeid, tree, context . source_diffs ) ?; }
+  Ok (( )) }
+
+async fn execute_truenode_view_requests (
+  tree       : &mut Tree<ViewNode>,
+  context    : &mut CompletionContext<'_>,
+  true_nodes : &[NodeId],
+) -> Result<(), Box<dyn Error>> {
+  for treeid in true_nodes {
     super::complete_postorder::truenode::
-    complete_truenode ( treeid,
-                        tree,
-                        context . defmap,
-                        context . source_diffs,
-                        &context . env . config,
-                        &context . env . driver,
-                        context . errors,
-                        context . deleted_since_head_pid_src_map )
-    . await ?;
-  } else if matches!(
-    kind, ViewNodeKind::Scaff (Scaffold::AliasCol)) {
+    execute_truenode_view_requests (
+      *treeid, tree, context . defmap, context . source_diffs,
+      &context . env . config, &context . env . driver,
+      context . errors, context . deleted_since_head_pid_src_map )
+    . await ?; }
+  Ok (( )) }
+
+async fn ensure_hiddenin_cols_under_definitive_subscribees (
+  tree       : &mut Tree<ViewNode>,
+  context    : &CompletionContext<'_>,
+  true_nodes : &[NodeId],
+) -> Result<(), Box<dyn Error>> {
+  for treeid in true_nodes {
+    super::complete_postorder::truenode::
+    ensure_hiddenin_col_under_definitive_subscribee (
+      tree, *treeid, &context . env . config,
+      &context . env . driver ) . await ?; }
+  Ok (( )) }
+
+fn reconcile_alias_cols (
+  tree    : &mut Tree<ViewNode>,
+  context : &CompletionContext<'_>,
+) -> Result<(), Box<dyn Error>> {
+  let nodes : Vec<NodeId> =
+    collect_matching_nodeids (
+      tree, false,
+      |vn| matches! ( &vn . kind,
+        ViewNodeKind::Scaff (Scaffold::AliasCol) )) ?;
+  for treeid in nodes {
       super::complete_postorder::aliascol::
       complete_alias_col (
         tree, treeid, context . source_diffs, &context . env . config ) ?;
-  } else if matches!(
-      kind, ViewNodeKind::Scaff (Scaffold::IDCol)) {
-        super::complete_postorder::id_col::
-        complete_id_col (
-          treeid, tree, context . source_diffs,
-          &context . env . config ) ?;
-  } else if matches!(
-    kind, ViewNodeKind::Scaff (Scaffold::HiddenInSubscribeeCol)) {
+  }
+  Ok (( )) }
+
+fn reconcile_id_cols (
+  tree    : &mut Tree<ViewNode>,
+  context : &CompletionContext<'_>,
+) -> Result<(), Box<dyn Error>> {
+  let nodes : Vec<NodeId> =
+    collect_matching_nodeids (
+      tree, false,
+      |vn| matches! ( &vn . kind,
+        ViewNodeKind::Scaff (Scaffold::IDCol) )) ?;
+  for treeid in nodes {
+    super::complete_postorder::id_col::
+    complete_id_col (
+      treeid, tree, context . source_diffs,
+      &context . env . config ) ?; }
+  Ok (( )) }
+
+fn reconcile_hiddenin_cols (
+  tree    : &mut Tree<ViewNode>,
+  context : &CompletionContext<'_>,
+) -> Result<(), Box<dyn Error>> {
+  let nodes : Vec<NodeId> =
+    collect_matching_nodeids (
+      tree, false,
+      |vn| matches! ( &vn . kind,
+        ViewNodeKind::Scaff (Scaffold::HiddenInSubscribeeCol) )) ?;
+  for treeid in nodes {
       super::complete_postorder::hiddeninsubscribee_col::
       complete_hiddeninsubscribee_col (
         treeid, tree, context . source_diffs, context . env,
-        context . deleted_since_head_pid_src_map ) ?;
-  } else if matches!( kind,
-      ViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol)) {
-        super::complete_postorder::hiddenoutsideof_subscribeecol::
-        complete_hiddenoutsideofsubscribeecol (
-          treeid, tree, context . source_diffs, context . env,
-          context . deleted_since_head_pid_src_map ) ?;
-  } else if matches!( kind, ViewNodeKind::Deleted (_)) { // no-op
-  } else if matches!( kind, ViewNodeKind::DeletedScaff (_) ) {
-    // Detach self if no children remain.
+        context . deleted_since_head_pid_src_map ) ?; }
+  Ok (( )) }
+
+fn reconcile_hiddenoutside_cols (
+  tree    : &mut Tree<ViewNode>,
+  context : &CompletionContext<'_>,
+) -> Result<(), Box<dyn Error>> {
+  let nodes : Vec<NodeId> =
+    collect_matching_nodeids (
+      tree, false,
+      |vn| matches! ( &vn . kind,
+        ViewNodeKind::Scaff (
+          Scaffold::HiddenOutsideOfSubscribeeCol) )) ?;
+  for treeid in nodes {
+    super::complete_postorder::hiddenoutsideof_subscribeecol::
+    complete_hiddenoutsideofsubscribeecol (
+      treeid, tree, context . source_diffs, context . env,
+      context . deleted_since_head_pid_src_map ) ?; }
+  Ok (( )) }
+
+fn remove_empty_deleted_scaffolds (
+  tree : &mut Tree<ViewNode>,
+) -> Result<(), Box<dyn Error>> {
+  let nodes : Vec<NodeId> =
+    collect_matching_nodeids (
+      tree, false,
+      |vn| matches! ( &vn . kind,
+        ViewNodeKind::DeletedScaff (_) )) ?;
+  for treeid in nodes {
     let has_children : bool =
-      tree . get (treeid) . unwrap ()
-      . children () . next () . is_some ();
+      match tree . get (treeid) {
+        Some (node) => node . children () . next () . is_some (),
+        None => continue };
     if ! has_children {
       tree . get_mut (treeid) . unwrap () . detach (); }
-  } else if matches!( kind, ViewNodeKind::Unknown (_) ) {
-    // No-op: Unknown is a placeholder for an unresolvable id and
-    // has nothing to populate post-order. Listed explicitly so a
-    // reader sees the variant covered.
   }
-  // No-op for: BufferRoot, TextChanged, Alias { .. },
-  // ID { .. }, SubscribeeCol.
-  // These nodes' correctness depends on their parent
-  // having been processed (or, for SubscribeeCol, on the
-  // preorder pass).
-  Ok(( )) }
+  Ok (( )) }
+
+fn collect_matching_nodeids<Predicate> (
+  tree      : &Tree<ViewNode>,
+  preorder  : bool,
+  predicate : Predicate,
+) -> Result<Vec<NodeId>, Box<dyn Error>>
+where Predicate : Fn (&ViewNode) -> bool {
+  let root_treeid : NodeId = tree . root () . id ();
+  let mut result : Vec<NodeId> = Vec::new ();
+  do_everywhere_in_tree_dfs_readonly (
+    tree, root_treeid, preorder,
+    &mut |node| {
+      if predicate (node . value ()) {
+        result . push (node . id ()); }
+      Ok (( )) } )
+    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+  Ok (result) }

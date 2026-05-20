@@ -11,12 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-/// Postorder (child-first) TrueNode handler.
-///
-/// Extracts this node's view requests
-/// and delegates to execute_view_requests,
-/// processing the definitive view request first if present.
-pub async fn complete_truenode (
+pub async fn execute_truenode_view_requests (
   node               : NodeId,
   tree               : &mut Tree<ViewNode>,
   visited            : &mut DefinitiveMap,
@@ -29,7 +24,7 @@ pub async fn complete_truenode (
   error_unless_node_satisfies(
     tree, node,
     |vn : &ViewNode| matches!( &vn . kind, ViewNodeKind::True (_) ),
-    "complete_truenode: expected TrueNode" )
+    "execute_truenode_view_requests: expected TrueNode" )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   let requests : Vec<(NodeId, ViewRequest)> =
     extract_view_requests_definitive_first( tree, node ) ?;
@@ -37,11 +32,9 @@ pub async fn complete_truenode (
     execute_view_requests(
       tree, requests, source_diffs, config, driver,
       visited, errors, deleted_since_head_pid_src_map ) . await ?; }
-  maybe_add_hiddenincol_under_definitive_subscribee (
-    tree, node, config, driver ) . await ?;
   Ok(( )) }
 
-async fn maybe_add_hiddenincol_under_definitive_subscribee (
+pub async fn ensure_hiddenin_col_under_definitive_subscribee (
   tree   : &mut Tree<ViewNode>,
   node   : NodeId,
   config : &SkgConfig,

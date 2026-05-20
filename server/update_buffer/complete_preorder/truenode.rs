@@ -93,7 +93,7 @@ impl CompletionMode {
       && is_subscribee }
 }
 
-/// TrueNode completion.
+/// TrueNode content expansion.
 ///
 /// INTENDED USE: Use in the first, DFS preorder (parent-first)
 /// buffer-update pass through the tree.
@@ -108,7 +108,6 @@ impl CompletionMode {
 /// 4. reconcile_content_children -- goal list + phantoms + indep-mark.
 /// 5. order_children_as_scaffolds_then_ignored_then_content
 /// 6. maybe_prepend_subscribee_col
-/// 7. maybe_prepend_diff_view_scaffolds
 pub fn complete_truenode_preorder (
   node               : NodeId,
   tree               : &mut Tree<ViewNode>,
@@ -151,10 +150,24 @@ pub fn complete_truenode_preorder (
     tree, node ) ?;
   maybe_prepend_subscribee_col(
     tree, node, &subscribes_to ) ?;
-  maybe_prepend_diff_view_scaffolds(
-    tree, node,
-    source_diffs, &pid, &source ) ?;
   Ok(( )) }
+
+pub fn ensure_diff_scaffolds_for_truenode (
+  node         : NodeId,
+  tree         : &mut Tree<ViewNode>,
+  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+) -> Result<(), Box<dyn Error>> {
+  let ready : Option<(ID, SourceName)> =
+    read_at_node_in_tree ( tree, node,
+      |vn : &ViewNode| match &vn . kind {
+        ViewNodeKind::True (t)
+          if ! t . is_phantom () && ! t . is_indefinitive () =>
+            Some (( t . id . clone (), t . source . clone () )),
+        _ => None } ) ?;
+  if let Some ((pid, source)) = ready {
+    maybe_prepend_diff_view_scaffolds (
+      tree, node, source_diffs, &pid, &source ) ?; }
+  Ok (( )) }
 
 /// Phase 1 of complete_truenode_preorder: phantom/indefinitive/
 /// deleted-by-this-save nodes are finalised in place here and
