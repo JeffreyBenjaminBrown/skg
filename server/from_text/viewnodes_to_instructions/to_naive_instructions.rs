@@ -264,7 +264,7 @@ pub(crate) fn naive_node_edit_intents_from_role_viewforest (
   role_viewforest : &Tree<ViewNode_in_Role>,
 ) -> Result<Vec<NodeEditIntent>, String> {
   let candidate_ids : Vec<NodeId> =
-    collect_preliminary_intent_candidate_ids (
+    collect_intent_candidate_treeids (
       role_viewforest)?;
   let basics_by_node_id : HashMap<NodeId, NodeEditMinimal> =
     collect_node_edit_basics (role_viewforest, &candidate_ids)?;
@@ -365,7 +365,22 @@ fn reconcile_nodeEditIntents_with_same_ID (
         . to_string())?;
   Ok (visibility_save) }
 
-fn collect_preliminary_intent_candidate_ids (
+/// Returns EgoTree NodeIDs for spots that *might* own a NodeEditIntent.
+///
+/// Later passes split save/delete details. Here we only decide
+/// which tree positions are meaningful for intent extraction:
+///
+/// - Definitive ordinary TrueNodes own graph edits for themselves.
+/// - Definitive TrueNodes viewed directly as a subscribee own the
+///   save-time subscribe-hiderel surface for their subscriber.
+/// - Display scaffolds are not intent roots, and most of their
+///   descendants are interpreted by scaffold-specific collectors or
+///   ignored as presentation state.
+///
+/// Keeping this as a separate ordered pass lets the following
+/// collectors share one candidate list without each rediscovering the
+/// same traversal/pruning policy.
+fn collect_intent_candidate_treeids (
   tree  : &Tree<ViewNode_in_Role>,
 ) -> Result<Vec<NodeId>, String> {
   fn maybe_collect_candidate_and_recurse (
@@ -409,10 +424,11 @@ fn collect_preliminary_intent_candidate_ids (
       ViewNodeKind::Unknown (_) =>
         // An UnknownNode is a placeholder for a missing referent. It cannot generate save instructions itself, but its descendents might, so we recurse.
         recurse_on_children( tree, node_id, result )?,
-      ViewNodeKind::True (_) => {
+      ViewNodeKind::True (t) => {
         if role == SaveRole::OrdinaryTrueNode
            || matches! (role, SaveRole::AsSubscribee { .. })
-        { result . push (node_id);
+        { if ! t . is_indefinitive() {
+            result . push (node_id); }
           recurse_on_children( tree, node_id, result )?; }}}
     Ok(( )) }
 
@@ -435,10 +451,8 @@ fn collect_node_edit_basics (
         *candidate_id,
         |node| match &node . viewnode . kind {
           ViewNodeKind::True (t) => Ok (t . clone()),
-          _ => Err (
-            "preliminary intent candidate was not a TrueNode"
-              . to_string()),
-        })??;
+          _ => Err ( "intent candidate was not a TrueNode"
+                      . to_string() ), } )??;
     if let Some (basics) =
       node_edit_basics_from_treenode (&true_node)
     { result . insert (*candidate_id, basics); }}
