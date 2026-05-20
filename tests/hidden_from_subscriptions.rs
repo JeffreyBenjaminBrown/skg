@@ -244,7 +244,7 @@ fn assert_hides_e1_in_subscribee_col (
   assert! (
     ! buffer . lines() . any ( |line|
       line . starts_with ("**** (skg (node (id e1)") ),
-    "Expected e1 not to remain visible as direct subscribee content:\n{}",
+    "Expected e1 not to remain visible as subscribee-as-such content:\n{}",
     buffer ); }
 
 fn assert_does_not_hide_e1 (
@@ -295,11 +295,11 @@ fn assert_e1_removed_from_visible_subscribee_branch (
   assert! (
     ! buffer . lines() . any ( |line|
       line . starts_with ("**** (skg (node (id e1)") ),
-    "Expected e1 not to be regenerated as direct subscribee content:\n{}",
+    "Expected e1 not to be regenerated as subscribee-as-such content:\n{}",
     buffer );
   assert! (
     buffer . contains ("**** (skg (node (id e2)"),
-    "Expected unrelated direct subscribee content e2 to remain visible:\n{}",
+    "Expected unrelated subscribee-as-such content e2 to remain visible:\n{}",
     buffer ); }
 
 fn remove_e1_and_e2_subtrees (
@@ -953,7 +953,7 @@ fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide(
     assert! (
       rerendered . lines() . any ( |line|
         line . starts_with ("**** (skg (node (id H)") ),
-      "Expected H to be visible direct subscribee content:\n{}",
+      "Expected H to be visible subscribee-as-such content:\n{}",
       rerendered );
     let r_skg : NodeComplete =
       node_from_disk (&config, "R")?;
@@ -1042,7 +1042,7 @@ fn test_collateral_view_reflects_newly_unhidden_subscribee_content(
     assert! (
       collateral_views[0] . lines() . any ( |line|
         line . starts_with ("**** (skg (node (id H)") ),
-      "Expected H to be visible direct subscribee content in collateral view:\n{}",
+      "Expected H to be visible subscribee-as-such content in collateral view:\n{}",
       collateral_views[0] );
 
     cleanup_test (

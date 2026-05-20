@@ -184,7 +184,7 @@ For each SaveNode whose corresponding ViewNode is a TrueNode shown as
 a subscribee:
 
 - If the node's source is foreign and its only difference from
-  pre-save data is direct-content membership in that as-a-subscribee
+  pre-save data is direct-content membership in that subscribee-as-such
   position, drop that SaveNode.
 - If title/body/source/aliases/subscribes/hides/overrides differ,
   keep the SaveNode so existing foreign-node validation reports an
@@ -253,7 +253,7 @@ important sharing case. Exercise:
 
 - Initial view from S.
 - Request a definitive view for E.
-- Physically remove one direct child from E's as-a-subscribee content.
+- Physically remove one direct child from E's subscribee-as-such content.
 - Save.
 - Assert that S's saved '.skg' now includes that ID in
   'hides_from_its_subscriptions'.

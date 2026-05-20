@@ -21,7 +21,7 @@ The =source_diffs.is_none()= clause carried a TODO questioning
 whether it should be necessary.
 
 That TODO is now misleading. The branch preservation rule exists so
-normal saved views can carry direct =AsSubscribee= child-list edits
+normal saved views can carry subscribee-as-such child-list edits
 through to save extraction. Diff-mode saved views are different:
 their child lists include generated phantom/removed state, and those
 display nodes must be regenerated from diff data rather than
@@ -44,7 +44,7 @@ Read:
 ** 2. Add a focused regression
 
 Add the narrowest test that proves a diff-mode saved view containing a
-direct =AsSubscribee= branch does not preserve a stale direct child
+subscribee-as-such branch does not preserve a stale direct child
 list.
 
 Preferred shape:
@@ -102,7 +102,7 @@ cargo test --test new viewnodes_to_instructions
 * Acceptance criteria
 
 - There is a regression proving diff-mode saved-view completion does
-  not preserve stale direct =AsSubscribee= child lists.
+  not preserve stale subscribee-as-such child lists.
 - =should_preserve_saved_as_subscribee_branch= no longer contains the
   misleading TODO.
 - The replacement comment names the saved-view/diff-mode distinction.
@@ -113,7 +113,7 @@ cargo test --test new viewnodes_to_instructions
 
 Complete. Added a focused =git_diff_view= regression with a one-source
 subscriber/subscribee fixture. The test saves a diff-mode view where
-the direct =AsSubscribee= branch is missing a generated removed child,
+the subscribee-as-such branch is missing a generated removed child,
 then asserts that saved-view completion regenerates that phantom from
 =source_diffs=.
 

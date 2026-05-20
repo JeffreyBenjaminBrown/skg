@@ -11,10 +11,10 @@ use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use crate::types::viewnode::{ IndefOrDef, ViewNode, ViewNodeKind };
 use crate::types::views_state::nodecomplete_from_in_rust_graph;
-use subscribee_hiderel_intents::{ SubscribeeHiderelIntent, subscribee_hiderel_intents_from_tree, };
+use subscribee_hiderel_intents::{ SubscribeeHiderelIntent, subscribee_hiderel_intents_from_candidates, };
 use super::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
 use super::validate::buffernode_differs_from_disknode;
-use to_naive_instructions::{ naive_node_edit_intents_from_role_viewforest, reconcile_nodeEditIntents, NodeEditIntent, NodeSaveIntent, SameIdReconciledNodeEditIntents, };
+use to_naive_instructions::{ collect_intent_candidates, naive_node_edit_intents_from_candidates, IntentCandidate, reconcile_nodeEditIntents, NodeEditIntent, NodeSaveIntent, SameIdReconciledNodeEditIntents, };
 
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
@@ -104,11 +104,16 @@ pub async fn extract_nonmerge_save_plan (
 fn extract_save_intents (
   role_viewforest : &Tree<ViewNode_in_Role>,
 ) -> Result<SaveExtraction, Box<dyn Error>> {
+  let candidates : Vec<IntentCandidate> =
+    collect_intent_candidates (role_viewforest)
+    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   let hiderel_intents : Vec<SubscribeeHiderelIntent> =
-    subscribee_hiderel_intents_from_tree (role_viewforest)
+    subscribee_hiderel_intents_from_candidates (
+      role_viewforest, &candidates)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   let node_edit_intents : Vec<NodeEditIntent> =
-    naive_node_edit_intents_from_role_viewforest (role_viewforest)
+    naive_node_edit_intents_from_candidates (
+      role_viewforest, &candidates)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (SaveExtraction {
     node_edit_intents,
@@ -137,8 +142,6 @@ async fn validate_no_title_or_body_edit_in_subscribeeAsSuch (
       optnodecomplete_from_id (
         config, driver, &t . id) . await ?
     else { continue; };
-    if ! source_is_owned (config, &from_disk . source) {
-      continue; }
     if t . title != from_disk . title || *body != from_disk . body {
       return Err (Box::new (BufferValidationError::Other (
         format!(

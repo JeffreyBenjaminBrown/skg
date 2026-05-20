@@ -7,9 +7,9 @@ Some of that has recently (since branching from main) been improved.
 This plan after this paragraph was written by Codex, <2026-05-14 Thu>,
 to describe other opportunities for simplification.
 
-* Simplify the save-buffer path after direct subscribee visibility
+* Simplify the save-buffer path after subscribee-as-such visibility
 
-The recent role-tree work fixed the direct =AsSubscribee= hazard: role
+The recent role-tree work fixed the subscribee-as-such hazard: role
 context now travels with each view-tree occurrence, and a subscribee
 shown in subscribee position no longer globally suppresses ordinary
 =contains= edits for the same graph ID elsewhere.
@@ -38,7 +38,7 @@ checked view tree
 This is the highest-priority cleanup. The function currently performs
 role annotation, visibility extraction, graph-intent extraction,
 same-ID reconciliation, conversion to =DefineNode=, disk
-supplementation, source-move detection, direct-subscribee =contains=
+supplementation, source-move detection, subscribee-as-such =contains=
 restoration, visibility folding, and unchanged filtering.
 
 The behavior is now covered by tests, so the next pass should be a
@@ -75,7 +75,7 @@ It should separate these concerns behind names:
 - collect 'SourceMove' values.
 
 This can still be behavior-preserving. The point is not yet to remove
-the direct-subscribee guardrail or move visibility folding; that comes
+the subscribee-as-such guardrail or move visibility folding; that comes
 later. The point is to make the helper's internal sequence explicit
 enough that the later policy changes have one obvious edit point.
 
@@ -87,7 +87,7 @@ pipelines.
 Status: complete. Disk supplementation now has explicit save/delete
 paths, loads disk state only for saves, fills unspecified fields,
 canonicalizes IDs, detects source moves, and collects source moves.
-The temporary direct-subscribee guardrail was removed by item f.
+The temporary subscribee-as-such guardrail was removed by item f.
 
 ** DONE c. Move subscribee visibility folding before final =DefineNode= construction
 
@@ -96,7 +96,7 @@ This is tied with item a for importance.
 The current representation used to do this:
 
 #+begin_src text
-direct AsSubscribee child list
+subscribee-as-such child list
   -> apparent subscribee.contains edit
   -> restore subscribee.contains from disk
   -> separately infer subscriber hide/unhide intent
@@ -105,13 +105,13 @@ direct AsSubscribee child list
 The cleaner target is:
 
 #+begin_src text
-direct AsSubscribee child list
+subscribee-as-such child list
   -> subscriber visibility intent
   -> fold into the subscriber's node intent
   -> never becomes a graph contains edit for the subscribee
 #+end_src
 
-That would remove the need for the direct-subscribee =contains=
+That would remove the need for the subscribee-as-such =contains=
 guardrail during disk supplementation. It would also make visibility
 edits less sensitive to the fact that they currently run after graph
 =SaveNode= construction.
@@ -121,7 +121,7 @@ the =NodeEditIntent= layer, before =DefineNode= construction and before
 disk supplementation. That removed the late mutation of completed
 =DefineNode= values.
 
-The fuller target above also said that the direct =AsSubscribee= child
+The fuller target above also said that the subscribee-as-such child
 list should never become a graph =contains= edit for the subscribee.
 That part is now handled by item d's explicit intent shape: direct
 =AsSubscribee= nodes use an unspecified =contains= value instead of
@@ -143,35 +143,35 @@ subscribee children as graph =contains=:
 If item c lands first, separate variants will probably be clearer than
 an enum field.
 
-This item owns the remaining direct-subscribee part of item c's fuller
-target. It should split the direct =AsSubscribee= branch out before
+This item owns the remaining subscribee-as-such part of item c's fuller
+target. It should split the subscribee-as-such branch out before
 graph-save =contains= is built:
 
 - ordinary definitive nodes should produce graph-save intents whose
   direct children mean graph =contains=;
-- direct =AsSubscribee= nodes should produce visibility-surface
+- subscribee-as-such nodes should produce visibility-surface
   intents whose direct children mean subscriber-visible subscribee
   content;
-- recursive ordinary descendants below a direct subscribee should still
+- recursive ordinary descendants below a subscribee-as-such should still
   be allowed to produce ordinary graph-save intents;
-- a direct subscribee occurrence and an ordinary occurrence for the
+- a subscribee-as-such occurrence and an ordinary occurrence for the
   same graph ID should no longer reconcile as two ordinary-looking
   saves with a boolean distinction.
 
 Acceptance criterion: after this item, there should be no need for a
-direct-subscribee =contains= restoration guardrail during disk
-supplementation, because no direct-subscribee visibility surface ever
+subscribee-as-such =contains= restoration guardrail during disk
+supplementation, because no subscribee-as-such visibility surface ever
 becomes a subscribee graph =contains= edit.
 
 Status: complete. =NodeEditIntent= now distinguishes ordinary
-=GraphSave= from direct =AsSubscribee= edit surfaces, and
-=NodeSaveIntent.contains= is unspecified for direct =AsSubscribee=
+=GraphSave= from subscribee-as-such edit surfaces, and
+=NodeSaveIntent.contains= is unspecified for subscribee-as-such
 occurrences. The old =children_affect_only_hiding= field is gone.
 
 ** DONE e. Reconcile visibility surfaces explicitly
 
 =SubscribeeHiderelIntent= already exists, but the save path still
-needs clearer reconciliation rules once direct =AsSubscribee= branches
+needs clearer reconciliation rules once subscribee-as-such branches
 are no longer encoded as ordinary-looking saves.
 
 Visibility edits are now folded into =NodeEditIntent= before
@@ -183,7 +183,7 @@ reconciliation should consume graph edits and visibility surfaces as
 distinct inputs:
 
 - duplicate ordinary graph saves for the same ID still conflict;
-- ordinary graph saves and direct-subscribee visibility surfaces for
+- ordinary graph saves and subscribee-as-such visibility surfaces for
   the same graph ID can coexist;
 - duplicate visibility surfaces conflict only when they express
   incompatible visibility for the same subscriber/content pair;
@@ -228,7 +228,7 @@ post-=reconcile_nodeEditIntents= ordering and PID lookup.
 
 Disk supplementation should restore unspecified fields and detect
 source moves. It should not need to know that a node appeared as a
-direct subscribee or that its =contains= must be restored from disk.
+subscribee-as-such or that its =contains= must be restored from disk.
 
 Visibility folding now happens before =DefineNode= construction, but
 that alone was not enough to make disk supplementation policy-neutral.
@@ -244,7 +244,7 @@ After that, the supplementation phase should do only this:
 
 Acceptance criterion: delete
 ='restore_subscribee_content_from_disk_if_needed' or its equivalent.
-No disk-supplementation helper should inspect direct-subscribee role
+No disk-supplementation helper should inspect subscribee-as-such role
 policy, =children_affect_only_hiding=, or any replacement field.
 
 That is an important simplification because supplementation is already
@@ -253,7 +253,7 @@ cross-cutting enough without also carrying view-position policy.
 Status: complete. Disk supplementation now receives save intents,
 fills unspecified =contains= from disk, canonicalizes IDs, detects
 source moves, and supplements unspecified fields. It no longer carries
-a direct-subscribee restoration guardrail or role-position flag.
+a subscribee-as-such restoration guardrail or role-position flag.
 
 ** DONE g. Tighten same-ID reconciliation around intent variants
 
@@ -261,7 +261,7 @@ The current same-ID reconciliation now happens at the
 =NodeEditIntent= layer, which is the right direction. After the intent
 shape is split, the rules can be stated more directly:
 
-- ordinary graph save wins over a direct-subscribee visibility surface
+- ordinary graph save wins over a subscribee-as-such visibility surface
   for the same graph ID;
 - duplicate ordinary graph saves conflict;
 - save/delete conflicts reject;
@@ -269,7 +269,7 @@ shape is split, the rules can be stated more directly:
   incompatible visibility for the same subscriber/content pair.
 
 This should preserve the existing regression where the same ID appears
-both in a direct subscribee position and as an ordinary definitive
+both in a subscribee-as-such position and as an ordinary definitive
 node, and the ordinary node's =contains= edit survives.
 
 Status: complete. Same-ID node-edit reconciliation now returns a
@@ -282,11 +282,11 @@ validation.
 ** DONE h. Revisit validation once save roles are stable
 
 Keep pre-save validation unchanged for now. That boundary was useful
-for making the direct-subscribee fix narrow.
+for making the subscribee-as-such fix narrow.
 
 Later, consider whether validation should consume the role-annotated
 tree too. That would let foreign-node validation, display-only
-traversal, and direct-subscribee visibility policy all use the same
+traversal, and subscribee-as-such visibility policy all use the same
 positional facts. This is lower priority because moving validation too
 early risks mixing this cleanup with a larger behavior change.
 
@@ -301,7 +301,7 @@ The current validation boundary is intentional:
 - local structural validation checks what shapes are legal in the
   input tree, which is distinct from save-role interpretation;
 - foreign-node validation runs after save instruction construction,
-  where direct =AsSubscribee= child-list edits have already avoided
+  where subscribee-as-such child-list edits have already avoided
   becoming foreign subscribee =contains= edits.
 
 No narrow role-aware validation helper was justified.
@@ -312,7 +312,7 @@ The save extraction path is now clearer than the rerender path that
 feeds it. The remaining completion contract should be written down
 before broadening edit behavior inside subscribee branches:
 
-- saved direct =AsSubscribee= branches must preserve user-authored
+- saved subscribee-as-such branches must preserve user-authored
   child-list signal long enough for save extraction;
 - generated display scaffolds must not become graph edits;
 - diff-mode phantom or removed children must not accidentally infer
@@ -338,19 +338,19 @@ Status: complete. The boundary is:
 Code references:
 
 - =should_preserve_saved_as_subscribee_branch= documents the saved-view
-  guard that keeps direct =AsSubscribee= child-list signal intact;
+  guard that keeps subscribee-as-such child-list signal intact;
 - =reconcile_sharing_scaffold_children= documents rerender-time
   sharing scaffold reconciliation and phantom child construction;
 - =subscribee_hiderel_intents_from_tree= owns the save-time
-  interpretation of direct =AsSubscribee= visible children.
+  interpretation of subscribee-as-such visible children.
 
 * Test expectations
 
-Each simplification should keep the current direct-subscribee behavior
+Each simplification should keep the current subscribee-as-such behavior
 covered:
 
-- child removal under a direct subscribee infers subscriber hide;
-- child restoration under a direct subscribee infers subscriber unhide;
+- child removal under a subscribee-as-such infers subscriber hide;
+- child restoration under a subscribee-as-such infers subscriber unhide;
 - child-list edits in subscribee position do not become foreign
   subscribee =contains= edits;
 - foreign title/body edits still report =ModifiedForeignNode=;

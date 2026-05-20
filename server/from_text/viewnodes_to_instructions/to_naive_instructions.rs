@@ -13,7 +13,6 @@ use std::collections::{HashMap, HashSet};
 
 pub(crate) enum NodeEditIntent {
   GraphSave      (NodeSaveIntent),
-  SubscribeeEdit (NodeSaveIntent),
   Delete         (NodeDeleteIntent),
 }
 
@@ -59,14 +58,24 @@ enum NodeEditMinimalAction {
   Delete,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum IntentCandidateKind {
+  OrdinaryTrueNode,
+  SubscribeeAsSuch { subscriber : ID },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct IntentCandidate {
+  pub(crate) treeid : NodeId,
+  pub(crate) kind   : IntentCandidateKind,
+}
+
 impl NodeEditIntent {
   pub(crate) fn pid (
     &self,
   ) -> &ID {
     match self {
       NodeEditIntent::GraphSave (intent) => &intent . pid,
-      NodeEditIntent::SubscribeeEdit (intent) =>
-        &intent . pid,
       NodeEditIntent::Delete (intent) => &intent . pid,
     }}
 
@@ -78,7 +87,6 @@ impl NodeEditIntent {
   ) {
     match self {
       NodeEditIntent::GraphSave (intent)
-        | NodeEditIntent::SubscribeeEdit (intent)
         => intent . apply_hiderel_delta (
              base_hides, inferred_hides, inferred_unhides),
       NodeEditIntent::Delete (_) => {}, }}
@@ -105,8 +113,7 @@ impl NodeEditIntent {
     self,
   ) -> Result<NodeSaveIntent, String> {
     match self {
-      NodeEditIntent::GraphSave (intent)
-      | NodeEditIntent::SubscribeeEdit (intent) =>
+      NodeEditIntent::GraphSave (intent) =>
         Ok (intent),
       NodeEditIntent::Delete (_) =>
         Err ("Delete intent does not contain a SaveNode" . to_string()),
@@ -121,7 +128,6 @@ impl NodeEditIntent {
           id     : intent . pid,
           source : intent . source, } )),
       NodeEditIntent::GraphSave (intent)
-        | NodeEditIntent::SubscribeeEdit (intent)
         => Ok (DefineNode::Save (SaveNode (
           intent . into_nodecomplete() ))) }}
 }
@@ -263,9 +269,25 @@ pub(crate) fn naive_node_edit_intents_from_viewforest (
 pub(crate) fn naive_node_edit_intents_from_role_viewforest (
   role_viewforest : &Tree<ViewNode_in_Role>,
 ) -> Result<Vec<NodeEditIntent>, String> {
-  let candidate_ids : Vec<NodeId> =
-    collect_intent_candidate_treeids (
+  let candidates : Vec<IntentCandidate> =
+    collect_intent_candidates (
       role_viewforest)?;
+  naive_node_edit_intents_from_candidates (
+    role_viewforest, &candidates) }
+
+pub(crate) fn naive_node_edit_intents_from_candidates (
+  role_viewforest : &Tree<ViewNode_in_Role>,
+  candidates      : &[IntentCandidate],
+) -> Result<Vec<NodeEditIntent>, String> {
+  let candidate_ids : Vec<NodeId> =
+    candidates . iter()
+    . filter_map (|candidate| match &candidate . kind {
+      IntentCandidateKind::OrdinaryTrueNode =>
+        Some (candidate . treeid),
+      IntentCandidateKind::SubscribeeAsSuch { .. } =>
+        None,
+    })
+    . collect();
   let basics_by_node_id : HashMap<NodeId, NodeEditMinimal> =
     collect_node_edit_basics (role_viewforest, &candidate_ids)?;
   let save_candidate_ids : Vec<NodeId> =
@@ -288,7 +310,6 @@ pub(crate) fn naive_node_edit_intents_from_role_viewforest (
     collect_subscribees_by_node_id (
       role_viewforest, &save_candidate_ids)?;
   assemble_node_edit_intents (
-    role_viewforest,
     candidate_ids,
     basics_by_node_id,
     contains_by_node_id,
@@ -323,7 +344,6 @@ fn reconcile_nodeEditIntents_with_same_ID (
   intents : Vec<NodeEditIntent>,
 ) -> Result<NodeEditIntent, String> {
   let mut ordinary_save : Option<NodeEditIntent> = None;
-  let mut visibility_save : Option<NodeEditIntent> = None;
   let mut delete : Option<NodeEditIntent> = None;
   for intent in intents {
     let intent : NodeEditIntent = intent;
@@ -331,20 +351,13 @@ fn reconcile_nodeEditIntents_with_same_ID (
       NodeEditIntent::GraphSave (_) => {
         if ordinary_save . is_some() {
           return Err (
-            "Multiple ordinary save instructions for same ID"
-              . to_string()); }
-        ordinary_save = Some (intent); },
-      NodeEditIntent::SubscribeeEdit (_) => {
-          if visibility_save . is_some() {
-            return Err (
-              "Multiple direct AsSubscribee save instructions for same ID"
+              "Multiple ordinary save instructions for same ID"
                 . to_string()); }
-          visibility_save = Some (intent); },
+        ordinary_save = Some (intent); },
       NodeEditIntent::Delete (_) => {
         if delete . is_none() {
           delete = Some (intent); }}}}
-  if delete . is_some() && (ordinary_save . is_some()
-                           || visibility_save . is_some()) {
+  if delete . is_some() && ordinary_save . is_some() {
     return Err (
       "Cannot have both Delete and Save for same ID" . to_string()); }
   match delete {
@@ -359,19 +372,17 @@ fn reconcile_nodeEditIntents_with_same_ID (
       return Ok (ordinary_save); },
     None => {},
   }
-  let visibility_save : NodeEditIntent =
-    visibility_save . ok_or (
-      "No delete and no save instruction found. This should not be possible."
-        . to_string())?;
-  Ok (visibility_save) }
+  Err (
+    "No delete and no save instruction found. This should not be possible."
+      . to_string()) }
 
-/// Returns EgoTree NodeIDs for spots that *might* own a NodeEditIntent.
+/// Returns buffer-order positions that can own save-intent extraction.
 ///
 /// Later passes split save/delete details. Here we only decide
 /// which tree positions are meaningful for intent extraction:
 ///
 /// - Definitive ordinary TrueNodes own graph edits for themselves.
-/// - Definitive TrueNodes viewed directly as a subscribee own the
+/// - Definitive subscribee-as-such TrueNodes own the
 ///   save-time subscribe-hiderel surface for their subscriber.
 /// - Display scaffolds are not intent roots, and most of their
 ///   descendants are interpreted by scaffold-specific collectors or
@@ -380,20 +391,20 @@ fn reconcile_nodeEditIntents_with_same_ID (
 /// Keeping this as a separate ordered pass lets the following
 /// collectors share one candidate list without each rediscovering the
 /// same traversal/pruning policy.
-fn collect_intent_candidate_treeids (
+pub(crate) fn collect_intent_candidates (
   tree  : &Tree<ViewNode_in_Role>,
-) -> Result<Vec<NodeId>, String> {
+) -> Result<Vec<IntentCandidate>, String> {
   fn maybe_collect_candidate_and_recurse (
     tree    : &Tree<ViewNode_in_Role>,
     node_id : NodeId,
-    result  : &mut Vec<NodeId>
+    result  : &mut Vec<IntentCandidate>
   ) -> Result<(), String> {
 
     /// Defined separately because it's called in two places.
     fn recurse_on_children (
       tree: &Tree<ViewNode_in_Role>,
       node_id: NodeId,
-      result: &mut Vec<NodeId>
+      result: &mut Vec<IntentCandidate>
     ) -> Result<(), String> {
       for child_treeid in
         { let child_treeids: Vec<NodeId> =
@@ -425,14 +436,26 @@ fn collect_intent_candidate_treeids (
         // An UnknownNode is a placeholder for a missing referent. It cannot generate save instructions itself, but its descendents might, so we recurse.
         recurse_on_children( tree, node_id, result )?,
       ViewNodeKind::True (t) => {
-        if role == SaveRole::OrdinaryTrueNode
-           || matches! (role, SaveRole::AsSubscribee { .. })
-        { if ! t . is_indefinitive() {
-            result . push (node_id); }
+        let candidate_kind : Option<IntentCandidateKind> =
+          match role {
+            SaveRole::OrdinaryTrueNode =>
+              Some (IntentCandidateKind::OrdinaryTrueNode),
+            SaveRole::AsSubscribee { subscriber } =>
+              Some (IntentCandidateKind::SubscribeeAsSuch {
+                subscriber,
+              }),
+            _ => None,
+          };
+        if let Some (kind) = candidate_kind {
+          if ! t . is_indefinitive() {
+            result . push (IntentCandidate {
+              treeid : node_id,
+              kind,
+            }); }
           recurse_on_children( tree, node_id, result )?; }}}
     Ok(( )) }
 
-  let mut result: Vec<NodeId> = Vec::new();
+  let mut result: Vec<IntentCandidate> = Vec::new();
   let root_id : NodeId = tree . root() . id();
   maybe_collect_candidate_and_recurse (
     tree, root_id, &mut result ) ?;
@@ -453,25 +476,27 @@ fn collect_node_edit_basics (
           ViewNodeKind::True (t) => Ok (t . clone()),
           _ => Err ( "intent candidate was not a TrueNode"
                       . to_string() ), } )??;
-    if let Some (basics) =
-      node_edit_basics_from_treenode (&true_node)
-    { result . insert (*candidate_id, basics); }}
+    let basics : NodeEditMinimal =
+      node_edit_basics_from_treenode (&true_node)?;
+    result . insert (*candidate_id, basics); }
   Ok (result) }
 
 fn node_edit_basics_from_treenode (
   t : &TrueNode
-) -> Option<NodeEditMinimal> {
+) -> Result<NodeEditMinimal, String> {
   match &t . indef_or_def {
     IndefOrDef::Indefinitive =>
-      None,
+      Err (
+        "intent candidate was indefinitive; this should have been filtered earlier"
+          . to_string()),
     IndefOrDef::Definitive { body, edit_request } => {
       if *edit_request == Some (EditRequest::Delete) {
-        return Some (NodeEditMinimal {
+        return Ok (NodeEditMinimal {
           pid    : t . id . clone(),
           source : t . source . clone(),
           kind   : NodeEditMinimalAction::Delete,
         }); }
-      Some (NodeEditMinimal {
+      Ok (NodeEditMinimal {
         pid    : t . id . clone(),
         source : t . source . clone(),
         kind   : NodeEditMinimalAction::Save {
@@ -520,7 +545,6 @@ fn collect_subscribees_by_node_id (
   Ok (result) }
 
 fn assemble_node_edit_intents (
-  tree                       : &Tree<ViewNode_in_Role>,
   candidate_ids              : Vec<NodeId>,
   mut basics_by_node_id      : HashMap<NodeId, NodeEditMinimal>,
   mut contains_by_node_id    : HashMap<NodeId, Vec<ID>>,
@@ -530,9 +554,10 @@ fn assemble_node_edit_intents (
   let mut result : Vec<NodeEditIntent> =
     Vec::new();
   for candidate_id in candidate_ids {
-    let Some (basics) =
+    let basics : NodeEditMinimal =
       basics_by_node_id . remove (&candidate_id)
-      else { continue; };
+      . ok_or (
+        "assemble_node_edit_intents: missing node edit basics")?;
     match basics . kind {
       NodeEditMinimalAction::Delete =>
         result . push (NodeEditIntent::Delete (NodeDeleteIntent {
@@ -547,7 +572,7 @@ fn assemble_node_edit_intents (
               body,
               contains                     :
                 contains_for_save_intent (
-                  tree, candidate_id, &mut contains_by_node_id)?,
+                  candidate_id, &mut contains_by_node_id)?,
               extra_ids                    : vec![],
               aliases                      :
                 aliases_by_node_id . remove (&candidate_id) . ok_or (
@@ -559,29 +584,18 @@ fn assemble_node_edit_intents (
               overrides_view_of            : MSV::Unspecified,
               misc                         : Vec::new(),
             };
-          if matches!(
-               tree . get (candidate_id) . unwrap() . value() . role,
-               SaveRole::AsSubscribee { .. })
-          { result . push (
-              NodeEditIntent::SubscribeeEdit (intent)); }
-          else {
-            result . push (NodeEditIntent::GraphSave (intent)); }},
+          result . push (NodeEditIntent::GraphSave (intent)); },
     }}
   Ok (result) }
 
 fn contains_for_save_intent (
-  tree                    : &Tree<ViewNode_in_Role>,
   candidate_id            : NodeId,
   contains_by_node_id     : &mut HashMap<NodeId, Vec<ID>>,
 ) -> Result<MSV<ID>, String> {
   let contains : Vec<ID> =
     contains_by_node_id . remove (&candidate_id) . ok_or (
       "assemble_node_edit_intents: missing contains")?;
-  if matches!(
-       tree . get (candidate_id) . unwrap() . value() . role,
-       SaveRole::AsSubscribee { .. })
-  { Ok (MSV::Unspecified) }
-  else { Ok (MSV::Specified (contains)) }}
+  Ok (MSV::Specified (contains)) }
 
 /// Treats the input tree as the source of truth; does not read dbs.
 /// Returns None if no SubscribeeCol found,

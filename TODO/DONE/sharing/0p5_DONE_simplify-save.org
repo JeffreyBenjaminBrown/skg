@@ -40,7 +40,7 @@ The required order is:
 4. DONE Begin splitting save extraction into explicit intent-oriented
    passes by introducing an internal NodeEditIntent layer.
 5. PARTIAL Move unchanged filtering later, or make it intent-aware.
-6. DONE Neutralize direct as-subscribee child-list edits so they do
+6. DONE Neutralize subscribee-as-such child-list edits so they do
    not become graph 'contains' edits for the subscribee.
 7. Define a stricter completion contract for SubscribeeCol branches:
    preserve user-authored branch edits, and reconcile only the parts
@@ -654,7 +654,7 @@ All of those passed in this environment. 'cargo fmt --check' was
 attempted but this toolchain does not have the 'cargo fmt' subcommand
 installed.
 
-** DONE Guard against direct as-subscribee contains edits after disk supplementation
+** DONE Guard against edits to subscribee-as-such content after disk supplementation
 
 The current DefineNode pipeline now has a focused prerequisite for
 future fork-edit work: a SaveNode for a node whose own buffer position
@@ -669,14 +669,14 @@ server/from_text/viewnodes_to_instructions.rs
 tests/new/viewnodes_to_instructions.rs
 #+end_src
 
-The new helper 'direct_as_subscribee_save_pids' classifies the checked
+The new helper 'subscribee_as_such_save_pids' classifies the checked
 viewforest with 'SaveRole' and records only TrueNodes whose own role
 is 'AsSubscribee'. During
 'viewforest_to_nonmerge_save_instructions', after ID canonicalization
-and disk supplementation, those direct as-subscribee SaveNodes get
+and disk supplementation, those subscribee-as-such SaveNodes get
 their 'contains' restored from the pre-save disk node.
 
-Important correction: the buffer child list under a direct subscribee
+Important correction: the buffer child list under a subscribee-as-such
 is not meaningless and should not be discarded conceptually. It is
 user input whose eventual meaning is subscriber visibility:
 
@@ -708,13 +708,13 @@ This is intentionally narrow:
 
 Added tests prove:
 
-- removing a direct child from a direct as-subscribee branch restores
-  the subscribee's disk 'contains';
+- removing a child (but not a deeper descendent)
+  from a subscribee-as-such branch restores the subscribee's disk 'contains';
 - an ordinary owned node's child-list edit still changes its
   'contains';
 - a recursive descendant under the subscribee keeps its own
   child-list edit;
-- a foreign direct-as-subscribee title edit remains visible to
+- a foreign subscribee-as-such title edit remains visible to
   'validate_and_filter_foreign_instructions'.
 
 Future rule recorded separately: editing a foreign node's content
@@ -744,7 +744,7 @@ DONE section. What remains here is the actual comparison against disk
 and subscriber hides to infer hide/unhide deltas.
 
 After the prerequisite save-intent shape is in place, add a pass that
-interprets direct child-list edits under AsSubscribee positions as
+interprets child-list edits under subscribee-as-such positions as
 subscriber visibility edits, not SaveNodes for the subscribee.
 Inputs:
 
@@ -814,7 +814,7 @@ Current behavior is unchanged:
 - no invalid insertion policy;
 - no folding into subscriber 'hides_from_its_subscriptions';
 - no change to 'DefineNode' output;
-- the current restore-from-disk guardrail for direct as-subscribee
+- the current restore-from-disk guardrail for subscribee-as-such
   'contains' remains in place.
 
 The raw intent includes only direct visible content children:
@@ -860,7 +860,7 @@ But the construction path still must preserve those buffer children
 long enough for subscribee visibility inference. The rule is:
 
 #+begin_src text
-direct AsSubscribee child list
+subscribee-as-such child list
   -> hide/unhide intent for the subscriber
   -> never a graph contains edit for the subscribee
 #+end_src
@@ -995,9 +995,9 @@ the new feature:
 - DONE split NodeEditIntent into save/delete variants;
 - DONE split candidate traversal from intent construction;
 - DONE split save-field collection into explicit passes;
-- DONE neutralize direct as-subscribee child-list edits so they do
+- DONE neutralize subscribee-as-such child-list edits so they do
   not become graph 'contains' edits for the subscribee;
-- DONE extract raw direct as-subscribee visibility intents without
+- DONE extract raw subscribee-as-such visibility intents without
   interpreting them yet;
 - preserve raw-buffer edits separately from graph edits beyond the
   current immediate NodeEditIntent-to-DefineNode conversion;
@@ -1009,7 +1009,7 @@ the new feature:
 Only then implement the feature as:
 
 - DONE infer fork hide deltas from roles;
-- DONE infer unhide deltas from direct AsSubscribee buffer children that
+- DONE infer unhide deltas from subscribee-as-such buffer children that
   are disk content of the subscribee;
 - DONE fold hide/unhide deltas into subscriber edits;
 - fork foreign content-relationship edits based on ownership,
@@ -1078,7 +1078,7 @@ hide/unhide inference work has a stable surface to interpret.
 The rule is intentionally narrow:
 
 - only saved-view rerender;
-- only direct subscribees under SubscribeeCol;
+- only subscribee-as-suchs under SubscribeeCol;
 - only normal non-diff mode;
 - collateral views and diff views still reconcile from graph/diff
   data.
@@ -1113,17 +1113,17 @@ Results:
   'test_deleting_foreign_subscribee_content_infers_hide' and
   'test_moving_foreign_subscribee_content_elsewhere_still_hides'.
 
-* Update 2026-05-12: direct as-subscribee hide inference done
+* Update 2026-05-12: subscribee-as-such hide inference done
 
 The first hide-inference feature slice is implemented:
 
-- direct, definitive AsSubscribee branches now produce visibility
+- subscribee-as-such definitive branches now produce visibility
   intents;
-- missing direct subscribee content is folded into the owned
+- missing subscribee-as-such content is folded into the owned
   subscriber's 'hides_from_its_subscriptions';
 - if the missing child was moved to become ordinary direct content
   of the subscriber, no hide is inferred;
-- direct AsSubscribee child-list edits still do not become graph
+- subscribee-as-such child-list edits still do not become graph
   'contains' edits for the subscribee;
 - saved-view rerender now inserts HiddenInSubscribeeCol under
   expanded subscribees when the updated subscriber hides intersect
@@ -1156,13 +1156,13 @@ Results:
 - 'cargo run --bin cleanup-test-dbs' found no leftover test
   databases.
 
-* Update 2026-05-12: direct as-subscribee unhide inference done
+* Update 2026-05-12: subscribee-as-such unhide inference done
 
 The inverse visibility edit is implemented. Direct, definitive
 AsSubscribee children that are disk content of the subscribee now
 remove matching IDs from the owned subscriber's
 'hides_from_its_subscriptions'. Unrelated hides are preserved, and the
-direct AsSubscribee child list still does not become a graph
+subscribee-as-such child list still does not become a graph
 'contains' edit for the subscribee.
 
 The old hide-only helper was renamed from
@@ -1172,7 +1172,7 @@ longer describes the feature as temporary hide-only behavior.
 
 Added regressions:
 
-- save-instruction test for visible direct subscribee content removing
+- save-instruction test for visible subscribee-as-such content removing
   an existing subscriber hide;
 - save-instruction test proving unrelated existing hides survive an
   unhide edit;

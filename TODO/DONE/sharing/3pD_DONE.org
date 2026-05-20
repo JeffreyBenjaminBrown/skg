@@ -53,7 +53,7 @@ First write the test to expose current behavior:
 - assert that the save is rejected once the policy is implemented.
 
 The test should live near the existing foreign
-=foreign_direct_as_subscribee_title_edit_reaches_validation= coverage
+=foreign_subscribee_as_such_title_edit_reaches_validation= coverage
 unless a better nearby module already exists.
 
 ** 2. Add the validation boundary

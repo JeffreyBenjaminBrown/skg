@@ -26,12 +26,12 @@ its own traversal rules. That means some concepts now exist in two
 places:
 
 - save extraction uses =SaveRole= to distinguish ordinary content,
-  direct =AsSubscribee= surfaces, display scaffolds, aliases, ID
+  subscribee-as-such surfaces, display scaffolds, aliases, ID
   display, and hidden-subscribee scaffolds;
 - validation has separate logic for foreign edits, duplicate
   definitions, display-only scaffolds, and source consistency.
 
-This duplication is risky because direct subscribee behavior depends
+This duplication is risky because subscribee-as-such behavior depends
 on position. The role classifier already captures that position.
 
 * Questions to answer first
@@ -43,7 +43,7 @@ Before editing validation, inspect current validation flow and answer:
   by =SaveRole=?
 - Which validation rules intentionally run before save-role
   classification and should stay independent?
-- Which tests cover foreign direct =AsSubscribee= title/body edits,
+- Which tests cover foreign subscribee-as-such title/body edits,
   display-only scaffolds, duplicate definitions, and conflicting
   visibility?
 
@@ -92,8 +92,8 @@ would become simpler or safer if it received =Tree<ViewNode_in_Role>=.
 
 Pay special attention to:
 
-- foreign node title/body edits in direct =AsSubscribee= position;
-- direct =AsSubscribee= child-list edits, which should not be treated
+- foreign node title/body edits in subscribee-as-such position;
+- subscribee-as-such child-list edits, which should not be treated
   as foreign subscribee =contains= edits;
 - display-only scaffolds such as alias/id/hidden scaffolds;
 - definitive duplicate checks.
@@ -117,7 +117,7 @@ existing test shows the current behavior is wrong.
 Current behavior to preserve:
 
 - foreign title/body edits still report =ModifiedForeignNode=;
-- direct =AsSubscribee= child-list edits do not report a foreign
+- subscribee-as-such child-list edits do not report a foreign
   subscribee =contains= edit;
 - duplicate definitive definitions are still rejected;
 - conflicting subscribee visibility edits are still rejected;
@@ -153,7 +153,7 @@ cargo test --test multi_source_errors -- --nocapture
 - The validation boundary is explicitly documented.
 - Any code change is narrow and justified by removed duplicate
   positional reasoning.
-- Existing direct-subscribee and foreign-edit behavior is preserved.
+- Existing subscribee-as-such and foreign-edit behavior is preserved.
 - The planned tests pass.
 
 * Non-goals
@@ -178,7 +178,7 @@ The validation boundary should remain where it is for now:
   save-role interpretation;
 - =validate_and_filter_foreign_instructions= runs after save
   instruction construction, so it sees the already-corrected
-  instruction shape where direct =AsSubscribee= child-list edits are
+  instruction shape where subscribee-as-such child-list edits are
   not foreign subscribee =contains= edits.
 
 Moving validation onto =Tree<ViewNode_in_Role>= would require a larger

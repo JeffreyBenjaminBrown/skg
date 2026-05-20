@@ -18,14 +18,14 @@ The target function is
 It currently does all of these jobs inline or nearly inline:
 
 - classify the checked view tree into save roles;
-- extract direct subscribee visibility intents;
+- extract subscribee-as-such visibility intents;
 - extract preliminary graph edit intents;
 - reconcile repeated IDs;
 - convert intents into 'DefineNode';
 - canonicalize IDs from disk;
 - detect source moves;
 - supplement unspecified fields from disk;
-- restore direct-as-subscribee 'contains' from disk via
+- restore subscribee-as-such 'contains' from disk via
   'children_affect_only_hiding';
 - fold subscribee visibility intents into subscriber hide relations;
 - filter unchanged saves.
@@ -210,7 +210,7 @@ cargo test --test typedb update_typedb_from_saveinstructions -- --nocapture
 
 Add a regression only if the extraction reveals an uncovered boundary.
 The highest-value candidate would assert that a single save with both
-ordinary and direct-as-subscribee occurrences still preserves the
+ordinary and subscribee-as-such occurrences still preserves the
 ordinary occurrence's 'contains' edit while not saving the direct
 subscribee branch as subscribee 'contains'. If that behavior is
 already covered, do not add another near-duplicate.
@@ -224,7 +224,7 @@ already covered, do not add another near-duplicate.
   one helper and return both instructions and source moves explicitly.
 - Subscribee visibility folding remains after disk supplementation and
   before unchanged filtering.
-- Existing direct-subscribee, foreign-node, source-move, same-ID, and
+- Existing subscribee-as-such, foreign-node, source-move, same-ID, and
   unchanged-filtering behavior is unchanged.
 - The tests listed above pass, or any environmental blocker is
   recorded with the command that hit it.

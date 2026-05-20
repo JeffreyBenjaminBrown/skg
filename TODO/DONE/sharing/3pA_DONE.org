@@ -31,7 +31,7 @@ The relevant distinction is:
 - saved-view and collateral rerender go through
   =complete_viewforest=, whose preorder/postorder passes call the
   sharing scaffold completers and =reconcile_sharing_scaffold_children=;
-- direct =AsSubscribee= saved-view preservation happens in
+- subscribee-as-such saved-view preservation happens in
   =should_preserve_saved_as_subscribee_branch= before save extraction,
   not in these initial-render helpers.
 

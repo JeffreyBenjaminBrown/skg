@@ -359,7 +359,6 @@ fn role_aware_extraction_collects_subscribees_without_hidden_branches (
     save_ids (&instructions),
     vec![
       ID::from ("subscriber"),
-      ID::from ("subscribee"),
       ID::from ("subscribee-content")]);
   assert_eq!(
     saved_node_by_id (&instructions, "subscriber") . subscribes_to,
@@ -367,9 +366,8 @@ fn role_aware_extraction_collects_subscribees_without_hidden_branches (
   assert_eq!(
     saved_node_by_id (&instructions, "subscriber") . contains,
     vec![]);
-  assert_eq!(
-    saved_node_by_id (&instructions, "subscribee") . contains,
-    vec![]); }
+  assert!(
+    ! save_ids (&instructions) . contains (&ID::from ("subscribee"))); }
 
 #[test]
 fn subscribee_hiderel_intent_collects_direct_visible_content (
@@ -534,7 +532,6 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
     vec![
       ID::from ("root"),
       ID::from ("child"),
-      ID::from ("subscribee"),
       ID::from ("doomed")]);
   let root : &NodeComplete =
     saved_node_by_id (&instructions, "root");
@@ -580,7 +577,6 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
       ID::from ("root"),
       ID::from ("independent"),
       ID::from ("content"),
-      ID::from ("subscribee"),
       ID::from ("doomed")]);
   let root : &NodeComplete =
     saved_node_by_id (&instructions, "root");
@@ -600,10 +596,10 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
       if id == &ID::from ("doomed"))); }
 
 #[test]
-fn direct_as_subscribee_child_list_removal_keeps_disk_contains (
+fn subscribee_as_such_child_list_removal_does_not_save_subscribee (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db_from_config (
-    "skg-test-direct-as-subscribee-keeps-contains",
+    "skg-test-subscribee-as-such-keeps-contains",
     SUBSCRIBEE_EDIT_CONFIG,
     |config, driver| Box::pin (async move {
       let input : &str =
@@ -616,16 +612,17 @@ fn direct_as_subscribee_child_list_removal_keeps_disk_contains (
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
           input, config, driver) . await?;
-      assert_eq!(
-        saved_node_by_id (&instructions, "e") . contains,
-        vec![ID::from ("e1"), ID::from ("e2")]);
+      assert!(
+        ! save_ids (&instructions) . contains (&ID::from ("e")),
+        "subscribee-as-such should not produce a SaveNode: {:?}",
+        instructions);
       Ok (()) })) }
 
 #[test]
-fn direct_as_subscribee_child_removal_is_not_foreign_contains_edit (
+fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db_from_config (
-    "skg-test-direct-as-subscribee-removal-not-foreign-edit",
+    "skg-test-subscribee-as-such-removal-not-foreign-edit",
     SUBSCRIBEE_EDIT_CONFIG,
     |config, driver| Box::pin (async move {
       let input : &str =
@@ -646,15 +643,15 @@ fn direct_as_subscribee_child_removal_is_not_foreign_contains_edit (
           error,
           BufferValidationError::ModifiedForeignNode (id, _)
             if id == &ID::from ("e"))),
-        "direct subscribee should not be reported as a contains edit: {:?}",
+        "subscribee-as-such should not be reported as a contains edit: {:?}",
         errors);
       Ok (()) })) }
 
 #[test]
-fn direct_as_subscribee_child_list_removal_infers_subscriber_hide (
+fn subscribee_as_such_child_list_removal_infers_subscriber_hide (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db_from_config (
-    "skg-test-direct-as-subscribee-infers-hide",
+    "skg-test-subscribee-as-such-infers-hide",
     SUBSCRIBEE_EDIT_CONFIG,
     |config, driver| Box::pin (async move {
       let input : &str =
@@ -671,16 +668,17 @@ fn direct_as_subscribee_child_list_removal_infers_subscriber_hide (
         saved_node_by_id (&instructions, "r")
           . hides_from_its_subscriptions,
         MSV::Specified (vec![ID::from ("e1")]));
-      assert_eq!(
-        saved_node_by_id (&instructions, "e") . contains,
-        vec![ID::from ("e1"), ID::from ("e2")]);
+      assert!(
+        ! save_ids (&instructions) . contains (&ID::from ("e")),
+        "subscribee-as-such should not produce a SaveNode: {:?}",
+        instructions);
       Ok (()) })) }
 
 #[test]
-fn moving_direct_as_subscribee_child_to_subscriber_does_not_hide (
+fn moving_subscribee_as_such_child_to_subscriber_does_not_hide (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db_from_config (
-    "skg-test-direct-as-subscribee-move-to-subscriber-no-hide",
+    "skg-test-subscribee-as-such-move-to-subscriber-no-hide",
     SUBSCRIBEE_EDIT_CONFIG,
     |config, driver| Box::pin (async move {
       let input : &str =
@@ -704,10 +702,10 @@ fn moving_direct_as_subscribee_child_to_subscriber_does_not_hide (
       Ok (()) })) }
 
 #[test]
-fn direct_as_subscribee_visible_child_removes_subscriber_hide (
+fn subscribee_as_such_visible_child_removes_subscriber_hide (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db_from_config (
-    "skg-test-direct-as-subscribee-infers-unhide",
+    "skg-test-subscribee-as-such-infers-unhide",
     "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml",
     |config, driver| Box::pin (async move {
       let input : &str =
@@ -726,16 +724,17 @@ fn direct_as_subscribee_visible_child_removes_subscriber_hide (
         saved_node_by_id (&instructions, "R")
           . hides_from_its_subscriptions,
         MSV::Specified (vec![]));
-      assert_eq!(
-        saved_node_by_id (&instructions, "E1") . contains,
-        vec![ID::from ("E11"), ID::from ("H"), ID::from ("E12")]);
+      assert!(
+        ! save_ids (&instructions) . contains (&ID::from ("E1")),
+        "subscribee-as-such should not produce a SaveNode: {:?}",
+        instructions);
       Ok (()) })) }
 
 #[test]
-fn direct_as_subscribee_unhide_preserves_unrelated_hides (
+fn subscribee_as_such_unhide_preserves_unrelated_hides (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db_from_config (
-    "skg-test-direct-as-subscribee-unhide-keeps-unrelated",
+    "skg-test-subscribee-as-such-unhide-keeps-unrelated",
     "tests/hidden_from_subscriptions/fixtures-every-kind-of-col/skgconfig.toml",
     |config, driver| Box::pin (async move {
       let input : &str =
@@ -879,16 +878,17 @@ fn recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
           input, config, driver) . await?;
-      assert_eq!(
-        saved_node_by_id (&instructions, "e") . contains,
-        vec![ID::from ("e1"), ID::from ("e2")]);
+      assert!(
+        ! save_ids (&instructions) . contains (&ID::from ("e")),
+        "subscribee-as-such should not produce a SaveNode: {:?}",
+        instructions);
       assert_eq!(
         saved_node_by_id (&instructions, "e2") . contains,
         Vec::<ID>::new());
       Ok (()) })) }
 
 #[test]
-fn foreign_direct_as_subscribee_title_edit_reaches_validation (
+fn foreign_subscribee_as_such_title_edit_is_rejected (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db_from_config (
     "skg-test-subscribee-title-edit-validation",
@@ -901,19 +901,23 @@ fn foreign_direct_as_subscribee_title_edit_reaches_validation (
                 *** (skg (node (id e) (source foreign))) changed title
                 **** (skg (node (id e2) (source foreign))) e2
                 "};
-      let instructions : Vec<DefineNode> =
+      let result : Result<Vec<DefineNode>, Box<dyn Error>> =
         save_instructions_from_org_with_disk (
-          input, config, driver) . await?;
-      let errors : Vec<BufferValidationError> =
-        validate_and_filter_foreign_instructions (
-          instructions, config, driver) . await . unwrap_err();
+          input, config, driver) . await;
+      let error : Box<dyn Error> =
+        result . unwrap_err();
+      let buffer_error : &BufferValidationError =
+        error . downcast_ref::<BufferValidationError>()
+        . expect ("expected BufferValidationError::Other");
       assert!(
-        errors . iter() . any (|error| matches!(
-          error,
-          BufferValidationError::ModifiedForeignNode (id, source)
-            if id == &ID::from ("e") && source . as_str() == "foreign")),
-        "expected ModifiedForeignNode for e, got {:?}",
-        errors);
+        matches!(
+          buffer_error,
+          BufferValidationError::Other (msg)
+            if msg . contains ("Cannot edit title/body")
+               && msg . contains ("subscribee-as-such")
+               && msg . contains ("e")),
+        "expected foreign subscribee-as-such title edit rejection, got {:?}",
+        buffer_error);
       Ok (()) })) }
 
 #[test]

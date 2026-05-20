@@ -185,7 +185,7 @@ ordering or exposes an untested invariant. Useful assertions:
   lookup table.
 - Subscriber hide/unhide folding uses a keyed reconciled collection.
 - Output order is explicit and deterministic.
-- Existing direct-subscribee behavior remains unchanged.
+- Existing subscribee-as-such behavior remains unchanged.
 - The planned tests pass.
 
 * Non-goals
@@ -194,5 +194,5 @@ ordering or exposes an untested invariant. Useful assertions:
 - Do not change rerender or completion behavior.
 - Do not introduce a new dependency unless the local collection is
   clearly worse than using an existing ordered-map dependency.
-- Do not broaden duplicate direct-subscribee edit semantics unless a
+- Do not broaden duplicate subscribee-as-such edit semantics unless a
   current test or obvious bug requires it.

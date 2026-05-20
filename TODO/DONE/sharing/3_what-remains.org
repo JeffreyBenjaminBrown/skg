@@ -3,16 +3,16 @@
 This report supersedes the earlier =3_what-remains.org= text, which
 was written before the 2p5 cleanup completed.
 
-The direct =AsSubscribee= hide/unhide feature now has the important
+The subscribee-as-such hide/unhide feature now has the important
 save-path shape:
 
-- direct =AsSubscribee= child-list removals no longer become
+- subscribee-as-such child-list removals no longer become
   subscribee graph =contains= edits;
-- direct =AsSubscribee= visible children are extracted as
+- subscribee-as-such visible children are extracted as
   =SubscribeeHiderelIntent= values;
 - visibility folding happens before =DefineNode= construction;
 - disk supplementation is policy-neutral and no longer has a
-  direct-subscribee =contains= restoration guardrail;
+  subscribee-as-such =contains= restoration guardrail;
 - post-=reconcile_nodeEditIntents= lookup is keyed by
   =SameIdReconciledNodeEditIntents=;
 - validation and rerender/completion boundaries are documented in
@@ -70,7 +70,7 @@ is_saved_view && source_diffs.is_none() && is_subscribee
 and carried a TODO questioning the =source_diffs.is_none()= clause.
 
 This is still a real boundary question. Normal saved views must
-preserve direct =AsSubscribee= child lists long enough for save
+preserve subscribee-as-such child lists long enough for save
 extraction to interpret them as visibility edits. Diff views also
 contain generated phantom/removed children, and those display nodes
 must not infer hides or unhides.
@@ -83,7 +83,7 @@ by a more direct distinction.
 Execution plan: [[./3pB_DONE.org][3pB_DONE.org]].
 
 Status: complete. A focused git-diff saved-view regression now proves
-that a direct =AsSubscribee= branch regenerates phantom/removed
+that a subscribee-as-such branch regenerates phantom/removed
 children from =source_diffs= instead of preserving a stale direct
 child list. The misleading TODO was replaced with that rationale.
 
@@ -155,7 +155,7 @@ view.
 
 ** DONE f. Decide whether HiddenIn/HiddenOutside collections are editable
 
-The current hide/unhide edit surface is direct =AsSubscribee= visible
+The current hide/unhide edit surface is subscribee-as-such visible
 content. =HiddenInSubscribeeCol= and
 =HiddenOutsideOfSubscribeeCol= are display-derived scaffolds, not
 general editable relation collections.
@@ -229,14 +229,14 @@ insert the first subscribee.
 view/edit surface. The herald flag is not enough to explain which
 side of the relation a node is on or to edit it.
 
-This is outside direct subscribee hide/unhide, but it remains a
+This is outside subscribee-as-such hide/unhide, but it remains a
 sharing-model gap.
 
 *** k. Generalize relationship collections
 
 =vision.org= still points toward collections for all relation directions.
 The current work improves one relation surface: subscriber visibility
-over direct subscribee content. It does not generalize relation
+over subscribee-as-such content. It does not generalize relation
 display or editing.
 
 *** l. Settle user-facing language
@@ -245,14 +245,14 @@ The code and planning docs use several implementation terms:
 
 - subscribee
 - shown as a subscribee;
-- direct =AsSubscribee= branch;
+- subscribee-as-such branch;
 - visibility intent;
 - hiderel;
 - =HiddenInSubscribeeCol=.
 
 User-facing commands and docs should probably say something closer to
 "hide this subscribed item from this view" and "show this subscribed
-item again", rather than "edit direct =AsSubscribee= child lists."
+item again", rather than "edit subscribee-as-such child lists."
 
 **** Jeff prefers
 "subscribee-as-such"
@@ -264,9 +264,9 @@ item again", rather than "edit direct =AsSubscribee= child lists."
 - role classification exists and save extraction uses it;
 - naive save extraction is split into candidates, minimal node data,
   field collection, and intent conversion;
-- direct =AsSubscribee= child-list removals no longer become
+- subscribee-as-such child-list removals no longer become
   subscribee graph =contains= edits;
-- direct =AsSubscribee= visible-child signal is extracted before
+- subscribee-as-such visible-child signal is extracted before
   final =DefineNode= construction;
 - direct hide and unhide inference both have save-instruction tests;
 - overlapping subscribee visibility conflicts are rejected by

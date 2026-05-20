@@ -32,7 +32,6 @@ and can be recovered by a later session.
 Some people intpret a fork as a binary choice.
 In Skg a fork can split into any number.
 
-
 ## hiderel = "hides" relationship
 
 See schema.tql for what a "hides" relationship is.
@@ -62,6 +61,27 @@ The metadata is used for Rust to know what to do with it,
 and for Emacs to let the user know how to interpret it.
 
 ## mk = make / create
+
+## "subscribee as such"
+
+In Skg some nodes are "subscribers", which "subscribe" to "subscribees".
+(See [the schema](./schema.tql).)
+A node that plays the 'subscribee' role can be viewed as an ordinary node,
+or *as* a subscribee. In the latter case it appears
+underneath the relevant subscriber, in a 'subscribeeCol':
+```
+  * subscriber
+  ** subscribeeCol
+  *** subsribee1
+  *** subsribee2
+  ...
+```
+
+In the above view, subscribee1 and subscribee2 are both "subscribees as such":
+They are not just subscribees, but they are being shown *as* subscribees.
+This changes the way edits are interpreted:
+Edits to a "subscribee as such" can only affect
+what the relevant subscriber hides, nothing else.
 
 ## title != headline
 

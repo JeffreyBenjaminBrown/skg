@@ -15,14 +15,14 @@ comments at the important boundaries:
   explains the rerender-time sharing scaffold reconciliation path.
 - =subscribee_visibility_intents_from_tree= in
   [[../../server/from_text/viewnodes_to_instructions/subscribee_visibility_intents.rs][subscribee_visibility_intents.rs]]
-  owns save-time extraction of direct =AsSubscribee= visible-child
+  owns save-time extraction of subscribee-as-such visible-child
   signal.
 
 The boundary is:
 
 - save extraction owns interpretation of user-authored direct
   =AsSubscribee= child lists as subscriber visibility edits;
-- saved-view completion preserves definitive direct =AsSubscribee=
+- saved-view completion preserves definitive subscribee-as-such
   child lists until save extraction can interpret them;
 - collateral-view completion and diff-mode completion may regenerate
   branches from graph/diff facts, because they are not the saved
