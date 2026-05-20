@@ -9,7 +9,7 @@ fn test_do_everywhere_adding_parent() {
   let expected_tree = tree_from_org_text (expected_text) . unwrap();
   let root_id = tree . root() . id();
   do_everywhere_in_tree_dfs(
-    &mut tree, root_id,
+    &mut tree, root_id, true,
     &mut |mut node| { // Have a parent? Then append its title to yours.
       let current_title = node . value() . clone();
       let parent_title: Option<String> =
@@ -31,7 +31,7 @@ fn test_do_everywhere_adding_grandchild() {
   let expected_tree = tree_from_org_text (expected_text) . unwrap();
   let root_id = tree . root() . id();
   do_everywhere_in_tree_dfs(
-    &mut tree, root_id,
+    &mut tree, root_id, true,
     &mut |mut node| { // Have a grandchild? Then append your first one's title to yours.
       let current_title = node . value() . clone();
       let node_id = node . id();
@@ -50,4 +50,24 @@ fn test_do_everywhere_adding_grandchild() {
       Ok(()) }
   ) . unwrap();
   assert!(eq_trees(tree . root(), expected_tree . root()));
+}
+
+#[test]
+fn test_do_everywhere_postorder() {
+  let initial_text = include_str!("generic/fixtures/initial.txt");
+  let mut tree = tree_from_org_text (initial_text) . unwrap();
+  let root_id = tree . root() . id();
+  let mut visited : Vec<String> = Vec::new();
+  do_everywhere_in_tree_dfs(
+    &mut tree, root_id, false,
+    &mut |node| {
+      visited . push ( node . value() . clone() );
+      Ok(()) }
+  ) . unwrap();
+  assert_eq!( visited, vec![
+    "11" . to_string(),
+    "121" . to_string(),
+    "12" . to_string(),
+    "13" . to_string(),
+    "1" . to_string() ] );
 }

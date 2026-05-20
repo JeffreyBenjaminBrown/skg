@@ -33,6 +33,7 @@ pub async fn add_missing_info_to_viewforest(
   do_everywhere_in_tree_dfs(
     viewforest,
     root_id,
+    true,
     &mut |mut node| {
       make_alias_if_appropriate (&mut node)?;
       inherit_parent_source_if_possible (&mut node)?;

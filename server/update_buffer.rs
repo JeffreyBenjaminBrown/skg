@@ -448,6 +448,7 @@ fn clear_diff_metadata (
   do_everywhere_in_tree_dfs (
     viewforest,
     viewforest_root_id,
+    true,
     &mut |mut node : NodeMut<ViewNode>| -> Result<(), String>
       { // Ignores scaffolds: some (Alias, ID) carry diff data,
         // but they are regenerated from scratch by their postorder

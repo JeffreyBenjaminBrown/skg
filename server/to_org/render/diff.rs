@@ -35,7 +35,7 @@ pub fn apply_diff_to_viewforest (
   let root_id : NodeId =
     viewforest . root() . id();
   do_everywhere_in_tree_dfs (
-    viewforest, root_id,
+    viewforest, root_id, true,
     &mut |node_mut| { process_node_for_diff (
                         node_mut, source_diffs,
                         deleted_since_head_pid_src_map,

@@ -167,7 +167,7 @@ pub fn maybePlaced_to_placed_tree (
   do_everywhere_in_tree_dfs_readonly(
     // PITFALL: Readonly for 'unchecked',
     // but mutates 'checked' and 'id_map'.
-    &unchecked, unchecked_root_id,
+    &unchecked, unchecked_root_id, true,
     &mut |node_ref
     | {
       if node_ref . id() == unchecked_root_id {

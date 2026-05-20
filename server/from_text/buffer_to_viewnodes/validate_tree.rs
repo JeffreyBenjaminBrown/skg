@@ -71,7 +71,7 @@ pub async fn find_buffer_errors_for_saving (
     viewforest, &mut errors);
   { // local structure validation
     let _ = do_everywhere_in_tree_dfs_readonly(
-      viewforest, viewforest . root() . id(),
+      viewforest, viewforest . root() . id(), true,
       &mut |node_ref| {
         if let Err (e) = local::validate_local_structure(
                viewforest, node_ref . id(), config) {

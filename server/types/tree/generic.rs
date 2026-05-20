@@ -141,16 +141,18 @@ where F: FnOnce(NodeMut<T>) -> R {
     . ok_or ("with_node_mut: node not found") ?;
   Ok ( f (node_mut) ) }
 
-/// Apply a function to every node in a subtree, DFS preorder traversal.
+/// Apply a function to every node in a subtree, DFS traversal.
 /// Starts at `start_node_id` and recursively visits all descendants.
 /// The function receives `NodeMut<T>`, which allows:
 /// - Mutating the node's value via `.value()`
 /// - Navigating to parent via `.parent()` (immutable)
 /// - Accessing the tree via `.tree()` (immutable)
+/// If `preorder` is true, runs the function before descendants.
+/// If `preorder` is false, runs it after descendants.
 ///
 /// Example: Convert TrueNodes to Aliases when parent is AliasCol
 /// ```ignore
-/// do_everywhere_in_tree_dfs(&mut tree, root_id, |mut node| {
+/// do_everywhere_in_tree_dfs(&mut tree, root_id, true, |mut node| {
 ///   if let Some(parent) = node.parent() {
 ///     if matches!(parent.value(), ViewNode { kind: Scaff(AliasCol), .. }) {
 ///       // Convert to Alias
@@ -164,6 +166,7 @@ where F: FnOnce(NodeMut<T>) -> R {
 pub fn do_everywhere_in_tree_dfs<T, F>(
   tree          : &mut Tree<T>,
   start_node_id : NodeId,
+  preorder      : bool,
   f             : &mut F
 ) -> Result<(), String>
 where F: FnMut(NodeMut<T>) -> Result<(), String> {
@@ -174,13 +177,17 @@ where F: FnMut(NodeMut<T>) -> Result<(), String> {
     node_ref . children ()
       . map ( |c| c . id( ))
       . collect () };
-  { // do F here
+  if preorder {
     let node_mut : NodeMut<T> = tree . get_mut (start_node_id)
       . ok_or ("do_everywhere_in_tree_dfs: node not found") ?;
     f (node_mut) ?; }
   for child_id in child_ids { // recurse
     do_everywhere_in_tree_dfs (
-      tree, child_id, f ) ?; }
+      tree, child_id, preorder, f ) ?; }
+  if !preorder {
+    let node_mut : NodeMut<T> = tree . get_mut (start_node_id)
+      . ok_or ("do_everywhere_in_tree_dfs: node not found") ?;
+    f (node_mut) ?; }
   Ok (( ))}
 
 /// Like do_everywhere_in_tree_dfs, but read-only.
@@ -189,16 +196,22 @@ where F: FnMut(NodeMut<T>) -> Result<(), String> {
 pub fn do_everywhere_in_tree_dfs_readonly<T, F>(
   tree          : &Tree<T>,
   start_node_id : NodeId,
+  preorder      : bool,
   f             : &mut F
 ) -> Result<(), String>
 where F: FnMut(NodeRef<T>) -> Result<(), String> {
   let node_ref : NodeRef<T> =
     tree . get (start_node_id) . ok_or (
       "do_everywhere_in_tree_dfs_readonly: start node not found" ) ?;
-  f (node_ref) ?;
+  if preorder { f (node_ref) ?; }
   for child in node_ref . children() {
     do_everywhere_in_tree_dfs_readonly (
-      tree, child . id(), f ) ?; }
+      tree, child . id(), preorder, f ) ?; }
+  if !preorder {
+    let node_ref : NodeRef<T> =
+      tree . get (start_node_id) . ok_or (
+        "do_everywhere_in_tree_dfs_readonly: start node not found" ) ?;
+    f (node_ref) ?; }
   Ok (( ))}
 
 /// Like do_everywhere_in_tree_dfs, but the lambda ("f") returns:
