@@ -108,7 +108,7 @@ impl CompletionMode {
 /// 4. reconcile_content_children -- goal list + phantoms + indep-mark.
 /// 5. order_children_as_scaffolds_then_ignored_then_content
 /// 6. maybe_prepend_subscribee_col
-pub fn complete_truenode_preorder (
+pub fn expand_true_content_at_truenode (
   node               : NodeId,
   tree               : &mut Tree<ViewNode>,
   defmap             : &mut DefinitiveMap,
@@ -122,7 +122,7 @@ pub fn complete_truenode_preorder (
   error_unless_node_satisfies(
     tree, node, |vn : &ViewNode| matches!( &vn . kind,
                                            ViewNodeKind::True (_)),
-    "complete_truenode_preorder: expected TrueNode" ) ?;
+    "expand_true_content_at_truenode: expected TrueNode" ) ?;
   let mode : CompletionMode =
     CompletionMode::new (is_saved_view, source_diffs);
   make_indef_if_repeat_then_extend_defmap(
@@ -169,7 +169,7 @@ pub fn ensure_diff_scaffolds_for_truenode (
       tree, node, source_diffs, &pid, &source ) ?; }
   Ok (( )) }
 
-/// Phase 1 of complete_truenode_preorder: phantom/indefinitive/
+/// Phase 1 of expand_true_content_at_truenode: phantom/indefinitive/
 /// deleted-by-this-save nodes are finalised in place here and
 /// the function returns Stop; everything else yields Continue
 /// with the (pid, source) that later phases need.

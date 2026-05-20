@@ -131,7 +131,7 @@ async fn expand_true_content_at_node (
     tree . get (treeid) . unwrap () . value () . kind . clone ();
   if matches!( kind, ViewNodeKind::True (_)) {
     super::complete_preorder::truenode::
-    complete_truenode_preorder (
+    expand_true_content_at_truenode (
       treeid, tree, context . defmap, context . source_diffs,
       &context . env . config, context . graph_snap,
       context . deleted_since_head_pid_src_map,
@@ -140,7 +140,7 @@ async fn expand_true_content_at_node (
   } else if matches!( kind,
       ViewNodeKind::Scaff (Scaffold::SubscribeeCol) ) {
         super::complete_preorder::subscribee_col::
-        complete_subscribee_col_preorder (
+        reconcile_subscribee_col_children (
           treeid, tree, context . source_diffs, context . env,
           context . deleted_since_head_pid_src_map
         ) . await ?;
@@ -205,7 +205,7 @@ fn reconcile_alias_cols (
         ViewNodeKind::Scaff (Scaffold::AliasCol) )) ?;
   for treeid in nodes {
       super::complete_postorder::aliascol::
-      complete_alias_col (
+      reconcile_alias_col_children (
         tree, treeid, context . source_diffs, &context . env . config ) ?;
   }
   Ok (( )) }
@@ -221,7 +221,7 @@ fn reconcile_id_cols (
         ViewNodeKind::Scaff (Scaffold::IDCol) )) ?;
   for treeid in nodes {
     super::complete_postorder::id_col::
-    complete_id_col (
+    reconcile_id_col_children (
       treeid, tree, context . source_diffs,
       &context . env . config ) ?; }
   Ok (( )) }
@@ -237,7 +237,7 @@ fn reconcile_hiddenin_cols (
         ViewNodeKind::Scaff (Scaffold::HiddenInSubscribeeCol) )) ?;
   for treeid in nodes {
       super::complete_postorder::hiddeninsubscribee_col::
-      complete_hiddeninsubscribee_col (
+      reconcile_hiddenin_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
         context . deleted_since_head_pid_src_map ) ?; }
   Ok (( )) }
@@ -254,7 +254,7 @@ fn reconcile_hiddenoutside_cols (
           Scaffold::HiddenOutsideOfSubscribeeCol) )) ?;
   for treeid in nodes {
     super::complete_postorder::hiddenoutsideof_subscribeecol::
-    complete_hiddenoutsideofsubscribeecol (
+    reconcile_hiddenoutside_subscribee_col_children (
       treeid, tree, context . source_diffs, context . env,
       context . deleted_since_head_pid_src_map ) ?; }
   Ok (( )) }

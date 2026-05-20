@@ -33,7 +33,7 @@ struct SubscribeeColContext {
 /// - If no subscribees: transfer focus if needed, then delete.
 /// - If parent is indefinitive: reconcile subscribee children.
 /// - Ensure HiddenOutsideOfSubscribeeCol exists and is last.
-pub async fn complete_subscribee_col_preorder (
+pub async fn reconcile_subscribee_col_children (
   node                           : NodeId,
   tree                           : &mut Tree<ViewNode>,
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
@@ -83,7 +83,7 @@ fn read_subscribee_col_context (
                  t . is_indefinitive () )),
         _ => None } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
-    . ok_or ("complete_subscribee_col_preorder: parent is not a TrueNode") ?;
+    . ok_or ("reconcile_subscribee_col_children: parent is not a TrueNode") ?;
   let worktree_subscribees : Vec<ID> =
     nodecomplete_from_inrustgraph_or_disk (
       &env . config, &parent_pid, &parent_source )

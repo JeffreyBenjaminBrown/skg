@@ -30,11 +30,11 @@ impl SharingScaffoldKind {
   pub fn caller_label (self) -> &'static str {
     match self {
       Self::SubscribeeCol =>
-        "complete_subscribee_col_preorder",
+        "reconcile_subscribee_col_children",
       Self::HiddenInSubscribeeCol =>
-        "complete_hiddeninsubscribee_col",
+        "reconcile_hiddenin_subscribee_col_children",
       Self::HiddenOutsideOfSubscribeeCol =>
-        "complete_hiddenoutsideofsubscribeecol", } }
+        "reconcile_hiddenoutside_subscribee_col_children", } }
 
   /// The 'Scaffold' variant a node of this kind carries.
   pub fn scaffold (self) -> Scaffold {

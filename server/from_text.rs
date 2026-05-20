@@ -95,7 +95,7 @@ pub async fn buffer_to_saveplan (
         nonmerge_plan . define_nodes, config, driver )
       . await } . map_err (SaveError::BufferValidationErrors) ?;
   let merge_instructions : Vec<Merge> =
-    // PITFALL: The edit_requests consumed here remain in viewforest until cleared by complete_truenode_preorder, during complete_viewforest. Merge extraction only plans merge mutations; it does not mutate the saved viewforest.
+    // PITFALL: The edit_requests consumed here remain in viewforest until cleared by expand_true_content_at_truenode, during complete_viewforest. Merge extraction only plans merge mutations; it does not mutate the saved viewforest.
     extract_merge_save_plan (
       &save_authority, config, driver )
     . await . map_err (SaveError::DatabaseError) ?;
@@ -119,7 +119,7 @@ async fn extract_merge_save_plan (
   driver            : &TypeDBDriver,
 ) -> Result<Vec<Merge>, Box<dyn std::error::Error>> {
   // PITFALL: The edit_requests consumed here remain in viewforest
-  // until cleared by complete_truenode_preorder, during
+  // until cleared by expand_true_content_at_truenode, during
   // complete_viewforest.
   let merge_instructions : Vec<Merge> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(

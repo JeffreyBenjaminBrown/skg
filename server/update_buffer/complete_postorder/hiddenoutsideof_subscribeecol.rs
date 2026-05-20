@@ -33,7 +33,7 @@ struct HiddenOutsideContext {
 ///
 /// Collects nodes that the subscriber hides from its subscriptions
 /// but that are NOT top-level content of any subscribee.
-pub fn complete_hiddenoutsideofsubscribeecol (
+pub fn reconcile_hiddenoutside_subscribee_col_children (
   node                           : NodeId,
   tree                           : &mut Tree<ViewNode>,
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
@@ -71,7 +71,7 @@ fn validate_hiddenoutside_parent (
       tree, node, 1,
       |vn : &ViewNode| match &vn . kind {
         ViewNodeKind::Scaff (Scaffold::SubscribeeCol) => Ok(( )),
-        _ => Err( "complete_hiddenoutsideofsubscribeecol: \
+        _ => Err( "reconcile_hiddenoutside_subscribee_col_children: \
                    ancestor 1 is not a SubscribeeCol" ) } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;

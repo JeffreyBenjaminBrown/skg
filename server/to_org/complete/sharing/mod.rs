@@ -112,7 +112,7 @@ pub async fn maybe_add_subscribeeCol_branch (
                         ViewNodeKind::True (t) if t . is_indefinitive () ) )
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_indefinitive { return Ok(( )); } }
-  { // Pre-existing SubscribeeCol children are reconciled by the rerender pipeline's 'resolve_truenode_state_and_expand_content', which dispatches to 'complete_subscribee_col_preorder'.
+  { // Pre-existing SubscribeeCol children are reconciled by the rerender pipeline's 'expand_true_content_until_stable', which dispatches to 'reconcile_subscribee_col_children'.
     if unique_scaffold_child_of_viewnode (
       tree, node_id, &Scaffold::SubscribeeCol )? . is_some ()
     { return Ok (( )); }}
@@ -179,7 +179,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
     tree, subscribee_treeid )?
   { return Err ( "maybe_add_hiddenInSubscribeeCol_branch called on non-subscribee" . into ( )); }
   if unique_scaffold_child_of_viewnode (
-      // Pre-existing HiddenIn collections are instead reconciled by the rerender pipeline's 'insert_and_reconcile_generated_scaffolds', which dispatches to 'complete_hiddeninsubscribee_col'.
+      // Pre-existing HiddenIn collections are instead reconciled by the rerender pipeline's 'reconcile_hiddenin_cols', which dispatches to 'reconcile_hiddenin_subscribee_col_children'.
        tree, subscribee_treeid, &Scaffold::HiddenInSubscribeeCol
      )? . is_some ()
   { return Ok (( )); }

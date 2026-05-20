@@ -35,7 +35,7 @@ struct HiddenInContext {
 /// The HiddenInSubscribeeCol collects nodes that the subscriber
 /// hides from its subscriptions AND that are top-level content
 /// of the subscribee.
-pub fn complete_hiddeninsubscribee_col (
+pub fn reconcile_hiddenin_subscribee_col_children (
   node                           : NodeId,
   tree                           : &mut Tree<ViewNode>,
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,

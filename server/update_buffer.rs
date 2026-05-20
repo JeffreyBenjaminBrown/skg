@@ -416,7 +416,7 @@ fn remove_branches_that_git_marked_removed (
 /// AliasCol is NOT removed: it may have been requested by the user
 /// (not just injected by diff mode), and tracking which case applies
 /// is not worth the complexity. Phantom Alias children (injected by
-/// diff mode) are cleaned up by complete_alias_col during the postorder
+/// diff mode) are cleaned up by reconcile_alias_col_children during the postorder
 /// pass: its goal list won't include them, so they are detached.
 fn remove_diff_only_scaffolds (
   viewforest : &mut Tree<ViewNode>
