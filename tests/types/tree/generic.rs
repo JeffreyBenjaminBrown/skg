@@ -60,7 +60,7 @@ fn test_do_everywhere_postorder() {
   let mut visited : Vec<String> = Vec::new();
   do_everywhere_in_tree_dfs(
     &mut tree, root_id, false,
-    &mut |node| {
+    &mut |mut node| {
       visited . push ( node . value() . clone() );
       Ok(()) }
   ) . unwrap();
