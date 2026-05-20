@@ -2,7 +2,7 @@
 /// is a Skg buffer from the Emacs client,
 /// read by the Rust server when the user saves it.
 /// The sole purpose of all the sub-libraries in 'from_text::'
-/// is the function 'buffer_to_viewforest_and_save_instructions'
+/// is the function 'buffer_to_saveplan'
 /// defined here.
 
 pub mod buffer_to_viewnodes;
@@ -10,7 +10,7 @@ pub mod viewnodes_to_instructions;
 pub mod supplement_from_disk;
 pub mod validate;
 
-use crate::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_viewforest;
+use crate::merge::mergeInstructionTriple::instructiontriples_from_merge_candidates;
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::SkgConfig;
 use crate::types::save::{Merge, DefineNode, SourceMove};
@@ -20,7 +20,10 @@ use crate::types::viewnode::ViewNode;
 use buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use buffer_to_viewnodes::add_missing_info::add_missing_info_to_viewforest;
 use buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
-use viewnodes_to_instructions::{extract_nonmerge_save_plan, NonmergeSavePlan};
+use viewnodes_to_instructions::{
+  extract_nonmerge_save_plan_from_authority,
+  NonmergeSavePlan,
+  SaveAuthority};
 use validate::{validate_and_filter_foreign_instructions, validate_merges_involve_only_owned_nodes, validate_no_simultaneous_move_and_merge};
 
 use ego_tree::Tree;
@@ -41,7 +44,7 @@ pub struct SavePlan {
 /// - placed, role-aware viewforest: saved-view role policy;
 /// - disk-supplemented DefineNodes: foreign write policy;
 /// - non-merge plus merge plan: cross-plan source-move/merge policy.
-pub async fn buffer_to_viewforest_and_save_instructions (
+pub async fn buffer_to_saveplan (
   buffer_text : &str,
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
@@ -76,9 +79,14 @@ pub async fn buffer_to_viewforest_and_save_instructions (
         "maybePlaced_to_placed_tree" ). entered();
       maybePlaced_to_placed_tree (maybePlaced_viewforest) }
         . map_err ( |e| SaveError::ParseError (e) ) ?;
+  let save_authority : SaveAuthority =
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "SaveAuthority::from_viewforest" ). entered();
+      SaveAuthority::from_viewforest (&viewforest) }
+        . map_err ( |e| SaveError::ParseError (e) ) ?;
   let nonmerge_plan : NonmergeSavePlan =
-    extract_nonmerge_save_plan (
-      & viewforest, config, driver )
+    extract_nonmerge_save_plan_from_authority (
+      &save_authority, config, driver )
     . await . map_err (SaveError::DatabaseError) ?;
   let define_nodes : Vec<DefineNode> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -89,7 +97,7 @@ pub async fn buffer_to_viewforest_and_save_instructions (
   let merge_instructions : Vec<Merge> =
     // PITFALL: The edit_requests consumed here remain in viewforest until cleared by complete_truenode_preorder, during complete_viewforest. Merge extraction only plans merge mutations; it does not mutate the saved viewforest.
     extract_merge_save_plan (
-      & viewforest, config, driver )
+      &save_authority, config, driver )
     . await . map_err (SaveError::DatabaseError) ?;
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "validate_merges_involve_only_owned_nodes" ). entered();
@@ -106,17 +114,17 @@ pub async fn buffer_to_viewforest_and_save_instructions (
                  source_moves : nonmerge_plan . source_moves } ) }
 
 async fn extract_merge_save_plan (
-  viewforest : &Tree<ViewNode>,
-  config     : &SkgConfig,
-  driver     : &TypeDBDriver,
+  extraction_forest : &SaveAuthority,
+  config            : &SkgConfig,
+  driver            : &TypeDBDriver,
 ) -> Result<Vec<Merge>, Box<dyn std::error::Error>> {
   // PITFALL: The edit_requests consumed here remain in viewforest
   // until cleared by complete_truenode_preorder, during
   // complete_viewforest.
   let merge_instructions : Vec<Merge> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "extract_merge_save_plan" ). entered();
-      instructiontriples_from_the_merges_in_an_viewforest (
-        viewforest, config, driver )
+      "extract_merge_save_plan" ). entered();
+      instructiontriples_from_merge_candidates (
+        extraction_forest, config, driver )
       . await } ?;
   Ok (merge_instructions) }

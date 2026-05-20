@@ -1,4 +1,17 @@
 * Problems found during herald overhaul research
+** Save validation and extraction use different edit-request surfaces
+   The save extraction path uses 'collect_intent_candidates' to define
+   which view positions can produce save/merge instructions. Some
+   validation still walks the whole viewforest directly, especially
+   merge validation and contradictory instruction collection.
+
+   That can make validation and execution disagree for edit metadata
+   placed under display/scaffold positions: validation may see it even
+   when extraction ignores it, or vice versa if the candidate policy
+   changes. The cleaner fix is probably to validate write-intent
+   metadata through the same candidate/role policy used by extraction,
+   and explicitly reject edit requests outside that surface.
+
 ** Save rerender may not insert missing HiddenInSubscribeeCol
    While experimenting with the "delete as-a-subscribee content
    implies hide" feature, I saw a case where the subscriber's

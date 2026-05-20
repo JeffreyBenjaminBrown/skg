@@ -1,5 +1,8 @@
 use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
 use crate::dbs::typedb::search::find_related_nodes;
+use crate::from_text::viewnodes_to_instructions::SaveAuthority;
+use crate::from_text::viewnodes_to_instructions::to_naive_instructions::{
+  IntentCandidateKind };
 use crate::types::views_state::nodecomplete_from_inrustgraph_or_disk_async;
 use crate::types::save::{Merge, SaveNode, DeleteNode};
 use crate::types::misc::{MSV, SkgConfig, ID};
@@ -73,26 +76,43 @@ pub async fn neighbor_savenodes_for_merges (
     save_nodes . push ( SaveNode (node) ); }
   Ok (save_nodes) }
 
-/// PURPOSE: For each ViewNode with a merge instruction, creates a Merge:
-/// - acquiree_text_preserver: new node containing the acquiree's title and body
-/// - updated_acquirer: acquirer node with modified contents and extra IDs
-/// - acquiree_to_delete: acquiree marked for deletion
-pub async fn instructiontriples_from_the_merges_in_an_viewforest(
+/// Supplanted by 'instructiontriples_from_merge_candidates'.
+/// It now exists only to avoid test churn.
+pub async fn instructiontriples_from_the_merges_in_a_viewforest(
   viewforest: &Tree<ViewNode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<Merge>,
             Box<dyn Error>> {
-  let mut merges: Vec<Merge> =
+  let extraction_forest : SaveAuthority =
+    SaveAuthority::from_viewforest (viewforest)
+    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+  instructiontriples_from_merge_candidates (
+    &extraction_forest, config, driver ) . await }
+
+/// PURPOSE: For each ViewNode with a merge instruction, creates a Merge:
+/// - acquiree_text_preserver: new node containing the acquiree's title and body
+/// - updated_acquirer: acquirer node with modified contents and extra IDs
+/// - acquiree_to_delete: acquiree marked for deletion
+pub(crate) async fn instructiontriples_from_merge_candidates (
+  extraction_forest : &SaveAuthority,
+  config            : &SkgConfig,
+  driver            : &TypeDBDriver,
+) -> Result<Vec<Merge>, Box<dyn Error>> {
+  let mut merges : Vec<Merge> =
     Vec::new();
-  for edge in viewforest . root() . traverse() {
-    if let ego_tree::iter::Edge::Open (node_ref) = edge {
-      if let Some (merge) =
-        optmerge_from_viewnode(
-          { let viewnode : &ViewNode = node_ref . value();
-            viewnode },
-          config, driver ) . await?
-        { merges . push (merge); }} }
+  for candidate in extraction_forest . candidates () {
+    if ! matches!(
+      candidate . kind,
+      IntentCandidateKind::OrdinaryTrueNode)
+    { continue; }
+    let node_ref =
+      extraction_forest . role_viewforest () . get (candidate . treeid)
+      . ok_or ("merge candidate not found") ?;
+    if let Some (merge) =
+      optmerge_from_viewnode (
+        &node_ref . value() . viewnode, config, driver ) . await?
+    { merges . push (merge); }}
   Ok (merges) }
 
 /// Returns Some(Merge) if the viewnode has a merge instruction,

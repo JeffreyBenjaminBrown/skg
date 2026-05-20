@@ -21,6 +21,46 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
+/// The user intends changes to the graph.
+/// Skg derives all of those intentions from one of these.
+/// .
+/// Caveats:
+/// - Disk supplementation reads disk/DB to fill unspecified fields
+///   and detect source moves, so not every field is from SaveAuthority.
+/// - Later persistence adds derived instructions that are
+///   not extracted from the buffer:
+///   - delete-propagation cleanup appends cleanup SaveNodes in server/save.rs
+///   - merge neighbor SaveNodes are derived from
+///     merge instructions plus graph/DB state
+pub(crate) struct SaveAuthority {
+  role_viewforest : Tree<ViewNode_in_Role>,
+  candidates      : Vec<IntentCandidate>,
+}
+
+impl SaveAuthority {
+  pub(crate) fn from_viewforest (
+    viewforest : &Tree<ViewNode>,
+  ) -> Result<SaveAuthority, String> {
+    let role_viewforest : Tree<ViewNode_in_Role> =
+      viewforest_with_saveroles (viewforest) ?;
+    let candidates : Vec<IntentCandidate> =
+      collect_intent_candidates (&role_viewforest) ?;
+    Ok (SaveAuthority {
+      role_viewforest,
+      candidates,
+    }) }
+
+  pub(crate) fn role_viewforest (
+    &self,
+  ) -> &Tree<ViewNode_in_Role> {
+    &self . role_viewforest }
+
+  pub(crate) fn candidates (
+    &self,
+  ) -> &[IntentCandidate] {
+    &self . candidates }
+}
+
 struct SaveExtraction {
   node_edit_intents  : Vec<NodeEditIntent>,
   hiderel_intents : Vec<SubscribeeHiderelIntent>,
@@ -60,13 +100,8 @@ impl Definenodes_with_Sourcemoves {
       self . source_moves . push (sm); }}
 }
 
-/// Converts a viewforest of ViewNodes to DefineNodes,
-/// reconciling duplicates via 'reconcile_same_id_instructions'
-/// and supplementing None fields with data from disk.
-/// Indefinitive nodes produce no instructions.
-/// The initial extraction is called "naive" because its output
-/// has not yet gone through same-ID reconciliation,
-/// disk supplementation, or unchanged filtering.
+/// Supplanted by 'extract_nonmerge_save_plan_from_authority'.
+/// It now exists only to avoid test churn.
 pub async fn extract_nonmerge_save_plan (
   viewforest : &Tree<ViewNode>, // "viewforest" = tree with BufferRoot
   config : &SkgConfig,
@@ -74,12 +109,32 @@ pub async fn extract_nonmerge_save_plan (
 ) -> Result<NonmergeSavePlan, Box<dyn Error>> {
   let _span : tracing::span::EnteredSpan = tracing::info_span!(
     "extract_nonmerge_save_plan" ). entered();
-  let role_viewforest : Tree<ViewNode_in_Role> =
-    viewforest_with_saveroles (viewforest) ?;
+  let extraction_forest : SaveAuthority =
+    SaveAuthority::from_viewforest (viewforest)
+    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+  extract_nonmerge_save_plan_from_authority (
+    &extraction_forest, config, driver ) . await
+}
+
+/// Converts a viewforest of ViewNodes to DefineNodes,
+/// reconciling duplicates via 'reconcile_same_id_instructions'
+/// and supplementing None fields with data from disk.
+/// Indefinitive nodes produce no instructions.
+pub(crate) async fn extract_nonmerge_save_plan_from_authority (
+  save_authority : &SaveAuthority,
+  config         : &SkgConfig,
+  driver         : &TypeDBDriver,
+) -> Result<NonmergeSavePlan, Box<dyn Error>> {
+  let _span : tracing::span::EnteredSpan = tracing::info_span!(
+    "extract_nonmerge_save_plan_from_authority" ). entered();
+  let role_viewforest : &Tree<ViewNode_in_Role> =
+    save_authority . role_viewforest ();
+  let candidates : &[IntentCandidate] =
+    save_authority . candidates ();
   validate_no_title_or_body_edit_in_subscribeeAsSuch (
-    &role_viewforest, config, driver ) . await ?;
+    role_viewforest, config, driver ) . await ?;
   let extracted : SaveExtraction =
-    extract_save_intents (&role_viewforest)?;
+    extract_save_intents (role_viewforest, candidates)?;
   let intents_without_dups : SameIdReconciledNodeEditIntents =
     reconcile_nodeEditIntents (extracted . node_edit_intents)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -103,17 +158,15 @@ pub async fn extract_nonmerge_save_plan (
 
 fn extract_save_intents (
   role_viewforest : &Tree<ViewNode_in_Role>,
+  candidates      : &[IntentCandidate],
 ) -> Result<SaveExtraction, Box<dyn Error>> {
-  let candidates : Vec<IntentCandidate> =
-    collect_intent_candidates (role_viewforest)
-    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   let hiderel_intents : Vec<SubscribeeHiderelIntent> =
     subscribee_hiderel_intents_from_candidates (
-      role_viewforest, &candidates)
+      role_viewforest, candidates)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   let node_edit_intents : Vec<NodeEditIntent> =
     naive_node_edit_intents_from_candidates (
-      role_viewforest, &candidates)
+      role_viewforest, candidates)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (SaveExtraction {
     node_edit_intents,

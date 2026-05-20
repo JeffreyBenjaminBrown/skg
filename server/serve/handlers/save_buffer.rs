@@ -2,7 +2,7 @@ use crate::context::update_context_types_for_saved_nodes;
 use crate::types::env::SkgEnv;
 use crate::from_text::{
   SavePlan,
-  buffer_to_viewforest_and_save_instructions};
+  buffer_to_saveplan};
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
 use crate::save::update_graph_including_merges;
@@ -154,9 +154,9 @@ pub async fn update_from_and_rerender_buffer (
 
   let save_plan : SavePlan =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-            "buffer_to_viewforest_and_save_instructions"
+            "buffer_to_saveplan"
           ) . entered();
-        buffer_to_viewforest_and_save_instructions (
+        buffer_to_saveplan (
           org_buffer_text, &env . config, &env . driver ) . await
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;

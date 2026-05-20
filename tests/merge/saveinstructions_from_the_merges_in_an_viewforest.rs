@@ -1,5 +1,5 @@
 use indoc::indoc;
-use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_an_viewforest;
+use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_a_viewforest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, MSV, SourceName};
@@ -23,7 +23,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
         let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
         let viewforest = maybePlaced_to_placed_tree (unchecked_viewforest)?;
         let merge_instructions =
-        instructiontriples_from_the_merges_in_an_viewforest(
+        instructiontriples_from_the_merges_in_a_viewforest(
          &viewforest, config, driver)
         . await?;
 

@@ -1,7 +1,7 @@
 // cargo test --test save birth_and_indefinitive
 
 use skg::dbs::filesystem::one_node::nodecomplete_from_id;
-use skg::from_text::buffer_to_viewforest_and_save_instructions;
+use skg::from_text::buffer_to_saveplan;
 use skg::save::update_fs_from_saveinstructions;
 use skg::save::update_typedb_from_saveinstructions;
 use skg::test_utils::run_with_test_db;
@@ -46,7 +46,7 @@ fn test_birth_and_indefinitive(
           *** (skg (node (id 4) (source main))) 4
         "};
         let save_plan =
-          buffer_to_viewforest_and_save_instructions(
+          buffer_to_saveplan(
             org_text,
             config,
             driver ) . await?;

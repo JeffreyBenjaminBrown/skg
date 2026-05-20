@@ -1217,7 +1217,7 @@ is now : id_to_pid_if_found
 ** neighbor_savenodes_for_merges (line 48)
    - True?: Partly. The function loads each neighbor's NodeComplete from disk (or memory) — a per-neighbor I/O step the name doesn't suggest — and filters out neighbors that are themselves acquirers/acquirees in the batch.
    - Omits?: It omits the per-neighbor disk/memory load and the in-batch acquirer/acquiree filter.
-** instructiontriples_from_the_merges_in_an_viewforest (line 82)
+** instructiontriples_from_the_merges_in_a_viewforest (line 82)
    - True?: Partly. Despite "instructiontriples" in the name, the return type is Vec<Merge>, not a Vec of triples; "Merge" itself happens to be a struct of three fields, but the name promises a tuple-style return.
    - Omits?: It omits that the return type is the Merge struct, and that each Merge is built by reading both nodes' NodeCompletes from memory or disk.
 ** optmerge_from_viewnode (line 102)
@@ -1445,7 +1445,7 @@ is now : id_to_pid_if_found
    - Omits?: It omits that the rendering is filtered by per-birth heuristics; identical GraphNodeStats can render differently depending on the node's birth.
 
 * server/from_text.rs
-** buffer_to_viewforest_and_save_instructions (line 29)
+** buffer_to_saveplan (line 29)
    - True?: Partly. The function also constructs (and returns) merge instructions and source moves, and it performs validation passes that can short-circuit with errors. The name groups all of that under "save instructions".
    - Omits?: It omits the merge-instruction extraction, the source-move extraction, and the multiple validation steps that may produce BufferValidationErrors.
 

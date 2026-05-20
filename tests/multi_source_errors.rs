@@ -3,7 +3,7 @@
 use indoc::indoc;
 use regex::Regex;
 use skg::test_utils::{strip_org_comments, cleanup_test_tantivy_and_typedb_dbs};
-use skg::from_text::buffer_to_viewforest_and_save_instructions;
+use skg::from_text::buffer_to_saveplan;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_viewforest;
@@ -60,7 +60,7 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
       indoc! {"
         * (skg (node (id pub-1))) pub-1                                      # root with no source
         * (skg (node (id dub-1) (source dub))) dub-1                         # source does not exist
-        * (skg (node (id priv-1) (source public))) priv-1 # This line includes an error, mismatch between buffer and disk sources, which is not caught yet, but it is caught by 'buffer_to_viewforest_and_save_instructions', as verified by 'test_reconciliation_errors'.
+        * (skg (node (id priv-1) (source public))) priv-1 # This line includes an error, mismatch between buffer and disk sources, which is not caught yet, but it is caught by 'buffer_to_saveplan', as verified by 'test_reconciliation_errors'.
         * (skg (node (id priv-1) (source private))) priv-1                   # error: multiple defining viewnodes for this id
       "};
     let buffer_text: String =
@@ -173,7 +173,7 @@ fn test_foreign_node_modification_errors(
 
       let buffer_text: String =
         strip_org_comments (buffer_with_errors);
-      let result = buffer_to_viewforest_and_save_instructions(
+      let result = buffer_to_saveplan(
         &buffer_text,
         &config,
         &driver,
@@ -249,7 +249,7 @@ fn test_foreign_node_modification_errors(
 
       let buffer_text: String = strip_org_comments(
         buffer_with_merges);
-      let result = buffer_to_viewforest_and_save_instructions(
+      let result = buffer_to_saveplan(
         &buffer_text,
         &config,
         &driver,
@@ -341,7 +341,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       let buffer_text: String =
         strip_org_comments (buffer_with_move);
 
-      let result = buffer_to_viewforest_and_save_instructions(
+      let result = buffer_to_saveplan(
         &buffer_text,
         &config,
         &driver,
@@ -371,7 +371,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         strip_org_comments (buffer_with_inconsistent_sources);
 
       // This should fail during validation (before indefinitives are filtered)
-      let result = buffer_to_viewforest_and_save_instructions(
+      let result = buffer_to_saveplan(
         &buffer_text,
         &config,
         &driver,

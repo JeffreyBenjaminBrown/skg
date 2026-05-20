@@ -54,7 +54,7 @@ over another hidden side effect.
 
 ** DONE a. Split save preparation into an explicit plan object
 
-=buffer_to_viewforest_and_save_instructions= used to return a tuple:
+=buffer_to_saveplan= used to return a tuple:
 
 #+begin_src rust
 (Tree<ViewNode>, Vec<DefineNode>, Vec<Merge>, Vec<SourceMove>)
@@ -87,7 +87,7 @@ return value through the pipeline.
 Executed increment:
 
 - introduce =SavePlan= in =from_text.rs=;
-- have =buffer_to_viewforest_and_save_instructions= return it;
+- have =buffer_to_saveplan= return it;
 - update the few callers/tests mechanically;
 - do not change behavior.
 
@@ -144,7 +144,7 @@ Merge handling is now outside non-merge extraction:
 
 #+begin_src text
 extract_nonmerge_save_plan
-instructiontriples_from_the_merges_in_an_viewforest
+instructiontriples_from_the_merges_in_a_viewforest
 #+end_src
 
 That is good. But the merge extractor still has a comment saying it
@@ -342,7 +342,7 @@ obvious.
 
 Suggested documentation-only increment:
 
-- add a short section near =buffer_to_viewforest_and_save_instructions=
+- add a short section near =buffer_to_saveplan=
   explaining the maturity stages:
 
   - unchecked, metadata-filled tree;
@@ -356,7 +356,7 @@ Suggested documentation-only increment:
 This would help future work avoid moving a validator earlier than its
 required facts.
 
-Status: complete. =buffer_to_viewforest_and_save_instructions= now
+Status: complete. =buffer_to_saveplan= now
 documents the save-preparation data maturity stages. The validators
 whose placement is easiest to question now state the facts they
 require: metadata-filled unchecked tree, role-classified viewforest,
