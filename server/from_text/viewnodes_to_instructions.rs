@@ -63,9 +63,9 @@ impl Definenodes_with_Sourcemoves {
 /// Converts a viewforest of ViewNodes to DefineNodes,
 /// reconciling duplicates via 'reconcile_same_id_instructions'
 /// and supplementing None fields with data from disk.
-/// ASSUMES indefinitive nodes produced no instructions.
+/// Indefinitive nodes produce no instructions.
 /// The initial extraction is called "naive" because its output
-/// is preliminary: it has not yet gone through same-ID reconciliation,
+/// has not yet gone through same-ID reconciliation,
 /// disk supplementation, or unchanged filtering.
 pub async fn extract_nonmerge_save_plan (
   viewforest : &Tree<ViewNode>, // "viewforest" = tree with BufferRoot

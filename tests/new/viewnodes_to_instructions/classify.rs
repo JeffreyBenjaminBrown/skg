@@ -93,7 +93,7 @@ fn classifies_alias_and_id_display_scaffolds (
     SaveRole::DisplayOnly);
   assert_eq!(
     role_for_title (&viewforest, &roles, "first alias"),
-    SaveRole::AliasText);
+    SaveRole::AliasDisplay);
   assert_eq!(
     role_for_title (&viewforest, &roles, "its IDs"),
     SaveRole::DisplayOnly);

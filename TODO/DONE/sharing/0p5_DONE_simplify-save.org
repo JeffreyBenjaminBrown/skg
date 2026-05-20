@@ -147,7 +147,7 @@ enum SaveRole {
   AsSubscribee { subscriber: ID },
   HiddenInSubscribeeCol { subscriber: ID, subscribee: ID },
   HiddenOutsideOfSubscribeeCol { subscriber: ID },
-  AliasText,
+  AliasDisplay,
   IdDisplay,
   DisplayOnly,
 }

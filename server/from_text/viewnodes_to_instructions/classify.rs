@@ -12,7 +12,7 @@ pub enum SaveRole {
   AsSubscribee { subscriber: ID },
   HiddenInSubscribeeCol { subscriber: ID, subscribee: ID },
   HiddenOutsideOfSubscribeeCol { subscriber: ID },
-  AliasText,
+  AliasDisplay,
   IdDisplay,
   DisplayOnly,
 }
@@ -89,7 +89,7 @@ fn saverole_for_node (
     ViewNodeKind::Scaff (Scaffold::BufferRoot) =>
       Ok (SaveRole::BufferRoot),
     ViewNodeKind::Scaff (Scaffold::Alias { .. }) =>
-      Ok (SaveRole::AliasText),
+      Ok (SaveRole::AliasDisplay),
     ViewNodeKind::Scaff (Scaffold::ID { .. }) =>
       Ok (SaveRole::IdDisplay),
     ViewNodeKind::Scaff (_)
