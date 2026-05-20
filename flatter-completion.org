@@ -1,0 +1,553 @@
+* Plan: flatter completion
+
+This plan targets the rerender-time completion procedure in the save-buffer
+path, reached as:
+
+#+begin_src text
+update_views_after_save
+  -> rerender_view
+  -> complete_viewforest
+#+end_src
+
+The premise is that extra tree traversals are cheap. The goal is therefore
+not speed. The goal is to make completion read as a sequence of simple passes,
+where each pass has one reason to exist and one kind of mutation.
+
+I like verbose names here. This plan uses names that describe the mutation,
+not just the traversal shape.
+
+* Current shape
+
+The core files are:
+
+- =server/update_buffer.rs=
+- =server/update_buffer/complete.rs=
+- =server/update_buffer/complete_preorder/truenode.rs=
+- =server/update_buffer/complete_preorder/subscribee_col.rs=
+- =server/update_buffer/complete_postorder/truenode.rs=
+- =server/update_buffer/complete_postorder/aliascol.rs=
+- =server/update_buffer/complete_postorder/id_col.rs=
+- =server/update_buffer/complete_postorder/hiddeninsubscribee_col.rs=
+- =server/update_buffer/complete_postorder/hiddenoutsideof_subscribeecol.rs=
+- =server/update_buffer/util.rs=
+- =server/to_org/complete/sharing/child_data.rs=
+- =server/to_org/complete/sharing/goal_list.rs=
+
+=rerender_view= already has some flat passes before and after completion:
+
+#+begin_src text
+strip_stale_diff_state
+complete_viewforest
+mark_view_roots_independent
+validate_birth_relationships
+attach_containerward_ancestries_to_removedhere_phantoms
+set_graphnodestats_in_viewforest
+set_viewnodestats_in_viewforest
+viewforest_to_string
+#+end_src
+
+The unflattened part is inside =complete_viewforest=. It currently does two
+manual recursive passes:
+
+#+begin_src text
+resolve_truenode_state_and_expand_content       ; parent-first
+insert_and_reconcile_generated_scaffolds        ; child-first
+#+end_src
+
+Those two pass names hide many concerns. In particular,
+=complete_truenode_preorder= performs all of these in one node visit:
+
+1. repeats become indefinitive and =DefinitiveMap= is extended
+2. phantom, indefinitive and deleted-by-this-save nodes are finalized
+3. edit requests are cleared
+4. collateral/non-saved nodes sync title/body/source from disk
+5. content goal lists are computed
+6. content children are reconciled
+7. erroneous content children become independent
+8. children are ordered into scaffold, ignored, content groups
+9. =SubscribeeCol= is inserted if needed
+10. diff scaffolds are inserted if needed
+
+The postorder pass similarly bundles:
+
+1. execute deferred view requests on TrueNodes
+2. add =HiddenInSubscribeeCol= under definitive subscribees
+3. reconcile =AliasCol=
+4. reconcile =IDCol=
+5. reconcile =HiddenInSubscribeeCol=
+6. reconcile =HiddenOutsideOfSubscribeeCol=
+7. collapse empty =DeletedScaff= nodes
+
+* Dependency facts to preserve
+
+These dependencies are real and should survive the simplification:
+
+** Parent state before child state
+
+Children need their parent's content/scaffold context to be current.
+Content children and =SubscribeeCol= children have to exist before recursive
+processing reaches them.
+
+** Content before view requests
+
+=execute_view_requests= should run after content reconciliation has produced
+the ordinary content children. Otherwise requested views attach to a partial
+tree.
+
+** View requests before generated scaffold reconciliation
+
+View requests can insert =AliasCol= and other scaffold branches. The
+reconciliation passes for =AliasCol= and =IDCol= should run after those
+branches exist.
+
+** Sharing scaffold order
+
+=SubscribeeCol= needs to be populated before its child subscribees can be
+processed as subscribees. =HiddenInSubscribeeCol= can only be added under a
+subscribee after that subscribee exists and has been made definitive or
+indefinitive correctly. =HiddenOutsideOfSubscribeeCol= should remain last
+under =SubscribeeCol=.
+
+** Deleted scaffolds
+
+Scaffolds under deleted branches become =DeletedScaff=. Empty =DeletedScaff=
+nodes are removed after child processing, not before.
+
+* Traversal helper
+
+Before splitting completion heavily, extend the existing tree traversal
+helpers in =server/types/tree/generic.rs= so completion passes do not each
+spell their own DFS boilerplate.
+
+The existing helpers are:
+
+#+begin_src text
+do_everywhere_in_tree_dfs
+do_everywhere_in_tree_dfs_readonly
+do_everywhere_in_tree_dfs_prunable
+#+end_src
+
+The first two can take a boolean =preorder= argument:
+
+#+begin_src rust
+do_everywhere_in_tree_dfs (
+  tree,
+  start_node_id,
+  preorder,
+  f )
+
+do_everywhere_in_tree_dfs_readonly (
+  tree,
+  start_node_id,
+  preorder,
+  f )
+#+end_src
+
+When =preorder= is true, call =f= before recursing into children. When false,
+recurse into children first and call =f= afterward.
+
+=do_everywhere_in_tree_dfs_prunable= should probably remain preorder-only,
+at least initially. Its callback decides whether children should be traversed,
+so its semantics are naturally parent-first. A postorder-prunable traversal
+would be a different operation: by the time the callback runs, the children
+have already been visited.
+
+For readability at call sites, consider tiny wrappers:
+
+#+begin_src rust
+do_everywhere_in_tree_dfs_preorder (...)
+do_everywhere_in_tree_dfs_postorder (...)
+#+end_src
+
+These wrappers can simply pass =true= or =false=. The boolean keeps the helper
+small; the wrappers keep completion code self-documenting.
+
+Async passes still need care. The current =complete_viewforest= uses manual
+async recursion because the traversal helpers take synchronous closures.
+Flattened async passes have two reasonable options:
+
+- use a manual async traversal only where newly inserted children must be
+  reached immediately, or
+- collect =NodeId=s in the desired order with a synchronous traversal, then
+  process those IDs with =await= in a loop.
+
+The second option is good for direct scaffold reconciliation. The first option
+is better for content expansion, because content reconciliation creates new
+TrueNodes that need completion under the same expansion wave.
+
+* Traversal order inventory
+
+The refactor should preserve current order where order might matter. Some
+future simplification might prove individual passes order-insensitive, but the
+first behavior-preserving split should be conservative.
+
+#+begin_src text
+pass                                            traversal to preserve
+mark_scaffolds_under_deleted_branches           preorder, prunable if detaching
+expand_true_content_until_stable                preorder inside each expansion wave
+  normalize_truenode_identity_and_state         parent before child
+  sync_collateral_truenodes_from_graph          parent before child
+  reconcile_content_children                    parent before child; includes new children
+  order_truenode_children                       after content reconciliation for that parent
+  ensure_subscribee_cols                        before visiting subscribee children
+  reconcile_subscribee_cols                     before visiting subscribee children
+ensure_diff_scaffolds                           preorder for current-order equivalence
+execute_truenode_view_requests                  postorder
+ensure_hiddenin_cols_under_definitive_subscribees postorder
+reconcile_alias_cols                            postorder
+reconcile_id_cols                               postorder
+reconcile_hiddenin_cols                         postorder
+reconcile_hiddenoutside_cols                    postorder
+remove_empty_deleted_scaffolds                  postorder
+#+end_src
+
+The most important entries are =expand_true_content_until_stable= and
+=execute_truenode_view_requests=. Content expansion is parent-first today,
+including children inserted by the parent. View requests are child-first today.
+Those two facts should be treated as invariants during the flattening.
+
+* Proposed flattened sequence
+
+Replace the two broad completion passes with a larger list of named passes.
+Each pass may traverse the tree. That is acceptable.
+
+#+begin_src text
+complete_viewforest
+  -> mark_scaffolds_under_deleted_branches
+  -> expand_true_content_until_stable
+       -> normalize_truenode_identity_and_state
+       -> sync_collateral_truenodes_from_graph
+       -> reconcile_content_children
+       -> order_truenode_children
+       -> ensure_subscribee_cols
+       -> reconcile_subscribee_cols
+  -> ensure_diff_scaffolds
+  -> execute_truenode_view_requests
+  -> ensure_hiddenin_cols_under_definitive_subscribees
+  -> reconcile_alias_cols
+  -> reconcile_id_cols
+  -> reconcile_hiddenin_cols
+  -> reconcile_hiddenoutside_cols
+  -> remove_empty_deleted_scaffolds
+#+end_src
+
+This is intentionally a little more verbose than the current two-pass model.
+The payoff is that each pass name says what changed.
+
+* Concrete refactoring steps
+
+** Step 1: introduce an explicit pass driver
+
+In =server/update_buffer/complete.rs=, keep =CompletionContext= but replace
+=complete_viewforest_with_context= with a visible ordered list of passes.
+
+At first, the list can still call the old functions, to keep the first diff
+small:
+
+#+begin_src rust
+run_parent_first_state_pass (...)
+run_child_first_scaffold_pass (...)
+#+end_src
+
+Then split those callers one by one.
+
+This gives a stable place to document dependencies and makes later commits
+reviewable.
+
+** Step 2: add postorder traversal support to generic tree helpers
+
+Update =do_everywhere_in_tree_dfs= and
+=do_everywhere_in_tree_dfs_readonly= to accept a =preorder= boolean. Keep their
+preorder behavior unchanged when =preorder= is true.
+
+Then update existing callers to pass =true=. This should be a no-behavior-change
+commit.
+
+Do not force =do_everywhere_in_tree_dfs_prunable= into the same shape unless a
+real postorder-prunable use appears. Completion can keep using the prunable
+preorder helper for removal-like passes.
+
+** Step 3: separate deleted-scaffold propagation
+
+Move this logic out of =complete_parent_first_at_node=:
+
+#+begin_src text
+Scaff under Deleted or DeletedScaff parent becomes DeletedScaff
+#+end_src
+
+Make it a standalone parent-first or ordinary DFS pass:
+
+#+begin_src text
+mark_scaffolds_under_deleted_branches
+#+end_src
+
+This removes an unrelated special case from the TrueNode/SubscribeeCol
+dispatcher.
+
+** Step 4: split TrueNode preorder into state and content passes
+
+Break =complete_truenode_preorder= into separate public or module-private
+pass functions:
+
+#+begin_src text
+normalize_truenode_identity_and_state
+sync_collateral_truenodes_from_graph
+reconcile_content_children
+order_truenode_children
+ensure_subscribee_cols
+ensure_diff_scaffolds
+#+end_src
+
+Important detail: =normalize_truenode_identity_and_state= should record the
+same early-stop semantics currently returned by =TruenodeKindOutcome=. A
+simple helper predicate such as =truenode_needs_content_completion= is clearer
+than carrying that outcome through every later phase.
+
+The passes should be allowed to reread pid/source/NodeComplete as needed.
+Avoid inventing a large "prepared TrueNode facts" cache unless the code becomes
+obviously repetitive.
+
+Do not make these pure whole-forest passes without accounting for newly
+inserted content children. The current parent-first recursion visits children
+that were just created by the parent. A flattened version still needs one of
+these shapes:
+
+- keep a narrow =expand_true_content_until_stable= recursive driver whose
+  internal steps are named plainly, or
+- run collected-node passes in rounds until no content or subscribee children
+  were inserted.
+
+The first option is probably simpler and preserves behavior more directly.
+
+** Step 5: give content reconciliation one job
+
+=reconcile_content_children= currently computes child goals, reconciles
+children, and marks non-goal children independent. Keep those as neighboring
+helpers, but make the top-level pass read like:
+
+#+begin_src text
+for each completable TrueNode:
+  read graph facts
+  compute content goal
+  reconcile content children
+#+end_src
+
+Then run a separate pass:
+
+#+begin_src text
+mark_erroneous_content_children_independent
+#+end_src
+
+This duplicates some content-goal computation unless a small local helper is
+shared. That duplication is acceptable if it keeps each mutation obvious.
+
+Because content reconciliation can create new TrueNodes, this pass belongs
+inside =expand_true_content_until_stable=, not in the later direct scaffold
+reconciliation phase.
+
+** Step 6: split =SubscribeeCol= insertion from reconciliation
+
+Right now =complete_truenode_preorder= inserts a =SubscribeeCol=, and
+=complete_subscribee_col_preorder= may reconcile its children and ensure
+=HiddenOutsideOfSubscribeeCol= exists.
+
+Flatten that into:
+
+#+begin_src text
+ensure_subscribee_cols
+reconcile_subscribee_cols
+ensure_hiddenoutside_cols_are_last
+#+end_src
+
+The last pass can be folded into =reconcile_subscribee_cols= if making it
+separate feels too small, but it should no longer be hidden behind the word
+"preorder".
+
+** Step 7: split TrueNode postorder
+
+Rename =complete_postorder/truenode.rs::complete_truenode= into two separate
+passes:
+
+#+begin_src text
+execute_truenode_view_requests
+ensure_hiddenin_cols_under_definitive_subscribees
+#+end_src
+
+They have different purposes and different dependencies. View requests are
+user-driven expansion. Hidden-in columns are sharing display maintenance.
+
+These passes should continue to run in postorder. If implemented as
+collect-then-process, collect matching TrueNode IDs with
+=do_everywhere_in_tree_dfs (..., preorder = false, ...)=.
+
+** Step 8: make scaffold reconciliation passes direct
+
+Instead of a single child-first dispatcher that pattern-matches each node kind,
+run direct passes:
+
+#+begin_src text
+reconcile_alias_cols
+reconcile_id_cols
+reconcile_hiddenin_cols
+reconcile_hiddenoutside_cols
+remove_empty_deleted_scaffolds
+#+end_src
+
+Each pass should collect matching =NodeId=s first, then process them. This
+avoids borrow fights and keeps mutation order explicit.
+
+For =HiddenInSubscribeeCol= and =HiddenOutsideOfSubscribeeCol=, keep the
+existing read/compute/build/reconcile shape. That part is already clear.
+
+Collect matching scaffold =NodeId=s with postorder traversal for the first
+behavior-preserving version. For =AliasCol= and =IDCol= order probably matters
+less once each pass is isolated, but preserving postorder avoids mixing a
+semantic refactor with an ordering change.
+
+** Step 9: rename away from traversal order where possible
+
+The current names =complete_preorder= and =complete_postorder= describe how
+work is scheduled, not what work means.
+
+After the split, prefer module names like:
+
+#+begin_src text
+complete/state.rs
+complete/content.rs
+complete/subscriptions.rs
+complete/view_requests.rs
+complete/diff_scaffolds.rs
+complete/scaffold_children.rs
+complete/deleted.rs
+#+end_src
+
+This can be done after behavior-preserving splits, to avoid noisy diffs.
+
+* Suggested commit order
+
+** Commit 1: driver only
+
+Make =complete_viewforest_with_context= visibly call a list of named pass
+functions, while those pass functions still delegate to the current two
+recursive routines.
+
+Expected behavior change: none.
+
+** Commit 2: traversal helper supports postorder
+
+Add the =preorder= boolean to =do_everywhere_in_tree_dfs= and
+=do_everywhere_in_tree_dfs_readonly=. Update existing callers to pass =true=.
+
+Expected behavior change: none.
+
+** Commit 3: deleted scaffold pass
+
+Extract deleted-scaffold propagation and empty =DeletedScaff= cleanup into
+standalone passes.
+
+Expected behavior change: none.
+
+** Commit 4: TrueNode state normalization
+
+Extract repeat handling, phantom/indefinitive/deleted handling, edit-request
+clearing, and collateral sync into their own passes.
+
+Expected behavior change: none.
+
+** Commit 5: content and child ordering
+
+Extract content goal reconciliation, independent marking, and child ordering.
+This is the riskiest commit because it changes when newly-created children are
+visited by later passes. Keep an explicit recursive or round-until-stable
+driver here, and add or run save-rerender tests.
+
+Expected behavior change: none.
+
+** Commit 6: subscribee columns
+
+Separate =SubscribeeCol= insertion, reconciliation, and hidden-outside ordering.
+
+Expected behavior change: none.
+
+** Commit 7: view requests and hidden-in columns
+
+Split =complete_postorder/truenode.rs::complete_truenode= into user-request
+execution and sharing-maintenance passes.
+
+Expected behavior change: none.
+
+** Commit 8: direct scaffold reconciliation passes
+
+Replace the postorder kind dispatcher with direct passes over =AliasCol=,
+=IDCol=, =HiddenInSubscribeeCol=, and =HiddenOutsideOfSubscribeeCol=.
+
+Expected behavior change: none.
+
+** Commit 9: names and module layout
+
+Rename modules and functions so names describe the mutation, not the traversal.
+
+Expected behavior change: none.
+
+* Testing focus
+
+Run targeted tests after the risky commits, then broader tests after the full
+flattening.
+
+Useful existing tests and areas:
+
+- =tests/rebuild/complete_aliascol.rs=
+- =tests/git_diff_view/ids/save.rs=
+- =tests/git_diff_view/newhere_cycle/save.rs=
+- =tests/merge/merge_acquiree_in_sibling_subtree.rs=
+- =tests/integration/save_collateral_add_content_and_modify_text/test-emacs.el=
+- =tests/integration/save_collateral_delete_then_edit_under_it/test-emacs.el=
+- =tests/integration/content-view-and-save/test-emacs.el=
+
+The cases most likely to catch regressions are:
+
+- saved view vs collateral view title/body sync
+- duplicate definitive views becoming indefinitive
+- merge acquiree extra IDs being resolved before content reconciliation
+- deleted-by-this-save nodes becoming =DeletedNode=
+- subscribee-as-such branches preserving saved edits
+- diff phantoms and =TextChanged=/=IDCol=/=AliasCol= regeneration
+- empty deleted scaffolds disappearing
+- focus transfer when a focused generated scaffold is detached
+
+* Possible simplifications discovered while reading
+
+** The =CompletionMode= type may become unnecessary
+
+Once saved/collateral sync and diff-specific passes are separate,
+=CompletionMode= may reduce to two direct predicates at call sites, or vanish.
+
+** =complete_relevant_children= should stay
+
+This helper bundles a real reusable operation: reconcile a child list against
+a goal list while preserving focus. It is not merely traversal fusion, so this
+plan does not try to flatten it.
+
+** Read/compute/reconcile in sharing code is already good
+
+The three sharing scaffold completers already follow a clear shape:
+
+#+begin_src text
+read context
+compute goal
+build child data
+reconcile children
+mark irrelevant children independent
+detach if empty
+#+end_src
+
+The plan is to schedule those steps more plainly, not to undo that local
+structure.
+
+* Ordering note
+
+The current behavior inserts diff scaffolds during TrueNode preorder, before
+the postorder view-request pass. That means requested =AliasCol= branches and
+diff-created =AliasCol= branches are both present by the time
+=complete_alias_col= runs. Preserve that order unless a test demonstrates a
+better one.
