@@ -50,9 +50,9 @@ Current code shape suggests this behavior:
 - =collect_contains= returns =MSV::Unspecified= for
   =SaveRole::AsSubscribee=, so the subscribee's =contains= is not
   edited from that branch;
-- =subscribee_visibility_intents_from_tree= includes qualifying
+- =subscribee_hiderel_intents_from_tree= includes qualifying
   view-children in =visible_content=;
-- =apply_hiderels_from_subscribee_visibility= compares
+- =apply_hiderels_from_intents= compares
   =visible_content= only against the subscribee's disk =contains=, so
   extra IDs are ignored for hide/unhide;
 - the extra view-child itself may still have save semantics if it is
@@ -131,7 +131,7 @@ cargo check
 * Outcome
 
 Complete. The policy is documented at
-=apply_hiderels_from_subscribee_visibility=.
+=apply_hiderels_from_intents=.
 
 Saved =AsSubscribee= completion now normalizes view-children that are
 not graph-content of the subscribee to =Birth=Independent= and orders

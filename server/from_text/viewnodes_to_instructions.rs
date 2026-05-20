@@ -1,7 +1,7 @@
 pub mod to_naive_instructions;
 pub mod reconcile_same_id_instructions;
 pub mod classify;
-pub mod subscribee_visibility_intents;
+pub mod subscribee_hiderel_intents;
 
 use classify::{ SaveRole, viewforest_with_saveroles, ViewNode_in_Role };
 use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
@@ -11,7 +11,7 @@ use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use crate::types::viewnode::{ IndefOrDef, ViewNode, ViewNodeKind };
 use crate::types::views_state::nodecomplete_from_in_rust_graph;
-use subscribee_visibility_intents::{ SubscribeeVisibilityIntent, subscribee_visibility_intents_from_tree, };
+use subscribee_hiderel_intents::{ SubscribeeHiderelIntent, subscribee_hiderel_intents_from_tree, };
 use super::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
 use super::validate::buffernode_differs_from_disknode;
 use to_naive_instructions::{ naive_node_edit_intents_from_role_viewforest, reconcile_nodeEditIntents, NodeEditIntent, NodeSaveIntent, SameIdReconciledNodeEditIntents, };
@@ -23,7 +23,7 @@ use typedb_driver::TypeDBDriver;
 
 struct SaveExtraction {
   node_edit_intents  : Vec<NodeEditIntent>,
-  visibility_intents : Vec<SubscribeeVisibilityIntent>,
+  hiderel_intents : Vec<SubscribeeHiderelIntent>,
 }
 
 pub struct NonmergeSavePlan {
@@ -76,7 +76,7 @@ pub async fn extract_nonmerge_save_plan (
     "extract_nonmerge_save_plan" ). entered();
   let role_viewforest : Tree<ViewNode_in_Role> =
     viewforest_with_saveroles (viewforest) ?;
-  validate_no_owned_title_or_body_edit_in_as_subscribee (
+  validate_no_title_or_body_edit_in_subscribeeAsSuch (
     &role_viewforest, config, driver ) . await ?;
   let extracted : SaveExtraction =
     extract_save_intents (&role_viewforest)?;
@@ -84,9 +84,9 @@ pub async fn extract_nonmerge_save_plan (
     reconcile_nodeEditIntents (extracted . node_edit_intents)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   let intents_with_visibility : SameIdReconciledNodeEditIntents =
-    apply_hiderels_from_subscribee_visibility (
+    apply_hiderels_from_intents (
       intents_without_dups,
-      &extracted . visibility_intents,
+      &extracted . hiderel_intents,
       config,
       driver ) . await ?;
   let with_disk : Definenodes_with_Sourcemoves =
@@ -104,22 +104,24 @@ pub async fn extract_nonmerge_save_plan (
 fn extract_save_intents (
   role_viewforest : &Tree<ViewNode_in_Role>,
 ) -> Result<SaveExtraction, Box<dyn Error>> {
-  let visibility_intents : Vec<SubscribeeVisibilityIntent> =
-    subscribee_visibility_intents_from_tree (role_viewforest)
+  let hiderel_intents : Vec<SubscribeeHiderelIntent> =
+    subscribee_hiderel_intents_from_tree (role_viewforest)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   let node_edit_intents : Vec<NodeEditIntent> =
     naive_node_edit_intents_from_role_viewforest (role_viewforest)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (SaveExtraction {
     node_edit_intents,
-    visibility_intents,
+    hiderel_intents,
   }) }
 
-async fn validate_no_owned_title_or_body_edit_in_as_subscribee (
+async fn validate_no_title_or_body_edit_in_subscribeeAsSuch (
   role_viewforest : &Tree<ViewNode_in_Role>,
   config          : &SkgConfig,
   driver          : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
+  // Requires a checked, role-classified viewforest: only then do we
+  // know which definitive nodes are being edited as subscribees.
   for node_ref in role_viewforest . nodes() {
     if ! matches!(
       node_ref . value() . role,
@@ -215,7 +217,7 @@ async fn supplement_saveintent_from_disk (
       }) }}}
 
 /// Interpret view-children under definitive AsSubscribee branches as
-/// subscriber visibility edits.
+/// subscriber edits to "hides" relationships.
 ///
 /// At this point graph edit intents have been same-ID reconciled, but
 /// have not yet been converted to DefineNodes or supplemented from
@@ -226,22 +228,22 @@ async fn supplement_saveintent_from_disk (
 ///
 /// - If N is graph-content of subscribee E,
 ///   and E has a view-child with ID N and Birth=ContentOf,
-///   then N is visible through this subscription
-///   and is removed from the hides of subscriber R.
+///   then N is intended to be visible through this subscription,
+///   so it is removed from the hides of subscriber R.
 /// - If N is graph-content of E, E has no view-child with ID N and
 ///   Birth=ContentOf, and N is not graph-content of R after the save,
 ///   then N is hidden from R.
 /// - If N is a Birth=ContentOf view-child of E but is not
-///   graph-content of E, then it is not a visibility signal.
+///   graph-content of E, then it is not a hiderel edit.
 ///   This does not touch it. The completion/rerender pipeline
 ///   will change it to Independent.
-async fn apply_hiderels_from_subscribee_visibility (
+async fn apply_hiderels_from_intents (
   mut node_edit_intents : SameIdReconciledNodeEditIntents,
-  vis_intents     : &[SubscribeeVisibilityIntent],
+  vis_intents     : &[SubscribeeHiderelIntent],
   config          : &SkgConfig,
   driver          : &TypeDBDriver,
 ) -> Result<SameIdReconciledNodeEditIntents, Box<dyn Error>> {
-  validate_no_overlapping_subscribee_visibility_conflicts (
+  validate_no_overlapping_subscribee_hiderel_conflicts (
     vis_intents, config, driver ) . await ?;
   for intent in vis_intents {
     let Some (subscribee_from_disk) =
@@ -280,14 +282,21 @@ async fn apply_hiderels_from_subscribee_visibility (
       &inferred_unhides ); }
   Ok (node_edit_intents) }
 
-async fn validate_no_overlapping_subscribee_visibility_conflicts (
-  intents : &[SubscribeeVisibilityIntent],
+/// Checks one subscriber + content node
+/// against all subscribee branches under the subscriber.
+/// Rejects the save if one subscribee says "hide it"
+/// and another says "show it".
+async fn validate_no_overlapping_subscribee_hiderel_conflicts (
+  intents : &[SubscribeeHiderelIntent],
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
+  // Requires subscribee hiderel intents plus disk contains lists:
+  // the conflict is per subscriber/subscribee-content pair, not just
+  // per visible child shown in the buffer.
   let mut seen : HashMap<(ID, ID), bool> = HashMap::new();
   for intent in intents {
-    let intent : &SubscribeeVisibilityIntent = intent;
+    let intent : &SubscribeeHiderelIntent = intent;
     let subscribee_from_disk : NodeComplete =
       match optnodecomplete_from_id (
         config, driver, &intent . subscribee ) . await ?

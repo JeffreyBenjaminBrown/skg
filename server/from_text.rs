@@ -34,6 +34,13 @@ pub struct SavePlan {
   pub source_moves       : Vec<SourceMove>,
 }
 
+/// Save preparation deliberately validates at several
+/// data-maturity stages:
+/// - raw org parse: errors only visible before tree construction;
+/// - metadata-filled unchecked tree: global/local buffer structure;
+/// - checked role-aware viewforest: saved-view role policy;
+/// - disk-supplemented DefineNodes: foreign write policy;
+/// - non-merge plus merge plan: cross-plan source-move/merge policy.
 pub async fn buffer_to_viewforest_and_save_instructions (
   buffer_text : &str,
   config      : &SkgConfig,
@@ -47,9 +54,9 @@ pub async fn buffer_to_viewforest_and_save_instructions (
       . map_err (SaveError::ParseError) ?;
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "add_missing_info_to_viewforest" ). entered();
-    // Precedes all validation functions.
-    // For why, see the header comment of one of them,
-    // 'find_buffer_errors_for_saving'.
+    // Metadata filling must precede unchecked-tree validation:
+    // those validators compare nodes by pid and expect sources to be
+    // inherited/resolved.
     add_missing_info_to_viewforest (
       & mut unchecked_viewforest, & config . db_name, driver )
     . await } . map_err (SaveError::DatabaseError) ?;

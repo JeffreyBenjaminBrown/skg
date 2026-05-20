@@ -11,16 +11,16 @@ use ego_tree::{NodeRef, Tree};
 /// it with disk `subscribee.contains` and subscriber hides to infer
 /// hide/unhide edits on the subscriber.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SubscribeeVisibilityIntent {
+pub struct SubscribeeHiderelIntent {
   pub subscriber      : ID,
   pub subscribee      : ID,
-  pub visible_content : Vec<ID>,
+  pub visible_content : Vec<ID>, // What *not* to hide.
 }
 
-pub fn subscribee_visibility_intents_from_tree (
+pub fn subscribee_hiderel_intents_from_tree (
   viewforest : &Tree<ViewNode_in_Role>,
-) -> Result<Vec<SubscribeeVisibilityIntent>, String> {
-  let mut result : Vec<SubscribeeVisibilityIntent> =
+) -> Result<Vec<SubscribeeHiderelIntent>, String> {
+  let mut result : Vec<SubscribeeHiderelIntent> =
     Vec::new();
   for node_ref in viewforest . nodes() {
     let subscriber : ID =
@@ -37,7 +37,7 @@ pub fn subscribee_visibility_intents_from_tree (
         _ => return Err (
           "AsSubscribee role assigned to non-TrueNode" . to_string()),
       };
-    result . push (SubscribeeVisibilityIntent {
+    result . push (SubscribeeHiderelIntent {
       subscriber,
       subscribee,
       visible_content :

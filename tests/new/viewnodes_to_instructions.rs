@@ -10,8 +10,8 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nod
 use skg::from_text::validate::validate_and_filter_foreign_instructions;
 use skg::from_text::viewnodes_to_instructions::classify::{
   viewforest_with_saveroles, ViewNode_in_Role };
-use skg::from_text::viewnodes_to_instructions::subscribee_visibility_intents::{
-  subscribee_visibility_intents_from_tree, SubscribeeVisibilityIntent };
+use skg::from_text::viewnodes_to_instructions::subscribee_hiderel_intents::{
+  subscribee_hiderel_intents_from_tree, SubscribeeHiderelIntent };
 use skg::from_text::viewnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_tree;
 use skg::from_text::viewnodes_to_instructions::extract_nonmerge_save_plan;
 use skg::test_utils::extract_nodecomplete_if_save_else_error;
@@ -53,14 +53,14 @@ fn checked_viewforest_from_org (
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   unchecked_to_checked_tree (unchecked_viewforest) . unwrap() }
 
-fn visibility_intents_from_org (
+fn hiderel_intents_from_org (
   input : &str,
-) -> Vec<SubscribeeVisibilityIntent> {
+) -> Vec<SubscribeeHiderelIntent> {
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
   let role_viewforest : Tree<ViewNode_in_Role> =
     viewforest_with_saveroles (&viewforest) . unwrap();
-  subscribee_visibility_intents_from_tree (
+  subscribee_hiderel_intents_from_tree (
     &role_viewforest) . unwrap() }
 
 fn set_membership_unstaged_minus (
@@ -372,7 +372,7 @@ fn role_aware_extraction_collects_subscribees_without_hidden_branches (
     vec![]); }
 
 #[test]
-fn subscribee_visibility_intent_collects_direct_visible_content (
+fn subscribee_hiderel_intent_collects_direct_visible_content (
 ) {
   let input : &str =
     indoc! {"
@@ -384,15 +384,15 @@ fn subscribee_visibility_intent_collects_direct_visible_content (
             "};
 
   assert_eq!(
-    visibility_intents_from_org (input),
-    vec![SubscribeeVisibilityIntent {
+    hiderel_intents_from_org (input),
+    vec![SubscribeeHiderelIntent {
       subscriber      : ID::from ("subscriber"),
       subscribee      : ID::from ("subscribee"),
       visible_content : vec![ID::from ("a"), ID::from ("b")],
     }]); }
 
 #[test]
-fn subscribee_visibility_intents_preserve_subscribee_tree_order (
+fn subscribee_hiderel_intents_preserve_subscribee_tree_order (
 ) {
   let input : &str =
     indoc! {"
@@ -405,21 +405,21 @@ fn subscribee_visibility_intents_preserve_subscribee_tree_order (
             "};
 
   assert_eq!(
-    visibility_intents_from_org (input),
+    hiderel_intents_from_org (input),
     vec![
-      SubscribeeVisibilityIntent {
+      SubscribeeHiderelIntent {
         subscriber      : ID::from ("subscriber"),
         subscribee      : ID::from ("first"),
         visible_content : vec![ID::from ("first-child")],
       },
-      SubscribeeVisibilityIntent {
+      SubscribeeHiderelIntent {
         subscriber      : ID::from ("subscriber"),
         subscribee      : ID::from ("second"),
         visible_content : vec![ID::from ("second-child")],
       }]); }
 
 #[test]
-fn subscribee_visibility_intent_uses_only_direct_children (
+fn subscribee_hiderel_intent_uses_only_direct_children (
 ) {
   let input : &str =
     indoc! {"
@@ -431,15 +431,15 @@ fn subscribee_visibility_intent_uses_only_direct_children (
             "};
 
   assert_eq!(
-    visibility_intents_from_org (input),
-    vec![SubscribeeVisibilityIntent {
+    hiderel_intents_from_org (input),
+    vec![SubscribeeHiderelIntent {
       subscriber      : ID::from ("subscriber"),
       subscribee      : ID::from ("subscribee"),
       visible_content : vec![ID::from ("child")],
     }]); }
 
 #[test]
-fn subscribee_visibility_intent_ignores_indefinitive_subscribee (
+fn subscribee_hiderel_intent_ignores_indefinitive_subscribee (
 ) {
   let input : &str =
     indoc! {"
@@ -449,11 +449,11 @@ fn subscribee_visibility_intent_ignores_indefinitive_subscribee (
             "};
 
   assert_eq!(
-    visibility_intents_from_org (input),
-    Vec::<SubscribeeVisibilityIntent>::new()); }
+    hiderel_intents_from_org (input),
+    Vec::<SubscribeeHiderelIntent>::new()); }
 
 #[test]
-fn subscribee_visibility_intent_excludes_non_content_delete_and_phantom_children (
+fn subscribee_hiderel_intent_excludes_non_content_delete_and_phantom_children (
 ) {
   let input : &str =
     indoc! {"
@@ -470,20 +470,20 @@ fn subscribee_visibility_intent_excludes_non_content_delete_and_phantom_children
   set_membership_unstaged_minus (&mut viewforest, "phantom");
   let role_viewforest : Tree<ViewNode_in_Role> =
     viewforest_with_saveroles (&viewforest) . unwrap();
-  let intents : Vec<SubscribeeVisibilityIntent> =
-    subscribee_visibility_intents_from_tree (
+  let intents : Vec<SubscribeeHiderelIntent> =
+    subscribee_hiderel_intents_from_tree (
       &role_viewforest) . unwrap();
 
   assert_eq!(
     intents,
-    vec![SubscribeeVisibilityIntent {
+    vec![SubscribeeHiderelIntent {
       subscriber      : ID::from ("subscriber"),
       subscribee      : ID::from ("subscribee"),
       visible_content : vec![ID::from ("keep")],
     }]); }
 
 #[test]
-fn subscribee_visibility_intent_ignores_hidden_scaffold_contents (
+fn subscribee_hiderel_intent_ignores_hidden_scaffold_contents (
 ) {
   let input : &str =
     indoc! {"
@@ -498,8 +498,8 @@ fn subscribee_visibility_intent_ignores_hidden_scaffold_contents (
             "};
 
   assert_eq!(
-    visibility_intents_from_org (input),
-    vec![SubscribeeVisibilityIntent {
+    hiderel_intents_from_org (input),
+    vec![SubscribeeHiderelIntent {
       subscriber      : ID::from ("subscriber"),
       subscribee      : ID::from ("subscribee"),
       visible_content : vec![ID::from ("visible")],
@@ -760,7 +760,7 @@ fn direct_as_subscribee_unhide_preserves_unrelated_hides (
       Ok (()) })) }
 
 #[test]
-fn overlapping_subscribee_visibility_conflict_rejects_save (
+fn overlapping_subscribee_hiderel_conflict_rejects_save (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_db_from_config (
     "skg-test-overlapping-subscribee-visibility-conflict",

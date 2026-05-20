@@ -27,6 +27,10 @@ use typedb_driver::TypeDBDriver;
 ///   'assign_pids_throughout_viewforest'. (Otherwise two org nodes
 ///   might refer to the same skg node, yet appear not to.)
 /// - All nodes have sources, per 'inherit_parent_source_if_possible'.
+///
+/// This is the unchecked-tree validation stage: metadata is complete,
+/// but role classification, save-intent extraction, and disk
+/// supplementation have not happened yet.
 pub async fn find_buffer_errors_for_saving (
   viewforest: &Tree<UncheckedViewNode>,
   config: &SkgConfig,

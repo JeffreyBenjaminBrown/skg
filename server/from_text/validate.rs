@@ -13,6 +13,10 @@ use typedb_driver::TypeDBDriver;
 /// ERRORS: if an instruction
 /// - Would modify or delete a foreign node
 /// - Would create a node in a foreign source
+///
+/// Requires disk-supplemented DefineNodes: unchanged foreign saves are
+/// harmless only after unspecified fields have been filled from disk,
+/// and foreign creates are recognized by checking disk for the pid.
 pub async fn validate_and_filter_foreign_instructions(
   instructions: Vec<DefineNode>,
   config: &SkgConfig,
@@ -119,6 +123,9 @@ fn source_is_foreign(
 /// Validates that merge instructions involve no foreign nodes.
 /// A merge modifies the acquirer and deletes the acquiree,
 /// so both must be from sources the user owns.
+///
+/// Requires extracted Merge plans: the acquirer/acquiree sources
+/// live on the merge's generated Save/Delete instructions.
 pub(super) fn validate_merges_involve_only_owned_nodes(
   merge_instructions: &[Merge],
   config: &SkgConfig,
@@ -203,6 +210,11 @@ pub(crate) fn flatten_ms<T: Clone>(
     other => other . clone() }}
 
 /// Validates that no node is both moved and merged in the same save.
+///
+/// Requires both completed non-merge extraction and merge extraction:
+/// source moves are detected during disk supplementation of
+/// DefineNodes, while merge acquiree/acquirer ids come from merge
+/// requests in the checked viewforest.
 pub(super) fn validate_no_simultaneous_move_and_merge (
   source_moves       : &[SourceMove],
   merge_instructions : &[Merge],

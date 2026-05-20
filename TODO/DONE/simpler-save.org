@@ -322,7 +322,7 @@ The saved-as-subscribee preservation rule and saved-view disk-sync
 rule now live on that mode value. The completion mechanics themselves
 were left intact.
 
-** g. Make validation phases match data maturity
+** DONE g. Make validation phases match data maturity
 
 There are several validation moments:
 
@@ -330,7 +330,7 @@ There are several validation moments:
 - unchecked-tree structural validation in
   =find_buffer_errors_for_saving=;
 - role-aware validation in
-  =validate_no_owned_title_or_body_edit_in_as_subscribee=;
+  =validate_no_title_or_body_edit_in_subscribeeAsSuch=;
 - disk-supplemented foreign validation;
 - merge validation;
 - simultaneous move/merge validation.
@@ -355,6 +355,13 @@ Suggested documentation-only increment:
 
 This would help future work avoid moving a validator earlier than its
 required facts.
+
+Status: complete. =buffer_to_viewforest_and_save_instructions= now
+documents the save-preparation data maturity stages. The validators
+whose placement is easiest to question now state the facts they
+require: metadata-filled unchecked tree, role-classified viewforest,
+disk-supplemented DefineNodes, extracted Merge plans, or the combined
+non-merge/merge plan.
 
 * Probably not worth doing soon
 
@@ -393,14 +400,15 @@ validation/filtering first; unify later only if the result is simpler.
 
 * Suggested next plan
 
-Items a, b, c, e, and f are complete. Item d has the
+Items a, b, c, e, f, and g are complete. Item d has the
 store-application split but not a standalone preparation API. The
-best next incremental plan is probably item g:
+main ranked opportunities are done.
 
-** Make validation phases match data maturity
+** Reassess remaining opportunities
 
-Goal: document and, where cheap, align each validation with the data
-maturity stage it actually requires.
+Goal: decide whether the partial item d work deserves another pass or
+whether the remaining "probably not worth doing soon" notes should
+stay deferred.
 
 Why next:
 
@@ -411,11 +419,10 @@ Why next:
   orchestration;
 - item e grouped rerender context and collateral output;
 - item f named the completion mode predicates;
-- item g applies that same phase-boundary clarity to validation.
+- item g documented validation maturity requirements.
 
 Acceptance criteria:
 
-- each save validation phase has a short maturity-stage explanation;
-- no validator moves earlier than its required inputs;
-- behavior is unchanged unless a clearly dead validation call is found;
-- focused save validation tests still pass.
+- TODO/simpler-save.org clearly states what remains, if anything;
+- any next work is justified by a real simplification rather than
+  symmetry with previous cleanup.

@@ -15,7 +15,7 @@ The save path currently does this:
 #+begin_src text
 naive Vec<NodeEditIntent>
   -> reconcile_nodeEditIntents -> Vec<NodeEditIntent>
-  -> apply_hiderels_from_subscribee_visibility scans the Vec by PID
+  -> apply_hiderels_from_intents scans the Vec by PID
   -> build_disk_supplemented_define_nodes iterates the Vec
 #+end_src
 
@@ -114,7 +114,7 @@ tests to the explicit order unless user-visible behavior would change.
 ** 4. Move visibility folding onto the keyed collection
 
 Change
-=apply_hiderels_from_subscribee_visibility= in
+=apply_hiderels_from_intents= in
 [[../../server/from_text/viewnodes_to_instructions.rs][viewnodes_to_instructions.rs]]
 to accept and return =ReconciledNodeEditIntents=.
 

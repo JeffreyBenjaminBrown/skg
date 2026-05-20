@@ -32,6 +32,11 @@ and can be recovered by a later session.
 Some people intpret a fork as a binary choice.
 In Skg a fork can split into any number.
 
+
+## hiderel = "hides" relationship
+
+See schema.tql for what a "hides" relationship is.
+
 ## interp = interpretation
 
 ## kv-pair = key-value pair

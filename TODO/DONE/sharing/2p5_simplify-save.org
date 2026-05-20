@@ -170,7 +170,7 @@ occurrences. The old =children_affect_only_hiding= field is gone.
 
 ** DONE e. Reconcile visibility surfaces explicitly
 
-=SubscribeeVisibilityIntent= already exists, but the save path still
+=SubscribeeHiderelIntent= already exists, but the save path still
 needs clearer reconciliation rules once direct =AsSubscribee= branches
 are no longer encoded as ordinary-looking saves.
 
@@ -216,7 +216,7 @@ The important properties are:
 - visibility surfaces remain first-class until their deltas are folded
   into owned subscriber graph-save intents.
 
-Status: complete. =SubscribeeVisibilityIntent= remains a separate
+Status: complete. =SubscribeeHiderelIntent= remains a separate
 visibility-surface extraction result rather than being folded into
 same-ID node-edit reconciliation. Overlapping visibility surfaces are
 validated by subscriber/content visibility, and compatible duplicates
@@ -276,7 +276,7 @@ Status: complete. Same-ID node-edit reconciliation now returns a
 keyed =SameIdReconciledNodeEditIntents= collection with explicit
 output order, and the current variant rules are centralized there.
 Duplicate visibility-surface semantics are handled outside same-ID
-node-edit reconciliation by =SubscribeeVisibilityIntent= overlap
+node-edit reconciliation by =SubscribeeHiderelIntent= overlap
 validation.
 
 ** DONE h. Revisit validation once save roles are stable
@@ -341,7 +341,7 @@ Code references:
   guard that keeps direct =AsSubscribee= child-list signal intact;
 - =reconcile_sharing_scaffold_children= documents rerender-time
   sharing scaffold reconciliation and phantom child construction;
-- =subscribee_visibility_intents_from_tree= owns the save-time
+- =subscribee_hiderel_intents_from_tree= owns the save-time
   interpretation of direct =AsSubscribee= visible children.
 
 * Test expectations

@@ -13,8 +13,8 @@ edit for the subscribee.
 The current save extraction has two parallel signals for direct
 =AsSubscribee= branches:
 
-- 'subscribee_visibility_intents_from_tree' extracts
-  'SubscribeeVisibilityIntent { subscriber, subscribee,
+- 'subscribee_hiderel_intents_from_tree' extracts
+  'SubscribeeHiderelIntent { subscriber, subscribee,
   visible_content }'.
 - 'naive_node_edit_intents_from_role_viewforest' also emits a
   'NodeEditIntent::Save' for the same direct subscribee node, with
@@ -42,7 +42,7 @@ Prefer explicit variants:
 pub(crate) enum NodeEditIntent {
   GraphSave (NodeSaveIntent),
   Delete (NodeDeleteIntent),
-  SubscribeeVisibilitySurface (SubscribeeVisibilityIntent),
+  SubscribeeVisibilitySurface (SubscribeeHiderelIntent),
 }
 #+end_src
 
@@ -52,7 +52,7 @@ intermediate is acceptable:
 #+begin_src rust
 struct SaveExtraction {
   graph_edit_intents : Vec<NodeEditIntent>,
-  visibility_surfaces : Vec<SubscribeeVisibilityIntent>,
+  visibility_surfaces : Vec<SubscribeeHiderelIntent>,
 }
 #+end_src
 
@@ -107,7 +107,7 @@ displayed child list become graph =contains=.
 
 ** 3. Make visibility surfaces first-class extraction output
 
-Keep 'SubscribeeVisibilityIntent' as the visibility-surface shape
+Keep 'SubscribeeHiderelIntent' as the visibility-surface shape
 unless a better name is obviously worth it.
 
 The extraction phase should return graph edit intents and visibility
@@ -115,7 +115,7 @@ surfaces separately, or a single enum whose variants keep them
 separate. The top-level save pipeline should make the distinction
 obvious.
 
-The existing 'subscribee_visibility_intents_from_tree' already collects
+The existing 'subscribee_hiderel_intents_from_tree' already collects
 the right visible child-list signal. Prefer reusing it over rebuilding
 that traversal inside graph intent extraction.
 

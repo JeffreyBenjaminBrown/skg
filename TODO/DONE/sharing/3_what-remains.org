@@ -9,7 +9,7 @@ save-path shape:
 - direct =AsSubscribee= child-list removals no longer become
   subscribee graph =contains= edits;
 - direct =AsSubscribee= visible children are extracted as
-  =SubscribeeVisibilityIntent= values;
+  =SubscribeeHiderelIntent= values;
 - visibility folding happens before =DefineNode= construction;
 - disk supplementation is policy-neutral and no longer has a
   direct-subscribee =contains= restoration guardrail;
@@ -108,7 +108,7 @@ branch, then document or enforce the chosen policy.
 Execution plan: [[./3pC_DONE.org][3pC_DONE.org]].
 
 Status: complete. The policy is documented in
-=apply_hiderels_from_subscribee_visibility=. Saved =AsSubscribee=
+=apply_hiderels_from_intents=. Saved =AsSubscribee=
 completion now normalizes view-children that are not graph-content of
 the subscribee to =Birth=Independent= and orders graph-content
 view-children by the subscribee's graph-content order. Foreign and

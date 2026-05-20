@@ -52,9 +52,9 @@ let with_disk =
   build_disk_supplemented_define_nodes (
     reconciled, config, driver ) . await?;
 let with_visibility =
-  apply_hiderels_from_subscribee_visibility (
+  apply_hiderels_from_intents (
     with_disk.instructions,
-    &with_disk.visibility_intents,
+    &with_disk.hiderel_intents,
     config,
     driver ) . await?;
 let changed =
@@ -83,7 +83,7 @@ Keep the existing public or test-facing entry points working:
 Then 'viewforest_to_nonmerge_save_instructions' can classify once and
 pass the role tree to both:
 
-- 'subscribee_visibility_intents_from_tree';
+- 'subscribee_hiderel_intents_from_tree';
 - the graph edit intent extractor.
 
 This is a pure extraction if the role tree is copied exactly as today.
@@ -96,7 +96,7 @@ submodule:
 #+begin_src rust
 struct SaveExtraction {
   node_edit_intents  : Vec<NodeEditIntent>,
-  visibility_intents : Vec<SubscribeeVisibilityIntent>,
+  hiderel_intents : Vec<SubscribeeHiderelIntent>,
 }
 #+end_src
 
@@ -153,7 +153,7 @@ named and isolated, making items b and f easier.
 
 ** 5. Leave visibility folding and unchanged filtering in place
 
-Keep 'apply_hiderels_from_subscribee_visibility' after disk
+Keep 'apply_hiderels_from_intents' after disk
 supplementation and before 'filter_wouldbe_noop_definenodes'.
 
 That position matters because a subscriber whose only edit is an
@@ -167,7 +167,7 @@ Use existing types and helpers. Avoid changing:
 - 'NodeEditIntent';
 - 'NodeSaveIntent';
 - 'children_affect_only_hiding';
-- 'SubscribeeVisibilityIntent';
+- 'SubscribeeHiderelIntent';
 - 'DefineNode';
 - 'SaveNode';
 - validation modules.
