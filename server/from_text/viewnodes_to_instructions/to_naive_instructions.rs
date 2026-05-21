@@ -275,6 +275,16 @@ pub(crate) fn naive_node_edit_intents_from_role_viewforest (
   naive_node_edit_intents_from_candidates (
     role_viewforest, &candidates) }
 
+/// "Naive" in the sense that the output still needs to be:
+/// - reconciled across duplicate appearances of the same PID
+///   ('reconcile_nodeEditIntents' does that)
+/// - enriched by subscribee-as-such visibility/hiderel inference
+///   ('apply_hiderels_from_intents' does that)
+/// - supplemented from disk ('build_disk_supplemented_define_nodes')
+/// - filtered for no-op saves
+/// - ignorant of the special hiderel interpretation in the case of
+///   IntentCandidateKind::SubscribeeAsSuch
+///   ('ubscribee_hiderel_intents_from_candidates' does that)
 pub(crate) fn naive_node_edit_intents_from_candidates (
   role_viewforest : &Tree<ViewNode_in_Role>,
   candidates      : &[IntentCandidate],
