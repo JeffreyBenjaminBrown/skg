@@ -38,34 +38,27 @@ pub(crate) struct NodeDeleteIntent {
 /// Node edit intents for the entire saved buffer.
 pub(crate) struct SameIdReconciledNodeEditIntents {
   order  : Vec<ID>,
-  by_pid : HashMap<ID, NodeEditIntent>,
-}
+  by_pid : HashMap<ID, NodeEditIntent>, }
 
 struct NodeEditMinimal {
   pid    : ID,
   source : SourceName,
-  kind   : NodeEditMinimalAction,
-}
+  kind   : NodeEditMinimalAction, }
 
 enum NodeEditMinimalAction {
-  Save {
-    title : String,
-    body  : Option<String>,
-  },
-  Delete,
-}
+  Save { title : String,
+         body  : Option<String>, },
+  Delete, }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum IntentCandidateKind {
   OrdinaryTrueNode,
-  SubscribeeAsSuch { subscriber : ID },
-}
+  SubscribeeAsSuch { subscriber : ID }, }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct IntentCandidate {
   pub(crate) treeid : NodeId,
-  pub(crate) kind   : IntentCandidateKind,
-}
+  pub(crate) kind   : IntentCandidateKind, }
 
 impl NodeEditIntent {
   pub(crate) fn pid (
@@ -434,9 +427,9 @@ pub(crate) fn collect_intent_candidates (
       ViewNodeKind::True (t) => {
         let candidate_kind : Option<IntentCandidateKind> =
           match role {
-            SaveRole::OrdinaryTrueNode =>
+            SaveRole::Truenode =>
               Some (IntentCandidateKind::OrdinaryTrueNode),
-            SaveRole::AsSubscribee { subscriber } =>
+            SaveRole::TruenodeAsSubscribee { subscriber } =>
               Some (IntentCandidateKind::SubscribeeAsSuch {
                 subscriber,
               }),
@@ -623,7 +616,7 @@ fn collect_subscribees (
             ViewNodeKind::True (t) => {
               if matches!(
                    subscribeecol_child . value() . role,
-                   SaveRole::AsSubscribee { .. })
+                   SaveRole::TruenodeAsSubscribee { .. })
                  && !t . parent_ignores_it()
               { subscribees . push(t . id . clone()); }},
             ViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol) =>
@@ -654,7 +647,7 @@ fn collect_contents_to_save_from_children<'a> (
         // In diff view, skip phantom nodes.
         if matches!(
              child_ref . value() . role,
-             SaveRole::OrdinaryTrueNode)
+             SaveRole::Truenode)
            && ! t . parent_ignores_it()
            && ! t . is_phantom ()
            && ! matches!( t . edit_request (),

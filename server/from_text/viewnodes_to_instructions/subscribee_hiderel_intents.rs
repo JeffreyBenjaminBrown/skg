@@ -71,7 +71,7 @@ fn collect_direct_visible_content (
       ViewNodeKind::True (t) => {
         if matches!(
              child_ref . value() . role,
-             SaveRole::OrdinaryTrueNode)
+             SaveRole::Truenode)
            && ! t . parent_ignores_it()
            && ! t . is_phantom()
            && ! matches!(

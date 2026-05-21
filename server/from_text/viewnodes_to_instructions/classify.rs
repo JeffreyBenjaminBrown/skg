@@ -8,8 +8,8 @@ pub type SaveRoleMap = HashMap<NodeId, SaveRole>;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SaveRole {
   BufferRoot,
-  OrdinaryTrueNode,
-  AsSubscribee { subscriber: ID },
+  Truenode,
+  TruenodeAsSubscribee { subscriber: ID },
   HiddenInSubscribeeCol { subscriber: ID, subscribee: ID },
   HiddenOutsideOfSubscribeeCol { subscriber: ID },
   AliasDisplay,
@@ -104,10 +104,10 @@ fn classify_truenode (
   node_ref : NodeRef<ViewNode>,
 ) -> Result<SaveRole, String> {
   let Some (parent_ref) = node_ref . parent()
-    else { return Ok (SaveRole::OrdinaryTrueNode); };
+    else { return Ok (SaveRole::Truenode); };
   match &parent_ref . value() . kind {
     ViewNodeKind::Scaff (Scaffold::SubscribeeCol) =>
-      Ok (SaveRole::AsSubscribee {
+      Ok (SaveRole::TruenodeAsSubscribee {
         subscriber : truenode_id (
           parent_ref . parent(),
           "SubscribeeCol must have a TrueNode parent")?,
@@ -152,7 +152,7 @@ fn classify_truenode (
           subscribeecol_ref . parent(),
           "SubscribeeCol must have a TrueNode parent")?,
       }) },
-    _ => Ok (SaveRole::OrdinaryTrueNode),
+    _ => Ok (SaveRole::Truenode),
   }}
 
 fn truenode_id (

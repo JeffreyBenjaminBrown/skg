@@ -65,9 +65,9 @@ pub struct UnknownNode {
   pub id : ID,
 }
 
-pub type TrueNode          = TrueNode_Generic < ID, SourceName >;
+pub type TrueNode            = TrueNode_Generic < ID, SourceName >;
 pub type MaybePlacedTruenode = TrueNode_Generic < Option < ID >,
-                                                Option < SourceName >>;
+                                                  Option < SourceName >>;
 
 /// A ViewNode that corresponds to a NodeComplete.
 #[derive( Debug, Clone, PartialEq )]
@@ -169,14 +169,11 @@ pub enum Scaffold {
   HiddenInSubscribeeCol, // Child of a Subscribee. Collects nodes that the subscriber hides from its subscriptions, and that are top-level content of this subscribee.
   HiddenOutsideOfSubscribeeCol, // Child of SubscribeeCol. Collects nodes that the subscriber hides from its subscriptions, but that are not top-level content of any of its subscribees.
   // DISPLAY NOTE: Shown after all Subscribees, under the same SubscribeeCol.
-  ID { id: ID, // an ID of the node's grandparent.
+  ID { id: ID, // an ID of grandparent (the parent being an IDCol)
        membership: MembershipAxes },
   IDCol, // Collects (as children) Scaffold::IDs for its parent.
   SubscribeeCol, // Collects subscribees for its parent.
-  /// Indicates title or body changed between stages. Visible in
-  /// 'git diff mode'. Per-stage bools mark whether the change is
-  /// staged (HEAD vs index) and/or unstaged (index vs worktree).
-  TextChanged { staged: bool, unstaged: bool },
+  TextChanged { staged: bool, unstaged: bool }, // Indicates title or body changed between stages. Visible in 'git diff mode'. Per-stage bools mark whether the change is staged (HEAD vs index) and/or unstaged (index vs worktree).
 }
 
 /// A discriminant (i.e. some labels) for the Scaffold variants.
