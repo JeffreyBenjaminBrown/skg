@@ -101,9 +101,9 @@ impl CompletionMode {
 /// pass will not be correct if any truenode is missing children.
 ///
 /// WHAT IT DOES (high-level phases), in order:
-/// - resolve_truenode_kind:- phantom/indefinitive/deleted-by-save
-///   short-circuits; otherwise yields (pid, source).
-/// - clear_consumed_edit_request
+/// - resolve_truenode_kind: fetch (pid, source), but
+///   short-circuit for phantom/indefinitive/deleted-by-save.
+/// - clear_edit_request
 /// - Load NodeComplete;
 ///   sync title/body from disk for non-saved views.
 /// - reconcile_content_children:
@@ -135,7 +135,7 @@ pub fn expand_true_content_at_truenode (
       deleted_by_this_save_pids ) ?
     { TruenodeKindOutcome::Stop => return Ok (( )),
       TruenodeKindOutcome::Continue { pid, source } => (pid, source) };
-  clear_consumed_edit_request (tree, node) ?;
+  clear_edit_request (tree, node) ?;
   let nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source ( config, &pid, &initial_source ) ?;
   let source : SourceName =
@@ -212,10 +212,8 @@ fn resolve_truenode_kind (
     return Ok (TruenodeKindOutcome::Stop); }
   Ok (TruenodeKindOutcome::Continue { pid, source }) }
 
-/// Phase 2: clear the edit_request that this preorder visit has
-/// consumed. Analogous to 'remove_completed_view_request' for
-/// view requests.
-fn clear_consumed_edit_request (
+/// The edit request should have been used by now.
+fn clear_edit_request (
   tree : &mut Tree<ViewNode>,
   node : NodeId,
 ) -> Result<(), Box<dyn Error>> {

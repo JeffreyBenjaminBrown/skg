@@ -5,14 +5,14 @@
 // `FnMut` closure which cannot `.await`.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::env::SkgEnv;
-use crate::types::misc::{ID, SourceName};
-use crate::types::git::SourceDiff;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, ScaffoldKind};
 use crate::to_org::util::DefinitiveMap;
-use crate::types::tree::generic::{
-  do_everywhere_in_tree_dfs,
-  do_everywhere_in_tree_dfs_readonly};
+use crate::types::env::SkgEnv;
+use crate::types::git::SourceDiff;
+use crate::types::misc::{ID, SourceName};
+use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_readonly};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, ScaffoldKind};
+use super::complete_preorder::subscribee_col::reconcile_subscribee_col_children;
+use super::complete_preorder::truenode::expand_true_content_at_truenode;
 
 use ego_tree::{Tree, NodeId};
 use std::collections::{HashMap, HashSet};
@@ -98,14 +98,14 @@ fn expand_true_content_until_stable<'a> (
   context : &'a mut CompletionContext<'_>,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin ( async move {
-    // Box? Pin? See the 'MANUAL RECURSION' comment at the top of this file.
     expand_true_content_at_node (tree, treeid, context) . await ?;
-    let child_treeids : Vec<NodeId> =
-      tree . get (treeid) . unwrap ()
-      . children () . map ( |c| c . id () ) . collect ();
-    for child_treeid in child_treeids {
-      expand_true_content_until_stable (
-        tree, child_treeid, context ) . await ?; }
+    { // Recursion boilerplate. See 'MANUAL RECURSION' comment at top of file.
+      let child_treeids : Vec<NodeId> =
+        tree . get (treeid) . unwrap ()
+        . children () . map ( |c| c . id () ) . collect ();
+      for child_treeid in child_treeids {
+        expand_true_content_until_stable (
+          tree, child_treeid, context ) . await ?; }}
     Ok(( )) }) }
 
 async fn expand_true_content_at_node (
@@ -116,7 +116,6 @@ async fn expand_true_content_at_node (
   let kind : ViewNodeKind =
     tree . get (treeid) . unwrap () . value () . kind . clone ();
   if matches!( kind, ViewNodeKind::True (_)) {
-    super::complete_preorder::truenode::
     expand_true_content_at_truenode (
       treeid, tree, context . defmap, context . source_diffs,
       &context . env . config, context . graph_snap,
@@ -125,7 +124,6 @@ async fn expand_true_content_at_node (
       context . is_saved_view ) ?;
   } else if matches!( kind,
       ViewNodeKind::Scaff (Scaffold::SubscribeeCol) ) {
-        super::complete_preorder::subscribee_col::
         reconcile_subscribee_col_children (
           treeid, tree, context . source_diffs, context . env,
           context . deleted_since_head_pid_src_map

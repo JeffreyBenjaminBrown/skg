@@ -1237,7 +1237,7 @@ is now : id_to_pid_if_found
 ** resolve_truenode_kind (line 118)
    - True?: Partly. Despite "resolve", the function also calls maybe_change_node_diff_status, which mutates the node's diff axes, and it can mutate the node into a DeletedNode kind in the deleted_by_this_save case.
    - Omits?: It omits the diff-axis mutation and the kind-rewrite to DeletedNode.
-** clear_consumed_edit_request (line 158)
+** clear_edit_request (line 158)
    - True?: Yes.
    - Omits?: Nothing material.
 ** sync_truenode_text_from_disk (line 171)
