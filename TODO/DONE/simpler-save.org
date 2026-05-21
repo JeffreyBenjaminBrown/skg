@@ -34,7 +34,7 @@ At the top level, save now has a reasonably legible sequence:
 10. rerender the saved view and collateral views.
 
 The cleanest part is now
-=extract_nonmerge_save_plan=:
+=extract_nonmergeSavePlan=:
 
 #+begin_src text
 classify roles
@@ -143,7 +143,7 @@ then run as separate named steps over that classification.
 Merge handling is now outside non-merge extraction:
 
 #+begin_src text
-extract_nonmerge_save_plan
+extract_nonmergeSavePlan
 instructiontriples_from_the_merges_in_a_viewforest
 #+end_src
 
@@ -163,7 +163,7 @@ extraction, but the names do not line up:
 Suggested increment:
 
 - rename or wrap merge extraction so the top-level reads as
-  =extract_nonmerge_save_plan= and =extract_merge_save_plan=, or
+  =extract_nonmergeSavePlan= and =extract_merge_save_plan=, or
   similar;
 - remove or rewrite the "slightly inefficient, walking again" comment
   in =mergeInstructionTriple.rs= so it no longer suggests bundling
@@ -171,7 +171,7 @@ Suggested increment:
 - keep merge validation separate.
 
 Status: complete. =from_text.rs= now has
-=extract_nonmerge_save_plan= and =extract_merge_save_plan= phases.
+=extract_nonmergeSavePlan= and =extract_merge_save_plan= phases.
 The merge helper still owns the merge mechanics, but the top-level
 save preparation no longer calls it by its raw mechanical name. The
 merge traversal comment now explains that a separate walk is

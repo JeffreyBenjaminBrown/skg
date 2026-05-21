@@ -100,32 +100,32 @@ impl Definenodes_with_Sourcemoves {
       self . source_moves . push (sm); }}
 }
 
-/// Supplanted by 'extract_nonmerge_save_plan_from_authority'.
+/// Supplanted by 'extract_nonmergeSavePlan_from_authority'.
 /// It now exists only to avoid test churn.
-pub async fn extract_nonmerge_save_plan (
+pub async fn extract_nonmergeSavePlan (
   viewforest : &Tree<ViewNode>, // "viewforest" = tree with BufferRoot
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result<NonmergeSavePlan, Box<dyn Error>> {
   let _span : tracing::span::EnteredSpan = tracing::info_span!(
-    "extract_nonmerge_save_plan" ). entered();
+    "extract_nonmergeSavePlan" ). entered();
   let extraction_forest : SaveAuthority =
     SaveAuthority::from_viewforest (viewforest)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  extract_nonmerge_save_plan_from_authority (
+  extract_nonmergeSavePlan_from_authority (
     &extraction_forest, config, driver ) . await
 }
 
 /// Reconciles duplicates via 'reconcile_same_id_instructions'
 /// and supplements None fields with data from disk.
 /// Indefinitive nodes produce no instructions.
-pub(crate) async fn extract_nonmerge_save_plan_from_authority (
+pub(crate) async fn extract_nonmergeSavePlan_from_authority (
   save_authority : &SaveAuthority,
   config         : &SkgConfig,
   driver         : &TypeDBDriver,
 ) -> Result<NonmergeSavePlan, Box<dyn Error>> {
   let _span : tracing::span::EnteredSpan = tracing::info_span!(
-    "extract_nonmerge_save_plan_from_authority" ). entered();
+    "extract_nonmergeSavePlan_from_authority" ). entered();
   let role_viewforest : &Tree<ViewNode_in_Role> =
     save_authority . role_viewforest ();
   let candidates : &[IntentCandidate] =

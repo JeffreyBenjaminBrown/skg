@@ -5,7 +5,7 @@ use skg::save::update_typedb_from_saveinstructions;
 use skg::dbs::typedb::search::find_related_nodes;
 use skg::dbs::typedb::nodes::which_ids_exist;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::from_text::viewnodes_to_instructions::extract_nonmerge_save_plan;
+use skg::from_text::viewnodes_to_instructions::extract_nonmergeSavePlan;
 use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
 use skg::types::misc::ID;
 use skg::types::viewnode::ViewNode;
@@ -52,7 +52,7 @@ fn test_update_nodes_and_relationships2 (
 
     // Convert to instructions (adds missing info and reconciles)
     let nonmerge_plan =
-      extract_nonmerge_save_plan (
+      extract_nonmergeSavePlan (
         & viewforest, & config, & driver ) . await ?;
 
     // Apply the update

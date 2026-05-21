@@ -21,7 +21,7 @@ use buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use buffer_to_viewnodes::add_missing_info::add_missing_info_to_viewforest;
 use buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use viewnodes_to_instructions::{
-  extract_nonmerge_save_plan_from_authority,
+  extract_nonmergeSavePlan_from_authority,
   NonmergeSavePlan,
   SaveAuthority};
 use validate::{validate_and_filter_foreign_instructions, validate_no_simultaneous_move_and_merge};
@@ -85,7 +85,7 @@ pub async fn buffer_to_validated_saveplan (
       SaveAuthority::from_viewforest (&viewforest) }
         . map_err ( |e| SaveError::ParseError (e) ) ?;
   let nonmerge_plan : NonmergeSavePlan =
-    extract_nonmerge_save_plan_from_authority (
+    extract_nonmergeSavePlan_from_authority (
       &save_authority, config, driver )
     . await . map_err (SaveError::DatabaseError) ?;
   let merge_instructions : Vec<Merge> =

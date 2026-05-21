@@ -13,7 +13,7 @@ use skg::from_text::viewnodes_to_instructions::classify::{
 use skg::from_text::viewnodes_to_instructions::subscribee_hiderel_intents::{
   subscribee_hiderel_intents_from_tree, SubscribeeHiderelIntent };
 use skg::from_text::viewnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_tree;
-use skg::from_text::viewnodes_to_instructions::extract_nonmerge_save_plan;
+use skg::from_text::viewnodes_to_instructions::extract_nonmergeSavePlan;
 use skg::test_utils::extract_nodecomplete_if_save_else_error;
 use skg::test_utils::run_with_test_db_from_config;
 use skg::types::errors::BufferValidationError;
@@ -95,12 +95,12 @@ async fn save_instructions_from_org_with_disk (
   let viewforest : Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) ?;
   let save_plan =
-    extract_nonmerge_save_plan (
+    extract_nonmergeSavePlan (
       &viewforest, config, driver) . await?;
   Ok (save_plan . define_nodes) }
 
 #[test]
-fn test_extract_nonmerge_save_plan_basic() {
+fn test_extract_nonmergeSavePlan_basic() {
   let input: &str =
     indoc! {"
             * (skg (node (id root1) (source main))) root node 1
@@ -152,7 +152,7 @@ fn test_extract_nonmerge_save_plan_basic() {
       panic!("Expected Delete, got Save") }; }
 
 #[test]
-fn test_extract_nonmerge_save_plan_with_aliases() {
+fn test_extract_nonmergeSavePlan_with_aliases() {
   let input: &str =
     indoc! {"
             * (skg (node (id main) (source main))) main node
@@ -196,7 +196,7 @@ fn test_extract_nonmerge_save_plan_with_aliases() {
 }
 
 #[test]
-fn test_extract_nonmerge_save_plan_no_aliases() {
+fn test_extract_nonmergeSavePlan_no_aliases() {
   let input: &str =
     indoc! {"
             * (skg (node (id node1) (source main))) node without aliases
@@ -222,7 +222,7 @@ fn test_extract_nonmerge_save_plan_no_aliases() {
 }
 
 #[test]
-fn test_extract_nonmerge_save_plan_multiple_alias_cols() {
+fn test_extract_nonmergeSavePlan_multiple_alias_cols() {
   // Multiple AliasCols under the same node is invalid
   // (validate_tree rejects this). The function should error.
   let input: &str =
@@ -248,7 +248,7 @@ fn test_extract_nonmerge_save_plan_multiple_alias_cols() {
 }
 
 #[test]
-fn test_extract_nonmerge_save_plan_mixed_relations() {
+fn test_extract_nonmergeSavePlan_mixed_relations() {
   let input: &str =
     indoc! {"
             * (skg (node (id root) (source main))) root node
@@ -988,7 +988,7 @@ fn owned_as_subscribee_body_edit_is_rejected (
       Ok (()) })) }
 
 #[test]
-fn test_extract_nonmerge_save_plan_deep_nesting() {
+fn test_extract_nonmergeSavePlan_deep_nesting() {
   let input: &str =
     indoc! {"
             * (skg (node (id level1) (source main))) level 1
@@ -1030,7 +1030,7 @@ fn test_extract_nonmerge_save_plan_deep_nesting() {
 }
 
 #[test]
-fn test_extract_nonmerge_save_plan_error_missing_id() {
+fn test_extract_nonmergeSavePlan_error_missing_id() {
   let input: &str =
     indoc! {"
             * (skg (node (id good_node) (source main))) good node
@@ -1050,7 +1050,7 @@ fn test_extract_nonmerge_save_plan_error_missing_id() {
 }
 
 #[test]
-fn test_extract_nonmerge_save_plan_empty_input() {
+fn test_extract_nonmergeSavePlan_empty_input() {
   let viewforest: Tree<ViewNode> = Tree::new(viewforest_root_viewnode());
   let instructions: Vec<DefineNode> =
     naive_saveinstructions_from_tree (viewforest) . unwrap();
@@ -1059,7 +1059,7 @@ fn test_extract_nonmerge_save_plan_empty_input() {
 }
 
 #[test]
-fn test_extract_nonmerge_save_plan_only_aliases() {
+fn test_extract_nonmergeSavePlan_only_aliases() {
   let input: &str =
     indoc! {"
             * (skg (node (id main) (source main))) main node
@@ -1085,7 +1085,7 @@ fn test_extract_nonmerge_save_plan_only_aliases() {
 }
 
 #[test]
-fn test_extract_nonmerge_save_plan_complex_scenario() {
+fn test_extract_nonmergeSavePlan_complex_scenario() {
   let input: &str =
     indoc! {"
             * (skg (node (id doc1) (source main))) Document 1
