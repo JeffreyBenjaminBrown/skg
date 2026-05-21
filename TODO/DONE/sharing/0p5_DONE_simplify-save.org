@@ -612,7 +612,7 @@ field collection used to assemble save/delete intents:
 #+begin_src text
 checked tree + SaveRoleMap
   -> Vec<NodeId> candidate TrueNode positions
-  -> NodeEditMinimal by candidate
+  -> NodeIntentLocal by candidate
   -> contains / aliases / subscribes_to by save candidate
   -> Vec<NodeIntent>
   -> Vec<DefineNode>

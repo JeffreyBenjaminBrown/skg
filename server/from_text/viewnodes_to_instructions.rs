@@ -13,7 +13,7 @@ use crate::types::viewnode::{ IndefOrDef, ViewNode, ViewNodeKind };
 use subscribee_hiderel_intents::{ SubscribeeHiderelIntent, subscribee_hiderel_intents_from_candidates, };
 use super::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
 use super::validate::buffernode_differs_from_disknode;
-use to_naive_instructions::{ collect_savenode_candidates, naive_node_edit_intents_from_candidates, SavenodeCandidate, reconcile_nodeEditIntents, NodeIntent, NodeSaveIntent, SameIdReconciledNodeIntents, };
+use to_naive_instructions::{ collect_savenode_candidates, naive_node_edit_intents_from_candidates, DefinenodeCandidate, reconcile_nodeEditIntents, NodeIntent, NodeSaveIntent, SameIdReconciledNodeIntents, };
 
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
@@ -33,7 +33,7 @@ use typedb_driver::TypeDBDriver;
 ///     merge instructions plus graph/DB state
 pub(crate) struct SaveAuthority {
   role_viewforest : Tree<ViewNode_in_Role>, // The whole buffer/view.
-  candidates      : Vec<SavenodeCandidate>, // Some of the nodes from the buffer.
+  candidates      : Vec<DefinenodeCandidate>, // Some of the nodes from the buffer.
 }
 
 impl SaveAuthority {
@@ -42,7 +42,7 @@ impl SaveAuthority {
   ) -> Result<SaveAuthority, String> {
     let role_viewforest : Tree<ViewNode_in_Role> =
       viewforest_with_saveroles (viewforest) ?;
-    let candidates : Vec<SavenodeCandidate> =
+    let candidates : Vec<DefinenodeCandidate> =
       collect_savenode_candidates (&role_viewforest) ?;
     Ok (SaveAuthority {
       role_viewforest,
@@ -56,7 +56,7 @@ impl SaveAuthority {
 
   pub(crate) fn candidates (
     &self,
-  ) -> &[SavenodeCandidate] {
+  ) -> &[DefinenodeCandidate] {
     &self . candidates }
 }
 
@@ -130,7 +130,7 @@ pub(crate) async fn extract_nonmergeSavePlan_from_authority (
     "extract_nonmergeSavePlan_from_authority" ). entered();
   let role_viewforest : &Tree<ViewNode_in_Role> =
     save_authority . role_viewforest ();
-  let candidates : &[SavenodeCandidate] =
+  let candidates : &[DefinenodeCandidate] =
     save_authority . candidates ();
   let extracted : SaveExtraction =
     extract_save_intents (role_viewforest, candidates)?;
@@ -157,7 +157,7 @@ pub(crate) async fn extract_nonmergeSavePlan_from_authority (
 
 fn extract_save_intents (
   role_viewforest : &Tree<ViewNode_in_Role>,
-  candidates      : &[SavenodeCandidate],
+  candidates      : &[DefinenodeCandidate],
 ) -> Result<SaveExtraction, Box<dyn Error>> {
   let hiderel_intents : Vec<SubscribeeHiderelIntent> =
     subscribee_hiderel_intents_from_candidates (

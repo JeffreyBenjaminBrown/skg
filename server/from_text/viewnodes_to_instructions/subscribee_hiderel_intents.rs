@@ -1,7 +1,7 @@
 use crate::from_text::viewnodes_to_instructions::classify::{
   SaveRole, ViewNode_in_Role };
 use crate::from_text::viewnodes_to_instructions::to_naive_instructions::{
-  collect_savenode_candidates, SavenodeCandidate, SavenodeCandidateKind };
+  collect_savenode_candidates, DefinenodeCandidate, DefinenodeCandidateKind };
 use crate::types::misc::ID;
 use crate::types::viewnode::{EditRequest, ViewNode, ViewNodeKind};
 
@@ -24,21 +24,21 @@ pub struct SubscribeeHiderelIntent {
 pub fn subscribee_hiderel_intents_from_tree (
   viewforest : &Tree<ViewNode_in_Role>,
 ) -> Result<Vec<SubscribeeHiderelIntent>, String> {
-  let candidates : Vec<SavenodeCandidate> =
+  let candidates : Vec<DefinenodeCandidate> =
     collect_savenode_candidates (viewforest)?;
   subscribee_hiderel_intents_from_candidates (
     viewforest, &candidates) }
 
 pub(crate) fn subscribee_hiderel_intents_from_candidates (
   viewforest : &Tree<ViewNode_in_Role>,
-  candidates : &[SavenodeCandidate],
+  candidates : &[DefinenodeCandidate],
 ) -> Result<Vec<SubscribeeHiderelIntent>, String> {
   let mut result : Vec<SubscribeeHiderelIntent> =
     Vec::new();
   for candidate in candidates {
     let subscriber : ID =
       match &candidate . kind {
-        SavenodeCandidateKind::SubscribeeAsSuch { subscriber } =>
+        DefinenodeCandidateKind::SubscribeeAsSuch { subscriber } =>
           subscriber . clone(),
         _ => continue,
       };
