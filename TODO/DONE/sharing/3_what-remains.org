@@ -13,7 +13,7 @@ save-path shape:
 - visibility folding happens before =DefineNode= construction;
 - disk supplementation is policy-neutral and no longer has a
   subscribee-as-such =contains= restoration guardrail;
-- post-=reconcile_nodeEditIntents= lookup is keyed by
+- post-=reconcile_nodeIntents= lookup is keyed by
   =SameIdReconciledNodeIntents=;
 - validation and rerender/completion boundaries are documented in
   [[./2p5_simplify-save.org][2p5_simplify-save.org]].

@@ -222,7 +222,7 @@ same-ID node-edit reconciliation. Overlapping visibility surfaces are
 validated by subscriber/content visibility, and compatible duplicates
 are allowed. Hide/unhide deltas are then folded into the keyed
 =SameIdReconciledNodeIntents= collection, which owns
-post-=reconcile_nodeEditIntents= ordering and PID lookup.
+post-=reconcile_nodeIntents= ordering and PID lookup.
 
 ** DONE f. Keep disk supplementation policy-neutral
 

@@ -14,7 +14,7 @@ The save path currently does this:
 
 #+begin_src text
 naive Vec<NodeIntent>
-  -> reconcile_nodeEditIntents -> Vec<NodeIntent>
+  -> reconcile_nodeIntents -> Vec<NodeIntent>
   -> apply_hiderels_from_intents scans the Vec by PID
   -> build_disk_supplemented_define_nodes iterates the Vec
 #+end_src
@@ -61,7 +61,7 @@ pipeline actually does:
 
 ** 1. Add =ReconciledNodeIntents=
 
-Put the type near =reconcile_nodeEditIntents= in
+Put the type near =reconcile_nodeIntents= in
 [[../../server/from_text/viewnodes_to_instructions/to_naive_instructions.rs][to_naive_instructions.rs]]
 unless the imports become awkward.
 
@@ -69,7 +69,7 @@ Preserve the current public entry point temporarily if that keeps the
 patch smaller:
 
 #+begin_src rust
-pub(crate) fn reconcile_nodeEditIntents (
+pub(crate) fn reconcile_nodeIntents (
   intents : Vec<NodeIntent>,
 ) -> Result<ReconciledNodeIntents, String>
 #+end_src

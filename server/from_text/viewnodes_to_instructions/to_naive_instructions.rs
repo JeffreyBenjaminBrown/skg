@@ -179,7 +179,7 @@ impl SameIdReconciledNodeIntents {
         . ok_or ( "SameIdReconciledNodeIntents::from_groups: missing group" . to_string())?;
       by_pid . insert (
         pid . clone(),
-        reconcile_nodeEditIntents_with_same_ID (group)?); }
+        reconcile_nodeIntents_with_same_ID (group)?); }
     Ok (SameIdReconciledNodeIntents { order, by_pid }) }
 
   pub(crate) fn into_ordered_intents (
@@ -262,7 +262,7 @@ pub(crate) fn naive_node_edit_intents_from_role_viewforest (
 
 /// "Naive" in the sense that the output still needs to be:
 /// - reconciled across duplicate appearances of the same PID
-///   ('reconcile_nodeEditIntents' does that)
+///   ('reconcile_nodeIntents' does that)
 /// - enriched by subscribee-as-such visibility/hiderel inference
 ///   ('apply_hiderels_from_intents' does that)
 /// - supplemented from disk ('build_disk_supplemented_define_nodes')
@@ -315,7 +315,7 @@ pub(crate) fn naive_node_edit_intents_from_candidates (
 /// Groups intens by ID, then on each group calls
 /// reconcile_one_id_node_edit_intents.
 #[allow(non_snake_case)]
-pub(crate) fn reconcile_nodeEditIntents (
+pub(crate) fn reconcile_nodeIntents (
   intents : Vec<NodeIntent>,
 ) -> Result<SameIdReconciledNodeIntents, String> {
   let mut grouped : HashMap<ID, Vec<NodeIntent>> =
@@ -335,7 +335,7 @@ pub(crate) fn reconcile_nodeEditIntents (
 
 /// ASSUMES the inputs all share an ID.
 #[allow(non_snake_case)]
-fn reconcile_nodeEditIntents_with_same_ID (
+fn reconcile_nodeIntents_with_same_ID (
   intents : Vec<NodeIntent>,
 ) -> Result<NodeIntent, String> {
   let mut optSave : Option<NodeIntent> = None;

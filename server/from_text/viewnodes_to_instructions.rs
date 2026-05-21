@@ -13,7 +13,7 @@ use crate::types::viewnode::{ IndefOrDef, ViewNode, ViewNodeKind };
 use subscribee_hiderel_intents::{ SubscribeeHiderelIntent, subscribee_hiderel_intents_from_candidates, };
 use super::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
 use super::validate::buffernode_differs_from_disknode;
-use to_naive_instructions::{ collect_savenode_candidates, naive_node_edit_intents_from_candidates, DefinenodeCandidate, reconcile_nodeEditIntents, NodeIntent, NodeSaveIntent, SameIdReconciledNodeIntents, };
+use to_naive_instructions::{ collect_savenode_candidates, naive_node_edit_intents_from_candidates, DefinenodeCandidate, reconcile_nodeIntents, NodeIntent, NodeSaveIntent, SameIdReconciledNodeIntents, };
 
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
@@ -135,7 +135,7 @@ pub(crate) async fn extract_nonmergeSavePlan_from_authority (
   let extracted : SaveExtraction =
     extract_save_intents (role_viewforest, candidates)?;
   let intents_without_dups : SameIdReconciledNodeIntents =
-    reconcile_nodeEditIntents (extracted . node_edit_intents)
+    reconcile_nodeIntents (extracted . node_edit_intents)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   let intents_with_visibility : SameIdReconciledNodeIntents =
     apply_hiderels_from_intents (

@@ -111,7 +111,7 @@ This gives a clean boundary:
 
 ** 3. Name same-ID reconciliation as its own phase
 
-Wrap the existing 'reconcile_nodeEditIntents' call in a phase helper
+Wrap the existing 'reconcile_nodeIntents' call in a phase helper
 with a save-pipeline name, for example 'reconcile_save_intents'.
 
 Do not change its current rules in this item. The later items in
