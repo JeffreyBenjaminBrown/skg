@@ -49,7 +49,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
   fn for_save (
     env               : &'a SkgEnv,
     diff_mode_enabled : bool,
-    save_instructions : &[DefineNode],
+    define_nodes      : &[DefineNode],
   ) -> RerenderAfterSaveContext<'a> {
     let source_diffs
       : Option<HashMap<SourceName, SourceDiff>>
@@ -62,8 +62,8 @@ impl<'a> RerenderAfterSaveContext<'a> {
       . unwrap_or_default();
     let deleted_by_this_save_pids : HashSet<ID> =
       // PITFALL: Can overlap deleted_since_head_pid_src_map, but neither is necessarily a subset of the other. If you delete something that you added since head, it will only be here. And if you deleted something since head but not in this save, it will only be there.
-      // Merge acquirees are deliberately NOT included: post-merge they are extra-ids of their acquirers, not genuine deletions. The preprocessing pass 'resolve_extra_ids_in_viewforest' below rewrites their viewnodes to point at the acquirer before rerender runs, so the (deleted ...) path never fires for them.
-      save_instructions . iter()
+      // PITFALL: Looks dangerous but isn't: Each merge includes an acquiree deletion. This would make ViewNodes with that ID invalid (since ViewNodes by this point should have PIDs). It doesn't, though, because resolve_extra_ids_in_viewforest will rewrite those ViewNodes to instead use the acquirer's PID (i.e. to depict the acquirer now, instead of the acquiree as before) before using this set.
+      define_nodes . iter()
       . filter_map( |instr| match instr {
         DefineNode::Delete (d) => Some( d . id . clone() ),
         _ => None })
@@ -102,20 +102,20 @@ struct RenderedCollateralView {
 pub async fn update_views_after_save (
   stream                      : &mut std::net::TcpStream,
   saved_view                  : Tree<ViewNode>,
-  save_instructions           : Vec<DefineNode>,
+  define_nodes                : Vec<DefineNode>,
   diff_mode_enabled           : bool,
   env                         : &SkgEnv,
   viewuri_from_request_result : &Result<ViewUri, String>,
-  views_state                  : &mut ViewsState,
+  views_state                 : &mut ViewsState,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  // Snapshot the in-Rust graph once for this save's rerender pass.
-  // Used both by resolve_extra_ids_in_viewforest (swap acquiree pids
-  // to acquirer pids before rerender) and by content_goal_list
-  // resolution during reconcile (neighbors' on-disk contains still
-  // point at the acquiree id).
   let mut context : RerenderAfterSaveContext =
+    // Snapshot the in-Rust graph once for this save's rerender pass.
+    // Used both by resolve_extra_ids_in_viewforest (swap acquiree pids
+    // to acquirer pids before rerender) and by content_goal_list
+    // resolution during reconcile (neighbors' on-disk contains still
+    // point at the acquiree id).
     RerenderAfterSaveContext::for_save (
-      env, diff_mode_enabled, &save_instructions );
+      env, diff_mode_enabled, &define_nodes );
   let mut saved_view_mut : Tree<ViewNode> = saved_view;
   resolve_extra_ids_in_viewforest (
     &mut saved_view_mut, &context . graph_snap ) ?;
@@ -131,7 +131,7 @@ pub async fn update_views_after_save (
       uri, saved_view_mut);
     let collateral_uris : Vec<ViewUri> =
       find_collateral_view_uris (
-        uri, &save_instructions, views_state);
+        uri, &define_nodes, views_state);
     if collateral_uris . is_empty () {
       tracing::debug!("update_views_after_save: no collateral views");
     } else {
@@ -192,17 +192,17 @@ async fn rerender_collateral_view (
     viewforest,
   }) }
 
-/// Given the saved ViewUri and save instructions,
+/// Given the saved ViewUri and DefineNodes,
 /// return the URIs of other views whose viewforests
 /// contain any changed PID. Includes search views --
 /// they are just as editable as other kinds.
 fn find_collateral_view_uris (
-  saved_uri         : &ViewUri,
-  save_instructions : &[DefineNode],
-  views_state        : &ViewsState,
+  saved_uri    : &ViewUri,
+  define_nodes : &[DefineNode],
+  views_state  : &ViewsState,
 ) -> Vec<ViewUri> {
   let changed_pids : HashSet<ID> =
-    save_instructions . iter ()
+    define_nodes . iter ()
     . filter_map ( |instr| match instr {
       DefineNode::Save ( SaveNode (n)) =>
         Some ( n . pid . clone () ),

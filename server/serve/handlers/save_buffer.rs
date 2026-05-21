@@ -18,7 +18,7 @@ use crate::types::env::SkgEnv;
 use crate::types::errors::SaveError;
 use crate::types::git::{SourceDiff, GitDiffStatus};
 use crate::types::misc::{ID, SourceName, SkgConfig};
-use crate::types::save::format_save_error_as_org;
+use crate::types::save::{DefineNode, format_save_error_as_org};
 use crate::types::views_state::ViewUri;
 use crate::update_buffer::update_views_after_save;
 
@@ -163,15 +163,15 @@ pub async fn update_from_and_rerender_buffer (
     { return Err ( "Nothing to save found in org_buffer_text"
                    . into() ); }
   let SavePlan { viewforest,
-                 define_nodes,
-                 merge_instructions,
+                 define_nodes       : nonmerge_defineNodes,
+                 merge_instructions : merges,
                  source_moves }
     = save_plan;
 
   { // update the graph
     update_graph_including_merges (
-      define_nodes . clone(),
-      &merge_instructions,
+      nonmerge_defineNodes . clone(),
+      &merges,
       &source_moves,
       env . config . clone(),
       &mut env . tantivy_index,
@@ -181,19 +181,23 @@ pub async fn update_from_and_rerender_buffer (
         "update_context_types_for_saved_nodes" ). entered();
       update_context_types_for_saved_nodes (
         &env . tantivy_index, &env . config . db_name,
-        &env . driver, &define_nodes ) . await
+        &env . driver, &nonmerge_defineNodes ) . await
       . unwrap_or_else ( |e| tracing::warn! (
         "context type recomputation failed: {}", e )); }}
 
+  let define_nodes : Vec<DefineNode> = // includes the merges
+    nonmerge_defineNodes . iter () . cloned ()
+    . chain ( merges . iter ()
+              . flat_map ( |merge| merge . to_vec () ))
+    . collect ();
+
   debug_assert! (
     // TODO | PITFALL: This is quite a weak assertion.
-    // PURPOSE: The in-Rust graph must already reflect every Save and Delete
-    // in 'save_instructions' by the time this function runs. Violating
-    // this invariant (e.g. by reordering the save pipeline so that
-    // 'update_views_after_save' runs before 'apply_definenodes')
-    // would let the rerender read stale NodeCompletes from the in-Rust graph.
-    in_rust_graph_coherent_with_save_instructions (&define_nodes) . is_ok (),
-    "update_views_after_save: in-Rust graph not coherent with save_instructions" );
+    // PURPOSE: The in-Rust graph must already reflect every Save and Delete in 'define_nodes' by the time this function runs. Violating this invariant (e.g. by reordering the save pipeline so that 'update_views_after_save' runs before 'apply_definenodes') would let the rerender read stale NodeCompletes from the in-Rust graph.
+    in_rust_graph_coherent_with_save_instructions (
+        &define_nodes
+      ) . is_ok (),
+    "update_views_after_save: in-Rust graph not coherent with define_nodes" );
 
   update_views_after_save (
     stream,
