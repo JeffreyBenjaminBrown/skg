@@ -33,8 +33,8 @@ use typedb_driver::TypeDBDriver;
 ///   - merge neighbor SaveNodes are derived from
 ///     merge instructions plus graph/DB state
 pub(crate) struct SaveAuthority {
-  role_viewforest : Tree<ViewNode_in_Role>,
-  candidates      : Vec<IntentCandidate>,
+  role_viewforest : Tree<ViewNode_in_Role>, // The whole buffer/view.
+  candidates      : Vec<IntentCandidate>, // Some of the nodes from the buffer.
 }
 
 impl SaveAuthority {
@@ -116,9 +116,8 @@ pub async fn extract_nonmerge_save_plan (
     &extraction_forest, config, driver ) . await
 }
 
-/// Converts a viewforest of ViewNodes to DefineNodes,
-/// reconciling duplicates via 'reconcile_same_id_instructions'
-/// and supplementing None fields with data from disk.
+/// Reconciles duplicates via 'reconcile_same_id_instructions'
+/// and supplements None fields with data from disk.
 /// Indefinitive nodes produce no instructions.
 pub(crate) async fn extract_nonmerge_save_plan_from_authority (
   save_authority : &SaveAuthority,

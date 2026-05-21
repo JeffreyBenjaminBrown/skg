@@ -33,6 +33,8 @@ pub fn classify_save_roles (
     roles . insert (node_id, role); }
   Ok (roles) }
 
+/// The SaveRole for each node is computed using the data in it and,
+/// potentially, in some of its neighbors in the tree.
 pub fn viewforest_with_saveroles (
   viewforest : &Tree<ViewNode>,
 ) -> Result<Tree<ViewNode_in_Role>, String> {

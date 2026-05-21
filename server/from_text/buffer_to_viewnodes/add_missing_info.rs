@@ -16,7 +16,8 @@ use typedb_driver::TypeDBDriver;
 use uuid::Uuid;
 
 /// PURPOSE:
-/// Just read the code; it's clearer than a restatement in English.
+/// Just read this function definition;
+/// it's clearer than a restatement in English.
 /// .
 /// PITFALL:
 /// Does not add *all* missing info.
