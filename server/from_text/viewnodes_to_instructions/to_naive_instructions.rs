@@ -35,10 +35,7 @@ pub(crate) struct NodeDeleteIntent {
   source : SourceName,
 }
 
-/// Node edit intents for the entire saved buffer,
-/// after reconcile_nodeEditIntents.
-/// PITFALL: There's a later step also called reconciliation:
-/// reconcile_same_id_instructions.
+/// Node edit intents for the entire saved buffer.
 pub(crate) struct SameIdReconciledNodeEditIntents {
   order  : Vec<ID>,
   by_pid : HashMap<ID, NodeEditIntent>,
@@ -181,7 +178,7 @@ impl NodeSaveIntent {
 
 impl SameIdReconciledNodeEditIntents {
   fn from_groups (
-    order  : Vec<ID>,
+    order      : Vec<ID>,
     mut groups : HashMap<ID, Vec<NodeEditIntent>>,
   ) -> Result<SameIdReconciledNodeEditIntents, String> {
     let mut by_pid : HashMap<ID, NodeEditIntent> =
@@ -189,9 +186,7 @@ impl SameIdReconciledNodeEditIntents {
     for pid in &order {
       let group : Vec<NodeEditIntent> =
         groups . remove (pid)
-        . ok_or (
-          "SameIdReconciledNodeEditIntents::from_groups: missing group"
-          . to_string())?;
+        . ok_or ( "SameIdReconciledNodeEditIntents::from_groups: missing group" . to_string())?;
       by_pid . insert (
         pid . clone(),
         reconcile_nodeEditIntents_with_same_ID (group)?); }
@@ -326,8 +321,8 @@ pub(crate) fn naive_node_edit_intents_from_candidates (
     aliases_by_node_id,
     subscribees_by_node_id) }
 
-/// Two NodeEditIntents can conflict if they have the same ID.
-/// This groups them by ID, and then on each group calls
+/// Ensures there is at most one save *or* one delete per ID.
+/// Groups intens by ID, then on each group calls
 /// reconcile_one_id_node_edit_intents.
 #[allow(non_snake_case)]
 pub(crate) fn reconcile_nodeEditIntents (
@@ -353,38 +348,29 @@ pub(crate) fn reconcile_nodeEditIntents (
 fn reconcile_nodeEditIntents_with_same_ID (
   intents : Vec<NodeEditIntent>,
 ) -> Result<NodeEditIntent, String> {
-  let mut ordinary_save : Option<NodeEditIntent> = None;
-  let mut delete : Option<NodeEditIntent> = None;
+  let mut optSave : Option<NodeEditIntent> = None;
+  let mut optDelete : Option<NodeEditIntent> = None;
   for intent in intents {
     let intent : NodeEditIntent = intent;
     match intent {
       NodeEditIntent::GraphSave (_) => {
-        if ordinary_save . is_some() {
+        if optSave . is_some() {
           return Err (
               "Multiple ordinary save instructions for same ID"
                 . to_string()); }
-        ordinary_save = Some (intent); },
+        optSave = Some (intent); },
       NodeEditIntent::Delete (_) => {
-        if delete . is_none() {
-          delete = Some (intent); }}}}
-  if delete . is_some() && ordinary_save . is_some() {
-    return Err (
-      "Cannot have both Delete and Save for same ID" . to_string()); }
-  match delete {
-    Some (delete) => {
-      let delete : NodeEditIntent = delete;
-      return Ok (delete); },
-    None => {},
-  }
-  match ordinary_save {
-    Some (ordinary_save) => {
-      let ordinary_save : NodeEditIntent = ordinary_save;
-      return Ok (ordinary_save); },
-    None => {},
-  }
-  Err (
-    "No delete and no save instruction found. This should not be possible."
-      . to_string()) }
+        if optDelete . is_none() {
+          optDelete = Some (intent); }} }}
+  if optDelete . is_some() && optSave . is_some() {
+    return Err ( "Cannot have both Delete and Save for same ID" . to_string()); }
+  match optDelete {
+    Some (delete) => { return Ok (delete); },
+    None => {}, }
+  match optSave {
+    Some (save) => { return Ok (save); },
+    None => {}, }
+  Err ( "No delete and no save instruction found. This should not be possible." . to_string()) }
 
 /// Returns buffer-order positions that can own save-intent extraction.
 ///

@@ -54,8 +54,9 @@ pub async fn buffer_to_validated_saveplan (
     : ( Tree<MaybePlacedViewnode>, Vec<BufferValidationError> )
     = { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "org_to_uninterpreted_nodes" ). entered();
+        // parse the raw buffer
         org_to_uninterpreted_nodes (buffer_text) }
-      . map_err (SaveError::ParseError) ?;
+          . map_err (SaveError::ParseError) ?;
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "add_missing_info_to_viewforest" ). entered();
     // Metadata filling must precede maybePlaced-tree validation,

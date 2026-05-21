@@ -193,9 +193,8 @@ pub(crate) async fn validate_no_title_or_body_edit_in_subscribeeAsSuch (
     else { continue; };
     if t . title != from_disk . title || *body != from_disk . body {
       return Err (Box::new (BufferValidationError::Other (
-        format!(
-          "Cannot edit title/body for node {} in subscribee-as-such position. View the node as itself to edit title/body.",
-          t . id )))); }}
+        format!( "Cannot edit title/body for node {} in subscribee-as-such position. View the node as itself to edit title/body.",
+                  t . id )) )); }}
   Ok (( )) }
 
 async fn build_disk_supplemented_define_nodes (
