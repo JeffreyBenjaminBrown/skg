@@ -183,7 +183,7 @@ first behavior-preserving split should be conservative.
 
 #+begin_src text
 pass                                            traversal to preserve
-mark_scaffolds_under_deleted_branches           preorder, prunable if detaching
+scaffolds_with_deleted_parents_become_deletedScaff           preorder, prunable if detaching
 expand_true_content_until_stable                preorder inside each expansion wave
   normalize_truenode_identity_and_state         parent before child
   sync_collateral_truenodes_from_graph          parent before child
@@ -213,7 +213,7 @@ Each pass may traverse the tree. That is acceptable.
 
 #+begin_src text
 complete_viewforest
-  -> mark_scaffolds_under_deleted_branches
+  -> scaffolds_with_deleted_parents_become_deletedScaff
   -> expand_true_content_until_stable
        -> normalize_truenode_identity_and_state
        -> sync_collateral_truenodes_from_graph
@@ -239,7 +239,7 @@ The payoff is that each pass name says what changed.
 ** Step 1: introduce an explicit pass driver
 
 In =server/update_buffer/complete.rs=, keep =CompletionContext= but replace
-=complete_viewforest_with_context= with a visible ordered list of passes.
+=complete_viewforest= with a visible ordered list of passes.
 
 At first, the list can still call the old functions, to keep the first diff
 small:
@@ -278,7 +278,7 @@ Scaff under Deleted or DeletedScaff parent becomes DeletedScaff
 Make it a standalone parent-first or ordinary DFS pass:
 
 #+begin_src text
-mark_scaffolds_under_deleted_branches
+scaffolds_with_deleted_parents_become_deletedScaff
 #+end_src
 
 This removes an unrelated special case from the TrueNode/SubscribeeCol
@@ -427,7 +427,7 @@ This can be done after behavior-preserving splits, to avoid noisy diffs.
 
 ** Commit 1: driver only
 
-Make =complete_viewforest_with_context= visibly call a list of named pass
+Make =complete_viewforest= visibly call a list of named pass
 functions, while those pass functions still delegate to the current two
 recursive routines.
 

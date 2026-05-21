@@ -5,10 +5,10 @@ pub mod graphnodestats;
 pub mod util;
 pub mod viewnodestats;
 
-pub use complete::complete_viewforest;
 pub use graphnodestats::set_graphnodestats_in_viewforest;
 pub use viewnodestats::set_viewnodestats_in_viewforest;
 
+use complete::{complete_viewforest, CompletionContext};
 use crate::dbs::in_rust_graph::{ InRustGraph, scheduled_audit::take_pending_audit_warning};
 use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
@@ -228,16 +228,21 @@ pub async fn rerender_view (
   is_saved_view : bool,
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
-  tracing::debug!("rerender_view: starting");
-  strip_stale_diff_state (viewforest) ?;
-  let mut defmap : DefinitiveMap = DefinitiveMap::new ();
-  tracing::debug!("rerender_view: starting complete_viewforest");
-  complete_viewforest (
-    viewforest, &mut defmap,
-    &context . source_diffs, context . env, &context . graph_snap,
-    &mut context . errors, &context . deleted_since_head_pid_src_map,
-    &context . deleted_by_this_save_pids,
-    is_saved_view ) . await ?;
+  { tracing::debug!("rerender_view: starting");
+    strip_stale_diff_state (viewforest) ?; }
+  { tracing::debug!("rerender_view: starting complete_viewforest");
+    let mut defmap : DefinitiveMap = DefinitiveMap::new ();
+    let mut completion_context : CompletionContext = CompletionContext {
+      defmap                         : &mut defmap,
+      source_diffs                   : &context . source_diffs,
+      env                            : context . env,
+      graph_snap                     : &context . graph_snap,
+      errors                         : &mut context . errors,
+      deleted_since_head_pid_src_map : &context . deleted_since_head_pid_src_map,
+      deleted_by_this_save_pids      : &context . deleted_by_this_save_pids,
+      is_saved_view, };
+    complete_viewforest (
+      viewforest, &mut completion_context ) . await ?; }
   mark_view_roots_independent (viewforest);
   if let Some (snap) = snapshot_global () {
     // Correct any birth markers whose claimed relation to the
@@ -250,14 +255,14 @@ pub async fn rerender_view (
     viewforest, &context . env . config,
     &context . env . driver ) . await ?;
   tracing::debug!("rerender_view: complete_viewforest done ({:.3}s), starting graphnodestats",
-            t_rerender . elapsed () . as_secs_f64 ());
+                  t_rerender . elapsed () . as_secs_f64 ());
   let ( container_to_contents, content_to_containers ) =
     set_graphnodestats_in_viewforest (
       viewforest,
       &context . env . config,
       &context . env . driver ) . await ?;
   tracing::debug!("rerender_view: graphnodestats done ({:.3}s), rendering to string",
-            t_rerender . elapsed () . as_secs_f64 ());
+                  t_rerender . elapsed () . as_secs_f64 ());
   set_viewnodestats_in_viewforest (
     viewforest,
     &container_to_contents,

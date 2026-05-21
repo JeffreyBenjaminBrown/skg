@@ -21,49 +21,26 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-pub async fn complete_viewforest (
-  viewforest                     : &mut Tree<ViewNode>,
-  defmap                         : &mut DefinitiveMap,
-  source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
-  env                            : &SkgEnv,
-  graph_snap                     : &Arc<InRustGraph>,
-  errors                         : &mut Vec<String>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  deleted_by_this_save_pids      : &HashSet<ID>,
-  is_saved_view                  : bool,
-) -> Result<(), Box<dyn Error>> {
-  let mut context : CompletionContext = CompletionContext {
-    defmap,
-    source_diffs,
-    env,
-    graph_snap,
-    errors,
-    deleted_since_head_pid_src_map,
-    deleted_by_this_save_pids,
-    is_saved_view,
-  };
-  complete_viewforest_with_context (viewforest, &mut context) . await }
-
-struct CompletionContext<'a> {
-  defmap                         : &'a mut DefinitiveMap,
-  source_diffs                   : &'a Option<HashMap<SourceName, SourceDiff>>,
-  env                            : &'a SkgEnv,
-  graph_snap                     : &'a Arc<InRustGraph>,
-  errors                         : &'a mut Vec<String>,
-  deleted_since_head_pid_src_map : &'a HashMap<ID, SourceName>,
-  deleted_by_this_save_pids      : &'a HashSet<ID>,
-  is_saved_view                  : bool,
+pub(super) struct CompletionContext<'a> {
+  pub(super) defmap                         : &'a mut DefinitiveMap,
+  pub(super) source_diffs                   : &'a Option<HashMap<SourceName, SourceDiff>>,
+  pub(super) env                            : &'a SkgEnv,
+  pub(super) graph_snap                     : &'a Arc<InRustGraph>,
+  pub(super) errors                         : &'a mut Vec<String>,
+  pub(super) deleted_since_head_pid_src_map : &'a HashMap<ID, SourceName>,
+  pub(super) deleted_by_this_save_pids      : &'a HashSet<ID>,
+  pub(super) is_saved_view                  : bool,
 }
 
-async fn complete_viewforest_with_context (
+pub(super) async fn complete_viewforest (
   viewforest : &mut Tree<ViewNode>,
   context    : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
   let root_treeid : NodeId = viewforest . root () . id ();
-  mark_scaffolds_under_deleted_branches (viewforest) ?;
+  scaffolds_with_deleted_parents_become_deletedScaff (viewforest) ?;
   expand_true_content_until_stable (
     viewforest, root_treeid, context ) . await ?;
-  mark_scaffolds_under_deleted_branches (viewforest) ?;
+  scaffolds_with_deleted_parents_become_deletedScaff (viewforest) ?;
   ensure_diff_scaffolds (viewforest, context) ?;
   let postorder_true_nodes : Vec<NodeId> =
     collect_matching_nodeids (
@@ -80,7 +57,15 @@ async fn complete_viewforest_with_context (
   remove_empty_deleted_scaffolds (viewforest) ?;
   Ok(( )) }
 
-fn mark_scaffolds_under_deleted_branches (
+/// Convert to DeletedScaff every scaffold node
+/// whose parent is deleted (be it scaffold or truenode).
+///
+/// Completion can encounter this in two ways:
+/// - The incoming view already had scaffolds
+///   beneath a node that has since become Deleted.
+/// - An earlier completion phase may add or preserve scaffolds
+///   before a later pass has cleaned up the deleted subtree.
+fn scaffolds_with_deleted_parents_become_deletedScaff (
   tree : &mut Tree<ViewNode>,
 ) -> Result<(), Box<dyn Error>> {
   let root_treeid : NodeId = tree . root () . id ();
@@ -99,7 +84,8 @@ fn mark_scaffolds_under_deleted_branches (
             ViewNodeKind::DeletedScaff (_) ))
           . unwrap_or (false);
         if parent_is_deleted {
-          node . value () . kind = ViewNodeKind::DeletedScaff (kind); }}
+          node . value () . kind =
+            ViewNodeKind::DeletedScaff (kind); }}
       Ok (( )) } )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) }
 
@@ -111,8 +97,8 @@ fn expand_true_content_until_stable<'a> (
   treeid  : NodeId,
   context : &'a mut CompletionContext<'_>,
 ) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
-  // See the 'MANUAL RECURSION' comment at the top of this file.
   Box::pin ( async move {
+    // Box? Pin? See the 'MANUAL RECURSION' comment at the top of this file.
     expand_true_content_at_node (tree, treeid, context) . await ?;
     let child_treeids : Vec<NodeId> =
       tree . get (treeid) . unwrap ()

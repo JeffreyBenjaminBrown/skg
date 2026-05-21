@@ -100,24 +100,26 @@ impl CompletionMode {
 /// That's because the second, DFS-postorder (child-first)
 /// pass will not be correct if any truenode is missing children.
 ///
-/// WHAT IT DOES (high-level phases):
-/// 1. resolve_truenode_kind -- phantom/indefinitive/deleted-by-save
-///    short-circuits; otherwise yields (pid, source).
-/// 2. clear_consumed_edit_request
-/// 3. Load NodeComplete; sync title/body from disk for non-saved views.
-/// 4. reconcile_content_children -- goal list + phantoms + indep-mark.
-/// 5. order_children_as_scaffolds_then_ignored_then_content
-/// 6. maybe_prepend_subscribee_col
+/// WHAT IT DOES (high-level phases), in order:
+/// - resolve_truenode_kind:- phantom/indefinitive/deleted-by-save
+///   short-circuits; otherwise yields (pid, source).
+/// - clear_consumed_edit_request
+/// - Load NodeComplete;
+///   sync title/body from disk for non-saved views.
+/// - reconcile_content_children:
+///   goal list + phantoms + indep-mark
+/// - order_children_as_scaffolds_then_ignored_then_content
+/// - maybe_prepend_subscribee_col
 pub fn expand_true_content_at_truenode (
   node               : NodeId,
   tree               : &mut Tree<ViewNode>,
   defmap             : &mut DefinitiveMap,
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
-  graph_snap                      : &Arc<InRustGraph>,
+  graph_snap                     : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  deleted_by_this_save_pids       : &HashSet<ID>,
-  is_saved_view                   : bool,
+  deleted_by_this_save_pids      : &HashSet<ID>,
+  is_saved_view                  : bool,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
     tree, node, |vn : &ViewNode| matches!( &vn . kind,
