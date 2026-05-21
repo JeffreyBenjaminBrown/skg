@@ -28,7 +28,7 @@ fn test_reconcile_alias_col_children
 
 async fn test_reconcile_alias_col_children_logic (
   config : &SkgConfig,
-  driver : &typedb_driver::TypeDBDriver,
+  _driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
 
   let source_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
@@ -167,7 +167,7 @@ fn test_reconcile_alias_col_children_duplicate_aliases_different_orders
 
 async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders_logic (
   config : &SkgConfig,
-  driver : &typedb_driver::TypeDBDriver,
+  _driver : &typedb_driver::TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
 
   let source_diffs : Option<HashMap<SourceName, SourceDiff>> = None;

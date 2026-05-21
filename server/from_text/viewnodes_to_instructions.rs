@@ -111,6 +111,9 @@ pub async fn extract_nonmergeSavePlan (
   let extraction_forest : SaveAuthority =
     SaveAuthority::from_viewforest (viewforest)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+  validate_no_title_or_body_edit_in_subscribeeAsSuch (
+    extraction_forest . role_viewforest (), config, driver
+  ) . await?;
   extract_nonmergeSavePlan_from_authority (
     &extraction_forest, config, driver ) . await
 }

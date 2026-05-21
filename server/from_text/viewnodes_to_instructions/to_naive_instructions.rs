@@ -45,6 +45,8 @@ struct NodeEditMinimal {
   source : SourceName,
   kind   : NodeEditMinimalAction, }
 
+/// What one can discern from the node
+/// without considering its neighbors.
 enum NodeEditMinimalAction {
   Save { title : String,
          body  : Option<String>, },
