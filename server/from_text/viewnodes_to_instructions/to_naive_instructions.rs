@@ -53,14 +53,14 @@ enum NodeEditMinimalAction {
   Delete, }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum IntentCandidateKind {
+pub(crate) enum SavenodeCandidateKind {
   OrdinaryTrueNode,
   SubscribeeAsSuch { subscriber : ID }, }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct IntentCandidate {
+pub(crate) struct SavenodeCandidateKind {
   pub(crate) treeid : NodeId,
-  pub(crate) kind   : IntentCandidateKind, }
+  pub(crate) kind   : SavenodeCandidateKind, }
 
 impl NodeEditIntent {
   pub(crate) fn pid (
@@ -259,8 +259,8 @@ pub(crate) fn naive_node_edit_intents_from_viewforest (
 pub(crate) fn naive_node_edit_intents_from_role_viewforest (
   role_viewforest : &Tree<ViewNode_in_Role>,
 ) -> Result<Vec<NodeEditIntent>, String> {
-  let candidates : Vec<IntentCandidate> =
-    collect_intent_candidates (
+  let candidates : Vec<SavenodeCandidate> =
+    collect_savenode_candidates (
       role_viewforest)?;
   naive_node_edit_intents_from_candidates (
     role_viewforest, &candidates) }
@@ -273,18 +273,18 @@ pub(crate) fn naive_node_edit_intents_from_role_viewforest (
 /// - supplemented from disk ('build_disk_supplemented_define_nodes')
 /// - filtered for no-op saves
 /// - ignorant of the special hiderel interpretation in the case of
-///   IntentCandidateKind::SubscribeeAsSuch
+///   SavenodeCandidateKind::SubscribeeAsSuch
 ///   ('ubscribee_hiderel_intents_from_candidates' does that)
 pub(crate) fn naive_node_edit_intents_from_candidates (
   role_viewforest : &Tree<ViewNode_in_Role>,
-  candidates      : &[IntentCandidate],
+  candidates      : &[SavenodeCandidate],
 ) -> Result<Vec<NodeEditIntent>, String> {
   let candidate_ids : Vec<NodeId> =
     candidates . iter()
     . filter_map (|candidate| match &candidate . kind {
-      IntentCandidateKind::OrdinaryTrueNode =>
+      SavenodeCandidateKind::OrdinaryTrueNode =>
         Some (candidate . treeid),
-      IntentCandidateKind::SubscribeeAsSuch { .. } =>
+      SavenodeCandidateKind::SubscribeeAsSuch { .. } =>
         None,
     })
     . collect();
@@ -382,20 +382,20 @@ fn reconcile_nodeEditIntents_with_same_ID (
 /// Keeping this as a separate ordered pass lets the following
 /// collectors share one candidate list without each rediscovering the
 /// same traversal/pruning policy.
-pub(crate) fn collect_intent_candidates (
+pub(crate) fn collect_savenode_candidates (
   tree  : &Tree<ViewNode_in_Role>,
-) -> Result<Vec<IntentCandidate>, String> {
+) -> Result<Vec<SavenodeCandidate>, String> {
   fn maybe_collect_candidate_and_recurse (
     tree    : &Tree<ViewNode_in_Role>,
     node_id : NodeId,
-    result  : &mut Vec<IntentCandidate>
+    result  : &mut Vec<SavenodeCandidate>
   ) -> Result<(), String> {
 
     /// Defined separately because it's called in two places.
     fn recurse_on_children (
       tree: &Tree<ViewNode_in_Role>,
       node_id: NodeId,
-      result: &mut Vec<IntentCandidate>
+      result: &mut Vec<SavenodeCandidate>
     ) -> Result<(), String> {
       for child_treeid in
         { let child_treeids: Vec<NodeId> =
@@ -427,26 +427,26 @@ pub(crate) fn collect_intent_candidates (
         // An UnknownNode is a placeholder for a missing referent. It cannot generate save instructions itself, but its descendents might, so we recurse.
         recurse_on_children( tree, node_id, result )?,
       ViewNodeKind::True (t) => {
-        let candidate_kind : Option<IntentCandidateKind> =
+        let candidate_kind : Option<SavenodeCandidateKind> =
           match role {
             SaveRole::Truenode =>
-              Some (IntentCandidateKind::OrdinaryTrueNode),
+              Some (SavenodeCandidateKind::OrdinaryTrueNode),
             SaveRole::TruenodeAsSubscribee { subscriber } =>
-              Some (IntentCandidateKind::SubscribeeAsSuch {
+              Some (SavenodeCandidateKind::SubscribeeAsSuch {
                 subscriber,
               }),
             _ => None,
           };
         if let Some (kind) = candidate_kind {
           if ! t . is_indefinitive() {
-            result . push (IntentCandidate {
+            result . push (SavenodeCandidate {
               treeid : node_id,
               kind,
             }); }
           recurse_on_children( tree, node_id, result )?; }}}
     Ok(( )) }
 
-  let mut result: Vec<IntentCandidate> = Vec::new();
+  let mut result: Vec<SavenodeCandidate> = Vec::new();
   let root_id : NodeId = tree . root() . id();
   maybe_collect_candidate_and_recurse (
     tree, root_id, &mut result ) ?;

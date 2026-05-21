@@ -1,6 +1,6 @@
 * Problems found during herald overhaul research
 ** Save validation and extraction use different edit-request surfaces
-   The save extraction path uses 'collect_intent_candidates' to define
+   The save extraction path uses 'collect_savenode_candidates' to define
    which view positions can produce save/merge instructions. Some
    validation still walks the whole viewforest directly, especially
    merge validation and contradictory instruction collection.

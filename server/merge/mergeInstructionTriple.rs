@@ -2,7 +2,7 @@ use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
 use crate::dbs::typedb::search::find_related_nodes;
 use crate::from_text::viewnodes_to_instructions::SaveAuthority;
 use crate::from_text::viewnodes_to_instructions::to_naive_instructions::{
-  IntentCandidateKind };
+  SavenodeCandidateKind };
 use crate::dbs::node_lookup::nodeComplete_rustFIrst_by_id;
 use crate::types::save::{Merge, SaveNode, DeleteNode};
 use crate::types::misc::{MSV, SkgConfig, ID};
@@ -104,7 +104,7 @@ pub(crate) async fn instructiontriples_from_merge_candidates (
   for candidate in extraction_forest . candidates () {
     if ! matches!(
       candidate . kind,
-      IntentCandidateKind::OrdinaryTrueNode)
+      SavenodeCandidateKind::OrdinaryTrueNode)
     { continue; }
     let node_ref =
       extraction_forest . role_viewforest () . get (candidate . treeid)
