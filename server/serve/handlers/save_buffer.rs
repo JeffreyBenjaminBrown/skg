@@ -1,8 +1,6 @@
 use crate::context::update_context_types_for_saved_nodes;
-use crate::types::env::SkgEnv;
-use crate::from_text::{
-  SavePlan,
-  buffer_to_validated_saveplan};
+use crate::dbs::in_rust_graph::in_rust_graph_coherent_with_save_instructions;
+use crate::from_text::{ SavePlan, buffer_to_validated_saveplan};
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
 use crate::save::update_graph_including_merges;
@@ -15,7 +13,8 @@ use crate::serve::util::{
   read_length_prefixed_content,
   send_response_with_length_prefix,
   tag_sexp_response,
-  tag_text_response};
+  tag_text_response };
+use crate::types::env::SkgEnv;
 use crate::types::errors::SaveError;
 use crate::types::git::{SourceDiff, GitDiffStatus};
 use crate::types::misc::{ID, SourceName, SkgConfig};
@@ -186,11 +185,20 @@ pub async fn update_from_and_rerender_buffer (
       . unwrap_or_else ( |e| tracing::warn! (
         "context type recomputation failed: {}", e )); }}
 
+  debug_assert! (
+    // TODO | PITFALL: This is quite a weak assertion.
+    // PURPOSE: The in-Rust graph must already reflect every Save and Delete
+    // in 'save_instructions' by the time this function runs. Violating
+    // this invariant (e.g. by reordering the save pipeline so that
+    // 'update_views_after_save' runs before 'apply_definenodes')
+    // would let the rerender read stale NodeCompletes from the in-Rust graph.
+    in_rust_graph_coherent_with_save_instructions (&define_nodes) . is_ok (),
+    "update_views_after_save: in-Rust graph not coherent with save_instructions" );
+
   update_views_after_save (
     stream,
     viewforest,
     define_nodes,
-    &merge_instructions,
     diff_mode_enabled,
     env,
     viewuri_from_request_result,

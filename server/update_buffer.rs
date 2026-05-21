@@ -9,7 +9,7 @@ pub use complete::complete_viewforest;
 pub use graphnodestats::set_graphnodestats_in_viewforest;
 pub use viewnodestats::set_viewnodestats_in_viewforest;
 
-use crate::dbs::in_rust_graph::{InRustGraph, in_rust_graph_coherent_with_save_instructions, scheduled_audit::take_pending_audit_warning};
+use crate::dbs::in_rust_graph::{ InRustGraph, scheduled_audit::take_pending_audit_warning};
 use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
@@ -21,7 +21,7 @@ use crate::to_org::util::DefinitiveMap;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::views_state::ViewUri;
 use crate::types::misc::{ID, SourceName, SkgConfig};
-use crate::types::save::{DefineNode, Merge, SaveNode};
+use crate::types::save::{DefineNode, SaveNode};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
 use crate::to_org::util::{mark_view_roots_independent, validate_birth_relationships};
 use crate::dbs::in_rust_graph::snapshot_global;
@@ -103,27 +103,11 @@ pub async fn update_views_after_save (
   stream                      : &mut std::net::TcpStream,
   saved_view                  : Tree<ViewNode>,
   save_instructions           : Vec<DefineNode>,
-  merge_instructions          : &[Merge],
   diff_mode_enabled           : bool,
   env                         : &SkgEnv,
   viewuri_from_request_result : &Result<ViewUri, String>,
   views_state                  : &mut ViewsState,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  // PITFALL: The in-Rust graph must already reflect every Save and Delete in
-  // 'save_instructions' by the time this function runs. Violating
-  // this invariant (e.g. by reordering the save pipeline so that
-  // 'update_views_after_save' runs before 'apply_definenodes')
-  // would let the rerender read stale NodeCompletes from the in-Rust graph.
-  debug_assert! (
-    in_rust_graph_coherent_with_save_instructions (&save_instructions) . is_ok (),
-    "update_views_after_save: in-Rust graph not coherent with save_instructions" );
-  // 'merge_instructions' is no longer consumed here: the graph
-  // mutation already happened upstream, the acquiree/acquirer
-  // mapping is in the in-Rust graph's extra_id_to_pid map, and
-  // resolve_extra_ids_in_viewforest consults that map. We keep the
-  // parameter for caller stability and to make the provenance of
-  // the extra-id bindings explicit at the save-handler level.
-  let _ = merge_instructions;
   // Snapshot the in-Rust graph once for this save's rerender pass.
   // Used both by resolve_extra_ids_in_viewforest (swap acquiree pids
   // to acquirer pids before rerender) and by content_goal_list
