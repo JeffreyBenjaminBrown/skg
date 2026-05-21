@@ -246,7 +246,7 @@ async fn supplement_saveintent_from_disk (
     None =>
       Ok (Definenode_with_Opt_Sourcemove {
         instruction :
-          NodeEditIntent::GraphSave (from_buffer) . into_define_node()
+          NodeEditIntent::Save (from_buffer) . into_define_node()
           . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
         source_move : None,
       }),

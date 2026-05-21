@@ -84,10 +84,10 @@ Do not broaden behavior in this item unless tests force it.
 
 Current behavior to preserve:
 
-- duplicate =GraphSave= intents for the same ID conflict;
+- duplicate =Save= intents for the same ID conflict;
 - duplicate =SubscribeeEdit= intents for the same ID conflict;
 - save/delete conflicts reject;
-- if a =GraphSave= and =SubscribeeEdit= share an ID, the
+- if a =Save= and =SubscribeeEdit= share an ID, the
   ordinary graph save wins for final graph output;
 - delete output remains possible and ordered.
 
@@ -172,7 +172,7 @@ cargo test --test typedb update_typedb_from_saveinstructions -- --nocapture
 Add or adjust one focused regression if the new collection changes
 ordering or exposes an untested invariant. Useful assertions:
 
-- same-ID ordinary =GraphSave= still wins over a direct
+- same-ID ordinary =Save= still wins over a direct
   =AsSubscribee= edit surface;
 - synthesized subscriber hide/unhide saves are appended when no
   subscriber graph save already exists;

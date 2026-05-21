@@ -40,7 +40,7 @@ Prefer explicit variants:
 
 #+begin_src rust
 pub(crate) enum NodeEditIntent {
-  GraphSave (NodeSaveIntent),
+  Save (NodeSaveIntent),
   Delete (NodeDeleteIntent),
   SubscribeeVisibilitySurface (SubscribeeHiderelIntent),
 }
@@ -65,7 +65,7 @@ lists must not be stored in 'NodeSaveIntent.contains'.
 
 Change 'NodeEditIntent::Save' to either:
 
-- 'NodeEditIntent::GraphSave'; or
+- 'NodeEditIntent::Save'; or
 - a separate 'GraphEditIntent::Save' if the enum split is cleaner.
 
 The point is to make every graph-save variant mean that its 'contains'

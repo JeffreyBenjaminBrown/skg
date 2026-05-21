@@ -135,7 +135,7 @@ role-position policy as if it were a graph-save property.
 Prefer a representation that cannot accidentally treat direct
 subscribee children as graph =contains=:
 
-- separate variants such as =NodeEditIntent::GraphSave= and
+- separate variants such as =NodeEditIntent::Save= and
   =NodeEditIntent::SubscribeeVisibilitySurface=; or
 - a small enum such as
   =DirectChildrenMeaning::{GraphContains, SubscriberVisibility}=.
@@ -164,7 +164,7 @@ supplementation, because no subscribee-as-such visibility surface ever
 becomes a subscribee graph =contains= edit.
 
 Status: complete. =NodeEditIntent= now distinguishes ordinary
-=GraphSave= from subscribee-as-such edit surfaces, and
+=Save= from subscribee-as-such edit surfaces, and
 =NodeSaveIntent.contains= is unspecified for subscribee-as-such
 occurrences. The old =children_affect_only_hiding= field is gone.
 

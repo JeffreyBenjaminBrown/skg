@@ -12,8 +12,8 @@ use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 
 pub(crate) enum NodeEditIntent {
-  GraphSave (NodeSaveIntent),
-  Delete    (NodeDeleteIntent),
+  Save   (NodeSaveIntent),
+  Delete (NodeDeleteIntent),
 }
 
 pub(crate) struct NodeSaveIntent {
@@ -67,9 +67,8 @@ impl NodeEditIntent {
     &self,
   ) -> &ID {
     match self {
-      NodeEditIntent::GraphSave (intent) => &intent . pid,
-      NodeEditIntent::Delete (intent) => &intent . pid,
-    }}
+      NodeEditIntent::Save (intent) => &intent . pid,
+      NodeEditIntent::Delete (intent) => &intent . pid, }}
 
   pub(crate) fn apply_hiderel_delta (
     &mut self,
@@ -78,7 +77,7 @@ impl NodeEditIntent {
     inferred_unhides : &[ID],
   ) {
     match self {
-      NodeEditIntent::GraphSave (intent)
+      NodeEditIntent::Save (intent)
         => intent . apply_hiderel_delta (
              base_hides, inferred_hides, inferred_unhides),
       NodeEditIntent::Delete (_) => {}, }}
@@ -86,7 +85,7 @@ impl NodeEditIntent {
   pub(crate) fn graph_save_from_nodecomplete (
     node : NodeComplete,
   ) -> NodeEditIntent {
-    NodeEditIntent::GraphSave (NodeSaveIntent {
+    NodeEditIntent::Save (NodeSaveIntent {
       pid                          : node . pid,
       source                       : node . source,
       title                        : node . title,
@@ -105,7 +104,7 @@ impl NodeEditIntent {
     self,
   ) -> Result<NodeSaveIntent, String> {
     match self {
-      NodeEditIntent::GraphSave (intent) =>
+      NodeEditIntent::Save (intent) =>
         Ok (intent),
       NodeEditIntent::Delete (_) =>
         Err ("Delete intent does not contain a SaveNode" . to_string()),
@@ -119,7 +118,7 @@ impl NodeEditIntent {
         => Ok (DefineNode::Delete (DeleteNode {
           id     : intent . pid,
           source : intent . source, } )),
-      NodeEditIntent::GraphSave (intent)
+      NodeEditIntent::Save (intent)
         => Ok (DefineNode::Save (SaveNode (
           intent . into_nodecomplete() ))) }}
 }
@@ -201,7 +200,7 @@ impl SameIdReconciledNodeEditIntents {
     subscriber_from_disk : &NodeComplete,
   ) -> HashSet<ID> {
     match self . by_pid . get (&subscriber_from_disk . pid) {
-      Some (NodeEditIntent::GraphSave (intent)) =>
+      Some (NodeEditIntent::Save (intent)) =>
         intent . contains . or_default() . iter() . cloned() . collect(),
       _ =>
         subscriber_from_disk . contains . iter() . cloned() . collect(),
@@ -348,7 +347,7 @@ fn reconcile_nodeEditIntents_with_same_ID (
   for intent in intents {
     let intent : NodeEditIntent = intent;
     match intent {
-      NodeEditIntent::GraphSave (_) => {
+      NodeEditIntent::Save (_) => {
         if optSave . is_some() {
           return Err (
               "Multiple ordinary save instructions for same ID"
@@ -575,7 +574,7 @@ fn assemble_node_edit_intents (
               overrides_view_of            : MSV::Unspecified,
               misc                         : Vec::new(),
             };
-          result . push (NodeEditIntent::GraphSave (intent)); },
+          result . push (NodeEditIntent::Save (intent)); },
     }}
   Ok (result) }
 
