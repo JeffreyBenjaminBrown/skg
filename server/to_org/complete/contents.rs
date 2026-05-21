@@ -18,6 +18,7 @@ pub fn clobberIndefinitiveViewnode (
   treeid  : NodeId,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
+
   let (node_id, source) : (ID, SourceName) =
     pid_and_source_from_treenode (
       tree, treeid, "clobberIndefinitiveViewnode" ) ?;
@@ -29,5 +30,4 @@ pub fn clobberIndefinitiveViewnode (
     t . title = title;
     t . source = source; }
   ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-
   Ok (( )) }

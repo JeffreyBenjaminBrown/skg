@@ -99,19 +99,7 @@ impl CompletionMode {
 /// INTENDED USE: Use in the first, DFS preorder (parent-first)
 /// buffer-update pass through the tree.
 /// That's because the second, DFS-postorder (child-first)
-/// pass will not be correct if any truenode is missing children.
-///
-/// WHAT IT DOES (high-level phases), in order:
-/// - make_indef_if_repeat_then_extend_defmap
-/// - truenode_completion_treatment: fetch (pid, source), but
-///   short-circuit for phantom/indefinitive/deleted-by-save.
-/// - clear_edit_request
-/// - Load NodeComplete;
-///   sync title/body from disk for non-saved views.
-/// - reconcile_content_children:
-///   goal list + phantoms + indep-mark
-/// - order_children_as_scaffolds_then_ignored_then_content
-/// - maybe_prepend_subscribee_col
+/// pass would be wrong if any truenode were missing children.
 pub fn expand_true_content_at_truenode (
   node               : NodeId,
   tree               : &mut Tree<ViewNode>,
@@ -195,7 +183,7 @@ fn truenode_completion_treatment (
   let (pid, source) : (ID, SourceName) =
     pid_and_source_from_treenode( tree, node,
                                   "truenode_completion_treatment" ) ?;
-  maybe_change_node_diff_status(
+  set_diff_status(
     tree, node, &pid, source_diffs, &source) ?;
   let is_indefinitive : bool =
     read_at_node_in_tree( tree, node,
@@ -689,7 +677,7 @@ fn build_child_creation_data (
   Ok (result) }
 
 /// In diff view, set the TrueNode's per-stage diff axes.
-fn maybe_change_node_diff_status (
+fn set_diff_status (
   tree         : &mut Tree<ViewNode>,
   node         : NodeId,
   pid          : &ID,
@@ -712,9 +700,9 @@ fn maybe_change_node_diff_status (
     . and_then ( |d| d . status . to_existence_sign () );
   let unstaged_x : Option<Sign> = source_diff . unstaged . get (&file_path)
     . and_then ( |d| d . status . to_existence_sign () );
-  // Membership axes derive from the parent's per-stage contains_diff:
-  // if pid is New(pid) in a stage, that stage's M is Plus.
   let (staged_m, unstaged_m) : (Option<Sign>, Option<Sign>) = {
+    // Membership axes derive from the parent's per-stage contains_diff:
+    // if pid is New(pid) in a stage, that stage's M is Plus.
     let is_non_content : bool =
       read_at_node_in_tree( tree, node,
         |vn : &ViewNode| match &vn . kind {

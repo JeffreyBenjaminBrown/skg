@@ -1235,7 +1235,7 @@ is now : id_to_pid_if_found
    - True?: Partly. The "complete" verb is honest at the level of the comment (seven phases) but the name conceals that this single function may mutate the node's kind to Deleted (via mutate_truenode_to_deletednode), clobber it as indefinitive, or short-circuit on phantom — i.e., "complete" sometimes means "rewrite".
    - Omits?: It omits the in-place kind mutation paths and the clobber-and-stop behavior.
 ** truenode_completion_treatment (line 118)
-   - True?: Partly. Despite "resolve", the function also calls maybe_change_node_diff_status, which mutates the node's diff axes, and it can mutate the node into a DeletedNode kind in the deleted_by_this_save case.
+   - True?: Partly. Despite "resolve", the function also calls set_diff_status, which mutates the node's diff axes, and it can mutate the node into a DeletedNode kind in the deleted_by_this_save case.
    - Omits?: It omits the diff-axis mutation and the kind-rewrite to DeletedNode.
 ** clear_edit_request (line 158)
    - True?: Yes.
@@ -1276,7 +1276,7 @@ is now : id_to_pid_if_found
 ** build_child_creation_data (line 533)
    - True?: Partly. The function reads NodeCompletes from memory/disk for non-existing children — a per-call I/O step buried under "build".
    - Omits?: It omits the disk reads.
-** maybe_change_node_diff_status (line 596)
+** set_diff_status (line 596)
    - True?: Partly. The function changes ExistenceAxes, MembershipAxes, AND not_in_git on the truenode; "diff_status" is a term of art the reader may not know covers all three fields.
    - Omits?: It omits the breadth of the rewrite (three fields) and the not-in-git case.
 ** membership_signs_from_parent_contains (line 650)
