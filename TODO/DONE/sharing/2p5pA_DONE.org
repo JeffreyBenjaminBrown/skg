@@ -95,7 +95,7 @@ submodule:
 
 #+begin_src rust
 struct SaveExtraction {
-  node_edit_intents  : Vec<NodeEditIntent>,
+  node_edit_intents  : Vec<NodeIntent>,
   hiderel_intents : Vec<SubscribeeHiderelIntent>,
 }
 #+end_src
@@ -121,7 +121,7 @@ in the pipeline.
 
 ** 4. Extract conversion plus disk supplementation
 
-Move the current loop over reconciled 'NodeEditIntent' values into a
+Move the current loop over reconciled 'NodeIntent' values into a
 helper, probably returning:
 
 #+begin_src rust
@@ -164,7 +164,7 @@ to item c of 2p5, not this plan.
 
 Use existing types and helpers. Avoid changing:
 
-- 'NodeEditIntent';
+- 'NodeIntent';
 - 'NodeSaveIntent';
 - 'children_affect_only_hiding';
 - 'SubscribeeHiderelIntent';
@@ -233,6 +233,6 @@ already covered, do not add another near-duplicate.
 
 - Do not move visibility folding before 'DefineNode' construction.
 - Do not replace 'children_affect_only_hiding'.
-- Do not split 'NodeEditIntent' into graph and visibility variants.
+- Do not split 'NodeIntent' into graph and visibility variants.
 - Do not change same-ID reconciliation policy.
 - Do not change validation or rerender completion semantics.

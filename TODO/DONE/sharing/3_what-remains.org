@@ -14,7 +14,7 @@ save-path shape:
 - disk supplementation is policy-neutral and no longer has a
   subscribee-as-such =contains= restoration guardrail;
 - post-=reconcile_nodeEditIntents= lookup is keyed by
-  =SameIdReconciledNodeEditIntents=;
+  =SameIdReconciledNodeIntents=;
 - validation and rerender/completion boundaries are documented in
   [[./2p5_simplify-save.org][2p5_simplify-save.org]].
 

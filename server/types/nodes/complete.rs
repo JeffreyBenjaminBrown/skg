@@ -30,15 +30,10 @@ pub struct NodeComplete {
   // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/misc.rs) distinguishes 'Unspecified' ("user didn't mention this field") from 'Specified(vec![...])' ("user wants it to be this value, even if empty"). This matters when reconciling multiple NodeCompletes (e.g. 'reconcile_same_id_instructions' and supplement_unspecified_fields_from_disk). On disk the distinction is not needed: both 'Unspecified' and Specified(vec![])' are rendered as a missing field.
 
   pub title: String,
-
   pub aliases: MSV<String>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.)
-
   pub source: SourceName, // source name, inferred from file location and SkgConfig
-
   pub pid: ID, // Primary ID. Determines filename, TypeDB identity, Tantivy key, map key. Never changes.
-
   pub extra_ids: Vec<ID>, // Extra IDs accumulated through merges. Usually empty.
-
   pub body: Option<String>, // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding org headline, to which it belongs, and the next (if there is a next).
 
   pub contains                     : Vec<ID>, // See schema.tql.

@@ -11,7 +11,11 @@ use crate::types::list::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 
-pub(crate) enum NodeEditIntent {
+/// What the user appears to intend to do with this node.
+/// Might eventually become a DefineNode.
+/// Uses MSV values in the Save variant (whereas DefineNode uses
+/// SaveNode, which uses NodeComplete, which specifies all values).
+pub(crate) enum NodeIntent {
   Save   (NodeSaveIntent),
   Delete (NodeDeleteIntent),
 }
@@ -36,9 +40,9 @@ pub(crate) struct NodeDeleteIntent {
 }
 
 /// Node edit intents for the entire saved buffer.
-pub(crate) struct SameIdReconciledNodeEditIntents {
+pub(crate) struct SameIdReconciledNodeIntents {
   order  : Vec<ID>,
-  by_pid : HashMap<ID, NodeEditIntent>, }
+  by_pid : HashMap<ID, NodeIntent>, }
 
 struct NodeEditMinimal {
   pid    : ID,
@@ -62,13 +66,13 @@ pub(crate) struct SavenodeCandidateKind {
   pub(crate) treeid : NodeId,
   pub(crate) kind   : SavenodeCandidateKind, }
 
-impl NodeEditIntent {
+impl NodeIntent {
   pub(crate) fn pid (
     &self,
   ) -> &ID {
     match self {
-      NodeEditIntent::Save (intent) => &intent . pid,
-      NodeEditIntent::Delete (intent) => &intent . pid, }}
+      NodeIntent::Save (intent) => &intent . pid,
+      NodeIntent::Delete (intent) => &intent . pid, }}
 
   pub(crate) fn apply_hiderel_delta (
     &mut self,
@@ -77,15 +81,15 @@ impl NodeEditIntent {
     inferred_unhides : &[ID],
   ) {
     match self {
-      NodeEditIntent::Save (intent)
+      NodeIntent::Save (intent)
         => intent . apply_hiderel_delta (
              base_hides, inferred_hides, inferred_unhides),
-      NodeEditIntent::Delete (_) => {}, }}
+      NodeIntent::Delete (_) => {}, }}
 
   pub(crate) fn graph_save_from_nodecomplete (
     node : NodeComplete,
-  ) -> NodeEditIntent {
-    NodeEditIntent::Save (NodeSaveIntent {
+  ) -> NodeIntent {
+    NodeIntent::Save (NodeSaveIntent {
       pid                          : node . pid,
       source                       : node . source,
       title                        : node . title,
@@ -104,9 +108,9 @@ impl NodeEditIntent {
     self,
   ) -> Result<NodeSaveIntent, String> {
     match self {
-      NodeEditIntent::Save (intent) =>
+      NodeIntent::Save (intent) =>
         Ok (intent),
-      NodeEditIntent::Delete (_) =>
+      NodeIntent::Delete (_) =>
         Err ("Delete intent does not contain a SaveNode" . to_string()),
     }}
 
@@ -114,11 +118,11 @@ impl NodeEditIntent {
     self,
   ) -> Result<DefineNode, String> {
     match self {
-      NodeEditIntent::Delete (intent)
+      NodeIntent::Delete (intent)
         => Ok (DefineNode::Delete (DeleteNode {
           id     : intent . pid,
           source : intent . source, } )),
-      NodeEditIntent::Save (intent)
+      NodeIntent::Save (intent)
         => Ok (DefineNode::Save (SaveNode (
           intent . into_nodecomplete() ))) }}
 }
@@ -170,26 +174,26 @@ impl NodeSaveIntent {
     self . hides_from_its_subscriptions =
       MSV::Specified (hides); }}
 
-impl SameIdReconciledNodeEditIntents {
+impl SameIdReconciledNodeIntents {
   fn from_groups (
     order      : Vec<ID>,
-    mut groups : HashMap<ID, Vec<NodeEditIntent>>,
-  ) -> Result<SameIdReconciledNodeEditIntents, String> {
-    let mut by_pid : HashMap<ID, NodeEditIntent> =
+    mut groups : HashMap<ID, Vec<NodeIntent>>,
+  ) -> Result<SameIdReconciledNodeIntents, String> {
+    let mut by_pid : HashMap<ID, NodeIntent> =
       HashMap::new();
     for pid in &order {
-      let group : Vec<NodeEditIntent> =
+      let group : Vec<NodeIntent> =
         groups . remove (pid)
-        . ok_or ( "SameIdReconciledNodeEditIntents::from_groups: missing group" . to_string())?;
+        . ok_or ( "SameIdReconciledNodeIntents::from_groups: missing group" . to_string())?;
       by_pid . insert (
         pid . clone(),
         reconcile_nodeEditIntents_with_same_ID (group)?); }
-    Ok (SameIdReconciledNodeEditIntents { order, by_pid }) }
+    Ok (SameIdReconciledNodeIntents { order, by_pid }) }
 
   pub(crate) fn into_ordered_intents (
     self,
-  ) -> Vec<NodeEditIntent> {
-    let SameIdReconciledNodeEditIntents { order, mut by_pid, }
+  ) -> Vec<NodeIntent> {
+    let SameIdReconciledNodeIntents { order, mut by_pid, }
       = self;
     order . into_iter()
       . filter_map ( |pid| by_pid . remove (&pid) )
@@ -200,7 +204,7 @@ impl SameIdReconciledNodeEditIntents {
     subscriber_from_disk : &NodeComplete,
   ) -> HashSet<ID> {
     match self . by_pid . get (&subscriber_from_disk . pid) {
-      Some (NodeEditIntent::Save (intent)) =>
+      Some (NodeIntent::Save (intent)) =>
         intent . contains . or_default() . iter() . cloned() . collect(),
       _ =>
         subscriber_from_disk . contains . iter() . cloned() . collect(),
@@ -219,8 +223,8 @@ impl SameIdReconciledNodeEditIntents {
         inferred_hides,
         inferred_unhides);
       return; }
-    let mut intent : NodeEditIntent =
-      NodeEditIntent::graph_save_from_nodecomplete (
+    let mut intent : NodeIntent =
+      NodeIntent::graph_save_from_nodecomplete (
         subscriber . clone());
     intent . apply_hiderel_delta (
       &subscriber . hides_from_its_subscriptions,
@@ -240,16 +244,16 @@ impl SameIdReconciledNodeEditIntents {
 pub fn naive_saveinstructions_from_tree (
   viewforest: Tree<ViewNode> // "viewforest" = tree with BufferRoot
 ) -> Result<Vec<DefineNode>, String> {
-  let intents : Vec<NodeEditIntent> =
+  let intents : Vec<NodeIntent> =
     naive_node_edit_intents_from_viewforest (&viewforest)?;
   intents
     . into_iter()
-    . map (NodeEditIntent::into_define_node)
+    . map (NodeIntent::into_define_node)
     . collect() }
 
 pub(crate) fn naive_node_edit_intents_from_viewforest (
   viewforest : &Tree<ViewNode>,
-) -> Result<Vec<NodeEditIntent>, String> {
+) -> Result<Vec<NodeIntent>, String> {
   let role_viewforest : Tree<ViewNode_in_Role> =
     viewforest_with_saveroles (viewforest)?;
   naive_node_edit_intents_from_role_viewforest (
@@ -257,7 +261,7 @@ pub(crate) fn naive_node_edit_intents_from_viewforest (
 
 pub(crate) fn naive_node_edit_intents_from_role_viewforest (
   role_viewforest : &Tree<ViewNode_in_Role>,
-) -> Result<Vec<NodeEditIntent>, String> {
+) -> Result<Vec<NodeIntent>, String> {
   let candidates : Vec<SavenodeCandidate> =
     collect_savenode_candidates (
       role_viewforest)?;
@@ -277,7 +281,7 @@ pub(crate) fn naive_node_edit_intents_from_role_viewforest (
 pub(crate) fn naive_node_edit_intents_from_candidates (
   role_viewforest : &Tree<ViewNode_in_Role>,
   candidates      : &[SavenodeCandidate],
-) -> Result<Vec<NodeEditIntent>, String> {
+) -> Result<Vec<NodeIntent>, String> {
   let candidate_ids : Vec<NodeId> =
     candidates . iter()
     . filter_map (|candidate| match &candidate . kind {
@@ -320,14 +324,14 @@ pub(crate) fn naive_node_edit_intents_from_candidates (
 /// reconcile_one_id_node_edit_intents.
 #[allow(non_snake_case)]
 pub(crate) fn reconcile_nodeEditIntents (
-  intents : Vec<NodeEditIntent>,
-) -> Result<SameIdReconciledNodeEditIntents, String> {
-  let mut grouped : HashMap<ID, Vec<NodeEditIntent>> =
+  intents : Vec<NodeIntent>,
+) -> Result<SameIdReconciledNodeIntents, String> {
+  let mut grouped : HashMap<ID, Vec<NodeIntent>> =
     HashMap::new();
   let mut order : Vec<ID> =
     Vec::new();
   for intent in intents {
-    let intent : NodeEditIntent = intent;
+    let intent : NodeIntent = intent;
     let pid : ID =
       intent . pid() . clone();
     if ! grouped . contains_key (&pid) {
@@ -335,25 +339,25 @@ pub(crate) fn reconcile_nodeEditIntents (
     grouped . entry (pid)
       . or_insert_with (Vec::new)
       . push (intent); }
-  SameIdReconciledNodeEditIntents::from_groups (order, grouped) }
+  SameIdReconciledNodeIntents::from_groups (order, grouped) }
 
 /// ASSUMES the inputs all share an ID.
 #[allow(non_snake_case)]
 fn reconcile_nodeEditIntents_with_same_ID (
-  intents : Vec<NodeEditIntent>,
-) -> Result<NodeEditIntent, String> {
-  let mut optSave : Option<NodeEditIntent> = None;
-  let mut optDelete : Option<NodeEditIntent> = None;
+  intents : Vec<NodeIntent>,
+) -> Result<NodeIntent, String> {
+  let mut optSave : Option<NodeIntent> = None;
+  let mut optDelete : Option<NodeIntent> = None;
   for intent in intents {
-    let intent : NodeEditIntent = intent;
+    let intent : NodeIntent = intent;
     match intent {
-      NodeEditIntent::Save (_) => {
+      NodeIntent::Save (_) => {
         if optSave . is_some() {
           return Err (
               "Multiple ordinary save instructions for same ID"
                 . to_string()); }
         optSave = Some (intent); },
-      NodeEditIntent::Delete (_) => {
+      NodeIntent::Delete (_) => {
         if optDelete . is_none() {
           optDelete = Some (intent); }} }}
   if optDelete . is_some() && optSave . is_some() {
@@ -540,8 +544,8 @@ fn assemble_node_edit_intents (
   mut contains_by_node_id    : HashMap<NodeId, Vec<ID>>,
   mut aliases_by_node_id     : HashMap<NodeId, MSV<String>>,
   mut subscribees_by_node_id : HashMap<NodeId, MSV<ID>>,
-) -> Result<Vec<NodeEditIntent>, String> {
-  let mut result : Vec<NodeEditIntent> =
+) -> Result<Vec<NodeIntent>, String> {
+  let mut result : Vec<NodeIntent> =
     Vec::new();
   for candidate_id in candidate_ids {
     let basics : NodeEditMinimal =
@@ -550,7 +554,7 @@ fn assemble_node_edit_intents (
         "assemble_node_edit_intents: missing node edit basics")?;
     match basics . kind {
       NodeEditMinimalAction::Delete =>
-        result . push (NodeEditIntent::Delete (NodeDeleteIntent {
+        result . push (NodeIntent::Delete (NodeDeleteIntent {
           pid    : basics . pid,
           source : basics . source, } )),
       NodeEditMinimalAction::Save { title, body } =>
@@ -574,7 +578,7 @@ fn assemble_node_edit_intents (
               overrides_view_of            : MSV::Unspecified,
               misc                         : Vec::new(),
             };
-          result . push (NodeEditIntent::Save (intent)); },
+          result . push (NodeIntent::Save (intent)); },
     }}
   Ok (result) }
 

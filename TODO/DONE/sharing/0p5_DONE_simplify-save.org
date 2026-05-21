@@ -38,7 +38,7 @@ The required order is:
 3. DONE Route existing SaveNode construction through that
    interpreted structure.
 4. DONE Begin splitting save extraction into explicit intent-oriented
-   passes by introducing an internal NodeEditIntent layer.
+   passes by introducing an internal NodeIntent layer.
 5. PARTIAL Move unchanged filtering later, or make it intent-aware.
 6. DONE Neutralize subscribee-as-such child-list edits so they do
    not become graph 'contains' edits for the subscribee.
@@ -197,7 +197,7 @@ Before producing final 'DefineNode's, introduce an intermediate
 intent type. It can be small:
 
 #+begin_src rust
-struct NodeEditIntent {
+struct NodeIntent {
   pid: ID,
   source: SourceName,
   title: Option<String>,
@@ -485,14 +485,14 @@ cargo test --test new viewnodes_to_instructions -- --nocapture
 'cargo fmt --check' could not be run in that environment because
 'cargo fmt' / 'rustfmt' was not installed.
 
-** DONE Add a behavior-preserving NodeEditIntent layer
+** DONE Add a behavior-preserving NodeIntent layer
 
 'naive_saveinstructions_from_tree' now has an internal
-'NodeEditIntent' boundary. The current extraction path is:
+'NodeIntent' boundary. The current extraction path is:
 
 #+begin_src text
 checked tree + SaveRoleMap
-  -> Vec<NodeEditIntent>
+  -> Vec<NodeIntent>
   -> Vec<DefineNode>
 #+end_src
 
@@ -532,12 +532,12 @@ matched zero tests in this harness, so the broader
 'cargo fmt --check' still could not be run in this environment
 because 'cargo fmt' / 'rustfmt' was not installed.
 
-** DONE Split NodeEditIntent into save/delete variants
+** DONE Split NodeIntent into save/delete variants
 
-'NodeEditIntent' is now structurally typed:
+'NodeIntent' is now structurally typed:
 
 #+begin_src text
-NodeEditIntent
+NodeIntent
   -> Save(NodeSaveIntent)
   -> Delete(NodeDeleteIntent)
 #+end_src
@@ -573,7 +573,7 @@ The preliminary extraction now has one more internal boundary:
 #+begin_src text
 checked tree + SaveRoleMap
   -> Vec<NodeId> candidate TrueNode positions
-  -> Vec<NodeEditIntent>
+  -> Vec<NodeIntent>
   -> Vec<DefineNode>
 #+end_src
 
@@ -614,14 +614,14 @@ checked tree + SaveRoleMap
   -> Vec<NodeId> candidate TrueNode positions
   -> NodeEditMinimal by candidate
   -> contains / aliases / subscribes_to by save candidate
-  -> Vec<NodeEditIntent>
+  -> Vec<NodeIntent>
   -> Vec<DefineNode>
 #+end_src
 
 This is still behavior-preserving and still internal to
 'to_naive_instructions.rs'. It does not infer fork edits, does not
 change filtering, and does not change the immediate conversion from
-'NodeEditIntent' to 'DefineNode'.
+'NodeIntent' to 'DefineNode'.
 
 The split makes the remaining fork-edit work less awkward because
 ordinary graph fields are now collected in named passes rather than
@@ -843,7 +843,7 @@ All four commands passed in this environment.
 
 After graph intents and subscribee visibility intents exist
 separately, fold the visibility edits into the subscriber's
-NodeEditIntent by updating 'hides_from_its_subscriptions'. If the
+NodeIntent by updating 'hides_from_its_subscriptions'. If the
 subscriber has no graph edit intent yet, synthesize one from pre-save
 data.
 
@@ -991,8 +991,8 @@ the new feature:
 - DONE split source moves out of disk supplementation;
 - DONE add role classification;
 - DONE route existing SaveNode extraction through it;
-- DONE add a behavior-preserving NodeEditIntent layer;
-- DONE split NodeEditIntent into save/delete variants;
+- DONE add a behavior-preserving NodeIntent layer;
+- DONE split NodeIntent into save/delete variants;
 - DONE split candidate traversal from intent construction;
 - DONE split save-field collection into explicit passes;
 - DONE neutralize subscribee-as-such child-list edits so they do
@@ -1000,7 +1000,7 @@ the new feature:
 - DONE extract raw subscribee-as-such visibility intents without
   interpreting them yet;
 - preserve raw-buffer edits separately from graph edits beyond the
-  current immediate NodeEditIntent-to-DefineNode conversion;
+  current immediate NodeIntent-to-DefineNode conversion;
 - move unchanged filtering later, or make it intent-aware;
 - DONE simplify sharing completion by replacing traversal-minimizing
   control flow with small explicit read/compute/mutate passes;

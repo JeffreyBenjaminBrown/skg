@@ -13,7 +13,7 @@ use crate::types::viewnode::{ IndefOrDef, ViewNode, ViewNodeKind };
 use subscribee_hiderel_intents::{ SubscribeeHiderelIntent, subscribee_hiderel_intents_from_candidates, };
 use super::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
 use super::validate::buffernode_differs_from_disknode;
-use to_naive_instructions::{ collect_savenode_candidates, naive_node_edit_intents_from_candidates, SavenodeCandidate, reconcile_nodeEditIntents, NodeEditIntent, NodeSaveIntent, SameIdReconciledNodeEditIntents, };
+use to_naive_instructions::{ collect_savenode_candidates, naive_node_edit_intents_from_candidates, SavenodeCandidate, reconcile_nodeEditIntents, NodeIntent, NodeSaveIntent, SameIdReconciledNodeIntents, };
 
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
@@ -61,8 +61,8 @@ impl SaveAuthority {
 }
 
 struct SaveExtraction {
-  node_edit_intents  : Vec<NodeEditIntent>,
-  hiderel_intents : Vec<SubscribeeHiderelIntent>,
+  node_edit_intents : Vec<NodeIntent>,
+  hiderel_intents   : Vec<SubscribeeHiderelIntent>,
 }
 
 pub struct NonmergeSavePlan {
@@ -134,10 +134,10 @@ pub(crate) async fn extract_nonmergeSavePlan_from_authority (
     save_authority . candidates ();
   let extracted : SaveExtraction =
     extract_save_intents (role_viewforest, candidates)?;
-  let intents_without_dups : SameIdReconciledNodeEditIntents =
+  let intents_without_dups : SameIdReconciledNodeIntents =
     reconcile_nodeEditIntents (extracted . node_edit_intents)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  let intents_with_visibility : SameIdReconciledNodeEditIntents =
+  let intents_with_visibility : SameIdReconciledNodeIntents =
     apply_hiderels_from_intents (
       intents_without_dups,
       &extracted . hiderel_intents,
@@ -163,7 +163,7 @@ fn extract_save_intents (
     subscribee_hiderel_intents_from_candidates (
       role_viewforest, candidates)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  let node_edit_intents : Vec<NodeEditIntent> =
+  let node_edit_intents : Vec<NodeIntent> =
     naive_node_edit_intents_from_candidates (
       role_viewforest, candidates)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -201,7 +201,7 @@ pub(crate) async fn validate_no_title_or_body_edit_in_subscribeeAsSuch (
   Ok (( )) }
 
 async fn build_disk_supplemented_define_nodes (
-  intents : Vec<NodeEditIntent>,
+  intents : Vec<NodeIntent>,
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
 ) -> Result<Definenodes_with_Sourcemoves, Box<dyn Error>> {
@@ -215,12 +215,12 @@ async fn build_disk_supplemented_define_nodes (
   Ok (result) }
 
 async fn supplement_nodeeditintent_from_disk (
-  intent : NodeEditIntent,
+  intent : NodeIntent,
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result<Definenode_with_Opt_Sourcemove, Box<dyn Error>> {
   match intent {
-    NodeEditIntent::Delete (_) =>
+    NodeIntent::Delete (_) =>
       Ok (Definenode_with_Opt_Sourcemove {
         instruction : intent . into_define_node()
           . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
@@ -246,7 +246,7 @@ async fn supplement_saveintent_from_disk (
     None =>
       Ok (Definenode_with_Opt_Sourcemove {
         instruction :
-          NodeEditIntent::Save (from_buffer) . into_define_node()
+          NodeIntent::Save (from_buffer) . into_define_node()
           . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
         source_move : None,
       }),
@@ -293,11 +293,11 @@ async fn supplement_saveintent_from_disk (
 ///   This does not touch it. The completion/rerender pipeline
 ///   will change it to Independent.
 async fn apply_hiderels_from_intents (
-  mut node_edit_intents : SameIdReconciledNodeEditIntents,
+  mut node_edit_intents : SameIdReconciledNodeIntents,
   vis_intents     : &[SubscribeeHiderelIntent],
   config          : &SkgConfig,
   driver          : &TypeDBDriver,
-) -> Result<SameIdReconciledNodeEditIntents, Box<dyn Error>> {
+) -> Result<SameIdReconciledNodeIntents, Box<dyn Error>> {
   validate_no_overlapping_subscribee_hiderel_conflicts (
     vis_intents, config, driver ) . await ?;
   for intent in vis_intents {

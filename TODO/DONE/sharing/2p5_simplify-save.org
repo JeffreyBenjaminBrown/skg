@@ -65,7 +65,7 @@ become the new place where unrelated save policies hide.
 The next cleanup should make that helper boring and locally readable.
 It should separate these concerns behind names:
 
-- convert a reconciled 'NodeEditIntent' into a preliminary
+- convert a reconciled 'NodeIntent' into a preliminary
   'DefineNode';
 - pass delete instructions through without disk supplementation;
 - load the disk node for saves;
@@ -117,7 +117,7 @@ edits less sensitive to the fact that they currently run after graph
 =SaveNode= construction.
 
 Status: visibility folding now happens at
-the =NodeEditIntent= layer, before =DefineNode= construction and before
+the =NodeIntent= layer, before =DefineNode= construction and before
 disk supplementation. That removed the late mutation of completed
 =DefineNode= values.
 
@@ -135,8 +135,8 @@ role-position policy as if it were a graph-save property.
 Prefer a representation that cannot accidentally treat direct
 subscribee children as graph =contains=:
 
-- separate variants such as =NodeEditIntent::Save= and
-  =NodeEditIntent::SubscribeeVisibilitySurface=; or
+- separate variants such as =NodeIntent::Save= and
+  =NodeIntent::SubscribeeVisibilitySurface=; or
 - a small enum such as
   =DirectChildrenMeaning::{GraphContains, SubscriberVisibility}=.
 
@@ -163,7 +163,7 @@ subscribee-as-such =contains= restoration guardrail during disk
 supplementation, because no subscribee-as-such visibility surface ever
 becomes a subscribee graph =contains= edit.
 
-Status: complete. =NodeEditIntent= now distinguishes ordinary
+Status: complete. =NodeIntent= now distinguishes ordinary
 =Save= from subscribee-as-such edit surfaces, and
 =NodeSaveIntent.contains= is unspecified for subscribee-as-such
 occurrences. The old =children_affect_only_hiding= field is gone.
@@ -174,7 +174,7 @@ occurrences. The old =children_affect_only_hiding= field is gone.
 needs clearer reconciliation rules once subscribee-as-such branches
 are no longer encoded as ordinary-looking saves.
 
-Visibility edits are now folded into =NodeEditIntent= before
+Visibility edits are now folded into =NodeIntent= before
 =DefineNode= construction, but visibility surfaces still are not
 reconciled as their own intent class.
 
@@ -194,7 +194,7 @@ distinct inputs:
 This item should remove the need for visibility-specific special cases
 inside ordinary graph-save reconciliation.
 
-It should also replace the current =Vec<NodeEditIntent>=-as-database
+It should also replace the current =Vec<NodeIntent>=-as-database
 pattern with an explicitly addressable reconciled collection. The code
 now sometimes scans a vector looking for "the save intent for this
 PID"; that is a smell because after same-ID reconciliation the intended
@@ -202,9 +202,9 @@ invariant is already at most one graph edit per PID. Prefer a
 structure along these lines:
 
 #+begin_src rust
-struct SameIdReconciledNodeEditIntents {
+struct SameIdReconciledNodeIntents {
   order  : Vec<ID>,
-  by_pid : HashMap<ID, NodeEditIntent>,
+  by_pid : HashMap<ID, NodeIntent>,
 }
 #+end_src
 
@@ -221,7 +221,7 @@ visibility-surface extraction result rather than being folded into
 same-ID node-edit reconciliation. Overlapping visibility surfaces are
 validated by subscriber/content visibility, and compatible duplicates
 are allowed. Hide/unhide deltas are then folded into the keyed
-=SameIdReconciledNodeEditIntents= collection, which owns
+=SameIdReconciledNodeIntents= collection, which owns
 post-=reconcile_nodeEditIntents= ordering and PID lookup.
 
 ** DONE f. Keep disk supplementation policy-neutral
@@ -258,7 +258,7 @@ a subscribee-as-such restoration guardrail or role-position flag.
 ** DONE g. Tighten same-ID reconciliation around intent variants
 
 The current same-ID reconciliation now happens at the
-=NodeEditIntent= layer, which is the right direction. After the intent
+=NodeIntent= layer, which is the right direction. After the intent
 shape is split, the rules can be stated more directly:
 
 - ordinary graph save wins over a subscribee-as-such visibility surface
@@ -273,7 +273,7 @@ both in a subscribee-as-such position and as an ordinary definitive
 node, and the ordinary node's =contains= edit survives.
 
 Status: complete. Same-ID node-edit reconciliation now returns a
-keyed =SameIdReconciledNodeEditIntents= collection with explicit
+keyed =SameIdReconciledNodeIntents= collection with explicit
 output order, and the current variant rules are centralized there.
 Duplicate visibility-surface semantics are handled outside same-ID
 node-edit reconciliation by =SubscribeeHiderelIntent= overlap

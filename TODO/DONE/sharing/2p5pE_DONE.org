@@ -3,7 +3,7 @@
 This plan addresses the next practical slice of items e and g in
 [[./2p5_simplify-save.org][2p5_simplify-save.org]].
 
-The goal is to stop treating a reconciled =Vec<NodeEditIntent>= as a
+The goal is to stop treating a reconciled =Vec<NodeIntent>= as a
 little database. After same-ID reconciliation, the save path wants an
 explicit invariant: at most one node edit intent is addressable for a
 given graph ID, while output order remains predictable.
@@ -13,8 +13,8 @@ given graph ID, while output order remains predictable.
 The save path currently does this:
 
 #+begin_src text
-naive Vec<NodeEditIntent>
-  -> reconcile_nodeEditIntents -> Vec<NodeEditIntent>
+naive Vec<NodeIntent>
+  -> reconcile_nodeEditIntents -> Vec<NodeIntent>
   -> apply_hiderels_from_intents scans the Vec by PID
   -> build_disk_supplemented_define_nodes iterates the Vec
 #+end_src
@@ -34,9 +34,9 @@ reconciliation is supposed to have established that invariant already.
 Introduce a small collection:
 
 #+begin_src rust
-pub(crate) struct ReconciledNodeEditIntents {
+pub(crate) struct ReconciledNodeIntents {
   order  : Vec<ID>,
-  by_pid : HashMap<ID, NodeEditIntent>,
+  by_pid : HashMap<ID, NodeIntent>,
 }
 #+end_src
 
@@ -46,7 +46,7 @@ small methods unless direct crate-local access is clearly simpler.
 The collection should provide named operations for the things the save
 pipeline actually does:
 
-- construct from naive =NodeEditIntent= values by applying the current
+- construct from naive =NodeIntent= values by applying the current
   same-ID reconciliation rules;
 - look up a graph-save intent by PID;
 - insert a synthesized graph-save intent for an owned subscriber when
@@ -54,12 +54,12 @@ pipeline actually does:
   graph save;
 - compute the subscriber's post-save =contains= set without scanning a
   raw vector;
-- consume itself into ordered =NodeEditIntent= values for disk
+- consume itself into ordered =NodeIntent= values for disk
   supplementation.
 
 * Implementation steps
 
-** 1. Add =ReconciledNodeEditIntents=
+** 1. Add =ReconciledNodeIntents=
 
 Put the type near =reconcile_nodeEditIntents= in
 [[../../server/from_text/viewnodes_to_instructions/to_naive_instructions.rs][to_naive_instructions.rs]]
@@ -70,12 +70,12 @@ patch smaller:
 
 #+begin_src rust
 pub(crate) fn reconcile_nodeEditIntents (
-  intents : Vec<NodeEditIntent>,
-) -> Result<ReconciledNodeEditIntents, String>
+  intents : Vec<NodeIntent>,
+) -> Result<ReconciledNodeIntents, String>
 #+end_src
 
 or add a new constructor and update callers. The important result is
-that callers no longer receive a plain =Vec<NodeEditIntent>= after
+that callers no longer receive a plain =Vec<NodeIntent>= after
 same-ID reconciliation.
 
 ** 2. Preserve current reconciliation behavior first
@@ -116,7 +116,7 @@ tests to the explicit order unless user-visible behavior would change.
 Change
 =apply_hiderels_from_intents= in
 [[../../server/from_text/viewnodes_to_instructions.rs][viewnodes_to_instructions.rs]]
-to accept and return =ReconciledNodeEditIntents=.
+to accept and return =ReconciledNodeIntents=.
 
 Replace the local vector scan helpers with collection methods, for
 example:
@@ -136,11 +136,11 @@ for a PID.
 ** 5. Keep disk supplementation boring
 
 =build_disk_supplemented_define_nodes= can still iterate ordered
-=NodeEditIntent= values, but the conversion from keyed collection to
+=NodeIntent= values, but the conversion from keyed collection to
 ordered values should happen at the boundary:
 
 #+begin_src text
-ReconciledNodeEditIntents
+ReconciledNodeIntents
   -> into_ordered_intents()
   -> build_disk_supplemented_define_nodes
 #+end_src
@@ -181,7 +181,7 @@ ordering or exposes an untested invariant. Useful assertions:
 
 * Acceptance criteria
 
-- No post-reconciliation code treats =Vec<NodeEditIntent>= as a
+- No post-reconciliation code treats =Vec<NodeIntent>= as a
   lookup table.
 - Subscriber hide/unhide folding uses a keyed reconciled collection.
 - Output order is explicit and deterministic.

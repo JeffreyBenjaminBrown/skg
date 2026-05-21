@@ -24,7 +24,7 @@ sequence:
 
 The remaining dense part is inside
 'build_disk_supplemented_define_nodes'. For each reconciled
-'NodeEditIntent', it currently:
+'NodeIntent', it currently:
 
 - remembers whether children affect only hiding;
 - converts the intent into 'DefineNode';
@@ -93,7 +93,7 @@ helper such as:
 
 Input:
 
-- 'NodeEditIntent'
+- 'NodeIntent'
 
 Output:
 
@@ -201,7 +201,7 @@ Do not:
 
 - move subscribee visibility folding before 'DefineNode' construction;
 - remove 'children_affect_only_hiding';
-- split 'NodeEditIntent' variants;
+- split 'NodeIntent' variants;
 - change same-ID reconciliation;
 - make disk supplementation policy-neutral yet.
 

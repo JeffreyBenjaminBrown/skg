@@ -17,7 +17,7 @@ The current save extraction has two parallel signals for direct
   'SubscribeeHiderelIntent { subscriber, subscribee,
   visible_content }'.
 - 'naive_node_edit_intents_from_role_viewforest' also emits a
-  'NodeEditIntent::Save' for the same subscribee-as-such node, with
+  'NodeIntent::Save' for the same subscribee-as-such node, with
   'children_affect_only_hiding = true' and a temporary 'contains'
   list taken from the displayed children.
 
@@ -39,7 +39,7 @@ save for subscribee-as-such branches.
 Prefer explicit variants:
 
 #+begin_src rust
-pub(crate) enum NodeEditIntent {
+pub(crate) enum NodeIntent {
   Save (NodeSaveIntent),
   Delete (NodeDeleteIntent),
   SubscribeeVisibilitySurface (SubscribeeHiderelIntent),
@@ -51,7 +51,7 @@ intermediate is acceptable:
 
 #+begin_src rust
 struct SaveExtraction {
-  graph_edit_intents : Vec<NodeEditIntent>,
+  graph_edit_intents : Vec<NodeIntent>,
   visibility_surfaces : Vec<SubscribeeHiderelIntent>,
 }
 #+end_src
@@ -63,9 +63,9 @@ lists must not be stored in 'NodeSaveIntent.contains'.
 
 ** 1. Rename ordinary save intent to make its graph meaning explicit
 
-Change 'NodeEditIntent::Save' to either:
+Change 'NodeIntent::Save' to either:
 
-- 'NodeEditIntent::Save'; or
+- 'NodeIntent::Save'; or
 - a separate 'GraphEditIntent::Save' if the enum split is cleaner.
 
 The point is to make every graph-save variant mean that its 'contains'
@@ -124,7 +124,7 @@ that traversal inside graph intent extraction.
 Delete:
 
 - the field on 'NodeSaveIntent';
-- 'NodeEditIntent::children_affect_only_hiding';
+- 'NodeIntent::children_affect_only_hiding';
 - every branch that tests it;
 - comments explaining that a graph save's children can affect only
   hiding.
@@ -160,7 +160,7 @@ role-annotated tree
   -> no-op filtering
 #+end_src
 
-Do not introduce the keyed 'ReconciledNodeEditIntents' collection in
+Do not introduce the keyed 'ReconciledNodeIntents' collection in
 this item unless it is clearly necessary. That belongs naturally to
 item e. A local vector scan is acceptable for this item if the intent
 shape is fixed.
