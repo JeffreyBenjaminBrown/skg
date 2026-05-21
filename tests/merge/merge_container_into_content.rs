@@ -166,7 +166,7 @@ async fn merge_container_into_content_impl (
       . to_string() ); }
 
   // a should NOT appear as a DeletedNode: the preprocessing pass
-  // 'resolve_extra_ids_in_viewforest' rewrites viewnodes whose pid
+  // 'rewriteInPlace_viewnodes_whose_id_is_newly_extra' rewrites viewnodes whose pid
   // became an extra-id (here, a is an extra-id of aa after the
   // merge) to carry the acquirer's pid instead. The acquiree line
   // is displayed as a view of the acquirer, not as a tombstone.

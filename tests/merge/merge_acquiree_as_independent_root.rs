@@ -22,7 +22,7 @@
 //
 // Correct behaviour: any viewnode with pid = acquiree should be
 // swapped to pid = acquirer *before* rerender. The preprocessing
-// pass resolve_extra_ids_in_viewforest does that.
+// pass rewriteInPlace_viewnodes_whose_id_is_newly_extra does that.
 //
 // Expected result:
 //   * d            <-- was b, rewritten to d (first in doc order -> definitive)
@@ -91,7 +91,7 @@ async fn merge_acquiree_as_independent_root_impl (
   let lines : Vec<&str> = view . lines() . collect();
 
   // 1. No (deleted ...) anywhere: acquiree b should have been
-  //    swapped to d by resolve_extra_ids_in_viewforest.
+  //    swapped to d by rewriteInPlace_viewnodes_whose_id_is_newly_extra.
   if view . contains ("(deleted") {
     failures . push (
       "saved view contains a (deleted ...) atom -- the top-level \

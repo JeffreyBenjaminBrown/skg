@@ -131,7 +131,7 @@ impl OpenViews {
       else { self . views . insert (
                uri . clone (),
                ViewState { viewforest : new_viewforest,
-                           pids } ); } }
+                           pids } ); }}
 
   pub fn unregister_view (
     &mut self,

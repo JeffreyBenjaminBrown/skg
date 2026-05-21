@@ -1016,7 +1016,7 @@ is now : id_to_pid_if_found
 ** rerender_view (line 203)
    - True?: Partly. "Rerender" understates the work: the function strips diff state, completes the viewforest, marks roots independent, validates birth relationships, attaches RemovedHere ancestries, sets graphnodestats and viewnodestats, and only then renders.
    - Omits?: It omits that the viewforest is mutated extensively (so callers cannot treat it as read-only) and that errors are appended to a passed-in Vec.
-** resolve_extra_ids_in_viewforest (line 284)
+** rewriteInPlace_viewnodes_whose_id_is_newly_extra (line 284)
    - True?: Yes. Resolves extra-ids by rewriting truenodes whose pid is an extra_id of a different primary.
    - Omits?: Nothing important; the doc explains the swap semantics.
 ** strip_stale_diff_state (line 322)
