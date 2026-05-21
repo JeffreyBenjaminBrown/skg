@@ -4,7 +4,7 @@ use crate::to_org::complete::sharing::goal_list::goal_list_for_hiddeninsubscribe
 use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
-use crate::types::views_state::nodecomplete_from_inrustgraph_or_disk;
+use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::pid_and_source_from_ancestor;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Birth};
@@ -79,12 +79,12 @@ fn read_hiddenin_context (
       kind . caller_label () ) ?;
   let subscribee_contains : Vec<ID> = {
     let subscribee_nodecomplete : NodeComplete =
-      nodecomplete_from_inrustgraph_or_disk (
+      nodecomplete_rustFirst_by_pid_and_source (
         &env . config, &subscribee_pid, &subscribee_source ) ?;
     subscribee_nodecomplete . contains . clone() };
   let subscriber_hides : Vec<ID> = {
     let subscriber_nodecomplete : NodeComplete =
-      nodecomplete_from_inrustgraph_or_disk (
+      nodecomplete_rustFirst_by_pid_and_source (
         &env . config, &subscriber_pid, &subscriber_source ) ?;
     subscriber_nodecomplete . hides_from_its_subscriptions
       . or_default() . to_vec() };

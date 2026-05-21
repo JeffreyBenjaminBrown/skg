@@ -1,4 +1,4 @@
-use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
+use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode, Merge, SourceMove};
@@ -67,7 +67,7 @@ async fn apply_foreign_policy(
       if !source_is_foreign (config, &node . source) {
         // not foreign, so keep
         return Ok (ForeignPolicyOutcome::Keep); }
-      match optnodecomplete_from_id(
+      match optNodeComplete_rustFIrst_by_id(
         config, driver, &node . pid
       ) . await {
         Ok(Some (disk_node)) => {

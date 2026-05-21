@@ -4,7 +4,7 @@ use crate::to_org::complete::sharing::goal_list::goal_list_for_hiddenoutsideof_s
 use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
-use crate::types::views_state::nodecomplete_from_inrustgraph_or_disk;
+use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::{pid_and_source_from_ancestor, read_at_ancestor_in_tree};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth};
@@ -88,7 +88,7 @@ fn read_hiddenoutside_context (
       tree, node, kind . correct_subscriber_ancestor_distance (),
       kind . caller_label () ) ?;
   let wt_subscriber_nodecomplete : NodeComplete =
-    nodecomplete_from_inrustgraph_or_disk (
+    nodecomplete_rustFirst_by_pid_and_source (
       &env . config, &subscriber_pid, &subscriber_source ) ?;
   let wt_subscriber_hides : Vec<ID> =
     wt_subscriber_nodecomplete . hides_from_its_subscriptions

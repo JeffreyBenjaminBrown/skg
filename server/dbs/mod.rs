@@ -5,5 +5,6 @@
 pub mod filesystem;
 pub mod init;
 pub mod in_rust_graph;
+pub mod node_lookup;
 pub mod tantivy;
 pub mod typedb;

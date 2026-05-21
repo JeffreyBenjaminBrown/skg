@@ -9,7 +9,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::env::find_source_with_optional_tantivy;
 use crate::types::nodes::complete::NodeComplete;
 use crate::git_ops::read_repo::nodecomplete_from_git_head;
-use crate::types::views_state::nodecomplete_from_inrustgraph_or_disk;
+use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, Scaffold, DeletedNode, IndefOrDef,
@@ -135,7 +135,7 @@ pub fn expand_true_content_at_truenode (
       TruenodeKindOutcome::Continue { pid, source } => (pid, source) };
   clear_consumed_edit_request (tree, node) ?;
   let nodecomplete : NodeComplete =
-    nodecomplete_from_inrustgraph_or_disk ( config, &pid, &initial_source ) ?;
+    nodecomplete_rustFirst_by_pid_and_source ( config, &pid, &initial_source ) ?;
   let source : SourceName =
     nodecomplete . source . clone ();
   if mode . should_sync_truenode_from_disk () { // The saved (definitive) view of a node *defines* the title, body, and source, but other views need those fields updated.
@@ -396,7 +396,7 @@ fn content_goal_list (
                                     "content_goal_list" ) ?;
     let worktree_hidden : Vec<ID> =
       { let grandparent_nodecomplete : NodeComplete =
-          nodecomplete_from_inrustgraph_or_disk (
+          nodecomplete_rustFirst_by_pid_and_source (
             config, &grandparent_pid, &grandparent_source ) ?;
         grandparent_nodecomplete . hides_from_its_subscriptions
           . or_default() . to_vec() };
@@ -682,7 +682,7 @@ fn build_child_creation_data (
           . ok_or_else ( || -> Box<dyn Error> { format! (
             "find_source: no source for {}", id . 0 ) . into () } ) ?;
       let skg : NodeComplete =
-        nodecomplete_from_inrustgraph_or_disk ( config, id, &child_source ) ?;
+        nodecomplete_rustFirst_by_pid_and_source ( config, id, &child_source ) ?;
       result . insert( id . clone(),
                      ChildData { title: skg . title . clone(),
                                  source: skg . source . clone(),

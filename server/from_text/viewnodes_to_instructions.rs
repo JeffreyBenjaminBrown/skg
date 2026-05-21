@@ -4,13 +4,12 @@ pub mod classify;
 pub mod subscribee_hiderel_intents;
 
 use classify::{ SaveRole, viewforest_with_saveroles, ViewNode_in_Role };
-use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
+use crate::dbs::node_lookup::{ nodecomplete_from_in_rust_graph, optNodeComplete_rustFIrst_by_id};
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use crate::types::viewnode::{ IndefOrDef, ViewNode, ViewNodeKind };
-use crate::types::views_state::nodecomplete_from_in_rust_graph;
 use subscribee_hiderel_intents::{ SubscribeeHiderelIntent, subscribee_hiderel_intents_from_candidates, };
 use super::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
 use super::validate::buffernode_differs_from_disknode;
@@ -191,7 +190,7 @@ async fn validate_no_title_or_body_edit_in_subscribeeAsSuch (
       &t . indef_or_def
     else { continue; };
     let Some (from_disk) =
-      optnodecomplete_from_id (
+      optNodeComplete_rustFIrst_by_id (
         config, driver, &t . id) . await ?
     else { continue; };
     if t . title != from_disk . title || *body != from_disk . body {
@@ -241,7 +240,8 @@ async fn supplement_saveintent_from_disk (
   let pid : ID =
     from_buffer . pid . clone();
   let from_disk : Option<NodeComplete> =
-    optnodecomplete_from_id (config, driver, &pid) . await ?;
+    optNodeComplete_rustFIrst_by_id (
+      config, driver, &pid) . await ?;
   match from_disk {
     None =>
       Ok (Definenode_with_Opt_Sourcemove {
@@ -302,11 +302,11 @@ async fn apply_hiderels_from_intents (
     vis_intents, config, driver ) . await ?;
   for intent in vis_intents {
     let Some (subscribee_from_disk) =
-      optnodecomplete_from_id (
+      optNodeComplete_rustFIrst_by_id (
         config, driver, &intent . subscribee ) . await ?
     else { continue; };
     let Some (subscriber_from_disk) =
-      optnodecomplete_from_id (
+      optNodeComplete_rustFIrst_by_id (
         config, driver, &intent . subscriber ) . await ?
     else { continue; };
     if ! source_is_owned (config, &subscriber_from_disk . source) {
@@ -353,7 +353,7 @@ async fn validate_no_overlapping_subscribee_hiderel_conflicts (
   for intent in intents {
     let intent : &SubscribeeHiderelIntent = intent;
     let subscribee_from_disk : NodeComplete =
-      match optnodecomplete_from_id (
+      match optNodeComplete_rustFIrst_by_id (
         config, driver, &intent . subscribee ) . await ?
       { Some (subscribee_from_disk) => subscribee_from_disk,
         None                        => continue, };

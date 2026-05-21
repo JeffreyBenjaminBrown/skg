@@ -3,7 +3,7 @@ use crate::dbs::typedb::search::find_related_nodes;
 use crate::from_text::viewnodes_to_instructions::SaveAuthority;
 use crate::from_text::viewnodes_to_instructions::to_naive_instructions::{
   IntentCandidateKind };
-use crate::types::views_state::nodecomplete_from_inrustgraph_or_disk_async;
+use crate::dbs::node_lookup::nodeComplete_rustFIrst_by_id;
 use crate::types::save::{Merge, SaveNode, DeleteNode};
 use crate::types::misc::{MSV, SkgConfig, ID};
 use crate::types::viewnode::EditRequest;
@@ -72,7 +72,7 @@ pub async fn neighbor_savenodes_for_merges (
     Vec::with_capacity (to_load . len ());
   for pid in &to_load {
     let node : NodeComplete =
-      nodecomplete_from_inrustgraph_or_disk_async (config, driver, pid) . await ?;
+      nodeComplete_rustFIrst_by_id (config, driver, pid) . await ?;
     save_nodes . push ( SaveNode (node) ); }
   Ok (save_nodes) }
 
@@ -131,10 +131,10 @@ async fn optmerge_from_viewnode (
     _ => return Ok (None) };
   let acquirer_id : &ID = &t . id;
   let acquirer_from_disk : NodeComplete =
-    nodecomplete_from_inrustgraph_or_disk_async (
+    nodeComplete_rustFIrst_by_id (
       config, driver, acquirer_id ) . await?;
   let acquiree_from_disk : NodeComplete =
-    nodecomplete_from_inrustgraph_or_disk_async (
+    nodeComplete_rustFIrst_by_id (
       config, driver, &acquiree_id ) . await?;
   let acquiree_text_preserver : NodeComplete =
     create_acquiree_text_preserver (&acquiree_from_disk);

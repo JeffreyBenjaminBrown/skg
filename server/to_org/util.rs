@@ -2,7 +2,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
-use crate::types::views_state::nodecomplete_from_inrustgraph_or_disk;
+use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
@@ -69,7 +69,7 @@ pub(super) fn nodecomplete_and_viewnode_from_pid_and_source (
   source : &SourceName,
 ) -> Result < ( NodeComplete, ViewNode ), Box<dyn Error> > {
   let nodecomplete : NodeComplete =
-    nodecomplete_from_inrustgraph_or_disk ( config, pid, source )?;
+    nodecomplete_rustFirst_by_pid_and_source ( config, pid, source )?;
   let title : String = nodecomplete . title . replace ( '\n', " " );
   if title . is_empty () {
     return Err ( Box::new ( io::Error::new (
@@ -509,7 +509,7 @@ pub(super) fn content_ids_if_definitive_else_empty (
       tree, treeid, "content_ids_if_definitive_else_empty" ) {
       Ok (p) => p,
       Err (_) => return Ok ( Vec::new () ), };
-  Ok ( nodecomplete_from_inrustgraph_or_disk ( config, &pid, &source )
+  Ok ( nodecomplete_rustFirst_by_pid_and_source ( config, &pid, &source )
     . map ( |nodecomplete| nodecomplete . contains . clone () )
     . unwrap_or_default () ) }
 

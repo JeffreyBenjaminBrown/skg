@@ -1,7 +1,7 @@
 /// Utilities for phantom node lookup in git diff view.
 /// A phantom is a display-only placeholder for a removed node.
 
-use super::views_state::nodecomplete_from_inrustgraph_or_disk;
+use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -22,7 +22,7 @@ pub fn title_for_phantom (
     . and_then( |diffs| diffs . get (source) )
     . and_then( |sd| sd . deleted_nodes . get (id) )
     . map( |n| n . title . clone() )
-    . or_else( || nodecomplete_from_inrustgraph_or_disk (
+    . or_else( || nodecomplete_rustFirst_by_pid_and_source (
                     config, id, source )
                   . ok() . map( |n| n . title ) )
     . unwrap_or_else( || format!( "TITLE NOT FOUND for ID {}", id . 0 )) }

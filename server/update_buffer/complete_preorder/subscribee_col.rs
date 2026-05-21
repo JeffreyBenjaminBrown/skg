@@ -3,7 +3,7 @@ use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, 
 use crate::to_org::complete::sharing::goal_list::goal_list_for_subscribee_col;
 use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
 use crate::types::git::SourceDiff;
-use crate::types::views_state::nodecomplete_from_inrustgraph_or_disk;
+use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child_of_viewnode, insert_scaffold_as_child};
@@ -85,7 +85,7 @@ fn read_subscribee_col_context (
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
     . ok_or ("reconcile_subscribee_col_children: parent is not a TrueNode") ?;
   let worktree_subscribees : Vec<ID> =
-    nodecomplete_from_inrustgraph_or_disk (
+    nodecomplete_rustFirst_by_pid_and_source (
       &env . config, &parent_pid, &parent_source )
       . ok ()
       . map ( |skg| skg . subscribes_to . or_default () . to_vec () )

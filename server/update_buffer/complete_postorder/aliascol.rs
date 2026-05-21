@@ -1,5 +1,5 @@
 use crate::types::git::{MembershipAxes, NodeChanges, SourceDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_truenode};
-use crate::types::views_state::nodecomplete_from_inrustgraph_or_disk;
+use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth};
@@ -44,7 +44,7 @@ pub fn reconcile_alias_col_children (
       tree, aliascol_node_id, 1,
       "reconcile_alias_col_children" ) ?;
   let parent_nodecomplete : NodeComplete =
-    nodecomplete_from_inrustgraph_or_disk (
+    nodecomplete_rustFirst_by_pid_and_source (
       config, &parent_pid, &parent_source )
     . map_err ( |_| "reconcile_alias_col_children: parent NodeComplete not found" ) ?;
   let (staged_nc, unstaged_nc)

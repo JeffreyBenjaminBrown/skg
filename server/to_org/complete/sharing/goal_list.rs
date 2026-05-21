@@ -9,7 +9,7 @@ use crate::dbs::in_rust_graph::snapshot_global;
 use crate::git_ops::read_repo::nodecomplete_from_git_head;
 use crate::types::git::{SourceDiff, NodeChanges, net_diff_from_per_stage, per_stage_node_changes_for_truenode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
-use crate::types::views_state::nodecomplete_from_inrustgraph_or_disk;
+use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::phantom::source_from_disk;
@@ -122,7 +122,7 @@ pub fn goal_list_for_hiddenoutsideof_subscribeecol (
       . flat_map ( |pid| {
         match snapshot_global_source (pid, config) {
           Some (src) =>
-            nodecomplete_from_inrustgraph_or_disk ( config, pid, &src )
+            nodecomplete_rustFirst_by_pid_and_source ( config, pid, &src )
               . ok ()
               . map ( |skg| skg . contains )
               . unwrap_or_default (),
@@ -179,7 +179,7 @@ fn head_subscribee_contains_from_inrustgraph_and_diffs (
       per_stage_node_changes_for_truenode (
         source_diffs, pid, &subscribee_source );
     if staged_nc . is_none () && unstaged_nc . is_none () {
-      if let Ok (skg) = nodecomplete_from_inrustgraph_or_disk (
+      if let Ok (skg) = nodecomplete_rustFirst_by_pid_and_source (
         config, pid, &subscribee_source )
       { for id in skg . contains . into_iter () {
           result . insert (id); } }
