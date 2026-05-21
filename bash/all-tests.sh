@@ -7,7 +7,7 @@
 # - tests/results/*.log: individual test results
 #
 # INTEGRATION TEST FAILURES ARE RETRIED:
-# First they are all run concurrently.
+# First they are run with bounded concurrency.
 # If any fail, this re-runs the failures in isolation
 # to distinguish real failures from concurrency collisions.
 
@@ -16,16 +16,26 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 RESULTS_DIR="$PROJECT_ROOT/tests/results"
 BEEP="$PROJECT_ROOT/../sound/play-beep.sh beep-soothing"
 SOUND=1
+source "$SCRIPT_DIR/test-runner-lib.sh"
 
 usage () {
   cat <<EOF
 Usage: $0 [--no-sound]
 
-Runs Emacs, nextest, and integration tests in parallel.
+Runs Emacs, nextest, and integration tests in parallel with bounded internal
+concurrency.
 
 Options:
   --no-sound   Do not play the completion sound.
   -h, --help   Show this help.
+
+Environment:
+  SKG_CARGO_BUILD_JOBS       Cargo build jobs. Default: half CPUs, capped at 4.
+  SKG_NEXTEST_JOBS           Nextest jobs. Default: half CPUs, capped at 4.
+  SKG_INTEGRATION_PARALLEL   Integration tests at once. Default: half CPUs,
+                             capped at 2. Falls back to SKG_TEST_PARALLEL.
+  SKG_TEST_NICE              nice level for test commands. Default: 15.
+  SKG_TEST_IONICE=0          Disable idle I/O priority.
 EOF
 }
 
@@ -58,15 +68,24 @@ rm -rf "$RESULTS_DIR"
 mkdir -p "$RESULTS_DIR"
 
 T_START=$SECONDS
+BUILD_JOBS="$(skg_positive_int_or_default "${SKG_CARGO_BUILD_JOBS:-}" "$(skg_default_jobs 4)")"
+NEXTEST_JOBS="$(skg_positive_int_or_default "${SKG_NEXTEST_JOBS:-}" "$(skg_default_jobs 4)")"
+if [ -n "${SKG_INTEGRATION_PARALLEL:-}" ]; then
+  INTEGRATION_PARALLEL_RAW="$SKG_INTEGRATION_PARALLEL"
+else
+  INTEGRATION_PARALLEL_RAW="${SKG_TEST_PARALLEL:-}"
+fi
+INTEGRATION_PARALLEL="$(skg_positive_int_or_default "$INTEGRATION_PARALLEL_RAW" "$(skg_default_jobs 2)")"
 
 echo -e "${BOLD}=== All Tests ===${NC}"
+echo -e "${DIM}Build jobs: $BUILD_JOBS; nextest jobs: $NEXTEST_JOBS; integration parallel: $INTEGRATION_PARALLEL${NC}"
 echo ""
 
 # ── Phase 1: Build ──────────────────────────────────────────────
 
 echo -n "Building... "
 T_BUILD=$SECONDS
-if cargo build --bin skg --bin cleanup-test-dbs \
+if skg_low_priority cargo build --jobs "$BUILD_JOBS" --bin skg --bin cleanup-test-dbs \
      >"$RESULTS_DIR/build.log" 2>&1; then
   ELAPSED_BUILD=$((SECONDS - T_BUILD))
   echo -e "${GREEN}OK${NC} ${DIM}(${ELAPSED_BUILD}s)${NC}"
@@ -89,7 +108,7 @@ echo ""
 # 2a. Emacs tests
 (
   cd "$PROJECT_ROOT"
-  "$SCRIPT_DIR/emacs-tests.sh"
+  skg_low_priority "$SCRIPT_DIR/emacs-tests.sh"
 ) >"$RESULTS_DIR/emacs.log" 2>&1 &
 PID_EMACS=$!
 T_EMACS=$SECONDS
@@ -98,28 +117,46 @@ echo "  Emacs tests       (pid $PID_EMACS)"
 # 2b. Nextest
 (
   cd "$PROJECT_ROOT"
-  cargo nextest run --no-fail-fast
+  skg_low_priority cargo nextest run --jobs "$NEXTEST_JOBS" --no-fail-fast
 ) >"$RESULTS_DIR/nextest.log" 2>&1 &
 PID_NEXTEST=$!
 T_NEXTEST=$SECONDS
 echo "  Nextest            (pid $PID_NEXTEST)"
 
-# 2c. Integration tests — run each one in parallel
+# 2c. Integration tests — run with bounded parallelism
 INTEGRATION_DIR="$PROJECT_ROOT/tests/integration"
 INTEGRATION_NAMES=()
 INTEGRATION_PIDS=()
+INTEGRATION_STARTED=()
+
+running_integration_jobs () {
+  local running count pid
+  running="$(jobs -rp)"
+  count=0
+  for pid in "${INTEGRATION_PIDS[@]}"; do
+    if printf '%s\n' "$running" | grep -qx "$pid"; then
+      count=$((count + 1))
+    fi
+  done
+  echo "$count"
+}
 
 for dir in "$INTEGRATION_DIR"/*/; do
   [ -f "$dir/run-test.sh" ] || continue
+
+  while [ "$(running_integration_jobs)" -ge "$INTEGRATION_PARALLEL" ]; do
+    sleep 0.2
+  done
+
   name="$(basename "$dir")"
   INTEGRATION_NAMES+=("$name")
+  INTEGRATION_STARTED+=($SECONDS)
   (
     cd "$dir"
-    ./run-test.sh
+    skg_low_priority ./run-test.sh
   ) >"$RESULTS_DIR/integration-$name.log" 2>&1 &
   INTEGRATION_PIDS+=($!)
 done
-T_INTEGRATION=$SECONDS
 
 echo "  Integration tests  (${#INTEGRATION_NAMES[@]} tests)"
 echo ""
@@ -159,9 +196,9 @@ INTEGRATION_FAILED=()
 
 for i in "${!INTEGRATION_PIDS[@]}"; do
   name="${INTEGRATION_NAMES[$i]}"
-  wait_for "${INTEGRATION_PIDS[$i]}" "Integration / $name" $T_INTEGRATION
+  wait_for "${INTEGRATION_PIDS[$i]}" "Integration / $name" "${INTEGRATION_STARTED[$i]}"
   INTEGRATION_EXITS+=($LAST_EXIT)
-  INTEGRATION_ELAPSED+=($((SECONDS - T_INTEGRATION)))
+  INTEGRATION_ELAPSED+=($((SECONDS - INTEGRATION_STARTED[$i])))
   if [ $LAST_EXIT -ne 0 ]; then
     INTEGRATION_FAILED+=("$name")
   fi

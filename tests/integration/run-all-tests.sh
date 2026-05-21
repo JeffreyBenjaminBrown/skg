@@ -14,6 +14,8 @@ while [ -L "$SCRIPT_SOURCE" ]; do
 done
 INTEGRATION_DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")" && pwd)"
 TESTS_LOG="$INTEGRATION_DIR/tests.log"
+PROJECT_ROOT="$(cd "$INTEGRATION_DIR/../.." && pwd)"
+source "$PROJECT_ROOT/bash/test-runner-lib.sh"
 
 echo "=== SKG Integration Test Suite ==="
 echo "Integration directory: $INTEGRATION_DIR"
@@ -23,7 +25,6 @@ echo ""
 # Clean up any straggler test databases from previous runs
 # Uses TypeDB's API for safe deletion (doesn't require stopping TypeDB)
 echo "Cleaning up straggler test databases..."
-PROJECT_ROOT="$(cd "$INTEGRATION_DIR/../.." && pwd)"
 "$PROJECT_ROOT/target/debug/cleanup-test-dbs"
 echo ""
 
@@ -75,19 +76,17 @@ echo ""
 echo "Running ${#TEST_DIRS[@]} tests in parallel..."
 
 # Max parallel tests. Each test spins up a server (TypeDB + Tantivy init),
-# so too many at once can starve the system — especially under an RT kernel.
-MAX_PARALLEL=${SKG_TEST_PARALLEL:-4}
+# so too many at once can starve the system, especially under an RT kernel.
+DEFAULT_PARALLEL="$(skg_default_jobs 2)"
+MAX_PARALLEL="$(skg_positive_int_or_default "${SKG_TEST_PARALLEL:-}" "$DEFAULT_PARALLEL")"
+echo "Running up to $MAX_PARALLEL integration test(s) at once. Override with SKG_TEST_PARALLEL."
 
 # Start tests in batches, with nice/ionice to reduce system impact.
 declare -a pids=()
 declare -a test_results=()
 
 for test_dir in "${TEST_DIRS[@]}"; do
-  if command -v ionice >/dev/null 2>&1; then
-    nice -n 15 ionice -c 3 bash -c "$(declare -f run_single_test); INTEGRATION_DIR='$INTEGRATION_DIR' run_single_test '$test_dir'" &
-  else
-    nice -n 15 bash -c "$(declare -f run_single_test); INTEGRATION_DIR='$INTEGRATION_DIR' run_single_test '$test_dir'" &
-  fi
+  skg_low_priority bash -c "$(declare -f run_single_test); INTEGRATION_DIR='$INTEGRATION_DIR' run_single_test '$test_dir'" &
   pids+=($!)
 
   # Throttle: when we hit MAX_PARALLEL, wait for one to finish.
