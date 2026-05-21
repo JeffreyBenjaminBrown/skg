@@ -3,19 +3,19 @@ use super::nodes::complete::NodeComplete;
 use super::errors::{SaveError, BufferValidationError};
 
 
+/////////////////
+/// Types
+/////////////////
+
 /// When a user changes a node's source,
-/// one of these is generated (in addition to the usual DefineNode).
+/// one of these is generated
+/// (in addition to the usual DefineNode).
 #[derive(Debug)]
 pub struct SourceMove {
   pub pid        : ID,
   pub old_source : SourceName,
   pub new_source : SourceName,
 }
-
-
-/////////////////
-/// Types
-/////////////////
 
 /// Defines what to do with a single node: save it or delete it.
 /// PITFALL: Don't merge the 'Merge' type into this one.

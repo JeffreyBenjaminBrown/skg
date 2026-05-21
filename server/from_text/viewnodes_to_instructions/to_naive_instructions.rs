@@ -11,13 +11,13 @@ use crate::types::list::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 
-/// What the user appears to intend to do with this node.
+/// What the user appears to intend for this node.
 /// Might eventually become a DefineNode.
 /// Uses MSV values in the Save variant (whereas DefineNode uses
 /// SaveNode, which uses NodeComplete, which specifies all values).
 pub(crate) enum NodeIntent {
   Save   (NodeSaveIntent),
-  Delete (NodeDeleteIntent),
+  Delete (DeleteNode), /// DefineNode uses the same DeleteNode type
 }
 
 pub(crate) struct NodeSaveIntent {
@@ -32,11 +32,6 @@ pub(crate) struct NodeSaveIntent {
   hides_from_its_subscriptions : MSV<ID>,
   overrides_view_of            : MSV<ID>,
   misc                         : Vec<FileProperty>,
-}
-
-pub(crate) struct NodeDeleteIntent {
-  pid    : ID,
-  source : SourceName,
 }
 
 /// Node edit intents for the entire saved buffer.
@@ -62,7 +57,7 @@ pub(crate) enum SavenodeCandidateKind {
   SubscribeeAsSuch { subscriber : ID }, }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct SavenodeCandidateKind {
+pub(crate) struct SavenodeCandidate {
   pub(crate) treeid : NodeId,
   pub(crate) kind   : SavenodeCandidateKind, }
 
@@ -72,7 +67,7 @@ impl NodeIntent {
   ) -> &ID {
     match self {
       NodeIntent::Save (intent) => &intent . pid,
-      NodeIntent::Delete (intent) => &intent . pid, }}
+      NodeIntent::Delete (intent) => &intent . id, }}
 
   pub(crate) fn apply_hiderel_delta (
     &mut self,
@@ -119,9 +114,7 @@ impl NodeIntent {
   ) -> Result<DefineNode, String> {
     match self {
       NodeIntent::Delete (intent)
-        => Ok (DefineNode::Delete (DeleteNode {
-          id     : intent . pid,
-          source : intent . source, } )),
+        => Ok (DefineNode::Delete (intent)),
       NodeIntent::Save (intent)
         => Ok (DefineNode::Save (SaveNode (
           intent . into_nodecomplete() ))) }}
@@ -554,8 +547,8 @@ fn assemble_node_edit_intents (
         "assemble_node_edit_intents: missing node edit basics")?;
     match basics . kind {
       NodeEditMinimalAction::Delete =>
-        result . push (NodeIntent::Delete (NodeDeleteIntent {
-          pid    : basics . pid,
+        result . push (NodeIntent::Delete (DeleteNode {
+          id     : basics . pid,
           source : basics . source, } )),
       NodeEditMinimalAction::Save { title, body } =>
         { let intent : NodeSaveIntent =
