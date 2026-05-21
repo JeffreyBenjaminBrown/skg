@@ -13,7 +13,7 @@
 //
 // Before this fix, the rerender of the saved buffer would show b
 // as a DeletedNode at the top level (b hit
-// deleted_by_this_save_pids in truenode_completion_treatment and
+// deleted_by_this_save_pids in expand_true_content_at_truenode and
 // short-circuited to (deleted ...)). The goal-list-resolution fix
 // in reconcile_content_children only helped for acquirees that
 // were content-children of some other node in the view -- it did

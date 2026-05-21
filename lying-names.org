@@ -1234,9 +1234,6 @@ is now : id_to_pid_if_found
 ** complete_truenode_preorder (line 72)
    - True?: Partly. The "complete" verb is honest at the level of the comment (seven phases) but the name conceals that this single function may mutate the node's kind to Deleted (via mutate_truenode_to_deletednode), clobber it as indefinitive, or short-circuit on phantom — i.e., "complete" sometimes means "rewrite".
    - Omits?: It omits the in-place kind mutation paths and the clobber-and-stop behavior.
-** truenode_completion_treatment (line 118)
-   - True?: Partly. Despite "resolve", the function also calls set_diff_status, which mutates the node's diff axes, and it can mutate the node into a DeletedNode kind in the deleted_by_this_save case.
-   - Omits?: It omits the diff-axis mutation and the kind-rewrite to DeletedNode.
 ** clear_edit_request (line 158)
    - True?: Yes.
    - Omits?: Nothing material.

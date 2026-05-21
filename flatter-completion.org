@@ -298,10 +298,10 @@ ensure_subscribee_cols
 ensure_diff_scaffolds
 #+end_src
 
-Important detail: =normalize_truenode_identity_and_state= should record the
-same early-stop semantics currently returned by =TruenodeCompletionTreatment=. A
+Important detail: =normalize_truenode_identity_and_state= should preserve the
+same early-stop semantics currently in =expand_true_content_at_truenode=. A
 simple helper predicate such as =truenode_needs_content_completion= is clearer
-than carrying that outcome through every later phase.
+than carrying that outcome through every later pass.
 
 The passes should be allowed to reread pid/source/NodeComplete as needed.
 Avoid inventing a large "prepared TrueNode facts" cache unless the code becomes

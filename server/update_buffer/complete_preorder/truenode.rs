@@ -43,17 +43,6 @@ struct ChildData {
   kind   : ContentReality,
 }
 
-/// Outcome of dispatching on the TrueNode's kind and state.
-/// Stop means the node has been handled (phantom/indefinitive/
-/// deleted-by-this-save) and no further completion is needed.
-/// Continue carries the pid/source extracted once for the rest
-/// of the pipeline.
-enum TruenodeCompletionTreatment {
-  Stop,
-  Continue { pid : ID,
-             source : SourceName },
-}
-
 #[derive(Clone, Copy)]
 struct CompletionMode {
   saved_view : bool, // false => collateral buffer
@@ -115,21 +104,41 @@ pub fn expand_true_content_at_truenode (
     tree, node, |vn : &ViewNode| matches!( &vn . kind,
                                            ViewNodeKind::True (_)),
     "expand_true_content_at_truenode: expected TrueNode" ) ?;
-  let mode : CompletionMode =
-    CompletionMode::new (is_saved_view, source_diffs);
   make_indef_if_repeat_then_extend_defmap(
     tree, node, defmap ) ?;
+  // Handle git diff view before the clobber-and-early-return
+  // that happens to indefinitive nodes.
+  let is_phantom : bool =
+    read_at_node_in_tree( tree, node,
+      |vn : &ViewNode| match &vn . kind {
+        ViewNodeKind::True (t) => t . is_phantom(),
+        _ => false } ) ?;
+  if is_phantom { return Ok (( )); }
   let (pid, initial_source) : (ID, SourceName) =
-    match truenode_completion_treatment (
-      tree, node, source_diffs, config,
-      deleted_by_this_save_pids ) ?
-    { TruenodeCompletionTreatment::Stop => return Ok (( )),
-      TruenodeCompletionTreatment::Continue { pid, source } => (pid, source) };
+    pid_and_source_from_treenode( tree, node,
+                                  "expand_true_content_at_truenode" ) ?;
+  set_diff_status(
+    tree, node, &pid, source_diffs, &initial_source) ?;
+  let is_indefinitive : bool =
+    read_at_node_in_tree( tree, node,
+      |vn : &ViewNode| match &vn . kind {
+        ViewNodeKind::True (t) => t . is_indefinitive (),
+        _ => false } ) ?;
+  if is_indefinitive {
+    clobberIndefinitiveViewnode( tree, node, config ) ?;
+    return Ok (( )); }
+  if deleted_by_this_save_pids . contains (&pid) {
+    mutate_truenode_to_deletednode (
+      tree, node, &pid, &initial_source ) ?;
+    return Ok (( )); }
   clear_edit_request (tree, node) ?;
   let nodecomplete : NodeComplete =
-    nodecomplete_rustFirst_by_pid_and_source ( config, &pid, &initial_source ) ?;
+    nodecomplete_rustFirst_by_pid_and_source (
+      config, &pid, &initial_source ) ?;
   let source : SourceName =
     nodecomplete . source . clone ();
+  let mode : CompletionMode =
+    CompletionMode::new (is_saved_view, source_diffs);
   if mode . should_sync_truenode_from_disk () { // The saved (definitive) view of a node *defines* the title, body, and source, but other views need those fields updated.
     sync_truenode_from_disk (tree, node, &nodecomplete) ?; }
   let subscribes_to : Vec<ID> =
@@ -160,44 +169,6 @@ pub fn ensure_diff_scaffolds_for_truenode (
     maybe_prepend_diff_view_scaffolds (
       tree, node, source_diffs, &pid, &source ) ?; }
   Ok (( )) }
-
-/// Phantom/indefinitive/deleted-by-this-save nodes
-/// are finalised in place here, returning Stop.
-/// Everything else yields Continue with (pid, source).
-fn truenode_completion_treatment (
-  tree                       : &mut Tree<ViewNode>,
-  node                       : NodeId,
-  source_diffs               : &Option<HashMap<SourceName, SourceDiff>>,
-  config                     : &SkgConfig,
-  deleted_by_this_save_pids  : &HashSet<ID>,
-) -> Result<TruenodeCompletionTreatment, Box<dyn Error>> {
-  // Handle git diff view *before* the clobber-and-early-return
-  // that happens to indefinitive nodes.
-  let is_phantom : bool =
-    read_at_node_in_tree( tree, node,
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::True (t) => t . is_phantom(),
-        _ => false } ) ?;
-  if is_phantom {
-    return Ok (TruenodeCompletionTreatment::Stop); }
-  let (pid, source) : (ID, SourceName) =
-    pid_and_source_from_treenode( tree, node,
-                                  "truenode_completion_treatment" ) ?;
-  set_diff_status(
-    tree, node, &pid, source_diffs, &source) ?;
-  let is_indefinitive : bool =
-    read_at_node_in_tree( tree, node,
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::True (t) => t . is_indefinitive (),
-        _ => false } ) ?;
-  if is_indefinitive {
-    clobberIndefinitiveViewnode( tree, node, config ) ?;
-    return Ok (TruenodeCompletionTreatment::Stop); }
-  if deleted_by_this_save_pids . contains (&pid) {
-    mutate_truenode_to_deletednode (
-      tree, node, &pid, &source ) ?;
-    return Ok (TruenodeCompletionTreatment::Stop); }
-  Ok (TruenodeCompletionTreatment::Continue { pid, source }) }
 
 /// The edit request should have been used by now.
 fn clear_edit_request (
