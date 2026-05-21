@@ -137,7 +137,7 @@ pub(crate) async fn extract_nonmergeSavePlan_from_authority (
   let intents_without_dups : SameIdReconciledNodeIntents =
     reconcile_nodeIntents (extracted . node_edit_intents)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  let intents_with_visibility : SameIdReconciledNodeIntents =
+  let intents_with_hiderels : SameIdReconciledNodeIntents =
     apply_hiderels_from_intents (
       intents_without_dups,
       &extracted . hiderel_intents,
@@ -145,15 +145,15 @@ pub(crate) async fn extract_nonmergeSavePlan_from_authority (
       driver ) . await ?;
   let with_disk : Definenodes_with_Sourcemoves =
     build_disk_supplemented_define_nodes (
-      intents_with_visibility . into_ordered_intents(),
+      intents_with_hiderels . into_ordered_intents(),
       config,
       driver ) . await ?;
-  let changed_instructions : Vec<DefineNode> =
+  let sans_noops : Vec<DefineNode> =
     filter_wouldbe_noop_definenodes (with_disk . instructions);
   Ok (NonmergeSavePlan {
-    define_nodes : changed_instructions,
+    define_nodes : sans_noops,
     source_moves : with_disk . source_moves,
-  }) }
+  } ) }
 
 fn extract_save_intents (
   role_viewforest : &Tree<ViewNode_in_Role>,
@@ -248,8 +248,7 @@ async fn supplement_saveintent_from_disk (
         instruction :
           NodeIntent::Save (from_buffer) . into_define_node()
           . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
-        source_move : None,
-      }),
+        source_move : None, } ),
     Some (disk_node) => {
       let disk_node : NodeComplete = disk_node;
       let mut from_buffer : NodeSaveIntent = from_buffer;

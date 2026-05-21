@@ -17,7 +17,7 @@ use std::collections::{HashMap, HashSet};
 /// SaveNode, which uses NodeComplete, which specifies all values).
 pub(crate) enum NodeIntent {
   Save   (NodeSaveIntent),
-  Delete (DeleteNode), /// DefineNode uses the same DeleteNode type
+  Delete (DeleteNode), // DefineNode uses the same DeleteNode type
 }
 
 pub(crate) struct NodeSaveIntent {
@@ -57,8 +57,8 @@ pub(crate) struct DefinenodeCandidate {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum DefinenodeCandidateKind {
-  OrdinaryTrueNode,
-  SubscribeeAsSuch { subscriber : ID }, }
+  OrdinaryNode,
+  NodeAsSubscribee { subscriber : ID }, }
 
 impl NodeIntent {
   pub(crate) fn pid (
@@ -268,7 +268,7 @@ pub(crate) fn naive_node_edit_intents_from_role_viewforest (
 /// - supplemented from disk ('build_disk_supplemented_define_nodes')
 /// - filtered for no-op saves
 /// - ignorant of the special hiderel interpretation in the case of
-///   DefinenodeCandidateKind::SubscribeeAsSuch
+///   DefinenodeCandidateKind::NodeAsSubscribee
 ///   ('ubscribee_hiderel_intents_from_candidates' does that)
 pub(crate) fn naive_node_edit_intents_from_candidates (
   role_viewforest : &Tree<ViewNode_in_Role>,
@@ -277,9 +277,9 @@ pub(crate) fn naive_node_edit_intents_from_candidates (
   let candidate_ids : Vec<NodeId> =
     candidates . iter()
     . filter_map (|candidate| match &candidate . kind {
-      DefinenodeCandidateKind::OrdinaryTrueNode =>
+      DefinenodeCandidateKind::OrdinaryNode =>
         Some (candidate . treeid),
-      DefinenodeCandidateKind::SubscribeeAsSuch { .. } =>
+      DefinenodeCandidateKind::NodeAsSubscribee { .. } =>
         None,
     })
     . collect();
@@ -425,9 +425,9 @@ pub(crate) fn collect_savenode_candidates (
         let candidate_kind : Option<DefinenodeCandidateKind> =
           match role {
             SaveRole::Truenode =>
-              Some (DefinenodeCandidateKind::OrdinaryTrueNode),
+              Some (DefinenodeCandidateKind::OrdinaryNode),
             SaveRole::TruenodeAsSubscribee { subscriber } =>
-              Some (DefinenodeCandidateKind::SubscribeeAsSuch {
+              Some (DefinenodeCandidateKind::NodeAsSubscribee {
                 subscriber,
               }),
             _ => None,

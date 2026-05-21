@@ -143,7 +143,7 @@ Implemented role shape:
 #+begin_src rust
 enum SaveRole {
   BufferRoot,
-  OrdinaryTrueNode,
+  OrdinaryNode,
   AsSubscribee { subscriber: ID },
   HiddenInSubscribeeCol { subscriber: ID, subscribee: ID },
   HiddenOutsideOfSubscribeeCol { subscriber: ID },
@@ -586,7 +586,7 @@ Behavior is unchanged:
 
 - candidate order preserves preorder output;
 - indefinitive candidates are still skipped when intents are built;
-- definitive 'OrdinaryTrueNode' and 'AsSubscribee' positions still
+- definitive 'OrdinaryNode' and 'AsSubscribee' positions still
   produce intents as before;
 - aliases, 'contains', and 'subscribes_to' still use the same
   role-aware helper logic;
@@ -630,7 +630,7 @@ inside one recursive function. Current behavior is preserved:
 - candidate order still determines preorder output;
 - indefinitive candidates still produce no intent;
 - delete intents still carry only 'pid' and 'source';
-- definitive 'OrdinaryTrueNode' and 'AsSubscribee' positions still
+- definitive 'OrdinaryNode' and 'AsSubscribee' positions still
   produce save intents;
 - 'contains', aliases, and 'subscribes_to' use the existing
   role-aware rules;
@@ -819,7 +819,7 @@ Current behavior is unchanged:
 
 The raw intent includes only direct visible content children:
 
-- child TrueNodes with role 'OrdinaryTrueNode';
+- child TrueNodes with role 'OrdinaryNode';
 - excluding non-content births, phantoms, and delete-request children;
 - ignoring scaffolds, hidden scaffold contents, deleted/unknown nodes,
   and recursive descendants.

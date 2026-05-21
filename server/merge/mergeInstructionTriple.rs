@@ -102,9 +102,8 @@ pub(crate) async fn instructiontriples_from_merge_candidates (
   let mut merges : Vec<Merge> =
     Vec::new();
   for candidate in extraction_forest . candidates () {
-    if ! matches!(
-      candidate . kind,
-      DefinenodeCandidateKind::OrdinaryTrueNode)
+    if ! matches!( candidate . kind,
+                   DefinenodeCandidateKind::OrdinaryNode)
     { continue; }
     let node_ref =
       extraction_forest . role_viewforest () . get (candidate . treeid)

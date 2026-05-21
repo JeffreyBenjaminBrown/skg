@@ -38,7 +38,7 @@ pub(crate) fn subscribee_hiderel_intents_from_candidates (
   for candidate in candidates {
     let subscriber : ID =
       match &candidate . kind {
-        DefinenodeCandidateKind::SubscribeeAsSuch { subscriber } =>
+        DefinenodeCandidateKind::NodeAsSubscribee { subscriber } =>
           subscriber . clone(),
         _ => continue,
       };
