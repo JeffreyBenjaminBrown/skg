@@ -24,7 +24,7 @@ use viewnodes_to_instructions::{
   extract_nonmerge_save_plan_from_authority,
   NonmergeSavePlan,
   SaveAuthority};
-use validate::{validate_and_filter_foreign_instructions, validate_merges_involve_only_owned_nodes, validate_no_simultaneous_move_and_merge};
+use validate::{validate_and_filter_foreign_instructions, validate_no_simultaneous_move_and_merge};
 
 use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
@@ -88,22 +88,20 @@ pub async fn buffer_to_validated_saveplan (
     extract_nonmerge_save_plan_from_authority (
       &save_authority, config, driver )
     . await . map_err (SaveError::DatabaseError) ?;
-  let define_nodes : Vec<DefineNode> =
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "validate_and_filter_foreign_instructions" ). entered();
-      validate_and_filter_foreign_instructions (
-        nonmerge_plan . define_nodes, config, driver )
-      . await } . map_err (SaveError::BufferValidationErrors) ?;
   let merge_instructions : Vec<Merge> =
     // PITFALL: The edit_requests consumed here remain in viewforest until cleared by expand_true_content_at_truenode, during complete_viewforest. Merge extraction only plans merge mutations; it does not mutate the saved viewforest.
     extract_merge_save_plan (
       &save_authority, config, driver )
     . await . map_err (SaveError::DatabaseError) ?;
-  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "validate_merges_involve_only_owned_nodes" ). entered();
-    validate_merges_involve_only_owned_nodes (
-      & merge_instructions, config ) }
-    . map_err (SaveError::BufferValidationErrors) ?;
+  let define_nodes : Vec<DefineNode> =
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "validate_and_filter_foreign_instructions" ). entered();
+      validate_and_filter_foreign_instructions (
+        nonmerge_plan . define_nodes,
+        &merge_instructions,
+        config,
+        driver )
+      . await } . map_err (SaveError::BufferValidationErrors) ?;
   validate_no_simultaneous_move_and_merge (
     &nonmerge_plan . source_moves, &merge_instructions )
     . map_err (SaveError::BufferValidationErrors) ?;

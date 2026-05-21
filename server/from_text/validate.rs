@@ -18,15 +18,22 @@ use typedb_driver::TypeDBDriver;
 /// harmless only after unspecified fields have been filled from disk,
 /// and foreign creates are recognized by checking disk for the pid.
 pub async fn validate_and_filter_foreign_instructions(
-  instructions: Vec<DefineNode>,
-  config: &SkgConfig,
-  driver: &TypeDBDriver,
+  instructions       : Vec<DefineNode>,
+  merge_instructions : &[Merge],
+  config             : &SkgConfig,
+  driver             : &TypeDBDriver,
 ) -> Result<Vec<DefineNode>,
             Vec<BufferValidationError>> {
   let mut outcomes : Vec<ForeignPolicyOutcome> =
     Vec::new();
-  for instruction in &instructions {
-    outcomes . push (
+  let merge_definenodes : Vec<DefineNode> =
+    merge_instructions . iter ()
+    . flat_map ( |merge| merge . to_vec () )
+    . collect ();
+  for instruction in
+    instructions . iter ()
+    . chain (merge_definenodes . iter ())
+  { outcomes . push (
       apply_foreign_policy(
         instruction, config, driver
       ) . await? ); }
@@ -98,6 +105,8 @@ fn collect_foreign_policy_outcomes(
   if errors . is_empty() { Ok (())
   } else { Err (errors) }}
 
+/// Drop any DefineNode that
+/// defines a foreign node to be unchanged.
 fn filter_unchanged_foreign_saves(
   instructions: Vec<DefineNode>,
   outcomes: &[ForeignPolicyOutcome],
@@ -119,46 +128,6 @@ fn source_is_foreign(
   config . sources . get (source)
     . map(|s| !s . user_owns_it)
     . unwrap_or (false)}
-
-/// Validates that merge instructions involve no foreign nodes.
-/// A merge modifies the acquirer and deletes the acquiree,
-/// so both must be from sources the user owns.
-///
-/// Requires extracted Merge plans: the acquirer/acquiree sources
-/// live on the merge's generated Save/Delete instructions.
-pub(super) fn validate_merges_involve_only_owned_nodes(
-  merge_instructions: &[Merge],
-  config: &SkgConfig,
-) -> Result<(), Vec<BufferValidationError>> {
-  let mut errors: Vec<BufferValidationError> =
-    Vec::new();
-  for merge in merge_instructions {
-    { // Check if acquirer is from foreign source
-      let acquirer_source: &SourceName =
-        &merge . updated_acquirer . 0 . source;
-      if { let acquirer_is_foreign: bool =
-             config . sources . get (acquirer_source)
-             . map(|s| !s . user_owns_it)
-             . unwrap_or (false);
-           acquirer_is_foreign }
-      { let id : &ID = merge . acquirer_id();
-        errors . push(
-          BufferValidationError::ModifiedForeignNode(
-            id . clone(),
-            acquirer_source . clone() )); }}
-    { // Check if acquiree is from foreign source
-      let acquiree_source: &SourceName =
-        &merge . acquiree_to_delete . source;
-      let acquiree_is_foreign: bool =
-        config . sources . get (acquiree_source)
-        . map(|s| !s . user_owns_it)
-        . unwrap_or (false);
-      if acquiree_is_foreign {
-        errors . push(BufferValidationError::ModifiedForeignNode(
-          merge . acquiree_id() . clone(),
-          acquiree_source . clone() )); }} }
-  if errors . is_empty() { Ok(( ))
-  } else { Err (errors) }}
 
 /// Returns true if the buffer node differs from the disk node
 /// in any definitive field (title, body, contains) or
