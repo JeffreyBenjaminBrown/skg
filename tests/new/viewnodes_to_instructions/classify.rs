@@ -65,13 +65,13 @@ fn classifies_buffer_root_and_ordinary_truenodes (
     Some (&SaveRole::BufferRoot));
   assert_eq!(
     role_for_title (&viewforest, &roles, "root"),
-    SaveRole::Truenode);
+    SaveRole::Ordinary);
   assert_eq!(
     role_for_title (&viewforest, &roles, "ordinary"),
-    SaveRole::Truenode);
+    SaveRole::Ordinary);
   assert_eq!(
     role_for_title (&viewforest, &roles, "independent"),
-    SaveRole::Truenode); }
+    SaveRole::Ordinary); }
 
 #[test]
 fn classifies_alias_and_id_display_scaffolds (
@@ -125,7 +125,7 @@ fn classifies_subscribee_col_positions (
     SaveRole::DisplayOnly);
   assert_eq!(
     role_for_title (&viewforest, &roles, "subscribee"),
-    SaveRole::TruenodeAsSubscribee {
+    SaveRole::Subscribee {
       subscriber : ID::from ("subscriber"),
     });
   assert_eq!(

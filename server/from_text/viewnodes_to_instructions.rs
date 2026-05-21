@@ -182,7 +182,7 @@ pub(crate) async fn validate_no_title_or_body_edit_in_subscribeeAsSuch (
   for node_ref in role_viewforest . nodes() {
     if ! matches!(
       node_ref . value() . role,
-      SaveRole::TruenodeAsSubscribee { .. })
+      SaveRole::Subscribee { .. })
     { continue; }
     let ViewNodeKind::True (t) =
       &node_ref . value() . viewnode . kind
@@ -270,7 +270,7 @@ async fn supplement_saveintent_from_disk (
         source_move : maybe_move,
       }) }}}
 
-/// Interpret view-children under definitive TruenodeAsSubscribee branches as
+/// Interpret view-children under definitive Subscribee branches as
 /// subscriber edits to "hides" relationships.
 ///
 /// At this point graph edit intents have been same-ID reconciled, but

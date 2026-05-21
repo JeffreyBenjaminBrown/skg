@@ -57,8 +57,8 @@ pub(crate) struct DefinenodeCandidate {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum DefinenodeCandidateKind {
-  OrdinaryNode,
-  NodeAsSubscribee { subscriber : ID }, }
+  Ordinary,
+  Subscribee { subscriber : ID }, }
 
 impl NodeIntent {
   pub(crate) fn pid (
@@ -268,7 +268,7 @@ pub(crate) fn naive_node_edit_intents_from_role_viewforest (
 /// - supplemented from disk ('build_disk_supplemented_define_nodes')
 /// - filtered for no-op saves
 /// - ignorant of the special hiderel interpretation in the case of
-///   DefinenodeCandidateKind::NodeAsSubscribee
+///   DefinenodeCandidateKind::Subscribee
 ///   ('ubscribee_hiderel_intents_from_candidates' does that)
 pub(crate) fn naive_node_edit_intents_from_candidates (
   role_viewforest : &Tree<ViewNode_in_Role>,
@@ -277,9 +277,9 @@ pub(crate) fn naive_node_edit_intents_from_candidates (
   let candidate_ids : Vec<NodeId> =
     candidates . iter()
     . filter_map (|candidate| match &candidate . kind {
-      DefinenodeCandidateKind::OrdinaryNode =>
+      DefinenodeCandidateKind::Ordinary =>
         Some (candidate . treeid),
-      DefinenodeCandidateKind::NodeAsSubscribee { .. } =>
+      DefinenodeCandidateKind::Subscribee { .. } =>
         None,
     })
     . collect();
@@ -424,10 +424,10 @@ pub(crate) fn collect_savenode_candidates (
       ViewNodeKind::True (t) => {
         let candidate_kind : Option<DefinenodeCandidateKind> =
           match role {
-            SaveRole::Truenode =>
-              Some (DefinenodeCandidateKind::OrdinaryNode),
-            SaveRole::TruenodeAsSubscribee { subscriber } =>
-              Some (DefinenodeCandidateKind::NodeAsSubscribee {
+            SaveRole::Ordinary =>
+              Some (DefinenodeCandidateKind::Ordinary),
+            SaveRole::Subscribee { subscriber } =>
+              Some (DefinenodeCandidateKind::Subscribee {
                 subscriber,
               }),
             _ => None,
@@ -613,7 +613,7 @@ fn collect_subscribees (
             ViewNodeKind::True (t) => {
               if matches!(
                    subscribeecol_child . value() . role,
-                   SaveRole::TruenodeAsSubscribee { .. })
+                   SaveRole::Subscribee { .. })
                  && !t . parent_ignores_it()
               { subscribees . push(t . id . clone()); }},
             ViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol) =>
@@ -644,7 +644,7 @@ fn collect_contents_to_save_from_children<'a> (
         // In diff view, skip phantom nodes.
         if matches!(
              child_ref . value() . role,
-             SaveRole::Truenode)
+             SaveRole::Ordinary)
            && ! t . parent_ignores_it()
            && ! t . is_phantom ()
            && ! matches!( t . edit_request (),

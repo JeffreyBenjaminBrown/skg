@@ -6,8 +6,8 @@ use std::collections::HashMap;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SaveRole {
   BufferRoot,
-  Truenode,
-  TruenodeAsSubscribee { subscriber: ID },
+  Ordinary,
+  Subscribee { subscriber: ID },
   HiddenInSubscribeeCol { subscriber: ID, subscribee: ID },
   HiddenOutsideOfSubscribeeCol { subscriber: ID },
   AliasDisplay,
@@ -104,10 +104,10 @@ fn classify_truenode (
   node_ref : NodeRef<ViewNode>,
 ) -> Result<SaveRole, String> {
   let Some (parent_ref) = node_ref . parent()
-    else { return Ok (SaveRole::Truenode); };
+    else { return Ok (SaveRole::Ordinary); };
   match &parent_ref . value() . kind {
     ViewNodeKind::Scaff (Scaffold::SubscribeeCol) =>
-      Ok (SaveRole::TruenodeAsSubscribee {
+      Ok (SaveRole::Subscribee {
         subscriber : truenode_id (
           parent_ref . parent(),
           "SubscribeeCol must have a TrueNode parent")?,
@@ -152,7 +152,7 @@ fn classify_truenode (
           subscribeecol_ref . parent(),
           "SubscribeeCol must have a TrueNode parent")?,
       }) },
-    _ => Ok (SaveRole::Truenode),
+    _ => Ok (SaveRole::Ordinary),
   }}
 
 fn truenode_id (

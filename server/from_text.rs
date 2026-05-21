@@ -110,11 +110,10 @@ pub async fn buffer_to_validated_saveplan (
   validate_no_simultaneous_move_and_merge (
     &nonmerge_plan . source_moves, &merge_instructions )
     . map_err (SaveError::BufferValidationErrors) ?;
-
-  Ok (SavePlan { viewforest,
-                 define_nodes,
-                 merge_instructions,
-                 source_moves : nonmerge_plan . source_moves } ) }
+  Ok ( SavePlan { viewforest,
+                  define_nodes,
+                  merge_instructions,
+                  source_moves : nonmerge_plan . source_moves } ) }
 
 async fn extract_merge_save_plan (
   extraction_forest : &SaveAuthority,

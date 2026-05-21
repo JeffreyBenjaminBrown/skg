@@ -38,7 +38,7 @@ pub(crate) fn subscribee_hiderel_intents_from_candidates (
   for candidate in candidates {
     let subscriber : ID =
       match &candidate . kind {
-        DefinenodeCandidateKind::NodeAsSubscribee { subscriber } =>
+        DefinenodeCandidateKind::Subscribee { subscriber } =>
           subscriber . clone(),
         _ => continue,
       };
@@ -71,7 +71,7 @@ fn collect_direct_visible_content (
       ViewNodeKind::True (t) => {
         if matches!(
              child_ref . value() . role,
-             SaveRole::Truenode)
+             SaveRole::Ordinary)
            && ! t . parent_ignores_it()
            && ! t . is_phantom()
            && ! matches!(
