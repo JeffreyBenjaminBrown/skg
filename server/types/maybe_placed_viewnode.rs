@@ -143,20 +143,17 @@ impl From<ViewNode> for MaybePlacedViewnode {
   }
 }
 
-/// PURPOSE:
-/// Builds a Tree<ViewNode> isomorphic to the input tree.
-/// In the maybePlaced (input) type, id and source are optional;
-/// in the output, they are mandatory.
-/// .
-/// ERROR CONDITIONS:
-/// Errs if any TrueNode is missing either field.
-/// Since validation happens before this, it shouldn't err.
+/// Does *not* compute missing source or ID.
+/// Merely converts a Tree<MaybePlacedViewnode>
+///              to a Tree<ViewNode>,
+/// failing if it finds any source or ID missing.
 pub fn maybePlaced_to_placed_tree (
   unchecked: Tree<MaybePlacedViewnode>
 ) -> Result<Tree<ViewNode>, String> {
   let unchecked_root_id: NodeId =
     unchecked . root() . id();
   let mut checked: Tree<ViewNode> =
+    // This tree begins as a clone of the other's root.
     Tree::new( ViewNode::try_from(
       unchecked . root() . value() . clone() )? );
   let mut id_map: HashMap< NodeId, // key : unchecked
