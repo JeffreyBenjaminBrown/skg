@@ -98,8 +98,7 @@ struct RenderedCollateralView {
 /// this updates the rendered views and ViewsState.
 /// .
 /// ASSUMES:
-/// the graph was already updated.
-/// Updating views before updating the graph would be bad.
+/// the graph was already updated. The reverse order would be bad.
 pub async fn update_views_after_save (
   stream                      : &mut std::net::TcpStream,
   saved_view                  : Tree<ViewNode>,

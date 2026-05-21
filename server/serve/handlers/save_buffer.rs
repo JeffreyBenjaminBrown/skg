@@ -163,12 +163,11 @@ pub async fn update_from_and_rerender_buffer (
   if save_plan . viewforest . root() . children() . next() . is_none()
     { return Err ( "Nothing to save found in org_buffer_text"
                    . into() ); }
-  let SavePlan {
-    viewforest,
-    define_nodes,
-    merge_instructions,
-    source_moves,
-  } = save_plan;
+  let SavePlan { viewforest,
+                 define_nodes,
+                 merge_instructions,
+                 source_moves }
+    = save_plan;
 
   { // update the graph
     update_graph_including_merges (
@@ -185,7 +184,7 @@ pub async fn update_from_and_rerender_buffer (
         &env . tantivy_index, &env . config . db_name,
         &env . driver, &define_nodes ) . await
       . unwrap_or_else ( |e| tracing::warn! (
-        "context type recomputation failed: {}", e )); } }
+        "context type recomputation failed: {}", e )); }}
 
   update_views_after_save (
     stream,
