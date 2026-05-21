@@ -3,8 +3,6 @@ use crate::types::viewnode::{Scaffold, ViewNode, ViewNodeKind};
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::HashMap;
 
-pub type SaveRoleMap = HashMap<NodeId, SaveRole>;
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SaveRole {
   BufferRoot,
@@ -25,8 +23,10 @@ pub struct ViewNode_in_Role {
 
 pub fn classify_save_roles (
   viewforest : &Tree<ViewNode>,
-) -> Result<SaveRoleMap, String> {
-  let mut roles : SaveRoleMap = HashMap::new();
+) -> Result< HashMap<NodeId, SaveRole>,
+             String> {
+  let mut roles : HashMap<NodeId, SaveRole> =
+    HashMap::new();
   for node_ref in viewforest . nodes() {
     let node_id : NodeId = node_ref . id();
     let role : SaveRole = saverole_for_node (node_ref) ?;

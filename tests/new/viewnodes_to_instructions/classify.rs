@@ -1,8 +1,9 @@
 use ego_tree::{NodeId, Tree};
 use indoc::indoc;
+use std::collections::HashMap;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::viewnodes_to_instructions::classify::{
-  classify_save_roles, SaveRole, SaveRoleMap,
+  classify_save_roles, SaveRole,
 };
 use skg::types::git::MembershipAxes;
 use skg::types::misc::{ID, SourceName};
@@ -28,7 +29,7 @@ fn checked_viewforest_from_org (
 
 fn role_for_title (
   tree  : &Tree<ViewNode>,
-  roles : &SaveRoleMap,
+  roles : &HashMap<NodeId, SaveRole>,
   title : &str,
 ) -> SaveRole {
   for node_ref in tree . nodes() {
@@ -56,7 +57,7 @@ fn classifies_buffer_root_and_ordinary_truenodes (
             "};
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
-  let roles : SaveRoleMap =
+  let roles : HashMap<NodeId, SaveRole> =
     classify_save_roles (&viewforest) . unwrap();
 
   assert_eq!(
@@ -85,7 +86,7 @@ fn classifies_alias_and_id_display_scaffolds (
             "};
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
-  let roles : SaveRoleMap =
+  let roles : HashMap<NodeId, SaveRole> =
     classify_save_roles (&viewforest) . unwrap();
 
   assert_eq!(
@@ -116,7 +117,7 @@ fn classifies_subscribee_col_positions (
             "};
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
-  let roles : SaveRoleMap =
+  let roles : HashMap<NodeId, SaveRole> =
     classify_save_roles (&viewforest) . unwrap();
 
   assert_eq!(
@@ -198,7 +199,7 @@ fn classifies_deleted_unknown_and_deleted_scaffolds_as_display_only (
         membership : MembershipAxes::default(),
       })) . id();
 
-  let roles : SaveRoleMap =
+  let roles : HashMap<NodeId, SaveRole> =
     classify_save_roles (&viewforest) . unwrap();
 
   assert_eq!(roles . get (&deleted_id), Some (&SaveRole::DisplayOnly));
@@ -252,7 +253,7 @@ fn every_node_gets_a_role (
             "};
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
-  let roles : SaveRoleMap =
+  let roles : HashMap<NodeId, SaveRole> =
     classify_save_roles (&viewforest) . unwrap();
   let node_count : usize =
     viewforest . nodes() . count();

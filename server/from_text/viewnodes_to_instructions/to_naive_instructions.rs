@@ -12,8 +12,8 @@ use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 
 pub(crate) enum NodeEditIntent {
-  GraphSave      (NodeSaveIntent),
-  Delete         (NodeDeleteIntent),
+  GraphSave (NodeSaveIntent),
+  Delete    (NodeDeleteIntent),
 }
 
 pub(crate) struct NodeSaveIntent {
