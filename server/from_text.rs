@@ -23,7 +23,8 @@ use buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use viewnodes_to_instructions::{
   extract_nonmergeSavePlan_from_authority,
   NonmergeSavePlan,
-  SaveAuthority};
+  SaveAuthority,
+  validate_no_title_or_body_edit_in_subscribeeAsSuch};
 use validate::{validate_and_filter_foreign_instructions, validate_no_simultaneous_move_and_merge};
 
 use ego_tree::Tree;
@@ -84,6 +85,9 @@ pub async fn buffer_to_validated_saveplan (
         "SaveAuthority::from_viewforest" ). entered();
       SaveAuthority::from_viewforest (&viewforest) }
         . map_err ( |e| SaveError::ParseError (e) ) ?;
+  validate_no_title_or_body_edit_in_subscribeeAsSuch (
+    save_authority . role_viewforest (), config, driver
+  ) . await . map_err (SaveError::DatabaseError) ?;
   let nonmerge_plan : NonmergeSavePlan =
     extract_nonmergeSavePlan_from_authority (
       &save_authority, config, driver )

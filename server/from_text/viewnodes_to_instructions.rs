@@ -129,8 +129,6 @@ pub(crate) async fn extract_nonmergeSavePlan_from_authority (
     save_authority . role_viewforest ();
   let candidates : &[IntentCandidate] =
     save_authority . candidates ();
-  validate_no_title_or_body_edit_in_subscribeeAsSuch (
-    role_viewforest, config, driver ) . await ?;
   let extracted : SaveExtraction =
     extract_save_intents (role_viewforest, candidates)?;
   let intents_without_dups : SameIdReconciledNodeEditIntents =
@@ -171,7 +169,7 @@ fn extract_save_intents (
     hiderel_intents,
   }) }
 
-async fn validate_no_title_or_body_edit_in_subscribeeAsSuch (
+pub(crate) async fn validate_no_title_or_body_edit_in_subscribeeAsSuch (
   role_viewforest : &Tree<ViewNode_in_Role>,
   config          : &SkgConfig,
   driver          : &TypeDBDriver,
