@@ -54,7 +54,7 @@ over another hidden side effect.
 
 ** DONE a. Split save preparation into an explicit plan object
 
-=buffer_to_saveplan= used to return a tuple:
+=buffer_to_validated_saveplan= used to return a tuple:
 
 #+begin_src rust
 (Tree<ViewNode>, Vec<DefineNode>, Vec<Merge>, Vec<SourceMove>)
@@ -87,7 +87,7 @@ return value through the pipeline.
 Executed increment:
 
 - introduce =SavePlan= in =from_text.rs=;
-- have =buffer_to_saveplan= return it;
+- have =buffer_to_validated_saveplan= return it;
 - update the few callers/tests mechanically;
 - do not change behavior.
 
@@ -342,7 +342,7 @@ obvious.
 
 Suggested documentation-only increment:
 
-- add a short section near =buffer_to_saveplan=
+- add a short section near =buffer_to_validated_saveplan=
   explaining the maturity stages:
 
   - unchecked, metadata-filled tree;
@@ -356,7 +356,7 @@ Suggested documentation-only increment:
 This would help future work avoid moving a validator earlier than its
 required facts.
 
-Status: complete. =buffer_to_saveplan= now
+Status: complete. =buffer_to_validated_saveplan= now
 documents the save-preparation data maturity stages. The validators
 whose placement is easiest to question now state the facts they
 require: metadata-filled unchecked tree, role-classified viewforest,

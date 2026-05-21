@@ -2,7 +2,7 @@
 /// is a Skg buffer from the Emacs client,
 /// read by the Rust server when the user saves it.
 /// The sole purpose of all the sub-libraries in 'from_text::'
-/// is the function 'buffer_to_saveplan'
+/// is the function 'buffer_to_validated_saveplan'
 /// defined here.
 
 pub mod buffer_to_viewnodes;
@@ -44,7 +44,7 @@ pub struct SavePlan {
 /// - placed, role-aware viewforest: saved-view role policy;
 /// - disk-supplemented DefineNodes: foreign write policy;
 /// - non-merge plus merge plan: cross-plan source-move/merge policy.
-pub async fn buffer_to_saveplan (
+pub async fn buffer_to_validated_saveplan (
   buffer_text : &str,
   config      : &SkgConfig,
   driver      : &TypeDBDriver,

@@ -1445,7 +1445,7 @@ is now : id_to_pid_if_found
    - Omits?: It omits that the rendering is filtered by per-birth heuristics; identical GraphNodeStats can render differently depending on the node's birth.
 
 * server/from_text.rs
-** buffer_to_saveplan (line 29)
+** buffer_to_validated_saveplan (line 29)
    - True?: Partly. The function also constructs (and returns) merge instructions and source moves, and it performs validation passes that can short-circuit with errors. The name groups all of that under "save instructions".
    - Omits?: It omits the merge-instruction extraction, the source-move extraction, and the multiple validation steps that may produce BufferValidationErrors.
 

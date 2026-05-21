@@ -27,7 +27,7 @@ HiddenOutside from that field.
 
 The save path is:
 
-- [[../../server/from_text.rs][from_text.rs]] 'buffer_to_saveplan'
+- [[../../server/from_text.rs][from_text.rs]] 'buffer_to_validated_saveplan'
 - [[../../server/from_text/viewnodes_to_instructions.rs][viewnodes_to_instructions.rs]] 'viewforest_to_nonmerge_save_instructions'
 - [[../../server/from_text/viewnodes_to_instructions/to_naive_instructions.rs][to_naive_instructions.rs]] 'naive_saveinstructions_from_tree'
 - [[../../server/from_text/supplement_from_disk.rs][supplement_from_disk.rs]] 'supplement_none_fields_from_disk_if_save'
