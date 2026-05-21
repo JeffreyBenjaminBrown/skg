@@ -48,9 +48,10 @@ struct ChildData {
 /// deleted-by-this-save) and no further completion is needed.
 /// Continue carries the pid/source extracted once for the rest
 /// of the pipeline.
-enum TruenodeKindOutcome {
+enum TruenodeCompletionTreatment {
   Stop,
-  Continue { pid : ID, source : SourceName },
+  Continue { pid : ID,
+             source : SourceName },
 }
 
 #[derive(Clone, Copy)]
@@ -101,7 +102,8 @@ impl CompletionMode {
 /// pass will not be correct if any truenode is missing children.
 ///
 /// WHAT IT DOES (high-level phases), in order:
-/// - resolve_truenode_kind: fetch (pid, source), but
+/// - make_indef_if_repeat_then_extend_defmap
+/// - truenode_completion_treatment: fetch (pid, source), but
 ///   short-circuit for phantom/indefinitive/deleted-by-save.
 /// - clear_edit_request
 /// - Load NodeComplete;
@@ -130,11 +132,11 @@ pub fn expand_true_content_at_truenode (
   make_indef_if_repeat_then_extend_defmap(
     tree, node, defmap ) ?;
   let (pid, initial_source) : (ID, SourceName) =
-    match resolve_truenode_kind (
+    match truenode_completion_treatment (
       tree, node, source_diffs, config,
       deleted_by_this_save_pids ) ?
-    { TruenodeKindOutcome::Stop => return Ok (( )),
-      TruenodeKindOutcome::Continue { pid, source } => (pid, source) };
+    { TruenodeCompletionTreatment::Stop => return Ok (( )),
+      TruenodeCompletionTreatment::Continue { pid, source } => (pid, source) };
   clear_edit_request (tree, node) ?;
   let nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source ( config, &pid, &initial_source ) ?;
@@ -171,31 +173,28 @@ pub fn ensure_diff_scaffolds_for_truenode (
       tree, node, source_diffs, &pid, &source ) ?; }
   Ok (( )) }
 
-/// Phase 1 of expand_true_content_at_truenode: phantom/indefinitive/
-/// deleted-by-this-save nodes are finalised in place here and
-/// the function returns Stop; everything else yields Continue
-/// with the (pid, source) that later phases need.
-fn resolve_truenode_kind (
+/// Phantom/indefinitive/deleted-by-this-save nodes
+/// are finalised in place here, returning Stop.
+/// Everything else yields Continue with (pid, source).
+fn truenode_completion_treatment (
   tree                       : &mut Tree<ViewNode>,
   node                       : NodeId,
   source_diffs               : &Option<HashMap<SourceName, SourceDiff>>,
   config                     : &SkgConfig,
   deleted_by_this_save_pids  : &HashSet<ID>,
-) -> Result<TruenodeKindOutcome, Box<dyn Error>> {
+) -> Result<TruenodeCompletionTreatment, Box<dyn Error>> {
   // Handle git diff view *before* the clobber-and-early-return
   // that happens to indefinitive nodes.
   let is_phantom : bool =
-    // Phantoms (nodes with diff status already set, e.g. Removed,
-    // RemovedHere) are display-only placeholders created during
-    // content reconciliation. They need no further completion.
     read_at_node_in_tree( tree, node,
       |vn : &ViewNode| match &vn . kind {
         ViewNodeKind::True (t) => t . is_phantom(),
         _ => false } ) ?;
-  if is_phantom { return Ok (TruenodeKindOutcome::Stop); }
+  if is_phantom {
+    return Ok (TruenodeCompletionTreatment::Stop); }
   let (pid, source) : (ID, SourceName) =
     pid_and_source_from_treenode( tree, node,
-                                  "resolve_truenode_kind" ) ?;
+                                  "truenode_completion_treatment" ) ?;
   maybe_change_node_diff_status(
     tree, node, &pid, source_diffs, &source) ?;
   let is_indefinitive : bool =
@@ -205,12 +204,12 @@ fn resolve_truenode_kind (
         _ => false } ) ?;
   if is_indefinitive {
     clobberIndefinitiveViewnode( tree, node, config ) ?;
-    return Ok (TruenodeKindOutcome::Stop); }
+    return Ok (TruenodeCompletionTreatment::Stop); }
   if deleted_by_this_save_pids . contains (&pid) {
     mutate_truenode_to_deletednode (
       tree, node, &pid, &source ) ?;
-    return Ok (TruenodeKindOutcome::Stop); }
-  Ok (TruenodeKindOutcome::Continue { pid, source }) }
+    return Ok (TruenodeCompletionTreatment::Stop); }
+  Ok (TruenodeCompletionTreatment::Continue { pid, source }) }
 
 /// The edit request should have been used by now.
 fn clear_edit_request (

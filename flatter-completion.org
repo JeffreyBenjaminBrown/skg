@@ -299,7 +299,7 @@ ensure_diff_scaffolds
 #+end_src
 
 Important detail: =normalize_truenode_identity_and_state= should record the
-same early-stop semantics currently returned by =TruenodeKindOutcome=. A
+same early-stop semantics currently returned by =TruenodeCompletionTreatment=. A
 simple helper predicate such as =truenode_needs_content_completion= is clearer
 than carrying that outcome through every later phase.
 

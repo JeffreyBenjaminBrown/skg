@@ -126,7 +126,7 @@ pub async fn complete_branch_minus_content (
 /// Does only what it says -- in particular,
 /// does not clobber the node after making it indefinitive.
 ///
-/// The two jobs in the name of this are inseparable --
+/// The two jobs in the name cannot be unbundled --
 /// we have to interleave extending the defmap
 /// with marking things indefinitive, because the defmap
 /// is how we know whether to mark something indefinitive.
