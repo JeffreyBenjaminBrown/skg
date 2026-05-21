@@ -59,7 +59,10 @@ impl CompletionMode {
       diff_view  : source_diffs . is_some(),
     }}
 
-  fn should_sync_truenode_from_disk (
+  /// The saved (definitive) view of a node
+  /// *defines* the title, body, and source.
+  /// Collateral views, though, need those fields updated.
+  fn should_sync_from_disk_even_though_definitive (
     self,
   ) -> bool {
     ! self . saved_view }
@@ -106,27 +109,26 @@ pub fn expand_true_content_at_truenode (
     "expand_true_content_at_truenode: expected TrueNode" ) ?;
   make_indef_if_repeat_then_extend_defmap(
     tree, node, defmap ) ?;
-  // Handle git diff view before the clobber-and-early-return
-  // that happens to indefinitive nodes.
-  let is_phantom : bool =
-    read_at_node_in_tree( tree, node,
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::True (t) => t . is_phantom(),
-        _ => false } ) ?;
-  if is_phantom { return Ok (( )); }
+  { let is_phantom : bool =
+      read_at_node_in_tree( tree, node,
+        |vn : &ViewNode| match &vn . kind {
+          ViewNodeKind::True (t) => t . is_phantom(),
+          _ => false } ) ?;
+    if is_phantom { return Ok (( )); }}
   let (pid, initial_source) : (ID, SourceName) =
     pid_and_source_from_treenode( tree, node,
                                   "expand_true_content_at_truenode" ) ?;
-  set_diff_status(
+  set_diff_status (
+    // Must precede the clobber-and-early-return done to indefinitive nodes.
     tree, node, &pid, source_diffs, &initial_source) ?;
-  let is_indefinitive : bool =
-    read_at_node_in_tree( tree, node,
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::True (t) => t . is_indefinitive (),
-        _ => false } ) ?;
-  if is_indefinitive {
-    clobberIndefinitiveViewnode( tree, node, config ) ?;
-    return Ok (( )); }
+  { let is_indefinitive : bool =
+      read_at_node_in_tree( tree, node,
+        |vn : &ViewNode| match &vn . kind {
+          ViewNodeKind::True (t) => t . is_indefinitive (),
+          _ => false } ) ?;
+    if is_indefinitive {
+      clobberIndefinitiveViewnode( tree, node, config ) ?;
+      return Ok (( )); }}
   if deleted_by_this_save_pids . contains (&pid) {
     mutate_truenode_to_deletednode (
       tree, node, &pid, &initial_source ) ?;
@@ -139,7 +141,7 @@ pub fn expand_true_content_at_truenode (
     nodecomplete . source . clone ();
   let mode : CompletionMode =
     CompletionMode::new (is_saved_view, source_diffs);
-  if mode . should_sync_truenode_from_disk () { // The saved (definitive) view of a node *defines* the title, body, and source, but other views need those fields updated.
+  if mode . should_sync_from_disk_even_though_definitive () {
     sync_truenode_from_disk (tree, node, &nodecomplete) ?; }
   let subscribes_to : Vec<ID> =
     reconcile_content_children (
@@ -200,7 +202,7 @@ fn sync_truenode_from_disk (
   ) ?;
   Ok (( )) }
 
-/// Phase 4: compute the content goal list (diff-aware), reconcile
+/// Compute the content goal list (diff-aware), reconcile
 /// children against it, and mark any surviving non-goal children
 /// as Birth::Independent. Returns 'subscribes_to' so phase 6 can
 /// decide whether to prepend a SubscribeeCol.
