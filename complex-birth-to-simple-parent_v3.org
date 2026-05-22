@@ -1,0 +1,328 @@
+* Complex Birth to Simple Parent, v3
+
+This report revises =complex-birth-to-simple-parent_v2.org= after the
+TODO comments there.
+
+The revised proposal is:
+
+- rename =Birth= to =ParentIs=;
+- use variants =Container=, =Content=, =LinkTarget=, =Independent=,
+  and =Absent=;
+- omit =ParentIs::Container= from metadata, because it is the default;
+- explicitly write =ParentIs::Absent= where it applies;
+- show no parent herald for =Absent=;
+- if a node with =ParentIs::Absent= is moved under a visible parent,
+  normalize it to =Container= before save interpretation.
+
+* Name mapping
+
+The new names describe what the visible parent is relative to the
+child.
+
+| Old =Birth=       | New =ParentIs= | Meaning                                                 |
+|-------------------+----------------+---------------------------------------------------------|
+| =ContentOf=       | =Container=    | parent contains child                                   |
+| =ContainerOf=     | =Content=      | parent is contained by child                            |
+| =LinksTo=         | =LinkTarget=   | parent is linked to by child                            |
+| =Independent=     | =Independent=  | child has a visible parent, but no graph relation to it |
+| root/no parent    | =Absent=       | child has no visible parent                             |
+
+Important pitfall: old =Birth::ContainerOf= should become
+=ParentIs::Content=, not =ParentIs::Container=.
+
+* Main finding
+
+With explicit =Absent=, the model is cleaner than v2.
+
+Missing metadata can now mean exactly one thing:
+
+#+begin_src rust
+  missing parentIs == ParentIs::Container
+#+end_src
+
+That preserves compact metadata for ordinary content children without
+making omission context-sensitive.
+
+=Absent= remains a tree-position fact, not a graph relationship. It is
+valid for direct TrueNode children of the invisible =BufferRoot=. If a
+user moves such a node under a visible parent, the save path should
+normalize =Absent= to =Container= so the move creates an ordinary
+containment edit.
+
+* Pushback
+
+The remaining thing to be precise about is whether explicit
+=(parentIs absent)= is user-editable. If it is, then a user could write
+it under a visible parent. The system should not preserve that as a
+meaningful parent relationship, because it contradicts the tree shape.
+
+Recommendation: treat =Absent= under a visible parent as a transient
+stale marker and normalize it to =Container= before validation and save
+instruction extraction. That matches the desired move behavior and keeps
+=Absent= reserved for =BufferRoot= children.
+
+I do not see a need for an optional type or a separate
+=ParentIsFromMetadata= wrapper if =Absent= is explicit. The parser can
+default missing =parentIs= directly to =Container=.
+
+** TODO If that happens
+let's change the Absent to Independent.
+The user shouldn't do that, but if they do,
+what they probably meant is to make the node independent of its parent.
+We should also present a warning
+(the usual way non-fatal warnings are presented during a save).
+
+* Assignments and mutations
+
+** Type definition and default
+
+=server/types/viewnode.rs= defines =Birth= on lines 21-26 and stores it
+on =TrueNode_Generic= at lines 78-79.
+
+Recommendation:
+
+#+begin_src rust
+  pub enum ParentIs {
+    Container,
+    Content,
+    LinkTarget,
+    Independent,
+    Absent,
+  }
+#+end_src
+
+Default construction should use =ParentIs::Container=, matching the
+metadata default. That includes the current equivalents of
+=default_truenode=, =mk_definitive_viewnode=, and
+=MaybePlacedTruenode::default=.
+
+Keep the helper name =parent_ignores_it=. Its current meaning remains
+useful: when saving, a view-child with this property has no graph effect
+on its visible parent.
+
+The predicate should become:
+
+#+begin_src rust
+  self.parent_is != ParentIs::Container
+#+end_src
+
+=Absent= therefore ignores its parent for save extraction. The
+normalization rule below is what prevents a moved top-level node from
+remaining =Absent= under a visible parent.
+
+** Parse metadata
+
+=server/serve/parse_metadata_sexp.rs= currently defaults missing
+=birth= to =Birth::ContentOf= in =default_metadata=.
+
+Under v3, this can remain a simple metadata-level default:
+
+- missing =parentIs= => =ParentIs::Container=;
+- =(parentIs container)= is accepted but redundant;
+- =(parentIs absent)= parses to =ParentIs::Absent=.
+
+Unlike v2, no tree-aware parser default is needed, because =Absent= is
+explicit.
+
+** Normalize stale Absent after tree construction
+
+Add one tree-aware normalization pass after org parsing has built the
+viewforest, before validation and save extraction:
+
+- direct TrueNode children of =BufferRoot= may remain
+  =ParentIs::Absent=;
+- TrueNodes under any visible parent with =ParentIs::Absent= become
+  =ParentIs::Container=.
+
+This handles the user workflow: a top-level node rendered with
+=(parentIs absent)= can be moved under another node and saved as
+content without editing metadata.
+
+This pass should probably also run before rendering any existing
+viewforest, so stale =Absent= markers do not persist after structural
+edits.
+
+** Initial content views
+
+=server/to_org/render/content_view.rs= calls
+=set_view_root_births_from_graphstats= after graph stats are attached.
+=server/to_org/util.rs= lines 193-211 then assigns =ContentOf= or
+=Independent= to direct =BufferRoot= children based on graph container
+count.
+
+Under v3, graph container count should not determine =ParentIs= for a
+view-root. A direct =BufferRoot= child has no visible parent.
+
+Recommendation: replace =set_view_root_births_from_graphstats= with
+=mark_view_roots_parent_absent= or similar. It should set direct
+=BufferRoot= TrueNodes to =ParentIs::Absent=.
+
+** Save rerender
+
+=server/update_buffer.rs= line 246 calls =mark_view_roots_independent=.
+=server/to_org/util.rs= lines 213-229 implement that by assigning
+=Birth::Independent= to direct =BufferRoot= children.
+
+Under v3, this should become the same root normalization used for
+initial views: direct =BufferRoot= TrueNodes get =ParentIs::Absent=.
+
+This fixes the known problem: a graph-content view-root no longer
+changes from =ContentOf= on initial visit to =Independent= after save.
+It is =Absent= in both cases.
+
+*** TODO This will render some code dead. Let's delete it once it's dead.
+
+** Render metadata
+
+=server/org_to_text.rs= lines 238-251 omit =Birth::ContentOf= and emit
+the other variants.
+
+Under v3:
+
+- =ParentIs::Container= is omitted;
+- =ParentIs::Absent= is emitted explicitly, probably
+  =(parentIs absent)=;
+- =ParentIs::Content= renders as =(parentIs content)=;
+- =ParentIs::LinkTarget= renders as =(parentIs linkTarget)=;
+- =ParentIs::Independent= renders as =(parentIs independent)=.
+
+This makes omission unambiguous: it always means =Container=.
+
+** Heralds
+
+=elisp/heralds-minor-mode.el= lines 143-149 and 317-351 inject
+=birth contentOf= when the metadata omits =birth=.
+
+Under v3, that can be mechanically updated:
+
+- omitted =parentIs= means =Container=;
+- explicit =(parentIs absent)= should produce no parent herald;
+- =Content=, =LinkTarget=, and =Independent= keep visible non-default
+  heralds.
+
+Because =Absent= is explicit, heralds do not need headline-level
+context just to distinguish =Absent= from =Container=.
+
+** Search result roots
+
+=server/serve/handlers/text_search.rs= lines 352-357 currently assigns
+=Birth::Independent= to indexed root hits and =Birth::ContentOf= to
+other hits. Lines 399-407 create each hit as a direct child of
+=BufferRoot=.
+
+Under v3, all level-1 search hits should be =ParentIs::Absent=,
+regardless of graph context. If search wants to display "this hit is a
+context root" or "this hit has containers", that should be separate
+metadata or graph stats, not =ParentIs=.
+
+Search enrichment then inserts ancestry under those hits. Those inserted
+children should use =ParentIs::Content=, because their visible parent is
+content of them.
+
+** Containerward and sourceward expansions
+
+=server/to_org/expand/backpath.rs= should be renamed carefully:
+
+- current =Birth::ContainerOf= assignments become =ParentIs::Content=;
+- current =Birth::LinksTo= assignments become =ParentIs::LinkTarget=;
+- current ordinary content expansion becomes =ParentIs::Container=.
+
+The assignments are otherwise conceptually correct: they describe why a
+node was inserted under its visible parent.
+
+** Completion repair to Independent
+
+The existing repairs to =Independent= remain conceptually correct:
+
+- =server/update_buffer/complete_preorder/truenode.rs= lines 437-460;
+- =server/to_org/util.rs= lines 258-296;
+- =server/update_buffer/complete_postorder/hiddeninsubscribee_col.rs=
+  lines 135-146;
+- =server/update_buffer/complete_postorder/hiddenoutsideof_subscribeecol.rs=
+  lines 140-151;
+- the currently-unreachable AliasCol fallback at
+  =server/update_buffer/complete_postorder/aliascol.rs= lines 96-101.
+
+In v3 these should set =ParentIs::Independent=. That means there is a
+visible parent, but the claimed graph relation to it does not hold.
+
+They should not set =Absent=, because the node has a visible parent.
+
+* Save semantics
+
+The save pipeline mostly wants one predicate: does the visible parent
+contain this child?
+
+Under v3:
+
+#+begin_src rust
+  parent_contains_child = parent_is == ParentIs::Container
+#+end_src
+
+Everything else is parent-ignored for ordinary contains-list extraction:
+=Content=, =LinkTarget=, =Independent=, and =Absent=.
+
+Before this predicate is used for save extraction, normalize
+=ParentIs::Absent= under visible parents to =ParentIs::Container=.
+
+* Recommended implementation order
+
+1. Introduce =ParentIs= with the new variant names, and update comments
+   so the enum is parent-oriented.
+
+2. Keep missing =parentIs= as a metadata-level default for
+   =ParentIs::Container=.
+
+3. Add =ParentIs::Absent= parsing and rendering. Render it explicitly.
+   Do not attach a herald to it.
+
+4. Keep the helper name =parent_ignores_it=, updating only its predicate
+   and comments.
+
+5. Replace root passes:
+   =set_view_root_births_from_graphstats= and
+   =mark_view_roots_independent= should become root =Absent=
+   normalization.
+
+6. Add the stale-=Absent= normalization pass:
+   any TrueNode with visible parent and =ParentIs::Absent= becomes
+   =ParentIs::Container= before save interpretation.
+
+7. Rename expansion variants carefully:
+   old =ContainerOf= => new =Content=;
+   old =LinksTo= => new =LinkTarget=;
+   old =ContentOf= => new =Container=.
+
+8. Update herald and metadata-editing code from =birth= to =parentIs=.
+
+9. Update tests, especially rendered strings that currently expect
+   top-level =(birth independent)= or omitted =birth= default injection.
+
+* Tests most likely to change
+
+- content and initial view tests expecting level-1
+  =(birth independent)=;
+- save/rerender tests involving a graph-content view-root;
+- search enrichment tests that inspect root birth markers;
+- integration tests that assert containerward ancestry carries old
+  =(birth containerOf)= spelling;
+- herald tests around default ={= injection and non-default glyphs;
+- Elisp metadata editing tests that expose =birth= as an editable field;
+- save tests that rely on omitted =birth= meaning content should still
+  pass after the rename, because omitted =parentIs= still means
+  =Container=.
+
+Add a focused test for the important new behavior:
+
+1. Render a top-level node with =ParentIs::Absent=.
+2. Move that line under another definitive node without editing its
+   metadata.
+3. Save.
+4. Verify the new visible parent's =contains= includes the moved node.
+
+* Summary
+
+The v3 design avoids the main ambiguity in v2. Because =Absent= is
+explicit, omitted =parentIs= can simply mean =Container= everywhere.
+The only tree-aware rule still needed is stale-=Absent= normalization
+when a top-level line is moved under a visible parent.
