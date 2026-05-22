@@ -212,7 +212,7 @@ fn relationship_diffs_for_pid (
       let gained : Vec<ID> =
         after . difference (&before) . cloned () . collect ();
       let unchanged : Vec<ID> =
-        if *role == "container" {
+        if is_backward_relationship_role (role) {
           before . intersection (&after) . cloned () . collect ()
         } else {
           Vec::new () };
@@ -221,6 +221,14 @@ fn relationship_diffs_for_pid (
       } else {
         Some ( RelationshipDiff { role, lost, gained, unchanged } ) } } )
     . collect ()
+}
+
+fn is_backward_relationship_role (
+  role : &str,
+) -> bool {
+  matches! (
+    role,
+    "container" | "subscribee" | "hidden" | "replaced" | "dest" )
 }
 
 fn contained_list_diff_for_pid (

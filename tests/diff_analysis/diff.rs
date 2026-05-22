@@ -124,6 +124,37 @@ fn lost_container_reports_current_existing_containers () {
 }
 
 #[test]
+fn backward_subscribee_reports_current_existing_related_nodes () {
+  let mut old : NodeComplete =
+    node ("old", "Old", &[]);
+  old . subscribes_to = MSV::Specified (vec! [id ("target")]);
+  let mut stay : NodeComplete =
+    node ("stay", "Stay", &[]);
+  stay . subscribes_to = MSV::Specified (vec! [id ("target")]);
+  let mut stay_after : NodeComplete =
+    node ("stay", "Stay", &[]);
+  stay_after . subscribes_to = MSV::Specified (vec! [id ("target")]);
+  let mut new : NodeComplete =
+    node ("new", "New", &[]);
+  new . subscribes_to = MSV::Specified (vec! [id ("target")]);
+  let report : DiffReport =
+    report_for (
+      vec! [ old, stay, node ("target", "Target", &[]) ],
+      vec! [ stay_after, new, node ("target", "Target", &[]) ] );
+  let reports : HashMap<ID, &NodeDiffReport> =
+    reports_by_pid (&report);
+  let target_report : &NodeDiffReport =
+    reports . get (&id ("target")) . unwrap ();
+  let subscribee_diff : &RelationshipDiff =
+    target_report . relationship_diffs . iter ()
+      . find ( |diff| diff . role == "subscribee" )
+      . unwrap ();
+  assert_eq! (subscribee_diff . lost, vec! [id ("old")]);
+  assert_eq! (subscribee_diff . gained, vec! [id ("new")]);
+  assert_eq! (subscribee_diff . unchanged, vec! [id ("stay")]);
+}
+
+#[test]
 fn contained_order_change_gets_list_diff () {
   let before : Vec<NodeComplete> =
     vec! [ node ("a", "A", &["b", "c"]),

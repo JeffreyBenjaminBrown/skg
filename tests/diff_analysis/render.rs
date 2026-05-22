@@ -154,3 +154,45 @@ fn unchanged_container_relationship_heading_is_explicit () {
     "unchanged-only container heading should be explicit: {}",
     rendered );
 }
+
+#[test]
+fn non_container_backward_relationships_render_as_signed_sets () {
+  let mut node : NodeDiffReport =
+    node_report ("target", "Target");
+  node . relationship_diffs =
+    vec! [
+      RelationshipDiff {
+        role: "dest",
+        lost: vec! [id ("old")],
+        gained: vec! [id ("new")],
+        unchanged: vec! [id ("stay")] } ];
+  let report : DiffReport =
+    DiffReport {
+      duplicate_ids: Vec::new (),
+      titles: HashMap::from ([
+        (id ("old"), "Old".to_string ()),
+        (id ("new"), "New".to_string ()),
+        (id ("stay"), "Stay".to_string ()) ]),
+      buckets: vec! [
+        NodeBucket {
+          name: "modified, other",
+          nodes: vec! [node] } ] };
+  let rendered : String =
+    render_report (&report);
+  assert! (
+    rendered . contains ("**** dest (with gains and losses)\n"),
+    "backward relationship should use signed-set heading: {}",
+    rendered );
+  assert! (
+    rendered . contains ("****** -o..Old\n"),
+    "lost backward relation should be marked with '-': {}",
+    rendered );
+  assert! (
+    rendered . contains ("****** +n..New\n"),
+    "gained backward relation should be marked with '+': {}",
+    rendered );
+  assert! (
+    rendered . contains ("******  s..Stay\n"),
+    "unchanged backward relation should be marked with a space: {}",
+    rendered );
+}

@@ -134,8 +134,8 @@ fn render_relationship_diff (
   report        : &DiffReport,
   abbreviations : &HashMap<ID, String>,
 ) {
-  if diff . role == "container" {
-    render_container_relationship_diff (
+  if is_backward_relationship_role (diff . role) {
+    render_backward_relationship_diff (
       out, diff, report, abbreviations );
     return; }
   out . push_str (&format! ("**** {}\n", diff . role));
@@ -149,14 +149,14 @@ fn render_relationship_diff (
       render_related_node (out, id, report, abbreviations); }}
 }
 
-fn render_container_relationship_diff (
+fn render_backward_relationship_diff (
   out           : &mut String,
   diff          : &RelationshipDiff,
   report        : &DiffReport,
   abbreviations : &HashMap<ID, String>,
 ) {
   out . push_str (&format! (
-    "**** {}\n", container_relationship_heading (diff) ));
+    "**** {}\n", backward_relationship_heading (diff) ));
   for id in &diff . lost {
     render_related_node_with_marker (
       out, "-", id, report, abbreviations ); }
@@ -168,14 +168,32 @@ fn render_container_relationship_diff (
       out, " ", id, report, abbreviations ); }
 }
 
-fn container_relationship_heading (
+fn backward_relationship_heading (
   diff : &RelationshipDiff,
-) -> &'static str {
+) -> String {
+  let base : &str =
+    backward_relationship_heading_base (diff . role);
   match (diff . gained . is_empty (), diff . lost . is_empty ()) {
-    (false, false) => "containers (with gains and losses)",
-    (false, true)  => "containers (with gains)",
-    (true, false)  => "containers (with losses)",
-    (true, true)   => "containers (unchanged)", }
+    (false, false) => format! ("{} (with gains and losses)", base),
+    (false, true)  => format! ("{} (with gains)", base),
+    (true, false)  => format! ("{} (with losses)", base),
+    (true, true)   => format! ("{} (unchanged)", base), }
+}
+
+fn backward_relationship_heading_base (
+  role : &str,
+) -> &str {
+  match role {
+    "container" => "containers",
+    _           => role, }
+}
+
+fn is_backward_relationship_role (
+  role : &str,
+) -> bool {
+  matches! (
+    role,
+    "container" | "subscribee" | "hidden" | "replaced" | "dest" )
 }
 
 fn render_contained_list_diff (
