@@ -1,4 +1,5 @@
 pub mod close_view;
+pub mod diff_analysis;
 pub mod get_file_path;
 pub mod rebuild_dbs;
 pub mod rerender_all_views;

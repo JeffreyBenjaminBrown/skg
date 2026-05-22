@@ -17,6 +17,7 @@ pub enum RequestType {
   RebuildDbs,
   RerenderAllViews,
   TitlesByIds,
+  DiffAnalysis,
 }
 
 impl RequestType {
@@ -36,6 +37,7 @@ impl RequestType {
       "rebuild dbs"              => Ok (RequestType::RebuildDbs),
       "rerender all views"       => Ok (RequestType::RerenderAllViews),
       "titles by ids"            => Ok (RequestType::TitlesByIds),
+      "diff analysis"            => Ok (RequestType::DiffAnalysis),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See api-and-formats.md
@@ -63,6 +65,7 @@ pub enum TcpToClient {
   RerenderView,
   RerenderDone,
   TitlesByIds,
+  DiffAnalysis,
   Error,
 }
 
@@ -88,4 +91,5 @@ impl TcpToClient {
       TcpToClient::RerenderView     => "rerender-view",
       TcpToClient::RerenderDone     => "rerender-done",
       TcpToClient::TitlesByIds      => "titles-by-ids",
+      TcpToClient::DiffAnalysis     => "diff-analysis",
       TcpToClient::Error            => "error", }} }

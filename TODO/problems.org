@@ -254,6 +254,22 @@
    does not exist in the repository. Either the file was renamed or
    the reference is stale.
 
+** 'compute_interleaved_diff' can collide for large unique-item lists
+   WARNING: TODO.org refers to the headline title verbatim.
+
+   server/types/list.rs maps each unique item to a Unicode scalar and
+   feeds the resulting strings to 'similar::TextDiff::from_chars'.
+
+   The mapping starts at 0x100 and uses
+   'char::from_u32(char_counter).unwrap_or('?')'. Once the counter
+   reaches surrogate code points, or eventually passes Unicode's max
+   scalar value, multiple distinct items map to '?'. That can make the
+   diff incorrect.
+
+   It probably does not matter for small relationship lists, but a
+   generic list diff helper should either avoid scalar encoding or
+   return an error instead of silently colliding.
+
 ** Long-running SKG server can hide code/protocol fixes
    On 2026-05-04, the server process listening on port 1730 was still
    an older / already-running binary. It accepted 'titles by ids'

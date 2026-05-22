@@ -1,0 +1,348 @@
+* goal
+Create an Emacs command that asks what git states to compare,
+then returns one org buffer summarizing every affected Skg node across
+all configured sources.
+
+The report is semantic rather than textual:
+it compares graph facts, scalar node fields, aliases, extra IDs,
+and all five schema relations in both role directions.
+* user workflow
+** TODO command
+Add an Emacs command,
+'skg-diff-report',
+bound to C-c t r.
+** prompt
+Prompt:
+
+- "include staged changes?"
+- If yes, ask "include unstaged changes?"
+- If no, do not ask the second question and assume unstaged=yes.
+
+This gives three useful comparisons:
+
+- HEAD -> worktree, including staged and unstaged changes.
+- HEAD -> index, staged only.
+- index -> worktree, unstaged only.
+
+Do not offer "neither"; it would produce an empty report.
+** response
+The server sends one length-prefixed response with:
+
+- response-type: 'diff-analysis'
+- content: the org report
+- errors: empty or a list of warnings/errors
+
+The Emacs handler opens/replaces a read-only buffer, perhaps
+=*skg diff analysis*=.
+* API
+** request
+Add a request:
+
+  #+begin_src elisp
+  ((request . "diff analysis")
+   (include-staged . "true")
+   (include-unstaged . "true"))
+  #+end_src
+
+The bool string convention matches existing request parsing better than
+introducing a new representation.
+** refusal cases
+Return a readable error buffer, not a panic, if:
+
+- any configured source is not in a git repository,
+- any source has no HEAD commit,
+- any selected comparison needs HEAD and HEAD is a merge commit,
+- any '.skg' blob in the selected snapshots cannot be parsed.
+
+Duplicated IDs are not a refusal case by themselves; they get the
+special top section described below.
+* code shape
+** module layout
+Add a standalone module rather than extending 'types/git.rs':
+
+- 'server/diff_analysis/mod.rs'
+- 'server/diff_analysis/snapshot.rs'
+- 'server/diff_analysis/diff.rs'
+- 'server/diff_analysis/render.rs'
+- 'server/diff_analysis/types.rs'
+
+This keeps it separate from the existing git diff view, whose types are
+optimized for annotating viewnodes.
+** server endpoint
+Add:
+
+- 'RequestType::DiffAnalysis' in 'server/serve/protocol.rs'
+- 'TcpToClient::DiffAnalysis' in 'server/serve/protocol.rs'
+- 'server/serve/handlers/diff_analysis.rs'
+- a branch in 'handle_emacs'
+- 'pub mod diff_analysis;' in 'server/serve/handlers/mod.rs'
+
+The handler should parse the two bools, call the diff-analysis module,
+format the org report, and send it length-prefixed.
+** client endpoint
+Add:
+
+- 'elisp/skg-request-diff-analysis.el'
+- a require in 'elisp/skg-client.el'
+- a keybinding in 'elisp/skg-keymaps-and-aliases.el'
+- docs in 'docs/COMMANDS.org' and 'api-and-formats.md'
+
+The client should mirror the unsaved-buffer guard used by
+'skg-view-diff-mode', because the report is based on git/index/worktree,
+not unsaved Emacs edits.
+* snapshot model
+** endpoint snapshots
+Represent the two endpoint graphs explicitly.
+
+For each configured source, read one of:
+
+- HEAD tree,
+- index,
+- worktree.
+
+The selected comparison determines endpoints:
+
+| include staged | include unstaged | before | after    |
+|----------------+------------------+--------+----------|
+| yes            | yes              | HEAD   | worktree |
+| yes            | no               | HEAD   | index    |
+| no             | yes              | index  | worktree |
+
+** reading HEAD and index
+The existing 'git_ops/read_repo.rs' has helpers for reading a single
+file at HEAD or index.
+
+Add helpers that enumerate all tracked '*.skg' files at HEAD and index:
+
+- HEAD: walk 'repo.head()?.peel_to_tree()?'.
+- index: iterate 'repo.index()?.iter()'.
+- use paths relative to the repo root, filtered to the configured source
+  directory and '*.skg'.
+
+Then parse each blob as 'NodeFS' and attach the configured 'SourceName'.
+** reading worktree
+Use or factor 'read_skg_files_from_folder' from
+'server/dbs/filesystem/multiple_nodes.rs'. It is currently private;
+either expose a narrowly named helper or duplicate only temporarily and
+deduplicate before finishing.
+*** TODO I prefer exposure to duplication.
+** source paths inside larger repos
+The existing diff code accounts for a source directory that is inside a
+larger git repo via 'path_relative_to_repo'.
+
+The snapshot reader must do the same, otherwise it might accidentally
+read every '.skg' file in the enclosing repo rather than only files in
+the configured source.
+* semantic model
+** node key
+Use full IDs internally.
+
+Primary ID is the node identity. Extra IDs are aliases for detecting
+duplicates and reporting 'extra_id' changes, but should not create
+separate node records.
+** TODO node fields
+For each node, compare:
+
+- existence,
+- source,
+- title,
+- body,
+- aliases,
+- extra_id,
+- contained,
+- container, // Jeff added this
+- subscriber,
+- subscribee,
+- hider,
+- hidden,
+- replacement,
+- replaced,
+- source of textlink,
+- dest of textlink.
+
+Use schema role names for relationship headings.
+** relation extraction
+Build outbound edge sets from each node:
+
+- 'contains': container -> contained, ordered list for the contained
+  role on the node's own '.skg' file.
+- 'subscribes': subscriber -> subscribee.
+- 'hides_from_its_subscriptions': hider -> hidden.
+- 'overrides_view_of': replacement -> replaced.
+- 'textlinks_to': source -> dest, parsed from title and body with
+  'textlinks_from_node'.
+
+Then build reverse indexes for the opposite roles.
+** list diff versus set diff
+Only 'contained' gets both:
+
+- set lost/gained,
+- ordered list diff.
+
+Every other multivalue fact uses set lost/gained only:
+aliases, extra IDs, and every other relation role.
+** TODO text diff
+The title and body are compared as neither lists nor sets,
+but rather as text.
+** source changes
+If the same primary ID appears in before and after with different
+sources, report a 'source' section:
+
+- was: old source
+- is: new source
+
+Under 'identifiers', use the after source for existing nodes, as in the
+vision.
+** duplicate IDs across sources
+Before computing ordinary node reports, detect IDs that appear in more
+than one source in either endpoint snapshot.
+
+Render a top section:
+
+  #+begin_src org
+  ** IDs duplicated across sources
+  *** <node abbreviation>
+  **** <ID>
+  **** source(s) before these changes
+  ***** <source>
+  **** source(s) after these changes
+  ***** <source>
+  #+end_src
+
+Omit those IDs from the rest of the report.
+
+This section can be the whole report if every affected node is
+ambiguous this way.
+* affected-node classification
+** affected set
+A node is affected if any of these changed:
+
+- its existence,
+- title or body,
+- source,
+- aliases or extra IDs,
+- any outbound relation role represented in its own record,
+- any inbound relation role computed from another node's record.
+
+This means a node can be reported even when its own '.skg' file did not
+change.
+** root buckets
+Root means "no container in the full graph across all sources".
+
+Classify after duplicate-ID omission:
+
+- "modified, newly orphaned": existed before and after, not root before,
+  root after, and affected.
+- "modified, other": existed before and after, affected, and not newly
+  orphaned.
+- "new roots": absent before, present after, root after.
+- "new nodes, not roots": absent before, present after, not root after.
+- "deleted roots": present before, absent after, root before.
+- "deleted nodes, not roots": present before, absent after, not root
+  before.
+
+Within each bucket, sort by abbreviation.
+* rendering
+** abbreviations
+Use enough leading UUID characters to distinguish every abbreviation in
+the report, then append:
+
+  ..<first 40 characters of title>
+
+If there is no title in the after snapshot, use the before title.
+If neither exists, use an explicit placeholder like "[missing title]".
+** identifiers
+Each node gets:
+
+  #+begin_src org
+  **** identifiers
+  ***** <source>
+  ***** <full id>
+  ***** <full title>
+  #+end_src
+
+For deleted nodes, source and title come from the before snapshot.
+For existing nodes, they come from the after snapshot.
+** relationship sections
+For each changed role, render only nonempty subsections.
+
+For set-style roles:
+
+  #+begin_src org
+  **** <role>
+  ***** lost
+  ****** <node abbreviation>
+  ******* <full id>
+  ******* <full title>
+  ***** gained
+  ****** <node abbreviation>
+  ******* <full id>
+  ******* <full title>
+  #+end_src
+
+For 'contained', also render 'diff' if the ordered list changed.
+** text diffs
+Render title and body diffs under separate headings only if changed.
+
+Use a leading space before every diff line, including lines beginning
+with '+' or '-', so org parsing cannot mistake a body line for a
+headline or keyword.
+** empty report
+If nothing changed, return a valid org buffer with a single message:
+
+  #+begin_src org
+  * affected nodes
+  ** no affected nodes
+  #+end_src
+* tests
+** pure unit tests
+Add fast tests for:
+
+- set diff helper,
+- abbreviation disambiguation,
+- root classification,
+- source move detection,
+- duplicate-ID section and omission,
+- affected-by-inbound-change without own-file modification,
+- 'contained' set diff versus ordered diff,
+- textlinks inferred from title/body.
+** git fixture tests
+Add small source fixtures and compare:
+
+- HEAD -> worktree,
+- HEAD -> index,
+- index -> worktree,
+- multiple sources with cross-source relations,
+- source move across two repos,
+- every source must be a git repo.
+** server protocol test
+Test that a 'diff analysis' request returns a length-prefixed
+'diff-analysis' response with org content.
+** Emacs test
+Test the prompt logic independently:
+
+- staged=no sends staged=false, unstaged=true.
+- staged=yes, unstaged=no sends staged=true, unstaged=false.
+- staged=yes, unstaged=yes sends both true.
+* implementation order
+** add pure semantic core
+Create the diff-analysis types, set diff helper, relation extraction,
+reverse indexes, affected-node classification, and renderer.
+
+Use hand-built 'NodeComplete' fixtures first; do not involve git yet.
+** add snapshot readers
+Implement HEAD/index/worktree graph readers per source.
+
+At this point, add git fixture tests that prove snapshot selection is
+correct before wiring the endpoint.
+** add server endpoint
+Wire 'diff analysis' through protocol and handler.
+
+Return error org buffers for refusal cases.
+** add Emacs command
+Add the prompt, request sender, response handler, and keybinding.
+** document
+Update 'api-and-formats.md' and 'docs/COMMANDS.org'.
+** final verification
+Run the focused Rust tests, focused Emacs tests, and then the broader
+suite that is practical in the current environment.

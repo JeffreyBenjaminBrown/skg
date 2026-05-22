@@ -1,0 +1,315 @@
+* request
+I have responded to your feedback.
+If any new problems arise, please append them in a new section,
+"feedback, round 2", which I will respond to inline the same way.
+Otherwise, please plan this, in a new file TODO/diff-analysis/plan.org
+* the idea
+** overview
+For each node modified, create an org-formatted report.
+Indicate gains and losses in each direction for each relationship:
+containers lost and gained (unordered),
+contents lost and gained (unordered *and* ordered),
+etc.
+Orphans (a.k.a. roots) should be obvious.
+** useful utilities
+*** I believe these already exist.
+*** diff two lists
+This should produce output readable the way git diff is readable.
+*** diff two sets
+This can't be longer than the diff of two lists,
+but it can be shorter. Everything that *moved*
+in the list will show up in the diff of the two lists,
+but when the lists are viewedas sets,
+moves will not be in the diff.
+** report format sketch
+Titles in quotes in the following are verbatim.
+I have written ^ rather than * to avoid confusing Emacs,
+in which I am editing this; in reality those should be *s.
+
+  ^ "affected nodes" // document title, unique level^1 headline
+  ^^ "modified, newly orphaned"
+  ^^^ <node abbreviation> // the parent can have many children like this
+      That's "<first 8 chars of UUID>..<first 40 of title>",
+      without the brackets but with the two-dot elipsis.
+  ^^^^ "identifiers"
+  ^^^^^ <source>
+  ^^^^^ <full id>
+  ^^^^^ <full title>
+  ^^^^ "contents"
+  ^^^^^ "lost"
+        can have any number of children like the following
+        but 'lost' is omitted entirely if empty
+  ^^^^^^ [abbreviation of a node lost]
+  ^^^^^^^ full id
+  ^^^^^^^ full title
+  ^^^^^ gained // similar to the earlier "lost"
+  ^^^^^ diff
+  Whereas 'lost' and 'gained' view the contents as a set,
+  this views them as a diff. This can thus be noisier.
+  ^^^^ containers // similar to the earlier "contents"
+  ^^^^ [etc, more fields]
+  ^^^ [etc, more nodes]
+  ^^ "modified, other" // similar to "modified, newly orphaned"
+  ^^ "new roots"
+  ^^^ <node abbreviation>
+  ^^^^ "identifiers" // just like for modifid nodes
+  ^^^^ "contents"
+  nothing but lines starting with plus
+  ^^^^ "containers"
+  nothing but lines starting with plus
+  ^^^^ [etc, more fields]
+  ^^^ [etc, more nodes]
+  ^^ "new nodes, not roots"
+  ^^ "deleted roots"
+  ^^^ <node abbreviation
+  ^^^^ "identifiers" // just like for modifid nodes
+  ^^^^ "contents"
+  nothing but lines starting with minus
+  ^^^^ "containers"
+  nothing but lines starting with minus
+  ^^^^ [etc, more fields]
+  ^^^ [etc, more nodes]
+  ^^ "deleted nodes, not roots"
+** nuances
+*** 'extra_ids' is treated much like 'contents'.
+*** Changes to title and body are shown as diffs
+They are only reported if they actually differ.
+They look something like this:
+
+  ^^^ "title"
+  -what it used to be
+  +what it is now
+  ^^^ "body"
+  -a line that disappeared
+  -another that disappeared
+  +a line that appeared
+  this one didn't change
+  -a third that disappeared
+  etc.
+*** changes to source
+would look like
+
+  ^^^ source
+  ^^^^ "was: " <source>
+  ^^^^ "is: " <source>
+
+and if the source changed, then under "identifiers"
+we see the new source, not the old one.
+*** should see all five relations
+even though some of those are barely implemented so far.
+*** One report is drawn using data from *all* sources.
+Since the repos are interconnected,
+the changes since head (over all repos)
+are likely to make sense taken as a whole
+but not when looked at in isolation (a single source).
+* feedback, round 1
+These are problems Codex found,
+with a response from Jeff underneath each.
+** unclear
+*** What comparison should the analyzer report?
+The current git-diff view distinguishes staged and unstaged changes.
+This sketch says "since head", which sounds like a single HEAD-to-worktree
+net diff.
+
+That is probably the right first report, but it should be explicit.
+Otherwise a staged deletion followed by an unstaged re-addition can be
+reported either as "unchanged overall" or as two real stage-local events.
+**** TODO it should prompt the user
+twice: first "include staged changes?",
+and only ask "include unstaged changes?"
+if the answer to the first was true
+(that is, assume the answer to the second is true
+if the first was false).
+*** What counts as "modified"?
+Some nodes are affected even when their own file is not modified.
+For instance, if A gains B in its 'contains' list, then B gained a
+container even if B.skg did not change.
+
+I think "affected nodes" should include all nodes whose own scalar
+fields changed, whose outbound relationship lists changed, or whose
+inbound relationships changed because some other node changed.
+**** TODO yes
+e.g. 'containers' records not changes to the node's .skg file,
+but to some other node's .skg file.
+*** What is the exact definition of a root?
+I assume a root means "a node with no containers" over the whole
+post-change graph, across all sources.
+**** TODO yes
+*** How should staged and unstaged source moves be represented?
+Source is inferred from file location, not serialized in '.skg'.
+Moving a node between sources is a delete in one git repo and an add
+in another, so the analyzer needs a global join rule, probably primary
+ID equality.
+
+That rule should say what happens if the same primary ID appears in two
+sources at once during an intermediate staged/unstaged state.
+**** TODO good point
+Yes, somehow the git diff info from all repos needs to be consiered.
+Note that some (all?) of that info is already floating around
+in the server at some point, e.g. when the diff view is rendered.
+
+If the same ID appears in two separate repos,
+that should be highlighted at the top of the file:
+
+  ^^ "IDs duplicated across sources"
+  ^^^ node abbreviation
+  ^^^^ <ID>
+  ^^^^ "source(s) before these changes"
+  ^^^^^ <source>
+  ^^^^^ [etc, more sources]
+  ^^^^ "source(s) after these changes"
+  ^^^^^ <source>
+  ^^^^^ [etc, more sources]
+
+Such duplicated nodes can be omitted from the rest of the report.
+*** Should deleted nodes be resolved from HEAD, index, or both?
+For a net HEAD-to-worktree report, deleted-node titles and relationship
+lists should come from HEAD.
+
+For a per-stage report, a node deleted only in the unstaged stage should
+come from the index. The current diff code already has to make this
+distinction via 'before_node'.
+**** TODO It sounds like you answered your question?
+Or is there still something to decide?
+*** Are textlinks one of the five relations?
+The schema has five graph relations: 'contains', 'textlinks_to',
+'subscribes', 'hides_from_its_subscriptions', and 'overrides_view_of'.
+The sketch names "all five relations" but also names 'extra_ids' as a
+field treated like contents.
+
+If textlinks are included, title/body diffs can also imply relationship
+diffs, because textlinks are inferred from text rather than stored as
+an explicit '.skg' field.
+**** TODO good point
+Yes, textlinks should be one of the fields reported on,
+in either direction.
+The fact that those relationships can be inferred
+from the rest of the report is fine.
+*** Should aliases be reported?
+The existing diff code tracks 'aliases_diff', but the sketch mentions
+'extra_ids' and not aliases.
+
+Aliases are not TypeDB graph relations, but they are durable node data
+and currently participate in git-diff scaffolds.
+**** TODO yes!
+*** Should every relationship get both directions?
+"containers" and "contents" are the two directions of 'contains'.
+The analogous headings for other relations need names:
+'textlink sources'/'textlink targets',
+'subscribers'/'subscribees',
+'hiders'/'hidden from subscriptions',
+and 'replacements'/'replaced nodes', or something similar.
+**** TODO yes, both directions, but regarding the names
+let's just use the role name from schema.tql in every case.
+That might look less grammatical but it seems clearer.
+(i.e. where I had written "containers" above,
+I should have just written "container".
+That would be the name for the out-link,
+responsibility of other .skg files,
+and 'contained' would be the name of the in-links,
+visible in the .skg file for the node in question.)
+*** Are relationship fields sets or lists?
+'contains' is ordered. The other durable relationship fields are stored
+as list-shaped MSVs, but probably act semantically as sets.
+
+The report should say whether order changes in 'subscribes_to',
+'hides_from_its_subscriptions', 'overrides_view_of', 'extra_ids', and
+'aliases' matter or should be ignored.
+**** TODO good point!
+It makes sense to report both list-diff and set-diff for 'contained'.
+For every other kind of data (relation, extra_id, what have you)
+we should use only set-diff. (The list diff is still *defined*,
+but meaningless.)
+** awkward
+*** The proposed org report mixes org structure and diff body text
+Title and body diffs can contain lines beginning with '*', ':', '#+',
+or other org-significant text.
+
+If those lines are inserted literally under an org headline, the report
+can accidentally create headlines, drawers, or keywords. A source block
+or consistently indented example block would make the report robust.
+**** TODO are you sure?
+Every line in the diff starts with space, - or +.
+It *should* be the case that the leading space
+defeats whatever in Skg would otherwise interpret the bullet of a headline.
+If that's not true, we need to write a test to prove it,
+and then fix it.
+*** "lost" and "gained" omit empty sections, but "diff" probably should too
+If a relationship has no changes, omitting it keeps the report readable.
+If only ordering changed, showing just "diff" and omitting "lost" and
+"gained" is useful.
+
+That rule should be stated once, because otherwise empty relationship
+headings could make large reports hard to scan.
+**** TODO agreed
+*** The abbreviation is not collision-proof
+First 8 UUID chars plus 40 title chars is readable, but collisions are
+possible, especially if a report contains many nodes with similar
+titles.
+
+Since the full ID is nearby under "identifiers", this is not fatal, but
+the renderer should probably disambiguate duplicate abbreviations within
+one report.
+**** TODO good point
+Yes, internally, while creating the report,
+we use the full UUID.
+That confusion should not be possible to the server.
+
+To ensure that it's not possible to the user,
+we could do this: rather than use a fixed 8 characters of UUID
+for the abbreviations, we dynamically use just enough
+of the head of the UUID to distinguish it from the others.
+*** "new nodes, not roots" and "deleted nodes, not roots" might hide the cause
+For a deleted non-root, the interesting fact is usually which containers
+lost it. For a new non-root, the interesting fact is which containers
+gained it.
+
+Those categories are fine, but the per-node relationship sections need
+to make the cause obvious enough that the top-level bucket is not the
+only clue.
+**** TODO seems fine to me
+** inefficient or risky
+*** The analyzer should probably build complete before/after graph snapshots
+Trying to derive every inbound relationship directly from per-file diffs
+will be awkward and easy to get wrong.
+
+A simpler model is:
+- read the old graph for every git-tracked source at the chosen baseline,
+- read the new graph for every source at the chosen target,
+- compute outbound diffs from node records,
+- compute inbound diffs from reverse indexes over those snapshots.
+
+That also naturally identifies roots and newly orphaned nodes.
+**** TODO agreed, and would go further
+There's already a fair bit of machinery for displaying the 'git diff view'.
+Hopefully we can use some of it wholesale,
+and even where we can't we can hopefully use similar approaches.
+*** Current 'NodeChanges' is too narrow for this report
+'server/git_ops/diff.rs' currently computes text_changed,
+'aliases_diff', 'ids_diff', and 'contains_diff'.
+
+The analyzer will need diffs for 'extra_ids' separately from primary ID,
+all three sharing relationships, source moves, file existence, and
+probably textlink edges inferred from title/body.
+**** TODO that's fine
+This can be a standalone module with its own types.
+*** A set-diff utility is not clearly present
+'server/types/list.rs' has 'compute_interleaved_diff' and
+'dedup_vector', but I did not see a dedicated "diff two sets" utility.
+
+It would be better to add one explicit helper than to repeatedly derive
+sets through ad hoc filtering of list diffs.
+**** TODO yes
+*** Cross-source reporting needs one missing-source policy
+Some configured sources may not be git repos.
+The current view marks those nodes 'notInGit'.
+
+For a whole-report analyzer, either non-git sources are frozen context
+for resolving inbound relationships, or they are reported in a separate
+"not comparable" section. Silent omission would make inbound gains and
+losses misleading.
+**** TODO let's duck that
+by refusing to produce the report
+if the user hasn't made a source into a repo.
+They probably intended to,
+and if they didn't they probably won't be using this.

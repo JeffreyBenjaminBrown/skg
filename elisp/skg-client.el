@@ -12,6 +12,7 @@
 (require 'skg-modify-graph)
 (require 'skg-view-new-empty)
 (require 'skg-request-file-path)
+(require 'skg-request-diff-analysis)
 (require 'skg-request-git-diff-mode)
 (require 'skg-request-rebuild-dbs)
 (require 'skg-request-rerender-all-views)

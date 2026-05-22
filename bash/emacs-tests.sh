@@ -14,6 +14,7 @@ echo -e "${YELLOW}Running Skg Emacs Tests...${NC}"
 
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+source "$SCRIPT_DIR/test-runner-lib.sh"
 
 # Test directory (relative to project root, which is parent of SCRIPT_DIR)
 TEST_DIR="$SCRIPT_DIR/../tests/elisp"
@@ -86,7 +87,7 @@ if [ -z "$EMACS_CMD" ]; then
 fi
 
 # Change to test directory and run emacs with the temporary test file
-if cd "$TEST_DIR" && "$EMACS_CMD" --batch -l "$TEMP_TEST_FILE" 2>&1; then
+if cd "$TEST_DIR" && skg_low_priority "$EMACS_CMD" --batch -l "$TEMP_TEST_FILE" 2>&1; then
     echo -e "${GREEN}All tests passed!${NC}"
     EXIT_CODE=0
 else

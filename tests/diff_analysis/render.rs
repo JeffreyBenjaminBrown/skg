@@ -1,0 +1,81 @@
+use skg::diff_analysis::render::render_report;
+use skg::diff_analysis::types::{
+  DiffReport, ListDiffItem, NodeBucket, NodeDiffReport, SourceForReport};
+use skg::types::misc::{ID, SourceName};
+
+use std::collections::HashMap;
+
+fn id (
+  s : &str,
+) -> ID {
+  ID::from (s)
+}
+
+fn node_report (
+  pid   : &str,
+  title : &str,
+) -> NodeDiffReport {
+  NodeDiffReport {
+    pid: id (pid),
+    source: SourceForReport::After (SourceName::from ("main")),
+    title: title . to_string (),
+    title_diff: None,
+    body_diff: None,
+    source_change: None,
+    value_set_diffs: Vec::new (),
+    relationship_diffs: Vec::new (),
+    contained_list_diff: None }
+}
+
+#[test]
+fn abbreviations_use_enough_id_prefix_to_disambiguate () {
+  let report : DiffReport =
+    DiffReport {
+      duplicate_ids: Vec::new (),
+      titles: HashMap::new (),
+      buckets: vec! [
+        NodeBucket {
+          name: "modified, other",
+          nodes: vec! [
+            node_report ("abcdef-1", "same title"),
+            node_report ("abcdef-2", "same title") ] } ] };
+  let rendered : String =
+    render_report (&report);
+  assert! (
+    rendered . contains ("abcdef-1..same title"),
+    "first abbreviation should include enough ID: {}",
+    rendered );
+  assert! (
+    rendered . contains ("abcdef-2..same title"),
+    "second abbreviation should include enough ID: {}",
+      rendered );
+}
+
+#[test]
+fn unchanged_contained_diff_lines_align_with_changed_lines () {
+  let mut node : NodeDiffReport =
+    node_report ("parent", "Parent");
+  node . contained_list_diff =
+    Some (vec! [
+      ListDiffItem::Unchanged (id ("keep")),
+      ListDiffItem::Removed (id ("gone")),
+      ListDiffItem::Added (id ("new")) ]);
+  let report : DiffReport =
+    DiffReport {
+      duplicate_ids: Vec::new (),
+      titles: HashMap::from ([
+        (id ("keep"), "Keep".to_string ()),
+        (id ("gone"), "Gone".to_string ()),
+        (id ("new"), "New".to_string ()) ]),
+      buckets: vec! [
+        NodeBucket {
+          name: "modified, other",
+          nodes: vec! [node] } ] };
+  let rendered : String =
+    render_report (&report);
+  assert! (
+    rendered . contains (
+      "\n**** contained diff\n  k..Keep\n -g..Gone\n +n..New\n" ),
+    "contained diff rows should align: {}",
+    rendered );
+}
