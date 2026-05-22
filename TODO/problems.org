@@ -335,3 +335,12 @@
    fixed idle taxes. The likely mitigation is one shared TypeDB server
    with distinct database names per Skg instance, plus separate Skg
    ports/configs.
+
+** Diff analysis still does whole-source work for tiny diffs
+   Investigated on 2026-05-22;
+   see 'faster-diff-analysis.org'.
+
+   After the changed-file prototype, clean diffs are fast and node
+   reports are restricted to affected PIDs. A one-file title change
+   still reads the complete before endpoint, so the next win is cached
+   endpoint graphs keyed by HEAD commit OID and index identity.

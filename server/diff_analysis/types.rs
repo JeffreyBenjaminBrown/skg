@@ -22,6 +22,12 @@ pub struct SnapshotPair {
   pub after  : GraphSnapshot,
 }
 
+#[derive(Clone, Debug)]
+pub struct ChangedSnapshotPair {
+  pub pair          : SnapshotPair,
+  pub affected_pids : BTreeSet<ID>,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct GraphSnapshot {
   pub nodes      : HashMap<ID, NodeComplete>,

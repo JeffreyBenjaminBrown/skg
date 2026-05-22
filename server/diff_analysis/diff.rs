@@ -9,27 +9,105 @@ use crate::types::textlinks::textlinks_from_node;
 
 use similar::{ChangeTag, TextDiff};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::thread;
+use std::time::{Duration, Instant};
 
 pub fn diff_snapshots (
   pair : &SnapshotPair,
 ) -> DiffReport {
+  diff_snapshots_with_pid_filter (pair, None)
+}
+
+pub fn diff_snapshots_for_pids (
+  pair : &SnapshotPair,
+  pids : &BTreeSet<ID>,
+) -> DiffReport {
+  diff_snapshots_with_pid_filter (pair, Some (pids))
+}
+
+fn diff_snapshots_with_pid_filter (
+  pair      : &SnapshotPair,
+  only_pids : Option<&BTreeSet<ID>>,
+) -> DiffReport {
+  let total_start : Instant =
+    Instant::now ();
   let duplicate_ids : Vec<DuplicateIDReport> =
-    duplicate_id_reports (&pair . before, &pair . after);
+    profile_step ("duplicate_id_reports", || {
+      duplicate_id_reports (&pair . before, &pair . after) });
   let ambiguous_pids : BTreeSet<ID> =
-    ambiguous_pids (&pair . before, &pair . after, &duplicate_ids);
-  let before_facts : GraphFacts =
-    GraphFacts::from_snapshot (&pair . before, &ambiguous_pids);
-  let after_facts : GraphFacts =
-    GraphFacts::from_snapshot (&pair . after, &ambiguous_pids);
+    profile_step ("ambiguous_pids", || {
+      ambiguous_pids (&pair . before, &pair . after, &duplicate_ids) });
+  let (before_facts, after_facts) : (GraphFacts, GraphFacts) =
+    graph_facts_for_diff (pair, &ambiguous_pids, only_pids);
   let mut reports : Vec<NodeDiffReport> =
-    node_reports (
-      pair, &before_facts, &after_facts, &ambiguous_pids );
-  reports . sort_by_key ( |r| r . title . clone () );
+    profile_step ("node_reports", || {
+      node_reports (
+        pair, &before_facts, &after_facts, &ambiguous_pids, only_pids ) });
+  profile_step ("sort reports", || {
+    reports . sort_by_key ( |r| r . title . clone () ); });
+  let titles : HashMap<ID, String> =
+    profile_step ("title_map", || {
+      title_map (&pair . before, &pair . after) });
+  let buckets : Vec<NodeBucket> =
+    profile_step ("bucket_reports", || {
+      bucket_reports (reports, &before_facts, &after_facts) });
+  profile_log (
+    "diff_snapshots total",
+    total_start . elapsed ());
   DiffReport {
     duplicate_ids,
-    titles: title_map (&pair . before, &pair . after),
-    buckets: bucket_reports (reports, &before_facts, &after_facts) }
+    titles,
+    buckets }
 }
+
+fn graph_facts_for_diff (
+  pair           : &SnapshotPair,
+  ambiguous_pids : &BTreeSet<ID>,
+  only_pids      : Option<&BTreeSet<ID>>,
+) -> (GraphFacts, GraphFacts) {
+  thread::scope ( |scope| {
+    let before_handle : thread::ScopedJoinHandle<'_, GraphFacts> =
+      scope . spawn ( || profile_step (
+        "before GraphFacts", || {
+          GraphFacts::from_snapshot_maybe_limited (
+            &pair . before, ambiguous_pids, only_pids) }) );
+    let after_handle : thread::ScopedJoinHandle<'_, GraphFacts> =
+      scope . spawn ( || profile_step (
+        "after GraphFacts", || {
+          GraphFacts::from_snapshot_maybe_limited (
+            &pair . after, ambiguous_pids, only_pids) }) );
+    ( before_handle . join ()
+        . expect ("before GraphFacts panicked"),
+      after_handle . join ()
+        . expect ("after GraphFacts panicked") ) })
+}
+
+fn profile_step<T, F> (
+  label : &str,
+  f     : F,
+) -> T
+where
+  F : FnOnce () -> T,
+{
+  let start : Instant =
+    Instant::now ();
+  let result : T =
+    f ();
+  profile_log (label, start . elapsed ());
+  result
+}
+
+fn profile_log (
+  label    : &str,
+  duration : Duration,
+) {
+  if std::env::var_os ("SKG_PROFILE_DIFF_ANALYSIS") . is_none () {
+    return; }
+  eprintln! (
+    "diff-analysis profile: {}: {}.{:03}s",
+    label,
+    duration . as_secs (),
+    duration . subsec_millis ()); }
 
 fn duplicate_id_reports (
   before : &GraphSnapshot,
@@ -76,12 +154,19 @@ fn node_reports (
   before_facts  : &GraphFacts,
   after_facts   : &GraphFacts,
   ambiguous_pids : &BTreeSet<ID>,
+  only_pids      : Option<&BTreeSet<ID>>,
 ) -> Vec<NodeDiffReport> {
   let pids : BTreeSet<ID> =
-    pair . before . nodes . keys () . cloned ()
-      . chain (pair . after . nodes . keys () . cloned ())
-      . filter ( |pid| ! ambiguous_pids . contains (pid) )
-      . collect ();
+    match only_pids {
+      Some (pids) =>
+        pids . iter () . cloned ()
+          . filter ( |pid| ! ambiguous_pids . contains (pid) )
+          . collect (),
+      None =>
+        pair . before . nodes . keys () . cloned ()
+          . chain (pair . after . nodes . keys () . cloned ())
+          . filter ( |pid| ! ambiguous_pids . contains (pid) )
+          . collect (), };
   let mut reports : Vec<NodeDiffReport> =
     Vec::new ();
   for pid in pids {
@@ -357,6 +442,18 @@ struct GraphFacts {
 }
 
 impl GraphFacts {
+  fn from_snapshot_maybe_limited (
+    snapshot       : &GraphSnapshot,
+    ambiguous_pids : &BTreeSet<ID>,
+    only_pids      : Option<&BTreeSet<ID>>,
+  ) -> Self {
+    match only_pids {
+      Some (pids) =>
+        Self::from_snapshot_for_pids (snapshot, ambiguous_pids, pids),
+      None =>
+        Self::from_snapshot (snapshot, ambiguous_pids), }
+  }
+
   fn from_snapshot (
     snapshot       : &GraphSnapshot,
     ambiguous_pids : &BTreeSet<ID>,
@@ -408,6 +505,80 @@ impl GraphFacts {
           continue; }
         facts . add_edge ("source", &node . pid, &textlink . id);
         facts . add_edge ("dest", &textlink . id, &node . pid); } }
+    facts
+  }
+
+  fn from_snapshot_for_pids (
+    snapshot       : &GraphSnapshot,
+    ambiguous_pids : &BTreeSet<ID>,
+    pids           : &BTreeSet<ID>,
+  ) -> Self {
+    let tracked_pids : BTreeSet<ID> =
+      pids . difference (ambiguous_pids) . cloned () . collect ();
+    let mut facts : GraphFacts =
+      GraphFacts {
+        existing_pids: tracked_pids . iter ()
+          . filter ( |pid| snapshot . nodes . contains_key (*pid) )
+          . cloned () . collect (),
+        extra_ids: BTreeSet::new (),
+        role_sets: ROLE_NAMES . iter ()
+          . map ( |role| (*role, HashMap::new ()) )
+          . collect (),
+        contained_order: HashMap::new () };
+    for node in snapshot . nodes . values () {
+      if ambiguous_pids . contains (&node . pid) {
+        continue; }
+      let track_outbound : bool =
+        tracked_pids . contains (&node . pid);
+      if track_outbound {
+        facts . extra_ids . extend (
+          node . extra_ids . iter ()
+            . filter ( |id| ! ambiguous_pids . contains (*id) )
+            . cloned () );
+        facts . contained_order . insert (
+          node . pid . clone (),
+          node . contains . iter ()
+            . filter ( |id| ! ambiguous_pids . contains (*id) )
+            . cloned () . collect () ); }
+      facts . extra_ids . extend (
+        node . extra_ids . iter ()
+          . filter ( |id| tracked_pids . contains (*id) )
+          . cloned () );
+      for contained in &node . contains {
+        if ambiguous_pids . contains (contained) {
+          continue; }
+        if track_outbound {
+          facts . add_edge ("contained", &node . pid, contained); }
+        if tracked_pids . contains (contained) {
+          facts . add_edge ("container", contained, &node . pid); }}
+      for subscribee in node . subscribes_to . or_default () {
+        if ambiguous_pids . contains (subscribee) {
+          continue; }
+        if track_outbound {
+          facts . add_edge ("subscriber", &node . pid, subscribee); }
+        if tracked_pids . contains (subscribee) {
+          facts . add_edge ("subscribee", subscribee, &node . pid); }}
+      for hidden in node . hides_from_its_subscriptions . or_default () {
+        if ambiguous_pids . contains (hidden) {
+          continue; }
+        if track_outbound {
+          facts . add_edge ("hider", &node . pid, hidden); }
+        if tracked_pids . contains (hidden) {
+          facts . add_edge ("hidden", hidden, &node . pid); }}
+      for replaced in node . overrides_view_of . or_default () {
+        if ambiguous_pids . contains (replaced) {
+          continue; }
+        if track_outbound {
+          facts . add_edge ("replacement", &node . pid, replaced); }
+        if tracked_pids . contains (replaced) {
+          facts . add_edge ("replaced", replaced, &node . pid); }}
+      for textlink in textlinks_from_node (node) {
+        if ambiguous_pids . contains (&textlink . id) {
+          continue; }
+        if track_outbound {
+          facts . add_edge ("source", &node . pid, &textlink . id); }
+        if tracked_pids . contains (&textlink . id) {
+          facts . add_edge ("dest", &textlink . id, &node . pid); }}}
     facts
   }
 

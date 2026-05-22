@@ -1,0 +1,182 @@
+* What was slow
+The current 'skg-diff-report' server path was doing whole-source work
+even when the selected git diff had no changed nodes.
+
+For 'data/skgconfig.toml' on 2026-05-22, 'data/public' had 29150
+'.skg' files and a clean worktree. Before the small parallelization in
+this branch, a dev build took about 3.0s to report no affected nodes:
+
+| step                                 | dev time |
+|--------------------------------------+----------|
+| read complete before+after snapshots | 1.7-2.0s |
+| semantic diff                        | 1.1-1.4s |
+| render report                        | ~0s      |
+
+Changing one title in a temporary copy with one unstaged file produced
+almost the same timings. That matters: the cost was proportional to
+total source size, not changed set size.
+
+* What I changed
+I added 'tools/bench-diff-analysis.rs' and registered it as the
+'bench-diff-analysis' binary. It times:
+
+- the real 'diff_analysis_report' path by default
+- 'read_snapshot_pair'
+- 'diff_snapshots'
+- 'render_report'
+
+Pass 'full' as the third argument to time the older full-snapshot
+substeps directly.
+
+I also added opt-in profiling inside 'server/diff_analysis/snapshot.rs'
+and 'server/diff_analysis/diff.rs'. Set 'SKG_PROFILE_DIFF_ANALYSIS=1'
+to see sub-step timings.
+
+Then I parallelized two independent pieces:
+
+- reading before and after graph snapshots
+- building before and after 'GraphFacts'
+
+After that, the same dev-profile workload dropped from about 3.0s to
+about 2.0s. In release mode it dropped from about 0.85-0.93s to about
+0.52s.
+
+Then I tried the changed-file design. The current prototype:
+
+- asks git/libgit2 for changed '.skg' paths for the selected endpoints
+- returns immediately for an empty changed-path set
+- reads the before endpoint as a complete snapshot
+- overlays only changed after-endpoint files onto that snapshot
+- computes node reports only for affected PIDs
+- builds limited relationship facts when the affected PID set is known
+
+This preserves the existing full-snapshot path as the fallback and
+keeps the ordinary report API unchanged.
+
+* Current profile
+After the parallelization, clean 'data/public' in dev profile:
+
+| step                    | time            |
+|-------------------------+-----------------|
+| read snapshots          | 1.06s           |
+| duplicate ID reports    | 0.08s           |
+| build both 'GraphFacts' | 0.29s wall time |
+| 'node_reports'          | 0.55s           |
+| 'title_map'             | 0.04s           |
+| render                  | ~0s             |
+| total                   | 2.08s           |
+
+After the parallelization, one changed title in a temp copy:
+
+| step           | time  |
+|----------------+-------|
+| read snapshots | 1.01s |
+| semantic diff  | 0.98s |
+| render         | ~0s   |
+| total          | 1.99s |
+
+The remaining large costs are still whole-source costs.
+
+After the changed-file prototype:
+
+| case | dev time | release time |
+|------|----------|--------------|
+| clean 'data/public' | 0.250s | 0.091s |
+| one changed title in temp copy | 1.865s | 0.514s |
+
+For the one-change dev run, the profile was:
+
+| step | time |
+|------|------|
+| read before endpoint | 1.157s |
+| overlay changed after files | 0.062s |
+| duplicate ID reports | 0.084s |
+| limited 'GraphFacts' | 0.171s wall time |
+| 'node_reports' | 0.001s |
+| 'title_map' | 0.044s |
+| total | 1.865s |
+
+The remaining bottleneck is the complete before-endpoint read. The
+other major whole-source pass, relationship fact construction, is now
+small when the affected PID set is small.
+
+* What the data says
+This is not a TypeDB problem. 'skg-diff-report' does not query TypeDB
+on the measured path. It reads git/worktree snapshots directly, parses
+YAML into 'NodeComplete', builds in-Rust relationship indexes, scans
+every PID, and renders the small result.
+
+It is not a rendering problem. Rendering was effectively zero for both
+clean and one-file-change cases.
+
+It is not primarily a git-history traversal problem. The code reads
+only the selected endpoint trees, not full commit history. The expensive
+part is reparsing complete endpoint snapshots and comparing every node.
+
+Git can identify the changed file set quickly. On the same 29150-file
+source:
+
+| command | time |
+|---------|------|
+| 'git diff --name-only -- *.skg' on clean source | 0.018s |
+| same command with one changed file | 0.014s |
+| 'git status --porcelain -- *.skg' | 0.045-0.049s |
+
+That is the strongest evidence for a change-driven design.
+
+* Recommended next design
+The prototype now makes the clean case proportional to git's changed
+path detection, and makes node-reporting proportional to the affected
+set. The next meaningful speedup is caching or reusing the before
+endpoint.
+
+In order:
+
+- Cache HEAD endpoint snapshots by commit OID. This should remove most
+  of the remaining one-change cost when HEAD is the before endpoint.
+- Cache index endpoint snapshots by a conservative index identity
+  (index file mtime+size may be enough as an invalidation key; a
+  stronger checksum would be safer).
+- Use existing in-Rust graph indexes for the worktree side. The running
+  server already has 'InRustGraph' with inverse indexes, but the diff
+  handler currently receives only 'SkgConfig'. Passing the server env or
+  graph snapshot into the handler would avoid reparsing the worktree
+  endpoint.
+- Consider replacing global duplicate-ID and title-map construction with
+  cached maps. Those are not the main cost now, but they are still
+  whole-source scans.
+
+The target behavior is:
+
+- clean source: tens of milliseconds, not seconds
+- one changed file: parse one or a few YAML files, then inspect only
+  the affected neighborhood
+- many changed files: degrade toward the current full-snapshot cost
+
+* Risk notes
+The report currently includes duplicate IDs across all sources even if
+the selected diff is otherwise empty. A changed-file implementation
+must decide whether duplicate detection remains global, cached, or only
+change-adjacent.
+
+Backward relationship sections include unchanged related nodes as
+context when a backward relation changed. A changed-file implementation
+therefore needs inverse indexes for both endpoints; parsing only changed
+files is not enough by itself.
+
+'compute_interleaved_diff' remains a separate correctness risk for very
+large unique-item lists, already noted in 'TODO/problems.org'. It did
+not dominate this profile.
+
+* Commands run
+#+begin_src sh
+cargo build --bin bench-diff-analysis
+SKG_PROFILE_DIFF_ANALYSIS=1 target/debug/bench-diff-analysis data/skgconfig.toml all
+SKG_PROFILE_DIFF_ANALYSIS=1 target/debug/bench-diff-analysis /tmp/skg-diff-bench-config/skgconfig.toml all
+
+cargo build --release --bin bench-diff-analysis
+SKG_PROFILE_DIFF_ANALYSIS=1 target/release/bench-diff-analysis data/skgconfig.toml all
+SKG_PROFILE_DIFF_ANALYSIS=1 target/release/bench-diff-analysis /tmp/skg-diff-bench-config/skgconfig.toml all
+
+cargo test diff_analysis --tests
+#+end_src
