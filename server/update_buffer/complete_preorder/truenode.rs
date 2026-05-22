@@ -40,6 +40,7 @@ enum ContentReality {
 struct ChildData {
   title  : String,
   source : SourceName,
+  body   : Option<String>,
   kind   : ContentReality,
 }
 
@@ -426,7 +427,7 @@ fn complete_content_children (
         ContentReality::Real =>
           mk_definitive_viewnode(
             id . clone(), d . source . clone(),
-            d . title . clone(), None ),
+            d . title . clone(), d . body . clone() ),
         ContentReality::Phantom (ex, mem) =>
           mk_phantom_viewnode(
             id . clone(), d . source . clone(),
@@ -634,6 +635,7 @@ fn build_child_creation_data (
       result . insert( id . clone(),
                        ChildData { title,
                                    source: phantom_source,
+                                   body: None,
                                    kind } );
     } else {
       let child_source : SourceName =
@@ -646,6 +648,7 @@ fn build_child_creation_data (
       result . insert( id . clone(),
                      ChildData { title: skg . title . clone(),
                                  source: skg . source . clone(),
+                                 body: skg . body . clone(),
                                  kind: ContentReality::Real } ); }}
   Ok (result) }
 

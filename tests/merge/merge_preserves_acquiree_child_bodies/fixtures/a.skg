@@ -1,0 +1,6 @@
+pid: a
+title: a
+body: a text
+contains:
+- a1
+- a2

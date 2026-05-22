@@ -14,3 +14,6 @@ mod merge_acquiree_in_sibling_subtree;
 
 #[path = "merge/merge_acquiree_as_independent_root.rs"]
 mod merge_acquiree_as_independent_root;
+
+#[path = "merge/merge_preserves_acquiree_child_bodies.rs"]
+mod merge_preserves_acquiree_child_bodies;
