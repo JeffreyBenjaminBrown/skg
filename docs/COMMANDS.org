@@ -198,6 +198,15 @@ but it doesn't show you the command;
 it instead runs that command for you.
 *** C-c (g|G) (m|M) : skg-goto-in-magit-*
 These four commands are described elsewhere in this document.
+*** C-c t r         : skg-diff-report
+Asks whether to include staged changes and, if so,
+whether to include unstaged changes.
+Then opens an org report summarizing semantic graph changes
+across all configured sources.
+
+The report is based on git/index/worktree state,
+so the command refuses to run while any Skg view buffer
+has unsaved edits.
 ** C-c r : showing more information about a node
 These commands don't edit the graph. Each inserts a request
 into the metadata of the node at point that, on save, causes

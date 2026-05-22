@@ -1,6 +1,7 @@
 pub mod consts;
 pub mod context;
 pub mod dbs;
+pub mod diff_analysis;
 pub mod from_text;
 pub mod git_ops;
 pub mod import_org_roam;

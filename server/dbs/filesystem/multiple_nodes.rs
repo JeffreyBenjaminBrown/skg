@@ -76,7 +76,7 @@ pub fn check_for_duplicate_ids_across_sources (
   Err (io::Error::new (
     io::ErrorKind::InvalidData, msg )) }
 
-fn read_skg_files_from_folder (
+pub fn read_skg_files_from_folder (
   source_name : &SourceName,
   config      : &SkgConfig,
 ) -> io::Result < Vec<NodeComplete> > {

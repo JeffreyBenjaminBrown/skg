@@ -67,6 +67,21 @@ So far there are these endpoints:
     responses include diff annotations showing changes
     between git HEAD and the worktree.
 
+## Diff analysis
+  - Request: `((request . "diff analysis") (include-staged . "BOOL") (include-unstaged . "BOOL"))`
+    - `include-staged=true`, `include-unstaged=true`: compare HEAD to worktree.
+    - `include-staged=true`, `include-unstaged=false`: compare HEAD to index.
+    - `include-staged=false`, `include-unstaged=true`: compare index to worktree.
+    - Both false is rejected.
+  - Response: LP response-type "diff-analysis" with `((content "ORG") (errors ("..." ...)))`.
+  - Behavior: Builds a semantic org report of affected nodes across all sources,
+    including scalar node fields, aliases, extra IDs, all five schema relations
+    in both role directions, text diffs for title/body, duplicate IDs across
+    sources, and root/new/deleted/modified buckets.
+  - Refuses to produce an ordinary report if any configured source is not a git
+    repository, has no HEAD commit, has a selected merge-commit HEAD baseline,
+    or contains an unreadable `.skg` blob in the selected snapshots.
+
 ## Rebuild databases
   - Request: ((request . "rebuild dbs"))
   - Response: LP response-type "rebuild-dbs" with `((content "..."))`.

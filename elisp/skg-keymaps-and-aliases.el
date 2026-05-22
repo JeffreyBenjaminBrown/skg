@@ -148,7 +148,8 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c O l") #'skg-pop-link))
   (progn;; git add ops (only fire if the .skg file is not yet in HEAD)
     (define-key map (kbd "C-c t A") #'skg-git-add-if-new-recursive)
-    (define-key map (kbd "C-c t a") #'skg-git-add-if-new-recursive-preview)))
+    (define-key map (kbd "C-c t a") #'skg-git-add-if-new-recursive-preview)
+    (define-key map (kbd "C-c t r") #'skg-diff-report)))
 
 (defvar skg-id-stack-mode-map (make-sparse-keymap)
   "Keymap for `skg-id-stack-mode'.")
@@ -156,6 +157,36 @@ and hide INTERNAL from M-x completion."
 (let ((map skg-id-stack-mode-map))
   (setcdr map nil)
   (define-key map (kbd "C-x C-s") #'skg--save-id-stack-buffer))
+
+(defvar skg-diff-analysis-mode-map (make-sparse-keymap)
+  "Keymap for `skg-diff-analysis-mode'.")
+
+(let ((map skg-diff-analysis-mode-map))
+  (setcdr map nil)
+  (progn;; text search
+    (define-key map (kbd "C-c f RET") #'skg-search)
+    (define-key map (kbd "C-c f i")   #'skg-search-interactive))
+  (progn;; goto. Capital-G variants kill the buffer they were called from.
+    (define-key map (kbd "C-c g RET") #'skg-goto)
+    (define-key map (kbd "C-c G RET") #'skg-goto-and-close-this)
+    (define-key map (kbd "C-c g i")   #'skg-goto-by-id)
+    (define-key map (kbd "C-c G i")   #'skg-goto-by-id-and-close-this)
+    (define-key map (kbd "C-c g m")   #'skg-goto-in-magit)
+    (define-key map (kbd "C-c G m")   #'skg-goto-in-magit-and-close-this)
+    (define-key map (kbd "C-c g M")   #'skg-goto-in-magit-parent)
+    (define-key map (kbd "C-c G M")   #'skg-goto-in-magit-parent-and-close-this))
+  (progn;; view
+    (define-key map (kbd "C-c v e") #'skg-view-new-empty)
+    (define-key map (kbd "C-c v s") #'skg-view-id-stack))
+  (progn;; id navigation
+    (define-key map (kbd "C-c i n") #'skg-id-next)
+    (define-key map (kbd "C-c i p") #'skg-id-prev))
+  (progn;; id stack operations
+    (define-key map (kbd "C-c u")   #'skg-id-push)
+    (define-key map (kbd "C-c o i") #'skg-paste-id)
+    (define-key map (kbd "C-c o l") #'skg-paste-link)
+    (define-key map (kbd "C-c O i") #'skg-pop-id)
+    (define-key map (kbd "C-c O l") #'skg-pop-link)))
 
 (defvar skg-sexp-edit-mode-map (make-sparse-keymap)
   "Keymap for skg-sexp-edit-mode.")

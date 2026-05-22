@@ -103,7 +103,7 @@ pub fn value_from_request_sexp (
 /// Format buffer content and errors as an s-expression.
 /// Format: ((content "...") (errors ("error1" "error2" ...)))
 /// This is shared by save_buffer and single_root_view handlers.
-pub(super) fn format_buffer_response_sexp (
+pub(crate) fn format_buffer_response_sexp (
   buffer_content : &str,
   errors         : &[String]
 ) -> String {
