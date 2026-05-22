@@ -391,23 +391,36 @@ but a title can include multiple or no links.
 *** C-c i p : skg-id-prev
 See skg-id-next, above.
 *** the stack of links/ids
-C-c u for push, C-c (o|O) _ for pop
+C-c u for push, C-c o _ for paste, C-c O _ for pop
 **** C-c u : skg-id-push
 Stores, in the id stack,
 a link to the node the cursor is on.
 **** C-c o i : skg-paste-id
 Inserts the ID at the top of the id stack at the cursor.
 Does not modify the stack.
+**** C-c O i : skg-pop-id
+Like skg-paste-id,
+but also removes the node from the stack.
 **** C-c o l : skg-paste-link
 Inserts, at the cursor, a link to the node
 whose ID is at the top of the id stack.
 Does not modify the stack.
-**** C-c O i : skg-pop-id
-Removes a node from the top of the id stack,
-and inserts its ID at the cursor.
 **** C-c O l : skg-pop-link
-Removes a node from the top of the id stack,
-and inserts a link to that node at the cursor.
+Like skg-paste-link,
+but also removes the node from the stack.
+**** C-c o n : skg-paste-node
+This is the easiest way to give a node multiple containers --
+push it to the stack, then paste it as a node somewhere else.
+
+Inserts, at the cursor, an indefinitive view
+of the node whose ID is at the top of the id stack.
+Its metadata includes only the ID and =indef=,
+and its title comes from the stack.
+Does not modify the stack or save.
+Saving will provide the rest of its metadata.
+**** C-c O n : skg-pop-node
+Like skg-paste-node,
+but also removes the node from the stack.
 **** C-c v s : skg-view-id-stack
 repeated here; described earlier in this doc
 ** connection, reload, rebuild dbs

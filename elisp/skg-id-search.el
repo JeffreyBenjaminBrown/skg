@@ -6,6 +6,7 @@
 ;; It re-reads the same text a few times.
 
 (require 'cl-lib)
+(require 'subr-x)
 (require 'skg-buffer)
 (require 'skg-metadata)
 (require 'skg-request-single-root-content-view)
@@ -230,6 +231,37 @@ Prompts for the link label, defaulting to the title."
          ( label (read-string "Link label: " title) ))
     (insert (format "[[id:%s][%s]]" id label)) ))
 
+(defun skg--org-stars-for-node-insertion ()
+  "Return headline stars for inserting a node at point."
+  (if (derived-mode-p 'org-mode)
+      (save-excursion
+        (condition-case nil
+            (progn
+              (org-back-to-heading t)
+              (make-string (org-outline-level) ?*))
+          (error "*")))
+    "*"))
+
+(defun skg--insert-node-from-entry (entry)
+  "Insert an indefinitive TrueNode headline from ENTRY, an (id title) pair.
+If point is already after headline stars at the start of a line,
+insert only the metadata and title.  Otherwise insert a full same-level
+headline."
+  (let* (( id (car entry) )
+         ( title (cadr entry) )
+         ( node-text (format "(skg (node (id %s) indef)) %s" id title)) )
+    (if (save-excursion
+          (let ((pos (point)))
+            (beginning-of-line)
+            (and (looking-at "\\*+[ \t]*")
+                 (<= (match-end 0) pos)
+                 (string-blank-p
+                  (buffer-substring-no-properties (match-end 0) pos)))))
+        (insert node-text)
+      (insert (format "%s %s\n"
+                      (skg--org-stars-for-node-insertion)
+                      node-text)))))
+
 (defun skg-paste-id ()
   "Insert the ID at the top of `skg-id-stack' at point.
 Does not modify the stack."
@@ -247,6 +279,15 @@ Prompts for the link label, defaulting to the title from the stack."
     (when entry
       (skg--insert-link-from-entry entry) )))
 
+(defun skg-paste-node ()
+  "Insert an indefinitive TrueNode headline from the top of `skg-id-stack'.
+Does not modify the stack.  The inserted metadata contains the node ID
+and `indef`; the headline title comes from the stack entry."
+  (interactive)
+  (let (( entry (skg--id-stack-top-or-message) ))
+    (when entry
+      (skg--insert-node-from-entry entry) )))
+
 (defun skg-pop-id ()
   "Pop the top of `skg-id-stack' and insert the ID at point."
   (interactive)
@@ -263,6 +304,16 @@ Prompts for the link label, defaulting to the title from the stack."
     (when entry
       (pop skg-id-stack)
       (skg--insert-link-from-entry entry) )))
+
+(defun skg-pop-node ()
+  "Pop the top of `skg-id-stack' and insert an indefinitive TrueNode headline.
+The inserted metadata contains the node ID and `indef`; the headline
+title comes from the stack entry."
+  (interactive)
+  (let (( entry (skg--id-stack-top-or-message) ))
+    (when entry
+      (pop skg-id-stack)
+      (skg--insert-node-from-entry entry) )))
 
 (defun skg--point-in-metadata-p ()
   "If point is within metadata, return (id . title). Otherwise nil."

@@ -90,6 +90,8 @@ and hide INTERNAL from M-x completion."
   (define-key map (kbd "C-c i p")   #'skg-id-prev)
   (define-key map (kbd "C-c o i")   #'skg-paste-id)
   (define-key map (kbd "C-c o l")   #'skg-paste-link)
+  (define-key map (kbd "C-c o n")   #'skg-paste-node)
+  (define-key map (kbd "C-c O n")   #'skg-pop-node)
   (define-key map (kbd "C-c O i")   #'skg-pop-id)
   (define-key map (kbd "C-c O l")   #'skg-pop-link))
 
@@ -144,6 +146,8 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c u") #'skg-id-push))
     (define-key map (kbd "C-c o i") #'skg-paste-id)
     (define-key map (kbd "C-c o l") #'skg-paste-link)
+    (define-key map (kbd "C-c o n") #'skg-paste-node)
+    (define-key map (kbd "C-c O n") #'skg-pop-node)
     (define-key map (kbd "C-c O i") #'skg-pop-id)
     (define-key map (kbd "C-c O l") #'skg-pop-link))
   (progn;; git add ops (only fire if the .skg file is not yet in HEAD)
@@ -185,6 +189,8 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c u")   #'skg-id-push)
     (define-key map (kbd "C-c o i") #'skg-paste-id)
     (define-key map (kbd "C-c o l") #'skg-paste-link)
+    (define-key map (kbd "C-c o n") #'skg-paste-node)
+    (define-key map (kbd "C-c O n") #'skg-pop-node)
     (define-key map (kbd "C-c O i") #'skg-pop-id)
     (define-key map (kbd "C-c O l") #'skg-pop-link)))
 

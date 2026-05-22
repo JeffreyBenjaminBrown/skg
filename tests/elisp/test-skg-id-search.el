@@ -232,6 +232,37 @@ not the headline's metadata ID and title."
     (should (equal (skg--format-id-stack-as-org)
                    "* second\nid-2\n* first\nid-1")) ))
 
+(ert-deftest test-skg-paste-node ()
+  "Test that skg-paste-node inserts an indefinitive node without popping."
+  (let (( skg-id-stack '(("id-1" "Title from stack")) ))
+    (with-temp-buffer
+      (org-mode)
+      (skg-paste-node)
+      (should (equal (buffer-string)
+                     "* (skg (node (id id-1) indef)) Title from stack\n"))
+      (should (equal skg-id-stack '(("id-1" "Title from stack")) )) )))
+
+(ert-deftest test-skg-pop-node ()
+  "Test that skg-pop-node inserts an indefinitive node and pops the stack."
+  (let (( skg-id-stack '(("id-2" "Second")
+                         ("id-1" "First")) ))
+    (with-temp-buffer
+      (org-mode)
+      (skg-pop-node)
+      (should (equal (buffer-string)
+                     "* (skg (node (id id-2) indef)) Second\n"))
+      (should (equal skg-id-stack '(("id-1" "First")) )) )))
+
+(ert-deftest test-skg-paste-node-after-typed-stars ()
+  "If point is after headline stars, insert only node metadata and title."
+  (let (( skg-id-stack '(("id-1" "Title from stack")) ))
+    (with-temp-buffer
+      (org-mode)
+      (insert "** ")
+      (skg-paste-node)
+      (should (equal (buffer-string)
+                     "** (skg (node (id id-1) indef)) Title from stack")) )))
+
 (ert-deftest test-skg-view-id-stack ()
   "Test that skg-view-id-stack creates buffer with correct content."
   (let (( skg-id-stack '(("uuid-123" "My Node")) ))
