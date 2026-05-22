@@ -13,16 +13,18 @@ Two files are deliberately absent from the unload list:
   destroy both for every already-open skg buffer: the mode
   degrades to org-mode and the buffer-local var is cleared.
 
-- `skg-keymaps-and-aliases' defines `skg-id-stack-mode-map',
-  which `skg-id-search's `define-minor-mode' consults at load
-  time. Unloading it and then re-loading `skg-id-search' (via
-  the transitive require chain) makes the map void at the
-  define site.
+- `skg-keymaps-and-aliases' defines minor-mode maps that
+  `define-minor-mode' consults at load time. Unloading it and
+  then re-loading dependent modules (via the transitive require
+  chain) makes those maps void at the define site. Re-reading it
+  before `skg-init' also handles newly added map variables in a
+  long-running Emacs session where the feature was already
+  provided by older code.
 
 Both files are idempotent on re-evaluation (no top-level
 hooks, no advice, just `defvar', `define-derived-mode',
 `define-key', and `defun's), so we pick up edits to them via
-plain `load-file' at the end instead."
+plain `load-file' instead."
   (interactive)
   (let ((skg-features
          '( skg-client
@@ -38,6 +40,7 @@ plain `load-file' at the end instead."
             skg-view-new-empty
             skg-org-fold
             skg-request-file-path
+            skg-request-diff-analysis
             skg-request-git-diff-mode
             skg-request-rerender-all-views
             skg-request-save
@@ -65,8 +68,8 @@ plain `load-file' at the end instead."
   (let ((elisp-dir
          (file-name-directory
           (symbol-file 'skg-reload 'defun))))
-    (load-file (expand-file-name "skg-init.el"                elisp-dir))
     (load-file (expand-file-name "skg-keymaps-and-aliases.el" elisp-dir))
+    (load-file (expand-file-name "skg-init.el"                elisp-dir))
     (load-file (expand-file-name "skg-buffer.el"              elisp-dir)))
   (message "skg: all modules reloaded"))
 
