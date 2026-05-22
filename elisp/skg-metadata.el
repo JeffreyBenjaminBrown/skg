@@ -17,6 +17,7 @@ Does NOT save; call `skg-request-save-buffer' afterward."
   (if recursive
       (skg-delete-recursive)
     (skg-edit-metadata-at-point '(skg (node (editRequest delete))))
+    (forward-line)
     (message "This change will only be applied when you save the buffer.")))
 
 (defun skg-delete-recursive ()
