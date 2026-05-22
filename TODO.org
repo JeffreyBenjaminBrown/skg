@@ -1,10 +1,23 @@
-* ONGOING continue TODO/sharing/ at 3_*.org
-* rename 'placed' to 'addressed'
-* TODO too many things are called reconciliation
-* further subdivide the completion logic
-Traversing a 500 node tree in ego_tree takes about 10 microseconds,
-says ChatGPT, so I could do that a hundred times and only add 1 milisecond
-to the time it takes to save a buffer.
+* [[./TODO/analyze-diff.org][diff analyzer]]
+* a command for merge
+* setup for Lorena
+* [[./rerender_view.org][understand rerender_view]]
+* this title in TODO/problems.org
+'compute_interleaved_diff' can collide for large unique-item lists
+* make it installable on windows
+* use the .emacs in skg3
+requires rebuilding NixOS
+* OOPS : meant to review this diff range
+** command
+git diff 0668ddb6f78b2d678cde26389fa3d04cb6f98614..adf5603bdaf412c418e1e7a40853bb0bdc093941
+** hash interp
+ending
+  adf5603bdaf412c418e1e7a40853bb0bdc093941
+starting
+  0668ddb6f78b2d678cde26389fa3d04cb6f98614
+** if it's good
+then the next item can be deleted as done,
+"further subdivide the completion logic"
 * after a big edit to the CS for econ course notes, C-c t A took forever
 I had created a big tree of new nodes.
 * Why does saving this buffer set the node's birth to 'independent'?
