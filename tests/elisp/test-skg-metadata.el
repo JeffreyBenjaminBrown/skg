@@ -6,7 +6,9 @@
 (require 'ert)
 (require 'heralds-minor-mode)
 (require 'org)
+(require 'skg-keymaps-and-aliases)
 (require 'skg-metadata)
+(require 'skg-id-search)
 (require 'skg-modify-graph)
 (require 'skg-compare-sexpr)
 
@@ -175,6 +177,11 @@ Returns the parsed s-expression or nil if not found."
       (when (buffer-live-p source-buffer)
         (kill-buffer source-buffer)))))
 
+(ert-deftest test-skg-set-merge-request-keybinding ()
+  "Test C-c s m is bound to skg-set-merge-request."
+  (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c s m"))
+              'skg-set-merge-request)))
+
 (ert-deftest test-skg-set-source ()
   "Test skg-set-source replaces the node source field."
   (with-temp-buffer
@@ -219,6 +226,58 @@ Returns the parsed s-expression or nil if not found."
       (let ((display-text (overlay-get display-overlay 'display)))
         (should (string-match-p "⌂private" display-text))
         (should-not (string-match-p "⌂public" display-text))))))
+
+(ert-deftest test-skg-set-merge-request-with-bare-id ()
+  "Test skg-set-merge-request adds a merge editRequest."
+  (with-temp-buffer
+    (org-mode)
+    (insert "* (skg (node (id acquirer) (source public))) title")
+    (goto-char (point-min))
+    (skg-set-merge-request "acquiree")
+    (let ((result (test-skg--extract-metadata-sexp)))
+      (should (skg-sexp-subtree-p
+               result
+               '(skg (node (id acquirer) (source public)
+                           (editRequest (merge acquiree)))))))))
+
+(ert-deftest test-skg-set-merge-request-with-link-replaces-editrequest ()
+  "Test skg-set-merge-request accepts org links and replaces old editRequests."
+  (with-temp-buffer
+    (org-mode)
+    (insert "* (skg (node (id acquirer) (source public) (editRequest delete))) title")
+    (goto-char (point-min))
+    (skg-set-merge-request "[[id:acquiree][Acquiree title]]")
+    (let ((result (test-skg--extract-metadata-sexp)))
+      (should (skg-sexp-subtree-p
+               result
+               '(skg (node (editRequest (merge acquiree))))))
+      (should-not (skg-sexp-subtree-p
+                   result
+                   '(skg (node (editRequest delete))))))))
+
+(ert-deftest test-skg-install-id-stack-minibuffer-bindings ()
+  "Test merge-request prompts install ID-stack bindings."
+  (with-temp-buffer
+    (use-local-map (make-sparse-keymap))
+    (skg--install-id-stack-minibuffer-bindings)
+    (should (eq (key-binding (kbd "C-c o i") t) 'skg-paste-id))
+    (should (eq (key-binding (kbd "C-c o l") t) 'skg-paste-link))
+    (should (eq (key-binding (kbd "C-c O i") t) 'skg-pop-id))
+    (should (eq (key-binding (kbd "C-c O l") t) 'skg-pop-link))))
+
+(ert-deftest test-skg-pop-link-in-minibuffer-uses-stack-title ()
+  "Test popping a link in a minibuffer does not prompt for a label."
+  (with-temp-buffer
+    (let ((skg-id-stack '(("acquiree" "Acquiree title"))))
+      (cl-letf (((symbol-function 'minibufferp)
+                 (lambda (&optional _buffer) t))
+                ((symbol-function 'read-string)
+                 (lambda (&rest _args)
+                   (error "Should not prompt for a label"))))
+        (skg-pop-link))
+      (should (equal (buffer-string)
+                     "[[id:acquiree][Acquiree title]]"))
+      (should (null skg-id-stack)))))
 
 (ert-deftest test-skg-set-source-recursive-prunes-non-content-births ()
   "Test recursive source change follows only contentOf org relationships."

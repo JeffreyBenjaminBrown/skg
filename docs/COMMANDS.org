@@ -275,6 +275,17 @@ Like 'skg-set-source', but it also
 changes the source of every content descendent of the node at point
 whose source matches the original source of the node at point.
 Descendents whose Birth is not ContentOf are not traversed.
+*** C-c s m : skg-set-merge-request
+(See [[./merging.org][the docs on merging]] for why would you merge two nodes,
+and what it means to do that.)
+
+Run this from the acquirer node.
+It prompts for the acquiree, accepting either a bare ID
+or an org link like =[[id:ID][label]]=,
+and edits the acquirer's metadata to request a merge.
+
+The command only edits the node's metadata in the current buffer.
+Save the view afterward to apply the merge.
 ** C-c m : other graph modifications
 *** C-c m c : skg-replace-link-with-content
 Replace the leaf at point with a content relationship to the

@@ -35,8 +35,12 @@ and manually copying the ID from the node's metadata.
 
 *** Go to the other node, and add a merge request to its metadata.
 We call this other node the 'acquirer'.
-
-Currently this has to be done "manually":
+**** the new, easier way
+Run 'skg-set-merge-request' from the acquirer
+and enter the acquiree.
+The acquiree can be a link or a raw ID;
+see 'skg-paste-link' and similar commands.
+**** the old, "manual" way
 Open the acquirer's metadata ('skg-view-metadata'),
 go to the "None" under "editRequests",
 and use shift-left or shift-right to cycle through possible values,
@@ -44,7 +48,6 @@ until reaching 'merge'. You will be prompted for a node.
 Paste a link to, or the raw ID of,
 the node at the top of the id stack --
 see 'skg-paste-link' and similar commands.
-
 *** Save the buffer.
 This causes the server to act on the merge request
 and rebuild the buffer.

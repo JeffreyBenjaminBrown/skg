@@ -228,7 +228,9 @@ Othewrise (because the stack is empty) print a message and return nil."
 Prompts for the link label, defaulting to the title."
   (let* (( id (car entry) )
          ( title (cadr entry) )
-         ( label (read-string "Link label: " title) ))
+         ( label (if (minibufferp)
+                     title
+                   (read-string "Link label: " title))) )
     (insert (format "[[id:%s][%s]]" id label)) ))
 
 (defun skg--org-stars-for-node-insertion ()

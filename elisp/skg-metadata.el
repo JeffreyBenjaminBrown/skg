@@ -146,6 +146,43 @@ Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive)
   (skg-set-source t))
 
+(defun skg-set-merge-request (acquiree-id-or-link)
+  "Prompt for ACQUIREE-ID-OR-LINK and mark the node at point to merge it.
+The command is run from the acquirer.  The prompt accepts either a
+bare ID or an org id link like [[id:ID][label]].
+Does NOT save; call `skg-request-save-buffer' afterward."
+  (interactive
+   (list (skg--read-id-or-link "Acquiree ID or link: ")))
+  (let ((acquiree-id (skg--id-from-link-or-text acquiree-id-or-link)))
+    (when (string-empty-p acquiree-id)
+      (user-error "Acquiree ID cannot be empty"))
+    (skg-edit-metadata-at-point
+     `(skg (node (DELETE (editRequest))
+                 (editRequest (merge ,(intern acquiree-id))))))
+    (message "Merge request set for acquiree %s. Save to apply."
+             acquiree-id)))
+
+(defun skg--read-id-or-link (prompt)
+  "Read an ID or link with ID-stack paste/pop bindings in the minibuffer."
+  (minibuffer-with-setup-hook #'skg--install-id-stack-minibuffer-bindings
+    (read-string prompt)))
+
+(defun skg--install-id-stack-minibuffer-bindings ()
+  "Install ID-stack paste/pop bindings in the active minibuffer."
+  (let ((map (copy-keymap (current-local-map))))
+    (define-key map (kbd "C-c o i") #'skg-paste-id)
+    (define-key map (kbd "C-c o l") #'skg-paste-link)
+    (define-key map (kbd "C-c O i") #'skg-pop-id)
+    (define-key map (kbd "C-c O l") #'skg-pop-link)
+    (use-local-map map)))
+
+(defun skg--id-from-link-or-text (text)
+  "Extract an ID from TEXT, accepting org id links or bare IDs."
+  (let ((trimmed (string-trim text)))
+    (if (string-match "\\[\\[id:\\([^]]+\\)\\]\\[" trimmed)
+        (match-string 1 trimmed)
+      trimmed)))
+
 (defun skg--validate-source-name (source)
   "Signal an error if SOURCE cannot be represented in skg metadata."
   (when (string-match-p "[[:space:]]" source)
