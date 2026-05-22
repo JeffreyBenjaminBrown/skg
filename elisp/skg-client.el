@@ -37,22 +37,46 @@
           ;; or the existing one is dead
       (and                 skg-rust-tcp-proc
            (process-live-p skg-rust-tcp-proc ))
-    (setq                  skg-rust-tcp-proc
-          (make-network-process
-           :name "skg-doc"
-           :buffer nil
-           :host "127.0.0.1"
-           :service skg-port
-           :filter ;; handles the response
-           #'skg-handle-rust-response
-           :coding 'binary
-           :nowait nil ))
+    (condition-case err
+        (setq skg-rust-tcp-proc
+              (make-network-process
+               :name "skg-doc"
+               :buffer nil
+               :host "127.0.0.1"
+               :service skg-port
+               :filter ;; handles the response
+               #'skg-handle-rust-response
+               :coding 'binary
+               :nowait nil ))
+      (error
+       (setq skg-rust-tcp-proc nil)
+       (user-error "%s" (skg--server-unavailable-message err))))
     (set-process-sentinel
      ;; What sentinels do: When Emacs detects that a process changes state — it exits, is killed, the TCP connection closes (maybe abnormally), etc. — Emacs calls that process's sentinel function with the process and a string describing the event (e.g. "deleted\n", "connection broken by remote peer\n").
      ;; What this sentinel does: If the server crashes or the connection drops mid-save, skg--tcp-sentinel fires and unlocks all save-locked buffers. Without it, a server crash would leave buffers permanently locked.
      skg-rust-tcp-proc
      #'skg--tcp-sentinel) )
   skg-rust-tcp-proc)
+
+(defun skg--server-unavailable-message (err)
+  "Return a user-facing message for a failed Rust server connection ERR."
+  (let* ((logs-dir (expand-file-name
+                    "logs"
+                    (or skg-config-dir default-directory)))
+         (user-log (expand-file-name "server-to-user.log" logs-dir))
+         (watch-log (expand-file-name "cargo-watch.log" logs-dir)))
+    (format
+     (concat
+      "Could not connect to the SKG server on port %s.\n"
+      "The server may have failed during startup.\n"
+      "Look for the startup error in:\n"
+      "  %s\n"
+      "  %s\n"
+      "Connection error: %s")
+     (if (boundp 'skg-port) skg-port "[unknown]")
+     user-log
+     watch-log
+     (error-message-string err))))
 
 (defun skg-handle-rust-response (tcp-proc string)
   "Route the response from Rust to the LP handler.
