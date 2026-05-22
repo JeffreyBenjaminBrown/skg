@@ -1,6 +1,6 @@
-* [[./bug_merge-loses-acquiree-content-bodies.org]]
 * TODO setup for Lorena
 ** make it installable on windows
+* [[./TODO/birth-to-parent.org]]
 * critical
 ** I can't demo without privacy mode.
 The backlinks from skg contains unsafe references.
@@ -31,8 +31,6 @@ not interpret comments as search hits.
 * easy
 ** buffer names should strip "id:ID' from links
 from a common title, fuzzy search for titles with words like it, and from the search results, turn some of the (text) mentions into (graph-formalized) links
-** need recursive source change
-for [[id:0e1142bd-6f47-4112-b0a0-a862b7a1d192][not obviously safe to share]]
 ** beep also once the db has rebuilt
 ** the links-in herald should precede the contents herald
 Actually just omit the contents herald.
@@ -50,16 +48,8 @@ Why would you split up your skg stuff?
 * bugs
 ** after a big edit to the CS for econ course notes, C-c t A took forever
 I had created a big tree of new nodes.
-** Why does saving this buffer set the node's birth to 'independent'?
-*** this buffer
-```
-  * (skg (node (id 6fcd1f14-3d3a-4967-9215-52eba5403149) (source public) (birth independent) indef (graphStats (containers 1)) (viewStats (sourceHerald ⌂:public)))) bio for course at La Nacho
-```
-*** it loads with the right herald initially
-But after that saving sets it to independent.
 ** What's the second blue { in the herald for?
 Saw it looking at 'address', common to Valentina and Maps.
-** duplicate IDs silently kill the server, and it only reports the first
 ** 'compute_interleaved_diff' can collide for large unique-item lists
 WARNING: That is a verbatim heading title from TODO/problems.org
 * document

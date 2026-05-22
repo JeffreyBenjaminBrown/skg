@@ -1,0 +1,54 @@
+* 1
+Welcome, ChatGPT! Please read coding-advice/ORIENTATION.org,
+and whatever it refers to (recursively), for orientation. Then:
+
+There's something muddled about the Birth concept.
+It ought to describe the node's relationship to its parent
+when the view was last re-rendered (esp. before recent user edits
+that may have moved the node).
+We should rename it to, simply, Parent,
+and it should always match the reason the node was put there.
+
+If the node has no parent (or rather, no visible parent --
+the BufferRoot is its parent in the viewtree but not visible to the user)
+then it simply shouldn't have a Parent field at all,
+nor the corresponding herald.
+
+Please read through all the instances in which we assign or modify
+the Birth of a node, and determine whether any of them are muddled.
+I'm already aware of one: If a view-root is graph-content,
+a user's initial visit to it gives it Birth=ContentOf,
+but on saving that Birth is changed to Independent.
+This should solve that (since it won't have a Parent at all).
+But there might other, similarly unnatural things.
+
+Then write a report, 'complex-birth-to-simple-parent.org',
+with your findings and recommendations.
+* 2
+Halfway through your report I changed my mind somewhat.
+
+Let's call the field ParentIs, which is clearer than Parent,
+and make the variants:
+- Container // default, parent is container to child
+- Content
+- LinkTarget
+- Independent // no relation
+- Absent // use this instead of Optional
+
+This way we can continue to omit "parent is container"
+from the metadata of most nodes.
+
+If a user moves a node for which ParentIs=Absent
+to be a view-child of some other node,
+the Absent should change to the default, Container,
+so that they can save and make it content
+(which they probably intended)
+without having to edit its metadata before saving.
+
+Rather than edit your report in place,
+I suspect it'll be faster to just write a new report.
+I've renamed your report to complex-birth-to-simple-parent_v1.org.
+Please write a _v2 to a separate file.
+
+If you see anything to push back against --
+anything ill-specified, awkward, or unnecessary -- please do!
