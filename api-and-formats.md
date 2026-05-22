@@ -16,7 +16,7 @@ So far there are these endpoints:
     - `regex`, `body`, `operators` are optional; each defaults to "false".
       - "regex=true": interpret the query as a per-token regex; a RegexQuery is built directly and the QueryParser is bypassed.
       - "body=true": also search node bodies (titles are always searched).
-      - "operators=true": preserve Tantivy operator syntax (AND / OR / phrase / +foo / -bar / grouping / field:). Intra-word operator chars still get escaped heuristically so C++ etc. remain findable. Ignored in regex mode.
+      - "operators=true": preserve Tantivy phrase and operator syntax (AND / OR / phrase / +foo / -bar / grouping / field:). Intra-word operator chars still get escaped heuristically so C++ etc. remain findable. In regex mode, AND / OR / NOT / +foo / -bar combine per-token regexes at the document level; phrase syntax does not apply.
 
   - Phase 1, immediate: Server sends LP buffer content with response-type "search-results". Results are ordinary indefinitive non-content TrueNodes (not special scaffold types).
 

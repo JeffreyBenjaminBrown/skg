@@ -31,8 +31,8 @@ targets, and nodes that had an org-roam ID before import)
 are bumped in the ranking via their context-origin multiplier.
 
 Prompts for search terms. All search axes take their conservative
-defaults: no regex, titles only (no body), no Tantivy operator
-syntax.
+defaults: no per-token regex, titles only (no body), no Tantivy
+phrase and operator syntax.
 
 Run 'skg-goto' (below) from one of the links in the search
 results to open the view from that node.
@@ -40,19 +40,22 @@ results to open the view from that node.
 Same as skg-search but asks for three axis flags before
 sending:
 
-- *Regex?* — yes switches to per-token regex. Bypasses the
-  query parser; the pattern is handed to Tantivy's
-  'RegexQuery' verbatim.
+- *Use per-token regex (not phrase search)?* — yes switches
+  to per-token regex. Bypasses the query parser; each
+  whitespace-separated piece is handed to Tantivy's
+  'RegexQuery'.
 - *Body?* — yes adds the body field to the search (titles
   are always searched).
-- *Operators?* — yes enables AND / OR / NOT / +foo / -bar
-  semantics. In non-regex mode operators pass through
+- *Use Tantivy phrase and operator syntax (AND/OR/NOT/+/-)?*
+  — yes enables phrase quotes plus AND / OR / NOT / +foo /
+  -bar semantics. In non-regex mode this syntax passes through
   Tantivy's QueryParser (phrase quotes, grouping, field: all
   work; intra-word operator chars get escaped so =foo:bar=
-  remains findable). In regex mode operators combine the
-  per-piece RegexQueries at the document level — see the
-  regex=true section below.
-**** Query syntax with default axes (operators=false, regex=false)
+  remains findable). In regex mode, AND / OR / NOT / +foo /
+  -bar combine the per-piece RegexQueries at the document
+  level; phrase syntax does not apply there. See the regex=true
+  section below.
+**** Query syntax with default axes (phrase/operators=false, regex=false)
 Queries are literal. The query string is split on whitespace,
 and any word containing a Tantivy operator character
 (=+ - & | ! ( ) { } [ ] ^ " ~ * ? : \=) or the bare keyword
@@ -63,7 +66,7 @@ are searched literally. Words without specials pass through.
 - *Literal special characters*. A title like "C++ tips",
   "[draft] plan", or "cat:dog" is findable by typing its
   literal text.
-**** Query syntax with operators=true
+**** Query syntax with phrase/operators=true
 The query is handed to Tantivy's QueryParser, with one
 heuristic adjustment: any operator character sitting strictly
 inside a word (with word chars on both sides, scanning
@@ -95,9 +98,10 @@ previous character", NOT "any characters" (that's =.*=). So
 With operators=false, pieces are OR'd (SHOULD-combined)
 like the non-regex default.
 
-With operators=true, the keywords =AND= / =OR= / =NOT= and
-the prefixes =+piece= / =-piece= combine the per-piece
-RegexQueries at the document level:
+With phrase/operators=true (the wire flag is still
+=operators=true=), the keywords =AND= / =OR= / =NOT= and the
+prefixes =+piece= / =-piece= combine the per-piece RegexQueries
+at the document level:
 - =poli.* AND sci.*= — documents whose tokens include one
   matching =poli.*= AND one matching =sci.*=.
 - =poli.* NOT bio.*= — documents matching =poli.*= and NOT

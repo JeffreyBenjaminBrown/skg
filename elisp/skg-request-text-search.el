@@ -18,9 +18,9 @@ the ranking via their context-origin multiplier."
 (defun skg-search-interactive (search-terms)
   "Text search with per-axis prompts for regex, body, operators."
   (interactive "sSearch terms: ")
-  (let* ((regex     (y-or-n-p "Regex? "))
+  (let* ((regex     (y-or-n-p "Use per-token regex (not phrase search)? "))
          (body      (y-or-n-p "Include body text (titles are always searched)? "))
-         (operators (y-or-n-p "Use operator syntax (AND/OR/NOT/+/-)? ")))
+         (operators (y-or-n-p "Use Tantivy phrase and operator syntax (AND/OR/NOT/+/-)? ")))
     (skg--request-text-search search-terms
                               regex body operators)))
 
