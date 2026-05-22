@@ -1,42 +1,73 @@
-* ONGOING continue TODO/sharing/ at 3_*.org
-* rename 'placed' to 'addressed'
-* TODO too many things are called reconciliation
-* further subdivide the completion logic
-Traversing a 500 node tree in ego_tree takes about 10 microseconds,
-says ChatGPT, so I could do that a hundred times and only add 1 milisecond
-to the time it takes to save a buffer.
-* after a big edit to the CS for econ course notes, C-c t A took forever
+* critical
+** I can't demo without privacy mode.
+The backlinks from skg contains unsafe references.
+* TODO I want this todo list in Skg.
+Git review after reshaping it is hell.
+** merge & export these notes
+*** DONE "TODO" items in this repo
+*** [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skg]]
+*** [[id:627da2c2-2f34-46ac-a6d3-9c625c4ff31d][AI]]
+*** [[id:001d7913-c431-461c-92ae-a6a39394856c][processing]]
+* easy
+** buffer names should strip "id:ID' from links
+from a common title, fuzzy search for titles with words like it, and from the search results, turn some of the (text) mentions into (graph-formalized) links
+** need recursive source change
+for [[id:0e1142bd-6f47-4112-b0a0-a862b7a1d192][not obviously safe to share]]
+** a third paste option: the node itself
+not a link, not an id
+creates a multicontained node
+** delete should put point on next line
+** beep also once the db has rebuilt
+** the links-in herald should precede the contents herald
+Actually just omit the contents herald.
+The containers herald is the interesting one.
+That one should precede links-in.
+** rename shutdown->stop server
+** remap C-c C-o during Skg
+in skg buffers
+** show the herald it is responsible for next to each field in the metadata
+** ? request containerward paths, excluding the view-rootward one
+** IDs should not be writeable in the metadata view
+And what about extra-ids?
+** Is it a misfeature to let config_path differ from data_root?
+Why would you split up your skg stuff?
+* bugs
+** after a big edit to the CS for econ course notes, C-c t A took forever
 I had created a big tree of new nodes.
-* Why does saving this buffer set the node's birth to 'independent'?
-** this buffer
+** Why does saving this buffer set the node's birth to 'independent'?
+*** this buffer
 ```
   * (skg (node (id 6fcd1f14-3d3a-4967-9215-52eba5403149) (source public) (birth independent) indef (graphStats (containers 1)) (viewStats (sourceHerald ⌂:public)))) bio for course at La Nacho
 ```
-** it loads with the right herald initially
+*** it loads with the right herald initially
 But after that saving sets it to independent.
-* What's the second blue { in the herald for?
+** What's the second blue { in the herald for?
 Saw it looking at 'address', common to Valentina and Maps.
-* request containerward paths, excluding the view-rootward one
-* unify the three skg instances
-See TODO/docker-unification-strategies.org
-* IDs should not be writeable in the metadata view
-And what about extra-ids?
-* duplicate IDs silently kill the server, and it only reports the first
-* strategy for moving source
+** duplicate IDs silently kill the server, and it only reports the first
+* document
+** content is like "what is this idea looking at", and links sources are "what are looking at this idea"
+** strategy for moving source
 Commit all uncommitted changes from both sources.
 Do the move.
 Compare the state of both sources.
-* Is it a misfeature to let config_path differ from data_root?
-Why would you split up your skg stuff?
-* bug, no time
-In git diff view, phantom nodes become completely unfolded
-whenever the buffer is saved.
-Probably because they are regenerated.
-* TODO/sharing/1_dedup-sharing-rel-completion.org
-* TODO/sharing/2_hide-subscribee-content-deletions.org
-* TODO I want this todo list in Skg.
-Git review after reshaping it is hell.
-* INTERNALIZE: Use lightweight models for easy but wordy things.
+* maybe
+** a way to present more nodes on one line
+Just triple the relationship character and color it differently.
+Emacs could quickly toggle bbetween these two representations.
+** maybe a symbol for 'on screen definitive elsewhere' for links
+to allow recording
+multiple trails from a root to its content
+** unify the three skg instances
+See TODO/docker-unification-strategies.org
+* using AI
+** I liked this prompt at the top of a vision document.
+Please read and think about this.
+Report anything unclear, inelegant, inefficient, or awkward about it,
+in a last section titled 'problems'.
+Subdivide your questions and other feedback org-style
+(remember, the tree does not have to be uniform depth!)
+and I will respond inline.
+** INTERNALIZE: Use lightweight models for easy but wordy things.
 Like fixing interior imports.
 * references
 ** how to import from org-roam
@@ -65,11 +96,6 @@ d4dd2e850b449aa4ff92820f9dd66aad48cd6b0b
 f6664360241ec9de0c89a0934445eeb37d147a87
 **** TODO review commit 7dacceadcee6ea260ae19625bc8e7da1c77986d1
 which was to fix test db accumulation
-* merge & export these notes
-** DONE "TODO" items in this repo
-** [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skg]]
-** [[id:627da2c2-2f34-46ac-a6d3-9c625c4ff31d][AI]]
-** [[id:001d7913-c431-461c-92ae-a6a39394856c][processing]]
 * food for thought
 ** Skg projects graph relationships into trees.
 ** ? I wanted the 'helps' relation.
