@@ -340,7 +340,7 @@
    Investigated on 2026-05-22;
    see 'faster-diff-analysis.org'.
 
-   After the changed-file prototype, clean diffs are fast and node
-   reports are restricted to affected PIDs. A one-file title change
-   still reads the complete before endpoint, so the next win is cached
-   endpoint graphs keyed by HEAD commit OID and index identity.
+   After the changed-file prototype and endpoint snapshot cache, clean
+   diffs are fast and repeated one-change reports are much faster. The
+   next win is cached inverse indexes or reusable 'GraphFacts' keyed by
+   the same endpoint identities.

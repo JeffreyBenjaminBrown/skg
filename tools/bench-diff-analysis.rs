@@ -23,10 +23,16 @@ fn main (
   let config : SkgConfig =
     load_config (config_path) ?;
   if args . get (3) . map ( |s| s . as_str () ) != Some ("full") {
-    let rendered : String =
-      timed ("diff_analysis_report", || {
-        diff_analysis_report (&config, selection) }) ?;
-    println! ("rendered bytes: {}", rendered . len ());
+    let repeats : usize =
+      args . get (3)
+        . and_then ( |s| s . parse::<usize> () . ok () )
+        . unwrap_or (1);
+    for repeat in 0..repeats {
+      let rendered : String =
+        timed (
+          &format! ("diff_analysis_report {}", repeat + 1),
+          || diff_analysis_report (&config, selection)) ?;
+      println! ("rendered bytes: {}", rendered . len ()); }
     return Ok (( )); }
   let total_start : Instant =
     Instant::now ();

@@ -11,11 +11,17 @@ use crate::types::nodes::fs::NodeFS;
 
 use git2::{ObjectType, Repository, TreeWalkMode, TreeWalkResult};
 use std::collections::{BTreeSet, HashMap};
+use std::collections::hash_map::DefaultHasher;
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::str::from_utf8;
+use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
+
+static SNAPSHOT_CACHE : OnceLock<Mutex<HashMap<String, GraphSnapshot>>> =
+  OnceLock::new ();
 
 pub fn read_snapshot_pair (
   config    : &SkgConfig,
@@ -30,11 +36,11 @@ pub fn read_snapshot_pair (
       let before_handle : thread::ScopedJoinHandle<'_, Result<GraphSnapshot, String>> =
         scope . spawn ( || profile_step_result (
           "read before graph snapshot", || {
-            read_graph_snapshot (config, before_kind) }) );
+            read_graph_snapshot_maybe_cached (config, before_kind) }) );
       let after_handle : thread::ScopedJoinHandle<'_, Result<GraphSnapshot, String>> =
         scope . spawn ( || profile_step_result (
           "read after graph snapshot", || {
-            read_graph_snapshot (config, after_kind) }) );
+            read_graph_snapshot_maybe_cached (config, after_kind) }) );
       ( before_handle . join () . unwrap_or_else ( |_| Err (
           "Reading before graph snapshot panicked." . to_string () ) ),
         after_handle . join () . unwrap_or_else ( |_| Err (
@@ -63,7 +69,7 @@ pub fn read_changed_snapshot_pair (
       affected_pids: BTreeSet::new () } )); }
   let before : GraphSnapshot =
     profile_step_result ("read changed-path before graph snapshot", || {
-      read_graph_snapshot (config, before_kind) }) ?;
+      read_graph_snapshot_maybe_cached (config, before_kind) }) ?;
   let (after, affected_pids) : (GraphSnapshot, BTreeSet<ID>) =
     profile_step_result ("overlay changed after graph snapshot", || {
       overlay_changed_after_snapshot (
@@ -131,6 +137,102 @@ fn read_graph_snapshot (
     nodes . append (&mut source_nodes); }
   Ok (profile_step ("snapshot_from_nodes", || {
     snapshot_from_nodes (nodes) }))
+}
+
+fn read_graph_snapshot_maybe_cached (
+  config : &SkgConfig,
+  kind   : SnapshotKind,
+) -> Result<GraphSnapshot, String> {
+  let key : Option<String> =
+    snapshot_cache_key (config, kind) ?;
+  let Some (key) = key else {
+    return read_graph_snapshot (config, kind); };
+  if let Some (snapshot) =
+    snapshot_cache ()
+      . lock ()
+      . map_err ( |e| format! (
+        "Diff analysis snapshot cache lock failed: {}", e )) ?
+      . get (&key)
+      . cloned () {
+    profile_log ("snapshot cache hit", Duration::from_millis (0));
+    return Ok (snapshot); }
+  profile_log ("snapshot cache miss", Duration::from_millis (0));
+  let snapshot : GraphSnapshot =
+    read_graph_snapshot (config, kind) ?;
+  snapshot_cache ()
+    . lock ()
+    . map_err ( |e| format! (
+      "Diff analysis snapshot cache lock failed: {}", e )) ?
+    . insert (key, snapshot . clone ());
+  Ok (snapshot)
+}
+
+fn snapshot_cache (
+) -> &'static Mutex<HashMap<String, GraphSnapshot>> {
+  SNAPSHOT_CACHE . get_or_init ( || Mutex::new (HashMap::new ()) )
+}
+
+fn snapshot_cache_key (
+  config : &SkgConfig,
+  kind   : SnapshotKind,
+) -> Result<Option<String>, String> {
+  if kind == SnapshotKind::Worktree {
+    return Ok (None); }
+  let mut parts : Vec<String> =
+    Vec::new ();
+  let mut source_names : Vec<SourceName> =
+    config . sources . keys () . cloned () . collect ();
+  source_names . sort ();
+  for source_name in source_names {
+    let source : &SkgfileSource =
+      config . sources . get (&source_name) . ok_or_else ( || format! (
+        "Source '{}' not found in config", source_name )) ?;
+    let source_path : &Path =
+      Path::new (&source . path);
+    let repo : Repository =
+      open_repo (source_path) . ok_or_else ( || format! (
+        "Could not open git repo for source '{}'", source_name )) ?;
+    let identity : String =
+      match kind {
+        SnapshotKind::Head =>
+          head_cache_identity (&repo, &source_name) ?,
+        SnapshotKind::Index =>
+          index_cache_identity (&repo, &source_name) ?,
+        SnapshotKind::Worktree =>
+          unreachable! (), };
+    parts . push (format! (
+      "{}:{}:{}",
+      source_name,
+      source . path . display (),
+      identity )); }
+  Ok (Some (format! ("{:?}|{}", kind, parts . join ("|"))))
+}
+
+fn head_cache_identity (
+  repo        : &Repository,
+  source_name : &SourceName,
+) -> Result<String, String> {
+  repo . head ()
+    . and_then ( |head| head . peel_to_commit () )
+    . map ( |commit| format! ("head:{}", commit . id ()) )
+    . map_err ( |e| format! (
+      "Reading HEAD identity for source '{}': {}", source_name, e ))
+}
+
+fn index_cache_identity (
+  repo        : &Repository,
+  source_name : &SourceName,
+) -> Result<String, String> {
+  let index_path : PathBuf =
+    repo . path () . join ("index");
+  let bytes : Vec<u8> =
+    fs::read (&index_path) . map_err ( |e| format! (
+      "Reading index identity for source '{}' at {:?}: {}",
+      source_name, index_path, e )) ?;
+  let mut hasher : DefaultHasher =
+    DefaultHasher::new ();
+  bytes . hash (&mut hasher);
+  Ok (format! ("index:{:016x}", hasher . finish ()))
 }
 
 fn changed_paths_by_source (

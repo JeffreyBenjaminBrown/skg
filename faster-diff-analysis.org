@@ -83,6 +83,7 @@ After the changed-file prototype:
 |------|----------|--------------|
 | clean 'data/public' | 0.250s | 0.091s |
 | one changed title in temp copy | 1.865s | 0.514s |
+| one changed title, cached before endpoint | 0.50-0.52s | 0.17-0.18s |
 
 For the one-change dev run, the profile was:
 
@@ -99,6 +100,11 @@ For the one-change dev run, the profile was:
 The remaining bottleneck is the complete before-endpoint read. The
 other major whole-source pass, relationship fact construction, is now
 small when the affected PID set is small.
+
+After adding a process-local snapshot cache keyed by HEAD commit OID
+or index-file hash, repeated one-change reports in the same process
+avoid reparsing the before endpoint. This matches the long-running
+server shape better than a one-shot benchmark process.
 
 * What the data says
 This is not a TypeDB problem. 'skg-diff-report' does not query TypeDB
@@ -126,22 +132,19 @@ That is the strongest evidence for a change-driven design.
 
 * Recommended next design
 The prototype now makes the clean case proportional to git's changed
-path detection, and makes node-reporting proportional to the affected
-set. The next meaningful speedup is caching or reusing the before
-endpoint.
+path detection, makes node-reporting proportional to the affected set,
+and caches HEAD/index endpoint snapshots.
 
 In order:
 
-- Cache HEAD endpoint snapshots by commit OID. This should remove most
-  of the remaining one-change cost when HEAD is the before endpoint.
-- Cache index endpoint snapshots by a conservative index identity
-  (index file mtime+size may be enough as an invalidation key; a
-  stronger checksum would be safer).
 - Use existing in-Rust graph indexes for the worktree side. The running
   server already has 'InRustGraph' with inverse indexes, but the diff
   handler currently receives only 'SkgConfig'. Passing the server env or
   graph snapshot into the handler would avoid reparsing the worktree
   endpoint.
+- Cache inverse indexes or reusable 'GraphFacts' for HEAD/index
+  snapshots. Cache-hit one-change reports still scan all nodes to answer
+  inbound relationship questions for the affected PIDs.
 - Consider replacing global duplicate-ID and title-map construction with
   cached maps. Those are not the main cost now, but they are still
   whole-source scans.
@@ -173,10 +176,12 @@ not dominate this profile.
 cargo build --bin bench-diff-analysis
 SKG_PROFILE_DIFF_ANALYSIS=1 target/debug/bench-diff-analysis data/skgconfig.toml all
 SKG_PROFILE_DIFF_ANALYSIS=1 target/debug/bench-diff-analysis /tmp/skg-diff-bench-config/skgconfig.toml all
+SKG_PROFILE_DIFF_ANALYSIS=1 target/debug/bench-diff-analysis /tmp/skg-diff-bench-config/skgconfig.toml all 3
 
 cargo build --release --bin bench-diff-analysis
 SKG_PROFILE_DIFF_ANALYSIS=1 target/release/bench-diff-analysis data/skgconfig.toml all
 SKG_PROFILE_DIFF_ANALYSIS=1 target/release/bench-diff-analysis /tmp/skg-diff-bench-config/skgconfig.toml all
+SKG_PROFILE_DIFF_ANALYSIS=1 target/release/bench-diff-analysis /tmp/skg-diff-bench-config/skgconfig.toml all 3
 
 cargo test diff_analysis --tests
 #+end_src
