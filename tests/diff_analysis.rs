@@ -52,8 +52,8 @@ fn diff_analysis_report_includes_inbound_and_textlink_changes (
     "container node should report contained-role changes:\n{}",
     report );
   assert! (
-    report . contains ("**** container"),
-    "child node should report inbound container changes:\n{}",
+    report . contains ("**** containers (with gains)"),
+    "child node should report inbound container gains:\n{}",
     report );
   assert! (
     report . contains ("**** source"),
@@ -163,8 +163,12 @@ fn diff_analysis_reports_cross_source_inbound_relationships (
         include_staged: true,
         include_unstaged: true }) ?;
   assert! (
-    report . contains ("**** container"),
-    "right-source child should receive inbound container change:\n{}",
+    report . contains ("**** contained"),
+    "left-source container should report outbound contained change:\n{}",
+    report );
+  assert! (
+    report . contains ("**** containers (with gains)"),
+    "right-source child should report inbound container gain:\n{}",
     report );
   assert! (
     report . contains ("Alpha"),

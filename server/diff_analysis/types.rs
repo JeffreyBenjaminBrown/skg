@@ -77,9 +77,10 @@ pub struct ValueSetDiff {
 
 #[derive(Clone, Debug)]
 pub struct RelationshipDiff {
-  pub role   : &'static str,
-  pub lost   : Vec<ID>,
-  pub gained : Vec<ID>,
+  pub role      : &'static str,
+  pub lost      : Vec<ID>,
+  pub gained    : Vec<ID>,
+  pub unchanged : Vec<ID>,
 }
 
 #[derive(Clone, Debug)]

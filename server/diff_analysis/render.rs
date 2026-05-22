@@ -134,6 +134,10 @@ fn render_relationship_diff (
   report        : &DiffReport,
   abbreviations : &HashMap<ID, String>,
 ) {
+  if diff . role == "container" {
+    render_container_relationship_diff (
+      out, diff, report, abbreviations );
+    return; }
   out . push_str (&format! ("**** {}\n", diff . role));
   if ! diff . lost . is_empty () {
     out . push_str ("***** lost\n");
@@ -143,6 +147,35 @@ fn render_relationship_diff (
     out . push_str ("***** gained\n");
     for id in &diff . gained {
       render_related_node (out, id, report, abbreviations); }}
+}
+
+fn render_container_relationship_diff (
+  out           : &mut String,
+  diff          : &RelationshipDiff,
+  report        : &DiffReport,
+  abbreviations : &HashMap<ID, String>,
+) {
+  out . push_str (&format! (
+    "**** {}\n", container_relationship_heading (diff) ));
+  for id in &diff . lost {
+    render_related_node_with_marker (
+      out, "-", id, report, abbreviations ); }
+  for id in &diff . gained {
+    render_related_node_with_marker (
+      out, "+", id, report, abbreviations ); }
+  for id in &diff . unchanged {
+    render_related_node_with_marker (
+      out, " ", id, report, abbreviations ); }
+}
+
+fn container_relationship_heading (
+  diff : &RelationshipDiff,
+) -> &'static str {
+  match (diff . gained . is_empty (), diff . lost . is_empty ()) {
+    (false, false) => "containers (with gains and losses)",
+    (false, true)  => "containers (with gains)",
+    (true, false)  => "containers (with losses)",
+    (true, true)   => "containers (unchanged)", }
 }
 
 fn render_contained_list_diff (
@@ -170,9 +203,20 @@ fn render_related_node (
   report        : &DiffReport,
   abbreviations : &HashMap<ID, String>,
 ) {
+  render_related_node_with_marker (
+    out, "", id, report, abbreviations );
+}
+
+fn render_related_node_with_marker (
+  out           : &mut String,
+  marker        : &str,
+  id            : &ID,
+  report        : &DiffReport,
+  abbreviations : &HashMap<ID, String>,
+) {
   out . push_str (&format! (
-    "****** {}\n",
-    abbreviation_for (id, abbreviations) ));
+    "****** {}{}\n",
+    marker, abbreviation_for (id, abbreviations) ));
   out . push_str (&format! ("******* {}\n", id));
   out . push_str (&format! (
     "******* {}\n",
@@ -202,7 +246,8 @@ fn abbreviations_for_report (
       titles . insert (node . pid . clone (), node . title . clone ());
       for relationship in &node . relationship_diffs {
         for id in relationship . lost . iter ()
-          . chain (relationship . gained . iter ()) {
+          . chain (relationship . gained . iter ())
+          . chain (relationship . unchanged . iter ()) {
           titles . entry (id . clone ())
             . or_insert_with ( || report . titles . get (id)
               . cloned () . unwrap_or_else (

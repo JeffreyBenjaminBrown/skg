@@ -211,10 +211,15 @@ fn relationship_diffs_for_pid (
         before . difference (&after) . cloned () . collect ();
       let gained : Vec<ID> =
         after . difference (&before) . cloned () . collect ();
+      let unchanged : Vec<ID> =
+        if *role == "container" {
+          before . intersection (&after) . cloned () . collect ()
+        } else {
+          Vec::new () };
       if lost . is_empty () && gained . is_empty () {
         None
       } else {
-        Some ( RelationshipDiff { role, lost, gained } ) } } )
+        Some ( RelationshipDiff { role, lost, gained, unchanged } ) } } )
     . collect ()
 }
 

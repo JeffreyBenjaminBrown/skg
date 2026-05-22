@@ -75,7 +75,7 @@ fn bucket_names (
 }
 
 #[test]
-fn inbound_container_change_affects_child () {
+fn gained_container_affects_child () {
   let before : Vec<NodeComplete> =
     vec! [ node ("a", "A", &[]),
            node ("b", "B", &[]) ];
@@ -93,6 +93,34 @@ fn inbound_container_change_affects_child () {
       . find ( |diff| diff . role == "container" )
       . unwrap ();
   assert_eq! (container_diff . gained, vec! [id ("a")]);
+  assert! (container_diff . lost . is_empty ());
+  assert! (container_diff . unchanged . is_empty ());
+}
+
+#[test]
+fn lost_container_reports_current_existing_containers () {
+  let before : Vec<NodeComplete> =
+    vec! [ node ("old", "Old", &["child"]),
+           node ("stay", "Stay", &["child"]),
+           node ("child", "Child", &[]) ];
+  let after : Vec<NodeComplete> =
+    vec! [ node ("old", "Old", &[]),
+           node ("stay", "Stay", &["child"]),
+           node ("new", "New", &["child"]),
+           node ("child", "Child", &[]) ];
+  let report : DiffReport =
+    report_for (before, after);
+  let reports : HashMap<ID, &NodeDiffReport> =
+    reports_by_pid (&report);
+  let child_report : &NodeDiffReport =
+    reports . get (&id ("child")) . unwrap ();
+  let container_diff : &RelationshipDiff =
+    child_report . relationship_diffs . iter ()
+      . find ( |diff| diff . role == "container" )
+      . unwrap ();
+  assert_eq! (container_diff . lost, vec! [id ("old")]);
+  assert_eq! (container_diff . gained, vec! [id ("new")]);
+  assert_eq! (container_diff . unchanged, vec! [id ("stay")]);
 }
 
 #[test]

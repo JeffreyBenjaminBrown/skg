@@ -1,6 +1,7 @@
 use skg::diff_analysis::render::render_report;
 use skg::diff_analysis::types::{
-  DiffReport, ListDiffItem, NodeBucket, NodeDiffReport, SourceForReport};
+  DiffReport, ListDiffItem, NodeBucket, NodeDiffReport, RelationshipDiff,
+  SourceForReport};
 use skg::types::misc::{ID, SourceName};
 
 use std::collections::HashMap;
@@ -77,5 +78,79 @@ fn unchanged_contained_diff_lines_align_with_changed_lines () {
     rendered . contains (
       "\n**** contained diff\n  k..Keep\n -g..Gone\n +n..New\n" ),
     "contained diff rows should align: {}",
+      rendered );
+}
+
+#[test]
+fn container_relationship_renders_existing_containers_not_gained () {
+  let mut node : NodeDiffReport =
+    node_report ("child", "Child");
+  node . relationship_diffs =
+    vec! [
+      RelationshipDiff {
+        role: "container",
+        lost: vec! [id ("old")],
+        gained: vec! [id ("new")],
+        unchanged: vec! [id ("stay")] } ];
+  let report : DiffReport =
+    DiffReport {
+      duplicate_ids: Vec::new (),
+      titles: HashMap::from ([
+        (id ("old"), "Old".to_string ()),
+        (id ("new"), "New".to_string ()),
+        (id ("stay"), "Stay".to_string ()) ]),
+      buckets: vec! [
+        NodeBucket {
+          name: "modified, other",
+          nodes: vec! [node] } ] };
+  let rendered : String =
+    render_report (&report);
+  assert! (
+    rendered . contains ("**** containers (with gains and losses)\n"),
+    "container relationship should describe gains and losses: {}",
+    rendered );
+  assert! (
+    ! rendered . contains ("***** gained\n"),
+    "container relationship should not use gained heading: {}",
+    rendered );
+  assert! (
+    rendered . contains ("****** -o..Old\n"),
+    "lost container should be marked with '-': {}",
+    rendered );
+  assert! (
+    rendered . contains ("****** +n..New\n"),
+    "gained container should be marked with '+': {}",
+    rendered );
+  assert! (
+    rendered . contains ("******  s..Stay\n"),
+    "unchanged container should be marked with a space: {}",
+      rendered );
+}
+
+#[test]
+fn unchanged_container_relationship_heading_is_explicit () {
+  let mut node : NodeDiffReport =
+    node_report ("child", "Child");
+  node . relationship_diffs =
+    vec! [
+      RelationshipDiff {
+        role: "container",
+        lost: Vec::new (),
+        gained: Vec::new (),
+        unchanged: vec! [id ("stay")] } ];
+  let report : DiffReport =
+    DiffReport {
+      duplicate_ids: Vec::new (),
+      titles: HashMap::from ([
+        (id ("stay"), "Stay".to_string ()) ]),
+      buckets: vec! [
+        NodeBucket {
+          name: "modified, other",
+          nodes: vec! [node] } ] };
+  let rendered : String =
+    render_report (&report);
+  assert! (
+    rendered . contains ("**** containers (unchanged)\n"),
+    "unchanged-only container heading should be explicit: {}",
     rendered );
 }
