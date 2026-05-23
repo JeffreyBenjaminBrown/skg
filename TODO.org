@@ -1,5 +1,3 @@
-* TODO setup for Lorena
-** make it installable on windows
 * TODO git branch to-windows
 from skg2, run
   codex resume 019e52c1-e436-7e50-b6ee-43bd5562c0b2
@@ -14,6 +12,8 @@ codex resume 019e51dd-11ff-7241-a1cf-8c2dc7db7a79
 * TODO speed up test suite
 Consolidate redundant tests.
 * ONGOING [[./TODO/birth-to-parent.org]]
+* Each parentIs herald should be a different color.
+and always first
 * critical
 ** I can't demo without privacy mode.
 The backlinks from skg contains unsafe references.
@@ -43,6 +43,8 @@ That was so that M-? would
 not interpret comments as search hits.
 * easy
 ** source does not need to exist if it can be found
+** wut
+from a common title, fuzzy search for titles with words like it, and from the search results, turn some of the (text) mentions into (graph-formalized) links
 ** beep also once the db has rebuilt
 ** the links-in herald should precede the contents herald
 Actually just omit the contents herald.
