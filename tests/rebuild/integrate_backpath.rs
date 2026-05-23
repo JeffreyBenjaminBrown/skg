@@ -8,7 +8,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nod
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
-use skg::types::viewnode::{ViewNode, ViewNodeKind, Birth};
+use skg::types::viewnode::{ViewNode, ViewNodeKind, ParentIs};
 
 use skg::org_to_text::viewforest_to_string;
 
@@ -62,15 +62,15 @@ async fn test_path_with_cycle_impl(
 
   integrate_path_that_might_fork_or_cycle(
     &mut viewforest, root_id, path, branches,
-    cycle_nodes, &config, driver, Birth::ContainerOf
+    cycle_nodes, &config, driver, ParentIs::Content
   ). await?;
 
   let expected: &str = indoc! {"
     * (skg (node (id 1) (source main))) 1
     ** (skg folded (node (id 2) (source main))) 2
-    *** (skg (node (id 3) (source main) (birth containerOf) indef)) 3
-    **** (skg (node (id 4) (source main) (birth containerOf) indef)) 4
-    ***** (skg (node (id 1) (source main) (birth containerOf) indef)) 1
+    *** (skg (node (id 3) (source main) (parentIs content) indef)) 3
+    **** (skg (node (id 4) (source main) (parentIs content) indef)) 4
+    ***** (skg (node (id 1) (source main) (parentIs content) indef)) 1
     *** (skg (node (id off-path) (source main))) off-path
   "};
 
@@ -141,17 +141,17 @@ async fn test_path_with_branches_no_cycle_impl(
 
   integrate_path_that_might_fork_or_cycle(
     &mut viewforest, node_1_id, path, branches,
-    cycle_nodes, &config, driver, Birth::ContainerOf
+    cycle_nodes, &config, driver, ParentIs::Content
   ). await?;
 
   let expected: &str = indoc! {"
     * (skg (node (id 0) (source main))) 0
     ** (skg (node (id 1) (source main))) 1
     *** (skg folded (node (id 2) (source main))) 2
-    **** (skg (node (id 3) (source main) (birth containerOf) indef)) 3
-    ***** (skg (node (id 3) (source main) (birth containerOf) indef)) 3
-    ***** (skg (node (id 2) (source main) (birth containerOf) indef)) 2
-    ***** (skg (node (id 1) (source main) (birth containerOf) indef)) 1
+    **** (skg (node (id 3) (source main) (parentIs content) indef)) 3
+    ***** (skg (node (id 3) (source main) (parentIs content) indef)) 3
+    ***** (skg (node (id 2) (source main) (parentIs content) indef)) 2
+    ***** (skg (node (id 1) (source main) (parentIs content) indef)) 1
     **** (skg (node (id off-path) (source main))) off-path
   "};
 
@@ -223,17 +223,17 @@ async fn test_path_with_branches_with_cycle_impl(
 
   integrate_path_that_might_fork_or_cycle(
     &mut viewforest, node_1_id, path, branches,
-    cycle_nodes, &config, driver, Birth::ContainerOf
+    cycle_nodes, &config, driver, ParentIs::Content
   ). await?;
 
   let expected: &str = indoc! {"
     * (skg (node (id 0) (source main))) 0
     ** (skg (node (id 1) (source main))) 1
     *** (skg folded (node (id 2) (source main))) 2
-    **** (skg (node (id 3) (source main) (birth containerOf) indef)) 3
-    ***** (skg (node (id 3) (source main) (birth containerOf) indef)) 3
-    ***** (skg (node (id 2) (source main) (birth containerOf) indef)) 2
-    ***** (skg (node (id 1) (source main) (birth containerOf) indef)) 1
+    **** (skg (node (id 3) (source main) (parentIs content) indef)) 3
+    ***** (skg (node (id 3) (source main) (parentIs content) indef)) 3
+    ***** (skg (node (id 2) (source main) (parentIs content) indef)) 2
+    ***** (skg (node (id 1) (source main) (parentIs content) indef)) 1
     **** (skg (node (id off-path) (source main))) off-path
   "};
 
@@ -288,12 +288,12 @@ async fn test_fork_expansion_at_origin_impl(
   // sub-branches similarly reversed.
   let expected: &str = indoc! {"
     * (skg (node (id a11) (source main))) a11
-    ** (skg (node (id a2) (source main) (birth containerOf) indef)) a2
-    *** (skg (node (id b) (source main) (birth containerOf) indef)) b
-    *** (skg (node (id a) (source main) (birth containerOf) indef)) a
-    ** (skg (node (id a1) (source main) (birth containerOf) indef)) a1
-    *** (skg (node (id a1) (source main) (birth containerOf) indef)) a1
-    *** (skg (node (id a) (source main) (birth containerOf) indef)) a
+    ** (skg (node (id a2) (source main) (parentIs content) indef)) a2
+    *** (skg (node (id b) (source main) (parentIs content) indef)) b
+    *** (skg (node (id a) (source main) (parentIs content) indef)) a
+    ** (skg (node (id a1) (source main) (parentIs content) indef)) a1
+    *** (skg (node (id a1) (source main) (parentIs content) indef)) a1
+    *** (skg (node (id a) (source main) (parentIs content) indef)) a
   "};
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
   let expected_trees: Tree<ViewNode> =

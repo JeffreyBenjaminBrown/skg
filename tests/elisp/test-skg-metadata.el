@@ -279,18 +279,18 @@ Returns the parsed s-expression or nil if not found."
                      "[[id:acquiree][Acquiree title]]"))
       (should (null skg-id-stack)))))
 
-(ert-deftest test-skg-set-source-recursive-prunes-non-content-births ()
-  "Test recursive source change follows only contentOf org relationships."
+(ert-deftest test-skg-set-source-recursive-prunes-non-content-parentIs ()
+  "Test recursive source change follows only container org relationships."
   (with-temp-buffer
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id root) (source public) (birth independent))) root\n"
+      "* (skg (node (id root) (source public) (parentIs absent))) root\n"
       "** (skg (node (id content-child) (source public))) content child\n"
       "*** (skg (node (id content-grandchild) (source public))) content grandchild\n"
       "** (skg (node (id mismatched-content) (source foreign))) mismatched content\n"
       "*** (skg (node (id public-under-mismatch) (source public))) public under mismatch\n"
-      "** (skg (node (id link-child) (source public) (birth linksTo))) link child\n"
+      "** (skg (node (id link-child) (source public) (parentIs linkTarget))) link child\n"
       "*** (skg (node (id under-link) (source public))) under link\n"
       "** (skg aliasCol) aliases\n"
       "*** (skg (node (id under-scaffold) (source public))) under scaffold\n"))

@@ -115,10 +115,10 @@ async fn test_multi_root_view_logic (
 
   println!("Multi-root view result:\n{}", result);
 
-  let expected = indoc! {"* (skg (node (id 1) (source main) (birth independent))) 1
+  let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent))) 1
                           1 has a body
-                          * (skg (node (id 2) (source main) (birth independent))) 2
-                          * (skg (node (id 1) (source main) (birth independent) indef)) 1
+                          * (skg (node (id 2) (source main) (parentIs absent))) 2
+                          * (skg (node (id 1) (source main) (parentIs absent) indef)) 1
                           "};
   assert_eq!(result, expected,
              "Multi-root view should produce exact expected output");
@@ -143,7 +143,7 @@ fn test_single_root_view_with_cycle
 
       println!("Single root view with cycle result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id a) (source main) (birth independent) (graphStats (contents 1)))) a
+      let expected = indoc! {"* (skg (node (id a) (source main) (parentIs absent) (graphStats (contents 1)))) a
                               ** (skg (node (id b) (source main) (graphStats (containers 2) (contents 1)))) b
                               b has a body
                               *** (skg (node (id c) (source main) (graphStats (contents 1)) (viewStats containsParent))) c
@@ -179,10 +179,10 @@ fn test_multi_root_view_with_shared_nodes
       // and each SubscribeeCol has Subscribee children with the subscribed IDs.
       // Because node 2 has node 1 as a container, the multi_root_view
       // pipeline prepends node 1's ancestry (here just node 1 itself,
-      // indef ContainerOf) as the first child under the level-1 view of
+      // indef Content) as the first child under the level-1 view of
       // node 2.
       let expected = indoc! {
-        "* (skg (node (id 1) (source main) (birth independent) (graphStats (contents 2)))) title 1
+        "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 2)))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg (node (id 2) (source main) indef (graphStats (linksInFromLeaves 1) extraIDs subscribing))) title 2
@@ -191,9 +191,9 @@ fn test_multi_root_view_with_shared_nodes
          *** (skg subscribeeCol) it subscribes to these
          **** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing))) This is a [[id:shgulasdghu][test]] of a second kind.
          **** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing))) this title includes a [[id:22][textlink to another file]]
-         * (skg (node (id 2) (source main) (graphStats (linksInFromLeaves 1) extraIDs subscribing))) title 2
+         * (skg (node (id 2) (source main) (parentIs absent) (graphStats (containers 1) (linksInFromLeaves 1) extraIDs subscribing))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (source main) (birth containerOf) indef (graphStats (containers 0) (contents 2)) (viewStats containsParent))) title 1
+         ** (skg (node (id 1) (source main) (parentIs content) indef (graphStats (containers 0) (contents 2)) (viewStats containsParent))) title 1
          ** (skg subscribeeCol) it subscribes to these
          *** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing))) this title includes a [[id:22][textlink to another file]]
@@ -239,13 +239,13 @@ fn test_multi_root_view_with_node_limit
       // The SubscribeeCol includes Subscribee children created when the node was definitive.
       // For now we accept this behavior.
       let expected = indoc! {
-        "* (skg (node (id 1) (source main) (birth independent) (graphStats (contents 2)))) title 1
+        "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 2)))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg (node (id 2) (source main) indef (graphStats (linksInFromLeaves 1) extraIDs subscribing))) title 2
          ** (skg (node (id 3) (source main) indef (graphStats (linksInFromLeaves 1) extraIDs overriding subscribing))) title 3
-         * (skg (node (id 2) (source main) indef (graphStats (linksInFromLeaves 1) extraIDs subscribing))) title 2
-         ** (skg (node (id 1) (source main) (birth containerOf) indef (graphStats (containers 0) (contents 2)) (viewStats containsParent))) title 1
+         * (skg (node (id 2) (source main) (parentIs absent) indef (graphStats (containers 1) (linksInFromLeaves 1) extraIDs subscribing))) title 2
+         ** (skg (node (id 1) (source main) (parentIs content) indef (graphStats (containers 0) (contents 2)) (viewStats containsParent))) title 1
          ** (skg subscribeeCol) it subscribes to these
          *** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing))) this title includes a [[id:22][textlink to another file]]
@@ -290,7 +290,7 @@ fn test_limit_with_multiple_sibling_groups
 
       println!("Result with multiple sibling groups:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (birth independent) (graphStats (contents 2)))) 1
+      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 2)))) 1
                               1 body
                               ** (skg (node (id 11) (source main) (graphStats (contents 2)))) 11
                               11 body

@@ -1,11 +1,11 @@
-* Complex Birth to Simple Parent, v3
+* Complex ParentIs to Simple Parent, v3
 
-This report revises =complex-birth-to-simple-parent_v2.org= after the
+This report revises =complex-parentIs-to-simple-parent_v2.org= after the
 TODO comments there.
 
 The revised proposal is:
 
-- rename =Birth= to =ParentIs=;
+- rename =ParentIs= to =ParentIs=;
 - use variants =Container=, =Content=, =LinkTarget=, =Independent=,
   and =Absent=;
 - omit =ParentIs::Container= from metadata, because it is the default;
@@ -19,15 +19,15 @@ The revised proposal is:
 The new names describe what the visible parent is relative to the
 child.
 
-| Old =Birth=       | New =ParentIs= | Meaning                                                 |
+| Old =ParentIs=       | New =ParentIs= | Meaning                                                 |
 |-------------------+----------------+---------------------------------------------------------|
-| =ContentOf=       | =Container=    | parent contains child                                   |
-| =ContainerOf=     | =Content=      | parent is contained by child                            |
-| =LinksTo=         | =LinkTarget=   | parent is linked to by child                            |
+| =Container=       | =Container=    | parent contains child                                   |
+| =Content=     | =Content=      | parent is contained by child                            |
+| =LinkTarget=         | =LinkTarget=   | parent is linked to by child                            |
 | =Independent=     | =Independent=  | child has a visible parent, but no graph relation to it |
 | root/no parent    | =Absent=       | child has no visible parent                             |
 
-Important pitfall: old =Birth::ContainerOf= should become
+Important pitfall: old =ParentIs::Content= should become
 =ParentIs::Content=, not =ParentIs::Container=.
 
 * Main finding
@@ -76,7 +76,7 @@ We should also present a warning
 
 ** Type definition and default
 
-=server/types/viewnode.rs= defines =Birth= on lines 21-26 and stores it
+=server/types/viewnode.rs= defines =ParentIs= on lines 21-26 and stores it
 on =TrueNode_Generic= at lines 78-79.
 
 Recommendation:
@@ -113,7 +113,7 @@ remaining =Absent= under a visible parent.
 ** Parse metadata
 
 =server/serve/parse_metadata_sexp.rs= currently defaults missing
-=birth= to =Birth::ContentOf= in =default_metadata=.
+=parentIs= to =ParentIs::Container= in =default_metadata=.
 
 Under v3, this can remain a simple metadata-level default:
 
@@ -146,7 +146,7 @@ edits.
 
 =server/to_org/render/content_view.rs= calls
 =set_view_root_births_from_graphstats= after graph stats are attached.
-=server/to_org/util.rs= lines 193-211 then assigns =ContentOf= or
+=server/to_org/util.rs= lines 193-211 then assigns =Container= or
 =Independent= to direct =BufferRoot= children based on graph container
 count.
 
@@ -161,20 +161,20 @@ Recommendation: replace =set_view_root_births_from_graphstats= with
 
 =server/update_buffer.rs= line 246 calls =mark_view_roots_independent=.
 =server/to_org/util.rs= lines 213-229 implement that by assigning
-=Birth::Independent= to direct =BufferRoot= children.
+=ParentIs::Independent= to direct =BufferRoot= children.
 
 Under v3, this should become the same root normalization used for
 initial views: direct =BufferRoot= TrueNodes get =ParentIs::Absent=.
 
 This fixes the known problem: a graph-content view-root no longer
-changes from =ContentOf= on initial visit to =Independent= after save.
+changes from =Container= on initial visit to =Independent= after save.
 It is =Absent= in both cases.
 
 *** TODO This will render some code dead. Let's delete it once it's dead.
 
 ** Render metadata
 
-=server/org_to_text.rs= lines 238-251 omit =Birth::ContentOf= and emit
+=server/org_to_text.rs= lines 238-251 omit =ParentIs::Container= and emit
 the other variants.
 
 Under v3:
@@ -191,7 +191,7 @@ This makes omission unambiguous: it always means =Container=.
 ** Heralds
 
 =elisp/heralds-minor-mode.el= lines 143-149 and 317-351 inject
-=birth contentOf= when the metadata omits =birth=.
+=parentIs container= when the metadata omits =parentIs=.
 
 Under v3, that can be mechanically updated:
 
@@ -206,7 +206,7 @@ context just to distinguish =Absent= from =Container=.
 ** Search result roots
 
 =server/serve/handlers/text_search.rs= lines 352-357 currently assigns
-=Birth::Independent= to indexed root hits and =Birth::ContentOf= to
+=ParentIs::Independent= to indexed root hits and =ParentIs::Container= to
 other hits. Lines 399-407 create each hit as a direct child of
 =BufferRoot=.
 
@@ -223,8 +223,8 @@ content of them.
 
 =server/to_org/expand/backpath.rs= should be renamed carefully:
 
-- current =Birth::ContainerOf= assignments become =ParentIs::Content=;
-- current =Birth::LinksTo= assignments become =ParentIs::LinkTarget=;
+- current =ParentIs::Content= assignments become =ParentIs::Content=;
+- current =ParentIs::LinkTarget= assignments become =ParentIs::LinkTarget=;
 - current ordinary content expansion becomes =ParentIs::Container=.
 
 The assignments are otherwise conceptually correct: they describe why a
@@ -289,26 +289,26 @@ Before this predicate is used for save extraction, normalize
    =ParentIs::Container= before save interpretation.
 
 7. Rename expansion variants carefully:
-   old =ContainerOf= => new =Content=;
-   old =LinksTo= => new =LinkTarget=;
-   old =ContentOf= => new =Container=.
+   old =Content= => new =Content=;
+   old =LinkTarget= => new =LinkTarget=;
+   old =Container= => new =Container=.
 
-8. Update herald and metadata-editing code from =birth= to =parentIs=.
+8. Update herald and metadata-editing code from =parentIs= to =parentIs=.
 
 9. Update tests, especially rendered strings that currently expect
-   top-level =(birth independent)= or omitted =birth= default injection.
+   top-level =(parentIs independent)= or omitted =parentIs= default injection.
 
 * Tests most likely to change
 
 - content and initial view tests expecting level-1
-  =(birth independent)=;
+  =(parentIs independent)=;
 - save/rerender tests involving a graph-content view-root;
-- search enrichment tests that inspect root birth markers;
+- search enrichment tests that inspect root parentIs markers;
 - integration tests that assert containerward ancestry carries old
-  =(birth containerOf)= spelling;
+  =(parentIs content)= spelling;
 - herald tests around default ={= injection and non-default glyphs;
-- Elisp metadata editing tests that expose =birth= as an editable field;
-- save tests that rely on omitted =birth= meaning content should still
+- Elisp metadata editing tests that expose =parentIs= as an editable field;
+- save tests that rely on omitted =parentIs= meaning content should still
   pass after the rename, because omitted =parentIs= still means
   =Container=.
 

@@ -202,7 +202,7 @@ in the section above. Build clean; all 331 nextest tests pass.
   reasoning that their differences (preorder vs postorder,
   the col-deletion + ensure-HiddenOutside-last logic specific
   to SubscribeeCol's preorder completer, the different
-  birth-fixup sets in the two postorder completers) are real,
+  parentIs-fixup sets in the two postorder completers) are real,
   and a unified function would just push 'match kind' arms
   into the body.
 
@@ -307,7 +307,7 @@ pass.
 After these 4 steps the rerender side is essentially a thin
 shell: each completer fetches its inputs, calls one
 goal-list function, calls 'build_child_data', calls
-'reconcile_sharing_scaffold_children', fixes up birth on
+'reconcile_sharing_scaffold_children', fixes up parentIs on
 erroneous content, and calls 'detach_scaffold_if_empty'.
 
 ** Step 5 (fold initial-render): attempted, reverted

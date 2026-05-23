@@ -44,11 +44,12 @@
       (RED   removedM "-M"))
     (node
       (source) ;; ignored
-      (birth
-        (BLUE   contentOf   "{")
+      (parentIs
+        (BLUE   container   "{")
+        (absent)
         (ORANGE independent "⊥")
-        (ORANGE containerOf "}")
-        (ORANGE linksTo     "←"))
+        (ORANGE content "}")
+        (ORANGE linkTarget     "←"))
       ;; Server emits the abbreviated atom `indef' (see
       ;; org_to_text.rs); we match that here.
       (GREEN indef ABUT "☮")
@@ -118,7 +119,7 @@ table converts them 1:1 into short herald strings. A few patterns:
 
   * ABUT marker -- `(GREEN indef ABUT \"☮\")' tells the renderer to
     glue the `☮' onto the preceding token with no space. Used so
-    the indefinitive marker sits directly on its birth glyph.
+    the indefinitive marker sits directly on its parentIs glyph.
 
 WHY SOME RULES LOOK EMPTY OR REDUNDANT
 
@@ -140,11 +141,11 @@ WHY SOME RULES LOOK EMPTY OR REDUNDANT
 
 NORMALISATION
 
-The server leaves ContentOf birth implicit in `(node ...)'. Before
+The server leaves Container parentIs implicit in `(node ...)'. Before
 this table runs, `heralds--read-metadata' calls
-`heralds--inject-default-birth' to add `(birth contentOf)' when
-missing, so the `(birth (BLUE contentOf \"{\") ...)' sub-rule can
-fire uniformly for all four variants.")
+`heralds--inject-default-parentIs' to add `(parentIs container)' when
+missing, so the `(parentIs (BLUE container \"{\") ...)' sub-rule can
+fire uniformly for variants with visible heralds.")
 
 (defun heralds--tokens->text (tokens)
   "Convert list of TOKENS (propertized strings) to a display string.
@@ -152,7 +153,7 @@ Tokens carry `skg-color' on character ranges (single-color tokens
 propertize the whole string; INTERC-built tokens carry per-segment
 colors). Tokens separated by a space, except tokens whose position
 0 has an `skg-abut' property are joined to the preceding token
-with no separator (used to glue e.g. ☮ onto its birth character).
+with no separator (used to glue e.g. ☮ onto its parentIs character).
 Structural colons added by the transform (like `3:{' -> `3{') are
 stripped when either side is non-alphanumeric."
   (when tokens

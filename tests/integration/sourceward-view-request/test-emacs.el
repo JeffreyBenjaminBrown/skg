@@ -70,17 +70,17 @@ LINE-NUMBER is zero-based."
       (setq skg-port (string-to-number test-port))))
 
   (let ((expected-line0
-         (concat "* (skg (node (id 1) (source main) (birth independent) (graphStats (contents 2)))) 1\n"
+         (concat "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 2)))) 1\n"
                  "** (skg (node (id 11) (source main) (graphStats (linksInFromLeaves 1)))) 11\n"
                  "** (skg (node (id 12) (source main))) 12\n"))
         (expected-line2
-         (concat "* (skg (node (id 1) (source main) (birth independent) (graphStats (contents 2)))) 1\n"
+         (concat "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 2)))) 1\n"
                  "** (skg (node (id 11) (source main) (graphStats (linksInFromLeaves 1)))) 11\n"
                  "** (skg (node (id 12) (source main))) 12\n"))
         (expected-changed
-         (concat "* (skg (node (id 1) (source main) (birth independent) (graphStats (contents 2)))) 1\n"
+         (concat "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 2)))) 1\n"
                  "** (skg (node (id 11) (source main) (graphStats (linksInFromLeaves 1)))) 11\n"
-                 "*** (skg (node (id l-11) (source main) (birth linksTo) indef (graphStats (containers 0)))) [[id:11][a link to 11]]\n"
+                 "*** (skg (node (id l-11) (source main) (parentIs linkTarget) indef (graphStats (containers 0)))) [[id:11][a link to 11]]\n"
                  "** (skg (node (id 12) (source main))) 12\n"))
         (expected-no-link (concat "* 1\n** 11\n** 12\n"))
         (expected-with-link (concat "* 1\n** 11\n*** [[id:11][a link to 11]]\n** 12\n")))

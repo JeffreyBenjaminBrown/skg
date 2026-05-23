@@ -39,7 +39,7 @@ Would make subsequent views of the same node near-instant.
 'insert_containerward_ancestry_tree_recursive' in backpath.rs and
 'insert_containerward_ancestry_tree' in render_enriched_search_buffer.rs
 do the same thing: recursively walk an AncestryTree and prepend
-ContainerOf children, iterating in reverse to preserve order.
+Content children, iterating in reverse to preserve order.
 
 Their callers ('attach_containerward_ancestries_to_link_sources' and
 'insert_containerward_ancestries_into_search_view') also share

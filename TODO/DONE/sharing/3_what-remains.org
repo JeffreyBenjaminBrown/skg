@@ -110,7 +110,7 @@ Execution plan: [[./3pC_DONE.org][3pC_DONE.org]].
 Status: complete. The policy is documented in
 =apply_hiderels_from_intents=. Saved =AsSubscribee=
 completion now normalizes view-children that are not graph-content of
-the subscribee to =Birth=Independent= and orders graph-content
+the subscribee to =ParentIs=Independent= and orders graph-content
 view-children by the subscribee's graph-content order. Foreign and
 owned regression tests cover the behavior.
 

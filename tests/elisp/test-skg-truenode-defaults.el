@@ -43,7 +43,7 @@
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     ;; Should have: skg, node, id, abc, source, jeff,
-    ;; indef, false (default), birth, contentOf (default),
+    ;; indef, false (default), parentIs, container (default),
     ;; editRequest, none (default), viewRequests, none (default)
     (should (= (length headlines) 14))
     ;; Check default fields are present
@@ -74,21 +74,21 @@
     (should (string= (cdr (nth (1+ indef-idx) headlines)) "true"))))
 
 ;;
-;; Expand: sexp without birth -> inserts 'contentOf (default)' child
+;; Expand: sexp without parentIs -> inserts 'container (default)' child
 ;;
 
-(ert-deftest test-expand-birth-default-inserted ()
-  "Expanding a sexp without birth inserts 'contentOf (default)'."
+(ert-deftest test-expand-parentIs-default-inserted ()
+  "Expanding a sexp without parentIs inserts 'container (default)'."
   (let* ((sexp '(skg (node (id abc) (source jeff))))
          (org-text (sexp-to-org sexp))
          (expanded (skg-truenode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
-         (birth-idx (cl-position "birth" headlines
+         (parentIs-idx (cl-position "parentIs" headlines
                                  :key #'cdr :test #'string=)))
-    (should birth-idx)
-    (should (string= (cdr (nth (1+ birth-idx) headlines))
-                      "contentOf (default)"))))
+    (should parentIs-idx)
+    (should (string= (cdr (nth (1+ parentIs-idx) headlines))
+                      "container (default)"))))
 
 ;;
 ;; Strip: unmodified expanded org -> returns original sexp
@@ -117,8 +117,8 @@
                            "**** jeff\n"
                            "*** indef\n"
                            "**** true\n"
-                           "*** birth\n"
-                           "**** contentOf (default)\n"
+                           "*** parentIs\n"
+                           "**** container (default)\n"
                            "*** editRequest\n"
                            "**** none (default)\n"
                            "*** viewRequests\n"
@@ -132,7 +132,7 @@
 ;;
 
 (ert-deftest test-strip-bare-false ()
-  "Stripping accepts bare 'false' and 'contentOf' as default values."
+  "Stripping accepts bare 'false' and 'container' as default values."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
                            "*** id\n"
@@ -141,8 +141,8 @@
                            "**** jeff\n"
                            "*** indef\n"
                            "**** false\n"
-                           "*** birth\n"
-                           "**** contentOf\n"
+                           "*** parentIs\n"
+                           "**** container\n"
                            "*** editRequest\n"
                            "**** none\n"
                            "*** viewRequests\n"
@@ -206,10 +206,10 @@
                           (cl-remove-if-not
                            (lambda (hl) (= (car hl) 3))
                            headlines))))
-    ;; Order should be: id, source, indef, birth,
+    ;; Order should be: id, source, indef, parentIs,
     ;; editRequest, viewRequests, graphStats
     (should (equal level-3
-                   '("id" "source" "indef" "birth"
+                   '("id" "source" "indef" "parentIs"
                      "editRequest" "viewRequests" "graphStats")))))
 
 ;;
@@ -233,23 +233,23 @@
                                (editRequest (merge XYZ))))))))
 
 ;;
-;; Strip: birth independent -> kept as (birth independent)
+;; Strip: parentIs independent -> kept as (parentIs independent)
 ;;
 
-(ert-deftest test-strip-birth-independent ()
-  "Stripping birth=independent keeps field and value."
+(ert-deftest test-strip-parentIs-independent ()
+  "Stripping parentIs=independent keeps field and value."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
                            "*** id\n"
                            "**** abc\n"
                            "*** source\n"
                            "**** jeff\n"
-                           "*** birth\n"
+                           "*** parentIs\n"
                            "**** independent"))
          (stripped (skg-truenode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result
-                   '(skg (node (id abc) (source jeff) (birth independent)))))))
+                   '(skg (node (id abc) (source jeff) (parentIs independent)))))))
 
 ;;
 ;; Strip: viewRequests with actual values -> kept as-is
@@ -403,7 +403,7 @@ preserves source and all fields."
     (should (cl-find "public" headlines :key #'cdr :test #'string=))
     ;; All editable defaults must be present
     (should (cl-find "indef" headlines :key #'cdr :test #'string=))
-    (should (cl-find "birth" headlines :key #'cdr :test #'string=))
+    (should (cl-find "parentIs" headlines :key #'cdr :test #'string=))
     (should (cl-find "editRequest" headlines :key #'cdr :test #'string=))
     ;; graphStats must be preserved
     (should (cl-find "graphStats" headlines :key #'cdr :test #'string=))))

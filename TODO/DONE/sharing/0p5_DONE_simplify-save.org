@@ -130,7 +130,7 @@ facts like:
 - this TrueNode is inside HiddenInSubscribeeCol;
 - this TrueNode is inside HiddenOutsideOfSubscribeeCol;
 - this TrueNode is a top-level root;
-- this TrueNode is ignored content because of birth / phantom /
+- this TrueNode is ignored content because of parentIs / phantom /
   delete request.
 
 This stayed intentionally small: a 'HashMap<NodeId, SaveRole>' and a
@@ -157,7 +157,7 @@ This is worth doing because the new feature's core question is not
 "what children does this node have?" It is "what does this position
 mean?"
 
-Tests currently cover ordinary TrueNodes, independent births,
+Tests currently cover ordinary TrueNodes, independent parentIs,
 SubscribeeCol positions, HiddenIn/HiddenOutside positions, alias/id
 display scaffolds, deleted/deleted-scaffold/unknown nodes, and error
 handling for invalid HiddenIn context.
@@ -442,7 +442,7 @@ cover:
 - HiddenInSubscribeeCol child;
 - HiddenOutsideOfSubscribeeCol child;
 - deleted, deleted-scaffold, unknown, alias/id display nodes;
-- roots and independent births.
+- roots and independent parentIs.
 
 The test target 'cargo test --test new classify -- --nocapture'
 passes.
@@ -467,7 +467,7 @@ do not become ordinary graph saves or parent 'contains' entries.
 Added tests cover:
 
 - ordinary content still produces 'contains';
-- 'birth independent' children still produce their own SaveNodes but
+- 'parentIs independent' children still produce their own SaveNodes but
   are excluded from the parent's 'contains';
 - alias and ID display scaffolds do not produce SaveNodes;
 - SubscribeeCol children still populate 'subscribes_to';
@@ -820,7 +820,7 @@ Current behavior is unchanged:
 The raw intent includes only direct visible content children:
 
 - child TrueNodes with role 'OrdinaryNode';
-- excluding non-content births, phantoms, and delete-request children;
+- excluding non-content parentIs, phantoms, and delete-request children;
 - ignoring scaffolds, hidden scaffold contents, deleted/unknown nodes,
   and recursive descendants.
 

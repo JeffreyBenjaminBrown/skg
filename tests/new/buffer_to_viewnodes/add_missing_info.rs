@@ -2,10 +2,13 @@
 
 use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_viewforest;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::{
+  add_missing_info_to_viewforest,
+  normalize_absent_parentIs_under_visible_parent};
 use skg::test_utils::{run_with_test_db, compare_viewnode_trees_modulo_id, compare_viewnode_trees};
-use skg::types::maybe_placed_viewnode::MaybePlacedViewnode;
+use skg::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
 use skg::types::misc::{SkgConfig, ID};
+use skg::types::viewnode::ParentIs;
 
 use ego_tree::Tree;
 
@@ -81,6 +84,34 @@ async fn test_add_missing_info_logic (
     ); }
 
   Ok (( )) }
+
+#[test]
+fn test_normalize_absent_parentIs_under_visible_parent () {
+  let input : &str =
+    indoc! {"
+            * (skg (node (id root) (source main) (parentIs absent))) root
+            ** (skg (node (id moved) (source main) (parentIs absent))) moved
+        "};
+  let mut viewforest : Tree<MaybePlacedViewnode> =
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+
+  normalize_absent_parentIs_under_visible_parent (
+    &mut viewforest );
+
+  let root_node =
+    viewforest . root() . first_child() . unwrap();
+  let moved_node =
+    root_node . first_child() . unwrap();
+
+  match &root_node . value() . kind {
+    MaybePlacedViewnodeKind::True (t) =>
+      assert_eq! (t . parentIs, ParentIs::Absent),
+    _ => panic! ("expected root TrueNode") }
+  match &moved_node . value() . kind {
+    MaybePlacedViewnodeKind::True (t) =>
+      assert_eq! (t . parentIs, ParentIs::Container),
+    _ => panic! ("expected moved TrueNode") }
+}
 
 #[test]
 fn test_source_inheritance_multi_level(

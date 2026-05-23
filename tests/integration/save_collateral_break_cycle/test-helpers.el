@@ -1,19 +1,19 @@
 ;;; Shared helpers for save_collateral integration tests.
 ;;; Load with (load-file "path/to/test-helpers.el").
 
-(defun headline--birth-from-sexp (sexp)
-  "Read the (birth X) clause from a parsed metadata SEXP, defaulting
-to the symbol `contentOf' if absent. With ancestry-prepending and
-sourceward views, viewnodes can carry birth=containerOf, linksTo,
+(defun headline--parentIs-from-sexp (sexp)
+  "Read the (parentIs X) clause from a parsed metadata SEXP, defaulting
+to the symbol `container' if absent. With ancestry-prepending and
+sourceward views, viewnodes can carry parentIs=content, linkTarget,
 or independent in addition to the implicit default."
-  (let ((birth-list (when sexp
-                      (skg-sexp-cdr-at-path sexp '(skg node birth)))))
-    (if birth-list (car birth-list) 'contentOf)))
+  (let ((parentIs-list (when sexp
+                      (skg-sexp-cdr-at-path sexp '(skg node parentIs)))))
+    (if parentIs-list (car parentIs-list) 'container)))
 
 (defun headline-structure (buffer)
-  "Extract (depth birth id) triples from every headline in BUFFER.
-Depth is the number of asterisks. Birth is a symbol (independent,
-contentOf, containerOf, linksTo) — see `headline--birth-from-sexp'.
+  "Extract (depth parentIs id) triples from every headline in BUFFER.
+Depth is the number of asterisks. ParentIs is a symbol (independent,
+container, content, linkTarget) — see `headline--parentIs-from-sexp'.
 ID comes from the (skg (node (id X) ...)) metadata. Headlines
 without metadata are skipped."
   (with-current-buffer buffer
@@ -35,16 +35,16 @@ without metadata are skipped."
                                 (skg-sexp-cdr-at-path sexp '(skg node id))))
                      (id (when id-list
                            (format "%s" (car id-list))))
-                     (birth (headline--birth-from-sexp sexp)))
+                     (parentIs (headline--parentIs-from-sexp sexp)))
                 (when id
-                  (push (list depth birth id) result)))))
+                  (push (list depth parentIs id) result)))))
           (forward-line 1)))
       (nreverse result))))
 
 (defun headline-titles (buffer)
-  "Extract (depth birth title) triples from every headline in BUFFER.
-Depth is the number of asterisks. Birth is a symbol (see
-`headline--birth-from-sexp'). Title is the text after metadata."
+  "Extract (depth parentIs title) triples from every headline in BUFFER.
+Depth is the number of asterisks. ParentIs is a symbol (see
+`headline--parentIs-from-sexp'). Title is the text after metadata."
   (with-current-buffer buffer
     (let ((result '()))
       (save-excursion
@@ -61,13 +61,13 @@ Depth is the number of asterisks. Birth is a symbol (see
                      (sexp (condition-case nil
                                (car (read-from-string metadata-str))
                              (error nil)))
-                     (birth (headline--birth-from-sexp sexp)))
-                (push (list depth birth title) result))))
+                     (parentIs (headline--parentIs-from-sexp sexp)))
+                (push (list depth parentIs title) result))))
           (forward-line 1)))
       (nreverse result))))
 
 (defun format-headline-triples (triples)
-  "Format a list of (depth birth string) triples for display."
+  "Format a list of (depth parentIs string) triples for display."
   (mapconcat
    (lambda (triple)
      (format "(%d %s %S)"
@@ -76,8 +76,8 @@ Depth is the number of asterisks. Birth is a symbol (see
 
 (defun assert-headline-structure (buffer expected phase-label)
   "Assert that BUFFER's headline structure matches EXPECTED.
-EXPECTED is a list of (depth birth id) triples; birth is a symbol
-(independent, contentOf, containerOf, linksTo).
+EXPECTED is a list of (depth parentIs id) triples; parentIs is a symbol
+(independent, container, content, linkTarget).
 PHASE-LABEL is used in log messages. Kills emacs with exit 1 on failure."
   (let ((actual (headline-structure buffer)))
     (if (equal actual expected)
@@ -94,7 +94,7 @@ PHASE-LABEL is used in log messages. Kills emacs with exit 1 on failure."
 
 (defun assert-headline-titles (buffer expected phase-label)
   "Assert that BUFFER's headline titles match EXPECTED exactly.
-EXPECTED is a list of (depth birth title) triples; birth is a symbol.
+EXPECTED is a list of (depth parentIs title) triples; parentIs is a symbol.
 PHASE-LABEL is used in log messages. Kills emacs with exit 1 on failure."
   (let ((actual (headline-titles buffer)))
     (if (equal actual expected)

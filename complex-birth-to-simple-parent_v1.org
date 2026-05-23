@@ -1,9 +1,9 @@
-* Complex Birth to Simple Parent
+* Complex ParentIs to Simple Parent
 
 This report audits the places where Skg assigns, parses, renders, or
-rewrites a TrueNode's =Birth= metadata, with the proposed interpretation:
+rewrites a TrueNode's =ParentIs= metadata, with the proposed interpretation:
 
-- rename =Birth= to =Parent=;
+- rename =ParentIs= to =Parent=;
 - if a TrueNode has a visible view-parent, =Parent= records why this
   node is under that parent;
 - =Independent= remains meaningful for a node with a visible parent:
@@ -17,7 +17,7 @@ rewrites a TrueNode's =Birth= metadata, with the proposed interpretation:
 The muddle is concentrated in top-level nodes, not in the ordinary
 repair logic that changes bad relationship claims to =Independent=.
 
-At present =Birth::Independent= covers two cases:
+At present =ParentIs::Independent= covers two cases:
 
 - a visible-parent case: "this node has a view-parent, but no graph
   relationship explains that placement";
@@ -38,12 +38,12 @@ where =None= means "no visible parent", and =Some(Independent)= means
 
 ** Type definition and defaults
 
-=server/types/viewnode.rs= defines =Birth= and stores it directly on
+=server/types/viewnode.rs= defines =ParentIs= and stores it directly on
 =TrueNode_Generic=.
 
 - Lines 14-25 describe "why a node was brought into existence in the
   view tree".
-- Lines 78-79 explicitly say non-=ContentOf= makes the node effectively
+- Lines 78-79 explicitly say non-=Container= makes the node effectively
   a new tree root.
 
 That comment is now the conceptual problem: a node with
@@ -51,12 +51,12 @@ That comment is now the conceptual problem: a node with
 visible parent; it simply is not there because of =contains=,
 =textlinks_to=, or reverse =contains=.
 
-Constructors default to =Birth::ContentOf= in
+Constructors default to =ParentIs::Container= in
 =default_truenode=, =mk_definitive_viewnode=, and
 =MaybePlacedTruenode::default=. That is tolerable as an internal
 construction default, but it becomes unsafe once absence of a metadata
 field means "no visible parent". The parser/rendering boundary should
-not treat an absent =Parent= field as universal =ContentOf=.
+not treat an absent =Parent= field as universal =Container=.
 
 Recommendation: use =Option<Parent>= internally if feasible. If that is
 too large for one change, introduce a smaller transitional invariant:
@@ -69,10 +69,10 @@ before rendering, while =BufferRoot= children have none.
 then calls =set_view_root_births_from_graphstats=.
 
 =server/to_org/util.rs= lines 193-211 set direct =BufferRoot= children
-to =ContentOf= if they have graph containers, otherwise =Independent=.
+to =Container= if they have graph containers, otherwise =Independent=.
 This is the known muddle. A view-root that is graph-content currently
-gets =Birth= =ContentOf= even though it has no visible parent. A graph
-root gets =Birth= =Independent= for the same no-visible-parent reason.
+gets =ParentIs= =Container= even though it has no visible parent. A graph
+root gets =ParentIs= =Independent= for the same no-visible-parent reason.
 
 Recommendation: replace this with a top-level pass that clears =Parent=
 for all direct =BufferRoot= TrueNode children. Graph container counts can
@@ -83,10 +83,10 @@ relationship to =BufferRoot=.
 
 =server/update_buffer.rs= line 246 calls =mark_view_roots_independent=.
 =server/to_org/util.rs= lines 213-229 implement that by setting every
-direct =BufferRoot= TrueNode child to =Birth::Independent=.
+direct =BufferRoot= TrueNode child to =ParentIs::Independent=.
 
 This is the other half of the known muddle: a saved top-level
-graph-content node changes from =ContentOf= on initial visit to
+graph-content node changes from =Container= on initial visit to
 =Independent= after save. Under the proposed model, both states should
 be the same: no =Parent= field, because there is no visible parent.
 
@@ -97,8 +97,8 @@ about to be rendered.
 ** Search result roots
 
 =server/serve/handlers/text_search.rs= lines 352-357 assign
-=Birth::Independent= for search hits indexed as roots and
-=Birth::ContentOf= for other hits. Lines 399-407 then create each hit
+=ParentIs::Independent= for search hits indexed as roots and
+=ParentIs::Container= for other hits. Lines 399-407 then create each hit
 as a level-1 child of =BufferRoot=.
 
 Those level-1 search result nodes have no visible parent, so neither
@@ -112,31 +112,31 @@ hits, that should be separate metadata, not =Parent=.
 
 =server/serve/handlers/text_search/render_enriched_search_buffer.rs=
 lines 78-80 insert containerward ancestry below each top-level search
-hit with =Birth::ContainerOf=.
+hit with =ParentIs::Content=.
 
 That is correct under the proposed model: those inserted ancestry nodes
 do have a visible parent, and they were put there because each child
 contains its parent.
 
 Small documentation issue: lines 62-64 say "indefinitive independent",
-but the code uses =Birth::ContainerOf=. The comment should be updated.
+but the code uses =ParentIs::Content=. The comment should be updated.
 
 ** Containerward and sourceward expansions
 
 =server/to_org/expand/backpath.rs= is conceptually clean:
 
-- lines 52-56 integrate containerward paths with =Birth::ContainerOf=;
-- lines 83-87 integrate sourceward paths with =Birth::LinksTo=;
+- lines 52-56 integrate containerward paths with =ParentIs::Content=;
+- lines 83-87 integrate sourceward paths with =ParentIs::LinkTarget=;
 - lines 272-291 attach containerward ancestry under link sources;
-- lines 360-364 insert ancestry nodes as =Birth::ContainerOf=;
+- lines 360-364 insert ancestry nodes as =ParentIs::Content=;
 - lines 373-389 pass the requested relation into the created
   indefinitive child.
 
 These assignments match the reason the node was put under its visible
 parent.
 
-Recommendation: rename mechanically to =Parent::ContainerOf= and
-=Parent::LinksTo=, preserving behavior.
+Recommendation: rename mechanically to =Parent::Content= and
+=Parent::LinkTarget=, preserving behavior.
 
 ** Completion repair to Independent
 
@@ -147,8 +147,8 @@ because the node still has a visible parent:
   a child that looks like content but is no longer in the parent's
   content list is marked =Independent=.
 - =server/to_org/util.rs= lines 258-296:
-  =validate_birth_relationships= flips =ContentOf=, =ContainerOf=, or
-  =LinksTo= to =Independent= when the claimed relation to the current
+  =validate_birth_relationships= flips =Container=, =Content=, or
+  =LinkTarget= to =Independent= when the claimed relation to the current
   visible parent is false.
 - =server/update_buffer/complete_postorder/hiddeninsubscribee_col.rs=
   lines 135-146 and
@@ -164,31 +164,31 @@ parent exists, but no graph relationship explains this placement."
 
 ** Parsing and rendering
 
-=server/org_to_text.rs= lines 238-251 omit =Birth::ContentOf= from
+=server/org_to_text.rs= lines 238-251 omit =ParentIs::Container= from
 rendered metadata and render only the non-default variants. The Emacs
-herald code then injects =(birth contentOf)= when no =birth= field is
+herald code then injects =(parentIs container)= when no =parentIs= field is
 present:
 
 - =elisp/heralds-minor-mode.el= lines 143-149 document the injection;
 - lines 317-351 implement it.
 
 This will conflict with the new design. Missing metadata can no longer
-mean =ContentOf= everywhere, because missing =Parent= should be the
+mean =Container= everywhere, because missing =Parent= should be the
 normal representation for top-level TrueNodes.
 
 Recommendation:
 
 - render an explicit =Parent= field for every TrueNode with a visible
-  parent, including =ContentOf=;
+  parent, including =Container=;
 - render no =Parent= field for direct =BufferRoot= children;
-- remove the herald-side default injection of =contentOf=;
+- remove the herald-side default injection of =container=;
 - let the herald display show no parent glyph when the field is absent.
 
 The parser in =server/serve/parse_metadata_sexp.rs= defaults missing
-=birth= to =ContentOf= before tree placement is known. With optional
+=parentIs= to =Container= before tree placement is known. With optional
 =Parent=, that default needs to move to a tree-aware normalization step:
 
-- missing =Parent= under a visible parent means =ContentOf= for
+- missing =Parent= under a visible parent means =Container= for
   user-created ordinary child nodes, unless validation chooses to reject
   the omission;
 - missing =Parent= under =BufferRoot= means no visible parent;
@@ -197,7 +197,7 @@ The parser in =server/serve/parse_metadata_sexp.rs= defaults missing
 
 * Recommendations
 
-1. Rename the enum and metadata key from =Birth= / =birth= to
+1. Rename the enum and metadata key from =ParentIs= / =parentIs= to
    =Parent= / =parent=.
 
 2. Model the field as optional, either directly as =Option<Parent>= or
@@ -209,10 +209,10 @@ The parser in =server/serve/parse_metadata_sexp.rs= defaults missing
    =mark_view_roots_independent= with top-level normalization that
    clears the parent field on direct =BufferRoot= TrueNode children.
 
-5. Render =ContentOf= explicitly for non-root TrueNodes. Do not use
-   absence as a shorthand for =ContentOf= anymore.
+5. Render =Container= explicitly for non-root TrueNodes. Do not use
+   absence as a shorthand for =Container= anymore.
 
-6. Remove Emacs herald injection of default =contentOf=. Missing
+6. Remove Emacs herald injection of default =container=. Missing
    =Parent= should produce no parent herald.
 
 7. Keep the existing "bad claim becomes =Independent=" logic. It is
@@ -222,15 +222,15 @@ The parser in =server/serve/parse_metadata_sexp.rs= defaults missing
 * Likely test updates
 
 Expect test churn wherever rendered metadata assumes implicit
-=ContentOf= or top-level =birth independent=:
+=Container= or top-level =parentIs independent=:
 
 - render tests around =org_to_text.rs= metadata shape;
-- herald tests that expect a default ={= glyph from missing =birth=;
-- save/rerender tests that assert top-level =(birth independent)=;
+- herald tests that expect a default ={= glyph from missing =parentIs=;
+- save/rerender tests that assert top-level =(parentIs independent)=;
 - search tests that inspect root result metadata;
 - tests around =set_view_root_births_from_graphstats= and
   =mark_view_roots_independent=.
 
 The behavior of save extraction should mostly stay the same for
-parented nodes, because =ContentOf= versus non-=ContentOf= remains the
+parented nodes, because =Container= versus non-=Container= remains the
 important distinction for whether a child affects its parent.
