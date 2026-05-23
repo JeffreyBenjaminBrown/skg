@@ -1,5 +1,8 @@
 * TODO setup for Lorena
 ** make it installable on windows
+* TODO git branch to-windows
+from skg2, run
+  codex resume 019e52c1-e436-7e50-b6ee-43bd5562c0b2
 * TODO git branch faster-diff-analysis
 from skg3, run
   codex resume 019e51c3-97dd-7502-b8d0-9b0306c0c6f9
