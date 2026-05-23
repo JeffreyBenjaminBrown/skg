@@ -91,7 +91,7 @@ label (and optional color). A token emitted by an ABUT rule
 carries an `skg-abut' property on its first character. Renderers
 treat that as a signal to join the token to its predecessor with
 no separator. Typical use: gluing a modifier character onto the
-token it decorates (e.g. a peace symbol onto a birth character).
+token it decorates (e.g. a peace symbol onto a parentIs character).
 .
 INTERC is a directive for rules of the form
     ([COLOR] INTERC SEP [LABEL] [PREFIX...] SUB-RULES...)

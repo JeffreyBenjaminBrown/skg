@@ -1,6 +1,6 @@
 use crate::types::git::MembershipAxes;
 use crate::types::misc::SkgConfig;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, UnknownNode, EditRequest, GraphNodeStats, Birth };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, UnknownNode, EditRequest, GraphNodeStats, ParentIs };
 
 use ego_tree::{NodeRef, Tree};
 use std::error::Error;
@@ -177,7 +177,7 @@ fn true_node_metadata_to_string (
   ) -> String {
     fn graph_stats ( true_node : & TrueNode ) -> Option < String > {
       graphnodestats_to_sexp (
-        & true_node . graphStats, true_node . birth ) }
+        & true_node . graphStats, true_node . parentIs ) }
     fn view_stats (
       true_node : & TrueNode,
       config    : & SkgConfig,
@@ -235,20 +235,18 @@ fn true_node_metadata_to_string (
       vec! [ "node" . to_string () ];
     parts . push ( format! ( "(id {})", true_node . id . 0 ));
     parts . push ( format! ( "(source {})", true_node . source ));
-    // Birth::ContentOf is left implicit in the emitted sexp (it's
-    // the default). Consumers that care about the distinction --
-    // currently only heralds-minor-mode -- normalise by injecting
-    // (birth contentOf) on their end when no (birth ...) child is
-    // present. Keeping the default implicit here avoids touching
-    // every test that asserts on rendered metadata shape.
-    match true_node . birth {
-      Birth::ContentOf => {},
-      Birth::Independent =>
-        parts . push ( "(birth independent)" . to_string () ),
-      Birth::ContainerOf =>
-        parts . push ( "(birth containerOf)" . to_string () ),
-      Birth::LinksTo =>
-        parts . push ( "(birth linksTo)" . to_string () ) }
+    // ParentIs::Container is left implicit in the emitted sexp because
+    // it is the default parent relationship.
+    match true_node . parentIs {
+      ParentIs::Container => {},
+      ParentIs::Absent =>
+        parts . push ( "(parentIs absent)" . to_string () ),
+      ParentIs::Independent =>
+        parts . push ( "(parentIs independent)" . to_string () ),
+      ParentIs::Content =>
+        parts . push ( "(parentIs content)" . to_string () ),
+      ParentIs::LinkTarget =>
+        parts . push ( "(parentIs linkTarget)" . to_string () ) }
     if true_node . is_indefinitive () {
       // "indef" is short for "indefinitive" -- a read-only view of
       // a node (see IndefOrDef in types/viewnode.rs). The metadata
@@ -328,28 +326,29 @@ fn deleted_scaff_metadata_to_string (
 
 fn graphnodestats_to_sexp (
   gs    : &GraphNodeStats,
-  birth : Birth,
+  parentIs : ParentIs,
 ) -> Option < String > {
   let mut parts : Vec < String > = Vec::new ();
   if let Some (ref c) = gs . containRels {
-    // Per-birth suppression of the containers count. The client
+    // Per-parentIs suppression of the containers count. The client
     // INTERCs (containers N) and (contents M) into a combined
     // herald with `{` between them; we just decide whether each
     // raw atom is worth emitting.
-    // - ContentOf  : hide the common case of exactly 1 container
+    // - Container  : hide the common case of exactly 1 container
     //                (every content-child has at least one
     //                container; the number only matters when it's
     //                0 or >1).
     // - Independent: hide the common case of 0 containers (a view
     //                root is typically standalone).
-    // - ContainerOf / LinksTo: always show (these heralds indicate
+    // - Content / LinkTarget: always show (these heralds indicate
     //                that the node is *related* to the view root
     //                via the graph, so the count is always
     //                informative).
-    let show_containers : bool = match birth {
-      Birth::ContentOf                      => c . containers != 1,
-      Birth::Independent                    => c . containers != 0,
-      Birth::ContainerOf | Birth::LinksTo   => true, };
+    let show_containers : bool = match parentIs {
+      ParentIs::Container                      => c . containers != 1,
+      ParentIs::Independent                    => c . containers != 0,
+      ParentIs::Absent                         => c . containers != 0,
+      ParentIs::Content | ParentIs::LinkTarget => true, };
     let show_contents : bool = c . contents != 0;
     if show_containers {
       parts . push ( format! ("(containers {})", c . containers) ); }

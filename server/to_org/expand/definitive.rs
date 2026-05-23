@@ -8,7 +8,7 @@ use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_t
 use crate::to_org::util::{ DefinitiveMap, build_node_branch_minus_content, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, IndefOrDef, Birth, mk_indefinitive_viewnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, IndefOrDef, ParentIs, mk_indefinitive_viewnode };
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::tree::generic::read_at_node_in_tree;
@@ -407,7 +407,7 @@ async fn mk_removed_child_viewnode (
       child_id . clone(),
       child_nodecomplete . source . clone(),
       child_nodecomplete . title . clone(),
-      Birth::ContentOf );
+      ParentIs::Container );
   if let ViewNodeKind::True ( ref mut t ) = child_viewnode . kind {
     if let Some (source) = child_source {
       t . source = source; }

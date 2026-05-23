@@ -47,9 +47,9 @@ FIELD-VALUE is the current headline text, needed for source defaulting.
 Returns nil if the field is not cycleable."
   (cond
    ((string= field-name "indef")
-    '("false (default)" "true"))
-   ((string= field-name "birth")
-    '("contentOf (default)" "independent" "containerOf" "linksTo"))
+   '("false (default)" "true"))
+   ((string= field-name "parentIs")
+    '("container (default)" "content" "linkTarget" "independent" "absent"))
    ((string= field-name "editRequest")
     '("none (default)" "delete" "merge"))
    ((string= field-name "source") ;; from the config

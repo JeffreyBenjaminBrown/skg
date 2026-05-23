@@ -13,7 +13,7 @@ use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, Scaffold, DeletedNode, IndefOrDef,
-    Birth, mk_definitive_viewnode};
+    ParentIs, mk_definitive_viewnode};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_nodecomplete::{
     pid_and_source_from_treenode,
@@ -205,7 +205,7 @@ fn sync_truenode_from_disk (
 
 /// Compute the content goal list (diff-aware), reconcile
 /// children against it, and mark any surviving non-goal children
-/// as Birth::Independent. Returns 'subscribes_to' so phase 6 can
+/// as ParentIs::Independent. Returns 'subscribes_to' so phase 6 can
 /// decide whether to prepend a SubscribeeCol.
 fn reconcile_content_children (
   tree                           : &mut Tree<ViewNode>,
@@ -256,7 +256,7 @@ fn reconcile_content_children (
     tree, node, &apparent_content_ids ) ?;
   Ok (subscribes_to) }
 
-/// Changes the Births of non-content children to Independent,
+/// Changes the ParentIs of non-content children to Independent,
 /// and reorders the remaining content to match what's on disk.
 /// (The visible content is likely a subset of that on-disk content.)
 fn correct_the_viewChildren_of_subscribee (
@@ -436,7 +436,7 @@ fn complete_content_children (
 
 /// 'erroneous content children' are children that look like content,
 /// but that are not actually content.
-/// This marks them birth=Independent.
+/// This marks them parentIs=Independent.
 /// (Note that phantom nodes are not content in the worktree,
 /// but they are content in HEAD.
 /// This does not mark such phantoms as Independent.)
@@ -457,7 +457,7 @@ fn mark_erroneous_content_children_as_indep (
       _ => false },
     |vn : &mut ViewNode| {
       if let ViewNodeKind::True( ref mut t ) = vn . kind {
-        t . birth = Birth::Independent; }},
+        t . parentIs = ParentIs::Independent; }},
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
 
 /// Reorder children into three groups:

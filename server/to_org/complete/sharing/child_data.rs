@@ -12,7 +12,7 @@ use crate::types::misc::{ID, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Birth, mk_indefinitive_viewnode, mk_phantom_viewnode};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_viewnode, mk_phantom_viewnode};
 use crate::update_buffer::util::complete_relevant_children_in_viewnodetree;
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -23,7 +23,7 @@ use std::error::Error;
 /// scaffold's child (subscribee, hidden-in-subscribee, or
 /// hidden-outside-of-subscribees).
 ///
-/// `phantom: None` => normal indef ContentOf child.
+/// `phantom: None` => normal indef Container child.
 /// `phantom: Some(axes)` => diff-view phantom marking removal.
 pub struct ChildData {
   pub source  : SourceName,
@@ -111,7 +111,7 @@ pub fn build_child_data (
 /// `complete_relevant_children_in_viewnodetree` with identical
 /// relevance/key/create closures. Phantom-flagged ChildData entries
 /// produce phantom viewnodes; non-phantom entries produce
-/// indefinitive ContentOf viewnodes.
+/// indefinitive Container viewnodes.
 pub fn reconcile_sharing_scaffold_children (
   tree          : &mut Tree<ViewNode>,
   scaffold_node : NodeId,
@@ -137,7 +137,7 @@ pub fn reconcile_sharing_scaffold_children (
         None =>
           mk_indefinitive_viewnode (
             id . clone (), d . source . clone (),
-            d . title . clone (), Birth::ContentOf ),
+            d . title . clone (), ParentIs::Container ),
         Some ((ex, mem)) =>
           mk_phantom_viewnode (
             id . clone (), d . source . clone (),

@@ -116,8 +116,8 @@ Starts with the current source as minibuffer text.  S-left/S-right cycle
 through owned sources, C-? displays all configured sources and
 their paths, and typed source names are accepted directly.
 With a prefix argument RECURSIVE, changes every content-descendent
-whose source matches the source at point.  Descendents whose birth
-is not contentOf are not traversed.
+whose source matches the source at point.  Descendents whose parentIs
+is not container are not traversed.
 Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive "P")
   (let* ((current-source (skg--current-node-source))
@@ -142,7 +142,7 @@ Does NOT save; call `skg-request-save-buffer' afterward."
   "Prompt for and recursively change the source of the node at point.
 This is the recursive form of `skg-set-source': it changes every
 content-descendent whose source matches the source at point.
-Descendents whose birth is not contentOf are not traversed.
+Descendents whose parentIs is not container are not traversed.
 Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive)
   (skg-set-source t))
@@ -192,7 +192,7 @@ Does NOT save; call `skg-request-save-buffer' afterward."
 (defun skg--change-source-recursive (old-source new-source)
   "Change OLD-SOURCE to NEW-SOURCE in this content subtree.
 Returns the number of changed nodes.  The root node is inclusive;
-descendents whose birth is not contentOf are not traversed."
+descendents whose parentIs is not container are not traversed."
   (save-excursion
     (let ((changed-count 0)
           (start-level (org-outline-level)))
@@ -204,7 +204,7 @@ descendents whose birth is not contentOf are not traversed."
                   (> (org-outline-level) start-level))
         (let ((metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
           (if (not (and (skg--truenode-sexp-p metadata-sexp)
-                        (skg--node-birth-content-of-p metadata-sexp)))
+                        (skg--node-parentIs-content-of-p metadata-sexp)))
               (skg--goto-next-heading-after-subtree)
             (when (equal (skg--node-source metadata-sexp) old-source)
               (setq changed-count
@@ -236,12 +236,12 @@ descendents whose birth is not contentOf are not traversed."
   (and metadata-sexp
        (skg-sexp-subtree-p metadata-sexp '(skg (node)))))
 
-(defun skg--node-birth-content-of-p (metadata-sexp)
-  "Return non-nil if METADATA-SEXP has implicit or explicit contentOf birth."
-  (let ((birth-values (skg-sexp-cdr-at-path metadata-sexp
-                                            '(skg node birth))))
-    (or (not birth-values)
-        (eq (car birth-values) 'contentOf))))
+(defun skg--node-parentIs-content-of-p (metadata-sexp)
+  "Return non-nil if METADATA-SEXP has implicit or explicit container parentIs."
+  (let ((parentIs-values (skg-sexp-cdr-at-path metadata-sexp
+                                            '(skg node parentIs))))
+    (or (not parentIs-values)
+        (eq (car parentIs-values) 'container))))
 
 (defun skg--node-source (metadata-sexp)
   "Return METADATA-SEXP's node source as a string, or nil."

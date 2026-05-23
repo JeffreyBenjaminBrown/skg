@@ -8,7 +8,7 @@ pub use super::viewnode::MaybePlacedTruenode;
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::git::{ExistenceAxes, MembershipAxes};
-use super::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Scaffold, ScaffoldKind, DeletedNode, UnknownNode, GraphNodeStats, ViewNodeStats, IndefOrDef, Birth, };
+use super::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Scaffold, ScaffoldKind, DeletedNode, UnknownNode, GraphNodeStats, ViewNodeStats, IndefOrDef, ParentIs, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -55,7 +55,7 @@ impl TryFrom<MaybePlacedTruenode> for TrueNode {
       title          : u . title,
       id,
       source,
-      birth          : u . birth,
+      parentIs          : u . parentIs,
       graphStats     : u . graphStats,
       viewStats      : u . viewStats,
       view_requests  : u . view_requests,
@@ -105,7 +105,7 @@ impl From<TrueNode> for MaybePlacedTruenode {
       title          : t . title,
       id             : Some(t . id),
       source         : Some(t . source),
-      birth          : t . birth,
+      parentIs          : t . parentIs,
       graphStats     : t . graphStats,
       viewStats      : t . viewStats,
       view_requests  : t . view_requests,
@@ -252,7 +252,7 @@ impl Default for MaybePlacedTruenode {
       title          : String::new(),
       id             : None,
       source         : None,
-      birth          : Birth::ContentOf,
+      parentIs          : ParentIs::Container,
       graphStats     : GraphNodeStats::default(),
       viewStats      : ViewNodeStats::default(),
       view_requests  : HashSet::new(),

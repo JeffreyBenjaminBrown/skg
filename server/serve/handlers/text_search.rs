@@ -23,7 +23,7 @@ use crate::types::git::MembershipAxes;
 use crate::types::views_state::ViewUri;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, Birth, viewforest_root_viewnode, mk_indefinitive_viewnode};
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ParentIs, viewforest_root_viewnode, mk_indefinitive_viewnode};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use sexp::{Sexp, Atom};
@@ -43,7 +43,6 @@ use typedb_driver::TypeDBDriver;
 /// Non-origins keep their raw score (multiplier = 1).
 pub type MatchGroups =
   HashMap < ID, ( SourceName,
-                  Birth,
                   Vec < ( f32,           // score (after multiplier)
                           String ) >) >; // title or alias
 
@@ -341,20 +340,12 @@ pub fn group_matches_by_id (
             . entry (id)
             . or_insert_with ( || (
               source,
-              search_result_birth (origin_type),
               Vec::new () ))
-            . 2
+            . 1
             . push (( adjusted_score, title )); }},
       Err (e) => { tracing::error! (
         "Error retrieving document: {}", e ); }} }
   result_acc }
-
-fn search_result_birth (
-  origin_type : Option<ContextOriginType>,
-) -> Birth {
-  match origin_type {
-    Some (ContextOriginType::Root) => Birth::Independent,
-    _                              => Birth::ContentOf, } }
 
 /// Builds a Tree<ViewNode> representing the search results.
 /// Returns the viewforest and the ordered list of result IDs.
@@ -372,21 +363,20 @@ pub fn build_search_viewforest (
     Tree::new ( viewforest_root_viewnode () );
   let mut id_entries : Vec < ( &ID,
                                &SourceName,
-                               &Birth,
                                &Vec < ( f32, String ) > ) > =
     matches_by_id . iter ()
-    . map ( |(id, (source, birth, matches))| // flatten
-             (id, source, birth, matches) )
+    . map ( |(id, (source, matches))| // flatten
+             (id, source, matches) )
     . collect ();
   id_entries . sort_by ( |a, b| { // sort by best score (descending)
     let score_a : f32 =
-      a . 3 . first () . map ( |(s, _)| *s ) . unwrap_or (0.0);
+      a . 2 . first () . map ( |(s, _)| *s ) . unwrap_or (0.0);
     let score_b : f32 =
-      b . 3 . first () . map ( |(s, _)| *s ) . unwrap_or (0.0);
+      b . 2 . first () . map ( |(s, _)| *s ) . unwrap_or (0.0);
     score_b . partial_cmp (& score_a)
     . unwrap_or (std::cmp::Ordering::Equal) } );
   let mut search_results : Vec < ID > = Vec::new ();
-  for (id, source, birth, matches) in id_entries . iter ()
+  for (id, source, matches) in id_entries . iter ()
         . take (SEARCH_DISPLAY_LIMIT)
     { search_results . push ( (*id) . clone () );
       let mut sorted_matches : Vec < &(f32, String) > =
@@ -404,7 +394,7 @@ pub fn build_search_viewforest (
             (*id) . clone (),
             (*source) . clone (),
             title . clone (),
-            **birth ) )
+            ParentIs::Absent ) )
         . id () };
       if sorted_matches . len () > 1 {
         // We bury all but the best match in an AliasCol.

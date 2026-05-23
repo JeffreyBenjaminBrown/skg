@@ -19,12 +19,12 @@
 
 (defconst skg-truenode--canonical-field-order
   '("id" "source"
-    "indef" "birth" "editRequest" "viewRequests")
+    "indef" "parentIs" "editRequest" "viewRequests")
   "Canonical order for node fields. Fields not in this list go last.")
 
 (defconst skg-truenode--editable-defaults
   '(("indef"  . "false (default)")
-    ("birth"         . "contentOf (default)")
+    ("parentIs"         . "container (default)")
     ("editRequest"   . "none (default)")
     ("viewRequests"  . "none (default)"))
   "Alist of editable field names to their default value text.")
@@ -288,7 +288,7 @@ CHILD-LEVEL is the level of the field headline."
         ;; Collapse to bare atom (no children)
         (list (cons child-level field-name)))
        (t group)))
-     ((string= field-name "birth")
+     ((string= field-name "parentIs")
       (cond
        ((or (null value-text)
             (skg-truenode--default-content-p value-text))
@@ -347,8 +347,8 @@ CHILD-LEVEL is the level of the field headline."
 (defun skg-truenode--default-content-p (text)
   "Return non-nil if TEXT represents the default content value."
   (let ((trimmed (string-trim text)))
-    (or (string= trimmed "contentOf (default)")
-        (string= trimmed "contentOf"))))
+    (or (string= trimmed "container (default)")
+        (string= trimmed "container"))))
 
 (defun skg-truenode--default-none-p (text)
   "Return non-nil if TEXT represents the default none value."

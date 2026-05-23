@@ -11,18 +11,18 @@ use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
 
-/// Why a node was brought into existence in the view tree.
-/// Most nodes are born as content of the parent node,
-/// but there can be other reasons -- e.g. the user asked to see backlinks.
+/// What this node's visible parent is relative to this node.
+/// The default is Container: the parent contains this child.
 ///
 /// PITFALL: There might be multiple relationships between parent and child --
 /// e.g. cyclic containment. This does not encode all of them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Birth {
-  ContentOf,   // the default: This node is content of its parent, and was rendered here for that reason.
-  Independent, // This view of this node is not due to any relationship to its parent. There might be such a relationship. There also might be no such parent (if this node is a view-root).
-  ContainerOf, // containerward backpath: This node contains its parent, and was rendered here for that reason.
-  LinksTo,     // sourceward backpath: This node links to its parent, and was rendered here for that reason.
+pub enum ParentIs {
+  Container,   // default: parent contains this child.
+  Content,     // containerward backpath: parent is contained by this child.
+  LinkTarget,  // sourceward backpath: parent is linked to by this child.
+  Independent, // visible parent exists, but no graph relationship to it is claimed.
+  Absent,      // no visible parent; the only viewtree parent is BufferRoot.
 }
 
 //
@@ -75,8 +75,8 @@ pub struct TrueNode_Generic < Id, Src > {
   pub title          : String,
   pub id             : Id,
   pub source         : Src,
-  pub birth          : Birth, // When not Content, this node has no effect on its parent if the buffer is saved. It is effectively a new tree root, but does not have to be at the top of the buffer tree.
-  // PITFALL: Don't move birth to ViewNodeStats. It describes the node-to-parent relationship, but unlike viewStats fields it can be meaningfully changed by the user. It is not dictated solely by the view, but by some combination of the view and the user's intentions.
+  pub parentIs          : ParentIs, // When not Container, this node has no effect on its parent if the buffer is saved.
+  // PITFALL: Don't move parentIs to ViewNodeStats. It describes the node-to-parent relationship, but unlike viewStats fields it can be meaningfully changed by the user. It is not dictated solely by the view, but by some combination of the view and the user's intentions.
 
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
   pub graphStats    : GraphNodeStats,
@@ -215,7 +215,7 @@ pub enum ViewRequest {
 
 impl < Id, Src > TrueNode_Generic < Id, Src > {
   pub fn parent_ignores_it (&self) -> bool {
-    self . birth != Birth::ContentOf }
+    self . parentIs != ParentIs::Container }
 
   /// A phantom is a display-only placeholder for a node that does not
   /// exist as a real, editable entity in the worktree at this position.
@@ -509,7 +509,7 @@ pub fn default_truenode (
     title,
     id,
     source,
-    birth          : Birth::ContentOf,
+    parentIs          : ParentIs::Container,
     graphStats     : GraphNodeStats::default(),
     viewStats      : ViewNodeStats::default(),
     view_requests  : HashSet::new(),
@@ -532,7 +532,7 @@ pub fn mk_phantom_viewnode (
   membership : MembershipAxes,
 ) -> ViewNode {
   let mut viewnode : ViewNode =
-    mk_indefinitive_viewnode ( id, source, title, Birth::ContentOf );
+    mk_indefinitive_viewnode ( id, source, title, ParentIs::Container );
   if let ViewNodeKind::True ( ref mut t ) = viewnode . kind
     { t . existence  = existence;
       t . membership = membership; }
@@ -546,7 +546,7 @@ pub fn mk_definitive_viewnode (
 ) -> ViewNode { mk_viewnode ( id,
                             source,
                             title,
-                            Birth::ContentOf,
+                            ParentIs::Container,
                             IndefOrDef::Definitive {
                               body,
                               edit_request : None },
@@ -572,11 +572,11 @@ pub fn mk_indefinitive_viewnode (
   id     : ID,
   source : SourceName,
   title  : String,
-  birth  : Birth,
+  parentIs  : ParentIs,
 ) -> ViewNode { mk_viewnode ( id,
                             source,
                             title,
-                            birth,
+                            parentIs,
                             IndefOrDef::Indefinitive,
                             HashSet::new ( )) } // view_requests
 
@@ -585,7 +585,7 @@ pub fn mk_indefinitive_viewnode (
 /// Errors if the input is not a TrueNode.
 pub fn mk_indefinitive_from_viewnode (
   viewnode : ViewNode,
-  birth    : Birth,
+  parentIs    : ParentIs,
 ) -> Result < ViewNode, String > {
   let ViewNodeKind::True (t) = viewnode . kind
     else { return Err (
@@ -594,7 +594,7 @@ pub fn mk_indefinitive_from_viewnode (
   Ok ( mk_indefinitive_viewnode ( t . id,
                                   t . source,
                                   t . title,
-                                  birth )) }
+                                  parentIs )) }
 
 /// Create a ViewNode with *nearly* full metadata control.
 /// The exception is that the 'GraphNodeStats' and 'ViewNodeStats' are intentionally omitted,
@@ -604,7 +604,7 @@ pub fn mk_viewnode (
   id            : ID,
   source        : SourceName,
   title         : String,
-  birth         : Birth,
+  parentIs         : ParentIs,
   indef_or_def  : IndefOrDef,
   view_requests : HashSet < ViewRequest >,
 ) -> ViewNode {
@@ -612,7 +612,7 @@ pub fn mk_viewnode (
              folded      : false,
              body_folded : false,
              kind        : ViewNodeKind::True (
-               TrueNode { birth,
+               TrueNode { parentIs,
                           view_requests,
                           indef_or_def,
                           .. default_truenode (

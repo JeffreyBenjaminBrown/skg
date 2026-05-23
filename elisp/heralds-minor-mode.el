@@ -319,18 +319,18 @@ parse as an `(skg ...)' form."
   "Read METADATA-SEXP string into a Lisp object and normalise it.
 Returns nil if parsing fails. Normalisation currently means: if
 the sexp is an (skg (node ...)) form whose node has no explicit
-(birth ...) sub-form, insert (birth contentOf) -- the server
-leaves ContentOf implicit (see the note in org_to_text.rs), but
-the herald rules want to dispatch on all four birth variants
+(parentIs ...) sub-form, insert (parentIs container) -- the server
+leaves Container implicit (see the note in org_to_text.rs), but
+the herald rules want to dispatch on explicit parentIs variants
 explicitly."
   (let ((parsed (condition-case nil
                     (car (read-from-string metadata-sexp))
                   (error nil))))
-    (heralds--inject-default-birth parsed)))
+    (heralds--inject-default-parentIs parsed)))
 
-(defun heralds--inject-default-birth (sexp)
-  "If SEXP is `(skg (node ...) ...)` and the node has no (birth ...)
-child, return a copy with `(birth contentOf)' inserted into the
+(defun heralds--inject-default-parentIs (sexp)
+  "If SEXP is `(skg (node ...) ...)` and the node has no (parentIs ...)
+child, return a copy with `(parentIs container)' inserted into the
 node. Otherwise return SEXP unchanged."
   (if (and (listp sexp)
            (eq (car-safe sexp) 'skg))
@@ -341,14 +341,14 @@ node. Otherwise return SEXP unchanged."
                         (not (cl-some
                               (lambda (sub)
                                 (and (listp sub)
-                                     (eq (car-safe sub) 'birth)))
+                                     (eq (car-safe sub) 'parentIs)))
                               (cdr child))))
-                   ;; insert (birth contentOf) immediately after the
+                   ;; insert (parentIs container) immediately after the
                    ;; `node' symbol; its position in the list doesn't
                    ;; affect matching but keeps the normalised form
                    ;; readable if ever inspected.
                    (cons 'node
-                         (cons '(birth contentOf) (cdr child)))
+                         (cons '(parentIs container) (cdr child)))
                  child))
              (cdr sexp)))
     sexp))
@@ -378,6 +378,6 @@ node. Otherwise return SEXP unchanged."
 
 (defface heralds-orange-face
   '((t :foreground "white" :background "#d2691e"))
-  "White-on-orange for non-content birth heralds (⊥, }, ←).")
+  "White-on-orange for non-content parentIs heralds (⊥, }, ←).")
 
 (provide 'heralds-minor-mode)

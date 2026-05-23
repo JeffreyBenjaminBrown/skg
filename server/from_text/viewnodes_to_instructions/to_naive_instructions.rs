@@ -628,7 +628,7 @@ fn collect_subscribees (
 
 /// The following kinds of TrueNode children
 /// should be excluded from their parent's content:
-/// - anything with birth != ContentOf (i.e. parent_ignores_it)
+/// - anything with parentIs != Container (i.e. parent_ignores_it)
 /// - any phantom content ('Removed' or 'RemovedHere')
 /// - anything about to be deleted
 fn collect_contents_to_save_from_children<'a> (

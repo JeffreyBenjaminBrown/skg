@@ -23,7 +23,7 @@ use crate::types::views_state::ViewUri;
 use crate::types::misc::{ID, SourceName, SkgConfig};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
-use crate::to_org::util::{mark_view_roots_independent, validate_birth_relationships};
+use crate::to_org::util::{mark_view_roots_parent_absent, validate_parentIs_relationships};
 use crate::dbs::in_rust_graph::snapshot_global;
 use crate::types::viewnode::{IndefOrDef, ViewNode, ViewNodeKind, Scaffold};
 
@@ -243,14 +243,14 @@ pub async fn rerender_view (
       is_saved_view, };
     complete_viewforest (
       viewforest, &mut completion_context ) . await ?; }
-  mark_view_roots_independent (viewforest);
+  mark_view_roots_parent_absent (viewforest);
   if let Some (snap) = snapshot_global () {
-    // Correct any birth markers whose claimed relation to the
+    // Correct any parentIs markers whose claimed relation to the
     // parent doesn't hold in the in-Rust graph (e.g. user moved a
-    // birth=linksTo node under a new parent it doesn't link to).
+    // parentIs=linkTarget node under a new parent it doesn't link to).
     // No-op when the global graph handle isn't initialized (tests
     // that bypass startup).
-    validate_birth_relationships (viewforest, &snap); }
+    validate_parentIs_relationships (viewforest, &snap); }
   attach_containerward_ancestries_to_removedhere_phantoms (
     viewforest, &context . env . config,
     &context . env . driver ) . await ?;
@@ -339,7 +339,7 @@ fn strip_stale_diff_state (
 ///   is marked as removed or removed-here.
 /// Exception: Does not strip:
 ///   - top-level branches (children of BufferRoot)
-///   - non-content nodes (birth != ContentOf)
+///   - non-content nodes (parentIs != Container)
 /// Uses single-pass DFS: removes branch roots as encountered,
 /// skipping recursion into removed branches.
 ///
@@ -435,7 +435,7 @@ fn clear_diff_metadata (
 
 /// For every RemovedHere phantom in the viewforest,
 /// fetch its containerward ancestry from TypeDB
-/// and insert it as indefinitive ContainerOf children.
+/// and insert it as indefinitive Content children.
 /// Short-circuits when no RemovedHere phantoms exist.
 async fn attach_containerward_ancestries_to_removedhere_phantoms (
   viewforest    : &mut Tree<ViewNode>,

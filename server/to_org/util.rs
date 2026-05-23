@@ -10,7 +10,7 @@ use crate::types::tree::generations::collect_generation_ids;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_nodecomplete::{pid_and_source_from_treenode, write_at_truenode_in_tree};
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, Birth, TrueNode, viewforest_root_viewnode, mk_definitive_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, ParentIs, TrueNode, viewforest_root_viewnode, mk_definitive_viewnode, mk_unknown_viewnode };
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use ego_tree::iter::Edge;
@@ -187,10 +187,9 @@ pub async fn stub_viewforest_from_root_ids (
     ) . await ?; }
   Ok (viewforest) }
 
-/// Mark direct TrueNode children of BufferRoot according to their
-/// graphStats. A view-root with graph containers is still content in
-/// the graph; a view-root with no graph containers is independent.
-pub fn set_view_root_births_from_graphstats (
+/// Mark direct TrueNode children of BufferRoot as having no visible
+/// parent.
+pub fn mark_view_roots_parent_absent (
   viewforest : &mut Tree<ViewNode>,
 ) {
   let root_id : NodeId = viewforest . root () . id ();
@@ -202,45 +201,21 @@ pub fn set_view_root_births_from_graphstats (
       viewforest . get_mut (child_id) . unwrap ();
     let vn : &mut ViewNode = node_mut . value ();
     if let ViewNodeKind::True ( ref mut t ) = vn . kind {
-      let container_count : usize =
-        t . graphStats . containRels . as_ref ()
-        . map ( |c| c . containers )
-        . unwrap_or (0);
-      t . birth = if container_count > 0
-                  { Birth::ContentOf }
-                  else { Birth::Independent }; } } }
+      t . parentIs = ParentIs::Absent; } } }
 
-/// Mark direct TrueNode children of BufferRoot as birth=Independent.
-/// Used when rerendering an arbitrary saved buffer, whose top-level
-/// headlines are not necessarily being created by a content-view
-/// request.
-pub fn mark_view_roots_independent (
-  viewforest : &mut Tree<ViewNode>,
-) {
-  let root_id : NodeId = viewforest . root () . id ();
-  let child_ids : Vec<NodeId> =
-    viewforest . get (root_id) . unwrap ()
-    . children () . map ( |c| c . id () ) . collect ();
-  for child_id in child_ids {
-    let mut node_mut : NodeMut<ViewNode> =
-      viewforest . get_mut (child_id) . unwrap ();
-    let vn : &mut ViewNode = node_mut . value ();
-    if let ViewNodeKind::True ( ref mut t ) = vn . kind {
-      t . birth = Birth::Independent; } } }
-
-/// Walk the view and correct any TrueNode whose birth claims a
+/// Walk the view and correct any TrueNode whose parentIs claims a
 /// relationship to its parent that the actual graph doesn't
-/// support. Silently flips the birth to Independent on mismatch;
+/// support. Silently flips the parentIs to Independent on mismatch;
 /// the rendered herald then no longer misleads.
 ///
 /// Three kinds of claim are checked:
-/// - 'Birth::ContainerOf' on child C with TrueNode parent P:
+/// - 'ParentIs::Content' on child C with TrueNode parent P:
 ///   claim is "C contains P". Verified against C's 'contains'
 ///   list in the in-Rust graph.
-/// - 'Birth::LinksTo' on child C with TrueNode parent P:
+/// - 'ParentIs::LinkTarget' on child C with TrueNode parent P:
 ///   claim is "C's body/title links to P". Verified against C's
 ///   'textlinks_to' in the in-Rust graph.
-/// - 'Birth::ContentOf' on child C with INDEFINITIVE TrueNode
+/// - 'ParentIs::Container' on child C with INDEFINITIVE TrueNode
 ///   parent P: claim is "C is part of P's content". Verified
 ///   against P's 'contains' in the in-Rust graph. Definitive parents are
 ///   skipped because the save just redefined their 'contains' to
@@ -255,13 +230,14 @@ pub fn mark_view_roots_independent (
 /// invariant that 'apply_definenodes' has updated the in-Rust-graph
 /// graph before the rerender pass runs (see
 /// 'update_views_after_save').
-pub fn validate_birth_relationships (
+pub fn validate_parentIs_relationships (
   viewforest : &mut Tree<ViewNode>,
   graph  : &InRustGraph,
 ) {
   // Collect correction targets in a read-only first pass so the
   // &mut Tree write phase doesn't need simultaneous read access.
-  let mut to_flip : Vec<NodeId> = Vec::new ();
+  let mut to_independent : Vec<NodeId> = Vec::new ();
+  let mut to_container : Vec<NodeId> = Vec::new ();
   for edge in viewforest . root () . traverse () {
     if let Edge::Open (child_ref) = edge {
       let child_tn : &TrueNode =
@@ -277,23 +253,33 @@ pub fn validate_birth_relationships (
           // DeletedScaff) is not a legitimate subject for any of
           // these relational claims; skip without correcting.
           _ => continue };
-      let claim_ok : bool = match child_tn . birth {
-        Birth::ContainerOf =>
+      if child_tn . parentIs == ParentIs::Absent {
+        to_container . push ( child_ref . id () );
+        continue; }
+      let claim_ok : bool = match child_tn . parentIs {
+        ParentIs::Content =>
           child_contains_parent (graph, &child_tn . id, &parent_tn . id),
-        Birth::LinksTo =>
+        ParentIs::LinkTarget =>
           child_linksto_parent (graph, &child_tn . id, &parent_tn . id),
-        Birth::ContentOf => {
+        ParentIs::Container => {
           if parent_tn . is_indefinitive () {
             child_contained_by_parent (graph, &child_tn . id, &parent_tn . id)
           } else { true } }
-        Birth::Independent => true, };
-      if ! claim_ok { to_flip . push ( child_ref . id () ); } } }
-  for id in to_flip {
+        ParentIs::Independent => true,
+        ParentIs::Absent => false, };
+      if ! claim_ok { to_independent . push ( child_ref . id () ); } } }
+  for id in to_independent {
     let mut node_mut : NodeMut<ViewNode> =
       viewforest . get_mut (id) . unwrap ();
     if let ViewNodeKind::True ( ref mut t )
       = node_mut . value () . kind
-    { t . birth = Birth::Independent; } } }
+    { t . parentIs = ParentIs::Independent; } }
+  for id in to_container {
+    let mut node_mut : NodeMut<ViewNode> =
+      viewforest . get_mut (id) . unwrap ();
+    if let ViewNodeKind::True ( ref mut t )
+      = node_mut . value () . kind
+    { t . parentIs = ParentIs::Container; } } }
 
 /// Does 'child's 'contains' list include 'parent' (modulo
 /// extra_id aliasing on either side)?
@@ -600,7 +586,7 @@ where T: AsMut<ViewNode>,
   Ok (()) }
 
 #[cfg(test)]
-mod validate_birth_relationships_tests {
+mod validate_parentIs_relationships_tests {
   use super::*;
   use crate::types::misc::MSV;
   use crate::types::viewnode::mk_indefinitive_viewnode;
@@ -641,17 +627,17 @@ mod validate_birth_relationships_tests {
       g . nodes . insert (n . pid . clone (), n); }
     g }
 
-  fn true_child_birth (
+  fn true_child_parentIs (
     viewforest : &Tree<ViewNode>,
     nid    : NodeId,
-  ) -> Birth {
+  ) -> ParentIs {
     match & viewforest . get (nid) . unwrap () . value () . kind {
-      ViewNodeKind::True (t) => t . birth,
+      ViewNodeKind::True (t) => t . parentIs,
       _ => panic! ("expected TrueNode") } }
 
   #[test]
   fn linksto_false_claim_flipped_to_independent () {
-    // Parent P, child C with birth=LinksTo, but C's textlinks_to
+    // Parent P, child C with parentIs=LinkTarget, but C's textlinks_to
     // does NOT include P. The claim is false → flip.
     let graph : InRustGraph = graph_with (vec! [
       mk_node ("P", &[], &[], &[]),
@@ -661,20 +647,20 @@ mod validate_birth_relationships_tests {
     let root : NodeId = viewforest . root () . id ();
     let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
-                                Birth::ContentOf) ) . id ();
+                                ParentIs::Container) ) . id ();
     let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                                Birth::LinksTo) ) . id ();
+                                ParentIs::LinkTarget) ) . id ();
 
-    validate_birth_relationships (&mut viewforest, &graph);
+    validate_parentIs_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&viewforest, c_id), Birth::Independent,
-      "LinksTo claim with no backing textlink should flip to Independent");
+    assert_eq! (true_child_parentIs (&viewforest, c_id), ParentIs::Independent,
+      "LinkTarget claim with no backing textlink should flip to Independent");
   }
 
   #[test]
   fn linksto_true_claim_preserved () {
-    // Parent P, child C with birth=LinksTo and C's textlinks_to
+    // Parent P, child C with parentIs=LinkTarget and C's textlinks_to
     // DOES include P. The claim is true → preserve.
     let graph : InRustGraph = graph_with (vec! [
       mk_node ("P", &[], &[], &[]),
@@ -684,20 +670,20 @@ mod validate_birth_relationships_tests {
     let root : NodeId = viewforest . root () . id ();
     let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
-                                Birth::ContentOf) ) . id ();
+                                ParentIs::Container) ) . id ();
     let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                                Birth::LinksTo) ) . id ();
+                                ParentIs::LinkTarget) ) . id ();
 
-    validate_birth_relationships (&mut viewforest, &graph);
+    validate_parentIs_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&viewforest, c_id), Birth::LinksTo,
-      "LinksTo claim with a backing textlink must be preserved");
+    assert_eq! (true_child_parentIs (&viewforest, c_id), ParentIs::LinkTarget,
+      "LinkTarget claim with a backing textlink must be preserved");
   }
 
   #[test]
   fn containerof_false_claim_flipped () {
-    // Parent P, child C with birth=ContainerOf, but C's contains
+    // Parent P, child C with parentIs=Content, but C's contains
     // does NOT include P.
     let graph : InRustGraph = graph_with (vec! [
       mk_node ("P", &[], &[],    &[]),
@@ -707,14 +693,14 @@ mod validate_birth_relationships_tests {
     let root : NodeId = viewforest . root () . id ();
     let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
-                                Birth::ContentOf) ) . id ();
+                                ParentIs::Container) ) . id ();
     let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                                Birth::ContainerOf) ) . id ();
+                                ParentIs::Content) ) . id ();
 
-    validate_birth_relationships (&mut viewforest, &graph);
+    validate_parentIs_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&viewforest, c_id), Birth::Independent);
+    assert_eq! (true_child_parentIs (&viewforest, c_id), ParentIs::Independent);
   }
 
   #[test]
@@ -733,14 +719,14 @@ mod validate_birth_relationships_tests {
     let root : NodeId = viewforest . root () . id ();
     let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
-                                Birth::ContentOf) ) . id ();
+                                ParentIs::Container) ) . id ();
     let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                                Birth::ContainerOf) ) . id ();
+                                ParentIs::Content) ) . id ();
 
-    validate_birth_relationships (&mut viewforest, &graph);
+    validate_parentIs_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&viewforest, c_id), Birth::ContainerOf,
+    assert_eq! (true_child_parentIs (&viewforest, c_id), ParentIs::Content,
       "Extra_id-aliased parent pid should still satisfy the claim");
   }
 
@@ -758,14 +744,14 @@ mod validate_birth_relationships_tests {
     let root : NodeId = viewforest . root () . id ();
     let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("P-old"), src (), "P" . to_string (),
-                                Birth::ContentOf) ) . id ();
+                                ParentIs::Container) ) . id ();
     let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                                Birth::ContainerOf) ) . id ();
+                                ParentIs::Content) ) . id ();
 
-    validate_birth_relationships (&mut viewforest, &graph);
+    validate_parentIs_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&viewforest, c_id), Birth::ContainerOf,
+    assert_eq! (true_child_parentIs (&viewforest, c_id), ParentIs::Content,
       "When view parent id is the acquiree pid, the claim should \
        still hold via pid_of resolution on the parent side");
   }
@@ -773,7 +759,7 @@ mod validate_birth_relationships_tests {
   #[test]
   fn contentof_indefinitive_parent_false_claim_flipped () {
     // Parent is indefinitive; its contains list does NOT include C.
-    // So C's ContentOf claim is false.
+    // So C's Container claim is false.
     let graph : InRustGraph = graph_with (vec! [
       mk_node ("P", &[], &[], &[]),   // P.contains empty
       mk_node ("C", &[], &[], &[]),
@@ -782,14 +768,14 @@ mod validate_birth_relationships_tests {
     let root : NodeId = viewforest . root () . id ();
     let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
-                                Birth::ContentOf) ) . id ();
+                                ParentIs::Container) ) . id ();
     let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                                Birth::ContentOf) ) . id ();
+                                ParentIs::Container) ) . id ();
 
-    validate_birth_relationships (&mut viewforest, &graph);
+    validate_parentIs_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&viewforest, c_id), Birth::Independent);
+    assert_eq! (true_child_parentIs (&viewforest, c_id), ParentIs::Independent);
   }
 
   #[test]
@@ -808,17 +794,17 @@ mod validate_birth_relationships_tests {
                               "P" . to_string (), None) ) . id ();
     let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                                Birth::ContentOf) ) . id ();
+                                ParentIs::Container) ) . id ();
 
-    validate_birth_relationships (&mut viewforest, &graph);
+    validate_parentIs_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&viewforest, c_id), Birth::ContentOf,
-      "Definitive parent: ContentOf claim is never flipped here");
+    assert_eq! (true_child_parentIs (&viewforest, c_id), ParentIs::Container,
+      "Definitive parent: Container claim is never flipped here");
   }
 
   #[test]
   fn independent_always_preserved () {
-    // Independent birth is never touched.
+    // Independent parentIs is never touched.
     let graph : InRustGraph = graph_with (vec! [
       mk_node ("P", &[], &[], &[]),
       mk_node ("C", &[], &[], &[]),
@@ -827,17 +813,37 @@ mod validate_birth_relationships_tests {
     let root : NodeId = viewforest . root () . id ();
     let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
-                                Birth::ContentOf) ) . id ();
+                                ParentIs::Container) ) . id ();
     let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                                Birth::Independent) ) . id ();
+                                ParentIs::Independent) ) . id ();
 
-    validate_birth_relationships (&mut viewforest, &graph);
+    validate_parentIs_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&viewforest, c_id), Birth::Independent);
+    assert_eq! (true_child_parentIs (&viewforest, c_id), ParentIs::Independent);
   }
 
-  // ===== 3x2 matrix: moving a {containerOf, contentOf, linksTo}
+  #[test]
+  fn absent_under_visible_parent_becomes_container () {
+    let graph : InRustGraph = graph_with (vec! [
+      mk_node ("P", &[], &[], &["C"]),
+      mk_node ("C", &[], &[], &[]),
+    ]);
+    let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = viewforest . root () . id ();
+    let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
+      mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
+                                ParentIs::Container) ) . id ();
+    let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
+      mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
+                                ParentIs::Absent) ) . id ();
+
+    validate_parentIs_relationships (&mut viewforest, &graph);
+
+    assert_eq! (true_child_parentIs (&viewforest, c_id), ParentIs::Container);
+  }
+
+  // ===== 3x2 matrix: moving a {content, container, linkTarget}
   // child under a NEW parent where the relationship to the new
   // parent does / doesn't hold. =====================================
   //
@@ -849,13 +855,13 @@ mod validate_birth_relationships_tests {
   //   - The graph sometimes has a relationship from the child to
   //     p_new ("holds"), and sometimes doesn't ("no longer holds").
 
-  // ---- containerOf ------------------------------------------------
+  // ---- content ------------------------------------------------
 
   #[test]
   fn moved_containerof_relationship_holds_preserved () {
-    // Child C once had birth=containerOf under p_old (C.contains had
+    // Child C once had parentIs=content under p_old (C.contains had
     // p_old). User moved C under p_new. Test case: C's contains
-    // ALSO includes p_new → the containerOf claim still holds for
+    // ALSO includes p_new → the content claim still holds for
     // the new parent.
     let graph : InRustGraph = graph_with (vec! [
       mk_node ("p_old", &[], &[],                   &[]),
@@ -866,15 +872,15 @@ mod validate_birth_relationships_tests {
     let root : NodeId = viewforest . root () . id ();
     let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("p_new"), src (), "p_new" . to_string (),
-                                Birth::ContentOf) ) . id ();
+                                ParentIs::Container) ) . id ();
     let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                                Birth::ContainerOf) ) . id ();
+                                ParentIs::Content) ) . id ();
 
-    validate_birth_relationships (&mut viewforest, &graph);
+    validate_parentIs_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&viewforest, c_id), Birth::ContainerOf,
-      "Moved containerOf child still contains its new parent — keep");
+    assert_eq! (true_child_parentIs (&viewforest, c_id), ParentIs::Content,
+      "Moved content child still contains its new parent — keep");
   }
 
   #[test]
@@ -890,18 +896,18 @@ mod validate_birth_relationships_tests {
     let root : NodeId = viewforest . root () . id ();
     let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("p_new"), src (), "p_new" . to_string (),
-                                Birth::ContentOf) ) . id ();
+                                ParentIs::Container) ) . id ();
     let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                                Birth::ContainerOf) ) . id ();
+                                ParentIs::Content) ) . id ();
 
-    validate_birth_relationships (&mut viewforest, &graph);
+    validate_parentIs_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&viewforest, c_id), Birth::Independent,
-      "Moved containerOf child no longer contains new parent — flip");
+    assert_eq! (true_child_parentIs (&viewforest, c_id), ParentIs::Independent,
+      "Moved content child no longer contains new parent — flip");
   }
 
-  // ---- contentOf (indefinitive parent on both sides) -------------
+  // ---- container (indefinitive parent on both sides) -------------
 
   #[test]
   fn moved_contentof_indef_parent_relationship_holds_preserved () {
@@ -916,15 +922,15 @@ mod validate_birth_relationships_tests {
     let root : NodeId = viewforest . root () . id ();
     let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("p_new"), src (), "p_new" . to_string (),
-                                Birth::ContentOf) ) . id ();
+                                ParentIs::Container) ) . id ();
     let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                                Birth::ContentOf) ) . id ();
+                                ParentIs::Container) ) . id ();
 
-    validate_birth_relationships (&mut viewforest, &graph);
+    validate_parentIs_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&viewforest, c_id), Birth::ContentOf,
-      "Moved contentOf: indef p_new actually contains C — keep");
+    assert_eq! (true_child_parentIs (&viewforest, c_id), ParentIs::Container,
+      "Moved container: indef p_new actually contains C — keep");
   }
 
   #[test]
@@ -939,23 +945,23 @@ mod validate_birth_relationships_tests {
     let root : NodeId = viewforest . root () . id ();
     let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("p_new"), src (), "p_new" . to_string (),
-                                Birth::ContentOf) ) . id ();
+                                ParentIs::Container) ) . id ();
     let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                                Birth::ContentOf) ) . id ();
+                                ParentIs::Container) ) . id ();
 
-    validate_birth_relationships (&mut viewforest, &graph);
+    validate_parentIs_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&viewforest, c_id), Birth::Independent,
-      "Moved contentOf: indef p_new doesn't contain C — flip");
+    assert_eq! (true_child_parentIs (&viewforest, c_id), ParentIs::Independent,
+      "Moved container: indef p_new doesn't contain C — flip");
   }
 
-  // ---- linksTo ---------------------------------------------------
+  // ---- linkTarget ---------------------------------------------------
 
   #[test]
   fn moved_linksto_relationship_holds_preserved () {
     // C's body linked to both p_old and p_new. User moved C under
-    // p_new; the linksTo claim holds.
+    // p_new; the linkTarget claim holds.
     let graph : InRustGraph = graph_with (vec! [
       mk_node ("p_old", &[], &[], &[]),
       mk_node ("p_new", &[], &[], &[]),
@@ -965,15 +971,15 @@ mod validate_birth_relationships_tests {
     let root : NodeId = viewforest . root () . id ();
     let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("p_new"), src (), "p_new" . to_string (),
-                                Birth::ContentOf) ) . id ();
+                                ParentIs::Container) ) . id ();
     let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                                Birth::LinksTo) ) . id ();
+                                ParentIs::LinkTarget) ) . id ();
 
-    validate_birth_relationships (&mut viewforest, &graph);
+    validate_parentIs_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&viewforest, c_id), Birth::LinksTo,
-      "Moved linksTo: C still links to p_new — keep");
+    assert_eq! (true_child_parentIs (&viewforest, c_id), ParentIs::LinkTarget,
+      "Moved linkTarget: C still links to p_new — keep");
   }
 
   #[test]
@@ -988,14 +994,14 @@ mod validate_birth_relationships_tests {
     let root : NodeId = viewforest . root () . id ();
     let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_indefinitive_viewnode (id ("p_new"), src (), "p_new" . to_string (),
-                                Birth::ContentOf) ) . id ();
+                                ParentIs::Container) ) . id ();
     let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
       mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                                Birth::LinksTo) ) . id ();
+                                ParentIs::LinkTarget) ) . id ();
 
-    validate_birth_relationships (&mut viewforest, &graph);
+    validate_parentIs_relationships (&mut viewforest, &graph);
 
-    assert_eq! (true_child_birth (&viewforest, c_id), Birth::Independent,
-      "Moved linksTo: C doesn't link to p_new — flip");
+    assert_eq! (true_child_parentIs (&viewforest, c_id), ParentIs::Independent,
+      "Moved linkTarget: C doesn't link to p_new — flip");
   }
 }

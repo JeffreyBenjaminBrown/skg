@@ -27,7 +27,7 @@ use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnr
 use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request;
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
-use crate::to_org::util::set_view_root_births_from_graphstats;
+use crate::to_org::util::mark_view_roots_parent_absent;
 use crate::types::env::SkgEnv;
 use crate::types::errors::BufferValidationError;
 use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode,maybePlaced_to_placed_tree};
@@ -275,7 +275,7 @@ fn handle_snapshot_response (
       &mut viewforest, root_treeid,
       &payload . graphnodestats,
       &env . config ); }
-  set_view_root_births_from_graphstats (
+  mark_view_roots_parent_absent (
     &mut viewforest );
   let enriched : String =
     viewforest_to_string ( &viewforest, &env . config )
