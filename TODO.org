@@ -1,7 +1,15 @@
-* TODO git branch birth-to-parentIs
-has two commits, the second (later) unreviewed
 * TODO setup for Lorena
 ** make it installable on windows
+* TODO git branch faster-diff-analysis
+from skg3, run
+  codex resume 019e51c3-97dd-7502-b8d0-9b0306c0c6f9
+* TODO git branch birth-to-parentIs
+** has two commits
+the second (later) unreviewed
+** from skg2, run
+codex resume 019e51dd-11ff-7241-a1cf-8c2dc7db7a79
+* TODO speed up test suite
+Consolidate redundant tests.
 * ONGOING [[./TODO/birth-to-parent.org]]
 * critical
 ** I can't demo without privacy mode.
