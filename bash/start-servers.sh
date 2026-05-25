@@ -1,16 +1,16 @@
 # USAGE:
 # - TO START
 #   By default, this uses data/skgconfig.toml:
-#     ./bash/run-servers.sh
+#     ./bash/start-servers.sh
 #   You can override that default to use data somewhere else,
 #     by running this:
-#       SKG_CONFIG=another_skg_config ./bash/run-servers.sh
-#     or by editing SKG_CONFIG in ./bash/run-servers.sh
+#       SKG_CONFIG=another_skg_config ./bash/start-servers.sh
+#     or by editing SKG_CONFIG in ./bash/start-servers.sh
 # - TO SHUTDOWN
 #   - If foregrounded at command line, use
 #     Ctrl-C
 #   - If in background at command line, run
-#       ./bash/shutdown-servers.sh
+#       ./bash/stop-servers.sh
 #     or do it yourself:
 #       kill -TERM -PID # kills the whole group
 #     If you do it yourself, the PID was printed when it started,
@@ -131,10 +131,10 @@ echo "Script PID: $$"
 echo "Process group: $(ps -o pgid= -p $$)"
 
 # Create kill script for easy shutdown
-echo "#!/bin/bash" >     bash/shutdown-servers.sh
-echo "kill -TERM -$$" >> bash/shutdown-servers.sh
-chmod +x                 bash/shutdown-servers.sh
-echo "Created bash/shutdown-servers.sh - run it to stop all servers"
+echo "#!/bin/bash" >     bash/stop-servers.sh
+echo "kill -TERM -$$" >> bash/stop-servers.sh
+chmod +x                 bash/stop-servers.sh
+echo "Created bash/stop-servers.sh - run it to stop all servers"
 
 # Check and start TypeDB server if needed. A zombie TypeDB whose gRPC
 # thread has died is treated as not-running — start_typedb will kill it

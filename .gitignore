@@ -15,8 +15,8 @@
 /.ssh/
 /_burying
 
- # generated each time by run-servers.sh
-/bash/shutdown-servers.sh
+ # generated each time by start-servers.sh
+/bash/stop-servers.sh
 
 /claude-*.org
 /data

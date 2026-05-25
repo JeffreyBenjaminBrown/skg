@@ -235,7 +235,7 @@
    directory. New install packaging will need a tracked starter data
    template or the docs will send users to a missing path.
 
-** 'bash/run-servers.sh' process management is not safe for multiple Skg servers in one container
+** 'bash/start-servers.sh' process management is not safe for multiple Skg servers in one container
    Found while writing docker-unification-strategies.org.
 
    'start_skg_with_restart' runs broad process kills:

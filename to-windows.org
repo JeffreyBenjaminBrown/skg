@@ -10,7 +10,7 @@ The desired deliverable sounds like a downloadable package containing:
 - a run script that:
   - asks where to mount the Skg data folder
   - launches the Docker image
-  - runs =bash/run-servers.sh= inside the container
+  - runs =bash/start-servers.sh= inside the container
   - launches Emacs if it is not already running
   - loads Skg into Emacs the way =docs/setup.org= currently does
 
@@ -18,7 +18,7 @@ The desired deliverable sounds like a downloadable package containing:
 The current setup flow is:
 - build or pull =jeffreybbrown/hode:latest=
 - run a Linux container with the project source bind-mounted at =/home/ubuntu/host=
-- run =bash/run-servers.sh= inside the container
+- run =bash/start-servers.sh= inside the container
 - initialize Emacs with:
 
 #+begin_src elisp
@@ -27,7 +27,7 @@ The current setup flow is:
          (skg-client-init "../data/skgconfig.toml"))
 #+end_src
 
-=bash/run-servers.sh= starts TypeDB, then starts Skg through =cargo watch -w server/ -x "run --bin skg -- $SKG_CONFIG"=.
+=bash/start-servers.sh= starts TypeDB, then starts Skg through =cargo watch -w server/ -x "run --bin skg -- $SKG_CONFIG"=.
 That means the container currently needs the Skg source tree, not only the user's data.
 
 The current =bash/docker.sh= is host-specific:
@@ -199,7 +199,7 @@ It includes:
 - =Dockerfile=, which builds =jeffreybbrown/skg:latest= from this repo
   by copying the source into =/opt/skg= and installing a prebuilt
   =/usr/local/bin/skg= binary.
-- =container/run-servers.sh=, which starts TypeDB and the prebuilt Skg
+- =container/start-servers.sh=, which starts TypeDB and the prebuilt Skg
   server binary inside the container.
 - =install.ps1=, which pulls the Docker image.
 - =run.ps1=, which:
