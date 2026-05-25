@@ -3,11 +3,12 @@ Have independent code count the number of disappeared files,
 moved files, new roots, and other anomalies,
 and check it against the report.
 (Backgrounded.)
-* TODO git branch birth-to-parentIs
-** has two commits
-the second (later) unreviewed
-** from skg2, run
-codex resume 019e51dd-11ff-7241-a1cf-8c2dc7db7a79
+* AWAITS links in before contents
+** graphstats should precede even the link source count
+but follow parentIs and indef
+** containsParent is a viewstat, not just an isParent value?
+Seems good to use two heralds of the same shape, like "}}",
+but one is the color of isParent and the other the color of viewStats.
 * TODO speed up test suite
 Consolidate redundant tests.
 * ONGOING [[./TODO/birth-to-parent.org]]
