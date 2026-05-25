@@ -1,0 +1,53 @@
+* Windows setup
+Prerequisites:
+- Docker Desktop
+- GNU Emacs for Windows
+- Git for Windows, so the starter data repositories can be initialized
+
+From PowerShell, in the package folder:
+
+#+begin_src powershell
+  .\install.ps1
+  .\run.ps1
+#+end_src
+
+=install.ps1= pulls the Docker image.
+
+=run.ps1= asks for a data folder and remembers the answer in
+=.skg-windows-settings.json= beside the script. On first run it creates:
+- =skgconfig.toml=
+- =public/=
+- =private/=
+- =list-of-repositories.txt=
+- =bash/pull-all.sh=
+- =bash/push-all.sh=
+- =bash/remote-all.sh=
+- =bash/status-all.sh=
+
+If the chosen folder already contains =skgconfig.toml=, the script checks
+that every configured source folder exists and is a git repository.
+
+If there is no config yet, but =public/= or =private/= exists and is
+nonempty, the script quits instead of guessing what to do with existing
+files.
+
+The Docker container is named =skg-windows= by default. The script reuses it
+if it already exists and was created from the requested image. If a
+container with that name exists for a different image, the script quits.
+
+The TypeDB port is not exposed to Windows. The Skg server port defaults to
+=1731= and is exposed for native Windows Emacs.
+
+* Building the package folder
+From the repository root on Linux:
+
+#+begin_src bash
+  ./windows/build/02-build-package.sh
+#+end_src
+
+That writes =windows/out/skg-windows-package/= with the two PowerShell
+scripts, docs, starter data scripts, and the Emacs Lisp client files.
+
+The package root contains the project =README.org=, so links like
+=[[./docs/setup.org]]= keep working. Windows-specific instructions are in
+=WINDOWS.org=.

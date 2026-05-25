@@ -218,6 +218,23 @@
    multi-second first-render latency.
 * Other problems
 
+** Windows packaging request names scripts as top-level =bash/= scripts, but they live in =data/bash/=
+   The requested files =pull-all.sh=, =push-all.sh=, =remote-all.sh=,
+   and =status-all.sh= are not present under top-level =bash/= in this
+   checkout. They exist under =data/bash/=, which appears to be
+   gitignored/private data.
+
+   If these are intended to be packaged for new users, they should
+   probably live in a tracked template/starter-data location, or the
+   Windows packaging plan should explicitly copy them from the private
+   =data/bash/= source.
+
+** =docs/setup.org= refers to =example-data/=, but no =example-data/= is present
+   The setup doc says "See example-data/ for how" when describing the
+   data folder. This checkout does not contain an =example-data/=
+   directory. New install packaging will need a tracked starter data
+   template or the docs will send users to a missing path.
+
 ** 'bash/run-servers.sh' process management is not safe for multiple Skg servers in one container
    Found while writing docker-unification-strategies.org.
 

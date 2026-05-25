@@ -1,0 +1,71 @@
+$Out = "$env:USERPROFILE\Desktop\skg-docker-diagnostics.txt"
+
+"=== time ===" | Out-File $Out
+Get-Date | Out-File $Out -Append
+
+"`n=== user ===" | Out-File $Out -Append
+whoami | Out-File $Out -Append
+
+"`n=== admin groups ===" | Out-File $Out -Append
+whoami /groups |
+  Select-String -Pattern "S-1-5-32-544|Administradores|Administrators" |
+  Out-File $Out -Append
+
+"`n=== processor virtualization ===" | Out-File $Out -Append
+Get-CimInstance Win32_Processor |
+  Select-Object Name,
+                VirtualizationFirmwareEnabled,
+                VMMonitorModeExtensions,
+                SecondLevelAddressTranslationExtensions |
+  Format-List |
+  Out-File $Out -Append
+
+"`n=== windows optional features ===" | Out-File $Out -Append
+Get-WindowsOptionalFeature -Online `
+  -FeatureName Microsoft-Windows-Subsystem-Linux,
+               VirtualMachinePlatform,
+               Microsoft-Hyper-V-All |
+  Select-Object FeatureName, State |
+  Format-Table -AutoSize |
+  Out-File $Out -Append
+
+"`n=== wsl status ===" | Out-File $Out -Append
+wsl --status 2>&1 | Out-File $Out -Append
+
+"`n=== wsl list verbose ===" | Out-File $Out -Append
+wsl -l -v 2>&1 | Out-File $Out -Append
+
+"`n=== docker services ===" | Out-File $Out -Append
+Get-Service *docker* 2>&1 |
+  Format-Table -AutoSize |
+  Out-File $Out -Append
+
+"`n=== sc query com.docker.service ===" | Out-File $Out -Append
+sc.exe query com.docker.service 2>&1 | Out-File $Out -Append
+
+"`n=== docker processes ===" | Out-File $Out -Append
+Get-Process *docker* -ErrorAction SilentlyContinue |
+  Select-Object ProcessName, Id, Path |
+  Format-Table -AutoSize |
+  Out-File $Out -Append
+
+"`n=== docker context ===" | Out-File $Out -Append
+docker context ls 2>&1 | Out-File $Out -Append
+
+"`n=== docker version ===" | Out-File $Out -Append
+docker version 2>&1 | Out-File $Out -Append
+
+"`n=== docker info ===" | Out-File $Out -Append
+docker info 2>&1 | Out-File $Out -Append
+
+"`n=== recent Docker logs under AppData ===" | Out-File $Out -Append
+Get-ChildItem "$env:LOCALAPPDATA\Docker" `
+  -Recurse `
+  -File `
+  -ErrorAction SilentlyContinue |
+  Sort-Object LastWriteTime -Descending |
+  Select-Object -First 20 FullName, LastWriteTime, Length |
+  Format-Table -AutoSize |
+  Out-File $Out -Append
+
+"`nWrote $Out"

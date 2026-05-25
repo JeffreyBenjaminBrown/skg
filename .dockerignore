@@ -1,0 +1,9 @@
+.git
+target
+windows/out
+windows/testing/tmp
+data
+docker-typedb-rust
+nix-jbb
+*.swp
+*~

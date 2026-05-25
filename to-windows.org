@@ -1,0 +1,225 @@
+* Goal
+Make Skg easy to install and run on Windows 10 or 11 for a user who has:
+- Emacs
+- Docker
+- a DockerHub account
+
+The desired deliverable sounds like a downloadable package containing:
+- a =docs/= folder
+- an install script that fetches the Docker image
+- a run script that:
+  - asks where to mount the Skg data folder
+  - launches the Docker image
+  - runs =bash/run-servers.sh= inside the container
+  - launches Emacs if it is not already running
+  - loads Skg into Emacs the way =docs/setup.org= currently does
+
+* Current Linux shape
+The current setup flow is:
+- build or pull =jeffreybbrown/hode:latest=
+- run a Linux container with the project source bind-mounted at =/home/ubuntu/host=
+- run =bash/run-servers.sh= inside the container
+- initialize Emacs with:
+
+#+begin_src elisp
+  (progn (load-file "../elisp/skg-reload.el")
+         (skg-reload)
+         (skg-client-init "../data/skgconfig.toml"))
+#+end_src
+
+=bash/run-servers.sh= starts TypeDB, then starts Skg through =cargo watch -w server/ -x "run --bin skg -- $SKG_CONFIG"=.
+That means the container currently needs the Skg source tree, not only the user's data.
+
+The current =bash/docker.sh= is host-specific:
+- container name =skg2=
+- host source path =/home/rust/skg2=
+- container source path =/home/ubuntu/host=
+- Linux audio mount =/run/user/1000/pipewire-0=
+- Linux user =1000:1000=
+- platform =linux/amd64=
+- port mapping derived from =data/skgconfig.toml=
+
+* Desired starter data
+The starter =data/= folder should resemble the current real data folder, but only include:
+- =public/=
+- =private/=
+- =list-of-repositories.txt=
+- =bash/pull-all.sh=
+- =bash/push-all.sh=
+- =bash/remote-all.sh=
+- =bash/status-all.sh=
+
+=public/= and =private/= should be empty git repositories.
+=list-of-repositories.txt= should list only those two repos.
+
+A likely starter =skgconfig.toml= would be:
+
+#+begin_src toml
+  db_name = "skg"
+  tantivy_folder = ".index.tantivy"
+  port = 1731
+  beep_when_server_becomes_available = false
+
+  [[sources]]
+  name = "public"
+  path = "public"
+  user_owns_it = true
+
+  [[sources]]
+  name = "private"
+  path = "private"
+  user_owns_it = true
+#+end_src
+
+I have not yet confirmed whether =beep_when_server_becomes_available = false= is desired for Windows, but it avoids depending on Linux audio plumbing.
+
+* Packaging uncertainties
+The major open design choice is whether the Windows package should include the Skg source tree.
+
+The current Docker image supplies Rust, TypeDB, Emacs, Magit, cargo-watch, and related tools, but =docker.nix= does not appear to copy this Skg repository into the image.
+The Linux run path gets the source by bind-mounting it from the host.
+
+For Windows, that implies one of these directions:
+- include the Skg source tree in the downloadable package and mount it into the container
+- build a new image that contains the Skg source and either runs =cargo run= there or includes a prebuilt Skg binary
+- split "developer image" from "user image", with the user image containing only runtime dependencies and the built Skg server/client files
+
+* Questions before planning
+** round 1, asked and answered
+*** Docker image and source packaging
+Should a Windows user download the Skg source tree as part of the package, or should the Docker image contain everything except their data?
+
+If the image should contain everything, should it contain:
+- the source tree and run with =cargo watch=, like development does now
+- a prebuilt =skg= binary, without =cargo watch=
+
+Do you want to keep using =jeffreybbrown/hode:latest= for Windows users, or create/tag a more specific image such as =jeffreybbrown/skg:latest=?
+**** The container should include everything.
+Let's have it even include the prebuilt binary.
+The user should be able to rebuild it,
+but their ordinary entry point should not be cargo watch.
+(They could get confused when the server stopped working
+while it was reinitializing because it rebuilt when they
+modified a comment in the source.)
+*** Script technology
+Should the Windows scripts be PowerShell scripts, batch files, or both?
+
+PowerShell is the more natural fit for asking questions, locating Emacs, launching Docker, and handling paths.
+Batch is more double-click-familiar but much clumsier for this task.
+**** TODO sounds like Powershell then
+I am not familiar.
+It's okay if our installer asks them questions,
+if that would be helpful.
+*** DockerHub account
+Why does the user need a DockerHub account?
+
+If the image is public, =docker pull jeffreybbrown/hode:latest= should usually work without login.
+If the image is private, the install script should run =docker login= before =docker pull=.
+**** TODO oh that's awesome, they don't then
+*** Data folder mount
+When the run script asks where to mount the =data/= folder, should it:
+- use a default like =$HOME\skg-data= and create it if missing
+- ask every time
+- remember the answer in a local config file
+
+Should the package include the starter =data/= folder beside the scripts, or should the install/run script create it at the chosen data location?
+**** TODO
+It should ask them for a spot and remember the answer.
+The first time it provides some reasonable default.
+After that it provides their last response.
+If it finds a .skgconfig there, it should validate that
+(all repos must exist) and use it if valid,
+otherwise quit, explaining what went wrong.
+If it finds empty public/ and/or private/ folders,
+that's fine, but if it finds a folder of either name
+that is nonempty, it should quit, explaining what went wrong.
+*** Emacs on Windows
+Should the script assume one of these Emacs layouts?
+- =emacs.exe= or =runemacs.exe= is already on =PATH=
+- the user installed GNU Emacs in a standard path under =C:\Program Files=
+- the user will provide the path interactively
+
+Should Skg be loaded into native Windows Emacs, or should Emacs run inside the Docker container and display on Windows somehow?
+Your wording says "If it has Emacs and Docker", which I interpret as native Windows Emacs plus containerized server.
+**** TODO
+Yes, native; the docker container should not need Emacs.
+I guess ask the user where it is,
+but also search in reasonable places,
+report what was found and let them select one of those
+(but they can also type in an arbitrary path).
+*** Emacs server behavior
+For "launches Emacs if it's not already running", should the script use =emacsclientw.exe= and start an Emacs daemon/server if needed?
+
+If so, the Skg load command can be sent with =emacsclientw.exe --eval ...=.
+If not, the script can start =runemacs.exe= with an =--eval= expression, but detecting an already-running GUI Emacs is less robust.
+**** TODO It sounds like it should.
+I have no familiarity.
+*** Paths seen by Emacs vs container
+The server resolves source paths from =skgconfig.toml= inside the container.
+The Emacs client resolves the same config file on Windows.
+
+That raises a path question:
+- Should the Windows Emacs client read a Windows-side =skgconfig.toml= from the mounted data folder?
+- Should the container read a separate container-side config with Linux paths?
+- Or should both read the same config using only relative source paths, so Windows and Linux path syntax never appears in it?
+
+The last option looks best if the config file lives in the mounted data root and uses relative paths like =public= and =private=.
+**** TODO let's use relative paths
+*** Ports and container lifecycle
+Should the run script always remove and recreate the container, or reuse an existing =skg= container if it exists?
+
+Should the default Rust-Emacs API port remain =1731= for Windows users?
+
+Do you want the TypeDB port =1729= exposed to Windows, or only the Rust-Emacs API port?
+**** TODO
+TypeDB port needs no exposure.
+The default Rust-Emacs port can remain so.
+The run script should try to reuse any existing container
+of the same name. If it's the wrong image it should report
+that someone's using the namespace and quit.
+*** Git remotes
+The starter repos are empty and have had =git init= run.
+Should the setup also help the user add GitHub remotes for =public= and =private=, or leave that entirely manual?
+
+The included =pull-all.sh= and =push-all.sh= are only useful after remotes exist.
+**** TODO let's duck, let the user worry about it
+*** Scope of first implementation
+Should this first Windows package be a pragmatic alpha for technical users, or should it aim to be double-click install/run for non-programmers?
+
+This affects how much validation, logging, and GUI-free fallback behavior the scripts need.
+**** TODO let's err on the side of making it easy to debug
+I imagine that means less clicking and more typing.
+I'll be trying it with her tomorrow;
+no nontechnical user needs to be able to do it alone yet.
+
+* Implemented first pass
+The first pass lives in =windows/=.
+
+It includes:
+- =Dockerfile=, which builds =jeffreybbrown/skg:latest= from this repo
+  by copying the source into =/opt/skg= and installing a prebuilt
+  =/usr/local/bin/skg= binary.
+- =container/run-servers.sh=, which starts TypeDB and the prebuilt Skg
+  server binary inside the container.
+- =install.ps1=, which pulls the Docker image.
+- =run.ps1=, which:
+  - asks for and remembers the data folder
+  - validates an existing =skgconfig.toml=
+  - initializes =public/= and =private/= as empty git repositories when no
+    config exists yet
+  - copies the helper bash scripts into the data folder
+  - reuses an existing same-name container only when it uses the requested
+    image and data mount
+  - exposes only the Skg server port to Windows
+  - searches for =emacsclientw.exe= and lets the user choose or type a path
+  - starts native Windows Emacs if necessary
+  - loads Skg into native Windows Emacs with the same =skg-reload= /
+    =skg-client-init= pattern as =docs/setup.org=
+- =starter-data/bash/*.sh=, the four repository helper scripts.
+- =docs/=, with user and image-build notes.
+- =build-package.sh=, which assembles a downloadable package folder with
+  the two PowerShell scripts, docs, starter data scripts, and the Elisp
+  client files.
+
+This execution environment does not have Docker installed, so the image
+build has not been tested here.
