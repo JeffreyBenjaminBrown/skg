@@ -207,17 +207,17 @@ async fn merge_container_into_content_impl (
       failures . push (
         "b does not appear as a child of aa"
         . to_string() );
-    } else if b_under_aa . unwrap() . contains ("birth") {
+    } else if b_under_aa . unwrap() . contains ("parentIs") {
       failures . push (
-        "b under aa is marked birth=Independent"
+        "b under aa is marked parentIs=Independent"
         . to_string() ); }
     if c_under_aa . is_none() {
       failures . push (
         "c does not appear as a child of aa"
         . to_string() );
-    } else if c_under_aa . unwrap() . contains ("birth") {
+    } else if c_under_aa . unwrap() . contains ("parentIs") {
       failures . push (
-        "c under aa is marked birth=Independent"
+        "c under aa is marked parentIs=Independent"
         . to_string() ); }
 
     // Text preserver should appear under aa.

@@ -289,7 +289,7 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
                 "many should appear among results" );
       let score_for = |id : &str| -> f32 {
         matches_by_id . get (& ID::new (id)) . unwrap ()
-          . 2 . iter () . map ( |(s, _)| *s )
+          . 1 . iter () . map ( |(s, _)| *s )
           . fold (f32::NEG_INFINITY, f32::max) };
       let many_score : f32 = score_for ("many");
       let few_score  : f32 = score_for ("few");
@@ -320,10 +320,10 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
       assert! ( matches_re . contains_key (&ID::new ("many")),
                 "many should appear among regex results" );
       let many_score_re : f32 = matches_re . get (& ID::new ("many"))
-        . unwrap () . 2 . iter () . map ( |(s, _)| *s )
+        . unwrap () . 1 . iter () . map ( |(s, _)| *s )
         . fold (f32::NEG_INFINITY, f32::max);
       let few_score_re : f32 = matches_re . get (& ID::new ("few"))
-        . unwrap () . 2 . iter () . map ( |(s, _)| *s )
+        . unwrap () . 1 . iter () . map ( |(s, _)| *s )
         . fold (f32::NEG_INFINITY, f32::max);
       println! ("regex: many score = {}, few score = {}",
                 many_score_re, few_score_re);

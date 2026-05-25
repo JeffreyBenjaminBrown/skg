@@ -84,7 +84,7 @@ Execution plan: [[./3pB_DONE.org][3pB_DONE.org]].
 
 Status: complete. A focused git-diff saved-view regression now proves
 that a subscribee-as-such branch regenerates phantom/removed
-children from =source_diffs= instead of preserving a stale direct
+children from =source_diffs= instead of preserving a stale
 child list. The misleading TODO was replaced with that rationale.
 
 ** DONE c. Define policy for extra view-children under =AsSubscribee=
@@ -110,7 +110,7 @@ Execution plan: [[./3pC_DONE.org][3pC_DONE.org]].
 Status: complete. The policy is documented in
 =apply_hiderels_from_intents=. Saved =AsSubscribee=
 completion now normalizes view-children that are not graph-content of
-the subscribee to =Birth=Independent= and orders graph-content
+the subscribee to =ParentIs=Independent= and orders graph-content
 view-children by the subscribee's graph-content order. Foreign and
 owned regression tests cover the behavior.
 
@@ -135,11 +135,11 @@ foreign-node validation behavior is preserved.
 
 ** DONE e. Document direct-only visibility semantics for users
 
-The implemented visibility intent reads only direct children under a
+The implemented visibility intent reads only children under a
 definitive =AsSubscribee= node:
 
-- removing a direct child can hide that content from the subscriber;
-- restoring a direct hidden child can unhide it;
+- removing a child can hide that content from the subscriber;
+- restoring a hidden child can unhide it;
 - editing deeper descendants remains ordinary graph editing for those
   descendant nodes, not subscriber visibility editing.
 

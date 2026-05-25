@@ -130,7 +130,7 @@ facts like:
 - this TrueNode is inside HiddenInSubscribeeCol;
 - this TrueNode is inside HiddenOutsideOfSubscribeeCol;
 - this TrueNode is a top-level root;
-- this TrueNode is ignored content because of birth / phantom /
+- this TrueNode is ignored content because of parentIs / phantom /
   delete request.
 
 This stayed intentionally small: a 'HashMap<NodeId, SaveRole>' and a
@@ -157,7 +157,7 @@ This is worth doing because the new feature's core question is not
 "what children does this node have?" It is "what does this position
 mean?"
 
-Tests currently cover ordinary TrueNodes, independent births,
+Tests currently cover ordinary TrueNodes, independent parentIs,
 SubscribeeCol positions, HiddenIn/HiddenOutside positions, alias/id
 display scaffolds, deleted/deleted-scaffold/unknown nodes, and error
 handling for invalid HiddenIn context.
@@ -186,8 +186,8 @@ The payoff is that the as-a-subscribee feature becomes a normal pass:
 #+begin_src text
 For each AsSubscribee(E under subscriber S):
   if E is definitive:
-    compare E's pre-save direct contains to visible direct children
-    subtract S's ordinary direct content
+    compare E's pre-save contains to visible children
+    subtract S's ordinary content
     append the remainder to S.hides_from_its_subscriptions
 #+end_src
 
@@ -442,7 +442,7 @@ cover:
 - HiddenInSubscribeeCol child;
 - HiddenOutsideOfSubscribeeCol child;
 - deleted, deleted-scaffold, unknown, alias/id display nodes;
-- roots and independent births.
+- roots and independent parentIs.
 
 The test target 'cargo test --test new classify -- --nocapture'
 passes.
@@ -467,7 +467,7 @@ do not become ordinary graph saves or parent 'contains' entries.
 Added tests cover:
 
 - ordinary content still produces 'contains';
-- 'birth independent' children still produce their own SaveNodes but
+- 'parentIs independent' children still produce their own SaveNodes but
   are excluded from the parent's 'contains';
 - alias and ID display scaffolds do not produce SaveNodes;
 - SubscribeeCol children still populate 'subscribes_to';
@@ -762,7 +762,7 @@ struct SubscribeeVisibilityEdit {
 }
 #+end_src
 
-The pass should compare the buffer's visible direct children under
+The pass should compare the buffer's visible children under
 the subscribee against the subscribee's pre-save graph 'contains' and
 the subscriber's current 'hides_from_its_subscriptions':
 
@@ -787,7 +787,7 @@ Added a behavior-preserving raw extraction pass:
 server/from_text/viewnodes_to_instructions/subscribee_hiderel_intents.rs
 #+end_src
 
-The pass records the direct child-list signal under each direct
+The pass records the child-list signal under each
 'AsSubscribee' position before graph-save construction erases it:
 
 #+begin_src rust
@@ -817,14 +817,14 @@ Current behavior is unchanged:
 - the current restore-from-disk guardrail for subscribee-as-such
   'contains' remains in place.
 
-The raw intent includes only direct visible content children:
+The raw intent includes only visible content children:
 
 - child TrueNodes with role 'OrdinaryNode';
-- excluding non-content births, phantoms, and delete-request children;
+- excluding non-content parentIs, phantoms, and delete-request children;
 - ignoring scaffolds, hidden scaffold contents, deleted/unknown nodes,
   and recursive descendants.
 
-Tests cover direct visible children, multiple subscribees in tree
+Tests cover visible children, multiple subscribees in tree
 order, recursive descendants, independent/delete/phantom exclusions,
 and HiddenIn/HiddenOutside scaffold contents.
 
@@ -1069,7 +1069,7 @@ Results:
 
 * Update 2026-05-12: SubscribeeCol preservation done
 
-Saved-view completion now preserves direct visible children of a
+Saved-view completion now preserves visible children of a
 definitive TrueNode directly under SubscribeeCol instead of
 regenerating that child list from disk. This keeps user-authored
 as-subscribee branch edits in the returned saved view, so the later
@@ -1121,7 +1121,7 @@ The first hide-inference feature slice is implemented:
   intents;
 - missing subscribee-as-such content is folded into the owned
   subscriber's 'hides_from_its_subscriptions';
-- if the missing child was moved to become ordinary direct content
+- if the missing child was moved to become ordinary content
   of the subscriber, no hide is inferred;
 - subscribee-as-such child-list edits still do not become graph
   'contains' edits for the subscribee;

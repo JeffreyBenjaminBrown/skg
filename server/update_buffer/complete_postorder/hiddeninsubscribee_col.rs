@@ -7,7 +7,7 @@ use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::pid_and_source_from_ancestor;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Birth};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, ParentIs};
 use crate::update_buffer::util::{detach_scaffold_if_empty, treat_certain_children};
 
 use ego_tree::{NodeId, Tree};
@@ -143,6 +143,6 @@ fn mark_non_subscribee_content_independent (
       _ => false },
     |vn : &mut ViewNode| {
       if let ViewNodeKind::True( ref mut t ) = vn . kind {
-        t . birth = Birth::Independent; } },
+        t . parentIs = ParentIs::Independent; } },
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (( )) }

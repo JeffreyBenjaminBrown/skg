@@ -1,7 +1,7 @@
 pub mod contradictory_instructions;
 
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::viewnode::{Birth, ViewRequest};
+use crate::types::viewnode::{ParentIs, ViewRequest};
 use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::errors::BufferValidationError;
@@ -84,9 +84,9 @@ pub async fn find_buffer_errors_for_saving (
 /// For each node in the viewforest, if it has a definitive view request,
 /// verify that:
 /// - The node is indefinitive.
-/// - It has no content children (TrueNode children with birth ==
-///   ContentOf). Non-content children — containerOf ancestry stubs,
-///   linksTo references, scaffolds, etc. — don't block expansion:
+/// - It has no content children (TrueNode children with parentIs ==
+///   Container). Non-content children — containerward ancestry stubs,
+///   link sources, scaffolds, etc. — don't block expansion:
 ///   they won't be clobbered by it.
 /// - No other node with the same ID has a definitive view request,
 ///   because there can only be one definitive view.
@@ -111,7 +111,7 @@ fn validate_definitive_view_requests (
               node_ref . children () . any ( |child| matches! (
                 &child . value () . kind,
                 MaybePlacedViewnodeKind::True (ct)
-                  if ct . birth == Birth::ContentOf ));
+                  if ct . parentIs == ParentIs::Container ));
             if has_content_children
             { errors . push( BufferValidationError::DefinitiveRequestOnNodeWithContentChildren( id . clone() )); }}
           { // Error: at most one request per ID

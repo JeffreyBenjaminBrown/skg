@@ -53,7 +53,7 @@ fn classifies_buffer_root_and_ordinary_truenodes (
     indoc! {"
             * (skg (node (id root) (source main))) root
             ** (skg (node (id ordinary) (source main))) ordinary
-            ** (skg (node (id independent) (source main) (birth independent))) independent
+            ** (skg (node (id independent) (source main) (parentIs independent))) independent
             "};
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);

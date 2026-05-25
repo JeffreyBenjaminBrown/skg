@@ -5,7 +5,7 @@
 // even if the parent ignores it.
 
 use skg::types::misc::{ ID, SourceName, SkgConfig, SkgfileSource };
-use skg::types::viewnode::{ Birth, ViewNode, ViewNodeKind, viewforest_root_viewnode, mk_definitive_viewnode, mk_indefinitive_viewnode };
+use skg::types::viewnode::{ ParentIs, ViewNode, ViewNodeKind, viewforest_root_viewnode, mk_definitive_viewnode, mk_indefinitive_viewnode };
 use skg::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
 
 use ego_tree::Tree;
@@ -32,7 +32,7 @@ fn two_source_config () -> SkgConfig {
   SkgConfig::dummyFromSources (sources) }
 
 /// When a node N has the same source as its nearest truenode ancestor,
-/// even if N is marked birth=Independent,
+/// even if N is marked parentIs=Independent,
 /// sourceAtBoundary should be false.
 #[test]
 fn source_inheritance_across_non_content_same_source () {
@@ -52,7 +52,7 @@ fn source_inheritance_across_non_content_same_source () {
       ID::from ("b"),
       SourceName::from ("pub"),
       "node B" . to_string (),
-      Birth::Independent );
+      ParentIs::Independent );
     viewforest . get_mut (a_id) . unwrap () . append (vn); }
   set_viewnodestats_in_viewforest (
     &mut viewforest,
@@ -60,7 +60,7 @@ fn source_inheritance_across_non_content_same_source () {
     &content_to_containers,
     &config );
   // B has same source as A, so sourceAtBoundary should be false,
-  // even though B has birth != ContentOf.
+  // even though B has parentIs != Container.
   let b_ref =
     viewforest . get (a_id) . unwrap ()
     . first_child () . unwrap ();
@@ -70,7 +70,7 @@ fn source_inheritance_across_non_content_same_source () {
             "Same source across non-content boundary \
              should NOT be at boundary" ); }
 
-/// When a non-content child (birth != ContentOf) has a different source
+/// When a non-content child (parentIs != Container) has a different source
 /// from its nearest truenode ancestor,
 /// sourceAtBoundary should be true.
 #[test]
@@ -91,7 +91,7 @@ fn source_inheritance_across_non_content_different_source () {
       ID::from ("b"),
       SourceName::from ("priv"),
       "node B" . to_string (),
-      Birth::Independent );
+      ParentIs::Independent );
     viewforest . get_mut (a_id) . unwrap () . append (vn); }
   set_viewnodestats_in_viewforest (
     &mut viewforest,

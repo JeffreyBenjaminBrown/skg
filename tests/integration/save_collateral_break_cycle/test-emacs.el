@@ -29,11 +29,11 @@
       (kill-emacs 1))
     (assert-headline-structure
      buf
-     '((1 contentOf "a")
-       (2 containerOf  "b")
-       (3 containerOf  "a")
-       (2 contentOf    "b")
-       (3 contentOf    "a"))
+     '((1 container "a")
+       (2 content  "b")
+       (3 content  "a")
+       (2 container    "b")
+       (3 container    "a"))
      "phase 1: buffer A initial")))
 
 (defun phase-2-open-buffer-b ()
@@ -48,11 +48,11 @@
       (kill-emacs 1))
     (assert-headline-structure
      buf
-     '((1 contentOf "b")
-       (2 containerOf  "a")
-       (3 containerOf  "b")
-       (2 contentOf    "a")
-       (3 contentOf    "b"))
+     '((1 container "b")
+       (2 content  "a")
+       (3 content  "b")
+       (2 container    "a")
+       (3 container    "b"))
      "phase 2: buffer B initial")))
 
 (defun phase-3-remove-and-save ()
@@ -82,9 +82,9 @@
     (assert-headline-structure
      buf
      '((1 independent "a")
-       (2 independent "b")  ;; was containerOf; corrected after b dropped a
-       (3 containerOf  "a")
-       (2 contentOf    "b"))
+       (2 independent "b")  ;; was content; corrected after b dropped a
+       (3 content  "a")
+       (2 container    "b"))
      "phase 4: buffer A after collateral update")))
 
 (defun run-all-tests ()

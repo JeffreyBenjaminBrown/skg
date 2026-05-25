@@ -70,7 +70,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
             Root body content
             ** (skg folded (node (id child1))) child1
             Child1 body
-            * (skg (node (birth independent) indef)) independent root node
+            * (skg (node (parentIs absent) indef)) independent root node
             ParentIgnores body
             * (skg (node (viewStats cycle))) cycling node
             This node has cycle flag
@@ -181,7 +181,7 @@ fn test_org_to_uninterpreted_nodes2_body_spacing() {
 fn test_org_to_uninterpreted_nodes2_indented_star_is_body_text() {
   let input: &str =
     indoc! {"
-            * (skg (node (id afff132a-e822-46cb-aed4-5725b7d1b0c5) (source public) (birth independent))) [#A] pressing*
+            * (skg (node (id afff132a-e822-46cb-aed4-5725b7d1b0c5) (source public) (parentIs absent))) [#A] pressing*
               * = org-roam transplant first needs
             ** dogfood it
         "};

@@ -671,7 +671,7 @@ fn test_extra_view_child_under_foreign_subscribee_is_independent(
 
     assert_line_contains_all (
       &rerendered,
-      &["(id a)", "(birth independent)"]);
+      &["(id a)", "(parentIs independent)"]);
     assert_line_order (&rerendered, "(id e1)", "(id e2)");
     assert_does_not_hide_e1 (&rerendered);
     let e_skg : NodeComplete =
@@ -721,7 +721,7 @@ fn test_extra_view_child_under_owned_subscribee_is_independent(
 
     assert_line_contains_all (
       &rerendered,
-      &["(id e)", "(birth independent)"]);
+      &["(id e)", "(parentIs independent)"]);
     assert_line_order (&rerendered, "(id r1)", "(id r2)");
     assert!(
       ! rerendered . contains ("hiddenInSubscribeeCol"),
@@ -775,7 +775,7 @@ fn test_every_kind_of_col(
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (birth independent) (graphStats (contents 1) subscribing))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing))) R
        ** (skg subscribeeCol) it subscribes to these
        *** (skg (node (id E1) (source main) indef (graphStats (containers 0) (contents 2) subscribing))) subscribee-1
        *** (skg (node (id E2) (source main) indef (graphStats (containers 0) (contents 2) subscribing))) subscribee-2
@@ -806,7 +806,7 @@ fn test_every_kind_of_col(
     println!("View from R after save with definitive view requests:\n{}", expanded);
 
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (birth independent) (graphStats (contents 1) subscribing))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing))) R
        ** (skg subscribeeCol) it subscribes to these
        *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 2) subscribing))) subscribee-1
        **** (skg hiddenInSubscribeeCol) hidden from this subscription
@@ -858,7 +858,7 @@ fn test_hidden_within_but_none_without(
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (birth independent) (graphStats (contents 1) subscribing))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing))) R
        ** (skg subscribeeCol) it subscribes to these
        *** (skg (node (id E1) (source main) indef (graphStats (containers 0) (contents 3) subscribing))) subscribee-1
        ** (skg (node (id R1) (source main))) R1
@@ -888,7 +888,7 @@ fn test_hidden_within_but_none_without(
     // HiddenInSubscribeeCol precedes content regardless of .skg order.
     // E1.skg has [E11, H, E12] but view shows HiddenInSubscribeeCol (with H) before E11 and E12.
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (birth independent) (graphStats (contents 1) subscribing))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing))) R
        ** (skg subscribeeCol) it subscribes to these
        *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 3) subscribing))) subscribee-1
        **** (skg hiddenInSubscribeeCol) hidden from this subscription
@@ -1136,7 +1136,7 @@ fn test_hidden_without_but_none_within(
                           false ) . await?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (birth independent) (graphStats (contents 1) subscribing))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing))) R
        ** (skg subscribeeCol) it subscribes to these
        *** (skg (node (id E1) (source main) indef (graphStats (containers 0) (contents 2) subscribing))) subscribee-1
        *** (skg (node (id E2) (source main) indef (graphStats (containers 0) subscribing))) subscribee-2
@@ -1165,7 +1165,7 @@ fn test_hidden_without_but_none_within(
     println!("View from R after save with definitive view requests:\n{}",
              with_subscribees_expanded);
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (birth independent) (graphStats (contents 1) subscribing))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing))) R
        ** (skg subscribeeCol) it subscribes to these
        *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 2) subscribing))) subscribee-1
        **** (skg (node (id E11) (source main))) E11
@@ -1263,7 +1263,7 @@ fn test_overlapping_hidden_within(
                           false ) . await?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (birth independent) (graphStats (contents 1) subscribing))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing))) R
        ** (skg subscribeeCol) it subscribes to these
        *** (skg (node (id E1) (source main) indef (graphStats (containers 0) (contents 1) subscribing))) subscribee-1
        *** (skg (node (id E2) (source main) indef (graphStats (containers 0) (contents 1) subscribing))) subscribee-2
@@ -1290,7 +1290,7 @@ fn test_overlapping_hidden_within(
       response . saved_view };
     println!("View from R after save with definitive view requests:\n{}", expanded);
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (birth independent) (graphStats (contents 1) subscribing))) R
+      "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing))) R
        ** (skg subscribeeCol) it subscribes to these
        *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 1) subscribing))) subscribee-1
        **** (skg hiddenInSubscribeeCol) hidden from this subscription

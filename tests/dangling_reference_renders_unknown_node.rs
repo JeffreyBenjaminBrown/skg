@@ -43,11 +43,11 @@ fn test_dangling_reference_renders_unknown_node
       println!("Rendered:\n{}", rendered);
       // graphStats is empty because contents/containers counters
       // count only resolvable nodes (UnknownNode is a placeholder,
-      // not an actual contained node), and the per-birth filter
-      // hides (containers 0) for independent-birth.
+      // not an actual contained node), and the per-parentIs filter
+      // hides (containers 0) for absent-parentIs.
       // The unknown line has no headline title -- the id already
       // appears in the metadata, no need to duplicate it.
-      let expected = indoc! {"* (skg (node (id parent) (source main) (birth independent))) parent
+      let expected = indoc! {"* (skg (node (id parent) (source main) (parentIs absent))) parent
                               ** (skg (unknownNode (id ghost)))
                               "};
       assert_eq! (rendered, expected,

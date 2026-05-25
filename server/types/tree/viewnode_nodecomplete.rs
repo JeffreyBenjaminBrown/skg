@@ -215,7 +215,7 @@ pub fn find_children_by_ids (
 /// Check if all nodes at the specified generation satisfy the predicate.
 /// Returns true if the generation is empty (vacuously true).
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes TrueNodes with birth != ContentOf.
+/// If skip_non_content, excludes TrueNodes with parentIs != Container.
 pub fn generation_includes_only<F> (
   tree                : &Tree<MaybePlacedViewnode>,
   node_id             : NodeId,
@@ -231,7 +231,7 @@ where F: Fn (&MaybePlacedViewnode) -> bool
 
 /// Check if the generation is nonempty and all nodes satisfy the predicate.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes TrueNodes with birth != ContentOf.
+/// If skip_non_content, excludes TrueNodes with parentIs != Container.
 pub fn generation_exists_and_includes<F> (
   tree                : &Tree<MaybePlacedViewnode>,
   node_id             : NodeId,
@@ -249,7 +249,7 @@ where F: Fn (&MaybePlacedViewnode) -> bool
 
 /// Check if the specified generation is empty.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes TrueNodes with birth != ContentOf.
+/// If skip_non_content, excludes TrueNodes with parentIs != Container.
 pub fn generation_does_not_exist (
   tree                : &Tree<MaybePlacedViewnode>,
   node_id             : NodeId,
@@ -264,7 +264,7 @@ pub fn generation_does_not_exist (
 /// Positive generation = descendants (1 = children, 2 = grandchildren, etc.)
 /// Generation 0 returns just the node itself.
 /// If 'skip_non_content' is true and generation > 0,
-///   then we exclude TrueNodes with birth != ContentOf.
+///   then we exclude TrueNodes with parentIs != Container.
 fn collect_generation (
   tree               : &Tree<MaybePlacedViewnode>,
   node_id            : NodeId,

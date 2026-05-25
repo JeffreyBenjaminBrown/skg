@@ -155,7 +155,7 @@ impl OpenViews {
 
 /// Collect all IDs (primary + extras) for every root
 /// -- i.e. every level-1 headline -- in the view.
-/// (There can be graph roots at other levels, via non-Content birth;
+/// (There can be graph roots at other levels, via non-Content parentIs;
 /// this does not return those.)
 ///
 /// Extra_ids are pulled from the in-Rust graph. If in-Rust graph isn't

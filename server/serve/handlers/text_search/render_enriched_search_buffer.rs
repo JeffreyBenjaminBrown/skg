@@ -1,7 +1,7 @@
 use crate::dbs::tantivy::title_and_source_by_id;
 use crate::dbs::typedb::ancestry::AncestryTree;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Birth, mk_indefinitive_viewnode};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_viewnode};
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::HashMap;
@@ -77,7 +77,7 @@ fn prepend_containing_child_from_tantivy (
         SourceName::from ("search") ) );
   let viewnode : ViewNode =
     mk_indefinitive_viewnode ( node_id . clone (), source, title,
-                               Birth::ContainerOf );
+                               ParentIs::Content );
   let mut parent_mut : NodeMut<ViewNode> =
     viewforest . get_mut (parent_treeid) . unwrap ();
   parent_mut . prepend (viewnode)

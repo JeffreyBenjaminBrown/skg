@@ -16,7 +16,7 @@ use crate::types::git::SourceDiff;
 use crate::org_to_text::viewforest_to_string;
 use crate::to_org::render::diff::apply_diff_to_viewforest;
 use crate::to_org::render::initial_bfs::render_initial_viewforest_bfs;
-use crate::to_org::util::set_view_root_births_from_graphstats;
+use crate::to_org::util::mark_view_roots_parent_absent;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use crate::update_buffer::graphnodestats::set_graphnodestats_in_viewforest;
@@ -76,7 +76,7 @@ pub async fn multi_root_view (
       set_graphnodestats_in_viewforest (
         &mut viewforest,
         config, driver ) . await } ?;
-  set_view_root_births_from_graphstats (
+  mark_view_roots_parent_absent (
     &mut viewforest );
   set_viewnodestats_in_viewforest (
     &mut viewforest, &container_to_contents, &content_to_containers,

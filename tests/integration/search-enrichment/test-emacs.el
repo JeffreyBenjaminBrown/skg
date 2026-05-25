@@ -21,16 +21,16 @@
       (message "✗ FAIL: leaf-b search root not found during %s" phase)
       (message "Buffer content:\n%s" content)
       (kill-emacs 1))
-    (when (string-match-p "(birth independent)" line)
+    (when (string-match-p "(parentIs independent)" line)
       (message "✗ FAIL: leaf-b search root is independent during %s: %S"
                phase line)
       (kill-emacs 1))
-    (when (string-match-p "(birth containerOf)" line)
-      (message "✗ FAIL: leaf-b search root is containerOf during %s: %S"
+    (when (string-match-p "(parentIs content)" line)
+      (message "✗ FAIL: leaf-b search root is content during %s: %S"
                phase line)
       (kill-emacs 1))
-    (when (string-match-p "(birth linksTo)" line)
-      (message "✗ FAIL: leaf-b search root is linksTo during %s: %S"
+    (when (string-match-p "(parentIs linkTarget)" line)
+      (message "✗ FAIL: leaf-b search root is linkTarget during %s: %S"
                phase line)
       (kill-emacs 1))))
 

@@ -29,9 +29,9 @@
     (assert-headline-titles
      buf
      '((1 independent "a")
-       (2 contentOf   "b")
-       (3 contentOf   "c")
-       (2 contentOf   "c"))
+       (2 container   "b")
+       (3 container   "c")
+       (2 container   "c"))
      "phase 1: initial view")))
 
 (defun phase-2-remove-c-from-under-b-and-save ()
@@ -54,8 +54,8 @@
     (assert-headline-titles
      (current-buffer)
      '((1 independent "a")
-       (2 contentOf   "b")
-       (2 contentOf   "c"))
+       (2 container   "b")
+       (2 container   "c"))
      "phase 2: after removing c from b")
     (skg-request-save-buffer)
     (skg-test-wait-for-response)
@@ -87,9 +87,9 @@
     (message "  Final buffer: %S" content)
     ;; The containerward path for c should show a as container.
     ;; Look for a node under the phantom c
-    ;; that has "containerOf" in its metadata.
-    (unless (string-match-p "containerOf" content)
-      (message "✗ FAIL [phase 4]: no containerOf node found in buffer")
+    ;; that has "content" in its metadata.
+    (unless (string-match-p "content" content)
+      (message "✗ FAIL [phase 4]: no content node found in buffer")
       (message "  Expected containerward ancestry under phantom c")
       (kill-emacs 1))
     (message "✓ PASS [phase 4]: containerward ancestry auto-inserted")))

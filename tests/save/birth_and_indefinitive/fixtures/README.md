@@ -1,6 +1,6 @@
-# Test Fixtures for birth=Independent and indefinitive
+# Test Fixtures for parentIs=Independent and indefinitive
 
-These fixtures test the interaction between `birth=Independent` and `indefinitive` metadata flags during buffer saves.
+These fixtures test the interaction between `parentIs=Independent` and `indefinitive` metadata flags during buffer saves.
 
 ## Initial State
 
@@ -21,7 +21,7 @@ The test simulates saving this buffer:
 
 ```org
 * (skg (node (id 1) (source main))) 1
-** (skg (node (id 2) (source main) (birth independent) indef)) 2
+** (skg (node (id 2) (source main) (parentIs independent) indef)) 2
 *** (skg (node (id 4) (source main))) 4
 ```
 
@@ -35,9 +35,9 @@ After save:
 
 2. **Node 1** should have `contains = []`
    - Remains empty despite having node 2 as an org-child
-   - Node 2 does not affect its parent due to `birth=Independent`
+   - Node 2 does not affect its parent due to `parentIs=Independent`
 
 This verifies that:
-- `birth=Independent` prevents a child from updating its parent's contents
+- `parentIs=Independent` prevents a child from updating its parent's contents
 - `indefinitive` allows appending to existing contents rather than replacing them
 - Both flags work correctly together through the full save pipeline

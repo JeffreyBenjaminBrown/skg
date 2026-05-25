@@ -266,7 +266,7 @@ fn has_empty_title ( t : &MaybePlacedTruenode ) -> bool {
 
 /// Check that all non-ignored, non-phantom TrueNode children
 /// have distinct IDs.
-/// "Non-ignored" means birth == ContentOf.
+/// "Non-ignored" means parentIs == Container.
 /// "Non-phantom" means diff is not Removed or RemovedHere.
 /// Returns true if all such children have distinct IDs,
 /// or if there are no such children.

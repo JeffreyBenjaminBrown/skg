@@ -148,9 +148,9 @@ target. It should split the subscribee-as-such branch out before
 graph-save =contains= is built:
 
 - ordinary definitive nodes should produce graph-save intents whose
-  direct children mean graph =contains=;
+  children mean graph =contains=;
 - subscribee-as-such nodes should produce visibility-surface
-  intents whose direct children mean subscriber-visible subscribee
+  intents whose children mean subscriber-visible subscribee
   content;
 - recursive ordinary descendants below a subscribee-as-such should still
   be allowed to produce ordinary graph-save intents;

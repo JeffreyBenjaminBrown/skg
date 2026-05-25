@@ -2,7 +2,7 @@ use crate::types::git::{MembershipAxes, NodeChanges, SourceDiff, axes_from_per_s
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, Birth};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, ParentIs};
 use crate::types::tree::generic::{pid_and_source_from_ancestor, read_at_ancestor_in_tree};
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, treat_certain_children};
 use ego_tree::{NodeId, Tree};
@@ -18,7 +18,7 @@ use std::error::Error;
 /// - Fetch the corresponding NodeComplete from the map
 /// - Read its aliases into 'aliases'
 /// - Partition the AliasCol's children into:
-///   - TrueNodes with birth != ContentOf
+///   - TrueNodes with parentIs != Container
 ///   - Alias scaffold nodes
 ///   (Error if any child does not fit these categories.)
 /// - Reorder children: ignored TrueNodes first, then Alias nodes
@@ -98,6 +98,6 @@ pub fn reconcile_alias_col_children (
       |vn : &ViewNode| matches!( &vn . kind, ViewNodeKind::True (_)),
       |vn : &mut ViewNode| {
         if let ViewNodeKind::True( ref mut t ) = vn . kind {
-          t . birth = Birth::Independent; }},
+          t . parentIs = ParentIs::Independent; }},
     ) . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   Ok( () ) }

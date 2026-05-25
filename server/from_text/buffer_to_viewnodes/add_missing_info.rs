@@ -5,7 +5,7 @@
 
 use crate::types::git::MembershipAxes;
 use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
-use crate::types::viewnode::Scaffold;
+use crate::types::viewnode::{ParentIs, Scaffold};
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::dbs::typedb::util::pids_from_ids::replace_ids_with_pids;
@@ -41,6 +41,29 @@ pub async fn add_missing_info_to_viewforest(
       assign_new_id_if_absent (&mut node)?; // Do this *after* PID replacement, so that fresh UUIDs don't trigger a pointless TypeDB lookup.
       Ok (( )) } )?;
   Ok (( )) }
+
+pub fn absent_parentIs_under_visible_parent_becomes_isContainer (
+  viewforest : &mut Tree<MaybePlacedViewnode>,
+) {
+  let root_id : NodeId =
+    viewforest . root() . id();
+  let mut need_changing : Vec<NodeId> = Vec::new();
+  for node_ref in viewforest . root() . descendants() {
+    // collect immuatable references to what needs changing
+    let parent_is_visible : bool =
+      node_ref . parent()
+      . map ( |p| p . id() != root_id )
+      . unwrap_or (false);
+    if ! parent_is_visible { continue; }
+    if let MaybePlacedViewnodeKind::True (t) = &node_ref . value() . kind {
+      if t . parentIs == ParentIs::Absent {
+        need_changing . push (node_ref . id()); }}}
+  for node_id in need_changing { // change them
+    let mut node_mut : NodeMut<MaybePlacedViewnode> =
+      viewforest . get_mut (node_id) . unwrap();
+    if let MaybePlacedViewnodeKind::True (t) =
+      &mut node_mut . value() . kind
+    { t . parentIs = ParentIs::Container; }}}
 
 /// Make it a Scaffold::Alias if both:
 /// - it is a TrueNode

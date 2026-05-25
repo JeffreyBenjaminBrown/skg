@@ -63,7 +63,7 @@ fn test_definitive_view_limit_10
 
       // With limit=10, all children should be expanded
       let expected = indoc! {"
-        * (skg (node (id 1) (source main) (birth independent) (graphStats (contents 3)))) 1
+        * (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
         ** (skg (node (id 11) (source main))) 11
         ** (skg (node (id 12) (source main) (graphStats (contents 4)))) 12
         12 body
@@ -82,7 +82,7 @@ fn test_definitive_view_limit_10
         *** (skg (node (id 124) (source main))) 124
         124 body
         ** (skg (node (id 13) (source main))) 13
-        * (skg (node (id 2) (source main) (birth independent))) 2
+        * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
 
       assert_eq!(result, expected,
@@ -155,7 +155,7 @@ fn test_definitive_view_limit_5_or_6
       // Both limits produce the same result because truncation
       // completes the sibling group.
       let expected = indoc! {"
-        * (skg (node (id 1) (source main) (birth independent) (graphStats (contents 3)))) 1
+        * (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
         ** (skg (node (id 11) (source main))) 11
         ** (skg (node (id 12) (source main) (graphStats (contents 4)))) 12
         12 body
@@ -167,7 +167,7 @@ fn test_definitive_view_limit_5_or_6
         *** (skg (node (id 123) (source main) indef)) 123
         *** (skg (node (id 124) (source main) indef)) 124
         ** (skg (node (id 13) (source main))) 13
-        * (skg (node (id 2) (source main) (birth independent))) 2
+        * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
 
       assert_eq!(result_5, expected,
@@ -238,7 +238,7 @@ fn test_definitive_view_limit_1_to_4
       // - Limit is hit on the first generation
       // - Sibling group is completed, all are indefinitive
       let expected = indoc! {"
-        * (skg (node (id 1) (source main) (birth independent) (graphStats (contents 3)))) 1
+        * (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
         ** (skg (node (id 11) (source main))) 11
         ** (skg (node (id 12) (source main) (graphStats (contents 4)))) 12
         12 body
@@ -247,7 +247,7 @@ fn test_definitive_view_limit_1_to_4
         *** (skg (node (id 123) (source main) indef)) 123
         *** (skg (node (id 124) (source main) indef)) 124
         ** (skg (node (id 13) (source main))) 13
-        * (skg (node (id 2) (source main) (birth independent))) 2
+        * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
 
       assert_eq!(result_1, expected,
@@ -304,10 +304,10 @@ fn test_definitive_view_conflicting
         // The second 12 (root with request) should be expanded.
         // NOTE: The first 12 redefines the children of 12 as [122]
         // rather than [121,122,123,124].
-        "* (skg (node (id 1) (source main) (birth independent) (graphStats (contents 1)))) 1
+        "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 1)))) 1
          ** (skg (node (id 12) (source main) indef (graphStats (contents 1)))) 12
          *** (skg (node (id 122) (source main) indef (graphStats (contents 1)))) 122
-         * (skg (node (id 12) (source main) (birth independent) (graphStats (containers 1) (contents 1)))) 12
+         * (skg (node (id 12) (source main) (parentIs absent) (graphStats (containers 1) (contents 1)))) 12
          ** (skg (node (id 122) (source main) (graphStats (contents 1)))) 122
          122 body
          *** (skg (node (id 1221) (source main))) 1221
@@ -357,7 +357,7 @@ fn test_definitive_view_with_cycle
 
       // a should expand to show b, and b's child a should be marked as cycle
       let expected = indoc! {"
-        * (skg (node (id cyc-a) (source main) (birth independent) (graphStats (containers 1) (contents 1)))) cyc-a
+        * (skg (node (id cyc-a) (source main) (parentIs absent) (graphStats (containers 1) (contents 1)))) cyc-a
         cyc-a body
         ** (skg (node (id cyc-b) (source main) (graphStats (contents 1)) (viewStats containsParent))) cyc-b
         cyc-b body
@@ -410,8 +410,8 @@ fn test_definitive_view_with_repeat
         // but the definitive view of 121 deleted its children.
         // The new 121 under 12 is rendered indefinitive,
         // because it was already rendered as a sibling of 12.
-        "* (skg (node (id 121) (source main) (birth independent) (graphStats (containers 1)))) 121
-         * (skg (node (id 12) (source main) (birth independent) (graphStats (containers 1) (contents 4)))) 12
+        "* (skg (node (id 121) (source main) (parentIs absent) (graphStats (containers 1)))) 121
+         * (skg (node (id 12) (source main) (parentIs absent) (graphStats (containers 1) (contents 4)))) 12
          12 body
          ** (skg (node (id 121) (source main) indef)) 121
          ** (skg (node (id 122) (source main) (graphStats (contents 1)))) 122

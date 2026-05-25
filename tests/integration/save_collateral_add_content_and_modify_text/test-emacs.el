@@ -31,11 +31,11 @@
       (kill-emacs 1))
     (assert-headline-structure
      buf
-     '((1 contentOf "a")
-       (2 containerOf  "b")
-       (3 containerOf  "a")
-       (2 contentOf    "b")
-       (3 contentOf    "a"))
+     '((1 container "a")
+       (2 content  "b")
+       (3 content  "a")
+       (2 container    "b")
+       (3 container    "a"))
      "phase 1: buffer A initial")))
 
 (defun phase-2-open-buffer-b ()
@@ -50,11 +50,11 @@
       (kill-emacs 1))
     (assert-headline-structure
      buf
-     '((1 contentOf "b")
-       (2 containerOf  "a")
-       (3 containerOf  "b")
-       (2 contentOf    "a")
-       (3 contentOf    "b"))
+     '((1 container "b")
+       (2 content  "a")
+       (3 content  "b")
+       (2 container    "a")
+       (3 container    "b"))
      "phase 2: buffer B initial")))
 
 (defun phase-3-edit-and-save ()
@@ -65,11 +65,11 @@
     ;; Verify pre-edit structure
     (assert-headline-titles
      buf
-     '((1 contentOf "b")
-       (2 containerOf  "a")
-       (3 containerOf  "b")
-       (2 contentOf    "a")
-       (3 contentOf    "b"))
+     '((1 container "b")
+       (2 content  "a")
+       (3 content  "b")
+       (2 container    "a")
+       (3 container    "b"))
      "phase 3: buffer B before edit")
     (with-current-buffer buf
       ;; Change a's title on line 4 (the definitive a):
@@ -86,12 +86,12 @@
     ;; Verify post-edit structure
     (assert-headline-titles
      buf
-     '((1 contentOf "b")
-       (2 containerOf  "a")
-       (3 containerOf  "b")
-       (2 contentOf    "Node a was given this longer title")
-       (3 contentOf    "b")
-       (3 contentOf    "c"))
+     '((1 container "b")
+       (2 content  "a")
+       (3 content  "b")
+       (2 container    "Node a was given this longer title")
+       (3 container    "b")
+       (3 container    "c"))
      "phase 3: buffer B after edit")
     (with-current-buffer buf
       (skg-request-save-buffer))
@@ -108,11 +108,11 @@
     (assert-headline-titles
      buf
      '((1 independent "b")
-       (2 containerOf  "Node a was given this longer title")
-       (3 containerOf  "b")
-       (2 contentOf    "Node a was given this longer title")
-       (3 contentOf    "b")
-       (3 contentOf    "c"))
+       (2 content  "Node a was given this longer title")
+       (3 content  "b")
+       (2 container    "Node a was given this longer title")
+       (3 container    "b")
+       (3 container    "c"))
      "phase 4: buffer B after save")
     (with-current-buffer buf ;; Verify the line for c has its title and an ID
       (goto-char (point-min))
@@ -151,11 +151,11 @@ and the new child c."
     (assert-headline-titles
      buf
      '((1 independent "Node a was given this longer title")
-       (2 containerOf  "b")
-       (3 containerOf  "Node a was given this longer title")
-       (2 contentOf    "b")
-       (3 contentOf    "Node a was given this longer title")
-       (2 contentOf    "c"))
+       (2 content  "b")
+       (3 content  "Node a was given this longer title")
+       (2 container    "b")
+       (3 container    "Node a was given this longer title")
+       (2 container    "c"))
      "phase 5: buffer A after collateral update")))
 
 (defun run-all-tests ()

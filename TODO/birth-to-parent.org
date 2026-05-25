@@ -2,7 +2,7 @@
 Welcome, ChatGPT! Please read coding-advice/ORIENTATION.org,
 and whatever it refers to (recursively), for orientation. Then:
 
-There's something muddled about the Birth concept.
+There's something muddled about the ParentIs concept.
 It ought to describe the node's relationship to its parent
 when the view was last re-rendered (esp. before recent user edits
 that may have moved the node).
@@ -15,14 +15,14 @@ then it simply shouldn't have a Parent field at all,
 nor the corresponding herald.
 
 Please read through all the instances in which we assign or modify
-the Birth of a node, and determine whether any of them are muddled.
+the ParentIs of a node, and determine whether any of them are muddled.
 I'm already aware of one: If a view-root is graph-content,
-a user's initial visit to it gives it Birth=ContentOf,
-but on saving that Birth is changed to Independent.
+a user's initial visit to it gives it ParentIs=Container,
+but on saving that ParentIs is changed to Independent.
 This should solve that (since it won't have a Parent at all).
 But there might other, similarly unnatural things.
 
-Then write a report, 'complex-birth-to-simple-parent.org',
+Then write a report, 'complex-parentIs-to-simple-parent.org',
 with your findings and recommendations.
 * 2
 Halfway through your report I changed my mind somewhat.
@@ -47,7 +47,7 @@ without having to edit its metadata before saving.
 
 Rather than edit your report in place,
 I suspect it'll be faster to just write a new report.
-I've renamed your report to complex-birth-to-simple-parent_v1.org.
+I've renamed your report to complex-parentIs-to-simple-parent_v1.org.
 Please write a _v2 to a separate file.
 
 If you see anything to push back against --

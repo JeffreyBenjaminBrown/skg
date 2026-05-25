@@ -44,11 +44,12 @@
       (RED   removedM "-M"))
     (node
       (source) ;; ignored
-      (birth
-        (BLUE   contentOf   "{")
+      (parentIs
+        (BLUE   container   "{")
+        (absent)
         (ORANGE independent "⊥")
-        (ORANGE containerOf "}")
-        (ORANGE linksTo     "←"))
+        (ORANGE content "}")
+        (ORANGE linkTarget     "←"))
       ;; Server emits the abbreviated atom `indef' (see
       ;; org_to_text.rs); we match that here.
       (GREEN indef ABUT "☮")
@@ -118,7 +119,7 @@ table converts them 1:1 into short herald strings. A few patterns:
 
   * ABUT marker -- `(GREEN indef ABUT \"☮\")' tells the renderer to
     glue the `☮' onto the preceding token with no space. Used so
-    the indefinitive marker sits directly on its birth glyph.
+    the indefinitive marker sits directly on its parentIs glyph.
 
 WHY SOME RULES LOOK EMPTY OR REDUNDANT
 
@@ -140,11 +141,11 @@ WHY SOME RULES LOOK EMPTY OR REDUNDANT
 
 NORMALISATION
 
-The server leaves ContentOf birth implicit in `(node ...)'. Before
+The server leaves Container parentIs implicit in `(node ...)'. Before
 this table runs, `heralds--read-metadata' calls
-`heralds--inject-default-birth' to add `(birth contentOf)' when
-missing, so the `(birth (BLUE contentOf \"{\") ...)' sub-rule can
-fire uniformly for all four variants.")
+`heralds--inject-default-parentIs' to add `(parentIs container)' when
+missing, so the `(parentIs (BLUE container \"{\") ...)' sub-rule can
+fire uniformly for variants with visible heralds.")
 
 (defun heralds--tokens->text (tokens)
   "Convert list of TOKENS (propertized strings) to a display string.
@@ -152,7 +153,7 @@ Tokens carry `skg-color' on character ranges (single-color tokens
 propertize the whole string; INTERC-built tokens carry per-segment
 colors). Tokens separated by a space, except tokens whose position
 0 has an `skg-abut' property are joined to the preceding token
-with no separator (used to glue e.g. ☮ onto its birth character).
+with no separator (used to glue e.g. ☮ onto its parentIs character).
 Structural colons added by the transform (like `3:{' -> `3{') are
 stripped when either side is non-alphanumeric."
   (when tokens
@@ -318,18 +319,18 @@ parse as an `(skg ...)' form."
   "Read METADATA-SEXP string into a Lisp object and normalise it.
 Returns nil if parsing fails. Normalisation currently means: if
 the sexp is an (skg (node ...)) form whose node has no explicit
-(birth ...) sub-form, insert (birth contentOf) -- the server
-leaves ContentOf implicit (see the note in org_to_text.rs), but
-the herald rules want to dispatch on all four birth variants
+(parentIs ...) sub-form, insert (parentIs container) -- the server
+leaves Container implicit (see the note in org_to_text.rs), but
+the herald rules want to dispatch on explicit parentIs variants
 explicitly."
   (let ((parsed (condition-case nil
                     (car (read-from-string metadata-sexp))
                   (error nil))))
-    (heralds--inject-default-birth parsed)))
+    (heralds--inject-default-parentIs parsed)))
 
-(defun heralds--inject-default-birth (sexp)
-  "If SEXP is `(skg (node ...) ...)` and the node has no (birth ...)
-child, return a copy with `(birth contentOf)' inserted into the
+(defun heralds--inject-default-parentIs (sexp)
+  "If SEXP is `(skg (node ...) ...)` and the node has no (parentIs ...)
+child, return a copy with `(parentIs container)' inserted into the
 node. Otherwise return SEXP unchanged."
   (if (and (listp sexp)
            (eq (car-safe sexp) 'skg))
@@ -340,14 +341,14 @@ node. Otherwise return SEXP unchanged."
                         (not (cl-some
                               (lambda (sub)
                                 (and (listp sub)
-                                     (eq (car-safe sub) 'birth)))
+                                     (eq (car-safe sub) 'parentIs)))
                               (cdr child))))
-                   ;; insert (birth contentOf) immediately after the
+                   ;; insert (parentIs container) immediately after the
                    ;; `node' symbol; its position in the list doesn't
                    ;; affect matching but keeps the normalised form
                    ;; readable if ever inspected.
                    (cons 'node
-                         (cons '(birth contentOf) (cdr child)))
+                         (cons '(parentIs container) (cdr child)))
                  child))
              (cdr sexp)))
     sexp))
@@ -377,6 +378,6 @@ node. Otherwise return SEXP unchanged."
 
 (defface heralds-orange-face
   '((t :foreground "white" :background "#d2691e"))
-  "White-on-orange for non-content birth heralds (⊥, }, ←).")
+  "White-on-orange for non-content parentIs heralds (⊥, }, ←).")
 
 (provide 'heralds-minor-mode)

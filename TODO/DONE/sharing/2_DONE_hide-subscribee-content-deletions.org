@@ -64,9 +64,9 @@ The current renderer already has most of the desired behavior:
 On save, for each subscriber S in the buffer, inspect each expanded
 subscribee E shown under S's SubscribeeCol.
 
-For each direct child C in E's pre-save 'contains':
+For each child C in E's pre-save 'contains':
 
-- If C is still visible as a non-ignored direct child of E in the
+- If C is still visible as a non-ignored child of E in the
   as-a-subscribee view, do not add a hide.
 - If C is no longer visible under E, but C is now ordinary direct
   content of S, do not add a hide.
@@ -75,7 +75,7 @@ For each direct child C in E's pre-save 'contains':
 
 The comparison should be direct-content only. Hiding grandchildren
 should happen only when their immediate subscribee parent is shown as
-a subscribee and the grandchild was removed from that direct child
+a subscribee and the grandchild was removed from that child
 list. This matches the current rendering semantics, which filter only
 top-level subscribed content at each expanded subscribee node.
 
@@ -140,7 +140,7 @@ For each subscribee E:
   'nodecomplete_from_inrustgraph_or_disk'.
 - Let 'pre_save_contains' be E's current 'contains'.
 - Let 'visible_in_buffer' be E's non-ignored, non-phantom, non-delete
-  direct TrueNode children, excluding scaffold children such as
+  TrueNode children, excluding scaffold children such as
   HiddenInSubscribeeCol.
 - For every ID in 'pre_save_contains' that is absent from
   'visible_in_buffer' and absent from S's ordinary content, infer a
@@ -210,7 +210,7 @@ HiddenOutsideOfSubscribeeCol. The vision explicitly leaves unhiding
 unresolved, and the current local validation treats those scaffold
 children as display rows, not edit commands.
 
-For this feature, the only edit surface is the direct content children
+For this feature, the only edit surface is the content children
 of a definitive TrueNode shown as a subscribee.
 
 ** Rerendering should mostly fall out
@@ -255,16 +255,16 @@ important sharing case. Exercise:
 
 - Initial view from S.
 - Request a definitive view for E.
-- Physically remove one direct child from E's subscribee-as-such content.
+- Physically remove one child from E's subscribee-as-such content.
 - Save.
 - Assert that S's saved '.skg' now includes that ID in
   'hides_from_its_subscriptions'.
 - Assert the returned buffer shows the child under
-  HiddenInSubscribeeCol, not under E's visible direct content.
+  HiddenInSubscribeeCol, not under E's visible content.
 
 Also test the "move to S ordinary content" case:
 
-- Move the child out from under E and into S's direct content.
+- Move the child out from under E and into S's content.
 - Save.
 - Assert S's hide list did not gain that ID.
 - Assert E's as-a-subscribee view no longer shows that ID under the

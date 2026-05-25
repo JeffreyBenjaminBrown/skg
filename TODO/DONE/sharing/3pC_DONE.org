@@ -4,25 +4,25 @@ Suppose:
 - C, view-child of R, is a subscribee collection
 - E, view-child of C, is a subscribee
 
-If N is a view-child of E with Birth=ContentOf,
+If N is a view-child of E with ParentIs=Container,
 there are two cases:
 - If N is *not* graph-content of E,
-  N's Birth should become Independent.
+  N's ParentIs should become Independent.
 - If N *is* graph-content of E,
   then N should be unhidden from R.
 
 If N is graph-content of E,
-and no view-child of E has the ID of N and Birth=ContentOf,
+and no view-child of E has the ID of N and ParentIs=Container,
 and N is not graph-content of R after the save,
 then N should be hidden from R.
 Otherwise, no effect.
 
-After the above changes, the Birth=ContentOf children of E
+After the above changes, the ParentIs=Container children of E
 should be reordered to match their order as E's graph-content.
 
 Conclusion: this answers the design question. Extra view-children are
 not rejected and are not saved as graph-content of E. If they are not
-graph-content of E, they should be normalized to Birth=Independent.
+graph-content of E, they should be normalized to ParentIs=Independent.
 Only graph-content of E participates in hide/unhide inference.
 * Plan: define extra view-child policy under AsSubscribee
 
@@ -42,7 +42,7 @@ The core invariant is already protected: children of an
 The user policy is now settled in [[*Jeff's preconception][Jeff's preconception]]. If a user
 inserts a new view-child under a subscribee-in-subscription position,
 that child is not part of the subscribee's pre-save graph-content, so
-it should be normalized to Birth=Independent and should not itself
+it should be normalized to ParentIs=Independent and should not itself
 mean hide or unhide for that subscribee relationship.
 
 Current code shape suggests this behavior:
@@ -86,8 +86,8 @@ the tests.
 
 If not, make the smallest change needed so that:
 
-- view-children of E with Birth=ContentOf that are not graph-content
-  of E become Birth=Independent;
+- view-children of E with ParentIs=Container that are not graph-content
+  of E become ParentIs=Independent;
 - graph-content view-children of E are ordered to match E's
   graph-content order;
 - only graph-content of E participates in hide/unhide inference.
@@ -124,7 +124,7 @@ cargo check
   =contains= edits.
 - Tests prove extras that are not graph-content of E do not affect
   hide/unhide inference.
-- Tests prove extras are normalized to Birth=Independent and
+- Tests prove extras are normalized to ParentIs=Independent and
   graph-content view-children are ordered by E's graph-content order.
 - No unrelated behavior changes.
 
@@ -134,11 +134,11 @@ Complete. The policy is documented at
 =apply_hiderels_from_intents=.
 
 Saved =AsSubscribee= completion now normalizes view-children that are
-not graph-content of the subscribee to =Birth=Independent= and orders
+not graph-content of the subscribee to =ParentIs=Independent= and orders
 graph-content view-children by the subscribee's graph-content order.
 
 Added foreign and owned regressions in
 =tests/hidden_from_subscriptions.rs=. They verify that extra
 view-children do not become subscribee =contains= edits, do not affect
-hide/unhide inference, become =Birth=Independent= in the saved view,
+hide/unhide inference, become =ParentIs=Independent= in the saved view,
 and leave graph-content view-children in graph-content order.

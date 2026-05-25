@@ -497,10 +497,10 @@ fn test_empty_title_allowed_for_indefinitive_and_delete (
 fn test_definitive_request_with_only_non_content_children_is_allowed (
 ) -> Result<(), Box<dyn Error>> {
   // A definitive view request on an indefinitive node whose children
-  // are all NON-content (birth != ContentOf) should be permitted: the
+  // are all NON-content (parentIs != Container) should be permitted: the
   // expansion would fill the node with content, and non-content
-  // children (e.g. 'birth containerOf' ancestry stubs) don't conflict
-  // with that. Only ContentOf children would be clobbered.
+  // children (e.g. 'parentIs content' ancestry stubs) don't conflict
+  // with that. Only Container children would be clobbered.
   run_with_test_db(
     "skg-test-definitive-non-content-children",
     "tests/merge/merge_nodes/fixtures",
@@ -509,7 +509,7 @@ fn test_definitive_request_with_only_non_content_children_is_allowed (
       let input : &str =
         indoc! {"
                 * (skg (node (id parent) (source main) indef (viewRequests definitiveView))) parent
-                ** (skg (node (id ancestor) (source main) (birth containerOf))) non-content child
+                ** (skg (node (id ancestor) (source main) (parentIs content))) non-content child
             "};
       let viewforest : Tree<MaybePlacedViewnode> =
         org_to_uninterpreted_nodes (input) . unwrap () . 0;
@@ -529,7 +529,7 @@ fn test_definitive_request_with_only_non_content_children_is_allowed (
 #[test]
 fn test_definitive_request_with_content_child_is_rejected (
 ) -> Result<(), Box<dyn Error>> {
-  // Flip side: a ContentOf child (the default when 'birth' is absent)
+  // Flip side: a Container child (the default when 'parentIs' is absent)
   // DOES conflict with expansion, so the error should fire.
   run_with_test_db(
     "skg-test-definitive-content-children",
@@ -552,7 +552,7 @@ fn test_definitive_request_with_content_child_is_rejected (
             if id . 0 == "parent" ))
         . collect ();
       assert_eq! ( hits . len (), 1,
-        "A ContentOf child should trigger exactly one \
+        "A Container child should trigger exactly one \
          DefinitiveRequestOnNodeWithContentChildren for 'parent'. \
          Errors: {:?}",
         errors );

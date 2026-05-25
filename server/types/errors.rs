@@ -34,7 +34,7 @@ pub enum BufferValidationError {
   CannotMoveAndMergeSimultaneously (ID),
   SourceNotInConfig              (ID, SourceName),
   DefinitiveRequestOnDefinitiveNode      (ID), // A definitive view request on a node that is already definitive
-  DefinitiveRequestOnNodeWithContentChildren (ID), // A definitive view request on a node that has content (birth=ContentOf) children. Non-content children (e.g. containerOf ancestry stubs) don't trigger this.
+  DefinitiveRequestOnNodeWithContentChildren (ID), // A definitive view request on a node that has content (parentIs=Container) children. Non-content children (e.g. containerward ancestry stubs) don't trigger this.
   MultipleDefinitiveRequestsForSameId    (ID), // Multiple definitive view requests for the same ID
   EmptyTitle                             (ID),
   LocalStructureViolation        (String, ID), // (error message, nearest ancestor ID)

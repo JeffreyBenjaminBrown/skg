@@ -1,8 +1,8 @@
 ;;; Integration test: opening a content view of `child', whose
 ;;; parent contains it, should render the buffer with `parent'
-;;; prepended as the first child of `child' (Birth::ContainerOf
+;;; prepended as the first child of `child' (ParentIs::Content
 ;;; indefinitive). Because `child' is contained in the graph, the
-;;; view-root is born as contentOf; that default is implicit in
+;;; view-root is born as container; that default is implicit in
 ;;; emitted metadata.
 
 (load-file "../../../elisp/skg-init.el")
@@ -34,13 +34,13 @@
                             (match-string 0 text))))
         (unless root-line
           (fail "no view-root headline for child; buffer:\n%s" text))
-        (when (string-match-p "(birth independent)" root-line)
+        (when (string-match-p "(parentIs independent)" root-line)
           (fail "contained view-root should be content, not independent; line: %S"
                 root-line))
-        (when (string-match-p "(birth containerOf)" root-line)
-          (fail "contained view-root should be content, not containerOf; line: %S"
+        (when (string-match-p "(parentIs content)" root-line)
+          (fail "contained view-root should be content, not content; line: %S"
                 root-line))
-        (when (string-match-p "(birth linksTo)" root-line)
+        (when (string-match-p "(parentIs linkTarget)" root-line)
           (fail "contained view-root should be content, not line: %S"
                 root-line)))
       (let ((line (and (string-match
@@ -48,8 +48,8 @@
                        (match-string 0 text))))
         (unless line
           (fail "no level-2 headline for parent; buffer:\n%s" text))
-        (unless (string-match-p "(birth containerOf)" line)
-          (fail "parent is not (birth containerOf); line: %S" line))
+        (unless (string-match-p "(parentIs content)" line)
+          (fail "parent is not (parentIs content); line: %S" line))
         (unless (string-match-p " indef\\b" line)
           (fail "parent is not indefinitive; line: %S" line))))))
 

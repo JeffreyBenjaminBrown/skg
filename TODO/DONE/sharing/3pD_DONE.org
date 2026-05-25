@@ -85,7 +85,7 @@ The existing policy remains:
 - view-children under the subscribee-as-such branch express
   subscriber visibility only when they are graph-content of the
   subscribee;
-- extra view-children are normalized to =Birth=Independent= by saved
+- extra view-children are normalized to =ParentIs=Independent= by saved
   completion;
 - the subscribee's graph-content is not saved from this branch.
 

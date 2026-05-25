@@ -37,7 +37,7 @@
 
    Consider refactoring to mutate in place:
    clear body, set indef_or_def to Indefinitive,
-   update birth — but keep everything else.
+   update parentIs — but keep everything else.
 
 ** 'path_from_pid_and_source' uses .expect() and can panic
    server/util.rs. Already noted in MEMORY.md.

@@ -18,7 +18,7 @@
 ///    And the test 'test_super_indentation_creates_grouping_nodes'
 ///    might be clearer than any explanation.)
 ///    Org-roam allows "super-indentation": a headline like `*** c` directly under
-///    `* a`, skipping level 2. When a node's direct children span
+///    `* a`, skipping level 2. When a node's children span
 ///    more than one headline level, we wrap them in **synthetic
 ///    grouping nodes** — `SectionTree` nodes that do not correspond
 ///    to any line in the file. They carry an `override_body` instead
@@ -33,7 +33,7 @@
 ///
 /// 5. **Emit NodeCompletes.** Walk the viewforest depth-first, converting each
 ///    `SectionTree` into a flat `NodeComplete` whose `contains` field lists
-///    its direct children by ID.
+///    its children by ID.
 
 use crate::types::misc::{ID, MSV, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
@@ -188,14 +188,14 @@ fn build_section_viewforest (
 //
 
 /// Walk a SectionTree bottom-up, inserting synthetic grouping nodes
-/// wherever a node's direct children span more than one headline level.
+/// wherever a node's children span more than one headline level.
 fn insert_super_indentation_groups (
   tree : &mut SectionTree,
 ) {
   // Recurse into children first (bottom-up).
   for child in &mut tree . children {
     insert_super_indentation_groups (child); }
-  // Collect distinct levels of direct children.
+  // Collect distinct levels of children.
   let mut levels : Vec<usize> = tree . children . iter()
     . map (|c| c . section . level)
     . collect::<Vec<_>>();

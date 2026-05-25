@@ -2,11 +2,11 @@ Most of this is straightforward,
 but the super-indentation rules are not.
 
 SUPER-INDENTATION
-means a node has direct org children at more than one headline depth, e.g. *** child directly under a * parent alongside ** child or * child levels. The importer does not preserve that as raw skipped org levels. Instead, bottom-up, it inserts synthetic grouping nodes whenever a node’s direct children span multiple headline levels.
+means a node has org children at more than one headline depth, e.g. *** child directly under a * parent alongside ** child or * child levels. The importer does not preserve that as raw skipped org levels. Instead, bottom-up, it inserts synthetic grouping nodes whenever a node’s children span multiple headline levels.
 
 For each such mixed-level child set:
 
-- The most-indented direct children go under a generated node titled These are special!.
+- The most-indented children go under a generated node titled These are special!.
 - That generated node’s body is They were super-indented in org-roam.
 - The remaining, less-indented children go under a generated node titled These are normal.
 - That node’s body says they were buried to encourage reading the super-indented nodes.
