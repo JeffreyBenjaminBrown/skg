@@ -183,10 +183,11 @@ target, then the buffer is saved."
 
 (defun skg--replace-current-subtree-with-link-headline (id title)
   "Replace the current org subtree with a headline linking to ID.
-The link label is TITLE with any nested links reduced to plain text."
+The default link label is TITLE with any nested links reduced to plain text."
   (let* ((stars (nth 0 (skg-split-as-stars-metadata-title
                        (skg-get-current-headline-text))))
-         (label (skg--replace-headline-links-with-labels title))
+         (default-label (skg--replace-headline-links-with-labels title))
+         (label (skg--read-link-label default-label))
          (replacement (format "%s[[id:%s][%s]]\n" stars id label))
          (start (line-beginning-position))
          (end (save-excursion
@@ -274,5 +275,11 @@ one link is not an id link."
          (match-string 2 link)
        (match-string 1 link)))
    title))
+
+(defun skg--read-link-label (default-label)
+  "Prompt for a link label, defaulting to DEFAULT-LABEL."
+  (if (minibufferp)
+      default-label
+    (read-string "Link label: " default-label)))
 
 (provide 'skg-modify-graph)

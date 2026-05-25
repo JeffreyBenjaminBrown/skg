@@ -1,12 +1,8 @@
-* to be more sure of the git diff analysis
+* ? to be more sure of the git diff analysis
 Have independent code count the number of disappeared files,
 moved files, new roots, and other anomalies,
 and check it against the report.
 (Backgrounded.)
-* offer to change link label before fixing it in 'C-c m l'
-* TODO git branch faster-diff-analysis
-from skg3, run
-  codex resume 019e51c3-97dd-7502-b8d0-9b0306c0c6f9
 * TODO git branch birth-to-parentIs
 ** has two commits
 the second (later) unreviewed
