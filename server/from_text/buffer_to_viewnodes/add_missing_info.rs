@@ -42,13 +42,14 @@ pub async fn add_missing_info_to_viewforest(
       Ok (( )) } )?;
   Ok (( )) }
 
-pub fn normalize_absent_parentIs_under_visible_parent (
+pub fn absent_parentIs_under_visible_parent_becomes_isContainer (
   viewforest : &mut Tree<MaybePlacedViewnode>,
 ) {
   let root_id : NodeId =
     viewforest . root() . id();
-  let mut node_ids : Vec<NodeId> = Vec::new();
+  let mut need_changing : Vec<NodeId> = Vec::new();
   for node_ref in viewforest . root() . descendants() {
+    // collect immuatable references to what needs changing
     let parent_is_visible : bool =
       node_ref . parent()
       . map ( |p| p . id() != root_id )
@@ -56,8 +57,8 @@ pub fn normalize_absent_parentIs_under_visible_parent (
     if ! parent_is_visible { continue; }
     if let MaybePlacedViewnodeKind::True (t) = &node_ref . value() . kind {
       if t . parentIs == ParentIs::Absent {
-        node_ids . push (node_ref . id()); }}}
-  for node_id in node_ids {
+        need_changing . push (node_ref . id()); }}}
+  for node_id in need_changing { // change them
     let mut node_mut : NodeMut<MaybePlacedViewnode> =
       viewforest . get_mut (node_id) . unwrap();
     if let MaybePlacedViewnodeKind::True (t) =

@@ -24,7 +24,7 @@
 
 (defconst skg-truenode--editable-defaults
   '(("indef"  . "false (default)")
-    ("parentIs"         . "container (default)")
+    ("parentIs"      . "container (default)")
     ("editRequest"   . "none (default)")
     ("viewRequests"  . "none (default)"))
   "Alist of editable field names to their default value text.")

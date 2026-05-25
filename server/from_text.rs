@@ -20,7 +20,7 @@ use crate::types::viewnode::ViewNode;
 use buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest,
-  normalize_absent_parentIs_under_visible_parent};
+  absent_parentIs_under_visible_parent_becomes_isContainer};
 use buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use viewnodes_to_instructions::{
   extract_nonmergeSavePlan_from_authority,
@@ -67,7 +67,7 @@ pub async fn buffer_to_validated_saveplan (
     add_missing_info_to_viewforest (
       & mut maybePlaced_viewforest, & config . db_name, driver )
     . await } . map_err (SaveError::DatabaseError) ?;
-  normalize_absent_parentIs_under_visible_parent (
+  absent_parentIs_under_visible_parent_becomes_isContainer (
     &mut maybePlaced_viewforest );
   { // If saving is impossible, don't.
     let mut validation_errors : Vec<BufferValidationError> =

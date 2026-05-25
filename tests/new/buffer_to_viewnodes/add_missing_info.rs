@@ -4,7 +4,7 @@ use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest,
-  normalize_absent_parentIs_under_visible_parent};
+  absent_parentIs_under_visible_parent_becomes_isContainer};
 use skg::test_utils::{run_with_test_db, compare_viewnode_trees_modulo_id, compare_viewnode_trees};
 use skg::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
 use skg::types::misc::{SkgConfig, ID};
@@ -86,7 +86,7 @@ async fn test_add_missing_info_logic (
   Ok (( )) }
 
 #[test]
-fn test_normalize_absent_parentIs_under_visible_parent () {
+fn test_absent_parentIs_under_visible_parent_becomes_isContainer () {
   let input : &str =
     indoc! {"
             * (skg (node (id root) (source main) (parentIs absent))) root
@@ -95,7 +95,7 @@ fn test_normalize_absent_parentIs_under_visible_parent () {
   let mut viewforest : Tree<MaybePlacedViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
 
-  normalize_absent_parentIs_under_visible_parent (
+  absent_parentIs_under_visible_parent_becomes_isContainer (
     &mut viewforest );
 
   let root_node =
