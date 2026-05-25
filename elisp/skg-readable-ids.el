@@ -1,7 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Minor mode that annotates skg UUIDs in magit buffers
-;;; with their titles, using after-string overlays.
+;;; PURPOSE: Minor mode that annotates skg UUIDs in magit and .skg
+;;; file buffers with their titles, using after-string overlays.
 ;;; It affects both bare IDs and IDs that are part of .skg filenames.
 ;;;
 ;;; PITFALL: The after-string overlays break home/end navigation
@@ -170,9 +170,23 @@ exposing the id. Plain titles pass through unchanged."
    "[[\\1]]"
    title))
 
+(defun skg-readable-ids--skg-file-buffer-p (buf)
+  "Return non-nil if BUF visits a .skg file."
+  (and (buffer-live-p buf)
+       (buffer-local-value 'buffer-file-name buf)
+       (string-match-p "\\.skg\\'"
+                       (buffer-local-value 'buffer-file-name buf))))
+
+(defun skg-readable-ids--maybe-enable ()
+  "Enable `skg-readable-ids-mode' if the current buffer visits a .skg file."
+  (when (skg-readable-ids--skg-file-buffer-p (current-buffer))
+    (skg-readable-ids-mode 1)))
+
+(add-hook 'find-file-hook #'skg-readable-ids--maybe-enable)
+
 ;;;###autoload
 (define-minor-mode skg-readable-ids-mode
-  "Annotate skg IDs in magit buffers with their titles."
+  "Annotate skg IDs in buffers with their titles."
   :lighter " skg-titles"
   (if skg-readable-ids-mode
       (progn
