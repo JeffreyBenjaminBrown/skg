@@ -48,6 +48,7 @@ pub enum ViewNodeKind {
   Deleted      (DeletedNode),
   DeletedScaff (ScaffoldKind),
   Unknown      (UnknownNode),
+  Inactive     (InactiveNode),
 }
 
 /// A node whose .skg file was deleted by a save in another buffer.
@@ -66,6 +67,13 @@ pub struct DeletedNode {
 #[derive( Debug, Clone, PartialEq )]
 pub struct UnknownNode {
   pub id : ID,
+}
+
+#[derive( Debug, Clone, PartialEq )]
+pub struct InactiveNode {
+  pub id         : ID,
+  pub source     : SourceName,
+  pub membership : MembershipAxes,
 }
 
 pub type TrueNode            = TrueNode_Generic < ID, SourceName >;
@@ -415,6 +423,7 @@ impl ViewNode {
       // line. The metadata alone is non-empty, so viewnode_to_text
       // is satisfied.
       ViewNodeKind::Unknown (_) => "",
+      ViewNodeKind::Inactive (_) => "node from inactive source",
     }}
 
   /// Reasonable for both TrueNodes and Scaffolds.
@@ -425,6 +434,7 @@ impl ViewNode {
       ViewNodeKind::Deleted (d) => d . body . as_ref (),
       ViewNodeKind::DeletedScaff (_) => None,
       ViewNodeKind::Unknown (_) => None,
+      ViewNodeKind::Inactive (_) => None,
     }}
 }
 
@@ -567,6 +577,19 @@ pub fn mk_unknown_viewnode (
     folded      : false,
     body_folded : false,
     kind        : ViewNodeKind::Unknown ( UnknownNode { id } ),
+  }}
+
+pub fn mk_inactive_viewnode (
+  id         : ID,
+  source     : SourceName,
+  membership : MembershipAxes,
+) -> ViewNode {
+  ViewNode {
+    focused     : false,
+    folded      : false,
+    body_folded : false,
+    kind        : ViewNodeKind::Inactive (
+      InactiveNode { id, source, membership } ),
   }}
 
 /// Create an indefinitive ViewNode from disk data.

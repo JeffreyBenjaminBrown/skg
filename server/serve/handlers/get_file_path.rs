@@ -3,6 +3,7 @@ use crate::serve::util::{
   value_from_request_sexp,
   send_response_with_length_prefix,
   tag_text_response};
+use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::util::path_from_pid_and_source;
 
@@ -16,6 +17,20 @@ pub fn handle_get_file_path_request (
   stream  : &mut TcpStream,
   request : &str,
   config  : &SkgConfig,
+) {
+  let active : ActiveSourceSet =
+    ActiveSourceSet::named (
+      config,
+      crate::source_sets::SourceSetName::from ("all"))
+    . expect ("reserved source-set all should always resolve");
+  handle_get_file_path_request_with_source_set (
+    stream, request, config, &active ) }
+
+pub fn handle_get_file_path_request_with_source_set (
+  stream  : &mut TcpStream,
+  request : &str,
+  config  : &SkgConfig,
+  active  : &ActiveSourceSet,
 ) {
   let id : ID = match value_from_request_sexp (
     "id", request ) {
@@ -37,6 +52,15 @@ pub fn handle_get_file_path_request (
           TcpToClient::GetFilePath,
           &format! ( "Error: {}", e ) ));
       return; } };
+  if ! active . contains_source (&source) {
+    send_response_with_length_prefix (
+      stream,
+      & tag_text_response (
+        TcpToClient::GetFilePath,
+        &format! (
+          "Error: source {} is not in active source-set {}",
+          source, active . name ) ));
+    return; }
   let raw_path : String = match path_from_pid_and_source (
     config,
     & source,

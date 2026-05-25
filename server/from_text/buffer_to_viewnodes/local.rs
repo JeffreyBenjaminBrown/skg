@@ -61,6 +61,7 @@ pub fn validate_local_structure (
           validate_idscaffold(tree, node_id), },
       MaybePlacedViewnodeKind::Deleted (_) => Vec::new(),
       MaybePlacedViewnodeKind::DeletedScaff (_) => Vec::new(),
+      MaybePlacedViewnodeKind::Inactive (_) => Vec::new(),
       MaybePlacedViewnodeKind::Unknown (_) => Vec::new() };
 
   if errors . is_empty() {

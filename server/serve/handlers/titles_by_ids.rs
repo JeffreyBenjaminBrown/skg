@@ -2,6 +2,8 @@ use crate::dbs::tantivy::titles_by_ids;
 use crate::serve::handlers::save_buffer::compute_diff_for_every_source;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::send_response_with_length_prefix;
+use crate::source_sets::{ActiveSourceSet, titles_for_source_set_for_test};
+use crate::types::env::find_source_with_optional_tantivy;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName, SkgConfig, TantivyIndex};
 use crate::types::sexp::extract_string_list_from_sexp;
@@ -9,6 +11,13 @@ use crate::types::sexp::extract_string_list_from_sexp;
 use sexp::{Sexp, Atom};
 use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
+
+pub fn titles_by_ids_for_source_set_for_test (
+  config : &SkgConfig,
+  active : &ActiveSourceSet,
+  ids    : &[ID],
+) -> Result<HashMap<ID, String>, Box<dyn std::error::Error>> {
+  titles_for_source_set_for_test (config, active, ids) }
 
 /// Handle a "titles by ids" request from Emacs.
 /// Parses the ID list, performs a bulk Tantivy lookup, supplements
@@ -20,6 +29,23 @@ pub fn handle_titles_by_ids_request (
   tantivy_index     : &TantivyIndex,
   config            : &SkgConfig,
   diff_mode_enabled : bool,
+) {
+  let active : ActiveSourceSet =
+    ActiveSourceSet::named (
+      config,
+      crate::source_sets::SourceSetName::from ("all"))
+    . expect ("reserved source-set all should always resolve");
+  handle_titles_by_ids_request_with_source_set (
+    stream, request, tantivy_index, config,
+    diff_mode_enabled, &active ) }
+
+pub fn handle_titles_by_ids_request_with_source_set (
+  stream            : &mut TcpStream,
+  request           : &str,
+  tantivy_index     : &TantivyIndex,
+  config            : &SkgConfig,
+  diff_mode_enabled : bool,
+  active            : &ActiveSourceSet,
 ) {
   let parsed : Sexp =
     match sexp::parse (request) {
@@ -51,6 +77,17 @@ pub fn handle_titles_by_ids_request (
       compute_diff_for_every_source (config);
     add_deleted_node_titles_by_ids (
       &mut title_map, &ids, &source_diffs ); }
+  title_map . retain ( |id, _| {
+    if active . is_all () {
+      true
+    } else {
+      let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
+        HashMap::new ();
+      find_source_with_optional_tantivy (
+        id, &deleted_since_head_pid_src_map,
+        Some (tantivy_index), config )
+      . map ( |source| active . contains_source (&source) )
+      . unwrap_or (false) } } );
   let content_pairs : Vec<String> =
     title_map . iter ()
     . map ( |(id, title)|

@@ -22,6 +22,7 @@ use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
 use crate::types::git::MembershipAxes;
 use crate::types::views_state::ViewUri;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
+use crate::source_sets::{ActiveSourceSet, search_ids_for_source_set_for_test as search_ids_for_source_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ParentIs, viewforest_root_viewnode, mk_indefinitive_viewnode};
 
@@ -46,6 +47,16 @@ pub type MatchGroups =
                   Vec < ( f32,           // score (after multiplier)
                           String ) >) >; // title or alias
 
+pub fn search_ids_for_source_set_for_test (
+  tantivy_index : &TantivyIndex,
+  config        : &SkgConfig,
+  active        : &ActiveSourceSet,
+  terms         : &str,
+  limit         : usize,
+) -> Result<Vec<ID>, Box<dyn std::error::Error>> {
+  search_ids_for_source_set_for_test_impl (
+    tantivy_index, config, active, terms, limit ) }
+
 /// Structured enrichment data passed through the slot,
 /// replacing the raw rendered String.
 pub struct SearchEnrichmentPayload {
@@ -66,6 +77,7 @@ pub fn handle_text_search_request (
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
   views_state       : &mut ViewsState,
+  active            : &ActiveSourceSet,
 ) {
   let parsed_sexp : Result < Sexp, String > =
     sexp::parse (request)
@@ -102,12 +114,21 @@ pub fn handle_text_search_request (
                 "No matches found." ));
             return; }
           let matches_by_id : MatchGroups =
-            group_matches_by_id (
+            filter_match_groups_to_active_sources (
+              group_matches_by_id (
               best_matches,
               searcher,
               &env . tantivy_index,
               &search_terms,
-              &search_opts );
+              &search_opts ),
+              active );
+          if matches_by_id . is_empty () {
+            send_response_with_length_prefix (
+              stream,
+              & tag_text_response (
+                TcpToClient::SearchResults,
+                "No matches found." ));
+            return; }
           let (viewforest, search_results) : (Tree<ViewNode>, Vec<ID>) =
             build_search_viewforest (
               &search_terms,
@@ -158,6 +179,17 @@ fn bool_key (
   extract_v_from_kv_pair_in_sexp ( sexp, key )
     . unwrap_or_default ()
     == "true" }
+
+fn filter_match_groups_to_active_sources (
+  matches_by_id : MatchGroups,
+  active        : &ActiveSourceSet,
+) -> MatchGroups {
+  if active . is_all () {
+    return matches_by_id; }
+  matches_by_id . into_iter ()
+    . filter ( |(_, (source, _))|
+      active . contains_source (source) )
+    . collect () }
 
 /// Spawn a background thread to compute containerward acnestries
 /// and graphnodestats, then write the structured payload

@@ -360,6 +360,7 @@ fn is_ancestor_id (
       |viewnode| match &viewnode . kind {
         ViewNodeKind::True (t)    => Some ( t . id . clone () ),
         ViewNodeKind::Deleted (d) => Some ( d . id . clone () ),
+        ViewNodeKind::Inactive (i) => Some ( i . id . clone () ),
         ViewNodeKind::Unknown (u) => Some ( u . id . clone () ),
         ViewNodeKind::Scaff (_) |
         ViewNodeKind::DeletedScaff (_) => None } )
@@ -380,6 +381,7 @@ pub fn get_id_from_treenode (
   match node_kind {
     ViewNodeKind::True (t)    => Ok ( t . id ),
     ViewNodeKind::Deleted (d) => Ok ( d . id ),
+    ViewNodeKind::Inactive (i) => Ok ( i . id ),
     ViewNodeKind::Unknown (u) => Ok ( u . id ),
     ViewNodeKind::Scaff (_)   => Err ( "get_id_from_treenode: caller should not pass a Scaffold" . into() ),
     ViewNodeKind::DeletedScaff (_) => Err ( "get_id_from_treenode: caller should not pass a DeletedScaff" . into() ),
@@ -541,6 +543,7 @@ pub fn truenode_in_tree_is_indefinitive (
   match node_kind {
     ViewNodeKind::True (t)    => Ok (t . is_indefinitive ()),
     ViewNodeKind::Deleted (_) => Ok (false),
+    ViewNodeKind::Inactive (_) => Ok (false),
     ViewNodeKind::Unknown (_) => Ok (false),
     ViewNodeKind::Scaff (_)   => Err ( "is_indefinitive: caller should not pass a Scaffold" . into( )),
     ViewNodeKind::DeletedScaff (_) => Err ( "is_indefinitive: caller should not pass a DeletedScaff" . into( )),

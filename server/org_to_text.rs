@@ -1,6 +1,6 @@
 use crate::types::git::MembershipAxes;
 use crate::types::misc::SkgConfig;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, UnknownNode, EditRequest, GraphNodeStats, ParentIs };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, UnknownNode, InactiveNode, EditRequest, GraphNodeStats, ParentIs };
 
 use ego_tree::{NodeRef, Tree};
 use std::error::Error;
@@ -105,7 +105,11 @@ pub fn viewnode_to_string (
     ViewNodeKind::Unknown (unknown_node) =>
       Ok ( unknown_node_metadata_to_string (
         viewnode . focused, viewnode . folded,
-        viewnode . body_folded, unknown_node )) }}
+        viewnode . body_folded, unknown_node )),
+    ViewNodeKind::Inactive (inactive_node) =>
+      Ok ( inactive_node_metadata_to_string (
+        viewnode . focused, viewnode . folded,
+        viewnode . body_folded, inactive_node )) } }
 
 /// Render metadata for a Scaffold:
 ///   (skg [focused] [folded] scaffoldKind)
@@ -306,6 +310,28 @@ fn unknown_node_metadata_to_string (
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   parts . push ( format! ( "(unknownNode (id {}))",
                             unknown_node . id . 0 ));
+  parts . join (" ") }
+
+fn inactive_node_metadata_to_string (
+  focused       : bool,
+  folded        : bool,
+  body_folded   : bool,
+  inactive_node : &InactiveNode,
+) -> String {
+  let mut parts : Vec < String > = Vec::new ();
+  if focused     { parts . push ( "focused"    . to_string () ); }
+  if folded      { parts . push ( "folded"     . to_string () ); }
+  if body_folded { parts . push ( "bodyFolded" . to_string () ); }
+  let mut inactive_parts : Vec<String> =
+    vec! [
+      "inactiveNode" . to_string (),
+      format! ("(id {})", inactive_node . id . 0),
+      format! ("(source {})", inactive_node . source) ];
+  append_membership_stage_forms (
+    &mut inactive_parts,
+    &inactive_node . membership );
+  parts . push ( format! (
+    "({})", inactive_parts . join (" ") ));
   parts . join (" ") }
 
 /// Render metadata for a DeletedScaff:

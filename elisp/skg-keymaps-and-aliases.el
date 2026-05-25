@@ -28,6 +28,7 @@ and hide INTERNAL from M-x completion."
            ;; For if someone forgets "source" but remembers "link".
            skg-request-sourceward-view)
 (skg-alias skg-set-definitive       skg-request-definitive-view)
+(skg-alias skg-source-set           skg-set-active-source-set)
 (skg-alias skg-view-heralds-mode     heralds-minor-mode)
 (skg-alias skg-view-metadata         skg-edit-metadata)
 
@@ -35,10 +36,11 @@ and hide INTERNAL from M-x completion."
 ;; Keymaps
 ;;
 
-(progn ;; Global
+  (progn ;; Global
   (global-set-key (kbd "C-c f RET") #'skg-search)
   (global-set-key (kbd "C-c f i")   #'skg-search-interactive)
-  (global-set-key (kbd "C-c f l")   #'skg-search-make-link))
+  (global-set-key (kbd "C-c f l")   #'skg-search-make-link)
+  (global-set-key (kbd "C-c f s")   #'skg-source-set))
 
 (with-eval-after-load 'magit ;; Magit
   ;; Popping to the id stack would make no sense here,
@@ -107,7 +109,8 @@ and hide INTERNAL from M-x completion."
   (progn;; text search
     (define-key map (kbd "C-c f RET") #'skg-search)
     (define-key map (kbd "C-c f i")   #'skg-search-interactive)
-    (define-key map (kbd "C-c f l")   #'skg-search-make-link))
+    (define-key map (kbd "C-c f l")   #'skg-search-make-link)
+    (define-key map (kbd "C-c f s")   #'skg-source-set))
   (progn;; goto. Capital-G variants kill the buffer they were called from.
     (define-key map (kbd "C-c g RET") #'skg-goto)
     (define-key map (kbd "C-c G RET") #'skg-goto-and-close-this)

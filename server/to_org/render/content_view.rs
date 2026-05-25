@@ -19,6 +19,7 @@ use crate::to_org::render::initial_bfs::render_initial_viewforest_bfs;
 use crate::to_org::util::mark_view_roots_parent_absent;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
+use crate::source_sets::{ActiveSourceSet, render_viewforest_with_source_set};
 use crate::update_buffer::graphnodestats::set_graphnodestats_in_viewforest;
 use crate::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
 
@@ -92,6 +93,25 @@ pub async fn multi_root_view (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "viewforest_to_string" ). entered();
       viewforest_to_string (& viewforest, config) } ?;
+  Ok ((buffer_content, pids, viewforest)) }
+
+pub async fn multi_root_view_with_source_set (
+  driver            : &TypeDBDriver,
+  config            : &SkgConfig,
+  tantivy_index     : Option<&TantivyIndex>,
+  root_ids          : &[ID],
+  diff_mode_enabled : bool,
+  active_source_set : &ActiveSourceSet,
+) -> Result < (String, Vec<ID>, Tree<ViewNode>),
+              Box<dyn Error> > {
+  let ( _buffer_content, pids, mut viewforest )
+    : (String, Vec<ID>, Tree<ViewNode>) =
+    multi_root_view (
+      driver, config, tantivy_index, root_ids,
+      diff_mode_enabled ) . await ?;
+  let buffer_content : String =
+    render_viewforest_with_source_set (
+      &mut viewforest, config, active_source_set ) ?;
   Ok ((buffer_content, pids, viewforest)) }
 
 /// For each view-root in the forest (= each TrueNode child of

@@ -8,7 +8,7 @@ pub use super::viewnode::MaybePlacedTruenode;
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::git::{ExistenceAxes, MembershipAxes};
-use super::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Scaffold, ScaffoldKind, DeletedNode, UnknownNode, GraphNodeStats, ViewNodeStats, IndefOrDef, ParentIs, };
+use super::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Scaffold, ScaffoldKind, DeletedNode, InactiveNode, UnknownNode, GraphNodeStats, ViewNodeStats, IndefOrDef, ParentIs, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -36,6 +36,7 @@ pub enum MaybePlacedViewnodeKind {
   Scaff        (Scaffold),  // Scaffold is shared - scaffolds never have IDs
   Deleted      (DeletedNode),
   DeletedScaff (ScaffoldKind),
+  Inactive     (InactiveNode),
   Unknown      (UnknownNode),
 }
 
@@ -80,6 +81,8 @@ impl TryFrom<MaybePlacedViewnodeKind> for ViewNodeKind {
         Ok(ViewNodeKind::Deleted (d)),
       MaybePlacedViewnodeKind::DeletedScaff (kind) =>
         Ok (ViewNodeKind::DeletedScaff (kind)),
+      MaybePlacedViewnodeKind::Inactive (i) =>
+        Ok (ViewNodeKind::Inactive (i)),
       MaybePlacedViewnodeKind::Unknown (u) =>
         Ok (ViewNodeKind::Unknown (u)) }}
 }
@@ -128,6 +131,8 @@ impl From<ViewNodeKind> for MaybePlacedViewnodeKind {
         MaybePlacedViewnodeKind::Deleted (d),
       ViewNodeKind::DeletedScaff (kind) =>
         MaybePlacedViewnodeKind::DeletedScaff (kind),
+      ViewNodeKind::Inactive (i) =>
+        MaybePlacedViewnodeKind::Inactive (i),
       ViewNodeKind::Unknown (u) =>
         MaybePlacedViewnodeKind::Unknown (u) }}
 }
@@ -290,6 +295,8 @@ impl MaybePlacedViewnode {
       MaybePlacedViewnodeKind::Deleted (d) => &d . title,
       MaybePlacedViewnodeKind::DeletedScaff (kind) =>
         kind . default_title (),
+      MaybePlacedViewnodeKind::Inactive (_) =>
+        "node from inactive source",
       MaybePlacedViewnodeKind::Unknown (_) => "", }}
 
   /// A distinguishable label for error messages.
@@ -301,6 +308,8 @@ impl MaybePlacedViewnode {
         format!("deleted:{}", d . id . 0),
       MaybePlacedViewnodeKind::DeletedScaff (kind) =>
         format!("deletedScaffold:{}", kind . repr_in_client ()),
+      MaybePlacedViewnodeKind::Inactive (i) =>
+        format!("inactive:{}", i . id . 0),
       MaybePlacedViewnodeKind::Unknown (u) =>
         format!("unknown:{}", u . id . 0), }}
 
@@ -311,6 +320,7 @@ impl MaybePlacedViewnode {
       MaybePlacedViewnodeKind::Scaff (_)   => None,
       MaybePlacedViewnodeKind::Deleted (d) => d . body . as_ref(),
       MaybePlacedViewnodeKind::DeletedScaff (_) => None,
+      MaybePlacedViewnodeKind::Inactive (_) => None,
       MaybePlacedViewnodeKind::Unknown (_) => None, }}
 
   /// PITFALL: Don't let this convince you a Scaff can have an ID.
@@ -320,6 +330,7 @@ impl MaybePlacedViewnode {
       MaybePlacedViewnodeKind::Scaff (_)   => None,
       MaybePlacedViewnodeKind::Deleted (d) => Some(&d . id),
       MaybePlacedViewnodeKind::DeletedScaff (_) => None,
+      MaybePlacedViewnodeKind::Inactive (i) => Some(&i . id),
       MaybePlacedViewnodeKind::Unknown (u) => Some(&u . id), }}
 }
 

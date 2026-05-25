@@ -418,6 +418,8 @@ pub(crate) fn collect_savenode_candidates (
         recurse_on_children( tree, node_id, result )?,
       ViewNodeKind::DeletedScaff (_) =>
         recurse_on_children( tree, node_id, result )?,
+      ViewNodeKind::Inactive (_) =>
+        recurse_on_children( tree, node_id, result )?,
       ViewNodeKind::Unknown (_) =>
         // An UnknownNode is a placeholder for a missing referent. It cannot generate save instructions itself, but its descendents might, so we recurse.
         recurse_on_children( tree, node_id, result )?,
@@ -620,6 +622,7 @@ fn collect_subscribees (
               continue, // valid child of SubscribeeCol, but not a subscribee
             ViewNodeKind::Deleted (_) |
             ViewNodeKind::DeletedScaff (_) |
+            ViewNodeKind::Inactive (_) |
             ViewNodeKind::Unknown (_) =>
               continue, // inert in this context
             ViewNodeKind::Scaff (s) => return Err(format!( "SubscribeeCol has unexpected Scaffold child: {:?}", s)), }}

@@ -477,6 +477,7 @@ fn order_children_as_scaffolds_then_ignored_then_content (
         ViewNodeKind::True (t) if t . parent_ignores_it() => 1,
         ViewNodeKind::True (_)                            => 2,
         ViewNodeKind::Deleted (_)                         => 2,
+        ViewNodeKind::Inactive (_)                        => 2,
         // UnknownNode is a content-position placeholder: order it
         // alongside the Deleted/True content children rather than as
         // a scaffold.

@@ -95,6 +95,7 @@ fn saverole_for_node (
     ViewNodeKind::Scaff (Scaffold::ID { .. }) =>
       Ok (SaveRole::IdDisplay),
     ViewNodeKind::Scaff (_)
+      | ViewNodeKind::Inactive (_)
       | ViewNodeKind::Deleted (_)
       | ViewNodeKind::DeletedScaff (_)
       | ViewNodeKind::Unknown (_)

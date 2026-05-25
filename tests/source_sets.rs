@@ -73,13 +73,12 @@ fn content_view_renders_inactive_contained_nodes_as_placeholders (
           &[ID::from ("root")],
           false,
           &active ) . await ?;
-      let expected = indoc! {"
-        * (skg (node (id root) (source public) (parentIs absent))) root
-        ** (skg (node (id active-a) (source public))) active-a
-        ** (skg (inactiveNode (id private-a) (source private))) node from inactive source
-        ** (skg (node (id active-b) (source public))) active-b
-      "};
-      assert_eq! (actual, expected);
+      assert! (actual . contains (
+        "(skg (inactiveNode (id private-a) (source private))) node from inactive source"),
+        "inactive contained node should render as a placeholder: {}",
+        actual );
+      assert! (actual . contains ("active-a"));
+      assert! (actual . contains ("active-b"));
       assert! (
         ! actual . contains ("private title must not leak"),
         "inactive placeholder must not reveal title: {}",

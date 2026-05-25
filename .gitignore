@@ -20,7 +20,16 @@
 
 /claude-*.org
 /data
+
+# Ignore example-data/, with the (marked by a leading "!")
+# exception of the two files that ensure subfolders public/ and private/
 /example-data
+!/example-data/
+!/example-data/public/
+!/example-data/private/
+!/example-data/public/.gitkeep
+!/example-data/private/.gitkeep
+
 /target
 /tests/results
 /tests/results

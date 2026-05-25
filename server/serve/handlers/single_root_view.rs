@@ -1,7 +1,7 @@
 use crate::dbs::in_rust_graph::scheduled_audit::take_pending_audit_warning;
 use crate::types::env::SkgEnv;
 use crate::serve::ViewsState;
-use crate::to_org::render::content_view::single_root_view;
+use crate::to_org::render::content_view::multi_root_view_with_source_set;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   view_uri_from_request,
@@ -11,6 +11,7 @@ use crate::serve::util::{
   tag_text_response};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::misc::ID;
+use crate::source_sets::ActiveSourceSet;
 use crate::types::views_state::ViewUri;
 
 use futures::executor::block_on;
@@ -28,11 +29,39 @@ pub fn handle_single_root_view_request (
   request    : &str,
   env        : &SkgEnv,
   views_state : &mut ViewsState,
+  active_source_set : &ActiveSourceSet,
 ) {
   let view_uri_result : Result<ViewUri, String> =
     view_uri_from_request (request);
   match node_id_from_single_root_view_request (request) {
     Ok (node_id) => {
+      match active_source_set . id_source_is_active (
+        &env . config, &node_id ) {
+        Ok (true) => {},
+        Ok (false) => {
+          let response_sexp : String =
+            format_buffer_response_sexp (
+              &String::new (),
+              &vec! [format! (
+                "Node {} is not in active source-set {}",
+                node_id,
+                active_source_set . name )] );
+          send_response_with_length_prefix (
+            stream,
+            & tag_sexp_response (
+              TcpToClient::ContentView, &response_sexp ));
+          return; },
+        Err (e) => {
+          let response_sexp : String =
+            format_buffer_response_sexp (
+              &String::new (),
+              &vec! [format! (
+                "Error checking source-set visibility: {}", e )] );
+          send_response_with_length_prefix (
+            stream,
+            & tag_sexp_response (
+              TcpToClient::ContentView, &response_sexp ));
+          return; }}
       if let Some (existing_uri)
         = views_state . open_views
           . content_view_uri_for_root_id ( &node_id )
@@ -53,12 +82,13 @@ pub fn handle_single_root_view_request (
       { let _span : tracing::span::EnteredSpan =
           tracing::info_span!( "single_root_view" ). entered();
         block_on ( async {
-            match single_root_view (
+            match multi_root_view_with_source_set (
               &env . driver,
               &env . config,
               Some (&env . tantivy_index),
-              &node_id,
-              views_state . diff_mode_enabled ) . await
+              &[node_id . clone ()],
+              views_state . diff_mode_enabled,
+              active_source_set ) . await
             { Ok ( (buffer_content, pids, viewforest) ) => {
                 if let Ok (view_uri) = &view_uri_result {
                   views_state . open_views . register_view (

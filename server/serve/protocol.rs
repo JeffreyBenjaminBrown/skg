@@ -18,6 +18,9 @@ pub enum RequestType {
   RerenderAllViews,
   TitlesByIds,
   DiffAnalysis,
+  ListSourceSets,
+  ActiveSourceSet,
+  SetActiveSourceSet,
 }
 
 impl RequestType {
@@ -38,6 +41,9 @@ impl RequestType {
       "rerender all views"       => Ok (RequestType::RerenderAllViews),
       "titles by ids"            => Ok (RequestType::TitlesByIds),
       "diff analysis"            => Ok (RequestType::DiffAnalysis),
+      "list source sets"         => Ok (RequestType::ListSourceSets),
+      "active source set"        => Ok (RequestType::ActiveSourceSet),
+      "set active source set"    => Ok (RequestType::SetActiveSourceSet),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See api-and-formats.md
@@ -66,6 +72,8 @@ pub enum TcpToClient {
   RerenderDone,
   TitlesByIds,
   DiffAnalysis,
+  SourceSets,
+  ActiveSourceSet,
   Error,
 }
 
@@ -92,4 +100,6 @@ impl TcpToClient {
       TcpToClient::RerenderDone     => "rerender-done",
       TcpToClient::TitlesByIds      => "titles-by-ids",
       TcpToClient::DiffAnalysis     => "diff-analysis",
+      TcpToClient::SourceSets       => "source-sets",
+      TcpToClient::ActiveSourceSet  => "active-source-set",
       TcpToClient::Error            => "error", }} }

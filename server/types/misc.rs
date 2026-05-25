@@ -1,5 +1,5 @@
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt;
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -55,6 +55,15 @@ pub struct SkgfileSource {
   pub user_owns_it : bool,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct SourceSetName ( pub String );
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+pub struct SourceSet {
+  pub name    : SourceSetName,
+  pub sources : Vec<SourceName>,
+}
+
 impl SkgfileSource {
   pub fn herald_label (&self) -> &str {
     self . abbreviation . as_deref ()
@@ -70,6 +79,13 @@ pub struct SkgConfig {
 
   #[serde ( deserialize_with = "deserialize_sources" )]
   pub sources        : HashMap<SourceName, SkgfileSource>,
+
+  #[serde(default, deserialize_with = "deserialize_source_sets")]
+  pub source_sets    : HashMap<SourceSetName, SourceSet>,
+
+  #[serde(default = "default_source_set_name")]
+  pub default_source_set : SourceSetName,
+
   pub db_name        : String,
   pub tantivy_folder : PathBuf,
 
@@ -146,6 +162,31 @@ where
       source ); }
   Ok (map)
 }
+
+fn deserialize_source_sets<'de, D> (
+  deserializer : D
+) -> Result <HashMap<SourceSetName, SourceSet>, D::Error>
+where
+  D : Deserializer<'de>
+{
+  let sets_vec : Vec<SourceSet> =
+    Vec::deserialize (deserializer) ?;
+  let mut map : HashMap<SourceSetName, SourceSet> =
+    HashMap::new ();
+  let mut seen : HashSet<SourceSetName> =
+    HashSet::new ();
+  for set in sets_vec {
+    if ! seen . insert (set . name . clone ()) {
+      return Err (serde::de::Error::custom (
+        format! ("Duplicate source-set name '{}'", set . name))); }
+    map . insert (
+      set . name . clone (),
+      set ); }
+  Ok (map)
+}
+
+fn default_source_set_name () -> SourceSetName {
+  SourceSetName::from ("all") }
 
 fn default_port() -> u16 {
   DEFAULT_PORT }
@@ -245,6 +286,12 @@ impl fmt::Display for SourceName {
          -> fmt::Result {
     write! ( f, "{}", self . 0 ) }}
 
+impl fmt::Display for SourceSetName {
+  fn fmt ( &self,
+            f: &mut fmt::Formatter<'_> )
+         -> fmt::Result {
+    write! ( f, "{}", self . 0 ) }}
+
 impl From<String> for ID {
   fn from ( s : String ) -> Self {
     ID (s) }}
@@ -257,9 +304,17 @@ impl From<String> for SourceName {
   fn from ( s : String ) -> Self {
     SourceName (s) }}
 
+impl From<String> for SourceSetName {
+  fn from ( s : String ) -> Self {
+    SourceSetName (s) }}
+
 impl From<&String> for SourceName {
   fn from ( s : &String ) -> Self {
     SourceName ( s . clone () ) }}
+
+impl From<&String> for SourceSetName {
+  fn from ( s : &String ) -> Self {
+    SourceSetName ( s . clone () ) }}
 
 impl From <&str> for ID {
   fn from(s: &str) -> Self {
@@ -268,6 +323,10 @@ impl From <&str> for ID {
 impl From <&str> for SourceName {
   fn from(s: &str) -> Self {
     SourceName ( s . to_string () ) }}
+
+impl From <&str> for SourceSetName {
+  fn from(s: &str) -> Self {
+    SourceSetName ( s . to_string () ) }}
 
 impl SkgConfig {
   /// Creates a SkgConfig with dummy values for everything except sources.
@@ -279,6 +338,8 @@ impl SkgConfig {
       config_path        : PathBuf::from (""),
       data_root          : PathBuf::from ("."),
       sources,
+      source_sets        : HashMap::new (),
+      default_source_set : SourceSetName::from ("all"),
       db_name            : "unused" . to_string(),
       tantivy_folder     : PathBuf::from ("/tmp/unused"),
       port               : 0,
@@ -300,6 +361,8 @@ impl SkgConfig {
       config_path        : PathBuf::from (""),
       data_root          : PathBuf::from ("."),
       sources,
+      source_sets        : HashMap::new (),
+      default_source_set : SourceSetName::from ("all"),
       db_name            : db_name . to_string(),
       tantivy_folder     : PathBuf::from (tantivy_folder),
       port               : DEFAULT_PORT,
@@ -318,4 +381,21 @@ impl SkgConfig {
       . map ( |s| s . user_owns_it )
       . unwrap_or (false)
   }
+
+  pub fn default_source_set_name (
+    &self,
+  ) -> &SourceSetName {
+    &self . default_source_set }
+
+  pub fn source_set_sources (
+    &self,
+    name : &SourceSetName,
+  ) -> Result<BTreeSet<SourceName>, String> {
+    if name . 0 == "all" {
+      return Ok ( self . sources . keys () . cloned () . collect () ); }
+    let source_set : &SourceSet =
+      self . source_sets . get (name)
+      . ok_or_else ( || format! (
+        "Source-set '{}' not found in config", name )) ?;
+    Ok ( source_set . sources . iter () . cloned () . collect () ) }
 }

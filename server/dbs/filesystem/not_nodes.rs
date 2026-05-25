@@ -52,6 +52,7 @@ pub fn load_config (
       . to_path_buf ();
     fs::canonicalize (&raw) . unwrap_or (raw) };
   make_paths_absolute (&mut config);
+  validate_source_sets (&config)?;
   validate_source_paths_creating_owned_ones_if_needed(
     &config . sources)?;
   Ok (config) }
@@ -105,6 +106,7 @@ pub fn load_config_with_overrides (
       . to_path_buf ();
     fs::canonicalize (&raw) . unwrap_or (raw) };
   make_paths_absolute (&mut config);
+  validate_source_sets (&config)?;
   if let Some (name) = db_name {
     config . db_name = name . to_string();
     config . tantivy_folder =
@@ -119,6 +121,32 @@ pub fn load_config_with_overrides (
   validate_source_paths_creating_owned_ones_if_needed(
     &config . sources)?;
   Ok (config) }
+
+fn validate_source_sets (
+  config : &SkgConfig,
+) -> Result<(), Box<dyn std::error::Error>> {
+  if config . sources . contains_key (&SourceName::from ("all")) {
+    return Err ("Configured source may not be named 'all'" . into ()); }
+  for (name, source_set) in &config . source_sets {
+    if name . 0 == "all" {
+      return Err ("User-defined source-set may not be named 'all'" . into ()); }
+    if source_set . sources . is_empty () {
+      return Err (format! (
+        "Source-set '{}' must contain at least one source", name
+      ) . into ()); }
+    for source in &source_set . sources {
+      if ! config . sources . contains_key (source) {
+        return Err (format! (
+          "Source-set '{}' references unknown source '{}'",
+          name, source
+        ) . into ()); }}}
+  if config . default_source_set . 0 != "all"
+  && ! config . source_sets . contains_key (&config . default_source_set) {
+    return Err (format! (
+      "Default source-set '{}' not found in config",
+      config . default_source_set
+    ) . into ()); }
+  Ok (()) }
 
 /// Resolve relative paths in the config against data_root.
 /// Absolute paths are left unchanged.

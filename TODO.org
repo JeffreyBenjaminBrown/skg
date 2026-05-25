@@ -44,10 +44,6 @@ That was so that M-? would
 not interpret comments as search hits.
 * easy
 ** beep also once the db has rebuilt
-** the links-in herald should precede the contents herald
-Actually just omit the contents herald.
-The containers herald is the interesting one.
-That one should precede links-in.
 ** rename shutdown->stop server
 ** remap C-c C-o during Skg
 in skg buffers

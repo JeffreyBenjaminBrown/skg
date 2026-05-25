@@ -1,0 +1,56 @@
+* done
+- Config model, defaults, reserved =all= behavior, and validation.
+- API/docs entries for source-set config, protocol, inactive placeholders,
+  title lookup, file path lookup, and diff-analysis behavior.
+- Example data defines a default =public= source-set and tracks empty
+  =public/= and =private/= directories with =.gitkeep=.
+- Per-connection active source-set state, server protocol handlers, and
+  Emacs commands for list/get/set source-set.
+- Source-set switching closes/unregisters active Skg views and cancels
+  in-flight search enrichment.
+- Content view root requests are refused when the root is outside the
+  active source-set.
+- Search phase-1 filtering removes inactive-source hits before display
+  ranking/truncation.
+- Inactive placeholder viewnode/metadata rendering exists, with generic
+  title and no inactive title/body/alias/extra-id/graphStats leakage.
+- Inline diff mode can render inactive placeholders with relationship
+  position markers without leaking inactive node content.
+- =titles by ids= omits inactive-source titles under restricted source
+  sets.
+- =get file path= refuses inactive-source paths under restricted source
+  sets.
+- Diff-analysis refuses to run unless the active source-set is =all=.
+- Initial source-set contract tests cover config, content placeholders,
+  search filtering, title lookup, helper-level save behavior, helper-level
+  backward traversal filtering, and inline diff placeholders.
+
+* pending
+- Parse =inactiveNode= metadata in the real buffer parser as a distinct
+  inactive placeholder kind.
+- Enforce real save validation for inactive placeholders: reject edits to
+  title/body/metadata/source/id and reject active children beneath an
+  inactive placeholder.
+- Implement real save semantics for inactive placeholders: unchanged
+  placeholders preserve =contains=, moves reorder =contains=, deletions
+  remove inactive IDs, and duplicate behavior is explicitly defined.
+- Replace helper-only save tests with real save-pipeline tests for inactive
+  placeholders.
+- Thread active source-set filtering into initial content traversal instead
+  of rendering inactive subtrees and replacing them after the fact.
+- Thread active source-set filtering into content completion/rerender paths.
+- Thread active source-set filtering into sourceward and containerward
+  expansion paths.
+- Truncate search enrichment ancestry before inactive containers/link
+  sources, filter fork branches independently, and omit empty forks.
+- Add production tests for sourceward/containerward/search-enrichment
+  truncation rather than only helper tests.
+- Make graphStats source-set-aware where practical.
+- Add precise =PITFALL | TODO= comments for any remaining graphStats or
+  herald counts that include inactive nodes.
+- Ensure readable-ID mode shortens inactive IDs but does not title-annotate
+  inactive-source IDs or inactive placeholder metadata.
+- Add readable-ID tests for inactive placeholders and inactive-source IDs.
+- Add source-set switch integration coverage, including buffer closure and
+  stale enrichment cancellation.
+- Add end-to-end integration coverage for restricted-source search and save.

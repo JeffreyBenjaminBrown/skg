@@ -16,20 +16,23 @@ use crate::dbs::typedb::util::delete_database;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
-use crate::serve::handlers::diff_analysis::handle_diff_analysis_request;
-use crate::serve::handlers::get_file_path::handle_get_file_path_request;
+use crate::serve::handlers::diff_analysis::handle_diff_analysis_request_with_source_set;
+use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_source_set;
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
 use crate::serve::handlers::rerender_all_views::{ handle_git_diff_toggle_and_rerender, handle_rerender_all_views_request};
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
+use crate::serve::handlers::source_sets::handle_source_set_request;
 use crate::serve::handlers::text_search::render_enriched_search_buffer::insert_containerward_ancestries_into_search_view;
 use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
-use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request;
+use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request_with_source_set;
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
 use crate::to_org::util::mark_view_roots_parent_absent;
 use crate::types::env::SkgEnv;
 use crate::types::errors::BufferValidationError;
+use crate::source_sets::ActiveSourceSet;
+use crate::source_sets::apply_source_set_to_viewforest;
 use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode,maybePlaced_to_placed_tree};
 use crate::types::viewnode::ViewNode;
 use crate::types::views_state::{OpenViews, ViewUri};
@@ -83,6 +86,17 @@ fn handle_emacs (
     ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (), };
+  let mut active_source_set : ActiveSourceSet =
+    ActiveSourceSet::default_from_config (
+      &env . config )
+      . unwrap_or_else ( |e| {
+        tracing::error! (
+          error = %e,
+          "failed to initialize active source-set; falling back to all");
+        ActiveSourceSet::named (
+          &env . config,
+          crate::types::misc::SourceSetName::from ("all"))
+        . expect ("reserved source-set all should always resolve") });
 
   let enrichment_slot // To update search results once the 'enrichment' (containerward paths + graphnodestats) has been computed.
     : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
@@ -114,7 +128,8 @@ fn handle_emacs (
               &mut stream,
               &request_header,
               &env,
-              &mut views_state ),
+              &mut views_state,
+              &active_source_set ),
           Ok (RequestType::SaveBuffer) =>
             // PITFALL: Uses the same BufReader that read the request,
             // so that any already-buffered header/payload are visible.
@@ -137,7 +152,8 @@ fn handle_emacs (
               &request_header,
               &enrichment_slot,
               &env,
-              &mut views_state ); }
+              &mut views_state,
+              &active_source_set ); }
           Ok (RequestType::TextSearch) => {
             // Cancel any in-flight background search
             search_cancelled . store (true, Ordering::SeqCst);
@@ -148,7 +164,8 @@ fn handle_emacs (
               &env,
               &enrichment_slot,
               &search_cancelled,
-              &mut views_state ); }
+              &mut views_state,
+              &active_source_set ); }
           Ok (RequestType::VerifyConnection) =>
             handle_verify_connection_request (
               &mut stream ),
@@ -156,17 +173,31 @@ fn handle_emacs (
             // Never returns - exits process
             handle_shutdown_request ( &mut stream, &env ),
           Ok (RequestType::GetFilePath) =>
-            handle_get_file_path_request ( &mut stream,
+            handle_get_file_path_request_with_source_set ( &mut stream,
                                            &request_header,
-                                           &env . config ),
+                                           &env . config,
+                                           &active_source_set ),
           Ok (RequestType::TitlesByIds) =>
-            handle_titles_by_ids_request (
+            handle_titles_by_ids_request_with_source_set (
               &mut stream, &request_header,
               &env . tantivy_index, &env . config,
-              views_state . diff_mode_enabled ),
+              views_state . diff_mode_enabled,
+              &active_source_set ),
           Ok (RequestType::DiffAnalysis) =>
-            handle_diff_analysis_request (
-              &mut stream, &request_header, &env . config ),
+            handle_diff_analysis_request_with_source_set (
+              &mut stream, &request_header, &env . config,
+              &active_source_set ),
+          Ok (RequestType::ListSourceSets)
+          | Ok (RequestType::ActiveSourceSet)
+          | Ok (RequestType::SetActiveSourceSet) =>
+            handle_source_set_request (
+              &mut stream,
+              &request_header,
+              &env . config,
+              &mut views_state,
+              &mut active_source_set,
+              &enrichment_slot,
+              &search_cancelled ),
           Ok (RequestType::GitDiffModeToggle) =>
             handle_git_diff_toggle_and_rerender (
               &mut stream,
@@ -229,6 +260,7 @@ fn handle_snapshot_response (
   enrichment_slot : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   env             : &SkgEnv,
   views_state      : &mut ViewsState,
+  active_source_set : &ActiveSourceSet,
 ) {
   let terms : String
     = match value_from_request_sexp ("terms", request)
@@ -277,6 +309,9 @@ fn handle_snapshot_response (
       &env . config ); }
   mark_view_roots_parent_absent (
     &mut viewforest );
+  apply_source_set_to_viewforest (
+    &mut viewforest,
+    active_source_set );
   let enriched : String =
     viewforest_to_string ( &viewforest, &env . config )
     . expect ("search viewforest rendering never fails");
