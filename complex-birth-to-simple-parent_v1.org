@@ -1,0 +1,236 @@
+* Complex Birth to Simple Parent
+
+This report audits the places where Skg assigns, parses, renders, or
+rewrites a TrueNode's =Birth= metadata, with the proposed interpretation:
+
+- rename =Birth= to =Parent=;
+- if a TrueNode has a visible view-parent, =Parent= records why this
+  node is under that parent;
+- =Independent= remains meaningful for a node with a visible parent:
+  it means the node is under that parent in the view, but not because of
+  a graph relationship to that parent;
+- if a TrueNode's only viewtree parent is the invisible =BufferRoot=,
+  it should have no =Parent= field and no corresponding herald.
+
+* Main finding
+
+The muddle is concentrated in top-level nodes, not in the ordinary
+repair logic that changes bad relationship claims to =Independent=.
+
+At present =Birth::Independent= covers two cases:
+
+- a visible-parent case: "this node has a view-parent, but no graph
+  relationship explains that placement";
+- a no-visible-parent case: "this node is a top-level headline under
+  =BufferRoot=".
+
+Those are different facts. The proposed =Parent= model should keep the
+first and remove the second by making the field optional:
+
+#+begin_src rust
+  Option<Parent>
+#+end_src
+
+where =None= means "no visible parent", and =Some(Independent)= means
+"visible parent, no graph relation to it".
+
+* Assignments and mutations
+
+** Type definition and defaults
+
+=server/types/viewnode.rs= defines =Birth= and stores it directly on
+=TrueNode_Generic=.
+
+- Lines 14-25 describe "why a node was brought into existence in the
+  view tree".
+- Lines 78-79 explicitly say non-=ContentOf= makes the node effectively
+  a new tree root.
+
+That comment is now the conceptual problem: a node with
+=Parent= =Independent= is not necessarily a new tree root. It can have a
+visible parent; it simply is not there because of =contains=,
+=textlinks_to=, or reverse =contains=.
+
+Constructors default to =Birth::ContentOf= in
+=default_truenode=, =mk_definitive_viewnode=, and
+=MaybePlacedTruenode::default=. That is tolerable as an internal
+construction default, but it becomes unsafe once absence of a metadata
+field means "no visible parent". The parser/rendering boundary should
+not treat an absent =Parent= field as universal =ContentOf=.
+
+Recommendation: use =Option<Parent>= internally if feasible. If that is
+too large for one change, introduce a smaller transitional invariant:
+all non-=BufferRoot= TrueNodes must have an explicit parent relation
+before rendering, while =BufferRoot= children have none.
+
+** Initial content views
+
+=server/to_org/render/content_view.rs= builds the initial content view,
+then calls =set_view_root_births_from_graphstats=.
+
+=server/to_org/util.rs= lines 193-211 set direct =BufferRoot= children
+to =ContentOf= if they have graph containers, otherwise =Independent=.
+This is the known muddle. A view-root that is graph-content currently
+gets =Birth= =ContentOf= even though it has no visible parent. A graph
+root gets =Birth= =Independent= for the same no-visible-parent reason.
+
+Recommendation: replace this with a top-level pass that clears =Parent=
+for all direct =BufferRoot= TrueNode children. Graph container counts can
+still be shown by =graphStats=, but they should not be represented as a
+relationship to =BufferRoot=.
+
+** Save rerender
+
+=server/update_buffer.rs= line 246 calls =mark_view_roots_independent=.
+=server/to_org/util.rs= lines 213-229 implement that by setting every
+direct =BufferRoot= TrueNode child to =Birth::Independent=.
+
+This is the other half of the known muddle: a saved top-level
+graph-content node changes from =ContentOf= on initial visit to
+=Independent= after save. Under the proposed model, both states should
+be the same: no =Parent= field, because there is no visible parent.
+
+Recommendation: replace =mark_view_roots_independent= with a function
+that clears top-level =Parent=, and call it anywhere a viewforest is
+about to be rendered.
+
+** Search result roots
+
+=server/serve/handlers/text_search.rs= lines 352-357 assign
+=Birth::Independent= for search hits indexed as roots and
+=Birth::ContentOf= for other hits. Lines 399-407 then create each hit
+as a level-1 child of =BufferRoot=.
+
+Those level-1 search result nodes have no visible parent, so neither
+value is a parent relationship. This is another top-level muddle.
+
+Recommendation: search result roots should have no =Parent= field.
+If the UI wants to distinguish "context-origin root" from other search
+hits, that should be separate metadata, not =Parent=.
+
+** Search enrichment ancestry
+
+=server/serve/handlers/text_search/render_enriched_search_buffer.rs=
+lines 78-80 insert containerward ancestry below each top-level search
+hit with =Birth::ContainerOf=.
+
+That is correct under the proposed model: those inserted ancestry nodes
+do have a visible parent, and they were put there because each child
+contains its parent.
+
+Small documentation issue: lines 62-64 say "indefinitive independent",
+but the code uses =Birth::ContainerOf=. The comment should be updated.
+
+** Containerward and sourceward expansions
+
+=server/to_org/expand/backpath.rs= is conceptually clean:
+
+- lines 52-56 integrate containerward paths with =Birth::ContainerOf=;
+- lines 83-87 integrate sourceward paths with =Birth::LinksTo=;
+- lines 272-291 attach containerward ancestry under link sources;
+- lines 360-364 insert ancestry nodes as =Birth::ContainerOf=;
+- lines 373-389 pass the requested relation into the created
+  indefinitive child.
+
+These assignments match the reason the node was put under its visible
+parent.
+
+Recommendation: rename mechanically to =Parent::ContainerOf= and
+=Parent::LinksTo=, preserving behavior.
+
+** Completion repair to Independent
+
+The following mutations are not muddled under the clarified model,
+because the node still has a visible parent:
+
+- =server/update_buffer/complete_preorder/truenode.rs= lines 437-460:
+  a child that looks like content but is no longer in the parent's
+  content list is marked =Independent=.
+- =server/to_org/util.rs= lines 258-296:
+  =validate_birth_relationships= flips =ContentOf=, =ContainerOf=, or
+  =LinksTo= to =Independent= when the claimed relation to the current
+  visible parent is false.
+- =server/update_buffer/complete_postorder/hiddeninsubscribee_col.rs=
+  lines 135-146 and
+  =server/update_buffer/complete_postorder/hiddenoutsideof_subscribeecol.rs=
+  lines 140-151 do the same for children that do not belong in those
+  sharing scaffolds.
+- =server/update_buffer/complete_postorder/aliascol.rs= lines 96-101
+  would mark TrueNode children of =AliasCol= as =Independent= if that
+  currently-unreachable situation becomes allowed.
+
+These should remain =Independent= after the rename. They record "visible
+parent exists, but no graph relationship explains this placement."
+
+** Parsing and rendering
+
+=server/org_to_text.rs= lines 238-251 omit =Birth::ContentOf= from
+rendered metadata and render only the non-default variants. The Emacs
+herald code then injects =(birth contentOf)= when no =birth= field is
+present:
+
+- =elisp/heralds-minor-mode.el= lines 143-149 document the injection;
+- lines 317-351 implement it.
+
+This will conflict with the new design. Missing metadata can no longer
+mean =ContentOf= everywhere, because missing =Parent= should be the
+normal representation for top-level TrueNodes.
+
+Recommendation:
+
+- render an explicit =Parent= field for every TrueNode with a visible
+  parent, including =ContentOf=;
+- render no =Parent= field for direct =BufferRoot= children;
+- remove the herald-side default injection of =contentOf=;
+- let the herald display show no parent glyph when the field is absent.
+
+The parser in =server/serve/parse_metadata_sexp.rs= defaults missing
+=birth= to =ContentOf= before tree placement is known. With optional
+=Parent=, that default needs to move to a tree-aware normalization step:
+
+- missing =Parent= under a visible parent means =ContentOf= for
+  user-created ordinary child nodes, unless validation chooses to reject
+  the omission;
+- missing =Parent= under =BufferRoot= means no visible parent;
+- explicit =Parent= under =BufferRoot= should probably be stripped on
+  rerender, and might be rejected or ignored on save.
+
+* Recommendations
+
+1. Rename the enum and metadata key from =Birth= / =birth= to
+   =Parent= / =parent=.
+
+2. Model the field as optional, either directly as =Option<Parent>= or
+   by a clear equivalent invariant.
+
+3. Keep =Independent=, but only for nodes with visible parents.
+
+4. Replace =set_view_root_births_from_graphstats= and
+   =mark_view_roots_independent= with top-level normalization that
+   clears the parent field on direct =BufferRoot= TrueNode children.
+
+5. Render =ContentOf= explicitly for non-root TrueNodes. Do not use
+   absence as a shorthand for =ContentOf= anymore.
+
+6. Remove Emacs herald injection of default =contentOf=. Missing
+   =Parent= should produce no parent herald.
+
+7. Keep the existing "bad claim becomes =Independent=" logic. It is
+   consistent with the clarified meaning because the node still has a
+   visible parent.
+
+* Likely test updates
+
+Expect test churn wherever rendered metadata assumes implicit
+=ContentOf= or top-level =birth independent=:
+
+- render tests around =org_to_text.rs= metadata shape;
+- herald tests that expect a default ={= glyph from missing =birth=;
+- save/rerender tests that assert top-level =(birth independent)=;
+- search tests that inspect root result metadata;
+- tests around =set_view_root_births_from_graphstats= and
+  =mark_view_roots_independent=.
+
+The behavior of save extraction should mostly stay the same for
+parented nodes, because =ContentOf= versus non-=ContentOf= remains the
+important distinction for whether a child affects its parent.
