@@ -1,0 +1,60 @@
+* Transfer the Skg Docker image by external drive
+This avoids DockerHub. Build the image on NixOS, save it to the external
+drive, load it on Windows, then run the Windows package.
+
+** On NixOS
+Check that the image exists:
+
+#+begin_src bash
+  docker image ls | grep 'jeffreybbrown/skg'
+#+end_src
+
+Save a compressed archive to the external drive:
+
+#+begin_src bash
+  docker save jeffreybbrown/skg:latest \
+    | gzip > /run/media/jeff/ext_hdd.9g.tshb/skg-docker-image.tar.gz
+#+end_src
+
+Optional checksum:
+
+#+begin_src bash
+  sha256sum /path/to/external-drive/skg/skg-docker-image.tar.gz \
+    > /path/to/external-drive/skg/skg-docker-image.tar.gz.sha256
+#+end_src
+
+If Windows Docker has trouble loading the gzipped archive, save an
+uncompressed archive instead:
+
+#+begin_src bash
+  docker save -o /path/to/external-drive/skg/skg-docker-image.tar \
+    jeffreybbrown/skg:latest
+#+end_src
+
+** On Windows
+Plug in the drive. In PowerShell, load the image:
+
+#+begin_src powershell
+  docker load -i E:\skg\skg-docker-image.tar.gz
+#+end_src
+
+If using the uncompressed archive:
+
+#+begin_src powershell
+  docker load -i E:\skg\skg-docker-image.tar
+#+end_src
+
+Confirm the image loaded:
+
+#+begin_src powershell
+  docker images
+#+end_src
+
+Then from the Windows Skg package folder:
+
+#+begin_src powershell
+  .\run.ps1
+#+end_src
+
+You can skip =.\install.ps1= if the image was already loaded from disk,
+because =install.ps1= only pulls the image from DockerHub.

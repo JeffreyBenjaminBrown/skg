@@ -1,0 +1,18 @@
+* Build the Windows user image
+From the repository root:
+
+#+begin_src bash
+  ./windows/build/01-build-image.sh
+#+end_src
+
+To publish it:
+
+#+begin_src bash
+  ./windows/build/03-push-image.sh
+#+end_src
+
+The image is based on =jeffreybbrown/hode:latest=, copies this repository
+to =/opt/skg=, builds =skg=, and installs the binary at
+=/usr/local/bin/skg=.
+
+The user-facing run path starts the prebuilt binary, not =cargo watch=.
