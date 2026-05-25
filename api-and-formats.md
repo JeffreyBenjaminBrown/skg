@@ -17,6 +17,10 @@ So far there are these endpoints:
       - "regex=true": interpret the query as a per-token regex; a RegexQuery is built directly and the QueryParser is bypassed.
       - "body=true": also search node bodies (titles are always searched).
       - "operators=true": preserve Tantivy phrase and operator syntax (AND / OR / phrase / +foo / -bar / grouping / field:). Intra-word operator chars still get escaped heuristically so C++ etc. remain findable. In regex mode, AND / OR / NOT / +foo / -bar combine per-token regexes at the document level; phrase syntax does not apply.
+    - The active source-set is applied before grouping, ranking,
+      alias/title selection, and display truncation. Inactive-source
+      documents do not influence result order or which title/alias is
+      shown for an active result.
 
   - Phase 1, immediate: Server sends LP buffer content with response-type "search-results". Results are ordinary indefinitive non-content TrueNodes (not special scaffold types).
 
@@ -24,10 +28,16 @@ So far there are these endpoints:
     1. Rust sends LP response-type "request-snapshot" with `(("content" "TERMS"))` — asking Emacs for a snapshot of the search buffer matching those terms.
     2. Emacs replies with `((request . "snapshot response") (terms . "TERMS"))\n` followed by `Content-Length: N\r\n\r\n<buffer text>` — the current buffer contents, including any unsaved user edits. Emacs sets the buffer to readonly before sending.
     3. Rust parses the snapshot, inserts containerward ancestry and graphnodestats, and sends LP response-type "search-enrichment" with `(("terms" "TERMS") ("content" "ORG"))`. Emacs replaces the buffer and exits readonly.
+    - Enrichment uses the same active source-set as the original
+      search. Containerward ancestry truncates before inactive
+      containers.
 
 ## Single root content tree view from ID
   - Request: ((request . "single root content view") (id . "NODE_ID") (view-uri . "URI"))
   - Response: length-prefixed content, formatted `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` constitutes `LENGTH` bytes. PAYLOAD may contain quotation marks; hence the length prefix. The document structure is detailed below, under `Single root content tree view`.
+  - If `NODE_ID` resolves to an inactive source, the server refuses the
+    request with a human-readable message and does not open a buffer.
+    Following a link to an inactive-source node behaves the same way.
 
 ## Save buffer
   - Request: First `((request . "save buffer") (view-uri . "URI") (point-lines-below-focused-headline . "N") (point-screen-lines-below-window-start . "M"))\n`, then `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` is the buffer content (`LENGTH` bytes).
@@ -55,6 +65,9 @@ So far there are these endpoints:
   - Response: Plain text with newline termination containing the file path relative to the skgconfig.toml directory, e.g. `skg/some-uuid.skg`.
   - Errors: If the file does not exist on disk, responds with "File not found: <path>".
   - Does not require TypeDB or Tantivy -- only the config.
+  - If the requested source is inactive in the current connection's
+    active source-set, the server refuses to expose the path. Direct
+    file visits outside Skg are not intercepted.
 
 ## Git diff mode toggle
   - Request: ((request . "git diff mode toggle"))
@@ -83,6 +96,8 @@ So far there are these endpoints:
   - Refuses to produce an ordinary report if any configured source is not a git
     repository, has no HEAD commit, has a selected merge-commit HEAD baseline,
     or contains an unreadable `.skg` blob in the selected snapshots.
+  - Refuses to run unless the active source-set is `all`; restricted
+    source-set diff reports are not defined yet.
 
 ## Rebuild databases
   - Request: ((request . "rebuild dbs"))
@@ -108,12 +123,34 @@ So far there are these endpoints:
     Does not save or modify the graph. Used after toggling
     git diff mode to refresh all views without requiring a save.
 
+## Source sets
+  - Request: ((request . "list source sets"))
+  - Response: LP response-type "source-sets" with
+    `((active "NAME") (sets ("NAME1" "NAME2" ...)))`.
+  - Request: ((request . "active source set"))
+  - Response: LP response-type "active-source-set" with
+    `((active "NAME"))`.
+  - Request: ((request . "set active source set") (name . "NAME"))
+  - Response: Multiple length-prefixed messages, sent sequentially:
+    1. Source-set response:
+       `Content-Length: N\r\n\r\n(("response-type" "active-source-set") ("active" "NAME") ("content" "Active source-set: NAME"))`
+    2. View-close/lock messages as needed by the Emacs client.
+  - Behavior: The active source-set is per Emacs TCP connection. It
+    defaults from `skgconfig.toml`, resets on reconnect, and is not
+    written back to the config. Changing it requires confirmation in
+    Emacs, closes/unregisters all active Skg buffers for that
+    connection, and cancels any in-flight search enrichment.
+
 ## Titles by ids
   - Request: ((request . "titles by ids") (ids "uuid1" "uuid2" ...))
   - Response: LP response-type "titles-by-ids" with `((response-type "titles-by-ids") (content ((uuid1 . "title1") (uuid2 . "title2") ...)))`.
   - IDs not found in Tantivy are simply absent from the response, except
     that deleted `.skg` files visible in the current git diff can also
     supply titles.
+  - Inactive-source IDs are omitted from the title map, even if they
+    exist in Tantivy or on disk. `skg-readable-ids-mode` may still
+    shorten UUIDs uniformly, but it must not title-annotate inactive
+    IDs.
   - Used by `skg-readable-ids-mode` to annotate UUIDs in magit buffers with their titles.
 
 ## Shutdown server
@@ -173,6 +210,7 @@ Pass its path as a command-line argument (default: `data/skgconfig.toml`) when s
 | `timing_log`         | no       | false   | When true, writes a JSON log to `<data_root>/logs/server.jsonl`. |
 | `auto_audit_daily`   | no       | false   | When true, audits the in-Rust memory against TypeDB at most once per day, backgrounded at lowest priority. Mismatches are appended to `<data_root>/audits.org` and flagged to the client on the next outbound buffer. |
 | `beep_when_server_becomes_available` | no | true | When true, plays a local sound after server initialization finishes. |
+| `default_source_set` | no | `all` | Source-set active when a client connects. Runtime changes are per connection and are not written back. |
 
 ## Sources
 
@@ -183,6 +221,42 @@ Each `[[sources]]` entry defines a directory of `.skg` files:
 | `name`         | yes      | Unique name for this source (used in metadata, provenance). |
 | `path`         | yes      | Directory containing `.skg` files. Relative to data root. |
 | `user_owns_it` | yes      | `true` if the user can create/edit nodes here; `false` for foreign (read-only) sources. |
+
+The source name `all` is reserved and rejected.
+
+## Source sets
+
+Each `[[source_sets]]` entry defines a named list of source names:
+
+| Field     | Required | Description |
+|-----------|----------|-------------|
+| `name`    | yes      | Source-set name. Must be unique and must not be `all`. |
+| `sources` | yes      | Non-empty list of existing source names. |
+
+The source-set name `all` is predefined and means every configured
+source. Users must not define their own `[[source_sets]]` entry named
+`all`. Source names and source-set names may otherwise collide; this
+allows singleton sets to be named after the source they contain.
+
+Example:
+
+```toml
+default_source_set = "public"
+
+[[sources]]
+name = "public"
+path = "public"
+user_owns_it = true
+
+[[sources]]
+name = "private"
+path = "private"
+user_owns_it = true
+
+[[source_sets]]
+name = "public"
+sources = ["public"]
+```
 
 ## Log files
 
@@ -259,3 +333,29 @@ Examples:
 (skg id (unstaged removedM))
 (skg (textChanged staged unstaged))
 ```
+
+## Inactive-source placeholder metadata
+
+When a node from an inactive source appears as content of an active
+container, it renders as a placeholder rather than as a TrueNode:
+
+```
+(skg (inactiveNode (id NODE_ID) (source SOURCE)))
+```
+
+The headline text is generic, e.g. `node from inactive source`. The
+real ID and source are kept in metadata so saving can preserve, reorder,
+duplicate, or remove the placeholder in the active container's
+`contains` list. Herald rules must not display the source, and title
+lookup/readable-ID helpers must not resolve the ID to a title while its
+source is inactive.
+
+The placeholder's own content is read-only: editing its title, body,
+metadata, source, or ID is a buffer validation error. Moving or deleting
+the placeholder as content of an active container is allowed and changes
+that container's `contains` list.
+
+In git diff mode, inactive placeholders may show only relationship
+position markers such as `(unstaged newM)` or `(unstaged removedM)`.
+They must not reveal title/body/alias/source-change diffs or deleted
+phantom titles.

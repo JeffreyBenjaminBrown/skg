@@ -54,12 +54,12 @@
       ;; org_to_text.rs); we match that here.
       (GREEN indef ABUT "☮")
       (graphStats
-        (BLUE INTERC "{"
-          (YELLOW containers (ANY IT))
-          (BLUE   contents   (ANY IT)))
         (YELLOW INTERC "→"
           (linksInFromContainers (ANY IT))
           (linksInFromLeaves     (ANY IT)))
+        (BLUE INTERC "{"
+          (YELLOW containers (ANY IT))
+          (BLUE   contents   (ANY IT)))
         (BLUE aliasing "A")
         (BLUE extraIDs "I")
         (BLUE overriding "O")
@@ -96,8 +96,14 @@ colour directives, ANY/IT, ABUT, and INTERC are documented there.
 
 SERVER-EMITTED ATOMS VS. RULE FORM
 
-The server emits metadata atoms as small labeled tuples; this rule
-table converts them 1:1 into short herald strings. A few patterns:
+The server emits metadata atoms as small labeled tuples; the rules sexp
+converts them 1:1 into short herald strings.
+The rules' order is presentation order, independent of the raw metadata order.
+The rules can repeat a head of a path
+ -- e.g. '(x a) (y a) (x b)` can be used to interleave
+the presentations of lists x and y.
+
+A few patterns:
 
   * Simple rules (COLOR? LABEL CHILDREN...) -- e.g.
     `(GREEN alias \"alias\")' matches `(alias \"foo\")' and emits the
@@ -113,9 +119,9 @@ table converts them 1:1 into short herald strings. A few patterns:
       rule against `staged' s children and joining the results.
     - Unlabelled: sub-rules run against the current object's
       own children (no wrapper atom required). Used at
-      `(graphStats ...)' level to turn raw sibling atoms like
-      `(containers N)' and `(contents M)' into a single `N{M'
-      token, without needing a fake wrapper on the server side.
+      `(graphStats ...)' level to turn raw sibling atoms into
+      compact tokens like `N→M' and `N{M', without needing fake
+      wrappers on the server side.
 
   * ABUT marker -- `(GREEN indef ABUT \"☮\")' tells the renderer to
     glue the `☮' onto the preceding token with no space. Used so

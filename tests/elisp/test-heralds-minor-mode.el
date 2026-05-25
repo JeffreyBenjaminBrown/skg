@@ -57,6 +57,8 @@
           ( should ( string-match "⟳" display-text ))
           ( should ( string-match "3{" display-text ))
           ( should ( string-match "→1" display-text ))
+          ( should (< (string-match "→1" display-text)
+                      (string-match "3{" display-text)) )
           ( should ( string-match "delete" display-text )) )) )
     (progn ;; what happens upon disabling it
       (heralds-minor-mode -1) ;; disable

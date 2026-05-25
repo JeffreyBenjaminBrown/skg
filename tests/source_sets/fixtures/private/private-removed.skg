@@ -1,0 +1,3 @@
+pid: private-removed
+title: private removed title must not leak
+body: private body must not leak

@@ -1,0 +1,336 @@
+* plan : source sets
+Implement source sets as a display/search restriction that does not
+change the underlying databases. The active source-set is per Emacs
+connection, defaults from =skgconfig.toml=, resets on reconnect, and
+can be changed at runtime after closing all active Skg buffers.
+
+Use graph-relationship vocabulary in implementation notes:
+=container=, =contained=, =link source=, =link target=, etc. Reserve
+"parent" for org/view parentage.
+
+* contract
+** Config
+Add source-set config to =skgconfig.toml=.
+
+- A source-set is a named list of existing source names.
+- A reserved source-set named =all= is predefined and means all
+  configured sources.
+- A configured source may not be named =all=.
+- A user-defined source-set may not be named =all=.
+- The config names the default active source-set.
+- The default active source-set must exist.
+- Empty user-defined source-sets are rejected.
+- Missing source names inside a source-set are rejected.
+- Duplicate source-set names are rejected.
+- Source and source-set names may otherwise collide; singleton
+  source-sets named after sources are allowed.
+** Runtime state
+Store the active source-set in per-connection state, beside
+=diff_mode_enabled= in =ViewsState=.
+
+Changing it should:
+
+- ask Emacs to confirm closing all active Skg buffers
+- close/unregister all active Skg buffers
+- cancel or invalidate any in-flight search enrichment
+- update the per-connection active source-set
+- report the active source-set name back to Emacs
+
+Do not persist runtime changes to =skgconfig.toml=. Reconnects and
+server restarts use the config default.
+** Visibility
+Active-source nodes render normally.
+
+Inactive nodes reached as content of an active container render as an
+inactive placeholder. This intentionally leaks that an inactive node
+exists in that position, but not title, body, aliases, extra IDs, graph
+stats, source herald text, or other content.
+
+Inactive nodes reached by backward traversal are truncated before the
+inactive node:
+
+- containerward paths stop before the inactive container
+- sourceward paths stop before the inactive link source
+- forks are filtered per branch
+- empty forks are omitted
+
+Requests to open or follow a link to an inactive-source root fail with
+a minibuffer message and do not open a buffer. Visiting the raw =.skg=
+file is not intercepted.
+** Inactive placeholders
+Add a distinct viewnode/metadata shape for inactive placeholders.
+
+The placeholder metadata keeps the real ID and source so save can
+preserve and reorder =contains= lists. Herald rules must not display the
+source. Readable-ID/title lookup tools must treat the placeholder as
+inactive and avoid title lookup.
+
+Placeholder edit semantics:
+
+- the placeholder's node content cannot be edited
+- attempts to edit placeholder title/body/metadata/source/id are rejected
+  with normal buffer validation errors
+- the placeholder can be moved, duplicated, or deleted as content of an
+  active container
+- saving such moves/deletions modifies the active container's
+  =contains= list, including relationships to inactive nodes
+
+* implementation sequence
+** 1. Config model and validation
+Update =server/types/misc.rs=:
+
+- add source-set structs/fields to =SkgConfig=
+- add helper methods for resolving a source-set name to a set of
+  =SourceName=
+- add =source_is_active= / =id_source_is_active= style predicates
+- preserve existing test constructors with sensible defaults
+
+Update config loading/validation wherever =SkgConfig= is read:
+
+- reject missing/duplicate/empty invalid source-set data
+- reject configured source name =all=
+- reject user-defined source-set name =all=
+- default to =all= if the config omits source-set fields only if that
+  keeps old configs working cleanly
+
+Update docs for =skgconfig.toml= after the data shape settles.
+** 2. Protocol and Emacs controls
+Add server request handlers for:
+
+- getting active source-set/status
+- setting active source-set
+- listing source-sets, if useful for completion
+
+Add Emacs commands for:
+
+- choosing active source-set
+- confirming buffer closure
+- closing/unregistering active Skg buffers
+- displaying the active source-set in messages/status
+
+When source-set changes, cancel old search enrichment. The current
+search path already has =search_cancelled= and an enrichment slot; make
+source-set switching use the same invalidation mechanism.
+** 3. Active-source predicates in read paths
+Thread the active source-set through display/search calls without
+rebuilding TypeDB or Tantivy.
+
+Apply the predicate to both TypeDB and in-Rust graph shortcuts:
+
+- initial content BFS
+- content completion/rerender
+- sourceward and containerward expansion
+- search enrichment ancestry
+- graph stats, where supported
+- title lookup surfaces
+- readable-ID annotations
+
+Do not rely only on TypeDB query filters. Production paths often use
+the in-Rust graph first.
+** 4. Search filtering
+Filter by active source-set before grouping, ranking, alias/title choice,
+and =SEARCH_DISPLAY_LIMIT= truncation.
+
+Then apply the same source-set to enrichment:
+
+- containerward ancestry is truncated before inactive containers
+- graph stats either become source-set-aware or carry precise
+  =PITFALL | TODO= comments naming the remaining lie
+- inactive hits cannot influence active hit ranking or displayed title
+** 5. Inactive placeholder viewnodes
+Add a distinct inactive-placeholder kind rather than overloading deleted
+phantoms.
+
+Rendering requirements:
+
+- headline text should be generic, e.g. =node from inactive source=
+- metadata includes ID and source for save
+- herald rules hide the source
+- no title/body/alias/extra-id/graphStats/sourceward metadata
+- metadata search helpers distinguish placeholders from TrueNodes and
+  deleted phantoms
+
+Display content:
+
+- active contained nodes render normally
+- inactive contained nodes render as placeholders
+- source-set filtering should not create unknown-node placeholders for
+  known inactive nodes; unknown nodes remain a separate concept
+- in diff view mode, inactive placeholders still render the appropriate
+  =NewHere= / =RemovedHere= relationship-position markers without
+  revealing inactive title/body/source content
+
+** 6. Save semantics for placeholders
+Extend buffer parsing and validation so inactive placeholders are
+recognized as their own kind.
+
+Rules:
+
+- editing placeholder title/body/metadata/source/id is an error
+- placeholder position under an active container contributes its ID to
+  the saved container =contains= list
+- moving a placeholder within an active container reorders =contains=
+- deleting a placeholder removes that inactive ID from =contains=
+- duplicating a placeholder should follow the same duplicate-content
+  semantics as duplicating an active child, or be rejected if duplicate
+  =contains= entries are invalid
+- placing active children beneath a placeholder is rejected
+
+This keeps the first implementation simple: visible children, including
+inactive placeholders, still define the full visible =contains= list for
+the active container.
+** 7. Backward traversal filtering
+Update containerward/sourceward path construction:
+
+- filter each step by endpoint source before rendering
+- truncate before inactive nodes
+- filter fork branches independently
+- omit empty fork scaffolds
+- keep graph traversal capable of seeing inactive nodes internally so it
+  can know where to truncate
+
+Use the same rules in search enrichment ancestry.
+** 8. Diff behavior
+Diff-analysis report:
+
+- refuse to run unless the active source-set is =all=
+- explain that restricted-source diff reports are not defined yet
+
+Inline git diff mode:
+
+- may run under restricted source-sets
+- active-source nodes show normal inline diff annotations
+- inactive placeholders may show only relationship/list-position diff
+  markers needed for =contains= editing
+- inactive placeholders must not show title/body/alias/source-change
+  diffs or deleted-node phantom titles
+- inactive-source deleted phantoms must not leak title/body/source
+** 9. Readable IDs and title/file-path surfaces
+Readable-ID mode:
+
+- may shorten UUIDs uniformly
+- must not title-annotate inactive-source IDs
+- must treat inactive-placeholder metadata as inactive even though it
+  contains ID/source
+
+Other surfaces:
+
+- =titles by ids= should omit inactive-source titles unless active
+  source-set is =all= or the ID is active
+- =get file path= should not expose inactive-source paths through Skg
+  commands
+- direct file visits remain outside Skg's control
+** 10. Heralds and stats
+Prefer source-set-aware stats where practical.
+
+Where not practical in the first cut, leave precise comments such as:
+
+- =PITFALL | TODO: graphStats.linksIn includes inactive link sources=
+- =PITFALL | TODO: graphStats.contents includes inactive contained nodes=
+- =PITFALL | TODO: container/sourceward stats include inactive nodes=
+
+Do not use broad comments like "heralds lie"; name each lie.
+
+* tests
+** Config tests
+- old config without source-set fields defaults to =all=, if backward
+  compatibility is kept
+- configured default source-set is loaded
+- invalid default source-set is rejected
+- missing source in source-set is rejected
+- empty source-set is rejected
+- duplicate source-set names are rejected
+- source named =all= is rejected
+- user-defined source-set named =all= is rejected
+- source/source-set name collision other than =all= is accepted
+** Search tests
+- inactive-source title hit is absent
+- inactive-source alias hit is absent
+- inactive hits do not crowd active hits out before display truncation
+- enrichment does not add inactive ancestry
+- graphStats behavior is tested or explicitly documented as TODO
+** Content view tests
+- active root with active children renders normally
+- active root with inactive contained node renders inactive placeholder
+- inactive root request fails with clear message
+- following a link to inactive target fails with clear message
+- source-set switch closes open views and cancels stale enrichment
+** Save tests
+- saving unchanged view with inactive placeholder preserves =contains=
+- moving inactive placeholder reorders =contains=
+- deleting inactive placeholder removes it from =contains=
+- editing inactive placeholder title/body/metadata/source/id is rejected
+- adding active child under inactive placeholder is rejected
+- duplicating inactive placeholder is either rejected or has defined
+  duplicate-content behavior
+** Backward view tests
+- containerward path truncates before inactive container
+- sourceward path truncates before inactive link source
+- mid-path truncation renders exactly the visible prefix and stops
+  before the first inactive node
+- fork branches are filtered independently
+- partially inactive forks render only active branches
+- completely inactive forks are not drawn at all; no empty fork scaffold
+  remains
+** Diff tests
+- diff-analysis refuses when active source-set is not =all=
+- inline diff does not reveal inactive placeholder title/body/source
+- inline diff still annotates active-source nodes
+- inactive placeholders show allowed relationship/list-position markers
+  only
+- inactive-source nodes in diff view mode render correct =NewHere= and
+  =RemovedHere= markers without leaking hidden content
+- inactive placeholders do not show title/body/alias/source-change diffs
+- inactive-source deleted phantoms do not leak title/body/source
+** Readable-ID tests
+- inactive IDs are shortened if mode is active
+- inactive IDs are not title-annotated
+- active IDs remain title-annotated
+
+* likely code touch points
+** Rust
+- =server/types/misc.rs= for config and active-source helpers
+- config loading in =server/main.rs= / initialization path
+- =server/serve.rs= and =server/serve/protocol.rs= for requests/state
+- =server/types/views_state.rs= for per-connection active source-set
+- =server/to_org/render/initial_bfs.rs=
+- =server/to_org/util.rs=
+- =server/to_org/expand/backpath.rs=
+- =server/dbs/typedb/paths.rs=
+- =server/dbs/typedb/ancestry.rs=
+- =server/update_buffer/graphnodestats.rs=
+- =server/serve/handlers/text_search.rs=
+- =server/serve/handlers/text_search/render_enriched_search_buffer.rs=
+- =server/serve/handlers/diff_analysis.rs=
+- =server/serve/handlers/titles_by_ids.rs=
+- =server/serve/handlers/get_file_path.rs=
+- =server/from_text/buffer_to_viewnodes/*=
+- =server/from_text/viewnodes_to_instructions/*=
+- =server/types/viewnode.rs=
+- =server/org_to_text.rs=
+** Emacs Lisp
+- =elisp/skg-config.el=
+- =elisp/skg-client.el=
+- =elisp/skg-request-views.el=
+- =elisp/skg-request-text-search.el=
+- =elisp/skg-id-search.el=
+- =elisp/skg-readable-ids.el=
+- =elisp/heralds-minor-mode.el=
+- keymap/alias files for source-set switching commands
+
+* rollout
+Implement in small commits/steps:
+
+1. config model and validation, with tests
+2. protocol/runtime active source-set state, with Emacs switch command
+3. search filtering before ranking/truncation
+4. inactive placeholder rendering for content views
+5. save validation and placeholder save semantics
+6. backward traversal/search enrichment filtering
+7. readable-ID/title/file-path filtering
+8. diff-analysis refusal and inline diff placeholder constraints
+9. herald/stat cleanup and precise TODO comments
+
+After each stage, run the narrow Rust/Elisp tests for the touched path.
+Before merging the feature, run Rust tests plus relevant Emacs tests and
+at least one integration test covering source-set switch/search/save.

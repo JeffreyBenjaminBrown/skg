@@ -1,22 +1,23 @@
-* ? to be more sure of the git diff analysis
+* ONGOING [[./TODO/source-sets.org]]
+* critical
+** I can't demo without privacy mode.
+The backlinks from skg itself contains unsafe references.
+* AWAITS ? to be more sure of the git diff analysis
 Have independent code count the number of disappeared files,
 moved files, new roots, and other anomalies,
 and check it against the report.
 (Backgrounded.)
-* TODO git branch birth-to-parentIs
-** has two commits
-the second (later) unreviewed
-** from skg2, run
-codex resume 019e51dd-11ff-7241-a1cf-8c2dc7db7a79
-* TODO speed up test suite
+* AWAITS links in before contents
+** graphstats should precede even the link source count
+but follow parentIs and indef
+** containsParent is a viewstat, not just an isParent value?
+Seems good to use two heralds of the same shape, like "}}",
+but one is the color of isParent and the other the color of viewStats.
+* AWAITS speed up test suite
 Consolidate redundant tests.
 * ONGOING [[./TODO/birth-to-parent.org]]
-* the contained diff in a diff analysis report should also have titles
 * Each parentIs herald should be a different color.
 and always first
-* critical
-** I can't demo without privacy mode.
-The backlinks from skg contains unsafe references.
 * understand
 ** [[./rerender_view.org][understand rerender_view]]
 ** OOPS : meant to review this diff range
@@ -42,9 +43,6 @@ requires rebuilding NixOS
 That was so that M-? would
 not interpret comments as search hits.
 * easy
-** source does not need to exist if it can be found
-** wut
-from a common title, fuzzy search for titles with words like it, and from the search results, turn some of the (text) mentions into (graph-formalized) links
 ** beep also once the db has rebuilt
 ** the links-in herald should precede the contents herald
 Actually just omit the contents herald.
@@ -87,10 +85,11 @@ See TODO/docker-unification-strategies.org
 ** I liked this prompt at the top of a vision document.
 Please read and think about this.
 Report anything unclear, inelegant, inefficient, or awkward about it,
-in a last section titled 'problems'.
+in the following section, 'problems'.
 Subdivide your questions and other feedback org-style
 (remember, the tree does not have to be uniform depth!)
 and I will respond inline.
+Please don't perform any git write ops for now, but read all you want.
 ** INTERNALIZE: Use lightweight models for easy but wordy things.
 Like fixing interior imports.
 * references
