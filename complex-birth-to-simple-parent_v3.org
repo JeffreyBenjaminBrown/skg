@@ -44,7 +44,7 @@ That preserves compact metadata for ordinary content children without
 making omission context-sensitive.
 
 =Absent= remains a tree-position fact, not a graph relationship. It is
-valid for direct TrueNode children of the invisible =BufferRoot=. If a
+valid for TrueNode children of the invisible =BufferRoot=. If a
 user moves such a node under a visible parent, the save path should
 normalize =Absent= to =Container= so the move creates an ordinary
 containment edit.
@@ -129,7 +129,7 @@ explicit.
 Add one tree-aware normalization pass after org parsing has built the
 viewforest, before validation and save extraction:
 
-- direct TrueNode children of =BufferRoot= may remain
+- TrueNode children of =BufferRoot= may remain
   =ParentIs::Absent=;
 - TrueNodes under any visible parent with =ParentIs::Absent= become
   =ParentIs::Container=.
@@ -147,11 +147,11 @@ edits.
 =server/to_org/render/content_view.rs= calls
 =set_view_root_births_from_graphstats= after graph stats are attached.
 =server/to_org/util.rs= lines 193-211 then assigns =Container= or
-=Independent= to direct =BufferRoot= children based on graph container
+=Independent= to =BufferRoot= children based on graph container
 count.
 
 Under v3, graph container count should not determine =ParentIs= for a
-view-root. A direct =BufferRoot= child has no visible parent.
+view-root. A =BufferRoot= child has no visible parent.
 
 Recommendation: replace =set_view_root_births_from_graphstats= with
 =mark_view_roots_parent_absent= or similar. It should set direct
@@ -161,10 +161,10 @@ Recommendation: replace =set_view_root_births_from_graphstats= with
 
 =server/update_buffer.rs= line 246 calls =mark_view_roots_independent=.
 =server/to_org/util.rs= lines 213-229 implement that by assigning
-=ParentIs::Independent= to direct =BufferRoot= children.
+=ParentIs::Independent= to =BufferRoot= children.
 
 Under v3, this should become the same root normalization used for
-initial views: direct =BufferRoot= TrueNodes get =ParentIs::Absent=.
+initial views: =BufferRoot= TrueNodes get =ParentIs::Absent=.
 
 This fixes the known problem: a graph-content view-root no longer
 changes from =Container= on initial visit to =Independent= after save.
@@ -207,7 +207,7 @@ context just to distinguish =Absent= from =Container=.
 
 =server/serve/handlers/text_search.rs= lines 352-357 currently assigns
 =ParentIs::Independent= to indexed root hits and =ParentIs::Container= to
-other hits. Lines 399-407 create each hit as a direct child of
+other hits. Lines 399-407 create each hit as a child of
 =BufferRoot=.
 
 Under v3, all level-1 search hits should be =ParentIs::Absent=,

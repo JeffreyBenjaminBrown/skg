@@ -34,7 +34,7 @@ Important pitfall: old =ParentIs::Content= should not become
 The model works well if =Absent= is treated as a tree-position fact,
 not as a save-time parent relationship.
 
-=Absent= should be valid when rendering a direct TrueNode child of
+=Absent= should be valid when rendering a TrueNode child of
 =BufferRoot=. It should not survive as the effective =ParentIs= of a
 TrueNode under a visible parent. If such a node is moved under another
 node, the save path should normalize it to =Container= before extracting
@@ -125,11 +125,11 @@ no effect in the graph on the parent.
 =server/to_org/render/content_view.rs= calls
 =set_view_root_births_from_graphstats= after graph stats are attached.
 =server/to_org/util.rs= lines 193-211 then assigns =Container= or
-=Independent= to direct =BufferRoot= children based on graph container
+=Independent= to =BufferRoot= children based on graph container
 count.
 
 Under v2, this pass should not inspect graph container count for
-=ParentIs=. A direct =BufferRoot= child has no visible parent, whether
+=ParentIs=. A =BufferRoot= child has no visible parent, whether
 or not it has graph containers elsewhere.
 
 Recommendation: replace =set_view_root_births_from_graphstats= with
@@ -140,10 +140,10 @@ Recommendation: replace =set_view_root_births_from_graphstats= with
 
 =server/update_buffer.rs= line 246 calls =mark_view_roots_independent=.
 =server/to_org/util.rs= lines 213-229 implement that by assigning
-=ParentIs::Independent= to direct =BufferRoot= children.
+=ParentIs::Independent= to =BufferRoot= children.
 
 Under v2, this should become the same root normalization used for
-initial views: direct =BufferRoot= TrueNodes get =ParentIs::Absent=.
+initial views: =BufferRoot= TrueNodes get =ParentIs::Absent=.
 
 This fixes the known problem: a graph-content view-root no longer
 changes from =Container= on initial visit to =Independent= after save.
@@ -219,7 +219,7 @@ headline level into herald generation and inject only when level > 1.
 
 =server/serve/handlers/text_search.rs= lines 352-357 currently assigns
 =ParentIs::Independent= to indexed root hits and =ParentIs::Container= to
-other hits. Lines 399-407 create each hit as a direct child of
+other hits. Lines 399-407 create each hit as a child of
 =BufferRoot=.
 
 Under v2, all level-1 search hits should be =ParentIs::Absent=,

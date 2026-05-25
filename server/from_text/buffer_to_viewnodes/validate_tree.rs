@@ -85,8 +85,8 @@ pub async fn find_buffer_errors_for_saving (
 /// verify that:
 /// - The node is indefinitive.
 /// - It has no content children (TrueNode children with parentIs ==
-///   Container). Non-content children — content ancestry stubs,
-///   linkTarget references, scaffolds, etc. — don't block expansion:
+///   Container). Non-content children — containerward ancestry stubs,
+///   link sources, scaffolds, etc. — don't block expansion:
 ///   they won't be clobbered by it.
 /// - No other node with the same ID has a definitive view request,
 ///   because there can only be one definitive view.

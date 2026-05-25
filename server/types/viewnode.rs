@@ -11,8 +11,11 @@ use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
 
-/// What this node's visible parent is relative to this node.
-/// The default is Container: the parent contains this child.
+/// What this node's visible parent is relative to this node --
+/// or, more precisely, what it *was* when this buffer was (re)drawn,
+/// before the user may have moved the node elsewhere, invalidating this.
+/// Most nodes are born as content of the parent node,
+/// but there can be other reasons -- e.g. the user asked to see backlinks.
 ///
 /// PITFALL: There might be multiple relationships between parent and child --
 /// e.g. cyclic containment. This does not encode all of them.

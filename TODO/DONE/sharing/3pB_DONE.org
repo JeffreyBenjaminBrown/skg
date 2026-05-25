@@ -44,7 +44,7 @@ Read:
 ** 2. Add a focused regression
 
 Add the narrowest test that proves a diff-mode saved view containing a
-subscribee-as-such branch does not preserve a stale direct child
+subscribee-as-such branch does not preserve a stale child
 list.
 
 Preferred shape:

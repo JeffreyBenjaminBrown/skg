@@ -68,14 +68,14 @@ before rendering, while =BufferRoot= children have none.
 =server/to_org/render/content_view.rs= builds the initial content view,
 then calls =set_view_root_births_from_graphstats=.
 
-=server/to_org/util.rs= lines 193-211 set direct =BufferRoot= children
+=server/to_org/util.rs= lines 193-211 set =BufferRoot= children
 to =Container= if they have graph containers, otherwise =Independent=.
 This is the known muddle. A view-root that is graph-content currently
 gets =ParentIs= =Container= even though it has no visible parent. A graph
 root gets =ParentIs= =Independent= for the same no-visible-parent reason.
 
 Recommendation: replace this with a top-level pass that clears =Parent=
-for all direct =BufferRoot= TrueNode children. Graph container counts can
+for all =BufferRoot= TrueNode children. Graph container counts can
 still be shown by =graphStats=, but they should not be represented as a
 relationship to =BufferRoot=.
 
@@ -83,7 +83,7 @@ relationship to =BufferRoot=.
 
 =server/update_buffer.rs= line 246 calls =mark_view_roots_independent=.
 =server/to_org/util.rs= lines 213-229 implement that by setting every
-direct =BufferRoot= TrueNode child to =ParentIs::Independent=.
+=BufferRoot= TrueNode child to =ParentIs::Independent=.
 
 This is the other half of the known muddle: a saved top-level
 graph-content node changes from =Container= on initial visit to
@@ -180,7 +180,7 @@ Recommendation:
 
 - render an explicit =Parent= field for every TrueNode with a visible
   parent, including =Container=;
-- render no =Parent= field for direct =BufferRoot= children;
+- render no =Parent= field for =BufferRoot= children;
 - remove the herald-side default injection of =container=;
 - let the herald display show no parent glyph when the field is absent.
 
@@ -207,7 +207,7 @@ The parser in =server/serve/parse_metadata_sexp.rs= defaults missing
 
 4. Replace =set_view_root_births_from_graphstats= and
    =mark_view_roots_independent= with top-level normalization that
-   clears the parent field on direct =BufferRoot= TrueNode children.
+   clears the parent field on =BufferRoot= TrueNode children.
 
 5. Render =Container= explicitly for non-root TrueNodes. Do not use
    absence as a shorthand for =Container= anymore.

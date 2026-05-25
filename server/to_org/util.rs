@@ -187,8 +187,7 @@ pub async fn stub_viewforest_from_root_ids (
     ) . await ?; }
   Ok (viewforest) }
 
-/// Mark direct TrueNode children of BufferRoot as having no visible
-/// parent.
+/// Mark TrueNode children of BufferRoot as having no visible parent.
 pub fn mark_view_roots_parent_absent (
   viewforest : &mut Tree<ViewNode>,
 ) {

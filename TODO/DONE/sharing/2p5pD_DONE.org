@@ -100,7 +100,7 @@ Current behavior to preserve:
 
 If title/body edits on a subscribee-as-such need to keep reaching
 foreign validation, represent that explicitly rather than smuggling the
-direct child list through 'contains'. For instance, a direct
+child list through 'contains'. For instance, an
 =AsSubscribee= occurrence could produce a graph save with no opinion
 about 'contains' plus a separate visibility surface. Do not let the
 displayed child list become graph =contains=.
@@ -200,7 +200,7 @@ subscribee-as-such extraction no longer creates a graph-save
   'NodeSaveIntent.contains'.
 - The disk supplementation path has no subscribee-as-such guardrail and
   no role-position policy parameter.
-- Same-ID behavior still permits an ordinary graph save and a direct
+- Same-ID behavior still permits an ordinary graph save and an
   subscribee visibility surface for the same graph ID to coexist.
 - Current subscribee-as-such hide/unhide behavior is unchanged.
 - The tests above pass.
