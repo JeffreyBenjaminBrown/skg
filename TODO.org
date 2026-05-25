@@ -1,6 +1,25 @@
-* TODO setup for Lorena
-** make it installable on windows
-* [[./TODO/birth-to-parent.org]]
+* When visiting a .skg file from magit with skg-read-mode enabled
+that minor mode should also be enabled in the opened file
+* to be more sure of the git diff analysis
+Have independent code count the number of disappeared files,
+moved files, new roots, and other anomalies,
+and check it against the report.
+(Backgrounded.)
+* offer to change link label before fixing it in 'C-c m l'
+* TODO git branch faster-diff-analysis
+from skg3, run
+  codex resume 019e51c3-97dd-7502-b8d0-9b0306c0c6f9
+* TODO git branch birth-to-parentIs
+** has two commits
+the second (later) unreviewed
+** from skg2, run
+codex resume 019e51dd-11ff-7241-a1cf-8c2dc7db7a79
+* TODO speed up test suite
+Consolidate redundant tests.
+* ONGOING [[./TODO/birth-to-parent.org]]
+* the contained diff in a diff analysis report should also have titles
+* Each parentIs herald should be a different color.
+and always first
 * critical
 ** I can't demo without privacy mode.
 The backlinks from skg contains unsafe references.
@@ -29,7 +48,8 @@ requires rebuilding NixOS
 That was so that M-? would
 not interpret comments as search hits.
 * easy
-** buffer names should strip "id:ID' from links
+** source does not need to exist if it can be found
+** wut
 from a common title, fuzzy search for titles with words like it, and from the search results, turn some of the (text) mentions into (graph-formalized) links
 ** beep also once the db has rebuilt
 ** the links-in herald should precede the contents herald
@@ -46,6 +66,8 @@ And what about extra-ids?
 ** Is it a misfeature to let config_path differ from data_root?
 Why would you split up your skg stuff?
 * bugs
+** making a node multicontained does not update its container count
+in the buffer it was copied from
 ** after a big edit to the CS for econ course notes, C-c t A took forever
 I had created a big tree of new nodes.
 ** What's the second blue { in the herald for?
