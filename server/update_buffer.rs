@@ -156,8 +156,10 @@ pub async fn update_views_after_save (
         Err (e) => { context . errors . push (e); }} }}
   if let Some (w) = take_pending_audit_warning () {
     context . errors . insert (0, w); }
-  Ok ( SaveResponse { saved_view : saved_text,
-                       errors : context . errors } ) }
+  Ok ( SaveResponse {
+    saved_view          : saved_text,
+    errors              : context . errors,
+    save_point_position : None, } ) }
 
 async fn rerender_collateral_view (
   uri         : ViewUri,

@@ -1,5 +1,3 @@
-* When visiting a .skg file from magit with skg-read-mode enabled
-that minor mode should also be enabled in the opened file
 * to be more sure of the git diff analysis
 Have independent code count the number of disappeared files,
 moved files, new roots, and other anomalies,

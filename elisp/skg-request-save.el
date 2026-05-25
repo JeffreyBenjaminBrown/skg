@@ -20,7 +20,9 @@ unlocked when the early response arrives."
   (let ((focused-had-metadata ;; Whether the focused headline already has metadata. Storing this lets us clean up the bare (skg) that removal leaves behind.
          (save-excursion
            (org-back-to-heading t)
-           (looking-at "\\*+ (skg"))))
+           (looking-at "\\*+ (skg")))
+        (save-point-position
+         (skg--current-save-point-position)))
     (skg-add-folded-markers)
     (skg-add-focused-marker)
     (let* ((tcp-proc (skg-tcp-connect-to-rust))
@@ -28,8 +30,9 @@ unlocked when the early response arrives."
            (saved-uri skg-view-uri)
            (buffer-contents (buffer-string))
            (request-s-exp (concat (prin1-to-string
-                                   `((request . "save buffer")
-                                     (view-uri . ,skg-view-uri)))
+                                   (skg--save-request-sexp
+                                    skg-view-uri
+                                    save-point-position))
                                   "\n"))
            (content-bytes (encode-coding-string buffer-contents 'utf-8))
            (content-length (length content-bytes))
@@ -81,6 +84,39 @@ unlocked when the early response arrives."
       ;; Send the length-prefixed buffer contents
       (process-send-string tcp-proc header)
       (process-send-string tcp-proc buffer-contents))))
+
+(defun skg--save-request-sexp (view-uri save-point-position)
+  `((request . "save buffer")
+    (view-uri . ,view-uri)
+    (point-lines-below-focused-headline
+     . ,(number-to-string
+         (plist-get save-point-position
+                    :point-lines-below-focused-headline)))
+    (point-screen-lines-below-window-start
+     . ,(number-to-string
+         (plist-get save-point-position
+                    :point-screen-lines-below-window-start)))))
+
+(defun skg--current-save-point-position ()
+  "WHAT IT DOES: Return point position data that should survive the save redraw:
+- text-line offset: relative to the focused headline
+- screen-line offset: relative to the top *visible* line of the window
+WHY: A character offset from buffer start is not stable enough: saving can make branches appear or disappear above point. The focused headline is already preserved by metadata, so record point relative to that headline and to the window top."
+  (let ((point-line (line-number-at-pos (point) t))
+        (window (get-buffer-window (current-buffer) t)))
+    (list :point-lines-below-focused-headline
+          (save-excursion
+            (org-back-to-heading t)
+            (- point-line (line-number-at-pos (point) t)))
+          :point-screen-lines-below-window-start
+          (if window
+              (max 0
+                   (count-screen-lines
+                    (window-start window)
+                    (point)
+                    nil
+                    window))
+            0))))
 
 (defun skg-strip-bare-skg-at-focused-headline ()
   "Remove bare (skg) from the current headline if that is its only metadata.
@@ -151,9 +187,12 @@ display in the warnings/errors buffer."
   (condition-case err
       (let* ((response (read sexp-string))
              (content-value (cadr (assoc 'content response)))
-             (errors-list   (cadr (assoc 'errors response))))
+             (errors-list   (cadr (assoc 'errors response)))
+             (save-point-position
+              (skg--save-point-position-from-response response)))
         (when content-value
-          (skg-replace-buffer-with-new-content nil content-value))
+          (skg-replace-buffer-with-new-content
+           nil content-value save-point-position))
         (when errors-list
           (let ((errors-text (skg-errors-to-org-string errors-list)))
             (if content-value
@@ -164,7 +203,29 @@ display in the warnings/errors buffer."
     (error (skg-log 'error 'save "parsing save response: %S" err)
            (skg-log 'error 'save "sexp string was: %S" sexp-string))))
 
-(defun skg-replace-buffer-with-new-content (_tcp-proc new-content)
+(defun skg--save-point-position-from-response (response)
+  "Extract optional save point position from RESPONSE."
+  (list :point-lines-below-focused-headline
+        (skg--nat-from-response response
+                                'point-lines-below-focused-headline)
+        :point-screen-lines-below-window-start
+        (skg--nat-from-response response
+                                'point-screen-lines-below-window-start)))
+
+(defun skg--nat-from-response (response key)
+  "Extract natural number KEY from RESPONSE, accepting strings or ints."
+  (let ((entry (assoc key response)))
+    (when entry
+      (let ((value (cadr entry)))
+        (cond
+         ((natnump value) value)
+         ((and (stringp value)
+               (string-match-p "\\`[0-9]+\\'" value))
+          (string-to-number value)))))))
+
+(defun skg-replace-buffer-with-new-content (_tcp-proc new-content
+                                                      &optional
+                                                      save-point-position)
   "Replace the current buffer contents with NEW-CONTENT from Rust.
 After inserting content, folds marked headlines, removes fold markers,
 moves point to focused headline, and removes focus marker."
@@ -192,6 +253,7 @@ moves point to focused headline, and removes focus marker."
       ;; stay on the focused headline set just above.
       (skg-fold-marked-headlines)
       (skg-remove-folded-markers))
+    (skg--restore-save-point-position save-point-position)
     (set-buffer-modified-p
      ;; Clear modified flag and re-register the one-shot hook
      ;; AFTER all buffer modifications are done.
@@ -199,6 +261,51 @@ moves point to focused headline, and removes focus marker."
     (add-hook 'first-change-hook
               #'skg-warn-if-other-buffer-modified nil t)
     (message "Buffer updated with processed content from Rust")))
+
+(defun skg--restore-save-point-position (save-point-position)
+  "Restore point and window row from SAVE-POINT-POSITION, if available."
+  (when save-point-position
+    (let ((point-lines-below-focused-headline
+           (plist-get save-point-position
+                      :point-lines-below-focused-headline))
+          (point-screen-lines-below-window-start
+           (plist-get save-point-position
+                      :point-screen-lines-below-window-start)))
+      (when point-lines-below-focused-headline
+        (skg--restore-point-below-focused-headline
+         point-lines-below-focused-headline))
+      (when point-screen-lines-below-window-start
+        (skg--recenter-current-buffer-window
+         point-screen-lines-below-window-start)))))
+
+(defun skg--restore-point-below-focused-headline (line-offset)
+  "Move LINE-OFFSET body lines below the focused headline if possible.
+If that line no longer belongs to the focused headline's entry,
+leave point on the focused headline."
+  (let ((focused-heading (point)))
+    (when (> line-offset 0)
+      (let ((candidate
+             (save-excursion
+               (forward-line line-offset)
+               (point)))
+            (next-heading
+             (save-excursion
+               (when (outline-next-heading)
+                 (point)))))
+        (if (and (or (null next-heading)
+                     (< candidate next-heading))
+                 (not (save-excursion
+                        (goto-char candidate)
+                        (org-at-heading-p))))
+            (goto-char candidate)
+          (goto-char focused-heading))))))
+
+(defun skg--recenter-current-buffer-window (screen-line)
+  "Place point on SCREEN-LINE in a displayed window for this buffer."
+  (let ((window (get-buffer-window (current-buffer) t)))
+    (when window
+      (with-selected-window window
+        (recenter screen-line)))))
 
 (defun skg-big-nonfatal-message (buffer-name message-text content)
   "Display CONTENT in BUFFER-NAME and show MESSAGE-TEXT in minibuffer."

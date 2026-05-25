@@ -82,4 +82,51 @@ isolate the fold-processing path from the focus-processing path."
             (should (string-match-p "^\\* " actual))))
       (kill-buffer buf))))
 
+(ert-deftest test-save-response-restores-point-in-focused-body ()
+  "Point returns to the same body line below the focused headline."
+  (let* ((from-rust
+          (concat
+           "* (skg focused (node (id root))) root\n"
+           "body 1\n"
+           "body 2\n"
+           "** (skg (node (id child))) child\n"))
+         (buf (generate-new-buffer "*test-save-response-body-point*")))
+    (unwind-protect
+        (with-current-buffer buf
+          (org-mode)
+          (setq-local skg-view-uri "test-uri")
+          (skg-replace-buffer-with-new-content
+           nil
+           from-rust
+           '(:point-lines-below-focused-headline 2
+             :point-screen-lines-below-window-start 0))
+          (should (string= "body 2"
+                           (buffer-substring-no-properties
+                            (line-beginning-position)
+                            (line-end-position)))))
+      (kill-buffer buf))))
+
+(ert-deftest test-save-response-leaves-point-on-focused-headline-when-body-line-vanishes ()
+  "If the saved body line is gone, point stays on the focused headline."
+  (let* ((from-rust
+          (concat
+           "* (skg focused (node (id root))) root\n"
+           "** (skg (node (id child))) child\n"))
+         (buf (generate-new-buffer "*test-save-response-vanished-body-point*")))
+    (unwind-protect
+        (with-current-buffer buf
+          (org-mode)
+          (setq-local skg-view-uri "test-uri")
+          (skg-replace-buffer-with-new-content
+           nil
+           from-rust
+           '(:point-lines-below-focused-headline 2
+             :point-screen-lines-below-window-start 0))
+          (should (string-match-p
+                   "^\\* .*root$"
+                   (buffer-substring-no-properties
+                    (line-beginning-position)
+                    (line-end-position)))))
+      (kill-buffer buf))))
+
 (provide 'test-skg-save-response-folded-root)

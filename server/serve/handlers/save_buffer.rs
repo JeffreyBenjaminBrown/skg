@@ -13,7 +13,8 @@ use crate::serve::util::{
   read_length_prefixed_content,
   send_response_with_length_prefix,
   tag_sexp_response,
-  tag_text_response };
+  tag_text_response,
+  value_from_request_sexp };
 use crate::types::env::SkgEnv;
 use crate::types::errors::SaveError;
 use crate::types::git::{SourceDiff, GitDiffStatus};
@@ -36,16 +37,33 @@ use std::path::Path;
 /// See <api-and-formats.md § Save buffer> for the full sequence:
 ///   save-lock → collateral-view* → save-result.
 pub struct SaveResponse {
-  pub saved_view : String,
-  pub errors     : Vec<String>,
+  pub saved_view          : String,
+  pub errors              : Vec<String>,
+  pub save_point_position : Option<SavePointPosition>,
+}
+
+#[derive(Clone)]
+pub struct SavePointPosition {
+  pub point_lines_below_focused_headline    : usize,
+  pub point_screen_lines_below_window_start : usize,
 }
 
 impl SaveResponse {
   /// Format: ((content "...") (errors (...)))
   fn to_sexp_string (&self) -> String {
-    format_buffer_response_sexp (
-      & self . saved_view,
-      & self . errors ) }}
+    let mut response : Sexp =
+      sexp::parse (
+        &format_buffer_response_sexp (
+          & self . saved_view,
+          & self . errors ))
+      . expect (
+        "format_buffer_response_sexp should produce valid sexp" );
+    if let ( Sexp::List (items),
+             Some (point_position) ) =
+      ( &mut response, &self . save_point_position )
+    { push_save_point_position_to_sexp_items (
+        items, point_position ); }
+    response . to_string () }}
 
 /// Handles save buffer requests from Emacs.
 /// - Reads the buffer content (with length prefix).
@@ -61,6 +79,8 @@ pub fn handle_save_buffer_request (
 ) {
   let viewuri_from_request_result : Result<ViewUri, String> =
     view_uri_from_request (request);
+  let save_point_position : Option<SavePointPosition> =
+    save_point_position_from_request (request);
   match read_length_prefixed_content (reader) {
     Ok (initial_buffer_content) => {
       { // Send early lock message before the expensive pipeline.
@@ -82,7 +102,9 @@ pub fn handle_save_buffer_request (
             views_state . diff_mode_enabled,
             &viewuri_from_request_result,
             views_state ))
-        { Ok (save_response) => {
+        { Ok (mut save_response) => {
+            save_response . save_point_position =
+              save_point_position . clone ();
             send_response_with_length_prefix (
               stream,
               & tag_sexp_response (
@@ -92,7 +114,8 @@ pub fn handle_save_buffer_request (
             if let Some (save_error) = err . downcast_ref::<SaveError>() {
               let response_sexp : String =
                 empty_response_sexp (
-                  & format_save_error_as_org (save_error) )
+                  & format_save_error_as_org (save_error),
+                  & save_point_position )
                 . to_string ();
               send_response_with_length_prefix (
                 stream,
@@ -117,9 +140,10 @@ pub fn handle_save_buffer_request (
 
 /// Create an s-expression with nil content and an error message.
 fn empty_response_sexp (
-  error_buffer_content : &str
+  error_buffer_content : &str,
+  save_point_position   : &Option<SavePointPosition>,
 ) -> Sexp {
-  Sexp::List ( vec! [
+  let mut items : Vec<Sexp> = vec! [
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "content" . to_string () )),
       Sexp::Atom ( Atom::S ( "nil" . to_string () )) ] ),
@@ -127,7 +151,51 @@ fn empty_response_sexp (
       Sexp::Atom ( Atom::S ( "errors" . to_string () )),
       Sexp::List ( vec! [
         Sexp::Atom ( Atom::S (
-          error_buffer_content . to_string () )) ] ) ] ) ] ) }
+          error_buffer_content . to_string () )) ] ) ] ) ];
+  if let Some (point_position) = save_point_position {
+    push_save_point_position_to_sexp_items (
+      &mut items, point_position ); }
+  Sexp::List (items) }
+
+fn push_save_point_position_to_sexp_items (
+  items          : &mut Vec<Sexp>,
+  point_position : &SavePointPosition,
+) {
+  items . push (
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S (
+        "point-lines-below-focused-headline" . to_string () )),
+      Sexp::Atom ( Atom::I (
+        point_position . point_lines_below_focused_headline
+        as i64 )), ] ));
+  items . push (
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S (
+        "point-screen-lines-below-window-start" . to_string () )),
+      Sexp::Atom ( Atom::I (
+        point_position . point_screen_lines_below_window_start
+        as i64 )), ] )); }
+
+fn save_point_position_from_request (
+  request : &str,
+) -> Option<SavePointPosition> {
+  let point_lines_below_focused_headline : usize =
+    nat_from_request (
+      request,
+      "point-lines-below-focused-headline" ) ?;
+  let point_screen_lines_below_window_start : usize =
+    nat_from_request (
+      request,
+      "point-screen-lines-below-window-start" ) ?;
+  Some ( SavePointPosition {
+    point_lines_below_focused_headline,
+    point_screen_lines_below_window_start, } ) }
+
+fn nat_from_request (
+  request : &str,
+  key     : &str,
+) -> Option<usize> {
+  value_from_request_sexp (key, request) . ok () ? . parse () . ok () }
 
 /// PURPOSE: Process the buffer that a user wants to save.
 /// - "save": Update dbs and filesystem.

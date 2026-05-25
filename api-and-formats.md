@@ -30,7 +30,9 @@ So far there are these endpoints:
   - Response: length-prefixed content, formatted `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` constitutes `LENGTH` bytes. PAYLOAD may contain quotation marks; hence the length prefix. The document structure is detailed below, under `Single root content tree view`.
 
 ## Save buffer
-  - Request: First `((request . "save buffer") (view-uri . "URI"))\n`, then `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` is the buffer content (`LENGTH` bytes).
+  - Request: First `((request . "save buffer") (view-uri . "URI") (point-lines-below-focused-headline . "N") (point-screen-lines-below-window-start . "M"))\n`, then `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` is the buffer content (`LENGTH` bytes).
+    - `point-lines-below-focused-headline` is global to the buffer save: the number of text lines from the focused headline to point before save.
+    - `point-screen-lines-below-window-start` is global to the buffer save: the number of screen lines from the window's top line to point before save. The server echoes both point fields in the final save response so Emacs can restore point and scroll position after replacing the buffer text.
   - Response: Multiple length-prefixed messages, sent sequentially:
     1. Early lock message (sent immediately, before the expensive pipeline):
        `Content-Length: N\r\n\r\n((response-type save-lock) (lock-views ("URI1" "URI2" ...)))`
@@ -39,7 +41,7 @@ So far there are these endpoints:
        `Content-Length: N\r\n\r\n((response-type collateral-view) (view-uri "URI") (content "..."))`
        Emacs unlocks and updates each buffer as it arrives.
     3. Final save response:
-       `Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)))`
+       `Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (point-lines-below-focused-headline N) (point-screen-lines-below-window-start M))`
        `content` is the re-rendered saved buffer (nil on failure). `errors` is a list of error/warning strings (empty list if none).
   - If the server errors before sending the early lock message (e.g. malformed request), only one message is sent: the error response in the save-result format.
 
