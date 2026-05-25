@@ -1,0 +1,422 @@
+* vision : source sets
+I would like to implement a new language element for skgconfig.toml,
+'source-set'. A user can have any number of source sets,
+name each set however they want,
+and change the 'active source-set' to restrict search and display.
+
+This should not chnage Skg's dbs -- e.g. typedb does not reload big graph chunks
+just because someone switched the active source-set.
+
+Making search results consult only the relevant sources is straightforward.
+Changing display is less obvious.
+
+For this first cut, heralds can still reflect the whole graph --
+e.g. if a private node still shows in the count of link sources
+targeting a public node, it doesn't matter --
+but wherever we encode the adjacent machinery we should leave a
+"PITFALL | TODO" comment explaining that they lie.
+But then again it does seem easy to do so:
+We would just restrict the sources used by the relevant TypeDB queries.
+The SkgConfig probably already reaches them so we wouldn't even
+need to thread more arguments through the call chain.
+
+Beyond heralds, the bigger questions are which viewnodes to show,
+and how to handle spaces where censored viewnodes would have been.
+A lot of special cases will arise, but the basic principle should be:
+- don't show information from inactive sources
+- don't even represent absent nodes (e.g. no "phantoms" for them,
+  the way deleted nodes show phantoms)
+- yet (somehow?) permit new nodes inserted by a user
+  to cause appropriate modifications to the node's full
+  list of content
+* feedback, round 1
+** Unclear contract for "active source-set"
+*** Is it process-global, per Emacs connection, per buffer, or per request?
+    Today =ViewsState= is per TCP connection and stores things like
+    diff mode and open views. =SkgConfig= is static process state. If
+    the active source-set is a mutable field in =SkgConfig=, changing it
+    would affect every client connection and every open view. If it is
+    per connection, it probably belongs beside =diff_mode_enabled= in
+    =ViewsState=. If it is per buffer, =ViewState= needs to remember
+    the source-set used to render it.
+
+    My guess: per connection is the least surprising first cut. But
+    per-buffer may be necessary if users can keep a public view and a
+    private view open at the same time.
+**** TODO per-connection seems fine
+Warn in the minibuffer 'are you okay with closing all active Skg buffers?',
+and if they are, make that part of it.
+*** What is the default?
+    The config should say whether absent source-set config means "all
+    sources", whether a named source-set is active by default, and what
+    happens if the configured active set is empty or names a missing
+    source.
+**** TODO That should be part of the config, too.
+And it should predefine a set called 'all',
+and disallow use of that name for an ordinary source set.
+*** Does a source-set contain only source names?
+    If source-sets can contain only =[[sources]].name= values, the
+    implementation and validation are simple. If source-sets can include
+    other source-sets, exclusions, or globs, cycle detection and error
+    messages become part of the feature.
+*** TODO yes, just a list of names
+** "Restrict TypeDB queries by source" is not quite the right model
+   Source is an attribute of nodes/files. Relationships are ID-based and
+   source-independent. There is no source on the =contains= relation, on
+   =textlinks_to=, etc.
+
+   That means display filtering has to define which endpoint controls
+   visibility:
+
+   - For content: probably show child C under parent P only if C's node
+     source is active. But then active children of inactive parents have
+     no visible containerward context.
+   - For textlinks-in: probably show link source L only if L's source is
+     active, regardless of the target's source.
+   - For graph stats: counts can be filtered by source of the related
+     node, but that is not the same thing as filtering the relation.
+
+   The TypeDB queries can implement those endpoint-source rules, but the
+   rule itself should be explicit before coding.
+*** TODO
+I agree, that's a better way to treat the data.
+
+Where you wrote, "But then active children of inactive parents have no visible containerward context," I don't see how we would reach an inactive parent in the first place. It seems like a non-issue to me but let me know if I'm missing something.
+** Display filtering can silently become destructive on save
+*** Definitive content saves currently specify the whole visible child list
+    In the save pipeline, a definitive TrueNode's org children define
+    its =contains= list. =MSV= protects fields that the buffer does not
+    mention, but comments in =server/types/misc.rs= say contents are
+    different: TrueNode children always define contents.
+
+    If inactive-source children are simply omitted from a definitive
+    node's view, saving an otherwise unchanged buffer can delete those
+    hidden children from the parent's real =contains= list.
+**** TODO yeah I guess
+I was imagining you would see an easy diff-based solution.
+Coding it myself I would just include a new kind of phantom.
+It does seem natural to start there.
+*** New-node insertion needs an ordering rule around hidden siblings
+    The vision says:
+
+    - do not represent absent nodes
+    - yet let inserted nodes modify the node's full content list
+
+    Those conflict unless save has an explicit merge algorithm. Example:
+
+    : full contains:    [A_public, B_private, C_public]
+    : public view sees: [A_public, C_public]
+
+    If the user inserts X between A and C, should full =contains= become
+    [A, X, B, C], [A, B, X, C], or [A, X, C, B]? None of those follows
+    from the visible tree alone.
+*** Possible first-cut save rule
+    Treat filtered-out children as "invisible anchors" during save, even
+    if they are not rendered. For each saved parent, compare the edited
+    visible subsequence to the old full =contains= list from disk/in-Rust
+    graph, then merge changes back while preserving hidden children
+    unless the user explicitly exposes and edits them.
+
+    This is more like a source-aware list patch than today's "visible
+    children are the whole list" rule. Without something like it,
+    source-set display should probably be read-only.
+** Censored roots and navigation need a rule
+   If a user requests a root whose source is inactive, should Skg:
+
+   - refuse to open it,
+   - open an empty buffer,
+   - open a warning-only buffer,
+   - or temporarily expand the active source-set?
+
+   Similarly, search might return only active nodes, but =skg-view= by
+   ID, readable-ID annotations, textlink navigation, and sourceward views
+   can be initiated from IDs that are not in the active set.
+*** TODO
+If they request such a node,
+report that the node is not in an active source in the mimibuffer and quit.
+(If they try to visit the associated .skg file, skg should not interfere.)
+
+Trying to follow a link to a hidden source should have the same effect.
+
+Readable ID annotations should not appear for inactive sources.
+
+Backward (sourceward and containerward) views
+should truncate just before inactive sources.
+If a containerward path starts with an inactive source,
+it is entirely absent; if its third value is inactive but the first two are not,
+it shows the first two; etc.
+Also filter the fork if the path ends in a fork.
+
+** Existing open views need source-set provenance
+   If switching the active source-set rerenders all open views, their
+   stored =ViewState.pids= will change. That affects collateral
+   rerendering after save, "already open view" detection, and which
+   buffers get locked.
+
+   If views remember the source-set they were rendered under, two views
+   of the same root under different source-sets need distinct =ViewUri=
+   values or an additional disambiguator. Otherwise opening a private
+   view could replace or reuse an already-open public view of the same
+   root.
+
+*** TODO Not a problem because we'll close them.
+
+** Search filtering has more surfaces than the first Tantivy hit list
+   The first search phase can filter Tantivy docs by =source_field=.
+   But the enrichment phase also fetches containerward ancestry and
+   graph stats. Those need the same source-set or they can reintroduce
+   inactive nodes into the enriched result buffer.
+
+   The same concern applies to =titles by ids=, readable-ID overlays,
+   =get file path=, diff analysis, sourceward views, and any metadata
+   command that resolves an ID to title/source outside ordinary search.
+   If source-sets are meant as privacy/public-mode boundaries, these are
+   leaks. If they are only a convenience display filter, the docs should
+   say so.
+
+*** TODO Sure, let's close all those leaks.
+Except for the one where inactive nodes render as 'node from inactive source',
+which I can worry about later.
+** Herald TODO comments should name the lie precisely
+   "Heralds lie under source-set filtering" is true but too broad to be
+   useful later. The comments should say which counts include inactive
+   sources, for instance:
+
+   - =graphStats.linksIn= includes inactive link sources
+   - =graphStats.contents= includes inactive children
+   - containerward/sourceward heralds can mention inactive containers
+
+   That will make it easier to convert individual stats to source-set
+   aware queries later.
+*** TODO agreed, if it continues to be true
+But if your 'close all the leaks' project completes, it won't be, right?
+
+** In-Rust graph shortcut is good, but it changes where filtering belongs
+   A lot of production reads now use the in-Rust graph before TypeDB.
+   That supports the "do not reload DBs on source-set switch" goal. But
+   it also means source-set filtering cannot be implemented only by
+   changing TypeDB queries. The in-Rust graph traversal helpers
+   (=find_related_nodes_from_in_rust_graph=, initial BFS content
+   traversal, graph stats shortcuts, etc.) need the same active-source
+   predicate.
+
+*** TODO agreed
+
+** Source-set switching and diff mode may compose awkwardly
+   Diff mode computes changes for every configured source and annotates
+   views afterward. If the active source-set excludes a source, should
+   deleted phantoms from that source disappear? Should source-set
+   filtering hide unstaged changes in inactive sources from diff
+   analysis? A first cut can say "diff mode is whole-graph", but then it
+   should not be used as a privacy-safe public view.
+
+*** TODO are the non-diff-report leaks named in the above paragraph still problems
+with the revised policy that nodes in inactive sources can leak as content
+(as long as we show no information beyond their ID in magit)?
+
+*** TODO the diff mode report
+should just refuse to run if the active source set is not 'all',
+explaining that it's not obvious how to generate such a report.
+
+** Config validation should fail loudly
+   It would be easy to silently accept a misspelled source name in a
+   source-set and then show a mysteriously incomplete graph. The config
+   loader should reject:
+
+   - duplicate source-set names
+   - source-set names colliding with source names, if that would confuse
+     commands or UI
+   - missing source names inside a source-set
+   - an active source-set name that is not defined
+   - empty source-sets, unless explicitly supported
+
+*** TODO yes to all but one
+Name collisions should be supported --
+that is the most natural way to name singleton source sets.
+* feedback, round 2
+** Inactive parents are reachable through backward views
+   You asked how we would reach an inactive parent. I was thinking of
+   paths that start from an active node and walk backward:
+
+   - =containerward= view from an active child whose container is inactive
+   - search enrichment, which attaches containerward ancestry to active
+     search hits
+   - =sourceward= view from an active target whose link source is inactive
+
+   Your later truncation rule seems like the right answer: stop before
+   the inactive node. That means the active child can appear to have no
+   visible containerward context even though it has a real inactive
+   container.
+*** TODO right
+but I should clarify some language: There is no 'parent' concept
+in the graph itself. There are the relationships described in schema.tql,
+and that's all. Every use of the word 'parent' is implicitly 'view-parent':
+the relationship from org headline to org subheadline.
+This is described in more depth in "glossary.md".
+** "New kind of phantom" needs a narrow meaning
+   A rendered hidden-source phantom would contradict the earlier rule
+   "don't even represent absent nodes" and would leak the inactive node's
+   existence, position, and maybe ID/source/title.
+
+   If by phantom you mean an internal save anchor, that sounds fine. It
+   should probably not render as an org headline, should not have normal
+   metadata commands, and should not be copyable/movable by ordinary
+   buffer edits. Otherwise it becomes part of the user-visible graph and
+   reopens the privacy/display questions.
+*** TODO no, I mean the obvious, slightly-dangerous thing
+If someone has a hidden node under their public node 'murder',
+well good, maybe we'll catch them.
+If someone has a hidden node under 'love' or 'mom' or 'science',
+I don't think anyone will consider it incriminating.
+
+The fact that a public node contains private nodes does not reveal much.
+We can feel reasonably safe showing that such nodes exist,
+if we don't reveal their titles or their own content.
+This makes the changes to the save-buffer path much easier.
+Later we can worry about hiding them without disrupting save.
+** Source-set switch should cancel in-flight enrichment
+   Closing all active Skg buffers on source-set switch avoids stale
+   =ViewState= problems. It should also cancel or invalidate any
+   background search enrichment already running for the old source-set.
+   The current search path has an enrichment slot and cancellation flag;
+   a late old enrichment response could otherwise repopulate a closed or
+   newly reopened search buffer with old-source-set ancestry/stats.
+*** TODO agreed
+** The reserved =all= name conflicts with existing source names
+   Predefining a source-set called =all= is useful, but if singleton
+   source-set names may collide with source names, then a configured
+   source named =all= becomes ambiguous.
+
+   Possible resolutions:
+
+   - reject source names equal to =all=
+   - allow a source named =all= but require a different syntax when
+     referring to the reserved source-set
+   - reserve =all= only in the source-set namespace and never auto-create
+     a singleton source-set for a source with that name
+*** TODO disallowing it seems fine
+** Runtime active set vs config default needs a persistence rule
+   If the config contains the default active source-set, but the user can
+   change the active source-set at runtime, should that runtime choice be
+   written back to =skgconfig.toml=, remembered in Emacs state, or reset
+   on reconnect/server restart? Per-connection state plus config default
+   suggests "reset on reconnect", but that should be explicit.
+*** TODO reset on reconnect
+** "Close all leaks" and "node from inactive source" conflict slightly
+   The response says to close all leaks except where inactive nodes render
+   as =node from inactive source=. That placeholder still leaks at least:
+
+   - that some inactive node exists
+   - that it has a relation to the visible node
+   - possibly its ID, if the metadata includes one
+   - possibly its source, if the placeholder says which inactive source
+
+   That may be acceptable in magit or other already-raw contexts, but it
+   should be scoped. For ordinary Skg views, your earlier "don't show
+   information from inactive sources" rule seems to imply truncation or
+   omission, not placeholders.
+** Readable-ID behavior should distinguish shortening from titles
+   "Readable ID annotations should not appear for inactive sources" is
+   clear for title overlays. Current =skg-readable-ids-mode= also
+   shortens every UUID before the server title response arrives. If IDs
+   from inactive sources may appear in raw magit/.skg buffers, should
+   they still be shortened to 8 chars plus ellipsis, or should inactive
+   IDs remain unmodified?
+*** TODO shortening them along with the rest seems fine
+** Diff mode has two surfaces
+   Refusing the diff-analysis report when the active source-set is not
+   =all= resolves the big report.
+
+   Inline git diff mode is separate: it annotates normal content views
+   and computes =SourceDiff= for every source. If the visible tree is
+   source-set filtered first, then inactive normal nodes should be absent.
+   But deleted phantoms and diff scaffolds can be introduced after the
+   initial render, so they also need the active-source predicate. The
+   rule I infer is: inline diff mode may run under a restricted
+   source-set, but it must only annotate active-source nodes and must not
+   create inactive-source phantoms.
+*** TODO please ask me about this again, if it's still an issue,
+after you've read my earlier 'yes, I really mean the slightly-dangerous thing'.
+I suspect that explanation may solve this.
+** Backward path fork filtering needs per-branch behavior
+   "Also filter the fork if the path ends in a fork" sounds right. The
+   implementation detail to specify is whether inactive fork branches are
+   dropped independently. I think yes:
+
+   - active branches remain visible
+   - inactive branches are omitted
+   - if every branch is inactive, the fork display disappears rather than
+     showing an empty fork scaffold
+*** TODO yes
+* feedback, round 3
+** Use graph-relationship vocabulary in the implementation notes
+   Your correction about "parent" is right. In implementation notes for
+   this feature, I should say "container", "contained", "link source",
+   "link target", etc. for graph relationships, and reserve "parent" for
+   org/view parentage.
+** The visible inactive placeholder needs edit semantics
+   The "slightly-dangerous" placeholder policy resolves the save-buffer
+   difficulty, but it needs exact editing rules. If an inactive child is
+   rendered as a headline under an active container, can the user:
+
+   - move the placeholder within the visible list?
+   - delete the placeholder?
+   - cut/paste it under a different active node?
+   - add active children beneath it?
+   - edit its metadata/source/id?
+
+   My recommendation: initially allow it to act only as an order
+   placeholder for preserving the active container's full =contains=
+   list. It should probably be read-only as a node, and save should
+   either ignore attempts to edit it or reject the buffer with a clear
+   error. If moving/deleting placeholders is allowed, that becomes an
+   explicit way to modify relationships to inactive nodes, which is a
+   bigger feature.
+*** TODO
+Reject attempts to change it with a clear error
+(reported the same way as, and with, any other errors).
+So it can't have its content edited --
+but it can be moved, duplicated or deleted as content.
+** Placeholder metadata should reveal only what save requires
+   A visible placeholder needs enough identity for save to preserve the
+   hidden node in =contains=. It does not need title, body, aliases, extra
+   IDs, graph stats, source herald, or link/sourceward metadata.
+
+   The remaining policy choice is whether to show the UUID and source
+   name. UUID is probably needed internally; source name is not always
+   needed for display. If the rendered org text contains the real UUID,
+   then copy/search/readable-id tooling may see it, so every metadata
+   helper must treat this placeholder kind as inactive and avoid title
+   lookups.
+*** TODO keep the ID and source
+but don't display the source in the herald rules
+** Inline diff mode still needs a placeholder rule
+   The "slightly-dangerous" placeholder policy does mostly solve the
+   inline diff question, but not completely. We still need to decide what
+   diff annotations can appear on an inactive placeholder.
+
+   I think the safe first rule is:
+
+   - active-source nodes can show normal inline diff annotations
+   - inactive placeholders can show at most relationship/list-position
+     diff markers needed to preserve the active node's visible =contains=
+     edit
+   - inactive placeholders must not show title/body/alias/source-change
+     diffs or deleted-node phantom titles
+
+   That preserves the "exists here" leak while avoiding a content leak.
+*** TODO agreed
+** Search result ranking under source sets should filter before truncation
+   Search should apply the active source-set before =SEARCH_DISPLAY_LIMIT=
+   truncation and before grouping/sorting decisions that could be
+   affected by inactive alias/title hits. Otherwise inactive hits could
+   crowd active hits out of the top N, or an active result's displayed
+   best title/alias could be chosen from an inactive-source document.
+*** TODO agreed
+** Source-set API should report the active set to Emacs
+   Since runtime state resets on reconnect and switching closes all Skg
+   buffers, Emacs needs a cheap way to know/display the active source-set
+   name. This can be part of the switch response, and probably also part
+   of init/status so the minibuffer can say what source-set the current
+   connection is using.
+*** TODO sure
