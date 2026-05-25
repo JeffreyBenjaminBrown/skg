@@ -1,0 +1,4 @@
+pid: private-container
+title: private container title must not leak
+contains:
+- active-container

@@ -156,9 +156,9 @@ Display content:
 - inactive contained nodes render as placeholders
 - source-set filtering should not create unknown-node placeholders for
   known inactive nodes; unknown nodes remain a separate concept
-*** TODO the tests added
-should include a test that NewHere and RemovedHere
-render correctly for nodes from inactive sources in diff view mode.
+- in diff view mode, inactive placeholders still render the appropriate
+  =NewHere= / =RemovedHere= relationship-position markers without
+  revealing inactive title/body/source content
 
 ** 6. Save semantics for placeholders
 Extend buffer parsing and validation so inactive placeholders are
@@ -190,11 +190,6 @@ Update containerward/sourceward path construction:
   can know where to truncate
 
 Use the same rules in search enrichment ancestry.
-*** TODO we should test each of these cases
-i.e. a backpath truncated in the middle shows exactly
-all the first visible nodes and stops before showing the first invisible one,
-and a fork is censored partially,
-and a fork censored completely is not drawn at all.
 ** 8. Diff behavior
 Diff-analysis report:
 
@@ -210,7 +205,6 @@ Inline git diff mode:
 - inactive placeholders must not show title/body/alias/source-change
   diffs or deleted-node phantom titles
 - inactive-source deleted phantoms must not leak title/body/source
-*** TODO let's also test each of these cases
 ** 9. Readable IDs and title/file-path surfaces
 Readable-ID mode:
 
@@ -272,12 +266,22 @@ Do not use broad comments like "heralds lie"; name each lie.
 ** Backward view tests
 - containerward path truncates before inactive container
 - sourceward path truncates before inactive link source
+- mid-path truncation renders exactly the visible prefix and stops
+  before the first inactive node
 - fork branches are filtered independently
-- empty fork scaffold is omitted
+- partially inactive forks render only active branches
+- completely inactive forks are not drawn at all; no empty fork scaffold
+  remains
 ** Diff tests
 - diff-analysis refuses when active source-set is not =all=
 - inline diff does not reveal inactive placeholder title/body/source
 - inline diff still annotates active-source nodes
+- inactive placeholders show allowed relationship/list-position markers
+  only
+- inactive-source nodes in diff view mode render correct =NewHere= and
+  =RemovedHere= markers without leaking hidden content
+- inactive placeholders do not show title/body/alias/source-change diffs
+- inactive-source deleted phantoms do not leak title/body/source
 ** Readable-ID tests
 - inactive IDs are shortened if mode is active
 - inactive IDs are not title-annotated

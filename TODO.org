@@ -43,9 +43,6 @@ requires rebuilding NixOS
 That was so that M-? would
 not interpret comments as search hits.
 * easy
-** source does not need to exist if it can be found
-** wut
-from a common title, fuzzy search for titles with words like it, and from the search results, turn some of the (text) mentions into (graph-formalized) links
 ** beep also once the db has rebuilt
 ** the links-in herald should precede the contents herald
 Actually just omit the contents herald.

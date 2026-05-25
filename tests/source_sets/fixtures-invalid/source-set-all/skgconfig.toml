@@ -1,0 +1,12 @@
+db_name = "placeholder"
+tantivy_folder = "/tmp/placeholder"
+default_source_set = "public"
+
+[[sources]]
+name = "public"
+path = "public"
+user_owns_it = true
+
+[[source_sets]]
+name = "all"
+sources = ["public"]

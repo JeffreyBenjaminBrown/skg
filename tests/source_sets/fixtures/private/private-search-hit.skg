@@ -1,0 +1,4 @@
+pid: private-search-hit
+title: shared ranking term private title must not leak
+aliases:
+- shared ranking term shared ranking term shared ranking term

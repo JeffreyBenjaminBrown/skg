@@ -1,0 +1,4 @@
+pid: private-other-branch
+title: private other branch title must not leak
+contains:
+- child-with-fork
