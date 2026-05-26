@@ -48,6 +48,10 @@ pub struct SourceDiff {
   pub is_git_repo: bool,
   pub staged   : HashMap<PathBuf, NodeCompleteDiff>,
   pub unstaged : HashMap<PathBuf, NodeCompleteDiff>,
+  /// Nodes that exist in the index or worktree but not in the
+  /// stage baseline. Used to title new/untracked files before the
+  /// search index has seen them.
+  pub added_nodes: HashMap<ID, NodeComplete>,
   /// Nodes that existed in HEAD but not in worktree (deleted files).
   /// Loaded from git HEAD or from the index. Used for phantom titles.
   pub deleted_nodes: HashMap<ID, NodeComplete>,
@@ -64,6 +68,10 @@ pub struct NodeCompleteDiff {
   /// 'collect_deleted_nodes_for_both' to resolve phantom titles.
   /// Name reflects the stage's baseline rather than always-HEAD.
   pub before_node: Option<NodeComplete>,
+  /// The "after" state of this stage: INDEX for staged, worktree for
+  /// unstaged. Populated only for Added status; used for unindexed
+  /// titles of new files.
+  pub after_node: Option<NodeComplete>,
 }
 
 /// A single entry representing a changed file.
@@ -147,6 +155,7 @@ impl SourceDiff {
       is_git_repo  : false,
       staged       : HashMap::new(),
       unstaged     : HashMap::new(),
+      added_nodes  : HashMap::new(),
       deleted_nodes: HashMap::new() } } }
 
 impl GitDiffStatus {

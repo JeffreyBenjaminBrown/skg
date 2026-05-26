@@ -126,7 +126,8 @@ mod tests {
         aliases_diff:  Vec::new (),
         ids_diff:      Vec::new (),
         contains_diff, } ),
-      before_node: None, } }
+      before_node: None,
+      after_node: None, } }
 
   fn source_diff_with_parent_contains (
     parent_pid : &ID,
@@ -146,6 +147,7 @@ mod tests {
     SourceDiff {
       is_git_repo: true,
       staged, unstaged,
+      added_nodes: HashMap::new (),
       deleted_nodes: HashMap::new (), } }
 
   #[test]

@@ -762,7 +762,8 @@ mod tests {
         aliases_diff:  Vec::new (),
         ids_diff:      Vec::new (),
         contains_diff: Vec::new (), } ),
-      before_node: None, } }
+      before_node: None,
+      after_node: None, } }
 
   fn sd_with (
     pid     : &ID,
@@ -777,6 +778,7 @@ mod tests {
     SourceDiff {
       is_git_repo: true,
       staged: s, unstaged: u,
+      added_nodes: HashMap::new (),
       deleted_nodes: HashMap::new (), } }
 
   fn diffs_with (src: &SourceName, sd: SourceDiff)

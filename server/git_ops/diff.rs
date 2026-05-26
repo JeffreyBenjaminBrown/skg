@@ -34,9 +34,12 @@ pub fn compute_diff_for_source (
       Stage::Unstaged ) ?;
   let deleted_nodes : HashMap<ID, NodeComplete> =
     collect_deleted_nodes_for_both (&staged, &unstaged);
+  let added_nodes : HashMap<ID, NodeComplete> =
+    collect_added_nodes_for_both (&staged, &unstaged);
   Ok ( SourceDiff { is_git_repo: true,
                     staged,
                     unstaged,
+                    added_nodes,
                     deleted_nodes }) }
 
 /// Tag for which pair of git states a stage compares.
@@ -86,7 +89,10 @@ fn compute_nodecomplete_diff_for_stage (
   Ok ( NodeCompleteDiff {
     status: entry . status . clone(),
     node_changes,
-    before_node }) }
+    before_node: before_node . filter (
+      |_| entry . status == GitDiffStatus::Deleted),
+    after_node: after_node . filter (
+      |_| entry . status == GitDiffStatus::Added) }) }
 
 /// Parses a NodeFS from a YAML blob, then attaches a default
 /// (empty) source to produce a NodeComplete. This preserves today's
@@ -151,6 +157,23 @@ fn collect_deleted_nodes_for_both (
         if let Some ( ref before_node ) = nodecomplete_diff . before_node {
           let pid : &ID = &before_node . pid;
           result . insert ( pid . clone(), before_node . clone() ); }} } }
+  result }
+
+/// Collect NodeCompletes for files added in either stage.
+/// Used to look up titles for new/untracked nodes before Tantivy has
+/// indexed them.
+fn collect_added_nodes_for_both (
+  staged   : &HashMap<PathBuf, NodeCompleteDiff>,
+  unstaged : &HashMap<PathBuf, NodeCompleteDiff>,
+) -> HashMap<ID, NodeComplete> {
+  let mut result : HashMap<ID, NodeComplete> =
+    HashMap::new();
+  for diffs in [staged, unstaged] {
+    for nodecomplete_diff in diffs . values () {
+      if nodecomplete_diff . status == GitDiffStatus::Added {
+        if let Some ( ref after_node ) = nodecomplete_diff . after_node {
+          let pid : &ID = &after_node . pid;
+          result . insert ( pid . clone(), after_node . clone() ); }} } }
   result }
 
 /// Compare two NodeCompletes and return the differences.
