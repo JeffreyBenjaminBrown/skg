@@ -303,7 +303,7 @@ fn handle_snapshot_response (
   insert_containerward_ancestries_into_search_view (
     &mut viewforest, &payload . search_results,
     &payload . ancestry_by_id, &env . tantivy_index,
-    &env . config );
+    &env . config, active_source_set );
   { let root_treeid : NodeId =
       viewforest . root () . id ();
     set_metadata_relationships_in_node_recursive (

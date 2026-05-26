@@ -13,11 +13,10 @@ use crate::source_sets::ActiveSourceSet;
 use crate::to_org::util::{ get_id_from_treenode, nodecomplete_and_viewnode_from_id, remove_completed_view_request};
 
 use crate::types::env::find_source_with_optional_tantivy;
-use crate::types::git::MembershipAxes;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::tree::viewnode_nodecomplete::{ find_child_by_id, find_children_by_ids};
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, ParentIs, mk_inactive_viewnode, mk_indefinitive_from_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_from_viewnode, mk_unknown_viewnode };
 
 use ego_tree::{NodeId,Tree};
 use std::collections::{HashSet, HashMap};
@@ -257,13 +256,13 @@ fn integrate_linear_portion_of_path<'a> (
       match find_child_by_id ( tree, node_id, path_head ) {
         Some (child_treeid) => child_treeid,
         None => {
-          let (child_id, should_descend) =
+          match
             prepend_indefinitive_child_with_source_set (
                     tree, node_id, path_head, config, driver, parentIs
-                    , active ) . await ?;
-          if ! should_descend {
-            return Ok (child_id); }
-          child_id } };
+                    , active ) . await ?
+          {
+            Some (child_id) => child_id,
+            None => return Ok (node_id), } } };
     integrate_linear_portion_of_path ( // recurse
       tree,
       next_node_id, // we just found or inserted this
@@ -448,13 +447,14 @@ pub fn insert_containerward_ancestry_tree_recursive<'a> (
 ) -> Pin<Box<dyn Future<Output = Result<(),
                                         Box<dyn Error>>> + 'a>> {
   Box::pin ( async move {
-    let (child_nid, should_descend) =
+    let child_nid : NodeId = match
       prepend_indefinitive_child_with_source_set (
         tree, parent_nid, node . id (),
         config, driver, ParentIs::Content, active
-      ) . await ?;
-    if ! should_descend {
-      return Ok (()); }
+      ) . await ?
+    {
+      Some (child_nid) => child_nid,
+      None => return Ok (()), };
     if let AncestryTree::Inner ( _, children ) = node {
       for child in children . iter () . rev () {
         insert_containerward_ancestry_tree_recursive (
@@ -494,7 +494,7 @@ pub async fn prepend_indefinitive_child_with_source_set (
   driver         : &TypeDBDriver,
   parentIs       : ParentIs,
   active         : Option<&ActiveSourceSet>,
-) -> Result < (NodeId, bool), Box<dyn Error> > {
+) -> Result < Option<NodeId>, Box<dyn Error> > {
   if let Some (active) = active {
     if ! active . is_all () {
       let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
@@ -504,15 +504,9 @@ pub async fn prepend_indefinitive_child_with_source_set (
           child_skgid, &deleted_since_head_pid_src_map, None, config )
       {
         if ! active . contains_source (&source) {
-          let viewnode : ViewNode =
-            mk_inactive_viewnode (
-              child_skgid . clone (), source, MembershipAxes::default () );
-          let new_child_treeid : NodeId =
-            tree . get_mut (parent_treeid) . unwrap ()
-            . prepend (viewnode) . id ();
-          return Ok ((new_child_treeid, false)); }}}}
+          return Ok (None); }}}}
   let new_child_treeid : NodeId =
     prepend_indefinitive_child (
       tree, parent_treeid, child_skgid, config, driver, parentIs )
     . await ?;
-  Ok ((new_child_treeid, true)) }
+  Ok (Some (new_child_treeid)) }

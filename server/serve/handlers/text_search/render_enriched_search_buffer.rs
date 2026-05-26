@@ -1,5 +1,6 @@
 use crate::dbs::tantivy::title_and_source_by_id;
 use crate::dbs::typedb::ancestry::AncestryTree;
+use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_viewnode};
 
@@ -15,6 +16,7 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
   ancestry_by_id : &HashMap<ID, AncestryTree>,
   tantivy_index  : &TantivyIndex,
   config         : &SkgConfig,
+  active         : &ActiveSourceSet,
 ) {
   // Search results ("hits") are level-1 BufferRoot children.
   // Match them by ID from search_results.
@@ -37,7 +39,7 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
           // the ancestry ends up first among siblings.
           insert_containerward_ancestry_tree (
             child, *node_nid,
-            viewforest, tantivy_index, config ); } } } } }
+            viewforest, tantivy_index, config, active ); } } } } }
 
 /// Recursively insert an AncestryTree and its children
 /// as indefinitive non-content TrueNode children
@@ -48,16 +50,19 @@ fn insert_containerward_ancestry_tree(
   viewforest        : &mut Tree<ViewNode>,
   tantivy_index : &TantivyIndex,
   config        : &SkgConfig,
+  active        : &ActiveSourceSet,
 ) {
-  let child_nid : NodeId =
+  let child_nid : NodeId = match
     prepend_containing_child_from_tantivy (
       node . id (), parent_nid,
-      viewforest, tantivy_index, config );
+      viewforest, tantivy_index, config, active ) {
+        Some (child_nid) => child_nid,
+        None => return, };
   if let AncestryTree::Inner ( _, children ) = node {
     for child in children {
       insert_containerward_ancestry_tree (
         child, child_nid,
-        viewforest, tantivy_index, config ); } } }
+        viewforest, tantivy_index, config, active ); } } }
 
 /// Looks up a node's title and source from Tantivy,
 /// prepends an indefinitive independent TrueNode child
@@ -69,16 +74,20 @@ fn prepend_containing_child_from_tantivy (
   viewforest        : &mut Tree<ViewNode>,
   tantivy_index : &TantivyIndex,
   _config       : &SkgConfig,
-) -> NodeId {
-  let (title, source) : (String, SourceName) =
-    title_and_source_by_id ( tantivy_index, node_id )
-    . unwrap_or_else ( ||
-      ( node_id . as_str () . to_string (),
-        SourceName::from ("search") ) );
+  active        : &ActiveSourceSet,
+) -> Option<NodeId> {
   let viewnode : ViewNode =
-    mk_indefinitive_viewnode ( node_id . clone (), source, title,
-                               ParentIs::Content );
+    match title_and_source_by_id ( tantivy_index, node_id ) {
+      Some ((title, source)) => {
+        if ! active . contains_source (&source) {
+          return None;
+        } else {
+          mk_indefinitive_viewnode (
+            node_id . clone (), source, title, ParentIs::Content ) }},
+      None =>
+        mk_indefinitive_viewnode (
+          node_id . clone (), SourceName::from ("search"),
+          node_id . as_str () . to_string (), ParentIs::Content ) };
   let mut parent_mut : NodeMut<ViewNode> =
     viewforest . get_mut (parent_treeid) . unwrap ();
-  parent_mut . prepend (viewnode)
-    . id () }
+  Some (parent_mut . prepend (viewnode) . id ()) }

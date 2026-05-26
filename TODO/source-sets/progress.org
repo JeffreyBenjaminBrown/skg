@@ -41,12 +41,12 @@
   create inactive placeholders for missing inactive-source content, and
   reapply source-set filtering before rendering rerendered buffers.
 - Sourceward and containerward expansion paths have source-set-aware
-  variants used by rerendered view requests; inactive path steps render
-  as placeholders and stop descent.
+  variants used by rerendered view requests.
+- Sourceward, containerward, and search-enrichment ancestry paths truncate
+  before inactive containers/link sources; fork branches are filtered
+  independently and all-inactive forks are omitted.
 
 * pending
-- Truncate search enrichment ancestry before inactive containers/link
-  sources, filter fork branches independently, and omit empty forks.
 - Add production tests for sourceward/containerward/search-enrichment
   truncation rather than only helper tests.
 - Make graphStats source-set-aware where practical.
