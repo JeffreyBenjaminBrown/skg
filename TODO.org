@@ -1,6 +1,7 @@
-* ONGOING [[./TODO/source-sets.org]]
-codex resume 019e610e-8d8a-7202-9792-e11e25e62540
+* DONE ? [[./TODO/source-sets.org]]
+Seems to work.
 * [[./TODO/incremental-init-might-be-broken.org]]
+* Need text search across paths.
 * critical
 ** I can't demo without privacy mode.
 The backlinks from skg itself contains unsafe references.

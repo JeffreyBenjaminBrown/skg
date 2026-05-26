@@ -196,7 +196,7 @@ if and only if it adheres to the following:
 
 The server's configuration file. See example-data/ for an example.
 
-Pass its path as a command-line argument (default: `data/skgconfig.toml`) when starting the server (see `bash/run-servers.sh`). The directory containing the file is the **data root**; all relative paths in the config are resolved against it.
+Pass its path as a command-line argument (default: `data/skgconfig.toml`) when starting the server (see `bash/start-servers.sh`). The directory containing the file is the **data root**; all relative paths in the config are resolved against it.
 
 ## Fields
 

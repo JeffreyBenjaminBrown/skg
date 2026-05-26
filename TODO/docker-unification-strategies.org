@@ -77,7 +77,7 @@ absolute directory.
 
 ** Cons
 
-- =bash/run-servers.sh= currently is not safe for multiple Skg servers in
+- =bash/start-servers.sh= currently is not safe for multiple Skg servers in
   one container. It uses broad =pkill= patterns for =cargo watch.*skg= and
   =cargo run --bin skg=, so starting or stopping one instance can kill the
   others.
@@ -94,7 +94,7 @@ absolute directory.
 
 ** Script changes I would make first
 
-- Make =bash/run-servers.sh= instance-aware. It should track PIDs under
+- Make =bash/start-servers.sh= instance-aware. It should track PIDs under
   =$DATA_ROOT/logs= or =$DATA_ROOT/run= and kill only the matching
   =cargo-watch= process group on shutdown.
 - Do not run =pkill -f "cargo watch.*skg"= or =pkill -f "cargo run --bin skg"=
@@ -294,7 +294,7 @@ They do not protect TypeDB databases, Tantivy indices, or files on disk.
    safer.
 2. Try a shared =CARGO_TARGET_DIR= while keeping separate containers. This
    proves the disk-space win without changing process topology.
-3. Refactor =bash/run-servers.sh= so Skg process management is per-instance.
+3. Refactor =bash/start-servers.sh= so Skg process management is per-instance.
 4. Start one long-lived container with all three worktrees mounted.
 5. Start one TypeDB server, then start each Skg server from its own checkout
    and config.

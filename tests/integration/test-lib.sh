@@ -15,7 +15,7 @@ check_typedb_server() {
   echo "Checking TypeDB server..."
   if ! is_typedb_running; then
     echo "ERROR: TypeDB server is not running!"
-    echo "Please start TypeDB server first by running: ./run-servers.sh"
+    echo "Please start TypeDB server first by running: ./start-servers.sh"
     exit 1
   fi
   echo "✓ TypeDB server is running"

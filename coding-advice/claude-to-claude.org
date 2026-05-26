@@ -39,7 +39,7 @@ When writing or modifying code:
 - `typedb server` must be running for Rust tests to pass
 - `cargo run` must be running for some Emacs Lisp tests, and for all integration tests, to pass.
 
-The script `run-servers.sh` persists those things. Only one TypeDB server should be running at a time, but many Skg servers (`cargo run --bash skg`) can run at the same time. Config files like the one at `data/skgconfig.toml` can be used to change TCP ports, database names and data folders,, so that different instances of Skg don't collide.
+The script `start-servers.sh` persists those things. Only one TypeDB server should be running at a time, but many Skg servers (`cargo run --bash skg`) can run at the same time. Config files like the one at `data/skgconfig.toml` can be used to change TCP ports, database names and data folders,, so that different instances of Skg don't collide.
 
 * Running Tests
 

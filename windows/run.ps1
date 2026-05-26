@@ -246,7 +246,7 @@ function Start-Or-Use-Container($DataRoot, $Port) {
   docker exec `
     -e "SKG_CONFIG=${ContainerDataRoot}/skgconfig.toml" `
     $ContainerName `
-    /opt/skg/windows/container/run-servers.sh
+    /opt/skg/windows/container/start-servers.sh
 }
 
 function Wait-For-Port($Port) {

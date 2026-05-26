@@ -181,6 +181,66 @@ fn titles_by_ids_finds_deleted_git_file_title_without_diff_mode (
     response );
   Ok (( )) }
 
+#[test]
+fn titles_by_ids_finds_untracked_git_file_title_without_diff_mode (
+) -> Result<(), Box<dyn Error>> {
+  let id : ID =
+    ID::new ("abf5bac1-de1c-4026-868a-60a51a5a3176");
+  let source_name : SourceName =
+    SourceName::from ("main");
+  let temp_dir : TempDir =
+    TempDir::new ()?;
+  let source_dir : &Path =
+    temp_dir . path ();
+  let repo : git2::Repository =
+    git2::Repository::init (source_dir)?;
+  configure_git_user (&repo)?;
+  fs::write (source_dir . join ("README.md"), "initial\n")?;
+  commit_all (&repo, "initial commit")?;
+  fs::write (
+    source_dir . join (format! ("{}.skg", id . 0)),
+    format! ("title: Untracked Title\npid: {}\n", id . 0))?;
+  let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
+    wipe_then_init_tantivy_db (
+      &Vec::<NodeComplete>::new (),
+      &temp_dir . path () . join ("tantivy"))?;
+  let config : SkgConfig =
+    SkgConfig::dummyFromSources (HashMap::from ([
+      (source_name . clone (),
+       SkgfileSource {
+         name          : source_name,
+         abbreviation  : None,
+         path          : source_dir . to_path_buf (),
+         user_owns_it  : true }) ]));
+  let listener : TcpListener =
+    TcpListener::bind ("127.0.0.1:0")?;
+  let addr =
+    listener . local_addr ()?;
+  let client : TcpStream =
+    TcpStream::connect (addr)?;
+  let (mut server, _peer) =
+    listener . accept ()?;
+  let request : String =
+    format! (
+      "((request . \"titles by ids\") (ids \"{}\"))",
+      id . 0);
+  handle_titles_by_ids_request (
+    &mut server,
+    &request,
+    &tantivy_index,
+    &config,
+    false );
+  drop (server);
+  let mut reader =
+    std::io::BufReader::new (client);
+  let response : String =
+    read_lp_message (&mut reader)?;
+  assert! (
+    response . contains ("Untracked Title"),
+    "untracked file title should be returned: {}",
+    response );
+  Ok (( )) }
+
 fn configure_git_user (
   repo : &git2::Repository,
 ) -> Result<(), Box<dyn Error>> {

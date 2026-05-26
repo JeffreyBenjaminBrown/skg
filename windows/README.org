@@ -12,7 +12,7 @@ The intended Windows setup is:
 - =Dockerfile= builds the user image =jeffreybbrown/skg:latest=.
 - =build/= contains host-side build and publish scripts.
 - =testing/= contains host-side Docker smoke-test scripts.
-- =container/run-servers.sh= runs inside the container and starts TypeDB
+- =container/start-servers.sh= runs inside the container and starts TypeDB
   plus the prebuilt Skg server binary.
 - =install.ps1= is the Windows-side DockerHub pull script.
 - =run.ps1= is the Windows-side launcher.

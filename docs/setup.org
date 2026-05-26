@@ -10,7 +10,7 @@ Please ask an AI for help setting it up.
    See ../bash/docker.sh
 ** within the Docker container
 *** start TypeDB server
-    See ../bash/run-servers.sh
+    See ../bash/start-servers.sh
 *** optional : import data from org-roam
     cargo run --bin skg -- import-org-roam [source] [target] [nickname]
     (Eventually importing will support more formats.)
@@ -30,7 +30,7 @@ Please ask an AI for help setting it up.
 ** Now you can use it. See [[../docs/COMMANDS.org][commands]].
 ** stop the server later if you want
    ```
-   ../bash/shutdown-servers.sh
+   ../bash/stop-servers.sh
    ```
 
    You can't use the client (much) when the server isn't running.

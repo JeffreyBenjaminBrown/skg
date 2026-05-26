@@ -75,6 +75,8 @@ pub fn handle_titles_by_ids_request_with_source_set (
      || title_map . len () < ids . len () {
     let source_diffs : HashMap<SourceName, SourceDiff> =
       compute_diff_for_every_source (config);
+    add_addedNode_titles_by_ids (
+      &mut title_map, &ids, &source_diffs );
     add_deleted_node_titles_by_ids (
       &mut title_map, &ids, &source_diffs ); }
   title_map . retain ( |id, _| {
@@ -128,6 +130,21 @@ pub fn add_deleted_node_titles_by_ids (
     ids . iter () . cloned () . collect ();
   for source_diff in source_diffs . values () {
     for node in source_diff . deleted_nodes . values () {
+      for id in node . all_ids () {
+        if requested_ids . contains (id) {
+          title_map
+            . entry (id . clone ())
+            . or_insert_with (|| node . title . clone ()); }}} }}
+
+pub fn add_addedNode_titles_by_ids (
+  title_map    : &mut HashMap<ID, String>,
+  ids          : &[ID],
+  source_diffs : &HashMap<SourceName, SourceDiff>,
+) {
+  let requested_ids : HashSet<ID> =
+    ids . iter () . cloned () . collect ();
+  for source_diff in source_diffs . values () {
+    for node in source_diff . added_nodes . values () {
       for id in node . all_ids () {
         if requested_ids . contains (id) {
           title_map

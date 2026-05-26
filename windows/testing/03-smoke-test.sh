@@ -16,7 +16,7 @@ docker run --name "$CONTAINER_NAME" --rm -d \
 docker exec \
   -e SKG_CONFIG=/data/skgconfig.toml \
   "$CONTAINER_NAME" \
-  /opt/skg/windows/container/run-servers.sh
+  /opt/skg/windows/container/start-servers.sh
 
 if wait_for_port "$SKG_TEST_PORT"; then
   echo "Skg is listening on 127.0.0.1:$SKG_TEST_PORT"

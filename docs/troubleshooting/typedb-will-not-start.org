@@ -4,10 +4,10 @@ Jeff edited those parts but has not fact-checked them.
 * informal quick fix
 If this doesn't do it, read on.
 ```
-  bash/shutdown-servers.sh
+  bash/stop-servers.sh
   pkill -9 -f typedb_server_bin
   rm -rf /opt/typedb/core/server/data/skg-test*
-  ./bash/run-servers.sh &
+  ./bash/start-servers.sh &
 ```
 * First: Check If TypeDB Is Already Running
 
@@ -96,7 +96,7 @@ sleep 5 && ps aux | grep -v grep | grep typedb
 You should see the typedb_server_bin process running.
 
 ** Note
-This issue was fixed in `/home/ubuntu/bash/run-servers.sh` on 2025-10-14. If you're using that script, it should now work correctly. If you're manually starting TypeDB, remember to include the stdin redirection.
+This issue was fixed in `/home/ubuntu/bash/start-servers.sh` on 2025-10-14. If you're using that script, it should now work correctly. If you're manually starting TypeDB, remember to include the stdin redirection.
 
 * Test Database Accumulation & "Too Many Open Files"
 
