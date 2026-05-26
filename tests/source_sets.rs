@@ -201,7 +201,7 @@ fn content_view_renders_inactive_contained_nodes_as_placeholders (
           false,
           &active ) . await ?;
       assert! (actual . contains (
-        "(skg (inactiveNode (id private-a) (source private))) node from inactive source"),
+        "(skg (inactiveNode (id private-a) (source private)))"),
         "inactive contained node should render as a placeholder: {}",
         actual );
       assert! (actual . contains ("active-a"));
@@ -237,12 +237,12 @@ fn diff_view_marks_inactive_placeholders_newhere_and_removedhere_without_content
           &active ) . await ?;
       assert! (
         actual . contains (
-          "(skg (inactiveNode (id private-new) (source private) (unstaged newM))) node from inactive source"),
+          "(skg (inactiveNode (id private-new) (source private) (unstaged newM)))"),
         "inactive new-here placeholder should carry only relationship-position diff metadata: {}",
         actual );
       assert! (
         actual . contains (
-          "(skg (inactiveNode (id private-removed) (source private) (unstaged removedM))) node from inactive source"),
+          "(skg (inactiveNode (id private-removed) (source private) (unstaged removedM)))"),
         "inactive removed-here placeholder should carry only relationship-position diff metadata: {}",
         actual );
       for forbidden in [
@@ -295,7 +295,7 @@ fn saving_inactive_placeholder_moves_and_deletes_update_contains (
       let moved_buffer = indoc! {"
         * (skg (node (id root) (source public))) root
         ** (skg (node (id active-b) (source public))) active-b
-        ** (skg (inactiveNode (id private-a) (source private))) node from inactive source
+        ** (skg (inactiveNode (id private-a) (source private)))
       "};
       let moved_instructions : Vec<DefineNode> =
         buffer_to_validated_saveplan (
@@ -378,13 +378,13 @@ fn restricted_source_search_and_save_work_together_end_to_end (
           &active ) . await ?;
       assert! (
         rendered . contains (
-          "(skg (inactiveNode (id private-a) (source private))) node from inactive source"),
+          "(skg (inactiveNode (id private-a) (source private)))"),
         "restricted content view should include an inactive placeholder: {}",
         rendered );
       let edited_buffer = indoc! {"
         * (skg (node (id root) (source public))) root
         ** (skg (node (id active-b) (source public))) active-b edited through restricted view
-        ** (skg (inactiveNode (id private-a) (source private))) node from inactive source
+        ** (skg (inactiveNode (id private-a) (source private)))
       "};
       let instructions : Vec<DefineNode> =
         buffer_to_validated_saveplan (

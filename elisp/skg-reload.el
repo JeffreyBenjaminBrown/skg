@@ -45,6 +45,7 @@ plain `load-file' instead."
             skg-request-rerender-all-views
             skg-request-save
             skg-request-single-root-content-view
+            skg-request-source-sets
             skg-request-text-search
             skg-request-verify-connection
             skg-search-make-link

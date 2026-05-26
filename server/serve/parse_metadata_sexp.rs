@@ -111,7 +111,7 @@ pub fn viewnode_from_metadata (
       } else if metadata . is_inactive_node {
         let error : Option<BufferValidationError> =
           if body . is_some ()
-          || title != "node from inactive source" {
+          || ! title . is_empty () {
             Some ( BufferValidationError::Other (
               "Inactive placeholder content cannot be edited"
               . to_string () ))

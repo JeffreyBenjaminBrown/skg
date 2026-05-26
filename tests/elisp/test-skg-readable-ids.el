@@ -104,7 +104,7 @@
                  (lambda (_proc _string) nil)))
         (insert
          (format
-          "* (skg (inactiveNode (id %s) (source private))) node from inactive source\n* (skg (node (id %s) (source public))) active\n"
+          "* (skg (inactiveNode (id %s) (source private)))\n* (skg (node (id %s) (source public))) active\n"
           test-skg-readable-ids--id-inactive
           test-skg-readable-ids--id-active))
         (setq skg-readable-ids--generation 0)

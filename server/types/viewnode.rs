@@ -423,7 +423,7 @@ impl ViewNode {
       // line. The metadata alone is non-empty, so viewnode_to_text
       // is satisfied.
       ViewNodeKind::Unknown (_) => "",
-      ViewNodeKind::Inactive (_) => "node from inactive source",
+      ViewNodeKind::Inactive (_) => "",
     }}
 
   /// Reasonable for both TrueNodes and Scaffolds.

@@ -641,7 +641,7 @@ fn test_inactive_placeholder_content_edits_rejected_at_parse_time () {
   let input_with_body_edit : &str =
     indoc! {"
       * (skg (node (id root) (source main))) parent
-      ** (skg (inactiveNode (id hidden) (source private))) node from inactive source
+      ** (skg (inactiveNode (id hidden) (source private)))
       edited body
     "};
   let (_viewforest2, parsing_errors2)
@@ -660,7 +660,7 @@ fn test_inactive_placeholder_active_children_rejected_locally () {
   let input : &str =
     indoc! {"
       * (skg (node (id root) (source main))) parent
-      ** (skg (inactiveNode (id hidden) (source private))) node from inactive source
+      ** (skg (inactiveNode (id hidden) (source private)))
       *** (skg (node (id child) (source main))) active child
     "};
   let (viewforest, parsing_errors)
@@ -701,7 +701,7 @@ fn test_inactive_placeholder_under_truenode_allowed_locally () {
   let input : &str =
     indoc! {"
       * (skg (node (id root) (source main))) parent
-      ** (skg (inactiveNode (id hidden) (source private))) node from inactive source
+      ** (skg (inactiveNode (id hidden) (source private)))
     "};
   let (viewforest, parsing_errors)
     : (Tree<MaybePlacedViewnode>, Vec<BufferValidationError>)
@@ -726,7 +726,7 @@ fn test_duplicate_inactive_placeholder_content_rejected_locally () {
     indoc! {"
       * (skg (node (id root) (source main))) parent
       ** (skg (node (id hidden) (source main))) active child
-      ** (skg (inactiveNode (id hidden) (source private))) node from inactive source
+      ** (skg (inactiveNode (id hidden) (source private)))
     "};
   let (viewforest, parsing_errors)
     : (Tree<MaybePlacedViewnode>, Vec<BufferValidationError>)

@@ -39,6 +39,27 @@
           "user_owns_it = false\n")
   "Config text with two owned sources and one foreign source.")
 
+(defvar test--config-with-interleaved-source-sets
+  (concat "[[source_sets]]\n"
+          "name = \"public-set\"\n"
+          "sources = [\"public\"]\n\n"
+          "[[sources]]\n"
+          "name = \"public\"\n"
+          "path = \"" (expand-file-name
+                       "test-skg-insert-heading-source-prompt/public"
+                       (file-name-directory load-file-name)) "\"\n"
+          "user_owns_it = true\n\n"
+          "[[source_sets]]\n"
+          "name = \"private-set\"\n"
+          "sources = [\"private\"]\n\n"
+          "[[sources]]\n"
+          "name = \"private\"\n"
+          "path = \"" (expand-file-name
+                       "test-skg-insert-heading-source-prompt/private"
+                       (file-name-directory load-file-name)) "\"\n"
+          "user_owns_it = true\n")
+  "Config text with interleaved sources and source-sets.")
+
 (defun test--with-skg-content-view (org-text config-text body-fn)
   "Run BODY-FN in a temp skg content-view buffer with ORG-TEXT.
 CONFIG-TEXT is written to a temporary skgconfig.toml so that
@@ -249,5 +270,40 @@ open the sexp-edit buffer (not prompt in minibuffer)."
                   "private")))
        (should (equal (skg--prompt-for-source-change "public")
                       "private"))))))
+
+(ert-deftest test-source-set-prompt-completes-configured-source-sets ()
+  "skg--prompt-for-source-set should complete all configured source-sets."
+  (test--with-skg-content-view
+   "* (skg (node (id x) (source public))) x\n"
+   test--config-with-interleaved-source-sets
+   (lambda ()
+     (cl-letf (((symbol-function 'completing-read)
+                (lambda (prompt collection predicate require-match
+                         initial-input &optional hist def
+                         inherit-input-method)
+                  (should (string-match-p "Source-set" prompt))
+                  (should (equal collection
+                                 '("all" "public-set" "private-set")))
+                  (should (null predicate))
+                  (should require-match)
+                  (should (null initial-input))
+                  (should (null hist))
+                  (should (equal def "all"))
+                  (should (null inherit-input-method))
+                  "private-set")))
+       (should (equal (skg--prompt-for-source-set)
+                      "private-set"))))))
+
+(ert-deftest test-config-readers-handle-interleaved-source-tables ()
+  "Elisp config readers should not confuse [[sources]] and [[source_sets]]."
+  (test--with-skg-content-view
+   "* (skg (node (id x) (source public))) x\n"
+   test--config-with-interleaved-source-sets
+   (lambda ()
+     (should (equal (skg--source-names) '("public" "private")))
+     (should (equal (skg--source-set-names)
+                    '("all" "public-set" "private-set")))
+     (should (equal (mapcar #'car (skg--source-paths))
+                    '("public" "private"))))))
 
 (provide 'test-skg-insert-heading-source-prompt)

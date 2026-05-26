@@ -227,7 +227,7 @@ fn inactive_placeholders_are_saved_as_content_positions () {
     indoc! {"
             * (skg (node (id root) (source main))) root
             ** (skg (node (id active-a) (source main))) active A
-            ** (skg (inactiveNode (id hidden) (source private))) node from inactive source
+            ** (skg (inactiveNode (id hidden) (source private)))
             ** (skg (node (id active-b) (source main))) active B
         "};
   let viewforest : Tree<ViewNode> =
@@ -253,7 +253,7 @@ fn inactive_placeholder_moves_reorder_contains () {
             * (skg (node (id root) (source main))) root
             ** (skg (node (id active-a) (source main))) active A
             ** (skg (node (id active-b) (source main))) active B
-            ** (skg (inactiveNode (id hidden) (source private))) node from inactive source
+            ** (skg (inactiveNode (id hidden) (source private)))
         "};
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);

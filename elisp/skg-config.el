@@ -21,28 +21,50 @@
       (when (file-exists-p config-file)
         config-file))))
 
+(defun skg--completing-read-with-cycle
+    (prompt collection &optional predicate require-match
+            initial-input hist def inherit-input-method cycle-values
+            extra-minibuffer-setup)
+  "Call `completing-read' with S-left/S-right cycling through CYCLE-VALUES.
+The usual `completing-read' arguments keep their ordinary meaning.
+EXTRA-MINIBUFFER-SETUP, if non-nil, runs inside the minibuffer setup
+hook after the cycle bindings are installed."
+  (let ((cycle (lambda (dir)
+                 (lambda ()
+                   (interactive)
+                   (when cycle-values
+                     (let* ((cur (minibuffer-contents))
+                            (idx (or (cl-position cur cycle-values
+                                                  :test #'string=)
+                                     (and initial-input
+                                          (cl-position initial-input
+                                                       cycle-values
+                                                       :test #'string=))
+                                     0))
+                            (new (nth (mod (+ idx dir)
+                                           (length cycle-values))
+                                      cycle-values)))
+                       (delete-minibuffer-contents)
+                       (insert new)))))))
+    (minibuffer-with-setup-hook
+        (lambda ()
+          (when cycle-values
+            (local-set-key (kbd "S-<left>")  (funcall cycle -1))
+            (local-set-key (kbd "S-<right>") (funcall cycle  1)))
+          (when extra-minibuffer-setup
+            (funcall extra-minibuffer-setup)))
+      (completing-read
+       prompt collection predicate require-match initial-input hist def
+       inherit-input-method))))
+
 (defun skg--prompt-for-owned-source ()
   "Prompt the user to choose an owned source, with S-left/S-right cycling.
 If there is only one owned source, return it without prompting."
   (let ((owned-sources (skg--owned-sources)))
     (if (= (length owned-sources) 1)
         (car owned-sources)
-      (let ((cycle (lambda (dir)
-                     (lambda ()
-                       (interactive)
-                       (let* ((cur (minibuffer-contents))
-                              (idx (or (cl-position cur owned-sources
-                                                    :test #'string=) 0))
-                              (new (nth (mod (+ idx dir)
-                                             (length owned-sources))
-                                        owned-sources)))
-                         (delete-minibuffer-contents)
-                         (insert new))))))
-        (minibuffer-with-setup-hook
-            (lambda ()
-              (local-set-key (kbd "S-<left>")  (funcall cycle -1))
-              (local-set-key (kbd "S-<right>") (funcall cycle  1)))
-          (completing-read "Source: " owned-sources nil t))))))
+      (skg--completing-read-with-cycle
+       "Source: " owned-sources nil t nil nil nil nil owned-sources))))
 
 (defun skg--prompt-for-source-change (current-source)
   "Prompt for a source to replace CURRENT-SOURCE.
@@ -51,29 +73,20 @@ configured source with its path.  The user may also type a source
 name directly."
   (let ((owned-sources (skg--owned-sources))
         (source-names (skg--source-names)))
-    (let ((cycle (lambda (dir)
-                   (lambda ()
-                     (interactive)
-                     (let* ((cur (minibuffer-contents))
-                            (idx (or (cl-position cur owned-sources
-                                                  :test #'string=)
-                                     (cl-position current-source owned-sources
-                                                  :test #'string=)
-                                     0))
-                            (new (nth (mod (+ idx dir)
-                                           (length owned-sources))
-                                      owned-sources)))
-                       (delete-minibuffer-contents)
-                       (insert new))))))
-      (minibuffer-with-setup-hook
-          (lambda ()
-            (when owned-sources
-              (local-set-key (kbd "S-<left>")  (funcall cycle -1))
-              (local-set-key (kbd "S-<right>") (funcall cycle  1)))
-            (local-set-key (kbd "C-?") #'skg-view-source-list))
-        (completing-read
-         "Source (S-left/right cycle; press C-? for a list of sources): "
-         source-names nil nil current-source)))))
+    (skg--completing-read-with-cycle
+     "Source (S-left/right cycle; press C-? for a list of sources): "
+     source-names nil nil current-source nil nil nil owned-sources
+     (lambda ()
+       (local-set-key (kbd "C-?") #'skg-view-source-list)))))
+
+(defun skg--prompt-for-source-set ()
+  "Prompt for a source-set name, with completion and S-left/S-right cycling."
+  (let ((source-sets (skg--source-set-names)))
+    (unless source-sets
+      (user-error "No skg source-sets found"))
+    (skg--completing-read-with-cycle
+     "Source-set (S-left/right cycle): "
+     source-sets nil t nil nil "all" nil source-sets)))
 
 (defun skg--source-paths ()
   "Return an alist of (source-name . absolute-path) from skgconfig.toml."
@@ -83,7 +96,15 @@ name directly."
 
 (defun skg--source-names ()
   "Return the configured source names from skgconfig.toml."
-  (mapcar #'car (skg--source-paths)))
+  (let ((config-file (skg-config-file)))
+    (when config-file
+      (skg-source-names-from-toml config-file))))
+
+(defun skg--source-set-names ()
+  "Return configured source-set names from skgconfig.toml, including all."
+  (let ((config-file (skg-config-file)))
+    (when config-file
+      (cons "all" (skg-source-set-names-from-toml config-file)))))
 
 (defun skg-view-source-list ()
   "Display an org buffer listing configured sources and their paths."
@@ -152,6 +173,37 @@ name directly."
         (forward-line 1))
       (nreverse sources))))
 
+(defun skg--toml-array-table-line-name (line)
+  "Return the array-table name from LINE, or nil if LINE is not one."
+  (when (string-match "^\\[\\[\\([[:alnum:]_-]+\\)\\]\\]" line)
+    (match-string 1 line)))
+
+(defun skg-table-names-from-toml (file table-name)
+  "Return name strings from each [[TABLE-NAME]] entry in FILE."
+  (with-temp-buffer
+    (insert-file-contents file)
+    (goto-char (point-min))
+    (let ((names '())
+          (current-table nil))
+      (while (not (eobp))
+        (let* ((line (string-trim
+                      (buffer-substring-no-properties
+                       (line-beginning-position)
+                       (line-end-position))))
+               (new-table (skg--toml-array-table-line-name line)))
+          (cond
+           (new-table
+            (setq current-table new-table))
+           ((and (equal current-table table-name)
+                 (string-match "^name[ \t]*=[ \t]*\"\\([^\"]+\\)\"" line))
+            (push (match-string 1 line) names))))
+        (forward-line 1))
+      (nreverse names))))
+
+(defun skg-source-names-from-toml (file)
+  "Return configured source names from FILE."
+  (skg-table-names-from-toml file "sources"))
+
 (defun skg-source-paths-from-toml (file)
   "Return an alist of (name . absolute-dir) for each [[sources]] entry
 in FILE. Relative source paths are resolved against the directory of
@@ -162,8 +214,9 @@ config-load time."
     (goto-char (point-min))
     (let* ((dir (file-name-directory file))
            (result    '())
-           (cur-name  nil)
-           (cur-path  nil)
+           (current-table nil)
+           (cur-name      nil)
+           (cur-path      nil)
            (flush (lambda ()
                     (when (and cur-name cur-path)
                       (push (cons cur-name
@@ -171,20 +224,31 @@ config-load time."
                             result)
                       (setq cur-name nil cur-path nil)))))
       (while (not (eobp))
-        (let ((line (string-trim
-                     (buffer-substring-no-properties
-                      (line-beginning-position)
-                      (line-end-position)))))
+        (let* ((line (string-trim
+                      (buffer-substring-no-properties
+                       (line-beginning-position)
+                       (line-end-position))))
+               (new-table (skg--toml-array-table-line-name line)))
           (cond
-           ((string-match "^\\[\\[sources\\]\\]" line)
-            (funcall flush))
-           ((string-match "^name[ \t]*=[ \t]*\"\\([^\"]+\\)\"" line)
-            (setq cur-name (match-string 1 line)))
-           ((string-match "^path[ \t]*=[ \t]*\"\\([^\"]+\\)\"" line)
-            (setq cur-path (match-string 1 line)))))
+           (new-table
+            (funcall flush)
+            (setq current-table new-table)
+            (setq cur-name nil cur-path nil))
+           ((and (equal current-table "sources")
+                 (string-match "^path[ \t]*=[ \t]*\"\\([^\"]+\\)\"" line))
+            (setq cur-path (match-string 1 line)))
+           ((and (equal current-table "sources")
+                 (string-match "^name[ \t]*=[ \t]*\"\\([^\"]+\\)\"" line))
+            (setq cur-name (match-string 1 line)))))
         (forward-line 1))
       (funcall flush)
       (nreverse result))))
+
+(defun skg-source-set-names-from-toml (file)
+  "Return configured source-set names from FILE.
+The reserved source-set `all' is intentionally not included here;
+callers that offer source-set choices should add it explicitly."
+  (skg-table-names-from-toml file "source_sets"))
 
 (defun skg--source-dir (source-name)
   "Return absolute directory for SOURCE-NAME per skgconfig.toml, or nil."

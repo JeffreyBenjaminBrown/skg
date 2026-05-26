@@ -666,8 +666,7 @@ fn build_child_creation_data (
         . is_some_and ( |active| !active . contains_source (&child_source) )
       {
         result . insert( id . clone(),
-                       ChildData { title: "node from inactive source"
-                                     . to_string (),
+                       ChildData { title: String::new (),
                                    source: child_source,
                                    body: None,
                                    kind: ContentReality::Inactive } );

@@ -36,6 +36,11 @@
       (source))
     (ORANGE unknownNode "Parent references unknown node."
       (id))
+    (BLUE inactiveNode "node from inactive source"
+      (id)
+      (source)
+      (staged)
+      (unstaged))
     (GREEN INTERC "" staged "staged:"
       (GREEN newM     "M")
       (RED   removedM "-M"))

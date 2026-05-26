@@ -164,6 +164,27 @@
       (should (string-match "unstaged" result))
       (should (string-match "-M" result)))))
 
+(ert-deftest test-heralds-inactive-node-display ()
+  "Inactive-node metadata should be masked by a blue placeholder herald."
+  (with-temp-buffer
+    (insert "(skg (inactiveNode (id hidden) (source private)))")
+    (let ((result (heralds-from-metadata
+                   "(skg (inactiveNode (id hidden) (source private)))")))
+      (should (equal (substring-no-properties result)
+                     "node from inactive source"))
+      (should (eq (get-text-property 0 'face result)
+                  'heralds-blue-face)))
+    (heralds-minor-mode 1)
+    (let* ((display-overlay
+            (cl-find-if (lambda (ov) (overlay-get ov 'display))
+                        (overlays-at (point-min))))
+           (display-text (overlay-get display-overlay 'display)))
+      (should display-overlay)
+      (should (equal (substring-no-properties display-text)
+                     "node from inactive source"))
+      (should (eq (get-text-property 0 'face display-text)
+                  'heralds-blue-face)))))
+
 (ert-deftest test-heralds-survive-major-mode-switch ()
   "After a major-mode switch orphans overlays, disabling heralds
 should still remove them."

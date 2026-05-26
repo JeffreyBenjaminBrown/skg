@@ -114,7 +114,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
 fn test_org_to_uninterpreted_nodes2_inactive_placeholder() {
   let input: &str =
     indoc! {"
-            * (skg (inactiveNode (id hidden) (source private) (unstaged newM))) node from inactive source
+            * (skg (inactiveNode (id hidden) (source private) (unstaged newM)))
         "};
 
   let viewforest: Tree<MaybePlacedViewnode> =
@@ -128,7 +128,7 @@ fn test_org_to_uninterpreted_nodes2_inactive_placeholder() {
   assert_eq!(inactive . id, ID::from ("hidden"));
   assert_eq!(inactive . source, SourceName::from ("private"));
   assert_eq!(inactive . membership . unstaged, Some (Sign::Plus));
-  assert_eq!(tree_roots[0] . value() . title(), "node from inactive source");
+  assert_eq!(tree_roots[0] . value() . title(), "");
   assert_eq!(tree_roots[0] . value() . body(), None);
 }
 

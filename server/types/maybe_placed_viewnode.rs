@@ -295,8 +295,7 @@ impl MaybePlacedViewnode {
       MaybePlacedViewnodeKind::Deleted (d) => &d . title,
       MaybePlacedViewnodeKind::DeletedScaff (kind) =>
         kind . default_title (),
-      MaybePlacedViewnodeKind::Inactive (_) =>
-        "node from inactive source",
+      MaybePlacedViewnodeKind::Inactive (_) => "",
       MaybePlacedViewnodeKind::Unknown (_) => "", }}
 
   /// A distinguishable label for error messages.

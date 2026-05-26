@@ -20,17 +20,17 @@ and hide INTERNAL from M-x completion."
 ;; Aliases
 ;;
 
-(skg-alias skg-save                  skg-request-save-buffer)
-(skg-alias skg-reveal-aliases          skg-request-aliases-view)
-(skg-alias skg-reveal-containerward    skg-request-containerward-view)
-(skg-alias skg-reveal-sourceward       skg-request-sourceward-view)
+(skg-alias skg-save                   skg-request-save-buffer)
+(skg-alias skg-reveal-aliases         skg-request-aliases-view)
+(skg-alias skg-reveal-containerward   skg-request-containerward-view)
+(skg-alias skg-reveal-sourceward      skg-request-sourceward-view)
 (skg-alias skg-reveal-link-sourceward
            ;; For if someone forgets "source" but remembers "link".
-           skg-request-sourceward-view)
-(skg-alias skg-set-definitive       skg-request-definitive-view)
-(skg-alias skg-source-set           skg-set-active-source-set)
-(skg-alias skg-view-heralds-mode     heralds-minor-mode)
-(skg-alias skg-view-metadata         skg-edit-metadata)
+                                      skg-request-sourceward-view)
+(skg-alias skg-set-definitive         skg-request-definitive-view)
+(skg-alias skg-limit-source-set       skg-set-active-source-set)
+(skg-alias skg-view-heralds-mode      heralds-minor-mode)
+(skg-alias skg-view-metadata          skg-edit-metadata)
 
 ;;
 ;; Keymaps
@@ -40,7 +40,7 @@ and hide INTERNAL from M-x completion."
   (global-set-key (kbd "C-c f RET") #'skg-search)
   (global-set-key (kbd "C-c f i")   #'skg-search-interactive)
   (global-set-key (kbd "C-c f l")   #'skg-search-make-link)
-  (global-set-key (kbd "C-c f s")   #'skg-source-set))
+  (global-set-key (kbd "C-c v l")   #'skg-limit-source-set))
 
 (with-eval-after-load 'magit ;; Magit
   ;; Popping to the id stack would make no sense here,
@@ -109,8 +109,7 @@ and hide INTERNAL from M-x completion."
   (progn;; text search
     (define-key map (kbd "C-c f RET") #'skg-search)
     (define-key map (kbd "C-c f i")   #'skg-search-interactive)
-    (define-key map (kbd "C-c f l")   #'skg-search-make-link)
-    (define-key map (kbd "C-c f s")   #'skg-source-set))
+    (define-key map (kbd "C-c f l")   #'skg-search-make-link))
   (progn;; goto. Capital-G variants kill the buffer they were called from.
     (define-key map (kbd "C-c g RET") #'skg-goto)
     (define-key map (kbd "C-c G RET") #'skg-goto-and-close-this)
@@ -138,6 +137,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c v d") #'skg-view-diff-mode)
     (define-key map (kbd "C-c v e") #'skg-view-new-empty)
     (define-key map (kbd "C-c v h") #'skg-view-heralds-mode)
+    (define-key map (kbd "C-c v l") #'skg-limit-source-set)
     (define-key map (kbd "C-c v m") #'skg-view-metadata)
     (define-key map (kbd "C-c v o") #'skg-view-org-ancestry)
     (define-key map (kbd "C-c v r") #'skg-readable-ids-mode)
@@ -185,6 +185,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c G M")   #'skg-goto-in-magit-parent-and-close-this))
   (progn;; view
     (define-key map (kbd "C-c v e") #'skg-view-new-empty)
+    (define-key map (kbd "C-c v l") #'skg-limit-source-set)
     (define-key map (kbd "C-c v s") #'skg-view-id-stack))
   (progn;; id navigation
     (define-key map (kbd "C-c i n") #'skg-id-next)

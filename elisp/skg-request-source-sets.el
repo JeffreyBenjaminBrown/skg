@@ -1,6 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
 
 (require 'skg-buffer)
+(require 'skg-config)
 (require 'skg-length-prefix)
 (require 'skg-state)
 
@@ -51,7 +52,7 @@
 
 (defun skg-set-active-source-set (name)
   "Set the active source-set for this TCP connection to NAME."
-  (interactive "sSource-set name: ")
+  (interactive (list (skg--prompt-for-source-set)))
   (when (yes-or-no-p "Close all SKG buffers before switching source-set? ")
     (skg-close-all-skg-buffers)
     (let ((tcp-proc (skg-tcp-connect-to-rust)))
