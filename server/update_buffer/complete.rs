@@ -5,6 +5,7 @@
 // `FnMut` closure which cannot `.await`.
 
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::source_sets::ActiveSourceSet;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
@@ -29,6 +30,7 @@ pub(super) struct CompletionContext<'a> {
   pub(super) errors                         : &'a mut Vec<String>,
   pub(super) deleted_since_head_pid_src_map : &'a HashMap<ID, SourceName>,
   pub(super) deleted_by_this_save_pids      : &'a HashSet<ID>,
+  pub(super) active_source_set              : Option<&'a ActiveSourceSet>,
   pub(super) is_saved_view                  : bool,
 }
 
@@ -121,6 +123,7 @@ async fn expand_true_content_at_node (
       &context . env . config, context . graph_snap,
       context . deleted_since_head_pid_src_map,
       context . deleted_by_this_save_pids,
+      context . active_source_set,
       context . is_saved_view ) ?;
   } else if matches!( kind,
       ViewNodeKind::Scaff (Scaffold::SubscribeeCol) ) {

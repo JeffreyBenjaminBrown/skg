@@ -1,5 +1,6 @@
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
-use crate::types::viewnode::mk_phantom_viewnode;
+use crate::source_sets::ActiveSourceSet;
+use crate::types::viewnode::{mk_inactive_viewnode, mk_phantom_viewnode};
 use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap};
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeChanges, net_diff_from_per_stage, per_stage_node_changes_for_truenode};
 use crate::types::list::{Diff_Item, compute_interleaved_diff, itemlist_and_removedset_from_diff};
@@ -35,6 +36,7 @@ use std::sync::Arc;
 enum ContentReality {
   Real, // Real content: Exists in worktree, and parent contains it at this position.
   Phantom (ExistenceAxes, MembershipAxes), // Is not contained by parent at this position, and might not exist at all.
+  Inactive,
 }
 
 struct ChildData {
@@ -102,6 +104,7 @@ pub fn expand_true_content_at_truenode (
   graph_snap                     : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   deleted_by_this_save_pids      : &HashSet<ID>,
+  active_source_set              : Option<&ActiveSourceSet>,
   is_saved_view                  : bool,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
@@ -149,7 +152,7 @@ pub fn expand_true_content_at_truenode (
       tree, node, &nodecomplete, &pid, &source,
       source_diffs, config, graph_snap,
       deleted_since_head_pid_src_map,
-      mode ) ?;
+      active_source_set, mode ) ?;
   order_children_as_scaffolds_then_ignored_then_content(
     tree, node ) ?;
   maybe_prepend_subscribee_col(
@@ -217,6 +220,7 @@ fn reconcile_content_children (
   config                         : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  active_source_set              : Option<&ActiveSourceSet>,
   mode                           : CompletionMode,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
   // Resolve each id through the in-Rust-graph extra_id map so that an
@@ -251,7 +255,8 @@ fn reconcile_content_children (
       is_sub, config ) ?;
   complete_content_children(
     tree, node, &goal_list, &removed_ids,
-    source_diffs, config, deleted_since_head_pid_src_map ) ?;
+    source_diffs, config, deleted_since_head_pid_src_map,
+    active_source_set ) ?;
   mark_erroneous_content_children_as_indep(
     tree, node, &apparent_content_ids ) ?;
   Ok (subscribes_to) }
@@ -405,20 +410,24 @@ fn complete_content_children (
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  active_source_set  : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
   let child_data : HashMap<ID, ChildData> =
     build_child_creation_data(
       tree, node, goal_list, removed_ids,
-      source_diffs, config, deleted_since_head_pid_src_map ) ?;
+      source_diffs, config, deleted_since_head_pid_src_map,
+      active_source_set ) ?;
   complete_relevant_children_in_viewnodetree(
     tree, node,
-    |vn : &ViewNode| matches!( &vn . kind,
-                               ViewNodeKind::True (t)
-                               if !t . parent_ignores_it() ),
+    |vn : &ViewNode| match &vn . kind {
+      ViewNodeKind::True (t) => !t . parent_ignores_it(),
+      ViewNodeKind::Inactive (_) => true,
+      _ => false },
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::True (t) => t . id . clone(),
+      ViewNodeKind::Inactive (i) => i . id . clone(),
       _ => panic!(
-        "complete_content_children: relevant child not TrueNode" ) },
+        "complete_content_children: relevant child had no content ID" ) },
     goal_list,
     |id : &ID| {
       let d : &ChildData = child_data . get (id) . expect(
@@ -431,7 +440,10 @@ fn complete_content_children (
         ContentReality::Phantom (ex, mem) =>
           mk_phantom_viewnode(
             id . clone(), d . source . clone(),
-            d . title . clone(), ex, mem ) } },
+            d . title . clone(), ex, mem ),
+        ContentReality::Inactive =>
+          mk_inactive_viewnode (
+            id . clone(), d . source . clone(), MembershipAxes::default ()) } },
   ) }
 
 /// 'erroneous content children' are children that look like content,
@@ -595,6 +607,7 @@ fn build_child_creation_data (
   source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  active_source_set  : Option<&ActiveSourceSet>,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
   let (parent_pid, parent_source) : (ID, SourceName) =
     pid_and_source_from_treenode (
@@ -605,9 +618,14 @@ fn build_child_creation_data (
           . ok_or ("build_child_creation_data: node not found") ?;
       let mut m : HashMap<ID, SourceName> = HashMap::new();
       for child_ref in node_ref . children() {
-        if let ViewNodeKind::True (t) = &child_ref . value() . kind {
-          m . insert( t . id . clone(),
-                      t . source . clone()); }}
+        match &child_ref . value() . kind {
+          ViewNodeKind::True (t) =>
+            { m . insert( t . id . clone(),
+                          t . source . clone()); },
+          ViewNodeKind::Inactive (i) =>
+            { m . insert( i . id . clone(),
+                          i . source . clone()); },
+          _ => {}, }}
       m };
   let mut result : HashMap<ID, ChildData> = HashMap::new();
   for id in goal_list {
@@ -644,6 +662,16 @@ fn build_child_creation_data (
           id, deleted_since_head_pid_src_map, None, config )
           . ok_or_else ( || -> Box<dyn Error> { format! (
             "find_source: no source for {}", id . 0 ) . into () } ) ?;
+      if active_source_set
+        . is_some_and ( |active| !active . contains_source (&child_source) )
+      {
+        result . insert( id . clone(),
+                       ChildData { title: "node from inactive source"
+                                     . to_string (),
+                                   source: child_source,
+                                   body: None,
+                                   kind: ContentReality::Inactive } );
+        continue; }
       let skg : NodeComplete =
         nodecomplete_rustFirst_by_pid_and_source ( config, id, &child_source ) ?;
       result . insert( id . clone(),

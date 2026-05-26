@@ -16,6 +16,7 @@ use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{ SaveResponse, compute_diff_for_every_source, deleted_ids_to_source};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
+use crate::source_sets::{ActiveSourceSet, apply_source_set_to_viewforest};
 use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
@@ -43,6 +44,7 @@ pub struct RerenderAfterSaveContext<'a> {
   pub deleted_since_head_pid_src_map : HashMap<ID, SourceName>,
   /// Pids deleted by this save; not necessarily a subset of git deletes.
   pub deleted_by_this_save_pids      : HashSet<ID>,
+  pub active_source_set              : Option<&'a ActiveSourceSet>,
 }
 
 impl<'a> RerenderAfterSaveContext<'a> {
@@ -50,6 +52,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
     env               : &'a SkgEnv,
     diff_mode_enabled : bool,
     define_nodes      : &[DefineNode],
+    active_source_set : Option<&'a ActiveSourceSet>,
   ) -> RerenderAfterSaveContext<'a> {
     let source_diffs
       : Option<HashMap<SourceName, SourceDiff>>
@@ -75,14 +78,16 @@ impl<'a> RerenderAfterSaveContext<'a> {
       errors : Vec::new (),
       deleted_since_head_pid_src_map,
       deleted_by_this_save_pids,
+      active_source_set,
     }}
 
   pub fn without_save (
     env               : &'a SkgEnv,
     diff_mode_enabled : bool,
+    active_source_set : Option<&'a ActiveSourceSet>,
   ) -> RerenderAfterSaveContext<'a> {
     RerenderAfterSaveContext::for_save (
-      env, diff_mode_enabled, &[] ) }
+      env, diff_mode_enabled, &[], active_source_set ) }
 }
 
 struct RenderedCollateralView {
@@ -107,6 +112,7 @@ pub async fn update_views_after_save (
   env                         : &SkgEnv,
   viewuri_from_request_result : &Result<ViewUri, String>,
   views_state                 : &mut ViewsState,
+  active_source_set           : Option<&ActiveSourceSet>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut context : RerenderAfterSaveContext =
     // Snapshot the in-Rust graph once for this save's rerender pass.
@@ -115,7 +121,7 @@ pub async fn update_views_after_save (
     // resolution during reconcile (neighbors' on-disk contains still
     // point at the acquiree id).
     RerenderAfterSaveContext::for_save (
-      env, diff_mode_enabled, &define_nodes );
+      env, diff_mode_enabled, &define_nodes, active_source_set );
   let mut saved_view_mut : Tree<ViewNode> = saved_view;
   rewriteInPlace_viewnodes_whose_id_is_newly_extra (
     &mut saved_view_mut, &context . graph_snap ) ?;
@@ -242,6 +248,7 @@ pub async fn rerender_view (
       errors                         : &mut context . errors,
       deleted_since_head_pid_src_map : &context . deleted_since_head_pid_src_map,
       deleted_by_this_save_pids      : &context . deleted_by_this_save_pids,
+      active_source_set              : context . active_source_set,
       is_saved_view, };
     complete_viewforest (
       viewforest, &mut completion_context ) . await ?; }
@@ -270,6 +277,8 @@ pub async fn rerender_view (
     &container_to_contents,
     &content_to_containers,
     &context . env . config );
+  if let Some (active) = context . active_source_set {
+    apply_source_set_to_viewforest (viewforest, active); }
   let result : Result<String, Box<dyn Error>> =
     viewforest_to_string (viewforest, &context . env . config);
   tracing::debug!("rerender_view: done ({:.3}s)",

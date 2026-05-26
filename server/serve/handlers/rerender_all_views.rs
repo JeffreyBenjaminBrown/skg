@@ -2,6 +2,7 @@ use crate::git_ops::read_repo::open_repo;
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_errors_sexp, format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response, tag_text_response};
+use crate::source_sets::ActiveSourceSet;
 use crate::types::env::SkgEnv;
 use crate::types::misc::SkgConfig;
 use crate::types::viewnode::ViewNode;
@@ -16,8 +17,10 @@ pub fn handle_rerender_all_views_request (
   stream     : &mut TcpStream,
   env        : &SkgEnv,
   views_state : &mut ViewsState,
+  active_source_set : &ActiveSourceSet,
 ) {
-  stream_rerender_views (stream, env, views_state); }
+  stream_rerender_views (
+    stream, env, views_state, Some (active_source_set)); }
 
 /// Stream re-rendered views to Emacs.
 /// Sends: rerender-lock → rerender-view* → rerender-done.
@@ -27,6 +30,7 @@ pub fn stream_rerender_views (
   stream     : &mut TcpStream,
   env        : &SkgEnv,
   views_state : &mut ViewsState,
+  active_source_set : Option<&ActiveSourceSet>,
 ) {
   let uris : Vec<ViewUri> =
     views_state . open_views . views . keys () . cloned () . collect ();
@@ -41,7 +45,7 @@ pub fn stream_rerender_views (
   // 2. Compute rerender context once, then stream each view.
   let mut context : RerenderAfterSaveContext =
     RerenderAfterSaveContext::without_save (
-      env, views_state . diff_mode_enabled );
+      env, views_state . diff_mode_enabled, active_source_set );
 
   for uri in uris {
     let mut viewforest : Tree<ViewNode> = match
@@ -87,6 +91,7 @@ pub fn handle_git_diff_toggle_and_rerender (
   stream     : &mut TcpStream,
   env        : &SkgEnv,
   views_state : &mut ViewsState,
+  active_source_set : &ActiveSourceSet,
 ) {
   views_state . diff_mode_enabled = ! views_state . diff_mode_enabled;
   let msg : String =
@@ -95,7 +100,8 @@ pub fn handle_git_diff_toggle_and_rerender (
   send_response_with_length_prefix (
     stream,
     & tag_text_response ( TcpToClient::GitDiffMode, &msg ));
-  stream_rerender_views (stream, env, views_state); }
+  stream_rerender_views (
+    stream, env, views_state, Some (active_source_set)); }
 
 /// Build the human-readable message for a diff-mode toggle,
 /// including warnings for sources not tracked in git.

@@ -5,6 +5,7 @@ use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
 use crate::save::update_graph_including_merges;
 use crate::serve::ViewsState;
+use crate::source_sets::ActiveSourceSet;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   view_uri_from_request,
@@ -76,6 +77,7 @@ pub fn handle_save_buffer_request (
   request    : &str,
   env        : &mut SkgEnv,
   views_state : &mut ViewsState,
+  active_source_set : &ActiveSourceSet,
 ) {
   let viewuri_from_request_result : Result<ViewUri, String> =
     view_uri_from_request (request);
@@ -101,7 +103,8 @@ pub fn handle_save_buffer_request (
             env,
             views_state . diff_mode_enabled,
             &viewuri_from_request_result,
-            views_state ))
+            views_state,
+            Some (active_source_set) ))
         { Ok (mut save_response) => {
             save_response . save_point_position =
               save_point_position . clone ();
@@ -212,6 +215,7 @@ pub async fn update_from_and_rerender_buffer (
   diff_mode_enabled           : bool,
   viewuri_from_request_result : &Result<ViewUri, String>,
   views_state                  : &mut ViewsState,
+  active_source_set            : Option<&ActiveSourceSet>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   if diff_mode_enabled { // diff mode is undefined for merge commits
     let sources : Vec<SourceName> =
@@ -274,7 +278,8 @@ pub async fn update_from_and_rerender_buffer (
     diff_mode_enabled,
     env,
     viewuri_from_request_result,
-    views_state ) . await }
+    views_state,
+    active_source_set ) . await }
 
 /// Check if any source's HEAD is a merge commit.
 /// Returns an error message if so,

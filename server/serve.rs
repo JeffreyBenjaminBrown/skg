@@ -138,7 +138,8 @@ fn handle_emacs (
               &mut stream,
               &request_header,
               &mut env,
-              &mut views_state ),
+              &mut views_state,
+              &active_source_set ),
           Ok (RequestType::CloseView) =>
             handle_close_view_request (
               &mut stream,
@@ -202,7 +203,8 @@ fn handle_emacs (
             handle_git_diff_toggle_and_rerender (
               &mut stream,
               &env,
-              &mut views_state ),
+              &mut views_state,
+              &active_source_set ),
           Ok (RequestType::RebuildDbs) =>
             handle_rebuild_dbs_request ( &mut stream,
                                          &mut env,
@@ -211,7 +213,8 @@ fn handle_emacs (
             handle_rerender_all_views_request (
               &mut stream,
               &env,
-              &mut views_state ),
+              &mut views_state,
+              &active_source_set ),
           Err (err) => {
             tracing::error!(error = %err, "Error determining request type");
             send_response_with_length_prefix (

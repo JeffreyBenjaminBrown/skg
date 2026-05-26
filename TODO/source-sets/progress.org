@@ -37,9 +37,11 @@
 - Initial content views under restricted source-sets build inactive child
   placeholders during BFS and do not enqueue inactive subtrees for
   traversal.
+- Content completion and rerender paths carry the active source-set,
+  create inactive placeholders for missing inactive-source content, and
+  reapply source-set filtering before rendering rerendered buffers.
 
 * pending
-- Thread active source-set filtering into content completion/rerender paths.
 - Thread active source-set filtering into sourceward and containerward
   expansion paths.
 - Truncate search enrichment ancestry before inactive containers/link

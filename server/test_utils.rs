@@ -250,7 +250,8 @@ pub async fn update_from_and_rerender_buffer_test (
     &mut env,
     diff_mode_enabled,
     viewuri_from_request_result,
-    views_state ) . await }
+    views_state,
+    None ) . await }
 
 /// Audit the given in-Rust graph handle against TypeDB; panic with a
 /// detailed message if they disagree. Intended for per-test-fixture
