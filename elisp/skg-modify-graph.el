@@ -278,7 +278,7 @@ one link is not an id link."
 
 (defun skg--read-link-label (default-label)
   "Prompt for a link label, defaulting to DEFAULT-LABEL."
-  (if (minibufferp)
+  (if (or noninteractive (minibufferp))
       default-label
     (read-string "Link label: " default-label)))
 

@@ -31,7 +31,7 @@
       (kill-emacs 1))
     (assert-headline-structure
      buf
-     '((1 container "a")
+     '((1 absent "a")
        (2 content  "b")
        (3 content  "a")
        (2 container    "b")
@@ -50,7 +50,7 @@
       (kill-emacs 1))
     (assert-headline-structure
      buf
-     '((1 container "b")
+     '((1 absent "b")
        (2 content  "a")
        (3 content  "b")
        (2 container    "a")
@@ -65,7 +65,7 @@
     ;; Verify pre-edit structure
     (assert-headline-titles
      buf
-     '((1 container "b")
+     '((1 absent "b")
        (2 content  "a")
        (3 content  "b")
        (2 container    "a")
@@ -86,7 +86,7 @@
     ;; Verify post-edit structure
     (assert-headline-titles
      buf
-     '((1 container "b")
+     '((1 absent "b")
        (2 content  "a")
        (3 content  "b")
        (2 container    "Node a was given this longer title")
@@ -107,7 +107,7 @@
       (kill-emacs 1))
     (assert-headline-titles
      buf
-     '((1 independent "b")
+     '((1 absent "b")
        (2 content  "Node a was given this longer title")
        (3 content  "b")
        (2 container    "Node a was given this longer title")
@@ -150,7 +150,7 @@ and the new child c."
                (buffer-substring-no-properties (point-min) (point-max))))
     (assert-headline-titles
      buf
-     '((1 independent "Node a was given this longer title")
+     '((1 absent "Node a was given this longer title")
        (2 content  "b")
        (3 content  "Node a was given this longer title")
        (2 container    "b")

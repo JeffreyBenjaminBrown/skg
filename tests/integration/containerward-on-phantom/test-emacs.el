@@ -28,7 +28,7 @@
     ;; a -> {b -> c(indef), c}.
     (assert-headline-titles
      buf
-     '((1 independent "a")
+     '((1 absent "a")
        (2 container   "b")
        (3 container   "c")
        (2 container   "c"))
@@ -53,7 +53,7 @@
     ;; Buffer should now be: a -> {b, c}
     (assert-headline-titles
      (current-buffer)
-     '((1 independent "a")
+     '((1 absent "a")
        (2 container   "b")
        (2 container   "c"))
      "phase 2: after removing c from b")

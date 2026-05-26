@@ -21,7 +21,7 @@
       (kill-emacs 1))
     (assert-headline-titles
      buf
-     '((1 independent "a")
+     '((1 absent "a")
        (2 container    "b")
        (3 container    "c")
        (3 container    "d")
@@ -43,7 +43,7 @@
     ;; b's first child before the definitive content (c, d, e).
     (assert-headline-titles
      buf
-     '((1 container "b")
+     '((1 absent "b")
        (2 content  "a")
        (2 container    "c")
        (2 container    "d")
@@ -86,7 +86,7 @@
     ;; c should be gone (deleted). d should appear under f.
     (assert-headline-titles
      buf
-     '((1 independent "b")
+     '((1 absent "b")
        (2 container   "e, edited")
        (2 container   "f")
        (3 container   "d"))
@@ -195,7 +195,7 @@
   (let ((buf-b (get-buffer "*b*")))
     (assert-headline-titles
      buf-b
-     '((1 independent "b")
+     '((1 absent "b")
        (2 container   "e, edited")
        (2 container   "f")
        (3 container   "d"))

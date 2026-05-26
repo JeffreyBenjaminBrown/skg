@@ -29,7 +29,7 @@
       (kill-emacs 1))
     (assert-headline-structure
      buf
-     '((1 container "a")
+     '((1 absent "a")
        (2 content  "b")
        (3 content  "a")
        (2 container    "b")
@@ -48,7 +48,7 @@
       (kill-emacs 1))
     (assert-headline-structure
      buf
-     '((1 container "b")
+     '((1 absent "b")
        (2 content  "a")
        (3 content  "b")
        (2 container    "a")
@@ -81,7 +81,7 @@
                (buffer-substring-no-properties (point-min) (point-max))))
     (assert-headline-structure
      buf
-     '((1 independent "a")
+     '((1 absent "a")
        (2 independent "b")  ;; was content; corrected after b dropped a
        (3 content  "a")
        (2 container    "b"))

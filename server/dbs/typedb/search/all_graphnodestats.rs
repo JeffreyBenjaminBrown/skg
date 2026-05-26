@@ -269,16 +269,15 @@ fn fetch_all_graphnodestats_in_rust (
                                             from_containers );
     num_links_in_from_leaves     . insert ( pid . clone (),
                                             from_leaves );
-    // has_subscribes / has_overrides: either role.
-    let out_sub : bool =
-      node_opt . map ( |n| ! n . subscribes_to
+    let out_sub : bool = // subscription out-links
+      node_opt . map ( |n| n . subscribes_to
                         . or_default () . iter ()
                         . filter_map ( |id| graph . pid_of (id) )
                         . any ( |related_pid|
                           pid_source_is_active (
                             graph, active, &related_pid) ) )
       . unwrap_or (false);
-    let in_sub  : bool =
+    let in_sub  : bool = // subscription in-links
       graph . subscribers_of . get (pid)
       . map ( |s| s . iter ()
         . any ( |related_pid|
@@ -286,15 +285,15 @@ fn fetch_all_graphnodestats_in_rust (
       . unwrap_or (false);
     if out_sub || in_sub { has_subscribes
                            . insert ( pid . clone () ); }
-    let out_ov : bool =
-      node_opt . map ( |n| ! n . overrides_view_of
+    let out_ov : bool = // overrides out-links
+      node_opt . map ( |n| n . overrides_view_of
                         . or_default () . iter ()
                         . filter_map ( |id| graph . pid_of (id) )
                         . any ( |related_pid|
                           pid_source_is_active (
                             graph, active, &related_pid) ) )
       . unwrap_or (false);
-    let in_ov  : bool =
+    let in_ov  : bool = // overrides in-links
       graph . replacements_of . get (pid)
       . map ( |s| s . iter ()
         . any ( |related_pid|
