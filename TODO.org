@@ -1,5 +1,6 @@
-* DONE ? [[./TODO/source-sets.org]]
-Seems to work.
+* [[./TODO/full-schema/vision.org]]
+* DONE ? [[./TODO/source-sets/]]
+codex resume 019e6210-347f-72d2-b35c-88dc629d748e
 * [[./TODO/incremental-init-might-be-broken.org]]
 * Need text search across paths.
 * critical

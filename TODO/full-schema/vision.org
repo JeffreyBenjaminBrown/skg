@@ -1,0 +1,1076 @@
+* implementing a UI for the full schema
+** status
+Currently, the 'contains' and 'textlinks_to' relations
+are (probably?) completely implemented.
+The 'subscribes' and 'hides' relations are somewhat implemented --
+the user can view and modify them.
+The 'overrides' relation is barely implemented --
+it is represented in the dbs, but there is no way for a user
+to read or write override relationships through the client.
+** goals
+*** a "hides" herald
+There is currently metadata sent from the server to indicate
+that a node is involved (in either role of the binary relationship)
+in subscribes or overrides relationships.
+These data correspond to the "S" and "O" heralds.
+There should be similar metadata for hides relationships,
+and a corresponding "H" herald.
+*** read-only org-branches for a node's subscribers, overriders and hiders
+Suppose we are interested in viewing the relationships involving node N.
+The user can already view what N subscribes to and hides,
+via the subscribeeCol scaffold (and the Hides*Col scaffolds
+contained in the subscribeeCol's descendents).
+We need similar -Col scaffolds, but read-only ones,
+for what subscribes *to* N, what hides N, and what overrides N.
+These are all in-links, which means the filesystem represents them
+not in the .skg file for N, but in the .skg files for the nodes
+connecting to N.
+
+The content of these -Col branches will initially be rendered indefinitive.
+(The user can request a definitive view for any of them,
+just like they can for any other viewnode.)
+
+Users can reorder the children of any of these read-only -Col scaffolds;
+saving will respect that order, rather than restore the previous one.
+If they insert new children, they will be relabeled parentIs=Independent.
+If they try to delete content, it will respawn.
+(The "completion" code has established tooling and idioms
+for this kind of work.)
+
+User edits to the title or body of one of these -Col scaffolds
+will be discarded; the -Col will respawn as before.
+In the cases of text edits to the col or deletions of its children,
+users should be warned that the edit was discarded,
+but it should not stop the save pipeline.
+*** 'indef' symbols for read-only collections
+Certain collections are always read-only.
+These include the new collections of
+subscribers, overriders and hiders,
+and also (I believe) IDCol and HiddenInSubscribeeCol,
+but (I believe) not HiddenOutsideOfSubscribeeCol.
+(Please fact-check me on those beliefs.)
+The server does not need modification, but the herald rules
+should attach the green peace symbol used elsewhere
+to the heralds for of these kinds of collection.
+*** writeable Overridee branches
+Similar to the subscribeeCol, the overridenCol will permit the user
+to create relationships in which the overriddenCol parent
+overrides each of the overriddenCol's children.
+*** visiting overridden nodes
+Most ways of rendering an overridden node
+will result in a view of the overrider,
+not the overridden. There is one exception:
+If V is a viewnode representing an overridden node N,
+and V is a child (with parentIs=container)
+of an 'overriddenCol', then visiting N from V,
+or requesting a definitive view from V,
+will actually use N, rather than its overrider.
+(The overrider is the parent of the overriddenCol,
+so we can already see what's there; this mechanism lets a user
+also see what's in the original overridden node.)
+
+Where an overridee is displayed without being overridden,
+nodes hidden by the overrider
+are nonetheless displayed. (The 'hides herald'
+described earlier will indicate that there is
+hiding action relevant to such a node.)
+
+Note that a viewnode V of node R might contain
+both an OverriddenCol child and a SubscribeeCol child,
+and the same node E might belong to both collections.
+In this case, a definitive view of E requested
+from the SubscribeeCol will hide thiings in E that R hides,
+but a definitive view of E requested from the OverriddenCol
+will not hide them. (This is in keeping with the full name
+of the 'hide' relationship: 'hides_from_its_subscriptions'.)
+*** more herald rules
+Where an overrider has been drawn in place of an overridden,
+a red "Og" ("OverridinG") herald should indicate the replacement.
+This will require a new kind of "viewnodestats" data:
+"overriding".
+
+If an overridden node N is a child of an overriddenCol,
+and the corresponding overrider R (N's grandparent)
+also subscribes to N, then N should include a red "Se"
+("SubscribeE").
+This also requires a new viewnodestat: grandparentSubscribes.
+
+If E is a subscribee, and is a child of a subscribeeCol,
+and R is the corresponding subscriber (grandparent to E),
+and R overrides E, then E should show a red "On" ("overridden")
+herald.
+* feedback, round 1
+** Read-only collections with persistent reorder need a storage story
+The plan says users can reorder the children of read-only inbound
+-Col scaffolds, and saving will respect that order.
+But inbound collections are not stored in N's '.skg' file:
+they are derived from other nodes' outgoing relationship lists.
+
+That leaves no obvious place to persist an arbitrary order of
+"everything that subscribes to N" without either:
+- editing each subscriber's file,
+- adding view-local ordering state,
+- adding a new graph relationship or ordering metadata,
+- or accepting that the order is only ephemeral.
+
+This is especially unclear for collections whose members come from
+many different files.  For example, the ordering of all hiders of N
+cannot be represented by reordering N's own fields, because N does not
+own those relationships.
+*** TODO check for membership, complete what's missing
+We can check each parentIs=container child of one of these 'Col
+scaffolds for whether the indicated relationship in fact holds.
+If it doesn't, we mark it parentIs=Independent.
+
+Then, for everything that should have been there
+which we didn't find, we append a ViewNode representing it.
+Order does not matter.
+*** "read-only" and "saving will respect order" are in tension
+If a collection is read-only, reordering it is still a graph edit
+unless the order is view-local.  The plan should say whether
+"read-only" means:
+- no graph relationship changes at all,
+- no membership changes, but display order can be edited,
+- or no edits except the completion code will tolerate and undo them.
+**** TODO you're right, it needs a new word
+'read-only beyond order and independent children'
+would be accurate. That's a mouthful; we can abbreviate it
+ROBOAIC, and dcoument that in glossary.md.
+** Discarded edits need warning semantics, not just error plumbing
+The vision says text/body edits to read-only -Col scaffolds should be
+discarded and the user warned, without stopping the save pipeline.
+The current save response has an 'errors' list.
+If warnings share that list, Emacs and future callers might treat
+successful saves as failures, or users might learn to ignore real
+errors.
+
+The plan should specify whether the API grows a warning channel,
+or whether these are deliberately non-fatal entries in 'errors'.
+*** TODO really?
+I thought there was a separate warnings channel,
+that got used for non-fatal (to the save) warnings.
+If there isn't, we should implement that.
+** Fact-check on existing read-only collections
+*** 'HiddenInSubscribeeCol' and 'HiddenOutsideOfSubscribeeCol'
+The sharing docs say both generated hidden collections are read-only
+displays, and tests suggest editing them is not the way to hide or
+unhide subscribed content.
+So I think both hidden collections are read-only in the important
+membership-edit sense.
+*** 'IDCol'
+I would not assume 'IDCol' is safely read-only until the desired
+semantics for extra IDs are stated.
+There is a TODO elsewhere saying IDs should not be writable.
+If the full-schema UI touches IDCol herald rules, it is worth deciding
+whether users may remove, reorder, or add extra IDs at all.
+**** TODO it should be disallowed
+Editing IDs via those collections seems dangerous and pointless.
+I can't imagine needing to do it.
+If a user *really* needs to edit the ID list,
+they know what they're doing,
+and can modify the .skg files directly.
+
+Edits to an IDCol should abort the save with an explanatory
+error message.
+** Override rendering needs a deterministic selection rule
+The biggest missing spec is:
+when a view would show overridden node N,
+which overrider, if any, replaces it?
+
+The schema permits many override relationships:
+- more than one node can override N,
+- one node can override more than one node,
+- override chains can exist,
+- override cycles can probably exist unless explicitly rejected.
+
+The plan currently assumes "the overrider" is singular.
+A plan of plans should define the resolution algorithm before adding
+view and save UI around it.  It should answer:
+- Are multiple active overriders an error, a fork display, or a ranked choice?
+- Does source-set filtering or source ownership affect which overrider wins?
+- Are override chains followed transitively?
+- Are override cycles detected and rendered with a cycle marker?
+- Does a node override itself through an extra ID or merge edge?
+*** TODO good catch!
+Every overridden should have at most one overrider
+among user-owned nodes.
+(This constraint should be reified in schema.tql.)
+The overriding action should be transitive:
+if X overrides Y overrides Z (and X and Y are user-owned)
+then most ways of visiting Z reveal X.
+However, when the path from overridden to overrider
+has length > 1, the minibuffer should report
+"Compound overrides relationship traversed. Such chains are legal but potentially confusing."
+Foreign-owned overrides relationships are reported normally
+in -Col scaffolds and heralds, but they do not actually
+trigger the replacement action.
+** Override substitution surfaces are broader than "visit"
+The vision discusses visiting overridden nodes,
+but override substitution also affects:
+- initial content views,
+- textlink navigation,
+- search results and search enrichment,
+- containerward and sourceward backpaths,
+- git diff views and diff analysis,
+- collateral rerendering after save,
+- readable-ID title lookups.
+
+Each surface needs the same override-resolution policy,
+or users will see different nodes depending on how they arrived.
+*** TODO Dang. That is complex.
+You're right. Let's apply the same policy almost everywhere,
+but not in the git diff analysis report, the git diff view,
+or the readable-ID lookups.
+** The exception for 'overriddenCol' needs a save rule
+If a child under 'overriddenCol' is the only place where the original
+overridden node is rendered instead of its overrider,
+then saving from that definitive view must know whether edits target:
+- the original overridden node,
+- the overriding node,
+- only the override relationship,
+- or no graph data because it is read-only.
+
+This is especially important because the text says a definitive view
+of E from 'SubscribeeCol' and from 'OverriddenCol' can intentionally
+show different effective content.
+That implies the view context must be part of save interpretation,
+not only render interpretation.
+*** TODO
+That's not quite right in two senses:
+- The overriddenCol is not read-only; it's the overriderCol (in the other direction) that's read-only.
+- There are two ways we can view
+the original overridden node from an overriddenCol
+it belongs to: By running skg-goto on it
+(which would generate a new buffer)
+or by requesting a definitive view from it
+(which would unfold more content from it in the same buffer).
+
+Each parentIs=container child C of the overriddenCol
+determines an override out-link from the overrider
+(C's grandparent). But if C is a definitive viewnode,
+then edits to C actually affect C (if it is owned).
+They don't affect C's overrider.
+** Hides herald needs role and scope precision
+A single "H" herald for either role of 'hides_from_its_subscriptions'
+may be too coarse.
+The relation is not generic hiding; it is scoped to what a subscriber
+sees through subscriptions.
+
+For node N, the herald could mean:
+- N hides something,
+- N is hidden by something,
+- N is hidden specifically inside one subscribee currently on screen,
+- N is hidden outside all subscribees,
+- N is hidden by an inactive or foreign source.
+
+Those cases lead to different user actions.
+At minimum the plan should decide whether "H" is only a graphStats
+boolean like current "S" and "O", or whether it needs counts/roles.
+*** TODO
+The H herald will just indicate the presence of
+any hide relationship, in either direction.
+When the user needs more information, they can request it.
+** Existing 'GraphNodeStats::overriding' is not enough for the new heralds
+The code already has 'GraphNodeStats::overriding',
+documented as "overrides *or* overridden, anywhere".
+The new "Og", "On", and overriddenCol-specific rules require
+view-specific role facts:
+- this rendered node replaced another node here,
+- this child is overridden by its grandparent,
+- this child is an overridee of this grandparent.
+
+Those are not graph-wide booleans.
+They need explicit 'ViewNodeStats' or context objects,
+and the plan should name where each fact comes from.
+*** TODO agreed
+graphnodestats:overriding is already well-defined and implemented.
+
+viewnodestats:overridden means 'what was drawn here was drawn in place of something it overrides'. For clarity let's rename it to 'overridesHere', and the herald to 'Oh'.
+
+We should rename the viewnodestats field for the 'On' herald to 'grandparentOverrides'. It only needs to be computed for
+subscribees-as-such. We rename the herald to 'gO'.
+If a node is overridden by its grandparent,
+but it is in an overriddenCol, the gO herald would be redundant,
+so omit it; it is only interesting from within a subscribeeCol.
+We don't look for whether the node overrides its grandparent --
+that will trigger the broad O ("some kind of overriding action")
+herald, which the user can investigate further.
+
+Similar, if a node is subscribed to by its grandparent,
+but its parent is a subscribeeCol,
+we don't need a herald to indicate
+the grandparent subscribes to it.
+But if the node is a child of an overriddenCol,
+then we *do* want the 'gS' ('grandparent subscribes to it')
+herald. Again we don't look for 'subscribes to grandparent';
+that will trigger the broad 'subscribing' herald,
+which a user can further investigate.
+
+** 'grandparentSubscribes' is too structurally narrow
+The proposed stat "grandparentSubscribes" encodes the current org
+shape, not the graph fact.
+It would be clearer as something like:
+"collection owner subscribes to this node".
+
+That would still be computed from the view context,
+but it would not bake a particular scaffold depth into the data name.
+
+*** TODO huh?
+Whether N's grandparent subscribes to or overrides N
+should be a viewnodestat, not a graphnodestat.
+It seems clear to me, and I don't see why we would not
+fix it to involve crossing precisely two levels of org headlines,
+but maybe I haven't understood.
+
+** Hidden content under overridden nodes needs examples
+The statement:
+"Where an overridee is displayed without being overridden,
+nodes hidden by the overrider are nonetheless displayed"
+is plausible, but hard to reason about without examples.
+
+It needs at least one concrete tree where R both overrides and
+subscribes to E, and R hides H.
+Then show:
+- E rendered as ordinary subscribed content,
+- E rendered inside OverriddenCol,
+- E rendered from a direct ID visit if override substitution applies.
+
+Those examples will expose whether "hides_from_its_subscriptions"
+is being applied only in subscription contexts,
+which seems to be the intended rule.
+
+*** TODO
+What you say seems to be the indended rule
+is in fact the intended rule.
+
+Suppose:
+- R both overrides and subscribes to E
+- R hides H
+- E contains G and H
+
+Then as both kinds of -Col grandchild of R,
+after the user has requested a definitive view for both,
+E would look like this:
+```
+  * R
+  ** subscribeeCol
+  *** E
+  **** G
+  ** overriddenCol
+  *** E
+  **** G
+  **** H
+```
+
+Regarding visits, I guess I should revise what I said earlier:
+It should still be that when drawing recursive content,
+be it de novo or during the completion pass of a save request,
+for any node N that would be drawn but is overridden
+(by a user-owned node) we instead draw its overrideer.
+But anytime we generate a new single-root content view,
+if its root is overridden,
+we should instead display (as org data)
+the full chain of override relationships
+and let the user choose where to go.
+Concretely, suppose X overrides Y overrides Z,
+and the user requests a view of Z.
+They should be presented with a buffer like this:
+```
+  The requested node is overridden.
+  Please select from the available destinations.
+  * Z
+  ** \O Y
+  *** \O X
+```
+The \O herald indicates 'this node overrides its parent'.
+
+In fact, in a menu like that,
+it would be fine for foreign overriders to also appear
+-- for example:
+```
+  * Z
+  ** \O Y
+  *** \O X
+  **** \O <foreign node that overrides X>
+  ** \O <foreign node that overrides Z>
+```
+
+The 'source' herald (already programmed) will inform the user
+which nodes are owned. We should however still
+impose the constraint that no two owned nodes
+may override the same node (foreign or otherwise).
+(Any node may, however, override multiple nodes,
+foreign or otherwise.)
+
+** New writeable 'OverriddenCol' is analogous to 'SubscribeeCol' only partly
+For 'SubscribeeCol', children define an outgoing list:
+R subscribes_to [E1, E2, ...].
+For 'OverriddenCol', children would define:
+R overrides_view_of [E1, E2, ...].
+
+That part is parallel.
+But rendering under 'OverriddenCol' also has the special "do not
+substitute the overrider" behavior, which has no equivalent in
+'SubscribeeCol'.  The plan should keep those two concerns separate:
+- editing the outgoing override list,
+- rendering original nodes through an override-bypassing context.
+
+*** TODO agreed
+but dedup as much code as we can.
+The codebase will get hairy fast if we don't
+treat each relation as homogeneously as possible
+relative to the others.
+
+** Deleting from generated inbound collections should not silently respawn forever
+The plan says inserted children become independent,
+deleted content respawns,
+and deleted/text-edited collection content should warn without stopping
+the save pipeline.
+
+That is probably right for a first cut,
+but it can create a confusing loop:
+the user deletes a node, saves successfully, and it comes back.
+The warning text should explicitly say which relationship
+owns the respawned child and where to edit it instead.
+
+*** TODO agreed
+
+** Source sets and inactive-node placeholders need to be integrated
+The source-set work introduced 'InactiveNode' placeholders
+and privacy/display constraints.
+The full-schema UI should decide how every new collection behaves
+when related nodes are inactive:
+- omit inactive inbound children,
+- show inactive placeholders,
+- include them only as save anchors,
+- or refuse to render the collection under restricted source sets.
+
+This matters most for inbound collections,
+because "a private node hides public node N" is itself information
+about the private source.
+
+*** TODO this will be easier than it sounds
+because order does not matter for these other relationships.
+(It is defined, but meaningless.)
+Thus we can safely omit entirely the representations
+of nodes from inactive sources where they would appear
+under a subscribeeCol, subscriberCol, overriddenCol, overriderCol,
+hidesCol or hiderCol. More than half of those are read-only,
+but even the ones that are writeable should not be tricky:
+The user can delete or reorder anything visible,
+and can't delete anything invisible.
+
+We have to treat content differently because content order matters
+-- inserting before a hidden node and after one are different.
+But hiding something 'before' hiding something else
+is meaningless, and similarly for other sharing relationships.
+** Diff mode needs relation-specific phantom rules
+Existing phantoms mostly model file existence and membership in
+contains-like lists.
+The new collections need similar rules for:
+- removed subscriptions,
+- removed hides,
+- removed overrides,
+- deleted scaffolds for generated collections,
+- changes to inbound collections derived from other files.
+
+Without this, inline diff mode may show relation edits for content
+but not for the full schema, or worse, show stale generated children
+as if they were editable facts.
+*** TODO let's ignore it
+Let's just not permit source set limitation in diff view mode.
+(If that contradicts soemthing I said earlier,
+let this override that, but append to the eventual plan
+a description of the problem of interaction between source-set
+and diff view, and what I had imagined to do about it.)
+** Tests should be planned by relationship and role
+This feature is too broad for one test plan.
+Each relation should get tests for:
+- outbound writable collection behavior,
+- inbound read-only collection behavior,
+- direct visit versus collection-context visit,
+- definitive versus indefinitive children,
+- source-set restricted rendering,
+- git diff rendering,
+- collateral rerender after save.
+
+Overrides need extra tests for multiple overriders,
+chains, cycles, and the OverriddenCol substitution exception.
+*** TODO agreed
+** Implementation order should isolate schema facts from view completion
+A robust sequence would separate these work packages:
+- complete typed accessors for each relation in both role directions,
+- define context-aware render facts and herald metadata,
+- add generated read-only inbound collections,
+- add writeable outbound 'OverriddenCol',
+- add override substitution and its bypass context,
+- integrate save/rerender/diff/source-set behavior.
+
+Doing override substitution before the relation accessors and context
+facts are explicit would make later bugs hard to localize.
+*** TODO agreed
+* feedback, round 2
+** Save warnings are UI-distinguished, not protocol-distinguished
+I checked the current API and Emacs handler.
+The save response still carries one 'errors' list.
+Emacs treats that list as warnings when the save also returned content,
+and as errors when content is nil.
+
+That behavior may be good enough,
+but it is not a separate warning channel.
+If ROBOAIC collection repair warnings are expected to be common,
+the plan should decide whether to:
+- preserve the current "errors plus content means warning" convention,
+- add a real 'warnings' field to save-result and content-view responses,
+- or rename the field to something broader.
+
+This matters because some of the proposed messages are routine
+completion/repair notices, while others should abort the save.
+*** TODO let's make it explicit
+It's confusing that sometimes errors aren't.
+Let's make a second warnings channel.
+If save succeeds, it's the only one with messages.
+If save fails, both channels can have messages.
+** ROBOAIC may be too opaque as user-facing vocabulary
+'Read-only beyond order and independent children' describes the
+behavior, but ROBOAIC is hard to remember and hard to read in prose.
+It might be fine as an internal note, but I would avoid putting it in
+metadata, herald docs, or user-visible warning text.
+
+Possible clearer terms:
+- generated collection,
+- membership-read-only collection,
+- inbound display collection,
+- completing collection.
+
+The glossary can still define the exact edit contract.
+*** TODO agreed
+Let's use 'read-only set'. We can leave out 'independent', I realize,
+because obviously independent children are independent.
+We should still, though, define 'read-only set' in the glossary.
+** 'HiddenOutsideOfSubscribeeCol' read-only status is still unsettled
+The original vision said:
+"HiddenInSubscribeeCol, but (I believe) not HiddenOutsideOfSubscribeeCol."
+
+I responded that both generated hidden collections look read-only in
+the important membership-edit sense.  Your reply only addressed IDCol.
+So this is still open: should HiddenOutsideOfSubscribeeCol get the
+same read-only/indef peace-symbol treatment as HiddenInSubscribeeCol?
+
+I think yes, because the sharing docs say generated hidden collections
+are read-only displays, and hiding/unhiding is done by editing the
+subscribee-as-such content, not either hidden collection.
+*** TODO agreed
+** The override monogamy rule probably cannot live only in schema.tql
+The new rule is:
+every overridden node should have at most one overrider among
+user-owned nodes.
+
+That rule depends on 'user_owns_it', which currently lives in
+skgconfig.toml, not in TypeDB.  The TypeDB schema has a 'source'
+attribute, but does not know which sources are user-owned unless we
+add that fact to the database too.
+
+So the constraint probably needs one of these shapes:
+- application-level validation during rebuild/save,
+- TypeDB schema plus a new persisted/inferred user-owned source fact,
+- or a weaker TypeDB-only cardinality rule that ignores ownership.
+
+The weaker TypeDB-only rule would reject valid data involving multiple
+foreign overriders, which your response explicitly wants to display.
+*** TODO let's inform TypeDB of source, then.
+Note that this might make some areas of the code simplifiable:
+I think there are places where we go out of our way to find a source
+in another DB because TypeDB doesn't know about it.
+That should be mentioned in a portion of the plan called 'awaits',
+which will contain opportunities that are not part of the plan itself.
+** Override invalid existing data needs a policy
+Once the monogamy rule exists,
+rebuild and save can encounter already-invalid data:
+two user-owned nodes override the same target.
+
+The plan should say whether that is:
+- a hard rebuild failure,
+- a nonfatal audit/report item,
+- a save-blocking validation error only when touched,
+- or rendered as a choice/fork until the user resolves it.
+
+This is especially likely after imports, source moves, source-set
+changes, or merges.
+*** TODO Can this be part of some initial validation step
+run when the server first boots, or whenever the database is rebuilt?
+I feel like there might already be other such things.
+** "User-owned" needs source-set-independent meaning
+Several override rules use "user-owned".
+I assume this means the source's 'user_owns_it = true',
+not "currently active in the active source-set".
+
+That should be explicit.
+Otherwise an override could change behavior when the user switches
+from 'all' to 'public', which would be surprising and could make
+override chains unstable.
+*** TODO yes, user-owned = user-owned regardless of source set
+** Override chains need cycle and branch behavior
+The direct-view menu for "X overrides Y overrides Z" is a good
+clarification.
+It still needs rules for:
+- cycles, including foreign nodes in the cycle,
+- branching caused by multiple foreign overriders,
+- mixed branches where one branch contains the single user-owned
+  effective destination and another branch is foreign-only,
+- whether the menu truncates at inactive source-set nodes.
+
+The recursive replacement algorithm also needs the same cycle guard,
+or a bad override cycle could make rendering nonterminating.
+*** TODO actually let's simplify it
+Overriding your own overrider is crazy. Let's not allow it.
+Does that solve the problem?
+** The override-choice buffer needs an interaction contract
+The proposed buffer:
+```
+  The requested node is overridden.
+  Please select from the available destinations.
+  * Z
+  ** \O Y
+  *** \O X
+```
+is not an ordinary single-root content view.
+It includes prose before the org tree, and it asks the user to choose.
+
+The plan should say:
+- whether this is read-only,
+- what command selects a destination,
+- whether pressing RET / skg-goto on a line opens that node,
+- whether saving the menu is disallowed,
+- what metadata appears on these headings,
+- whether foreign destinations can be selected or only viewed.
+
+If this is a new view kind, it probably should not reuse all normal
+content-view save semantics.
+*** TODO you're right
+Instead the message should be in the minibuffer.
+User-owned overriding chains will not be creatable in the UI --
+they should cause a save rejection --
+but they could still exist ini the data, so we'll still need
+a menu like this. If each node displayed is indefinitive,
+we can use an ordinary Skg buffer. (Search results do that already.)
+** Direct visits versus recursive rendering still need a boundary
+The latest response says:
+- recursive content drawing substitutes a user-owned overrider,
+- a new single-root content view of an overridden root displays an
+  override-choice buffer instead.
+
+That is coherent, but it should be stated as the central rule.
+Then classify each surface under one side:
+- following a textlink,
+- search result visit,
+- readable-ID jump from magit,
+- requesting definitive view in an existing buffer,
+- opening from an OverriddenCol child,
+- collateral rerender after save.
+
+Some of these sound like "new single-root view" operations,
+but users may experience them as ordinary navigation.
+*** TODO
+- following a textlink -> give them the menu
+- search result visit -> give them the menu
+- readable-ID jump from magit -> don't override; go to the original
+- requesting definitive view in an existing buffer -> don't override if it is an overridden-as-such, otherwise override
+- opening from an OverriddenCol child -> give the menu
+- collateral rerender after save -> existing nodes are not changed to override them, but any new content shows the overrider instead of the original
+
+** Source-set omission for sharing collections still needs save preservation
+You wrote that inactive sharing-relation children can be omitted
+because order is meaningless,
+and the user cannot delete what is invisible.
+
+That is true only if save preserves omitted inactive relationship
+members.
+For writable outbound collections such as SubscribeeCol and
+OverriddenCol, saving a visible subset must not turn:
+R subscribes_to [active E, inactive F]
+into:
+R subscribes_to [active E]
+unless the user had a way to explicitly edit F.
+
+So the save algorithm needs a source-set-aware merge rule for
+relationship lists, analogous in spirit to the inactive content
+placeholder rule, but easier because ordering is not meaningful.
+
+*** TODO agreed
+
+One handy guard against this and related problems
+would be to ensure that while using a certain source-set,
+none of the SaveNode instructions (although maybe we filter
+before reaching that type, e.g. at the Intent type(s))
+can modify an inactive source.
+
+** Inbound collection reordering may be ephemeral by design
+Your response to inbound read-only collection order says:
+check membership, mark nonmembers independent,
+and append missing members; order does not matter.
+
+That sounds like the saved order of inbound generated collections is
+not persisted at all.  If so, the earlier line:
+"saving will respect that order, rather than restore the previous one"
+should probably be weakened.
+
+Maybe the intended rule is:
+the completion pass preserves the user's visible order within the
+current save/rerender, while appending missing generated members;
+future renders may choose any deterministic relation-derived order.
+
+*** TODO
+The saved order is persisted, for that viewnode;
+it is the order of the org-nodes in Emacs,
+and then the order of the viewtree nodes in Rust.
+It does not reach *disk*, and those order changes have no effect on the graph,
+but we can respect them in a user's view of the graph.
+Moreover it does not extend to other viewnodes:
+If the user has the same read-only collectioin visible
+in two different buffers, their orders do not have to match.
+
+** 'parentIs=container' in generated inbound collections is semantically loaded
+For generated inbound collections,
+a child under subscriberCol/overriderCol/hiderCol does not mean the
+collection scaffold's parent contains that child.
+It means that child has an inbound graph relation to the collection
+owner.
+
+Using parentIs=container as the "this membership is real" marker may
+work mechanically, but it overloads the existing meaning.
+The plan should either:
+- introduce relation-specific parentIs values,
+- explicitly document that parentIs=container under these scaffolds
+  means "member of this collection", not graph containment,
+- or use scaffold type plus child ID to validate membership without
+  relying on parentIs.
+
+*** TODO let's introduce a new value, 'parentIs=collector'
+and document that the specific relationship it defines,
+from the node to its grandparent,
+depends on what kind of scaffold its parent is.
+
+** Diff-mode policy conflicts with existing source-set plan/docs
+The latest response says:
+"Let's just not permit source set limitation in diff view mode."
+
+The current source-set plan/API says inline git diff mode can run under
+restricted source-sets, while diff-analysis refuses unless active set
+is 'all'.
+
+If the new policy should override the old one,
+the eventual plan needs an explicit migration item:
+- toggling diff mode while active source-set is not 'all' should refuse,
+- switching source-set away from 'all' while diff mode is enabled should
+  either refuse or turn diff mode off,
+- existing docs/tests for restricted inline diff mode should be updated.
+
+*** TODO refuse, refuse and agreed
+
+** Override substitution in diff views is intentionally disabled, but relation diffs still exist
+You excluded git diff view and diff analysis from override substitution.
+That sounds right.
+
+But diff views still need to display edits to 'overrides_view_of'
+relationships themselves.
+The existing code even has a TODO in 'server/to_org/render/diff.rs'
+that sharing relationships will need processing there.
+
+So "no override substitution in diff mode" should not become
+"ignore override relationship diffs".
+It only means diff mode shows raw graph facts rather than effective
+replacement views.
+
+*** TODO yes
+
+** Single user-owned overrider versus merges and extra IDs needs a check
+Merge code already redirects/combines 'overrides_view_of' through
+extra IDs.
+The monogamy rule should be checked after primary-ID resolution,
+not only on raw IDs.
+
+Otherwise two nodes could appear to override different IDs that resolve
+to the same primary node after a merge.
+
+*** TODO agreed
+
+** Existing spelling issue remains in the goals section
+The goals section still says 'overridenCol' once and
+'overriddenCol' elsewhere.
+This is simple, but because a new scaffold/API name will be created,
+it is worth fixing before plans or tests copy the typo.
+
+*** TODO agreed
+'override' has two rs.
+'overridden' has two rs and two ds.
+'overrider' has two rs but only one d.
+
+** TODO let's tweak the schema vocab
+
+This passage:
+
+  relation overrides_view_of,
+    relates replacement,
+    relates replaced;
+
+should be
+
+  relation overrides_view_of,
+    relates overrider,
+    relates overridden;
+* feedback, round 3
+** TypeDB already knows source; it does not know source ownership
+The schema already gives every node a 'source' attribute.
+So the missing fact is not source, but whether that source is
+user-owned.
+
+That means the relevant choice is narrower:
+- keep user ownership in Rust config and enforce override monogamy in
+  config-aware validation code,
+- or add source entities / source ownership facts to TypeDB.
+
+Adding source ownership to TypeDB might still be worthwhile,
+but the plan should not describe it as "inform TypeDB of source".
+It should describe it as "inform TypeDB of source ownership".
+*** If source ownership enters TypeDB, it needs a config-change rule
+'user_owns_it' is not on disk with the nodes;
+it is in 'skgconfig.toml'.
+If that fact becomes part of TypeDB,
+then changing config changes database truth even when no '.skg' file changed.
+
+The plan should say whether changing 'user_owns_it':
+- requires rebuilding TypeDB,
+- is handled by incremental config-diff updates,
+- or remains outside TypeDB and is only consulted from Rust.
+*** TODO
+Skg currently makes no allowance for changing the config while it's running,
+I think. And we don't need to allow for that.
+
+If skg already has source, that's great.
+That means this is a miniscule db change, in terms of data:
+we just need to make user-owns-it a field of each source.
+But that means making sources into entities,
+rather than fields.
+** Override monogamy still needs an owner-aware relation query
+The desired constraint is:
+no two user-owned overriders may override the same node.
+
+If foreign overriders are still allowed,
+the validation query cannot just look for duplicate inbound
+'overrides_view_of' edges.
+It has to count only inbound overriders whose source is user-owned.
+
+This should be explicit because the role rename to
+'overrider' / 'overridden' will make the query easy to read,
+but ownership filtering is the part that determines correctness.
+*** TODO agreed
+** Forbidding owned override chains is not the same as forbidding cycles
+"Overriding your own overrider" should be disallowed,
+but that only forbids one important shape:
+X overrides Y and Y overrides X,
+or more generally a user-owned chain.
+
+There are still possible mixed shapes:
+- owned X overrides foreign Y, foreign Y overrides X,
+- foreign A overrides owned B, owned B overrides C,
+- foreign-only cycles visible in the choice menu,
+- old invalid data with X overrides Y overrides Z among owned nodes.
+
+If recursive replacement only follows user-owned overriders,
+foreign-only cycles might be harmless for replacement but still matter
+for the menu.  The plan should separately state:
+- which override edges are illegal to create,
+- which invalid existing edges block save/rebuild,
+- which edges are traversed for replacement,
+- which edges are displayed in the menu.
+*** TODO agreed
+- if two user-owned overriders already override the same overridden,
+  then build/rebuild fails (but explaining why to the user)
+- save is blocked if it would otherwise lead to
+  two user-owned overriders overriding the same overridden
+- only user-owned edges are traversed for replacement
+- Display all edges in the menu, following the overrides relationship
+  (in the one direction -- from overridden to overrider) recursively.
+** The menu is still needed for invalid data, so it needs a cycle cutoff
+You wrote that user-owned override chains will not be creatable in the UI,
+but could still exist in the data, so a menu is still needed.
+
+That implies the menu must be robust to malformed data,
+including cycles and branching.
+Even if the validator reports the malformed data,
+rendering the diagnostic menu should not be able to loop forever.
+
+A simple rule would be:
+render each path until the first repeated ID,
+then show a cycle marker and stop that branch.
+*** TODO agreed
+** Save rejection should specify which override-chain edits are forbidden
+If user-owned override chains are save-rejected,
+the plan should name the exact condition.
+
+Possibilities:
+- reject any user-owned node overriding a node that is itself overridden
+  by a user-owned node,
+- reject any user-owned node overriding one of its own override
+  ancestors,
+- reject any user-owned override edge that creates a user-owned path
+  longer than one,
+- reject any user-owned override cycle, but allow acyclic chains.
+
+Your latest text sounds like "reject user-owned paths longer than one".
+If so, transitive automatic replacement becomes unnecessary for
+new valid data, and only remains a legacy/invalid-data fallback.
+*** TODO
+Disallow "X overrides Y overrides Z" where X and Y are both owned,
+regardless of what Z is.
+This prevents cycles, among other things.
+** Direct-visit menu plus OverriddenCol exception overlap awkwardly
+You now say:
+- opening from an OverriddenCol child gives the menu,
+- requesting definitive view in an existing buffer does not override
+  if it is overridden-as-such.
+
+That means an OverriddenCol child can show original content inline
+without substitution, but opening it as a new root still asks the user
+to choose among override destinations.
+
+That can be right, but the user-facing distinction is subtle.
+The plan should say that "OverriddenCol bypasses substitution only
+inside that existing view; it does not make direct visits silently open
+the original."
+*** TODO agreed
+** Collateral rerender rule may make old viewnodes semantically stale
+The rule:
+"existing nodes are not changed to override them, but any new content
+shows the overrider instead of the original"
+preserves visual stability,
+but it means a buffer can contain old original nodes next to newly
+rendered override-substituted nodes after save.
+
+That may be acceptable, but it needs a name and a rule:
+*** TODO Is the old original still editable as itself?
+Yes
+*** TODO Does saving again keep editing the original?
+Yes
+*** TODO Does closing and then reopening normalize it?
+Yes. If you kill the buffer and request it again,
+its state before the new request is forgotten.
+The root may or may not be overridden,
+depending on what the user asked for,
+but everything in its recursive content will use override substitution.
+*** TODO Does rerender-all normalize the buffer to current override policy?
+What is rerender-all?
+** View-local order for read-only sets needs storage in ViewState
+You clarified that read-only set order persists for that viewnode
+inside the Emacs/Rust viewtree,
+not on disk and not across buffers.
+
+That implies the server must preserve the user's current order through
+save completion and collateral rerender for that specific open view.
+If the view is reconstructed from graph data alone, the order is lost.
+
+The plan should identify where this view-local order lives:
+- only in the parsed buffer during the save pipeline,
+- in 'ViewState',
+- or in some per-view generated-collection ordering cache.
+
+This matters most for collateral rerenders of other buffers:
+their read-only set order should stay independent.
+*** TODO
+It's only in things we have already implemented:
+It's in the Emacs buffer (as ordinary text), and it's in ViewState.
+** 'parentIs=collector' needs a role-direction table
+Adding 'parentIs=collector' is a good fix,
+but it needs a small table mapping scaffold kind to graph meaning.
+
+*** TODO
+- child N of subscriberCol : N subscribes to N's grandparent. readonly.
+- child N of subscribeeCol : N's grandparent subscribes to N. writeable.
+- child N of overriderCol  : N overrides N's grandparent. readonly.
+- child N of overriddenCol : N's grandparent overrides N. writeable.
+- child N of hiderCol      : N hides N's grandparent. readonly.
+- child N of hiddenCol     : N's grandparent hides N. readonly
+  (use the hide*Col scaffolds under N's grandparent's subscribeeCol instead)
+
+The name does not need to include whether it is readonly,
+because the indef herald will do that job.
+** Writeable and read-only set scaffolds should have parallel names
+The plan now implies paired collections in both directions:
+subscribee/subscriber, overridden/overrider, hides/hider.
+
+Before implementing, choose names that reveal both:
+- the role played by the collection owner,
+- the role played by the children,
+- whether the collection is writable or generated read-only.
+
+For instance, 'overriddenCol' is writable because its owner is the
+overrider and its children are overridden nodes.
+But 'overriderCol' is read-only because its owner is the overridden
+node and its children are inbound overriders.
+
+This distinction should be made systematic across all relation
+collections.
+*** TODO see previous response
+** Filtering inactive sources before SaveNode may hide invalid active edits
+The proposed guard:
+while using a source-set, no SaveNode instructions can modify an
+inactive source
+is good, but not sufficient by itself.
+
+A visible active node can have a writable relationship list that
+contains omitted inactive targets.
+The SaveNode is for the active source,
+but a naive Specified list could still delete inactive relationship
+targets from that active node's file.
+
+So the guard needs two layers:
+- no instruction writes an inactive node's file,
+- active-node relationship fields preserve inactive targets that were
+  omitted from the restricted view.
+*** TODO yes, with the exception of content
+We handled the content case while implementing source-sets:
+Users can actually delete or insert content from inactive sources
+in active containers. That was because content's order
+makes the alternative hard.
+** A warnings channel affects more endpoints than save
+You decided to add a warnings channel for save.
+The same ambiguity exists in:
+- single-root content view responses,
+- rerender-all done responses,
+- diff-analysis responses,
+- search enrichment if it ever reports partial failures.
+
+The plan can still start with save,
+but it should either define warnings only for save-result,
+or deliberately update the shared response helper format.
+Otherwise server helpers like 'format_buffer_response_sexp' will keep
+encoding warning-like messages as 'errors'.
+*** TODO let's extend it to all of them
+** Source-set plus diff-mode policy should define current-state transition
+The new policy is "refuse, refuse":
+- refuse toggling diff mode unless active source-set is 'all',
+- refuse switching away from 'all' while diff mode is enabled.
+
+The plan should also say what happens if config default_source_set is
+not 'all' and the user starts a server/client session:
+diff mode is simply off, so that is fine.
+
+But if source-set changes close all Skg buffers,
+the refusal should happen before closing buffers.
+Otherwise a failed source-set switch could still destroy view state.
+*** TODO agreed
+** Role rename has broad code impact beyond schema.tql
+Changing 'replacement/replaced' to 'overrider/overridden' is good,
+but the plan should list all layers that need to change together:
+- schema.tql,
+- TypeDB relationship creation constants,
+- TypeDB search helpers,
+- merge tests and fixture comments,
+- diff analysis relationship labels,
+- any user-visible metadata/herald text.
+
+This should be treated as one atomic rename plan,
+because mixed role vocabulary will make TypeQL queries very hard to
+audit.
+*** TODO agreed
