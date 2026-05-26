@@ -1,4 +1,5 @@
 * ONGOING [[./TODO/source-sets.org]]
+* Need text search across paths.
 * critical
 ** I can't demo without privacy mode.
 The backlinks from skg itself contains unsafe references.
