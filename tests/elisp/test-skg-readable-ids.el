@@ -14,6 +14,12 @@
 (defconst test-skg-readable-ids--id-b
   "22222222-2222-4222-8222-222222222222")
 
+(defconst test-skg-readable-ids--id-inactive
+  "33333333-3333-4333-8333-333333333333")
+
+(defconst test-skg-readable-ids--id-active
+  "44444444-4444-4444-8444-444444444444")
+
 (defun test-skg-readable-ids--titles-payload (id title)
   (format "((response-type titles-by-ids) (content ((%S . %S))))"
           id title))
@@ -21,10 +27,29 @@
 (defun test-skg-readable-ids--after-string-count ()
   (let ((count 0))
     (dolist (ov (overlays-in (point-min) (point-max)))
+	    (when (and (overlay-get ov 'skg-magit-title)
+	               (overlay-get ov 'after-string))
+	        (setq count (1+ count))))
+	    count))
+
+(defun test-skg-readable-ids--display-count ()
+  (let ((count 0))
+    (dolist (ov (overlays-in (point-min) (point-max)))
       (when (and (overlay-get ov 'skg-magit-title)
-                 (overlay-get ov 'after-string))
+                 (overlay-get ov 'display))
         (setq count (1+ count))))
     count))
+
+(defun test-skg-readable-ids--after-string-count-at-id (id)
+  (save-excursion
+    (goto-char (point-min))
+    (let ((count 0))
+      (while (search-forward id nil t)
+        (dolist (ov (overlays-in (match-beginning 0) (match-end 0)))
+          (when (and (overlay-get ov 'skg-magit-title)
+                     (overlay-get ov 'after-string))
+            (setq count (1+ count)))))
+      count)))
 
 (ert-deftest test-skg-readable-ids-later-response-survives-earlier-response ()
   (let ((skg-response-handler-map nil)
@@ -64,4 +89,34 @@
          (test-skg-readable-ids--titles-payload
           test-skg-readable-ids--id-b
           "Title B"))
-        (should (= 1 (test-skg-readable-ids--after-string-count)))) )))
+	        (should (= 1 (test-skg-readable-ids--after-string-count)))) )))
+
+(ert-deftest test-skg-readable-ids-shortens-inactive-ids-without-title-overlay ()
+  (let ((skg-response-handler-map nil)
+        (skg-lp--pending-count 0)
+        (skg-lp--buf (unibyte-string))
+        (skg-lp--bytes-left nil)
+        (skg-readable-ids--pending-title-requests nil))
+    (with-temp-buffer
+      (cl-letf (((symbol-function 'skg-tcp-connect-to-rust)
+                 (lambda () 'fake-proc))
+                ((symbol-function 'process-send-string)
+                 (lambda (_proc _string) nil)))
+        (insert
+         (format
+          "* (skg (inactiveNode (id %s) (source private))) node from inactive source\n* (skg (node (id %s) (source public))) active\n"
+          test-skg-readable-ids--id-inactive
+          test-skg-readable-ids--id-active))
+        (setq skg-readable-ids--generation 0)
+        (skg-readable-ids--annotate-buffer)
+        (should (= 2 (test-skg-readable-ids--display-count)))
+        (skg-lp--dispatch-by-type
+         nil
+         (test-skg-readable-ids--titles-payload
+          test-skg-readable-ids--id-active
+          "Active Title"))
+        (should (= 1 (test-skg-readable-ids--after-string-count)))
+        (should (= 0 (test-skg-readable-ids--after-string-count-at-id
+                      test-skg-readable-ids--id-inactive)))
+        (should (= 1 (test-skg-readable-ids--after-string-count-at-id
+                      test-skg-readable-ids--id-active)))))))

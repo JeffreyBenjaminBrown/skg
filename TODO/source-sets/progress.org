@@ -52,11 +52,13 @@
   for content views, rerenders, and search enrichment.
 - Remaining TypeDB fallback graphStats leakage is documented with a
   precise =PITFALL | TODO= comment.
+- Readable-ID mode shortens inactive IDs uniformly while title overlays
+  only appear for IDs returned by source-set-filtered title lookup.
+- Readable-ID tests cover inactive placeholder IDs, inactive-source IDs
+  omitted from title responses, and active IDs still receiving title
+  annotations.
 
 * pending
-- Ensure readable-ID mode shortens inactive IDs but does not title-annotate
-  inactive-source IDs or inactive placeholder metadata.
-- Add readable-ID tests for inactive placeholders and inactive-source IDs.
 - Add source-set switch integration coverage, including buffer closure and
   stale enrichment cancellation.
 - Add end-to-end integration coverage for restricted-source search and save.
