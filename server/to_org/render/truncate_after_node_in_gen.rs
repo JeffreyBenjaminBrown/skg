@@ -2,8 +2,9 @@ use crate::to_org::util::{
   DefinitiveMap,
   get_id_from_treenode,
   makeIndefinitiveAndClobber,
-  make_and_append_child_pair,
+  make_and_append_child_pair_with_source_set,
   nodes_after_in_generation };
+use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::ViewNode;
 
@@ -28,6 +29,7 @@ pub async fn add_last_generation_and_truncate_some_of_previous (
   visited        : &mut DefinitiveMap,
   config         : &SkgConfig,
   driver         : &TypeDBDriver,
+  active         : Option<&ActiveSourceSet>,
 ) -> Result < (), Box<dyn Error> > {
   if space_left < 1 { // shouldn't happen
     return Ok (( )); }
@@ -41,10 +43,12 @@ pub async fn add_last_generation_and_truncate_some_of_previous (
            *parent_treeid != limit_parent_treeid ) // in new sibling group
       { break; }
       else {
-        let new_treeid : NodeId =
-          make_and_append_child_pair (
-            tree, *parent_treeid, child_skgid, config, driver ) . await ?;
-        makeIndefinitiveAndClobber ( tree, new_treeid, config ) ?; }}
+        let (new_treeid, should_make_indefinitive) =
+          make_and_append_child_pair_with_source_set (
+            tree, *parent_treeid,
+            child_skgid, config, driver, active ) . await ?;
+        if should_make_indefinitive {
+          makeIndefinitiveAndClobber ( tree, new_treeid, config ) ?; }}}
   truncate_after_node_in_generation_in_tree (
     tree, generation - 1, limit_parent_treeid,
     effective_root, visited, config ) ?;

@@ -15,7 +15,9 @@ use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids;
 use crate::types::git::SourceDiff;
 use crate::org_to_text::viewforest_to_string;
 use crate::to_org::render::diff::apply_diff_to_viewforest;
-use crate::to_org::render::initial_bfs::render_initial_viewforest_bfs;
+use crate::to_org::render::initial_bfs::{
+  render_initial_viewforest_bfs,
+  render_initial_viewforest_bfs_with_source_set};
 use crate::to_org::util::mark_view_roots_parent_absent;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
@@ -53,11 +55,31 @@ pub async fn multi_root_view (
   diff_mode_enabled : bool,
 ) -> Result < (String, Vec<ID>, Tree<ViewNode>),
               Box<dyn Error> > {
+  multi_root_view_inner (
+    driver, config, tantivy_index, root_ids,
+    diff_mode_enabled, None ) . await
+}
+
+async fn multi_root_view_inner (
+  driver            : &TypeDBDriver,
+  config            : &SkgConfig,
+  tantivy_index     : Option<&TantivyIndex>,
+  root_ids          : &[ID],
+  diff_mode_enabled : bool,
+  active_source_set : Option<&ActiveSourceSet>,
+) -> Result < (String, Vec<ID>, Tree<ViewNode>),
+              Box<dyn Error> > {
   let mut viewforest : Tree<ViewNode> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "render_initial_viewforest_bfs" ). entered();
-      render_initial_viewforest_bfs (
-        root_ids, config, driver ) . await } ?;
+      match active_source_set {
+        Some (active) =>
+          render_initial_viewforest_bfs_with_source_set (
+            root_ids, config, driver, active ) . await,
+        None =>
+          render_initial_viewforest_bfs (
+            root_ids, config, driver ) . await,
+      }} ?;
   if diff_mode_enabled {
     let source_diffs : HashMap<SourceName, SourceDiff> =
       compute_diff_for_every_source (config);
@@ -106,9 +128,9 @@ pub async fn multi_root_view_with_source_set (
               Box<dyn Error> > {
   let ( _buffer_content, pids, mut viewforest )
     : (String, Vec<ID>, Tree<ViewNode>) =
-    multi_root_view (
+    multi_root_view_inner (
       driver, config, tantivy_index, root_ids,
-      diff_mode_enabled ) . await ?;
+      diff_mode_enabled, Some (active_source_set) ) . await ?;
   let buffer_content : String =
     render_viewforest_with_source_set (
       &mut viewforest, config, active_source_set ) ?;

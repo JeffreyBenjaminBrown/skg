@@ -34,10 +34,11 @@
 - Inactive-placeholder source-set save coverage now uses the real
   =buffer_to_validated_saveplan= pipeline instead of a helper-only string
   scanner.
+- Initial content views under restricted source-sets build inactive child
+  placeholders during BFS and do not enqueue inactive subtrees for
+  traversal.
 
 * pending
-- Thread active source-set filtering into initial content traversal instead
-  of rendering inactive subtrees and replacing them after the fact.
 - Thread active source-set filtering into content completion/rerender paths.
 - Thread active source-set filtering into sourceward and containerward
   expansion paths.

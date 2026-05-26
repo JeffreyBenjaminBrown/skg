@@ -88,7 +88,7 @@ fn content_view_renders_inactive_contained_nodes_as_placeholders (
         ActiveSourceSet::named (
           &config,
           SourceSetName::from ("public"))?;
-      let (actual, _pids, _viewforest) : (String, Vec<ID>, Tree<ViewNode>) =
+      let (actual, pids, _viewforest) : (String, Vec<ID>, Tree<ViewNode>) =
         multi_root_view_with_source_set (
           driver, config, None,
           &[ID::from ("root")],
@@ -104,6 +104,11 @@ fn content_view_renders_inactive_contained_nodes_as_placeholders (
         ! actual . contains ("private title must not leak"),
         "inactive placeholder must not reveal title: {}",
         actual );
+      assert! (
+        ! pids . contains (&ID::from ("private-a")),
+        "initial content traversal should not render inactive-source \
+         children as TrueNodes: {:?}",
+        pids );
       Ok (( )) } )) }
 
 #[test]

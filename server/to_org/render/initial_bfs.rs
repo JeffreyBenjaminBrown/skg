@@ -17,8 +17,9 @@
 /// Then navigate up to L's parent P,
 /// and re-render as indefinitive every node in P's generation after P.
 
-use crate::to_org::util::{stub_viewforest_from_root_ids, content_ids_if_definitive_else_empty, build_node_branch_minus_content, DefinitiveMap};
+use crate::to_org::util::{stub_viewforest_from_root_ids, content_ids_if_definitive_else_empty, build_node_branch_minus_content_with_source_set, DefinitiveMap};
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
+use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{SkgConfig, ID};
 use crate::types::viewnode::ViewNode;
 
@@ -34,6 +35,26 @@ pub async fn render_initial_viewforest_bfs (
   root_ids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
+) -> Result < Tree<ViewNode>, Box<dyn Error> > {
+  render_initial_viewforest_bfs_inner (
+    root_ids, config, driver, None ) . await
+}
+
+pub async fn render_initial_viewforest_bfs_with_source_set (
+  root_ids : &[ID],
+  config   : &SkgConfig,
+  driver   : &TypeDBDriver,
+  active   : &ActiveSourceSet,
+) -> Result < Tree<ViewNode>, Box<dyn Error> > {
+  render_initial_viewforest_bfs_inner (
+    root_ids, config, driver, Some (active) ) . await
+}
+
+async fn render_initial_viewforest_bfs_inner (
+  root_ids : &[ID],
+  config   : &SkgConfig,
+  driver   : &TypeDBDriver,
+  active   : Option<&ActiveSourceSet>,
 ) -> Result < Tree<ViewNode>, Box<dyn Error> > {
   let mut visited : DefinitiveMap = DefinitiveMap::new();
   let mut viewforest : Tree<ViewNode> =
@@ -56,6 +77,7 @@ pub async fn render_initial_viewforest_bfs (
     &mut visited,
     config,
     driver,
+    active,
   ) . await ?;
   Ok (viewforest) }
 
@@ -70,6 +92,7 @@ fn render_generation_and_recurse<'a> (
   visited        : &'a mut DefinitiveMap,
   config         : &'a SkgConfig,
   driver         : &'a TypeDBDriver,
+  active         : Option<&'a ActiveSourceSet>,
 ) -> Pin<Box<dyn Future<
     Output = Result<(), Box<dyn Error>>> + 'a>> {
   Box::pin ( async move {
@@ -88,18 +111,19 @@ fn render_generation_and_recurse<'a> (
               "add_children", gen = gen_int + 1, count = next_gen_count
             ). entered();
           add_children_and_collect_their_ids (
-            viewforest, parent_child_rels_to_add, visited, config, driver
+            viewforest, parent_child_rels_to_add, visited, config, driver,
+            active
         ) . await } ?;
       render_generation_and_recurse (
         viewforest, next_gen, gen_int + 1,
         rendered_count, limit, effective_root,
-        visited, config, driver,
+        visited, config, driver, active,
       ) . await }
     else {
       add_last_generation_and_truncate_some_of_previous (
         viewforest, gen_int + 1, &parent_child_rels_to_add,
         limit - rendered_count, effective_root,
-        visited, config, driver,
+        visited, config, driver, active,
       ) . await ?;
       return Ok(( )); }
   } ) }
@@ -112,13 +136,16 @@ async fn add_children_and_collect_their_ids (
   visited     : &mut DefinitiveMap,
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
+  active      : Option<&ActiveSourceSet>,
 ) -> Result < Vec < NodeId >, Box<dyn Error> > {
   let mut child_treeids : Vec < NodeId > = Vec::new ();
   for (parent_treeid, child_skgid) in rels_to_add {
-    let child_treeid : NodeId = build_node_branch_minus_content (
+    let (child_treeid, should_recurse) =
+      build_node_branch_minus_content_with_source_set (
       Some ( (&mut *viewforest, parent_treeid) ),
-      &child_skgid, config, driver, visited ) . await ?;
-    child_treeids . push (child_treeid); }
+      &child_skgid, config, driver, visited, active ) . await ?;
+    if should_recurse {
+      child_treeids . push (child_treeid); }}
   Ok (child_treeids) }
 
 /// Collect all children IDs

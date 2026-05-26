@@ -242,7 +242,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
       let space_left : usize = limit - nodes_rendered;
       add_last_generation_and_truncate_some_of_previous (
         tree, generation, &gen_with_children,
-        space_left, effective_root, visited, config, driver ) . await ?;
+        space_left, effective_root, visited, config, driver, None ) . await ?;
       return Ok (( )); }
     let mut next_gen : Vec < (NodeId, ID) > = Vec::new ();
     for (parent_treeid, child_skgid) in gen_with_children {

@@ -1,8 +1,11 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::typedb::search::pid_and_source_from_id;
+use crate::source_sets::ActiveSourceSet;
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
+use crate::types::env::find_source_with_optional_tantivy;
+use crate::types::git::MembershipAxes;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
@@ -10,7 +13,7 @@ use crate::types::tree::generations::collect_generation_ids;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_nodecomplete::{pid_and_source_from_treenode, write_at_truenode_in_tree};
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, ParentIs, TrueNode, viewforest_root_viewnode, mk_definitive_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, ParentIs, TrueNode, viewforest_root_viewnode, mk_definitive_viewnode, mk_inactive_viewnode, mk_unknown_viewnode };
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use ego_tree::iter::Edge;
@@ -417,6 +420,38 @@ pub async fn make_and_append_child_pair (
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (child_treeid) }
 
+pub async fn make_and_append_child_pair_with_source_set (
+  tree          : &mut Tree<ViewNode>,
+  parent_treeid : NodeId,
+  child_skgid   : &ID,
+  config        : &SkgConfig,
+  driver        : &TypeDBDriver,
+  active        : Option<&ActiveSourceSet>,
+) -> Result < (NodeId, bool), Box<dyn Error> > {
+  if let Some (active) = active {
+    if ! active . is_all () {
+      let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
+        HashMap::new ();
+      if let Some (source) =
+        find_source_with_optional_tantivy (
+          child_skgid, &deleted_since_head_pid_src_map, None, config )
+      {
+        if ! active . contains_source (&source) {
+          let inactive : ViewNode =
+            mk_inactive_viewnode (
+              child_skgid . clone (), source, MembershipAxes::default () );
+          let child_treeid : NodeId =
+            with_node_mut (
+              tree, parent_treeid,
+              ( |mut parent_mut|
+                parent_mut . append (inactive) . id () ))
+            . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+          return Ok ((child_treeid, false)); }}}}
+  let child_treeid : NodeId =
+    make_and_append_child_pair (
+      tree, parent_treeid, child_skgid, config, driver ) . await ?;
+  Ok ((child_treeid, true)) }
+
 /// Builds a node from disk, place it in a tree,
 /// complete the branch it implies except for 'content' descendents,
 /// and return the NodeId of the branch root.
@@ -480,6 +515,44 @@ pub async fn build_node_branch_minus_content (
                  format! ("build_node_branch_minus_content({})", skgid),
                  t0 . elapsed () . as_secs_f64());
   result }
+
+pub async fn build_node_branch_minus_content_with_source_set (
+  tree_and_parent : Option<(&mut Tree<ViewNode>, NodeId)>,
+  skgid           : &ID,
+  config          : &SkgConfig,
+  driver          : &TypeDBDriver,
+  visited         : &mut DefinitiveMap,
+  active          : Option<&ActiveSourceSet>,
+) -> Result < (NodeId, bool), Box<dyn Error> > {
+  if let Some (active) = active {
+    if ! active . is_all () {
+      let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
+        HashMap::new ();
+      if let Some (source) =
+        find_source_with_optional_tantivy (
+          skgid, &deleted_since_head_pid_src_map, None, config )
+      {
+        if ! active . contains_source (&source) {
+          let inactive : ViewNode =
+            mk_inactive_viewnode (
+              skgid . clone (), source, MembershipAxes::default () );
+          let node_id : NodeId =
+            match tree_and_parent {
+              Some ((tree, parent_treeid)) =>
+                with_node_mut (
+                  tree, parent_treeid,
+                  ( |mut parent_mut|
+                    parent_mut . append (inactive) . id () ))
+                . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
+              None =>
+                return Err (
+                  "build_node_branch_minus_content_with_source_set: inactive root"
+                  . into () ) };
+          return Ok ((node_id, false)); }}}}
+  let node_id : NodeId =
+    build_node_branch_minus_content (
+      tree_and_parent, skgid, config, driver, visited ) . await ?;
+  Ok ((node_id, true)) }
 
 /// Collect content child IDs from a node.
 /// Returns empty vec if the node is indefinitive or has no NodeComplete.

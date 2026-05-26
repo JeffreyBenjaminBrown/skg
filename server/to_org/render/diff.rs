@@ -174,16 +174,21 @@ fn mark_membership_on_existing_children (
   for child_id in child_ids {
     let mut child : NodeMut<ViewNode> =
       node_mut . tree() . get_mut (child_id) . unwrap();
-    if let ViewNodeKind::True ( ref mut t ) = child . value() . kind {
-      if let Some (m) = by_id . get ( &t . id ) {
+    let child_id_and_membership : Option<(ID, &mut MembershipAxes)> =
+      match &mut child . value() . kind {
+        ViewNodeKind::True (t) =>
+          Some ((t . id . clone (), &mut t . membership)),
+        ViewNodeKind::Inactive (i) =>
+          Some ((i . id . clone (), &mut i . membership)),
+        _ => None };
+    if let Some ((id, membership)) = child_id_and_membership {
+      if let Some (m) = by_id . get (&id) {
         // Only Plus signs are meaningful here (the child appears in
-        // worktree.contains; if a stage shows '-' that would imply the
-        // child *was* there in some baseline but isn't in the worktree,
-        // which would make it a phantom -- handled separately).
+        // worktree.contains; '-' positions are phantoms, handled separately).
         if m . staged   == Some (Sign::Plus)
-          { t . membership . staged   = Some (Sign::Plus); }
+          { membership . staged   = Some (Sign::Plus); }
         if m . unstaged == Some (Sign::Plus)
-          { t . membership . unstaged = Some (Sign::Plus); } } } } }
+          { membership . unstaged = Some (Sign::Plus); }}}} }
 
 /// Insert phantoms for IDs that appear in the merged contains diff with
 /// any '-' (Removed) sign on any stage. These are positions missing
