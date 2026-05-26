@@ -5,9 +5,11 @@
 // exists, and should fail until that feature is wired in.
 
 use indoc::indoc;
-use ego_tree::Tree;
+use ego_tree::{NodeId, Tree};
 
+use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::dbs::filesystem::not_nodes::load_config;
+use skg::dbs::typedb::ancestry::AncestryTree;
 use skg::source_sets::{
   ActiveSourceSet,
   SourceSetName,
@@ -15,15 +17,23 @@ use skg::source_sets::{
   filter_branches_to_active_sources_for_test,
   run_with_source_set_test_db};
 use skg::from_text::buffer_to_validated_saveplan;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::org_to_text::viewforest_to_string;
+use skg::to_org::expand::backpath::{
+  build_and_integrate_containerward_path_with_source_set,
+  integrate_path_that_might_fork_or_cycle_with_source_set};
 use skg::to_org::render::content_view::multi_root_view_with_source_set;
+use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::errors::SaveError;
-use skg::types::misc::{ID, SourceName};
+use skg::types::misc::{ID, MSV, SourceName};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode};
-use skg::types::viewnode::ViewNode;
+use skg::types::viewnode::{ParentIs, ViewNode, ViewNodeKind};
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
+use std::fs;
+use std::path::Path;
 
 fn save_ids (
   instructions : &[DefineNode],
@@ -42,6 +52,28 @@ fn saved_node_by_id<'a> (
       if node . pid == ID::from (id) {
         return node; }}}
   panic! ("SaveNode not found: {}", id) }
+
+fn viewforest_from_org (
+  input : &str,
+) -> Result<Tree<ViewNode>, Box<dyn Error>> {
+  let unchecked_viewforest =
+    org_to_uninterpreted_nodes (input)? . 0;
+  Ok ( maybePlaced_to_placed_tree (unchecked_viewforest)? ) }
+
+fn first_child_id (
+  tree : &Tree<ViewNode>,
+) -> NodeId {
+  tree . root () . first_child () . unwrap () . id () }
+
+fn true_child_ids (
+  tree      : &Tree<ViewNode>,
+  parent_id : NodeId,
+) -> BTreeSet<ID> {
+  tree . get (parent_id) . unwrap () . children ()
+    . filter_map ( |child| match &child . value () . kind {
+      ViewNodeKind::True (node) => Some (node . id . clone ()),
+      _ => None, })
+    . collect () }
 
 #[test]
 fn config_loads_default_source_set_and_named_source_sets (
@@ -289,6 +321,185 @@ fn backward_path_filters_forks_per_branch_and_omits_empty_forks (
       &config, &active, inactive_branches)?
     . is_empty (),
     "fully inactive forks should not render an empty fork scaffold" );
+  Ok (( )) }
+
+#[test]
+fn containerward_expansion_truncates_before_inactive_container (
+) -> Result<(), Box<dyn Error>> {
+  run_with_source_set_test_db (
+    "skg-test-source-sets-containerward-truncation",
+    "tests/source_sets/fixtures/skgconfig.toml",
+    "/tmp/tantivy-test-source-sets-containerward-truncation",
+    |config, driver, _tantivy| Box::pin ( async move {
+      let active : ActiveSourceSet =
+        ActiveSourceSet::named (
+          &config,
+          SourceSetName::from ("public"))?;
+      let mut viewforest : Tree<ViewNode> =
+        viewforest_from_org (indoc! {"
+          * (skg (node (id child-for-backpath) (source public))) child-for-backpath
+        "})?;
+      let child_id : NodeId = first_child_id (&viewforest);
+      build_and_integrate_containerward_path_with_source_set (
+        &mut viewforest,
+        child_id,
+        config,
+        driver,
+        Some (&active)) . await ?;
+      let child_children : BTreeSet<ID> =
+        true_child_ids (&viewforest, child_id);
+      assert_eq! (
+        child_children,
+        BTreeSet::from ([ID::from ("active-container")]),
+        "containerward expansion should keep the active prefix and \
+         truncate before the inactive container" );
+      let rendered : String =
+        viewforest_to_string (&viewforest, config)?;
+      assert! (
+        ! rendered . contains ("private-container"),
+        "inactive container should not render as a placeholder or \
+         TrueNode: {}",
+        rendered );
+      assert! (
+        ! rendered . contains ("active-root-after-private"),
+        "nodes beyond the first inactive container should be unreachable: {}",
+        rendered );
+      Ok (( )) } )) }
+
+#[test]
+fn sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
+) -> Result<(), Box<dyn Error>> {
+  run_with_source_set_test_db (
+    "skg-test-source-sets-sourceward-fork-truncation",
+    "tests/source_sets/fixtures/skgconfig.toml",
+    "/tmp/tantivy-test-source-sets-sourceward-fork-truncation",
+    |config, driver, _tantivy| Box::pin ( async move {
+      let active : ActiveSourceSet =
+        ActiveSourceSet::named (
+          &config,
+          SourceSetName::from ("public"))?;
+      let mut viewforest : Tree<ViewNode> =
+        viewforest_from_org (indoc! {"
+          * (skg (node (id child-with-fork) (source public))) child-with-fork
+        "})?;
+      let child_id : NodeId = first_child_id (&viewforest);
+      integrate_path_that_might_fork_or_cycle_with_source_set (
+        &mut viewforest,
+        child_id,
+        Vec::new (),
+        HashSet::from ([
+          ID::from ("active-fork-branch"),
+          ID::from ("private-fork-branch"),
+          ID::from ("private-other-branch")]),
+        HashSet::new (),
+        config,
+        driver,
+        ParentIs::LinkTarget,
+        Some (&active)) . await ?;
+      assert_eq! (
+        true_child_ids (&viewforest, child_id),
+        BTreeSet::from ([ID::from ("active-fork-branch")]),
+        "sourceward fork expansion should retain active branches \
+         independently and omit inactive branches" );
+
+      let mut empty_fork_viewforest : Tree<ViewNode> =
+        viewforest_from_org (indoc! {"
+          * (skg (node (id child-with-fork) (source public))) child-with-fork
+        "})?;
+      let empty_fork_child_id : NodeId =
+        first_child_id (&empty_fork_viewforest);
+      integrate_path_that_might_fork_or_cycle_with_source_set (
+        &mut empty_fork_viewforest,
+        empty_fork_child_id,
+        Vec::new (),
+        HashSet::from ([
+          ID::from ("private-fork-branch"),
+          ID::from ("private-other-branch")]),
+        HashSet::new (),
+        config,
+        driver,
+        ParentIs::LinkTarget,
+        Some (&active)) . await ?;
+      assert! (
+        true_child_ids (&empty_fork_viewforest, empty_fork_child_id)
+        . is_empty (),
+        "all-inactive sourceward forks should not leave children or \
+         empty fork scaffolding" );
+      Ok (( )) } )) }
+
+#[test]
+fn search_enrichment_truncates_ancestry_before_inactive_container (
+) -> Result<(), Box<dyn Error>> {
+  let config =
+    load_config ("tests/source_sets/fixtures/skgconfig.toml")?;
+  let active : ActiveSourceSet =
+    ActiveSourceSet::named (
+      &config,
+      SourceSetName::from ("public"))?;
+  let mut result_node : NodeComplete =
+    skg::types::nodes::complete::empty_node_complete ();
+  result_node . pid = ID::from ("active-search-hit");
+  result_node . title = "active search hit" . to_string ();
+  result_node . source = SourceName::from ("public");
+  result_node . aliases =
+    MSV::Specified (vec!["search term" . to_string ()]);
+  let mut active_container : NodeComplete =
+    skg::types::nodes::complete::empty_node_complete ();
+  active_container . pid = ID::from ("active-container");
+  active_container . title = "active-container" . to_string ();
+  active_container . source = SourceName::from ("public");
+  let mut private_container : NodeComplete =
+    skg::types::nodes::complete::empty_node_complete ();
+  private_container . pid = ID::from ("private-container");
+  private_container . title =
+    "private container title must not leak" . to_string ();
+  private_container . source = SourceName::from ("private");
+  let index_dir : &str =
+    "/tmp/tantivy-test-source-sets-search-enrichment-truncation";
+  let (tantivy, _count) =
+    wipe_then_init_tantivy_db (
+      &[ result_node, active_container, private_container ],
+      Path::new (index_dir))?;
+  let mut matches_by_id =
+    skg::serve::handlers::text_search::MatchGroups::new ();
+  matches_by_id . insert (
+    ID::from ("active-search-hit"),
+    ( SourceName::from ("public"),
+      vec![(1.0, "active search hit" . to_string ())] ));
+  let ancestry_by_id : HashMap<ID, AncestryTree> =
+    HashMap::from ([(
+      ID::from ("active-search-hit"),
+      AncestryTree::Inner (
+        ID::from ("active-search-hit"),
+        vec![AncestryTree::Inner (
+          ID::from ("active-container"),
+          vec![AncestryTree::Root (
+            ID::from ("private-container"))])]))]);
+  let rendered : String =
+    skg::serve::handlers::text_search
+      ::enriched_search_buffer_for_source_set_for_test (
+        "search term",
+        &matches_by_id,
+        &[ID::from ("active-search-hit")],
+        &ancestry_by_id,
+        &tantivy,
+        &config,
+        &active)?;
+  assert! (
+    rendered . contains ("active-container"),
+    "active ancestry should render: {}",
+    rendered );
+  assert! (
+    ! rendered . contains ("private-container"),
+    "inactive enrichment ancestry should be truncated before the \
+     inactive container: {}",
+    rendered );
+  assert! (
+    ! rendered . contains ("private container title must not leak"),
+    "inactive enrichment ancestry must not reveal title text: {}",
+    rendered );
+  if Path::new (index_dir) . exists () {
+    fs::remove_dir_all (index_dir)?; }
   Ok (( )) }
 
 #[test]

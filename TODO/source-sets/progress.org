@@ -45,10 +45,10 @@
 - Sourceward, containerward, and search-enrichment ancestry paths truncate
   before inactive containers/link sources; fork branches are filtered
   independently and all-inactive forks are omitted.
+- Production tests cover containerward truncation, sourceward fork
+  filtering, and search-enrichment ancestry truncation.
 
 * pending
-- Add production tests for sourceward/containerward/search-enrichment
-  truncation rather than only helper tests.
 - Make graphStats source-set-aware where practical.
 - Add precise =PITFALL | TODO= comments for any remaining graphStats or
   herald counts that include inactive nodes.

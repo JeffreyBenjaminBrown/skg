@@ -57,6 +57,26 @@ pub fn search_ids_for_source_set_for_test (
   search_ids_for_source_set_for_test_impl (
     tantivy_index, config, active, terms, limit ) }
 
+pub fn enriched_search_buffer_for_source_set_for_test (
+  terms          : &str,
+  matches_by_id  : &MatchGroups,
+  search_results : &[ID],
+  ancestry_by_id : &HashMap<ID, AncestryTree>,
+  tantivy_index  : &TantivyIndex,
+  config         : &SkgConfig,
+  active         : &ActiveSourceSet,
+) -> Result<String, Box<dyn std::error::Error>> {
+  let (mut viewforest, _ids) : (Tree<ViewNode>, Vec<ID>) =
+    build_search_viewforest (terms, matches_by_id);
+  render_enriched_search_buffer::insert_containerward_ancestries_into_search_view (
+    &mut viewforest,
+    search_results,
+    ancestry_by_id,
+    tantivy_index,
+    config,
+    active );
+  Ok ( viewforest_to_string ( &viewforest, config )? ) }
+
 /// Structured enrichment data passed through the slot,
 /// replacing the raw rendered String.
 pub struct SearchEnrichmentPayload {
