@@ -9,6 +9,7 @@ use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, audit::{audit_in
 use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
+use crate::dbs::typedb::sources::create_all_sources;
 use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::types::env::SkgEnv;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, HeadlineInfo};
@@ -135,6 +136,7 @@ where
       . collect ();
     overwrite_new_empty_typedb_db(db_name, &driver) . await?;
     read_and_use_schema(db_name, &driver) . await?;
+    create_all_sources(db_name, &driver, &config) . await?;
     create_all_nodes(db_name, &driver, &typedb_nodes) . await?;
     create_all_relationships(db_name, &driver, &typedb_nodes) . await?;
     let driver_arc : Arc<TypeDBDriver> = Arc::new (driver);
@@ -274,7 +276,7 @@ pub async fn populate_test_db_from_fixtures (
   db_name: &str,
   driver: &TypeDBDriver
 ) -> Result<(), Box<dyn Error>> {
-  let nodes: Vec<NodeComplete> = {
+  let config : SkgConfig = {
     let mut sources: HashMap<SourceName, SkgfileSource> =
       HashMap::new();
     sources . insert(
@@ -284,12 +286,15 @@ pub async fn populate_test_db_from_fixtures (
         abbreviation: None,
         path: PathBuf::from (data_folder),
         user_owns_it: true, } );
-    read_all_skg_files_from_sources(
-      &SkgConfig::dummyFromSources (sources))? };
+    SkgConfig::dummyFromSources (sources) };
+  let nodes: Vec<NodeComplete> =
+    read_all_skg_files_from_sources (&config)?;
   overwrite_new_empty_typedb_db (
     db_name, driver ) . await ?;
   read_and_use_schema (
     db_name, driver ) . await?;
+  create_all_sources (
+    db_name, driver, &config ) . await ?;
   let typedb_nodes : Vec<NodeTypedb> =
     nodes . iter ()
     . map (NodeTypedb::from_complete_parsing_textlinks)

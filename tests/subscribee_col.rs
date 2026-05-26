@@ -6,6 +6,7 @@ use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
+use skg::dbs::typedb::sources::create_all_sources;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID};
 
@@ -36,6 +37,7 @@ async fn setup_multi_source_test(
     . collect ();
   overwrite_new_empty_typedb_db(db_name, &driver) . await?;
   read_and_use_schema(db_name, &driver) . await?;
+  create_all_sources(db_name, &driver, &config) . await?;
   create_all_nodes(db_name, &driver, &typedb_nodes) . await?;
   create_all_relationships(db_name, &driver, &typedb_nodes) . await?;
   Ok((config, driver)) }

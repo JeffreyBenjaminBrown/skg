@@ -16,12 +16,17 @@ use ego_tree::Tree;
 use skg::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use skg::dbs::typedb::relationships::delete_out_links;
 use skg::dbs::typedb::search::pid_and_source_from_id;
+use skg::dbs::typedb::sources::{
+  node_source_relation_count,
+  source_name_for_node_ids,
+  source_ownership_for_node_ids,
+};
 use skg::dbs::typedb::util::ConceptRowStream;
 use skg::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::{run_with_test_db, run_with_test_db_from_config};
 use skg::to_org::render::content_view::single_root_view;
-use skg::types::misc::{ID, SkgConfig};
+use skg::types::misc::{ID, SkgConfig, SourceName};
 
 use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
@@ -81,6 +86,17 @@ fn test_typedb_delete_out_links (
     |config, driver, _tantivy| Box::pin ( async move {
       test_delete_out_links_contains_container (
         & config . db_name, driver ) . await ?;
+      Ok (( )) } ) ) }
+
+#[test]
+fn test_typedb_source_entities_and_node_sources (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db_from_config (
+    "skg-test-typedb-source-entities",
+    "tests/save/validate_foreign_nodes/skgconfig.toml",
+    |config, driver| Box::pin ( async move {
+      test_source_entities_and_node_sources (
+        &config . db_name, driver ) . await ?;
       Ok (( )) } ) ) }
 
 async fn test_all_relationships (
@@ -327,6 +343,95 @@ async fn test_create_only_nodes_with_no_ids_present (
     "NodeComplete count should increase by exactly 1 (only 'new' was created)." );
 
   Ok ( () ) }
+
+async fn test_source_entities_and_node_sources (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
+  let source_rows : HashSet<(String, String)> =
+    collect_source_entities (db_name, driver) . await ?;
+  let expected_sources : HashSet<(String, String)> =
+    [ ("main" . to_string (), "true" . to_string ()),
+      ("foreign" . to_string (), "false" . to_string ()) ]
+    . into_iter ()
+    . collect ();
+  assert_eq! (source_rows, expected_sources);
+
+  let relation_counts =
+    node_source_relation_count (db_name, driver) . await ?;
+  assert_eq! (
+    relation_counts . values () . filter ( |count| **count != 1 ) . count (),
+    0,
+    "Every node should have exactly one has_source relation: {:?}",
+    relation_counts );
+  assert_eq! (relation_counts . len (), 7);
+
+  let source_names =
+    source_name_for_node_ids (
+      db_name, driver,
+      &[ID::from ("node1"), ID::from ("foreign1"), ID::from ("absent")]
+    ) . await ?;
+  assert_eq! (
+    source_names . get (&ID::from ("node1")),
+    Some (&SourceName::from ("main")) );
+  assert_eq! (
+    source_names . get (&ID::from ("foreign1")),
+    Some (&SourceName::from ("foreign")) );
+  assert! ( ! source_names . contains_key (&ID::from ("absent")) );
+
+  let ownership =
+    source_ownership_for_node_ids (
+      db_name, driver,
+      &[ID::from ("node1"), ID::from ("foreign1"), ID::from ("absent")]
+    ) . await ?;
+  assert_eq! (ownership . get (&ID::from ("node1")), Some (&true));
+  assert_eq! (ownership . get (&ID::from ("foreign1")), Some (&false));
+  assert! ( ! ownership . contains_key (&ID::from ("absent")) );
+
+  let schema : String =
+    std::fs::read_to_string ("schema.tql") ?;
+  assert! (
+    ! schema . contains ("attribute source,"),
+    "TypeDB schema should not define the old node string source attribute" );
+
+  Ok (( )) }
+
+async fn collect_source_entities (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+) -> Result<HashSet<(String, String)>, Box<dyn Error>> {
+  let tx : Transaction =
+    driver . transaction (
+      db_name, TransactionType::Read ) . await ?;
+  let answer : QueryAnswer =
+    tx . query (
+      r#"match
+           $src isa source,
+             has source_name $source_name,
+             has user_owns_it $owned;
+         select $source_name, $owned;"# ) . await ?;
+  let mut stream : ConceptRowStream = answer . into_rows ();
+  let mut rows : HashSet<(String, String)> = HashSet::new ();
+  while let Some (row_result) = stream . next () . await {
+    let row : ConceptRow = row_result ?;
+    let source_name : String =
+      row . get ("source_name")?
+      . map ( |c| extract_payload_from_typedb_string_rep (
+        &c . to_string () ))
+      . unwrap_or_default ();
+    let owned : String =
+      row . get ("owned")?
+      . map ( |c| {
+        if c . to_string () . contains ("true") {
+          "true" . to_string ()
+        } else {
+          "false" . to_string ()
+        }
+      } )
+      . unwrap_or_default ();
+    rows . insert ((source_name, owned));
+  }
+  Ok (rows) }
 
 /// Helper: count all `node` entities in the DB by streaming rows.
 /// (Avoids reliance on `count;` semantics.)

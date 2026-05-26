@@ -89,8 +89,75 @@ The plan now includes the wider TypeDB query migration, source-move
 updates, direct test-helper setup changes, config-change rebuild
 guard, and tests proving that TypeDB nodes no longer own the old
 string 'source' attribute.
+*** implemented
+Changed the TypeDB schema so configured sources are first-class
+'source' entities with:
+- 'source_name',
+- 'user_owns_it'.
+
+Removed the node-owned TypeDB string 'source' attribute.  Nodes now
+belong to sources through 'has_source', with the node role constrained
+to exactly one source:
+#+begin_example
+plays has_source:node @card(1)
+#+end_example
+
+Added TypeDB source helpers for creating source entities, replacing a
+node's source relation, querying node source names and ownership, and
+counting node-source relations for tests.
+
+Updated TypeDB initialization and direct test setup paths to create
+source entities before creating nodes.  Node insertion now creates the
+node and its 'has_source' relation in the same transaction.
+
+Rewrote 'pid_and_source_from_id' to recover source names through
+'has_source'.  Source moves now update the 'has_source' relation
+instead of a node attribute.
+
+Updated the TypeDB/in-Rust graph audit to compare source membership
+through 'has_source'.
+
+Added the startup incremental-init guard for config changes: a running
+server does not poll 'skgconfig.toml', but on restart a config mtime
+newer than '.skg_init_marker' prevents incremental init.
+
+Collapsed the source-move TypeDB helper surface back to one public
+function, 'update_node_source'.  The implementation still updates the
+'has_source' relation, but the temporary
+'replace_node_source_relation' name is gone.
+*** tested
+Focused checks passed:
+- 'cargo check'
+- 'cargo test --test typedb -- --nocapture'
+- 'cargo test --test move_source -- --nocapture'
+- 'cargo nextest run --test collateral_source_move'
+- 'cargo test --test multi_source_errors -- --nocapture'
+- 'cargo test --test subscribee_col -- --nocapture'
+- 'cargo test --test hidden_from_subscriptions -- --nocapture'
+- 'cargo test --test source_sets -- --nocapture'
+
+Full suite passed:
+- 'bash/all-tests.sh --no-sound'
+
+After the 'update_node_source' helper cleanup:
+- 'cargo check' passed
+- 'cargo test --test move_source -- --nocapture' compiled, but could
+  not run because TypeDB was not accepting TCP connections
+- after TypeDB was restarted,
+  'cargo test --test move_source -- --nocapture' passed
 * problems discovered along the way, open
 * problems discovered along the way, solved
+** focused TypeDB tests require a running TypeDB server
+After the 'update_node_source' helper cleanup, the source-move test
+binary compiled, but all tests initially failed immediately with:
+#+begin_example
+tcp connect error: Connection refused (os error 111)
+#+end_example
+
+*** resolution
+After TypeDB was restarted, the focused source-move test passed:
+- 'cargo test --test move_source -- --nocapture'
+
 ** global string replacement would be unsafe
 The words "replacement" and "replaced" appear in many unrelated
 contexts, including buffer/string replacement and content-link
@@ -133,3 +200,37 @@ existing formatter, while still covering that explicit 'errors' and
 'warnings' fields are present and separated.
 
 'cargo test serve::util --lib' passes after the fix.
+** TypeQL match-insert can silently insert nothing
+When node insertion was rewritten to match a source entity and then
+insert the node plus 'has_source' relation, missing source entities did
+not produce a TypeDB error.  The match simply had no rows, so the
+insert did nothing.  This showed up as source-move tests finding no
+nodes in TypeDB.
+*** resolution
+Node creation now explicitly checks that the source entity exists
+before issuing the insert.  Setup paths were also updated to create
+source entities before nodes.
+
+'cargo test --test move_source -- --nocapture' passes after the fix.
+** direct TypeDB setup helpers are easy to miss
+Most TypeDB setup flows now create source entities before creating
+nodes, but a direct nextest helper in 'tests/collateral_source_move.rs'
+still created nodes immediately after schema load.  The new explicit
+source existence check exposed this as:
+```
+TypeDB source entity 'public' does not exist
+```
+*** resolution
+Updated that helper to call 'create_all_sources' before
+'create_all_nodes'.
+
+'cargo nextest run --test collateral_source_move' passes after the
+fix, and the full test suite passes.
+** TypeDB boolean display is not a bare boolean string
+TypeDB row concepts for 'user_owns_it' display as strings like
+'Attribute(user_owns_it: true)', not just 'true'.  The first source
+entity test expected the bare spelling.
+*** resolution
+Normalized boolean row values by checking whether the TypeDB concept
+string contains 'true'.  The source entity test and full TypeDB target
+pass after the fix.

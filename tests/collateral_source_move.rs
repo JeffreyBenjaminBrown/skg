@@ -14,6 +14,7 @@ use skg::dbs::in_rust_graph::{
   new_handle};
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
+use skg::dbs::typedb::sources::create_all_sources;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
@@ -166,6 +167,7 @@ async fn setup_test_dbs (
     . collect ();
   overwrite_new_empty_typedb_db (db_name, &driver) . await?;
   read_and_use_schema (db_name, &driver) . await?;
+  create_all_sources (db_name, &driver, &config) . await?;
   create_all_nodes (db_name, &driver, &typedb_nodes) . await?;
   create_all_relationships (db_name, &driver, &typedb_nodes) . await?;
   let tantivy_index : TantivyIndex =

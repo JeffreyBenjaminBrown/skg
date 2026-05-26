@@ -11,6 +11,7 @@ use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_all_outbound_relationships_to_nodes;
+use crate::dbs::typedb::sources::create_all_sources;
 use crate::dbs::typedb::util::connect_to_typedb;
 use crate::types::env::SkgEnv;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
@@ -66,7 +67,8 @@ pub fn initialize_dbs (
   let can_incremental : bool = block_on ( async {
     can_do_incremental_init_of_dbs (
       &driver, &config . db_name, &marker_path,
-      Path::new ( &config . tantivy_folder )
+      Path::new ( &config . tantivy_folder ),
+      &config . config_path,
     ) . await } );
   let result : (SkgEnv, InitContextHandoff, Vec<NodeComplete>) =
     if can_incremental {
@@ -98,17 +100,19 @@ pub fn initialize_dbs (
 /// DEAD ? See "incremental init" in is-it-dead.org.
 ///
 /// PURPOSE:
-/// Checks the four preconditions for incremental init:
+/// Checks preconditions for incremental init:
 /// 1. TypeDB database exists
 /// 2. Marker file exists
 /// 3. schema.tql mtime <= marker mtime
-/// 4. Tantivy index directory contains files
+/// 4. skgconfig.toml mtime <= marker mtime
+/// 5. Tantivy index directory contains files
 ///    (guards against manual deletion of index contents)
 async fn can_do_incremental_init_of_dbs (
   driver        : &TypeDBDriver,
   db_name       : &str,
   marker_path   : &Path,
   tantivy_path  : &Path,
+  config_path   : &Path,
 ) -> bool {
   let db_exists : bool =
     match driver . databases() . contains (db_name) . await {
@@ -131,6 +135,13 @@ async fn can_do_incremental_init_of_dbs (
       Ok (t)  => t,
       Err (_) => return false, };
   if schema_mtime > marker_mtime { return false; }
+  if ! config_path . as_os_str () . is_empty () {
+    let config_mtime : std::time::SystemTime =
+      match fs::metadata (config_path)
+        . and_then ( |m| m . modified() )
+      { Ok (t)  => t,
+        Err (_) => return false, };
+    if config_mtime > marker_mtime { return false; }}
   let tantivy_has_files : bool =
     tantivy_path . is_dir ()
     && fs::read_dir (tantivy_path)
@@ -297,6 +308,10 @@ pub async fn wipe_then_init_typedb_db (
   read_and_use_schema (
     & config . db_name,
     driver ) . await ?;
+  create_all_sources (
+    & config . db_name,
+    driver,
+    config ) . await ?;
   let t0 : Instant = Instant::now();
   let typedb_nodes : Vec<NodeTypedb> = // Convert to NodeTypedb (narrow) at the boundary. Parses textlinks from each node's title+body.
     nodes . iter ()

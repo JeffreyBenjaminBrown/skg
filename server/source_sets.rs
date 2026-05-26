@@ -220,6 +220,8 @@ where
       . collect ();
     overwrite_new_empty_typedb_db (db_name, &driver) . await?;
     read_and_use_schema (db_name, &driver) . await?;
+    crate::dbs::typedb::sources::create_all_sources (
+      db_name, &driver, &config ) . await?;
     create_all_nodes (db_name, &driver, &typedb_nodes) . await?;
     create_all_relationships (db_name, &driver, &typedb_nodes) . await?;
     let mut tantivy : TantivyIndex =

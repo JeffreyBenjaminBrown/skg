@@ -150,16 +150,37 @@ pub async fn create_node (
 ) -> Result < (), Box<dyn Error> > {
 
   let primary_id : &ID = &node . pid;
+  error_unless_source_exists (tx, &node . source) . await ?;
   tx . query ( {
     let insert_node_query : String = format! (
-      r#"insert $n isa node,
-                   has id "{}",
-                   has source "{}";"#,
-      primary_id . as_str (),
-      node . source );
+      r#"match
+           $src isa source, has source_name "{}";
+         insert
+           $n isa node, has id "{}";
+           $rel isa has_source (node: $n, source: $src);"#,
+      node . source,
+      primary_id . as_str (), );
     insert_node_query } ) . await ?;
   insert_extra_ids ( &node, tx ) . await ?; // PITFALL: This creates has_extra_id relationships, so you might expect it to belong in `create_relationships_from_node`. But it's important that these relationships be created before any others, because the others might refer to nodes via their `extra_id`s. They are basically optional attributes of a node; they have no meaning beyond being another way to refer to a node.
   Ok (()) }
+
+async fn error_unless_source_exists (
+  tx     : &typedb_driver::Transaction,
+  source : &SourceName,
+) -> Result<(), Box<dyn Error>> {
+  let answer : QueryAnswer =
+    tx . query ( format! (
+      r#"match
+           $src isa source, has source_name "{}";
+         select $src;"#,
+      source ) ) . await ?;
+  let mut rows : ConceptRowStream = answer . into_rows ();
+  match rows . next () . await {
+    Some (Ok (_)) => Ok (()),
+    Some (Err (e)) => Err (e . into ()),
+    None => Err (format! (
+      "TypeDB source entity '{}' does not exist", source ) . into ()),
+  } }
 
 async fn insert_extra_ids (
   node : &NodeTypedb,
@@ -262,29 +283,5 @@ async fn delete_one_node_from_pid (
     r#"match $node isa node, has id "{}";
        delete $node;"#,
     id . as_str () ) ) . await ?;
-  tx . commit () . await ?;
-  Ok (()) }
-
-/// Updates the source attribute of a node in TypeDB.
-/// Deletes the old source and inserts the new one in a single transaction.
-pub async fn update_node_source (
-  db_name    : &str,
-  driver     : &TypeDBDriver,
-  pid        : &ID,
-  new_source : &SourceName,
-) -> Result<(), Box<dyn Error>> {
-  let tx : Transaction =
-    driver . transaction (
-      db_name, TransactionType::Write ) . await ?;
-  tx . query ( format! (
-    r#"match
-         $n isa node, has id "{}";
-         $n has source $old_src;
-       delete
-         has $old_src of $n;
-       insert
-         $n has source "{}";"#,
-    pid . as_str(),
-    new_source ) ) . await ?;
   tx . commit () . await ?;
   Ok (()) }

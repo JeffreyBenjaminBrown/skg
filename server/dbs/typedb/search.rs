@@ -300,9 +300,9 @@ pub async fn pid_and_source_from_id (
     let answer : QueryAnswer = tx . query ( {
       let query : String = format! (
         r#"match
-          $node isa node,
-                has id $primary_id,
-                has source $source;
+          $node isa node, has id $primary_id;
+          $src isa source, has source_name $source;
+          $source_rel isa has_source (node: $node, source: $src);
           {{ $node has id "{}"; }} or
           {{ $e   isa     extra_id, has id "{}";
              $rel isa has_extra_id ( node: $node,

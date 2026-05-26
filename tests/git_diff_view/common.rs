@@ -16,6 +16,7 @@ pub use skg::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema, cre
 pub use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 pub use skg::dbs::typedb::nodes::create_all_nodes;
 pub use skg::dbs::typedb::relationships::create_all_relationships;
+pub use skg::dbs::typedb::sources::create_all_sources;
 pub use skg::to_org::render::content_view::multi_root_view;
 pub use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 pub use skg::types::misc::{ID, SkgConfig, SkgfileSource, TantivyIndex, SourceName};
@@ -112,6 +113,7 @@ pub async fn setup_test_dbs(
     . collect ();
   overwrite_new_empty_typedb_db(db_name, &driver) . await?;
   read_and_use_schema(db_name, &driver) . await?;
+  create_all_sources(db_name, &driver, &config) . await?;
   create_all_nodes(db_name, &driver, &typedb_nodes) . await?;
   create_all_relationships(db_name, &driver, &typedb_nodes) . await?;
 

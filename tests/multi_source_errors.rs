@@ -17,6 +17,7 @@ use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
+use skg::dbs::typedb::sources::create_all_sources;
 use skg::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema};
 use ego_tree::Tree;
 use std::error::Error;
@@ -51,6 +52,7 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
       . collect ();
     overwrite_new_empty_typedb_db(&config . db_name, &driver) . await?;
     read_and_use_schema(&config . db_name, &driver) . await?;
+    create_all_sources(&config . db_name, &driver, &config) . await?;
     create_all_nodes(&config . db_name, &driver, &typedb_nodes) . await?;
     create_all_relationships(&config . db_name, &driver, &typedb_nodes) . await?;
 
@@ -150,6 +152,7 @@ fn test_foreign_node_modification_errors(
       . collect ();
     overwrite_new_empty_typedb_db(&config . db_name, &driver) . await?;
     read_and_use_schema(&config . db_name, &driver) . await?;
+    create_all_sources(&config . db_name, &driver, &config) . await?;
     create_all_nodes(&config . db_name, &driver, &typedb_nodes) . await?;
     create_all_relationships(&config . db_name, &driver, &typedb_nodes) . await?;
 
@@ -327,6 +330,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       . collect ();
     overwrite_new_empty_typedb_db(&config . db_name, &driver) . await?;
     read_and_use_schema(&config . db_name, &driver) . await?;
+    create_all_sources(&config . db_name, &driver, &config) . await?;
     create_all_nodes(&config . db_name, &driver, &typedb_nodes) . await?;
     create_all_relationships(&config . db_name, &driver, &typedb_nodes) . await?;
 

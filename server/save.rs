@@ -11,7 +11,7 @@ use crate::merge::merge_nodes;
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::nodes::delete_nodes_from_pids;
 use crate::dbs::typedb::nodes::overwrite_extra_ids_of_node;
-use crate::dbs::typedb::nodes::update_node_source;
+use crate::dbs::typedb::sources::update_node_source;
 use crate::dbs::typedb::nodes::which_ids_exist;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_all_outbound_relationships_to_nodes;

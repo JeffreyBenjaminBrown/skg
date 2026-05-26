@@ -25,6 +25,7 @@ use typedb_driver::{Transaction, TransactionType, TypeDBDriver};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
 use crate::dbs::typedb::search::find_related_nodes_for_one_primary_pid_in_tx;
+use crate::dbs::typedb::sources::source_name_for_one_node_id_in_tx;
 use crate::types::misc::ID;
 
 /// A single disagreement between the in-Rust graph and TypeDB, for
@@ -172,6 +173,21 @@ pub async fn audit_one_node (
         role,
         in_rust_graph : in_rust_graph_set,
         typedb    : typedb_set, } ); } }
+  let in_rust_source : HashSet<ID> =
+    [ID::from (node . source . as_str ())]
+    . into_iter () . collect ();
+  let typedb_source : HashSet<ID> =
+    source_name_for_one_node_id_in_tx (tx, pid) . await ?
+    . map ( |s| [ID::from (s . as_str ())]
+                . into_iter () . collect () )
+    . unwrap_or_default ();
+  if in_rust_source != typedb_source {
+    mismatches . push ( Mismatch {
+      pid       : pid . clone (),
+      relation  : "has_source",
+      role      : "node",
+      in_rust_graph : in_rust_source,
+      typedb    : typedb_source, } ); }
   Ok (mismatches) }
 
 /// IDs appearing as the second member of 'node''s outbound edges in
