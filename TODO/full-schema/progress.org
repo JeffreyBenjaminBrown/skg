@@ -36,6 +36,44 @@ errors across structured server responses and Emacs handlers.
 
 The plan also includes the small documentation item from the same
 metaplan section: defining "read-only set" in 'glossary.md'.
+*** implemented
+Added an explicit 'warnings' field alongside 'errors' for the
+structured response shapes used by:
+- save-result
+- single-root content view
+- rerender-done
+- diff-analysis
+- search-enrichment
+
+Updated the shared Rust response-formatting helpers so buffer-like
+responses emit:
+#+begin_example
+((content "...") (errors (...)) (warnings (...)))
+#+end_example
+
+Updated rerender-done formatting to emit:
+#+begin_example
+((errors (...)) (warnings (...)))
+#+end_example
+
+Moved existing nonfatal audit messages out of the save/content-view
+error path and into the warning path.  Existing fatal validation and
+generation failures still travel as errors.
+
+Updated the Emacs handlers to parse 'errors' and 'warnings'
+separately and to show both, when present, in a single org buffer with
+top-level 'errors' and 'warnings' headings.
+
+Updated 'api-and-formats.md' for the new protocol shape and added the
+"read-only set" definition to 'glossary.md'.
+*** tested
+Focused checks passed:
+- 'cargo check'
+- 'cargo test serve::util --lib'
+- 'bash/emacs-tests.sh'
+
+Full suite passed:
+- 'bash/all-tests.sh --no-sound'
 * problems discovered along the way, open
 * problems discovered along the way, solved
 ** global string replacement would be unsafe
@@ -59,3 +97,24 @@ Renamed the confusing merge fixture IDs:
 - 'overrides-view-of-1' -> 'overrider-of-1'
 
 The affected merge tests and the full test suite pass after the rename.
+** content-view handler syntax can be hard to audit after nested response changes
+While updating the single-root content-view handler, an unbalanced
+parenthesis was introduced in the nested condition-case / if / let*
+shape.  The Emacs test loader caught this immediately.
+*** resolution
+Rewrote the changed branch with explicit 'has-errors',
+'has-warnings', and 'has-content' locals, which made the nesting
+shallower and easier to read.
+
+'bash/emacs-tests.sh' passes after the fix.
+** exact Rust sexp formatting differs from the prose examples
+The sexp crate prints symbol-like atoms such as 'content',
+'errors', and 'save-result' without quotes, and prints an empty string
+atom as an empty atom.  The first focused Rust tests expected the more
+documentation-like quoted spelling.
+*** resolution
+Updated the tests to assert the actual protocol strings emitted by the
+existing formatter, while still covering that explicit 'errors' and
+'warnings' fields are present and separated.
+
+'cargo test serve::util --lib' passes after the fix.

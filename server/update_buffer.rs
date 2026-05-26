@@ -42,6 +42,7 @@ pub struct RerenderAfterSaveContext<'a> {
   pub source_diffs : Option<HashMap<SourceName, SourceDiff>>,
   pub graph_snap   : Arc<InRustGraph>,
   pub errors       : Vec<String>,
+  pub warnings     : Vec<String>,
   /// Files deleted since HEAD, keyed by pid, for diff-mode rendering.
   pub deleted_since_head_pid_src_map : HashMap<ID, SourceName>,
   /// Pids deleted by this save; not necessarily a subset of git deletes.
@@ -78,6 +79,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
       source_diffs,
       graph_snap : env . in_rust_graph . load_full (),
       errors : Vec::new (),
+      warnings : Vec::new (),
       deleted_since_head_pid_src_map,
       deleted_by_this_save_pids,
       active_source_set,
@@ -163,10 +165,11 @@ pub async fn update_views_after_save (
                 &rendered . uri, &rendered . text) )); },
         Err (e) => { context . errors . push (e); }} }}
   if let Some (w) = take_pending_audit_warning () {
-    context . errors . insert (0, w); }
+    context . warnings . insert (0, w); }
   Ok ( SaveResponse {
     saved_view          : saved_text,
     errors              : context . errors,
+    warnings            : context . warnings,
     save_point_position : None, } ) }
 
 async fn rerender_collateral_view (

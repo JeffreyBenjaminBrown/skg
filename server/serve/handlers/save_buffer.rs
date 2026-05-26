@@ -14,7 +14,6 @@ use crate::serve::util::{
   read_length_prefixed_content,
   send_response_with_length_prefix,
   tag_sexp_response,
-  tag_text_response,
   value_from_request_sexp };
 use crate::types::env::SkgEnv;
 use crate::types::errors::SaveError;
@@ -40,6 +39,7 @@ use std::path::Path;
 pub struct SaveResponse {
   pub saved_view          : String,
   pub errors              : Vec<String>,
+  pub warnings            : Vec<String>,
   pub save_point_position : Option<SavePointPosition>,
 }
 
@@ -50,13 +50,14 @@ pub struct SavePointPosition {
 }
 
 impl SaveResponse {
-  /// Format: ((content "...") (errors (...)))
+  /// Format: ((content "...") (errors (...)) (warnings (...)))
   fn to_sexp_string (&self) -> String {
     let mut response : Sexp =
       sexp::parse (
         &format_buffer_response_sexp (
           & self . saved_view,
-          & self . errors ))
+          & self . errors,
+          & self . warnings ))
       . expect (
         "format_buffer_response_sexp should produce valid sexp" );
     if let ( Sexp::List (items),
@@ -118,6 +119,7 @@ pub fn handle_save_buffer_request (
               let response_sexp : String =
                 empty_response_sexp (
                   & format_save_error_as_org (save_error),
+                  &[],
                   & save_point_position )
                 . to_string ();
               send_response_with_length_prefix (
@@ -128,22 +130,35 @@ pub fn handle_save_buffer_request (
               let error_msg : String =
                 format!("Error processing buffer content: {}", err);
               tracing::error!("{}", error_msg);
+              let response_sexp : String =
+                empty_response_sexp (
+                  &error_msg,
+                  &[],
+                  &save_point_position )
+                . to_string ();
               send_response_with_length_prefix (
                 stream,
-                & tag_text_response (
-                  TcpToClient::SaveResult, &error_msg )); }} }}; }
+                & tag_sexp_response (
+                  TcpToClient::SaveResult, &response_sexp )); }} }}; }
     Err (err) => {
       let error_msg : String =
         format! ("Error reading buffer content: {}", err );
       tracing::error! ( "{}", error_msg );
+      let response_sexp : String =
+        empty_response_sexp (
+          &error_msg,
+          &[],
+          &save_point_position )
+        . to_string ();
       send_response_with_length_prefix (
         stream,
-        & tag_text_response (
-          TcpToClient::SaveResult, &error_msg )); }} }
+        & tag_sexp_response (
+          TcpToClient::SaveResult, &response_sexp )); }} }
 
 /// Create an s-expression with nil content and an error message.
 fn empty_response_sexp (
   error_buffer_content : &str,
+  warnings             : &[String],
   save_point_position   : &Option<SavePointPosition>,
 ) -> Sexp {
   let mut items : Vec<Sexp> = vec! [
@@ -154,7 +169,14 @@ fn empty_response_sexp (
       Sexp::Atom ( Atom::S ( "errors" . to_string () )),
       Sexp::List ( vec! [
         Sexp::Atom ( Atom::S (
-          error_buffer_content . to_string () )) ] ) ] ) ];
+          error_buffer_content . to_string () )) ] ) ] ),
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "warnings" . to_string () )),
+      Sexp::List (
+        warnings . iter ()
+          . map ( |warning| Sexp::Atom (
+            Atom::S ( warning . clone () )) )
+          . collect () ) ] ) ];
   if let Some (point_position) = save_point_position {
     push_save_point_position_to_sexp_items (
       &mut items, point_position ); }

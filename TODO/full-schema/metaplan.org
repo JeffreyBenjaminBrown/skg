@@ -1,8 +1,5 @@
 * metaplan : full schema UI
-The level 3 headlines in the following are ordered,
-across (not just within) the level-2 headlines.
-** reviewed (and maybe sightly changed) by Jeff, look good
-*** overview & goal
+** overview & goal
 This plan completes the user-facing UI for every relationship in
 'schema.tql':
 - 'contains'
@@ -20,7 +17,8 @@ and coherent under save, rerender and git diff views.
 
 The implementation should proceed in the order below.
 Each section is large enough to deserve its own dedicated sub-plan.
-*** DONE Rename the roles of 'overrides_view_of' everywhere:
+* steps, in order
+** DONE Rename the roles of 'overrides_view_of' everywhere:
 ```
 relation overrides_view_of,
   relates overrider,
@@ -36,7 +34,7 @@ This rename should be atomic across:
 - diff analysis relationship labels
 - fixtures and comments
 - any user-visible metadata or herald text
-*** Add an explicit warning channel
+** ONGOING Add an explicit warning channel
 to protocol responses that can carry
 nonfatal messages.  The old convention, where 'errors' sometimes
 meant warnings if content was present, is confusing.  Responses that
@@ -55,7 +53,7 @@ inserted by the user that are not real members are relabeled
 completion.
 
 Use "read-only set" in prose and user-facing warnings, not an acronym.
-*** Represent source ownership in the database model
+** Represent source ownership in the database model
 Override behavior depends on whether a source is user-owned.
 The current TypeDB schema already records each node's source name,
 but it does not record whether that source is user-owned.
@@ -75,7 +73,7 @@ This accomplishes two things:
   against the graph,
 - future code may be simplified where it currently leaves TypeDB to
   recover source-related facts elsewhere.
-*** Validate override invariants at rebuild and save
+** Validate override invariants at rebuild and save
 Override substitution must be deterministic for user-owned data.
 Validation should reject states that would make effective views
 ambiguous or recursively unstable.
@@ -106,7 +104,7 @@ ordinary recursive content rendering.
 Validation should resolve extra IDs to primary IDs before checking
 these constraints, because merges must not allow two apparently distinct
 override targets to become the same effective overridden node.
-*** Add relation accessors and generated collections
+** Add relation accessors and generated collections
 Before adding more UI, complete relation accessors in both directions
 for every schema relationship.
 The implementation should make it easy to ask:
@@ -150,7 +148,7 @@ will indicate whether it is truly a member of that col,
 or independent of it. The user can break those parentIs
 heralds by moving the node, but need only refresh the buffer
 in order to correct them.
-*** Make read-only sets predictable under save and rerender
+** Make read-only sets predictable under save and rerender
 Read-only sets are generated from the graph, but user-visible order
 can matter while the view is open.
 
@@ -174,7 +172,7 @@ and opening it again may normalize the view from graph data
 (because nothing persists the changes a user makes to
 the order of a -Col scaffold outside of that -Col scaffold,
 much less outside of the view the scaffold belongs to).
-*** Add heralds and view-specific stats
+** Add heralds and view-specific stats
 Heralds should distinguish graph-wide relation presence from
 view-specific facts.
 
@@ -210,7 +208,7 @@ collections.
 Edits to IDCol should abort save with an explanatory error.
 Editing IDs through the UI is dangerous and unnecessary; direct file
 editing remains available for exceptional manual repair.
-*** Define override rendering and navigation
+** Define override rendering and navigation
 Ordinary recursive content rendering applies automatic override
 substitution.  When recursive rendering would draw node N, and N has
 a valid user-owned overrider R, draw R instead.
@@ -257,7 +255,7 @@ remains editable as itself and a later save keeps editing that
 original.  New recursive content introduced during rerender, though,
 uses current override substitution.  Closing and reopening the buffer
 normalizes recursive content from current graph data.
-*** Preserve source-set safety
+** Preserve source-set safety
 Source-set filtering must not leak inactive-source data unnecessarily
 and must not silently delete hidden relationship members.
 
@@ -290,7 +288,7 @@ Save processing needs two protections:
 Content remains the exception already handled by source-set work:
 inactive content placeholders can participate in active containers
 because content order matters.
-*** Define diff-mode policy for the full schema
+** Define diff-mode policy for the full schema
 Diff mode is raw graph inspection, not effective override rendering.
 Override substitution should not apply in git diff mode or diff
 analysis.
@@ -305,26 +303,27 @@ Toggling diff mode should refuse unless the active source-set is
 'all'.  Switching away from source-set 'all' should refuse while diff
 mode is enabled.  The refusal must happen before closing buffers for
 a source-set switch.
-** unreviewed by Jeff
-*** Update save, rebuild and rerender validation
+** Update save, rebuild and rerender validation
 The save pipeline should reject:
 - edits to IDCol,
 - attempts to create or modify nodes in inactive sources,
 - changes that violate user-owned override monogamy,
 - changes that create a user-owned override chain,
-- malformed edits to read-only set scaffolds that cannot be repaired.
+- malformed read-only set edits that prevent the server from
+  identifying the collection, its owner, or a child node's intended
+  identity.
 
 The save pipeline should warn, without aborting, when it repairs
 ordinary read-only set edits by restoring generated members,
-relabeling independent children, or discarding collection title/body
-edits.
+relabeling independent children to independent,
+or discarding collection title/body edits.
 
 Rebuild/init should validate global graph invariants that are not
 local to one buffer, especially override monogamy and user-owned
 override chains.  If invalid data exists, rebuild should fail with a
 specific explanation rather than starting a server whose override
 rendering is ambiguous.
-*** Test the relationship matrix
+** Test the relationship matrix
 The test plan should be organized by relationship and role.
 For every collection type, cover:
 - initial rendering,
@@ -352,7 +351,7 @@ For warnings, cover:
 - failed save with both warnings and errors,
 - single-root content view warning delivery,
 - rerender-all warning delivery.
-*** Document the resulting model
+** Document the resulting model
 Update the project docs after the behavior is implemented:
 - 'schema.tql' comments for new role names and source ownership,
 - 'api-and-formats.md' for the warnings channel, new metadata, and
@@ -365,7 +364,7 @@ Documentation should use graph-role vocabulary for graph facts:
 container/contained, subscriber/subscribee, hider/hidden,
 overrider/overridden.
 Use parent/child only for org/view parentage.
-*** awaits
+** awaits
 These are adjacent opportunities, not part of the plan itself.
 
 Once sources are represented more richly in TypeDB, inspect code that

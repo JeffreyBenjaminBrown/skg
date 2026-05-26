@@ -45,7 +45,7 @@ pub fn handle_diff_analysis_request_with_source_set (
         format! ("* diff analysis failed\n** {}\n", e),
         vec! [e] ), };
   let response : String =
-    format_buffer_response_sexp (&content, &errors);
+    format_buffer_response_sexp (&content, &errors, &[]);
   send_response_with_length_prefix (
     stream,
     &tag_sexp_response (TcpToClient::DiffAnalysis, &response) );

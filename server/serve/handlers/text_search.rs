@@ -297,7 +297,7 @@ fn collect_ids_from_ancestry_node(
 
 /// Build the tagged s-exp for a search enrichment payload.
 /// Format: (("response-type" "search-enrichment")
-///          ("terms" "TERMS") ("content" "ORG"))
+///          ("terms" "TERMS") ("content" "ORG") ("warnings" ()))
 pub fn mk_search_enrichment_sexp (
   terms   : &str,
   content : &str,
@@ -313,6 +313,9 @@ pub fn mk_search_enrichment_sexp (
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "content" . to_string () )),
       Sexp::Atom ( Atom::S ( content   . to_string () )), ] ),
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "warnings" . to_string () )),
+      Sexp::List ( vec! [] ), ] ),
   ] ) . to_string () }
 
 /// Groups raw Tantivy results by ID, applying score adjustments

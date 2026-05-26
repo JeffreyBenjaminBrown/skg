@@ -173,33 +173,54 @@ which would trigger overlay modification-hooks if still present."
           (skg-handle-save-sexp payload)))
     (skg--unlock-all-save-locked)) )
 
-(defun skg-errors-to-org-string (errors-list)
-  "Convert ERRORS-LIST (from the server) to org-buffer text.
-Each error becomes its own top-level headline. This is the single
-place where server-side `Vec<String>` errors get org-formatted for
-display in the warnings/errors buffer."
-  (if (listp errors-list)
-      (mapconcat (lambda (e) (concat "* " e)) errors-list "\n")
-    (concat "* " errors-list)))
+(defun skg--message-list-nonempty-p (message-list)
+  "Return non-nil when MESSAGE-LIST has at least one message."
+  (and (listp message-list)
+       message-list))
+
+(defun skg-messages-to-org-string (messages)
+  "Convert MESSAGES (from the server) to org-buffer text.
+Each message becomes its own headline."
+  (if (listp messages)
+      (mapconcat (lambda (message) (concat "* " message)) messages "\n")
+    (concat "* " messages)))
+
+(defun skg-errors-and-warnings-to-org-string (errors warnings)
+  "Convert ERRORS and WARNINGS to one org buffer with two sections."
+  (let ((sections nil))
+    (when (skg--message-list-nonempty-p errors)
+      (push (concat "* errors\n"
+                    (mapconcat (lambda (message)
+                                 (concat "** " message))
+                               errors "\n"))
+            sections))
+    (when (skg--message-list-nonempty-p warnings)
+      (push (concat "* warnings\n"
+                    (mapconcat (lambda (message)
+                                 (concat "** " message))
+                               warnings "\n"))
+            sections))
+    (mapconcat #'identity (nreverse sections) "\n")))
+
+(defalias 'skg-errors-to-org-string #'skg-messages-to-org-string)
 
 (defun skg-handle-save-sexp (sexp-string)
-  "Parse and handle save response s-exp: ((content ...) (errors (...)))."
+  "Parse and handle save response s-exp.
+Expected shape: ((content ...) (errors (...)) (warnings (...)))."
   (condition-case err
       (let* ((response (read sexp-string))
              (content-value (cadr (assoc 'content response)))
              (errors-list   (cadr (assoc 'errors response)))
+             (warnings-list (cadr (assoc 'warnings response)))
              (save-point-position
               (skg--save-point-position-from-response response)))
         (when content-value
           (skg-replace-buffer-with-new-content
            nil content-value save-point-position))
-        (when errors-list
-          (let ((errors-text (skg-errors-to-org-string errors-list)))
-            (if content-value
-                (skg-show-save-warnings ;; Success with warnings
-                 errors-text)
-              (skg-show-save-errors ;; Failure with errors
-               errors-text)))))
+        (when (or (skg--message-list-nonempty-p errors-list)
+                  (skg--message-list-nonempty-p warnings-list))
+          (skg-show-save-errors-and-warnings
+           errors-list warnings-list content-value)))
     (error (skg-log 'error 'save "parsing save response: %S" err)
            (skg-log 'error 'save "sexp string was: %S" sexp-string))))
 
@@ -332,5 +353,30 @@ leave point on the focused headline."
    "*SKG Save Warnings*"
    "Save succeeded with warnings - see *SKG Save Warnings*"
    warning-content))
+
+(defun skg-show-save-errors-and-warnings
+    (errors warnings content-present)
+  "Show ERRORS and WARNINGS from a save response in one org buffer."
+  (let* ((has-errors (skg--message-list-nonempty-p errors))
+         (has-warnings (skg--message-list-nonempty-p warnings))
+         (buffer-name
+          (cond
+           ((and has-errors has-warnings) "*SKG Save Errors and Warnings*")
+           (has-errors "*SKG Save Errors - Inconsistencies Found*")
+           (t "*SKG Save Warnings*")))
+         (message-text
+          (cond
+           ((and has-errors has-warnings)
+            "Save reported errors and warnings")
+           (has-errors
+            "Save failed - errors shown in *SKG Save Errors - Inconsistencies Found*")
+           (content-present
+            "Save succeeded with warnings - see *SKG Save Warnings*")
+           (t
+            "Save reported warnings")))
+         (content
+          (skg-errors-and-warnings-to-org-string errors warnings)))
+    (skg-big-nonfatal-message
+     buffer-name message-text content)))
 
 (provide 'skg-request-save)
