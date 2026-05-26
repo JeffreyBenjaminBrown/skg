@@ -342,7 +342,7 @@ is now : id_to_pid_if_found
 ** insert_relationship_from_list (line 141)
    - True?: Partly. Despite the singular "relationship" in the name, the function actually inserts ONE relationship PER element of id_list (so N inserts). The accompanying comment claims "Length = 2", which contradicts the loop body (it iterates the whole list).
    - Omits?: That it iterates and emits one TypeDB insert per id; the in-line "Length = 2" comment is also wrong.
-** delete_all_outbound_relationships (line 202)
+** delete_all_outbound_relationships_to_nodes (line 202)
    - True?: Partly. Same exclusion concern — "all outbound" excludes has_extra_id (which is technically also outbound from the node, semantically).
    - Omits?: That has_extra_id is not deleted by this function.
 ** delete_out_links (line 219)

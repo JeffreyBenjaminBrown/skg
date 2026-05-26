@@ -10,7 +10,7 @@ use crate::dbs::tantivy::write::update_index_with_nodes;
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::relationships::create_all_relationships;
-use crate::dbs::typedb::relationships::delete_all_outbound_relationships;
+use crate::dbs::typedb::relationships::delete_all_outbound_relationships_to_nodes;
 use crate::dbs::typedb::util::connect_to_typedb;
 use crate::types::env::SkgEnv;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
@@ -181,7 +181,7 @@ fn incremental_init_of_dbs (
       nodes . iter()
       . map ( |n| n . pid . clone() )
       . collect();
-    delete_all_outbound_relationships (
+    delete_all_outbound_relationships_to_nodes (
       &config . db_name, driver, &pids ) . await ?;
     tracing::info! (elapsed_s = ?t1 . elapsed(),
               "Deleted stale relationships");

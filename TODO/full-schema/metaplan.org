@@ -34,7 +34,7 @@ This rename should be atomic across:
 - diff analysis relationship labels
 - fixtures and comments
 - any user-visible metadata or herald text
-** ONGOING Add an explicit warning channel
+** DONE Add an explicit warning channel
 to protocol responses that can carry
 nonfatal messages.  The old convention, where 'errors' sometimes
 meant warnings if content was present, is confusing.  Responses that
@@ -53,7 +53,7 @@ inserted by the user that are not real members are relabeled
 completion.
 
 Use "read-only set" in prose and user-facing warnings, not an acronym.
-** Represent source ownership in the database model
+** ONGOING represent source ownership in TypeDB
 Override behavior depends on whether a source is user-owned.
 The current TypeDB schema already records each node's source name,
 but it does not record whether that source is user-owned.

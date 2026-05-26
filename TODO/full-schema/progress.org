@@ -74,6 +74,21 @@ Focused checks passed:
 
 Full suite passed:
 - 'bash/all-tests.sh --no-sound'
+** stage 3 : TypeDB knows source ownership
+*** planned
+Wrote 'TODO/full-schema/3_typedb-knows-ownership.org',
+a focused implementation plan for representing configured source
+ownership in TypeDB.
+
+The first draft kept the existing node 'source' attribute for
+compatibility, but that was rejected as insufficiently clean.
+Rewrote the plan so TypeDB sources are first-class entities and nodes
+belong to sources only through a 'has_source' relationship.
+
+The plan now includes the wider TypeDB query migration, source-move
+updates, direct test-helper setup changes, config-change rebuild
+guard, and tests proving that TypeDB nodes no longer own the old
+string 'source' attribute.
 * problems discovered along the way, open
 * problems discovered along the way, solved
 ** global string replacement would be unsafe

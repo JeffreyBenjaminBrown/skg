@@ -14,7 +14,7 @@ use crate::dbs::typedb::nodes::overwrite_extra_ids_of_node;
 use crate::dbs::typedb::nodes::update_node_source;
 use crate::dbs::typedb::nodes::which_ids_exist;
 use crate::dbs::typedb::relationships::create_all_relationships;
-use crate::dbs::typedb::relationships::delete_all_outbound_relationships;
+use crate::dbs::typedb::relationships::delete_all_outbound_relationships_to_nodes;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName, TantivyIndex};
 use crate::types::nodes::rust::NodeRust;
 use crate::types::nodes::tantivy::NodeTantivy;
@@ -266,8 +266,8 @@ pub async fn update_typedb_from_saveinstructions (
             db_name, driver, node ) . await ?; } } }
     { // Delete all 5 outbound relation types before recreating. Otherwise re-saves of existing nodes duplicate every outbound relation except 'contains'.
       let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "delete_all_outbound_relationships") . entered ();
-      delete_all_outbound_relationships (
+        "delete_all_outbound_relationships_to_nodes") . entered ();
+      delete_all_outbound_relationships_to_nodes (
         db_name, driver, & to_write_pids )
       . await ?; }
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(

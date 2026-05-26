@@ -197,9 +197,9 @@ pub async fn insert_relationship_from_list (
         relation_name, primary_id, target_id . as_str(), e, query))?; }
   Ok (( )) }
 
-/// Delete all 5 outbound relationship types
+/// Delete all 5 outbound node-to-node relationship types
 /// for the given IDs.
-pub async fn delete_all_outbound_relationships (
+pub async fn delete_all_outbound_relationships_to_nodes (
   db_name : &str,
   driver  : &TypeDBDriver,
   ids     : &Vec<ID>,
