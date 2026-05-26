@@ -28,14 +28,26 @@ Full suite passed:
 - 'bash/all-tests.sh'
   - passed once after the role rename
   - passed again after renaming the merge override fixture IDs
+** stage 2 : explicit warning channel
+*** planned
+Wrote 'TODO/full-schema/2_explicit-warning-channel.org',
+a focused implementation plan for separating protocol warnings from
+errors across structured server responses and Emacs handlers.
+
+The plan also includes the small documentation item from the same
+metaplan section: defining "read-only set" in 'glossary.md'.
 * problems discovered along the way, open
-** stage 1 : rename override relationship roles
-*** global string replacement would be unsafe
+* problems discovered along the way, solved
+** global string replacement would be unsafe
 The words "replacement" and "replaced" appear in many unrelated
 contexts, including buffer/string replacement and content-link
 replacement.  The implementation should classify matches before
 editing rather than applying a mechanical global rename.
-* problems discovered along the way, solved
+*** resolution
+Stage 1 was implemented with targeted edits only.
+Searches for old override role strings confirmed that remaining
+"replacement" / "replaced" language is unrelated to the
+'overrides_view_of' TypeDB roles.
 ** fixture IDs may contain stale vocabulary
 Some test fixture IDs appear to include old words such as
 'overrides-view-of-1'.  These are IDs rather than role labels.

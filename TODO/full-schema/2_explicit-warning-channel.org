@@ -1,0 +1,230 @@
+* plan : explicit warning channel
+This plan implements the metaplan item:
+"Add an explicit warning channel."
+
+The stage removes the current ambiguity where response field 'errors'
+sometimes means fatal errors and sometimes means nonfatal warnings.
+It also defines "read-only set" in the glossary, because later stages
+will need a stable user-facing term for generated collections whose
+membership cannot be edited through that collection.
+** target state
+Protocol responses that can carry both fatal and nonfatal messages use
+separate fields:
+- 'errors' for fatal or failure-explaining messages,
+- 'warnings' for nonfatal messages.
+
+A successful response can include warnings.
+A failed response can include both errors and warnings.
+The client no longer decides whether an 'errors' entry is a warning by
+checking whether 'content' is present.
+
+The shared response shape for buffer-like responses is:
+```
+((content "...") (errors ("..." ...)) (warnings ("..." ...)))
+```
+
+Empty lists are represented explicitly.  This keeps the response shape
+regular and makes Emacs handlers simpler.
+
+*** 'glossary.md' defines "read-only set".
+The definition should say that a read-only set is generated from graph
+facts, cannot edit graph membership through that generated collection,
+may preserve order view-locally, relabels nonmembers independent, and
+restores missing real members during completion.
+
+** scope
+This stage covers responses that currently carry an 'errors' field or
+warning-like data:
+- save-result,
+- single-root content view,
+- rerender-done,
+- diff-analysis,
+- search-enrichment if a partial-failure path exists or is easy to
+  prepare for,
+- shared Rust response formatting helpers,
+- Emacs handlers for those responses,
+- API docs.
+
+This stage should not invent new warning-producing behavior for later
+full-schema read-only sets.  It only creates the channel those later
+warnings will use.
+
+This stage should not alter existing fatal validation semantics.
+Validation errors should still abort saves.
+** response helper design
+*** Add a shared message payload shape
+Introduce a small Rust helper/type or pair of helpers that formats:
+- buffer content,
+- errors,
+- warnings.
+
+Prefer updating 'format_buffer_response_sexp' to accept both errors
+and warnings, or adding a new helper and converting callers in one
+pass.  Avoid keeping two nearly identical helpers long-term.
+
+Update comments for 'tag_sexp_response' and related helpers so examples
+show both 'errors' and 'warnings' where appropriate.
+*** Keep response shape regular
+Every buffer-like response should include both fields:
+```
+(errors (...))
+(warnings (...))
+```
+
+This avoids fragile client code that has to distinguish absent field
+from empty list.
+*** Preserve plain text responses separately
+Some endpoints use 'tag_text_response' for simple status strings.
+Those do not need the new warning channel unless the endpoint already
+has structured errors/warnings.  In particular, git diff mode toggle
+currently embeds warnings in a text message; changing that is optional
+and can remain outside this stage unless it falls out naturally.
+** Rust implementation work
+*** Save responses
+Extend 'SaveResponse' with:
+- 'errors: Vec<String>',
+- 'warnings: Vec<String>'.
+
+Successful saves should put nonfatal messages in 'warnings'.
+Fatal save errors should produce nil content and entries under
+'errors'.  If there are warning-like messages already accumulated
+before a fatal failure, preserve them under 'warnings' when practical.
+
+Update 'empty_response_sexp' so it includes both fields.
+*** Single-root content view responses
+Separate audit warnings from generation errors.
+
+When content generation succeeds and 'take_pending_audit_warning'
+returns a message, send it as a warning.
+
+When content generation fails, send the generation failure as an
+error.  If an audit warning is also pending, send it as a warning.
+
+Source-set refusal for an inactive node should remain an error,
+because no content view is opened.
+*** Rerender-all done responses
+Change rerender-done from:
+```
+((errors (...)))
+```
+to:
+```
+((errors (...)) (warnings (...)))
+```
+
+Current rerender failures should stay errors.  There may be no
+warnings yet, but the field should exist.
+*** Diff-analysis responses
+Update diff-analysis response formatting to carry both 'errors' and
+'warnings'.
+
+Current diff-analysis refusal/failure messages should remain errors.
+If the current code has only errors, warnings can be empty for now.
+*** Search enrichment
+Inspect the search enrichment path.
+If it has no warning or partial-failure path, record that no behavioral
+change is needed yet, but keep the plan prepared for the shared helper
+if search enrichment later uses a buffer-like response.
+** Emacs implementation work
+*** Add parsing helpers
+Add small helpers in the Emacs client to extract:
+- content,
+- errors,
+- warnings.
+
+Prefer one shared formatter for message lists, not an errors-only
+formatter whose name becomes misleading.
+*** Save handler
+Update 'skg-handle-save-sexp':
+- replace buffer content when content is present,
+- show warnings from 'warnings',
+- show errors from 'errors',
+- do not treat errors as warnings merely because content exists.
+
+If both warnings and errors exist, show both in a single org-buffer,
+collected under two top-level headings
+entitled 'errors' and 'warnings'.
+*** Content view handler
+Update content-view handling similarly:
+- open content when content exists,
+- show warnings as warnings,
+- show errors as errors.
+
+Do not use content presence to reinterpret errors.
+*** Rerender handler
+Update rerender-done handling to read both fields.
+Show warnings as nonfatal warnings and errors as errors.
+
+The rerender stream should still unlock buffers and clean up handlers
+even if either list is nonempty.
+*** Diff-analysis handler
+Update diff-analysis Emacs handling to read 'warnings' separately from
+'errors'.
+
+Diff-analysis content can still open when warnings exist.
+Errors should keep their current user-visible failure behavior.
+** Tests
+*** Rust response formatting tests
+Add or update tests for Rust formatting helpers:
+- content with no messages,
+- content with warnings,
+- nil/empty content with errors,
+- content with both warnings and errors if supported,
+- rerender-done errors/warnings-only payload.
+*** Emacs parser/handler tests
+Add focused Emacs tests for:
+- save success with warnings,
+- save failure with errors,
+- save failure with both errors and warnings,
+- content view success with warnings,
+- content view failure with errors,
+- rerender-done with warnings and errors.
+
+Prefer tests that directly call handler/parsing functions where
+possible, so the protocol shape is covered without needing full
+integration setup for every case.
+*** Regression tests
+Run focused Rust and Emacs tests first, then run:
+```
+bash/all-tests.sh
+```
+
+The metaplan expectation is that the full test suite passes after this
+stage.
+** API and docs
+Update 'api-and-formats.md':
+- save-result includes 'warnings',
+- single-root content view includes 'warnings',
+- rerender-done includes 'warnings',
+- diff-analysis includes 'warnings',
+- old text saying 'errors' is a list of error/warning strings is
+  removed.
+
+Update 'glossary.md' with "read-only set".
+
+Use "warning" only for nonfatal messages.  Use "error" for messages
+that explain why requested content or save output failed.
+** acceptance criteria
+This stage is complete when:
+- structured responses no longer use 'errors' for nonfatal warnings,
+- response helpers emit explicit 'warnings' fields,
+- Emacs handlers display warnings separately from errors,
+- existing audit warnings travel through 'warnings',
+- save/content-view/rerender/diff-analysis docs show the new shape,
+- 'glossary.md' defines "read-only set",
+- focused tests pass,
+- 'bash/all-tests.sh' passes.
+** risks and guardrails
+*** Existing tests may assume exact sexp shape
+Some tests may compare response strings or parse only 'errors'.
+Update them to expect explicit empty 'warnings' where appropriate.
+*** A broad rename from errors to messages would be noisy
+Do not rename every internal 'errors' variable in parsing and
+validation code.  The core requirement is protocol clarity, not a
+global vocabulary refactor.
+*** Warnings must not mask failed operations
+A response with nil/empty content and errors should still be treated
+as a failure even if warnings are also present.
+*** Not every warning-like endpoint must be converted
+Plain text status responses can stay plain text.  The required work is
+for structured responses that already carry 'errors' or buffer content.

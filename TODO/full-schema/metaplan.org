@@ -20,7 +20,7 @@ and coherent under save, rerender and git diff views.
 
 The implementation should proceed in the order below.
 Each section is large enough to deserve its own dedicated sub-plan.
-*** Rename the roles of 'overrides_view_of' everywhere:
+*** DONE Rename the roles of 'overrides_view_of' everywhere:
 ```
 relation overrides_view_of,
   relates overrider,
@@ -290,7 +290,6 @@ Save processing needs two protections:
 Content remains the exception already handled by source-set work:
 inactive content placeholders can participate in active containers
 because content order matters.
-** unreviewed by Jeff
 *** Define diff-mode policy for the full schema
 Diff mode is raw graph inspection, not effective override rendering.
 Override substitution should not apply in git diff mode or diff
@@ -306,6 +305,7 @@ Toggling diff mode should refuse unless the active source-set is
 'all'.  Switching away from source-set 'all' should refuse while diff
 mode is enabled.  The refusal must happen before closing buffers for
 a source-set switch.
+** unreviewed by Jeff
 *** Update save, rebuild and rerender validation
 The save pipeline should reject:
 - edits to IDCol,
