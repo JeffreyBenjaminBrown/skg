@@ -418,8 +418,7 @@ pub(crate) fn collect_savenode_candidates (
         recurse_on_children( tree, node_id, result )?,
       ViewNodeKind::DeletedScaff (_) =>
         recurse_on_children( tree, node_id, result )?,
-      ViewNodeKind::Inactive (_) =>
-        recurse_on_children( tree, node_id, result )?,
+      ViewNodeKind::Inactive (_) => {},
       ViewNodeKind::Unknown (_) =>
         // An UnknownNode is a placeholder for a missing referent. It cannot generate save instructions itself, but its descendents might, so we recurse.
         recurse_on_children( tree, node_id, result )?,
@@ -653,8 +652,18 @@ fn collect_contents_to_save_from_children<'a> (
            && ! matches!( t . edit_request (),
                           Some (&EditRequest::Delete))
         { contents . push( t . id . clone() ); }},
+      ViewNodeKind::Inactive (i) => {
+        if ! inactive_is_phantom (i) {
+          contents . push ( i . id . clone () ); }},
       _ => continue }}
   contents }
+
+fn inactive_is_phantom (
+  inactive : &crate::types::viewnode::InactiveNode,
+) -> bool {
+  inactive . membership . staged == Some (crate::types::git::Sign::Minus)
+  || inactive . membership . unstaged == Some (crate::types::git::Sign::Minus)
+}
 
 #[allow(non_snake_case)]
 fn scaffold_from_viewnodeInRole (

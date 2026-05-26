@@ -28,11 +28,11 @@
   inactive placeholder kind.
 - Real save validation rejects inactive placeholder title/body edits and
   active children beneath inactive placeholders.
+- Real save extraction treats inactive placeholders as content positions:
+  unchanged placeholders preserve =contains=, moves reorder =contains=,
+  deletions remove inactive IDs, and duplicate content IDs are rejected.
 
 * pending
-- Implement real save semantics for inactive placeholders: unchanged
-  placeholders preserve =contains=, moves reorder =contains=, deletions
-  remove inactive IDs, and duplicate behavior is explicitly defined.
 - Replace helper-only save tests with real save-pipeline tests for inactive
   placeholders.
 - Thread active source-set filtering into initial content traversal instead

@@ -222,6 +222,70 @@ fn test_extract_nonmergeSavePlan_no_aliases() {
 }
 
 #[test]
+fn inactive_placeholders_are_saved_as_content_positions () {
+  let input : &str =
+    indoc! {"
+            * (skg (node (id root) (source main))) root
+            ** (skg (node (id active-a) (source main))) active A
+            ** (skg (inactiveNode (id hidden) (source private))) node from inactive source
+            ** (skg (node (id active-b) (source main))) active B
+        "};
+  let viewforest : Tree<ViewNode> =
+    checked_viewforest_from_org (input);
+  let instructions : Vec<DefineNode> =
+    naive_saveinstructions_from_tree (viewforest) . unwrap ();
+
+  assert_eq!(
+    save_ids (&instructions),
+    vec![ID::from ("root"), ID::from ("active-a"), ID::from ("active-b")],
+    "inactive placeholders should not produce SaveNodes");
+  assert_eq!(
+    saved_node_by_id (&instructions, "root") . contains,
+    vec![ID::from ("active-a"),
+         ID::from ("hidden"),
+         ID::from ("active-b")]);
+}
+
+#[test]
+fn inactive_placeholder_moves_reorder_contains () {
+  let input : &str =
+    indoc! {"
+            * (skg (node (id root) (source main))) root
+            ** (skg (node (id active-a) (source main))) active A
+            ** (skg (node (id active-b) (source main))) active B
+            ** (skg (inactiveNode (id hidden) (source private))) node from inactive source
+        "};
+  let viewforest : Tree<ViewNode> =
+    checked_viewforest_from_org (input);
+  let instructions : Vec<DefineNode> =
+    naive_saveinstructions_from_tree (viewforest) . unwrap ();
+
+  assert_eq!(
+    saved_node_by_id (&instructions, "root") . contains,
+    vec![ID::from ("active-a"),
+         ID::from ("active-b"),
+         ID::from ("hidden")]);
+}
+
+#[test]
+fn inactive_placeholder_deletions_remove_contains () {
+  let input : &str =
+    indoc! {"
+            * (skg (node (id root) (source main))) root
+            ** (skg (node (id active-a) (source main))) active A
+            ** (skg (node (id active-b) (source main))) active B
+        "};
+  let viewforest : Tree<ViewNode> =
+    checked_viewforest_from_org (input);
+  let instructions : Vec<DefineNode> =
+    naive_saveinstructions_from_tree (viewforest) . unwrap ();
+
+  assert_eq!(
+    saved_node_by_id (&instructions, "root") . contains,
+    vec![ID::from ("active-a"), ID::from ("active-b")]);
+}
+
+#[test]
 fn test_extract_nonmergeSavePlan_multiple_alias_cols() {
   // Multiple AliasCols under the same node is invalid
   // (validate_tree rejects this). The function should error.

@@ -254,7 +254,7 @@ fn validate_truenode (
          MaybePlacedViewnodeKind::Unknown (_)                    )) {
     errors . push("TrueNode's children must include only TrueNode, AliasCol, IDCol, SubscribeeCol, TextChanged, Deleted, DeletedScaff, InactiveNode, or UnknownNode" . to_string()); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
-    errors . push("TrueNode's non-ignored TrueNode children must be unique (no two sharing the same ID)." . to_string()); }
+    errors . push("TrueNode's non-ignored content children must be unique (no two sharing the same ID)." . to_string()); }
   if has_empty_title (t) {
     errors . push("Definitive node has an empty title." . to_string()); }
   errors }
@@ -281,7 +281,7 @@ fn has_empty_title ( t : &MaybePlacedTruenode ) -> bool {
                Some (&EditRequest::Delete) );
   is_definitive && !is_delete && t . title . trim () . is_empty () }
 
-/// Check that all non-ignored, non-phantom TrueNode children
+/// Check that all non-ignored, non-phantom content children
 /// have distinct IDs.
 /// "Non-ignored" means parentIs == Container.
 /// "Non-phantom" means diff is not Removed or RemovedHere.
@@ -295,9 +295,18 @@ pub fn nonignored_children_have_distinct_ids (
     else { return true; };
   let mut seen : HashSet<ID> = HashSet::new();
   for child in node_ref . children() {
-    if let MaybePlacedViewnodeKind::True (t) = &child . value() . kind {
-      if !t . parent_ignores_it() && !t . is_phantom () {
-        if let Some (id) = &t . id {
-          if !seen . insert(id . clone()) {
-            return false; }} }} }
+    let content_id : Option<ID> =
+      match &child . value() . kind {
+        MaybePlacedViewnodeKind::True (t)
+          if !t . parent_ignores_it() && !t . is_phantom () =>
+          t . id . clone(),
+        MaybePlacedViewnodeKind::Inactive (i)
+          if i . membership . staged != Some (crate::types::git::Sign::Minus)
+          && i . membership . unstaged != Some (crate::types::git::Sign::Minus) =>
+          Some (i . id . clone()),
+        _ => None,
+      };
+    if let Some (id) = content_id {
+      if !seen . insert(id) {
+        return false; }}}
   true }

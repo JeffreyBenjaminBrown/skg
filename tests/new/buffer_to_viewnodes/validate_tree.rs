@@ -720,6 +720,38 @@ fn test_inactive_placeholder_under_truenode_allowed_locally () {
     . expect ("TrueNode should accept an inactive placeholder child");
 }
 
+#[test]
+fn test_duplicate_inactive_placeholder_content_rejected_locally () {
+  let input : &str =
+    indoc! {"
+      * (skg (node (id root) (source main))) parent
+      ** (skg (node (id hidden) (source main))) active child
+      ** (skg (inactiveNode (id hidden) (source private))) node from inactive source
+    "};
+  let (viewforest, parsing_errors)
+    : (Tree<MaybePlacedViewnode>, Vec<BufferValidationError>)
+    = org_to_uninterpreted_nodes (input) . unwrap ();
+  assert_eq! (
+    parsing_errors . len(), 0,
+    "Test fixture should not have parse errors: {:?}",
+    parsing_errors );
+
+  let config : SkgConfig = validation_config ();
+  let root_id = viewforest . root () . children ()
+    . next ()
+    . expect ("root child should exist")
+    . id ();
+  let error = validate_local_structure (
+      &viewforest, root_id, &config)
+    . expect_err (
+      "Duplicate active/inactive content IDs should fail validation");
+  assert!(
+    error . message . contains ("non-ignored content children must be unique"),
+    "Unexpected duplicate-content validation error: {:?}",
+    error );
+  assert_eq! (error . id . 0, "root");
+}
+
 fn validation_config () -> SkgConfig {
   let mut sources : HashMap<SourceName, SkgfileSource> =
     HashMap::new ();
