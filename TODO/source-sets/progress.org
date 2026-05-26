@@ -57,8 +57,9 @@
 - Readable-ID tests cover inactive placeholder IDs, inactive-source IDs
   omitted from title responses, and active IDs still receiving title
   annotations.
+- Source-set switch integration coverage verifies active-set mutation,
+  registered-view closure, stale search-enrichment clearing, and
+  cancellation of in-flight search enrichment.
 
 * pending
-- Add source-set switch integration coverage, including buffer closure and
-  stale enrichment cancellation.
 - Add end-to-end integration coverage for restricted-source search and save.

@@ -10,6 +10,10 @@ use ego_tree::{NodeId, Tree};
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::typedb::ancestry::AncestryTree;
+use skg::dbs::typedb::search::all_graphnodestats::AllGraphNodeStats;
+use skg::serve::ViewsState;
+use skg::serve::handlers::source_sets::handle_source_set_request;
+use skg::serve::handlers::text_search::SearchEnrichmentPayload;
 use skg::source_sets::{
   ActiveSourceSet,
   SourceSetName,
@@ -28,12 +32,20 @@ use skg::types::errors::SaveError;
 use skg::types::misc::{ID, MSV, SourceName};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode};
-use skg::types::viewnode::{ParentIs, ViewNode, ViewNodeKind};
+use skg::types::viewnode::{
+  ParentIs,
+  ViewNode,
+  ViewNodeKind,
+  viewforest_root_viewnode};
+use skg::types::views_state::{OpenViews, ViewState, ViewUri};
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::fs;
+use std::net::{TcpListener, TcpStream};
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 fn save_ids (
   instructions : &[DefineNode],
@@ -75,6 +87,17 @@ fn true_child_ids (
       _ => None, })
     . collect () }
 
+fn connected_tcp_stream_pair (
+) -> Result<(TcpStream, TcpStream), Box<dyn Error>> {
+  let listener : TcpListener =
+    TcpListener::bind ("127.0.0.1:0")?;
+  let addr = listener . local_addr ()?;
+  let client : TcpStream =
+    TcpStream::connect (addr)?;
+  let (server, _addr) =
+    listener . accept ()?;
+  Ok ((server, client)) }
+
 #[test]
 fn config_loads_default_source_set_and_named_source_sets (
 ) -> Result<(), Box<dyn Error>> {
@@ -105,8 +128,59 @@ fn config_rejects_reserved_all_source_and_source_set_names (
     load_config ("tests/source_sets/fixtures-invalid/source-set-all/skgconfig.toml");
   assert! (
     source_set_all . is_err (),
-    "user-defined source-set named all must be rejected" );
+	    "user-defined source-set named all must be rejected" );
 }
+
+#[test]
+fn source_set_switch_closes_views_and_cancels_stale_search_enrichment (
+) -> Result<(), Box<dyn Error>> {
+  let config =
+    load_config ("tests/source_sets/fixtures/skgconfig.toml")?;
+  let mut active : ActiveSourceSet =
+    ActiveSourceSet::named (
+      &config,
+      SourceSetName::from ("public"))?;
+  let mut views_state : ViewsState =
+    ViewsState {
+      diff_mode_enabled : false,
+      open_views        : OpenViews::new (), };
+  views_state . open_views . views . insert (
+    ViewUri::SearchView ("shared ranking term" . to_string ()),
+    ViewState {
+      viewforest : Tree::new (viewforest_root_viewnode ()),
+      pids       : HashSet::from ([ID::from ("active-search-hit")]), });
+  let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
+    Arc::new (Mutex::new (Some (SearchEnrichmentPayload {
+      terms          : "shared ranking term" . to_string (),
+      search_results : vec![ID::from ("active-search-hit")],
+      ancestry_by_id : HashMap::new (),
+      graphnodestats : AllGraphNodeStats::empty (), })));
+  let search_cancelled : Arc<AtomicBool> =
+    Arc::new (AtomicBool::new (false));
+  let (mut server_stream, _client_stream) =
+    connected_tcp_stream_pair ()?;
+  handle_source_set_request (
+    &mut server_stream,
+    "((request . \"set active source set\") (name . \"all\"))",
+    &config,
+    &mut views_state,
+    &mut active,
+    &enrichment_slot,
+    &search_cancelled);
+  assert_eq! (
+    active . name,
+    SourceSetName::from ("all"),
+    "source-set switch should update the active set" );
+  assert! (
+    views_state . open_views . views . is_empty (),
+    "source-set switch should close registered views" );
+  assert! (
+    enrichment_slot . lock () . unwrap () . is_none (),
+    "source-set switch should drop stale search enrichment payloads" );
+  assert! (
+    search_cancelled . load (Ordering::SeqCst),
+    "source-set switch should cancel in-flight search enrichment" );
+  Ok (( )) }
 
 #[test]
 fn content_view_renders_inactive_contained_nodes_as_placeholders (
