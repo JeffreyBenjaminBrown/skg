@@ -24,10 +24,10 @@
 - Initial source-set contract tests cover config, content placeholders,
   search filtering, title lookup, helper-level save behavior, helper-level
   backward traversal filtering, and inline diff placeholders.
+- Real buffer parser recognizes =inactiveNode= metadata as a distinct
+  inactive placeholder kind.
 
 * pending
-- Parse =inactiveNode= metadata in the real buffer parser as a distinct
-  inactive placeholder kind.
 - Enforce real save validation for inactive placeholders: reject edits to
   title/body/metadata/source/id and reject active children beneath an
   inactive placeholder.

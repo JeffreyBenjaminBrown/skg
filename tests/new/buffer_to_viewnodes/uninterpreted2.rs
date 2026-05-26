@@ -2,7 +2,8 @@
 
 use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::misc::ID;
+use skg::types::git::Sign;
+use skg::types::misc::{ID, SourceName};
 use skg::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
 use ego_tree::Tree;
 
@@ -107,6 +108,28 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   assert_eq!(cycle_t . viewStats . cycle, true);
   assert_eq!(cycle_node . body(),
              Some(&"This node has cycle flag" . to_string()));
+}
+
+#[test]
+fn test_org_to_uninterpreted_nodes2_inactive_placeholder() {
+  let input: &str =
+    indoc! {"
+            * (skg (inactiveNode (id hidden) (source private) (unstaged newM))) node from inactive source
+        "};
+
+  let viewforest: Tree<MaybePlacedViewnode> =
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let tree_roots: Vec<_> =
+    viewforest . root() . children() . collect();
+  assert_eq!(tree_roots . len(), 1);
+  let inactive = match &tree_roots[0] . value() . kind {
+    MaybePlacedViewnodeKind::Inactive (inactive) => inactive,
+    _ => panic!("expected InactiveNode") };
+  assert_eq!(inactive . id, ID::from ("hidden"));
+  assert_eq!(inactive . source, SourceName::from ("private"));
+  assert_eq!(inactive . membership . unstaged, Some (Sign::Plus));
+  assert_eq!(tree_roots[0] . value() . title(), "node from inactive source");
+  assert_eq!(tree_roots[0] . value() . body(), None);
 }
 
 #[test]

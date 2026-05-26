@@ -19,7 +19,7 @@ use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
-use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode, UnknownNode, IndefOrDef, NodeContainRels, NodeLinksourceRels, ParentIs};
+use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode, InactiveNode, UnknownNode, IndefOrDef, NodeContainRels, NodeLinksourceRels, ParentIs};
 use crate::types::maybe_placed_viewnode::{
     MaybePlacedViewnode, MaybePlacedViewnodeKind, MaybePlacedTruenode,
 };
@@ -62,6 +62,11 @@ pub struct ViewnodeMetadata {
   // When Some, this is an UnknownNode (a placeholder for a missing
   // referent). Carries only the id; no source/title/body apply.
   pub unknown_node_id: Option<ID>,
+  // When true, this is an inactive-source placeholder. It carries id,
+  // source, and relationship-position membership axes, but no editable
+  // node content.
+  pub is_inactive_node : bool,
+  pub inactive_membership : MembershipAxes,
 }
 
 pub fn default_metadata() -> ViewnodeMetadata {
@@ -86,7 +91,9 @@ pub fn default_metadata() -> ViewnodeMetadata {
     textchanged_unstaged : false,
     is_deleted_node: false,
     deleted_scaff_kind: None,
-    unknown_node_id: None, }}
+    unknown_node_id: None,
+    is_inactive_node: false,
+    inactive_membership: MembershipAxes::default(), }}
 
 /// Create an MaybePlacedViewnode from parsed metadata components.
 /// This is the bridge between parsing (ViewnodeMetadata) and runtime (MaybePlacedViewnode).
@@ -101,6 +108,22 @@ pub fn viewnode_from_metadata (
     = if let Some (ref uid) = metadata . unknown_node_id {
         ( MaybePlacedViewnodeKind::Unknown (
             UnknownNode { id: uid . clone () } ), None )
+      } else if metadata . is_inactive_node {
+        let error : Option<BufferValidationError> =
+          if body . is_some ()
+          || title != "node from inactive source" {
+            Some ( BufferValidationError::Other (
+              "Inactive placeholder content cannot be edited"
+              . to_string () ))
+          } else { None };
+        ( MaybePlacedViewnodeKind::Inactive (
+            InactiveNode {
+              id         : metadata . id . clone ()
+                           . unwrap_or_else ( || ID::from ("")),
+              source     : metadata . source . clone ()
+                           . unwrap_or_else ( || SourceName::from ("")),
+              membership : metadata . inactive_membership } ),
+          error )
       } else if let Some (kind) = metadata . deleted_scaff_kind {
         ( MaybePlacedViewnodeKind::DeletedScaff (kind), None )
       } else if metadata . is_deleted_node {
@@ -216,6 +239,8 @@ pub fn parse_metadata_to_viewnodemd (
             // (unknownNode (id X)) -- placeholder for a referenced
             // node with no record anywhere. No source/title/body.
             parse_unknownnode_sexp ( &items[1..], &mut result ) ?; },
+          "inactiveNode" => {
+            parse_inactivenode_sexp ( &items[1..], &mut result ) ?; },
           "staged" => {
             // (staged ATOMS) at top level is for Scaffolds (Alias/ID).
             apply_axis_atoms_to_membership_scaffold (
@@ -435,6 +460,59 @@ fn parse_unknownnode_sexp (
             "Unknown unknownNode key: {}", key )); }} },
       _ => { return Err ( "Unexpected element in unknownNode sexp"
                            . to_string () ); }} }
+  Ok (( )) }
+
+/// Parse the (inactiveNode (id X) (source S) [(staged M)] [(unstaged M)])
+/// s-expression contents.
+fn parse_inactivenode_sexp (
+  items    : &[Sexp],
+  metadata : &mut ViewnodeMetadata,
+) -> Result<(), String> {
+  let mut id : Option<ID> = None;
+  let mut source : Option<SourceName> = None;
+  let mut membership : MembershipAxes =
+    MembershipAxes::default ();
+  for element in items {
+    match element {
+      Sexp::List (subitems) if subitems . len () >= 1 => {
+        let key : String =
+          atom_to_string ( &subitems[0] ) ?;
+        match key . as_str () {
+          "id" => {
+            if subitems . len () != 2 {
+              return Err (
+                "inactiveNode id requires exactly one value"
+                . to_string () ); }
+            let value : String =
+              atom_to_string ( &subitems[1] ) ?;
+            id = Some ( ID::from (value)); },
+          "source" => {
+            if subitems . len () != 2 {
+              return Err (
+                "inactiveNode source requires exactly one value"
+                . to_string () ); }
+            let value : String =
+              atom_to_string ( &subitems[1] ) ?;
+            source = Some ( SourceName::from (value)); },
+          "staged" => {
+            apply_axis_atoms_to_membership_scaffold (
+              &subitems[1..], true, &mut membership ) ?; },
+          "unstaged" => {
+            apply_axis_atoms_to_membership_scaffold (
+              &subitems[1..], false, &mut membership ) ?; },
+          _ => { return Err ( format! (
+            "Unknown inactiveNode key: {}", key )); }} },
+      _ => { return Err (
+        "Unexpected element in inactiveNode sexp"
+        . to_string () ); }}}
+  metadata . id =
+    Some ( id . ok_or (
+      "inactiveNode requires an id" . to_string () )? );
+  metadata . source =
+    Some ( source . ok_or (
+      "inactiveNode requires a source" . to_string () )? );
+  metadata . is_inactive_node = true;
+  metadata . inactive_membership = membership;
   Ok (( )) }
 
 /// Parse the (deleted (id X) (source S)) s-expression contents.
