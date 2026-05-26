@@ -1,4 +1,6 @@
 * ONGOING [[./TODO/source-sets.org]]
+codex resume 019e610e-8d8a-7202-9792-e11e25e62540
+* [[./TODO/incremental-init-might-be-broken.org]]
 * critical
 ** I can't demo without privacy mode.
 The backlinks from skg itself contains unsafe references.

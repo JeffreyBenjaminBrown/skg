@@ -1,0 +1,285 @@
+* Codex thinks it's half-broken.
+Incremental init is worth keeping, but I would not call it fully correct for all filesystem changes.
+
+What looks OK:
+
+- Ordinary title/body edits.
+- Relationship edits in existing files: contains/textlinks/subscribes/hides/overrides are deleted and recreated.
+- New files: missing TypeDB nodes are created.
+- Tantivy updates for modified files.
+- The transaction leak/panic trigger we found is fixed.
+
+What still looks broken or at least semantically incomplete:
+
+- Deleted .skg files are not detected. Stale nodes can remain in TypeDB/Tantivy after manual deletes, branch switches, pulls, or imports that remove files.
+- Existing node source changes are not reflected in TypeDB. If a file moves between source dirs with the same ID, incremental init reads the new source but does not update the TypeDB source attribute.
+- Existing node extra_ids changes are probably not synced. create_only_nodes_with_no_ids_present skips existing nodes, and incremental init does not run the save-path overwrite_extra_ids_of_node step.
+
+So: if “incremental init” means “recover after ordinary edited files and new files,” it seems usable. If it means “make TypeDB/Tantivy exactly match arbitrary disk state after git checkout/pull/manual moves/deletes/imports,” it is still broken.
+
+A pragmatic policy would be: keep incremental init, but force or recommend full rebuild after operations that delete files, move nodes across sources, or change merge/extra-id state outside the running server.
+* But it does speed things up.
+Here's some code to measure that,
+preceded by its output.
+** Context
+This measures Skg incremental init on the real data set in =$DATA_ROOT=.
+
+- Data set size: $NODE_COUNT .skg nodes.
+- Full rebuild baseline, recent measured time to =Server ready=: about ${FULL_REBUILD_READY_SECONDS}s.
+- Full rebuild =initialize_dbs= span: about ${FULL_REBUILD_INIT_SECONDS}s.
+- Method: keep TypeDB running, set =data/.skg_init_marker= to "now", touch N
+  .skg files after it, start =cargo run --bin skg -- $CONFIG=, and parse
+  =data/logs/incremental-init-performance-skg.log=.
+- Search strategy: measure the minimum and maximum touched-node counts, then
+  binary search in log-space using geometric midpoints.
+- Caution: touching files changes mtimes but not file contents.
+
+** Results
+| touched | modified-reported | initialize_dbs | to-server-ready | useful-vs-full-ready | note |
+|-
+EOF
+
+duration_seconds () {
+  local raw="$1"
+  awk -v raw="$raw" '
+    BEGIN {
+      if (raw ~ /ms$/) {
+        sub(/ms$/, "", raw); print raw / 1000;
+      } else if (raw ~ /µs$/) {
+        sub(/µs$/, "", raw); print raw / 1000000;
+      } else if (raw ~ /us$/) {
+        sub(/us$/, "", raw); print raw / 1000000;
+      } else if (raw ~ /s$/) {
+        sub(/s$/, "", raw); print raw;
+      } else {
+        print raw;
+      }
+    }'
+}
+
+timestamp_seconds () {
+  local ts="$1"
+  if [ -z "$ts" ]; then
+    echo ""
+    return 0
+  fi
+  date -u -d "$ts" +%s.%N 2>/dev/null || echo ""
+}
+
+append_result () {
+  local touched="$1"
+  local reported="$2"
+  local init_busy="$3"
+  local ready_elapsed="$4"
+  local useful="$5"
+  local note="$6"
+  printf '| %s | %s | %s | %s | %s | %s |\n' \
+    "$touched" "$reported" "$init_busy" "$ready_elapsed" "$useful" "$note" \
+    >> "$OUT"
+}
+
+stop_servers () {
+  pkill -f "cargo-watch.*skg" >/dev/null 2>&1 || true
+  pkill -f "target/debug/skg $CONFIG" >/dev/null 2>&1 || true
+  for _ in $(seq 1 20); do
+    if ! pgrep -f "cargo-watch.*skg|target/debug/skg $CONFIG" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+  done
+  sleep 1
+}
+
+ensure_typedb () {
+  if (exec 3<>/dev/tcp/127.0.0.1/1729) 2>/dev/null; then
+    exec 3<&- 3>&-
+    return 0
+  fi
+  nohup typedb server > "$DATA_ROOT/logs/typedb.log" 2>&1 < /dev/null &
+  for _ in $(seq 1 60); do
+    if (exec 3<>/dev/tcp/127.0.0.1/1729) 2>/dev/null; then
+      exec 3<&- 3>&-
+      return 0
+    fi
+    sleep 1
+  done
+  echo "TypeDB did not become ready on 1729" >&2
+  exit 1
+}
+
+touch_n_files () {
+  local n="$1"
+  touch "$DATA_ROOT/.skg_init_marker"
+  sleep 1
+  head -n "$n" "$FILE_LIST" | xargs -r touch
+}
+
+measure_count () {
+  local count="$1"
+  local offset start_time ready_deadline segment tmp reported init_busy init_secs
+  local listen_ts ready_ts listen_s ready_s ready_elapsed useful note
+
+  stop_servers
+  ensure_typedb
+  touch_n_files "$count"
+
+  offset="$(wc -c < "$SKG_LOG" 2>/dev/null || echo 0)"
+  start_time="$(date -u +%s)"
+  ready_deadline="$((start_time + 900))"
+  cargo run --bin skg -- "$CONFIG" >> "$SKG_LOG" 2>&1 &
+  skg_runner_pid="$!"
+
+  while true; do
+    segment="$(tail -c +"$((offset + 1))" "$SKG_LOG" 2>/dev/null || true)"
+    if printf '%s\n' "$segment" | grep -q 'initialize_dbs: close' \
+       && printf '%s\n' "$segment" | grep -q 'Server ready[.]'; then
+      break
+    fi
+    if printf '%s\n' "$segment" | grep -q 'Finished running[.] Exit status: [1-9]'; then
+      append_result "$count" "?" "failed" "failed" "no" "server exited"
+      kill "$skg_runner_pid" >/dev/null 2>&1 || true
+      stop_servers
+      return 2
+    fi
+    if [ "$(date -u +%s)" -gt "$ready_deadline" ]; then
+      append_result "$count" "?" "timeout" "timeout" "no" "timed out"
+      kill "$skg_runner_pid" >/dev/null 2>&1 || true
+      stop_servers
+      return 2
+    fi
+    sleep 2
+  done
+
+  tmp="$(mktemp /tmp/skg-incremental-segment.XXXXXX)"
+  printf '%s\n' "$segment" > "$tmp"
+  reported="$(sed -n 's/.*Modified \.skg file(s) found\. count=\([0-9][0-9]*\).*/\1/p' "$tmp" | tail -1)"
+  [ -n "$reported" ] || reported="0"
+  init_busy="$(sed -n 's/.*initialize_dbs: close time.busy=\([^ ]*\).*/\1/p' "$tmp" | tail -1)"
+  listen_ts="$(sed -n 's/^\([^ ]*\).*Listening for Emacs connections.*/\1/p' "$tmp" | tail -1)"
+  ready_ts="$(sed -n 's/^\([^ ]*\).*Server ready[.].*/\1/p' "$tmp" | tail -1)"
+  rm -f "$tmp"
+
+  listen_s="$(timestamp_seconds "$listen_ts")"
+  ready_s="$(timestamp_seconds "$ready_ts")"
+  if [ -n "$listen_s" ] && [ -n "$ready_s" ]; then
+    ready_elapsed="$(awk -v a="$listen_s" -v b="$ready_s" 'BEGIN { printf "%.3fs", b - a }')"
+  else
+    ready_elapsed="?"
+  fi
+
+  init_secs="$(duration_seconds "$init_busy")"
+  useful="$(awk -v got="$init_secs" -v full="$FULL_REBUILD_READY_SECONDS" \
+    'BEGIN { if (got < full) print "yes"; else print "no"; }')"
+  note="ok"
+  append_result "$count" "$reported" "$init_busy" "$ready_elapsed" "$useful" "$note"
+  kill "$skg_runner_pid" >/dev/null 2>&1 || true
+  stop_servers
+  if [ "$useful" = "yes" ]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+append_summary () {
+  local text="$1"
+  {
+    echo
+    echo "* Search status"
+    echo "$text"
+    echo
+    echo "Finished at $(date -u '+%Y-%m-%dT%H:%M:%SZ')."
+  } >> "$OUT"
+}
+
+low=1
+high="$NODE_COUNT"
+
+measure_count "$low"
+low_status="$?"
+measure_count "$high"
+high_status="$?"
+
+if [ "$low_status" -ne 0 ]; then
+  append_summary "Incremental init was already not useful at 1 touched node; no helpful range found."
+  exit 0
+fi
+
+if [ "$high_status" -eq 0 ]; then
+  append_summary "Incremental init remained useful through $high touched nodes; no crossover found up to the full data set."
+  exit 0
+fi
+
+for _ in $(seq 1 10); do
+  if [ "$high" -le "$((low + 1))" ]; then
+    break
+  fi
+  mid="$(awk -v lo="$low" -v hi="$high" 'BEGIN { printf "%d", exp((log(lo) + log(hi)) / 2) + 0.5 }')"
+  if [ "$mid" -le "$low" ] || [ "$mid" -ge "$high" ]; then
+    break
+  fi
+  measure_count "$mid"
+  status="$?"
+  if [ "$status" -eq 0 ]; then
+    low="$mid"
+  else
+    high="$mid"
+  fi
+done
+
+append_summary "Estimated crossover: incremental init is useful at $low touched nodes and not useful at $high touched nodes, relative to the ${FULL_REBUILD_READY_SECONDS}s full-rebuild-to-ready baseline."
+*** Context
+This measures Skg incremental init on the real data set in =data=.
+
+- Data set size: 59865 .skg nodes.
+- Full rebuild baseline, recent measured time to =Server ready=: about 44.6s.
+- Full rebuild =initialize_dbs= span: about 43.5s.
+- Method: keep TypeDB running, set =data/.skg_init_marker= to "now", touch N
+  .skg files after it, start =cargo run --bin skg -- data/skgconfig.toml=, and parse
+  =data/logs/incremental-init-performance-skg.log=.
+- Search strategy: measure the minimum and maximum touched-node counts, then
+  binary search in log-space using geometric midpoints.
+- Caution: touching files changes mtimes but not file contents.
+
+*** Results
+| touched | modified-reported | initialize_dbs | to-server-ready | useful-vs-full-ready | note |
+|---------+-------------------+----------------+-----------------+----------------------+------|
+|       1 |                 1 | 2.67s          | 3.905s          | yes                  | ok   |
+|   59865 |             59865 | 136s           | 137.730s        | no                   | ok   |
+|     245 |               245 | 3.34s          | 4.706s          | yes                  | ok   |
+|    3830 |              3830 | 10.8s          | 12.114s         | yes                  | ok   |
+|   15142 |             15142 | 34.6s          | 36.035s         | yes                  | ok   |
+|   30108 |             30108 | 69.2s          | 70.768s         | no                   | ok   |
+|   21352 |             21352 | 49.3s          | 50.950s         | no                   | ok   |
+** The program that generated the Results below
+#!/usr/bin/env bash
+
+set -u
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT" || exit 1
+
+CONFIG="${SKG_CONFIG:-data/skgconfig.toml}"
+DATA_ROOT="$(dirname "$CONFIG")"
+SERVER_LOG="$DATA_ROOT/logs/cargo-watch.log"
+RUN_LOG="$DATA_ROOT/logs/incremental-init-performance-run-servers.log"
+SKG_LOG="$DATA_ROOT/logs/incremental-init-performance-skg.log"
+OUT="$ROOT/incremental-init-performance.org"
+FILE_LIST="$(mktemp /tmp/skg-incremental-files.XXXXXX)"
+
+FULL_REBUILD_READY_SECONDS="44.6"
+FULL_REBUILD_INIT_SECONDS="43.5"
+
+cleanup () {
+  rm -f "$FILE_LIST"
+}
+trap cleanup EXIT
+
+find "$DATA_ROOT" \
+  -path "$DATA_ROOT/.index.tantivy" -prune -o \
+  -type f -name '*.skg' -print \
+  | sort > "$FILE_LIST"
+
+NODE_COUNT="$(wc -l < "$FILE_LIST" | tr -d ' ')"
+
+cat > "$OUT" <<EOF

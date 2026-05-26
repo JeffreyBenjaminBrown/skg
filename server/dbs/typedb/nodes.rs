@@ -99,37 +99,46 @@ pub async fn which_ids_exist (
 ) -> Result < HashSet < String >, Box<dyn Error> > {
   if ids . is_empty () {
     return Ok ( HashSet::new () ); }
-  let results : Vec < Option < String > > =
-    stream::iter ( ids . iter ()
-      . map ( |id| check_one_id_exists (
-                db_name, driver, id . clone () )) )
-    . buffer_unordered (
-        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
-    . collect () . await;
+  let tx : Transaction =
+    driver . transaction (
+      db_name, TransactionType::Read ) . await ?;
+  let result : Result < HashSet < String >, Box<dyn Error> > =
+    which_ids_exist_in_tx ( &tx, ids ) . await;
+  let close_result : typedb_driver::Result < () > =
+    tx . close () . await;
   let found : HashSet < String > =
-    results . into_iter ()
-    . flatten ()
-    . collect ();
+    result ?;
+  close_result ?;
+  Ok (found) }
+
+async fn which_ids_exist_in_tx (
+  tx  : &Transaction,
+  ids : &BTreeSet < String >,
+) -> Result < HashSet < String >, Box<dyn Error> > {
+  let mut found : HashSet < String > =
+    HashSet::new ();
+  for id in ids {
+    if check_one_id_exists_in_tx (tx, id) . await ? {
+      found . insert (id . clone ()); }}
   Ok (found) }
 
 /// Check whether a single ID exists in the DB.
 /// Returns Some(id) if it exists, None otherwise.
-async fn check_one_id_exists (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-  id      : String,
-) -> Option < String > {
-  let tx : Transaction =
-    driver . transaction (
-      db_name, TransactionType::Read ) . await . ok () ?;
+async fn check_one_id_exists_in_tx (
+  tx : &Transaction,
+  id : &str,
+) -> Result < bool, Box<dyn Error> > {
   let answer : QueryAnswer =
     tx . query ( format! (
       "match $n isa node, has id \"{}\"; select $n;",
-      id ) ) . await . ok () ?;
-  let mut rows : ConceptRowStream = answer . into_rows ();
-  if rows . next () . await . is_some () {
-    Some (id) }
-  else { None } }
+      id ) ) . await ?;
+  let result : bool = {
+    let mut rows : ConceptRowStream = answer . into_rows ();
+    match rows . next () . await {
+      Some (Ok (_)) => true,
+      Some (Err (e)) => return Err (e . into ()),
+      None => false, } };
+  Ok (result) }
 
 pub async fn create_node (
   // Creates: the `node`,
