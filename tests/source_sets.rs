@@ -13,14 +13,35 @@ use skg::source_sets::{
   SourceSetName,
   filter_path_to_active_sources_for_test,
   filter_branches_to_active_sources_for_test,
-  save_inactive_placeholder_buffer_for_test,
   run_with_source_set_test_db};
+use skg::from_text::buffer_to_validated_saveplan;
 use skg::to_org::render::content_view::multi_root_view_with_source_set;
+use skg::types::errors::SaveError;
 use skg::types::misc::{ID, SourceName};
+use skg::types::nodes::complete::NodeComplete;
+use skg::types::save::{DefineNode, SaveNode};
 use skg::types::viewnode::ViewNode;
 
 use std::collections::BTreeSet;
 use std::error::Error;
+
+fn save_ids (
+  instructions : &[DefineNode],
+) -> Vec<ID> {
+  instructions . iter() . filter_map (|instruction| match instruction {
+    DefineNode::Save (SaveNode (node)) => Some (node . pid . clone()),
+    DefineNode::Delete (_) => None,
+  }) . collect() }
+
+fn saved_node_by_id<'a> (
+  instructions : &'a [DefineNode],
+  id           : &str,
+) -> &'a NodeComplete {
+  for instruction in instructions {
+    if let DefineNode::Save (SaveNode (node)) = instruction {
+      if node . pid == ID::from (id) {
+        return node; }}}
+  panic! ("SaveNode not found: {}", id) }
 
 #[test]
 fn config_loads_default_source_set_and_named_source_sets (
@@ -155,51 +176,65 @@ fn search_filters_inactive_sources_before_ranking_and_truncation (
 #[test]
 fn saving_inactive_placeholder_moves_and_deletes_update_contains (
 ) -> Result<(), Box<dyn Error>> {
-  let buffer = indoc! {"
-    * (skg (node (id root) (source public))) root
-    ** (skg (node (id active-b) (source public))) active-b
-    ** (skg (inactiveNode (id private-a) (source private))) node from inactive source
-  "};
-  let saved =
-    save_inactive_placeholder_buffer_for_test (
-      "tests/source_sets/fixtures/skgconfig.toml",
-      buffer)?;
-  assert_eq! (
-    saved . contains_for (&ID::from ("root"))?,
-    vec![ID::from ("active-b"), ID::from ("private-a")],
-    "moving an inactive placeholder should reorder the active \
-     container's contains list" );
-  let buffer = indoc! {"
-    * (skg (node (id root) (source public))) root
-    ** (skg (node (id active-b) (source public))) active-b
-  "};
-  let saved =
-    save_inactive_placeholder_buffer_for_test (
-      "tests/source_sets/fixtures/skgconfig.toml",
-      buffer)?;
-  assert_eq! (
-    saved . contains_for (&ID::from ("root"))?,
-    vec![ID::from ("active-b")],
-    "deleting an inactive placeholder should remove that inactive \
-     ID from contains" );
-  Ok (( )) }
+  run_with_source_set_test_db (
+    "skg-test-source-sets-save-placeholders",
+    "tests/source_sets/fixtures/skgconfig.toml",
+    "/tmp/tantivy-test-source-sets-save-placeholders",
+    |config, driver, _tantivy| Box::pin ( async move {
+      let moved_buffer = indoc! {"
+        * (skg (node (id root) (source public))) root
+        ** (skg (node (id active-b) (source public))) active-b
+        ** (skg (inactiveNode (id private-a) (source private))) node from inactive source
+      "};
+      let moved_instructions : Vec<DefineNode> =
+        buffer_to_validated_saveplan (
+          moved_buffer, config, driver) . await?
+        . define_nodes;
+      assert_eq! (
+        saved_node_by_id (&moved_instructions, "root") . contains,
+        vec![ID::from ("active-b"), ID::from ("private-a")],
+        "moving an inactive placeholder should reorder the active \
+         container's contains list" );
+      assert! (
+        ! save_ids (&moved_instructions) . contains (&ID::from ("private-a")),
+        "inactive placeholder should not produce a SaveNode" );
+
+      let deleted_buffer = indoc! {"
+        * (skg (node (id root) (source public))) root
+        ** (skg (node (id active-b) (source public))) active-b
+      "};
+      let deleted_instructions : Vec<DefineNode> =
+        buffer_to_validated_saveplan (
+          deleted_buffer, config, driver) . await?
+        . define_nodes;
+      assert_eq! (
+        saved_node_by_id (&deleted_instructions, "root") . contains,
+        vec![ID::from ("active-b")],
+        "deleting an inactive placeholder should remove that inactive \
+         ID from contains" );
+      Ok (( )) } )) }
 
 #[test]
 fn saving_edits_to_inactive_placeholder_content_are_rejected (
-) {
-  let buffer = indoc! {"
-    * (skg (node (id root) (source public))) root
-    ** (skg (inactiveNode (id private-a) (source private))) edited title
-    This body edit should be rejected.
-  "};
-  let result =
-    save_inactive_placeholder_buffer_for_test (
-      "tests/source_sets/fixtures/skgconfig.toml",
-      buffer);
-  assert! (
-    result . is_err (),
-    "editing inactive placeholder title/body should be rejected" );
-}
+) -> Result<(), Box<dyn Error>> {
+  run_with_source_set_test_db (
+    "skg-test-source-sets-save-placeholder-edit",
+    "tests/source_sets/fixtures/skgconfig.toml",
+    "/tmp/tantivy-test-source-sets-save-placeholder-edit",
+    |config, driver, _tantivy| Box::pin ( async move {
+      let buffer = indoc! {"
+        * (skg (node (id root) (source public))) root
+        ** (skg (inactiveNode (id private-a) (source private))) edited title
+        This body edit should be rejected.
+      "};
+      let result =
+        buffer_to_validated_saveplan (
+          buffer, config, driver) . await;
+      assert! (
+        matches! ( result, Err (SaveError::BufferValidationErrors (_)) ),
+        "editing inactive placeholder title/body should be rejected: {:?}",
+        result );
+      Ok (( )) } )) }
 
 #[test]
 fn backward_path_truncates_before_first_inactive_node (

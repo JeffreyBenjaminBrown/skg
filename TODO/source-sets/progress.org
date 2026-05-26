@@ -31,10 +31,11 @@
 - Real save extraction treats inactive placeholders as content positions:
   unchanged placeholders preserve =contains=, moves reorder =contains=,
   deletions remove inactive IDs, and duplicate content IDs are rejected.
+- Inactive-placeholder source-set save coverage now uses the real
+  =buffer_to_validated_saveplan= pipeline instead of a helper-only string
+  scanner.
 
 * pending
-- Replace helper-only save tests with real save-pipeline tests for inactive
-  placeholders.
 - Thread active source-set filtering into initial content traversal instead
   of rendering inactive subtrees and replacing them after the fact.
 - Thread active source-set filtering into content completion/rerender paths.

@@ -35,10 +35,6 @@ pub struct ActiveSourceSet {
   pub sources : BTreeSet<SourceName>,
 }
 
-pub struct SourceSetSaveResult {
-  contains_by_id : HashMap<ID, Vec<ID>>,
-}
-
 impl ActiveSourceSet {
   pub fn default_from_config (
     config : &SkgConfig,
@@ -80,15 +76,6 @@ impl ActiveSourceSet {
       Some (source) => self . contains_source (&source),
       None          => false } ) }
 }
-
-impl SourceSetSaveResult {
-  pub fn contains_for (
-    &self,
-    id : &ID,
-  ) -> Result<Vec<ID>, Box<dyn Error>> {
-    self . contains_by_id . get (id) . cloned ()
-      . ok_or_else ( || format! (
-        "No saved contains list for {}", id ) . into () ) }}
 
 pub fn filter_path_to_active_sources_for_test (
   config : &SkgConfig,
@@ -160,48 +147,6 @@ pub fn render_viewforest_with_source_set (
 ) -> Result<String, Box<dyn Error>> {
   apply_source_set_to_viewforest (viewforest, active);
   viewforest_to_string (viewforest, config) }
-
-pub fn save_inactive_placeholder_buffer_for_test (
-  _config_path : &str,
-  buffer       : &str,
-) -> Result<SourceSetSaveResult, Box<dyn Error>> {
-  let mut contains_by_id : HashMap<ID, Vec<ID>> = HashMap::new ();
-  let mut current_root : Option<ID> = None;
-  let mut current_contains : Vec<ID> = Vec::new ();
-  for line in buffer . lines () {
-    if ! line . starts_with ('*') { 
-      if current_root . is_some () {
-        return Err ("Inactive placeholder body edits are rejected" . into ()); }
-      continue; }
-    let level : usize =
-      line . chars () . take_while ( |c| *c == '*' ) . count ();
-    let id : Option<ID> =
-      id_from_metadata_line (line);
-    if level == 1 {
-      if let Some (root) = current_root . take () {
-        contains_by_id . insert (root, current_contains . clone ());
-        current_contains . clear (); }
-      current_root = id;
-    } else if level == 2 {
-      if line . contains ("inactiveNode")
-      && ! line . ends_with ("node from inactive source") {
-        return Err ("Inactive placeholder title edits are rejected" . into ()); }
-      if let Some (child_id) = id {
-        current_contains . push (child_id); }}}
-  if let Some (root) = current_root . take () {
-    contains_by_id . insert (root, current_contains); }
-  Ok (SourceSetSaveResult { contains_by_id }) }
-
-fn id_from_metadata_line (
-  line : &str,
-) -> Option<ID> {
-  let start : usize =
-    line . find ("(id ")? + 4;
-  let rest : &str =
-    &line[start..];
-  let end : usize =
-    rest . find (')')?;
-  Some (ID::from (&rest[..end])) }
 
 pub fn titles_for_source_set_for_test (
   config : &SkgConfig,
