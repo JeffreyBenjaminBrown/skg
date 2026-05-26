@@ -60,6 +60,9 @@
 - Source-set switch integration coverage verifies active-set mutation,
   registered-view closure, stale search-enrichment clearing, and
   cancellation of in-flight search enrichment.
+- End-to-end restricted-source coverage combines search filtering,
+  content placeholder rendering, inactive-placeholder save preservation,
+  and active-source edits through the real save-plan pipeline.
 
 * pending
-- Add end-to-end integration coverage for restricted-source search and save.
+- None.

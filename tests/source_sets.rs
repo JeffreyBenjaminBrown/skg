@@ -345,6 +345,63 @@ fn saving_edits_to_inactive_placeholder_content_are_rejected (
         matches! ( result, Err (SaveError::BufferValidationErrors (_)) ),
         "editing inactive placeholder title/body should be rejected: {:?}",
         result );
+	      Ok (( )) } )) }
+
+#[test]
+fn restricted_source_search_and_save_work_together_end_to_end (
+) -> Result<(), Box<dyn Error>> {
+  run_with_source_set_test_db (
+    "skg-test-source-sets-search-save-e2e",
+    "tests/source_sets/fixtures/skgconfig.toml",
+    "/tmp/tantivy-test-source-sets-search-save-e2e",
+    |config, driver, tantivy| Box::pin ( async move {
+      let active : ActiveSourceSet =
+        ActiveSourceSet::named (
+          &config,
+          SourceSetName::from ("public"))?;
+      let ids : Vec<ID> =
+        skg::serve::handlers::text_search::search_ids_for_source_set_for_test (
+          tantivy,
+          &config,
+          &active,
+          "shared ranking term",
+          10 )?;
+      assert_eq! (
+        ids,
+        vec![ID::from ("active-search-hit")],
+        "restricted search should only return active-source hits" );
+      let (rendered, _pids, _viewforest) : (String, Vec<ID>, Tree<ViewNode>) =
+        multi_root_view_with_source_set (
+          driver, config, None,
+          &[ID::from ("root")],
+          false,
+          &active ) . await ?;
+      assert! (
+        rendered . contains (
+          "(skg (inactiveNode (id private-a) (source private))) node from inactive source"),
+        "restricted content view should include an inactive placeholder: {}",
+        rendered );
+      let edited_buffer = indoc! {"
+        * (skg (node (id root) (source public))) root
+        ** (skg (node (id active-b) (source public))) active-b edited through restricted view
+        ** (skg (inactiveNode (id private-a) (source private))) node from inactive source
+      "};
+      let instructions : Vec<DefineNode> =
+        buffer_to_validated_saveplan (
+          edited_buffer, config, driver) . await?
+        . define_nodes;
+      assert_eq! (
+        saved_node_by_id (&instructions, "root") . contains,
+        vec![ID::from ("active-b"), ID::from ("private-a")],
+        "restricted save should preserve inactive placeholders as \
+         content positions" );
+      assert! (
+        ! save_ids (&instructions) . contains (&ID::from ("private-a")),
+        "restricted save should not write inactive-source nodes" );
+      assert_eq! (
+        saved_node_by_id (&instructions, "active-b") . title,
+        "active-b edited through restricted view",
+        "restricted save should still write active-source edits" );
       Ok (( )) } )) }
 
 #[test]
