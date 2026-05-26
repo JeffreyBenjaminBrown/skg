@@ -9,12 +9,15 @@
 
 use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
 use crate::dbs::typedb::paths::{ paths_to_first_nonlinearities, PathToFirstNonlinearity};
+use crate::source_sets::ActiveSourceSet;
 use crate::to_org::util::{ get_id_from_treenode, nodecomplete_and_viewnode_from_id, remove_completed_view_request};
 
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::env::find_source_with_optional_tantivy;
+use crate::types::git::MembershipAxes;
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::tree::viewnode_nodecomplete::{ find_child_by_id, find_children_by_ids};
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_from_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, ParentIs, mk_inactive_viewnode, mk_indefinitive_from_viewnode, mk_unknown_viewnode };
 
 use ego_tree::{NodeId,Tree};
 use std::collections::{HashSet, HashMap};
@@ -31,9 +34,21 @@ pub async fn build_and_integrate_containerward_view_then_drop_request (
   typedb_driver : &TypeDBDriver,
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
+  build_and_integrate_containerward_view_then_drop_request_with_source_set (
+    tree, node_id, config, typedb_driver, errors, None ) . await
+}
+
+pub async fn build_and_integrate_containerward_view_then_drop_request_with_source_set (
+  tree          : &mut Tree<ViewNode>,
+  node_id       : NodeId,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+  errors        : &mut Vec < String >,
+  active        : Option<&ActiveSourceSet>,
+) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
-    build_and_integrate_containerward_path (
-      tree, node_id, config, typedb_driver ) . await;
+    build_and_integrate_containerward_path_with_source_set (
+      tree, node_id, config, typedb_driver, active ) . await;
   remove_completed_view_request (
     tree, node_id,
     ViewRequest::Containerward,
@@ -49,10 +64,22 @@ pub async fn build_and_integrate_containerward_path (
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
+  build_and_integrate_containerward_path_with_source_set (
+    tree, node_id, config, driver, None ) . await
+}
+
+pub async fn build_and_integrate_containerward_path_with_source_set (
+  tree      : &mut Tree<ViewNode>,
+  node_id   : NodeId,
+  config    : &SkgConfig,
+  driver    : &TypeDBDriver,
+  active    : Option<&ActiveSourceSet>,
+) -> Result < (), Box<dyn Error> > {
   let _ : Vec<ID> = build_and_integrate_backpaths (
     tree, node_id, config, driver,
     "contains", "contained", "container",
-    ParentIs::Content
+    ParentIs::Content,
+    active
   ) . await ?;
   Ok (( )) }
 
@@ -63,9 +90,21 @@ pub async fn build_and_integrate_sourceward_view_then_drop_request (
   typedb_driver : &TypeDBDriver,
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
+  build_and_integrate_sourceward_view_then_drop_request_with_source_set (
+    tree, node_id, config, typedb_driver, errors, None ) . await
+}
+
+pub async fn build_and_integrate_sourceward_view_then_drop_request_with_source_set (
+  tree          : &mut Tree<ViewNode>,
+  node_id       : NodeId,
+  config        : &SkgConfig,
+  typedb_driver : &TypeDBDriver,
+  errors        : &mut Vec < String >,
+  active        : Option<&ActiveSourceSet>,
+) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
-    build_and_integrate_sourceward_path (
-      tree, node_id, config, typedb_driver ) . await;
+    build_and_integrate_sourceward_path_with_source_set (
+      tree, node_id, config, typedb_driver, active ) . await;
   remove_completed_view_request (
     tree, node_id,
     ViewRequest::Sourceward,
@@ -80,13 +119,25 @@ pub async fn build_and_integrate_sourceward_path (
   config    : &SkgConfig,
   driver    : &TypeDBDriver,
 ) -> Result < (), Box<dyn Error> > {
+  build_and_integrate_sourceward_path_with_source_set (
+    tree, node_id, config, driver, None ) . await
+}
+
+pub async fn build_and_integrate_sourceward_path_with_source_set (
+  tree      : &mut Tree<ViewNode>,
+  node_id   : NodeId,
+  config    : &SkgConfig,
+  driver    : &TypeDBDriver,
+  active    : Option<&ActiveSourceSet>,
+) -> Result < (), Box<dyn Error> > {
   let _source_pids : Vec<ID> =
     build_and_integrate_backpaths (
       tree, node_id, config, driver,
       "textlinks_to", "dest", "source",
-      ParentIs::LinkTarget ) . await ?;
+      ParentIs::LinkTarget,
+      active ) . await ?;
   attach_containerward_ancestries_to_link_sources (
-    tree, node_id, config, driver ) . await }
+    tree, node_id, config, driver, active ) . await }
 
 /// Plural 'backpaths' because if the origin
 /// immediately forks in the backward direction,
@@ -106,6 +157,7 @@ async fn build_and_integrate_backpaths (
   input_role  : &str,
   output_role : &str,
   parentIs       : ParentIs,
+  active      : Option<&ActiveSourceSet>,
 ) -> Result < Vec<ID>, Box<dyn Error> > {
   let terminus_pid : ID =
     get_id_from_treenode ( tree, node_id ) ?;
@@ -117,7 +169,7 @@ async fn build_and_integrate_backpaths (
   let pids : Vec<ID> =
     extract_pids_from_paths ( &paths );
   integrate_backpaths (
-    node_id, tree, paths, parentIs, config, driver
+    node_id, tree, paths, parentIs, config, driver, active
   ) . await ?;
   Ok (pids) }
 
@@ -130,12 +182,13 @@ async fn integrate_backpaths (
 
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
+  active  : Option<&ActiveSourceSet>,
 ) -> Result < (), Box<dyn Error> > {
   for p in paths {
-    integrate_path_that_might_fork_or_cycle (
+    integrate_path_that_might_fork_or_cycle_with_source_set (
       tree, node_id,
       p.path, p.branches, p.cycle_nodes,
-      config, driver, parentIs
+      config, driver, parentIs, active
     ) . await ?; }
   Ok(()) }
 
@@ -143,7 +196,6 @@ async fn integrate_backpaths (
 /// using provided backpath data.
 pub async fn integrate_path_that_might_fork_or_cycle (
   tree        : &mut Tree<ViewNode>,
-
   node_id     : NodeId,
   path        : Vec < ID >,
   branches    : HashSet < ID >,
@@ -152,19 +204,35 @@ pub async fn integrate_path_that_might_fork_or_cycle (
   driver      : &TypeDBDriver,
   parentIs       : ParentIs,
 ) -> Result < (), Box<dyn Error> > {
+  integrate_path_that_might_fork_or_cycle_with_source_set (
+    tree, node_id, path, branches, cycle_nodes,
+    config, driver, parentIs, None ) . await
+}
+
+pub async fn integrate_path_that_might_fork_or_cycle_with_source_set (
+  tree        : &mut Tree<ViewNode>,
+  node_id     : NodeId,
+  path        : Vec < ID >,
+  branches    : HashSet < ID >,
+  cycle_nodes : HashSet < ID >,
+  config      : &SkgConfig,
+  driver      : &TypeDBDriver,
+  parentIs       : ParentIs,
+  active      : Option<&ActiveSourceSet>,
+) -> Result < (), Box<dyn Error> > {
   let last_node_id : NodeId =
     integrate_linear_portion_of_path (
-      tree, node_id, &path, config, driver, parentIs
+      tree, node_id, &path, config, driver, parentIs, active
     ). await ?;
   if ! branches . is_empty () {
     integrate_branches_in_node (
       tree, last_node_id, branches, config, driver, parentIs
-    ). await ?;
+      , active ). await ?;
   } else if ! cycle_nodes . is_empty () {
     // PITFALL: If there are branches, cycle nodes are ignored.
     integrate_cycle_nodes (
       tree, last_node_id, cycle_nodes, config, driver, parentIs
-    ). await ?; }
+      , active ). await ?; }
   Ok (( )) }
 
 /// Recursively integrate the remaining path into the tree.
@@ -177,6 +245,7 @@ fn integrate_linear_portion_of_path<'a> (
   config  : &'a SkgConfig,
   driver  : &'a TypeDBDriver,
   parentIs   : ParentIs,
+  active  : Option<&'a ActiveSourceSet>,
 ) -> Pin<Box<dyn Future<Output = Result<NodeId,
                                         Box<dyn Error>>> + 'a>> {
   Box::pin(async move {
@@ -187,16 +256,22 @@ fn integrate_linear_portion_of_path<'a> (
     let next_node_id : NodeId =
       match find_child_by_id ( tree, node_id, path_head ) {
         Some (child_treeid) => child_treeid,
-        None => { prepend_indefinitive_child (
+        None => {
+          let (child_id, should_descend) =
+            prepend_indefinitive_child_with_source_set (
                     tree, node_id, path_head, config, driver, parentIs
-                  ) . await ? } };
+                    , active ) . await ?;
+          if ! should_descend {
+            return Ok (child_id); }
+          child_id } };
     integrate_linear_portion_of_path ( // recurse
       tree,
       next_node_id, // we just found or inserted this
       path_tail,
       config,
       driver,
-      parentIs ). await } ) }
+      parentIs,
+      active ). await } ) }
 
 /// Add branch nodes as children of the specified node.
 /// Branches are added in sorted order (reversed for prepending).
@@ -209,6 +284,7 @@ async fn integrate_branches_in_node (
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
   parentIs    : ParentIs,
+  active   : Option<&ActiveSourceSet>,
 ) -> Result < (), Box<dyn Error> > {
   let found_children : HashMap < ID, NodeId > =
     find_children_by_ids ( tree, node_id, &branches );
@@ -220,9 +296,9 @@ async fn integrate_branches_in_node (
   { // Simplifies testing. Not necessary in production.
     branches_to_add . sort (); }
   for branch_id in branches_to_add {
-    prepend_indefinitive_child (
+    prepend_indefinitive_child_with_source_set (
       tree, node_id, &branch_id, config, driver, parentIs
-    ). await ?; }
+      , active ). await ?; }
   Ok (( )) }
 
 /// Add cycle nodes as children of the specified node.
@@ -235,6 +311,7 @@ async fn integrate_cycle_nodes (
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
   parentIs       : ParentIs,
+  active      : Option<&ActiveSourceSet>,
 ) -> Result < (), Box<dyn Error> > {
   let found_children : HashMap < ID, NodeId > =
     find_children_by_ids ( tree, node_id, &cycle_nodes );
@@ -245,9 +322,9 @@ async fn integrate_cycle_nodes (
     . collect ();
   { to_add . sort (); }
   for cycle_id in to_add {
-    prepend_indefinitive_child (
+    prepend_indefinitive_child_with_source_set (
       tree, node_id, &cycle_id, config, driver, parentIs
-    ). await ?; }
+      , active ). await ?; }
   Ok (( )) }
 
 /// Extract every PID from a Vec<PathToFirstNonlinearity>,
@@ -277,6 +354,7 @@ async fn attach_containerward_ancestries_to_link_sources (
   node_id : NodeId,
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
+  active  : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
   // Collect LinkTarget nodes before mutating the tree.
   let links_to_nodeids : Vec<NodeId> = {
@@ -287,8 +365,8 @@ async fn attach_containerward_ancestries_to_link_sources (
           if t . parentIs == ParentIs::LinkTarget {
             result . push ( node_ref . id () ); }} }}
     result };
-  attach_containerward_ancestries_at_nodeids (
-    tree, &links_to_nodeids, config, driver ) . await }
+  attach_containerward_ancestries_at_nodeids_with_source_set (
+    tree, &links_to_nodeids, config, driver, active ) . await }
 
 /// For each NodeId, look up its TrueNode pid in the tree, fetch
 /// every such pid's containerward ancestry from the graph (in
@@ -302,6 +380,17 @@ pub async fn attach_containerward_ancestries_at_nodeids (
   nodeids : &[NodeId],
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
+  attach_containerward_ancestries_at_nodeids_with_source_set (
+    tree, nodeids, config, driver, None ) . await
+}
+
+pub async fn attach_containerward_ancestries_at_nodeids_with_source_set (
+  tree    : &mut Tree<ViewNode>,
+  nodeids : &[NodeId],
+  config  : &SkgConfig,
+  driver  : &TypeDBDriver,
+  active  : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
   let pairs : Vec<(NodeId, ID)> =
     nodeids . iter ()
@@ -320,7 +409,7 @@ pub async fn attach_containerward_ancestries_at_nodeids (
       &ids, & config . db_name, driver,
       config . max_ancestry_depth ) . await;
   attach_containerward_ancestries_from_map (
-    tree, &pairs, &ancestry_map, config, driver ) . await }
+    tree, &pairs, &ancestry_map, config, driver, active ) . await }
 
 /// Inner helper: given pre-collected pairs and a pre-fetched map,
 /// prepend each pair's `Inner` ancestry. Pulled out only because
@@ -332,6 +421,7 @@ async fn attach_containerward_ancestries_from_map (
   ancestry_map : &HashMap<ID, AncestryTree>,
   config       : &SkgConfig,
   driver       : &TypeDBDriver,
+  active       : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
   for ( treeid, pid ) in pairs {
     let ancestry : &AncestryTree = match ancestry_map . get (pid) {
@@ -341,7 +431,7 @@ async fn attach_containerward_ancestries_from_map (
       for child in children . iter () . rev () {
         insert_containerward_ancestry_tree_recursive (
           child, *treeid,
-          tree, config, driver ) . await ?; }} }
+          tree, config, driver, active ) . await ?; }} }
   Ok (( )) }
 
 /// Recursively insert an AncestryTree as indefinitive
@@ -354,19 +444,22 @@ pub fn insert_containerward_ancestry_tree_recursive<'a> (
   tree       : &'a mut Tree<ViewNode>,
   config     : &'a SkgConfig,
   driver     : &'a TypeDBDriver,
+  active     : Option<&'a ActiveSourceSet>,
 ) -> Pin<Box<dyn Future<Output = Result<(),
                                         Box<dyn Error>>> + 'a>> {
   Box::pin ( async move {
-    let child_nid : NodeId =
-      prepend_indefinitive_child (
+    let (child_nid, should_descend) =
+      prepend_indefinitive_child_with_source_set (
         tree, parent_nid, node . id (),
-        config, driver, ParentIs::Content
+        config, driver, ParentIs::Content, active
       ) . await ?;
+    if ! should_descend {
+      return Ok (()); }
     if let AncestryTree::Inner ( _, children ) = node {
       for child in children . iter () . rev () {
         insert_containerward_ancestry_tree_recursive (
           child, child_nid,
-          tree, config, driver
+          tree, config, driver, active
         ) . await ?; } }
     Ok (()) } ) }
 
@@ -392,3 +485,34 @@ pub async fn prepend_indefinitive_child (
     tree . get_mut (parent_treeid) . unwrap ()
     . prepend (viewnode) . id ();
   Ok (new_child_treeid) }
+
+pub async fn prepend_indefinitive_child_with_source_set (
+  tree           : &mut Tree<ViewNode>,
+  parent_treeid  : NodeId,
+  child_skgid    : &ID,
+  config         : &SkgConfig,
+  driver         : &TypeDBDriver,
+  parentIs       : ParentIs,
+  active         : Option<&ActiveSourceSet>,
+) -> Result < (NodeId, bool), Box<dyn Error> > {
+  if let Some (active) = active {
+    if ! active . is_all () {
+      let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
+        HashMap::new ();
+      if let Some (source) =
+        find_source_with_optional_tantivy (
+          child_skgid, &deleted_since_head_pid_src_map, None, config )
+      {
+        if ! active . contains_source (&source) {
+          let viewnode : ViewNode =
+            mk_inactive_viewnode (
+              child_skgid . clone (), source, MembershipAxes::default () );
+          let new_child_treeid : NodeId =
+            tree . get_mut (parent_treeid) . unwrap ()
+            . prepend (viewnode) . id ();
+          return Ok ((new_child_treeid, false)); }}}}
+  let new_child_treeid : NodeId =
+    prepend_indefinitive_child (
+      tree, parent_treeid, child_skgid, config, driver, parentIs )
+    . await ?;
+  Ok ((new_child_treeid, true)) }

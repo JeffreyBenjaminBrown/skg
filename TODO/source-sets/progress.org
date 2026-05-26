@@ -40,10 +40,11 @@
 - Content completion and rerender paths carry the active source-set,
   create inactive placeholders for missing inactive-source content, and
   reapply source-set filtering before rendering rerendered buffers.
+- Sourceward and containerward expansion paths have source-set-aware
+  variants used by rerendered view requests; inactive path steps render
+  as placeholders and stop descent.
 
 * pending
-- Thread active source-set filtering into sourceward and containerward
-  expansion paths.
 - Truncate search enrichment ancestry before inactive containers/link
   sources, filter fork branches independently, and omit empty forks.
 - Add production tests for sourceward/containerward/search-enrichment

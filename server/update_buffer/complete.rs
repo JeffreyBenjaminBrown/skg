@@ -165,7 +165,8 @@ async fn execute_truenode_view_requests (
     execute_truenode_view_requests (
       *treeid, tree, context . defmap, context . source_diffs,
       &context . env . config, &context . env . driver,
-      context . errors, context . deleted_since_head_pid_src_map )
+      context . errors, context . deleted_since_head_pid_src_map,
+      context . active_source_set )
     . await ?; }
   Ok (( )) }
 

@@ -17,7 +17,7 @@ use crate::serve::handlers::save_buffer::{ SaveResponse, compute_diff_for_every_
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::source_sets::{ActiveSourceSet, apply_source_set_to_viewforest};
-use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids;
+use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids_with_source_set;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::views_state::ViewUri;
@@ -262,7 +262,8 @@ pub async fn rerender_view (
     validate_parentIs_relationships (viewforest, &snap); }
   attach_containerward_ancestries_to_removedhere_phantoms (
     viewforest, &context . env . config,
-    &context . env . driver ) . await ?;
+    &context . env . driver,
+    context . active_source_set ) . await ?;
   tracing::debug!("rerender_view: complete_viewforest done ({:.3}s), starting graphnodestats",
                   t_rerender . elapsed () . as_secs_f64 ());
   let ( container_to_contents, content_to_containers ) =
@@ -452,6 +453,7 @@ async fn attach_containerward_ancestries_to_removedhere_phantoms (
   viewforest    : &mut Tree<ViewNode>,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
+  active        : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
   let phantom_nodeids : Vec<NodeId> = {
     let mut result : Vec<NodeId> = Vec::new ();
@@ -461,5 +463,5 @@ async fn attach_containerward_ancestries_to_removedhere_phantoms (
           if t . is_removedhere_phantom () {
             result . push ( node_ref . id () ); }} }}
     result };
-  attach_containerward_ancestries_at_nodeids (
-    viewforest, &phantom_nodeids, config, typedb_driver ) . await }
+  attach_containerward_ancestries_at_nodeids_with_source_set (
+    viewforest, &phantom_nodeids, config, typedb_driver, active ) . await }

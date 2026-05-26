@@ -11,7 +11,7 @@
 /// - render to string
 
 use crate::serve::handlers::save_buffer::{compute_diff_for_every_source, deleted_ids_to_source};
-use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids;
+use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids_with_source_set;
 use crate::types::git::SourceDiff;
 use crate::org_to_text::viewforest_to_string;
 use crate::to_org::render::diff::apply_diff_to_viewforest;
@@ -92,7 +92,7 @@ async fn multi_root_view_inner (
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "attach_containerward_ancestries_to_view_roots" ). entered();
     attach_containerward_ancestries_to_view_roots (
-      &mut viewforest, config, driver ) . await ?; }
+      &mut viewforest, config, driver, active_source_set ) . await ?; }
   let ( container_to_contents, content_to_containers ) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "set_graphnodestats_in_viewforest" ). entered();
@@ -143,9 +143,10 @@ async fn attach_containerward_ancestries_to_view_roots (
   viewforest : &mut Tree<ViewNode>,
   config     : &SkgConfig,
   driver     : &TypeDBDriver,
+  active     : Option<&ActiveSourceSet>,
 ) -> Result < (), Box<dyn Error> > {
   let view_root_nodeids : Vec<NodeId> =
     viewforest . root () . children () . map ( |c| c . id () )
       . collect ();
-  attach_containerward_ancestries_at_nodeids (
-    viewforest, &view_root_nodeids, config, driver ) . await }
+  attach_containerward_ancestries_at_nodeids_with_source_set (
+    viewforest, &view_root_nodeids, config, driver, active ) . await }

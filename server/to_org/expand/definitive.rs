@@ -1,11 +1,12 @@
 use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
 use crate::dbs::typedb::nodes::which_ids_exist;
 use crate::git_ops::read_repo::nodecomplete_from_index_or_head;
+use crate::source_sets::ActiveSourceSet;
 use crate::to_org::complete::sharing::{ maybe_add_hiddenInSubscribeeCol_branch, type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
-use crate::to_org::expand::backpath::{ build_and_integrate_containerward_view_then_drop_request, build_and_integrate_sourceward_view_then_drop_request};
+use crate::to_org::expand::backpath::{ build_and_integrate_containerward_view_then_drop_request_with_source_set, build_and_integrate_sourceward_view_then_drop_request_with_source_set};
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
-use crate::to_org::util::{ DefinitiveMap, build_node_branch_minus_content, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
+use crate::to_org::util::{ DefinitiveMap, build_node_branch_minus_content_with_source_set, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, IndefOrDef, ParentIs, mk_indefinitive_viewnode };
@@ -28,6 +29,7 @@ pub async fn execute_view_requests (
   visited       : &mut DefinitiveMap,
   errors        : &mut Vec < String >,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  active_source_set : Option<&ActiveSourceSet>,
 ) -> Result < (), Box<dyn Error> > {
   for (node_id, request) in requests {
     match request {
@@ -36,18 +38,20 @@ pub async fn execute_view_requests (
           viewforest, node_id, config, typedb_driver, errors )
           . await ?; },
       ViewRequest::Containerward => {
-        build_and_integrate_containerward_view_then_drop_request (
-          viewforest, node_id, config, typedb_driver, errors )
+        build_and_integrate_containerward_view_then_drop_request_with_source_set (
+          viewforest, node_id, config, typedb_driver, errors,
+          active_source_set )
           . await ?; },
       ViewRequest::Sourceward => {
-        build_and_integrate_sourceward_view_then_drop_request (
-          viewforest, node_id, config, typedb_driver, errors )
+        build_and_integrate_sourceward_view_then_drop_request_with_source_set (
+          viewforest, node_id, config, typedb_driver, errors,
+          active_source_set )
           . await ?; },
       ViewRequest::Definitive => {
         execute_definitive_view_request (
           viewforest, node_id, source_diffs, config, typedb_driver,
           visited, errors,
-          deleted_since_head_pid_src_map ) . await ?; }, }}
+          deleted_since_head_pid_src_map, active_source_set ) . await ?; }, }}
   Ok (( )) }
 
 /// BEHAVIOR:
@@ -69,6 +73,7 @@ async fn execute_definitive_view_request (
   visited       : &mut DefinitiveMap,
   _errors       : &mut Vec < String >,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  active_source_set : Option<&ActiveSourceSet>,
 ) -> Result < (), Box<dyn Error> > {
   let node_pid : ID = get_id_from_treenode (
     viewforest, node_id ) ?;
@@ -109,11 +114,12 @@ async fn execute_definitive_view_request (
     extendDefinitiveSubtree_fromGit (
       viewforest, node_id, config . initial_node_limit,
       visited, source_diffs, config, &hidden_ids, typedb_driver,
-      deleted_since_head_pid_src_map ) . await ?; }
+      deleted_since_head_pid_src_map, active_source_set ) . await ?; }
   else {
     extendDefinitiveSubtreeFromLeaf (
       viewforest, node_id, config . initial_node_limit,
-      visited, config, typedb_driver, &hidden_ids ) . await ?;
+      visited, config, typedb_driver, &hidden_ids,
+      active_source_set ) . await ?;
     if type_and_parent_type_consistent_with_subscribee (
       viewforest, node_id ) ?
     { maybe_add_hiddenInSubscribeeCol_branch (
@@ -224,6 +230,7 @@ async fn extendDefinitiveSubtreeFromLeaf (
   config         : &SkgConfig,
   driver         : &TypeDBDriver,
   hidden_ids     : &HashSet < ID >,
+  active_source_set : Option<&ActiveSourceSet>,
 ) -> Result < (), Box<dyn Error> > {
   let mut gen_with_children : Vec < (NodeId, // effective root
                                      ID) > = // one of its children
@@ -242,15 +249,18 @@ async fn extendDefinitiveSubtreeFromLeaf (
       let space_left : usize = limit - nodes_rendered;
       add_last_generation_and_truncate_some_of_previous (
         tree, generation, &gen_with_children,
-        space_left, effective_root, visited, config, driver, None ) . await ?;
+        space_left, effective_root, visited, config, driver,
+        active_source_set ) . await ?;
       return Ok (( )); }
     let mut next_gen : Vec < (NodeId, ID) > = Vec::new ();
     for (parent_treeid, child_skgid) in gen_with_children {
-      let new_treeid : NodeId = build_node_branch_minus_content (
+      let (new_treeid, should_recurse) = build_node_branch_minus_content_with_source_set (
         Some((tree, parent_treeid)),
-        &child_skgid, config, driver, visited ) . await ?;
+        &child_skgid, config, driver, visited,
+        active_source_set ) . await ?;
       nodes_rendered += 1;
-      if ! truenode_in_tree_is_indefinitive ( tree, new_treeid ) ? {
+      if should_recurse
+      && ! truenode_in_tree_is_indefinitive ( tree, new_treeid ) ? {
         // No filtering here; 'hidden_ids' only applies to top-level.
         let grandchild_skgids : Vec < ID > =
           content_ids_if_definitive_else_empty (
@@ -300,6 +310,7 @@ async fn extendDefinitiveSubtree_fromGit (
   hidden_ids     : &HashSet<ID>,
   typedb_driver  : &TypeDBDriver,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  _active_source_set : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
   let (pid, src) : (ID, SourceName) =
     pid_and_source_from_treenode ( tree, effective_root,

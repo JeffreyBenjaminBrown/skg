@@ -1,5 +1,6 @@
 use crate::to_org::complete::sharing::{ maybe_add_hiddenInSubscribeeCol_branch, type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::expand::definitive::execute_view_requests;
+use crate::source_sets::ActiveSourceSet;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SkgConfig, SourceName};
@@ -20,6 +21,7 @@ pub async fn execute_truenode_view_requests (
   driver             : &TypeDBDriver,
   errors             : &mut Vec<String>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  active_source_set  : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
     tree, node,
@@ -31,7 +33,8 @@ pub async fn execute_truenode_view_requests (
   if ! requests . is_empty() {
     execute_view_requests(
       tree, requests, source_diffs, config, driver,
-      visited, errors, deleted_since_head_pid_src_map ) . await ?; }
+      visited, errors, deleted_since_head_pid_src_map,
+      active_source_set ) . await ?; }
   Ok(( )) }
 
 pub async fn ensure_hiddenin_col_under_definitive_subscribee (
