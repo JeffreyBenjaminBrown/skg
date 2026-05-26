@@ -22,7 +22,9 @@ use crate::to_org::util::mark_view_roots_parent_absent;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use crate::source_sets::{ActiveSourceSet, render_viewforest_with_source_set};
-use crate::update_buffer::graphnodestats::set_graphnodestats_in_viewforest;
+use crate::update_buffer::graphnodestats::{
+  set_graphnodestats_in_viewforest,
+  set_graphnodestats_in_viewforest_with_source_set};
 use crate::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
 
 use ego_tree::{NodeId, Tree};
@@ -96,9 +98,14 @@ async fn multi_root_view_inner (
   let ( container_to_contents, content_to_containers ) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "set_graphnodestats_in_viewforest" ). entered();
-      set_graphnodestats_in_viewforest (
-        &mut viewforest,
-        config, driver ) . await } ?;
+      match active_source_set {
+        Some (active) =>
+          set_graphnodestats_in_viewforest_with_source_set (
+            &mut viewforest, config, driver, active ) . await,
+        None =>
+          set_graphnodestats_in_viewforest (
+            &mut viewforest, config, driver ) . await,
+      }} ?;
   mark_view_roots_parent_absent (
     &mut viewforest );
   set_viewnodestats_in_viewforest (

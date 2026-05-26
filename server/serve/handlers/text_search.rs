@@ -13,7 +13,9 @@ use crate::consts::SEARCH_DISPLAY_LIMIT;
 use crate::context::ContextOriginType;
 use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
-use crate::dbs::typedb::search::all_graphnodestats::{ AllGraphNodeStats, fetch_all_graphnodestats};
+use crate::dbs::typedb::search::all_graphnodestats::{
+  AllGraphNodeStats,
+  fetch_all_graphnodestats_with_source_set};
 use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
@@ -173,7 +175,7 @@ pub fn handle_text_search_request (
             // phase 2 (enriched) search results, backgrounded
             enrichment_slot, search_cancelled,
             &env . driver, &env . config,
-            &search_terms, &search_results ); },
+            &search_terms, &search_results, active ); },
         Err (e) => {
           send_response_with_length_prefix (
             stream,
@@ -222,6 +224,7 @@ fn spawn_enrichment_thread (
   config           : &SkgConfig,
   search_terms     : &str,
   search_results   : &[ID],
+  active           : &ActiveSourceSet,
 ) {
   { // Clear stale enrichment before spawning.
     // todo ? Instead, permit multiple enrichments for different search result buffers to coexist.
@@ -234,6 +237,7 @@ fn spawn_enrichment_thread (
   let cancel_clone  : Arc<AtomicBool>   = Arc::clone (search_cancelled);
   let driver_clone  : Arc<TypeDBDriver> = Arc::clone (typedb_driver);
   let config_clone  : SkgConfig         = config . clone ();
+  let active_clone  : ActiveSourceSet   = active . clone ();
   let terms_clone   : String            = search_terms . to_string ();
   let ids_clone     : Vec<ID>           = search_results . to_vec ();
   let max_depth : usize = config . max_ancestry_depth;
@@ -260,10 +264,11 @@ fn spawn_enrichment_thread (
       id_set . into_iter () . collect () };
     let graphnodestats : AllGraphNodeStats =
       futures::executor::block_on (
-        fetch_all_graphnodestats (
+        fetch_all_graphnodestats_with_source_set (
           &config_clone . db_name,
           &driver_clone,
-          &all_enriched_ids ) )
+          &all_enriched_ids,
+          Some (&active_clone) ) )
       . unwrap_or_else ( |e| {
         tracing::warn! ("search enrichment: graphnodestats failed: {}", e);
         AllGraphNodeStats::empty () } );

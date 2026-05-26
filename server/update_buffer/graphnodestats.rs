@@ -1,7 +1,9 @@
 use crate::dbs::typedb::search::all_graphnodestats::{
   fetch_all_graphnodestats,
+  fetch_all_graphnodestats_with_source_set,
   graphnodestats_for_pid,
   AllGraphNodeStats};
+use crate::source_sets::ActiveSourceSet;
 use crate::to_org::util::collect_ids_from_tree;
 use crate::types::misc::{ID, SkgConfig};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
@@ -22,7 +24,29 @@ pub async fn set_graphnodestats_in_viewforest (
   driver : &TypeDBDriver,
 ) -> Result < ( HashMap < ID, HashSet < ID > >,
                HashMap < ID, HashSet < ID > > ),
-             Box<dyn Error> > {
+	             Box<dyn Error> > {
+  set_graphnodestats_in_viewforest_inner (
+    viewforest, config, driver, None ) . await }
+
+pub async fn set_graphnodestats_in_viewforest_with_source_set (
+  viewforest : &mut Tree<ViewNode>,
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+  active : &ActiveSourceSet,
+) -> Result < ( HashMap < ID, HashSet < ID > >,
+	               HashMap < ID, HashSet < ID > > ),
+	             Box<dyn Error> > {
+  set_graphnodestats_in_viewforest_inner (
+    viewforest, config, driver, Some (active) ) . await }
+
+async fn set_graphnodestats_in_viewforest_inner (
+  viewforest : &mut Tree<ViewNode>,
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+  active : Option<&ActiveSourceSet>,
+) -> Result < ( HashMap < ID, HashSet < ID > >,
+	               HashMap < ID, HashSet < ID > > ),
+	             Box<dyn Error> > {
   let pids : Vec < ID > =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "collect_ids_from_tree" ). entered();
@@ -30,8 +54,14 @@ pub async fn set_graphnodestats_in_viewforest (
   let stats : AllGraphNodeStats =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "fetch_all_graphnodestats" ). entered();
-      fetch_all_graphnodestats (
-        & config . db_name, driver, & pids ) . await } ?;
+      match active {
+        Some (active) =>
+          fetch_all_graphnodestats_with_source_set (
+            & config . db_name, driver, & pids, Some (active) ) . await,
+        None =>
+          fetch_all_graphnodestats (
+            & config . db_name, driver, & pids ) . await,
+      }} ?;
   let root_treeid : NodeId = viewforest . root () . id ();
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "set_graphnodestats_recursive" ). entered();

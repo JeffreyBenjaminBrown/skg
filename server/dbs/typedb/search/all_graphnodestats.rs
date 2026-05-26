@@ -13,6 +13,7 @@
 use crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS;
 use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
 use crate::dbs::typedb::util::concept_document::extract_id_from_map;
+use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::ID;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{GraphNodeStats, NodeContainRels, NodeLinksourceRels};
@@ -116,13 +117,27 @@ pub async fn fetch_all_graphnodestats (
   driver  : &TypeDBDriver,
   pids    : &[ID],
 ) -> Result < AllGraphNodeStats, Box<dyn Error> > {
+  fetch_all_graphnodestats_with_source_set (
+    db_name, driver, pids, None ) . await }
+
+pub async fn fetch_all_graphnodestats_with_source_set (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+  pids    : &[ID],
+  active  : Option<&ActiveSourceSet>,
+) -> Result < AllGraphNodeStats, Box<dyn Error> > {
   if pids . is_empty () {
     return Ok ( AllGraphNodeStats::empty() ); }
   let pid_set : HashSet < ID > =
     pids . iter () . cloned () . collect ();
   if let Some (graph_snap) = snapshot_global () {
     return Ok ( fetch_all_graphnodestats_in_rust (
-      &graph_snap, pids, &pid_set ) ); }
+      &graph_snap, pids, &pid_set, active ) ); }
+  // PITFALL | TODO: TypeDB fallback graphStats are not source-set-aware:
+  // contents, containers, linksIn, subscribing, and overriding still count
+  // inactive-source related nodes. The running server normally uses the
+  // in-Rust graph path above; this fallback is for tests/startup paths that
+  // bypass the global graph handle.
   fetch_all_graphnodestats_from_typedb (
     db_name, driver, pids, &pid_set ) . await }
 
@@ -200,6 +215,7 @@ fn fetch_all_graphnodestats_in_rust (
   graph   : &InRustGraph,
   pids    : &[ID],
   pid_set : &HashSet<ID>,
+  active  : Option<&ActiveSourceSet>,
 ) -> AllGraphNodeStats {
   let mut num_containers               : HashMap<ID, usize> = HashMap::new ();
   let mut num_contents                 : HashMap<ID, usize> = HashMap::new ();
@@ -216,11 +232,21 @@ fn fetch_all_graphnodestats_in_rust (
     // num_containers: size of inverse-contains set.
     let n_containers : usize =
       graph . contained_by . get (pid)
-      . map ( |s| s . len () ) . unwrap_or (0);
+      . map ( |s| s . iter ()
+        . filter ( |container_pid|
+          pid_source_is_active (graph, active, container_pid) )
+        . count () )
+      . unwrap_or (0);
     num_containers . insert ( pid . clone (), n_containers );
     // num_contents: length of outbound contains.
     let n_contents : usize =
-      node_opt . map ( |n| n . contains . len () ) . unwrap_or (0);
+      node_opt
+      . map ( |n| n . contains . iter ()
+        . filter_map ( |cid| graph . pid_of (cid) )
+        . filter ( |content_pid|
+          pid_source_is_active (graph, active, content_pid) )
+        . count () )
+      . unwrap_or (0);
     num_contents . insert ( pid . clone (), n_contents );
     // Link sources: partition textlinks_in by whether source has
     // non-empty contains.
@@ -228,7 +254,10 @@ fn fetch_all_graphnodestats_in_rust (
       if let Some (sources) = graph . textlinks_in . get (pid) {
         let mut with    : usize = 0;
         let mut without : usize = 0;
-        for src_pid in sources {
+        for src_pid in sources . iter ()
+          . filter ( |src_pid|
+            pid_source_is_active (graph, active, src_pid) )
+        {
           let src_has_content : bool =
             graph . nodes . get (src_pid)
             . map ( |n| ! n . contains . is_empty () )
@@ -243,20 +272,34 @@ fn fetch_all_graphnodestats_in_rust (
     // has_subscribes / has_overrides: either role.
     let out_sub : bool =
       node_opt . map ( |n| ! n . subscribes_to
-                        . or_default () . is_empty () )
+                        . or_default () . iter ()
+                        . filter_map ( |id| graph . pid_of (id) )
+                        . any ( |related_pid|
+                          pid_source_is_active (
+                            graph, active, &related_pid) ) )
       . unwrap_or (false);
     let in_sub  : bool =
       graph . subscribers_of . get (pid)
-      . map ( |s| ! s . is_empty () ) . unwrap_or (false);
+      . map ( |s| s . iter ()
+        . any ( |related_pid|
+          pid_source_is_active (graph, active, related_pid) ) )
+      . unwrap_or (false);
     if out_sub || in_sub { has_subscribes
                            . insert ( pid . clone () ); }
     let out_ov : bool =
       node_opt . map ( |n| ! n . overrides_view_of
-                        . or_default () . is_empty () )
+                        . or_default () . iter ()
+                        . filter_map ( |id| graph . pid_of (id) )
+                        . any ( |related_pid|
+                          pid_source_is_active (
+                            graph, active, &related_pid) ) )
       . unwrap_or (false);
     let in_ov  : bool =
       graph . replacements_of . get (pid)
-      . map ( |s| ! s . is_empty () ) . unwrap_or (false);
+      . map ( |s| s . iter ()
+        . any ( |related_pid|
+          pid_source_is_active (graph, active, related_pid) ) )
+      . unwrap_or (false);
     if out_ov || in_ov { has_overrides . insert ( pid . clone () ); }
     // container_to_contents[pid] = contains ∩ pid_set.
     // n.contains carries raw IDs; map each to its corresponding pid
@@ -269,6 +312,7 @@ fn fetch_all_graphnodestats_in_rust (
         . map ( |cid| graph . pid_of (cid)
                  . unwrap_or_else ( || cid . clone () ) )
         . filter ( |pid| pid_set . contains (pid) )
+        . filter ( |pid| pid_source_is_active (graph, active, pid) )
         . collect ();
       if ! intersected . is_empty () {
         container_to_contents . insert ( pid . clone (),
@@ -278,6 +322,7 @@ fn fetch_all_graphnodestats_in_rust (
       let intersected : HashSet<ID> =
         containers . iter ()
         . filter ( |cid| pid_set . contains (*cid) )
+        . filter ( |cid| pid_source_is_active (graph, active, cid) )
         . cloned () . collect ();
       if ! intersected . is_empty () {
         content_to_containers . insert ( pid . clone (),
@@ -291,7 +336,20 @@ fn fetch_all_graphnodestats_in_rust (
     has_overrides,
     container_to_contents,
     content_to_containers,
-  } }
+	  } }
+
+fn pid_source_is_active (
+  graph  : &InRustGraph,
+  active : Option<&ActiveSourceSet>,
+  pid    : &ID,
+) -> bool {
+  match active {
+    None => true,
+    Some (active) if active . is_all () => true,
+    Some (active) =>
+      graph . nodes . get (pid)
+      . map ( |node| active . contains_source (&node . source) )
+      . unwrap_or (false), } }
 
 async fn fetch_one_pid_stats (
   db_name : &str,

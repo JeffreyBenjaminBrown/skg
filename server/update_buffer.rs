@@ -5,7 +5,9 @@ pub mod graphnodestats;
 pub mod util;
 pub mod viewnodestats;
 
-pub use graphnodestats::set_graphnodestats_in_viewforest;
+pub use graphnodestats::{
+  set_graphnodestats_in_viewforest,
+  set_graphnodestats_in_viewforest_with_source_set};
 pub use viewnodestats::set_viewnodestats_in_viewforest;
 
 use complete::{complete_viewforest, CompletionContext};
@@ -267,10 +269,19 @@ pub async fn rerender_view (
   tracing::debug!("rerender_view: complete_viewforest done ({:.3}s), starting graphnodestats",
                   t_rerender . elapsed () . as_secs_f64 ());
   let ( container_to_contents, content_to_containers ) =
-    set_graphnodestats_in_viewforest (
-      viewforest,
-      &context . env . config,
-      &context . env . driver ) . await ?;
+    match context . active_source_set {
+      Some (active) =>
+        set_graphnodestats_in_viewforest_with_source_set (
+          viewforest,
+          &context . env . config,
+          &context . env . driver,
+          active ) . await,
+      None =>
+        set_graphnodestats_in_viewforest (
+          viewforest,
+          &context . env . config,
+          &context . env . driver ) . await,
+    } ?;
   tracing::debug!("rerender_view: graphnodestats done ({:.3}s), rendering to string",
                   t_rerender . elapsed () . as_secs_f64 ());
   set_viewnodestats_in_viewforest (

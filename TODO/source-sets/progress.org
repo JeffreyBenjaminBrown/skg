@@ -47,11 +47,13 @@
   independently and all-inactive forks are omitted.
 - Production tests cover containerward truncation, sourceward fork
   filtering, and search-enrichment ancestry truncation.
+- In-Rust graphStats fetching filters container, content, link-source,
+  subscribe, override, and viewStats containment maps by active source-set
+  for content views, rerenders, and search enrichment.
+- Remaining TypeDB fallback graphStats leakage is documented with a
+  precise =PITFALL | TODO= comment.
 
 * pending
-- Make graphStats source-set-aware where practical.
-- Add precise =PITFALL | TODO= comments for any remaining graphStats or
-  herald counts that include inactive nodes.
 - Ensure readable-ID mode shortens inactive IDs but does not title-annotate
   inactive-source IDs or inactive placeholder metadata.
 - Add readable-ID tests for inactive placeholders and inactive-source IDs.
