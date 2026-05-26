@@ -61,7 +61,8 @@ pub fn validate_local_structure (
           validate_idscaffold(tree, node_id), },
       MaybePlacedViewnodeKind::Deleted (_) => Vec::new(),
       MaybePlacedViewnodeKind::DeletedScaff (_) => Vec::new(),
-      MaybePlacedViewnodeKind::Inactive (_) => Vec::new(),
+      MaybePlacedViewnodeKind::Inactive (_) =>
+        validate_inactive_node(tree, node_id),
       MaybePlacedViewnodeKind::Unknown (_) => Vec::new() };
 
   if errors . is_empty() {
@@ -214,6 +215,20 @@ fn validate_idscaffold (
     errors . push("ID scaffold must have an IDCol parent." . to_string()); }
   errors }
 
+fn validate_inactive_node (
+  tree    : &Tree<MaybePlacedViewnode>,
+  node_id : NodeId,
+) -> Vec<String> {
+  let mut errors : Vec<String> = Vec::new();
+  if !generation_exists_and_includes(tree, node_id, -1, false, |node|
+       matches!(&node . kind, MaybePlacedViewnodeKind::True (_))) {
+    errors . push("Inactive placeholder must have a TrueNode parent."
+                  . to_string()); }
+  if !generation_does_not_exist(tree, node_id, 1, true) {
+    errors . push("Inactive placeholder must have no active children."
+                  . to_string()); }
+  errors }
+
 fn validate_truenode (
   tree    : &Tree<MaybePlacedViewnode>,
   node_id : NodeId,
@@ -235,8 +250,9 @@ fn validate_truenode (
          MaybePlacedViewnodeKind::Scaff (Scaffold::TextChanged { .. })   |
          MaybePlacedViewnodeKind::Deleted (_)                     |
          MaybePlacedViewnodeKind::DeletedScaff (_)                |
+         MaybePlacedViewnodeKind::Inactive (_)                    |
          MaybePlacedViewnodeKind::Unknown (_)                    )) {
-    errors . push("TrueNode's children must include only TrueNode, AliasCol, IDCol, SubscribeeCol, TextChanged, Deleted, DeletedScaff, or UnknownNode" . to_string()); }
+    errors . push("TrueNode's children must include only TrueNode, AliasCol, IDCol, SubscribeeCol, TextChanged, Deleted, DeletedScaff, InactiveNode, or UnknownNode" . to_string()); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
     errors . push("TrueNode's non-ignored TrueNode children must be unique (no two sharing the same ID)." . to_string()); }
   if has_empty_title (t) {

@@ -26,11 +26,10 @@
   backward traversal filtering, and inline diff placeholders.
 - Real buffer parser recognizes =inactiveNode= metadata as a distinct
   inactive placeholder kind.
+- Real save validation rejects inactive placeholder title/body edits and
+  active children beneath inactive placeholders.
 
 * pending
-- Enforce real save validation for inactive placeholders: reject edits to
-  title/body/metadata/source/id and reject active children beneath an
-  inactive placeholder.
 - Implement real save semantics for inactive placeholders: unchanged
   placeholders preserve =contains=, moves reorder =contains=, deletions
   remove inactive IDs, and duplicate behavior is explicitly defined.

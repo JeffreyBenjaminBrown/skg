@@ -5,10 +5,14 @@ use ego_tree::Tree;
 use regex::Regex;
 use skg::types::maybe_placed_viewnode::{MaybePlacedViewnode, maybePlaced_viewforest_root_viewnode};
 use skg::types::errors::BufferValidationError;
+use skg::types::misc::{SkgConfig, SkgfileSource, SourceName};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_viewnodes::local::validate_local_structure;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::test_utils::run_with_test_db;
 use std::error::Error;
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 #[test]
 fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
@@ -616,3 +620,117 @@ fn test_edit_request_on_indefinitive_is_rejected_at_parse_time() {
     "(editRequest delete) on a definitive node must not trigger EditRequestOnIndefinitive. Parse errors: {:?}",
     parsing_errors3 );
 }
+
+#[test]
+fn test_inactive_placeholder_content_edits_rejected_at_parse_time () {
+  let input_with_title_edit : &str =
+    indoc! {"
+      * (skg (node (id root) (source main))) parent
+      ** (skg (inactiveNode (id hidden) (source private))) edited title
+    "};
+  let (_viewforest, parsing_errors)
+    : (Tree<MaybePlacedViewnode>, Vec<BufferValidationError>)
+    = org_to_uninterpreted_nodes (input_with_title_edit) . unwrap ();
+  assert!(
+    parsing_errors . iter () . any ( |e| matches!(
+      e, BufferValidationError::Other (msg)
+         if msg . contains ("Inactive placeholder content cannot be edited"))),
+    "Changing an inactive placeholder title should be rejected. Parse errors: {:?}",
+    parsing_errors );
+
+  let input_with_body_edit : &str =
+    indoc! {"
+      * (skg (node (id root) (source main))) parent
+      ** (skg (inactiveNode (id hidden) (source private))) node from inactive source
+      edited body
+    "};
+  let (_viewforest2, parsing_errors2)
+    : (Tree<MaybePlacedViewnode>, Vec<BufferValidationError>)
+    = org_to_uninterpreted_nodes (input_with_body_edit) . unwrap ();
+  assert!(
+    parsing_errors2 . iter () . any ( |e| matches!(
+      e, BufferValidationError::Other (msg)
+         if msg . contains ("Inactive placeholder content cannot be edited"))),
+    "Adding inactive placeholder body text should be rejected. Parse errors: {:?}",
+    parsing_errors2 );
+}
+
+#[test]
+fn test_inactive_placeholder_active_children_rejected_locally () {
+  let input : &str =
+    indoc! {"
+      * (skg (node (id root) (source main))) parent
+      ** (skg (inactiveNode (id hidden) (source private))) node from inactive source
+      *** (skg (node (id child) (source main))) active child
+    "};
+  let (viewforest, parsing_errors)
+    : (Tree<MaybePlacedViewnode>, Vec<BufferValidationError>)
+    = org_to_uninterpreted_nodes (input) . unwrap ();
+  assert_eq! (
+    parsing_errors . len(), 0,
+    "Test fixture should not have parse errors: {:?}",
+    parsing_errors );
+
+  let config : SkgConfig = validation_config ();
+  let inactive_id = viewforest . root () . traverse ()
+    . filter_map ( |edge| match edge {
+      ego_tree::iter::Edge::Open (node_ref)
+        if matches! (
+          node_ref . value () . kind,
+          skg::types::maybe_placed_viewnode::MaybePlacedViewnodeKind::Inactive (_)) =>
+          Some (node_ref . id ()),
+      _ => None, })
+    . next ()
+    . expect ("inactive placeholder should exist");
+
+  let error = validate_local_structure (
+      &viewforest, inactive_id, &config)
+    . expect_err (
+      "Inactive placeholder with an active child should fail validation");
+  assert!(
+    error . message . contains ("Inactive placeholder must have no active children"),
+    "Unexpected inactive-placeholder validation error: {:?}",
+    error );
+  assert_eq! (
+    error . id . 0, "root",
+    "Inactive-placeholder child errors should report the nearest active ancestor");
+}
+
+#[test]
+fn test_inactive_placeholder_under_truenode_allowed_locally () {
+  let input : &str =
+    indoc! {"
+      * (skg (node (id root) (source main))) parent
+      ** (skg (inactiveNode (id hidden) (source private))) node from inactive source
+    "};
+  let (viewforest, parsing_errors)
+    : (Tree<MaybePlacedViewnode>, Vec<BufferValidationError>)
+    = org_to_uninterpreted_nodes (input) . unwrap ();
+  assert_eq! (
+    parsing_errors . len(), 0,
+    "Test fixture should not have parse errors: {:?}",
+    parsing_errors );
+
+  let config : SkgConfig = validation_config ();
+  let root_id = viewforest . root () . children ()
+    . next ()
+    . expect ("root child should exist")
+    . id ();
+  validate_local_structure (&viewforest, root_id, &config)
+    . expect ("TrueNode should accept an inactive placeholder child");
+}
+
+fn validation_config () -> SkgConfig {
+  let mut sources : HashMap<SourceName, SkgfileSource> =
+    HashMap::new ();
+  for source in ["main", "private"] {
+    let source_name : SourceName = SourceName::from (source);
+    sources . insert (
+      source_name . clone (),
+      SkgfileSource {
+        name          : source_name,
+        abbreviation  : None,
+        path          : PathBuf::from (format! ("/tmp/{}", source)),
+        user_owns_it  : true,
+      }); }
+  SkgConfig::dummyFromSources (sources) }
