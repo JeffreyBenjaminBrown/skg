@@ -217,10 +217,11 @@ substitution.  When recursive rendering would draw node N, and N has
 a valid user-owned overrider R, draw R instead.
 
 The exception is an overridden-as-such node under 'overriddenCol'.
-Within that existing view, requesting a definitive view for the child
+Within that existing view, requesting a definitive view for the
+overridden-as-such node
 uses the original overridden node, not its overrider.  This exception
-only applies inside that existing view.  Direct visits from that child
-do not silently open the original.
+only applies inside that existing view.  Direct visits (new buffers)
+from that child do not silently open the original.
 
 When the user requests a new single-root content view of a node that
 is overridden, Skg should not silently choose for them.  It should show

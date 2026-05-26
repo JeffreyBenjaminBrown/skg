@@ -1,2 +1,20 @@
 * progress
+** stage 1 : rename override relationship roles
+*** planned
+Wrote 'TODO/full-schema/1_rename-override-rels.org',
+a focused implementation plan for renaming 'overrides_view_of'
+roles from 'replacement' / 'replaced' to
+'overrider' / 'overridden' across schema, TypeDB queries,
+in-Rust inverse-map vocabulary, tests and docs.
 * problems discovered along the way
+** stage 1 : rename override relationship roles
+*** global string replacement would be unsafe
+The words "replacement" and "replaced" appear in many unrelated
+contexts, including buffer/string replacement and content-link
+replacement.  The implementation should classify matches before
+editing rather than applying a mechanical global rename.
+*** fixture IDs may contain stale vocabulary
+Some test fixture IDs appear to include old words such as
+'overrides-view-of-1'.  These are IDs rather than role labels.
+The implementation plan leaves room to keep them if renaming would
+create noisy fixture churn.

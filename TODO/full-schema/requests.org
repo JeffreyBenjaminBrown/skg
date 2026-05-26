@@ -17,12 +17,16 @@ and deleted your question about it.)
 I'm sure we're not done. Please review the document,
 and then append any new or still-open problems to
 'feedback, round 2' (which really does exist now).
-* implementation
-We're ready to start implementing. I renamed plan.org to metaplan.org
+* ONGOING implementation
+We're ready to start implementing.
+
+I renamed plan.org to metaplan.org
 (specifically TODO/full-schema/metaplan.org).
 I'm still manipulating it, so don't make any changes to the metaplan.
 (The initial stages of it are fixed now, I believe,
 which is why we can start implementing.)
+
+Unless and until I say otherwise, please leave git operations to me.
 
 First step: Please write a plan for the first stage of the metaplan,
 at TODO/full-schema/1_rename-override-rels.org,
