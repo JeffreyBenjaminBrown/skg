@@ -210,7 +210,6 @@ collections.
 Edits to IDCol should abort save with an explanatory error.
 Editing IDs through the UI is dangerous and unnecessary; direct file
 editing remains available for exceptional manual repair.
-** unreviewed by Jeff
 *** Define override rendering and navigation
 Ordinary recursive content rendering applies automatic override
 substitution.  When recursive rendering would draw node N, and N has
@@ -234,34 +233,54 @@ to overrider recursively and displays all edges, including foreign
 edges.  It must be robust to invalid data:
 if a path repeats an ID, stop that branch and show a cycle marker.
 
+There is already prior art for the creation of such 'ancestries',
+invoked by skg-reveal-containerward and skg-reveal-sourceward.
+The overrides traversal involved here should reuse that machinery,
+rather than reinventing any wheels.
+
 Navigation surfaces follow these rules:
 - following a textlink to an overridden node opens the menu,
-- visiting a search result for an overridden node opens the menu,
+- the skg-goto* commands open the menu
+  - which implies that visiting a search result
+    for an overridden node opens the menu
 - readable-ID jumps from magit go to the original raw node,
-- opening from an 'overriddenCol' child opens the menu,
-- requesting a definitive view inside an 'overriddenCol' bypasses
-  substitution in that existing view,
-- requesting a definitive view elsewhere applies recursive override
+- opening from a child of an 'overriddenCol' opens the menu,
+- requesting a definitive view from an overriddenCol's child
+  bypasses replacement-with-overrider in that existing view
+  (because the overrider is already its grandparent)
+- requesting a definitive view otherwise applies recursive override
   substitution.
 
 Collateral rerender after save preserves existing viewnodes as they
 were.  If an existing node shows an original overridden node, it
 remains editable as itself and a later save keeps editing that
-original.  New recursive content introduced during that rerender uses
-current override substitution.  Closing and reopening the buffer
+original.  New recursive content introduced during rerender, though,
+uses current override substitution.  Closing and reopening the buffer
 normalizes recursive content from current graph data.
 *** Preserve source-set safety
 Source-set filtering must not leak inactive-source data unnecessarily
 and must not silently delete hidden relationship members.
 
-For sharing-relation collections, inactive nodes can be omitted rather
-than shown as placeholders, because order is not semantically
+For sharing-relation collections, inactive nodes can be omitted
+*from the display* rather than shown as placeholders,
+because order is not semantically
 meaningful for these relationship lists.
 
 However, saving a restricted view must preserve omitted inactive
 relationship targets on active nodes.  For example, saving a visible
 subset of 'subscribes_to' or 'overrides_view_of' must not delete
 inactive targets merely because they were omitted from the view.
+
+JEFF speaking: The easiest approach here is probably:
+when the user saves the buffer, the stage that fills in data
+before applying changes to the graph should fill in any nodes
+that were omitted due to source-set restrictions
+for any write-enabled Col scaffold.
+Then, when those changes are applied, they are applied as sets --
+so if a node somehow got moved in the collection, that change
+(which is meaningless noise) has no effect on the graph.
+Deleted nodes are deleted from wherever they were,
+and new nodes can safely be placed at the end.
 
 Save processing needs two protections:
 - no instruction may write an inactive node's file,
@@ -271,6 +290,7 @@ Save processing needs two protections:
 Content remains the exception already handled by source-set work:
 inactive content placeholders can participate in active containers
 because content order matters.
+** unreviewed by Jeff
 *** Define diff-mode policy for the full schema
 Diff mode is raw graph inspection, not effective override rendering.
 Override substitution should not apply in git diff mode or diff

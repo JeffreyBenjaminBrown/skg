@@ -294,7 +294,7 @@ fn fetch_all_graphnodestats_in_rust (
                             graph, active, &related_pid) ) )
       . unwrap_or (false);
     let in_ov  : bool = // overrides in-links
-      graph . replacements_of . get (pid)
+      graph . overriders_of . get (pid)
       . map ( |s| s . iter ()
         . any ( |related_pid|
           pid_source_is_active (graph, active, related_pid) ) )
@@ -409,10 +409,10 @@ async fn fetch_one_pid_stats (
           "overrides_related": [
             match
               $ov isa node, has id $ovid;
-              {{ $rel5 isa overrides_view_of ( replacement: $node,
-                                               replaced:    $ov ); }} or
-              {{ $rel5 isa overrides_view_of ( replacement: $ov,
-                                               replaced:    $node ); }};
+              {{ $rel5 isa overrides_view_of ( overrider:  $node,
+                                               overridden: $ov ); }} or
+              {{ $rel5 isa overrides_view_of ( overrider:  $ov,
+                                               overridden: $node ); }};
             fetch {{ "id": $ovid }};
           ]
         }};"#,

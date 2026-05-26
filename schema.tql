@@ -37,8 +37,8 @@ define
     relates hider,
     relates hidden;
   relation overrides_view_of,
-    relates replacement,
-    relates replaced;
+    relates overrider,
+    relates overridden;
 
   # "the graph" is made of nodes, which resemble org-headlines.
   entity node,
@@ -52,8 +52,8 @@ define
     plays subscribes:subscribee,
     plays hides_from_its_subscriptions:hider,
     plays hides_from_its_subscriptions:hidden,
-    plays overrides_view_of:replacement,
-    plays overrides_view_of:replaced,
+    plays overrides_view_of:overrider,
+    plays overrides_view_of:overridden,
     plays has_extra_id:node;
 
   entity extra_id,

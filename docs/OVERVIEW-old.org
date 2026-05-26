@@ -156,7 +156,7 @@ describe an ancestor -- in this case, the SkgNode N.
      will appear in the subscriber's view of the subscribee.
 *** One node's view can override another's.
 **** language and definition
-     A 'replacement' node 'overrides_view_of' a 'replaced' node.
+     An 'overrider' node 'overrides_view_of' an 'overridden' node.
 **** creating an overrider by editing someone else's node
      serial
 ***** User U is reading note N by user W.

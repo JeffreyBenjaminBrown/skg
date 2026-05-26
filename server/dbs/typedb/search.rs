@@ -132,7 +132,7 @@ pub fn find_related_nodes_from_in_rust_graph (
         if let Some (n) = graph . nodes . get (&pid) {
           out . extend ( n . hides_from_its_subscriptions . or_default ()
                          . iter () . map (&pid_or_self) ); },
-      ("overrides_view_of",            "replacement", "replaced")   =>
+      ("overrides_view_of",            "overrider",   "overridden") =>
         if let Some (n) = graph . nodes . get (&pid) {
           out . extend ( n . overrides_view_of . or_default ()
                          . iter () . map (&pid_or_self) ); },
@@ -150,8 +150,8 @@ pub fn find_related_nodes_from_in_rust_graph (
       ("hides_from_its_subscriptions", "hidden",      "hider")       =>
         if let Some (s) = graph . hiders_of . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
-      ("overrides_view_of",            "replaced",    "replacement") =>
-        if let Some (s) = graph . replacements_of . get (&pid) {
+      ("overrides_view_of",            "overridden",  "overrider")   =>
+        if let Some (s) = graph . overriders_of . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
       ("textlinks_to",                 "dest",        "source")      =>
         if let Some (s) = graph . textlinks_in . get (&pid) {

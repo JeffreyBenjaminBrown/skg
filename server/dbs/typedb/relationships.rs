@@ -20,7 +20,7 @@ pub const OUTBOUND_RELATIONSHIP_TYPES : &[(&str, &str, &str)] = &[
   ("textlinks_to",                  "source",      "dest"),
   ("subscribes",                    "subscriber",  "subscribee"),
   ("hides_from_its_subscriptions",  "hider",       "hidden"),
-  ("overrides_view_of",             "replacement", "replaced"),
+  ("overrides_view_of",             "overrider",   "overridden"),
 ];
 
 /// Maps `create_relationships_for_one_node` over `nodes`,
@@ -114,8 +114,8 @@ pub async fn create_relationships_from_node (
     primary_id . as_str (),
     node . overrides_view_of . or_default(),
     "overrides_view_of",
-    "replacement",
-    "replaced",
+    "overrider",
+    "overridden",
     tx ) . await
     . map_err(|e| format!("Failed to create 'overrides_view_of' relationships: {}", e))?;
   Ok (()) }

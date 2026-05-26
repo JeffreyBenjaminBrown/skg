@@ -6,15 +6,44 @@ a focused implementation plan for renaming 'overrides_view_of'
 roles from 'replacement' / 'replaced' to
 'overrider' / 'overridden' across schema, TypeDB queries,
 in-Rust inverse-map vocabulary, tests and docs.
-* problems discovered along the way
+*** implemented
+Renamed the TypeDB roles for 'overrides_view_of' to
+'overrider' and 'overridden'.
+
+Updated the schema, TypeDB relationship helpers, TypeDB search
+helpers, graph-stats TypeQL, in-Rust inverse-map vocabulary,
+diff-analysis role labels, audit references, override-role tests,
+merge override queries, confusing merge fixture IDs, and the old
+overview doc sentence.
+
+The on-disk field remains 'overrides_view_of'.
+*** verified
+Focused checks passed:
+- 'cargo check'
+- 'cargo test --test typedb'
+- 'cargo test --test merge merge_nodes'
+- 'cargo test --test save none_overrides'
+
+Full suite passed:
+- 'bash/all-tests.sh'
+  - passed once after the role rename
+  - passed again after renaming the merge override fixture IDs
+* problems discovered along the way, open
 ** stage 1 : rename override relationship roles
 *** global string replacement would be unsafe
 The words "replacement" and "replaced" appear in many unrelated
 contexts, including buffer/string replacement and content-link
 replacement.  The implementation should classify matches before
 editing rather than applying a mechanical global rename.
-*** fixture IDs may contain stale vocabulary
+* problems discovered along the way, solved
+** fixture IDs may contain stale vocabulary
 Some test fixture IDs appear to include old words such as
 'overrides-view-of-1'.  These are IDs rather than role labels.
 The implementation plan leaves room to keep them if renaming would
 create noisy fixture churn.
+*** resolution
+Renamed the confusing merge fixture IDs:
+- '1-overrides-view-of' -> 'overridden-by-1'
+- 'overrides-view-of-1' -> 'overrider-of-1'
+
+The affected merge tests and the full test suite pass after the rename.

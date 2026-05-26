@@ -57,12 +57,12 @@ pub struct Mismatch {
   /// The in-Rust graph-side answer that's compared against TypeDB depends
   /// on which role this is:
   ///   If 'pid' plays the /first-column role/ (container, source,
-  ///     subscriber, hider, replacement) — in-Rust graph's answer is the
+  ///     subscriber, hider, overrider) — in-Rust graph's answer is the
   ///     forward field on pid's NodeRust (e.g. NodeRust.contains),
   ///     resolved through extra_id_to_pid to match TypeDB's
   ///     has_extra_id-aware view.
   ///   If 'pid' plays the /second-column role/ (contained, dest,
-  ///     subscribee, hidden, replaced) — in-Rust graph's answer is the
+  ///     subscribee, hidden, overridden) — in-Rust graph's answer is the
   ///     inverse-index lookup (e.g. graph.contained_by[pid]),
   ///     already canonical-pid-keyed.
   pub role : &'static str,
@@ -200,7 +200,7 @@ fn inverse_first_members_from_in_rust_graph (
     "contains"                     => &graph . contained_by,
     "subscribes"                   => &graph . subscribers_of,
     "hides_from_its_subscriptions" => &graph . hiders_of,
-    "overrides_view_of"            => &graph . replacements_of,
+    "overrides_view_of"            => &graph . overriders_of,
     "textlinks_to"                 => &graph . textlinks_in,
     _ => return HashSet::new (),
   };

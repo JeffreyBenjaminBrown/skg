@@ -188,24 +188,24 @@ async fn test_all_relationships (
     "1" . to_string(), "5" . to_string()));
   assert_eq!(hides_pairs, expected_hides_from_its_subscriptions);
 
-  let replacement_pairs = collect_all_of_some_binary_rel(
+  let overrider_pairs = collect_all_of_some_binary_rel(
     & config . db_name,
     & driver,
     r#" match
-          $replacement isa node, has id $from;
-          $replaced isa node, has id $to;
-          $rel isa overrides_view_of (replacement: $replacement,
-                                      replaced:    $replaced);
+          $overrider isa node, has id $from;
+          $overridden isa node, has id $to;
+          $rel isa overrides_view_of (overrider:  $overrider,
+                                      overridden: $overridden);
         select $from, $to;"#,
     "from",
     "to"
   ) . await?;
-  let mut expected_replacements = HashSet::new();
-  expected_replacements . insert((
+  let mut expected_overriders = HashSet::new();
+  expected_overriders . insert((
     "5" . to_string(), "3" . to_string()));
-  expected_replacements . insert((
+  expected_overriders . insert((
     "5" . to_string(), "4" . to_string()));
-  assert_eq!(replacement_pairs, expected_replacements);
+  assert_eq!(overrider_pairs, expected_overriders);
 
   Ok (( )) }
 

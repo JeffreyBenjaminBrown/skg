@@ -238,7 +238,7 @@ fn verify_filesystem_after_merge_2_into_1(
   assert_eq!(node_1 . overrides_view_of . or_default() . len(), 1,
              "Node 1 should keep its overrides_view_of");
   assert_eq!(&node_1 . overrides_view_of . or_default()[0],
-             &ID::from ("1-overrides-view-of"));
+             &ID::from ("overridden-by-1"));
 
   let acquiree_text_preserver_path: String =
     path_from_pid_and_source ( config,
@@ -502,21 +502,21 @@ async fn verify_typedb_after_merge_1_into_2 (
           "Node 1 no longer exists as a node entity");
 
   // Overrides relationships should be processed correctly
-  // - Node 1's overrides [1-overrides-view-of] should transfer to node 2
+  // - Node 1's overrides [overridden-by-1] should transfer to node 2
   let node_2_overrides: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ ID::from ("2") ], "overrides_view_of", "replacement", "replaced"
+    db_name, driver, & [ ID::from ("2") ], "overrides_view_of", "overrider", "overridden"
   ) . await?;
-  assert!(node_2_overrides . contains(&ID::from ("1-overrides-view-of")),
-          "Node 2 should override view of 1-overrides-view-of (transferred from node 1)");
+  assert!(node_2_overrides . contains(&ID::from ("overridden-by-1")),
+          "Node 2 should override view of overridden-by-1 (transferred from node 1)");
 
-  // - overrides-view-of-1 overrode [1] on disk. Post-merge, extra_id
+  // - overrider-of-1 overrode [1] on disk. Post-merge, extra_id
   //   resolution redirects "1" to node 2, so it now overrides [2].
-  let overrides_view_of_1_targets: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ ID::from ("overrides-view-of-1") ],
-    "overrides_view_of", "replacement", "replaced" ) . await ?;
-  assert!(overrides_view_of_1_targets . contains(&ID::from ("2")),
-          "overrides-view-of-1 should now override 2 (extra_id resolution of 1 → 2)");
-  assert!(!overrides_view_of_1_targets . contains(&ID::from ("1")),
+  let overrider_of_1_targets: HashSet<ID> = find_related_nodes(
+    db_name, driver, & [ ID::from ("overrider-of-1") ],
+    "overrides_view_of", "overrider", "overridden" ) . await ?;
+  assert!(overrider_of_1_targets . contains(&ID::from ("2")),
+          "overrider-of-1 should now override 2 (extra_id resolution of 1 → 2)");
+  assert!(!overrider_of_1_targets . contains(&ID::from ("1")),
           "Node 1 no longer exists as a node entity");
   Ok (( )) }
 
@@ -587,8 +587,8 @@ fn verify_filesystem_after_merge_1_into_2(
   assert_eq!(node_2 . overrides_view_of . or_default() . len(), 1,
              "Node 2 should have 1 overrides_view_of relationship");
   assert_eq!(&node_2 . overrides_view_of . or_default()[0],
-             &ID::from ("1-overrides-view-of"),
-             "Node 2 should override view of 1-overrides-view-of");
+             &ID::from ("overridden-by-1"),
+             "Node 2 should override view of overridden-by-1");
 
   let acquiree_text_preserver_path: String =
     path_from_pid_and_source( config,
@@ -722,13 +722,13 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
            "inverse hides under pid 2 should include \
             hides-1-from-subscriptions" );
 
-  let replacements : HashSet<ID> =
+  let overriders : HashSet<ID> =
     find_related_nodes_from_in_rust_graph (
       &snap, &input_acquirer,
-      "overrides_view_of", "replaced", "replacement" );
-  assert!( replacements . contains (&ID::from ("overrides-view-of-1")),
+      "overrides_view_of", "overridden", "overrider" );
+  assert!( overriders . contains (&ID::from ("overrider-of-1")),
            "inverse overrides_view_of under pid 2 should include \
-            overrides-view-of-1" );
+            overrider-of-1" );
 
   let textlink_sources : HashSet<ID> =
     find_related_nodes_from_in_rust_graph (
@@ -760,12 +760,12 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   assert!( hidden_by_h1 . contains (&ID::from ("11")),
            "hides-1-from-subscriptions also hides 11 (unchanged)" );
 
-  let replaced_by_ov1 : HashSet<ID> =
+  let overridden_by_ov1 : HashSet<ID> =
     find_related_nodes_from_in_rust_graph (
-      &snap, &vec![ID::from ("overrides-view-of-1")],
-      "overrides_view_of", "replacement", "replaced" );
-  assert!( replaced_by_ov1 . contains (&ID::from ("2")),
-           "overrides-view-of-1's forward overrides should resolve \
+      &snap, &vec![ID::from ("overrider-of-1")],
+      "overrides_view_of", "overrider", "overridden" );
+  assert!( overridden_by_ov1 . contains (&ID::from ("2")),
+           "overrider-of-1's forward overrides should resolve \
             to canonical pid 2" );
 
   let destinations_of_l1 : HashSet<ID> =

@@ -344,7 +344,7 @@ fn apply_delete_propagation_cleanup (
         &graph_snap . contained_by,
         &graph_snap . subscribers_of,
         &graph_snap . hiders_of,
-        &graph_snap . replacements_of, ] {
+        &graph_snap . overriders_of, ] {
         if let Some (set) = inverse . get (deleted) {
           for pid in set {
             referencer_pids . insert ( pid . clone () ); }} } }
