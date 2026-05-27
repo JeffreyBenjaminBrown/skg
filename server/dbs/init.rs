@@ -18,7 +18,12 @@ use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::nodes::complete::NodeComplete;
-use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
+use crate::dbs::in_rust_graph::{
+  InRustGraph,
+  InRustGraphHandle,
+  new_handle,
+  override_invariants::error_unless_override_invariants_hold,
+};
 
 use futures::executor::block_on;
 use std::collections::HashSet;
@@ -84,6 +89,13 @@ pub fn initialize_dbs (
           let nodes : Vec<NodeComplete> =
             read_all_skg_files_from_sources (config)
             . unwrap_or_default ();
+          let graph : InRustGraph =
+            InRustGraph::from_nodecompletes (&nodes);
+          if let Err (e)
+            = error_unless_override_invariants_hold (config, &graph)
+            { tracing::error! (
+                "Override invariant validation failed: {}", e);
+              std::process::exit (1); }
           let (env, handoff) : (SkgEnv, InitContextHandoff) =
             env_and_handoff_from_nodes (
               config, &nodes, Arc::new (driver), tantivy_index );
@@ -261,6 +273,12 @@ fn full_init (
       . unwrap_or_else ( |e| {
         tracing::error! ("Failed to read .skg files: {}", e);
         std::process::exit (1); } ) };
+  let graph : InRustGraph =
+    InRustGraph::from_nodecompletes (&nodes);
+  if let Err (e)
+    = error_unless_override_invariants_hold (config, &graph)
+    { tracing::error! ("Override invariant validation failed: {}", e);
+      std::process::exit (1); }
   tracing::info! (files = nodes . len(),
             sources = config . sources . len(),
             ".skg files read from source(s)");
@@ -302,6 +320,10 @@ pub async fn wipe_then_init_typedb_db (
   driver : &TypeDBDriver,
   nodes  : &[NodeComplete],
 ) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraph =
+    InRustGraph::from_nodecompletes (nodes);
+  error_unless_override_invariants_hold (
+    config, &graph ) ?;
   overwrite_new_empty_typedb_db (
     & config . db_name,
     driver ) . await ?;

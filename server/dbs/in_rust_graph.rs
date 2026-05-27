@@ -9,6 +9,7 @@
 
 pub mod audit;
 pub mod audit_store;
+pub mod override_invariants;
 pub mod scheduled_audit;
 
 use arc_swap::ArcSwap;
@@ -305,6 +306,19 @@ pub fn apply_definenodes (
 ) {
   let old : Arc<InRustGraph> = graph . load_full ();
   let mut new_graph : InRustGraph = (*old) . clone ();
+  apply_definenodes_to_inRustGraph (&mut new_graph, node_defs);
+  graph . store ( Arc::new (new_graph) ); }
+
+/// Apply a batch of DefineNodes to an ordinary in-memory graph value.
+///
+/// This is the shared mutation path for the live graph update and for
+/// save-time validation simulations.  Keep graph mutation semantics in
+/// this helper so the validator asks the same "what graph would this
+/// produce?" question as the real save path.
+pub fn apply_definenodes_to_inRustGraph (
+  mut new_graph : &mut InRustGraph,
+  node_defs : &[DefineNode],
+) {
   for instr in node_defs {
     match instr {
       DefineNode::Save (SaveNode (node)) => {
@@ -322,8 +336,7 @@ pub fn apply_definenodes (
       DefineNode::Delete (DeleteNode { id, .. }) => {
         if let Some (old_rust) = new_graph . nodes . get (id) . cloned () {
           remove_from_inverse_indexes (&mut new_graph, &old_rust); }
-        new_graph . nodes . remove (id); } } }
-  graph . store ( Arc::new (new_graph) ); }
+        new_graph . nodes . remove (id); }} }}
 
 /// Check that in-Rust graph reflects the expected post-apply state
 /// for a batch of save instructions: every Save's pid is present in

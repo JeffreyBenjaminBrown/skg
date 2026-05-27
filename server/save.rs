@@ -5,7 +5,16 @@ use crate::dbs::filesystem::multiple_nodes::{
   read_all_skg_files_from_sources,
   write_all_nodes_to_fs};
 use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
-use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, apply_definenodes};
+use crate::dbs::in_rust_graph::{
+  InRustGraph,
+  InRustGraphHandle,
+  apply_definenodes,
+  apply_definenodes_to_inRustGraph,
+  override_invariants::{
+    format_override_invariant_violations,
+    validate_override_invariants,
+  },
+};
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
 use crate::merge::merge_nodes;
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
@@ -16,6 +25,7 @@ use crate::dbs::typedb::nodes::which_ids_exist;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_all_outbound_relationships_to_nodes;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName, TantivyIndex};
+use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::nodes::rust::NodeRust;
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::nodes::typedb::NodeTypedb;
@@ -84,7 +94,7 @@ async fn apply_define_nodes_to_stores (
     // view that's consistent with what just landed on disk, and
     // never a mid-save half-applied state.
     let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "apply_definenodes_to_graph") . entered ();
+      "apply_definenodes_to_inRustGraph") . entered ();
     apply_definenodes (graph, &node_defs); }
 
   // TypeDB (async) and Tantivy (sync) in parallel.
@@ -173,6 +183,11 @@ pub async fn update_graph_including_merges (
   driver             : &TypeDBDriver,
   graph              : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
+  validate_override_invariants_after_save (
+    &save_instructions,
+    merge_instructions,
+    &config,
+    graph ) ?;
   let save_replacement : Option<TantivyIndex> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "update_graph_minus_merges" ). entered();
@@ -190,6 +205,35 @@ pub async fn update_graph_including_merges (
   if let Some (new_index) = merge_replacement {
     *tantivy_index = new_index; }
   Ok (( )) }
+
+pub fn validate_override_invariants_after_save (
+  save_instructions  : &[DefineNode],
+  merge_instructions : &[Merge],
+  config             : &SkgConfig,
+  graph              : &InRustGraphHandle,
+) -> Result<(), Box<dyn Error>> {
+  let graph_snap : Arc<InRustGraph> =
+    graph . load_full ();
+  let mut simulated : InRustGraph =
+    (*graph_snap) . clone ();
+  let mut nonmerge : Vec<DefineNode> =
+    save_instructions . to_vec ();
+  apply_delete_propagation_cleanup (&mut nonmerge, &graph_snap);
+  apply_definenodes_to_inRustGraph (&mut simulated, &nonmerge);
+  let merge_definenodes : Vec<DefineNode> =
+    merge_instructions . iter ()
+    . flat_map ( |merge| merge . to_vec () )
+    . collect ();
+  apply_definenodes_to_inRustGraph (&mut simulated, &merge_definenodes);
+  let violations =
+    validate_override_invariants (config, &simulated);
+  if violations . is_empty () {
+    Ok (( ))
+  } else {
+    Err (Box::new (SaveError::BufferValidationErrors (vec![
+      BufferValidationError::OverrideInvariantViolation (
+        format_override_invariant_violations (&violations))
+    ] ))) }}
 
 /// Update the DB from a batch of `DefineNode`s:
 /// 1) Delete all nodes marked Delete, using delete_nodes_from_pids

@@ -155,7 +155,66 @@ The plan centers the stage on one shared graph-shaped validator,
 save-time post-apply simulation before persistence, full-graph
 startup validation even after incremental database updates, extra-ID
 resolution before comparison, and client-facing validation errors.
+*** implemented
+Added a shared override-invariant validator for the in-Rust graph.
+It rejects:
+- more than one user-owned overrider for the same resolved overridden
+  PID,
+- user-owned override chains of the form X overrides Y overrides Z
+  where X and Y are user-owned,
+- nodes whose source is absent from the loaded config.
+
+The validator resolves override targets through the graph's primary-ID
+mapping before checking collisions.
+
+Factored the in-Rust graph DefineNode application logic so the save
+path and validation simulation share one mutation semantics.
+
+Save-time validation now simulates the real post-save graph before any
+store is mutated.  The simulation applies the same delete-propagation
+cleanup as the save path, then applies merge DefineNodes, and returns
+a structured buffer validation error if override invariants would be
+violated.
+
+Full TypeDB rebuild/init now validates the full node set before
+populating TypeDB.  Incremental startup validates the full graph after
+the all-node read and before publishing the server environment.
+Manual database rebuild also validates before replacing stores.
+
+Separated graph construction from override-invariant validation in the
+init/rebuild paths.  Callers now build an 'InRustGraph' explicitly and
+then call 'error_unless_override_invariants_hold', so validate-only
+uses no longer look like they are depending on a returned graph.
+*** tested
+Passed:
+- 'cargo check'
+- 'cargo test override --lib -- --nocapture'
+- 'cargo test --lib -- --nocapture'
+- after moving override-invariant validator tests out of the module:
+  - 'cargo test --test dbs -- --nocapture'
+  - 'cargo test --lib -- --nocapture'
+- after moving save-time override-invariant tests out of 'server/save.rs':
+  - 'cargo test --test save override_invariants -- --nocapture'
+  - 'cargo test --lib -- --nocapture'
+
+'cargo fmt' could not be run because the local cargo installation has
+no 'fmt' subcommand.
+
+TypeDB-backed integration test binaries compiled, but the tests could
+not run because TypeDB was not accepting TCP connections:
+- 'cargo test --test save -- --nocapture'
+- 'cargo test --test merge -- --nocapture'
+- 'cargo test --test typedb -- --nocapture'
 * problems discovered along the way, open
+** TypeDB-backed verification is currently blocked
+After stage 4 implementation, TypeDB-backed integration tests compile
+but fail immediately with:
+#+begin_example
+tcp connect error: Connection refused (os error 111)
+#+end_example
+
+No 'typedb' process or listening TypeDB port was visible from the
+workspace when checked with 'pgrep' and 'ss'.
 * problems discovered along the way, solved
 ** focused TypeDB tests require a running TypeDB server
 After the 'update_node_source' helper cleanup, the source-move test
