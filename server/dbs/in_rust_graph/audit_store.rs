@@ -15,24 +15,28 @@
 //! produces a single row with empty mismatch fields, and a
 //! mismatched audit produces one row per mismatch:
 //!
-//!   pid,audited_on,relation,role,in_rust_graph_ids,typedb_ids
+//!   pid,audited_on,relation,role,in_rust_graph,typedb
 //!
 //! Fields:
 //!   - 'pid': the audited node's primary ID.
 //!   - 'audited_on': YYYY-MM-DD (local).
 //!   - 'relation': empty for a clean row; one of
 //!     'contains', 'subscribes', 'hides_from_its_subscriptions',
-//!     'overrides_view_of', 'textlinks_to' for a mismatch row.
-//!   - 'role': empty for a clean row; the role 'pid' plays in the
+//!     'overrides_view_of', 'textlinks_to' for a relationship
+//!     mismatch row, or 'source' for a source mismatch row.
+//!   - 'role': empty for a clean row or source mismatch row;
+//!     otherwise the role 'pid' plays in the
 //!     relation (e.g. "container", "subscribee"). See
 //!     [[../../typedb/relationships.rs]] 'OUTBOUND_RELATIONSHIP_TYPES'
 //!     for the (relation, role_a, role_b) triples.
-//!   - 'in_rust_graph_ids': pipe-separated list of IDs (possibly empty) —
-//!     what in-Rust graph said the peer set was at audit time.
-//!   - 'typedb_ids': same, but what TypeDB said.
+//!   - 'in_rust_graph': pipe-separated list of IDs for a relationship
+//!     mismatch, or a source name for a source mismatch.
+//!   - 'typedb': pipe-separated list of IDs for a relationship
+//!     mismatch, or a source-audit result for a source mismatch.
 //!
-//! IDs are UUIDs or simple tokens (no commas, no pipes). If that
-//! ever stops being true, this format needs revisiting.
+//! IDs and source-audit payloads must not contain commas. Relationship
+//! ID sets also must not contain pipes. If that ever stops being true,
+//! this format needs revisiting.
 //!
 //! # Atomicity
 //!
@@ -48,6 +52,17 @@ use std::path::{Path, PathBuf};
 use crate::dbs::in_rust_graph::audit::Mismatch;
 use crate::types::misc::ID;
 
+/// A single mismatch as serialized to/from the store. Differs from
+/// 'Mismatch' only in owning its strings instead of borrowing
+/// 'static ones (so it survives a read round-trip).
+#[derive (Debug, Clone)]
+pub struct RecordedMismatch {
+  pub relation   : String,
+  pub role       : String,
+  pub in_rust_graph : String,
+  pub typedb     : String,
+}
+
 /// One pid's in-Rust-graph record: when it was last audited, and any
 /// mismatches from that audit. A clean audit has an empty 'mismatches'
 /// vec.
@@ -58,17 +73,6 @@ pub struct AuditRecord {
   pub mismatches    : Vec<RecordedMismatch>,
 }
 
-/// A single mismatch as serialized to/from the store. Differs from
-/// 'Mismatch' only in owning its strings instead of borrowing
-/// 'static ones (so it survives a read round-trip).
-#[derive (Debug, Clone)]
-pub struct RecordedMismatch {
-  pub relation   : String,
-  pub role       : String,
-  pub in_rust_graph_ids : Vec<ID>,
-  pub typedb_ids : Vec<ID>,
-}
-
 impl AuditRecord {
   /// True iff the last audit found no mismatches.
   pub fn is_clean (&self) -> bool {
@@ -77,11 +81,26 @@ impl AuditRecord {
 
 /// Build a RecordedMismatch from the in-Rust-graph audit output.
 pub fn record_from_mismatch (m : &Mismatch) -> RecordedMismatch {
-  RecordedMismatch {
-    relation   : m . relation . to_string (),
-    role       : m . role . to_string (),
-    in_rust_graph_ids : m . in_rust_graph . iter () . cloned () . collect (),
-    typedb_ids : m . typedb . iter () . cloned () . collect (), } }
+  match m {
+    Mismatch::Relationship (m) =>
+      RecordedMismatch {
+        relation      : m . relation . to_string (),
+        role          : m . role . to_string (),
+        in_rust_graph : pipe_join_hashset (&m . in_rust_graph),
+        typedb        : pipe_join_hashset (&m . typedb), },
+    Mismatch::Source (m) =>
+      RecordedMismatch {
+        relation      : "source" . to_string (),
+        role          : String::new (),
+        in_rust_graph : m . in_rust_graph . to_string (),
+        typedb        : m . typedb . to_string (), },
+    Mismatch::MissingTypedbNode { .. } =>
+      RecordedMismatch {
+        relation      : "missing_typedb_node" . to_string (),
+        role          : String::new (),
+        in_rust_graph : String::new (),
+        typedb        : String::new (), },
+  } }
 
 /// The path '<data_root>/.audit.csv'.
 pub fn audit_store_path (data_root : &Path) -> PathBuf {
@@ -140,8 +159,8 @@ pub fn save (
             f, "{},{},{},{},{},{}",
             rec . pid, rec . audited_on,
             m . relation, m . role,
-            pipe_join (&m . in_rust_graph_ids),
-            pipe_join (&m . typedb_ids)) ?; } } }
+            m . in_rust_graph,
+            m . typedb) ?; }}}
     f . sync_all () ?; }
   fs::rename (&tmp_path, &path) ?;
   Ok (( )) }
@@ -163,28 +182,35 @@ fn parse_row (
     return Err ("audited_on field is empty" . to_string ()); }
   let relation : &str = parts[2];
   let role     : &str = parts[3];
-  if relation . is_empty () && role . is_empty () {
-    // Clean row.
+  let in_rust_graph : &str = parts[4];
+  let typedb        : &str = parts[5];
+  if relation . is_empty ()
+     && role . is_empty ()
+     && in_rust_graph . is_empty ()
+     && typedb . is_empty ()
+  { // Clean row.
     return Ok ((pid, date, None)); }
-  if relation . is_empty () || role . is_empty () {
+  if relation . is_empty () {
     return Err (
-      "relation and role must either both be empty or both present"
+      "relation must be present for mismatch rows"
       . to_string ()); }
   Ok ((
     pid, date,
     Some ( RecordedMismatch {
       relation   : relation . to_string (),
       role       : role . to_string (),
-      in_rust_graph_ids : pipe_split (parts[4]),
-      typedb_ids : pipe_split (parts[5]), } ))) }
+      in_rust_graph : in_rust_graph . to_string (),
+      typedb     : typedb . to_string (), } ))) }
 
 fn pipe_join (ids : &[ID]) -> String {
   ids . iter () . map ( |id| id . as_str () )
     . collect::<Vec<&str>> () . join ("|") }
 
-fn pipe_split (s : &str) -> Vec<ID> {
-  if s . is_empty () { return Vec::new (); }
-  s . split ('|') . map ( |t| ID::new (t) ) . collect () }
+fn pipe_join_hashset (ids : &HashSet<ID>) -> String {
+  let mut ids : Vec<ID> =
+    ids . iter () . cloned () . collect ();
+  ids . sort ();
+  pipe_join (&ids) }
 
 /// Given an up-to-date corpus of pids and a store, return the pids
 /// that have NOT been audited today — i.e. pids that need auditing.
@@ -217,113 +243,3 @@ pub fn prune_to_corpus (
   store . into_iter ()
     . filter ( |rec| corpus . contains (&rec . pid) )
     . collect () }
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use tempfile::TempDir;
-
-  fn mk_record (pid : &str, date : &str) -> AuditRecord {
-    AuditRecord {
-      pid        : ID::new (pid),
-      audited_on : date . to_string (),
-      mismatches : Vec::new (), } }
-
-  fn mk_mismatched_record (
-    pid : &str, date : &str, relation : &str, role : &str,
-    mem : &[&str], db : &[&str],
-  ) -> AuditRecord {
-    AuditRecord {
-      pid        : ID::new (pid),
-      audited_on : date . to_string (),
-      mismatches : vec! [ RecordedMismatch {
-        relation   : relation . to_string (),
-        role       : role . to_string (),
-        in_rust_graph_ids : mem . iter () . map ( |s| ID::new (*s) ) . collect (),
-        typedb_ids : db  . iter () . map ( |s| ID::new (*s) ) . collect (), } ], } }
-
-  #[test]
-  fn roundtrip_clean_record () {
-    let tmp : TempDir = TempDir::new () . unwrap ();
-    let records : Vec<AuditRecord> = vec! [
-      mk_record ("pid1", "2026-04-21"),
-      mk_record ("pid2", "2026-04-21"),
-    ];
-    save (tmp . path (), &records) . unwrap ();
-    let loaded : Vec<AuditRecord> = load (tmp . path ());
-    assert_eq! (loaded . len (), 2);
-    assert! (loaded . iter () . all ( |r| r . is_clean ()));
-    let pids : HashSet<&str> = loaded . iter ()
-      . map ( |r| r . pid . as_str () ) . collect ();
-    assert! (pids . contains ("pid1"));
-    assert! (pids . contains ("pid2")); }
-
-  #[test]
-  fn roundtrip_with_mismatches () {
-    let tmp : TempDir = TempDir::new () . unwrap ();
-    let records : Vec<AuditRecord> = vec! [
-      mk_mismatched_record ("p1", "2026-04-21",
-        "contains", "container",
-        &["x", "y"], &["y"]),
-    ];
-    save (tmp . path (), &records) . unwrap ();
-    let loaded : Vec<AuditRecord> = load (tmp . path ());
-    assert_eq! (loaded . len (), 1);
-    let rec : &AuditRecord = &loaded[0];
-    assert_eq! (rec . pid . as_str (), "p1");
-    assert_eq! (rec . mismatches . len (), 1);
-    let m : &RecordedMismatch = &rec . mismatches[0];
-    assert_eq! (m . relation, "contains");
-    assert_eq! (m . role, "container");
-    assert_eq! (m . in_rust_graph_ids . len (), 2);
-    assert_eq! (m . typedb_ids . len (), 1); }
-
-  #[test]
-  fn malformed_rows_are_skipped () {
-    let tmp : TempDir = TempDir::new () . unwrap ();
-    let path : PathBuf = audit_store_path (tmp . path ());
-    fs::write (
-      &path,
-      "pid1,2026-04-21,,,,\n\
-       BAD_ROW_NO_COMMAS\n\
-       pid2,2026-04-21,contains,container,x|y,y\n\
-      " ) . unwrap ();
-    let loaded : Vec<AuditRecord> = load (tmp . path ());
-    assert_eq! (loaded . len (), 2); }
-
-  #[test]
-  fn pids_needing_audit_filters_correctly () {
-    let corpus : HashSet<ID> = ["a", "b", "c"] . iter ()
-      . map ( |s| ID::new (*s) ) . collect ();
-    let store : Vec<AuditRecord> = vec! [
-      mk_record ("a", "2026-04-21"), // audited today
-      mk_record ("b", "2026-04-20"), // yesterday
-      mk_record ("d", "2026-04-21"), // no longer in corpus
-    ];
-    let need : Vec<ID> = pids_needing_audit_today (
-      &store, &corpus, "2026-04-21");
-    let need_set : HashSet<&str> = need . iter ()
-      . map ( |id| id . as_str () ) . collect ();
-    assert_eq! (need_set . len (), 2);
-    assert! (need_set . contains ("b")); // yesterday → needs today
-    assert! (need_set . contains ("c")); // never audited → needs today
-    assert! (! need_set . contains ("a")); // today → skip
-    assert! (! need_set . contains ("d")); // out of corpus → skip
-  }
-
-  #[test]
-  fn prune_to_corpus_drops_missing () {
-    let corpus : HashSet<ID> = ["a", "c"] . iter ()
-      . map ( |s| ID::new (*s) ) . collect ();
-    let store : Vec<AuditRecord> = vec! [
-      mk_record ("a", "2026-04-21"),
-      mk_record ("b", "2026-04-21"), // gone from corpus
-      mk_record ("c", "2026-04-21"),
-    ];
-    let pruned : Vec<AuditRecord> = prune_to_corpus (store, &corpus);
-    assert_eq! (pruned . len (), 2);
-    let pids : HashSet<&str> = pruned . iter ()
-      . map ( |r| r . pid . as_str () ) . collect ();
-    assert! (pids . contains ("a"));
-    assert! (pids . contains ("c"));
-    assert! (! pids . contains ("b")); } }

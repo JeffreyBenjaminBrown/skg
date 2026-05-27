@@ -29,10 +29,9 @@ pub async fn create_all_sources (
                     has source_name "{}",
                     has user_owns_it {};"#,
       source_name,
-      source . user_owns_it ) ) . await ?;
-  }
+      source . user_owns_it ) ) . await ?; }
   tx . commit () . await ?;
-  Ok (()) }
+  Ok (( )) }
 
 /// Updates the TypeDB 'has_source' relationship of a node.
 /// Deletes the old relation and inserts the new one,

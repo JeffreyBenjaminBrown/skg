@@ -205,17 +205,72 @@ not run because TypeDB was not accepting TCP connections:
 - 'cargo test --test save -- --nocapture'
 - 'cargo test --test merge -- --nocapture'
 - 'cargo test --test typedb -- --nocapture'
+** stage 5 : source mismatch representation
+*** planned
+Wrote 'TODO/full-schema/5_source-mismatch-representation.org',
+a focused implementation plan for replacing the audit's set-shaped
+source mismatch adapter with a scalar source mismatch representation.
+
+The plan keeps relationship role-player-set mismatches as sets, adds
+an explicit source mismatch variant, and updates audit formatting so
+source names are not represented as node IDs.
+*** implemented
+Replaced the audit's single set-shaped 'Mismatch' struct with a
+variant representation:
+- relationship mismatches keep relation, role and role-player ID sets,
+- source mismatches carry the node PID, the in-Rust source name, and
+  the TypeDB source name,
+- missing TypeDB nodes are represented as their own mismatch variant.
+
+Updated audit formatting and the ad-hoc audit probe so source
+mismatches are printed as node-level source facts rather than as
+'relation=has_source role=node' relationship-set mismatches.
+
+Updated scheduled-audit org output and audit-store recording to handle
+the new mismatch variants.  The audit store still uses six CSV fields,
+but recorded payloads are now strings, so source names are not forced
+through 'ID'.
+
+The first implementation briefly added an audit-specific TypeDB source
+cardinality helper, but that duplicated the TypeDB schema constraint
+that each node plays 'has_source:node' exactly once.  The implementation
+now uses the existing scalar source-name lookup and represents the
+TypeDB side of source mismatches as a concrete 'SourceName'.  If the
+node+source query returns no row, the audit records a distinct missing
+TypeDB node mismatch instead.
+
+*** tested
+Passed:
+- 'cargo check'
+- 'cargo test --test dbs -- --nocapture'
+- 'cargo test audit --lib -- --nocapture'
+- 'cargo test --lib -- --nocapture'
+- 'cargo test --test typedb -- --nocapture'
+- 'bash/all-tests.sh --no-sound'
+- after moving audit-store tests out of the module:
+  - 'cargo test --test dbs -- --nocapture'
+  - 'cargo test audit --lib -- --nocapture'
+- after simplifying missing-source audit states into a missing-TypeDB-node variant:
+  - 'cargo test --test dbs -- --nocapture'
+  - 'cargo test audit --lib -- --nocapture'
+  - 'cargo test --test typedb -- --nocapture'
 * problems discovered along the way, open
-** TypeDB-backed verification is currently blocked
-After stage 4 implementation, TypeDB-backed integration tests compile
-but fail immediately with:
+* problems discovered along the way, solved
+** TypeDB-backed verification was blocked
+After stage 4 implementation, TypeDB-backed integration tests compiled
+but initially failed immediately with:
 #+begin_example
 tcp connect error: Connection refused (os error 111)
 #+end_example
 
 No 'typedb' process or listening TypeDB port was visible from the
 workspace when checked with 'pgrep' and 'ss'.
-* problems discovered along the way, solved
+
+*** resolution
+After TypeDB was available again, TypeDB-backed verification passed:
+- 'cargo test --test typedb -- --nocapture'
+- 'bash/all-tests.sh --no-sound'
+
 ** focused TypeDB tests require a running TypeDB server
 After the 'update_node_source' helper cleanup, the source-move test
 binary compiled, but all tests initially failed immediately with:

@@ -73,7 +73,7 @@ This accomplishes two things:
   against the graph,
 - future code may be simplified where it currently leaves TypeDB to
   recover source-related facts elsewhere.
-** Validate override invariants at rebuild and save
+** DONE Validate override invariants at rebuild and save
 Override substitution must be deterministic for user-owned data.
 Validation should reject states that would make effective views
 ambiguous or recursively unstable.
@@ -104,7 +104,7 @@ ordinary recursive content rendering.
 Validation should resolve extra IDs to primary IDs before checking
 these constraints, because merges must not allow two apparently distinct
 override targets to become the same effective overridden node.
-** Represent audit source mismatches as scalar facts
+** ONGOING Represent audit source mismatches as scalar facts
 The in-Rust graph audit compares TypeDB facts against the in-memory graph.
 Its existing mismatch type is set-shaped because it was originally used
 to compare relationship peer sets.

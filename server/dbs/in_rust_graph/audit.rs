@@ -26,56 +26,34 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
 use crate::dbs::typedb::search::find_related_nodes_for_one_primary_pid_in_tx;
 use crate::dbs::typedb::sources::source_name_for_one_node_id_in_tx;
-use crate::types::misc::ID;
+use crate::types::misc::{ID, SourceName};
+
+/// A disagreement between the TypeDB and InRustGraph dbs.
+#[derive(Debug, Clone)]
+pub enum Mismatch {
+  Relationship (RelationshipMismatch),
+  Source (SourceMismatch),
+  MissingTypedbNode { pid: ID } }
 
 /// A single disagreement between the in-Rust graph and TypeDB, for
 /// a particular node in a particular relation in a particular role.
-/// The audit produces zero or more of these per node per pass: a node
-/// might have no mismatches (everything agrees), or several (e.g. a
-/// 'contains' mismatch for the container role AND a 'subscribes'
-/// mismatch for the subscribee role).
 #[derive(Debug, Clone)]
-pub struct Mismatch {
-  /// The node being audited. The in-Rust graph and TypeDB disagree about one of
-  /// /this/ node's relationships. ('pid' is primary ID — the node's
-  /// canonical identifier, as distinct from any extra_ids.)
+pub struct RelationshipMismatch {
   pub pid       : ID,
-  /// Which of the five outbound relation types this disagreement is
-  /// about. Takes a value from the first column of
-  /// 'OUTBOUND_RELATIONSHIP_TYPES' in
-  /// [[../../typedb/relationships.rs]] — so one of "contains",
-  /// "textlinks_to", "subscribes", "hides_from_its_subscriptions",
-  /// or "overrides_view_of".
-  pub relation  : &'static str,
-  /// Which role 'pid' plays in the relation. Takes a value from the
-  /// second or third column of 'OUTBOUND_RELATIONSHIP_TYPES' in
-  /// [[../../typedb/relationships.rs]] — specifically, one of the
-  /// two roles associated with 'relation'. For 'contains' that's
-  /// "container" or "contained"; for 'subscribes' that's "subscriber"
-  /// or "subscribee"; etc. (See [[../../../schema.tql]] for the
-  /// canonical schema definition.)
-  ///
-  /// The in-Rust graph-side answer that's compared against TypeDB depends
-  /// on which role this is:
-  ///   If 'pid' plays the /first-column role/ (container, source,
-  ///     subscriber, hider, overrider) — in-Rust graph's answer is the
-  ///     forward field on pid's NodeRust (e.g. NodeRust.contains),
-  ///     resolved through extra_id_to_pid to match TypeDB's
-  ///     has_extra_id-aware view.
-  ///   If 'pid' plays the /second-column role/ (contained, dest,
-  ///     subscribee, hidden, overridden) — in-Rust graph's answer is the
-  ///     inverse-index lookup (e.g. graph.contained_by[pid]),
-  ///     already canonical-pid-keyed.
-  pub role : &'static str,
-/// What the in-Rust graph says the peer set is (after any needed
-  /// canonicalization — see the role-specific descriptions above).
-  /// The set may be empty, which is a valid in-Rust graph answer meaning
-  /// "no known peers in this relation in this role."
+  pub relation : &'static str,
+  /// The role of the node with the PID mentioned above.
+  pub role     : &'static str,
+  /// What the in-Rust graph says the other role-player set is (after any needed canonicalization — see the role-specific descriptions above). The set may be empty, which is a valid in-Rust graph answer meaning "no known other role players in this relation in this role."
   pub in_rust_graph : HashSet<ID>,
-  /// What TypeDB says the peer set is. Obtained by issuing the
-  /// has_extra_id-aware query for 'pid' in the complementary role
-  /// (the one 'pid' is NOT playing here). Also may be empty.
-  pub typedb    : HashSet<ID>,
+  /// Similarly, what TypeDB says.
+  pub typedb        : HashSet<ID>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SourceMismatch {
+  pub pid           : ID,
+  pub in_rust_graph : SourceName,
+  pub typedb        : SourceName,
 }
 
 /// Audit every node in the in-Rust graph against TypeDB. Returns the list of
@@ -167,27 +145,25 @@ pub async fn audit_one_node (
     in in_rust_graph_answers . into_iter () . zip (typedb_answers) {
     let typedb_set : HashSet<ID> = typedb_result ?;
     if in_rust_graph_set != typedb_set {
-      mismatches . push ( Mismatch {
+      mismatches . push ( Mismatch::Relationship (
+        RelationshipMismatch {
         pid       : pid . clone (),
         relation,
         role,
         in_rust_graph : in_rust_graph_set,
-        typedb    : typedb_set, } ); } }
-  let in_rust_source : HashSet<ID> =
-    [ID::from (node . source . as_str ())]
-    . into_iter () . collect ();
-  let typedb_source : HashSet<ID> =
-    source_name_for_one_node_id_in_tx (tx, pid) . await ?
-    . map ( |s| [ID::from (s . as_str ())]
-                . into_iter () . collect () )
-    . unwrap_or_default ();
-  if in_rust_source != typedb_source {
-    mismatches . push ( Mismatch {
-      pid       : pid . clone (),
-      relation  : "has_source",
-      role      : "node",
-      in_rust_graph : in_rust_source,
-      typedb    : typedb_source, } ); }
+        typedb    : typedb_set, } ) ); } }
+  let typedb_source : Option<SourceName> =
+    source_name_for_one_node_id_in_tx (tx, pid) . await ?;
+  let Some (typedb_source) = typedb_source else {
+    mismatches . push (Mismatch::MissingTypedbNode {
+      pid: pid . clone (), } );
+    return Ok (mismatches); };
+  if typedb_source != node . source {
+    mismatches . push ( Mismatch::Source (
+      SourceMismatch {
+        pid           : pid . clone (),
+        in_rust_graph : node . source . clone (),
+        typedb        : typedb_source, } )); }
   Ok (mismatches) }
 
 /// IDs appearing as the second member of 'node''s outbound edges in
@@ -232,8 +208,20 @@ pub fn format_mismatches (mismatches : &[Mismatch]) -> String {
     "{} mismatch(es) between in-Rust graph and TypeDB:\n",
     mismatches . len () );
   for m in mismatches {
-    s . push_str ( & format! (
-      "  pid={} relation={} role={} in-Rust graph={:?} typedb={:?}\n",
-      m . pid, m . relation, m . role,
-      m . in_rust_graph, m . typedb ) ); }
+    match m {
+      Mismatch::Relationship (m) => {
+        s . push_str ( & format! (
+          "  pid={} relation={} role={} in-Rust graph={:?} typedb={:?}\n",
+          m . pid, m . relation, m . role,
+          m . in_rust_graph, m . typedb ) ); }
+      Mismatch::Source (m) => {
+        s . push_str ( & format! (
+          "  pid={} source mismatch in-Rust graph={} typedb={}\n",
+          m . pid,
+          m . in_rust_graph,
+          m . typedb ) ); }
+      Mismatch::MissingTypedbNode { pid } => {
+        s . push_str ( & format! (
+          "  pid={} missing TypeDB node\n",
+          pid ) ); }}}
   s }
