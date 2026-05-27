@@ -145,6 +145,16 @@ After the 'update_node_source' helper cleanup:
   not run because TypeDB was not accepting TCP connections
 - after TypeDB was restarted,
   'cargo test --test move_source -- --nocapture' passed
+** stage 4 : validate override invariants
+*** planned
+Wrote 'TODO/full-schema/4_validate-override-invariants.org',
+a focused implementation plan for rejecting ambiguous or recursive
+user-owned override states at rebuild/init and save time.
+
+The plan centers the stage on one shared graph-shaped validator,
+save-time post-apply simulation before persistence, full-graph
+startup validation even after incremental database updates, extra-ID
+resolution before comparison, and client-facing validation errors.
 * problems discovered along the way, open
 * problems discovered along the way, solved
 ** focused TypeDB tests require a running TypeDB server

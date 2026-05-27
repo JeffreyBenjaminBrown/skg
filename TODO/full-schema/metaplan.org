@@ -53,7 +53,7 @@ inserted by the user that are not real members are relabeled
 completion.
 
 Use "read-only set" in prose and user-facing warnings, not an acronym.
-** ONGOING represent source ownership in TypeDB
+** DONE represent source ownership in TypeDB
 Override behavior depends on whether a source is user-owned.
 The current TypeDB schema already records each node's source name,
 but it does not record whether that source is user-owned.
@@ -386,16 +386,42 @@ Use parent/child only for org/view parentage.
 ** awaits
 These are adjacent opportunities, not part of the plan itself.
 
+*** Reuse richer TypeDB source facts
 Once sources are represented more richly in TypeDB, inspect code that
 currently recovers source facts from the filesystem, Tantivy, or the
 in-Rust graph because TypeDB could not answer source-related questions.
 Some of that code may become simpler.
 
+*** Improvements to the validation of override relationships
+Currently the algorithm is simple but processing-intensive:
+We take the full set of changes and simulate what they would do
+to a full graph, then validate every overide relationship in it.
+
+There are two ways to reduce that work:
+- The SavePlan applied to the simulation can ignore changes to
+  content, subscriptions and hide relationships.
+- The validator can restrict its attention to neighbors of changed nodes.
+
+The algorithm for the latter would be:
+
+**** monogamy constraint:
+For every new user-owned override relationship from X to Y,
+(X was saved; maybe Y was or maybe not)
+if there is another X' overriding Y, reject.
+
+**** no-chains constraint
+For every new user-owned override relationship from X to Y,
+verify that both:
+- there is no W that overrides X
+- there is no Z that Y overrides
+
+*** Revisit source-set and diff-mode composition
 After full-schema relation diffs exist, revisit whether restricted
 source-sets and inline diff mode can compose safely.  The plan above
 forbids that combination to keep the first full-schema implementation
 coherent.
 
+*** Reconsider override-choice view type
 After override-choice buffers exist, consider whether they deserve a
 dedicated view type rather than reusing ordinary indefinitive Skg
 buffers.

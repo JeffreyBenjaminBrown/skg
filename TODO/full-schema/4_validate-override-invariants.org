@@ -1,0 +1,304 @@
+* plan : validate override invariants at rebuild and save
+** overview
+This plan implements the metaplan item:
+"Validate override invariants at rebuild and save".
+
+The stage introduces one shared override-invariant validator and wires
+it into the places where Skg accepts graph state:
+- full database initialization / rebuild from disk,
+- incremental startup updates from modified files,
+- save-buffer planning before anything is written,
+- merge-inclusive saves before anything is written.
+
+The validator protects the semantic promise needed by later override
+rendering:
+for user-owned data, automatic override substitution is deterministic
+and non-recursive.
+
+This stage does not implement override substitution, override-choice
+menus, read-only override sets, or override rendering.  It only rejects
+graphs that would make those later operations ambiguous.
+** target state
+Skg rejects any graph state where a node has more than one user-owned
+overrider.
+
+Skg rejects any graph state containing a user-owned override chain:
+#+begin_example
+X overrides Y overrides Z
+#+end_example
+where both X and Y are user-owned.
+
+Foreign override edges remain legal graph facts.  They can participate
+in read-only displays and later UI affordances, but they do not count
+as automatic replacements and therefore do not trigger these rejection
+rules unless the overrider is user-owned.
+
+All checks resolve every override target through the current
+primary-ID mapping before comparing.  A target written as an extra ID
+is checked against the primary node it names.  This must remain true
+after saves and merges, because merges can turn what was a primary ID
+into an extra ID of another node.
+** invariants
+*** User-owned override monogamy
+For every effective overridden PID T, there may be at most one
+user-owned PID O such that:
+#+begin_example
+O overrides_view_of T
+#+end_example
+
+If T has user-owned overriders O1 and O2, the state is invalid.
+
+This check is keyed by the resolved primary PID of the overridden
+target, not by the literal ID string in an 'overrides_view_of' list.
+*** User-owned override chain rejection
+For every user-owned PID X:
+- if X overrides Y,
+- and Y resolves to a user-owned PID,
+- and that Y itself overrides anything,
+
+then the state is invalid.
+
+The target Z does not need to exist and does not need to be
+user-owned.  The invalid fact is that a user-owned replacement node is
+itself being used as an automatic replacement.
+
+This rule rejects longer user-owned chains as a consequence of
+rejecting every adjacent user-owned pair in a chain.
+*** Foreign override edges stay legal
+If a foreign node overrides T, that edge does not count toward
+automatic override monogamy and does not start an automatic
+replacement chain.
+
+If a user-owned X overrides a foreign Y, that can still be legal even
+if Y overrides Z.  Y is not a user-owned automatic replacement.
+** validation model
+*** Prefer one shared graph-shaped validator
+Create one validator that operates on an in-memory graph snapshot
+plus source ownership facts.
+
+The most natural home is probably a small module near the in-Rust
+graph, because the in-Rust graph already:
+- stores node sources,
+- stores outbound 'overrides_view_of',
+- resolves extra IDs to primary IDs,
+- maintains 'overriders_of' keyed by resolved primary IDs.
+
+The validator should return structured findings, not only a string.
+The same findings need to become:
+- startup/rebuild errors,
+- save-buffer validation errors,
+- test assertions.
+
+Suggested data shape:
+#+begin_example
+enum OverrideInvariantViolation {
+  MultipleUserOwnedOverriders {
+    overridden: ID,
+    overriders: Vec<ID>,
+  },
+  UserOwnedOverrideChain {
+    first_overrider: ID,
+    middle_overrider: ID,
+    final_targets: Vec<ID>,
+  },
+}
+#+end_example
+
+The exact type names can follow local conventions.
+*** Source ownership lookup
+The validator should determine whether a node is user-owned from its
+source name and 'SkgConfig.sources'.
+
+Unknown source names should not be silently treated as foreign.  They
+should become a validation or initialization error, because a missing
+source makes override semantics unknowable.
+*** Extra-ID resolution
+Override targets should be resolved through the graph's ID map before
+validation.
+
+For full initialization, build or reuse an 'InRustGraph' from all
+loaded nodes before TypeDB population.  That graph has the complete
+extra-id mapping and can validate the same effective targets that
+TypeDB relationship creation will use.
+
+For save validation, validate the graph that would exist after applying
+all non-merge and merge DefineNodes.  Do not validate only the buffer's
+changed nodes.
+** save-time integration
+*** Validate before persistence
+Save rejection must happen before filesystem writes.  Once the
+filesystem has been updated, recovery requires rebuilding other stores
+from a now-invalid source of truth.
+
+The validation should therefore run during save planning, after these
+facts are available:
+- disk-supplemented DefineNodes,
+- merge instructions,
+- source moves,
+- foreign-write filtering.
+
+The resulting check should build a simulated post-save graph from the
+current in-Rust graph snapshot and the complete mutation plan, then
+validate that simulated graph.
+*** Include merge instructions
+Merge instructions are not optional for this check.  A merge can:
+- transfer an 'overrides_view_of' edge to an acquirer,
+- turn the acquiree PID into an extra ID of the acquirer,
+- redirect other nodes' override targets through the new extra-ID map.
+
+The save-time validation input should therefore include:
+- the filtered non-merge DefineNodes,
+- every DefineNode implied by every Merge,
+- source moves if source moves can affect ownership.
+
+Source moves are currently restricted to owned-to-owned moves, so they
+should not change whether a node is user-owned.  Still, the validation
+entry point should make that assumption explicit rather than leaving a
+future config change to invalidate it silently.
+*** Error reporting to the client
+Add explicit buffer validation errors rather than routing these through
+generic database errors.
+
+For multiple user-owned overriders, report all collisions in one save
+response:
+#+begin_example
+node X is overridden by user-owned nodes Y, Z, W
+node X2 is overridden by user-owned nodes ...
+#+end_example
+
+For user-owned override chains, report every chain root/middle pair
+found, with enough IDs for the user to edit the responsible nodes.
+
+It is acceptable to initially add one or two new
+'BufferValidationError' variants, or to use 'Other' with carefully
+formatted messages if that keeps the stage smaller.  Prefer structured
+variants if the formatting surface is not too large.
+** rebuild and init integration
+*** Full rebuild
+After reading every '.skg' file and before populating TypeDB or
+Tantivy, build the validation graph and reject invalid override
+states.
+
+For server startup, invalid disk state should produce an explanatory
+startup failure rather than continuing with a database that cannot be
+rendered deterministically.
+
+For save-recovery rebuilds, the same validation should run before
+rebuilding TypeDB or Tantivy from disk.  If disk has become invalid,
+the save should fail with the override-invariant error rather than
+masking it behind a later database error.
+*** Incremental startup
+The invariant is global, so checking only modified files is not enough.
+A modified node can collide with an unmodified user-owned overrider,
+and an extra-ID change can redirect an old override target.
+
+Keep the implementation simple and safe:
+after incremental startup has updated TypeDB/Tantivy from modified
+files, the startup path already reads all nodes to rebuild the in-Rust
+graph.  Validate that full graph before publishing the server
+environment and before touching the init marker.
+
+If the validation fails, startup should fail instead of serving with
+an invalid in-Rust graph.
+** TypeDB usage
+This stage should not need TypeDB as the primary validation engine.
+The in-Rust graph is already the right source for save simulation and
+extra-ID resolution.
+
+TypeDB source ownership from the previous stage still matters because
+it proves that later TypeDB queries can ask the same ownership
+questions, but this validator can read ownership from 'SkgConfig' and
+node sources.
+
+Add TypeDB-specific tests only where they prove the init/save wiring,
+not because the invariant itself needs a TypeQL implementation.
+** implementation steps
+*** Add override-invariant validation module
+Add a focused module, probably near 'server/dbs/in_rust_graph', that:
+- validates user-owned override monogamy,
+- validates user-owned override chains,
+- formats or exposes structured violation data,
+- has small unit tests that do not require TypeDB.
+*** Add graph simulation for save validation
+Add a non-mutating helper that applies a batch of DefineNodes to a
+cloned 'InRustGraph' and returns the simulated graph.
+
+This should share as much logic as possible with 'apply_definenodes'
+so save validation and real graph updates do not drift.  A reasonable
+shape is:
+- extract the inner "apply to mutable graph" logic,
+- let 'apply_definenodes' publish the result,
+- let validation call the same helper on a clone and inspect it.
+*** Wire save planning
+After foreign filtering and simultaneous move/merge validation, build
+the complete post-save DefineNode batch and validate it against the
+current graph snapshot.
+
+Return override invariant failures as 'SaveError::BufferValidationErrors'.
+*** Wire initialization and rebuilds
+Validate full node sets in:
+- full init before TypeDB population,
+- incremental init after full node read and before environment
+  publication,
+- any rebuild helper that reads all nodes from disk after save or merge
+  recovery.
+
+Avoid duplicating validation logic in each call site.  Prefer a helper
+that accepts 'config' and a node slice and returns either a valid
+'InRustGraph' or formatted violations.
+*** Tests
+Add focused unit tests for the validator:
+- one user-owned overrider is valid,
+- two user-owned overriders of the same resolved target are invalid,
+- a foreign overrider plus one user-owned overrider is valid,
+- two foreign overriders are valid,
+- extra-ID targets are resolved before collision detection,
+- user-owned X -> user-owned Y -> any Z is invalid,
+- user-owned X -> foreign Y -> Z is valid,
+- foreign X -> user-owned Y -> Z is valid.
+
+Add save-path tests:
+- saving a second user-owned overrider is rejected before persistence,
+- saving a user-owned override chain is rejected before persistence,
+- a merge that redirects override targets into a collision is rejected,
+- the rejection response uses the explicit error channel, not warnings.
+
+Add init/rebuild tests:
+- invalid disk state with two user-owned overriders is rejected on
+  full init/rebuild,
+- invalid disk state created through an extra-ID target is rejected.
+** verification
+Run focused checks first:
+#+begin_example
+cargo check
+cargo test override
+cargo test --test save -- --nocapture
+cargo test --test merge -- --nocapture
+#+end_example
+
+Run TypeDB-backed tests for init/save wiring if new tests use TypeDB:
+#+begin_example
+cargo test --test typedb -- --nocapture
+#+end_example
+
+Finish with the full suite:
+#+begin_example
+bash/all-tests.sh --no-sound
+#+end_example
+** risks and pushback
+*** Save validation must not mutate the live graph
+The save-time check needs the post-save graph, but it must not publish
+that graph or write stores.  The plan therefore calls for a shared
+"apply to mutable graph" helper rather than calling the existing
+publishing function.
+*** Incremental init can hide global invalidity
+The invariant is global.  If incremental init validates only modified
+nodes, it will miss collisions and chains involving unmodified nodes.
+Validate the full graph on startup even when database updates were
+incremental.
+*** Error volume could be noisy
+Reporting every chain in a very tangled graph may produce a long error
+buffer.  That is acceptable for this stage because invalid override
+states should be rare and the user needs enough data to repair them.
+If it becomes noisy, a later UI pass can group or truncate display
+without weakening the validator.
