@@ -104,7 +104,7 @@ ordinary recursive content rendering.
 Validation should resolve extra IDs to primary IDs before checking
 these constraints, because merges must not allow two apparently distinct
 override targets to become the same effective overridden node.
-** ONGOING Represent audit source mismatches as scalar facts
+** DONE Represent audit source mismatches as scalar facts
 The in-Rust graph audit compares TypeDB facts against the in-memory graph.
 Its existing mismatch type is set-shaped because it was originally used
 to compare relationship peer sets.
@@ -123,7 +123,7 @@ side, so the audit output reflects the real invariant:
 This keeps relationship-set auditing and node-source auditing distinct,
 and prevents later validation work from inheriting an accidental
 "source names are node IDs" adapter.
-** Add relation accessors and generated collections
+** ONGOING Add relation accessors and generated collections
 Before adding more UI, complete relation accessors in both directions
 for every schema relationship.
 The implementation should make it easy to ask:

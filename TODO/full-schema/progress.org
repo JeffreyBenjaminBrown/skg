@@ -1,4 +1,30 @@
 * progress
+** stage 6 : relation accessors and generated collections
+*** planned
+Wrote 'TODO/full-schema/6_col-buckets-for-everything.org',
+a focused implementation plan for the metaplan item
+"Add relation accessors and generated collections".
+
+The plan separates:
+- in-Rust graph relation/role accessors,
+- metadata for relation collection scaffolds,
+- new Col scaffold parsing/rendering/validation,
+- 'parentIs=collector',
+- writable versus read-only collection save behavior.
+
+Revised the plan after review to:
+- use TypeDB's "relation" versus "relationship" terminology,
+- use "member" rather than "endpoint",
+- reuse the existing relation/role table instead of introducing a
+  separate relation-end abstraction.
+
+Revised the plan again to:
+- make collection scaffold headlines titleless on the server side and
+  uniformly explained by Emacs heralds,
+- restrict auto-add to de-novo view creation and optionally definitive
+  view expansion,
+- require save-triggered completion not to recreate relation
+  collection scaffolds deleted by the user.
 ** stage 1 : rename override relationship roles
 *** planned
 Wrote 'TODO/full-schema/1_rename-override-rels.org',
