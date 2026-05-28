@@ -8,10 +8,7 @@ use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::{pid_and_source_from_ancestor, read_at_ancestor_in_tree};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
-use crate::update_buffer::util::{
-  detach_scaffold_if_empty,
-  mark_managed_children_outside_goal_independent,
-};
+use crate::update_buffer::util::detach_scaffold_if_empty;
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -57,13 +54,10 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
       tree, node, &context,
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
-
   reconcile_sharing_scaffold_children(
+    // PITFALL: ('reconcile_hiddenin_subscribee_col_children' has a similar note.) Unlike relation-collection reconciliation, this read-only generated collection does not call mark_managed_children_outside_goal_independent first.  A non-goal collector child is a stale member, so reconciliation should remove it rather than preserving it as independent.
     tree, node, kind,
     &goal_list, &child_data ) ?;
-  mark_managed_children_outside_goal_independent (
-    tree, node, &goal_list,
-    |t| ! t . parent_ignores_it () ) ?;
   detach_scaffold_if_empty (tree, node) ?;
   Ok(( )) }
 

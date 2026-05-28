@@ -34,9 +34,11 @@ where
 /// independent.
 ///
 /// Callers provide `is_managed_child` because different scaffold
-/// completers own different kinds of children.  Relation collections
-/// manage collector children; HiddenOutsideOfSubscribeeCol manages
-/// ordinary content children.
+/// completers can define ownership differently.  Generated collection
+/// scaffolds should generally manage collector children.
+///
+/// Run this before `complete_relevant_children_in_viewnodetree` when
+/// the reconciler would otherwise discard non-goal managed children.
 pub fn mark_managed_children_outside_goal_independent<ManagedPredicate> (
   tree             : &mut Tree<ViewNode>,
   node             : NodeId,

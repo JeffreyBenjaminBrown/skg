@@ -129,20 +129,41 @@ fn validate_aliascol (
     errors . push("AliasCol must be unique among its siblings." . to_string()); }
   errors }
 
+/// Read the error messages to see what this validates.
 fn validate_hidden_in_subscribee_col (
   tree    : &Tree<MaybePlacedViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node . kind, MaybePlacedViewnodeKind::True (_))) {
-    errors . push("HiddenInSubscribeeCol must have a TrueNode parent (the subscribee)" . to_string()); }
+       matches!(&node . kind, MaybePlacedViewnodeKind::True (_)))
+    { errors . push(
+        "HiddenInSubscribeeCol must have a TrueNode parent (the subscribee)"
+        . to_string()); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
-       matches!(&node . kind, MaybePlacedViewnodeKind::True (_))) {
-    errors . push("HiddenInSubscribeeCol's (non-ignored) children must include only TrueNodes (they are what's hidden)." . to_string()); }
-  if !siblings_cannot_include(tree, node_id, |node|
-       matches!(&node . kind, MaybePlacedViewnodeKind::Scaff (Scaffold::HiddenInSubscribeeCol))) {
-    errors . push("HiddenInSubscribeeCol must be unique among its siblings." . to_string()); }
+       matches!(&node . kind, MaybePlacedViewnodeKind::True (_)))
+    { errors . push(
+        "HiddenInSubscribeeCol's children can only be TrueNodes (to hide)."
+        . to_string()); }
+  if !generation_includes_only(
+    tree, node_id, 1, true,
+    |node| matches!(&node . kind,
+                    MaybePlacedViewnodeKind::True (t)
+                    if t . parentIs == ParentIs::Collector))
+    { errors . push(
+        "HiddenInSubscribeeCol TrueNode children must have parentIs=collector."
+      . to_string()); }
+  if !siblings_cannot_include(
+    tree, node_id,
+    |node| matches!(&node . kind,
+                    MaybePlacedViewnodeKind::Scaff (
+                      Scaffold::HiddenInSubscribeeCol)))
+    { errors . push("HiddenInSubscribeeCol must be unique among its siblings."
+                    . to_string()); }
+  if !relation_col_children_have_distinct_ids(tree, node_id)
+    { errors . push(
+      "HiddenInSubscribeeCol must not have duplicate TrueNode children."
+        . to_string() ); }
   errors }
 
 fn validate_hidden_outside_of_subscribee_col (
@@ -155,10 +176,26 @@ fn validate_hidden_outside_of_subscribee_col (
     errors . push("HiddenOutsideOfSubscribeeCol must have a SubscribeeCol parent." . to_string()); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
        matches!(&node . kind, MaybePlacedViewnodeKind::True (_))) {
-    errors . push("HiddenOutsideOfSubscribeeCol's (non-ignored) children must include only TrueNodes." . to_string()); }
-  if !siblings_cannot_include(tree, node_id, |node|
-       matches!(&node . kind, MaybePlacedViewnodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol))) {
-    errors . push("HiddenOutsideOfSubscribeeCol must be unique among its siblings." . to_string()); }
+    errors . push("HiddenOutsideOfSubscribeeCol's children must include only TrueNodes." . to_string()); }
+  if !generation_includes_only(tree, node_id, 1, true, |node|
+       matches!(&node . kind,
+         MaybePlacedViewnodeKind::True (t)
+         if t . parentIs == ParentIs::Collector)) {
+    errors . push(
+      "HiddenOutsideOfSubscribeeCol TrueNode children must be parentIs=collector."
+      . to_string()); }
+  if !siblings_cannot_include(
+    tree, node_id,
+    |node| matches!(&node . kind,
+                    MaybePlacedViewnodeKind::Scaff (
+                      Scaffold::HiddenOutsideOfSubscribeeCol)))
+    { errors . push(
+        "HiddenOutsideOfSubscribeeCol must be unique among its siblings."
+        . to_string()); }
+  if !relation_col_children_have_distinct_ids(tree, node_id)
+    { errors . push(
+        "HiddenOutsideOfSubscribeeCol must not have duplicate TrueNode children."
+        . to_string() ); }
   errors }
 
 fn validate_subscribeecol (

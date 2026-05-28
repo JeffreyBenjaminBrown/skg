@@ -289,7 +289,7 @@ fn add_e11_to_hiddenoutside_col (
   insert_after_line_containing (
     buffer,
     "(skg hiddenOutsideOfSubscribeeCol)",
-    "**** (skg (node (id E11) (source main) indef)) E11" ) }
+    "**** (skg (node (id E11) (source main) (parentIs collector) indef)) E11" ) }
 
 fn assert_e1_removed_from_visible_subscribee_branch (
   buffer : &str,
@@ -1227,10 +1227,9 @@ fn test_adding_to_hiddenoutside_col_does_not_hide(
       "Expected original hidden-outside row H to remain:\n{}",
       rerendered );
     assert! (
-      rerendered . lines () . any ( |line|
-        line . contains ("(id E11)")
-        && line . contains ("parentIs independent")),
-      "Expected adding to HiddenOutsideOfSubscribeeCol to leave E11 independent:\n{}",
+      ! rerendered . lines () . any ( |line|
+        line . contains ("(id E11)") ),
+      "Expected adding to HiddenOutsideOfSubscribeeCol not to persist E11:\n{}",
       rerendered );
 
     cleanup_test (

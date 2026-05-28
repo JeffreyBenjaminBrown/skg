@@ -64,6 +64,15 @@ Documented and regression-tested the distinction between an absent
 writable relation collection and a present-but-empty collection:
 absence means no opinion, while an empty collection means the user
 explicitly wants the set to be empty.
+
+Review cleanup: made 'HiddenInSubscribeeCol' and
+'HiddenOutsideOfSubscribeeCol' use the same 'parentIs=collector'
+membership policy as the other generated collection scaffolds.
+Completion now discards stale collector children in those two
+read-only generated collections during reconciliation, and local
+validation requires their collection members to be collector-marked
+TrueNodes.  'HiddenCol' is a simpler relation collection, and follows the
+simple relation-collection reconciliation policy instead.
 *** tested
 Focused checks passed:
 - 'cargo check'

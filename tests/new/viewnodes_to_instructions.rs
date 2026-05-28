@@ -406,10 +406,10 @@ fn role_aware_extraction_collects_subscribees_without_hidden_branches (
             ** (skg subscribeeCol)
             *** (skg (node (id subscribee) (source main) (parentIs collector))) subscribee
             **** (skg hiddenInSubscribeeCol)
-            ***** (skg (node (id hidden-in) (source main))) hidden in child
+            ***** (skg (node (id hidden-in) (source main) (parentIs collector))) hidden in child
             **** (skg (node (id subscribee-content) (source main))) subscribee content
             *** (skg hiddenOutsideOfSubscribeeCol)
-            **** (skg (node (id hidden-outside) (source main))) hidden outside child
+            **** (skg (node (id hidden-outside) (source main) (parentIs collector))) hidden outside child
         "};
 
   let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
@@ -630,10 +630,10 @@ fn subscribee_hiderel_intent_ignores_hidden_scaffold_contents (
             ** (skg subscribeeCol)
             *** (skg (node (id subscribee) (source main) (parentIs collector))) subscribee
             **** (skg hiddenInSubscribeeCol)
-            ***** (skg (node (id hidden-in) (source main))) hidden in child
+            ***** (skg (node (id hidden-in) (source main) (parentIs collector))) hidden in child
             **** (skg (node (id visible) (source main))) visible
             *** (skg hiddenOutsideOfSubscribeeCol)
-            **** (skg (node (id hidden-outside) (source main))) hidden outside child
+            **** (skg (node (id hidden-outside) (source main) (parentIs collector))) hidden outside child
             "};
 
   assert_eq!(

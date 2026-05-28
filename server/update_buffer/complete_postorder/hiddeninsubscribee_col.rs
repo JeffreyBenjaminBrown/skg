@@ -7,8 +7,8 @@ use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::pid_and_source_from_ancestor;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, ParentIs};
-use crate::update_buffer::util::{detach_scaffold_if_empty, treat_certain_children};
+use crate::types::viewnode::ViewNode;
+use crate::update_buffer::util::detach_scaffold_if_empty;
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -55,12 +55,10 @@ pub fn reconcile_hiddenin_subscribee_col_children (
       tree, node, &context,
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
-
   reconcile_sharing_scaffold_children(
+    // PITFALL: ('reconcile_hiddenoutside_subscribee_col_children' has a similar note.) Unlike other reconciliation steps, in a HiddenInSubscribeeCol we do not call mark_managed_children_outside_goal_independent before reconciliation. If a user moves a node into a subscribee-as-such, 'unhiding' it from the corresponding subscriber, that would cause one of the children of the HiddenInSubscribeeCol to become stale (because it is no longer hidden). We do not want to mark it independent; we actually want to remove it from the HiddenInSubscribeeCol during reconciliation.
     tree, node, kind,
     &goal_list, &child_data ) ?;
-  mark_non_subscribee_content_independent (
-    tree, node, &context . subscribee_contains ) ?;
   detach_scaffold_if_empty (tree, node) ?;
   Ok(( )) }
 
@@ -125,24 +123,3 @@ fn build_hiddenin_child_data (
     tree, node, &context . subscribee_pid, &context . subscribee_source,
     goal_list, removed_ids,
     source_diffs, deleted_since_head_pid_src_map, env ) }
-
-fn mark_non_subscribee_content_independent (
-  tree                : &mut Tree<ViewNode>,
-  node                : NodeId,
-  subscribee_contains : &[ID],
-) -> Result<(), Box<dyn Error>> {
-  let subscribee_contains_set : HashSet<ID> =
-    subscribee_contains . iter() . cloned() . collect();
-  treat_certain_children(
-    tree, node,
-    |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::True (t) =>
-        ! t . parent_ignores_it()
-        && ! subscribee_contains_set . contains( &t . id )
-        && ! t . is_phantom(),
-      _ => false },
-    |vn : &mut ViewNode| {
-      if let ViewNodeKind::True( ref mut t ) = vn . kind {
-        t . parentIs = ParentIs::Independent; } },
-  ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
-  Ok (( )) }

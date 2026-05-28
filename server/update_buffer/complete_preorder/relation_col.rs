@@ -53,9 +53,11 @@ pub fn reconcile_relation_col_children (
       tree, node, &owner_pid, &owner_source,
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
-  reconcile_sharing_scaffold_children (
-    tree, node, kind, &goal_list, &child_data ) ?;
   mark_managed_children_outside_goal_independent (
+    // Do this before reconciliation -- otherwise non-goal collector
+    // children are treated as relevant collection members and discarded.
     tree, node, &goal_list,
     |t| t . parentIs == ParentIs::Collector ) ?;
+  reconcile_sharing_scaffold_children (
+    tree, node, kind, &goal_list, &child_data ) ?;
   Ok (( )) }

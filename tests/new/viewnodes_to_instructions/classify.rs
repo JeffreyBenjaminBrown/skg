@@ -128,9 +128,9 @@ fn classifies_subscribee_col_positions (
             ** (skg subscribeeCol) subscribees
             *** (skg (node (id subscribee) (source main) (parentIs collector))) subscribee
             **** (skg hiddenInSubscribeeCol) hidden in
-            ***** (skg (node (id hidden-in) (source main))) hidden in child
+            ***** (skg (node (id hidden-in) (source main) (parentIs collector))) hidden in child
             *** (skg hiddenOutsideOfSubscribeeCol) hidden outside
-            **** (skg (node (id hidden-outside) (source main))) hidden outside child
+            **** (skg (node (id hidden-outside) (source main) (parentIs collector))) hidden outside child
             "};
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
