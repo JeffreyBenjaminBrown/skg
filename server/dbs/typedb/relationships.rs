@@ -1,6 +1,10 @@
 use std::time::Duration;
 use std::error::Error;
 
+use crate::consts::{
+  TYPEDB_CONCURRENT_TRANSACTIONS,
+  TYPEDB_TRANSACTION_TIMEOUT_SECS,
+};
 use crate::dbs::in_rust_graph::snapshot_global;
 use crate::types::misc::ID;
 use crate::types::nodes::typedb::NodeTypedb;
@@ -39,7 +43,7 @@ pub async fn create_all_relationships (
       . map ( |node| create_relationships_for_one_node (
                 db_name, driver, node )) )
     . buffer_unordered (
-        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+        TYPEDB_CONCURRENT_TRANSACTIONS )
     . collect () . await;
   for result in results {
     result ?; }
@@ -55,7 +59,7 @@ async fn create_relationships_for_one_node (
   let options : TransactionOptions =
     TransactionOptions::new() . transaction_timeout (
       Duration::from_secs (
-        crate::consts::TYPEDB_TRANSACTION_TIMEOUT_SECS));
+        TYPEDB_TRANSACTION_TIMEOUT_SECS));
   let tx : Transaction =
     driver . transaction_with_options (
       db_name, TransactionType::Write, options )
@@ -228,7 +232,7 @@ pub async fn delete_out_links (
       . map ( |id| delete_out_links_for_one_id (
                 db_name, driver, id, relation, role )) )
     . buffer_unordered (
-        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+        TYPEDB_CONCURRENT_TRANSACTIONS )
     . collect () . await;
   for result in results {
     result ?; }

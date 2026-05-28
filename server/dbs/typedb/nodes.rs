@@ -1,3 +1,4 @@
+use crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS;
 use crate::types::misc::{ID, SourceName};
 use crate::types::nodes::typedb::NodeTypedb;
 
@@ -32,7 +33,7 @@ pub async fn create_all_nodes (
       . map ( |node| create_one_node_in_own_tx (
                 db_name, driver, node )) )
     . buffer_unordered (
-        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+        TYPEDB_CONCURRENT_TRANSACTIONS )
     . collect () . await;
   for result in results {
     result ?; }
@@ -69,7 +70,7 @@ pub async fn create_only_nodes_with_no_ids_present (
       . map ( |node| create_one_node_in_own_tx (
                 db_name, driver, node )) )
     . buffer_unordered (
-        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+        TYPEDB_CONCURRENT_TRANSACTIONS )
     . collect () . await;
   for result in &results {
     if let Err (e) = result {
@@ -254,7 +255,7 @@ pub async fn delete_nodes_from_pids (
       . map ( |id| delete_one_node_from_pid (
                 db_name, driver, id )) )
     . buffer_unordered (
-        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+        TYPEDB_CONCURRENT_TRANSACTIONS )
     . collect () . await;
   for result in results {
     result ?; }

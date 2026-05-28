@@ -1,4 +1,5 @@
 use crate::test_utils::cleanup_test_tantivy_and_typedb_dbs;
+use crate::consts::TYPEDB_ADDRESS;
 
 use std::path::PathBuf;
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
@@ -52,7 +53,7 @@ impl Drop for TestDbGuard {
         rt . block_on(async {
           let driver_result: Result<TypeDBDriver, _> =
             TypeDBDriver::new(
-              crate::consts::TYPEDB_ADDRESS,
+              TYPEDB_ADDRESS,
               Credentials::new("admin", "password"),
               match DriverOptions::new(false, None) {
                 Ok (opts) => opts,

@@ -34,7 +34,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
     read_all_skg_files_from_sources (&config) ?;
   check_for_duplicate_ids_across_sources (
     &nodes, &config . data_root) ?;
-  // Adjacency: pid → list of pids it directly contains.
+  // Adjacency: pid -> list of pids it contains.
   let adj : HashMap<ID, &[ID]> =
     nodes . iter ()
     . map ( |n| (n . pid . clone (), n . contains . as_slice ()) )

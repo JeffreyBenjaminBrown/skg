@@ -176,8 +176,8 @@ mod tests {
     format_buffer_response_sexp,
     format_errors_warnings_sexp,
     tag_sexp_response,
+    TcpToClient,
   };
-  use crate::serve::protocol::TcpToClient;
 
   #[test]
   fn format_buffer_response_includes_empty_errors_and_warnings () {

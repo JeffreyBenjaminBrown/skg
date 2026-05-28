@@ -53,7 +53,7 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
         . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(_, _)))
         . collect();
 
-      // AliasCol children must be Aliases (bad_child is a TrueNode under AliasCol)
+      // AliasCol children must be Aliases (bad_child is a TrueNode child of AliasCol)
       { let aliascol_children_re =
           Regex::new(r"(?i)aliascol.*children.*must.*alias") . unwrap();
         let aliascol_children_errors: Vec<_> = local_errors . iter()

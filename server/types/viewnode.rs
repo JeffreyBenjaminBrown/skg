@@ -22,6 +22,7 @@ use std::str::FromStr;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ParentIs {
   Container,   // default: parent contains this child.
+  Collector,   // parent is a generated relation collection scaffold.
   Content,     // containerward backpath: parent is contained by this child.
   LinkTarget,  // sourceward backpath: parent is linked to by this child.
   Independent, // visible parent exists, but no graph relationship to it is claimed.
@@ -180,9 +181,14 @@ pub enum Scaffold {
   HiddenInSubscribeeCol, // Child of a Subscribee. Collects nodes that the subscriber hides from its subscriptions, and that are top-level content of this subscribee.
   HiddenOutsideOfSubscribeeCol, // Child of SubscribeeCol. Collects nodes that the subscriber hides from its subscriptions, but that are not top-level content of any of its subscribees.
   // DISPLAY NOTE: Shown after all Subscribees, under the same SubscribeeCol.
+  HiddenCol, // Collects nodes hidden by its parent through hides_from_its_subscriptions.
+  HiderCol, // Collects nodes that hide its parent through hides_from_its_subscriptions.
   ID { id: ID, // an ID of grandparent (the parent being an IDCol)
        membership: MembershipAxes },
   IDCol, // Collects (as children) Scaffold::IDs for its parent.
+  OverriddenCol, // Collects nodes whose view this parent overrides.
+  OverriderCol, // Collects nodes that override this parent's view.
+  SubscriberCol, // Collects nodes that subscribe to its parent.
   SubscribeeCol, // Collects subscribees for its parent.
   TextChanged { staged: bool, unstaged: bool }, // Indicates title or body changed between stages. Visible in 'git diff mode'. Per-stage bools mark whether the change is staged (HEAD vs index) and/or unstaged (index vs worktree).
 }
@@ -197,8 +203,13 @@ pub enum ScaffoldKind { Alias,
                         BufferRoot,
                         HiddenInSubscribeeCol,
                         HiddenOutsideOfSubscribeeCol,
+                        HiddenCol,
+                        HiderCol,
                         IDCol,
                         ID,
+                        OverriddenCol,
+                        OverriderCol,
+                        SubscriberCol,
                         SubscribeeCol,
                         TextChanged, }
 
@@ -306,6 +317,11 @@ impl ScaffoldKind {
     ("forestRoot",                   ScaffoldKind::BufferRoot),
     ("hiddenInSubscribeeCol",        ScaffoldKind::HiddenInSubscribeeCol),
     ("hiddenOutsideOfSubscribeeCol", ScaffoldKind::HiddenOutsideOfSubscribeeCol),
+    ("hiddenCol",                    ScaffoldKind::HiddenCol),
+    ("hiderCol",                     ScaffoldKind::HiderCol),
+    ("overriddenCol",                ScaffoldKind::OverriddenCol),
+    ("overriderCol",                 ScaffoldKind::OverriderCol),
+    ("subscriberCol",                ScaffoldKind::SubscriberCol),
     ("subscribeeCol",                ScaffoldKind::SubscribeeCol),
     ("textChanged",                  ScaffoldKind::TextChanged),
     ("idCol",                        ScaffoldKind::IDCol),
@@ -331,6 +347,11 @@ impl ScaffoldKind {
       ScaffoldKind::AliasCol                     => "its aliases",
       ScaffoldKind::IDCol                        => "its IDs",
       ScaffoldKind::SubscribeeCol                => "it subscribes to these",
+      ScaffoldKind::SubscriberCol                => "these subscribe to it",
+      ScaffoldKind::OverriddenCol                => "it overrides the view of these",
+      ScaffoldKind::OverriderCol                 => "these override the view of it",
+      ScaffoldKind::HiddenCol                    => "it hides these from its subscriptions",
+      ScaffoldKind::HiderCol                     => "these hide it from their subscriptions",
       ScaffoldKind::HiddenInSubscribeeCol        => "hidden from this subscription",
       ScaffoldKind::HiddenOutsideOfSubscribeeCol => "hidden from all subscriptions",
       _                                          => "",
@@ -345,6 +366,11 @@ impl Scaffold {
       Scaffold::BufferRoot                   => ScaffoldKind::BufferRoot,
       Scaffold::HiddenInSubscribeeCol        => ScaffoldKind::HiddenInSubscribeeCol,
       Scaffold::HiddenOutsideOfSubscribeeCol => ScaffoldKind::HiddenOutsideOfSubscribeeCol,
+      Scaffold::HiddenCol                    => ScaffoldKind::HiddenCol,
+      Scaffold::HiderCol                     => ScaffoldKind::HiderCol,
+      Scaffold::OverriddenCol                => ScaffoldKind::OverriddenCol,
+      Scaffold::OverriderCol                 => ScaffoldKind::OverriderCol,
+      Scaffold::SubscriberCol                => ScaffoldKind::SubscriberCol,
       Scaffold::SubscribeeCol                => ScaffoldKind::SubscribeeCol,
       Scaffold::TextChanged { .. }           => ScaffoldKind::TextChanged,
       Scaffold::IDCol                        => ScaffoldKind::IDCol,
@@ -363,6 +389,14 @@ impl Scaffold {
     match self {
       Scaffold::Alias           { text, .. }  => text,
       Scaffold::ID              { id, .. }    => id,
+      Scaffold::SubscribeeCol
+        | Scaffold::SubscriberCol
+        | Scaffold::OverriddenCol
+        | Scaffold::OverriderCol
+        | Scaffold::HiderCol
+        | Scaffold::HiddenCol
+        | Scaffold::HiddenInSubscribeeCol
+        | Scaffold::HiddenOutsideOfSubscribeeCol => "",
       _ => self . kind () . default_title (),
     }}
 

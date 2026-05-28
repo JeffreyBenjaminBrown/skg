@@ -24,7 +24,7 @@
    initially had no hidden children also has no scaffold to complete.
    The eventual feature implementation probably needs to ensure that
    a HiddenInSubscribeeCol is inserted when the updated hide list
-   intersects a subscribee's direct content.
+   intersects a subscribee's content.
 
 ** 'mk_indefinitive_from_viewnode' silently drops fields
    server/types/viewnode.rs line 538.

@@ -18,7 +18,7 @@ Let's call the subscriber R and the subscribee E.
 
 If N is graph-content of E, and you delete N as a view-child of E, you have indicated to Skg that you would like to hide N from R's view of E. Skg obliges by creating a hides relationship from R to N. This does *not* change what E graph-contains; it just changes how R views E. (Remember, it's likely that E is not even something you own.)
 
-If you later put that same child back directly under the subscribed node in the subscription view and save, the hide is removed.
+If you later put that same child back among the subscribed node's children in the subscription view and save, the hide is removed.
 
 This rule only applies to the subscribee's children. Edits to deeper descendants have the usual effect, subject to ownership.
 

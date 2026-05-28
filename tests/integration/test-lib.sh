@@ -140,7 +140,7 @@ start_skg_server() {
   echo ""
   echo "Starting skg server (direct binary) with test config..."
   cd "$PROJECT_ROOT"
-  # Use the pre-built binary directly instead of cargo run to avoid lock contention
+  # Use the pre-built binary instead of cargo run to avoid lock contention
   target/debug/skg "$TEMP_CONFIG" > "$TEST_DIR/server.log" 2>&1 &
   CARGO_PID=$!
   echo "✓ Started skg server (PID: $CARGO_PID) with config: $TEMP_CONFIG"

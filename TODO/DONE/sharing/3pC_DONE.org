@@ -24,7 +24,7 @@ Conclusion: this answers the design question. Extra view-children are
 not rejected and are not saved as graph-content of E. If they are not
 graph-content of E, they should be normalized to ParentIs=Independent.
 Only graph-content of E participates in hide/unhide inference.
-* Plan: define extra view-child policy under AsSubscribee
+* Plan: define extra view-child policy for AsSubscribee
 
 This plan executes item c in
 [[./3_what-remains.org][3_what-remains.org]].
@@ -40,7 +40,7 @@ The core invariant is already protected: children of an
 =contains=.
 
 The user policy is now settled in [[*Jeff's preconception][Jeff's preconception]]. If a user
-inserts a new view-child under a subscribee-in-subscription position,
+inserts a new view-child as a child of a subscribee-in-subscription position,
 that child is not part of the subscribee's pre-save graph-content, so
 it should be normalized to ParentIs=Independent and should not itself
 mean hide or unhide for that subscribee relationship.
@@ -62,7 +62,7 @@ Current code shape suggests this behavior:
 
 ** 1. Characterize current behavior with focused tests
 
-Add tests for inserting a new view-child under a definitive
+Add tests for inserting a new view-child as a child of a definitive
 =AsSubscribee= branch:
 
 - one where the subscribee is foreign;

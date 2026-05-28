@@ -5,7 +5,7 @@
 ///   TrueNodes: (skg [focused] [folded]
 ///                   (node [(id ID)]
 ///                         [(source SOURCE)]
-///                         [(parentIs container|content|linkTarget|independent|absent)]
+///                         [(parentIs container|collector|content|linkTarget|independent|absent)]
 ///                         [indef]   ; short for "indefinitive"
 ///                         [cycle]
 ///                         [(stats [containsParent]
@@ -298,6 +298,16 @@ pub fn parse_metadata_to_viewnodemd (
             result . scaffold = Some (Scaffold::HiddenInSubscribeeCol),
           "hiddenOutsideOfSubscribeeCol" =>
             result . scaffold = Some (Scaffold::HiddenOutsideOfSubscribeeCol),
+          "hiddenCol" =>
+            result . scaffold = Some (Scaffold::HiddenCol),
+          "hiderCol" =>
+            result . scaffold = Some (Scaffold::HiderCol),
+          "overriddenCol" =>
+            result . scaffold = Some (Scaffold::OverriddenCol),
+          "overriderCol" =>
+            result . scaffold = Some (Scaffold::OverriderCol),
+          "subscriberCol" =>
+            result . scaffold = Some (Scaffold::SubscriberCol),
           "subscribeeCol" =>
             result . scaffold = Some (Scaffold::SubscribeeCol),
           "textChanged" =>
@@ -357,6 +367,7 @@ fn parse_node_sexp (
               atom_to_string ( &subitems[1] ) ?;
             metadata . parentIs = match value . as_str () {
               "container"   => ParentIs::Container,
+              "collector"   => ParentIs::Collector,
               "content"     => ParentIs::Content,
               "linkTarget"  => ParentIs::LinkTarget,
               "independent" => ParentIs::Independent,

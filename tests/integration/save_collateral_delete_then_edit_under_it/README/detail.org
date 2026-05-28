@@ -464,7 +464,7 @@ All under =tests/integration/save_collateral_delete_then_edit_under_it/=.
 Use =assert-headline-titles= for structural checks. For
 specific lines (e.g., "line 2 is a DeletedNode"), decompose
 with =skg-split-as-stars-metadata-title= and check the
-metadata sexp directly — e.g., that it contains =(deleted ...)=
+metadata sexp itself — e.g., that it contains =(deleted ...)=
 rather than =(node ...)=.
 
 For =DeletedScaff= lines, check that metadata contains

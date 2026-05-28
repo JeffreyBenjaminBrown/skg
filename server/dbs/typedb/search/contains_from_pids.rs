@@ -9,6 +9,7 @@ use typedb_driver::{
 };
 use futures::stream::{self, StreamExt};
 
+use crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS;
 use crate::types::misc::ID;
 use crate::dbs::typedb::util::concept_document::extract_id_from_map;
 
@@ -38,7 +39,7 @@ pub async fn contains_from_pids (
       . map ( |pid| contains_for_one_pid (
                 db_name, driver, pid )) )
     . buffer_unordered (
-        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+        TYPEDB_CONCURRENT_TRANSACTIONS )
     . collect () . await;
   let mut container_to_contents : HashMap < ID, HashSet < ID > > =
     HashMap::new ();

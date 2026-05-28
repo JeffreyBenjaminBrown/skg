@@ -151,7 +151,7 @@ The direction table is:
 - child N of 'hiddenCol': N's grandparent hides N.
   This is a read-only set.
 
-The existing hide-specific collections under 'subscribeeCol' remain
+The existing hide-specific child collections of 'subscribeeCol' remain
 the way to edit hiding behavior.  'hiddenCol' is only an inbound
 read-only set; it should explain where to edit instead if the user
 tries to modify it.

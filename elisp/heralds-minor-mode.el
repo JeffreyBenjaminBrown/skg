@@ -24,7 +24,12 @@
     (GREEN alias "alias")
     (GREEN hiddenInSubscribeeCol "hiddenIn")
     (GREEN hiddenOutsideOfSubscribeeCol "hiddenOut")
-    (GREEN subscribeeCol "subscribees")
+    (GREEN subscribeeCol "it subscribes to these")
+    (GREEN subscriberCol "these subscribe to it")
+    (GREEN hiddenCol "it hides these from its subscriptions")
+    (GREEN hiderCol "these hide it from their subscriptions")
+    (GREEN overriddenCol "it overrides the view of these")
+    (GREEN overriderCol "these override the view of it")
     (GREEN idCol "IDs")
     (GREEN id "ID")
     (GREEN textChanged "text changed : "
@@ -51,6 +56,7 @@
       (source) ;; ignored
       (parentIs
         (BLUE   container   "{")
+        (GREEN  collector   "∈")
         (absent)
         (ORANGE independent "⊥")
         (ORANGE content "}")

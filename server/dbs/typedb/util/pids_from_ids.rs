@@ -10,6 +10,7 @@ use typedb_driver::{
 use futures::stream::{self, StreamExt};
 use ego_tree::{NodeRef, NodeMut, NodeId, Tree};
 
+use crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS;
 use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
 use crate::types::misc::ID;
 use crate::dbs::in_rust_graph::snapshot_global;
@@ -104,7 +105,7 @@ pub async fn pids_from_ids (
       . map ( |id| pid_from_one_id (
                 db_name, driver, id . clone () )) )
     . buffer_unordered (
-        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+        TYPEDB_CONCURRENT_TRANSACTIONS )
     . collect () . await;
   let result : HashMap < ID, Option < ID > > =
     results . into_iter () . collect ();

@@ -1,3 +1,17 @@
+* TODO this comment surfaces a bug
+** the comment
+/// completers own different kinds of children.  Relation collections
+/// manage collector children; HiddenOutsideOfSubscribeeCol manages
+/// ordinary content children.
+** the bug
+They should all use membership language, not content language.
+* TODO should RelationRole be an enum?
+pub struct RelationRole {
+  pub relation : NodeRelation,
+  pub role     : &'static str,
+}
+* TODO introduce a RoleCol type
+and use that language everywhere
 * ONGOING [[./TODO/full-schema]]
 * DONE ? [[./TODO/source-sets/]]
 codex resume 019e6210-347f-72d2-b35c-88dc629d748e

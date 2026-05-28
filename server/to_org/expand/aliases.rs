@@ -26,7 +26,7 @@ pub async fn build_and_integrate_aliases_view_then_drop_request (
     "Failed to integrate aliases view",
     errors, result ) }
 
-/// Integrate an AliasCol child and, under it, Alias grandchildren
+/// Integrate an AliasCol child with its Alias grandchildren
 /// into the ViewNode tree containing the target node.
 ///
 /// PITFALL: This function fetches aliases from disk and

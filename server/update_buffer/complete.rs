@@ -6,6 +6,8 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
+use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
+use crate::to_org::complete::sharing::kind::SharingScaffoldKind::SubscribeeCol;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
@@ -14,6 +16,7 @@ use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_t
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, ScaffoldKind};
 use super::complete_preorder::subscribee_col::reconcile_subscribee_col_children;
 use super::complete_preorder::truenode::expand_true_content_at_truenode;
+use super::complete_preorder::relation_col::reconcile_relation_col_children;
 
 use ego_tree::{Tree, NodeId};
 use std::collections::{HashMap, HashSet};
@@ -131,7 +134,16 @@ async fn expand_true_content_at_node (
           treeid, tree, context . source_diffs, context . env,
           context . deleted_since_head_pid_src_map
         ) . await ?;
-  } else if matches!( kind, ViewNodeKind::Unknown (_) ) {
+  } else if let ViewNodeKind::Scaff (scaffold) = &kind {
+    if let Some (sharing_kind)
+      = SharingScaffoldKind::from_scaffold (scaffold)
+      { if sharing_kind . relation_member_role () . is_some ()
+          && sharing_kind != SubscribeeCol
+        { reconcile_relation_col_children (
+            treeid, tree, sharing_kind, context . source_diffs,
+            context . env, context . graph_snap,
+            context . deleted_since_head_pid_src_map ) ?; }}
+  } else if matches!( kind, ViewNodeKind::Unknown (_)) {
     // No-op: Unknown is a placeholder for an unresolvable id and
     // has no completion to do. Listed explicitly so a reader sees
     // the variant covered.

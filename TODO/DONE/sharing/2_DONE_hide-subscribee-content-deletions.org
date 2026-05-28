@@ -18,7 +18,7 @@ The narrow feature is:
 
 The main implementation belongs in the save pipeline, not in the
 renderer. Rendering already knows how to hide subscribee content:
-'content_goal_list' filters a subscribee's direct content by the
+'content_goal_list' filters a subscribee's content by the
 grandparent subscriber's 'hides_from_its_subscriptions', and the
 hidden-collection goal-list functions already derive HiddenIn and
 HiddenOutside from that field.
@@ -68,12 +68,12 @@ For each child C in E's pre-save 'contains':
 
 - If C is still visible as a non-ignored child of E in the
   as-a-subscribee view, do not add a hide.
-- If C is no longer visible under E, but C is now ordinary direct
+- If C is no longer visible under E, but C is now ordinary
   content of S, do not add a hide.
-- If C is no longer visible under E and C is not ordinary direct
+- If C is no longer visible under E and C is not ordinary
   content of S, add C to S's 'hides_from_its_subscriptions'.
 
-The comparison should be direct-content only. Hiding grandchildren
+The comparison should be content only. Hiding grandchildren
 should happen only when their immediate subscribee parent is shown as
 a subscribee and the grandchild was removed from that child
 list. This matches the current rendering semantics, which filter only
@@ -124,7 +124,7 @@ child. For each S:
 - Get S's pid and source.
 - Skip S if its source is not user-owned.
 - Find S's unique SubscribeeCol child with 'unique_scaffold_child'.
-- Collect S's ordinary direct content from the buffer with the same
+- Collect S's ordinary content from the buffer with the same
   effective rule as 'collect_contents_to_save_from_children':
   non-ignored TrueNode children, excluding phantoms and nodes marked
   for deletion.
@@ -186,7 +186,7 @@ For each SaveNode whose corresponding ViewNode is a TrueNode shown as
 a subscribee:
 
 - If the node's source is foreign and its only difference from
-  pre-save data is direct-content membership in that subscribee-as-such
+  pre-save data is content membership in that subscribee-as-such
   position, drop that SaveNode.
 - If title/body/source/aliases/subscribes/hides/overrides differ,
   keep the SaveNode so existing foreign-node validation reports an
@@ -259,12 +259,12 @@ important sharing case. Exercise:
 - Save.
 - Assert that S's saved '.skg' now includes that ID in
   'hides_from_its_subscriptions'.
-- Assert the returned buffer shows the child under
-  HiddenInSubscribeeCol, not under E's visible content.
+- Assert the returned buffer shows the child as a child of
+  HiddenInSubscribeeCol, not among E's visible content.
 
 Also test the "move to S ordinary content" case:
 
-- Move the child out from under E and into S's content.
+- Move the child out of E's children and into S's content.
 - Save.
 - Assert S's hide list did not gain that ID.
 - Assert E's as-a-subscribee view no longer shows that ID under the
@@ -293,7 +293,7 @@ Add helper functions that can answer:
 
 - Is this tree node a TrueNode shown as a subscribee?
 - What subscriber owns this as-a-subscribee position?
-- What direct content IDs are visible under this tree node?
+- What content IDs are visible under this tree node?
 
 Prefer putting them near the new save-pass module, not in the renderer.
 They are about interpreting a saved buffer, not about building one.
@@ -328,12 +328,12 @@ Run:
 ** (likely solved): Moving to some other owned node still means hidden from this subscriber
 
 The corrected example 3 makes the rule clear: if the removed child is
-not direct ordinary content of the subscriber S, add a hide by S, even
+not ordinary content of the subscriber S, add a hide by S, even
 if some other owned node contains it.
 
 ** (likely solved): Unexpanded subscribees must express no opinion
 
-If E is an indefinitive leaf under SubscribeeCol, its missing children
+If E is an indefinitive child of SubscribeeCol, its missing children
 must not be interpreted as deletions. Otherwise every save of a normal
 subscriber view could hide all content of all unexpanded subscribees.
 
@@ -352,7 +352,7 @@ for title/body/metadata edits.
 
 ** (likely solved): Moving into the subscriber should not add a hide
 
-The plan explicitly subtracts the subscriber's direct ordinary content
+The plan explicitly subtracts the subscriber's ordinary content
 from the inferred hide set. That matches the existing model in
 [[../../docs/sharing-model.md][sharing-model.md]], where ordinary integrated content implicitly hides
 subscribed content from the subscription display.

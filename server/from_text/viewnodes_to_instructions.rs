@@ -6,7 +6,7 @@ pub mod subscribee_hiderel_intents;
 use classify::{ SaveRole, viewforest_with_saveroles, ViewNode_in_Role };
 use crate::dbs::node_lookup::{ nodecomplete_from_in_rust_graph, optNodeComplete_rustFIrst_by_id};
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, SkgConfig};
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use crate::types::viewnode::{ IndefOrDef, ViewNode, ViewNodeKind };
@@ -270,7 +270,7 @@ async fn supplement_saveintent_from_disk (
         source_move : maybe_move,
       }) }}}
 
-/// Interpret view-children under definitive Subscribee branches as
+/// Interpret view-children of definitive Subscribee branches as
 /// subscriber edits to "hides" relationships.
 ///
 /// At this point graph edit intents have been same-ID reconciled, but
@@ -376,7 +376,7 @@ async fn validate_no_overlapping_subscribee_hiderel_conflicts (
 
 fn source_is_owned (
   config : &SkgConfig,
-  source : &crate::types::misc::SourceName,
+  source : &SourceName,
 ) -> bool {
   config . sources . get (source)
     . map ( |s| s . user_owns_it )

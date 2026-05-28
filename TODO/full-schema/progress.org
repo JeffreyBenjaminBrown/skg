@@ -25,6 +25,59 @@ Revised the plan again to:
   view expansion,
 - require save-triggered completion not to recreate relation
   collection scaffolds deleted by the user.
+*** implemented
+Added a typed in-Rust relation accessor layer for the ordinary
+node-to-node relations:
+- 'contains',
+- 'textlinks_to',
+- 'subscribes',
+- 'hides_from_its_subscriptions',
+- 'overrides_view_of'.
+
+Added relation collection scaffolds for:
+- 'subscriberCol',
+- 'overriddenCol',
+- 'overriderCol',
+- 'hiderCol',
+- 'hiddenCol'.
+
+Added 'parentIs=collector' and wired parsing, serialization, graph
+stats, local validation, rendering, completion and save extraction to
+understand it as generated-collection membership rather than ordinary
+containment.
+
+Changed server-side collection scaffold headlines to be titleless.
+Updated Emacs heralds so collection metadata supplies the visible
+labels, including the new relation collections.
+
+Initial view construction now auto-adds relation collections under
+definitive TrueNodes when the corresponding relationship set is
+non-empty.  Save-triggered completion reconciles existing relation
+collections but does not recreate ones the user deleted.
+
+Save extraction now treats 'subscribeeCol' and 'overriddenCol' as the
+writable relation collections.  The new read-only relation collection
+children remain display-only and do not become ordinary save
+candidates.
+
+Documented and regression-tested the distinction between an absent
+writable relation collection and a present-but-empty collection:
+absence means no opinion, while an empty collection means the user
+explicitly wants the set to be empty.
+*** tested
+Focused checks passed:
+- 'cargo check'
+- 'cargo test --test dbs -- --nocapture'
+- 'cargo test --test new viewnodes_to_instructions -- --nocapture'
+- 'cargo test --test save -- --nocapture'
+- 'cargo test --test content_view -- --nocapture'
+- 'cargo test --test subscribee_col -- --nocapture'
+- 'cargo test --test hidden_from_subscriptions -- --nocapture'
+- 'cargo test --test git_diff_view -- --nocapture'
+- 'bash/emacs-tests.sh'
+
+Full suite passed:
+- 'bash/all-tests.sh --no-sound'
 ** stage 1 : rename override relationship roles
 *** planned
 Wrote 'TODO/full-schema/1_rename-override-rels.org',
@@ -384,3 +437,50 @@ entity test expected the bare spelling.
 Normalized boolean row values by checking whether the TypeDB concept
 string contains 'true'.  The source entity test and full TypeDB target
 pass after the fix.
+** collector membership initially broke subscribee-as-such semantics
+Stage 6 changed generated collection members from implicit container
+children to explicit 'parentIs=collector' children.  That exposed old
+subscribee-as-such code paths that recognized editable subscribees
+only through non-ignored/container parent status.
+
+The symptom was hidden-subscription completion either failing to
+prefetch child data or failing to infer hide/unhide edits after a user
+moved a generated hidden child into visible subscribee content.
+*** resolution
+Changed the generated-collection membership tests so collection
+members must have 'parentIs=collector'.  The older omitted/default
+'parentIs=container' shape is no longer accepted as collection
+membership.
+
+The two affected meanings were:
+- a TrueNode child of 'subscribeeCol' is still a subscribee
+  member only when it has 'parentIs=collector',
+- a TrueNode child of a definitive subscribee-as-such branch is
+  still visible subscribee content if it is either an ordinary
+  container child or a generated collector child.
+
+The change was deliberately split by meaning.  Generated
+collection membership is strict: 'subscribeeCol', 'overriddenCol' and
+the read-only relation Cols count only collector children.  Ordinary
+content completion and ordinary save extraction still use
+'parentIs=container' / non-ignored when deciding whether a node is real
+containment content.  Visible content inside an expanded
+subscribee-as-such branch can still include a collector child, because
+moving a generated hidden child into the visible branch is the existing
+gesture for inferred unhide.
+
+Local validation now rejects TrueNode children of
+'subscribeeCol' or the relation Cols unless they have
+'parentIs=collector'.  Test fixtures that meant collection membership
+were updated to say so explicitly; test fixtures that meant "extra
+display child, not a collection member" now use 'parentIs=independent'.
+
+Updated the affected rendering and integration fixtures because the
+new intended output is different: collection scaffold headlines have
+empty titles, and generated collection members now print
+'(parentIs collector)' instead of relying on omitted/default
+'parentIs=container'.
+
+The hidden-subscription focused suite and the full test suite pass:
+- 'cargo test --test hidden_from_subscriptions -- --nocapture'
+- 'bash/all-tests.sh --no-sound'

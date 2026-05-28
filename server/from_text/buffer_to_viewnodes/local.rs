@@ -3,7 +3,8 @@
 /// without requiring global context.
 
 use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind, MaybePlacedTruenode};
-use crate::types::viewnode::{Scaffold, EditRequest, IndefOrDef};
+use crate::types::git::Sign;
+use crate::types::viewnode::{Scaffold, EditRequest, IndefOrDef, ParentIs};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::viewnode_nodecomplete::{
   generation_includes_only,
@@ -51,6 +52,12 @@ pub fn validate_local_structure (
           validate_hidden_in_subscribee_col(tree, node_id),
         Scaffold::HiddenOutsideOfSubscribeeCol =>
           validate_hidden_outside_of_subscribee_col(tree, node_id),
+        Scaffold::HiddenCol
+          | Scaffold::HiderCol
+          | Scaffold::OverriddenCol
+          | Scaffold::OverriderCol
+          | Scaffold::SubscriberCol =>
+          validate_relation_col(tree, node_id, s),
         Scaffold::SubscribeeCol =>
           validate_subscribeecol(tree, node_id),
         Scaffold::TextChanged { .. } =>
@@ -167,8 +174,56 @@ fn validate_subscribeecol (
          MaybePlacedViewnodeKind::True (_) |
          MaybePlacedViewnodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol))) {
     errors . push("SubscribeeCol's children must include only TrueNodes or HiddenOutsideOfSubscribeeCol." . to_string()); }
-  if !nonignored_children_have_distinct_ids(tree, node_id) {
-    errors . push("SubscribeeCol must not have duplicate TrueNode children." . to_string()); }
+  if !generation_includes_only(
+    tree, node_id, 1, true,
+    |node| match &node . kind {
+      MaybePlacedViewnodeKind::True (t) =>
+        t . parentIs == ParentIs::Collector,
+      MaybePlacedViewnodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol) =>
+        true,
+      _ => false, } )
+    { errors . push("SubscribeeCol TrueNode children must have parentIs=collector."
+                    . to_string() ); }
+  if !relation_col_children_have_distinct_ids(tree, node_id) {
+    errors . push("SubscribeeCol must not have duplicate TrueNode children."
+                  . to_string() ); }
+  errors }
+
+/// PURPOSE: It should be that the scaffold:
+/// - belongs to one TrueNode
+/// - has only collector-marked TrueNode members
+/// - is unique among its sibling scaffolds
+/// - does not repeat member IDs
+/// PITFALL: Does not check whether the members are correct for the graph;
+/// save extraction and completion decide relation meaning later.
+fn validate_relation_col (
+  tree     : &Tree<MaybePlacedViewnode>,
+  node_id  : NodeId,
+  scaffold : &Scaffold,
+) -> Vec<String> {
+  let mut errors : Vec<String> = Vec::new();
+  let label : String = scaffold . repr_in_client ();
+  let scaffold_for_compare : Scaffold = scaffold . clone ();
+  if !generation_exists_and_includes(tree, node_id, -1, false, |node|
+       matches!(&node . kind, MaybePlacedViewnodeKind::True (_))) {
+    errors . push(format!("{} must have a TrueNode parent.", label)); }
+  if !generation_includes_only(tree, node_id, 1, true, |node|
+       matches!(&node . kind, MaybePlacedViewnodeKind::True (_))) {
+    errors . push(format!("{}'s children must include only TrueNodes.", label)); }
+  if !generation_includes_only(tree, node_id, 1, true, |node|
+       matches!(&node . kind,
+         MaybePlacedViewnodeKind::True (t)
+         if t . parentIs == ParentIs::Collector)) {
+    errors . push(format!(
+      "{} TrueNode children must have parentIs=collector.", label)); }
+  if !siblings_cannot_include(tree, node_id, |node|
+       matches!(&node . kind,
+         MaybePlacedViewnodeKind::Scaff (s)
+         if s . matches_kind (&scaffold_for_compare))) {
+    errors . push(format!("{} must be unique among its siblings.", label)); }
+  if !relation_col_children_have_distinct_ids(tree, node_id) {
+    errors . push(format!(
+      "{} must not have duplicate TrueNode children.", label)); }
   errors }
 
 fn validate_text_changed (
@@ -247,12 +302,17 @@ fn validate_truenode (
          MaybePlacedViewnodeKind::Scaff (Scaffold::AliasCol)      |
          MaybePlacedViewnodeKind::Scaff (Scaffold::IDCol)         |
          MaybePlacedViewnodeKind::Scaff (Scaffold::SubscribeeCol) |
+         MaybePlacedViewnodeKind::Scaff (Scaffold::SubscriberCol) |
+         MaybePlacedViewnodeKind::Scaff (Scaffold::OverriddenCol) |
+         MaybePlacedViewnodeKind::Scaff (Scaffold::OverriderCol)  |
+         MaybePlacedViewnodeKind::Scaff (Scaffold::HiderCol)      |
+         MaybePlacedViewnodeKind::Scaff (Scaffold::HiddenCol)     |
          MaybePlacedViewnodeKind::Scaff (Scaffold::TextChanged { .. })   |
          MaybePlacedViewnodeKind::Deleted (_)                     |
          MaybePlacedViewnodeKind::DeletedScaff (_)                |
          MaybePlacedViewnodeKind::Inactive (_)                    |
          MaybePlacedViewnodeKind::Unknown (_)                    )) {
-    errors . push("TrueNode's children must include only TrueNode, AliasCol, IDCol, SubscribeeCol, TextChanged, Deleted, DeletedScaff, InactiveNode, or UnknownNode" . to_string()); }
+    errors . push("TrueNode's children must include only TrueNode, AliasCol, IDCol, relation collection scaffolds, TextChanged, Deleted, DeletedScaff, InactiveNode, or UnknownNode" . to_string()); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
     errors . push("TrueNode's non-ignored content children must be unique (no two sharing the same ID)." . to_string()); }
   if has_empty_title (t) {
@@ -301,12 +361,32 @@ pub fn nonignored_children_have_distinct_ids (
           if !t . parent_ignores_it() && !t . is_phantom () =>
           t . id . clone(),
         MaybePlacedViewnodeKind::Inactive (i)
-          if i . membership . staged != Some (crate::types::git::Sign::Minus)
-          && i . membership . unstaged != Some (crate::types::git::Sign::Minus) =>
+          if i . membership . staged != Some (Sign::Minus)
+          && i . membership . unstaged != Some (Sign::Minus) =>
           Some (i . id . clone()),
         _ => None,
       };
     if let Some (id) = content_id {
       if !seen . insert(id) {
         return false; }}}
+  true }
+
+fn relation_col_children_have_distinct_ids (
+  tree    : &Tree<MaybePlacedViewnode>,
+  node_id : NodeId,
+) -> bool {
+  let Some (node_ref) = tree . get (node_id)
+    else { return true; };
+  let mut seen : HashSet<ID> = HashSet::new();
+  for child in node_ref . children() {
+    let Some (id) =
+      (match &child . value() . kind {
+        MaybePlacedViewnodeKind::True (t)
+          if !t . is_phantom () =>
+          t . id . clone(),
+        _ => None,
+      })
+    else { continue; };
+    if !seen . insert (id) {
+      return false; }}
   true }

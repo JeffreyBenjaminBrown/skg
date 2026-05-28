@@ -37,6 +37,23 @@ fn role_for_title (
       return roles . get (&node_ref . id()) . unwrap() . clone(); }}
   panic! ("node not found: {}", title) }
 
+/// Test helper for fixtures where a scaffold kind appears only once.
+/// Returns the SaveRole assigned to the first scaffold node of that
+/// kind, so tests can assert the scaffold's own role separately from
+/// the roles assigned to its member children.
+fn saverole_of_first_scaffold (
+  tree     : &Tree<ViewNode>,
+  roles    : &HashMap<NodeId, SaveRole>,
+  scaffold : Scaffold,
+) -> SaveRole {
+  for node_ref in tree . nodes() {
+    if matches! (
+      &node_ref . value() . kind,
+      ViewNodeKind::Scaff (s) if *s == scaffold)
+    {
+      return roles . get (&node_ref . id()) . unwrap() . clone(); }}
+  panic! ("scaffold not found: {:?}", scaffold) }
+
 fn first_node_id_with_title (
   tree  : &Tree<ViewNode>,
   title : &str,
@@ -109,7 +126,7 @@ fn classifies_subscribee_col_positions (
     indoc! {"
             * (skg (node (id subscriber) (source main))) subscriber
             ** (skg subscribeeCol) subscribees
-            *** (skg (node (id subscribee) (source main))) subscribee
+            *** (skg (node (id subscribee) (source main) (parentIs collector))) subscribee
             **** (skg hiddenInSubscribeeCol) hidden in
             ***** (skg (node (id hidden-in) (source main))) hidden in child
             *** (skg hiddenOutsideOfSubscribeeCol) hidden outside
@@ -121,7 +138,7 @@ fn classifies_subscribee_col_positions (
     classify_save_roles (&viewforest) . unwrap();
 
   assert_eq!(
-    role_for_title (&viewforest, &roles, "it subscribes to these"),
+    saverole_of_first_scaffold (&viewforest, &roles, Scaffold::SubscribeeCol),
     SaveRole::DisplayOnly);
   assert_eq!(
     role_for_title (&viewforest, &roles, "subscribee"),
@@ -129,7 +146,7 @@ fn classifies_subscribee_col_positions (
       subscriber : ID::from ("subscriber"),
     });
   assert_eq!(
-    role_for_title (&viewforest, &roles, "hidden from this subscription"),
+    saverole_of_first_scaffold (&viewforest, &roles, Scaffold::HiddenInSubscribeeCol),
     SaveRole::DisplayOnly);
   assert_eq!(
     role_for_title (&viewforest, &roles, "hidden in child"),
@@ -138,7 +155,7 @@ fn classifies_subscribee_col_positions (
       subscribee : ID::from ("subscribee"),
     });
   assert_eq!(
-    role_for_title (&viewforest, &roles, "hidden from all subscriptions"),
+    saverole_of_first_scaffold (&viewforest, &roles, Scaffold::HiddenOutsideOfSubscribeeCol),
     SaveRole::DisplayOnly);
   assert_eq!(
     role_for_title (&viewforest, &roles, "hidden outside child"),
@@ -237,7 +254,7 @@ fn errors_on_hidden_in_without_subscribeecol_context (
     classify_save_roles (&viewforest) . unwrap_err();
   assert!(
     error . contains (
-      "HiddenInSubscribeeCol subscribee must be under SubscribeeCol"),
+      "HiddenInSubscribeeCol subscribee must be a child of SubscribeeCol"),
     "unexpected error: {}",
     error); }
 

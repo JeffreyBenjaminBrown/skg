@@ -11,6 +11,10 @@
 
 use crate::types::tree::generic::error_unless_node_satisfies;
 use crate::types::viewnode::{Scaffold, ViewNode, ViewNodeKind};
+use crate::dbs::in_rust_graph::relation_accessors::{
+  NodeRelation,
+  RelationRole,
+};
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
@@ -18,6 +22,11 @@ use std::error::Error;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SharingScaffoldKind {
   SubscribeeCol,
+  SubscriberCol,
+  OverriddenCol,
+  OverriderCol,
+  HiderCol,
+  HiddenCol,
   HiddenInSubscribeeCol,
   HiddenOutsideOfSubscribeeCol,
 }
@@ -31,6 +40,12 @@ impl SharingScaffoldKind {
     match self {
       Self::SubscribeeCol =>
         "reconcile_subscribee_col_children",
+      Self::SubscriberCol
+        | Self::OverriddenCol
+        | Self::OverriderCol
+        | Self::HiderCol
+        | Self::HiddenCol =>
+        "reconcile_relation_col_children",
       Self::HiddenInSubscribeeCol =>
         "reconcile_hiddenin_subscribee_col_children",
       Self::HiddenOutsideOfSubscribeeCol =>
@@ -41,6 +56,16 @@ impl SharingScaffoldKind {
     match self {
       Self::SubscribeeCol =>
         Scaffold::SubscribeeCol,
+      Self::SubscriberCol =>
+        Scaffold::SubscriberCol,
+      Self::OverriddenCol =>
+        Scaffold::OverriddenCol,
+      Self::OverriderCol =>
+        Scaffold::OverriderCol,
+      Self::HiderCol =>
+        Scaffold::HiderCol,
+      Self::HiddenCol =>
+        Scaffold::HiddenCol,
       Self::HiddenInSubscribeeCol =>
         Scaffold::HiddenInSubscribeeCol,
       Self::HiddenOutsideOfSubscribeeCol =>
@@ -57,9 +82,60 @@ impl SharingScaffoldKind {
   ///          └─ HiddenOutsideOfSubscribeeCol   ← distance 2
   pub fn correct_subscriber_ancestor_distance (self) -> usize {
     match self {
-      Self::SubscribeeCol                => 1,
+      Self::SubscribeeCol
+        | Self::SubscriberCol
+        | Self::OverriddenCol
+        | Self::OverriderCol
+        | Self::HiderCol
+        | Self::HiddenCol                => 1,
       Self::HiddenInSubscribeeCol        => 3,
       Self::HiddenOutsideOfSubscribeeCol => 2, } }
+
+  pub fn relation_member_role (self) -> Option<RelationRole> {
+    match self {
+      Self::SubscribeeCol =>
+        Some (RelationRole::new (
+          NodeRelation::Subscribes, "subscribee") . unwrap ()),
+      Self::SubscriberCol =>
+        Some (RelationRole::new (
+          NodeRelation::Subscribes, "subscriber") . unwrap ()),
+      Self::OverriddenCol =>
+        Some (RelationRole::new (
+          NodeRelation::OverridesViewOf, "overridden") . unwrap ()),
+      Self::OverriderCol =>
+        Some (RelationRole::new (
+          NodeRelation::OverridesViewOf, "overrider") . unwrap ()),
+      Self::HiderCol =>
+        Some (RelationRole::new (
+          NodeRelation::HidesFromItsSubscriptions, "hider") . unwrap ()),
+      Self::HiddenCol =>
+        Some (RelationRole::new (
+          NodeRelation::HidesFromItsSubscriptions, "hidden") . unwrap ()),
+      Self::HiddenInSubscribeeCol |
+      Self::HiddenOutsideOfSubscribeeCol =>
+        None,
+    } }
+
+  pub fn from_scaffold (scaffold : &Scaffold) -> Option<SharingScaffoldKind> {
+    match scaffold {
+      Scaffold::SubscribeeCol =>
+        Some (Self::SubscribeeCol),
+      Scaffold::SubscriberCol =>
+        Some (Self::SubscriberCol),
+      Scaffold::OverriddenCol =>
+        Some (Self::OverriddenCol),
+      Scaffold::OverriderCol =>
+        Some (Self::OverriderCol),
+      Scaffold::HiderCol =>
+        Some (Self::HiderCol),
+      Scaffold::HiddenCol =>
+        Some (Self::HiddenCol),
+      Scaffold::HiddenInSubscribeeCol =>
+        Some (Self::HiddenInSubscribeeCol),
+      Scaffold::HiddenOutsideOfSubscribeeCol =>
+        Some (Self::HiddenOutsideOfSubscribeeCol),
+      _ => None,
+    } }
 
   /// Error if 'node' is not a 'Scaff' of this kind.
   /// Wraps 'error_unless_node_satisfies' with

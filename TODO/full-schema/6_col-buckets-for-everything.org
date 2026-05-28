@@ -165,7 +165,7 @@ hiderCol        hides_from_its_subscriptions   hider        hidden        no
 hiddenCol       hides_from_its_subscriptions   hidden       hider         no
 #+end_example
 
-The existing hide-specific collections under 'subscribeeCol' are not
+The existing hide-specific child collections of 'subscribeeCol' are not
 entries in this table.  They have special semantics involving both a
 subscriber and subscribee and should remain separately handled.
 *** Collection titles and heralds
@@ -212,7 +212,7 @@ Each new relation collection scaffold must:
 - be unique among siblings of that parent,
 - have only TrueNode children unless a later metaplan phase explicitly
   allows presentation-only children,
-- reject duplicate TrueNode children under the same collection.
+- reject duplicate TrueNode children of the same collection.
 
 For now, keep validation structural.  Do not require local validation
 to query the graph.  Graph membership is handled by completion and

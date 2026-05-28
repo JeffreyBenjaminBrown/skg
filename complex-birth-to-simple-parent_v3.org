@@ -63,7 +63,7 @@ instruction extraction. That matches the desired move behavior and keeps
 
 I do not see a need for an optional type or a separate
 =ParentIsFromMetadata= wrapper if =Absent= is explicit. The parser can
-default missing =parentIs= directly to =Container=.
+default missing =parentIs= to =Container=.
 
 ** TODO If that happens
 let's change the Absent to Independent.

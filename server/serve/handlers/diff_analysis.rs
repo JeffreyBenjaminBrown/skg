@@ -6,7 +6,7 @@ use crate::serve::util::{
   send_response_with_length_prefix,
   tag_sexp_response,
   value_from_request_sexp};
-use crate::source_sets::ActiveSourceSet;
+use crate::source_sets::{ActiveSourceSet, SourceSetName};
 use crate::types::misc::SkgConfig;
 
 use std::net::TcpStream;
@@ -19,7 +19,7 @@ pub fn handle_diff_analysis_request (
   let active : ActiveSourceSet =
     ActiveSourceSet::named (
       config,
-      crate::source_sets::SourceSetName::from ("all"))
+      SourceSetName::from ("all"))
     . expect ("reserved source-set all should always resolve");
   handle_diff_analysis_request_with_source_set (
     stream, request, config, &active ) }

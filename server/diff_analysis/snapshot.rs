@@ -8,6 +8,7 @@ use crate::git_ops::read_repo::{
 use crate::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::fs::NodeFS;
+use crate::types::textlinks::textlinks_from_node;
 
 use git2::{ObjectType, Repository, TreeWalkMode, TreeWalkResult};
 use std::collections::{BTreeSet, HashMap};
@@ -351,7 +352,7 @@ fn affected_pids_for_changed_node (
       node . hides_from_its_subscriptions . or_default () . iter () . cloned ());
     pids . extend (node . overrides_view_of . or_default () . iter () . cloned ());
     pids . extend (
-      crate::types::textlinks::textlinks_from_node (node)
+      textlinks_from_node (node)
         . into_iter ()
         . map ( |textlink| textlink . id )); }
   pids

@@ -1,7 +1,7 @@
 ;;; Integration test for collateral buffer updates: title edit + add child
 ;;;
 ;;; Opens two buffers over a containment cycle (a contains b, b contains a).
-;;; From buffer B, edits a's title and adds a new child "c" under a (no
+;;; From buffer B, edits a's title and adds a new child "c" of a (no
 ;;; metadata — the server reads it as a TrueNode with a random UUID).
 ;;; Verifies that buffer B's save response reflects the changes (title,
 ;;; new node with UUID). Then checks collateral buffer A.
@@ -58,7 +58,7 @@
      "phase 2: buffer B initial")))
 
 (defun phase-3-edit-and-save ()
-  "Edit a's title, add child c under a, and save buffer B."
+  "Edit a's title, add child c of a, and save buffer B."
   (message "=== PHASE 3: Edit a's title, add child c, save ===")
   (setq integration-test-phase "phase-3-edit-and-save")
   (let ((buf (get-buffer "*b*")))

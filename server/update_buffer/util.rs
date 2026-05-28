@@ -1,4 +1,5 @@
-use crate::types::viewnode::ViewNode;
+use crate::types::misc::ID;
+use crate::types::viewnode::{ParentIs, TrueNode, ViewNode, ViewNodeKind};
 use crate::types::tree::generic::{with_node_mut, write_at_ancestor_in_tree};
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -28,6 +29,38 @@ where
         treatment( n . value() ); }
     } ) . map_err( |e| -> String { e . into() } )?; }
   Ok( () ) }
+
+/// Mark managed TrueNode children whose IDs are not in `goal_list` as
+/// independent.
+///
+/// Callers provide `is_managed_child` because different scaffold
+/// completers own different kinds of children.  Relation collections
+/// manage collector children; HiddenOutsideOfSubscribeeCol manages
+/// ordinary content children.
+pub fn mark_managed_children_outside_goal_independent<ManagedPredicate> (
+  tree             : &mut Tree<ViewNode>,
+  node             : NodeId,
+  goal_list        : &[ID],
+  is_managed_child : ManagedPredicate,
+) -> Result<(), Box<dyn Error>>
+where
+  ManagedPredicate : Fn (&TrueNode) -> bool,
+{
+  let goal_set : HashSet<ID> =
+    goal_list . iter () . cloned () . collect ();
+  treat_certain_children (
+    tree, node,
+    |vn : &ViewNode| match &vn . kind {
+      ViewNodeKind::True (t) =>
+        is_managed_child (t)
+        && ! goal_set . contains (&t . id)
+        && ! t . is_phantom (),
+      _ => false },
+    |vn : &mut ViewNode| {
+      if let ViewNodeKind::True (t) = &mut vn . kind {
+        t . parentIs = ParentIs::Independent; } } )
+    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+  Ok (( )) }
 
 /// Classify children of a node based on a classifier function.
 /// Returns a HashMap from classification key to Vec<NodeId>.

@@ -6,6 +6,7 @@ use crate::dbs::init::{
   read_and_use_schema};
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
+use crate::dbs::typedb::sources::create_all_sources;
 use crate::org_to_text::viewforest_to_string;
 use crate::types::env::find_source_with_optional_tantivy;
 use crate::types::git::MembershipAxes;
@@ -220,7 +221,7 @@ where
       . collect ();
     overwrite_new_empty_typedb_db (db_name, &driver) . await?;
     read_and_use_schema (db_name, &driver) . await?;
-    crate::dbs::typedb::sources::create_all_sources (
+    create_all_sources (
       db_name, &driver, &config ) . await?;
     create_all_nodes (db_name, &driver, &typedb_nodes) . await?;
     create_all_relationships (db_name, &driver, &typedb_nodes) . await?;

@@ -93,7 +93,7 @@ pub fn reconcile_alias_col_children (
     view_alias_text,
     &goal_list,
     create_alias )?;
-  treat_certain_children( // Currently unreachable: validation rejects TrueNode children under AliasCol. Left here in case validation is later relaxed.
+  treat_certain_children( // Currently unreachable: validation rejects TrueNode children of AliasCol. Left here in case validation is later relaxed.
       tree, aliascol_node_id,
       |vn : &ViewNode| matches!( &vn . kind, ViewNodeKind::True (_)),
       |vn : &mut ViewNode| {

@@ -1,7 +1,9 @@
 use crate::from_text::viewnodes_to_instructions::classify::{
   viewforest_with_saveroles, SaveRole, ViewNode_in_Role };
 use crate::types::viewnode::EditRequest;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, TrueNode, IndefOrDef};
+use crate::types::viewnode::ParentIs::Collector;
+use crate::types::git::Sign;
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, TrueNode, IndefOrDef, InactiveNode};
 use crate::types::misc::{ID, MSV, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
@@ -58,7 +60,8 @@ pub(crate) struct DefinenodeCandidate {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum DefinenodeCandidateKind {
   Ordinary,
-  Subscribee { subscriber : ID }, }
+  Subscribee { subscriber : ID },
+  Overridden { overrider : ID }, }
 
 impl NodeIntent {
   pub(crate) fn pid (
@@ -281,6 +284,8 @@ pub(crate) fn naive_node_edit_intents_from_candidates (
         Some (candidate . treeid),
       DefinenodeCandidateKind::Subscribee { .. } =>
         None,
+      DefinenodeCandidateKind::Overridden { .. } =>
+        None,
     })
     . collect();
   let basics_by_node_id : HashMap<NodeId, NodeIntentLocal> =
@@ -304,12 +309,16 @@ pub(crate) fn naive_node_edit_intents_from_candidates (
   let subscribees_by_node_id : HashMap<NodeId, MSV<ID>> =
     collect_subscribees_by_node_id (
       role_viewforest, &save_candidate_ids)?;
+  let overridden_by_node_id : HashMap<NodeId, MSV<ID>> =
+    collect_overridden_by_node_id (
+      role_viewforest, &save_candidate_ids)?;
   assemble_node_edit_intents (
     candidate_ids,
     basics_by_node_id,
     contains_by_node_id,
     aliases_by_node_id,
-    subscribees_by_node_id) }
+    subscribees_by_node_id,
+    overridden_by_node_id) }
 
 /// Ensures there is at most one save *or* one delete per ID.
 /// Groups intens by ID, then on each group calls
@@ -412,7 +421,7 @@ pub(crate) fn collect_savenode_candidates (
       ViewNodeKind::Scaff (Scaffold::SubscribeeCol) =>
         recurse_on_children( tree, node_id, result )?,
       ViewNodeKind::Scaff (_) => {
-        // Display-only scaffolds do not own graph edits. Do not recurse through them: children under scaffolds such as AliasCol, IDCol, HiddenInSubscribeeCol, and diff display scaffolds are interpreted by their specific collectors (ancestors in the view) or ignored as presentation-only state.
+        // Display-only scaffolds do not own graph edits. Do not recurse through them: children of scaffolds such as AliasCol, IDCol, HiddenInSubscribeeCol, and diff display scaffolds are interpreted by their specific collectors (ancestors in the view) or ignored as presentation-only state.
       },
       ViewNodeKind::Deleted (_) =>
         recurse_on_children( tree, node_id, result )?,
@@ -430,6 +439,10 @@ pub(crate) fn collect_savenode_candidates (
             SaveRole::Subscribee { subscriber } =>
               Some (DefinenodeCandidateKind::Subscribee {
                 subscriber,
+              }),
+            SaveRole::Overridden { overrider } =>
+              Some (DefinenodeCandidateKind::Overridden {
+                overrider,
               }),
             _ => None,
           };
@@ -531,12 +544,31 @@ fn collect_subscribees_by_node_id (
       collect_subscribees (tree, *candidate_id)?); }
   Ok (result) }
 
+/// The type signature says it all.
+fn collect_overridden_by_node_id (
+  tree               : &Tree<ViewNode_in_Role>,
+  save_candidate_ids : &[NodeId],
+) -> Result<HashMap<NodeId, // each key is a TrueNode
+                    MSV<ID>>, // what the tree says that key overrides
+            String> {
+  let mut result : HashMap<NodeId, MSV<ID>> =
+    HashMap::new();
+  for candidate_id in save_candidate_ids {
+    result . insert (
+      *candidate_id,
+      collect_members_from_child_relation_col (
+        tree, *candidate_id,
+        &Scaffold::OverriddenCol,
+        "OverriddenCol")?); }
+  Ok (result) }
+
 fn assemble_node_edit_intents (
   candidate_ids              : Vec<NodeId>,
   mut basics_by_node_id      : HashMap<NodeId, NodeIntentLocal>,
   mut contains_by_node_id    : HashMap<NodeId, Vec<ID>>,
   mut aliases_by_node_id     : HashMap<NodeId, MSV<String>>,
   mut subscribees_by_node_id : HashMap<NodeId, MSV<ID>>,
+  mut overridden_by_node_id  : HashMap<NodeId, MSV<ID>>,
 ) -> Result<Vec<NodeIntent>, String> {
   let mut result : Vec<NodeIntent> =
     Vec::new();
@@ -568,11 +600,11 @@ fn assemble_node_edit_intents (
                 subscribees_by_node_id . remove (&candidate_id) . ok_or (
                   "assemble_node_edit_intents: missing subscribees")?,
               hides_from_its_subscriptions : MSV::Unspecified,
-              overrides_view_of            : MSV::Unspecified,
-              misc                         : Vec::new(),
-            };
-          result . push (NodeIntent::Save (intent)); },
-    }}
+              overrides_view_of            :
+                overridden_by_node_id . remove (&candidate_id) . ok_or (
+                  "assemble_node_edit_intents: missing overridden")?,
+              misc                         : Vec::new(), };
+          result . push (NodeIntent::Save (intent)); }}}
   Ok (result) }
 
 fn contains_for_save_intent (
@@ -615,7 +647,7 @@ fn collect_subscribees (
               if matches!(
                    subscribeecol_child . value() . role,
                    SaveRole::Subscribee { .. })
-                 && !t . parent_ignores_it()
+                 && member_counts_for_relation_collection (t)
               { subscribees . push(t . id . clone()); }},
             ViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol) =>
               continue, // valid child of SubscribeeCol, but not a subscribee
@@ -627,6 +659,51 @@ fn collect_subscribees (
             ViewNodeKind::Scaff (s) => return Err(format!( "SubscribeeCol has unexpected Scaffold child: {:?}", s)), }}
         subscribees };
       Ok( MSV::Specified(dedup_vector (subscribees)) ) }} }
+
+/// Collect members from a writable relation collection scaffold S
+/// where S is a child of the input node_id.
+///
+/// Absence of the collection means the buffer expresses no opinion
+/// about the relation field.  A present-but-empty collection is an
+/// explicit empty set, so it must stay `MSV::Specified(vec![])`.
+fn collect_members_from_child_relation_col (
+  tree     : &Tree<ViewNode_in_Role>,
+  node_id  : NodeId, // this is the truenode; the collection is its child
+  scaffold : &Scaffold,
+  label    : &str,
+) -> Result<MSV<ID>, String> {
+  let col_id : Option<NodeId> =
+    unique_scaffold_child (
+      tree, node_id, scaffold,
+      scaffold_from_viewnodeInRole )?;
+  match col_id {
+    None => Ok (MSV::Unspecified),
+    Some (col_id) => {
+      let col_ref : NodeRef<ViewNode_in_Role> = tree . get (col_id)
+        . ok_or_else (|| format!("{} not found", label))?;
+      let mut members : Vec<ID> = Vec::new();
+      for child in col_ref . children() {
+        match &child . value() . viewnode . kind {
+          ViewNodeKind::True (t) => {
+            if member_counts_for_relation_collection (t) {
+              members . push (t . id . clone ()); }},
+          ViewNodeKind::Deleted (_) |
+          ViewNodeKind::DeletedScaff (_) |
+          ViewNodeKind::Inactive (_) |
+          ViewNodeKind::Unknown (_) =>
+            continue,
+          ViewNodeKind::Scaff (s) => return Err (format!(
+            "{} has unexpected Scaffold child: {:?}", label, s)), }}
+      Ok (MSV::Specified (dedup_vector (members))) }} }
+
+fn member_counts_for_relation_collection (
+  t : &TrueNode,
+) -> bool {
+  matches! (t . parentIs,
+            Collector)
+    && !t . is_phantom ()
+    && !matches!( t . edit_request (),
+                  Some (&EditRequest::Delete)) }
 
 /// The following kinds of TrueNode children
 /// should be excluded from their parent's content:
@@ -653,16 +730,16 @@ fn collect_contents_to_save_from_children<'a> (
                           Some (&EditRequest::Delete))
         { contents . push( t . id . clone() ); }},
       ViewNodeKind::Inactive (i) => {
-        if ! inactive_is_phantom (i) {
+        if ! inactiveNode_is_phantom (i) {
           contents . push ( i . id . clone () ); }},
       _ => continue }}
   contents }
 
-fn inactive_is_phantom (
-  inactive : &crate::types::viewnode::InactiveNode,
+fn inactiveNode_is_phantom (
+  inactive : &InactiveNode,
 ) -> bool {
-  inactive . membership . staged == Some (crate::types::git::Sign::Minus)
-  || inactive . membership . unstaged == Some (crate::types::git::Sign::Minus)
+  inactive . membership . staged == Some (Sign::Minus)
+  || inactive . membership . unstaged == Some (Sign::Minus)
 }
 
 #[allow(non_snake_case)]

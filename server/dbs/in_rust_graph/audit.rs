@@ -27,6 +27,7 @@ use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
 use crate::dbs::typedb::search::find_related_nodes_for_one_primary_pid_in_tx;
 use crate::dbs::typedb::sources::source_name_for_one_node_id_in_tx;
 use crate::types::misc::{ID, SourceName};
+use crate::types::nodes::rust::NodeRust;
 
 /// A disagreement between the TypeDB and InRustGraph dbs.
 #[derive(Debug, Clone)]
@@ -103,7 +104,7 @@ pub async fn audit_one_node (
   tx    : &Transaction,
   pid   : &ID,
 ) -> Result < Vec<Mismatch>, Box<dyn Error> > {
-  let node : &crate::types::nodes::rust::NodeRust =
+  let node : &NodeRust =
     match graph . nodes . get (pid) {
       Some (n) => n,
       None     => return Ok ( Vec::new () ) };
@@ -169,7 +170,7 @@ pub async fn audit_one_node (
 /// IDs appearing as the second member of 'node''s outbound edges in
 /// the named relation (see [[../../schema.tql]]).
 fn outbound_second_members_from_in_rust_graph (
-  node     : &crate::types::nodes::rust::NodeRust,
+  node     : &NodeRust,
   relation : &str,
 ) -> HashSet<ID> {
   match relation {

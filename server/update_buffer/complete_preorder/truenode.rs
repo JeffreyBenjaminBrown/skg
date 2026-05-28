@@ -8,6 +8,8 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::env::find_source_with_optional_tantivy;
+#[cfg(test)]
+use crate::types::git::{GitDiffStatus, NodeCompleteDiff};
 use crate::types::nodes::complete::NodeComplete;
 use crate::git_ops::read_repo::nodecomplete_from_git_head;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
@@ -147,16 +149,13 @@ pub fn expand_true_content_at_truenode (
     CompletionMode::new (is_saved_view, source_diffs);
   if mode . should_sync_from_disk_even_though_definitive () {
     sync_truenode_from_disk (tree, node, &nodecomplete) ?; }
-  let subscribes_to : Vec<ID> =
-    reconcile_content_children (
-      tree, node, &nodecomplete, &pid, &source,
-      source_diffs, config, graph_snap,
-      deleted_since_head_pid_src_map,
-      active_source_set, mode ) ?;
+  reconcile_content_children (
+    tree, node, &nodecomplete, &pid, &source,
+    source_diffs, config, graph_snap,
+    deleted_since_head_pid_src_map,
+    active_source_set, mode ) ?;
   order_children_as_scaffolds_then_ignored_then_content(
     tree, node ) ?;
-  maybe_prepend_subscribee_col(
-    tree, node, &subscribes_to ) ?;
   Ok(( )) }
 
 pub fn ensure_diff_scaffolds_for_truenode (
@@ -208,8 +207,7 @@ fn sync_truenode_from_disk (
 
 /// Compute the content goal list (diff-aware), reconcile
 /// children against it, and mark any surviving non-goal children
-/// as ParentIs::Independent. Returns 'subscribes_to' so phase 6 can
-/// decide whether to prepend a SubscribeeCol.
+/// as ParentIs::Independent.
 fn reconcile_content_children (
   tree                           : &mut Tree<ViewNode>,
   node                           : NodeId,
@@ -222,7 +220,7 @@ fn reconcile_content_children (
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   active_source_set              : Option<&ActiveSourceSet>,
   mode                           : CompletionMode,
-) -> Result<Vec<ID>, Box<dyn Error>> {
+) -> Result<(), Box<dyn Error>> {
   // Resolve each id through the in-Rust-graph extra_id map so that an
   // id appearing in a node's 'contains' after merging into another
   // node is redirected to the acquirer's pid. Without this, the
@@ -236,8 +234,6 @@ fn reconcile_content_children (
     . map ( |id| graph_snap . pid_of (id)
                  . unwrap_or_else ( || id . clone () ))
     . collect ();
-  let subscribes_to : Vec<ID> =
-    nodecomplete . subscribes_to . or_default() . to_vec();
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
     per_stage_node_changes_for_truenode (
@@ -246,7 +242,7 @@ fn reconcile_content_children (
   if mode . should_preserve_saved_as_subscribee_branch (is_sub)
     { correct_the_viewChildren_of_subscribee (
         tree, node, &content_ids ) ?;
-      return Ok (subscribes_to); }
+      return Ok (( )); }
   let (goal_list, removed_ids, apparent_content_ids) =
     // git diff view makes a difference
     content_goal_list(
@@ -259,7 +255,7 @@ fn reconcile_content_children (
     active_source_set ) ?;
   mark_erroneous_content_children_as_indep(
     tree, node, &apparent_content_ids ) ?;
-  Ok (subscribes_to) }
+  Ok (( )) }
 
 /// Changes the ParentIs of non-content children to Independent,
 /// and reorders the remaining content to match what's on disk.
@@ -312,22 +308,23 @@ fn mutate_truenode_to_deletednode (
         body, } ); }
   ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) }
 
-/// Whether this is a non-ignored child of a SubscribeeCol.
+/// Whether this is a collector member child of a SubscribeeCol.
 fn is_subscribee (
   tree : &Tree<ViewNode>,
   node : NodeId,
 ) -> Result<bool, Box<dyn Error>> {
-  let is_content_of_parent : bool =
+  let is_member_of_parent : bool =
     read_at_node_in_tree( tree, node,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::True (t) => !t . parent_ignores_it(),
+        ViewNodeKind::True (t) =>
+          t . parentIs == ParentIs::Collector,
         _ => false } ) ?;
   let parent_is_subscribee_col : bool =
     read_at_ancestor_in_tree( tree, node, 1,
       |vn : &ViewNode| matches!( &vn . kind,
         ViewNodeKind::Scaff (Scaffold::SubscribeeCol)))
     . unwrap_or (false);
-  Ok( is_content_of_parent && parent_is_subscribee_col ) }
+  Ok( is_member_of_parent && parent_is_subscribee_col ) }
 
 /// Reads per-stage contains_diff (rather than the merged view from
 /// 'node_changes_for_truenode') so that a contains-list removal that
@@ -500,22 +497,6 @@ fn order_children_as_scaffolds_then_ignored_then_content (
     . chain( groups . get( &1 ) . unwrap_or (&empty) . iter() )
     . chain( groups . get( &2 ) . unwrap_or (&empty) . iter() )
   { move_child_to_end( tree, node, cid ) ?; }
-  Ok(( )) }
-
-/// If the NodeComplete subscribes to anything and no SubscribeeCol
-/// child exists yet, prepend an empty one.
-/// (It will be populated when processing visits the SubscribeeCol.)
-fn maybe_prepend_subscribee_col (
-  tree          : &mut Tree<ViewNode>,
-  node          : NodeId,
-  subscribes_to : &[ID],
-) -> Result<(), Box<dyn Error>> {
-  if !subscribes_to . is_empty() {
-    if unique_scaffold_child_of_viewnode(
-      tree, node, &Scaffold::SubscribeeCol
-    ) ?. is_none() {
-      insert_scaffold_as_child(
-        tree, node, Scaffold::SubscribeeCol, true ) ?; } }
   Ok(( )) }
 
 /// In diff view, prepend scaffolds for changed fields:
@@ -777,7 +758,6 @@ fn write_truenode_diff (
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::types::git::{GitDiffStatus, NodeCompleteDiff};
 
   fn source_name (s: &str) -> SourceName { SourceName ( s . to_string () ) }
   fn id          (s: &str) -> ID          { ID ( s . to_string () ) }

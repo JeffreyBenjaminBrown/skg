@@ -2,16 +2,20 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::source_sets::ActiveSourceSet;
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
-use crate::to_org::complete::sharing::maybe_add_subscribeeCol_branch;
+use crate::to_org::complete::sharing::maybe_add_relation_col_branches;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::env::find_source_with_optional_tantivy;
 use crate::types::git::MembershipAxes;
+#[cfg(test)]
+use crate::types::misc::MSV;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
 use crate::types::tree::generations::collect_generation_ids;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_nodecomplete::{pid_and_source_from_treenode, write_at_truenode_in_tree};
+#[cfg(test)]
+use crate::types::viewnode::mk_indefinitive_viewnode;
 use crate::types::viewnode::ViewRequest;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, ParentIs, TrueNode, viewforest_root_viewnode, mk_definitive_viewnode, mk_inactive_viewnode, mk_unknown_viewnode };
 
@@ -121,8 +125,8 @@ pub async fn complete_branch_minus_content (
   { clobberIndefinitiveViewnode (
       tree, node_id, config ) ?; }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "maybe_add_subscribeeCol_branch" ). entered();
-    maybe_add_subscribeeCol_branch (
+      "maybe_add_relation_col_branches" ). entered();
+    maybe_add_relation_col_branches (
       tree, node_id, config, driver ) . await } ?;
   Ok (( )) }
 
@@ -227,7 +231,7 @@ pub fn mark_view_roots_parent_absent (
 /// so extra_id aliasing (typically a merge side-effect) doesn't
 /// produce false mismatches.
 ///
-/// Direct children of BufferRoot have no TrueNode parent and therefore
+/// Children of BufferRoot have no TrueNode parent and therefore
 /// do not fall through this check. Also relies on the save pipeline's
 /// invariant that 'apply_definenodes' has updated the in-Rust-graph
 /// graph before the rerender pass runs (see
@@ -239,7 +243,9 @@ pub fn validate_parentIs_relationships (
   // Collect correction targets in a read-only first pass so the
   // &mut Tree write phase doesn't need simultaneous read access.
   let mut to_independent : Vec<NodeId> = Vec::new ();
+    // these will be marked parentIs = independent
   let mut to_container : Vec<NodeId> = Vec::new ();
+    // these will be marked parentIs = container
   for edge in viewforest . root () . traverse () {
     if let Edge::Open (child_ref) = edge {
       let child_tn : &TrueNode =
@@ -251,11 +257,10 @@ pub fn validate_parentIs_relationships (
       let parent_tn : &TrueNode =
         match & parent_ref . value () . kind {
           ViewNodeKind::True (t) => t,
-          // A non-TrueNode parent (BufferRoot, Scaffold, Deleted,
-          // DeletedScaff) is not a legitimate subject for any of
-          // these relational claims; skip without correcting.
+          // A non-TrueNode parent (BufferRoot, Scaffold, Deleted, DeletedScaff) is not a legitimate subject for any of these relational claims; skip without correcting.
           _ => continue };
       if child_tn . parentIs == ParentIs::Absent {
+        // The child was a root, and the user gave it a parent, so let the parent contain it.
         to_container . push ( child_ref . id () );
         continue; }
       let claim_ok : bool = match child_tn . parentIs {
@@ -266,7 +271,9 @@ pub fn validate_parentIs_relationships (
         ParentIs::Container => {
           if parent_tn . is_indefinitive () {
             child_contained_by_parent (graph, &child_tn . id, &parent_tn . id)
-          } else { true } }
+          } else { // The definitive parent *defines* content, so cannot be incorrect.
+            true }}
+        ParentIs::Collector => false, // the truenode parent cannot be a collector
         ParentIs::Independent => true,
         ParentIs::Absent => false, };
       if ! claim_ok { to_independent . push ( child_ref . id () ); } } }
@@ -663,8 +670,6 @@ where T: AsMut<ViewNode>,
 #[cfg(test)]
 mod validate_parentIs_relationships_tests {
   use super::*;
-  use crate::types::misc::MSV;
-  use crate::types::viewnode::mk_indefinitive_viewnode;
 
   fn src () -> SourceName { SourceName::from ("main") }
   fn id  (s: &str) -> ID { ID ( s . to_string () ) }
@@ -919,14 +924,14 @@ mod validate_parentIs_relationships_tests {
   }
 
   // ===== 3x2 matrix: moving a {content, container, linkTarget}
-  // child under a NEW parent where the relationship to the new
+  // child of a NEW parent where the relationship to the new
   // parent does / doesn't hold. =====================================
   //
   // Each test sets up:
   //   - p_old: the child's original parent (the relationship it
   //     was originally marked with).
   //   - p_new: the new parent it has been moved under.
-  //   - The view viewforest has the child under p_new.
+  //   - The view viewforest has the child as a child of p_new.
   //   - The graph sometimes has a relationship from the child to
   //     p_new ("holds"), and sometimes doesn't ("no longer holds").
 

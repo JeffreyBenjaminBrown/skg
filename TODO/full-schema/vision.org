@@ -222,7 +222,7 @@ You're right. Let's apply the same policy almost everywhere,
 but not in the git diff analysis report, the git diff view,
 or the readable-ID lookups.
 ** The exception for 'overriddenCol' needs a save rule
-If a child under 'overriddenCol' is the only place where the original
+If a child of 'overriddenCol' is the only place where the original
 overridden node is rendered instead of its overrider,
 then saving from that definitive view must know whether edits target:
 - the original overridden node,
@@ -488,7 +488,7 @@ This feature is too broad for one test plan.
 Each relation should get tests for:
 - outbound writable collection behavior,
 - inbound read-only collection behavior,
-- direct visit versus collection-context visit,
+- plain visit versus collection-context visit,
 - definitive versus indefinitive children,
 - source-set restricted rendering,
 - git diff rendering,
@@ -732,7 +732,7 @@ in two different buffers, their orders do not have to match.
 
 ** 'parentIs=container' in generated inbound collections is semantically loaded
 For generated inbound collections,
-a child under subscriberCol/overriderCol/hiderCol does not mean the
+a child of subscriberCol/overriderCol/hiderCol does not mean the
 collection scaffold's parent contains that child.
 It means that child has an inbound graph relation to the collection
 owner.

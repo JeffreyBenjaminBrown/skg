@@ -23,7 +23,7 @@ Older planning docs also state the intended policy:
 - =TODO/sharing/vision.org= says =HiddenInSubscribeeCol= remains
   read-only;
 - =TODO/sharing/2_DONE_hide-subscribee-content-deletions.org= says
-  the only edit surface for this feature is the direct content
+  the only edit surface for this feature is the content
   children of a definitive node shown as a subscribee;
 - =TODO/sharing/status-before-plan.org= records that edits to these
   hidden collections were silently discarded and that the UI did not
@@ -76,7 +76,7 @@ from all subscriptions" collections are generated read-only displays.
 The docs should name the supported actions:
 
 - remove visible subscribed graph-content to hide it;
-- restore it directly under the subscribed node in the subscription
+- restore it among the subscribed node's children in the subscription
   view to unhide it;
 - do not edit the hidden collections themselves.
 

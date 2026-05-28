@@ -10,6 +10,7 @@
 pub mod audit;
 pub mod audit_store;
 pub mod override_invariants;
+pub mod relation_accessors;
 pub mod scheduled_audit;
 
 use arc_swap::ArcSwap;

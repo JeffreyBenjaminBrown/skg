@@ -3,7 +3,7 @@ use crate::from_text::viewnodes_to_instructions::classify::{
 use crate::from_text::viewnodes_to_instructions::to_naive_instructions::{
   collect_savenode_candidates, DefinenodeCandidate, DefinenodeCandidateKind };
 use crate::types::misc::ID;
-use crate::types::viewnode::{EditRequest, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{EditRequest, ParentIs, ViewNode, ViewNodeKind};
 
 use ego_tree::{NodeRef, Tree};
 
@@ -56,11 +56,17 @@ pub(crate) fn subscribee_hiderel_intents_from_candidates (
       subscriber,
       subscribee,
       visible_content :
-        collect_direct_visible_content (&node_ref),
+        collect_visible_content (&node_ref),
     }); }
   Ok (result) }
 
-fn collect_direct_visible_content (
+/// Collect the children that the buffer presents as visible
+/// content of one subscribee-as-such.
+///
+/// This list is not saved as the subscribee's 'contains'.  It is a
+/// signal used to infer what the subscriber should hide or unhide for
+/// this subscription.
+fn collect_visible_content (
   node_ref : &NodeRef<ViewNode_in_Role>,
 ) -> Vec<ID> {
   let mut result : Vec<ID> = Vec::new();
@@ -72,7 +78,9 @@ fn collect_direct_visible_content (
         if matches!(
              child_ref . value() . role,
              SaveRole::Ordinary)
-           && ! t . parent_ignores_it()
+           && ( // Ordinary content children are visible.  Collector children are also visible here because dragging a generated hidden child into the subscribee-as-such visible branch is how the user requests an unhide.
+             t . parentIs == ParentIs::Collector
+               || ! t . parent_ignores_it())
            && ! t . is_phantom()
            && ! matches!(
              t . edit_request(),

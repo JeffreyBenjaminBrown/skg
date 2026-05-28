@@ -1,5 +1,5 @@
 use crate::types::misc::ID;
-use crate::types::viewnode::{Scaffold, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{ParentIs, Scaffold, ViewNode, ViewNodeKind};
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::HashMap;
 
@@ -8,6 +8,7 @@ pub enum SaveRole {
   BufferRoot,
   Ordinary,
   Subscribee { subscriber: ID },
+  Overridden { overrider: ID },
   HiddenInSubscribeeCol { subscriber: ID, subscribee: ID },
   HiddenOutsideOfSubscribeeCol { subscriber: ID },
   AliasDisplay,
@@ -108,11 +109,24 @@ fn classify_truenode (
     else { return Ok (SaveRole::Ordinary); };
   match &parent_ref . value() . kind {
     ViewNodeKind::Scaff (Scaffold::SubscribeeCol) =>
-      Ok (SaveRole::Subscribee {
-        subscriber : truenode_id (
-          parent_ref . parent(),
-          "SubscribeeCol must have a TrueNode parent")?,
-      }),
+      if is_truenode_and_claims_parentIs_collector (node_ref) {
+        Ok (SaveRole::Subscribee {
+          subscriber : truenode_id (
+            parent_ref . parent(),
+            "SubscribeeCol must have a TrueNode parent")?, } )
+      } else { Ok (SaveRole::DisplayOnly) },
+    ViewNodeKind::Scaff (Scaffold::OverriddenCol) =>
+      if is_truenode_and_claims_parentIs_collector (node_ref) {
+        Ok (SaveRole::Overridden {
+          overrider : truenode_id (
+            parent_ref . parent(),
+            "OverriddenCol must have a TrueNode parent")?, } )
+      } else { Ok (SaveRole::DisplayOnly) },
+    ViewNodeKind::Scaff (Scaffold::SubscriberCol)
+      | ViewNodeKind::Scaff (Scaffold::OverriderCol)
+      | ViewNodeKind::Scaff (Scaffold::HiderCol)
+      | ViewNodeKind::Scaff (Scaffold::HiddenCol)
+      => Ok (SaveRole::DisplayOnly),
     ViewNodeKind::Scaff (Scaffold::HiddenInSubscribeeCol) => {
       let subscribee_ref : NodeRef<ViewNode> =
         parent_ref . parent() . ok_or (
@@ -129,7 +143,7 @@ fn classify_truenode (
         ViewNodeKind::Scaff (Scaffold::SubscribeeCol))
       {
         return Err (
-          "HiddenInSubscribeeCol subscribee must be under SubscribeeCol"
+          "HiddenInSubscribeeCol subscribee must be a child of SubscribeeCol"
             . to_string()); }
       Ok (SaveRole::HiddenInSubscribeeCol {
         subscriber : truenode_id (
@@ -167,4 +181,13 @@ fn truenode_id (
       Ok (t . id . clone()),
     _ =>
       Err (error . to_string()),
+  }}
+
+fn is_truenode_and_claims_parentIs_collector (
+  node_ref : NodeRef<ViewNode>,
+) -> bool {
+  match &node_ref . value() . kind {
+    ViewNodeKind::True (t) =>
+      t . parentIs == ParentIs::Collector,
+    _ => false,
   }}

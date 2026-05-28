@@ -178,8 +178,8 @@ cargo test --test typedb update_typedb_from_saveinstructions -- --nocapture
 
 Existing tests that must keep passing:
 
-- child removal under a subscribee-as-such infers subscriber hide;
-- child restoration under a subscribee-as-such infers subscriber unhide;
+- child removal from a subscribee-as-such infers subscriber hide;
+- child restoration to a subscribee-as-such infers subscriber unhide;
 - child-list edits in subscribee position do not become foreign
   subscribee =contains= edits;
 - foreign title/body edits still report =ModifiedForeignNode=;

@@ -137,6 +137,16 @@ fn scaffold_metadata_to_string (
       parts . push ( "hiddenInSubscribeeCol" . to_string () ),
     Scaffold::HiddenOutsideOfSubscribeeCol =>
       parts . push ( "hiddenOutsideOfSubscribeeCol" . to_string () ),
+    Scaffold::HiddenCol =>
+      parts . push ( "hiddenCol" . to_string () ),
+    Scaffold::HiderCol =>
+      parts . push ( "hiderCol" . to_string () ),
+    Scaffold::OverriddenCol =>
+      parts . push ( "overriddenCol" . to_string () ),
+    Scaffold::OverriderCol =>
+      parts . push ( "overriderCol" . to_string () ),
+    Scaffold::SubscriberCol =>
+      parts . push ( "subscriberCol" . to_string () ),
     Scaffold::SubscribeeCol =>
       parts . push ( "subscribeeCol" . to_string () ),
     Scaffold::TextChanged { staged, unstaged } => {
@@ -243,6 +253,8 @@ fn true_node_metadata_to_string (
     // it is the default parent relationship.
     match true_node . parentIs {
       ParentIs::Container => {},
+      ParentIs::Collector =>
+        parts . push ( "(parentIs collector)" . to_string () ),
       ParentIs::Absent =>
         parts . push ( "(parentIs absent)" . to_string () ),
       ParentIs::Independent =>
@@ -372,6 +384,7 @@ fn graphnodestats_to_sexp (
     //                informative).
     let show_containers : bool = match parentIs {
       ParentIs::Container                      => c . containers != 1,
+      ParentIs::Collector                      => c . containers != 0,
       ParentIs::Independent                    => c . containers != 0,
       ParentIs::Absent                         => c . containers != 0,
       ParentIs::Content | ParentIs::LinkTarget => true, };
