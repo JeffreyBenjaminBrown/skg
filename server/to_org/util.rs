@@ -273,10 +273,11 @@ pub fn validate_parentIs_relationships (
             child_contained_by_parent (graph, &child_tn . id, &parent_tn . id)
           } else { // The definitive parent *defines* content, so cannot be incorrect.
             true }}
-        ParentIs::Collector => false, // the truenode parent cannot be a collector
+        ParentIs::Collector => // parentIs=collector indicates membership in a collection scaffold parent, not a relation to a TrueNode parent.
+          false,
         ParentIs::Independent => true,
         ParentIs::Absent => false, };
-      if ! claim_ok { to_independent . push ( child_ref . id () ); } } }
+      if ! claim_ok { to_independent . push ( child_ref . id () ); }}}
   for id in to_independent {
     let mut node_mut : NodeMut<ViewNode> =
       viewforest . get_mut (id) . unwrap ();

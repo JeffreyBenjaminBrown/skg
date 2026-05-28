@@ -35,7 +35,7 @@ where
 ///
 /// Callers provide `is_managed_child` because different scaffold
 /// completers can define ownership differently.  Generated collection
-/// scaffolds should generally manage collector children.
+/// scaffolds should generally manage children marked parentIs=collector.
 ///
 /// Run this before `complete_relevant_children_in_viewnodetree` when
 /// the reconciler would otherwise discard non-goal managed children.

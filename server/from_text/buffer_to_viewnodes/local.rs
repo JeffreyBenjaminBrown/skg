@@ -228,7 +228,7 @@ fn validate_subscribeecol (
 
 /// PURPOSE: It should be that the scaffold:
 /// - belongs to one TrueNode
-/// - has only collector-marked TrueNode members
+/// - has only TrueNode members marked parentIs=collector
 /// - is unique among its sibling scaffolds
 /// - does not repeat member IDs
 /// PITFALL: Does not check whether the members are correct for the graph;

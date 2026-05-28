@@ -1,5 +1,5 @@
 use crate::types::misc::ID;
-use crate::types::viewnode::{ParentIs, Scaffold, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{Scaffold, ViewNode, ViewNodeKind};
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::HashMap;
 
@@ -109,14 +109,14 @@ fn classify_truenode (
     else { return Ok (SaveRole::Ordinary); };
   match &parent_ref . value() . kind {
     ViewNodeKind::Scaff (Scaffold::SubscribeeCol) =>
-      if is_truenode_and_claims_parentIs_collector (node_ref) {
+      if node_ref . value () . is_truenode_and_claims_parentIs_collector () {
         Ok (SaveRole::Subscribee {
           subscriber : truenode_id (
             parent_ref . parent(),
             "SubscribeeCol must have a TrueNode parent")?, } )
       } else { Ok (SaveRole::DisplayOnly) },
     ViewNodeKind::Scaff (Scaffold::OverriddenCol) =>
-      if is_truenode_and_claims_parentIs_collector (node_ref) {
+      if node_ref . value () . is_truenode_and_claims_parentIs_collector () {
         Ok (SaveRole::Overridden {
           overrider : truenode_id (
             parent_ref . parent(),
@@ -181,13 +181,4 @@ fn truenode_id (
       Ok (t . id . clone()),
     _ =>
       Err (error . to_string()),
-  }}
-
-fn is_truenode_and_claims_parentIs_collector (
-  node_ref : NodeRef<ViewNode>,
-) -> bool {
-  match &node_ref . value() . kind {
-    ViewNodeKind::True (t) =>
-      t . parentIs == ParentIs::Collector,
-    _ => false,
   }}

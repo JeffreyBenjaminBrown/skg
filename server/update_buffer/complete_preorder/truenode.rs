@@ -308,7 +308,8 @@ fn mutate_truenode_to_deletednode (
         body, } ); }
   ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) }
 
-/// Whether this is a collector member child of a SubscribeeCol.
+/// Whether this node claims parentIs=collector
+/// and is a child of SubscribeeCol.
 fn is_subscribee (
   tree : &Tree<ViewNode>,
   node : NodeId,

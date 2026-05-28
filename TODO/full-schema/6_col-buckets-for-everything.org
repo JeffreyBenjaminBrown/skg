@@ -321,7 +321,7 @@ In this stage, writable relation collections are:
 - 'subscribeeCol',
 - 'overriddenCol'.
 
-Their true 'parentIs=collector' children should write the corresponding
+Their TrueNode children marked 'parentIs=collector' should write the corresponding
 outbound list on the owner:
 - 'subscribeeCol' writes owner's 'subscribes_to',
 - 'overriddenCol' writes owner's 'overrides_view_of'.

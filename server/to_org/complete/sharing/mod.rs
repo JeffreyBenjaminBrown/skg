@@ -14,7 +14,7 @@ use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
 use crate::to_org::util::nodecomplete_and_viewnode_from_id;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{ParentIs, ViewNode, ViewNodeKind, Scaffold};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
 use crate::types::tree::viewnode_nodecomplete::{
   insert_scaffold_as_child,
@@ -83,16 +83,15 @@ pub fn type_and_parent_type_consistent_with_subscribee (
   let node_ref : NodeRef < ViewNode > =
     tree . get (node_id)
     . ok_or ("type_and_parent_type_consistent_with_subscribee: node not found") ?;
-  let is_truenode_with_collector_parent : bool = matches! (
-    & node_ref . value () . kind,
-    ViewNodeKind::True (t) if t . parentIs == ParentIs::Collector);
+  let is_truenode_and_claims_parentIs_collector : bool =
+    node_ref . value () . is_truenode_and_claims_parentIs_collector ();
   let parent_is_subscribee_col : bool =
     node_ref . parent ()
     . map ( |p| matches! (
               & p . value () . kind,
               ViewNodeKind::Scaff (Scaffold::SubscribeeCol)))
     . unwrap_or (false);
-  Ok ( is_truenode_with_collector_parent && parent_is_subscribee_col ) }
+  Ok ( is_truenode_and_claims_parentIs_collector && parent_is_subscribee_col ) }
 
 /// If appropriate, prepend a SubscribeeCol child containing:
 /// - for each subscribee, an indefinitive Subscribee child

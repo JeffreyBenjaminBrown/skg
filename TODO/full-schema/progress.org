@@ -68,11 +68,17 @@ explicitly wants the set to be empty.
 Review cleanup: made 'HiddenInSubscribeeCol' and
 'HiddenOutsideOfSubscribeeCol' use the same 'parentIs=collector'
 membership policy as the other generated collection scaffolds.
-Completion now discards stale collector children in those two
+Completion now discards stale children marked 'parentIs=collector' in those two
 read-only generated collections during reconciliation, and local
-validation requires their collection members to be collector-marked
-TrueNodes.  'HiddenCol' is a simpler relation collection, and follows the
-simple relation-collection reconciliation policy instead.
+validation requires their collection members to be TrueNodes marked
+'parentIs=collector'.  'HiddenCol' is a simpler relation collection,
+and follows the simple relation-collection reconciliation policy
+instead.
+
+Review cleanup: clarified language that called a collection member a
+"collector child".  Comments and local helper names now say that the
+child is marked 'parentIs=collector', so collection membership is not
+confused with the child itself being a collector.
 *** tested
 Focused checks passed:
 - 'cargo check'
@@ -448,7 +454,7 @@ string contains 'true'.  The source entity test and full TypeDB target
 pass after the fix.
 ** collector membership initially broke subscribee-as-such semantics
 Stage 6 changed generated collection members from implicit container
-children to explicit 'parentIs=collector' children.  That exposed old
+children to children explicitly marked 'parentIs=collector'.  That exposed old
 subscribee-as-such code paths that recognized editable subscribees
 only through non-ignored/container parent status.
 
@@ -463,18 +469,18 @@ membership.
 
 The two affected meanings were:
 - a TrueNode child of 'subscribeeCol' is still a subscribee
-  member only when it has 'parentIs=collector',
+  member only when it is marked 'parentIs=collector',
 - a TrueNode child of a definitive subscribee-as-such branch is
   still visible subscribee content if it is either an ordinary
-  container child or a generated collector child.
+  container child or a generated child marked 'parentIs=collector'.
 
 The change was deliberately split by meaning.  Generated
 collection membership is strict: 'subscribeeCol', 'overriddenCol' and
-the read-only relation Cols count only collector children.  Ordinary
+the read-only relation Cols count only children marked 'parentIs=collector'.  Ordinary
 content completion and ordinary save extraction still use
 'parentIs=container' / non-ignored when deciding whether a node is real
 containment content.  Visible content inside an expanded
-subscribee-as-such branch can still include a collector child, because
+subscribee-as-such branch can still include a child marked 'parentIs=collector', because
 moving a generated hidden child into the visible branch is the existing
 gesture for inferred unhide.
 

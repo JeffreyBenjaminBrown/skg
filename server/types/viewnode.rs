@@ -470,6 +470,13 @@ impl ViewNode {
       ViewNodeKind::Unknown (_) => None,
       ViewNodeKind::Inactive (_) => None,
     }}
+
+  pub fn is_truenode_and_claims_parentIs_collector (&self) -> bool {
+    match &self . kind {
+      ViewNodeKind::True (t) =>
+        t . parentIs == ParentIs::Collector,
+      _ => false,
+    }}
 }
 
 impl fmt::Display for EditRequest {
