@@ -1,0 +1,236 @@
+* purpose
+Introduce a single 'RoleCol' type for scaffold collections whose
+TrueNode children are meaningful because of the role they play in a
+relationship to an ancestor. (Unless qualified with a schema relation
+name, "ancestor" means "ancestor in the org tree view".)
+
+Replace the eight standalone scaffold variants:
+- 'SubscribeeCol'
+- 'SubscriberCol'
+- 'OverriddenCol'
+- 'OverriderCol'
+- 'HiderCol'
+- 'HiddenCol'
+- 'HiddenInSubscribeeCol'
+- 'HiddenOutsideOfSubscribeeCol'
+
+with:
+
+#+begin_src rust
+RoleCol { roleCol : RoleCol }
+#+end_src
+
+The external metadata strings should not change.  Buffers should still
+contain '(skg subscribeeCol)', '(skg hiddenInSubscribeeCol)', etc.
+
+* definition
+'RoleCol' should be a single enum with all eight constructors.
+
+The stable boundary is not "simple" versus "complex".  The role cols
+differ along several overlapping axes:
+- direct relation projection versus derived/filter projection,
+- writable versus read-only,
+- ordinary parent shape versus special subscribee/subscriber ancestry,
+- ordinary reconciliation versus special hidden-subscription
+  reconciliation.
+
+Therefore the useful abstraction is one 'RoleCol' enum with metadata
+methods, not separate 'SimpleRoleCol' and 'ComplexRoleCol' types.
+
+* target shape
+** type definitions
+Add something like:
+
+#+begin_src rust
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RoleCol {
+  Subscribee,
+  Subscriber,
+  Overridden,
+  Overrider,
+  Hider,
+  Hidden,
+  HiddenInSubscribee,
+  HiddenOutsideOfSubscribee,
+}
+#+end_src
+
+Then change 'Scaffold' to carry:
+
+#+begin_src rust
+RoleCol { roleCol : RoleCol },
+#+end_src
+
+'ScaffoldKind' can either:
+- keep the eight existing kind variants temporarily, and map each to
+  'Scaffold::RoleCol { .. }', or
+- also collapse to 'ScaffoldKind::RoleCol { roleCol : RoleCol }'.
+
+The cleaner final state is the second one, but a staged implementation
+can use the first as a bridge if it reduces churn.
+
+** metadata methods
+Hang the repeated role-col knowledge on 'RoleCol':
+- 'repr_in_client' / parse from client string,
+- 'default_title',
+- 'scaffold' or 'as_scaffold' helper,
+- 'relation_member_role' returning 'Option<RelationRole>',
+- 'is_writable',
+- 'is_generated_read_only' if useful,
+- 'correct_subscriber_ancestor_distance' or a more general owner
+  ancestor method,
+- predicates for the special hidden-subscription cols,
+- completion/reconciliation policy, if that makes dispatch clearer.
+
+The TypeDB relation/role mapping for the six direct relation cols
+should continue to derive from 'NodeRelation' and 'BinaryRolePosition'.
+Do not duplicate TypeDB role-name strings in 'RoleCol'.
+
+* implementation plan
+** introduce 'RoleCol' without changing behavior
+Add the enum and methods in 'server/types/viewnode.rs' or, if that file
+gets too dense, a sibling module re-exported from there.
+
+Initially, keep existing 'Scaffold' variants and implement conversions:
+- 'RoleCol::from_scaffold(&Scaffold) -> Option<RoleCol>',
+- 'RoleCol::scaffold(self) -> Scaffold'.
+
+This lets the rest of the code migrate one call site at a time.
+
+** migrate sharing metadata
+Replace or shrink 'SharingScaffoldKind'.
+
+Likely path:
+- Rename its conceptual role to 'RoleCol' where possible.
+- Move 'caller_label', 'relation_member_role',
+  'correct_subscriber_ancestor_distance', 'scaffold', and
+  'from_scaffold' onto 'RoleCol'.
+- Leave genuinely completion-specific policy as either 'RoleCol'
+  methods or a small enum returned by 'RoleCol::completion_policy'.
+
+Expected benefit: the relation collection completers take 'RoleCol'
+directly, and many eight-arm matches disappear.
+
+** collapse 'Scaffold'
+Change:
+
+#+begin_src rust
+Scaffold::SubscribeeCol
+#+end_src
+
+and siblings to:
+
+#+begin_src rust
+Scaffold::RoleCol { roleCol : RoleCol::Subscribee }
+#+end_src
+
+Update:
+- 'Scaffold::kind',
+- scaffold title rendering,
+- scaffold comparison helpers,
+- 'viewnode_from_scaffold' callers,
+- org/text serialization,
+- metadata sexp parsing.
+- 'api-and-formats.md', documenting that the external scaffold
+  metadata strings remain the same even though the Rust representation
+  is now 'RoleCol'-based.
+
+Preserve every existing client string.
+
+** collapse 'ScaffoldKind'
+If not done earlier, replace the eight 'ScaffoldKind::*Col' role-col
+variants with:
+
+#+begin_src rust
+ScaffoldKind::RoleCol { roleCol : RoleCol }
+#+end_src
+
+Update 'REPRS_IN_CLIENT' indirectly: because a static array of simple
+pairs is awkward with payload variants, prefer explicit match functions:
+- 'ScaffoldKind::repr_in_client',
+- 'ScaffoldKind::from_client_string'.
+
+** update validation and save classification
+Refactor local validation to dispatch by 'RoleCol' metadata rather than
+by repeated scaffold variants.
+
+Important policies to preserve:
+- all role-col members must be TrueNodes marked 'parentIs'collector',
+  except 'SubscribeeCol' may also contain
+  'HiddenOutsideOfSubscribeeCol' as its generated scaffold child;
+- 'HiddenInSubscribeeCol' must live under a subscribee-as-such;
+- 'HiddenOutsideOfSubscribeeCol' must live under 'SubscribeeCol';
+- direct relation role cols under a TrueNode must be unique among
+  sibling scaffolds;
+- duplicate TrueNode members under a role col remain invalid.
+
+Refactor save classification so writable behavior is driven by
+'RoleCol::is_writable' and/or explicit matches on:
+- 'RoleCol::Subscribee',
+- 'RoleCol::Overridden'.
+
+The read-only role cols must remain display-only.
+
+** update completion dispatch
+Change completion dispatch from matching eight scaffold variants to
+matching one 'Scaffold::RoleCol { roleCol }' and then dispatching on
+'roleCol' where necessary.
+
+Preserve the current differences:
+- 'Subscribee' has its own preorder completer and ensures
+  'HiddenOutsideOfSubscribee' appears last when needed;
+- 'HiddenInSubscribee' and 'HiddenOutsideOfSubscribee' use the
+  hidden-subscription goal-list policies and discard stale generated
+  members;
+- 'Subscriber', 'Overridden', 'Overrider', 'Hider', and 'Hidden' use
+  ordinary relation-col reconciliation.
+
+** update tests and fixtures
+Most text fixtures should not change, because client metadata strings
+stay the same.
+
+Expected test changes are mostly Rust construction/matching updates:
+- tests that call 'viewnode_from_scaffold(Scaffold::SubscribeeCol)',
+- tests that compare 'ScaffoldKind::SubscribeeCol',
+- save-classification tests,
+- local-validation tests,
+- completion tests.
+
+** update documentation
+Update 'api-and-formats.md' wherever it describes scaffold metadata.
+The documentation should continue to list the same external strings
+(for example 'subscribeeCol' and 'hiddenInSubscribeeCol'), but should
+describe them as role collection scaffolds if that helps explain their
+shared semantics.
+
+* risks and pushback
+** do not over-generalize role behavior
+'RoleCol' should remove repeated representation plumbing, not pretend
+all role cols have the same semantics.
+
+The hidden-subscription cols are role cols because their children are
+role-selected relative to a subscriber context, but their goal lists
+are derived/filter views rather than direct relation projections.
+
+** beware staged half-states
+There are two discriminants today: 'Scaffold' and 'ScaffoldKind'.
+Collapsing one but not the other is useful as a migration tactic, but
+the final state should not leave both carrying parallel eight-way role
+col cases.
+
+** preserve external format
+The org metadata strings are part of the user-visible buffer format.
+This refactor should not rename 'subscribeeCol',
+'hiddenOutsideOfSubscribeeCol', etc.
+
+* verification
+Run at least:
+- 'cargo check'
+- 'cargo test --test new viewnodes_to_instructions -- --nocapture'
+- 'cargo test --test subscribee_col -- --nocapture'
+- 'cargo test --test hidden_from_subscriptions -- --nocapture'
+- 'cargo test --test save -- --nocapture'
+- 'cargo test --test content_view -- --nocapture'
+
+If the diff is broad, also run:
+- 'bash/all-tests.sh --no-sound'
