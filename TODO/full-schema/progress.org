@@ -79,6 +79,17 @@ Review cleanup: clarified language that called a collection member a
 "collector child".  Comments and local helper names now say that the
 child is marked 'parentIs=collector', so collection membership is not
 confused with the child itself being a collector.
+
+Review cleanup: changed 'RelationRole' so its role is represented by
+'BinaryRolePosition' rather than a raw TypeQL role-name string.  The
+TypeQL role names remain derived from the existing relation/role table,
+so role names still have a single source of truth.
+
+Test-runner cleanup: made 'bash/all-tests.sh' sequential and
+conservative rather than suite-parallel.  Its defaults now use two
+Cargo build jobs, one nextest job, one integration test at a time, and
+a low TypeDB operation fanout.  The TypeDB fanout is now runtime
+configurable via 'SKG_TYPEDB_CONCURRENT_TRANSACTIONS'.
 *** tested
 Focused checks passed:
 - 'cargo check'

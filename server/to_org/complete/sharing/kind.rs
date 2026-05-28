@@ -12,6 +12,7 @@
 use crate::types::tree::generic::error_unless_node_satisfies;
 use crate::types::viewnode::{Scaffold, ViewNode, ViewNodeKind};
 use crate::dbs::in_rust_graph::relation_accessors::{
+  BinaryRolePosition,
   NodeRelation,
   RelationRole,
 };
@@ -95,22 +96,22 @@ impl SharingScaffoldKind {
     match self {
       Self::SubscribeeCol =>
         Some (RelationRole::new (
-          NodeRelation::Subscribes, "subscribee") . unwrap ()),
+          NodeRelation::Subscribes, BinaryRolePosition::Second)),
       Self::SubscriberCol =>
         Some (RelationRole::new (
-          NodeRelation::Subscribes, "subscriber") . unwrap ()),
+          NodeRelation::Subscribes, BinaryRolePosition::First)),
       Self::OverriddenCol =>
         Some (RelationRole::new (
-          NodeRelation::OverridesViewOf, "overridden") . unwrap ()),
+          NodeRelation::OverridesViewOf, BinaryRolePosition::Second)),
       Self::OverriderCol =>
         Some (RelationRole::new (
-          NodeRelation::OverridesViewOf, "overrider") . unwrap ()),
+          NodeRelation::OverridesViewOf, BinaryRolePosition::First)),
       Self::HiderCol =>
         Some (RelationRole::new (
-          NodeRelation::HidesFromItsSubscriptions, "hider") . unwrap ()),
+          NodeRelation::HidesFromItsSubscriptions, BinaryRolePosition::First)),
       Self::HiddenCol =>
         Some (RelationRole::new (
-          NodeRelation::HidesFromItsSubscriptions, "hidden") . unwrap ()),
+          NodeRelation::HidesFromItsSubscriptions, BinaryRolePosition::Second)),
       Self::HiddenInSubscribeeCol |
       Self::HiddenOutsideOfSubscribeeCol =>
         None,

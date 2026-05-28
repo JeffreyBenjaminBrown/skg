@@ -9,13 +9,13 @@ use typedb_driver::{
 };
 use futures::stream::{self, StreamExt};
 
-use crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS;
+use crate::consts::typedb_concurrent_transactions;
 use crate::types::misc::ID;
 use crate::dbs::typedb::util::concept_document::extract_id_from_map;
 
 
 /// PURPOSE: Find all 'contains' relations among a collection of nodes.
-/// Sends one query per PID, bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
+/// Sends one query per PID, bounded by 'typedb_concurrent_transactions'.
 /// Takes a vector of IDs (PIDs) and returns two maps:
 /// 1. container_to_contents: Map from each container to the set of nodes it contains
 /// 2. content_to_containers: Map from each contained node to the set of containers
@@ -39,7 +39,7 @@ pub async fn contains_from_pids (
       . map ( |pid| contains_for_one_pid (
                 db_name, driver, pid )) )
     . buffer_unordered (
-        TYPEDB_CONCURRENT_TRANSACTIONS )
+        typedb_concurrent_transactions () )
     . collect () . await;
   let mut container_to_contents : HashMap < ID, HashSet < ID > > =
     HashMap::new ();

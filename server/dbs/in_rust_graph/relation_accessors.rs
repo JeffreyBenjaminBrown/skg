@@ -56,37 +56,56 @@ impl NodeRelation {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct RelationRole {
   pub relation : NodeRelation,
-  pub role     : &'static str,
+  pub position : BinaryRolePosition,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum BinaryRolePosition {
+  First,
+  Second,
 }
 
 impl RelationRole {
   pub fn new (
     relation : NodeRelation,
+    position : BinaryRolePosition,
+  ) -> RelationRole {
+    RelationRole { relation, position } }
+
+  pub fn from_typeql_role_name (
+    relation : NodeRelation,
     role     : &'static str,
   ) -> Result<RelationRole, String> {
     let (first_role, second_role) : (&'static str, &'static str) =
       relation . roles ();
-    if role == first_role || role == second_role {
-      Ok (RelationRole { relation, role })
+    if role == first_role {
+      Ok (RelationRole::new (relation, BinaryRolePosition::First))
+    } else if role == second_role {
+      Ok (RelationRole::new (relation, BinaryRolePosition::Second))
     } else {
       Err (format!(
         "role '{}' is not part of relation '{}'",
         role, relation . typeql_name ())) } }
 
-  pub fn opposite_role (self) -> &'static str {
+  pub fn typeql_role_name (self) -> &'static str {
     let (first_role, second_role) : (&'static str, &'static str) =
       self . relation . roles ();
-    if self . role == first_role {
-      second_role
-    } else if self . role == second_role {
-      first_role
-    } else {
-      panic!(
-        "role '{}' is not part of relation '{}'",
-        self . role, self . relation . typeql_name ()) } }
+    match self . position {
+      BinaryRolePosition::First  => first_role,
+      BinaryRolePosition::Second => second_role,
+    } }
+
+  pub fn opposite_position (self) -> BinaryRolePosition {
+    match self . position {
+      BinaryRolePosition::First  => BinaryRolePosition::Second,
+      BinaryRolePosition::Second => BinaryRolePosition::First,
+    } }
+
+  pub fn opposite_role (self) -> RelationRole {
+    RelationRole::new (self . relation, self . opposite_position ()) }
 
   pub fn is_first_role (self) -> bool {
-    self . role == self . relation . roles () . 0 }
+    self . position == BinaryRolePosition::First }
 }
 
 impl InRustGraph {
@@ -135,10 +154,7 @@ impl InRustGraph {
     member_role : RelationRole,
   ) -> bool {
     let members : Vec<ID> =
-      self . other_member_pids (owner_pid, RelationRole {
-        relation : member_role . relation,
-        role     : member_role . opposite_role (),
-      });
+      self . other_member_pids (owner_pid, member_role . opposite_role ());
     members . contains (member_pid) }
 }
 

@@ -54,7 +54,7 @@ use crate::types::misc::{ID, SkgConfig};
 
 /// Pids audited per batch before sleeping. At 10 TypeDB queries per
 /// pid, one batch fires ~1280 queries in rapid succession (bounded
-/// by TYPEDB_CONCURRENT_TRANSACTIONS) before we pause.
+/// by 'typedb_concurrent_transactions') before we pause.
 const BATCH_SIZE : usize = 128;
 
 /// Minimum seconds to sleep between batches. The actual sleep is

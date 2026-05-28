@@ -10,7 +10,7 @@ use typedb_driver::{
 use futures::stream::{self, StreamExt};
 use ego_tree::{NodeRef, NodeMut, NodeId, Tree};
 
-use crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS;
+use crate::consts::typedb_concurrent_transactions;
 use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
 use crate::types::misc::ID;
 use crate::dbs::in_rust_graph::snapshot_global;
@@ -91,7 +91,7 @@ pub fn assign_pids_throughout_tree_from_map (
         child_mut, pid_map ); }} }}
 
 /// Look up PIDs for multiple IDs.
-/// Sends one query per ID, bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
+/// Sends one query per ID, bounded by 'typedb_concurrent_transactions'.
 /// Returns a HashMap mapping each ID to its PID (or None if not found).
 pub async fn pids_from_ids (
   db_name  : &str,
@@ -105,7 +105,7 @@ pub async fn pids_from_ids (
       . map ( |id| pid_from_one_id (
                 db_name, driver, id . clone () )) )
     . buffer_unordered (
-        TYPEDB_CONCURRENT_TRANSACTIONS )
+        typedb_concurrent_transactions () )
     . collect () . await;
   let result : HashMap < ID, Option < ID > > =
     results . into_iter () . collect ();

@@ -1,5 +1,6 @@
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::relation_accessors::{
+  BinaryRolePosition,
   NodeRelation,
   RelationRole,
 };
@@ -50,32 +51,32 @@ fn relation_accessors_return_both_membership_directions () {
   assert_eq!(
     graph . other_member_pids (
       &ID::from ("owner"),
-      RelationRole::new (NodeRelation::Subscribes, "subscriber") . unwrap ()),
+      RelationRole::new (NodeRelation::Subscribes, BinaryRolePosition::First)),
     vec![ID::from ("subscribee")] );
   assert_eq!(
     graph . other_member_pids (
       &ID::from ("owner"),
-      RelationRole::new (NodeRelation::Subscribes, "subscribee") . unwrap ()),
+      RelationRole::new (NodeRelation::Subscribes, BinaryRolePosition::Second)),
     vec![ID::from ("subscriber")] );
   assert_eq!(
     graph . other_member_pids (
       &ID::from ("owner"),
       RelationRole::new (
-        NodeRelation::HidesFromItsSubscriptions, "hider") . unwrap ()),
+        NodeRelation::HidesFromItsSubscriptions, BinaryRolePosition::First)),
     vec![ID::from ("hidden")] );
   assert_eq!(
     graph . other_member_pids (
       &ID::from ("owner"),
       RelationRole::new (
-        NodeRelation::HidesFromItsSubscriptions, "hidden") . unwrap ()),
+        NodeRelation::HidesFromItsSubscriptions, BinaryRolePosition::Second)),
     vec![ID::from ("hider")] );
   assert_eq!(
     graph . other_member_pids (
       &ID::from ("owner"),
-      RelationRole::new (NodeRelation::OverridesViewOf, "overrider") . unwrap ()),
+      RelationRole::new (NodeRelation::OverridesViewOf, BinaryRolePosition::First)),
     vec![ID::from ("overridden")] );
   assert_eq!(
     graph . other_member_pids (
       &ID::from ("owner"),
-      RelationRole::new (NodeRelation::OverridesViewOf, "overridden") . unwrap ()),
+      RelationRole::new (NodeRelation::OverridesViewOf, BinaryRolePosition::Second)),
     vec![ID::from ("overrider")] ); }

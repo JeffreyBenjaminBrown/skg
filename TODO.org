@@ -1,15 +1,3 @@
-* TODO this comment surfaces a bug
-** the comment
-/// completers own different kinds of children.  Relation collections
-/// manage collector children; HiddenOutsideOfSubscribeeCol manages
-/// ordinary content children.
-** the bug
-They should all use membership language, not content language.
-* TODO should RelationRole be an enum?
-pub struct RelationRole {
-  pub relation : NodeRelation,
-  pub role     : &'static str,
-}
 * TODO introduce a RoleCol type
 and use that language everywhere
 * ONGOING [[./TODO/full-schema]]
@@ -62,11 +50,10 @@ That was so that M-? would
 not interpret comments as search hits.
 * easy
 ** beep also once the db has rebuilt
-** rename shutdown->stop server
 ** remap C-c C-o during Skg
 in skg buffers
 ** show the herald it is responsible for next to each field in the metadata
-** ? request containerward paths, excluding the view-rootward one
+** ? request containerward paths *excluding* the view-rootward one
 ** IDs should not be writeable in the metadata view
 And what about extra-ids?
 ** Is it a misfeature to let config_path differ from data_root?

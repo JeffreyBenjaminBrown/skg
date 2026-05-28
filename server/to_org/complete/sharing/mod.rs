@@ -6,7 +6,6 @@ use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   partition_subscribee_content_for_subscriber,
   what_node_hides,
   what_nodes_contain };
-use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
 use crate::to_org::complete::sharing::child_data::{
   ChildData, reconcile_sharing_scaffold_children };
@@ -226,9 +225,8 @@ async fn maybe_add_one_relation_col (
   let Some (member_role) = kind . relation_member_role ()
     // The two Hidden*SubscribeeCol scaffolds lack this, hence end here.
     else { return Ok (( )); };
-  let owner_role = RelationRole {
-    relation : member_role . relation,
-    role     : member_role . opposite_role (), };
+  let owner_role =
+    member_role . opposite_role ();
   let member_ids : Vec<ID> =
     graph . other_member_pids (&owner_pid, owner_role);
   if member_ids . is_empty () {

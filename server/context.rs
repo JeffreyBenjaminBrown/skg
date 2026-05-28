@@ -12,7 +12,7 @@ use crate::consts::{
   MULTIPLIER_MULTI_CONTAINED,
   MULTIPLIER_ROOT,
   MULTIPLIER_TARGET,
-  TYPEDB_CONCURRENT_TRANSACTIONS,
+  typedb_concurrent_transactions,
 };
 use crate::dbs::tantivy::subset_with_hadid;
 use crate::dbs::tantivy::context_update::update_context_origin_types;
@@ -196,7 +196,7 @@ async fn map_to_containers_from_typedb (
             db_name, driver, &id ) . await ?;
         Ok ((id, containers)) }} ))
     . buffer_unordered (
-      TYPEDB_CONCURRENT_TRANSACTIONS )
+      typedb_concurrent_transactions () )
     . collect () . await;
   let mut map_to_containers : MapToContainers =
     HashMap::new ();
@@ -224,7 +224,7 @@ async fn link_targets_from_typedb (
             db_name, driver, &id ) . await ?;
         Ok ((id, hit)) }} ))
     . buffer_unordered (
-      TYPEDB_CONCURRENT_TRANSACTIONS )
+      typedb_concurrent_transactions () )
     . collect () . await;
   let mut targets : HashSet<ID> = HashSet::new ();
   for r in results {

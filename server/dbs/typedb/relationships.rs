@@ -2,7 +2,7 @@ use std::time::Duration;
 use std::error::Error;
 
 use crate::consts::{
-  TYPEDB_CONCURRENT_TRANSACTIONS,
+  typedb_concurrent_transactions,
   TYPEDB_TRANSACTION_TIMEOUT_SECS,
 };
 use crate::dbs::in_rust_graph::snapshot_global;
@@ -28,7 +28,7 @@ pub const OUTBOUND_RELATIONSHIP_TYPES : &[(&str, &str, &str)] = &[
 ];
 
 /// Maps `create_relationships_for_one_node` over `nodes`,
-/// bounded by TYPEDB_CONCURRENT_TRANSACTIONS
+/// bounded by 'typedb_concurrent_transactions'
 /// to avoid overwhelming TypeDB with concurrent transactions.
 /// Each node gets its own transaction.
 /// PITFALL : Does not create `has_extra_id` relationships.
@@ -43,7 +43,7 @@ pub async fn create_all_relationships (
       . map ( |node| create_relationships_for_one_node (
                 db_name, driver, node )) )
     . buffer_unordered (
-        TYPEDB_CONCURRENT_TRANSACTIONS )
+        typedb_concurrent_transactions () )
     . collect () . await;
   for result in results {
     result ?; }
@@ -219,7 +219,7 @@ pub async fn delete_all_outbound_relationships_to_nodes (
 /// Returns the number of IDs processed
 /// (not the number of relations deleted,
 /// which would be more work).
-/// Bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
+/// Bounded by 'typedb_concurrent_transactions'.
 pub async fn delete_out_links (
   db_name  : &str,
   driver   : &TypeDBDriver,
@@ -232,7 +232,7 @@ pub async fn delete_out_links (
       . map ( |id| delete_out_links_for_one_id (
                 db_name, driver, id, relation, role )) )
     . buffer_unordered (
-        TYPEDB_CONCURRENT_TRANSACTIONS )
+        typedb_concurrent_transactions () )
     . collect () . await;
   for result in results {
     result ?; }

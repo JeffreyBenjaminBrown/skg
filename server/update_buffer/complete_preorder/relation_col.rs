@@ -1,5 +1,4 @@
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::to_org::complete::sharing::child_data::{
   build_child_data,
   ChildData,
@@ -41,10 +40,7 @@ pub fn reconcile_relation_col_children (
       "{} called for non-relation collection {:?}",
       kind . caller_label (), kind) . into ()); };
   let owner_role =
-    RelationRole {
-      relation : member_role . relation,
-      role     : member_role . opposite_role (),
-    };
+    member_role . opposite_role ();
   let goal_list : Vec<ID> =
     graph_snap . other_member_pids (&owner_pid, owner_role);
   let removed_ids : HashSet<ID> = HashSet::new ();

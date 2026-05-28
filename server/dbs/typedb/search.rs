@@ -13,7 +13,7 @@ use typedb_driver::{
   TypeDBDriver,
 };
 
-use crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS;
+use crate::consts::typedb_concurrent_transactions;
 use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
 use crate::dbs::typedb::util::ConceptRowStream;
 use crate::dbs::typedb::util::concept_document::extract_id_from_node;
@@ -66,7 +66,7 @@ pub async fn find_container_ids_of_pid (
 /// TypeDB branch below is exercised only by tests that bypass
 /// 'init_global_handle_for_first_time_or_panic'; in the running server the in-Rust graph path is
 /// always taken. The TypeDB path sends one query per input ID,
-/// bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
+/// bounded by 'typedb_concurrent_transactions'.
 pub async fn find_related_nodes (
   db_name     : &str,
   driver      : &TypeDBDriver,
@@ -88,7 +88,7 @@ pub async fn find_related_nodes (
       . map ( |id| find_related_nodes_for_one_id (
                 db_name, driver, id,
                 &relation, &input_role, &output_role )) )
-    . buffer_unordered ( TYPEDB_CONCURRENT_TRANSACTIONS )
+    . buffer_unordered ( typedb_concurrent_transactions () )
     . collect () . await;
   let mut result : HashSet<ID> = HashSet::new ();
   for set in sets {

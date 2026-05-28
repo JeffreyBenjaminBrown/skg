@@ -1,4 +1,4 @@
-use crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS;
+use crate::consts::typedb_concurrent_transactions;
 use crate::types::misc::{ID, SourceName};
 use crate::types::nodes::typedb::NodeTypedb;
 
@@ -15,7 +15,7 @@ use typedb_driver::{
 use typedb_driver::answer::QueryAnswer;
 
 /// Maps `create_one_node_in_own_tx` over `nodes`,
-/// bounded by TYPEDB_CONCURRENT_TRANSACTIONS
+/// bounded by 'typedb_concurrent_transactions'
 /// to avoid overwhelming TypeDB with concurrent transactions.
 /// Creates all `node` entities, all `extra_id` entities,
 /// and all `has_extra_id` relationships.
@@ -33,7 +33,7 @@ pub async fn create_all_nodes (
       . map ( |node| create_one_node_in_own_tx (
                 db_name, driver, node )) )
     . buffer_unordered (
-        TYPEDB_CONCURRENT_TRANSACTIONS )
+        typedb_concurrent_transactions () )
     . collect () . await;
   for result in results {
     result ?; }
@@ -70,7 +70,7 @@ pub async fn create_only_nodes_with_no_ids_present (
       . map ( |node| create_one_node_in_own_tx (
                 db_name, driver, node )) )
     . buffer_unordered (
-        TYPEDB_CONCURRENT_TRANSACTIONS )
+        typedb_concurrent_transactions () )
     . collect () . await;
   for result in &results {
     if let Err (e) = result {
@@ -92,7 +92,7 @@ async fn create_one_node_in_own_tx (
 /// Parallel existence check:
 /// Given a set of candidate ID strings,
 /// return the subset that already exist in the DB.
-/// Sends one query per ID, bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
+/// Sends one query per ID, bounded by 'typedb_concurrent_transactions'.
 pub async fn which_ids_exist (
   db_name : &str,
   driver  : &TypeDBDriver,
@@ -243,7 +243,7 @@ pub async fn overwrite_extra_ids_of_node (
 /// PURPOSE: Delete the node corresponding to every ID it receives,
 /// including its extra IDs.
 /// Sends one transaction per node,
-/// bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
+/// bounded by 'typedb_concurrent_transactions'.
 pub async fn delete_nodes_from_pids (
   db_name : &str,
   driver  : &TypeDBDriver,
@@ -255,7 +255,7 @@ pub async fn delete_nodes_from_pids (
       . map ( |id| delete_one_node_from_pid (
                 db_name, driver, id )) )
     . buffer_unordered (
-        TYPEDB_CONCURRENT_TRANSACTIONS )
+        typedb_concurrent_transactions () )
     . collect () . await;
   for result in results {
     result ?; }
