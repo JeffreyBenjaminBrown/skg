@@ -294,11 +294,18 @@ and right before another whitespace and the node's title.
 The metadata grammar (which keys are recognized and how they're
 parsed) lives in `server/serve/parse_metadata_sexp.rs`. The
 in-memory types those keys correspond to are in
-`server/types/viewnode.rs` (`TrueNode`, `Scaffold`, `ScaffoldKind`)
+`server/types/viewnode.rs` (`TrueNode`, `Scaffold`, `ScaffoldKind`, `RoleCol`)
 and `server/types/git.rs` (`ExistenceAxes`, `MembershipAxes`, `Sign`).
 
 Metadata is not WYSIWYG; its appearance in the client
 is determined by `elisp/heralds-minor-mode`.
+
+Role collection scaffolds are represented in Rust as
+`Scaffold::RoleCol { roleCol: RoleCol }`, but their external metadata
+remains the established bare scaffold atom:
+`subscribeeCol`, `subscriberCol`, `overriddenCol`, `overriderCol`,
+`hiderCol`, `hiddenCol`, `hiddenInSubscribeeCol`, or
+`hiddenOutsideOfSubscribeeCol`.
 
 ## Diff-related metadata
 

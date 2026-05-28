@@ -21,7 +21,7 @@
 ///   needed to create any missing goal child without querying while
 ///   the tree is being mutated.
 
-use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
+use crate::types::viewnode::RoleCol;
 use crate::types::env::SkgEnv;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::misc::{ID, SourceName};
@@ -132,7 +132,7 @@ pub fn build_child_data (
 pub fn reconcile_sharing_scaffold_children (
   tree          : &mut Tree<ViewNode>,
   scaffold_node : NodeId,
-  kind          : SharingScaffoldKind,
+  kind          : RoleCol,
   goal_list     : &[ID],
   child_data    : &HashMap<ID, ChildData>,
 ) -> Result<(), Box<dyn Error>> {

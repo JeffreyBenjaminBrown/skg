@@ -90,6 +90,13 @@ conservative rather than suite-parallel.  Its defaults now use two
 Cargo build jobs, one nextest job, one integration test at a time, and
 a low TypeDB operation fanout.  The TypeDB fanout is now runtime
 configurable via 'SKG_TYPEDB_CONCURRENT_TRANSACTIONS'.
+
+RoleCol refactor: replaced the eight standalone role-collection
+scaffold constructors with 'Scaffold::RoleCol { roleCol: RoleCol }'
+and collapsed 'ScaffoldKind' role collection cases the same way.
+The external org metadata strings remain unchanged, and
+'api-and-formats.md' now documents that split between internal Rust
+representation and buffer syntax.
 *** tested
 Focused checks passed:
 - 'cargo check'

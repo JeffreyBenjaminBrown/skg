@@ -1,6 +1,6 @@
 use crate::types::git::MembershipAxes;
 use crate::types::misc::SkgConfig;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, UnknownNode, InactiveNode, EditRequest, GraphNodeStats, ParentIs };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, UnknownNode, InactiveNode, EditRequest, GraphNodeStats, ParentIs, RoleCol };
 
 use ego_tree::{NodeRef, Tree};
 use std::error::Error;
@@ -133,21 +133,21 @@ fn scaffold_metadata_to_string (
       parts . push ( "aliasCol" . to_string () ),
     Scaffold::BufferRoot =>
       return Err ( "scaffold_metadata_to_string: BufferRoot should never be rendered" . into () ),
-    Scaffold::HiddenInSubscribeeCol =>
+    Scaffold::RoleCol { roleCol: RoleCol::HiddenInSubscribee } =>
       parts . push ( "hiddenInSubscribeeCol" . to_string () ),
-    Scaffold::HiddenOutsideOfSubscribeeCol =>
+    Scaffold::RoleCol { roleCol: RoleCol::HiddenOutsideOfSubscribee } =>
       parts . push ( "hiddenOutsideOfSubscribeeCol" . to_string () ),
-    Scaffold::HiddenCol =>
+    Scaffold::RoleCol { roleCol: RoleCol::Hidden } =>
       parts . push ( "hiddenCol" . to_string () ),
-    Scaffold::HiderCol =>
+    Scaffold::RoleCol { roleCol: RoleCol::Hider } =>
       parts . push ( "hiderCol" . to_string () ),
-    Scaffold::OverriddenCol =>
+    Scaffold::RoleCol { roleCol: RoleCol::Overridden } =>
       parts . push ( "overriddenCol" . to_string () ),
-    Scaffold::OverriderCol =>
+    Scaffold::RoleCol { roleCol: RoleCol::Overrider } =>
       parts . push ( "overriderCol" . to_string () ),
-    Scaffold::SubscriberCol =>
+    Scaffold::RoleCol { roleCol: RoleCol::Subscriber } =>
       parts . push ( "subscriberCol" . to_string () ),
-    Scaffold::SubscribeeCol =>
+    Scaffold::RoleCol { roleCol: RoleCol::Subscribee } =>
       parts . push ( "subscribeeCol" . to_string () ),
     Scaffold::TextChanged { staged, unstaged } => {
       let mut tags : Vec<&'static str> = Vec::new ();

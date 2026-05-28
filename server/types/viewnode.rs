@@ -178,19 +178,24 @@ pub enum Scaffold {
           membership: MembershipAxes },
   AliasCol, // The node collects (as children) aliases for its parent.
   BufferRoot, // Not rendered. Makes viewforests easier to process. Its children are the level-1 headlines of the org buffer.
-  HiddenInSubscribeeCol, // Child of a Subscribee. Collects nodes that the subscriber hides from its subscriptions, and that are top-level content of this subscribee.
-  HiddenOutsideOfSubscribeeCol, // Child of SubscribeeCol. Collects nodes that the subscriber hides from its subscriptions, but that are not top-level content of any of its subscribees.
-  // DISPLAY NOTE: Shown after all Subscribees, under the same SubscribeeCol.
-  HiddenCol, // Collects nodes hidden by its parent through hides_from_its_subscriptions.
-  HiderCol, // Collects nodes that hide its parent through hides_from_its_subscriptions.
+  RoleCol { roleCol: RoleCol },
   ID { id: ID, // an ID of grandparent (the parent being an IDCol)
        membership: MembershipAxes },
   IDCol, // Collects (as children) Scaffold::IDs for its parent.
-  OverriddenCol, // Collects nodes whose view this parent overrides.
-  OverriderCol, // Collects nodes that override this parent's view.
-  SubscriberCol, // Collects nodes that subscribe to its parent.
-  SubscribeeCol, // Collects subscribees for its parent.
   TextChanged { staged: bool, unstaged: bool }, // Indicates title or body changed between stages. Visible in 'git diff mode'. Per-stage bools mark whether the change is staged (HEAD vs index) and/or unstaged (index vs worktree).
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RoleCol {
+  Subscribee, // Collects subscribees its parent subscribes to. Writeable.
+  Subscriber, // Collects nodes that subscribe to its parent. Read-only (editable from the other side of the relationship).
+  Overridden, // Collects nodes whose view its parent overrides. Writeable.
+  Overrider, // Collects nodes that override its parent's view. Read-only (editable from the other side of the relationship).
+  Hider, // Collects nodes that hide its parent. Read-only (editable from the other side of the relationship).
+  Hidden, // Collects nodes its parent hides. Read-only (but these relationships are editable from this side of the relationhip, within the parent's SubscribeeCol).
+  HiddenInSubscribee, // Child of a subscribee-as-such. Collects children of the subscribee that the subscriber hides. Read-only (but these relationships are editable by modifying the listed contents of the subscribee-as-such).
+  HiddenOutsideOfSubscribee, // Child of a SubscribeeCol. Collects things unnecessarily hidden by the SubscribeeCol's parent, because they are not contained by anything it subscribes to. Read-only. Shown after all Subscribees, under the same SubscribeeCol.
+  // TODO | PITFALL: HiddenOutsideOfSubscribee should be editable. Currently the client offers no easy way for a user to unhide things unnecessarily hidden. (It is technically possible, by creating a node you own, subscribing to it, and then modifying a subscribee-as-such representative of the new node. But that's baroque.)
 }
 
 /// A discriminant (i.e. some labels) for the Scaffold variants.
@@ -201,16 +206,9 @@ pub enum Scaffold {
 pub enum ScaffoldKind { Alias,
                         AliasCol,
                         BufferRoot,
-                        HiddenInSubscribeeCol,
-                        HiddenOutsideOfSubscribeeCol,
-                        HiddenCol,
-                        HiderCol,
+                        RoleCol { roleCol: RoleCol },
                         IDCol,
                         ID,
-                        OverriddenCol,
-                        OverriderCol,
-                        SubscriberCol,
-                        SubscribeeCol,
                         TextChanged, }
 
 /// Requests for editing operations on a node.
@@ -310,52 +308,81 @@ impl NodeLinksourceRels {
                        "→" ) } }
 
 impl ScaffoldKind {
-  /// Single source of truth for ScaffoldKind <-> Emacs string bijection.
-  const REPRS_IN_CLIENT: &'static [(&'static str, ScaffoldKind)] = &[
-    ("alias",                        ScaffoldKind::Alias),
-    ("aliasCol",                     ScaffoldKind::AliasCol),
-    ("forestRoot",                   ScaffoldKind::BufferRoot),
-    ("hiddenInSubscribeeCol",        ScaffoldKind::HiddenInSubscribeeCol),
-    ("hiddenOutsideOfSubscribeeCol", ScaffoldKind::HiddenOutsideOfSubscribeeCol),
-    ("hiddenCol",                    ScaffoldKind::HiddenCol),
-    ("hiderCol",                     ScaffoldKind::HiderCol),
-    ("overriddenCol",                ScaffoldKind::OverriddenCol),
-    ("overriderCol",                 ScaffoldKind::OverriderCol),
-    ("subscriberCol",                ScaffoldKind::SubscriberCol),
-    ("subscribeeCol",                ScaffoldKind::SubscribeeCol),
-    ("textChanged",                  ScaffoldKind::TextChanged),
-    ("idCol",                        ScaffoldKind::IDCol),
-    ("id",                           ScaffoldKind::ID),
-  ];
-
   /// String representation as used in Emacs metadata sexps.
   pub fn repr_in_client (&self) -> String {
-    Self::REPRS_IN_CLIENT . iter()
-      . find ( |(_, k)| k == self )
-      . map ( |(s, _)| s . to_string() )
-      . expect ("REPRS_IN_CLIENT should cover all ScaffoldKinds") }
+    match self {
+      ScaffoldKind::Alias               => "alias",
+      ScaffoldKind::AliasCol            => "aliasCol",
+      ScaffoldKind::BufferRoot          => "forestRoot",
+      ScaffoldKind::RoleCol { roleCol } => roleCol . repr_in_client (),
+      ScaffoldKind::TextChanged         => "textChanged",
+      ScaffoldKind::IDCol               => "idCol",
+      ScaffoldKind::ID                  => "id",
+    } . to_string () }
 
   /// Parse a client string to a ScaffoldKind.
   pub fn from_client_string ( s: &str ) -> Option<ScaffoldKind> {
-    Self::REPRS_IN_CLIENT . iter()
-      . find ( |(cs, _)| *cs == s )
-      . map ( |(_, k)| *k ) }
+    match s {
+      "alias"       => Some (ScaffoldKind::Alias),
+      "aliasCol"    => Some (ScaffoldKind::AliasCol),
+      "forestRoot"  => Some (ScaffoldKind::BufferRoot),
+      "textChanged" => Some (ScaffoldKind::TextChanged),
+      "idCol"       => Some (ScaffoldKind::IDCol),
+      "id"          => Some (ScaffoldKind::ID),
+      _             => RoleCol::from_client_string (s)
+                       . map ( |roleCol| ScaffoldKind::RoleCol { roleCol } ),
+    }}
 
   /// The default title for a scaffold of this kind.
   pub fn default_title (&self) -> &'static str {
     match self {
       ScaffoldKind::AliasCol                     => "its aliases",
       ScaffoldKind::IDCol                        => "its IDs",
-      ScaffoldKind::SubscribeeCol                => "it subscribes to these",
-      ScaffoldKind::SubscriberCol                => "these subscribe to it",
-      ScaffoldKind::OverriddenCol                => "it overrides the view of these",
-      ScaffoldKind::OverriderCol                 => "these override the view of it",
-      ScaffoldKind::HiddenCol                    => "it hides these from its subscriptions",
-      ScaffoldKind::HiderCol                     => "these hide it from their subscriptions",
-      ScaffoldKind::HiddenInSubscribeeCol        => "hidden from this subscription",
-      ScaffoldKind::HiddenOutsideOfSubscribeeCol => "hidden from all subscriptions",
+      ScaffoldKind::RoleCol { roleCol }          => roleCol . default_title (),
       _                                          => "",
-    }} }
+    }}}
+
+impl RoleCol {
+  pub fn repr_in_client (self) -> &'static str {
+    match self {
+      RoleCol::Subscribee                => "subscribeeCol",
+      RoleCol::Subscriber                => "subscriberCol",
+      RoleCol::Overridden                => "overriddenCol",
+      RoleCol::Overrider                 => "overriderCol",
+      RoleCol::Hider                     => "hiderCol",
+      RoleCol::Hidden                    => "hiddenCol",
+      RoleCol::HiddenInSubscribee        => "hiddenInSubscribeeCol",
+      RoleCol::HiddenOutsideOfSubscribee => "hiddenOutsideOfSubscribeeCol",
+    }}
+
+  pub fn from_client_string (s : &str) -> Option<RoleCol> {
+    match s {
+      "subscribeeCol"                => Some (RoleCol::Subscribee),
+      "subscriberCol"                => Some (RoleCol::Subscriber),
+      "overriddenCol"                => Some (RoleCol::Overridden),
+      "overriderCol"                 => Some (RoleCol::Overrider),
+      "hiderCol"                     => Some (RoleCol::Hider),
+      "hiddenCol"                    => Some (RoleCol::Hidden),
+      "hiddenInSubscribeeCol"        => Some (RoleCol::HiddenInSubscribee),
+      "hiddenOutsideOfSubscribeeCol" => Some (RoleCol::HiddenOutsideOfSubscribee),
+      _                              => None,
+    } }
+
+  pub fn default_title (self) -> &'static str {
+    match self {
+      RoleCol::Subscribee                => "it subscribes to these",
+      RoleCol::Subscriber                => "these subscribe to it",
+      RoleCol::Overridden                => "it overrides the view of these",
+      RoleCol::Overrider                 => "these override the view of it",
+      RoleCol::Hidden                    => "it hides these from its subscriptions",
+      RoleCol::Hider                     => "these hide it from their subscriptions",
+      RoleCol::HiddenInSubscribee        => "hidden from this subscription",
+      RoleCol::HiddenOutsideOfSubscribee => "hidden from all subscriptions",
+    } }
+
+  pub fn scaffold (self) -> Scaffold {
+    Scaffold::RoleCol { roleCol: self } }
+}
 
 impl Scaffold {
   /// Get the kind (discriminant) of this Scaffold.
@@ -364,14 +391,7 @@ impl Scaffold {
       Scaffold::Alias { .. }                 => ScaffoldKind::Alias,
       Scaffold::AliasCol                     => ScaffoldKind::AliasCol,
       Scaffold::BufferRoot                   => ScaffoldKind::BufferRoot,
-      Scaffold::HiddenInSubscribeeCol        => ScaffoldKind::HiddenInSubscribeeCol,
-      Scaffold::HiddenOutsideOfSubscribeeCol => ScaffoldKind::HiddenOutsideOfSubscribeeCol,
-      Scaffold::HiddenCol                    => ScaffoldKind::HiddenCol,
-      Scaffold::HiderCol                     => ScaffoldKind::HiderCol,
-      Scaffold::OverriddenCol                => ScaffoldKind::OverriddenCol,
-      Scaffold::OverriderCol                 => ScaffoldKind::OverriderCol,
-      Scaffold::SubscriberCol                => ScaffoldKind::SubscriberCol,
-      Scaffold::SubscribeeCol                => ScaffoldKind::SubscribeeCol,
+      Scaffold::RoleCol { roleCol }          => ScaffoldKind::RoleCol { roleCol: *roleCol },
       Scaffold::TextChanged { .. }           => ScaffoldKind::TextChanged,
       Scaffold::IDCol                        => ScaffoldKind::IDCol,
       Scaffold::ID { .. }                    => ScaffoldKind::ID,
@@ -389,14 +409,7 @@ impl Scaffold {
     match self {
       Scaffold::Alias           { text, .. }  => text,
       Scaffold::ID              { id, .. }    => id,
-      Scaffold::SubscribeeCol
-        | Scaffold::SubscriberCol
-        | Scaffold::OverriddenCol
-        | Scaffold::OverriderCol
-        | Scaffold::HiderCol
-        | Scaffold::HiddenCol
-        | Scaffold::HiddenInSubscribeeCol
-        | Scaffold::HiddenOutsideOfSubscribeeCol => "",
+      Scaffold::RoleCol { .. }               => "",
       _ => self . kind () . default_title (),
     }}
 

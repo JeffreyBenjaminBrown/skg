@@ -4,7 +4,7 @@
 
 use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind, MaybePlacedTruenode};
 use crate::types::git::Sign;
-use crate::types::viewnode::{Scaffold, EditRequest, IndefOrDef, ParentIs};
+use crate::types::viewnode::{Scaffold, EditRequest, IndefOrDef, ParentIs, RoleCol};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::viewnode_nodecomplete::{
   generation_includes_only,
@@ -48,17 +48,17 @@ pub fn validate_local_structure (
           validate_alias(tree, node_id),
         Scaffold::AliasCol =>
           validate_aliascol(tree, node_id),
-        Scaffold::HiddenInSubscribeeCol =>
+        Scaffold::RoleCol { roleCol: RoleCol::HiddenInSubscribee } =>
           validate_hidden_in_subscribee_col(tree, node_id),
-        Scaffold::HiddenOutsideOfSubscribeeCol =>
+        Scaffold::RoleCol { roleCol: RoleCol::HiddenOutsideOfSubscribee } =>
           validate_hidden_outside_of_subscribee_col(tree, node_id),
-        Scaffold::HiddenCol
-          | Scaffold::HiderCol
-          | Scaffold::OverriddenCol
-          | Scaffold::OverriderCol
-          | Scaffold::SubscriberCol =>
+        Scaffold::RoleCol { roleCol: RoleCol::Hidden }
+          | Scaffold::RoleCol { roleCol: RoleCol::Hider }
+          | Scaffold::RoleCol { roleCol: RoleCol::Overridden }
+          | Scaffold::RoleCol { roleCol: RoleCol::Overrider }
+          | Scaffold::RoleCol { roleCol: RoleCol::Subscriber } =>
           validate_relation_col(tree, node_id, s),
-        Scaffold::SubscribeeCol =>
+        Scaffold::RoleCol { roleCol: RoleCol::Subscribee } =>
           validate_subscribeecol(tree, node_id),
         Scaffold::TextChanged { .. } =>
           validate_text_changed(tree, node_id),
@@ -157,7 +157,8 @@ fn validate_hidden_in_subscribee_col (
     tree, node_id,
     |node| matches!(&node . kind,
                     MaybePlacedViewnodeKind::Scaff (
-                      Scaffold::HiddenInSubscribeeCol)))
+                      Scaffold::RoleCol {
+                        roleCol: RoleCol::HiddenInSubscribee } )))
     { errors . push("HiddenInSubscribeeCol must be unique among its siblings."
                     . to_string()); }
   if !relation_col_children_have_distinct_ids(tree, node_id)
@@ -171,9 +172,14 @@ fn validate_hidden_outside_of_subscribee_col (
   node_id : NodeId,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
-  if !generation_exists_and_includes(tree, node_id, -1, false, |node|
-       matches!(&node . kind, MaybePlacedViewnodeKind::Scaff (Scaffold::SubscribeeCol))) {
-    errors . push("HiddenOutsideOfSubscribeeCol must have a SubscribeeCol parent." . to_string()); }
+  if !generation_exists_and_includes(
+    tree, node_id, -1, false,
+    |node| matches!(&node . kind,
+                    MaybePlacedViewnodeKind::Scaff (
+                      Scaffold::RoleCol { roleCol: RoleCol::Subscribee } )))
+    { errors . push(
+        "HiddenOutsideOfSubscribeeCol must have a SubscribeeCol parent."
+        . to_string()); }
   if !generation_includes_only(tree, node_id, 1, true, |node|
        matches!(&node . kind, MaybePlacedViewnodeKind::True (_))) {
     errors . push("HiddenOutsideOfSubscribeeCol's children must include only TrueNodes." . to_string()); }
@@ -188,7 +194,8 @@ fn validate_hidden_outside_of_subscribee_col (
     tree, node_id,
     |node| matches!(&node . kind,
                     MaybePlacedViewnodeKind::Scaff (
-                      Scaffold::HiddenOutsideOfSubscribeeCol)))
+                      Scaffold::RoleCol {
+                        roleCol: RoleCol::HiddenOutsideOfSubscribee } )))
     { errors . push(
         "HiddenOutsideOfSubscribeeCol must be unique among its siblings."
         . to_string()); }
@@ -209,15 +216,19 @@ fn validate_subscribeecol (
   if !generation_includes_only(tree, node_id, 1, true, |node|
        matches!(&node . kind,
          MaybePlacedViewnodeKind::True (_) |
-         MaybePlacedViewnodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol))) {
-    errors . push("SubscribeeCol's children must include only TrueNodes or HiddenOutsideOfSubscribeeCol." . to_string()); }
+         MaybePlacedViewnodeKind::Scaff (
+           Scaffold::RoleCol {
+             roleCol: RoleCol::HiddenOutsideOfSubscribee } )))
+    { errors . push( "SubscribeeCol's children must include only TrueNodes or HiddenOutsideOfSubscribeeCol." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| match &node . kind {
       MaybePlacedViewnodeKind::True (t) =>
         t . parentIs == ParentIs::Collector,
-      MaybePlacedViewnodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol) =>
-        true,
+      MaybePlacedViewnodeKind::Scaff (
+        Scaffold::RoleCol {
+          roleCol: RoleCol::HiddenOutsideOfSubscribee })
+        => true,
       _ => false, } )
     { errors . push("SubscribeeCol TrueNode children must have parentIs=collector."
                     . to_string() ); }
@@ -338,12 +349,12 @@ fn validate_truenode (
          MaybePlacedViewnodeKind::True (_)                        |
          MaybePlacedViewnodeKind::Scaff (Scaffold::AliasCol)      |
          MaybePlacedViewnodeKind::Scaff (Scaffold::IDCol)         |
-         MaybePlacedViewnodeKind::Scaff (Scaffold::SubscribeeCol) |
-         MaybePlacedViewnodeKind::Scaff (Scaffold::SubscriberCol) |
-         MaybePlacedViewnodeKind::Scaff (Scaffold::OverriddenCol) |
-         MaybePlacedViewnodeKind::Scaff (Scaffold::OverriderCol)  |
-         MaybePlacedViewnodeKind::Scaff (Scaffold::HiderCol)      |
-         MaybePlacedViewnodeKind::Scaff (Scaffold::HiddenCol)     |
+         MaybePlacedViewnodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Subscribee }) |
+         MaybePlacedViewnodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Subscriber }) |
+         MaybePlacedViewnodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Overridden }) |
+         MaybePlacedViewnodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Overrider })  |
+         MaybePlacedViewnodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Hider })      |
+         MaybePlacedViewnodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Hidden })     |
          MaybePlacedViewnodeKind::Scaff (Scaffold::TextChanged { .. })   |
          MaybePlacedViewnodeKind::Deleted (_)                     |
          MaybePlacedViewnodeKind::DeletedScaff (_)                |

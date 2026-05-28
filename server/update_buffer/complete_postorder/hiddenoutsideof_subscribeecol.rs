@@ -1,13 +1,12 @@
 use crate::types::env::SkgEnv;
 use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_scaffold_children};
 use crate::to_org::complete::sharing::goal_list::goal_list_for_hiddenoutsideof_subscribeecol;
-use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::{pid_and_source_from_ancestor, read_at_ancestor_in_tree};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, RoleCol};
 use crate::update_buffer::util::detach_scaffold_if_empty;
 
 use ego_tree::{NodeId, Tree};
@@ -40,8 +39,8 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
   env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
-  let kind : SharingScaffoldKind =
-    SharingScaffoldKind::HiddenOutsideOfSubscribeeCol;
+  let kind : RoleCol =
+    RoleCol::HiddenOutsideOfSubscribee;
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
   validate_hiddenoutside_parent (tree, node) ?;
@@ -68,7 +67,9 @@ fn validate_hiddenoutside_parent (
   read_at_ancestor_in_tree(
       tree, node, 1,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Scaff (Scaffold::SubscribeeCol) => Ok(( )),
+        ViewNodeKind::Scaff (Scaffold::RoleCol {
+          roleCol: RoleCol::Subscribee })
+          => Ok(( )),
         _ => Err( "reconcile_hiddenoutside_subscribee_col_children: \
                    ancestor 1 is not a SubscribeeCol" ) } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
@@ -78,7 +79,7 @@ fn validate_hiddenoutside_parent (
 fn read_hiddenoutside_context (
   tree : &Tree<ViewNode>,
   node : NodeId,
-  kind : SharingScaffoldKind,
+  kind : RoleCol,
   env  : &SkgEnv,
 ) -> Result<HiddenOutsideContext, Box<dyn Error>> {
   let (subscriber_pid, subscriber_source) : (ID, SourceName) =

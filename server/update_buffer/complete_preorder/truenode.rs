@@ -15,7 +15,7 @@ use crate::git_ops::read_repo::nodecomplete_from_git_head;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, Scaffold, DeletedNode, IndefOrDef,
+    ViewNode, ViewNodeKind, Scaffold, RoleCol, DeletedNode, IndefOrDef,
     ParentIs, mk_definitive_viewnode};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_nodecomplete::{
@@ -323,7 +323,7 @@ fn is_subscribee (
   let parent_is_subscribee_col : bool =
     read_at_ancestor_in_tree( tree, node, 1,
       |vn : &ViewNode| matches!( &vn . kind,
-        ViewNodeKind::Scaff (Scaffold::SubscribeeCol)))
+        ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Subscribee })))
     . unwrap_or (false);
   Ok( is_member_of_parent && parent_is_subscribee_col ) }
 

@@ -19,7 +19,7 @@ use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
-use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode, InactiveNode, UnknownNode, IndefOrDef, NodeContainRels, NodeLinksourceRels, ParentIs};
+use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, RoleCol, DeletedNode, InactiveNode, UnknownNode, IndefOrDef, NodeContainRels, NodeLinksourceRels, ParentIs};
 use crate::types::maybe_placed_viewnode::{
     MaybePlacedViewnode, MaybePlacedViewnodeKind, MaybePlacedTruenode,
 };
@@ -295,21 +295,21 @@ pub fn parse_metadata_to_viewnodemd (
           "aliasCol" => result . scaffold = Some (Scaffold::AliasCol),
           "forestRoot" => result . scaffold = Some (Scaffold::BufferRoot),
           "hiddenInSubscribeeCol" =>
-            result . scaffold = Some (Scaffold::HiddenInSubscribeeCol),
+            result . scaffold = Some (Scaffold::RoleCol { roleCol: RoleCol::HiddenInSubscribee }),
           "hiddenOutsideOfSubscribeeCol" =>
-            result . scaffold = Some (Scaffold::HiddenOutsideOfSubscribeeCol),
+            result . scaffold = Some (Scaffold::RoleCol { roleCol: RoleCol::HiddenOutsideOfSubscribee }),
           "hiddenCol" =>
-            result . scaffold = Some (Scaffold::HiddenCol),
+            result . scaffold = Some (Scaffold::RoleCol { roleCol: RoleCol::Hidden }),
           "hiderCol" =>
-            result . scaffold = Some (Scaffold::HiderCol),
+            result . scaffold = Some (Scaffold::RoleCol { roleCol: RoleCol::Hider }),
           "overriddenCol" =>
-            result . scaffold = Some (Scaffold::OverriddenCol),
+            result . scaffold = Some (Scaffold::RoleCol { roleCol: RoleCol::Overridden }),
           "overriderCol" =>
-            result . scaffold = Some (Scaffold::OverriderCol),
+            result . scaffold = Some (Scaffold::RoleCol { roleCol: RoleCol::Overrider }),
           "subscriberCol" =>
-            result . scaffold = Some (Scaffold::SubscriberCol),
+            result . scaffold = Some (Scaffold::RoleCol { roleCol: RoleCol::Subscriber }),
           "subscribeeCol" =>
-            result . scaffold = Some (Scaffold::SubscribeeCol),
+            result . scaffold = Some (Scaffold::RoleCol { roleCol: RoleCol::Subscribee }),
           "textChanged" =>
             result . scaffold = Some (
               Scaffold::TextChanged { staged: false, unstaged: false } ),

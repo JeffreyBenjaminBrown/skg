@@ -4,7 +4,7 @@ use crate::to_org::util::get_id_from_treenode;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, TrueNode, Scaffold,
+    ViewNode, ViewNodeKind, TrueNode, Scaffold, RoleCol,
     viewnode_from_scaffold };
 use crate::types::maybe_placed_viewnode::{
     MaybePlacedViewnode, MaybePlacedViewnodeKind };
@@ -115,7 +115,7 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
     node_ref . parent ()
     . ok_or ("Subscribee has no parent (SubscribeeCol)") ?;
   if ! matches! ( &parent_ref . value () . kind,
-                  ViewNodeKind::Scaff (Scaffold::SubscribeeCol)) {
+                  ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Subscribee })) {
     return Err ( "Subscribee's parent is not a SubscribeeCol" .
                  into () ); }
   let grandparent_ref : NodeRef < ViewNode > =

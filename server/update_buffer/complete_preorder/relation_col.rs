@@ -4,7 +4,7 @@ use crate::to_org::complete::sharing::child_data::{
   ChildData,
   reconcile_sharing_scaffold_children,
 };
-use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
+use crate::types::viewnode::RoleCol;
 use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
@@ -25,7 +25,7 @@ use std::sync::Arc;
 pub fn reconcile_relation_col_children (
   node         : NodeId, // The relation collection scaffold. Its parent is a TrueNode.
   tree         : &mut Tree<ViewNode>,
-  kind         : SharingScaffoldKind,
+  kind         : RoleCol,
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
   env          : &SkgEnv,
   graph_snap   : &Arc<InRustGraph>,

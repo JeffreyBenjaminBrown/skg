@@ -3,7 +3,7 @@ use crate::from_text::viewnodes_to_instructions::classify::{
 use crate::types::viewnode::EditRequest;
 use crate::types::viewnode::ParentIs::Collector;
 use crate::types::git::Sign;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, TrueNode, IndefOrDef, InactiveNode};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, TrueNode, IndefOrDef, InactiveNode, RoleCol};
 use crate::types::misc::{ID, MSV, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
@@ -418,7 +418,7 @@ pub(crate) fn collect_savenode_candidates (
     match node_kind {
       ViewNodeKind::Scaff (Scaffold::BufferRoot) =>
         recurse_on_children( tree, node_id, result )?,
-      ViewNodeKind::Scaff (Scaffold::SubscribeeCol) =>
+      ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Subscribee }) =>
         recurse_on_children( tree, node_id, result )?,
       ViewNodeKind::Scaff (_) => {
         // Display-only scaffolds do not own graph edits. Do not recurse through them: children of scaffolds such as AliasCol, IDCol, HiddenInSubscribeeCol, and diff display scaffolds are interpreted by their specific collectors (ancestors in the view) or ignored as presentation-only state.
@@ -558,7 +558,7 @@ fn collect_overridden_by_node_id (
       *candidate_id,
       collect_members_from_child_relation_col (
         tree, *candidate_id,
-        &Scaffold::OverriddenCol,
+        &Scaffold::RoleCol { roleCol: RoleCol::Overridden },
         "OverriddenCol")?); }
   Ok (result) }
 
@@ -628,7 +628,7 @@ fn collect_subscribees (
 ) -> Result<MSV<ID>, String> {
   let subscribee_col_id : Option<NodeId> =
     unique_scaffold_child (
-      tree, node_id, &Scaffold::SubscribeeCol,
+      tree, node_id, &Scaffold::RoleCol { roleCol: RoleCol::Subscribee },
       scaffold_from_viewnodeInRole )?;
   match subscribee_col_id {
     None => Ok (MSV::Unspecified),
@@ -649,13 +649,14 @@ fn collect_subscribees (
                    SaveRole::Subscribee { .. })
                  && member_counts_for_relation_collection (t)
               { subscribees . push(t . id . clone()); }},
-            ViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol) =>
-              continue, // valid child of SubscribeeCol, but not a subscribee
-            ViewNodeKind::Deleted (_) |
-            ViewNodeKind::DeletedScaff (_) |
-            ViewNodeKind::Inactive (_) |
-            ViewNodeKind::Unknown (_) =>
-              continue, // inert in this context
+            ViewNodeKind::Scaff (Scaffold::RoleCol {
+              roleCol: RoleCol::HiddenOutsideOfSubscribee })
+              => continue, // valid child of SubscribeeCol, but not a subscribee
+            ViewNodeKind::Deleted (_)
+              | ViewNodeKind::DeletedScaff (_)
+              | ViewNodeKind::Inactive (_)
+              | ViewNodeKind::Unknown (_)
+              => continue, // inert in this context
             ViewNodeKind::Scaff (s) => return Err(format!( "SubscribeeCol has unexpected Scaffold child: {:?}", s)), }}
         subscribees };
       Ok( MSV::Specified(dedup_vector (subscribees)) ) }} }

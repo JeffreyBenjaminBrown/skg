@@ -14,6 +14,7 @@ use skg::types::viewnode::{
   viewforest_root_viewnode,
   viewnode_from_scaffold,
   DeletedNode,
+  RoleCol,
   Scaffold,
   ScaffoldKind,
   ViewNode,
@@ -138,7 +139,7 @@ fn classifies_subscribee_col_positions (
     classify_save_roles (&viewforest) . unwrap();
 
   assert_eq!(
-    saverole_of_first_scaffold (&viewforest, &roles, Scaffold::SubscribeeCol),
+    saverole_of_first_scaffold (&viewforest, &roles, Scaffold::RoleCol { roleCol: RoleCol::Subscribee }),
     SaveRole::DisplayOnly);
   assert_eq!(
     role_for_title (&viewforest, &roles, "subscribee"),
@@ -146,7 +147,7 @@ fn classifies_subscribee_col_positions (
       subscriber : ID::from ("subscriber"),
     });
   assert_eq!(
-    saverole_of_first_scaffold (&viewforest, &roles, Scaffold::HiddenInSubscribeeCol),
+    saverole_of_first_scaffold (&viewforest, &roles, Scaffold::RoleCol { roleCol: RoleCol::HiddenInSubscribee }),
     SaveRole::DisplayOnly);
   assert_eq!(
     role_for_title (&viewforest, &roles, "hidden in child"),
@@ -155,7 +156,7 @@ fn classifies_subscribee_col_positions (
       subscribee : ID::from ("subscribee"),
     });
   assert_eq!(
-    saverole_of_first_scaffold (&viewforest, &roles, Scaffold::HiddenOutsideOfSubscribeeCol),
+    saverole_of_first_scaffold (&viewforest, &roles, Scaffold::RoleCol { roleCol: RoleCol::HiddenOutsideOfSubscribee }),
     SaveRole::DisplayOnly);
   assert_eq!(
     role_for_title (&viewforest, &roles, "hidden outside child"),
@@ -188,7 +189,7 @@ fn classifies_deleted_unknown_and_deleted_scaffolds_as_display_only (
       folded      : false,
       body_folded : false,
       kind        : ViewNodeKind::DeletedScaff (
-        ScaffoldKind::SubscribeeCol),
+        ScaffoldKind::RoleCol { roleCol: RoleCol::Subscribee }),
     }) . id();
   let unknown_id : NodeId =
     viewforest . get_mut (root_id) . unwrap() . append (
@@ -242,7 +243,7 @@ fn errors_on_hidden_in_without_subscribeecol_context (
         None)) . id();
   let hidden_id : NodeId =
     viewforest . get_mut (root_node_id) . unwrap() . append (
-      viewnode_from_scaffold (Scaffold::HiddenInSubscribeeCol)) . id();
+      viewnode_from_scaffold (Scaffold::RoleCol { roleCol: RoleCol::HiddenInSubscribee })) . id();
   viewforest . get_mut (hidden_id) . unwrap() . append (
     mk_definitive_viewnode (
       ID::from ("hidden"),

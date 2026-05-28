@@ -6,17 +6,17 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
-use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
-use crate::to_org::complete::sharing::kind::SharingScaffoldKind::SubscribeeCol;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_readonly};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, ScaffoldKind};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, RoleCol};
+use super::complete_postorder::hiddeninsubscribee_col::reconcile_hiddenin_subscribee_col_children;
+use super::complete_postorder::hiddenoutsideof_subscribeecol::reconcile_hiddenoutside_subscribee_col_children;
+use super::complete_preorder::relation_col::reconcile_relation_col_children;
 use super::complete_preorder::subscribee_col::reconcile_subscribee_col_children;
 use super::complete_preorder::truenode::expand_true_content_at_truenode;
-use super::complete_preorder::relation_col::reconcile_relation_col_children;
 
 use ego_tree::{Tree, NodeId};
 use std::collections::{HashMap, HashSet};
@@ -129,16 +129,16 @@ async fn expand_true_content_at_node (
       context . active_source_set,
       context . is_saved_view ) ?;
   } else if matches!( kind,
-      ViewNodeKind::Scaff (Scaffold::SubscribeeCol) ) {
-        reconcile_subscribee_col_children (
+      ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Subscribee } ))
+      { reconcile_subscribee_col_children (
           treeid, tree, context . source_diffs, context . env,
           context . deleted_since_head_pid_src_map
         ) . await ?;
   } else if let ViewNodeKind::Scaff (scaffold) = &kind {
     if let Some (sharing_kind)
-      = SharingScaffoldKind::from_scaffold (scaffold)
+      = RoleCol::from_scaffold (scaffold)
       { if sharing_kind . relation_member_role () . is_some ()
-          && sharing_kind != SubscribeeCol
+          && sharing_kind != RoleCol::Subscribee
         { reconcile_relation_col_children (
             treeid, tree, sharing_kind, context . source_diffs,
             context . env, context . graph_snap,
@@ -234,10 +234,10 @@ fn reconcile_hiddenin_cols (
     collect_matching_nodeids (
       tree, false,
       |vn| matches! ( &vn . kind,
-        ViewNodeKind::Scaff (Scaffold::HiddenInSubscribeeCol) )) ?;
-  for treeid in nodes {
-      super::complete_postorder::hiddeninsubscribee_col::
-      reconcile_hiddenin_subscribee_col_children (
+        ViewNodeKind::Scaff (Scaffold::RoleCol {
+          roleCol: RoleCol::HiddenInSubscribee } ))) ?;
+  for treeid in nodes
+    { reconcile_hiddenin_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
         context . deleted_since_head_pid_src_map ) ?; }
   Ok (( )) }
@@ -251,12 +251,12 @@ fn reconcile_hiddenoutside_cols (
       tree, false,
       |vn| matches! ( &vn . kind,
         ViewNodeKind::Scaff (
-          Scaffold::HiddenOutsideOfSubscribeeCol) )) ?;
-  for treeid in nodes {
-    super::complete_postorder::hiddenoutsideof_subscribeecol::
-    reconcile_hiddenoutside_subscribee_col_children (
-      treeid, tree, context . source_diffs, context . env,
-      context . deleted_since_head_pid_src_map ) ?; }
+          Scaffold::RoleCol {
+            roleCol: RoleCol::HiddenOutsideOfSubscribee } ))) ?;
+  for treeid in nodes
+    { reconcile_hiddenoutside_subscribee_col_children (
+        treeid, tree, context . source_diffs, context . env,
+        context . deleted_since_head_pid_src_map ) ?; }
   Ok (( )) }
 
 fn remove_empty_deleted_scaffolds (
