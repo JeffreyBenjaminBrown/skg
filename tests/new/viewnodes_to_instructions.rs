@@ -6,7 +6,9 @@
 use indoc::indoc;
 use ego_tree::Tree;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_viewforest;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::{
+  org_to_uninterpreted_nodes,
+  org_to_uninterpreted_viewforest};
 use skg::from_text::validate::validate_and_filter_foreign_instructions;
 use skg::from_text::viewnodes_to_instructions::classify::{
   viewforest_with_saveroles, ViewNode_in_Role };
@@ -21,7 +23,11 @@ use skg::types::git::Sign;
 use skg::types::misc::{ID, MSV};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
-use skg::types::maybe_placed_viewnode::{MaybePlacedViewnode, maybePlaced_to_placed_tree};
+use skg::types::maybe_placed_viewnode::{
+  MaybePlacedViewnode,
+  maybePlaced_to_placed_tree,
+  maybePlaced_to_placed_viewforest};
+use skg::types::tree::forest::{MaybePlacedViewForest, ViewForest};
 use skg::types::viewnode::{ViewNode, ViewNodeKind, viewforest_root_viewnode};
 use std::error::Error;
 
@@ -88,15 +94,16 @@ async fn save_instructions_from_org_with_disk (
   config   : &skg::types::misc::SkgConfig,
   driver   : &typedb_driver::TypeDBDriver,
 ) -> Result<Vec<DefineNode>, Box<dyn Error>> {
-  let (mut maybePlaced_viewforest, _parsing_errors) =
-    org_to_uninterpreted_nodes (org_text) ?;
+  let (mut maybePlaced_viewforest, _parsing_errors)
+    : (MaybePlacedViewForest, Vec<BufferValidationError>) =
+    org_to_uninterpreted_viewforest (org_text) ?;
   add_missing_info_to_viewforest (
     &mut maybePlaced_viewforest, &config . db_name, driver) . await?;
-  let viewforest : Tree<ViewNode> =
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) ?;
+  let viewforest : ViewForest =
+    maybePlaced_to_placed_viewforest (maybePlaced_viewforest) ?;
   let save_plan =
     extract_nonmergeSavePlan (
-      &viewforest, config, driver) . await?;
+      viewforest . as_internal_tree (), config, driver) . await?;
   Ok (save_plan . define_nodes) }
 
 #[test]

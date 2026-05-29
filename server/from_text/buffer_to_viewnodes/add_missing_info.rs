@@ -7,9 +7,10 @@ use crate::types::git::MembershipAxes;
 use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
 use crate::types::viewnode::{ParentIs, Scaffold};
 use crate::types::misc::{ID, SourceName};
+use crate::types::tree::forest::MaybePlacedViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::dbs::typedb::util::pids_from_ids::replace_ids_with_pids;
-use ego_tree::{Tree, NodeId, NodeMut};
+use ego_tree::{NodeId, NodeMut};
 use std::boxed::Box;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -24,11 +25,12 @@ use uuid::Uuid;
 /// 'supplement_unspecified_fields_from_disk' does some of that, too,
 /// although it operates on DefineNodes, downstream.
 pub async fn add_missing_info_to_viewforest(
-  viewforest  : &mut Tree<MaybePlacedViewnode>, // has BufferRoot at root
+  viewforest  : &mut MaybePlacedViewForest,
   db_name : &str,
   driver  : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
-  let root_id: NodeId = viewforest . root() . id();
+  let root_id: NodeId =
+    viewforest . internal_root_id ();
   replace_ids_with_pids(
     viewforest, root_id, db_name, driver ) . await ?;
   do_everywhere_in_tree_dfs(
@@ -43,12 +45,12 @@ pub async fn add_missing_info_to_viewforest(
   Ok (( )) }
 
 pub fn absent_parentIs_under_visible_parent_becomes_isContainer (
-  viewforest : &mut Tree<MaybePlacedViewnode>,
+  viewforest : &mut MaybePlacedViewForest,
 ) {
   let root_id : NodeId =
-    viewforest . root() . id();
+    viewforest . internal_root_id ();
   let mut need_changing : Vec<NodeId> = Vec::new();
-  for node_ref in viewforest . root() . descendants() {
+  for node_ref in viewforest . nodes() {
     // collect immuatable references to what needs changing
     let parent_is_visible : bool =
       node_ref . parent()

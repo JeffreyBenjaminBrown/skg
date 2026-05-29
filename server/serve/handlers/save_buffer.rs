@@ -253,7 +253,7 @@ pub async fn update_from_and_rerender_buffer (
           org_buffer_text, &env . config, &env . driver ) . await
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
-  if save_plan . viewforest . root() . children() . next() . is_none()
+  if save_plan . viewforest . is_empty ()
     { return Err ( "Nothing to save found in org_buffer_text"
                    . into() ); }
   let SavePlan { viewforest,

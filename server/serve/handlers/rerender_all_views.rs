@@ -5,11 +5,10 @@ use crate::serve::util::{ format_errors_warnings_sexp, format_lock_views_sexp, f
 use crate::source_sets::ActiveSourceSet;
 use crate::types::env::SkgEnv;
 use crate::types::misc::SkgConfig;
-use crate::types::viewnode::ViewNode;
+use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::ViewUri;
 use crate::update_buffer::{rerender_view, RerenderAfterSaveContext};
 
-use ego_tree::Tree;
 use futures::executor::block_on;
 use std::net::TcpStream;
 
@@ -48,7 +47,7 @@ pub fn stream_rerender_views (
       env, views_state . diff_mode_enabled, active_source_set );
 
   for uri in uris {
-    let mut viewforest : Tree<ViewNode> = match
+    let mut viewforest : ViewForest = match
       views_state . open_views . viewuri_to_view (&uri) {
         Some (f) => f . clone (),
         None => {

@@ -384,10 +384,8 @@ Rendering already skips =BufferRoot=; we are not rendering it just for
 Emacs to discard it. The remaining issue is narrower: because the
 parser accepts =forestRoot= metadata, a user or fixture can still
 construct a =BufferRoot=-like node from org text. If =BufferRoot=
-becomes internal, the parser should probably reject =forestRoot= in
+becomes internal, the parser should reject =forestRoot= in
 ordinary buffer text, or accept it only in a clearly internal/test path.
-
-**** TODO where you said probably: definitely
 
 *** Top-level roots are not always equivalent to graph roots.
 The proposal should keep using language like "view roots" or "top-level

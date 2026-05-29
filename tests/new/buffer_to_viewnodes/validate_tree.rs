@@ -1,12 +1,11 @@
 // cargo test validate_tree
 
 use indoc::indoc;
-use ego_tree::Tree;
 use regex::Regex;
-use skg::types::maybe_placed_viewnode::{MaybePlacedViewnode, maybePlaced_viewforest_root_viewnode};
 use skg::types::errors::BufferValidationError;
 use skg::types::misc::{SkgConfig, SkgfileSource, SourceName};
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::types::tree::forest::MaybePlacedViewForest;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use skg::from_text::buffer_to_viewnodes::local::validate_local_structure;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::test_utils::run_with_test_db;
@@ -38,8 +37,8 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
             "};
 
       let (viewforest, parsing_errors)
-        : (Tree<MaybePlacedViewnode>, Vec<BufferValidationError>)
-        = org_to_uninterpreted_nodes(
+        : (MaybePlacedViewForest, Vec<BufferValidationError>)
+        = org_to_uninterpreted_viewforest(
             input_with_errors) . unwrap();
       let validation_errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
@@ -56,7 +55,8 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
       // AliasCol children must be Aliases (bad_child is a TrueNode child of AliasCol)
       { let aliascol_children_re =
           Regex::new(r"(?i)aliascol.*children.*must.*alias") . unwrap();
-        let aliascol_children_errors: Vec<_> = local_errors . iter()
+        let aliascol_children_errors: Vec<&BufferValidationError> =
+          local_errors . iter() . copied()
           . filter(|e| matches!(
             e, BufferValidationError::LocalStructureViolation(msg, _)
             if aliascol_children_re . is_match (msg)))
@@ -66,7 +66,8 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
 
       // Alias must have no children ("Alias with body problem" has alias_child)
       { let alias_children_re = Regex::new(r"(?i)alias.*must.*no.*children") . unwrap();
-        let alias_children_errors: Vec<_> = local_errors . iter()
+        let alias_children_errors: Vec<&BufferValidationError> =
+          local_errors . iter() . copied()
           . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
                                if alias_children_re . is_match (msg)))
           . collect();
@@ -77,8 +78,8 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
       // (3 aliases: "Alias with body problem", "Alias under non-AliasCol", "Root level Alias")
       { let alias_parent_re =
           Regex::new(r"(?i)alias.*must.*aliascol.*parent") . unwrap();
-        let alias_parent_errors: Vec<_> =
-          local_errors . iter()
+        let alias_parent_errors: Vec<&BufferValidationError> =
+          local_errors . iter() . copied()
           . filter(|e| matches!(
             e, BufferValidationError::LocalStructureViolation(msg, _)
             if alias_parent_re . is_match (msg)))
@@ -110,7 +111,8 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
 
       // Source validation (bad_child and alias_child have no sources)
       { let source_re = Regex::new(r"(?i)must.*source") . unwrap();
-        let source_errors: Vec<_> = local_errors . iter()
+        let source_errors: Vec<&BufferValidationError> =
+          local_errors . iter() . copied()
           . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
                                if source_re . is_match (msg)))
           . collect();
@@ -132,18 +134,20 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
                    if title == "Alias with body problem and orphaned" && kind == "alias")
         }), "Should find Body_of_Scaffold error for alias"); }
 
-      // BufferRoot children must be TrueNodes (Root level Alias is Scaffold at root)
-      { let bufferroot_children_re = Regex::new(r"(?i)bufferroot.*children.*must.*truenode") . unwrap();
-        let bufferroot_errors: Vec<_> = local_errors . iter()
-          . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
-                               if bufferroot_children_re . is_match (msg)))
+      // View roots must be TrueNodes or DeletedNodes.
+      { let viewroot_re = Regex::new(r"(?i)view roots.*must.*truenode.*deletednode") . unwrap();
+        let viewroot_errors: Vec<&BufferValidationError> =
+          errors . iter()
+          . filter(|e| matches!(e, BufferValidationError::Other (msg)
+                               if viewroot_re . is_match (msg)))
           . collect();
-        assert_eq!(bufferroot_errors . len(), 1,
-                   "Should find 1 'BufferRoot children must be TrueNodes' error"); }
+        assert_eq!(viewroot_errors . len(), 1,
+                   "Should find 1 'View roots must be TrueNodes or DeletedNodes' error"); }
 
       // TrueNode children (root has Alias children directly, not via AliasCol)
       { let truenode_children_re = Regex::new(r"(?i)truenode.*children.*must.*include.*only") . unwrap();
-        let truenode_children_errors: Vec<_> = local_errors . iter()
+        let truenode_children_errors: Vec<&BufferValidationError> =
+          local_errors . iter() . copied()
           . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
                                if truenode_children_re . is_match (msg)))
           . collect();
@@ -152,8 +156,8 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
 
       // "Alias with body problem" fails two checks (no children + AliasCol parent),
       // but multiple errors on one node combine into a single LocalStructureViolation.
-      assert_eq!(local_errors . len(), 8,
-                 "Should find exactly 8 LocalStructureViolation errors");
+      assert_eq!(local_errors . len(), 7,
+                 "Should find exactly 7 LocalStructureViolation errors");
 
       Ok (( )) } )) }
 
@@ -175,8 +179,8 @@ fn test_find_buffer_errors_for_saving_valid_input() -> Result<(), Box<dyn Error>
                 This body is allowed on normal nodes
             "};
 
-      let (viewforest, parsing_errors): (Tree<MaybePlacedViewnode>, Vec<BufferValidationError>) =
-        org_to_uninterpreted_nodes (valid_input) . unwrap();
+      let (viewforest, parsing_errors): (MaybePlacedViewForest, Vec<BufferValidationError>) =
+        org_to_uninterpreted_viewforest (valid_input) . unwrap();
       let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
 
       assert_eq!(parsing_errors . len(), 0, "Should find no parsing errors in valid input");
@@ -194,7 +198,7 @@ fn test_find_buffer_errors_for_saving_empty_input() -> Result<(), Box<dyn Error>
     "/tmp/tantivy-test-validate-tree-empty",
     |config, driver, _tantivy| Box::pin(async move {
       // Test empty input (viewforest with just BufferRoot, no tree roots)
-      let empty_viewforest: Tree<MaybePlacedViewnode> = Tree::new(maybePlaced_viewforest_root_viewnode());
+      let empty_viewforest: MaybePlacedViewForest = MaybePlacedViewForest::new();
       let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&empty_viewforest, config, driver) . await?;
 
       assert_eq!(errors . len(), 0, "Should find no errors in empty input");
@@ -220,8 +224,8 @@ fn test_multiple_aliascols_in_children() -> Result<(), Box<dyn Error>> {
                 *** (skg alias) Second alias
             "};
 
-      let viewforest: Tree<MaybePlacedViewnode> =
-        org_to_uninterpreted_nodes (input_with_multiple_aliascols) . unwrap() . 0;
+      let viewforest: MaybePlacedViewForest =
+        org_to_uninterpreted_viewforest (input_with_multiple_aliascols) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
 
@@ -255,8 +259,8 @@ fn test_duplicated_content_error() -> Result<(), Box<dyn Error>> {
                 ** (skg (node (id 1))) 1
             "};
 
-      let viewforest: Tree<MaybePlacedViewnode> =
-        org_to_uninterpreted_nodes (input_with_duplicated_content) . unwrap() . 0;
+      let viewforest: MaybePlacedViewForest =
+        org_to_uninterpreted_viewforest (input_with_duplicated_content) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
 
@@ -294,8 +298,8 @@ fn test_no_duplicated_content_error_when_different_ids() -> Result<(), Box<dyn E
                 ** (skg (node (id 2))) 2
             "};
 
-      let viewforest: Tree<MaybePlacedViewnode> =
-        org_to_uninterpreted_nodes (input_without_duplicated_content) . unwrap() . 0;
+      let viewforest: MaybePlacedViewForest =
+        org_to_uninterpreted_viewforest (input_without_duplicated_content) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
 
@@ -327,8 +331,8 @@ fn test_no_duplicated_content_error_for_phantom_siblings(
                 ** (skg (node (id 1) (source main) (unstaged removedX removedM))) phantom child
             "};
 
-      let viewforest: Tree<MaybePlacedViewnode> =
-        org_to_uninterpreted_nodes (input) . unwrap() . 0;
+      let viewforest: MaybePlacedViewForest =
+        org_to_uninterpreted_viewforest (input) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
 
@@ -361,8 +365,8 @@ fn test_root_without_source_validation(
                 * (skg (node (id root2))) Root without source (invalid)
             "};
 
-      let viewforest: Tree<MaybePlacedViewnode> =
-        org_to_uninterpreted_nodes (input) . unwrap() . 0;
+      let viewforest: MaybePlacedViewForest =
+        org_to_uninterpreted_viewforest (input) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
 
@@ -397,8 +401,8 @@ fn test_nonexistent_source_validation(
                   ** (skg (node (id child1) (source nonexistent))) Child with invalid source
                   * (skg (node (id root2) (source invalid_source))) Root with nonexistent source
               "};
-        let viewforest: Tree<MaybePlacedViewnode> =
-          org_to_uninterpreted_nodes (input) . unwrap() . 0;
+        let viewforest: MaybePlacedViewForest =
+          org_to_uninterpreted_viewforest (input) . unwrap() . 0;
         let errors: Vec<BufferValidationError> =
           find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
 
@@ -444,8 +448,8 @@ fn test_empty_title_rejected_for_definitive_node (
                 * (skg (node (id has-title) (source main))) has a title
                 * (skg (node (id no-title) (source main)))
             "};
-      let viewforest: Tree<MaybePlacedViewnode> =
-        org_to_uninterpreted_nodes (input) . unwrap() . 0;
+      let viewforest: MaybePlacedViewForest =
+        org_to_uninterpreted_viewforest (input) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
 
@@ -479,8 +483,8 @@ fn test_empty_title_allowed_for_indefinitive_and_delete (
                 * (skg (node (id indef) (source main) indef))
                 * (skg (node (id deleting) (source main) (editRequest delete)))
             "};
-      let viewforest: Tree<MaybePlacedViewnode> =
-        org_to_uninterpreted_nodes (input) . unwrap() . 0;
+      let viewforest: MaybePlacedViewForest =
+        org_to_uninterpreted_viewforest (input) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
 
@@ -515,8 +519,8 @@ fn test_definitive_request_with_only_non_content_children_is_allowed (
                 * (skg (node (id parent) (source main) indef (viewRequests definitiveView))) parent
                 ** (skg (node (id ancestor) (source main) (parentIs content))) non-content child
             "};
-      let viewforest : Tree<MaybePlacedViewnode> =
-        org_to_uninterpreted_nodes (input) . unwrap () . 0;
+      let viewforest : MaybePlacedViewForest =
+        org_to_uninterpreted_viewforest (input) . unwrap () . 0;
       let errors : Vec<BufferValidationError> =
         find_buffer_errors_for_saving (
           &viewforest, config, driver ) . await ?;
@@ -545,8 +549,8 @@ fn test_definitive_request_with_content_child_is_rejected (
                 * (skg (node (id parent) (source main) indef (viewRequests definitiveView))) parent
                 ** (skg (node (id c) (source main))) content child
             "};
-      let viewforest : Tree<MaybePlacedViewnode> =
-        org_to_uninterpreted_nodes (input) . unwrap () . 0;
+      let viewforest : MaybePlacedViewForest =
+        org_to_uninterpreted_viewforest (input) . unwrap () . 0;
       let errors : Vec<BufferValidationError> =
         find_buffer_errors_for_saving (
           &viewforest, config, driver ) . await ?;
@@ -575,8 +579,8 @@ fn test_edit_request_on_indefinitive_is_rejected_at_parse_time() {
       ** (skg (node (id phantom) (source main) indef (unstaged removedM) (editRequest delete))) phantom child
     "};
   let (_viewforest, parsing_errors)
-    : (Tree<MaybePlacedViewnode>, Vec<BufferValidationError>)
-    = org_to_uninterpreted_nodes (input_delete) . unwrap ();
+    : (MaybePlacedViewForest, Vec<BufferValidationError>)
+    = org_to_uninterpreted_viewforest (input_delete) . unwrap ();
   let matching : Vec<&BufferValidationError> =
     parsing_errors . iter ()
     . filter ( |e| matches! (
@@ -594,8 +598,8 @@ fn test_edit_request_on_indefinitive_is_rejected_at_parse_time() {
       ** (skg (node (id phantom) (source main) indef (editRequest (merge other)))) phantom child
     "};
   let (_viewforest2, parsing_errors2)
-    : (Tree<MaybePlacedViewnode>, Vec<BufferValidationError>)
-    = org_to_uninterpreted_nodes (input_merge) . unwrap ();
+    : (MaybePlacedViewForest, Vec<BufferValidationError>)
+    = org_to_uninterpreted_viewforest (input_merge) . unwrap ();
   let matching2 : Vec<&BufferValidationError> =
     parsing_errors2 . iter ()
     . filter ( |e| matches! (
@@ -613,8 +617,8 @@ fn test_edit_request_on_indefinitive_is_rejected_at_parse_time() {
       ** (skg (node (id leaf) (source main) (editRequest delete))) leaf
     "};
   let (_viewforest3, parsing_errors3)
-    : (Tree<MaybePlacedViewnode>, Vec<BufferValidationError>)
-    = org_to_uninterpreted_nodes (input_definitive) . unwrap ();
+    : (MaybePlacedViewForest, Vec<BufferValidationError>)
+    = org_to_uninterpreted_viewforest (input_definitive) . unwrap ();
   assert! ( ! parsing_errors3 . iter () . any ( |e|
     matches! (e, BufferValidationError::EditRequestOnIndefinitive (_)) ),
     "(editRequest delete) on a definitive node must not trigger EditRequestOnIndefinitive. Parse errors: {:?}",
@@ -629,8 +633,8 @@ fn test_inactive_placeholder_content_edits_rejected_at_parse_time () {
       ** (skg (inactiveNode (id hidden) (source private))) edited title
     "};
   let (_viewforest, parsing_errors)
-    : (Tree<MaybePlacedViewnode>, Vec<BufferValidationError>)
-    = org_to_uninterpreted_nodes (input_with_title_edit) . unwrap ();
+    : (MaybePlacedViewForest, Vec<BufferValidationError>)
+    = org_to_uninterpreted_viewforest (input_with_title_edit) . unwrap ();
   assert!(
     parsing_errors . iter () . any ( |e| matches!(
       e, BufferValidationError::Other (msg)
@@ -645,8 +649,8 @@ fn test_inactive_placeholder_content_edits_rejected_at_parse_time () {
       edited body
     "};
   let (_viewforest2, parsing_errors2)
-    : (Tree<MaybePlacedViewnode>, Vec<BufferValidationError>)
-    = org_to_uninterpreted_nodes (input_with_body_edit) . unwrap ();
+    : (MaybePlacedViewForest, Vec<BufferValidationError>)
+    = org_to_uninterpreted_viewforest (input_with_body_edit) . unwrap ();
   assert!(
     parsing_errors2 . iter () . any ( |e| matches!(
       e, BufferValidationError::Other (msg)
@@ -664,8 +668,8 @@ fn test_inactive_placeholder_active_children_rejected_locally () {
       *** (skg (node (id child) (source main))) active child
     "};
   let (viewforest, parsing_errors)
-    : (Tree<MaybePlacedViewnode>, Vec<BufferValidationError>)
-    = org_to_uninterpreted_nodes (input) . unwrap ();
+    : (MaybePlacedViewForest, Vec<BufferValidationError>)
+    = org_to_uninterpreted_viewforest (input) . unwrap ();
   assert_eq! (
     parsing_errors . len(), 0,
     "Test fixture should not have parse errors: {:?}",
@@ -704,16 +708,15 @@ fn test_inactive_placeholder_under_truenode_allowed_locally () {
       ** (skg (inactiveNode (id hidden) (source private)))
     "};
   let (viewforest, parsing_errors)
-    : (Tree<MaybePlacedViewnode>, Vec<BufferValidationError>)
-    = org_to_uninterpreted_nodes (input) . unwrap ();
+    : (MaybePlacedViewForest, Vec<BufferValidationError>)
+    = org_to_uninterpreted_viewforest (input) . unwrap ();
   assert_eq! (
     parsing_errors . len(), 0,
     "Test fixture should not have parse errors: {:?}",
     parsing_errors );
 
   let config : SkgConfig = validation_config ();
-  let root_id = viewforest . root () . children ()
-    . next ()
+  let root_id = viewforest . first_root ()
     . expect ("root child should exist")
     . id ();
   validate_local_structure (&viewforest, root_id, &config)
@@ -729,16 +732,15 @@ fn test_duplicate_inactive_placeholder_content_rejected_locally () {
       ** (skg (inactiveNode (id hidden) (source private)))
     "};
   let (viewforest, parsing_errors)
-    : (Tree<MaybePlacedViewnode>, Vec<BufferValidationError>)
-    = org_to_uninterpreted_nodes (input) . unwrap ();
+    : (MaybePlacedViewForest, Vec<BufferValidationError>)
+    = org_to_uninterpreted_viewforest (input) . unwrap ();
   assert_eq! (
     parsing_errors . len(), 0,
     "Test fixture should not have parse errors: {:?}",
     parsing_errors );
 
   let config : SkgConfig = validation_config ();
-  let root_id = viewforest . root () . children ()
-    . next ()
+  let root_id = viewforest . first_root ()
     . expect ("root child should exist")
     . id ();
   let error = validate_local_structure (

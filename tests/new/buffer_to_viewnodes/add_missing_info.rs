@@ -1,13 +1,18 @@
 // cargo test test_add_missing_info_comprehensive
 
 use indoc::indoc;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::{
+  org_to_uninterpreted_nodes,
+  org_to_uninterpreted_viewforest};
 use skg::from_text::buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest,
   absent_parentIs_under_visible_parent_becomes_isContainer};
 use skg::test_utils::{run_with_test_db, compare_viewnode_trees_modulo_id, compare_viewnode_trees};
 use skg::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
 use skg::types::misc::{SkgConfig, ID};
+use skg::types::tree::forest::{
+  MaybePlacedViewForest,
+  tree_forest_root_ids};
 use skg::types::viewnode::ParentIs;
 
 use ego_tree::Tree;
@@ -53,8 +58,8 @@ async fn test_add_missing_info_logic (
             ** (skg (node (id unpredictable) (source main))) no id
             *** (skg (node (id unpredictable) (source main))) also no id
         "};
-  let mut after_adding_missing_info: Tree<MaybePlacedViewnode> =
-    org_to_uninterpreted_nodes(
+  let mut after_adding_missing_info : MaybePlacedViewForest =
+    org_to_uninterpreted_viewforest (
       with_missing_info) . unwrap() . 0;
   add_missing_info_to_viewforest(
     &mut after_adding_missing_info,
@@ -64,7 +69,7 @@ async fn test_add_missing_info_logic (
     org_to_uninterpreted_nodes(
       without_missing_info ) . unwrap() . 0;
   assert_eq!(
-    expected_viewforest . root() . children() . count(),
+    tree_forest_root_ids (&expected_viewforest) . len(),
     1,
     "Expected exactly one tree in the expected viewforest" );
   assert!(
@@ -92,8 +97,8 @@ fn test_absent_parentIs_under_visible_parent_becomes_isContainer () {
             * (skg (node (id root) (source main) (parentIs absent))) root
             ** (skg (node (id moved) (source main) (parentIs absent))) moved
         "};
-  let mut viewforest : Tree<MaybePlacedViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let mut viewforest : MaybePlacedViewForest =
+    org_to_uninterpreted_viewforest (input) . unwrap() . 0;
 
   absent_parentIs_under_visible_parent_becomes_isContainer (
     &mut viewforest );
@@ -155,8 +160,8 @@ async fn test_source_inheritance_logic (
             ** (skg (node (id 22))) _
         "};
 
-  let mut actual_viewforest: Tree<MaybePlacedViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let mut actual_viewforest: MaybePlacedViewForest =
+    org_to_uninterpreted_viewforest (input) . unwrap() . 0;
   add_missing_info_to_viewforest(
     &mut actual_viewforest,
     &config . db_name,

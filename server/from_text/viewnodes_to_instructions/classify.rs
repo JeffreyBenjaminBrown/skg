@@ -5,7 +5,6 @@ use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SaveRole {
-  BufferRoot,
   Ordinary,
   Subscribee { subscriber: ID },
   Overridden { overrider: ID },
@@ -13,7 +12,7 @@ pub enum SaveRole {
   HiddenOutsideOfSubscribeeCol { subscriber: ID },
   AliasDisplay,
   IdDisplay,
-  DisplayOnly,
+  NoSaveRole,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -90,7 +89,7 @@ fn saverole_for_node (
     ViewNodeKind::True (_) =>
       classify_truenode (node_ref),
     ViewNodeKind::Scaff (Scaffold::BufferRoot) =>
-      Ok (SaveRole::BufferRoot),
+      Ok (SaveRole::NoSaveRole),
     ViewNodeKind::Scaff (Scaffold::Alias { .. }) =>
       Ok (SaveRole::AliasDisplay),
     ViewNodeKind::Scaff (Scaffold::ID { .. }) =>
@@ -100,7 +99,7 @@ fn saverole_for_node (
       | ViewNodeKind::Deleted (_)
       | ViewNodeKind::DeletedScaff (_)
       | ViewNodeKind::Unknown (_)
-      => Ok (SaveRole::DisplayOnly), }}
+      => Ok (SaveRole::NoSaveRole), }}
 
 fn classify_truenode (
   node_ref : NodeRef<ViewNode>,
@@ -114,19 +113,19 @@ fn classify_truenode (
           subscriber : truenode_id (
             parent_ref . parent(),
             "SubscribeeCol must have a TrueNode parent")?, } )
-      } else { Ok (SaveRole::DisplayOnly) },
+      } else { Ok (SaveRole::NoSaveRole) },
     ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Overridden }) =>
       if node_ref . value () . is_truenode_and_claims_parentIs_collector () {
         Ok (SaveRole::Overridden {
           overrider : truenode_id (
             parent_ref . parent(),
             "OverriddenCol must have a TrueNode parent")?, } )
-      } else { Ok (SaveRole::DisplayOnly) },
+      } else { Ok (SaveRole::NoSaveRole) },
     ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Subscriber })
       | ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Overrider })
       | ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Hider })
       | ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Hidden })
-      => Ok (SaveRole::DisplayOnly),
+      => Ok (SaveRole::NoSaveRole),
     ViewNodeKind::Scaff (Scaffold::RoleCol {
       roleCol: RoleCol::HiddenInSubscribee })
       => { let subscribee_ref : NodeRef<ViewNode> =

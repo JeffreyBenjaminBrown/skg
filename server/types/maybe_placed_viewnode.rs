@@ -7,6 +7,7 @@
 pub use super::viewnode::MaybePlacedTruenode;
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
+use super::tree::forest::{MaybePlacedViewForest, ViewForest};
 use super::git::{ExistenceAxes, MembershipAxes};
 use super::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Scaffold, ScaffoldKind, DeletedNode, InactiveNode, UnknownNode, GraphNodeStats, ViewNodeStats, IndefOrDef, ParentIs, };
 
@@ -155,6 +156,16 @@ impl From<ViewNode> for MaybePlacedViewnode {
 pub fn maybePlaced_to_placed_tree (
   unchecked: Tree<MaybePlacedViewnode>
 ) -> Result<Tree<ViewNode>, String> {
+  Ok (
+    maybePlaced_to_placed_viewforest (
+      MaybePlacedViewForest::from_internal_tree (unchecked)) ?
+    . into_internal_tree () ) }
+
+pub fn maybePlaced_to_placed_viewforest (
+  unchecked: MaybePlacedViewForest
+) -> Result<ViewForest, String> {
+  let unchecked : Tree<MaybePlacedViewnode> =
+    unchecked . into_internal_tree ();
   let unchecked_root_id: NodeId =
     unchecked . root() . id();
   let mut checked: Tree<ViewNode> =
@@ -188,7 +199,7 @@ pub fn maybePlaced_to_placed_tree (
       id_map . insert( node_ref . id(),
                        checked_id );
       Ok (( )) } )?;
-  Ok (checked) }
+  Ok (ViewForest::from_internal_tree (checked)) }
 
 /// Convert a placed ViewNode tree to an MaybePlacedViewnode tree.
 /// Infallible since checked types always satisfy maybePlaced requirements.

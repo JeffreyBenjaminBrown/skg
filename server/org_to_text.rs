@@ -1,18 +1,73 @@
 use crate::types::git::MembershipAxes;
 use crate::types::misc::SkgConfig;
+use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, UnknownNode, InactiveNode, EditRequest, GraphNodeStats, ParentIs, RoleCol };
 
 use ego_tree::{NodeRef, Tree};
 use std::error::Error;
 
-/// PURPOSE: Render a "viewforest" -- a tree with BufferRoot at root
-/// -- to org-mode text.
-/// BufferRoot is not rendered; its children start at level 1.
+/// PURPOSE: Render a view forest to org-mode text.
+/// Each forest root starts at level 1.
 ///
 /// ASSUMES: metadata has already been enriched with relationship data.
-/// ERRORS: if root is not a BufferRoot.
-pub fn viewforest_to_string (
+pub trait ViewForestRenderRoots {
+  fn render_roots<'a> (
+    &'a self,
+  ) -> Result<Box<dyn Iterator<Item = NodeRef<'a, ViewNode>> + 'a>,
+              Box<dyn Error>>;
+}
+
+impl ViewForestRenderRoots for ViewForest {
+  fn render_roots<'a> (
+    &'a self,
+  ) -> Result<Box<dyn Iterator<Item = NodeRef<'a, ViewNode>> + 'a>,
+              Box<dyn Error>> {
+    Ok (Box::new (self . roots ())) }
+}
+
+impl ViewForestRenderRoots for Tree<ViewNode> {
+  fn render_roots<'a> (
+    &'a self,
+  ) -> Result<Box<dyn Iterator<Item = NodeRef<'a, ViewNode>> + 'a>,
+              Box<dyn Error>> {
+    let root_ref : NodeRef<ViewNode> = self . root ();
+    let is_viewforest_root : bool =
+      matches! (
+        & root_ref . value () . kind,
+        ViewNodeKind::Scaff (Scaffold::BufferRoot));
+    if ! is_viewforest_root {
+      return Err (
+        "viewforest_to_string: root is not a BufferRoot" . into() ); }
+    Ok (Box::new (root_ref . children ())) }
+}
+
+pub fn viewforest_to_string <R> (
+  viewforest : &R,
+  config : &SkgConfig,
+) -> Result < String, Box<dyn Error> >
+where R : ViewForestRenderRoots + ?Sized {
+  render_view_roots_to_string (
+    viewforest . render_roots () ?, config ) }
+
+/// Compatibility helper for callers that still hold the old
+/// single-tree representation with an internal BufferRoot.
+pub fn viewforest_tree_to_string (
   viewforest : &Tree<ViewNode>,
+  config : &SkgConfig,
+) -> Result < String, Box<dyn Error> > {
+  let root_ref : NodeRef<ViewNode> = viewforest . root ();
+  let is_viewforest_root : bool =
+    matches! (
+      & root_ref . value () . kind,
+      ViewNodeKind::Scaff (Scaffold::BufferRoot));
+  if ! is_viewforest_root {
+    return Err (
+      "viewforest_tree_to_string: root is not a BufferRoot" . into() ); }
+  render_view_roots_to_string (
+    root_ref . children (), config ) }
+
+fn render_view_roots_to_string <'a> (
+  roots  : impl Iterator<Item = NodeRef<'a, ViewNode>>,
   config : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   fn render_node_subtree_to_org (
@@ -30,17 +85,9 @@ pub fn viewforest_to_string (
           level + 1,
           config )? ); }
     Ok (out) }
-  let root_ref : NodeRef<ViewNode> = viewforest . root ();
-  let is_viewforest_root : bool =
-    matches! (
-      & root_ref . value () . kind,
-      ViewNodeKind::Scaff (Scaffold::BufferRoot));
-  if ! is_viewforest_root {
-    return Err (
-      "viewforest_to_string: root is not a BufferRoot" . into() ); }
   let mut result : String =
     String::new ();
-  for child in root_ref . children () {
+  for child in roots {
     result . push_str (
       & render_node_subtree_to_org ( child, 1, config )? ); }
   Ok (result) }

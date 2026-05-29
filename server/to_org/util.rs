@@ -17,7 +17,10 @@ use crate::types::tree::viewnode_nodecomplete::{pid_and_source_from_treenode, wr
 #[cfg(test)]
 use crate::types::viewnode::mk_indefinitive_viewnode;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, ParentIs, TrueNode, viewforest_root_viewnode, mk_definitive_viewnode, mk_inactive_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, ParentIs, TrueNode, mk_definitive_viewnode, mk_inactive_viewnode, mk_unknown_viewnode };
+#[cfg(test)]
+use crate::types::viewnode::viewforest_root_viewnode;
+use crate::types::tree::forest::{ViewForest, tree_forest_root_ids};
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
 use ego_tree::iter::Edge;
@@ -175,36 +178,35 @@ pub fn detect_and_mark_cycle_v1 (
 // Reading and manipulating trees, esp. via IDs
 // ==============================================
 
-/// Create a viewforest (single tree with BufferRoot at root)
-/// containing just "tree root" nodes (no grandchildren yet),
+/// Create a viewforest containing just view roots,
 /// and complete each via build_node_branch_minus_content.
 pub async fn stub_viewforest_from_root_ids (
   root_skgids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
   visited  : &mut DefinitiveMap,
-) -> Result < Tree<ViewNode>, Box<dyn Error> > {
-  let mut viewforest : Tree<ViewNode> =
-    Tree::new ( viewforest_root_viewnode () );
-  let viewforest_root_treeid : NodeId = viewforest . root () . id ();
+) -> Result < ViewForest, Box<dyn Error> > {
+  let mut viewforest : ViewForest =
+    ViewForest::new ();
+  let viewforest_root_treeid : NodeId =
+    viewforest . internal_root_id ();
   for root_skgid in root_skgids {
     build_node_branch_minus_content (
-      Some ( (&mut viewforest, viewforest_root_treeid) ),
+      Some ( (viewforest . as_internal_tree_mut (),
+              viewforest_root_treeid) ),
       root_skgid, config, driver, visited
     ) . await ?; }
   Ok (viewforest) }
 
-/// Mark TrueNode children of BufferRoot as having no visible parent.
+/// Mark forest-root TrueNodes as having no parent in the view.
 pub fn mark_view_roots_parent_absent (
   viewforest : &mut Tree<ViewNode>,
 ) {
-  let root_id : NodeId = viewforest . root () . id ();
-  let child_ids : Vec<NodeId> =
-    viewforest . get (root_id) . unwrap ()
-    . children () . map ( |c| c . id () ) . collect ();
-  for child_id in child_ids {
+  let root_ids : Vec<NodeId> =
+    tree_forest_root_ids (viewforest);
+  for root_id in root_ids {
     let mut node_mut : NodeMut<ViewNode> =
-      viewforest . get_mut (child_id) . unwrap ();
+      viewforest . get_mut (root_id) . unwrap ();
     let vn : &mut ViewNode = node_mut . value ();
     if let ViewNodeKind::True ( ref mut t ) = vn . kind {
       t . parentIs = ParentIs::Absent; } } }
@@ -231,7 +233,7 @@ pub fn mark_view_roots_parent_absent (
 /// so extra_id aliasing (typically a merge side-effect) doesn't
 /// produce false mismatches.
 ///
-/// Children of BufferRoot have no TrueNode parent and therefore
+/// Forest roots have no TrueNode parent and therefore
 /// do not fall through this check. Also relies on the save pipeline's
 /// invariant that 'apply_definenodes' has updated the in-Rust-graph
 /// graph before the rerender pass runs (see

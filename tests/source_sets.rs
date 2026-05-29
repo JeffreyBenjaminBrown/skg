@@ -147,7 +147,7 @@ fn source_set_switch_closes_views_and_cancels_stale_search_enrichment (
   views_state . open_views . views . insert (
     ViewUri::SearchView ("shared ranking term" . to_string ()),
     ViewState {
-      viewforest : Tree::new (viewforest_root_viewnode ()),
+      viewforest : Tree::new (viewforest_root_viewnode ()) . into (),
       pids       : HashSet::from ([ID::from ("active-search-hit")]), });
   let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::new (Mutex::new (Some (SearchEnrichmentPayload {

@@ -9,6 +9,7 @@ use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 use crate::types::tree::generic::{
   read_at_node_in_tree, unique_scaffold_child };
+use crate::types::tree::forest::tree_forest_root_ids;
 use crate::types::list::dedup_vector;
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -237,7 +238,7 @@ impl SameIdReconciledNodeIntents {
 /// extraction itself may still use interpreted save roles and
 /// internal edit intents.
 pub fn naive_saveinstructions_from_tree (
-  viewforest: Tree<ViewNode> // "viewforest" = tree with BufferRoot
+  viewforest: Tree<ViewNode> // Legacy type. ViewForest is preferred, but changing this here would be hard.
 ) -> Result<Vec<DefineNode>, String> {
   let intents : Vec<NodeIntent> =
     naive_node_edit_intents_from_viewforest (&viewforest)?;
@@ -416,8 +417,6 @@ pub(crate) fn collect_savenode_candidates (
       read_at_node_in_tree (
         tree, node_id, |node| node . role . clone())?;
     match node_kind {
-      ViewNodeKind::Scaff (Scaffold::BufferRoot) =>
-        recurse_on_children( tree, node_id, result )?,
       ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Subscribee }) =>
         recurse_on_children( tree, node_id, result )?,
       ViewNodeKind::Scaff (_) => {
@@ -456,9 +455,9 @@ pub(crate) fn collect_savenode_candidates (
     Ok(( )) }
 
   let mut result: Vec<DefinenodeCandidate> = Vec::new();
-  let root_id : NodeId = tree . root() . id();
-  maybe_collect_candidate_and_recurse (
-    tree, root_id, &mut result ) ?;
+  for root_child in tree_forest_root_ids (tree) {
+    maybe_collect_candidate_and_recurse (
+      tree, root_child, &mut result ) ?; }
   Ok (result) }
 
 fn collect_node_edit_basics (

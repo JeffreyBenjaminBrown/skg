@@ -18,7 +18,7 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
   config         : &SkgConfig,
   active         : &ActiveSourceSet,
 ) {
-  // Search results ("hits") are level-1 BufferRoot children.
+  // Search results ("hits") are forest roots.
   // Match them by ID from search_results.
   let level1_ids : Vec<(NodeId, ID)> = {
     let root_ref : NodeRef<ViewNode> = viewforest . root ();

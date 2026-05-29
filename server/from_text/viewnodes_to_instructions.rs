@@ -102,7 +102,7 @@ impl Definenodes_with_Sourcemoves {
 /// Supplanted by 'extract_nonmergeSavePlan_from_authority'.
 /// It now exists only to avoid test churn.
 pub async fn extract_nonmergeSavePlan (
-  viewforest : &Tree<ViewNode>, // "viewforest" = tree with BufferRoot
+  viewforest : &Tree<ViewNode>, // Legacy type. ViewForest is preferred, but changing this here would be hard.
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result<NonmergeSavePlan, Box<dyn Error>> {

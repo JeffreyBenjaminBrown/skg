@@ -80,7 +80,7 @@ fn classifies_buffer_root_and_ordinary_truenodes (
 
   assert_eq!(
     roles . get (&viewforest . root() . id()),
-    Some (&SaveRole::BufferRoot));
+    Some (&SaveRole::NoSaveRole));
   assert_eq!(
     role_for_title (&viewforest, &roles, "root"),
     SaveRole::Ordinary);
@@ -109,13 +109,13 @@ fn classifies_alias_and_id_display_scaffolds (
 
   assert_eq!(
     role_for_title (&viewforest, &roles, "its aliases"),
-    SaveRole::DisplayOnly);
+    SaveRole::NoSaveRole);
   assert_eq!(
     role_for_title (&viewforest, &roles, "first alias"),
     SaveRole::AliasDisplay);
   assert_eq!(
     role_for_title (&viewforest, &roles, "its IDs"),
-    SaveRole::DisplayOnly);
+    SaveRole::NoSaveRole);
   assert_eq!(
     role_for_title (&viewforest, &roles, "extra-id"),
     SaveRole::IdDisplay); }
@@ -140,7 +140,7 @@ fn classifies_subscribee_col_positions (
 
   assert_eq!(
     saverole_of_first_scaffold (&viewforest, &roles, Scaffold::RoleCol { roleCol: RoleCol::Subscribee }),
-    SaveRole::DisplayOnly);
+    SaveRole::NoSaveRole);
   assert_eq!(
     role_for_title (&viewforest, &roles, "subscribee"),
     SaveRole::Subscribee {
@@ -148,7 +148,7 @@ fn classifies_subscribee_col_positions (
     });
   assert_eq!(
     saverole_of_first_scaffold (&viewforest, &roles, Scaffold::RoleCol { roleCol: RoleCol::HiddenInSubscribee }),
-    SaveRole::DisplayOnly);
+    SaveRole::NoSaveRole);
   assert_eq!(
     role_for_title (&viewforest, &roles, "hidden in child"),
     SaveRole::HiddenInSubscribeeCol {
@@ -157,7 +157,7 @@ fn classifies_subscribee_col_positions (
     });
   assert_eq!(
     saverole_of_first_scaffold (&viewforest, &roles, Scaffold::RoleCol { roleCol: RoleCol::HiddenOutsideOfSubscribee }),
-    SaveRole::DisplayOnly);
+    SaveRole::NoSaveRole);
   assert_eq!(
     role_for_title (&viewforest, &roles, "hidden outside child"),
     SaveRole::HiddenOutsideOfSubscribeeCol {
@@ -220,11 +220,11 @@ fn classifies_deleted_unknown_and_deleted_scaffolds_as_display_only (
   let roles : HashMap<NodeId, SaveRole> =
     classify_save_roles (&viewforest) . unwrap();
 
-  assert_eq!(roles . get (&deleted_id), Some (&SaveRole::DisplayOnly));
-  assert_eq!(roles . get (&deleted_scaff_id), Some (&SaveRole::DisplayOnly));
-  assert_eq!(roles . get (&unknown_id), Some (&SaveRole::DisplayOnly));
-  assert_eq!(roles . get (&text_changed_id), Some (&SaveRole::DisplayOnly));
-  assert_eq!(roles . get (&idcol_id), Some (&SaveRole::DisplayOnly));
+  assert_eq!(roles . get (&deleted_id), Some (&SaveRole::NoSaveRole));
+  assert_eq!(roles . get (&deleted_scaff_id), Some (&SaveRole::NoSaveRole));
+  assert_eq!(roles . get (&unknown_id), Some (&SaveRole::NoSaveRole));
+  assert_eq!(roles . get (&text_changed_id), Some (&SaveRole::NoSaveRole));
+  assert_eq!(roles . get (&idcol_id), Some (&SaveRole::NoSaveRole));
   assert_eq!(roles . get (&id_id), Some (&SaveRole::IdDisplay)); }
 
 #[test]

@@ -24,8 +24,6 @@ pub struct LocalStructureError {
   pub id      : ID,
 }
 
-/// Validate the local structure of a node.
-/// Returns Ok(()) if valid, or Err with the error details.
 pub fn validate_local_structure (
   tree    : &Tree<MaybePlacedViewnode>,
   node_id : NodeId,
@@ -43,7 +41,7 @@ pub fn validate_local_structure (
         validate_truenode(tree, node_id, t, config),
       MaybePlacedViewnodeKind::Scaff (s) => match s {
         Scaffold::BufferRoot =>
-          validate_buffer_root(tree, node_id),
+          Vec::new (),
         Scaffold::Alias { .. } =>
           validate_alias(tree, node_id),
         Scaffold::AliasCol =>
@@ -82,23 +80,6 @@ pub fn validate_local_structure (
       message: errors . join ("; "),
       id,
     } ) }}
-
-fn validate_buffer_root (
-  tree    : &Tree<MaybePlacedViewnode>,
-  node_id : NodeId,
-) -> Vec<String> {
-  let mut errors : Vec<String> = Vec::new();
-  if !generation_does_not_exist(
-    tree, node_id, -1, false)
-  { errors . push("BufferRoot must have no parent." . to_string() ); }
-  if !generation_includes_only(
-    tree, node_id, 1, false,
-    |node| matches!(&node . kind,
-                    MaybePlacedViewnodeKind::True (_) |
-                    MaybePlacedViewnodeKind::Deleted (_) ))
- { errors . push("BufferRoot's children must be TrueNodes."
-                . to_string() ); }
-  errors }
 
 fn validate_alias (
   tree    : &Tree<MaybePlacedViewnode>,

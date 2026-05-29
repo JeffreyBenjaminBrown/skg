@@ -26,9 +26,10 @@ use crate::types::views_state::ViewUri;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::source_sets::{ActiveSourceSet, search_ids_for_source_set_for_test as search_ids_for_source_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ParentIs, viewforest_root_viewnode, mk_indefinitive_viewnode};
+use crate::types::tree::forest::ViewForest;
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ParentIs, mk_indefinitive_viewnode};
 
-use ego_tree::{Tree, NodeId, NodeMut};
+use ego_tree::{NodeId, NodeMut};
 use sexp::{Sexp, Atom};
 use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
@@ -68,7 +69,7 @@ pub fn enriched_search_buffer_for_source_set_for_test (
   config         : &SkgConfig,
   active         : &ActiveSourceSet,
 ) -> Result<String, Box<dyn std::error::Error>> {
-  let (mut viewforest, _ids) : (Tree<ViewNode>, Vec<ID>) =
+  let (mut viewforest, _ids) : (ViewForest, Vec<ID>) =
     build_search_viewforest (terms, matches_by_id);
   render_enriched_search_buffer::insert_containerward_ancestries_into_search_view (
     &mut viewforest,
@@ -151,7 +152,7 @@ pub fn handle_text_search_request (
                 TcpToClient::SearchResults,
                 "No matches found." ));
             return; }
-          let (viewforest, search_results) : (Tree<ViewNode>, Vec<ID>) =
+          let (viewforest, search_results) : (ViewForest, Vec<ID>) =
             build_search_viewforest (
               &search_terms,
               &matches_by_id );
@@ -407,20 +408,17 @@ pub fn group_matches_by_id (
         "Error retrieving document: {}", e ); }} }
   result_acc }
 
-/// Builds a Tree<ViewNode> representing the search results.
+/// Builds a ViewForest representing the search results.
 /// Returns the viewforest and the ordered list of result IDs.
 ///
-/// Tree structure:
-///   BufferRoot
-///   ├── TrueNode per result (level 1, indefinitive, non-content)
-///   │   └── AliasCol + Alias children (if aliases matched)
-///   └── ...
+/// Forest structure: each root is a search result, with AliasCol +
+/// Alias children if aliases matched.
 pub fn build_search_viewforest (
   _search_terms : &str,
   matches_by_id : &MatchGroups,
-) -> (Tree<ViewNode>, Vec<ID>) {
-  let mut viewforest : Tree<ViewNode> =
-    Tree::new ( viewforest_root_viewnode () );
+) -> (ViewForest, Vec<ID>) {
+  let mut viewforest : ViewForest =
+    ViewForest::new ();
   let mut id_entries : Vec < ( &ID,
                                &SourceName,
                                &Vec < ( f32, String ) > ) > =
@@ -446,16 +444,13 @@ pub fn build_search_viewforest (
       sorted_matches . sort_by ( |a, b|
         b . 0 . partial_cmp (&a . 0) . unwrap () );
       let (_score, title) : &(f32, String) = sorted_matches [0];
-      let result_treeid : NodeId = {
-        let mut root_mut : NodeMut<ViewNode> =
-          viewforest . root_mut ();
-        root_mut . append (
+      let result_treeid : NodeId =
+        viewforest . append_root (
           mk_indefinitive_viewnode (
             (*id) . clone (),
             (*source) . clone (),
             title . clone (),
-            ParentIs::Absent ) )
-        . id () };
+            ParentIs::Absent ) );
       if sorted_matches . len () > 1 {
         // We bury all but the best match in an AliasCol.
         // PITFALL: The title might not be the best match,

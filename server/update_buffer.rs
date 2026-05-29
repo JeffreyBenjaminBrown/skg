@@ -26,6 +26,7 @@ use crate::types::views_state::ViewUri;
 use crate::types::misc::{ID, SourceName, SkgConfig};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
+use crate::types::tree::forest::ViewForest;
 use crate::to_org::util::{mark_view_roots_parent_absent, validate_parentIs_relationships};
 use crate::dbs::in_rust_graph::snapshot_global;
 use crate::types::viewnode::{IndefOrDef, ViewNode, ViewNodeKind, Scaffold};
@@ -97,7 +98,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
 struct RenderedCollateralView {
   uri        : ViewUri,
   text       : String,
-  viewforest : Tree<ViewNode>,
+  viewforest : ViewForest,
 }
 
 /// PURPOSE:
@@ -110,7 +111,7 @@ struct RenderedCollateralView {
 /// the graph was already updated. The reverse order would be bad.
 pub async fn update_views_after_save (
   stream                      : &mut std::net::TcpStream,
-  saved_view                  : Tree<ViewNode>,
+  saved_view                  : ViewForest,
   define_nodes                : Vec<DefineNode>,
   diff_mode_enabled           : bool,
   env                         : &SkgEnv,
@@ -126,7 +127,7 @@ pub async fn update_views_after_save (
     // point at the acquiree id).
     RerenderAfterSaveContext::for_save (
       env, diff_mode_enabled, &define_nodes, active_source_set );
-  let mut saved_view_mut : Tree<ViewNode> = saved_view;
+  let mut saved_view_mut : ViewForest = saved_view;
   rewriteInPlace_viewnodes_whose_id_is_newly_extra (
     &mut saved_view_mut, &context . graph_snap ) ?;
   let saved_text : String =
@@ -177,7 +178,7 @@ async fn rerender_collateral_view (
   views_state : &ViewsState,
   context     : &mut RerenderAfterSaveContext<'_>,
 ) -> Result<RenderedCollateralView, String> {
-  let mut viewforest : Tree<ViewNode> = match
+  let mut viewforest : ViewForest = match
     views_state . open_views . viewuri_to_view (&uri) {
       Some (f) => f . clone (),
       None => {
@@ -236,7 +237,7 @@ fn find_collateral_view_uris (
 /// Strip stale diff data, re-complete the viewforest,
 /// set graph/view stats, and render to string.
 pub async fn rerender_view (
-  viewforest    : &mut Tree<ViewNode>,
+  viewforest    : &mut ViewForest,
   context       : &mut RerenderAfterSaveContext<'_>,
   is_saved_view : bool,
 ) -> Result<String, Box<dyn Error>> {
@@ -354,7 +355,7 @@ fn rewriteInPlace_viewnodes_whose_id_is_newly_extra (
 /// is ready for a fresh pass. Three independent traversals today;
 /// could be fused if traversal cost ever mattered.
 fn strip_stale_diff_state (
-  viewforest : &mut Tree<ViewNode>
+  viewforest : &mut ViewForest
 ) -> Result<(), Box<dyn Error>> {
   remove_branches_that_git_marked_removed (viewforest) ?;
   remove_diff_only_scaffolds (viewforest) ?;
@@ -364,7 +365,7 @@ fn strip_stale_diff_state (
 /// Strip from the viewforest every branch whose root
 ///   is marked as removed or removed-here.
 /// Exception: Does not strip:
-///   - top-level branches (children of BufferRoot)
+///   - top-level branches (forest roots)
 ///   - non-content nodes (parentIs != Container)
 /// Uses single-pass DFS: removes branch roots as encountered,
 /// skipping recursion into removed branches.
@@ -380,19 +381,18 @@ fn strip_stale_diff_state (
 /// -- it is no longer missing here.
 /// Etc. Much easier to just regenerate them at each save.
 fn remove_branches_that_git_marked_removed (
-  viewforest : &mut Tree<ViewNode>
+  viewforest : &mut ViewForest
 ) -> Result<(), Box<dyn Error>> {
   let viewforest_root_id : NodeId =
-    viewforest . root() . id();
+    viewforest . internal_root_id ();
   do_everywhere_in_tree_dfs_prunable (
     viewforest,
     viewforest_root_id,
     &mut |mut node : NodeMut<ViewNode>| -> Result<bool, String> {
       let is_viewforest_root_child : bool = {
         match node . parent() {
-          Some (mut p) =>
-            matches! ( &p . value() . kind,
-                       ViewNodeKind::Scaff (Scaffold::BufferRoot)),
+          Some (p) =>
+            p . id () == viewforest_root_id,
           None => false } };
       let should_remove : bool =
         match &node . value() . kind {
@@ -417,10 +417,10 @@ fn remove_branches_that_git_marked_removed (
 /// diff mode) are cleaned up by reconcile_alias_col_children during the postorder
 /// pass: its goal list won't include them, so they are detached.
 fn remove_diff_only_scaffolds (
-  viewforest : &mut Tree<ViewNode>
+  viewforest : &mut ViewForest
 ) -> Result<(), Box<dyn Error>> {
   let viewforest_root_id : NodeId =
-    viewforest . root() . id();
+    viewforest . internal_root_id ();
   do_everywhere_in_tree_dfs_prunable (
     viewforest,
     viewforest_root_id,
@@ -439,10 +439,10 @@ fn remove_diff_only_scaffolds (
 /// Diff-only scaffolds (TextChanged, IDCol) are
 /// removed by 'remove_diff_only_scaffolds' before this runs.
 fn clear_diff_metadata (
-  viewforest : &mut Tree<ViewNode>
+  viewforest : &mut ViewForest
 ) -> Result<(), Box<dyn Error>> {
   let viewforest_root_id : NodeId =
-    viewforest . root() . id();
+    viewforest . internal_root_id ();
   do_everywhere_in_tree_dfs (
     viewforest,
     viewforest_root_id,

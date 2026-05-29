@@ -3,13 +3,14 @@ pub mod contradictory_instructions;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{ParentIs, ViewRequest};
 use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
+use crate::types::tree::forest::MaybePlacedViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::errors::BufferValidationError;
 use crate::merge::validate_merge::validate_merge_requests;
 use contradictory_instructions::find_inconsistent_instructions;
 use super::local;
-use ego_tree::Tree;
 use ego_tree::iter::Edge;
+use ego_tree::NodeId;
 use std::collections::HashSet;
 use typedb_driver::TypeDBDriver;
 
@@ -22,7 +23,7 @@ use typedb_driver::TypeDBDriver;
 /// because this one acts on a tree of MaybePlacedViewnodes rather than raw text.
 /// (Namely, Alias and AliasCol should not have body text.)
 ///
-/// ASSUMES that in the "viewforest" (tree with BufferRoot):
+/// ASSUMES that in the viewforest:
 /// - IDs have been replaced with PIDs, per
 ///   'assign_pids_throughout_viewforest'. (Otherwise two org nodes
 ///   might refer to the same skg node, yet appear not to.)
@@ -32,7 +33,7 @@ use typedb_driver::TypeDBDriver;
 /// but role classification, save-intent extraction, and disk
 /// supplementation have not happened yet.
 pub async fn find_buffer_errors_for_saving (
-  viewforest: &Tree<MaybePlacedViewnode>,
+  viewforest: &MaybePlacedViewForest,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<BufferValidationError>,
@@ -69,17 +70,36 @@ pub async fn find_buffer_errors_for_saving (
         BufferValidationError::Other (error_msg)); }}
   validate_definitive_view_requests(
     viewforest, &mut errors);
+  validate_view_roots (
+      viewforest, &mut errors);
   { // local structure validation
-    let _ = do_everywhere_in_tree_dfs_readonly(
-      viewforest, viewforest . root() . id(), true,
-      &mut |node_ref| {
-        if let Err (e) = local::validate_local_structure(
-               viewforest, node_ref . id(), config) {
-          errors . push(
-            BufferValidationError::LocalStructureViolation(
-              e . message, e . id )); }
-        Ok(( )) }); }
+    let root_ids : Vec<NodeId> =
+      viewforest . root_ids ();
+    for root_id in root_ids {
+      let _ = do_everywhere_in_tree_dfs_readonly(
+        viewforest, root_id, true,
+        &mut |node_ref| {
+          if let Err (e) = local::validate_local_structure(
+                 viewforest, node_ref . id(), config) {
+            errors . push(
+              BufferValidationError::LocalStructureViolation(
+                e . message, e . id )); }
+          Ok(( )) }); }}
   Ok (errors) }
+
+fn validate_view_roots (
+  viewforest : &MaybePlacedViewForest,
+  errors     : &mut Vec<BufferValidationError>,
+) {
+  for root in viewforest . roots () {
+    if ! matches! (
+      &root . value () . kind,
+      MaybePlacedViewnodeKind::True (_)
+        | MaybePlacedViewnodeKind::Deleted (_))
+    { errors . push (
+        BufferValidationError::Other (
+          "View roots must be TrueNodes or DeletedNodes."
+          . to_string () )); }}}
 
 /// For each node in the viewforest, if it has a definitive view request,
 /// verify that:
@@ -91,7 +111,7 @@ pub async fn find_buffer_errors_for_saving (
 /// - No other node with the same ID has a definitive view request,
 ///   because there can only be one definitive view.
 fn validate_definitive_view_requests (
-  viewforest : &Tree<MaybePlacedViewnode>, // "viewforest" = tree with BufferRoot
+  viewforest : &MaybePlacedViewForest,
   errors : &mut Vec<BufferValidationError>,
 ) {
   let mut ids_with_requests : HashSet<ID> =

@@ -65,7 +65,7 @@ pub fn find_inconsistent_instructions(
 
 /// Collect delete instructions, defining containers, and sources.
 fn collect_instructions(
-  viewforest: &Tree<MaybePlacedViewnode> // "viewforest" = tree with BufferRoot
+  viewforest: &Tree<MaybePlacedViewnode>
 ) -> (HashMap<ID, HashSet<WhetherToDelete>>, // deletes
       HashMap<ID, usize>, // defining containers
       HashMap<ID, HashSet<SourceName>>) { // sources

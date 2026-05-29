@@ -1,10 +1,10 @@
-* return point to not just the same line but the same* char
-  * or max within that line if too big)
 * ONGOING [[./TODO/full-schema]]
 codex resume 019e64c9-1ff6-75a3-91c5-2c54b644440b
 * DONE ? [[./TODO/source-sets/]]
 codex resume 019e6210-347f-72d2-b35c-88dc629d748e
 * [[./TODO/incremental-init-might-be-broken.org]]
+* return point to not just the same line but the same* char
+  * or max within that line if too big)
 * Need text search across paths.
 * critical
 ** I can't demo without privacy mode.

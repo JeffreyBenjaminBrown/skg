@@ -318,6 +318,14 @@ fn test_org_to_uninterpreted_nodes2_invalid_metadata() {
 }
 
 #[test]
+fn test_org_to_uninterpreted_nodes_rejects_forest_root() {
+  let input: &str = "* (skg forestRoot) illegal root";
+  let result = org_to_uninterpreted_nodes (input);
+  assert!(result . is_err());
+  assert!(result . unwrap_err() . contains ("forestRoot metadata is internal"));
+}
+
+#[test]
 fn test_org_to_uninterpreted_nodes2_orphaned_nodes() {
   // Test that nested nodes without a level 1 parent cause an error
   let input_orphaned: &str =

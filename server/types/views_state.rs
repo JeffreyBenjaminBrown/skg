@@ -1,9 +1,9 @@
 use crate::dbs::in_rust_graph::snapshot_global;
 use crate::types::many_to_many::ManyToMany;
-use crate::types::viewnode::{ViewNode, ViewNodeKind};
+use crate::types::tree::forest::ViewForest;
+use crate::types::viewnode::ViewNodeKind;
 use super::misc::ID;
 
-use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
 
 //
@@ -34,7 +34,7 @@ pub struct OpenViews {
 /// update_view, which maintain pids in sync with the viewforest.
 /// Direct viewforest mutation would make pids stale.
 pub struct ViewState {
-  pub viewforest : Tree<ViewNode>,
+  pub viewforest : ViewForest,
   pub pids   : HashSet<ID>, // all the TrueNodes (and DeletedNodes) in the buffer
 }
 
@@ -78,7 +78,7 @@ impl OpenViews {
   pub fn viewuri_to_view (
     &self,
     uri : &ViewUri,
-  ) -> Option<&Tree<ViewNode>> {
+  ) -> Option<&ViewForest> {
     self . views . get (uri)
       . map ( |vs| &vs . viewforest ) }
 
@@ -95,9 +95,11 @@ impl OpenViews {
   pub fn register_view (
     &mut self,
     uri    : ViewUri,
-    viewforest : Tree<ViewNode>,
+    viewforest : impl Into<ViewForest>,
     pids   : &[ID],
-  ) { let rids : HashSet<ID> =
+  ) { let viewforest : ViewForest =
+        viewforest . into ();
+      let rids : HashSet<ID> =
         root_ids_from_viewforest ( &viewforest );
       for rid in &rids {
         self . root_ids . insert (
@@ -110,9 +112,11 @@ impl OpenViews {
   pub fn update_view (
     &mut self,
     uri        : &ViewUri,
-    new_viewforest : Tree<ViewNode>,
-  ) { let pids : HashSet<ID> =
-        new_viewforest . root () . descendants ()
+    new_viewforest : impl Into<ViewForest>,
+  ) { let new_viewforest : ViewForest =
+        new_viewforest . into ();
+      let pids : HashSet<ID> =
+        new_viewforest . nodes ()
         . filter_map ( |n| match &n . value () . kind {
           ViewNodeKind::True (t)    => Some ( t . id . clone () ),
           ViewNodeKind::Deleted (d) => Some ( d . id . clone () ),
@@ -162,11 +166,11 @@ impl OpenViews {
 /// initialized (tests that bypass 'init_global_handle_for_first_time_or_panic'), only
 /// primary ids are collected — extras aren't available.
 fn root_ids_from_viewforest (
-  viewforest : &Tree<ViewNode>,
+  viewforest : &ViewForest,
 ) -> HashSet<ID> {
   let mut ids : HashSet<ID> = HashSet::new ();
   let graph_snap = snapshot_global ();
-  for child in viewforest . root () . children () {
+  for child in viewforest . roots () {
     if let ViewNodeKind::True (t) = &child . value () . kind {
       ids . insert ( t . id . clone () );
       if let Some (graph) = graph_snap . as_ref () {
