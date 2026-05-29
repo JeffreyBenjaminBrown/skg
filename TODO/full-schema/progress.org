@@ -1,4 +1,14 @@
 * progress
+** stage 7 : saving read-only RoleCols
+*** planned
+Wrote 'TODO/full-schema/7_saving-readonly-cols.org',
+a focused implementation plan for the metaplan item
+"Make read-only sets predictable under save and rerender".
+
+The plan distinguishes ordinary read-only RoleCols from the
+hidden-subscription RoleCols, because earlier review settled that
+stale generated members under HiddenIn/HiddenOutside should be
+discarded rather than preserved as independent branches.
 ** stage 6 : relation accessors and generated collections
 *** planned
 Wrote 'TODO/full-schema/6_col-buckets-for-everything.org',

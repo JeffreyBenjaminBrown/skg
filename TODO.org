@@ -1,4 +1,5 @@
-* ONGOING [[./TODO/roleCol-type.org]]
+* return point to not just the same line but the same* char
+  * or max within that line if too big)
 * ONGOING [[./TODO/full-schema]]
 * DONE ? [[./TODO/source-sets/]]
 codex resume 019e6210-347f-72d2-b35c-88dc629d748e

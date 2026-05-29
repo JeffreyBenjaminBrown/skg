@@ -1,0 +1,296 @@
+* plan : saving read-only RoleCols
+This plan covers the metaplan section:
+"Make read-only sets predictable under save and rerender".
+
+Stage 6 introduced generated RoleCols and deliberately kept read-only
+RoleCol children display-only for save extraction.  This stage makes
+their save/rerender behavior predictable and warning-producing.
+
+* scope
+** role cols covered
+The ordinary read-only RoleCols are:
+- 'subscriberCol'  -> 'RoleCol::Subscriber',
+- 'overriderCol'   -> 'RoleCol::Overrider',
+- 'hiderCol'       -> 'RoleCol::Hider',
+- 'hiddenCol'      -> 'RoleCol::Hidden'.
+
+The generated hidden-subscription RoleCols are also read-only:
+- 'hiddenInSubscribeeCol'        -> 'RoleCol::HiddenInSubscribee',
+- 'hiddenOutsideOfSubscribeeCol' -> 'RoleCol::HiddenOutsideOfSubscribee'.
+
+They need the same user-facing warning model, but not exactly the same
+stale-child preservation policy.  Earlier review settled that stale
+'parentIs=collector' children under the hidden-subscription RoleCols
+should be discarded during reconciliation, not preserved as
+independent branches.  Keep that policy unless it is explicitly
+reopened.
+
+** not covered
+Do not change the writable RoleCols:
+- 'subscribeeCol',
+- 'overriddenCol'.
+
+Do not change source-set restricted save behavior here except where
+read-only RoleCol completion must not make it worse.  The source-set
+stage later owns omitted inactive writable targets.
+
+Do not implement new heralds here.  The next metaplan stage owns
+read-only-set herald presentation.
+
+* desired behavior
+** ordinary read-only RoleCols
+For 'subscriberCol', 'overriderCol', 'hiderCol', and 'hiddenCol',
+save-triggered completion should:
+- preserve the user's visible order among real generated members that
+  are still present in the RoleCol,
+- relabel generated-looking nonmembers to 'parentIs=independent',
+- leave already-independent children independent,
+- append real missing generated members after the preserved real
+  members,
+- discard or ignore edits to the RoleCol scaffold itself,
+- warn without aborting the save when it repairs or ignores such edits.
+
+"Real generated member" means:
+- child is a TrueNode,
+- child is marked 'parentIs=collector',
+- child's ID is still in the graph-derived goal set for that RoleCol.
+
+"Generated-looking nonmember" means:
+- child is a TrueNode,
+- child is marked 'parentIs=collector',
+- child's ID is not in the goal set.
+
+** hidden-subscription read-only RoleCols
+For 'hiddenInSubscribeeCol' and 'hiddenOutsideOfSubscribeeCol',
+preserve the current policy:
+- real generated members that remain in the goal set survive,
+- missing real generated members are restored,
+- stale generated members are discarded, not relabeled independent,
+- warning delivery should still say that the generated collection was
+  repaired.
+
+The reason for the distinction is that the hidden-subscription cols
+are derived/filter views.  Their stale generated members mean "this
+node is no longer hidden here", not "the user added an independent
+branch that should remain under this collection".
+
+** user-visible order
+The order is view-local:
+- it lives in the tree held by the open view,
+- it is preserved across save-triggered rerender and collateral
+  rerender while that view remains open,
+- it is not written to disk,
+- closing and reopening may normalize order from graph data.
+
+For ordinary read-only RoleCols, reconciliation should derive an
+effective goal order from:
+1. existing visible collector-marked real members in their current
+   buffer order,
+2. graph-derived missing members appended after them.
+
+Do not reorder an existing read-only RoleCol to match arbitrary graph
+or HashMap iteration order.
+
+* implementation plan
+** classify RoleCol policy in one place
+Add metadata on 'RoleCol' rather than repeating case statements:
+- 'is_writable_relation_col',
+- 'is_ordinary_readonly_relation_col',
+- 'is_hidden_subscription_col',
+- 'is_readonly_set',
+- 'readonly_stale_member_policy' if useful.
+
+The direct relation mapping should continue to use
+'RoleCol::relation_member_role() -> Option<RelationRole>'.
+
+** make read-only reconciliation order-aware
+For ordinary read-only RoleCols, add a reconciliation path that:
+1. computes the graph-derived goal set,
+2. reads current children in view order,
+3. builds the effective goal list by keeping present real members in
+   current order,
+4. appends graph members not already present,
+5. demotes generated-looking nonmembers to independent before
+   reconciliation,
+6. completes missing generated members.
+
+This can be implemented either by:
+- adding an option/policy argument to
+  'reconcile_relation_col_children', or
+- splitting it into a small ordinary-readonly wrapper plus the
+  existing writable behavior.
+
+Prefer a policy argument or RoleCol method if that keeps completion
+dispatch simple.
+
+** preserve writable behavior
+Writable RoleCols should not get the same order treatment:
+- 'subscribeeCol' save extraction still treats a present empty col as
+  an explicit empty set,
+- 'overriddenCol' remains writable in the same way,
+- save-triggered completion should not recreate a deleted writable col.
+
+** produce warnings
+The save path already has a warning channel:
+'RerenderAfterSaveContext::warnings'.
+
+Add warnings during save-triggered completion when read-only RoleCol
+completion repairs user-visible edits.  Useful warning categories:
+- a generated-looking nonmember was relabeled independent,
+- a missing generated member was restored,
+- a duplicate generated member was removed,
+- a stale hidden-subscription member was removed,
+- scaffold title/body text was ignored, if such edits are observable.
+
+Warnings should name:
+- the collection kind, using the existing external atom
+  ('subscriberCol', 'hiddenOutsideOfSubscribeeCol', etc.),
+- the owner node ID when available,
+- the affected child ID when available.
+
+Avoid warning during ordinary initial rendering.  Warn only when
+completion is running as part of save/rerender of an existing view,
+where the user could have edited the open buffer.
+
+** decide how to detect scaffold title/body edits
+Scaffold nodes have no graph identity and no body in the in-memory
+'Scaffold' type.  If parser/rendering already discards scaffold title
+text before completion can inspect it, then title/body edit detection
+may be impossible at this layer.
+
+Implementation should first verify what survives from org parsing:
+- if scaffold title/body text is available in 'ViewNode', warn when
+  it is non-default or non-empty and ignored;
+- if it is already discarded before 'ViewNode', document that the
+  current representation makes this warning impossible and do not add
+  ad hoc parser state just for this stage.
+
+** keep malformed read-only structures fatal
+Warnings are for repairs the server understands.
+
+Keep aborting save when local validation cannot identify:
+- the RoleCol kind,
+- its owner context,
+- a child node's ID/source well enough to decide whether it is a real
+  member or an independent branch.
+
+This keeps "repair known benign edits" separate from "guess what the
+user meant from malformed structure".
+
+* likely edit points
+** RoleCol metadata
+- 'server/types/viewnode.rs'
+- 'server/to_org/complete/sharing/kind.rs'
+
+** completion
+- 'server/update_buffer/complete.rs'
+- 'server/update_buffer/complete_preorder/relation_col.rs'
+- 'server/to_org/complete/sharing/child_data.rs'
+- 'server/update_buffer/complete_postorder/hiddeninsubscribee_col.rs'
+- 'server/update_buffer/complete_postorder/hiddenoutsideof_subscribeecol.rs'
+- 'server/update_buffer/util.rs'
+
+** warning plumbing
+- 'server/update_buffer.rs'
+- 'server/update_buffer/complete.rs'
+- 'server/serve/handlers/save_buffer.rs' only if response formatting
+  needs tests or minor extension.
+
+** save classification and validation
+- 'server/from_text/viewnodes_to_instructions/classify.rs'
+- 'server/from_text/viewnodes_to_instructions/to_naive_instructions.rs'
+- 'server/from_text/buffer_to_viewnodes/local.rs'
+
+Save extraction should remain display-only for read-only RoleCols.
+The main save-classification work is making sure no new warning logic
+accidentally makes read-only RoleCol children into DefineNode
+candidates.
+
+* tests
+** ordinary read-only RoleCol order
+For each ordinary read-only RoleCol, or for one representative plus
+metadata-level tests proving the policy dispatch:
+- render a view with a read-only RoleCol,
+- reorder the generated members in the buffer,
+- save,
+- assert the rerendered saved view preserves that visible order.
+
+At minimum cover:
+- 'subscriberCol',
+- 'overriderCol' or 'hiderCol',
+- 'hiddenCol'.
+
+** ordinary read-only nonmembers
+Add a TrueNode under an ordinary read-only RoleCol with
+'parentIs=collector' whose relationship is not real.
+
+Save should:
+- not change the graph relationship,
+- rerender the child as 'parentIs=independent',
+- include a warning.
+
+Also test an already-independent child under the read-only RoleCol:
+- it should remain independent,
+- it should not create graph relationship edits,
+- it should not be duplicated by completion.
+
+** missing real members
+Delete a real generated member from an ordinary read-only RoleCol and
+save.
+
+Save should:
+- not change the graph relationship,
+- restore the missing member,
+- warn.
+
+** hidden-subscription stale members
+For 'hiddenInSubscribeeCol' and 'hiddenOutsideOfSubscribeeCol':
+- create or edit a buffer so a generated-looking child becomes stale,
+- save,
+- assert the stale child is removed, not relabeled independent,
+- assert a warning is delivered.
+
+This preserves the prior policy decision for these generated/filter
+RoleCols.
+
+** save-result warnings
+Add at least one test that inspects 'SaveResponse.warnings' or the
+formatted save-result sexp and proves a successful save can carry the
+read-only repair warning.
+
+** no writable regressions
+Keep or add focused tests proving:
+- empty 'subscribeeCol' still means explicit empty subscribe set,
+- empty 'overriddenCol' still means explicit empty override set,
+- deleting a writable col entirely still means "no opinion" where that
+  behavior already exists.
+
+* verification
+Run:
+- 'cargo check'
+- 'cargo test --test new viewnodes_to_instructions -- --nocapture'
+- 'cargo test --test new classify -- --nocapture'
+- 'cargo test --test save -- --nocapture'
+- 'cargo test --test subscribee_col -- --nocapture'
+- 'cargo test --test hidden_from_subscriptions -- --nocapture'
+- 'cargo test --test content_view -- --nocapture'
+
+If TypeDB-backed tests are affected by warning plumbing or collateral
+rerender behavior, also run:
+- 'cargo nextest run --test hidden_from_subscriptions'
+- 'bash/all-tests.sh --no-sound'
+
+* open questions
+** scaffold title/body edit warnings may be unobservable
+The metaplan asks to warn when collection scaffold title/body edits
+are discarded.  If the parser already throws away scaffold title/body
+text, this cannot be detected without changing the parsed
+representation.  Prefer documenting that limit over adding a noisy
+intermediate representation just to warn about text that has never had
+semantic meaning.
+
+** warning volume
+If a read-only set has many missing or stale members, warning once per
+member could overwhelm the user.  Prefer batching by RoleCol owner:
+"Repaired subscriberCol under X: restored 3 generated members and
+relabeled 2 nonmembers independent."

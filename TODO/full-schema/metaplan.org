@@ -123,7 +123,7 @@ side, so the audit output reflects the real invariant:
 This keeps relationship-set auditing and node-source auditing distinct,
 and prevents later validation work from inheriting an accidental
 "source names are node IDs" adapter.
-** ONGOING Add relation accessors and generated collections
+** DONE Add relation accessors and generated collections
 Before adding more UI, complete relation accessors in both directions
 for every schema relationship.
 The implementation should make it easy to ask:
