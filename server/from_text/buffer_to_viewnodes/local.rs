@@ -264,7 +264,7 @@ fn validate_text_changed (
        matches!(&node . kind, MaybePlacedViewnodeKind::True (_))) {
     errors . push("TextChanged must have a TrueNode parent." . to_string()); }
   if !generation_does_not_exist(tree, node_id, 1, true) {
-    errors . push("TextChanged must have no (non-ignroed) children." . to_string()); }
+    errors . push("TextChanged must have no (non-ignored) children." . to_string()); }
   if !siblings_cannot_include(tree, node_id, |node|
        matches!(&node . kind, MaybePlacedViewnodeKind::Scaff (Scaffold::TextChanged { .. }))) {
     errors . push("TextChanged must be unique among its siblings." . to_string()); }
