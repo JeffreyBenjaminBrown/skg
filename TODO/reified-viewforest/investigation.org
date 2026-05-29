@@ -1,0 +1,411 @@
+* ViewForest investigation
+
+** question
+
+The code currently represents an org buffer as an =ego_tree::Tree<ViewNode>=
+whose root value is =ViewNodeKind::Scaff (Scaffold::BufferRoot)=.
+That root is not rendered and is not semantically a view node; it is a
+technical workaround for =ego_tree='s single-tree ownership model.
+
+The proposed =ViewForest= type would keep this artificial root internal.
+Callers would see a forest: an ordered list of top-level org headings,
+each of which is the root of an ordinary =ViewNode= tree.
+
+This investigation asks:
+
+- would that simplify the code,
+- what interface should =ViewForest= expose,
+- how much of =ego_tree= should leak through, and
+- where are the awkward parts.
+
+** current representation
+
+The current convention is already explicit in comments, but not in the
+type system:
+
+- =server/from_text/buffer_to_viewnodes/uninterpreted.rs= parses org
+  text into a "viewforest": a =Tree<MaybePlacedViewnode>= with
+  =BufferRoot= at the root.
+- =server/types/viewnode.rs= contains =Scaffold::BufferRoot= and
+  =viewforest_root_viewnode=.
+- =server/types/maybe_placed_viewnode.rs= contains the parallel
+  =maybePlaced_viewforest_root_viewnode= and conversions between
+  maybe-placed and placed trees.
+- =server/org_to_text.rs= renders a "viewforest" by checking that
+  the root is =BufferRoot=, skipping it, and rendering its children at
+  org level 1.
+- =server/to_org/render/initial_bfs.rs= and =server/to_org/util.rs=
+  construct new buffers by creating a tree rooted at =BufferRoot= and
+  appending requested roots underneath it.
+- =server/from_text/viewnodes_to_instructions/classify.rs= maps
+  =BufferRoot= to =SaveRole::BufferRoot= so save extraction can recurse
+  through it without treating it as graph data.
+
+So the code has two incompatible truths:
+
+- most functions are really operating on a forest, and
+- the type says they are operating on one tree whose root is a scaffold.
+
+** places that already want a forest concept
+
+The strongest evidence is code that does one of these:
+
+- walks =viewforest.root().children()= because those children are the
+  actual top-level view roots;
+- special-cases =BufferRoot= while rendering, validating, classifying,
+  or extracting save intents;
+- constructs =Tree::new(viewforest_root_viewnode())= only to append
+  real roots under it;
+- comments that say "viewforest = tree with BufferRoot".
+
+Concrete examples:
+
+- =server/to_org/render/content_view.rs= collects level-1 root node IDs
+  in =attach_containerward_ancestries_to_view_roots=. A =ViewForest=
+  could offer =root_ids()= or =roots()= directly.
+- =server/types/views_state.rs= uses =root_ids_from_viewforest= to
+  maintain the reverse lookup from root IDs to view URIs. This is
+  exactly a forest operation.
+- =server/org_to_text.rs= checks and skips =BufferRoot=. Rendering a
+  =ViewForest= would naturally render every root at level 1.
+- =server/from_text/buffer_to_viewnodes/local.rs= validates
+  =BufferRoot= as if it were a scaffold node. With =ViewForest=,
+  "top-level entries must be TrueNode or DeletedNode" becomes a forest
+  invariant rather than a node validation rule.
+- =server/from_text/viewnodes_to_instructions/to_naive_instructions.rs=
+  treats =BufferRoot= as a traversal gateway. That role belongs on the
+  forest wrapper, not in the save-role algebra.
+- =server/update_buffer/viewnodestats.rs= starts recursion at the fake
+  root with no parent PID. A forest API could instead iterate roots
+  and make "no nearest TrueNode ancestor" explicit at the root boundary.
+- =server/serve/handlers/text_search.rs= builds search results as
+  children of =BufferRoot=. Search result groups are naturally forest
+  roots.
+
+** likely type shape
+
+The smallest useful type is a newtype wrapper around the current
+representation:
+
+#+begin_src rust
+pub struct ViewForest<T> {
+  tree : ego_tree::Tree<T>,
+  forest_root : ego_tree::NodeId,
+}
+#+end_src
+
+For =ViewNode= and =MaybePlacedViewnode=, the constructor would create
+an internal root value that callers cannot observe as a =ViewNode=.
+There are two plausible ways to do that.
+
+Option A: keep =Scaffold::BufferRoot= internally for a while.
+
+This is the migration-friendly path. =ViewForest<ViewNode>= still wraps
+=Tree<ViewNode>= whose root value is =BufferRoot=, but direct access to
+that value is private. Most code can be migrated from
+=Tree<ViewNode>= to =ViewForest<ViewNode>= before deleting the public
+=BufferRoot= variant.
+
+Option B: make the internal root not be a =ViewNode=.
+
+For example, store =Tree<ViewForestNode<T>>= where
+=ViewForestNode<T>= is =ForestRoot | Node(T)=. That better matches the
+domain model, but it breaks every =NodeRef<ViewNode>= and
+=NodeMut<ViewNode>= caller. It is a larger migration and probably not
+worth doing first.
+
+I would choose option A first, with the public API designed so option B
+remains possible later.
+
+** proposed public interface
+
+The wrapper should not try to hide =ego_tree= completely. Too much code
+uses =NodeId=, =NodeRef=, =NodeMut=, parent lookup, child append,
+detach/transplant-like operations, and tree traversals. A purist forest
+API would turn into a large compatibility layer.
+
+Instead, =ViewForest= should expose the operations the code actually
+uses, while naming the forest-specific ones clearly.
+
+Construction:
+
+#+begin_src rust
+impl<T> ViewForest<T> {
+  pub fn new_empty () -> Self;
+  pub fn from_internal_tree (tree : Tree<T>) -> Result<Self, String>;
+  pub fn into_internal_tree (self) -> Tree<T>;
+  pub fn as_internal_tree (&self) -> &Tree<T>;
+  pub fn as_internal_tree_mut (&mut self) -> &mut Tree<T>;
+}
+#+end_src
+
+The =as_internal_tree*= methods are deliberately ugly escape hatches.
+They make incremental migration possible, but their names communicate
+that callers are bypassing the abstraction.
+
+Forest-root operations:
+
+#+begin_src rust
+impl<T> ViewForest<T> {
+  pub fn is_empty (&self) -> bool;
+  pub fn roots (&self) -> impl Iterator<Item = NodeRef<T>>;
+  pub fn root_ids (&self) -> Vec<NodeId>;
+  pub fn first_root (&self) -> Option<NodeRef<T>>;
+  pub fn append_root (&mut self, value : T) -> NodeId;
+  pub fn prepend_root (&mut self, value : T) -> NodeId;
+}
+#+end_src
+
+Whole-forest traversal:
+
+#+begin_src rust
+impl<T> ViewForest<T> {
+  pub fn nodes (&self) -> impl Iterator<Item = NodeRef<T>>;
+  pub fn node_ids (&self) -> Vec<NodeId>;
+  pub fn traverse (&self) -> impl Iterator<Item = ego_tree::iter::Edge<NodeRef<T>>>;
+}
+#+end_src
+
+These should skip the internal root. If a caller needs to include the
+fake root, it should use the internal-tree escape hatch.
+
+Ordinary tree access:
+
+#+begin_src rust
+impl<T> ViewForest<T> {
+  pub fn get (&self, id : NodeId) -> Option<NodeRef<T>>;
+  pub fn get_mut (&mut self, id : NodeId) -> Option<NodeMut<T>>;
+  pub fn contains (&self, id : NodeId) -> bool;
+}
+#+end_src
+
+Subtree operations should stay mostly =ego_tree= flavored. Once a
+caller has a =NodeId= for a real node, its children, parent, ancestors,
+and descendants are ordinary tree operations.
+
+Specialized convenience methods for =ViewNode=:
+
+#+begin_src rust
+impl ViewForest<ViewNode> {
+  pub fn true_root_ids (&self) -> HashSet<ID>;
+  pub fn all_true_node_ids (&self) -> HashSet<ID>;
+  pub fn mark_roots_parent_absent (&mut self);
+  pub fn to_org_string (&self, config : &SkgConfig)
+    -> Result<String, Box<dyn Error>>;
+}
+#+end_src
+
+The snippets above use =ViewForest<T>= as the placeholder generic name,
+but the generic type probably deserves a more general name.
+
+#+begin_src rust
+pub type MaybePlacedViewForest = ViewForest<MaybePlacedViewnode>;
+pub type PlacedViewForest = ViewForest<ViewNode>;
+#+end_src
+
+A stronger naming option is to call the generic wrapper =Forest<T>= and
+reserve =ViewForest= for the concrete view-node forest:
+
+#+begin_src rust
+pub type MaybePlacedViewforest = Forest<MaybePlacedViewnode>;
+pub type ViewForest = Forest<ViewNode>;
+#+end_src
+
+I checked =ego_tree= 0.6 locally and did not find an existing =Forest=
+type. =Forest<T>= is therefore probably the better underlying name:
+there is nothing especially view-specific about representing a
+homogeneous forest using a single =ego_tree= tree. =ViewForest= can
+still exist as the concrete public alias most callers use.
+** operations that should migrate first
+
+The first migration should be intentionally thin:
+
+1. Add =ViewForest<T>= as a wrapper over the existing
+   =Tree<T> + BufferRoot= representation.
+2. Convert constructors and renderers:
+   - =org_to_uninterpreted_nodes= returns =ViewForest<MaybePlacedViewnode>=.
+   - =maybePlaced_to_placed_tree= becomes
+     =maybePlaced_to_placed_viewforest=.
+   - =viewforest_to_string= takes =ViewForest<ViewNode>=.
+   - =stub_viewforest_from_root_ids= and search rendering construct
+     =ViewForest<ViewNode>=.
+3. Convert storage:
+   - =ViewState.viewforest= becomes =ViewForest<ViewNode>=.
+   - =OpenViews::register_view= and =update_view= use forest methods
+     for root IDs and all PIDs.
+4. Convert traversal helpers only when needed.
+
+This avoids a large "rewrite every =Tree<ViewNode>= user" patch.
+Existing low-level functions can temporarily accept =forest.as_internal_tree()=
+or =forest.as_internal_tree_mut()=.
+
+** simplifications
+
+The most immediate simplification is naming. Many comments currently
+explain that a "viewforest" is a tree with =BufferRoot=. The type could
+say that.
+
+Rendering becomes cleaner. =viewforest_to_string= no longer has to
+validate and skip a root =ViewNode=. It can render =forest.roots()= at
+level 1.
+
+Root-specific logic becomes local. Calls like
+=viewforest.root().children()= in content rendering, source-set tests,
+view registration, search enrichment, and save emptiness checks can
+become =forest.roots()=, =forest.root_ids()=, or =forest.is_empty()=.
+
+Save-role classification becomes more honest. =SaveRole::BufferRoot=
+can probably disappear once extraction starts from forest roots instead
+of starting at a fake root. The traversal gateway would be the forest,
+not a bogus role.
+
+Validation becomes more domain-shaped. "The internal root has no parent"
+would be guaranteed by =ViewForest=. "Top-level org headings must be
+TrueNode or DeletedNode" would be a forest invariant. That removes
+=validate_buffer_root= from ordinary scaffold validation.
+
+View stats can express rootness directly. Roots would be iterated as
+roots, so =sourceAtBoundary= and =ParentIs::Absent= no longer need to be
+derived from adjacency to =BufferRoot=.
+
+Search views become easier to reason about. A search buffer is a forest
+of result groups, not a tree with a non-rendered scaffold parent.
+
+** things it will not simplify much
+
+It will not remove the need for stable =NodeId=s. Most algorithms use
+=NodeId= heavily because they mutate structure and need to avoid borrow
+conflicts. =ViewForest= should embrace that.
+
+It will not make transplant across truly independent ego_trees possible.
+The internal single =ego_tree::Tree= probably still has to exist, or
+every cross-root move would hit the original limitation again.
+
+It will not remove the need for scaffold nodes generally. =AliasCol=,
+=IDCol=, =RoleCol=, and diff scaffolds are real display nodes. Only
+=BufferRoot= is suspicious.
+
+It will not by itself distinguish "top-level org heading" from "graph
+root". The code already has cases where a top-level heading may have
+=ParentIs::Absent= while other non-content roots can occur deeper via
+backpaths or relation collections.
+
+** possible module placement
+
+The natural home is probably =server/types/tree/viewforest.rs= or
+=server/types/viewforest.rs=.
+
+I slightly prefer =server/types/tree/viewforest.rs= because the type is
+mostly an =ego_tree= adapter and the project already has tree utilities
+there. But if =ViewForest= becomes a first-class domain type used in
+view state, rendering, parsing, and saving, =server/types/viewforest.rs=
+may be easier to discover.
+
+Either way, =server/types/tree/mod.rs= should re-export it if it lives
+under =tree=.
+
+** migration hazards
+
+=NodeRef<T>= and =NodeMut<T>= lifetimes make custom iterator APIs harder
+than they look. Returning =impl Iterator<Item = NodeRef<T>>= should be
+possible for simple wrappers over =root().children()=, but more complex
+filtered traversals may need helper methods that collect =Vec<NodeId>=
+instead.
+
+Generic construction is awkward. =ViewForest<T>::new_empty()= needs an
+internal root value of type =T= if it wraps =Tree<T>=. That means either:
+
+- the generic type takes a root-constructor function,
+- a trait supplies the root value,
+- construction is only implemented for =ViewNode= and
+  =MaybePlacedViewnode=, or
+- the internal representation changes to =Tree<ViewForestNode<T>>=.
+
+The migration-friendly answer is to implement empty constructors only
+for the two concrete viewnode types at first.
+
+The conversion functions currently preserve exact tree shape and
+rebuild =NodeId= mappings internally. A forest wrapper should preserve
+the rule that external =NodeId=s do not survive conversion from
+maybe-placed to placed, unless the code already did not promise that.
+
+The API should avoid making the internal root ID public. If callers can
+ask for it, the abstraction will decay back into the current convention.
+Escape hatches should expose =Tree<T>= only for migration and should be
+removed or narrowed later.
+
+** recommended direction
+
+Implement =ViewForest<T>= as a thin wrapper around the current
+=Tree<T> with BufferRoot= representation.
+
+Do not immediately delete =Scaffold::BufferRoot=. First make it private
+in practice by moving construction, rendering, root iteration, and view
+state storage behind =ViewForest=. Once most code no longer matches on
+=BufferRoot=, then consider the more honest internal representation
+=Tree<ViewForestNode<T>>= or another private root marker.
+
+The best first measurable success would be:
+
+- no public function outside parsing/conversion/rendering/storage takes
+  =Tree<ViewNode>= when it means a whole buffer;
+- callers use =forest.roots()= rather than
+  =viewforest.root().children()=;
+- =SaveRole::BufferRoot= disappears or is isolated inside a compatibility
+  layer; and
+- =viewforest_to_string= cannot be called on a non-forest tree.
+
+** problems
+*** a few concerns, unsorted
+The desired scope is vague. "Offer all? at least all the ones we use"
+could mean either a narrow domain wrapper or a near-complete
+=ego_tree::Tree= facade. A near-complete facade would be expensive and
+not very useful. A narrow wrapper plus explicit escape hatches is more
+practical.
+
+The name =ViewForest= is good for whole-buffer data, but many algorithms
+operate on a single subtree inside that forest. The design should avoid
+forcing subtree algorithms to know about the forest wrapper when a
+=NodeId= plus tree access is enough.
+
+There is a tension between hiding the internal root and preserving
+=ego_tree= ergonomics. If too much of =ego_tree= is hidden, the wrapper
+will be painful. If too much is exposed, =BufferRoot= remains a social
+convention rather than a type-level boundary.
+
+Generic =ViewForest<T>= is only clean if the internal root is not a =T=.
+But the migration-friendly implementation still needs a fake =T= root.
+That means the first version will be architecturally transitional, not
+the final pure model.
+
+*** The current =Scaffold::BufferRoot= metadata token
+is parsed from ="forestRoot"= in =server/serve/parse_metadata_sexp.rs=.
+Rendering already skips =BufferRoot=; we are not rendering it just for
+Emacs to discard it. The remaining issue is narrower: because the
+parser accepts =forestRoot= metadata, a user or fixture can still
+construct a =BufferRoot=-like node from org text. If =BufferRoot=
+becomes internal, the parser should probably reject =forestRoot= in
+ordinary buffer text, or accept it only in a clearly internal/test path.
+
+**** TODO where you said probably: definitely
+
+*** Top-level roots are not always equivalent to graph roots.
+The proposal should keep using language like "view roots" or "top-level
+org headings" rather than "roots" where graph rootness might be inferred
+incorrectly. "Root" is well-defined for view nodes, but not for graph
+nodes unless the relation is specified. So far "graph root" usually
+means a content-root, but other relation-specific root notions are easy
+to imagine.
+*** mixed concerns, unsorted
+Search buffers and content buffers both use the same current
+representation, and that overlap is a feature. The user can treat Skg
+search results the same way they treat viewnodes in any other Skg
+buffer. The way those nodes got there is different, but they are the
+same kind of thing. A single =ViewForest= type is right; convenience
+methods like =true_root_ids= should simply document that they mean
+level-1 TrueNodes, not a search-specific or content-view-specific root
+concept.
+*** Tests construct raw =Tree::new(viewforest_root_viewnode())=
+in many
+places. A migration will touch a lot of tests even if production logic
+changes are small. The benefit is real, but it is not a tiny refactor.
