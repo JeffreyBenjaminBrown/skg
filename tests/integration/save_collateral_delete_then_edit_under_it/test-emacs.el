@@ -88,7 +88,7 @@ contains to [], overwriting subee.skg on disk."
      buf
      '((1 node "1")
        (2 node "11")
-       (3 aliasCol "its aliases")
+       (3 aliasCol "")
        (4 alias "eleven")
        (3 hiddenCol "")
        (4 node "subee-1")

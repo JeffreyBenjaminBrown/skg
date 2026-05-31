@@ -2,7 +2,8 @@
 
 use skg::org_to_text::viewnode_to_text;
 use skg::types::misc::{ID, SkgConfig, SourceName};
-use skg::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, TrueNode, IndefOrDef, GraphNodeStats, NodeContainRels, ParentIs, ViewNodeStats, viewnode_from_scaffold, default_truenode };
+use skg::types::viewnode::{ ViewNode, ViewNodeKind, Vognode, TrueNode, IndefOrDef, GraphNodeStats, NodeContainRels, ParentIs, ViewNodeStats, default_truenode };
+use skg::types::viewnode::QualCol;
 use std::collections::HashMap;
 
 #[test]
@@ -11,10 +12,10 @@ fn test_viewnode_to_text_no_metadata () {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind    : ViewNodeKind::True (
+    kind    : ViewNodeKind::Vognode (Vognode::Normal (
       default_truenode ( ID::from ("test"),
                          SourceName::from ("main"),
-                         "Test Title" . to_string() )) };
+                         "Test Title" . to_string() ))) };
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("TrueNode rendering never fails");
@@ -33,7 +34,7 @@ fn test_viewnode_to_text_with_body () {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind    : ViewNodeKind::True (t), };
+    kind    : ViewNodeKind::Vognode (Vognode::Normal (t)), };
   let result : String =
     viewnode_to_text ( 2, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("TrueNode rendering never fails");
@@ -41,12 +42,17 @@ fn test_viewnode_to_text_with_body () {
 
 #[test]
 fn test_viewnode_to_text_with_metadata () {
-  let mut node = viewnode_from_scaffold (Scaffold::AliasCol);
+  let mut node = ViewNode {
+    focused     : false,
+    folded      : false,
+    body_folded : false,
+    kind        : ViewNodeKind::QualCol (
+      QualCol::Alias) };
   node . folded = true;
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("AliasCol rendering never fails");
-  assert_eq! ( result, "* (skg folded aliasCol) its aliases\n" ); }
+  assert_eq! ( result, "* (skg folded aliasCol)\n" ); }
 
 #[test]
 fn test_viewnode_to_text_with_id_metadata () {
@@ -59,7 +65,7 @@ fn test_viewnode_to_text_with_id_metadata () {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind    : ViewNodeKind::True (t), };
+    kind    : ViewNodeKind::Vognode (Vognode::Normal (t)), };
   let result : String =
     viewnode_to_text ( 3, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("TrueNode rendering never fails");
@@ -79,7 +85,7 @@ fn test_metadata_ordering () {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind    : ViewNodeKind::True (t), };
+    kind    : ViewNodeKind::Vognode (Vognode::Normal (t)), };
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("TrueNode rendering never fails");
@@ -106,7 +112,7 @@ fn test_birth_affects_container_count_emission () {
                             SourceName::from ("main"),
                             "N" . to_string () ) };
     ViewNode { focused : false, folded : false, body_folded : false,
-               kind : ViewNodeKind::True (t) } };
+               kind : ViewNodeKind::Vognode (Vognode::Normal (t)) } };
   let cfg : SkgConfig =
     SkgConfig::dummyFromSources ( HashMap::new () );
   let content      : String = viewnode_to_text (

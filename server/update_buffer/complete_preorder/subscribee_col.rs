@@ -6,7 +6,8 @@ use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child_of_viewnode, insert_scaffold_as_child};
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, RoleCol};
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, RoleCol};
+use crate::types::viewnode::Vognode;
 use crate::update_buffer::util::{ detach_scaffold_transferring_focus, move_child_to_end};
 
 use ego_tree::{NodeId, Tree};
@@ -76,10 +77,10 @@ fn read_subscribee_col_context (
     = read_at_ancestor_in_tree(
       tree, node, kind . correct_subscriber_ancestor_distance (),
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::True (t) =>
-          Some(( t . id . clone(),
-                 t . source . clone(),
-                 t . is_indefinitive () )),
+        ViewNodeKind::Vognode (Vognode::Normal (t))
+          => Some(( t . id . clone(),
+                    t . source . clone(),
+                    t . is_indefinitive () )),
         _ => None } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
     . ok_or ("reconcile_subscribee_col_children: parent is not a TrueNode") ?;
@@ -127,13 +128,13 @@ fn ensure_hiddenoutsideofsubscribeecol_is_last (
 ) -> Result<(), Box<dyn Error>> {
   let hidden_outside : Option<NodeId> =
     unique_scaffold_child_of_viewnode(
-      tree, node, &Scaffold::RoleCol {
-        roleCol: RoleCol::HiddenOutsideOfSubscribee } ) ?;
+      tree, node,
+      &ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee) ) ?;
   match hidden_outside {
     Some (child) => { move_child_to_end( tree, node, child ) ?; },
     None => {
       insert_scaffold_as_child(
         tree, node,
-        Scaffold::RoleCol { roleCol: RoleCol::HiddenOutsideOfSubscribee },
+        ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee),
         false ) ?; }}
   Ok (( )) }

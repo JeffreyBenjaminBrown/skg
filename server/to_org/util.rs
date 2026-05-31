@@ -20,6 +20,7 @@ use crate::types::viewnode::ViewRequest;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, IndefOrDef, ParentIs, TrueNode, mk_definitive_viewnode, mk_inactive_viewnode, mk_unknown_viewnode };
 #[cfg(test)]
 use crate::types::viewnode::viewforest_root_viewnode;
+use crate::types::viewnode::Vognode;
 use crate::types::tree::forest::{ViewForest, tree_forest_root_ids};
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
@@ -168,8 +169,9 @@ pub fn detect_and_mark_cycle_v1 (
   let is_cycle : bool = {
     let pid : ID = get_id_from_treenode ( tree, node_id ) ?;
     is_ancestor_id ( tree, node_id, &pid ) ? };
-  write_at_truenode_in_tree ( tree, node_id, |t| {
-    t . viewStats . cycle = is_cycle; } )
+  write_at_truenode_in_tree
+    ( tree, node_id,
+      |t| { t . viewStats . cycle = is_cycle; } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (( )) }
 
@@ -208,8 +210,9 @@ pub fn mark_view_roots_parent_absent (
     let mut node_mut : NodeMut<ViewNode> =
       viewforest . get_mut (root_id) . unwrap ();
     let vn : &mut ViewNode = node_mut . value ();
-    if let ViewNodeKind::True ( ref mut t ) = vn . kind {
-      t . parentIs = ParentIs::Absent; } } }
+    if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
+      = vn . kind
+      { t . parentIs = ParentIs::Absent; }}}
 
 /// Walk the view and correct any TrueNode whose parentIs claims a
 /// relationship to its parent that the actual graph doesn't
@@ -252,13 +255,13 @@ pub fn validate_parentIs_relationships (
     if let Edge::Open (child_ref) = edge {
       let child_tn : &TrueNode =
         match & child_ref . value () . kind {
-          ViewNodeKind::True (t) => t,
+          ViewNodeKind::Vognode (Vognode::Normal (t)) => t,
           _ => continue };
       let parent_ref : NodeRef<ViewNode> = match child_ref . parent () {
         Some (p) => p, None => continue };
       let parent_tn : &TrueNode =
         match & parent_ref . value () . kind {
-          ViewNodeKind::True (t) => t,
+          ViewNodeKind::Vognode (Vognode::Normal (t)) => t,
           // A non-TrueNode parent (BufferRoot, Scaffold, Deleted, DeletedScaff) is not a legitimate subject for any of these relational claims; skip without correcting.
           _ => continue };
       if child_tn . parentIs == ParentIs::Absent {
@@ -283,13 +286,13 @@ pub fn validate_parentIs_relationships (
   for id in to_independent {
     let mut node_mut : NodeMut<ViewNode> =
       viewforest . get_mut (id) . unwrap ();
-    if let ViewNodeKind::True ( ref mut t )
+    if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
       = node_mut . value () . kind
     { t . parentIs = ParentIs::Independent; } }
   for id in to_container {
     let mut node_mut : NodeMut<ViewNode> =
       viewforest . get_mut (id) . unwrap ();
-    if let ViewNodeKind::True ( ref mut t )
+    if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
       = node_mut . value () . kind
     { t . parentIs = ParentIs::Container; } } }
 
@@ -344,19 +347,18 @@ fn child_contained_by_parent (
     graph . pid_of (x) . unwrap_or_else ( || x . clone () )
       == child_pid ) }
 
-pub fn collect_ids_from_tree (
+pub fn ids_that_can_have_graphnodestats (
   tree : &Tree<ViewNode>,
 ) -> Vec < ID > {
-  let mut pids : Vec < ID > = Vec::new ();
+  let mut ids : Vec < ID > = Vec::new ();
   for edge in tree . root () . traverse () {
     if let Edge::Open (node_ref) = edge {
       match &node_ref . value () . kind {
-        ViewNodeKind::True (t)    =>
-          pids . push ( t . id . clone () ),
-        ViewNodeKind::Deleted (d) =>
-          pids . push ( d . id . clone () ),
-        _ => {} } } }
-  pids }
+        ViewNodeKind::Vognode (v) =>
+          if let Some (t) = v . normal_or_phantom ()
+          { ids . push ( t . id . clone () ); },
+        _ => {} }}}
+  ids }
 
 /// Check if `target_skgid` appears in the ancestor path of `treeid`.
 /// Used for cycle detection.
@@ -365,18 +367,14 @@ fn is_ancestor_id (
   origin_treeid : NodeId,
   target_skgid  : &ID,
 ) -> Result<bool, Box<dyn Error>> {
-  read_at_node_in_tree(tree, origin_treeid, |_| ())
+  read_at_node_in_tree(
+    tree, origin_treeid,
+    |_| ())
     . map_err(|_| "is_ancestor_id: NodeId not in tree")?;
   for generation in 1.. {
     match read_at_ancestor_in_tree(
       tree, origin_treeid, generation,
-      |viewnode| match &viewnode . kind {
-        ViewNodeKind::True (t)    => Some ( t . id . clone () ),
-        ViewNodeKind::Deleted (d) => Some ( d . id . clone () ),
-        ViewNodeKind::Inactive (i) => Some ( i . id . clone () ),
-        ViewNodeKind::Unknown (u) => Some ( u . id . clone () ),
-        ViewNodeKind::Scaff (_) |
-        ViewNodeKind::DeletedScaff (_) => None } )
+      |viewnode| viewnode . id_if_vognode () . cloned () )
     { Ok(Some (id)) if &id == target_skgid
         => return Ok (true),
       Ok (_) => continue,
@@ -392,12 +390,9 @@ pub fn get_id_from_treenode (
     read_at_node_in_tree (
       tree, treeid, |viewnode| viewnode . kind . clone() )?;
   match node_kind {
-    ViewNodeKind::True (t)    => Ok ( t . id ),
-    ViewNodeKind::Deleted (d) => Ok ( d . id ),
-    ViewNodeKind::Inactive (i) => Ok ( i . id ),
-    ViewNodeKind::Unknown (u) => Ok ( u . id ),
-    ViewNodeKind::Scaff (_)   => Err ( "get_id_from_treenode: caller should not pass a Scaffold" . into() ),
-    ViewNodeKind::DeletedScaff (_) => Err ( "get_id_from_treenode: caller should not pass a DeletedScaff" . into() ),
+    ViewNodeKind::Vognode (v)
+      => Ok ( v . id () . clone () ),
+    _ => Err ( "get_id_from_treenode: caller must pass a vognode" . into() ),
   }}
 
 /// Build a node from disk and
@@ -624,12 +619,13 @@ pub fn truenode_in_tree_is_indefinitive (
                            |viewnode| viewnode . kind . clone() )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   match node_kind {
-    ViewNodeKind::True (t)    => Ok (t . is_indefinitive ()),
-    ViewNodeKind::Deleted (_) => Ok (false),
-    ViewNodeKind::Inactive (_) => Ok (false),
-    ViewNodeKind::Unknown (_) => Ok (false),
-    ViewNodeKind::Scaff (_)   => Err ( "is_indefinitive: caller should not pass a Scaffold" . into( )),
-    ViewNodeKind::DeletedScaff (_) => Err ( "is_indefinitive: caller should not pass a DeletedScaff" . into( )),
+    ViewNodeKind::Vognode (Vognode::Normal (t)
+                           | Vognode::Phantom (t))   => Ok (t . is_indefinitive ()),
+    ViewNodeKind::Vognode (Vognode::Deleted (_))
+      | ViewNodeKind::Vognode (Vognode::Inactive (_))
+      | ViewNodeKind::Vognode (Vognode::Unknown (_)) => Ok (false),
+    _                                                => Err (
+      "is_indefinitive: caller must pass a vognode" . into( )),
   }}
 
 /// Collect all child tree NodeIds from a node.
@@ -665,7 +661,7 @@ where T: AsMut<ViewNode>,
     errors . push ( format! ( "{}: {}", error_msg, e )); }
   let mut node_mut : NodeMut<T> =
     tree . get_mut (node_id) . ok_or ("remove_completed_view_request: node not found") ?;
-  if let ViewNodeKind::True (t)
+  if let ViewNodeKind::Vognode (Vognode::Normal (t))
     = &mut node_mut . value () . as_mut () . kind
     { t . view_requests . remove (&view_request); }
   Ok (()) }
@@ -715,7 +711,7 @@ mod validate_parentIs_relationships_tests {
     nid    : NodeId,
   ) -> ParentIs {
     match & viewforest . get (nid) . unwrap () . value () . kind {
-      ViewNodeKind::True (t) => t . parentIs,
+      ViewNodeKind::Vognode (Vognode::Normal (t)) => t . parentIs,
       _ => panic! ("expected TrueNode") } }
 
   #[test]

@@ -13,7 +13,8 @@ use crate::types::env::find_source_with_optional_tantivy;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges, axes_from_per_stage_diffs};
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::phantom::title_for_phantom;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, viewnode_from_scaffold, mk_phantom_viewnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, mk_phantom_viewnode };
+use crate::types::viewnode::{Vognode, QualCol, Qual};
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::types::tree::viewnode_nodecomplete::pid_and_source_from_treenode;
 
@@ -36,31 +37,19 @@ pub fn apply_diff_to_viewforest (
     viewforest . root() . id();
   do_everywhere_in_tree_dfs (
     viewforest, root_id, true,
-    &mut |node_mut| { process_node_for_diff (
-                        node_mut, source_diffs,
-                        deleted_since_head_pid_src_map,
-                        tantivy_index, config ) } )?;
+    &mut |mut node_mut| {
+      match &node_mut . value() . kind . clone() {
+        ViewNodeKind::Vognode (Vognode::Normal (_)) =>
+          process_truenode_diff (
+            node_mut, source_diffs, deleted_since_head_pid_src_map,
+            tantivy_index, config ),
+        _ => Ok (( )) }} )?;
   Ok (( )) }
 
-/// Process a single node for diff markers.
 /// This is only used for de-novo views (multi_root_view).
 /// TODO : Sharing relationships (hides, overrides, subscribes) will need processing here.
-fn process_node_for_diff (
-  mut node_mut                   : NodeMut<ViewNode>,
-  source_diffs                   : &HashMap<SourceName, SourceDiff>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  tantivy_index                  : Option<&TantivyIndex>,
-  config                         : &SkgConfig,
-) -> Result<(), String> {
-  match &node_mut . value() . kind . clone() {
-    ViewNodeKind::True (_) =>
-      process_truenode_diff (
-        node_mut, source_diffs, deleted_since_head_pid_src_map,
-        tantivy_index, config ),
-    _ => Ok (()) }}
-
-/// Decorate a TrueNode (and its scaffold/phantom children) with the
-/// per-stage axes derived from staged and unstaged NodeCompleteDiffs.
+/// Decorate a normal vognode and generate any diff-only children
+/// implied by staged and unstaged NodeCompleteDiffs.
 fn process_truenode_diff (
   mut node_mut                   : NodeMut<ViewNode>,
   source_diffs                   : &HashMap<SourceName, SourceDiff>,
@@ -79,7 +68,7 @@ fn process_truenode_diff (
       Some (d) => d,
       None => return Ok (( )) };
   if ! source_diff . is_git_repo {
-    if let ViewNodeKind::True ( ref mut t )
+    if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
       = node_mut . value() . kind
       { t . not_in_git = true; }
     return Ok (( )); }
@@ -96,9 +85,10 @@ fn process_truenode_diff (
     staged   . and_then ( |d| d . status . to_existence_sign ());
   let unstaged_x : Option<Sign> =
     unstaged . and_then ( |d| d . status . to_existence_sign ());
-  if let ViewNodeKind::True ( ref mut t ) = node_mut . value() . kind {
-    t . existence . staged   = staged_x;
-    t . existence . unstaged = unstaged_x; }
+  if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
+    = node_mut . value() . kind
+    { t . existence . staged   = staged_x;
+      t . existence . unstaged = unstaged_x; }
   // For an Added or Deleted file we don't read node_changes
   // (the comparison is degenerate). NewHere/RemovedHere on children
   // and IDcol/textChanged scaffolds only apply to Modified files.
@@ -116,9 +106,14 @@ fn process_truenode_diff (
     . map ( |c| c . text_changed ) . unwrap_or (false);
   if staged_text || unstaged_text {
     node_mut . prepend (
-      viewnode_from_scaffold (
-        Scaffold::TextChanged { staged   : staged_text,
-                                unstaged : unstaged_text } )); }
+      ViewNode {
+        focused     : false,
+        folded      : false,
+        body_folded : false,
+        kind        : ViewNodeKind::Qual (
+          Qual::TextChanged {
+            staged   : staged_text,
+            unstaged : unstaged_text } ) } ); }
   let merged_ids : Vec<(ID, MembershipAxes)> =
     axes_from_per_stage_diffs (
       staged_changes   . map ( |c| c . ids_diff . as_slice () ),
@@ -145,17 +140,24 @@ fn prepend_idcol_with_children (
   merged_ids : &[(ID, MembershipAxes)],
 ) {
   let idcol_node : ViewNode =
-    viewnode_from_scaffold (Scaffold::IDCol);
+    ViewNode {
+      focused     : false,
+      folded      : false,
+      body_folded : false,
+      kind        : ViewNodeKind::QualCol (QualCol::ID) };
   let idcol_treeid : NodeId =
     node_mut . prepend (idcol_node) . id();
   let mut idcol_mut : NodeMut<ViewNode> =
     node_mut . tree() . get_mut (idcol_treeid) . unwrap();
   for (id, membership) in merged_ids {
-    let id_scaffold : Scaffold =
-      Scaffold::ID { id: id . clone (),
-                     membership: *membership };
     let id_viewnode : ViewNode =
-      viewnode_from_scaffold (id_scaffold);
+      ViewNode {
+        focused     : false,
+        folded      : false,
+        body_folded : false,
+        kind        : ViewNodeKind::Qual (
+          Qual::ID {
+            id: id . clone (), membership: *membership } ) };
     idcol_mut . append (id_viewnode); } }
 
 /// For each existing child in the worktree's contains list, copy any
@@ -176,9 +178,9 @@ fn mark_membership_on_existing_children (
       node_mut . tree() . get_mut (child_id) . unwrap();
     let child_id_and_membership : Option<(ID, &mut MembershipAxes)> =
       match &mut child . value() . kind {
-        ViewNodeKind::True (t) =>
+        ViewNodeKind::Vognode (Vognode::Normal (t)) =>
           Some ((t . id . clone (), &mut t . membership)),
-        ViewNodeKind::Inactive (i) =>
+        ViewNodeKind::Vognode (Vognode::Inactive (i)) =>
           Some ((i . id . clone (), &mut i . membership)),
         _ => None };
     if let Some ((id, membership)) = child_id_and_membership {

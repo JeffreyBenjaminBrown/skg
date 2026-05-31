@@ -32,7 +32,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nod
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::SkgConfig;
-use skg::types::viewnode::{ViewNode, ViewNodeKind, ParentIs};
+use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode, ParentIs};
 
 
 use ego_tree::{NodeId, Tree};
@@ -46,7 +46,9 @@ fn children_info (
 ) -> Vec<(String, ParentIs)> {
   tree . get (node_id) . unwrap () . children ()
     . filter_map ( |child| {
-      if let ViewNodeKind::True (t) = &child . value () . kind {
+      if let ViewNodeKind::Vognode (
+        Vognode::Normal (t) | Vognode::Phantom (t)) =
+        &child . value () . kind {
         Some (( t.id.0 . clone (), t.parentIs ))
       } else { None } } )
     . collect () }
@@ -59,7 +61,9 @@ fn find_child (
 ) -> Option<NodeId> {
   tree . get (parent) . unwrap () . children ()
     . find ( |child| {
-      if let ViewNodeKind::True (t) = &child . value () . kind {
+      if let ViewNodeKind::Vognode (
+        Vognode::Normal (t) | Vognode::Phantom (t)) =
+        &child . value () . kind {
         t.id.0 == pid
       } else { false } } )
     . map ( |n| n . id () ) }

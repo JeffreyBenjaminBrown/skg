@@ -1,15 +1,15 @@
-/// MaybePlaced variants of ViewNode and ViewNodeKind,
+/// Mp variants of ViewNode and ViewNodeKind,
 /// plus conversions between placed and maybePlaced trees.
-/// 'MaybePlaced' means id and source might be absent.
+/// 'Mp' means id and source might be absent.
 /// Only needed briefly after parsing a buffer from the client;
 /// after validation, converted to placed types.
 
-pub use super::viewnode::MaybePlacedTruenode;
+pub use super::viewnode::MpTruenode;
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
-use super::tree::forest::{MaybePlacedViewForest, ViewForest};
+use super::tree::forest::{MpViewForest, ViewForest};
 use super::git::{ExistenceAxes, MembershipAxes};
-use super::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Scaffold, ScaffoldKind, DeletedNode, InactiveNode, UnknownNode, GraphNodeStats, ViewNodeStats, IndefOrDef, ParentIs, };
+use super::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Vognode, QualCol, Qual, RoleCol, DeletedNode, InactiveNode, UnknownNode, GraphNodeStats, ViewNodeStats, IndefOrDef, ParentIs, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -19,36 +19,45 @@ use std::collections::{HashMap, HashSet};
 //
 
 /// Every ViewNode has an ID and a source.
-/// In MaybePlacedViewnode, those two fields are optional.
+/// In MpViewnode, those two fields are optional.
 /// That's the only difference.
 #[derive(Debug, Clone, PartialEq)]
-pub struct MaybePlacedViewnode {
+pub struct MpViewnode {
   pub focused     : bool,
   pub folded      : bool,
   pub body_folded : bool,
-  pub kind        : MaybePlacedViewnodeKind,
+  pub kind        : MpViewnodeKind,
 }
 
-// MaybePlacedTruenode is defined in viewnode.rs.
+// MpTruenode is defined in viewnode.rs.
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum MaybePlacedViewnodeKind {
-  True         (MaybePlacedTruenode),
-  Scaff        (Scaffold),  // Scaffold is shared - scaffolds never have IDs
-  Deleted      (DeletedNode),
-  DeletedScaff (ScaffoldKind),
-  Inactive     (InactiveNode),
-  Unknown      (UnknownNode),
+pub enum MpViewnodeKind {
+  Vognode      (MpVognode),
+  QualCol      (QualCol),
+  Qual         (Qual),
+  PartnerCol   (RoleCol),
+  BufferRoot,
+  DeadScaffold,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum MpVognode {
+  Normal   (MpTruenode),
+  Phantom  (MpTruenode),
+  Inactive (InactiveNode),
+  Unknown  (UnknownNode),
+  Deleted  (DeletedNode),
 }
 
 //
 // Conversion implementations
 //
 
-impl TryFrom<MaybePlacedTruenode> for TrueNode {
+impl TryFrom<MpTruenode> for TrueNode {
   type Error = String;
 
-  fn try_from(u: MaybePlacedTruenode) -> Result<Self, Self::Error> {
+  fn try_from(u: MpTruenode) -> Result<Self, Self::Error> {
     let id = u . id . ok_or_else(
       || format!("Node '{}' has no ID", u . title))?;
     let source = u . source . ok_or_else(
@@ -69,29 +78,39 @@ impl TryFrom<MaybePlacedTruenode> for TrueNode {
   }
 }
 
-impl TryFrom<MaybePlacedViewnodeKind> for ViewNodeKind {
+impl TryFrom<MpViewnodeKind> for ViewNodeKind {
   type Error = String;
 
-  fn try_from(u: MaybePlacedViewnodeKind) -> Result<Self, Self::Error> {
+  fn try_from(u: MpViewnodeKind) -> Result<Self, Self::Error> {
     match u {
-      MaybePlacedViewnodeKind::True (t) =>
-        Ok(ViewNodeKind::True(TrueNode::try_from (t)?)),
-      MaybePlacedViewnodeKind::Scaff (s) =>
-        Ok(ViewNodeKind::Scaff (s)),
-      MaybePlacedViewnodeKind::Deleted (d) =>
-        Ok(ViewNodeKind::Deleted (d)),
-      MaybePlacedViewnodeKind::DeletedScaff (kind) =>
-        Ok (ViewNodeKind::DeletedScaff (kind)),
-      MaybePlacedViewnodeKind::Inactive (i) =>
-        Ok (ViewNodeKind::Inactive (i)),
-      MaybePlacedViewnodeKind::Unknown (u) =>
-        Ok (ViewNodeKind::Unknown (u)) }}
+      MpViewnodeKind::Vognode (MpVognode::Normal (t)) =>
+        Ok (ViewNodeKind::Vognode (
+          Vognode::Normal (TrueNode::try_from (t)?))),
+      MpViewnodeKind::Vognode (MpVognode::Phantom (t)) =>
+        Ok (ViewNodeKind::Vognode (
+          Vognode::Phantom (TrueNode::try_from (t)?))),
+      MpViewnodeKind::Vognode (MpVognode::Deleted (d)) =>
+        Ok (ViewNodeKind::Vognode (Vognode::Deleted (d))),
+      MpViewnodeKind::Vognode (MpVognode::Inactive (i)) =>
+        Ok (ViewNodeKind::Vognode (Vognode::Inactive (i))),
+      MpViewnodeKind::Vognode (MpVognode::Unknown (u)) =>
+        Ok (ViewNodeKind::Vognode (Vognode::Unknown (u))),
+      MpViewnodeKind::QualCol (c) =>
+        Ok (ViewNodeKind::QualCol (c)),
+      MpViewnodeKind::Qual (q) =>
+        Ok (ViewNodeKind::Qual (q)),
+      MpViewnodeKind::PartnerCol (r) =>
+        Ok (ViewNodeKind::PartnerCol (r)),
+      MpViewnodeKind::BufferRoot =>
+        Ok (ViewNodeKind::BufferRoot),
+      MpViewnodeKind::DeadScaffold =>
+        Ok (ViewNodeKind::DeadScaffold), }}
 }
 
-impl TryFrom<MaybePlacedViewnode> for ViewNode {
+impl TryFrom<MpViewnode> for ViewNode {
   type Error = String;
 
-  fn try_from(u: MaybePlacedViewnode) -> Result<Self, Self::Error> {
+  fn try_from(u: MpViewnode) -> Result<Self, Self::Error> {
     Ok(ViewNode {
       focused     : u . focused,
       folded      : u . folded,
@@ -103,9 +122,9 @@ impl TryFrom<MaybePlacedViewnode> for ViewNode {
 
 // Infallible conversions from placed to maybePlaced types.
 
-impl From<TrueNode> for MaybePlacedTruenode {
+impl From<TrueNode> for MpTruenode {
   fn from(t: TrueNode) -> Self {
-    MaybePlacedTruenode {
+    MpTruenode {
       title          : t . title,
       id             : Some(t . id),
       source         : Some(t . source),
@@ -121,50 +140,60 @@ impl From<TrueNode> for MaybePlacedTruenode {
   }
 }
 
-impl From<ViewNodeKind> for MaybePlacedViewnodeKind {
+impl From<ViewNodeKind> for MpViewnodeKind {
   fn from(k: ViewNodeKind) -> Self {
     match k {
-      ViewNodeKind::True (t) =>
-        MaybePlacedViewnodeKind::True(MaybePlacedTruenode::from (t)),
-      ViewNodeKind::Scaff (s) =>
-        MaybePlacedViewnodeKind::Scaff (s),
-      ViewNodeKind::Deleted (d) =>
-        MaybePlacedViewnodeKind::Deleted (d),
-      ViewNodeKind::DeletedScaff (kind) =>
-        MaybePlacedViewnodeKind::DeletedScaff (kind),
-      ViewNodeKind::Inactive (i) =>
-        MaybePlacedViewnodeKind::Inactive (i),
-      ViewNodeKind::Unknown (u) =>
-        MaybePlacedViewnodeKind::Unknown (u) }}
+      ViewNodeKind::Vognode (Vognode::Normal (t)) =>
+        MpViewnodeKind::Vognode (
+          MpVognode::Normal (MpTruenode::from (t))),
+      ViewNodeKind::Vognode (Vognode::Phantom (t)) =>
+        MpViewnodeKind::Vognode (
+          MpVognode::Phantom (MpTruenode::from (t))),
+      ViewNodeKind::Vognode (Vognode::Deleted (d)) =>
+        MpViewnodeKind::Vognode (MpVognode::Deleted (d)),
+      ViewNodeKind::Vognode (Vognode::Inactive (i)) =>
+        MpViewnodeKind::Vognode (MpVognode::Inactive (i)),
+      ViewNodeKind::Vognode (Vognode::Unknown (u)) =>
+        MpViewnodeKind::Vognode (MpVognode::Unknown (u)),
+      ViewNodeKind::QualCol (c) =>
+        MpViewnodeKind::QualCol (c),
+      ViewNodeKind::Qual (q) =>
+        MpViewnodeKind::Qual (q),
+      ViewNodeKind::PartnerCol (r) =>
+        MpViewnodeKind::PartnerCol (r),
+      ViewNodeKind::BufferRoot =>
+        MpViewnodeKind::BufferRoot,
+      ViewNodeKind::DeadScaffold =>
+        MpViewnodeKind::DeadScaffold, }}
 }
 
-impl From<ViewNode> for MaybePlacedViewnode {
+impl From<ViewNode> for MpViewnode {
   fn from(o: ViewNode) -> Self {
-    MaybePlacedViewnode {
+    MpViewnode {
       focused     : o . focused,
       folded      : o . folded,
       body_folded : o . body_folded,
-      kind        : MaybePlacedViewnodeKind::from(o . kind),
+      kind        : MpViewnodeKind::from(o . kind),
     }
   }
 }
 
 /// Does *not* compute missing source or ID.
-/// Merely converts a Tree<MaybePlacedViewnode>
+/// Merely converts a Tree<MpViewnode>
 ///              to a Tree<ViewNode>,
 /// failing if it finds any source or ID missing.
 pub fn maybePlaced_to_placed_tree (
-  unchecked: Tree<MaybePlacedViewnode>
+  unchecked: Tree<MpViewnode>
 ) -> Result<Tree<ViewNode>, String> {
   Ok (
     maybePlaced_to_placed_viewforest (
-      MaybePlacedViewForest::from_internal_tree (unchecked)) ?
+      MpViewForest::from_internal_tree (unchecked)) ?
     . into_internal_tree () ) }
 
 pub fn maybePlaced_to_placed_viewforest (
-  unchecked: MaybePlacedViewForest
+  unchecked: MpViewForest
 ) -> Result<ViewForest, String> {
-  let unchecked : Tree<MaybePlacedViewnode> =
+  let unchecked : Tree<MpViewnode> =
     unchecked . into_internal_tree ();
   let unchecked_root_id: NodeId =
     unchecked . root() . id();
@@ -201,14 +230,14 @@ pub fn maybePlaced_to_placed_viewforest (
       Ok (( )) } )?;
   Ok (ViewForest::from_internal_tree (checked)) }
 
-/// Convert a placed ViewNode tree to an MaybePlacedViewnode tree.
+/// Convert a placed ViewNode tree to an MpViewnode tree.
 /// Infallible since checked types always satisfy maybePlaced requirements.
 pub fn placed_to_maybePlaced_tree(
   checked: &Tree<ViewNode>
-) -> Tree<MaybePlacedViewnode> {
+) -> Tree<MpViewnode> {
   fn convert_children(
     checked_tree   : &Tree<ViewNode>,
-    unchecked_tree : &mut Tree<MaybePlacedViewnode>,
+    unchecked_tree : &mut Tree<MpViewnode>,
     checked_id     : NodeId,
     unchecked_id   : NodeId,
   ) {
@@ -226,11 +255,11 @@ pub fn placed_to_maybePlaced_tree(
         . get (checked_child_id)
         . unwrap()
         . value();
-      let unchecked_child : MaybePlacedViewnode =
-        MaybePlacedViewnode::from(checked_child . clone());
+      let unchecked_child : MpViewnode =
+        MpViewnode::from(checked_child . clone());
 
       let unchecked_child_id : NodeId =
-        { let mut parent_mut : NodeMut<MaybePlacedViewnode> =
+        { let mut parent_mut : NodeMut<MpViewnode> =
            unchecked_tree . get_mut (unchecked_id) . unwrap();
          parent_mut . append (unchecked_child) . id() };
 
@@ -244,9 +273,9 @@ pub fn placed_to_maybePlaced_tree(
 
   let root_checked : &ViewNode =
     checked . root() . value();
-  let root_unchecked : MaybePlacedViewnode =
-    MaybePlacedViewnode::from(root_checked . clone());
-  let mut unchecked : Tree<MaybePlacedViewnode> =
+  let root_unchecked : MpViewnode =
+    MpViewnode::from(root_checked . clone());
+  let mut unchecked : Tree<MpViewnode> =
     Tree::new (root_unchecked);
 
   let checked_root_id : NodeId =
@@ -262,9 +291,9 @@ pub fn placed_to_maybePlaced_tree(
 // Defaults
 //
 
-impl Default for MaybePlacedTruenode {
+impl Default for MpTruenode {
   fn default() -> Self {
-    MaybePlacedTruenode {
+    MpTruenode {
       title          : String::new(),
       id             : None,
       source         : None,
@@ -282,13 +311,14 @@ impl Default for MaybePlacedTruenode {
   }
 }
 
-impl Default for MaybePlacedViewnode {
+impl Default for MpViewnode {
   fn default() -> Self {
-    MaybePlacedViewnode {
+    MpViewnode {
       focused     : false,
       folded      : false,
       body_folded : false,
-      kind        : MaybePlacedViewnodeKind::True(MaybePlacedTruenode::default()),
+      kind        : MpViewnodeKind::Vognode (
+        MpVognode::Normal (MpTruenode::default())),
     }
   }
 }
@@ -297,67 +327,95 @@ impl Default for MaybePlacedViewnode {
 // Helper methods
 //
 
-impl MaybePlacedViewnode {
-  /// Reasonable for both TrueNodes and Scaffolds.
+impl MpViewnode {
   pub fn title (&self) -> &str {
     match &self . kind {
-      MaybePlacedViewnodeKind::True (t)    => &t . title,
-      MaybePlacedViewnodeKind::Scaff (s)   => s . title(),
-      MaybePlacedViewnodeKind::Deleted (d) => &d . title,
-      MaybePlacedViewnodeKind::DeletedScaff (kind) =>
-        kind . default_title (),
-      MaybePlacedViewnodeKind::Inactive (_) => "",
-      MaybePlacedViewnodeKind::Unknown (_) => "", }}
+      MpViewnodeKind::Vognode (MpVognode::Normal (t))
+        | MpViewnodeKind::Vognode (MpVognode::Phantom (t)) =>
+        &t . title,
+      MpViewnodeKind::Vognode (MpVognode::Deleted (d)) =>
+        &d . title,
+      MpViewnodeKind::Qual (q) =>
+        q . title (),
+      MpViewnodeKind::QualCol (_)
+        | MpViewnodeKind::PartnerCol (_)
+        | MpViewnodeKind::BufferRoot
+        | MpViewnodeKind::DeadScaffold
+        | MpViewnodeKind::Vognode (MpVognode::Inactive (_))
+        | MpViewnodeKind::Vognode (MpVognode::Unknown (_)) =>
+        "", }}
 
   /// A distinguishable label for error messages.
   pub fn error_label (&self) -> String {
     match &self . kind {
-      MaybePlacedViewnodeKind::True (t)    => t . title . clone(),
-      MaybePlacedViewnodeKind::Scaff (s)   => s . error_label(),
-      MaybePlacedViewnodeKind::Deleted (d) =>
+      MpViewnodeKind::Vognode (MpVognode::Normal (t))
+        | MpViewnodeKind::Vognode (MpVognode::Phantom (t))
+        => t . title . clone(),
+      MpViewnodeKind::Qual (Qual::Alias { text, .. }) =>
+        format!("qual:alias({})", text),
+      MpViewnodeKind::Qual (Qual::ID { id, .. }) =>
+        format!("qual:id({})", id),
+      MpViewnodeKind::Qual (Qual::TextChanged { .. }) =>
+        "qual:textChanged" . to_string (),
+      MpViewnodeKind::QualCol (col) =>
+        format!("qualCol:{}", col . repr_in_client ()),
+      MpViewnodeKind::PartnerCol (roleCol) =>
+        format!("partnerCol:{}", roleCol . repr_in_client ()),
+      MpViewnodeKind::BufferRoot =>
+        "forestRoot" . to_string (),
+      MpViewnodeKind::Vognode (MpVognode::Deleted (d)) =>
         format!("deleted:{}", d . id . 0),
-      MaybePlacedViewnodeKind::DeletedScaff (kind) =>
-        format!("deletedScaffold:{}", kind . repr_in_client ()),
-      MaybePlacedViewnodeKind::Inactive (i) =>
+      MpViewnodeKind::DeadScaffold =>
+        "deadScaffold" . to_string (),
+      MpViewnodeKind::Vognode (MpVognode::Inactive (i)) =>
         format!("inactive:{}", i . id . 0),
-      MaybePlacedViewnodeKind::Unknown (u) =>
+      MpViewnodeKind::Vognode (MpVognode::Unknown (u)) =>
         format!("unknown:{}", u . id . 0), }}
 
-  /// Reasonable for both TrueNodes and Scaffolds.
+  /// The body text to render for this node, when it has one.
   pub fn body (&self) -> Option<&String> {
     match &self . kind {
-      MaybePlacedViewnodeKind::True (t)    => t . body (),
-      MaybePlacedViewnodeKind::Scaff (_)   => None,
-      MaybePlacedViewnodeKind::Deleted (d) => d . body . as_ref(),
-      MaybePlacedViewnodeKind::DeletedScaff (_) => None,
-      MaybePlacedViewnodeKind::Inactive (_) => None,
-      MaybePlacedViewnodeKind::Unknown (_) => None, }}
+      MpViewnodeKind::Vognode (MpVognode::Normal (t))
+        | MpViewnodeKind::Vognode (MpVognode::Phantom (t))
+        => t . body (),
+      MpViewnodeKind::Vognode (MpVognode::Deleted (d)) =>
+        d . body . as_ref(),
+      MpViewnodeKind::QualCol (_)
+        | MpViewnodeKind::Qual (_)
+        | MpViewnodeKind::PartnerCol (_)
+        | MpViewnodeKind::BufferRoot
+        | MpViewnodeKind::DeadScaffold
+        | MpViewnodeKind::Vognode (MpVognode::Inactive (_))
+        | MpViewnodeKind::Vognode (MpVognode::Unknown (_)) =>
+        None, }}
 
   /// PITFALL: Don't let this convince you a Scaff can have an ID.
   pub fn id_opt (&self) -> Option<&ID> {
     match &self . kind {
-      MaybePlacedViewnodeKind::True (t)    => t . id . as_ref(),
-      MaybePlacedViewnodeKind::Scaff (_)   => None,
-      MaybePlacedViewnodeKind::Deleted (d) => Some(&d . id),
-      MaybePlacedViewnodeKind::DeletedScaff (_) => None,
-      MaybePlacedViewnodeKind::Inactive (i) => Some(&i . id),
-      MaybePlacedViewnodeKind::Unknown (u) => Some(&u . id), }}
+      MpViewnodeKind::Vognode (MpVognode::Normal (t))
+        | MpViewnodeKind::Vognode (MpVognode::Phantom (t))
+        => t . id . as_ref(),
+      MpViewnodeKind::Vognode (MpVognode::Deleted (d)) =>
+        Some (&d . id),
+      MpViewnodeKind::Vognode (MpVognode::Inactive (i)) =>
+        Some (&i . id),
+      MpViewnodeKind::Vognode (MpVognode::Unknown (u)) =>
+        Some (&u . id),
+      MpViewnodeKind::QualCol (_)
+        | MpViewnodeKind::Qual (_)
+        | MpViewnodeKind::PartnerCol (_)
+        | MpViewnodeKind::BufferRoot
+        | MpViewnodeKind::DeadScaffold =>
+        None, }}
 }
 
 //
 // Constructor functions for maybePlaced types
 //
 
-pub fn maybePlaced_viewforest_root_viewnode() -> MaybePlacedViewnode {
-  MaybePlacedViewnode {
+pub fn maybePlaced_viewforest_root_viewnode() -> MpViewnode {
+  MpViewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind        : MaybePlacedViewnodeKind::Scaff (Scaffold::BufferRoot), }}
-
-pub fn maybe_placed_viewnode_from_scaffold(scaffold: Scaffold) -> MaybePlacedViewnode {
-  MaybePlacedViewnode {
-    focused     : false,
-    folded      : false,
-    body_folded : false,
-    kind        : MaybePlacedViewnodeKind::Scaff (scaffold), }}
+    kind        : MpViewnodeKind::BufferRoot, }}

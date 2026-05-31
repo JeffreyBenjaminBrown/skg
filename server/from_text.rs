@@ -15,7 +15,7 @@ use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::SkgConfig;
 use crate::types::save::{Merge, DefineNode, SourceMove};
 use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
-use crate::types::tree::forest::{MaybePlacedViewForest, ViewForest};
+use crate::types::tree::forest::{MpViewForest, ViewForest};
 
 use buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use buffer_to_viewnodes::add_missing_info::{
@@ -52,7 +52,7 @@ pub async fn buffer_to_validated_saveplan (
   driver      : &TypeDBDriver,
 ) -> Result<SavePlan, SaveError> {
   let ( mut maybePlaced_viewforest, parsing_errors )
-    : ( MaybePlacedViewForest, Vec<BufferValidationError> )
+    : ( MpViewForest, Vec<BufferValidationError> )
     = { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "org_to_uninterpreted_viewforest" ). entered();
         // parse the raw buffer

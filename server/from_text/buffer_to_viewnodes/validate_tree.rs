@@ -2,8 +2,9 @@ pub mod contradictory_instructions;
 
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{ParentIs, ViewRequest};
-use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
-use crate::types::tree::forest::MaybePlacedViewForest;
+use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
+use crate::types::maybe_placed_viewnode::MpVognode;
+use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::errors::BufferValidationError;
 use crate::merge::validate_merge::validate_merge_requests;
@@ -20,7 +21,7 @@ use typedb_driver::TypeDBDriver;
 /// SHARES RESPONSIBILITY for error detection
 /// with 'org_to_uninterpreted_nodes',
 /// which runs earlier and detects a few errors that this one can't,
-/// because this one acts on a tree of MaybePlacedViewnodes rather than raw text.
+/// because this one acts on a tree of MpViewnodes rather than raw text.
 /// (Namely, Alias and AliasCol should not have body text.)
 ///
 /// ASSUMES that in the viewforest:
@@ -33,7 +34,7 @@ use typedb_driver::TypeDBDriver;
 /// but role classification, save-intent extraction, and disk
 /// supplementation have not happened yet.
 pub async fn find_buffer_errors_for_saving (
-  viewforest: &MaybePlacedViewForest,
+  viewforest: &MpViewForest,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<BufferValidationError>,
@@ -88,14 +89,14 @@ pub async fn find_buffer_errors_for_saving (
   Ok (errors) }
 
 fn validate_view_roots (
-  viewforest : &MaybePlacedViewForest,
+  viewforest : &MpViewForest,
   errors     : &mut Vec<BufferValidationError>,
 ) {
   for root in viewforest . roots () {
     if ! matches! (
       &root . value () . kind,
-      MaybePlacedViewnodeKind::True (_)
-        | MaybePlacedViewnodeKind::Deleted (_))
+      MpViewnodeKind::Vognode (MpVognode::Normal (_))
+        | MpViewnodeKind::Vognode (MpVognode::Deleted (_)))
     { errors . push (
         BufferValidationError::Other (
           "View roots must be TrueNodes or DeletedNodes."
@@ -111,29 +112,36 @@ fn validate_view_roots (
 /// - No other node with the same ID has a definitive view request,
 ///   because there can only be one definitive view.
 fn validate_definitive_view_requests (
-  viewforest : &MaybePlacedViewForest,
+  viewforest : &MpViewForest,
   errors : &mut Vec<BufferValidationError>,
 ) {
   let mut ids_with_requests : HashSet<ID> =
     HashSet::new();
   for edge in viewforest . root() . traverse()
   { if let Edge::Open (node_ref) = edge
-    { let viewnode : &MaybePlacedViewnode =
+    { let viewnode : &MpViewnode =
         node_ref . value();
-      if let MaybePlacedViewnodeKind::True (t) = &viewnode . kind
+      if let MpViewnodeKind::Vognode (
+        MpVognode::Normal (t)
+        | MpVognode::Phantom (t))
+      = &viewnode . kind
       { if t . view_requests . contains (&ViewRequest::Definitive)
         { if let Some (id) = &t . id {
-          { // Error: must be indefinitive
+          { // Must be indefinitive
             if ! t . is_indefinitive ()
-            { errors . push( BufferValidationError::DefinitiveRequestOnDefinitiveNode( id . clone() )); }}
-          { // Error: must have no content children.
+            { errors . push( BufferValidationError::DefinitiveRequestOnDefinitiveNode(
+              id . clone() )); }}
+          { // Must have no content children.
             let has_content_children : bool =
               node_ref . children () . any ( |child| matches! (
                 &child . value () . kind,
-                MaybePlacedViewnodeKind::True (ct)
+                MpViewnodeKind::Vognode (MpVognode::Normal (ct))
                   if ct . parentIs == ParentIs::Container ));
             if has_content_children
-            { errors . push( BufferValidationError::DefinitiveRequestOnNodeWithContentChildren( id . clone() )); }}
-          { // Error: at most one request per ID
+            { errors . push(
+              BufferValidationError::DefinitiveRequestOnNodeWithContentChildren(
+                id . clone() )); }}
+          { // At most one request per ID
             if ! ids_with_requests . insert(id . clone())
-            { errors . push( BufferValidationError::MultipleDefinitiveRequestsForSameId( id . clone() )); }} }}} }} }
+            { errors . push( BufferValidationError::MultipleDefinitiveRequestsForSameId(
+              id . clone() )); }} }}} }}}

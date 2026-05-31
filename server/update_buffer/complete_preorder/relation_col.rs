@@ -4,12 +4,11 @@ use crate::to_org::complete::sharing::child_data::{
   ChildData,
   reconcile_sharing_scaffold_children,
 };
-use crate::types::viewnode::RoleCol;
 use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::pid_and_source_from_ancestor;
-use crate::types::viewnode::{ParentIs, ViewNode};
+use crate::types::viewnode::{ParentIs, RoleCol, ViewNode};
 use crate::update_buffer::util::mark_managed_children_outside_goal_independent;
 
 use ego_tree::{NodeId, Tree};

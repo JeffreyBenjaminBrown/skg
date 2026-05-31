@@ -1,5 +1,5 @@
 use crate::types::maybe_placed_viewnode::{
-  MaybePlacedViewnode,
+  MpViewnode,
   maybePlaced_viewforest_root_viewnode};
 use crate::types::viewnode::{ViewNode, viewforest_root_viewnode};
 
@@ -16,14 +16,14 @@ pub struct Forest<T> {
   tree : Tree<T> }
 
 pub type ViewForest = Forest<ViewNode>;
-pub type MaybePlacedViewForest = Forest<MaybePlacedViewnode>;
+pub type MpViewForest = Forest<MpViewnode>;
 
 impl Forest<ViewNode> {
   pub fn new () -> Self {
     Forest { tree : Tree::new (
       viewforest_root_viewnode () ) }}}
 
-impl Forest<MaybePlacedViewnode> {
+impl Forest<MpViewnode> {
   pub fn new () -> Self {
     Forest { tree : Tree::new (
       maybePlaced_viewforest_root_viewnode () ) }}}

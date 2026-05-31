@@ -2,6 +2,7 @@ use crate::dbs::in_rust_graph::snapshot_global;
 use crate::types::many_to_many::ManyToMany;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::ViewNodeKind;
+use crate::types::viewnode::Vognode;
 use super::misc::ID;
 
 use std::collections::{HashMap, HashSet};
@@ -118,8 +119,11 @@ impl OpenViews {
       let pids : HashSet<ID> =
         new_viewforest . nodes ()
         . filter_map ( |n| match &n . value () . kind {
-          ViewNodeKind::True (t)    => Some ( t . id . clone () ),
-          ViewNodeKind::Deleted (d) => Some ( d . id . clone () ),
+          ViewNodeKind::Vognode (
+            v @ (Vognode::Normal (_)
+                 | Vognode::Phantom (_)
+                 | Vognode::Deleted (_))) =>
+            Some ( v . id () . clone () ),
           _ => None } )
         . collect ();
       self . root_ids . remove_right (uri);
@@ -171,7 +175,9 @@ fn root_ids_from_viewforest (
   let mut ids : HashSet<ID> = HashSet::new ();
   let graph_snap = snapshot_global ();
   for child in viewforest . roots () {
-    if let ViewNodeKind::True (t) = &child . value () . kind {
+    if let ViewNodeKind::Vognode (v) = &child . value () . kind {
+      let Some (t) = v . normal_or_phantom ()
+        else { continue; };
       ids . insert ( t . id . clone () );
       if let Some (graph) = graph_snap . as_ref () {
         if let Some (pid) = graph . pid_of ( &t . id ) {

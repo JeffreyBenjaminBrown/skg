@@ -187,14 +187,14 @@ Constructed in two steps:
 ** Expected initial structure (titles)
 
 Scaffold rendering uses fixed titles ("it subscribes to these",
-"hidden from this subscription", etc.) defined in
-=server/types/viewnode.rs= =Scaffold::title()=. The expected
-=headline-titles= output is approximately:
+=server/types/viewnode.rs=. Non-vognode collection headlines no
+longer carry explanatory titles; the client herald rules explain them.
+The expected =headline-titles= output is approximately:
 
 #+begin_example
 ((1 . "1")
  (2 . "11")
- (3 . "its aliases")
+ (3 . "")
  (4 . "eleven")
  (3 . "it subscribes to these")
  (4 . "subee")

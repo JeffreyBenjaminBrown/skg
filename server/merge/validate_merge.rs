@@ -8,7 +8,8 @@
 ///     - No node can be involved in more than one merge.
 
 use crate::types::viewnode::EditRequest;
-use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind, MaybePlacedTruenode};
+use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpTruenode};
+use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::misc::{ID, SkgConfig};
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use ego_tree::Tree;
@@ -17,7 +18,7 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 struct MergeValidationData<'a> {
-  acquirer_viewnodes     : Vec<&'a MaybePlacedViewnode>,
+  acquirer_viewnodes    : Vec<&'a MpViewnode>,
   acquirer_to_acquirees : HashMap<ID, HashSet<ID>>,
   acquiree_to_acquirers : HashMap<ID, HashSet<ID>>,
   to_delete_ids         : HashSet<ID>, }
@@ -26,7 +27,7 @@ struct MergeValidationData<'a> {
 /// Returns a vector of validation error messages,
 /// which is empty if all are valid.
 pub async fn validate_merge_requests(
-  viewforest: &Tree<MaybePlacedViewnode>,
+  viewforest: &Tree<MpViewnode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<String>, Box<dyn Error>> {
@@ -34,13 +35,11 @@ pub async fn validate_merge_requests(
   let merge_validation_data : MergeValidationData =
     collect_merge_validation_data (viewforest);
   for node in merge_validation_data . acquirer_viewnodes {
-    let t : &MaybePlacedTruenode = match &node . kind {
-      MaybePlacedViewnodeKind::True (t) => t,
-      MaybePlacedViewnodeKind::Scaff (s) => {
-        errors . push(format!(
-          "Acquirer node cannot be a Scaffold: {:?}", s));
-        continue; }
-      _ => continue };
+    let t : &MpTruenode = match &node . kind {
+      MpViewnodeKind::Vognode (MpVognode::Normal (t)) => t,
+      _ => { errors . push(format!( "Acquirer must be a vognode that exists: {:?}",
+                                     node . kind));
+             continue; }};
     let acquirer_id : &ID = match &t . id {
       Some (id) => id,
       None => { errors . push(format!(
@@ -63,17 +62,18 @@ pub async fn validate_merge_requests(
 /// To understand what this function does,
 /// it's easiest to read the definition of its return type.
 fn collect_merge_validation_data<'a>(
-  viewforest: &'a Tree<MaybePlacedViewnode>,
+  viewforest: &'a Tree<MpViewnode>,
 ) -> MergeValidationData<'a> {
-  let mut acquirer_viewnodes : Vec<&MaybePlacedViewnode> = Vec::new();
+  let mut acquirer_viewnodes : Vec<&MpViewnode> = Vec::new();
   let mut acquirer_to_acquirees : HashMap<ID, HashSet<ID>> = HashMap::new();
   let mut acquiree_to_acquirers : HashMap<ID, HashSet<ID>> = HashMap::new();
   let mut to_delete_ids : HashSet<ID> = HashSet::new();
   for edge in viewforest . root() . traverse() {
     if let ego_tree::iter::Edge::Open (node_ref) = edge {
-      let viewnode : &MaybePlacedViewnode = node_ref . value();
-      if let MaybePlacedViewnodeKind::True (t) = &viewnode . kind {
-        if let Some (id) = &t . id {
+      let viewnode : &MpViewnode = node_ref . value();
+      if let MpViewnodeKind::Vognode (MpVognode::Normal (t))
+        = &viewnode . kind
+      { if let Some (id) = &t . id {
           if matches!(t . edit_request (),
                       Some (EditRequest::Delete)) {
             to_delete_ids . insert(id . clone()); } // mutate!

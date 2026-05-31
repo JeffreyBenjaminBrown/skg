@@ -29,7 +29,8 @@ use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_t
 use crate::types::tree::forest::ViewForest;
 use crate::to_org::util::{mark_view_roots_parent_absent, validate_parentIs_relationships};
 use crate::dbs::in_rust_graph::snapshot_global;
-use crate::types::viewnode::{IndefOrDef, ViewNode, ViewNodeKind, Scaffold};
+use crate::types::viewnode::{IndefOrDef, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{Vognode, QualCol, Qual};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -329,26 +330,28 @@ fn rewriteInPlace_viewnodes_whose_id_is_newly_extra (
       let n_ref = viewforest . get (nid) . ok_or (
         "rewriteInPlace_viewnodes_whose_id_is_newly_extra: node not found") ?;
       match &n_ref . value () . kind {
-        ViewNodeKind::True (t) => {
-          match graph_snap . pid_of (&t . id) {
-            Some (primary) if primary != t . id => {
-              graph_snap . get (&primary) . map ( |r| (
-                primary . clone (),
-                r . source . clone (),
-                r . title . clone (),
-                r . body . clone () )) },
-            _ => None } },
+        ViewNodeKind::Vognode (Vognode::Normal (t)
+                               | Vognode::Phantom (t))
+          => { match graph_snap . pid_of (&t . id)
+               { Some (primary) if primary != t . id => {
+                     graph_snap . get (&primary) . map ( |r| (
+                       primary . clone (),
+                       r . source . clone (),
+                       r . title . clone (),
+                       r . body . clone () )) },
+                 _ => None } },
         _ => None } };
     if let Some ((new_pid, new_source, new_title, new_body)) = swap
     { let mut n_mut = viewforest . get_mut (nid)
         . ok_or ("rewriteInPlace_viewnodes_whose_id_is_newly_extra: node_mut failed") ?;
-      if let ViewNodeKind::True (t) = &mut n_mut . value () . kind {
-        t . id = new_pid;
+      if let ViewNodeKind::Vognode (Vognode::Normal (t))
+      = &mut n_mut . value () . kind
+      { t . id = new_pid;
         t . source = new_source;
         t . title = new_title;
         if let IndefOrDef::Definitive { body, .. }
-          = &mut t . indef_or_def {
-            *body = new_body; }} }}
+        = &mut t . indef_or_def
+        { *body = new_body; }} }}
   Ok (( )) }
 
 /// Reset all traces of a prior diff-view rendering so the viewforest
@@ -396,9 +399,8 @@ fn remove_branches_that_git_marked_removed (
           None => false } };
       let should_remove : bool =
         match &node . value() . kind {
-          ViewNodeKind::True (t) =>
-            t . is_phantom ()
-            && ! is_viewforest_root_child
+          ViewNodeKind::Vognode (Vognode::Phantom (t)) =>
+            ! is_viewforest_root_child
             && ! t . parent_ignores_it(),
           _ => false };
       if should_remove {
@@ -427,8 +429,8 @@ fn remove_diff_only_scaffolds (
     &mut |mut node : NodeMut<ViewNode>| -> Result<bool, String> {
       let is_diff_scaffold : bool =
         matches! ( &node . value() . kind,
-          ViewNodeKind::Scaff (Scaffold::TextChanged { .. }) |
-          ViewNodeKind::Scaff (Scaffold::IDCol) );
+          ViewNodeKind::Qual (Qual::TextChanged { .. }) |
+          ViewNodeKind::QualCol (QualCol::ID) );
       if is_diff_scaffold {
         node . detach();
         Ok (false) // pruned — don't recurse into detached children
@@ -451,7 +453,8 @@ fn clear_diff_metadata (
       { // Ignores scaffolds: some (Alias, ID) carry diff data,
         // but they are regenerated from scratch by their postorder
         // completers, so clearing them here is unnecessary.
-        if let ViewNodeKind::True (t)
+        if let ViewNodeKind::Vognode (Vognode::Normal (t)
+                                      | Vognode::Phantom (t))
           = &mut node . value() . kind
           { t . existence  = ExistenceAxes::default ();
             t . membership = MembershipAxes::default ();
@@ -473,9 +476,11 @@ async fn attach_containerward_ancestries_to_removedhere_phantoms (
     let mut result : Vec<NodeId> = Vec::new ();
     for edge in viewforest . root () . traverse () {
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
-        if let ViewNodeKind::True (t) = &node_ref . value () . kind {
-          if t . is_removedhere_phantom () {
-            result . push ( node_ref . id () ); }} }}
+        if let ViewNodeKind::Vognode (Vognode::Normal (t)
+                                      | Vognode::Phantom (t))
+          = &node_ref . value () . kind
+          { if t . is_removedhere_phantom ()
+            { result . push ( node_ref . id () ); }} }}
     result };
   attach_containerward_ancestries_at_nodeids_with_source_set (
     viewforest, &phantom_nodeids, config, typedb_driver, active ) . await }

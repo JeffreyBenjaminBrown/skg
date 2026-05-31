@@ -1,5 +1,6 @@
 use crate::types::misc::ID;
-use crate::types::viewnode::{Scaffold, ViewNode, ViewNodeKind, RoleCol};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol};
+use crate::types::viewnode::{Vognode, Qual};
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::HashMap;
 
@@ -86,19 +87,21 @@ fn saverole_for_node (
   node_ref : NodeRef<ViewNode>,
 ) -> Result<SaveRole, String> {
   match &node_ref . value() . kind {
-    ViewNodeKind::True (_) =>
+    ViewNodeKind::Vognode (Vognode::Normal (_)) =>
       classify_truenode (node_ref),
-    ViewNodeKind::Scaff (Scaffold::BufferRoot) =>
-      Ok (SaveRole::NoSaveRole),
-    ViewNodeKind::Scaff (Scaffold::Alias { .. }) =>
+    ViewNodeKind::Qual (Qual::Alias { .. }) =>
       Ok (SaveRole::AliasDisplay),
-    ViewNodeKind::Scaff (Scaffold::ID { .. }) =>
+    ViewNodeKind::Qual (Qual::ID { .. }) =>
       Ok (SaveRole::IdDisplay),
-    ViewNodeKind::Scaff (_)
-      | ViewNodeKind::Inactive (_)
-      | ViewNodeKind::Deleted (_)
-      | ViewNodeKind::DeletedScaff (_)
-      | ViewNodeKind::Unknown (_)
+    ViewNodeKind::QualCol (_)
+      | ViewNodeKind::BufferRoot
+      | ViewNodeKind::DeadScaffold
+      | ViewNodeKind::PartnerCol (_) // involved in save, but no direct save role
+      | ViewNodeKind::Qual (Qual::TextChanged { .. })
+      | ViewNodeKind::Vognode (Vognode::Deleted (_))
+      | ViewNodeKind::Vognode (Vognode::Inactive (_))
+      | ViewNodeKind::Vognode (Vognode::Phantom (_))
+      | ViewNodeKind::Vognode (Vognode::Unknown (_))
       => Ok (SaveRole::NoSaveRole), }}
 
 fn classify_truenode (
@@ -107,32 +110,31 @@ fn classify_truenode (
   let Some (parent_ref) = node_ref . parent()
     else { return Ok (SaveRole::Ordinary); };
   match &parent_ref . value() . kind {
-    ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Subscribee }) =>
+    ViewNodeKind::PartnerCol (RoleCol::Subscribee) =>
       if node_ref . value () . is_truenode_and_claims_parentIs_collector () {
         Ok (SaveRole::Subscribee {
-          subscriber : truenode_id (
+          subscriber : vognode_normal_id (
             parent_ref . parent(),
             "SubscribeeCol must have a TrueNode parent")?, } )
       } else { Ok (SaveRole::NoSaveRole) },
-    ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Overridden }) =>
+    ViewNodeKind::PartnerCol (RoleCol::Overridden) =>
       if node_ref . value () . is_truenode_and_claims_parentIs_collector () {
         Ok (SaveRole::Overridden {
-          overrider : truenode_id (
+          overrider : vognode_normal_id (
             parent_ref . parent(),
             "OverriddenCol must have a TrueNode parent")?, } )
       } else { Ok (SaveRole::NoSaveRole) },
-    ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Subscriber })
-      | ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Overrider })
-      | ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Hider })
-      | ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Hidden })
+    ViewNodeKind::PartnerCol (RoleCol::Subscriber)
+      | ViewNodeKind::PartnerCol (RoleCol::Overrider)
+      | ViewNodeKind::PartnerCol (RoleCol::Hider)
+      | ViewNodeKind::PartnerCol (RoleCol::Hidden)
       => Ok (SaveRole::NoSaveRole),
-    ViewNodeKind::Scaff (Scaffold::RoleCol {
-      roleCol: RoleCol::HiddenInSubscribee })
+    ViewNodeKind::PartnerCol (RoleCol::HiddenInSubscribee)
       => { let subscribee_ref : NodeRef<ViewNode> =
              parent_ref . parent() . ok_or (
              "HiddenInSubscribeeCol must have a TrueNode parent")?;
            let subscribee : ID =
-             truenode_id (
+             vognode_normal_id (
                Some (subscribee_ref),
                "HiddenInSubscribeeCol must have a TrueNode parent")?;
            let subscribeecol_ref : NodeRef<ViewNode> =
@@ -140,42 +142,38 @@ fn classify_truenode (
                "HiddenInSubscribeeCol subscribee must have a parent")?;
            if ! matches!(
              &subscribeecol_ref . value() . kind,
-             ViewNodeKind::Scaff (Scaffold::RoleCol {
-               roleCol: RoleCol::Subscribee } ))
+             ViewNodeKind::PartnerCol (RoleCol::Subscribee) )
              { return Err (
                  "HiddenInSubscribeeCol subscribee must be a child of SubscribeeCol"
                  . to_string()); }
            Ok (SaveRole::HiddenInSubscribeeCol {
-             subscriber : truenode_id (
+             subscriber : vognode_normal_id (
                subscribeecol_ref . parent(),
                "SubscribeeCol must have a TrueNode parent")?,
              subscribee } ) },
-    ViewNodeKind::Scaff (Scaffold::RoleCol {
-      roleCol: RoleCol::HiddenOutsideOfSubscribee })
+    ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee)
       => { let subscribeecol_ref : NodeRef<ViewNode> =
              parent_ref . parent() . ok_or (
                "HiddenOutsideOfSubscribeeCol must have a SubscribeeCol parent")?;
           if ! matches!(
             &subscribeecol_ref . value() . kind,
-            ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Subscribee }))
+            ViewNodeKind::PartnerCol (RoleCol::Subscribee))
           { return Err (
               "HiddenOutsideOfSubscribeeCol must have a SubscribeeCol parent"
                 . to_string()); }
           Ok (SaveRole::HiddenOutsideOfSubscribeeCol {
-            subscriber : truenode_id (
+            subscriber : vognode_normal_id (
               subscribeecol_ref . parent(),
               "SubscribeeCol must have a TrueNode parent")? } ) },
     _ => Ok (SaveRole::Ordinary) }}
 
-fn truenode_id (
+fn vognode_normal_id (
   node_ref : Option<NodeRef<ViewNode>>,
   error    : &str,
 ) -> Result<ID, String> {
   let node_ref : NodeRef<ViewNode> =
     node_ref . ok_or_else (|| error . to_string())?;
   match &node_ref . value() . kind {
-    ViewNodeKind::True (t) =>
-      Ok (t . id . clone()),
-    _ =>
-      Err (error . to_string()),
-  }}
+    ViewNodeKind::Vognode (Vognode::Normal (t))
+      => Ok (t . id . clone()),
+    _ => Err (error . to_string()), }}

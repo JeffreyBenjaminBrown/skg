@@ -2,8 +2,9 @@
 /// Nodes of the graph are represented via the 'NodeComplete' type.
 /// Nodes of the tree are represented via the 'ViewNode' type.
 ///   (That name might change once there are more clients. The only client so far is written in Emacs org-mode; hence the name.)
-/// Some 'ViewNode's correspond to NodeCompletes; these are 'TrueNode's.
-/// Others do not so correspond, but rather encode information about neighboring tree nodes. These are 'Scaffold' nodes.
+/// Some 'ViewNode's correspond to whole graph nodes; these are 'Vognode's.
+/// Others encode information about neighboring tree nodes, such as
+/// aliases, IDs, and partner collections.
 
 use super::git::{ExistenceAxes, MembershipAxes, Sign};
 use super::misc::{ID, SourceName};
@@ -44,12 +45,21 @@ pub struct ViewNode {
 
 #[derive( Debug, Clone, PartialEq )]
 pub enum ViewNodeKind {
-  True         (TrueNode),
-  Scaff        (Scaffold),
-  Deleted      (DeletedNode),
-  DeletedScaff (ScaffoldKind),
-  Unknown      (UnknownNode),
-  Inactive     (InactiveNode),
+  Vognode       (Vognode),
+  QualCol       (QualCol),
+  Qual          (Qual),
+  PartnerCol    (RoleCol),
+  BufferRoot,
+  DeadScaffold,
+}
+
+#[derive( Debug, Clone, PartialEq )]
+pub enum Vognode {
+  Normal   (TrueNode),
+  Phantom  (TrueNode),
+  Inactive (InactiveNode),
+  Unknown  (UnknownNode),
+  Deleted  (DeletedNode),
 }
 
 /// A node whose .skg file was deleted by a save in another buffer.
@@ -78,8 +88,8 @@ pub struct InactiveNode {
 }
 
 pub type TrueNode            = TrueNode_Generic < ID, SourceName >;
-pub type MaybePlacedTruenode = TrueNode_Generic < Option < ID >,
-                                                  Option < SourceName >>;
+pub type MpTruenode = TrueNode_Generic < Option < ID >,
+                                         Option < SourceName >>;
 
 /// A ViewNode that corresponds to a NodeComplete.
 #[derive( Debug, Clone, PartialEq )]
@@ -169,19 +179,18 @@ pub struct ViewNodeStats {
   pub sourceAtBoundary  : bool, // True if a root or if source differs from source of nearest truenode ancestor.
 }
 
-/// Scaffold nodes are display-only structures
-/// that don't correspond per se to nodes in the graph,
-/// but encode information about the ViewNodes around them.
+#[derive( Debug, Clone, Copy, PartialEq, Eq )]
+pub enum QualCol {
+  ID,
+  Alias,
+}
+
 #[derive( Debug, Clone, PartialEq )]
-pub enum Scaffold {
+pub enum Qual {
   Alias { text: String, // an alias for the node's grandparent
           membership: MembershipAxes },
-  AliasCol, // The node collects (as children) aliases for its parent.
-  BufferRoot, // Not rendered. Makes viewforests easier to process. Its children are the level-1 headlines of the org buffer.
-  RoleCol { roleCol: RoleCol },
   ID { id: ID, // an ID of grandparent (the parent being an IDCol)
        membership: MembershipAxes },
-  IDCol, // Collects (as children) Scaffold::IDs for its parent.
   TextChanged { staged: bool, unstaged: bool }, // Indicates title or body changed between stages. Visible in 'git diff mode'. Per-stage bools mark whether the change is staged (HEAD vs index) and/or unstaged (index vs worktree).
 }
 
@@ -197,19 +206,6 @@ pub enum RoleCol {
   HiddenOutsideOfSubscribee, // Child of a SubscribeeCol. Collects things unnecessarily hidden by the SubscribeeCol's parent, because they are not contained by anything it subscribes to. Read-only. Shown after all Subscribees, under the same SubscribeeCol.
   // TODO | PITFALL: HiddenOutsideOfSubscribee should be editable. Currently the client offers no easy way for a user to unhide things unnecessarily hidden. (It is technically possible, by creating a node you own, subscribing to it, and then modifying a subscribee-as-such representative of the new node. But that's baroque.)
 }
-
-/// A discriminant (i.e. some labels) for the Scaffold variants.
-/// (We can't simply use the Scaffold variants themselves,
-/// because of the Alias/ID payloads.)
-/// Used for the bijective Emacs string mapping.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ScaffoldKind { Alias,
-                        AliasCol,
-                        BufferRoot,
-                        RoleCol { roleCol: RoleCol },
-                        IDCol,
-                        ID,
-                        TextChanged, }
 
 /// Requests for editing operations on a node.
 /// Only one edit request is allowed per node.
@@ -307,41 +303,6 @@ impl NodeLinksourceRels {
                        self . sources_without_content, 0,
                        "→" ) } }
 
-impl ScaffoldKind {
-  /// String representation as used in Emacs metadata sexps.
-  pub fn repr_in_client (&self) -> String {
-    match self {
-      ScaffoldKind::Alias               => "alias",
-      ScaffoldKind::AliasCol            => "aliasCol",
-      ScaffoldKind::BufferRoot          => "forestRoot",
-      ScaffoldKind::RoleCol { roleCol } => roleCol . repr_in_client (),
-      ScaffoldKind::TextChanged         => "textChanged",
-      ScaffoldKind::IDCol               => "idCol",
-      ScaffoldKind::ID                  => "id",
-    } . to_string () }
-
-  /// Parse a client string to a ScaffoldKind.
-  pub fn from_client_string ( s: &str ) -> Option<ScaffoldKind> {
-    match s {
-      "alias"       => Some (ScaffoldKind::Alias),
-      "aliasCol"    => Some (ScaffoldKind::AliasCol),
-      "forestRoot"  => Some (ScaffoldKind::BufferRoot),
-      "textChanged" => Some (ScaffoldKind::TextChanged),
-      "idCol"       => Some (ScaffoldKind::IDCol),
-      "id"          => Some (ScaffoldKind::ID),
-      _             => RoleCol::from_client_string (s)
-                       . map ( |roleCol| ScaffoldKind::RoleCol { roleCol } ),
-    }}
-
-  /// The default title for a scaffold of this kind.
-  pub fn default_title (&self) -> &'static str {
-    match self {
-      ScaffoldKind::AliasCol                     => "its aliases",
-      ScaffoldKind::IDCol                        => "its IDs",
-      ScaffoldKind::RoleCol { roleCol }          => roleCol . default_title (),
-      _                                          => "",
-    }}}
-
 impl RoleCol {
   pub fn repr_in_client (self) -> &'static str {
     match self {
@@ -368,63 +329,80 @@ impl RoleCol {
       _                              => None,
     } }
 
-  pub fn default_title (self) -> &'static str {
+  pub fn origin_depth (self) -> usize {
     match self {
-      RoleCol::Subscribee                => "it subscribes to these",
-      RoleCol::Subscriber                => "these subscribe to it",
-      RoleCol::Overridden                => "it overrides the view of these",
-      RoleCol::Overrider                 => "these override the view of it",
-      RoleCol::Hidden                    => "it hides these from its subscriptions",
-      RoleCol::Hider                     => "these hide it from their subscriptions",
-      RoleCol::HiddenInSubscribee        => "hidden from this subscription",
-      RoleCol::HiddenOutsideOfSubscribee => "hidden from all subscriptions",
-    } }
-
-  pub fn scaffold (self) -> Scaffold {
-    Scaffold::RoleCol { roleCol: self } }
+      RoleCol::Subscribee
+        | RoleCol::Subscriber
+        | RoleCol::Overridden
+        | RoleCol::Overrider
+        | RoleCol::Hider
+        | RoleCol::Hidden => 1,
+      RoleCol::HiddenInSubscribee => 3,
+      RoleCol::HiddenOutsideOfSubscribee => 2, } }
 }
 
-impl Scaffold {
-  /// Get the kind (discriminant) of this Scaffold.
-  pub fn kind (&self) -> ScaffoldKind {
+impl QualCol {
+  pub fn repr_in_client (self) -> &'static str {
     match self {
-      Scaffold::Alias { .. }                 => ScaffoldKind::Alias,
-      Scaffold::AliasCol                     => ScaffoldKind::AliasCol,
-      Scaffold::BufferRoot                   => ScaffoldKind::BufferRoot,
-      Scaffold::RoleCol { roleCol }          => ScaffoldKind::RoleCol { roleCol: *roleCol },
-      Scaffold::TextChanged { .. }           => ScaffoldKind::TextChanged,
-      Scaffold::IDCol                        => ScaffoldKind::IDCol,
-      Scaffold::ID { .. }                    => ScaffoldKind::ID,
-    }}
+      QualCol::Alias => "aliasCol",
+      QualCol::ID    => "idCol",
+    } }
 
-  /// Compare scaffold kinds. For Alias/ID, compares variant only (ignoring payload).
-  pub fn matches_kind ( &self, other : &Scaffold ) -> bool {
-    self . kind() == other . kind() }
+  pub fn origin_depth (self) -> usize {
+    1 }
+}
 
-  /// String representation as used in Emacs metadata sexps.
-  pub fn repr_in_client (&self) -> String {
-    self . kind () . repr_in_client () }
+impl Qual {
+  pub fn repr_in_client (&self) -> &'static str {
+    match self {
+      Qual::Alias { .. }       => "alias",
+      Qual::ID { .. }          => "id",
+      Qual::TextChanged { .. } => "textChanged",
+    } }
 
   pub fn title (&self) -> &str {
     match self {
-      Scaffold::Alias           { text, .. }  => text,
-      Scaffold::ID              { id, .. }    => id,
-      Scaffold::RoleCol { .. }               => "",
-      _ => self . kind () . default_title (),
-    }}
+      Qual::Alias { text, .. } => text,
+      Qual::ID    { id, .. }   => id,
+      Qual::TextChanged { .. } => "",
+    } }
+}
 
-  /// A distinguishable label for use in error messages.
-  /// For scaffolds with payload, includes the payload.
-  /// For others, uses repr_in_client().
-  pub fn error_label (&self) -> String {
+impl Vognode {
+  pub fn normal_or_phantom (&self) -> Option<&TrueNode> {
     match self {
-      Scaffold::Alias { text, .. } =>
-        format!( "scaffold:alias({})", text ),
-      Scaffold::ID { id, .. } =>
-        format!( "scaffold:id({})", id ),
-      _ =>
-        format!( "scaffold:{}", self . repr_in_client() ),
-    }} }
+      Vognode::Normal  (t)
+        | Vognode::Phantom (t) => Some (t),
+      _ => None,
+    } }
+
+  pub fn normal_or_phantom_mut (&mut self) -> Option<&mut TrueNode> {
+    match self {
+      Vognode::Normal  (t)
+        | Vognode::Phantom (t) => Some (t),
+      _ => None,
+    } }
+
+  pub fn id (&self) -> &ID {
+    match self {
+      Vognode::Normal   (t) => &t . id,
+      Vognode::Phantom  (t) => &t . id,
+      Vognode::Inactive (i) => &i . id,
+      Vognode::Unknown  (u) => &u . id,
+      Vognode::Deleted  (d) => &d . id,
+    } }
+
+  pub fn pid_and_source (
+    &self,
+  ) -> Option<(&ID, &SourceName)> {
+    match self {
+      Vognode::Normal   (t)
+        | Vognode::Phantom (t) => Some ((&t . id, &t . source)),
+      Vognode::Inactive (i) => Some ((&i . id, &i . source)),
+      Vognode::Deleted  (d) => Some ((&d . id, &d . source)),
+      Vognode::Unknown  (_) => None,
+    } }
+}
 
 impl ViewRequest {
   /// Single source of truth for ViewRequest <-> client string bijection.
@@ -458,37 +436,50 @@ impl AsMut<ViewNode> for ViewNode {
     self }}
 
 impl ViewNode {
-  /// Reasonable for both TrueNodes and Scaffolds.
   pub fn title (&self) -> &str {
     match &self . kind {
-      ViewNodeKind::True    (t) => &t . title,
-      ViewNodeKind::Scaff   (s) => s . title (),
-      ViewNodeKind::Deleted (d) => &d . title,
-      ViewNodeKind::DeletedScaff (kind) => kind . default_title (),
-      // Empty: the id already appears in the metadata; surfacing it
-      // again as the org headline title would duplicate it on the
-      // line. The metadata alone is non-empty, so viewnode_to_text
-      // is satisfied.
-      ViewNodeKind::Unknown (_) => "",
-      ViewNodeKind::Inactive (_) => "",
+      ViewNodeKind::Vognode (Vognode::Normal (t))
+        | ViewNodeKind::Vognode (Vognode::Phantom (t)) =>
+        &t . title,
+      ViewNodeKind::Vognode (Vognode::Deleted (d)) =>
+        &d . title,
+      ViewNodeKind::Qual (q) =>
+        q . title (),
+      ViewNodeKind::QualCol (_)
+        | ViewNodeKind::PartnerCol (_)
+        | ViewNodeKind::BufferRoot
+        | ViewNodeKind::DeadScaffold
+        | ViewNodeKind::Vognode (Vognode::Unknown (_))
+        | ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
+        "",
     }}
 
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn body (&self) -> Option < &String > {
     match &self . kind {
-      ViewNodeKind::True    (t) => t . body (),
-      ViewNodeKind::Scaff   (_) => None,
-      ViewNodeKind::Deleted (d) => d . body . as_ref (),
-      ViewNodeKind::DeletedScaff (_) => None,
-      ViewNodeKind::Unknown (_) => None,
-      ViewNodeKind::Inactive (_) => None,
+      ViewNodeKind::Vognode (Vognode::Normal (t))
+        | ViewNodeKind::Vognode (Vognode::Phantom (t)) => t . body (),
+      ViewNodeKind::Vognode (Vognode::Deleted (d)) => d . body . as_ref (),
+      ViewNodeKind::Vognode (Vognode::Unknown (_))
+        | ViewNodeKind::Vognode (Vognode::Inactive (_))
+        | ViewNodeKind::QualCol (_)
+        | ViewNodeKind::Qual (_)
+        | ViewNodeKind::PartnerCol (_)
+        | ViewNodeKind::BufferRoot
+        | ViewNodeKind::DeadScaffold => None,
     }}
 
   pub fn is_truenode_and_claims_parentIs_collector (&self) -> bool {
     match &self . kind {
-      ViewNodeKind::True (t) =>
+      ViewNodeKind::Vognode (Vognode::Normal (t)) =>
         t . parentIs == ParentIs::Collector,
       _ => false,
+    }}
+
+  pub fn id_if_vognode (&self) -> Option<&ID> {
+    match &self . kind {
+      ViewNodeKind::Vognode (v) => Some (v . id ()),
+      _ => None,
     }}
 }
 
@@ -600,9 +591,10 @@ pub fn mk_phantom_viewnode (
 ) -> ViewNode {
   let mut viewnode : ViewNode =
     mk_indefinitive_viewnode ( id, source, title, ParentIs::Container );
-  if let ViewNodeKind::True ( ref mut t ) = viewnode . kind
+  if let ViewNodeKind::Vognode (Vognode::Normal (mut t)) = viewnode . kind
     { t . existence  = existence;
-      t . membership = membership; }
+      t . membership = membership;
+      viewnode . kind = ViewNodeKind::Vognode (Vognode::Phantom (t)); }
   viewnode }
 
 pub fn mk_definitive_viewnode (
@@ -630,7 +622,8 @@ pub fn mk_unknown_viewnode (
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind        : ViewNodeKind::Unknown ( UnknownNode { id } ),
+    kind        : ViewNodeKind::Vognode (
+      Vognode::Unknown ( UnknownNode { id } ) ),
   }}
 
 pub fn mk_inactive_viewnode (
@@ -642,8 +635,8 @@ pub fn mk_inactive_viewnode (
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind        : ViewNodeKind::Inactive (
-      InactiveNode { id, source, membership } ),
+    kind        : ViewNodeKind::Vognode (
+      Vognode::Inactive ( InactiveNode { id, source, membership } ) ),
   }}
 
 /// Create an indefinitive ViewNode from disk data.
@@ -667,7 +660,9 @@ pub fn mk_indefinitive_from_viewnode (
   viewnode : ViewNode,
   parentIs    : ParentIs,
 ) -> Result < ViewNode, String > {
-  let ViewNodeKind::True (t) = viewnode . kind
+  let ViewNodeKind::Vognode (Vognode::Normal (t)
+                             | Vognode::Phantom (t))
+    = viewnode . kind
     else { return Err (
       "mk_indefinitive_from_viewnode: expected TrueNode"
         . to_string () ) };
@@ -691,21 +686,13 @@ pub fn mk_viewnode (
   ViewNode { focused     : false,
              folded      : false,
              body_folded : false,
-             kind        : ViewNodeKind::True (
-               TrueNode { parentIs,
-                          view_requests,
-                          indef_or_def,
-                          .. default_truenode (
-                            id, source, title ) } ) }}
-
-/// Create a Scaffold ViewNode from a Scaffold.
-pub fn viewnode_from_scaffold ( scaffold : Scaffold ) -> ViewNode {
-  ViewNode {
-    focused     : false,
-    folded      : false,
-    body_folded : false,
-    kind        : ViewNodeKind::Scaff (scaffold),
-  }}
+             kind        : ViewNodeKind::Vognode (
+               Vognode::Normal (
+                 TrueNode { parentIs,
+                            view_requests,
+                            indef_or_def,
+                            .. default_truenode (
+                              id, source, title ) } ) ) }}
 
 /// Helper to create a BufferRoot ViewNode.
 pub fn viewforest_root_viewnode () -> ViewNode {
@@ -713,5 +700,5 @@ pub fn viewforest_root_viewnode () -> ViewNode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind        : ViewNodeKind::Scaff (Scaffold::BufferRoot),
+    kind        : ViewNodeKind::BufferRoot,
   }}

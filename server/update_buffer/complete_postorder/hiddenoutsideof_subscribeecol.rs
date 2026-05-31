@@ -6,7 +6,7 @@ use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::{pid_and_source_from_ancestor, read_at_ancestor_in_tree};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, RoleCol};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol};
 use crate::update_buffer::util::detach_scaffold_if_empty;
 
 use ego_tree::{NodeId, Tree};
@@ -67,8 +67,7 @@ fn validate_hiddenoutside_parent (
   read_at_ancestor_in_tree(
       tree, node, 1,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Scaff (Scaffold::RoleCol {
-          roleCol: RoleCol::Subscribee })
+        ViewNodeKind::PartnerCol (RoleCol::Subscribee)
           => Ok(( )),
         _ => Err( "reconcile_hiddenoutside_subscribee_col_children: \
                    ancestor 1 is not a SubscribeeCol" ) } )

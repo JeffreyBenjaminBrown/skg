@@ -15,8 +15,9 @@ use crate::git_ops::read_repo::nodecomplete_from_git_head;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, Scaffold, RoleCol, DeletedNode, IndefOrDef,
+    ViewNode, ViewNodeKind, DeletedNode, IndefOrDef,
     ParentIs, mk_definitive_viewnode};
+use crate::types::viewnode::{Vognode, QualCol, Qual, RoleCol};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_nodecomplete::{
     pid_and_source_from_treenode,
@@ -109,18 +110,15 @@ pub fn expand_true_content_at_truenode (
   active_source_set              : Option<&ActiveSourceSet>,
   is_saved_view                  : bool,
 ) -> Result<(), Box<dyn Error>> {
+  // Phantoms are diff placeholders; this pass mutates and expands
+  // real content nodes.
   error_unless_node_satisfies(
-    tree, node, |vn : &ViewNode| matches!( &vn . kind,
-                                           ViewNodeKind::True (_)),
-    "expand_true_content_at_truenode: expected TrueNode" ) ?;
+    tree, node,
+    |vn : &ViewNode| matches!( &vn . kind,
+                                ViewNodeKind::Vognode (Vognode::Normal (_))),
+    "expand_true_content_at_truenode: expected normal vognode" ) ?;
   make_indef_if_repeat_then_extend_defmap(
     tree, node, defmap ) ?;
-  { let is_phantom : bool =
-      read_at_node_in_tree( tree, node,
-        |vn : &ViewNode| match &vn . kind {
-          ViewNodeKind::True (t) => t . is_phantom(),
-          _ => false } ) ?;
-    if is_phantom { return Ok (( )); }}
   let (pid, initial_source) : (ID, SourceName) =
     pid_and_source_from_treenode( tree, node,
                                   "expand_true_content_at_truenode" ) ?;
@@ -130,7 +128,8 @@ pub fn expand_true_content_at_truenode (
   { let is_indefinitive : bool =
       read_at_node_in_tree( tree, node,
         |vn : &ViewNode| match &vn . kind {
-          ViewNodeKind::True (t) => t . is_indefinitive (),
+          ViewNodeKind::Vognode (Vognode::Normal (t))
+            => t . is_indefinitive (),
           _ => false } ) ?;
     if is_indefinitive {
       clobberIndefinitiveViewnode( tree, node, config ) ?;
@@ -158,32 +157,16 @@ pub fn expand_true_content_at_truenode (
     tree, node ) ?;
   Ok(( )) }
 
-pub fn ensure_diff_scaffolds_for_truenode (
-  node         : NodeId,
-  tree         : &mut Tree<ViewNode>,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
-) -> Result<(), Box<dyn Error>> {
-  let ready : Option<(ID, SourceName)> =
-    read_at_node_in_tree ( tree, node,
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::True (t)
-          if ! t . is_phantom () && ! t . is_indefinitive () =>
-            Some (( t . id . clone (), t . source . clone () )),
-        _ => None } ) ?;
-  if let Some ((pid, source)) = ready {
-    maybe_prepend_diff_view_scaffolds (
-      tree, node, source_diffs, &pid, &source ) ?; }
-  Ok (( )) }
-
 /// The edit request should have been used by now.
 fn clear_edit_request (
   tree : &mut Tree<ViewNode>,
   node : NodeId,
 ) -> Result<(), Box<dyn Error>> {
-  write_at_truenode_in_tree ( tree, node, |t| {
-    if let IndefOrDef::Definitive { edit_request, .. }
-      = &mut t . indef_or_def
-      { *edit_request = None; } } ) ?;
+  write_at_truenode_in_tree (
+    tree, node,
+    |t| { if let IndefOrDef::Definitive { edit_request, .. }
+          = &mut t . indef_or_def
+          { *edit_request = None; }} ) ?;
   Ok (( )) }
 
 /// Phase 3 (non-saved views only): overwrite the viewnode's title
@@ -197,12 +180,13 @@ fn sync_truenode_from_disk (
   let disk_title : String = nodecomplete . title . clone ();
   let disk_body  : Option<String> = nodecomplete . body . clone ();
   let disk_source : SourceName = nodecomplete . source . clone ();
-  write_at_truenode_in_tree ( tree, node, |t| {
-    t . title = disk_title;
-    t . source = disk_source;
-    if let IndefOrDef::Definitive { body, .. } = &mut t . indef_or_def {
-      *body = disk_body; } }
-  ) ?;
+  write_at_truenode_in_tree (
+    tree, node,
+    |t| { t . title = disk_title;
+          t . source = disk_source;
+          if let IndefOrDef::Definitive { body, .. }
+            = &mut t . indef_or_def
+            { *body = disk_body; }} ) ?;
   Ok (( )) }
 
 /// Compute the content goal list (diff-aware), reconcile
@@ -273,7 +257,7 @@ fn correct_the_viewChildren_of_subscribee (
     tree . get (node) . unwrap()
     . children()
     . filter_map ( |child| match &child . value() . kind {
-      ViewNodeKind::True (t)
+      ViewNodeKind::Vognode (Vognode::Normal (t))
         if !t . parent_ignores_it()
            && !t . is_phantom()
            && content_id_set . contains (&t . id) =>
@@ -296,20 +280,22 @@ fn mutate_truenode_to_deletednode (
   let (title, body) : (String, Option<String>) =
     read_at_node_in_tree ( tree, node,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::True (t) =>
-          ( t . title . clone(), t . body () . cloned() ),
+        ViewNodeKind::Vognode (Vognode::Normal (t))
+          => ( t . title . clone(),
+               t . body () . cloned() ),
         _ => ( String::new(), None ) } ) ?;
   write_at_node_in_tree ( tree, node,
     |vn : &mut ViewNode| {
-      vn . kind = ViewNodeKind::Deleted ( DeletedNode {
+      vn . kind = ViewNodeKind::Vognode (
+        Vognode::Deleted ( DeletedNode {
         id     : pid . clone(),
         source : source . clone(),
         title,
-        body, } ); }
+        body, } ) ); }
   ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) }
 
 /// Whether this node claims parentIs=collector
-/// and is a child of SubscribeeCol.
+/// and is a child of SubscribeeCol (and not a phantom).
 fn is_subscribee (
   tree : &Tree<ViewNode>,
   node : NodeId,
@@ -317,13 +303,13 @@ fn is_subscribee (
   let is_member_of_parent : bool =
     read_at_node_in_tree( tree, node,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::True (t) =>
-          t . parentIs == ParentIs::Collector,
+        ViewNodeKind::Vognode (Vognode::Normal (t))
+          => t . parentIs == ParentIs::Collector,
         _ => false } ) ?;
   let parent_is_subscribee_col : bool =
     read_at_ancestor_in_tree( tree, node, 1,
       |vn : &ViewNode| matches!( &vn . kind,
-        ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Subscribee })))
+        ViewNodeKind::PartnerCol (RoleCol::Subscribee)))
     . unwrap_or (false);
   Ok( is_member_of_parent && parent_is_subscribee_col ) }
 
@@ -418,12 +404,21 @@ fn complete_content_children (
   complete_relevant_children_in_viewnodetree(
     tree, node,
     |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::True (t) => !t . parent_ignores_it(),
-      ViewNodeKind::Inactive (_) => true,
+      ViewNodeKind::Vognode (Vognode::Normal (t))
+        => !t . parent_ignores_it(),
+      ViewNodeKind::Vognode (Vognode::Phantom (_))
+        // Existing phantoms are reordered or replaced, not duplicated.
+        => true,
+      ViewNodeKind::Vognode (Vognode::Inactive (_))
+        => true,
       _ => false },
     |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::True (t) => t . id . clone(),
-      ViewNodeKind::Inactive (i) => i . id . clone(),
+      ViewNodeKind::Vognode (Vognode::Normal (t)
+                             | Vognode::Phantom (t))
+        // Both kinds participate in child-list reconciliation.
+        => t . id . clone(),
+      ViewNodeKind::Vognode (Vognode::Inactive (i))
+        => i . id . clone(),
       _ => panic!(
         "complete_content_children: relevant child had no content ID" ) },
     goal_list,
@@ -460,14 +455,15 @@ fn mark_erroneous_content_children_as_indep (
   treat_certain_children(
     tree, node,
     |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::True (t) =>
+      ViewNodeKind::Vognode (Vognode::Normal (t)) =>
         !t . parent_ignores_it()
         && !content_id_set . contains( &t . id )
         && !t . is_phantom(), // phantoms, though not content in the worktree, are content in HEAD, and should not be parent-ignored
       _ => false },
     |vn : &mut ViewNode| {
-      if let ViewNodeKind::True( ref mut t ) = vn . kind {
-        t . parentIs = ParentIs::Independent; }},
+      if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
+        = vn . kind
+        { t . parentIs = ParentIs::Independent; }},
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
 
 /// Reorder children into three groups:
@@ -482,16 +478,21 @@ fn order_children_as_scaffolds_then_ignored_then_content (
   let groups : HashMap<i32, Vec<NodeId>> =
     partition_children( tree, node,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Scaff (_)                           => 0,
-        ViewNodeKind::DeletedScaff (_)                    => 0,
-        ViewNodeKind::True (t) if t . parent_ignores_it() => 1,
-        ViewNodeKind::True (_)                            => 2,
-        ViewNodeKind::Deleted (_)                         => 2,
-        ViewNodeKind::Inactive (_)                        => 2,
+        ViewNodeKind::QualCol (_)
+          | ViewNodeKind::Qual (_)
+          | ViewNodeKind::PartnerCol (_)
+          | ViewNodeKind::BufferRoot
+          | ViewNodeKind::DeadScaffold                => 0,
+        ViewNodeKind::Vognode (Vognode::Normal (t))
+          if t . parent_ignores_it()                  => 1,
+        ViewNodeKind::Vognode (Vognode::Phantom (_))  => 2,
+        ViewNodeKind::Vognode (Vognode::Normal (_))   => 2,
+        ViewNodeKind::Vognode (Vognode::Deleted (_))  => 2,
+        ViewNodeKind::Vognode (Vognode::Inactive (_)) => 2,
         // UnknownNode is a content-position placeholder: order it
         // alongside the Deleted/True content children rather than as
         // a scaffold.
-        ViewNodeKind::Unknown (_)                         => 2,
+        ViewNodeKind::Vognode (Vognode::Unknown (_))  => 2,
       } ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
   let empty : Vec<NodeId> = Vec::new();
   for &cid in groups . get( &0 ) . unwrap_or (&empty) . iter()
@@ -511,7 +512,7 @@ fn order_children_as_scaffolds_then_ignored_then_content (
 /// only the unstaged side) still triggers scaffold emission. See
 /// 'per_stage_node_changes_for_truenode' for why the merged view
 /// would drop such changes post-save.
-fn maybe_prepend_diff_view_scaffolds (
+pub(in crate::update_buffer) fn maybe_prepend_diff_view_scaffolds (
   tree         : &mut Tree<ViewNode>,
   node         : NodeId,
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
@@ -524,38 +525,47 @@ fn maybe_prepend_diff_view_scaffolds (
       source_diffs, pid, source );
   if staged_nc . is_none () && unstaged_nc . is_none () {
     return Ok (( )); }
-  let staged_text   : bool = staged_nc   . map ( |nc| nc . text_changed ) . unwrap_or (false);
-  let unstaged_text : bool = unstaged_nc . map ( |nc| nc . text_changed ) . unwrap_or (false);
+  let staged_text   : bool =
+    staged_nc   . map ( |nc| nc . text_changed ) . unwrap_or (false);
+  let unstaged_text : bool =
+    unstaged_nc . map ( |nc| nc . text_changed ) . unwrap_or (false);
   if staged_text || unstaged_text {
     if unique_scaffold_child_of_viewnode(
       tree, node,
-      &Scaffold::TextChanged { staged: false, unstaged: false }
+      &ViewNodeKind::Qual ( Qual::TextChanged { staged: false,
+                                                unstaged: false } )
     ) ?. is_none() {
       insert_scaffold_as_child(
         tree, node,
-        Scaffold::TextChanged { staged: staged_text,
-                                unstaged: unstaged_text },
-        true ) ?; } }
+        ViewNodeKind::Qual ( Qual::TextChanged { staged: staged_text,
+                                                 unstaged: unstaged_text } ),
+        true ) ?; }}
   let ids_changed : bool =
     has_list_changes (
       staged_nc   . map ( |nc| nc . ids_diff . as_slice () ),
       unstaged_nc . map ( |nc| nc . ids_diff . as_slice () ) );
   if ids_changed {
     if unique_scaffold_child_of_viewnode(
-      tree, node, &Scaffold::IDCol
+      tree, node,
+      &ViewNodeKind::QualCol (QualCol::ID)
     ) ?. is_none() {
       insert_scaffold_as_child(
-        tree, node, Scaffold::IDCol, true ) ?; } }
+        tree, node,
+        ViewNodeKind::QualCol (QualCol::ID),
+        true ) ?; } }
   let aliases_changed : bool =
     has_list_changes (
       staged_nc   . map ( |nc| nc . aliases_diff . as_slice () ),
       unstaged_nc . map ( |nc| nc . aliases_diff . as_slice () ) );
   if aliases_changed {
     if unique_scaffold_child_of_viewnode(
-      tree, node, &Scaffold::AliasCol
+      tree, node,
+      &ViewNodeKind::QualCol (QualCol::Alias)
     ) ?. is_none() {
       insert_scaffold_as_child(
-        tree, node, Scaffold::AliasCol, true ) ?; } }
+        tree, node,
+        ViewNodeKind::QualCol (QualCol::Alias),
+        true ) ?; }}
   Ok(( )) }
 
 /// True iff either stage's diff slice contains a New or Removed item.
@@ -601,12 +611,13 @@ fn build_child_creation_data (
       let mut m : HashMap<ID, SourceName> = HashMap::new();
       for child_ref in node_ref . children() {
         match &child_ref . value() . kind {
-          ViewNodeKind::True (t) =>
-            { m . insert( t . id . clone(),
-                          t . source . clone()); },
-          ViewNodeKind::Inactive (i) =>
-            { m . insert( i . id . clone(),
-                          i . source . clone()); },
+          ViewNodeKind::Vognode (Vognode::Normal (t)
+                                 | Vognode::Phantom (t))
+            => { m . insert( t . id . clone(),
+                             t . source . clone()); },
+          ViewNodeKind::Vognode (Vognode::Inactive (i))
+            => { m . insert( i . id . clone(),
+                             i . source . clone()); },
           _ => {}, }}
       m };
   let mut result : HashMap<ID, ChildData> = HashMap::new();
@@ -692,15 +703,20 @@ fn set_diff_status (
     let is_non_content : bool =
       read_at_node_in_tree( tree, node,
         |vn : &ViewNode| match &vn . kind {
-          ViewNodeKind::True (t) => t . parent_ignores_it(),
+          // Called for normal vognodes only; phantom parentIs is not
+          // part of diff-status inheritance.
+          ViewNodeKind::Vognode (Vognode::Normal (t))
+            => t . parent_ignores_it(),
           _ => true } ) ?;
     if is_non_content { (None, None) }
     else {
       let parent : Option<(ID, SourceName)> =
         read_at_ancestor_in_tree( tree, node, 1,
           |vn : &ViewNode| match &vn . kind {
-            ViewNodeKind::True (t) =>
-              Ok(( t . id . clone(), t . source . clone() )),
+            // Only normal ancestors define content membership axes;
+            // phantom ancestors are display placeholders.
+            ViewNodeKind::Vognode (Vognode::Normal (t))
+              => Ok(( t . id . clone(), t . source . clone() )),
             _ => Err ("not a TrueNode") }
         ) . ok () . and_then ( |r| r . ok () );
       match parent {
@@ -750,8 +766,11 @@ fn write_truenode_diff (
 ) -> Result<(), Box<dyn Error>> {
   write_at_node_in_tree( tree, node,
     |vn : &mut ViewNode| {
-      if let ViewNodeKind::True( ref mut t ) = vn . kind {
-        t . existence  = existence;
+      // Normal nodes get file/member diff axes here.
+      // Phantom axes are set when the phantom is constructed.
+      if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
+        = vn . kind
+      { t . existence  = existence;
         t . membership = membership;
         t . not_in_git = not_in_git; }}
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }

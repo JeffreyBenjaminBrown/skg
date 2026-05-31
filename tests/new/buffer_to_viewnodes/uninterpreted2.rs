@@ -4,7 +4,8 @@ use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::git::Sign;
 use skg::types::misc::{ID, SourceName};
-use skg::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
+use skg::types::maybe_placed_viewnode::{
+  MpViewnode, MpViewnodeKind, MpVognode};
 use ego_tree::Tree;
 
 #[test]
@@ -25,7 +26,7 @@ fn test_org_to_uninterpreted_nodes2() {
             ** bb
         "};
 
-  let viewforest: Tree<MaybePlacedViewnode> =
+  let viewforest: Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
 
   let viewforest_roots: Vec<_> = viewforest . root() . children() . collect();
@@ -77,7 +78,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
             This node has cycle flag
         "};
 
-  let viewforest: Tree<MaybePlacedViewnode> =
+  let viewforest: Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
 
   // Get tree roots (children of BufferRoot)
@@ -92,7 +93,8 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   // Test independent root node
   let unrel_node = tree_roots[1] . value();
   let rel_t = match &unrel_node . kind {
-    MaybePlacedViewnodeKind::True (t) => t,
+    MpViewnodeKind::Vognode (
+      MpVognode::Normal (t) | MpVognode::Phantom (t)) => t,
     _ => panic!("expected TrueNode") };
   assert_eq!(unrel_node . title(), "independent root node");
   assert_eq!(rel_t . parent_ignores_it(), true);
@@ -102,7 +104,8 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   // Test cycling node
   let cycle_node = tree_roots[2] . value();
   let cycle_t = match &cycle_node . kind {
-    MaybePlacedViewnodeKind::True (t) => t,
+    MpViewnodeKind::Vognode (
+      MpVognode::Normal (t) | MpVognode::Phantom (t)) => t,
     _ => panic!("expected TrueNode") };
   assert_eq!(cycle_node . title(), "cycling node");
   assert_eq!(cycle_t . viewStats . cycle, true);
@@ -117,13 +120,14 @@ fn test_org_to_uninterpreted_nodes2_inactive_placeholder() {
             * (skg (inactiveNode (id hidden) (source private) (unstaged newM)))
         "};
 
-  let viewforest: Tree<MaybePlacedViewnode> =
+  let viewforest: Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let tree_roots: Vec<_> =
     viewforest . root() . children() . collect();
   assert_eq!(tree_roots . len(), 1);
   let inactive = match &tree_roots[0] . value() . kind {
-    MaybePlacedViewnodeKind::Inactive (inactive) => inactive,
+    MpViewnodeKind::Vognode (
+      MpVognode::Inactive (inactive)) => inactive,
     _ => panic!("expected InactiveNode") };
   assert_eq!(inactive . id, ID::from ("hidden"));
   assert_eq!(inactive . source, SourceName::from ("private"));
@@ -141,7 +145,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
             * another node
         "};
 
-  let viewforest: Tree<MaybePlacedViewnode> =
+  let viewforest: Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
 
   let tree_roots: Vec<_> = viewforest . root() . children() . collect();
@@ -150,7 +154,8 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   // Test first node - should have all default values except title and body
   let first_node = tree_roots[0] . value();
   let first_t = match &first_node . kind {
-    MaybePlacedViewnodeKind::True (t) => t,
+    MpViewnodeKind::Vognode (
+      MpVognode::Normal (t) | MpVognode::Phantom (t)) => t,
     _ => panic!("expected TrueNode") };
   assert_eq!(first_node . title(), "simple node");
   assert_eq!(first_node . body(), Some(&"Simple body" . to_string()));
@@ -182,7 +187,7 @@ fn test_org_to_uninterpreted_nodes2_body_spacing() {
                 line 3 with 4 spaces
         "};
 
-  let viewforest: Tree<MaybePlacedViewnode> =
+  let viewforest: Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let tree_roots: Vec<_> = viewforest . root() . children() . collect();
 
@@ -209,7 +214,7 @@ fn test_org_to_uninterpreted_nodes2_indented_star_is_body_text() {
             ** dogfood it
         "};
 
-  let viewforest: Tree<MaybePlacedViewnode> =
+  let viewforest: Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let tree_roots: Vec<_> = viewforest . root() . children() . collect();
   let root = tree_roots[0] . value();
@@ -234,7 +239,7 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
             Regular body
         "};
 
-  let viewforest: Tree<MaybePlacedViewnode> =
+  let viewforest: Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
 
   // Get tree roots (children of BufferRoot)
@@ -259,13 +264,13 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
 #[test]
 fn test_org_to_uninterpreted_nodes2_empty_input() {
   let input = "";
-  let viewforest: Tree<MaybePlacedViewnode> =
+  let viewforest: Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   // BufferRoot should have no children
   assert_eq!(viewforest . root() . children() . count(), 0);
 
   let input2 = "   \n  \n  ";
-  let trees2: Tree<MaybePlacedViewnode> =
+  let trees2: Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input2) . unwrap() . 0;
   assert_eq!(trees2 . root() . children() . count(), 0);
 }
@@ -279,7 +284,7 @@ fn test_org_to_uninterpreted_nodes2_only_text() {
             at all
         "};
 
-  let viewforest: Tree<MaybePlacedViewnode> =
+  let viewforest: Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   assert_eq!(viewforest . root() . children() . count(), 0,
              "Should have no tree roots when there are no headlines");

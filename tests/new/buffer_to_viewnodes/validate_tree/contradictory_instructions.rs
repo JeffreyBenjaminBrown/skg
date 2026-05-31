@@ -1,7 +1,7 @@
 // cargo test contradictory_instructions
 
 use indoc::indoc;
-use skg::types::tree::forest::MaybePlacedViewForest;
+use skg::types::tree::forest::MpViewForest;
 use skg::types::misc::ID;
 use skg::types::errors::BufferValidationError;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
@@ -20,7 +20,7 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg (node (id node1) (editRequest delete))) duplicate of first node (same delete instruction)
         "};
 
-  let viewforest_consistent: MaybePlacedViewForest =
+  let viewforest_consistent: MpViewForest =
     org_to_uninterpreted_viewforest (input_consistent) . unwrap() . 0;
   let (inconsistent_ids_consistent, _, _) =
     find_inconsistent_instructions (&viewforest_consistent);
@@ -36,7 +36,7 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg (node (id conflict2))) another conflict end
         "};
 
-  let viewforest_inconsistent: MaybePlacedViewForest =
+  let viewforest_inconsistent: MpViewForest =
     org_to_uninterpreted_viewforest (input_inconsistent) . unwrap() . 0;
   let (inconsistent_ids, _, _) = find_inconsistent_instructions (&viewforest_inconsistent);
 
@@ -52,14 +52,14 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg (node (id valid_node))) only node with id
         "};
 
-  let viewforest_no_ids: MaybePlacedViewForest =
+  let viewforest_no_ids: MpViewForest =
     org_to_uninterpreted_viewforest (input_no_ids) . unwrap() . 0;
   let (inconsistent_no_ids, _, _) = find_inconsistent_instructions (&viewforest_no_ids);
   assert_eq!(inconsistent_no_ids . len(), 0, "Should have no conflicts when only one node has each ID");
 
   // Test empty viewforest (just BufferRoot, no tree roots)
-  let empty_viewforest: MaybePlacedViewForest =
-    MaybePlacedViewForest::new();
+  let empty_viewforest: MpViewForest =
+    MpViewForest::new();
   let (inconsistent_empty, _, _) =
     find_inconsistent_instructions (&empty_viewforest);
   assert_eq!(inconsistent_empty . len(), 0,
@@ -88,7 +88,7 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
                 This one is fine
             "};
 
-      let viewforest: MaybePlacedViewForest =
+      let viewforest: MpViewForest =
         org_to_uninterpreted_viewforest (input_with_multiple_defining_containers) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config, driver) . await?;

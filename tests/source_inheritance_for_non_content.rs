@@ -6,6 +6,7 @@
 
 use skg::types::misc::{ ID, SourceName, SkgConfig, SkgfileSource };
 use skg::types::viewnode::{ ParentIs, ViewNode, ViewNodeKind, viewforest_root_viewnode, mk_definitive_viewnode, mk_indefinitive_viewnode };
+use skg::types::viewnode::Vognode;
 use skg::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
 
 use ego_tree::Tree;
@@ -64,7 +65,9 @@ fn source_inheritance_across_non_content_same_source () {
   let b_ref =
     viewforest . get (a_id) . unwrap ()
     . first_child () . unwrap ();
-  let ViewNodeKind::True (t) = & b_ref . value () . kind
+  let ViewNodeKind::Vognode ( Vognode::Normal (t)
+                              | Vognode::Phantom (t))
+    = & b_ref . value () . kind
     else { panic! ("expected TrueNode") };
   assert! ( ! t . viewStats . sourceAtBoundary,
             "Same source across non-content boundary \
@@ -101,7 +104,9 @@ fn source_inheritance_across_non_content_different_source () {
   let b_ref =
     viewforest . get (a_id) . unwrap ()
     . first_child () . unwrap ();
-  let ViewNodeKind::True (t) = & b_ref . value () . kind
+  let ViewNodeKind::Vognode ( Vognode::Normal (t)
+                              | Vognode::Phantom (t))
+    = & b_ref . value () . kind
     else { panic! ("expected TrueNode") };
   assert! ( t . viewStats . sourceAtBoundary,
             "Different source across non-content boundary \

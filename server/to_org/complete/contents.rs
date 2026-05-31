@@ -26,8 +26,9 @@ pub fn clobberIndefinitiveViewnode (
     nodecomplete_rustFirst_by_pid_and_source ( config, &node_id, &source ) ?;
   let title : String = nodecomplete . title . clone();
   let source : SourceName = nodecomplete . source . clone();
-  write_at_truenode_in_tree ( tree, treeid, |t| {
-    t . title = title;
-    t . source = source; }
+  write_at_truenode_in_tree (
+    tree, treeid,
+    |t| { t . title = title;
+          t . source = source; }
   ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (( )) }

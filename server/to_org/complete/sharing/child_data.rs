@@ -21,14 +21,13 @@
 ///   needed to create any missing goal child without querying while
 ///   the tree is being mutated.
 
-use crate::types::viewnode::RoleCol;
 use crate::types::env::SkgEnv;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::misc::{ID, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_viewnode, mk_phantom_viewnode};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Vognode, ParentIs, RoleCol, mk_indefinitive_viewnode, mk_phantom_viewnode};
 use crate::update_buffer::util::complete_relevant_children_in_viewnodetree;
 use crate::update_buffer::util::treat_certain_children;
 
@@ -75,10 +74,11 @@ pub fn build_child_data (
         . ok_or ("build_child_data: node not found") ?;
     let mut m : HashMap<ID, (SourceName, String)> = HashMap::new ();
     for child_ref in node_ref . children () {
-      if let ViewNodeKind::True (t) = & child_ref . value () . kind {
-        m . insert ( t . id . clone (),
-                     ( t . source . clone (),
-                       t . title . clone () )); }}
+      if let ViewNodeKind::Vognode (Vognode::Normal (t))
+        = & child_ref . value () . kind
+        { m . insert ( t . id . clone (),
+                       ( t . source . clone (),
+                         t . title . clone () )); }}
     m };
   let mut result : HashMap<ID, ChildData> = HashMap::new ();
   for child_skgid in goal_list {
@@ -140,11 +140,12 @@ pub fn reconcile_sharing_scaffold_children (
   complete_relevant_children_in_viewnodetree (
     tree, scaffold_node,
     |vn : &ViewNode| matches! ( &vn . kind,
-                                ViewNodeKind::True (t)
+                                ViewNodeKind::Vognode (Vognode::Normal (t))
                                 if t . parentIs == ParentIs::Collector ),
     |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::True (t) => t . id . clone (),
-      _ => panic! ( "{}: relevant child not TrueNode", label ) },
+      ViewNodeKind::Vognode (Vognode::Normal (t))
+        => t . id . clone (),
+      _ => panic! ( "{}: relevant child not a normal graph node", label ) },
     goal_list,
     |id : &ID| {
       let d : &ChildData =
@@ -177,12 +178,13 @@ fn mark_goal_children_as_collectionBranch_members (
   treat_certain_children (
     tree, scaffold_node,
     |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::True (t) =>
+      ViewNodeKind::Vognode (Vognode::Normal (t)) =>
         goal_set . contains (&t . id)
         && ! t . is_phantom (),
       _ => false },
     |vn : &mut ViewNode| {
-      if let ViewNodeKind::True (t) = &mut vn . kind {
-        t . parentIs = ParentIs::Collector; } } )
+      if let ViewNodeKind::Vognode (Vognode::Normal (t))
+        = &mut vn . kind
+        { t . parentIs = ParentIs::Collector; }} )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (( )) }

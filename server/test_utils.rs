@@ -21,7 +21,8 @@ use crate::types::misc::{MSV, SkgConfig, SkgfileSource, ID, TantivyIndex, Source
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::maybe_placed_viewnode::{ MaybePlacedViewnode, MaybePlacedViewnodeKind };
+use crate::types::maybe_placed_viewnode::{ MpViewnode, MpViewnodeKind };
+use crate::types::maybe_placed_viewnode::MpVognode;
 
 use ego_tree::{Tree, NodeRef};
 use futures::FutureExt;
@@ -428,22 +429,22 @@ pub fn compare_headlines_modulo_id(
     _ => false,  // One is headline, other is not, or they have different errors
   }}
 
-/// Compare two MaybePlacedViewnode trees by DFS.
+/// Compare two MpViewnode trees by DFS.
 /// (PITFALL: Naive comparison of trees just compares NodeIds,
 /// which are nearly meaningless.)
 pub fn compare_viewnode_trees (
-  node1 : NodeRef < MaybePlacedViewnode >,
-  node2 : NodeRef < MaybePlacedViewnode >
+  node1 : NodeRef < MpViewnode >,
+  node2 : NodeRef < MpViewnode >
 ) -> bool {
-  let n1 : & MaybePlacedViewnode =
+  let n1 : & MpViewnode =
     node1 . value ();
-  let n2 : & MaybePlacedViewnode =
+  let n2 : & MpViewnode =
     node2 . value ();
   if n1 != n2 { return false; }
   { // recurse
-    let children1 : Vec < NodeRef < '_, MaybePlacedViewnode >> =
+    let children1 : Vec < NodeRef < '_, MpViewnode >> =
       node1 . children () . collect ();
-    let children2 : Vec < NodeRef < '_, MaybePlacedViewnode >> =
+    let children2 : Vec < NodeRef < '_, MpViewnode >> =
       node2 . children () . collect ();
     children1 . len () == children2 . len () &&
       children1 . iter () . zip ( children2 . iter () )
@@ -452,12 +453,12 @@ pub fn compare_viewnode_trees (
 
 /// Compares ignoring ID value but not ID presence/absence.
 pub fn compare_viewnode_trees_modulo_id(
-  viewforest1: &Tree<MaybePlacedViewnode>,
-  viewforest2: &Tree<MaybePlacedViewnode>
+  viewforest1: &Tree<MpViewnode>,
+  viewforest2: &Tree<MpViewnode>
 ) -> bool {
-  let root1 : Vec < NodeRef < '_, MaybePlacedViewnode >> =
+  let root1 : Vec < NodeRef < '_, MpViewnode >> =
     viewforest1 . root() . children() . collect();
-  let root2 : Vec < NodeRef < '_, MaybePlacedViewnode >> =
+  let root2 : Vec < NodeRef < '_, MpViewnode >> =
     viewforest2 . root() . children() . collect();
   if root1 . len() != root2 . len() {
     return false; }
@@ -467,37 +468,47 @@ pub fn compare_viewnode_trees_modulo_id(
     { return false; }}
   true }
 
-/// Compare two MaybePlacedViewnode subtrees, ignoring ID values.
+/// Compare two MpViewnode subtrees, ignoring ID values.
 fn compare_two_viewnode_branches_recursively_modulo_id (
-  node1: NodeRef<MaybePlacedViewnode>,
-  node2: NodeRef<MaybePlacedViewnode>
+  node1: NodeRef<MpViewnode>,
+  node2: NodeRef<MpViewnode>
 ) -> bool {
-  let n1 : &MaybePlacedViewnode = node1 . value();
-  let n2 : &MaybePlacedViewnode = node2 . value();
+  let n1 : &MpViewnode = node1 . value();
+  let n2 : &MpViewnode = node2 . value();
   match (&n1 . kind, &n2 . kind) {
-    ( MaybePlacedViewnodeKind::True (_),
-      MaybePlacedViewnodeKind::True (t2)) =>
+    ( MpViewnodeKind::Vognode (MpVognode::Normal (_)
+                               | MpVognode::Phantom (_)),
+      MpViewnodeKind::Vognode (MpVognode::Normal (t2)
+                               | MpVognode::Phantom (t2))) =>
     { // Copy the ID from one to the other, then compare.
-      let mut n1_copy : MaybePlacedViewnode =
+      let mut n1_copy : MpViewnode =
         n1 . clone();
-      if let MaybePlacedViewnodeKind::True (t) = &mut n1_copy . kind {
-        t . id = t2 . id . clone(); }
+      if let MpViewnodeKind::Vognode (MpVognode::Normal (t)
+                                      | MpVognode::Phantom (t))
+        = &mut n1_copy . kind
+        { t . id = t2 . id . clone(); }
       if n1_copy != *n2 { return false; }}
-    ( MaybePlacedViewnodeKind::Scaff (_),
-      MaybePlacedViewnodeKind::Scaff (_)) =>
+    ( MpViewnodeKind::QualCol (_)
+      | MpViewnodeKind::Qual (_)
+      | MpViewnodeKind::PartnerCol (_)
+      | MpViewnodeKind::BufferRoot,
+      MpViewnodeKind::QualCol (_)
+      | MpViewnodeKind::Qual (_)
+      | MpViewnodeKind::PartnerCol (_)
+      | MpViewnodeKind::BufferRoot) =>
     { if n1 != n2 { return false; }}
-    ( MaybePlacedViewnodeKind::Deleted (_),
-      MaybePlacedViewnodeKind::Deleted (_)) =>
+    ( MpViewnodeKind::Vognode (MpVognode::Deleted (_)),
+      MpViewnodeKind::Vognode (MpVognode::Deleted (_))) =>
     { if n1 != n2 { return false; }}
-    ( MaybePlacedViewnodeKind::DeletedScaff (_),
-      MaybePlacedViewnodeKind::DeletedScaff (_)) =>
+    ( MpViewnodeKind::DeadScaffold,
+      MpViewnodeKind::DeadScaffold) =>
     { if n1 != n2 { return false; }}
     _ => return false, // mismatched kinds
   }
   { // Recurse on children
-    let children1 : Vec < NodeRef < '_, MaybePlacedViewnode >> =
+    let children1 : Vec < NodeRef < '_, MpViewnode >> =
       node1 . children() . collect();
-    let children2 : Vec < NodeRef < '_, MaybePlacedViewnode >> =
+    let children2 : Vec < NodeRef < '_, MpViewnode >> =
       node2 . children() . collect();
     ( children1 . len() == children2 . len() &&
       children1 . iter() . zip(children2 . iter())

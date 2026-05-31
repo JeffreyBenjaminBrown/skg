@@ -10,6 +10,7 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use crate::types::viewnode::{ IndefOrDef, ViewNode, ViewNodeKind };
+use crate::types::viewnode::Vognode;
 use subscribee_hiderel_intents::{ SubscribeeHiderelIntent, subscribee_hiderel_intents_from_candidates, };
 use super::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
 use super::validate::buffernode_differs_from_disknode;
@@ -184,12 +185,12 @@ pub(crate) async fn validate_no_title_or_body_edit_in_subscribeeAsSuch (
       node_ref . value() . role,
       SaveRole::Subscribee { .. })
     { continue; }
-    let ViewNodeKind::True (t) =
-      &node_ref . value() . viewnode . kind
-    else { continue; };
+    let ViewNodeKind::Vognode (Vognode::Normal (t))
+      = &node_ref . value() . viewnode . kind
+      else { continue; };
     let IndefOrDef::Definitive { body, .. } =
       &t . indef_or_def
-    else { continue; };
+      else { continue; };
     let Some (from_disk) =
       optNodeComplete_rustFIrst_by_id (
         config, driver, &t . id) . await ?

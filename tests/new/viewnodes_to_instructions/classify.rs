@@ -7,16 +7,16 @@ use skg::from_text::viewnodes_to_instructions::classify::{
 };
 use skg::types::git::MembershipAxes;
 use skg::types::misc::{ID, SourceName};
-use skg::types::maybe_placed_viewnode::{maybePlaced_to_placed_tree, MaybePlacedViewnode};
+use skg::types::maybe_placed_viewnode::{maybePlaced_to_placed_tree, MpViewnode};
 use skg::types::viewnode::{
   mk_definitive_viewnode,
   mk_unknown_viewnode,
   viewforest_root_viewnode,
-  viewnode_from_scaffold,
   DeletedNode,
+  Vognode,
+  Qual,
+  QualCol,
   RoleCol,
-  Scaffold,
-  ScaffoldKind,
   ViewNode,
   ViewNodeKind,
 };
@@ -24,7 +24,7 @@ use skg::types::viewnode::{
 fn checked_viewforest_from_org (
   input : &str,
 ) -> Tree<ViewNode> {
-  let unchecked_viewforest : Tree<MaybePlacedViewnode> =
+  let unchecked_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   maybePlaced_to_placed_tree (unchecked_viewforest) . unwrap() }
 
@@ -34,7 +34,7 @@ fn role_for_title (
   title : &str,
 ) -> SaveRole {
   for node_ref in tree . nodes() {
-    if node_ref . value() . title() == title {
+    if node_ref . value() . title () == title {
       return roles . get (&node_ref . id()) . unwrap() . clone(); }}
   panic! ("node not found: {}", title) }
 
@@ -45,22 +45,22 @@ fn role_for_title (
 fn saverole_of_first_scaffold (
   tree     : &Tree<ViewNode>,
   roles    : &HashMap<NodeId, SaveRole>,
-  scaffold : Scaffold,
+  kind     : ViewNodeKind,
 ) -> SaveRole {
   for node_ref in tree . nodes() {
     if matches! (
       &node_ref . value() . kind,
-      ViewNodeKind::Scaff (s) if *s == scaffold)
+      node_kind if *node_kind == kind)
     {
       return roles . get (&node_ref . id()) . unwrap() . clone(); }}
-  panic! ("scaffold not found: {:?}", scaffold) }
+  panic! ("scaffold not found: {:?}", kind) }
 
 fn first_node_id_with_title (
   tree  : &Tree<ViewNode>,
   title : &str,
 ) -> NodeId {
   for node_ref in tree . nodes() {
-    if node_ref . value() . title() == title {
+    if node_ref . value() . title () == title {
       return node_ref . id(); }}
   panic! ("node not found: {}", title) }
 
@@ -108,13 +108,15 @@ fn classifies_alias_and_id_display_scaffolds (
     classify_save_roles (&viewforest) . unwrap();
 
   assert_eq!(
-    role_for_title (&viewforest, &roles, "its aliases"),
+    saverole_of_first_scaffold (
+      &viewforest, &roles, ViewNodeKind::QualCol (QualCol::Alias)),
     SaveRole::NoSaveRole);
   assert_eq!(
     role_for_title (&viewforest, &roles, "first alias"),
     SaveRole::AliasDisplay);
   assert_eq!(
-    role_for_title (&viewforest, &roles, "its IDs"),
+    saverole_of_first_scaffold (
+      &viewforest, &roles, ViewNodeKind::QualCol (QualCol::ID)),
     SaveRole::NoSaveRole);
   assert_eq!(
     role_for_title (&viewforest, &roles, "extra-id"),
@@ -139,7 +141,9 @@ fn classifies_subscribee_col_positions (
     classify_save_roles (&viewforest) . unwrap();
 
   assert_eq!(
-    saverole_of_first_scaffold (&viewforest, &roles, Scaffold::RoleCol { roleCol: RoleCol::Subscribee }),
+    saverole_of_first_scaffold (
+      &viewforest, &roles,
+      ViewNodeKind::PartnerCol (RoleCol::Subscribee)),
     SaveRole::NoSaveRole);
   assert_eq!(
     role_for_title (&viewforest, &roles, "subscribee"),
@@ -147,7 +151,9 @@ fn classifies_subscribee_col_positions (
       subscriber : ID::from ("subscriber"),
     });
   assert_eq!(
-    saverole_of_first_scaffold (&viewforest, &roles, Scaffold::RoleCol { roleCol: RoleCol::HiddenInSubscribee }),
+    saverole_of_first_scaffold (
+      &viewforest, &roles,
+      ViewNodeKind::PartnerCol (RoleCol::HiddenInSubscribee)),
     SaveRole::NoSaveRole);
   assert_eq!(
     role_for_title (&viewforest, &roles, "hidden in child"),
@@ -156,7 +162,9 @@ fn classifies_subscribee_col_positions (
       subscribee : ID::from ("subscribee"),
     });
   assert_eq!(
-    saverole_of_first_scaffold (&viewforest, &roles, Scaffold::RoleCol { roleCol: RoleCol::HiddenOutsideOfSubscribee }),
+    saverole_of_first_scaffold (
+      &viewforest, &roles,
+      ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee)),
     SaveRole::NoSaveRole);
   assert_eq!(
     role_for_title (&viewforest, &roles, "hidden outside child"),
@@ -176,20 +184,19 @@ fn classifies_deleted_unknown_and_deleted_scaffolds_as_display_only (
       focused     : false,
       folded      : false,
       body_folded : false,
-      kind        : ViewNodeKind::Deleted (DeletedNode {
+      kind        : ViewNodeKind::Vognode (Vognode::Deleted (DeletedNode {
         id     : ID::from ("deleted"),
         source : SourceName::from ("main"),
         title  : "deleted" . to_string(),
         body   : None,
-      }),
+      })),
     }) . id();
   let deleted_scaff_id : NodeId =
     viewforest . get_mut (root_id) . unwrap() . append (ViewNode {
       focused     : false,
       folded      : false,
       body_folded : false,
-      kind        : ViewNodeKind::DeletedScaff (
-        ScaffoldKind::RoleCol { roleCol: RoleCol::Subscribee }),
+      kind        : ViewNodeKind::DeadScaffold,
     }) . id();
   let unknown_id : NodeId =
     viewforest . get_mut (root_id) . unwrap() . append (
@@ -203,19 +210,29 @@ fn classifies_deleted_unknown_and_deleted_scaffolds_as_display_only (
         None)) . id();
   let text_changed_id : NodeId =
     viewforest . get_mut (root_node_id) . unwrap() . append (
-      viewnode_from_scaffold (Scaffold::TextChanged {
-        staged   : true,
-        unstaged : false,
-      })) . id();
+      ViewNode {
+        focused     : false,
+        folded      : false,
+        body_folded : false,
+        kind        : ViewNodeKind::Qual (
+          Qual::TextChanged { staged: true, unstaged: false }) }) . id();
   let idcol_id : NodeId =
     viewforest . get_mut (root_node_id) . unwrap() . append (
-      viewnode_from_scaffold (Scaffold::IDCol)) . id();
+      ViewNode {
+        focused     : false,
+        folded      : false,
+        body_folded : false,
+        kind        : ViewNodeKind::QualCol (QualCol::ID) }) . id();
   let id_id : NodeId =
     viewforest . get_mut (idcol_id) . unwrap() . append (
-      viewnode_from_scaffold (Scaffold::ID {
+      ViewNode {
+        focused     : false,
+        folded      : false,
+        body_folded : false,
+        kind        : ViewNodeKind::Qual (Qual::ID {
         id         : ID::from ("extra"),
         membership : MembershipAxes::default(),
-      })) . id();
+      }) }) . id();
 
   let roles : HashMap<NodeId, SaveRole> =
     classify_save_roles (&viewforest) . unwrap();
@@ -243,7 +260,12 @@ fn errors_on_hidden_in_without_subscribeecol_context (
         None)) . id();
   let hidden_id : NodeId =
     viewforest . get_mut (root_node_id) . unwrap() . append (
-      viewnode_from_scaffold (Scaffold::RoleCol { roleCol: RoleCol::HiddenInSubscribee })) . id();
+      ViewNode {
+        focused     : false,
+        folded      : false,
+        body_folded : false,
+        kind        : ViewNodeKind::PartnerCol (
+          RoleCol::HiddenInSubscribee) }) . id();
   viewforest . get_mut (hidden_id) . unwrap() . append (
     mk_definitive_viewnode (
       ID::from ("hidden"),

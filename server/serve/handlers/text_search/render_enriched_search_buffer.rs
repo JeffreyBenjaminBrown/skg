@@ -3,6 +3,7 @@ use crate::dbs::typedb::ancestry::AncestryTree;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_viewnode};
+use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::HashMap;
@@ -11,7 +12,7 @@ use std::collections::HashMap;
 /// under each level-1 result TrueNode.
 /// Ancestry children are prepended (inserted first among siblings).
 pub(crate) fn insert_containerward_ancestries_into_search_view (
-  viewforest         : &mut Tree<ViewNode>,
+  viewforest     : &mut Tree<ViewNode>,
   search_results : &[ID],
   ancestry_by_id : &HashMap<ID, AncestryTree>,
   tantivy_index  : &TantivyIndex,
@@ -24,8 +25,8 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
     let root_ref : NodeRef<ViewNode> = viewforest . root ();
     root_ref . children ()
     . filter_map ( |c| match &c . value () . kind {
-      ViewNodeKind::True (t) =>
-        Some (( c . id (), t . id . clone () )),
+      ViewNodeKind::Vognode (Vognode::Normal (t))
+        => Some (( c . id (), t . id . clone () )),
       _ => None } )
     . collect () };
   for (node_nid, node_id) in &level1_ids {

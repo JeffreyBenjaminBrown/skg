@@ -62,6 +62,11 @@ and for Emacs to let the user know how to interpret it.
 
 ## mk = make / create
 
+## mp = maybe-placed
+
+A viewnode that might have an ID and source,
+but might not, is maybe-placed.
+
 ## "subscribee as such"
 
 In Skg some nodes are "subscribers", which "subscribe" to "subscribees".
@@ -111,6 +116,12 @@ rewritten to 'Independent', and have no effect on N.
 (If the user wants X to subscribe to N, they must modify X, not N.)
 The user could delete R, but it will respawn as soon as they save,
 because, again, the subscriberCol is a read-only set.
+
+## scaffold
+
+A view of a graph consists of viewnodes.
+Some of these correspond to individual graphnodes.
+The rest are "scaffolds".
 
 ## title != headline
 

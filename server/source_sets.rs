@@ -15,6 +15,7 @@ pub use crate::types::misc::SourceSetName;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, mk_inactive_viewnode};
+use crate::types::viewnode::Vognode;
 use crate::test_utils::cleanup_test_tantivy_and_typedb_dbs;
 
 use ego_tree::{NodeId, NodeMut, Tree};
@@ -128,13 +129,15 @@ pub fn apply_source_set_to_viewforest (
   for id in ids {
     let inactive : Option<(ID, SourceName, MembershipAxes)> =
       viewforest . get (id)
-      . and_then ( |n| match &n . value () . kind {
-        ViewNodeKind::True (t)
-          if ! active . contains_source (&t . source) =>
-            Some (( t . id . clone (),
-                    t . source . clone (),
-                    t . membership )),
-        _ => None } );
+      . and_then (
+        |n| match &n . value () . kind {
+          ViewNodeKind::Vognode (Vognode::Normal (t)
+                                 | Vognode::Phantom (t))
+            if ! active . contains_source (&t . source)
+            => Some (( t . id . clone (),
+                       t . source . clone (),
+                       t . membership )),
+          _ => None } );
     if let Some ((pid, source, membership)) = inactive {
       let mut node_mut : NodeMut<ViewNode> =
         viewforest . get_mut (id) . unwrap ();

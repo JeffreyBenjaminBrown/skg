@@ -4,6 +4,7 @@ use crate::from_text::viewnodes_to_instructions::to_naive_instructions::{
   collect_savenode_candidates, DefinenodeCandidate, DefinenodeCandidateKind };
 use crate::types::misc::ID;
 use crate::types::viewnode::{EditRequest, ParentIs, ViewNode, ViewNodeKind};
+use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeRef, Tree};
 
@@ -47,9 +48,10 @@ pub(crate) fn subscribee_hiderel_intents_from_candidates (
         "subscribee hiderel candidate not found")?;
     let subscribee : ID =
       match &node_ref . value() . viewnode . kind {
-        ViewNodeKind::True (t) => t . id . clone(),
+        ViewNodeKind::Vognode (Vognode::Normal (t))
+          => t . id . clone(),
         _ => return Err (
-          "subscribee-as-such candidate was not a TrueNode"
+          "subscribee-as-such candidate was not a Normal viewnode"
             . to_string()),
       };
     result . push (SubscribeeHiderelIntent {
@@ -74,7 +76,7 @@ fn collect_visible_content (
     let child_ref : NodeRef<ViewNode_in_Role> = child_ref;
     let child : &ViewNode = &child_ref . value() . viewnode;
     match &child . kind {
-      ViewNodeKind::True (t) => {
+      ViewNodeKind::Vognode (Vognode::Normal (t)) => {
         if matches!(
              child_ref . value() . role,
              SaveRole::Ordinary)

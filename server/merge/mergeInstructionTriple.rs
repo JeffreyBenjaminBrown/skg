@@ -8,6 +8,7 @@ use crate::types::save::{Merge, SaveNode, DeleteNode};
 use crate::types::misc::{MSV, SkgConfig, ID};
 use crate::types::viewnode::EditRequest;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode};
+use crate::types::viewnode::Vognode;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::list::dedup_vector;
 use crate::util::setlike_vector_subtraction;
@@ -123,8 +124,8 @@ async fn optmerge_from_viewnode (
 ) -> Result<Option<Merge>,
             Box<dyn Error>> {
   let t : &TrueNode = match &node . kind {
-    ViewNodeKind::True (t) => t,
-    _ => return Ok (None) };
+    ViewNodeKind::Vognode (Vognode::Normal (t)) => t,
+    _                                           => return Ok (None) };
   let acquiree_id = match t . edit_request () {
     Some(EditRequest::Merge (id)) => id,
     _ => return Ok (None) };

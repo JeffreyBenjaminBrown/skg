@@ -3,7 +3,8 @@ use crate::from_text::viewnodes_to_instructions::classify::{
 use crate::types::viewnode::EditRequest;
 use crate::types::viewnode::ParentIs::Collector;
 use crate::types::git::Sign;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, TrueNode, IndefOrDef, InactiveNode, RoleCol};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode, IndefOrDef, InactiveNode, RoleCol};
+use crate::types::viewnode::{Vognode, QualCol, Qual};
 use crate::types::misc::{ID, MSV, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
@@ -417,42 +418,40 @@ pub(crate) fn collect_savenode_candidates (
       read_at_node_in_tree (
         tree, node_id, |node| node . role . clone())?;
     match node_kind {
-      ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Subscribee }) =>
+      ViewNodeKind::PartnerCol (RoleCol::Subscribee) =>
         recurse_on_children( tree, node_id, result )?,
-      ViewNodeKind::Scaff (_) => {
-        // Display-only scaffolds do not own graph edits. Do not recurse through them: children of scaffolds such as AliasCol, IDCol, HiddenInSubscribeeCol, and diff display scaffolds are interpreted by their specific collectors (ancestors in the view) or ignored as presentation-only state.
-      },
-      ViewNodeKind::Deleted (_) =>
+      ViewNodeKind::QualCol (_)
+        | ViewNodeKind::Qual (_)
+        | ViewNodeKind::PartnerCol (_)
+        | ViewNodeKind::BufferRoot => {},
+      ViewNodeKind::Vognode (Vognode::Deleted (_)) =>
         recurse_on_children( tree, node_id, result )?,
-      ViewNodeKind::DeletedScaff (_) =>
+      ViewNodeKind::DeadScaffold =>
         recurse_on_children( tree, node_id, result )?,
-      ViewNodeKind::Inactive (_) => {},
-      ViewNodeKind::Unknown (_) =>
+      ViewNodeKind::Vognode (Vognode::Inactive (_)) => {},
+      ViewNodeKind::Vognode (Vognode::Unknown (_)) =>
         // An UnknownNode is a placeholder for a missing referent. It cannot generate save instructions itself, but its descendents might, so we recurse.
         recurse_on_children( tree, node_id, result )?,
-      ViewNodeKind::True (t) => {
+      ViewNodeKind::Vognode (Vognode::Normal (t)) => {
         let candidate_kind : Option<DefinenodeCandidateKind> =
           match role {
             SaveRole::Ordinary =>
               Some (DefinenodeCandidateKind::Ordinary),
             SaveRole::Subscribee { subscriber } =>
               Some (DefinenodeCandidateKind::Subscribee {
-                subscriber,
-              }),
+                subscriber }),
             SaveRole::Overridden { overrider } =>
               Some (DefinenodeCandidateKind::Overridden {
-                overrider,
-              }),
-            _ => None,
-          };
+                overrider }),
+            _ => None };
         if let Some (kind) = candidate_kind {
           if ! t . is_indefinitive() {
             result . push (DefinenodeCandidate {
               treeid : node_id,
-              kind,
-            }); }
-          recurse_on_children( tree, node_id, result )?; }}}
-    Ok(( )) }
+              kind } ); }
+          recurse_on_children( tree, node_id, result )?; }},
+      ViewNodeKind::Vognode (Vognode::Phantom (_)) => {} }
+    Ok (( )) }
 
   let mut result: Vec<DefinenodeCandidate> = Vec::new();
   for root_child in tree_forest_root_ids (tree) {
@@ -472,7 +471,8 @@ fn collect_node_edit_basics (
         tree,
         *candidate_id,
         |node| match &node . viewnode . kind {
-          ViewNodeKind::True (t) => Ok (t . clone()),
+          ViewNodeKind::Vognode (Vognode::Normal (t) )
+            => Ok (t . clone()),
           _ => Err ( "intent candidate was not a TrueNode"
                       . to_string() ), } )??;
     let basics : NodeIntentLocal =
@@ -557,7 +557,7 @@ fn collect_overridden_by_node_id (
       *candidate_id,
       collect_members_from_child_relation_col (
         tree, *candidate_id,
-        &Scaffold::RoleCol { roleCol: RoleCol::Overridden },
+        RoleCol::Overridden,
         "OverriddenCol")?); }
   Ok (result) }
 
@@ -627,7 +627,7 @@ fn collect_subscribees (
 ) -> Result<MSV<ID>, String> {
   let subscribee_col_id : Option<NodeId> =
     unique_scaffold_child (
-      tree, node_id, &Scaffold::RoleCol { roleCol: RoleCol::Subscribee },
+      tree, node_id, &ViewNodeKind::PartnerCol (RoleCol::Subscribee),
       scaffold_from_viewnodeInRole )?;
   match subscribee_col_id {
     None => Ok (MSV::Unspecified),
@@ -642,21 +642,27 @@ fn collect_subscribees (
           let child_node : &ViewNode =
             &subscribeecol_child . value() . viewnode;
           match &child_node . kind {
-            ViewNodeKind::True (t) => {
+            ViewNodeKind::Vognode (Vognode::Normal (t)) => {
               if matches!(
                    subscribeecol_child . value() . role,
                    SaveRole::Subscribee { .. })
                  && member_counts_for_relation_collection (t)
               { subscribees . push(t . id . clone()); }},
-            ViewNodeKind::Scaff (Scaffold::RoleCol {
-              roleCol: RoleCol::HiddenOutsideOfSubscribee })
+            ViewNodeKind::Vognode (Vognode::Phantom (_))
+              => continue,
+            ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee)
               => continue, // valid child of SubscribeeCol, but not a subscribee
-            ViewNodeKind::Deleted (_)
-              | ViewNodeKind::DeletedScaff (_)
-              | ViewNodeKind::Inactive (_)
-              | ViewNodeKind::Unknown (_)
+            ViewNodeKind::Vognode (Vognode::Deleted (_))
+              | ViewNodeKind::DeadScaffold
+              | ViewNodeKind::Vognode (Vognode::Inactive (_))
+              | ViewNodeKind::Vognode (Vognode::Unknown (_))
               => continue, // inert in this context
-            ViewNodeKind::Scaff (s) => return Err(format!( "SubscribeeCol has unexpected Scaffold child: {:?}", s)), }}
+            ViewNodeKind::QualCol (_)
+              | ViewNodeKind::Qual (_)
+              | ViewNodeKind::PartnerCol (_)
+              | ViewNodeKind::BufferRoot => return Err(format!(
+                "SubscribeeCol has unexpected non-vognode child: {:?}",
+                child_node . kind)), }}
         subscribees };
       Ok( MSV::Specified(dedup_vector (subscribees)) ) }} }
 
@@ -669,12 +675,12 @@ fn collect_subscribees (
 fn collect_members_from_child_relation_col (
   tree     : &Tree<ViewNode_in_Role>,
   node_id  : NodeId, // this is the truenode; the collection is its child
-  scaffold : &Scaffold,
+  roleCol  : RoleCol,
   label    : &str,
 ) -> Result<MSV<ID>, String> {
   let col_id : Option<NodeId> =
     unique_scaffold_child (
-      tree, node_id, scaffold,
+      tree, node_id, &ViewNodeKind::PartnerCol (roleCol),
       scaffold_from_viewnodeInRole )?;
   match col_id {
     None => Ok (MSV::Unspecified),
@@ -684,16 +690,21 @@ fn collect_members_from_child_relation_col (
       let mut members : Vec<ID> = Vec::new();
       for child in col_ref . children() {
         match &child . value() . viewnode . kind {
-          ViewNodeKind::True (t) => {
+          ViewNodeKind::Vognode (Vognode::Normal (t)) => {
             if member_counts_for_relation_collection (t) {
               members . push (t . id . clone ()); }},
-          ViewNodeKind::Deleted (_) |
-          ViewNodeKind::DeletedScaff (_) |
-          ViewNodeKind::Inactive (_) |
-          ViewNodeKind::Unknown (_) =>
-            continue,
-          ViewNodeKind::Scaff (s) => return Err (format!(
-            "{} has unexpected Scaffold child: {:?}", label, s)), }}
+          ViewNodeKind::Vognode (Vognode::Phantom (_))
+            | ViewNodeKind::Vognode (Vognode::Deleted (_))
+            | ViewNodeKind::DeadScaffold
+            | ViewNodeKind::Vognode (Vognode::Inactive (_))
+            | ViewNodeKind::Vognode (Vognode::Unknown (_))
+            => continue,
+          ViewNodeKind::QualCol (_)
+            | ViewNodeKind::Qual (_)
+            | ViewNodeKind::PartnerCol (_)
+            | ViewNodeKind::BufferRoot => return Err (format!(
+              "{} has unexpected non-vognode child: {:?}",
+              label, child . value() . viewnode . kind)), }}
       Ok (MSV::Specified (dedup_vector (members))) }} }
 
 fn member_counts_for_relation_collection (
@@ -719,9 +730,8 @@ fn collect_contents_to_save_from_children<'a> (
     let child_ref : NodeRef<ViewNode_in_Role> = child_ref;
     let child : &ViewNode = &child_ref . value() . viewnode;
     match &child . kind {
-      ViewNodeKind::True (t) => {
-        // In diff view, skip phantom nodes.
-        if matches!(
+      ViewNodeKind::Vognode (Vognode::Normal (t)) => {
+           if matches!(
              child_ref . value() . role,
              SaveRole::Ordinary)
            && ! t . parent_ignores_it()
@@ -729,7 +739,7 @@ fn collect_contents_to_save_from_children<'a> (
            && ! matches!( t . edit_request (),
                           Some (&EditRequest::Delete))
         { contents . push( t . id . clone() ); }},
-      ViewNodeKind::Inactive (i) => {
+      ViewNodeKind::Vognode (Vognode::Inactive (i)) => {
         if ! inactiveNode_is_phantom (i) {
           contents . push ( i . id . clone () ); }},
       _ => continue }}
@@ -745,11 +755,8 @@ fn inactiveNode_is_phantom (
 #[allow(non_snake_case)]
 fn scaffold_from_viewnodeInRole (
   node : &ViewNode_in_Role,
-) -> Option<&Scaffold> {
-  match &node . viewnode . kind {
-    ViewNodeKind::Scaff (s) => Some (s),
-    _ => None,
-  }}
+) -> Option<&ViewNodeKind> {
+  Some (&node . viewnode . kind) }
 
 #[allow(non_snake_case)]
 fn collect_grandchild_aliases_for_viewnodeInRole (
@@ -758,7 +765,8 @@ fn collect_grandchild_aliases_for_viewnodeInRole (
 ) -> Result<MSV<String>, String> {
   let alias_col_id : Option<NodeId> =
     unique_scaffold_child (
-      tree, node_id, &Scaffold::AliasCol,
+      tree, node_id,
+      &ViewNodeKind::QualCol (QualCol::Alias),
       scaffold_from_viewnodeInRole )?;
   match alias_col_id {
     None => Ok (MSV::Unspecified),
@@ -771,7 +779,7 @@ fn collect_grandchild_aliases_for_viewnodeInRole (
         let alias_child : NodeRef<ViewNode_in_Role> = alias_child;
         if ! matches!(
           &alias_child . value() . viewnode . kind,
-          ViewNodeKind::Scaff (Scaffold::Alias { .. }))
+          ViewNodeKind::Qual (Qual::Alias { .. }))
         { return Err (format!(
             "AliasCol has non-Alias child with kind: {:?}",
             alias_child . value() . viewnode . kind)); }

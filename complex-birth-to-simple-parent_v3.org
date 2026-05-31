@@ -94,7 +94,7 @@ Recommendation:
 Default construction should use =ParentIs::Container=, matching the
 metadata default. That includes the current equivalents of
 =default_truenode=, =mk_definitive_viewnode=, and
-=MaybePlacedTruenode::default=.
+=MpTruenode::default=.
 
 Keep the helper name =parent_ignores_it=. Its current meaning remains
 useful: when saving, a view-child with this property has no graph effect

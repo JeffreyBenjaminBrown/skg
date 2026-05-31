@@ -188,10 +188,10 @@ The obvious blast radius includes:
 The compiler will catch many Rust omissions, but not semantic mistakes
 in tree-shape interpretation.
 
-*** MaybePlaced duplication doubles the work
+*** Mp duplication doubles the work
 
-The parsed-buffer stage has parallel 'MaybePlacedViewnode' and
-'MaybePlacedViewnodeKind' types.  Any public enum reshaping has to be
+The parsed-buffer stage has parallel 'MpViewnode' and
+'MpViewnodeKind' types.  Any public enum reshaping has to be
 mirrored there or hidden behind conversions.  This is a strong argument
 for introducing helper methods before replacing variants.
 
@@ -360,7 +360,7 @@ Only after the shape is settled:
 - 'ViewNode' -> 'Vnode';
 - 'ViewNodeKind' -> 'VnodeKind';
 - 'TrueNode' -> 'Gnode' once 'Vognode' owns the view-state enum role;
-- 'MaybePlacedViewnode' -> 'MaybePlacedVnode'.
+- 'MpViewnode' -> 'MpVnode'.
 
 This is mostly mechanical but noisy.  It is best done after semantic
 helpers have reduced the amount of pattern-matching churn.

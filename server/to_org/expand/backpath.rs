@@ -17,6 +17,7 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::tree::viewnode_nodecomplete::{ find_child_by_id, find_children_by_ids};
 use crate::types::viewnode::ViewRequest;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_from_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId,Tree};
 use std::collections::{HashSet, HashMap};
@@ -360,8 +361,9 @@ async fn attach_containerward_ancestries_to_link_sources (
     let mut result : Vec<NodeId> = Vec::new ();
     for edge in tree . get (node_id) . unwrap () . traverse () {
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
-        if let ViewNodeKind::True (t) = &node_ref . value () . kind {
-          if t . parentIs == ParentIs::LinkTarget {
+        if let ViewNodeKind::Vognode (Vognode::Normal (t))
+          = &node_ref . value () . kind
+        { if t . parentIs == ParentIs::LinkTarget {
             result . push ( node_ref . id () ); }} }}
     result };
   attach_containerward_ancestries_at_nodeids_with_source_set (
@@ -396,8 +398,8 @@ pub async fn attach_containerward_ancestries_at_nodeids_with_source_set (
       . filter_map ( |nid|
         tree . get (*nid) . and_then ( |n|
           match & n . value () . kind {
-            ViewNodeKind::True (t) =>
-              Some ( (*nid, t . id . clone ()) ),
+            ViewNodeKind::Vognode (Vognode::Normal (t))
+              => Some ( (*nid, t . id . clone ()) ),
             _ => None } ) )
       . collect ();
   if pairs . is_empty () { return Ok (( )); }

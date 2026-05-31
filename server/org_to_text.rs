@@ -1,7 +1,11 @@
 use crate::types::git::MembershipAxes;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, UnknownNode, InactiveNode, EditRequest, GraphNodeStats, ParentIs, RoleCol };
+use crate::types::viewnode::{
+  ViewNode, ViewNodeKind, Vognode, Qual, QualCol, TrueNode,
+  DeletedNode, UnknownNode, InactiveNode, EditRequest, GraphNodeStats,
+  ParentIs,
+};
 
 use ego_tree::{NodeRef, Tree};
 use std::error::Error;
@@ -34,7 +38,7 @@ impl ViewForestRenderRoots for Tree<ViewNode> {
     let is_viewforest_root : bool =
       matches! (
         & root_ref . value () . kind,
-        ViewNodeKind::Scaff (Scaffold::BufferRoot));
+        ViewNodeKind::BufferRoot);
     if ! is_viewforest_root {
       return Err (
         "viewforest_to_string: root is not a BufferRoot" . into() ); }
@@ -59,7 +63,7 @@ pub fn viewforest_tree_to_string (
   let is_viewforest_root : bool =
     matches! (
       & root_ref . value () . kind,
-      ViewNodeKind::Scaff (Scaffold::BufferRoot));
+      ViewNodeKind::BufferRoot);
   if ! is_viewforest_root {
     return Err (
       "viewforest_tree_to_string: root is not a BufferRoot" . into() ); }
@@ -133,70 +137,78 @@ pub fn viewnode_to_string (
   config   : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   match &viewnode . kind {
-    ViewNodeKind::Scaff (scaffold) =>
-      scaffold_metadata_to_string (
+    ViewNodeKind::QualCol (col) =>
+      qualcol_metadata_to_string (
         viewnode . focused, viewnode . folded,
-        viewnode . body_folded, scaffold ),
-    ViewNodeKind::True (true_node) =>
+        viewnode . body_folded, col ),
+    ViewNodeKind::Qual (qual) =>
+      qual_metadata_to_string (
+        viewnode . focused, viewnode . folded,
+        viewnode . body_folded, qual ),
+    ViewNodeKind::PartnerCol (roleCol) =>
+      Ok ( non_vognode_atom_metadata_to_string (
+        viewnode . focused, viewnode . folded,
+        viewnode . body_folded, roleCol . repr_in_client () ) ),
+    ViewNodeKind::BufferRoot =>
+      Err ( "viewnode_to_string: BufferRoot should never be rendered" . into () ),
+    ViewNodeKind::DeadScaffold =>
+      Ok ( deleted_scaff_metadata_to_string (
+        viewnode . focused, viewnode . folded,
+        viewnode . body_folded )),
+    ViewNodeKind::Vognode (Vognode::Normal (true_node) | Vognode::Phantom (true_node)) =>
       Ok ( true_node_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, true_node, config )),
-    ViewNodeKind::Deleted (deleted_node) =>
+    ViewNodeKind::Vognode (Vognode::Deleted (deleted_node)) =>
       Ok ( deleted_node_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, deleted_node )),
-    ViewNodeKind::DeletedScaff (kind) =>
-      Ok ( deleted_scaff_metadata_to_string (
-        viewnode . focused, viewnode . folded,
-        viewnode . body_folded, kind )),
-    ViewNodeKind::Unknown (unknown_node) =>
+    ViewNodeKind::Vognode (Vognode::Unknown (unknown_node)) =>
       Ok ( unknown_node_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, unknown_node )),
-    ViewNodeKind::Inactive (inactive_node) =>
+    ViewNodeKind::Vognode (Vognode::Inactive (inactive_node)) =>
       Ok ( inactive_node_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, inactive_node )) } }
 
-/// Render metadata for a Scaffold:
-///   (skg [focused] [folded] scaffoldKind)
-/// where scaffoldKind is a bare atom.
-/// ERRORS: if scaffold is BufferRoot.
-fn scaffold_metadata_to_string (
+fn non_vognode_atom_metadata_to_string (
   focused     : bool,
   folded      : bool,
   body_folded : bool,
-  scaffold    : &Scaffold
+  atom        : &str,
+) -> String {
+  let mut parts : Vec < String > = Vec::new ();
+  if focused     { parts . push ( "focused"    . to_string () ); }
+  if folded      { parts . push ( "folded"     . to_string () ); }
+  if body_folded { parts . push ( "bodyFolded" . to_string () ); }
+  parts . push (atom . to_string ());
+  parts . join (" ") }
+
+fn qualcol_metadata_to_string (
+  focused     : bool,
+  folded      : bool,
+  body_folded : bool,
+  col         : &QualCol,
+) -> Result < String, Box<dyn Error> > {
+  Ok ( non_vognode_atom_metadata_to_string (
+    focused, folded, body_folded, col . repr_in_client () ) ) }
+
+fn qual_metadata_to_string (
+  focused     : bool,
+  folded      : bool,
+  body_folded : bool,
+  qual        : &Qual,
 ) -> Result < String, Box<dyn Error> > {
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  match scaffold {
-    Scaffold::Alias { membership, .. } => {
+  match qual {
+    Qual::Alias { membership, .. } => {
       parts . push ( "alias" . to_string () );
       append_membership_stage_forms (&mut parts, membership); }
-    Scaffold::AliasCol =>
-      parts . push ( "aliasCol" . to_string () ),
-    Scaffold::BufferRoot =>
-      return Err ( "scaffold_metadata_to_string: BufferRoot should never be rendered" . into () ),
-    Scaffold::RoleCol { roleCol: RoleCol::HiddenInSubscribee } =>
-      parts . push ( "hiddenInSubscribeeCol" . to_string () ),
-    Scaffold::RoleCol { roleCol: RoleCol::HiddenOutsideOfSubscribee } =>
-      parts . push ( "hiddenOutsideOfSubscribeeCol" . to_string () ),
-    Scaffold::RoleCol { roleCol: RoleCol::Hidden } =>
-      parts . push ( "hiddenCol" . to_string () ),
-    Scaffold::RoleCol { roleCol: RoleCol::Hider } =>
-      parts . push ( "hiderCol" . to_string () ),
-    Scaffold::RoleCol { roleCol: RoleCol::Overridden } =>
-      parts . push ( "overriddenCol" . to_string () ),
-    Scaffold::RoleCol { roleCol: RoleCol::Overrider } =>
-      parts . push ( "overriderCol" . to_string () ),
-    Scaffold::RoleCol { roleCol: RoleCol::Subscriber } =>
-      parts . push ( "subscriberCol" . to_string () ),
-    Scaffold::RoleCol { roleCol: RoleCol::Subscribee } =>
-      parts . push ( "subscribeeCol" . to_string () ),
-    Scaffold::TextChanged { staged, unstaged } => {
+    Qual::TextChanged { staged, unstaged } => {
       let mut tags : Vec<&'static str> = Vec::new ();
       if *staged   { tags . push ("staged"); }
       if *unstaged { tags . push ("unstaged"); }
@@ -204,9 +216,7 @@ fn scaffold_metadata_to_string (
       { parts . push ( "textChanged" . to_string () ); }
       else
       { parts . push ( format! ( "(textChanged {})", tags . join (" ") )); } }
-    Scaffold::IDCol =>
-      parts . push ( "idCol" . to_string () ),
-    Scaffold::ID { membership, .. } => {
+    Qual::ID { membership, .. } => {
       parts . push ( "id" . to_string () );
       append_membership_stage_forms (&mut parts, membership); }
   }
@@ -399,14 +409,12 @@ fn deleted_scaff_metadata_to_string (
   focused     : bool,
   folded      : bool,
   body_folded : bool,
-  kind        : &ScaffoldKind,
 ) -> String {
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  parts . push ( format! ( "(deletedScaffold {})",
-                           kind . repr_in_client () ) );
+  parts . push ( "(deletedScaffold deadScaffold)" . to_string () );
   parts . join (" ") }
 
 fn graphnodestats_to_sexp (

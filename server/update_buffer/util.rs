@@ -1,5 +1,6 @@
 use crate::types::misc::ID;
 use crate::types::viewnode::{ParentIs, TrueNode, ViewNode, ViewNodeKind};
+use crate::types::viewnode::Vognode;
 use crate::types::tree::generic::{with_node_mut, write_at_ancestor_in_tree};
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -24,9 +25,9 @@ where
         . ok_or ("treat_certain_children: node not found")?;
       node_ref . children() . map( |c| c . id() ) . collect() };
   for child_id in child_ids {
-    with_node_mut( tree, child_id, |mut n| {
-      if treated( n . value() ) {
-        treatment( n . value() ); }
+    with_node_mut( tree, child_id,
+                   |mut n| { if treated( n . value() )
+                             { treatment( n . value() ); }
     } ) . map_err( |e| -> String { e . into() } )?; }
   Ok( () ) }
 
@@ -53,14 +54,15 @@ where
   treat_certain_children (
     tree, node,
     |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::True (t) =>
+      ViewNodeKind::Vognode (Vognode::Normal (t)) =>
         is_managed_child (t)
         && ! goal_set . contains (&t . id)
         && ! t . is_phantom (),
       _ => false },
     |vn : &mut ViewNode| {
-      if let ViewNodeKind::True (t) = &mut vn . kind {
-        t . parentIs = ParentIs::Independent; } } )
+      if let ViewNodeKind::Vognode (Vognode::Normal (t))
+        = &mut vn . kind
+        { t . parentIs = ParentIs::Independent; }} )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (( )) }
 
@@ -114,7 +116,8 @@ pub fn detach_scaffold_transferring_focus (
       tree, node, 1,
       |vn : &mut ViewNode| { vn . focused = true; } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
-  with_node_mut ( tree, node, |mut n| { n . detach (); } )
+  with_node_mut ( tree, node,
+                  |mut n| { n . detach (); } )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (()) }
 
@@ -139,9 +142,11 @@ pub fn move_child_to_end<Node> (
   parent_id : NodeId,
   child_id  : NodeId,
 ) -> Result<(), Box<dyn Error>> {
-  with_node_mut( tree, child_id, |mut n| { n . detach(); } )
+  with_node_mut( tree, child_id,
+                 |mut n| { n . detach(); } )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
-  with_node_mut( tree, parent_id, |mut p| { p . append_id (child_id); } )
+  with_node_mut( tree, parent_id,
+                 |mut p| { p . append_id (child_id); } )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   Ok( () ) }
 
@@ -252,10 +257,12 @@ where
       found };
   { // Remove invalid and duplicate nodes
     for &( node_id, _ ) in &duplicate_ids {
-      with_node_mut( tree, node_id, |mut n| { n . detach(); } )
+      with_node_mut( tree, node_id,
+                     |mut n| { n . detach(); } )
         . map_err( |e| -> Box<dyn Error> { e . into() } )?; }
     for &node_id in &invalid_ids {
-      with_node_mut( tree, node_id, |mut n| { n . detach(); } )
+      with_node_mut( tree, node_id,
+                     |mut n| { n . detach(); } )
         . map_err( |e| -> Box<dyn Error> { e . into() } )?; } }
   if discard_has_problem {
     // Respond to problem if any discard was problematic

@@ -5,7 +5,7 @@ use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_a_
 use skg::merge::merge_nodes;
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SourceName};
-use skg::types::viewnode::{EditRequest, ViewNode, ViewNodeKind, TrueNode, IndefOrDef, viewforest_root_viewnode, default_truenode};
+use skg::types::viewnode::{EditRequest, ViewNode, ViewNodeKind, Vognode, TrueNode, IndefOrDef, viewforest_root_viewnode, default_truenode};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::Merge;
 use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_source;
@@ -35,7 +35,7 @@ fn mk_test_viewnode (
   ViewNode { focused     : false,
             folded      : false,
             body_folded : false,
-            kind        : ViewNodeKind::True (t) }}
+            kind        : ViewNodeKind::Vognode (Vognode::Normal (t)) }}
 
 #[test]
 fn test_merge_2_into_1() -> Result<(), Box<dyn Error>> {

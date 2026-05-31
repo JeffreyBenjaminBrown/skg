@@ -8,10 +8,11 @@ use skg::from_text::buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest,
   absent_parentIs_under_visible_parent_becomes_isContainer};
 use skg::test_utils::{run_with_test_db, compare_viewnode_trees_modulo_id, compare_viewnode_trees};
-use skg::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
+use skg::types::maybe_placed_viewnode::{
+  MpViewnode, MpViewnodeKind, MpVognode};
 use skg::types::misc::{SkgConfig, ID};
 use skg::types::tree::forest::{
-  MaybePlacedViewForest,
+  MpViewForest,
   tree_forest_root_ids};
 use skg::types::viewnode::ParentIs;
 
@@ -58,14 +59,14 @@ async fn test_add_missing_info_logic (
             ** (skg (node (id unpredictable) (source main))) no id
             *** (skg (node (id unpredictable) (source main))) also no id
         "};
-  let mut after_adding_missing_info : MaybePlacedViewForest =
+  let mut after_adding_missing_info : MpViewForest =
     org_to_uninterpreted_viewforest (
       with_missing_info) . unwrap() . 0;
   add_missing_info_to_viewforest(
     &mut after_adding_missing_info,
     &config . db_name,
     driver ) . await ?;
-  let expected_viewforest: Tree<MaybePlacedViewnode> =
+  let expected_viewforest: Tree<MpViewnode> =
     org_to_uninterpreted_nodes(
       without_missing_info ) . unwrap() . 0;
   assert_eq!(
@@ -78,7 +79,7 @@ async fn test_add_missing_info_logic (
       &expected_viewforest),
     "add_missing_info_to_viewforest: Forests not equivalent modulo ID." );
 
-  { let actual_root : &MaybePlacedViewnode =
+  { let actual_root : &MpViewnode =
       after_adding_missing_info . root() . first_child() . unwrap() . value();
     let actual_root_id : &ID =
       actual_root . id_opt() . unwrap();
@@ -97,7 +98,7 @@ fn test_absent_parentIs_under_visible_parent_becomes_isContainer () {
             * (skg (node (id root) (source main) (parentIs absent))) root
             ** (skg (node (id moved) (source main) (parentIs absent))) moved
         "};
-  let mut viewforest : MaybePlacedViewForest =
+  let mut viewforest : MpViewForest =
     org_to_uninterpreted_viewforest (input) . unwrap() . 0;
 
   absent_parentIs_under_visible_parent_becomes_isContainer (
@@ -109,11 +110,13 @@ fn test_absent_parentIs_under_visible_parent_becomes_isContainer () {
     root_node . first_child() . unwrap();
 
   match &root_node . value() . kind {
-    MaybePlacedViewnodeKind::True (t) =>
+    MpViewnodeKind::Vognode (
+      MpVognode::Normal (t) | MpVognode::Phantom (t)) =>
       assert_eq! (t . parentIs, ParentIs::Absent),
     _ => panic! ("expected root TrueNode") }
   match &moved_node . value() . kind {
-    MaybePlacedViewnodeKind::True (t) =>
+    MpViewnodeKind::Vognode (
+      MpVognode::Normal (t) | MpVognode::Phantom (t)) =>
       assert_eq! (t . parentIs, ParentIs::Container),
     _ => panic! ("expected moved TrueNode") }
 }
@@ -160,13 +163,13 @@ async fn test_source_inheritance_logic (
             ** (skg (node (id 22))) _
         "};
 
-  let mut actual_viewforest: MaybePlacedViewForest =
+  let mut actual_viewforest: MpViewForest =
     org_to_uninterpreted_viewforest (input) . unwrap() . 0;
   add_missing_info_to_viewforest(
     &mut actual_viewforest,
     &config . db_name,
     driver ) . await ?;
-  let expected_viewforest: Tree<MaybePlacedViewnode> =
+  let expected_viewforest: Tree<MpViewnode> =
     org_to_uninterpreted_nodes (expected) . unwrap() . 0;
 
   assert!(

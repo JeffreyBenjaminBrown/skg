@@ -20,6 +20,7 @@ use crate::to_org::util::mark_view_roots_parent_absent;
 use crate::types::tree::forest::ViewForest;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
+use crate::types::viewnode::Vognode;
 use crate::source_sets::{ActiveSourceSet, render_viewforest_with_source_set};
 use crate::update_buffer::graphnodestats::{
   set_graphnodestats_in_viewforest,
@@ -114,7 +115,9 @@ async fn multi_root_view_inner (
     // Collect PIDs from viewforest before rendering to string.
     let mut ids : Vec<ID> = Vec::new ();
     for node_ref in viewforest . nodes () {
-      if let ViewNodeKind::True (t) = &node_ref . value () . kind
+      if let ViewNodeKind::Vognode (Vognode::Normal (t)
+                                    | Vognode::Phantom (t))
+        = &node_ref . value () . kind
         { ids . push ( t . id . clone () ); }}
     ids };
   let buffer_content : String =

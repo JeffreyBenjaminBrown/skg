@@ -24,11 +24,12 @@ use skg::types::misc::{ID, MSV};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::maybe_placed_viewnode::{
-  MaybePlacedViewnode,
+  MpViewnode,
   maybePlaced_to_placed_tree,
   maybePlaced_to_placed_viewforest};
-use skg::types::tree::forest::{MaybePlacedViewForest, ViewForest};
+use skg::types::tree::forest::{MpViewForest, ViewForest};
 use skg::types::viewnode::{ViewNode, ViewNodeKind, viewforest_root_viewnode};
+use skg::types::viewnode::Vognode;
 use std::error::Error;
 
 const SUBSCRIBEE_EDIT_CONFIG: &str =
@@ -55,7 +56,7 @@ fn saved_node_by_id<'a> (
 fn checked_viewforest_from_org (
   input : &str,
 ) -> Tree<ViewNode> {
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap() }
 
@@ -77,7 +78,10 @@ fn set_membership_unstaged_minus (
   for node_ref in tree . nodes() {
     let is_target : bool =
       match &node_ref . value() . kind {
-        ViewNodeKind::True (t) => t . id == ID::from (id),
+        ViewNodeKind::Vognode (
+          Vognode::Normal (t)
+          | Vognode::Phantom (t)) =>
+          t . id == ID::from (id),
         _ => false,
       };
     if is_target {
@@ -85,7 +89,9 @@ fn set_membership_unstaged_minus (
       break; }}
   let target_id = target_id . unwrap_or_else (||
     panic! ("node not found: {}", id));
-  if let ViewNodeKind::True (t) =
+  if let ViewNodeKind::Vognode (
+    Vognode::Normal (t)
+    | Vognode::Phantom (t)) =
     &mut tree . get_mut (target_id) . unwrap() . value() . kind
   { t . membership . unstaged = Some (Sign::Minus); }}
 
@@ -95,7 +101,7 @@ async fn save_instructions_from_org_with_disk (
   driver   : &typedb_driver::TypeDBDriver,
 ) -> Result<Vec<DefineNode>, Box<dyn Error>> {
   let (mut maybePlaced_viewforest, _parsing_errors)
-    : (MaybePlacedViewForest, Vec<BufferValidationError>) =
+    : (MpViewForest, Vec<BufferValidationError>) =
     org_to_uninterpreted_viewforest (org_text) ?;
   add_missing_info_to_viewforest (
     &mut maybePlaced_viewforest, &config . db_name, driver) . await?;
@@ -118,7 +124,7 @@ fn test_extract_nonmergeSavePlan_basic() {
             Root 2 body
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -171,7 +177,7 @@ fn test_extract_nonmergeSavePlan_with_aliases() {
             Content body
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -212,7 +218,7 @@ fn test_extract_nonmergeSavePlan_no_aliases() {
             Child body
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -307,7 +313,7 @@ fn test_extract_nonmergeSavePlan_multiple_alias_cols() {
             ** (skg (node (id content1) (source main))) content node
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -331,7 +337,7 @@ fn test_extract_nonmergeSavePlan_mixed_relations() {
             ** (skg (node (id unrelated2) (source main) (parentIs independent))) another unrelated child
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -360,7 +366,7 @@ fn role_aware_extraction_preserves_content_and_independent_children (
             ** (skg (node (id independent) (source main) (parentIs independent))) independent
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -387,7 +393,7 @@ fn role_aware_extraction_skips_alias_and_id_display_nodes (
             ** (skg (node (id child) (source main))) child
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -419,7 +425,7 @@ fn role_aware_extraction_collects_subscribees_without_hidden_branches (
             **** (skg (node (id hidden-outside) (source main) (parentIs collector))) hidden outside child
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -451,7 +457,7 @@ fn role_aware_extraction_collects_overridden_col (
             *** (skg (node (id overridden-b) (source main) (parentIs collector))) overridden B
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -476,7 +482,7 @@ fn empty_overridden_col_means_empty_override_set (
             ** (skg overriddenCol)
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -503,7 +509,7 @@ fn read_only_relation_col_children_do_not_become_save_instructions (
             *** (skg (node (id hidden) (source main) (parentIs collector))) hidden
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -668,7 +674,7 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
             Doomed body
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -712,7 +718,7 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
             Doomed body
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -1146,7 +1152,7 @@ fn test_extract_nonmergeSavePlan_deep_nesting() {
             ** (skg (node (id level2b) (source main))) level 2b
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -1185,7 +1191,7 @@ fn test_extract_nonmergeSavePlan_error_missing_id() {
             * node without ID
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let result : Result<Tree<ViewNode>, String> =
     // This conversion fails because of missing ID
@@ -1216,7 +1222,7 @@ fn test_extract_nonmergeSavePlan_only_aliases() {
             *** (skg alias) alias two
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -1249,7 +1255,7 @@ fn test_extract_nonmergeSavePlan_complex_scenario() {
             * (skg (node (id doc2) (source main))) Document 2
             ** (skg (node (id ref_section) (source main) (parentIs independent))) Reference Section
         "};
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();

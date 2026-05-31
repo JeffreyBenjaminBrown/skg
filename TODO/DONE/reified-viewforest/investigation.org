@@ -24,7 +24,7 @@ The current convention is already explicit in comments, but not in the
 type system:
 
 - =server/from_text/buffer_to_viewnodes/uninterpreted.rs= parses org
-  text into a "viewforest": a =Tree<MaybePlacedViewnode>= with
+  text into a "viewforest": a =Tree<MpViewnode>= with
   =BufferRoot= at the root.
 - =server/types/viewnode.rs= contains =Scaffold::BufferRoot= and
   =viewforest_root_viewnode=.
@@ -94,7 +94,7 @@ pub struct ViewForest<T> {
 }
 #+end_src
 
-For =ViewNode= and =MaybePlacedViewnode=, the constructor would create
+For =ViewNode= and =MpViewnode=, the constructor would create
 an internal root value that callers cannot observe as a =ViewNode=.
 There are two plausible ways to do that.
 
@@ -199,7 +199,7 @@ The snippets above use =ViewForest<T>= as the placeholder generic name,
 but the generic type probably deserves a more general name.
 
 #+begin_src rust
-pub type MaybePlacedViewForest = ViewForest<MaybePlacedViewnode>;
+pub type MpViewForest = ViewForest<MpViewnode>;
 pub type PlacedViewForest = ViewForest<ViewNode>;
 #+end_src
 
@@ -207,7 +207,7 @@ A stronger naming option is to call the generic wrapper =Forest<T>= and
 reserve =ViewForest= for the concrete view-node forest:
 
 #+begin_src rust
-pub type MaybePlacedViewforest = Forest<MaybePlacedViewnode>;
+pub type MpViewforest = Forest<MpViewnode>;
 pub type ViewForest = Forest<ViewNode>;
 #+end_src
 
@@ -223,7 +223,7 @@ The first migration should be intentionally thin:
 1. Add =ViewForest<T>= as a wrapper over the existing
    =Tree<T> + BufferRoot= representation.
 2. Convert constructors and renderers:
-   - =org_to_uninterpreted_nodes= returns =ViewForest<MaybePlacedViewnode>=.
+   - =org_to_uninterpreted_nodes= returns =ViewForest<MpViewnode>=.
    - =maybePlaced_to_placed_tree= becomes
      =maybePlaced_to_placed_viewforest=.
    - =viewforest_to_string= takes =ViewForest<ViewNode>=.
@@ -318,7 +318,7 @@ internal root value of type =T= if it wraps =Tree<T>=. That means either:
 - the generic type takes a root-constructor function,
 - a trait supplies the root value,
 - construction is only implemented for =ViewNode= and
-  =MaybePlacedViewnode=, or
+  =MpViewnode=, or
 - the internal representation changes to =Tree<ViewForestNode<T>>=.
 
 The migration-friendly answer is to implement empty constructors only

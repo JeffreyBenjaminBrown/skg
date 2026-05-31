@@ -707,16 +707,16 @@ is now : id_to_pid_if_found
 ** placed_to_maybePlaced_tree (line 191)
    - True?: Yes.
    - Omits?: Nothing.
-** MaybePlacedViewnode::title (line 287)
+** MpViewnode::title (line 287)
    - True?: Partly. The name is "title" but for some kinds (Scaffold, Deleted, DeletedScaff, Unknown) the function returns the scaffold's title/default-title, and Unknown returns "" — that's a reasonable union, but the name implies a node-level title, not a polymorphic dispatcher.
    - Omits?: The empty-string fallback for Unknown nodes.
-** MaybePlacedViewnode::error_label (line 297)
+** MpViewnode::error_label (line 297)
    - True?: Yes.
    - Omits?: Nothing.
-** MaybePlacedViewnode::body (line 309)
+** MpViewnode::body (line 309)
    - True?: Yes (returns Option).
    - Omits?: Nothing.
-** MaybePlacedViewnode::id_opt (line 318)
+** MpViewnode::id_opt (line 318)
    - True?: Yes.
    - Omits?: Nothing.
 ** maybePlaced_viewforest_root_viewnode (line 331)
@@ -925,7 +925,7 @@ is now : id_to_pid_if_found
    - True?: Partly. The name says "treenode" but the function actually accepts both TrueNode and Deleted kinds; for Scaffold and other kinds it errors. The name implies a more uniform extraction.
    - Omits?: That Deleted is also accepted (a non-obvious second case).
 ** id_from_self_or_nearest_ancestor (line 57)
-   - True?: Partly. The function only walks MaybePlacedTruenode kinds — Scaffolds and Deleted nodes are stepped over silently. Also, "nearest ancestor" suggests "an ancestor"; if no ancestor has an ID, the function errs.
+   - True?: Partly. The function only walks MpTruenode kinds — Scaffolds and Deleted nodes are stepped over silently. Also, "nearest ancestor" suggests "an ancestor"; if no ancestor has an ID, the function errs.
    - Omits?: The True-kind-only filter.
 ** unique_scaffold_child (line 75)
    - True?: Partly. The function returns Ok(None) when no child matches but Err when more than one matches. The "unique" name suggests uniqueness is enforced; in practice "0 or 1" is allowed and "2+" errors.
@@ -1045,7 +1045,7 @@ is now : id_to_pid_if_found
    - True?: Partly. "Default" is misleading because two fields, birth (Birth::ContentOf) and viewStats/graphStats, encode meaningful defaults rather than null/zero values; this function is the canonical empty-buffer-state seed, not a Default impl analog.
    - Omits?: It omits that birth defaults to ContentOf rather than the more "nothing" choice of Independent.
 ** viewnode_from_metadata (line 94)
-   - True?: Partly. The function also synthesizes BufferValidationErrors for two cases (Scaffold-with-body and EditRequestOnIndefinitive); the name says "viewnode_from" but the function returns a tuple of (MaybePlacedViewnode, Option<BufferValidationError>).
+   - True?: Partly. The function also synthesizes BufferValidationErrors for two cases (Scaffold-with-body and EditRequestOnIndefinitive); the name says "viewnode_from" but the function returns a tuple of (MpViewnode, Option<BufferValidationError>).
    - Omits?: It omits the validation-error generation that happens alongside conversion.
 ** parse_metadata_to_viewnodemd (line 180)
    - True?: Yes.
@@ -1664,7 +1664,7 @@ is now : id_to_pid_if_found
    - True?: Yes.
    - Omits?: Nothing material.
 
-** collect_ids_from_tree (line 328)
+** ids_that_can_have_graphnodestats (line 328)
    - True?: Partly. The function silently skips Scaffold and DeletedScaff nodes; this filter is invisible from the name.
    - Omits?: It omits the per-kind filtering (only True/Deleted/Unknown contribute).
 
@@ -1907,7 +1907,7 @@ is now : id_to_pid_if_found
    - Omits?: Nothing material.
 
 ** linecol_to_viewnode (line 121)
-   - True?: Partly. The name says "to viewnode", but the function returns (level, MaybePlacedViewnode, Option<BufferValidationError>) — three values, including an error.
+   - True?: Partly. The name says "to viewnode", but the function returns (level, MpViewnode, Option<BufferValidationError>) — three values, including an error.
    - Omits?: It omits that the function also returns the level and a possible validation error.
 
 ** headline_to_triple (line 146)

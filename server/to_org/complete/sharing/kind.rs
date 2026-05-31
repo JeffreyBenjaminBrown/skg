@@ -5,11 +5,11 @@
 //! enough structure (build child data, reconcile against a goal
 //! list) that several pieces of per-kind metadata are worth
 //! capturing as methods: the caller-label string used in panic
-//! messages, the corresponding 'Scaffold' variant, the number of
+//! messages, the corresponding PartnerCol variant, the number of
 //! ancestor links to the subscriber, and a self-type guard.
 
 use crate::types::tree::generic::error_unless_node_satisfies;
-use crate::types::viewnode::{RoleCol, Scaffold, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{RoleCol, ViewNode, ViewNodeKind};
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition,
   NodeRelation,
@@ -84,14 +84,7 @@ impl RoleCol {
         None,
     } }
 
-  pub fn from_scaffold (scaffold : &Scaffold) -> Option<RoleCol> {
-    match scaffold {
-      Scaffold::RoleCol { roleCol } =>
-        Some (*roleCol),
-      _ => None,
-    } }
-
-  /// Error if 'node' is not a 'Scaff' of this kind.
+  /// Error if 'node' is not a PartnerCol of this kind.
   /// Wraps 'error_unless_node_satisfies' with
   /// - a Box<dyn Error> result
   /// - a per-kind error string of the form
@@ -101,15 +94,14 @@ impl RoleCol {
     tree : &Tree<ViewNode>,
     node : NodeId,
   ) -> Result<(), Box<dyn Error>> {
-    let scaffold : Scaffold = self . scaffold ();
     error_unless_node_satisfies (
       tree, node,
       |vn : &ViewNode| matches! (
         &vn . kind,
-        ViewNodeKind::Scaff (s) if *s == scaffold ),
+        ViewNodeKind::PartnerCol (roleCol) if *roleCol == self ),
       &format! ( "{}: expected {:?}",
                  self . caller_label (),
-                 scaffold ),
+                 self ),
     ) . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
     Ok (( )) }
 }

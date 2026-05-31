@@ -1,5 +1,6 @@
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
+use crate::types::viewnode::Vognode;
 use ego_tree::{Tree, NodeId};
 use std::collections::{HashMap, HashSet};
 
@@ -31,7 +32,7 @@ fn set_viewnodestats_recursive (
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
   let opt_pid : Option<ID> =
-    if let ViewNodeKind::True (t) =
+    if let ViewNodeKind::Vognode (Vognode::Normal (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     { let node_pid : ID = t . id . clone ();
       detect_and_mark_cycle_v2 (
@@ -63,15 +64,15 @@ fn set_viewnodestats_recursive (
     if let Some ( ref pid ) = opt_pid
     { ancestor_ids . remove (pid); } } }
 
-/// Sets sourceAtBoundary on the TrueNode at treeid.
-/// True if no truenode ancestor exists (i.e. a root),
-/// or if the nearest truenode ancestor has a different source.
+/// Sets sourceAtBoundary on the normal vognode at treeid.
+/// True if no normal vognode ancestor exists (i.e. a root),
+/// or if the nearest normal vognode ancestor has a different source.
 fn set_source_at_boundary (
   tree   : &mut Tree<ViewNode>,
   treeid : NodeId,
 ) {
   let node_source : SourceName = {
-    let ViewNodeKind::True (t) =
+    let ViewNodeKind::Vognode (Vognode::Normal (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
     t . source . clone () };
@@ -81,12 +82,12 @@ fn set_source_at_boundary (
     match ancestor_source {
       None => true,
       Some (s) => s != node_source };
-  if let ViewNodeKind::True (t) =
+  if let ViewNodeKind::Vognode (Vognode::Normal (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . sourceAtBoundary = at_boundary; }}
 
 /// Walk rootward from treeid (exclusive) to find
-/// the nearest TrueNode ancestor's source.
+/// the nearest normal vognode ancestor's source.
 fn nearest_truenode_ancestor_source (
   tree   : &Tree<ViewNode>,
   treeid : NodeId,
@@ -95,7 +96,7 @@ fn nearest_truenode_ancestor_source (
   while let Some (parent_ref)
     = tree . get (current) . unwrap () . parent ()
     { current = parent_ref . id ();
-      if let ViewNodeKind::True (t)
+      if let ViewNodeKind::Vognode (Vognode::Normal (t))
         = & parent_ref . value () . kind
         { return Some ( t . source . clone () ); }}
   None }
@@ -108,7 +109,7 @@ fn detect_and_mark_cycle_v2 (
   node_pid     : &ID,
   ancestor_ids : &HashSet<ID>,
 ) {
-  if let ViewNodeKind::True (t) =
+  if let ViewNodeKind::Vognode (Vognode::Normal (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . cycle = ancestor_ids . contains (node_pid); } }
 
@@ -131,7 +132,7 @@ fn set_parent_containment_stats_in_viewnode (
           . map_or ( false, |contents|
                      contents . contains (parent_pid)) )
     } else { (true, false) }; // TODO ? PITFALL: Not ideal. If the parent is not a truenode, this suggests the node is its parent's content and not its container. In truth those concepts simply don't apply. But in that case, using these values for parent_is_container and parent_is_content has the desired effect on the node's metadata: It won't make any noise about either relationship.
-  if let ViewNodeKind::True (t) =
+  if let ViewNodeKind::Vognode (Vognode::Normal (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . parentIsContainer = parent_is_container;
     t . viewStats . parentIsContent = parent_is_content; }}

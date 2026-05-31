@@ -4,11 +4,12 @@ use crate::dbs::typedb::search::all_graphnodestats::{
   graphnodestats_for_pid,
   AllGraphNodeStats};
 use crate::source_sets::ActiveSourceSet;
-use crate::to_org::util::collect_ids_from_tree;
+use crate::to_org::util::ids_that_can_have_graphnodestats;
 use crate::types::misc::{ID, SkgConfig};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{GraphNodeStats, ViewNode, ViewNodeKind};
+use crate::types::viewnode::Vognode;
 
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
@@ -49,8 +50,8 @@ async fn set_graphnodestats_in_viewforest_inner (
 	             Box<dyn Error> > {
   let pids : Vec < ID > =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "collect_ids_from_tree" ). entered();
-      collect_ids_from_tree (viewforest) };
+        "ids_that_can_have_graphnodestats" ). entered();
+      ids_that_can_have_graphnodestats (viewforest) };
   let stats : AllGraphNodeStats =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "fetch_all_graphnodestats" ). entered();
@@ -80,23 +81,30 @@ pub fn set_metadata_relationships_in_node_recursive (
   config : &SkgConfig,
 ) {
   let new_stats : Option < GraphNodeStats > =
-    { // PITFALL: Uses 'false' for phantom and deleted nodes. Getting 'true' where appropriate would be expensive, requiring inquiry into the git history not just of the phantom, but also of things it was connected to.
+    { // Phantoms keep graphStats: these are node-global
+      // decorations for the ID, not parent/content facts. Missing
+      // current data still falls back to false rather than querying
+      // historical graph context for a placeholder.
       match & tree . get (treeid) . unwrap () . value () . kind {
-        ViewNodeKind::True (t) => {
-          let nodecomplete_opt : Option<NodeComplete> =
-            nodecomplete_rustFirst_by_pid_and_source (
-              config, &t . id, &t . source
-            ). ok ();
-          Some ( graphnodestats_for_pid (
-            &t . id, stats, nodecomplete_opt . as_ref () )) },
-        _ => None } // Scaff, Deleted, DeletedScaff
-    };
+        ViewNodeKind::Vognode (Vognode::Normal (t)
+                               | Vognode::Phantom (t))
+          => { let nodecomplete_opt : Option<NodeComplete>
+                 = nodecomplete_rustFirst_by_pid_and_source (
+                     config, &t . id, &t . source
+                   ). ok ();
+               Some ( graphnodestats_for_pid (
+                 &t . id, stats, nodecomplete_opt . as_ref () )) },
+        _ => None }};
   match new_stats {
-    Some (gs) => match &mut tree . get_mut (treeid)
-                         . unwrap () . value () . kind {
-      ViewNodeKind::True (t) =>
-        { t . graphStats = gs; },
-      _ => {} },
+    Some (gs) =>
+      // Keep writeback aligned with the read arm above: both normal
+      // vognodes and phantoms can display node-global graphStats.
+      match &mut tree . get_mut (treeid)
+        . unwrap () . value () . kind
+        { ViewNodeKind::Vognode (Vognode::Normal (t)
+                                 | Vognode::Phantom (t))
+          => { t . graphStats = gs; },
+        _ => {} },
     None => {} }
   let child_treeids : Vec < NodeId > =
     tree . get (treeid) . unwrap ()

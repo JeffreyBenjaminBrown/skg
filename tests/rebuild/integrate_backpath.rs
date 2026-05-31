@@ -8,7 +8,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nod
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, SkgConfig};
-use skg::types::viewnode::{ViewNode, ViewNodeKind, ParentIs};
+use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode, ParentIs};
 
 use skg::org_to_text::viewforest_to_string;
 
@@ -119,7 +119,9 @@ async fn test_path_with_branches_no_cycle_impl(
   let mut node_1_id : Option<NodeId> = None;
   for edge in viewforest . root() . traverse() {
     if let ego_tree::iter::Edge::Open (node_ref) = edge {
-      if let ViewNodeKind::True (t) = &node_ref . value() . kind {
+      if let ViewNodeKind::Vognode (
+        Vognode::Normal (t) | Vognode::Phantom (t)) =
+        &node_ref . value() . kind {
         if t . id . 0 == "1" {
           node_1_id = Some(node_ref . id());
           break; }}}}
@@ -201,7 +203,9 @@ async fn test_path_with_branches_with_cycle_impl(
     None;
   for edge in viewforest . root() . traverse() {
     if let ego_tree::iter::Edge::Open (node_ref) = edge {
-      if let ViewNodeKind::True (t) = &node_ref . value() . kind {
+      if let ViewNodeKind::Vognode (
+        Vognode::Normal (t) | Vognode::Phantom (t)) =
+        &node_ref . value() . kind {
         if t . id . 0 == "1" {
           node_1_id = Some(node_ref . id());
           break; }}}}

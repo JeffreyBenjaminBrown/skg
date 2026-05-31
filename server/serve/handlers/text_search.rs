@@ -27,7 +27,8 @@ use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::source_sets::{ActiveSourceSet, search_ids_for_source_set_for_test as search_ids_for_source_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ParentIs, mk_indefinitive_viewnode};
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_viewnode};
+use crate::types::viewnode::{QualCol, Qual};
 
 use ego_tree::{NodeId, NodeMut};
 use sexp::{Sexp, Atom};
@@ -462,8 +463,8 @@ pub fn build_search_viewforest (
             focused     : false,
             folded      : true,
             body_folded : false,
-            kind        : ViewNodeKind::Scaff (
-              Scaffold::AliasCol ) } )
+            kind        : ViewNodeKind::QualCol (
+              QualCol::Alias ) } )
           . id () };
         for (_score, title) in sorted_matches . iter () . skip (1) {
           let mut aliascol_mut : NodeMut<ViewNode> =
@@ -472,8 +473,7 @@ pub fn build_search_viewforest (
             focused     : false,
             folded      : false,
             body_folded : false,
-            kind        : ViewNodeKind::Scaff (
-              Scaffold::Alias {
+            kind        : ViewNodeKind::Qual (Qual::Alias {
                 text       : title . clone (),
                 membership : MembershipAxes::default () } ) } ); }} }
   (viewforest, search_results) }

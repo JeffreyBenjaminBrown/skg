@@ -1,4 +1,9 @@
-* TODO [[./TODO/vnode/]]
+* replace type
+Maybe ViewNode should be replaced with a pair
+(Vnode_Viewstate, Vnode),
+where Vnode is the new name of what was ViewNodeKind.
+* parentIs is vestigial for phantoms
+* autoload elisp/skg-view-org-ancestry.el
 * PAUSED [[./TODO/full-schema]]
 codex resume 019e64c9-1ff6-75a3-91c5-2c54b644440b
 * DONE ? [[./TODO/source-sets/]]

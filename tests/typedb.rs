@@ -30,8 +30,8 @@ use skg::types::misc::{ID, SkgConfig, SourceName};
 
 use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
-use skg::types::maybe_placed_viewnode::{MaybePlacedViewnode, maybePlaced_to_placed_tree};
-use skg::types::viewnode::{ViewNode, ViewNodeKind};
+use skg::types::maybe_placed_viewnode::{MpViewnode, maybePlaced_to_placed_tree};
+use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode};
 
 use futures::StreamExt;
 use std::collections::HashSet;
@@ -469,7 +469,7 @@ async fn test_recursive_document (
     = single_root_view (
           driver, config, None, &ID ( "a" . to_string () ), false
         ) . await ?;
-  let unchecked_viewforest : Tree<MaybePlacedViewnode> =
+  let unchecked_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (& result_org_text)
     . map_err ( |e| format! ( "Parse error: {}", e ) ) ? . 0;
   let result_viewforest : Tree<ViewNode> =
@@ -485,9 +485,13 @@ async fn test_recursive_document (
   let root_node : &ViewNode = root_node_ref . value ();
 
   // Root node should be "a"
-  assert! ( matches! ( &root_node . kind, ViewNodeKind::True (_) ),
+  assert! ( matches! ( &root_node . kind,
+                        ViewNodeKind::Vognode ( Vognode::Normal (_)
+                                                | Vognode::Phantom (_) )),
     "should be TrueNode" );
-  let ViewNodeKind::True (root_t) = &root_node . kind
+  let ViewNodeKind::Vognode (
+    Vognode::Normal (root_t) | Vognode::Phantom (root_t)) =
+    &root_node . kind
     else { unreachable!() };
   assert_eq! ( &root_t . id, &ID::from ("a"),
     "Root node should have id 'a'" );
@@ -500,9 +504,13 @@ async fn test_recursive_document (
     . expect ("Root should have child 'b'");
   let b_node : &ViewNode = b_node_ref . value ();
 
-  assert! ( matches! ( &b_node . kind, ViewNodeKind::True (_) ),
+  assert! ( matches! ( &b_node . kind,
+                        ViewNodeKind::Vognode ( Vognode::Normal (_)
+                                                | Vognode::Phantom (_) )),
     "should be TrueNode" );
-  let ViewNodeKind::True (b_t) = &b_node . kind
+  let ViewNodeKind::Vognode ( Vognode::Normal (b_t)
+                              | Vognode::Phantom (b_t))
+    = &b_node . kind
     else { unreachable!() };
   assert_eq! ( &b_t . id, &ID::from ("b"),
     "First child should have id 'b'" );
@@ -519,9 +527,13 @@ async fn test_recursive_document (
     . expect ("Node 'b' should have child 'c'");
   let c_node : &ViewNode = c_node_ref . value ();
 
-  assert! ( matches! ( &c_node . kind, ViewNodeKind::True (_) ),
+  assert! ( matches! ( &c_node . kind,
+                        ViewNodeKind::Vognode ( Vognode::Normal (_)
+                                                | Vognode::Phantom (_) )),
     "should be TrueNode" );
-  let ViewNodeKind::True (c_t) = &c_node . kind
+  let ViewNodeKind::Vognode ( Vognode::Normal (c_t)
+                              | Vognode::Phantom (c_t))
+    = &c_node . kind
     else { unreachable!() };
   assert_eq! ( &c_t . id, &ID::from ("c"),
     "Child of 'b' should have id 'c'" );
@@ -534,9 +546,13 @@ async fn test_recursive_document (
     . expect ("Node 'c' should have child 'b' (repeated)");
   let b_repeat : &ViewNode = b_repeat_ref . value ();
 
-  assert! ( matches! ( &b_repeat . kind, ViewNodeKind::True (_) ),
+  assert! ( matches! ( &b_repeat . kind,
+                        ViewNodeKind::Vognode ( Vognode::Normal (_)
+                                                | Vognode::Phantom (_) )),
     "should be TrueNode" );
-  let ViewNodeKind::True (b_repeat_t) = &b_repeat . kind
+  let ViewNodeKind::Vognode ( Vognode::Normal (b_repeat_t)
+                              | Vognode::Phantom (b_repeat_t))
+    = &b_repeat . kind
     else { unreachable!() };
   assert_eq! ( &b_repeat_t . id, &ID::from ("b"),
     "Child of 'c' should have id 'b'" );

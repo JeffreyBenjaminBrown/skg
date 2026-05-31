@@ -285,7 +285,7 @@ a top-level node under a parent would fail to save as new content.
    so the enum is parent-oriented.
 
 2. Add a tree-aware normalization pass immediately after parsing
-   MaybePlaced viewnodes and before validation/save extraction:
+   Mp viewnodes and before validation/save extraction:
    missing or =Absent= at level 1 => =Absent=; missing or =Absent= below
    level 1 => =Container=.
 

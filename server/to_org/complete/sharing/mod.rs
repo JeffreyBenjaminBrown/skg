@@ -12,7 +12,8 @@ use crate::to_org::complete::sharing::child_data::{
 use crate::to_org::util::nodecomplete_and_viewnode_from_id;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, RoleCol};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol};
+use crate::types::viewnode::Vognode;
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
 use crate::types::tree::viewnode_nodecomplete::{
   insert_scaffold_as_child,
@@ -87,7 +88,7 @@ pub fn type_and_parent_type_consistent_with_subscribee (
     node_ref . parent ()
     . map ( |p| matches! (
               & p . value () . kind,
-              ViewNodeKind::Scaff (Scaffold::RoleCol { roleCol: RoleCol::Subscribee })))
+              ViewNodeKind::PartnerCol (RoleCol::Subscribee)))
     . unwrap_or (false);
   Ok ( is_truenode_and_claims_parentIs_collector && parent_is_subscribee_col ) }
 
@@ -103,18 +104,21 @@ pub async fn maybe_add_subscribeeCol_branch (
 ) -> Result < (), Box<dyn Error> > {
   error_unless_node_satisfies(
     tree, node_id,
-    |vn| matches!( &vn . kind, ViewNodeKind::True (_) ),
+    |vn| matches!( &vn . kind,
+                    ViewNodeKind::Vognode (Vognode::Normal (_))),
     "maybe_add_subscribeeCol_branch: expected TrueNode" ) ?;
   { let is_indefinitive : bool =
       read_at_node_in_tree(
         tree, node_id,
         |vn| matches!( &vn . kind,
-                        ViewNodeKind::True (t) if t . is_indefinitive () ) )
+                        ViewNodeKind::Vognode (Vognode::Normal (t))
+                        if t . is_indefinitive () ))
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_indefinitive { return Ok(( )); } }
   { // Pre-existing SubscribeeCol children are reconciled by the rerender pipeline's 'expand_true_content_until_stable', which dispatches to 'reconcile_subscribee_col_children'.
     if unique_scaffold_child_of_viewnode (
-      tree, node_id, &Scaffold::RoleCol { roleCol: RoleCol::Subscribee } )? . is_some ()
+      tree, node_id,
+      &ViewNodeKind::PartnerCol (RoleCol::Subscribee) )? . is_some ()
     { return Ok (( )); }}
   let ( subscriber_pid, subscribee_ids ) : ( ID, Vec < ID > ) =
     pids_for_subscriber_and_its_subscribees ( tree, node_id, config ) ?;
@@ -139,7 +143,7 @@ pub async fn maybe_add_subscribeeCol_branch (
 
   let subscribee_col_nid : NodeId =
     insert_scaffold_as_child ( tree, node_id,
-      Scaffold::RoleCol { roleCol: RoleCol::Subscribee }, true ) ?;
+      ViewNodeKind::PartnerCol (RoleCol::Subscribee), true ) ?;
   { let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
       build_initial_render_child_data (
         &subscribee_ids, config, driver ) . await ?;
@@ -152,7 +156,8 @@ pub async fn maybe_add_subscribeeCol_branch (
     let hidden_outside_col_nid : NodeId =
       insert_scaffold_as_child (
         tree, subscribee_col_nid,
-        Scaffold::RoleCol { roleCol: RoleCol::HiddenOutsideOfSubscribee }, false ) ?;
+        ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee),
+        false ) ?;
     let hidden_outside_ids : Vec<ID> =
       hidden_outside_content . into_iter () . collect ();
     let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
@@ -175,14 +180,16 @@ pub async fn maybe_add_relation_col_branches (
 ) -> Result < (), Box<dyn Error> > {
   error_unless_node_satisfies(
     tree, node_id,
-    |vn| matches!( &vn . kind, ViewNodeKind::True (_) ),
+    |vn| matches!( &vn . kind,
+                    ViewNodeKind::Vognode (Vognode::Normal (_) )),
     "maybe_add_relation_col_branches: expected TrueNode" ) ?;
   { let is_indefinitive : bool =
       read_at_node_in_tree(
         tree, node_id,
         |vn| matches!( &vn . kind,
-                        ViewNodeKind::True (t) if t . is_indefinitive () ) )
-      .map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
+                        ViewNodeKind::Vognode (Vognode::Normal (t))
+                        if t . is_indefinitive () ) )
+      . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_indefinitive { return Ok(( )); } }
   maybe_add_subscribeeCol_branch (
     tree, node_id, config, driver) . await ?;
@@ -209,16 +216,17 @@ async fn maybe_add_one_relation_col (
   driver  : &TypeDBDriver,
   graph   : &Arc<InRustGraph>,
 ) -> Result < (), Box<dyn Error> > {
-  let scaffold : Scaffold = kind . scaffold ();
   if unique_scaffold_child_of_viewnode (
-    tree, node_id, &scaffold )? . is_some ()
+      tree, node_id, &ViewNodeKind::PartnerCol (kind)
+    )? . is_some ()
   { // There already is one. Don't draw a new one.
     return Ok (( )); }
   let owner_pid : ID =
     read_at_node_in_tree (
       tree, node_id,
       |vn| match &vn . kind {
-        ViewNodeKind::True (t) => Ok (t . id . clone ()),
+        ViewNodeKind::Vognode (Vognode::Normal (t))
+          => Ok (t . id . clone ()),
         _ => Err ("expected TrueNode" . to_string ()), } )
     .map_err( |e| -> Box<dyn Error> { e . into() } ) ??;
   let Some (member_role) = kind . relation_member_role ()
@@ -232,7 +240,8 @@ async fn maybe_add_one_relation_col (
     // It would be empty, so don't draw it.
     return Ok (( )); }
   let col_nid : NodeId =
-    insert_scaffold_as_child (tree, node_id, scaffold, true) ?;
+    insert_scaffold_as_child (
+      tree, node_id, ViewNodeKind::PartnerCol (kind), true) ?;
   let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
     build_initial_render_child_data (
       &member_ids, config, driver ) . await ?;
@@ -256,8 +265,8 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   { return Err ( "maybe_add_hiddenInSubscribeeCol_branch called on non-subscribee" . into ( )); }
   if unique_scaffold_child_of_viewnode (
       // Pre-existing HiddenIn collections are instead reconciled by the rerender pipeline's 'reconcile_hiddenin_cols', which dispatches to 'reconcile_hiddenin_subscribee_col_children'.
-       tree, subscribee_treeid, &Scaffold::RoleCol {
-         roleCol: RoleCol::HiddenInSubscribee }
+       tree, subscribee_treeid,
+       &ViewNodeKind::PartnerCol (RoleCol::HiddenInSubscribee)
      )? . is_some ()
   { return Ok (( )); }
   let ( subscribee_pid, subscriber_pid ) : ( ID, ID ) =
@@ -275,7 +284,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   let hidden_col_nid : NodeId =
     insert_scaffold_as_child (
       tree, subscribee_treeid,
-      Scaffold::RoleCol { roleCol: RoleCol::HiddenInSubscribee },
+      ViewNodeKind::PartnerCol (RoleCol::HiddenInSubscribee),
       true ) ?;
   let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
     build_initial_render_child_data (

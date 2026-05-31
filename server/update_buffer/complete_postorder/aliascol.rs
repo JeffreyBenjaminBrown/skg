@@ -2,7 +2,8 @@ use crate::types::git::{MembershipAxes, NodeChanges, SourceDiff, axes_from_per_s
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, ParentIs};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, ParentIs};
+use crate::types::viewnode::{Vognode, QualCol, Qual};
 use crate::types::tree::generic::{pid_and_source_from_ancestor, read_at_ancestor_in_tree};
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, treat_certain_children};
 use ego_tree::{NodeId, Tree};
@@ -35,7 +36,7 @@ pub fn reconcile_alias_col_children (
       read_at_ancestor_in_tree(
         tree, aliascol_node_id, 0,
         |viewnode| matches!( &viewnode . kind,
-                            ViewNodeKind::Scaff (Scaffold::AliasCol)) )
+                            ViewNodeKind::QualCol (QualCol::Alias)) )
       . map_err( |e| -> Box<dyn Error> { e . into() } )?;
     if !is_aliascol { return Err(
       "reconcile_alias_col_children: Node is not an AliasCol" . into() ); }}
@@ -70,12 +71,12 @@ pub fn reconcile_alias_col_children (
   let is_alias : fn (&ViewNode) -> bool =
     // relevance to complete_relevant_children
     |viewnode| matches!( &viewnode . kind,
-                        ViewNodeKind::Scaff( Scaffold::Alias { .. } ) );
+                        ViewNodeKind::Qual (Qual::Alias { .. } ) );
   let view_alias_text : fn (&ViewNode) -> String =
     |viewnode| match &viewnode . kind {
-      ViewNodeKind::Scaff( Scaffold::Alias { text, .. } ) =>
+      ViewNodeKind::Qual (Qual::Alias { text, .. } ) =>
         text . clone(),
-      _ => unreachable!(), }; // relevance means Scaffold::Alias
+      _ => unreachable!(), }; // relevance means Qual::Alias
   let create_alias = |text: &String| -> ViewNode {
     let membership : MembershipAxes =
       axes_map . get (text) . copied () . unwrap_or_default ();
@@ -83,9 +84,8 @@ pub fn reconcile_alias_col_children (
       focused     : false,
       folded      : false,
       body_folded : false,
-      kind        : ViewNodeKind::Scaff(
-        Scaffold::Alias { text : text . clone(),
-                          membership } ), } };
+      kind : ViewNodeKind::Qual (Qual::Alias { text : text . clone(),
+                                               membership } ), }};
   complete_relevant_children_in_viewnodetree(
     tree,
     aliascol_node_id,
@@ -93,11 +93,16 @@ pub fn reconcile_alias_col_children (
     view_alias_text,
     &goal_list,
     create_alias )?;
-  treat_certain_children( // Currently unreachable: validation rejects TrueNode children of AliasCol. Left here in case validation is later relaxed.
+  treat_certain_children(
+      // Currently unreachable: validation rejects normal vognode
+      // children of AliasCol. If that is later relaxed, only Normal
+      // Vognodes need repair; parentIs is a vestigial field in Phantoms.
       tree, aliascol_node_id,
-      |vn : &ViewNode| matches!( &vn . kind, ViewNodeKind::True (_)),
+      |vn : &ViewNode| matches!( &vn . kind,
+                                  ViewNodeKind::Vognode (Vognode::Normal (_)) ),
       |vn : &mut ViewNode| {
-        if let ViewNodeKind::True( ref mut t ) = vn . kind {
-          t . parentIs = ParentIs::Independent; }},
+        if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
+          = vn . kind
+          { t . parentIs = ParentIs::Independent; }},
     ) . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   Ok( () ) }
