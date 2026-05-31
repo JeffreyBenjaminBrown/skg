@@ -18,6 +18,10 @@ use std::str::FromStr;
 /// Most nodes are born as content of the parent node,
 /// but there can be other reasons -- e.g. the user asked to see backlinks.
 ///
+/// PITFALL: If a vognode is indefinitive, *none* of it children affect it,
+/// just as edits to itself do not affect it,
+/// regardless of what the children might claim with their ParentIs field.
+///
 /// PITFALL: There might be multiple relationships between parent and child --
 /// e.g. cyclic containment. This does not encode all of them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
