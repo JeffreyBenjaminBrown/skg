@@ -259,7 +259,7 @@ fn correct_the_viewChildren_of_subscribee (
     . filter_map ( |child| match &child . value() . kind {
       ViewNodeKind::Vognode (Vognode::Normal (t))
         if t . parentIs == ParentIs::Affected
-           && !t . is_phantom()
+           && !t . should_be_phantom()
            && content_id_set . contains (&t . id) =>
         Some ((t . id . clone(), child . id())),
       _ => None,
@@ -440,11 +440,16 @@ fn complete_content_children (
   ) }
 
 /// 'erroneous content children' are children that look like content,
-/// but that are not actually content.
+/// but are not actually content.
 /// This marks them parentIs=Independent.
-/// (Note that phantom nodes are not content in the worktree,
-/// but they are content in HEAD.
-/// This does not mark such phantoms as Independent.)
+///
+/// `content_ids` describes the parent's current, saved/worktree
+/// `contains` list. A removed-here phantom deliberately is *not* in that
+/// list: the point of the phantom is to show content that used to be under
+/// this parent in HEAD, but was removed from this parent in the worktree.
+/// If we treated that missing worktree membership as erroneous view
+/// placement, we would rewrite the phantom to `ParentIs::Independent` and
+/// lose the information that the diff is about removed content.
 fn mark_erroneous_content_children_as_indep (
   tree        : &mut Tree<ViewNode>,
   node        : NodeId,
@@ -458,7 +463,7 @@ fn mark_erroneous_content_children_as_indep (
       ViewNodeKind::Vognode (Vognode::Normal (t)) =>
         t . parentIs == ParentIs::Affected
         && !content_id_set . contains( &t . id )
-        && !t . is_phantom(), // phantoms, though not content in the worktree, are content in HEAD, and should not be parent-ignored
+        && !t . should_be_phantom(), // see this function's docstring
       _ => false },
     |vn : &mut ViewNode| {
       if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))

@@ -57,7 +57,7 @@ where
       ViewNodeKind::Vognode (Vognode::Normal (t)) =>
         is_managed_child (t)
         && ! goal_set . contains (&t . id)
-        && ! t . is_phantom (),
+        && ! t . should_be_phantom (),
       _ => false },
     |vn : &mut ViewNode| {
       if let ViewNodeKind::Vognode (Vognode::Normal (t))

@@ -181,7 +181,7 @@ fn mark_goal_children_as_collectionBranch_members (
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Normal (t)) =>
         goal_set . contains (&t . id)
-        && ! t . is_phantom (),
+        && ! t . should_be_phantom (),
       _ => false },
     |vn : &mut ViewNode| {
       if let ViewNodeKind::Vognode (Vognode::Normal (t))

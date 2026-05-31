@@ -205,7 +205,7 @@ pub fn viewnode_from_metadata (
             not_in_git       : metadata . truenode_not_in_git,
             indef_or_def, };
         let vognode =
-          if t . is_phantom ()
+          if t . should_be_phantom ()
           { MpVognode::Phantom (t) }
           else
           { MpVognode::Normal (t) };

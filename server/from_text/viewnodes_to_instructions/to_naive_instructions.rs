@@ -710,7 +710,7 @@ fn member_counts_for_relation_collection (
   t : &TrueNode,
 ) -> bool {
   t . parentIs == ParentIs::Affected
-    && !t . is_phantom ()
+    && !t . should_be_phantom ()
     && !matches!( t . edit_request (),
                   Some (&EditRequest::Delete)) }
 
@@ -733,7 +733,7 @@ fn collect_contents_to_save_from_children<'a> (
              child_ref . value() . role,
              SaveRole::Ordinary)
            && t . parentIs == ParentIs::Affected
-           && ! t . is_phantom ()
+           && ! t . should_be_phantom ()
            && ! matches!( t . edit_request (),
                           Some (&EditRequest::Delete))
         { contents . push( t . id . clone() ); }},

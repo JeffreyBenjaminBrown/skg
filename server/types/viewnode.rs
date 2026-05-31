@@ -239,13 +239,12 @@ pub enum ViewRequest {
 //
 
 impl < Id, Src > TrueNode_Generic < Id, Src > {
-  /// A phantom is a display-only placeholder for a node that does not
-  /// exist as a real, editable entity in the worktree at this position.
-  /// Triggered by either:
+  /// True when this node's diff axes require displaying it with the
+  /// `Vognode::Phantom` variant. Triggered by either:
   /// - any membership axis being '-' (removed in some stage), or
   /// - the worktree existence axis being '-' (file deleted), or
   /// - the "moved twice" pattern: stagedM = +, unstagedM = -.
-  pub fn is_phantom (
+  pub fn should_be_phantom (
     &self,
   ) -> bool {
     self    . membership . staged   == Some (Sign::Minus)
@@ -259,7 +258,7 @@ impl < Id, Src > TrueNode_Generic < Id, Src > {
   pub fn is_removedhere_phantom (
     &self,
   ) -> bool {
-    self . is_phantom ()
+    self . should_be_phantom ()
     && self . existence . unstaged != Some (Sign::Minus) }
 
   pub fn is_indefinitive (&self) -> bool {
@@ -447,7 +446,7 @@ impl ViewNode {
   ) {
     if let ViewNodeKind::Vognode (Vognode::Normal (t))
       = &self . kind
-      { if t . is_phantom ()
+      { if t . should_be_phantom ()
         { self . kind = ViewNodeKind::Vognode (
             Vognode::Phantom (t . clone () )); }}}
 

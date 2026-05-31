@@ -167,7 +167,7 @@ fn ensure_diff_scaffolds (
         tree . get (treeid) . unwrap ();
       match &node_ref . value () . kind {
         ViewNodeKind::Vognode (Vognode::Normal (t))
-          if ! t . is_phantom () && ! t . is_indefinitive () =>
+          if ! t . should_be_phantom () && ! t . is_indefinitive () =>
             Some (( t . id . clone (), t . source . clone () )),
         _ => None }};
     if let Some ((pid, source)) = ready {
