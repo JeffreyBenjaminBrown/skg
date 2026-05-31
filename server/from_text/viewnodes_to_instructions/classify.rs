@@ -111,14 +111,14 @@ fn classify_truenode (
     else { return Ok (SaveRole::Ordinary); };
   match &parent_ref . value() . kind {
     ViewNodeKind::PartnerCol (RoleCol::Subscribee) =>
-      if node_ref . value () . is_truenode_and_claims_parentIs_collector () {
+      if node_ref . value () . is_truenode_and_parentIs_affected () {
         Ok (SaveRole::Subscribee {
           subscriber : vognode_normal_id (
             parent_ref . parent(),
             "SubscribeeCol must have a TrueNode parent")?, } )
       } else { Ok (SaveRole::NoSaveRole) },
     ViewNodeKind::PartnerCol (RoleCol::Overridden) =>
-      if node_ref . value () . is_truenode_and_claims_parentIs_collector () {
+      if node_ref . value () . is_truenode_and_parentIs_affected () {
         Ok (SaveRole::Overridden {
           overrider : vognode_normal_id (
             parent_ref . parent(),

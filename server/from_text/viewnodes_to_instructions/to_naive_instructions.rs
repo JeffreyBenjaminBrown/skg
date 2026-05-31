@@ -1,9 +1,8 @@
 use crate::from_text::viewnodes_to_instructions::classify::{
   viewforest_with_saveroles, SaveRole, ViewNode_in_Role };
 use crate::types::viewnode::EditRequest;
-use crate::types::viewnode::ParentIs::Collector;
 use crate::types::git::Sign;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode, IndefOrDef, InactiveNode, RoleCol};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode, IndefOrDef, InactiveNode, ParentIs, RoleCol};
 use crate::types::viewnode::{Vognode, QualCol, Qual};
 use crate::types::misc::{ID, MSV, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
@@ -710,15 +709,14 @@ fn collect_members_from_child_relation_col (
 fn member_counts_for_relation_collection (
   t : &TrueNode,
 ) -> bool {
-  matches! (t . parentIs,
-            Collector)
+  t . parentIs == ParentIs::Affected
     && !t . is_phantom ()
     && !matches!( t . edit_request (),
                   Some (&EditRequest::Delete)) }
 
 /// The following kinds of TrueNode children
 /// should be excluded from their parent's content:
-/// - anything with parentIs != Container (i.e. parent_ignores_it)
+/// - anything with parentIs != Affected (display-only relative to parent)
 /// - any phantom content ('Removed' or 'RemovedHere')
 /// - anything about to be deleted
 fn collect_contents_to_save_from_children<'a> (
@@ -734,7 +732,7 @@ fn collect_contents_to_save_from_children<'a> (
            if matches!(
              child_ref . value() . role,
              SaveRole::Ordinary)
-           && ! t . parent_ignores_it()
+           && t . parentIs == ParentIs::Affected
            && ! t . is_phantom ()
            && ! matches!( t . edit_request (),
                           Some (&EditRequest::Delete))

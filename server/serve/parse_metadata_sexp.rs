@@ -5,7 +5,8 @@
 ///   TrueNodes: (skg [focused] [folded]
 ///                   (node [(id ID)]
 ///                         [(source SOURCE)]
-///                         [(parentIs container|collector|content|linkTarget|independent|absent)]
+///                         [(parentIs affected|independent|absent)]
+///                         [(birth linksToParent|containsParent)]
 ///                         [indef]   ; short for "indefinitive"
 ///                         [cycle]
 ///                         [(stats [containsParent]
@@ -22,7 +23,7 @@ use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
 use crate::types::viewnode::{
   GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest,
   Qual, QualCol, RoleCol, DeletedNode, InactiveNode, UnknownNode,
-  IndefOrDef, NodeContainRels, NodeLinksourceRels, ParentIs,
+  Birth, IndefOrDef, NodeContainRels, NodeLinksourceRels, ParentIs,
 };
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind, MpTruenode,
@@ -49,6 +50,7 @@ pub struct ViewnodeMetadata {
   pub id: Option<ID>,
   pub source: Option<SourceName>,
   pub parentIs: ParentIs,
+  pub birth: Birth,
   pub indefinitive: bool,
   pub graphStats: GraphNodeStats,
   pub viewStats: ViewNodeStats,
@@ -82,7 +84,8 @@ pub fn default_metadata() -> ViewnodeMetadata {
     non_vognode: None,
     id: None,
     source: None,
-    parentIs: ParentIs::Container,
+    parentIs: ParentIs::Affected,
+    birth: Birth::Unremarkable,
     indefinitive: false,
     graphStats: GraphNodeStats::default(),
     viewStats: ViewNodeStats::default(),
@@ -192,7 +195,8 @@ pub fn viewnode_from_metadata (
             title,
             id               : metadata . id . clone (),
             source           : metadata . source . clone (),
-            parentIs            : metadata . parentIs,
+            parentIs         : metadata . parentIs,
+            birth            : metadata . birth,
             graphStats       : metadata . graphStats . clone (),
             viewStats        : metadata . viewStats . clone (),
             view_requests    : metadata . view_requests . clone (),
@@ -404,14 +408,21 @@ fn parse_node_sexp (
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
             metadata . parentIs = match value . as_str () {
-              "container"   => ParentIs::Container,
-              "collector"   => ParentIs::Collector,
-              "content"     => ParentIs::Content,
-              "linkTarget"  => ParentIs::LinkTarget,
+              "affected"    => ParentIs::Affected,
               "independent" => ParentIs::Independent,
               "absent"      => ParentIs::Absent,
               _ => return Err ( format! (
                 "Invalid parentIs value: {}", value )), }; },
+          "birth" => {
+            if subitems . len () != 2 {
+              return Err ( "birth requires exactly one value" . to_string () ); }
+            let value : String =
+              atom_to_string ( &subitems[1] ) ?;
+            metadata . birth = match value . as_str () {
+              "linksToParent"    => Birth::LinksToParent,
+              "containsParent"   => Birth::ContainsParent,
+              _ => return Err ( format! (
+                "Invalid birth value: {}", value )), }; },
           "staged" => {
             apply_axis_atoms_to_truenode (
               &subitems[1..],

@@ -4,7 +4,7 @@ use crate::to_org::util::get_id_from_treenode;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, TrueNode };
+    ViewNode, ViewNodeKind, TrueNode, ParentIs };
 use crate::types::viewnode::{Vognode, QualCol, Qual, RoleCol};
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind };
@@ -224,7 +224,7 @@ pub fn find_children_by_ids (
 /// Check if all nodes at the specified generation satisfy the predicate.
 /// Returns true if the generation is empty (vacuously true).
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes TrueNodes with parentIs != Container.
+/// If skip_non_content, excludes TrueNodes with parentIs != Affected.
 pub fn generation_includes_only<F> (
   tree                : &Tree<MpViewnode>,
   node_id             : NodeId,
@@ -240,7 +240,7 @@ where F: Fn (&MpViewnode) -> bool
 
 /// Check if the generation is nonempty and all nodes satisfy the predicate.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes TrueNodes with parentIs != Container.
+/// If skip_non_content, excludes TrueNodes with parentIs != Affected.
 pub fn generation_exists_and_includes<F> (
   tree                : &Tree<MpViewnode>,
   node_id             : NodeId,
@@ -258,7 +258,7 @@ where F: Fn (&MpViewnode) -> bool
 
 /// Check if the specified generation is empty.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes TrueNodes with parentIs != Container.
+/// If skip_non_content, excludes TrueNodes with parentIs != Affected.
 pub fn generation_does_not_exist (
   tree                : &Tree<MpViewnode>,
   node_id             : NodeId,
@@ -273,7 +273,7 @@ pub fn generation_does_not_exist (
 /// Positive generation = descendants (1 = children, 2 = grandchildren, etc.)
 /// Generation 0 returns just the node itself.
 /// If 'skip_non_content' is true and generation > 0,
-///   then we exclude TrueNodes with parentIs != Container.
+///   then we exclude TrueNodes with parentIs != Affected.
 fn collect_generation (
   tree               : &Tree<MpViewnode>,
   node_id            : NodeId,
@@ -306,7 +306,7 @@ fn collect_generation (
                           !matches!(&c . value() . kind,
                                     MpViewnodeKind::Vognode (MpVognode::Normal (t)
                                                              | MpVognode::Phantom (t))
-                                    if t . parent_ignores_it() ))
+                                    if t . parentIs != ParentIs::Affected ))
               . map(|c| c . id()) ); }}
       current_gen = next_gen; }
     current_gen } }

@@ -61,7 +61,7 @@ fn source_inheritance_across_non_content_same_source () {
     &content_to_containers,
     &config );
   // B has same source as A, so sourceAtBoundary should be false,
-  // even though B has parentIs != Container.
+  // even though B has parentIs != Affected.
   let b_ref =
     viewforest . get (a_id) . unwrap ()
     . first_child () . unwrap ();
@@ -73,7 +73,7 @@ fn source_inheritance_across_non_content_same_source () {
             "Same source across non-content boundary \
              should NOT be at boundary" ); }
 
-/// When a non-content child (parentIs != Container) has a different source
+/// When a non-content child (parentIs != Affected) has a different source
 /// from its nearest truenode ancestor,
 /// sourceAtBoundary should be true.
 #[test]

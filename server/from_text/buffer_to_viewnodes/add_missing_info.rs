@@ -68,7 +68,7 @@ pub fn absent_parentIs_under_visible_parent_becomes_isContainer (
       viewforest . get_mut (node_id) . unwrap();
     if let MpViewnodeKind::Vognode (MpVognode::Normal (t))
       = &mut node_mut . value() . kind
-      { t . parentIs = ParentIs::Container; }}}
+      { t . parentIs = ParentIs::Affected; }}}
 
 /// Make it a Qual::Alias if both:
 /// - it is a TrueNode

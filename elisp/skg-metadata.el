@@ -115,9 +115,9 @@ If there is no active region, do nothing."
 Starts with the current source as minibuffer text.  S-left/S-right cycle
 through owned sources, C-? displays all configured sources and
 their paths, and typed source names are accepted directly.
-With a prefix argument RECURSIVE, changes every content-descendent
-whose source matches the source at point.  Descendents whose parentIs
-is not container are not traversed.
+With a prefix argument RECURSIVE, changes every affected content
+descendent whose source matches the source at point.
+Only descendents for which parentIs=affected are traversed.
 Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive "P")
   (let* ((current-source (skg--current-node-source))
@@ -142,7 +142,7 @@ Does NOT save; call `skg-request-save-buffer' afterward."
   "Prompt for and recursively change the source of the node at point.
 This is the recursive form of `skg-set-source': it changes every
 content-descendent whose source matches the source at point.
-Descendents whose parentIs is not container are not traversed.
+Only descendents for which parentIs=affected are traversed.
 Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive)
   (skg-set-source t))
@@ -192,7 +192,7 @@ Does NOT save; call `skg-request-save-buffer' afterward."
 (defun skg--change-source-recursive (old-source new-source)
   "Change OLD-SOURCE to NEW-SOURCE in this content subtree.
 Returns the number of changed nodes.  The root node is inclusive;
-descendents whose parentIs is not container are not traversed."
+only descendents for which parentIs=affected are traversed."
   (save-excursion
     (let ((changed-count 0)
           (start-level (org-outline-level)))
@@ -237,11 +237,11 @@ descendents whose parentIs is not container are not traversed."
        (skg-sexp-subtree-p metadata-sexp '(skg (node)))))
 
 (defun skg--node-parentIs-content-of-p (metadata-sexp)
-  "Return non-nil if METADATA-SEXP has implicit or explicit container parentIs."
+  "Return non-nil if METADATA-SEXP has implicit or explicit parentIs=affected."
   (let ((parentIs-values (skg-sexp-cdr-at-path metadata-sexp
                                             '(skg node parentIs))))
     (or (not parentIs-values)
-        (eq (car parentIs-values) 'container))))
+        (eq (car parentIs-values) 'affected))))
 
 (defun skg--node-source (metadata-sexp)
   "Return METADATA-SEXP's node source as a string, or nil."

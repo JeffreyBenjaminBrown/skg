@@ -240,7 +240,7 @@ fn assert_hides_e1_in_subscribee_col (
   buffer : &str,
 ) {
   assert! (
-    buffer . contains ("**** (skg hiddenInSubscribeeCol)\n***** (skg (node (id e1) (source foreign) (parentIs collector) indef"),
+    buffer . contains ("**** (skg hiddenInSubscribeeCol)\n***** (skg (node (id e1) (source foreign) indef"),
     "Expected e1 to be rendered under HiddenInSubscribeeCol:\n{}",
     buffer );
   assert! (
@@ -289,7 +289,7 @@ fn add_e11_to_hiddenoutside_col (
   insert_after_line_containing (
     buffer,
     "(skg hiddenOutsideOfSubscribeeCol)",
-    "**** (skg (node (id E11) (source main) (parentIs collector) indef)) E11" ) }
+    "**** (skg (node (id E11) (source main) indef)) E11" ) }
 
 fn assert_e1_removed_from_visible_subscribee_branch (
   buffer : &str,
@@ -620,7 +620,7 @@ fn test_moving_foreign_subscribee_content_elsewhere_still_hides(
     assert_hides_e1_in_subscribee_col (&rerendered);
     assert! (
       rerendered . contains (
-        "** (skg (node (id e1) (source foreign) (parentIs collector) indef" ),
+        "** (skg (node (id e1) (source foreign) indef" ),
       "Expected e1 to remain content of a:\n{}",
       rerendered );
     cleanup_test (
@@ -711,7 +711,7 @@ fn test_extra_view_child_under_owned_subscribee_is_independent(
       indoc! {"
               * (skg (node (id a) (source owned))) a
               ** (skg subscribeeCol)
-              *** (skg (node (id r) (source owned) (parentIs collector))) r
+              *** (skg (node (id r) (source owned))) r
               **** (skg (node (id r2) (source owned) indef)) r2
               **** (skg (node (id e) (source foreign) indef)) subscribee-e
               **** (skg (node (id r1) (source owned) indef)) r1
@@ -779,10 +779,10 @@ fn test_every_kind_of_col(
     let expected_initial = indoc! {
       "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing))) R
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) (parentIs collector) indef (graphStats (contents 2) subscribing))) subscribee-1
-       *** (skg (node (id E2) (source main) (parentIs collector) indef (graphStats (contents 2) subscribing))) subscribee-2
+       *** (skg (node (id E1) (source main) indef (graphStats (containers 0) (contents 2) subscribing))) subscribee-1
+       *** (skg (node (id E2) (source main) indef (graphStats (containers 0) (contents 2) subscribing))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeCol)
-       **** (skg (node (id hidden-for-no-reason) (source main) (parentIs collector) indef)) hidden-for-no-reason
+       **** (skg (node (id hidden-for-no-reason) (source main) indef (graphStats (containers 0)))) hidden-for-no-reason
        ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(initial_view, expected_initial,
@@ -810,16 +810,16 @@ fn test_every_kind_of_col(
     let expected_expanded = indoc! {
       "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing))) R
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) (parentIs collector) (graphStats (contents 2) subscribing))) subscribee-1
+       *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 2) subscribing))) subscribee-1
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg (node (id hidden-in-E1) (source main) (parentIs collector) indef (graphStats (containers 1)))) hidden-in-E1
+       ***** (skg (node (id hidden-in-E1) (source main) indef)) hidden-in-E1
        **** (skg (node (id E11) (source main))) E11
-       *** (skg (node (id E2) (source main) (parentIs collector) (graphStats (contents 2) subscribing))) subscribee-2
+       *** (skg (node (id E2) (source main) (graphStats (containers 0) (contents 2) subscribing))) subscribee-2
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg (node (id hidden-in-E2) (source main) (parentIs collector) indef (graphStats (containers 1)))) hidden-in-E2
+       ***** (skg (node (id hidden-in-E2) (source main) indef)) hidden-in-E2
        **** (skg (node (id E21) (source main))) E21
        *** (skg hiddenOutsideOfSubscribeeCol)
-       **** (skg (node (id hidden-for-no-reason) (source main) (parentIs collector) indef)) hidden-for-no-reason
+       **** (skg (node (id hidden-for-no-reason) (source main) indef (graphStats (containers 0)))) hidden-for-no-reason
        ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(expanded, expected_expanded,
@@ -862,7 +862,7 @@ fn test_hidden_within_but_none_without(
     let expected_initial = indoc! {
       "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing))) R
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) (parentIs collector) indef (graphStats (contents 3) subscribing))) subscribee-1
+       *** (skg (node (id E1) (source main) indef (graphStats (containers 0) (contents 3) subscribing))) subscribee-1
        ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(initial_view, expected_initial,
@@ -892,9 +892,9 @@ fn test_hidden_within_but_none_without(
     let expected_expanded = indoc! {
       "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing))) R
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) (parentIs collector) (graphStats (contents 3) subscribing))) subscribee-1
+       *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 3) subscribing))) subscribee-1
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg (node (id H) (source main) (parentIs collector) indef (graphStats (containers 1)))) H
+       ***** (skg (node (id H) (source main) indef)) H
        **** (skg (node (id E11) (source main))) E11
        **** (skg (node (id E12) (source main))) E12
        ** (skg (node (id R1) (source main))) R1
@@ -1140,10 +1140,10 @@ fn test_hidden_without_but_none_within(
     let expected_initial = indoc! {
       "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing))) R
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) (parentIs collector) indef (graphStats (contents 2) subscribing))) subscribee-1
-       *** (skg (node (id E2) (source main) (parentIs collector) indef (graphStats subscribing))) subscribee-2
+       *** (skg (node (id E1) (source main) indef (graphStats (containers 0) (contents 2) subscribing))) subscribee-1
+       *** (skg (node (id E2) (source main) indef (graphStats (containers 0) subscribing))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeCol)
-       **** (skg (node (id H) (source main) (parentIs collector) indef)) H
+       **** (skg (node (id H) (source main) indef (graphStats (containers 0)))) H
        ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(initial_view, expected_initial,
@@ -1169,13 +1169,13 @@ fn test_hidden_without_but_none_within(
     let expected_expanded = indoc! {
       "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing))) R
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) (parentIs collector) (graphStats (contents 2) subscribing))) subscribee-1
+       *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 2) subscribing))) subscribee-1
        **** (skg (node (id E11) (source main))) E11
        **** (skg (node (id E12) (source main) (graphStats (contents 1)))) E12
        ***** (skg (node (id E121) (source main))) E121
-       *** (skg (node (id E2) (source main) (parentIs collector) (graphStats subscribing))) subscribee-2
+       *** (skg (node (id E2) (source main) (graphStats (containers 0) subscribing))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeCol)
-       **** (skg (node (id H) (source main) (parentIs collector) indef)) H
+       **** (skg (node (id H) (source main) indef (graphStats (containers 0)))) H
        ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(with_subscribees_expanded, expected_expanded,
@@ -1223,7 +1223,7 @@ fn test_adding_to_hiddenoutside_col_does_not_hide(
 
     assert! (
       rerendered . lines () . any ( |line|
-        line . contains ("(id H)") && line . contains ("parentIs collector")),
+        line . contains ("(id H)")),
       "Expected original hidden-outside row H to remain:\n{}",
       rerendered );
     assert! (
@@ -1268,8 +1268,8 @@ fn test_overlapping_hidden_within(
     let expected_initial = indoc! {
       "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing))) R
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) (parentIs collector) indef (graphStats (contents 1) subscribing))) subscribee-1
-       *** (skg (node (id E2) (source main) (parentIs collector) indef (graphStats (contents 1) subscribing))) subscribee-2
+       *** (skg (node (id E1) (source main) indef (graphStats (containers 0) (contents 1) subscribing))) subscribee-1
+       *** (skg (node (id E2) (source main) indef (graphStats (containers 0) (contents 1) subscribing))) subscribee-2
        ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(initial_view, expected_initial,
@@ -1295,12 +1295,12 @@ fn test_overlapping_hidden_within(
     let expected_expanded = indoc! {
       "* (skg (node (id R) (source main) (parentIs absent) (graphStats (contents 1) subscribing))) R
        ** (skg subscribeeCol)
-       *** (skg (node (id E1) (source main) (parentIs collector) (graphStats (contents 1) subscribing))) subscribee-1
+       *** (skg (node (id E1) (source main) (graphStats (containers 0) (contents 1) subscribing))) subscribee-1
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg (node (id H) (source main) (parentIs collector) indef (graphStats (containers 2)))) H
-       *** (skg (node (id E2) (source main) (parentIs collector) (graphStats (contents 1) subscribing))) subscribee-2
+       ***** (skg (node (id H) (source main) indef (graphStats (containers 2)))) H
+       *** (skg (node (id E2) (source main) (graphStats (containers 0) (contents 1) subscribing))) subscribee-2
        **** (skg hiddenInSubscribeeCol)
-       ***** (skg (node (id H) (source main) (parentIs collector) indef (graphStats (containers 2)))) H
+       ***** (skg (node (id H) (source main) indef (graphStats (containers 2)))) H
        ** (skg (node (id R1) (source main))) R1
        "};
     assert_eq!(expanded, expected_expanded,

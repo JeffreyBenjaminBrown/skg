@@ -80,10 +80,7 @@ fn collect_visible_content (
         if matches!(
              child_ref . value() . role,
              SaveRole::Ordinary)
-           && ( // Ordinary content children are visible.  Children marked parentIs=collector are also visible here because dragging a generated hidden child into the subscribee-as-such visible branch is how the user requests an unhide.
-             t . parentIs == ParentIs::Collector
-               || ! t . parent_ignores_it())
-           && ! t . is_phantom()
+           && ( t . parentIs == ParentIs::Affected )
            && ! matches!(
              t . edit_request(),
              Some (&EditRequest::Delete))

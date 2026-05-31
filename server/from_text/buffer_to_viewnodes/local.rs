@@ -152,12 +152,12 @@ fn validate_hidden_in_subscribee_col (
     tree, node_id, 1, true,
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Normal (t))
-        => t . parentIs == ParentIs::Collector,
+        => t . parentIs == ParentIs::Affected,
       MpViewnodeKind::Vognode (MpVognode::Phantom (_))
         => true,
       _ => false, } )
     { errors . push(
-        "HiddenInSubscribeeCol TrueNode children must have parentIs=collector."
+        "HiddenInSubscribeeCol TrueNode children must have parentIs=affected."
       . to_string()); }
   if !siblings_cannot_include(
     tree, node_id,
@@ -196,12 +196,12 @@ fn validate_hidden_outside_of_subscribee_col (
     tree, node_id, 1, true,
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Normal (t))
-        => t . parentIs == ParentIs::Collector,
+        => t . parentIs == ParentIs::Affected,
       MpViewnodeKind::Vognode (MpVognode::Phantom (_))
         => true,
       _ => false, } )
     { errors . push(
-        "HiddenOutsideOfSubscribeeCol TrueNode children must be parentIs=collector."
+        "HiddenOutsideOfSubscribeeCol TrueNode children must be parentIs=affected."
         . to_string()); }
   if !siblings_cannot_include(
     tree, node_id,
@@ -242,14 +242,14 @@ fn validate_subscribeecol (
     tree, node_id, 1, true,
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Normal (t)) =>
-        t . parentIs == ParentIs::Collector,
+        t . parentIs == ParentIs::Affected,
       MpViewnodeKind::Vognode (MpVognode::Phantom (_)) =>
         true,
       MpViewnodeKind::PartnerCol (
         RoleCol::HiddenOutsideOfSubscribee)
         => true,
       _ => false, } )
-    { errors . push("SubscribeeCol TrueNode children must have parentIs=collector."
+    { errors . push("SubscribeeCol TrueNode children must have parentIs=affected."
                     . to_string() ); }
   if !relation_col_children_have_distinct_ids(tree, node_id) {
     errors . push("SubscribeeCol must not have duplicate TrueNode children."
@@ -280,12 +280,12 @@ fn validate_relation_col (
     tree, node_id, 1, true,
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Normal (t))
-        => t . parentIs == ParentIs::Collector,
+        => t . parentIs == ParentIs::Affected,
       MpViewnodeKind::Vognode (MpVognode::Phantom (_))
         => true,
       _ => false, } )
     { errors . push(format!(
-        "{} TrueNode children must have parentIs=collector.", label)); }
+        "{} TrueNode children must have parentIs=affected.", label)); }
   if !siblings_cannot_include(
     tree, node_id,
     |node| matches!(&node . kind,
@@ -427,7 +427,7 @@ fn has_empty_title ( t : &MpTruenode ) -> bool {
 
 /// Check that all non-ignored, non-phantom content children
 /// have distinct IDs.
-/// "Non-ignored" means parentIs == Container.
+/// "Non-ignored" means parentIs == Affected.
 /// "Non-phantom" means diff is not Removed or RemovedHere.
 /// Returns true if all such children have distinct IDs,
 /// or if there are no such children.
@@ -442,7 +442,7 @@ pub fn nonignored_children_have_distinct_ids (
     let content_id : Option<ID> =
       match &child . value() . kind {
         MpViewnodeKind::Vognode (MpVognode::Normal (t))
-          if !t . parent_ignores_it()
+          if t . parentIs == ParentIs::Affected
           => t . id . clone(),
         MpViewnodeKind::Vognode (MpVognode::Inactive (i))
           if i . membership . staged != Some (Sign::Minus)

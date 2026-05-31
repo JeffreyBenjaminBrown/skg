@@ -19,12 +19,13 @@
 
 (defconst skg-truenode--canonical-field-order
   '("id" "source"
-    "indef" "parentIs" "editRequest" "viewRequests")
+    "indef" "parentIs" "birth" "editRequest" "viewRequests")
   "Canonical order for node fields. Fields not in this list go last.")
 
 (defconst skg-truenode--editable-defaults
   '(("indef"  . "false (default)")
-    ("parentIs"      . "container (default)")
+    ("parentIs"      . "affected (default)")
+    ("birth"         . "unremarkable (default)")
     ("editRequest"   . "none (default)")
     ("viewRequests"  . "none (default)"))
   "Alist of editable field names to their default value text.")
@@ -294,6 +295,12 @@ CHILD-LEVEL is the level of the field headline."
             (skg-truenode--default-content-p value-text))
         nil) ;; remove: at default (content)
        (t group)))
+     ((string= field-name "birth")
+      (cond
+       ((or (null value-text)
+            (skg-truenode--default-birth-p value-text))
+        nil)
+       (t group)))
      ((string= field-name "editRequest")
       (cond
        ((or (null value-text)
@@ -345,10 +352,16 @@ CHILD-LEVEL is the level of the field headline."
         (string= trimmed "false"))))
 
 (defun skg-truenode--default-content-p (text)
-  "Return non-nil if TEXT represents the default content value."
+  "Return non-nil if TEXT represents the default 'affected' value."
   (let ((trimmed (string-trim text)))
-    (or (string= trimmed "container (default)")
-        (string= trimmed "container"))))
+    (or (string= trimmed "affected (default)")
+        (string= trimmed "affected"))))
+
+(defun skg-truenode--default-birth-p (text)
+  "Return non-nil if TEXT represents the default birth value."
+  (let ((trimmed (string-trim text)))
+    (or (string= trimmed "unremarkable (default)")
+        (string= trimmed "unremarkable"))))
 
 (defun skg-truenode--default-none-p (text)
   "Return non-nil if TEXT represents the default none value."

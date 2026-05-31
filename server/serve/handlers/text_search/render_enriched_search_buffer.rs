@@ -2,7 +2,7 @@ use crate::dbs::tantivy::title_and_source_by_id;
 use crate::dbs::typedb::ancestry::AncestryTree;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_viewnode};
+use crate::types::viewnode::{Birth, ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_viewnode_with_birth};
 use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
@@ -83,12 +83,14 @@ fn prepend_containing_child_from_tantivy (
         if ! active . contains_source (&source) {
           return None;
         } else {
-          mk_indefinitive_viewnode (
-            node_id . clone (), source, title, ParentIs::Content ) }},
+          mk_indefinitive_viewnode_with_birth (
+            node_id . clone (), source, title,
+            ParentIs::Independent, Birth::ContainsParent ) }},
       None =>
-        mk_indefinitive_viewnode (
+        mk_indefinitive_viewnode_with_birth (
           node_id . clone (), SourceName::from ("search"),
-          node_id . as_str () . to_string (), ParentIs::Content ) };
+          node_id . as_str () . to_string (),
+          ParentIs::Independent, Birth::ContainsParent ) };
   let mut parent_mut : NodeMut<ViewNode> =
     viewforest . get_mut (parent_treeid) . unwrap ();
   Some (parent_mut . prepend (viewnode) . id ()) }

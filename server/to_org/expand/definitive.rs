@@ -9,7 +9,7 @@ use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_t
 use crate::to_org::util::{ DefinitiveMap, build_node_branch_minus_content_with_source_set, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, IndefOrDef, mk_phantom_viewnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, IndefOrDef, ParentIs, mk_phantom_viewnode };
 use crate::types::viewnode::Vognode;
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
@@ -187,7 +187,7 @@ fn indefinitize_content_subtree (
         node_ref . children ()
         . filter ( |c| matches! ( &c . value() . kind,
                                   ViewNodeKind::Vognode (Vognode::Normal (t))
-                                  if !t . parent_ignores_it() ))
+                                  if t . parentIs == ParentIs::Affected ))
         . map ( |c| c . id () )
         . collect ();
       (node_pid, content_child_treeids) };

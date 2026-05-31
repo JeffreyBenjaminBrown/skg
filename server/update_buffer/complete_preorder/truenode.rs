@@ -258,7 +258,7 @@ fn correct_the_viewChildren_of_subscribee (
     . children()
     . filter_map ( |child| match &child . value() . kind {
       ViewNodeKind::Vognode (Vognode::Normal (t))
-        if !t . parent_ignores_it()
+        if t . parentIs == ParentIs::Affected
            && !t . is_phantom()
            && content_id_set . contains (&t . id) =>
         Some ((t . id . clone(), child . id())),
@@ -294,7 +294,7 @@ fn mutate_truenode_to_deletednode (
         body, } ) ); }
   ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) }
 
-/// Whether this node claims parentIs=collector
+/// Whether this node claims parentIs=affected
 /// and is a child of SubscribeeCol (and not a phantom).
 fn is_subscribee (
   tree : &Tree<ViewNode>,
@@ -304,7 +304,7 @@ fn is_subscribee (
     read_at_node_in_tree( tree, node,
       |vn : &ViewNode| match &vn . kind {
         ViewNodeKind::Vognode (Vognode::Normal (t))
-          => t . parentIs == ParentIs::Collector,
+          => t . parentIs == ParentIs::Affected,
         _ => false } ) ?;
   let parent_is_subscribee_col : bool =
     read_at_ancestor_in_tree( tree, node, 1,
@@ -405,7 +405,7 @@ fn complete_content_children (
     tree, node,
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Normal (t))
-        => !t . parent_ignores_it(),
+        => t . parentIs == ParentIs::Affected,
       ViewNodeKind::Vognode (Vognode::Phantom (_))
         // Existing phantoms are reordered or replaced, not duplicated.
         => true,
@@ -456,7 +456,7 @@ fn mark_erroneous_content_children_as_indep (
     tree, node,
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Normal (t)) =>
-        !t . parent_ignores_it()
+        t . parentIs == ParentIs::Affected
         && !content_id_set . contains( &t . id )
         && !t . is_phantom(), // phantoms, though not content in the worktree, are content in HEAD, and should not be parent-ignored
       _ => false },
@@ -484,7 +484,7 @@ fn order_children_as_scaffolds_then_ignored_then_content (
           | ViewNodeKind::BufferRoot
           | ViewNodeKind::DeadScaffold                => 0,
         ViewNodeKind::Vognode (Vognode::Normal (t))
-          if t . parent_ignores_it()                  => 1,
+          if t . parentIs != ParentIs::Affected                  => 1,
         ViewNodeKind::Vognode (Vognode::Phantom (_))  => 2,
         ViewNodeKind::Vognode (Vognode::Normal (_))   => 2,
         ViewNodeKind::Vognode (Vognode::Deleted (_))  => 2,
@@ -706,7 +706,7 @@ fn set_diff_status (
           // Called for normal vognodes only; phantom parentIs is not
           // part of diff-status inheritance.
           ViewNodeKind::Vognode (Vognode::Normal (t))
-            => t . parent_ignores_it(),
+            => t . parentIs != ParentIs::Affected,
           _ => true } ) ?;
     if is_non_content { (None, None) }
     else {
@@ -772,7 +772,8 @@ fn write_truenode_diff (
         = vn . kind
       { t . existence  = existence;
         t . membership = membership;
-        t . not_in_git = not_in_git; }}
+        t . not_in_git = not_in_git; }
+      vn . normal_to_phantom (); }
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
 
 #[cfg(test)]

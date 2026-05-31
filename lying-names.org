@@ -1784,7 +1784,7 @@ is now : id_to_pid_if_found
    - True?: Partly. The function inserts children in *reverse* order (so prepending preserves original order); this isn't conveyed by the name.
    - Omits?: It omits the reverse-iteration prepending strategy.
 
-** prepend_indefinitive_child (line 342)
+** prepend_indef_indep_child (line 342)
    - True?: Partly. The function falls back to an UnknownNode placeholder if the id can't be resolved, instead of erring or returning None.
    - Omits?: It omits the UnknownNode fallback path.
 

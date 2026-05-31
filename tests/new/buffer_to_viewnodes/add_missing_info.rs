@@ -117,7 +117,7 @@ fn test_absent_parentIs_under_visible_parent_becomes_isContainer () {
   match &moved_node . value() . kind {
     MpViewnodeKind::Vognode (
       MpVognode::Normal (t) | MpVognode::Phantom (t)) =>
-      assert_eq! (t . parentIs, ParentIs::Container),
+      assert_eq! (t . parentIs, ParentIs::Affected),
     _ => panic! ("expected moved TrueNode") }
 }
 

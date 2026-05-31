@@ -55,12 +55,16 @@
     (node
       (source) ;; ignored
       (parentIs
+        ;; The server omits affected parentIs. Normalisation inserts
+        ;; the internal-only `container' atom so omitted content keeps
+        ;; its herald while explicit `(parentIs affected)' stays quiet.
         (BLUE   container   "{")
-        (GREEN  collector   "∈")
         (absent)
-        (ORANGE independent "⊥")
-        (ORANGE content "}")
-        (ORANGE linkTarget     "←"))
+        (affected)
+        (ORANGE independent "⊥"))
+      (birth
+        (ORANGE containsParent "}")
+        (ORANGE linksToParent  "←"))
       ;; Server emits the abbreviated atom `indef' (see
       ;; org_to_text.rs); we match that here.
       (GREEN indef ABUT "☮")
@@ -158,11 +162,11 @@ WHY SOME RULES LOOK EMPTY OR REDUNDANT
 
 NORMALISATION
 
-The server leaves Container parentIs implicit in `(node ...)'. Before
+The server leaves parentIs=affected implicit in `(node ...)'. Before
 this table runs, `heralds--read-metadata' calls
 `heralds--inject-default-parentIs' to add `(parentIs container)' when
 missing, so the `(parentIs (BLUE container \"{\") ...)' sub-rule can
-fire uniformly for variants with visible heralds.")
+fire for omitted ordinary content.")
 
 (defun heralds--tokens->text (tokens)
   "Convert list of TOKENS (propertized strings) to a display string.
@@ -337,9 +341,10 @@ parse as an `(skg ...)' form."
 Returns nil if parsing fails. Normalisation currently means: if
 the sexp is an (skg (node ...)) form whose node has no explicit
 (parentIs ...) sub-form, insert (parentIs container) -- the server
-leaves Container implicit (see the note in org_to_text.rs), but
-the herald rules want to dispatch on explicit parentIs variants
-explicitly."
+leaves 'affected' membership implicit
+(see `true_node_metadata_to_string' in org_to_text.rs),
+but the herald rules use this internal marker to preserve the ordinary
+content herald."
   (let ((parsed (condition-case nil
                     (car (read-from-string metadata-sexp))
                   (error nil))))

@@ -9,7 +9,7 @@ use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
 use super::git::{ExistenceAxes, MembershipAxes};
-use super::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Vognode, QualCol, Qual, RoleCol, DeletedNode, InactiveNode, UnknownNode, GraphNodeStats, ViewNodeStats, IndefOrDef, ParentIs, };
+use super::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Vognode, QualCol, Qual, RoleCol, DeletedNode, InactiveNode, UnknownNode, GraphNodeStats, ViewNodeStats, Birth, IndefOrDef, ParentIs, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -67,6 +67,7 @@ impl TryFrom<MpTruenode> for TrueNode {
       id,
       source,
       parentIs          : u . parentIs,
+      birth          : u . birth,
       graphStats     : u . graphStats,
       viewStats      : u . viewStats,
       view_requests  : u . view_requests,
@@ -129,6 +130,7 @@ impl From<TrueNode> for MpTruenode {
       id             : Some(t . id),
       source         : Some(t . source),
       parentIs          : t . parentIs,
+      birth          : t . birth,
       graphStats     : t . graphStats,
       viewStats      : t . viewStats,
       view_requests  : t . view_requests,
@@ -297,7 +299,8 @@ impl Default for MpTruenode {
       title          : String::new(),
       id             : None,
       source         : None,
-      parentIs          : ParentIs::Container,
+      parentIs       : ParentIs::Affected,
+      birth          : Birth::Unremarkable,
       graphStats     : GraphNodeStats::default(),
       viewStats      : ViewNodeStats::default(),
       view_requests  : HashSet::new(),

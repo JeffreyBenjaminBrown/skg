@@ -4,7 +4,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   ViewNode, ViewNodeKind, Vognode, Qual, QualCol, TrueNode,
   DeletedNode, UnknownNode, InactiveNode, EditRequest, GraphNodeStats,
-  ParentIs,
+  Birth, ParentIs,
 };
 
 use ego_tree::{NodeRef, Tree};
@@ -247,8 +247,9 @@ fn true_node_metadata_to_string (
     config    : & SkgConfig,
   ) -> String {
     fn graph_stats ( true_node : & TrueNode ) -> Option < String > {
-      graphnodestats_to_sexp (
-        & true_node . graphStats, true_node . parentIs ) }
+      graphnodestats_to_sexp ( & true_node . graphStats,
+                                 true_node . parentIs,
+                                 true_node . birth ) }
     fn view_stats (
       true_node : & TrueNode,
       config    : & SkgConfig,
@@ -306,20 +307,20 @@ fn true_node_metadata_to_string (
       vec! [ "node" . to_string () ];
     parts . push ( format! ( "(id {})", true_node . id . 0 ));
     parts . push ( format! ( "(source {})", true_node . source ));
-    // ParentIs::Container is left implicit in the emitted sexp because
-    // it is the default parent relationship.
+    // ParentIs::Affected is left implicit because it is the default
+    // membership relation.
     match true_node . parentIs {
-      ParentIs::Container => {},
-      ParentIs::Collector =>
-        parts . push ( "(parentIs collector)" . to_string () ),
+      ParentIs::Affected => {},
       ParentIs::Absent =>
         parts . push ( "(parentIs absent)" . to_string () ),
       ParentIs::Independent =>
-        parts . push ( "(parentIs independent)" . to_string () ),
-      ParentIs::Content =>
-        parts . push ( "(parentIs content)" . to_string () ),
-      ParentIs::LinkTarget =>
-        parts . push ( "(parentIs linkTarget)" . to_string () ) }
+        parts . push ( "(parentIs independent)" . to_string () ) }
+    match true_node . birth {
+      Birth::Unremarkable => {},
+      Birth::ContainsParent =>
+        parts . push ( "(birth containsParent)" . to_string () ),
+      Birth::LinksToParent =>
+        parts . push ( "(birth linksToParent)" . to_string () ) }
     if true_node . is_indefinitive () {
       // "indef" is short for "indefinitive" -- a read-only view of
       // a node (see IndefOrDef in types/viewnode.rs). The metadata
@@ -418,31 +419,31 @@ fn deleted_scaff_metadata_to_string (
   parts . join (" ") }
 
 fn graphnodestats_to_sexp (
-  gs    : &GraphNodeStats,
+  gs       : &GraphNodeStats,
   parentIs : ParentIs,
+  birth    : Birth,
 ) -> Option < String > {
   let mut parts : Vec < String > = Vec::new ();
   if let Some (ref c) = gs . containRels {
     // Per-parentIs suppression of the containers count. The client
     // INTERCs (containers N) and (contents M) into a combined
-    // herald with `{` between them; we just decide whether each
-    // raw atom is worth emitting.
-    // - Container  : hide the common case of exactly 1 container
+    // herald with `{` between them; here, the server merely decides
+    // whether each raw atom is worth emitting.
+    // - Affected   : hide the common case of exactly 1 container
     //                (every content-child has at least one
     //                container; the number only matters when it's
     //                0 or >1).
-    // - Independent: hide the common case of 0 containers (a view
-    //                root is typically standalone).
-    // - Content / LinkTarget: always show (these heralds indicate
-    //                that the node is *related* to the view root
-    //                via the graph, so the count is always
+    // - Independent|Absent: hide the common case of 0 containers (a view
+    //                       root is typically standalone).
+    // - Non-default birth provenance: always show (the birth metadata
+    //                indicates that the node is *related* to the view
+    //                root via the graph, so the count is always
     //                informative).
-    let show_containers : bool = match parentIs {
-      ParentIs::Container                      => c . containers != 1,
-      ParentIs::Collector                      => c . containers != 0,
-      ParentIs::Independent                    => c . containers != 0,
-      ParentIs::Absent                         => c . containers != 0,
-      ParentIs::Content | ParentIs::LinkTarget => true, };
+    let show_containers : bool =
+      if birth != Birth::Unremarkable { true
+      } else { match parentIs {
+        ParentIs::Affected                       => c . containers != 1,
+        ParentIs::Independent | ParentIs::Absent => c . containers != 0 }};
     let show_contents : bool = c . contents != 0;
     if show_containers {
       parts . push ( format! ("(containers {})", c . containers) ); }

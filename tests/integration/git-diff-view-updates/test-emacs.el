@@ -22,10 +22,10 @@
     (assert-headline-titles
      buf
      '((1 absent "a")
-       (2 container    "b")
-       (3 container    "c")
-       (3 container    "d")
-       (3 container    "e"))
+       (2 affected    "b")
+       (3 affected    "c")
+       (3 affected    "d")
+       (3 affected    "e"))
      "phase 1: view-a initial")))
 
 ;; ─── Phase 2: Open view-b ───────────────────────────────────
@@ -40,14 +40,14 @@
       (message "✗ FAIL [phase 2]: buffer *b* not created")
       (kill-emacs 1))
     ;; multi_root_view prepends b's containerward ancestry (a) as
-    ;; b's first child before the definitive content (c, d, e).
+    ;; b's first child before the definitive affected children (c, d, e).
     (assert-headline-titles
      buf
      '((1 absent "b")
-       (2 content  "a")
-       (2 container    "c")
-       (2 container    "d")
-       (2 container    "e"))
+       (2 containsParent "a")
+       (2 affected       "c")
+       (2 affected       "d")
+       (2 affected       "e"))
      "phase 2: view-b initial")))
 
 ;; ─── Phase 3: Edit view-b and save ─────────────────────────
@@ -87,9 +87,9 @@
     (assert-headline-titles
      buf
      '((1 absent "b")
-       (2 container   "e, edited")
-       (2 container   "f")
-       (3 container   "d"))
+       (2 affected   "e, edited")
+       (2 affected   "f")
+       (3 affected   "d"))
      "phase 4: view-b after save")))
 
 ;; ─── Phase 5: Toggle diff mode on ──────────────────────────
@@ -196,9 +196,9 @@
     (assert-headline-titles
      buf-b
      '((1 absent "b")
-       (2 container   "e, edited")
-       (2 container   "f")
-       (3 container   "d"))
+       (2 affected   "e, edited")
+       (2 affected   "f")
+       (3 affected   "d"))
      "phase 11: view-b clean"))
   ;; view-a should have no diff/phantom nodes
   (let* ((buf-a (get-buffer "*a*"))

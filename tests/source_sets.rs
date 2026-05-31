@@ -33,7 +33,7 @@ use skg::types::misc::{ID, MSV, SourceName};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode};
 use skg::types::viewnode::{
-  ParentIs,
+  Birth,
   ViewNode,
   ViewNodeKind,
   viewforest_root_viewnode};
@@ -528,7 +528,7 @@ fn sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
         HashSet::new (),
         config,
         driver,
-        ParentIs::LinkTarget,
+        Birth::LinksToParent,
         Some (&active)) . await ?;
       assert_eq! (
         true_child_ids (&viewforest, child_id),
@@ -552,7 +552,7 @@ fn sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
         HashSet::new (),
         config,
         driver,
-        ParentIs::LinkTarget,
+        Birth::LinksToParent,
         Some (&active)) . await ?;
       assert! (
         true_child_ids (&empty_fork_viewforest, empty_fork_child_id)

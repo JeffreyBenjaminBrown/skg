@@ -120,7 +120,7 @@
 
       If the ancestry tree later needs to be grafted into a ViewNode
       ego_tree, a small conversion function (walk AncestryNode, call
-      'prepend_indefinitive_child_with_parent_ignores' per node) is
+      'prepend_indef_indep_child_with_parent_ignores' per node) is
       straightforward — and is already planned in the "Integration
       into ViewNode tree" section above.
 
@@ -217,7 +217,7 @@
 
     'build_and_integrate_full_ancestry_then_drop_request' calls
     'full_containerward_ancestry', then walks the AncestryNode tree
-    and calls 'prepend_indefinitive_child_with_parent_ignores' for
+    and calls 'prepend_indef_indep_child_with_parent_ignores' for
     each Inner and Root node — the same function backpath.rs already
     uses.
 

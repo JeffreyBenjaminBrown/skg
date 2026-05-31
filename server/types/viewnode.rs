@@ -12,26 +12,31 @@ use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
 
-/// What this node's visible parent is relative to this node --
-/// or, more precisely, what it *was* when this buffer was (re)drawn,
-/// before the user may have moved the node elsewhere, invalidating this.
-/// Most nodes are born as content of the parent node,
-/// but there can be other reasons -- e.g. the user asked to see backlinks.
+/// Whether this node participates in the collection represented by
+/// its visible parent. For an ordinary Vognode parent, that collection
+/// is the parent's content. For a PartnerCol parent, the RoleCol
+/// decides the relation collection. For other kinds of parent's,
+/// a node's ParentIs has no effect.
 ///
 /// PITFALL: If a vognode is indefinitive, *none* of it children affect it,
 /// just as edits to itself do not affect it,
 /// regardless of what the children might claim with their ParentIs field.
 ///
-/// PITFALL: There might be multiple relationships between parent and child --
-/// e.g. cyclic containment. This does not encode all of them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ParentIs {
-  Container,   // default: parent contains this child.
-  Collector,   // parent is a generated relation collection scaffold.
-  Content,     // containerward backpath: parent is contained by this child.
-  LinkTarget,  // sourceward backpath: parent is linked to by this child.
-  Independent, // visible parent exists, but no graph relationship to it is claimed.
-  Absent,      // no visible parent; the only viewtree parent is BufferRoot.
+  Affected,    // default: upon saving, this can affect its parent's collection
+  Independent, // upon saving, this cannot affect its parent
+  Absent,      // No (visible) parent. (BufferRoot is not visible.)
+}
+
+/// Why a generated node was originally displayed under its visible parent.
+/// This is view history used for display and stale-relation validation,
+/// not save extraction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Birth {
+  Unremarkable,
+  ContainsParent,
+  LinksToParent,
 }
 
 //
@@ -98,11 +103,11 @@ pub type MpTruenode = TrueNode_Generic < Option < ID >,
 /// A ViewNode that corresponds to a NodeComplete.
 #[derive( Debug, Clone, PartialEq )]
 pub struct TrueNode_Generic < Id, Src > {
-  pub title          : String,
-  pub id             : Id,
-  pub source         : Src,
-  pub parentIs          : ParentIs, // When not Container, this node has no effect on its parent if the buffer is saved.
-  // PITFALL: Don't move parentIs to ViewNodeStats. It describes the node-to-parent relationship, but unlike viewStats fields it can be meaningfully changed by the user. It is not dictated solely by the view, but by some combination of the view and the user's intentions.
+  pub title         : String,
+  pub id            : Id,
+  pub source        : Src,
+  pub parentIs      : ParentIs,
+  pub birth         : Birth,
 
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
   pub graphStats    : GraphNodeStats,
@@ -234,9 +239,6 @@ pub enum ViewRequest {
 //
 
 impl < Id, Src > TrueNode_Generic < Id, Src > {
-  pub fn parent_ignores_it (&self) -> bool {
-    self . parentIs != ParentIs::Container }
-
   /// A phantom is a display-only placeholder for a node that does not
   /// exist as a real, editable entity in the worktree at this position.
   /// Triggered by either:
@@ -246,7 +248,7 @@ impl < Id, Src > TrueNode_Generic < Id, Src > {
   pub fn is_phantom (
     &self,
   ) -> bool {
-    self . membership . staged   == Some (Sign::Minus)
+    self    . membership . staged   == Some (Sign::Minus)
     || self . membership . unstaged == Some (Sign::Minus)
     || self . existence  . unstaged == Some (Sign::Minus) }
 
@@ -440,6 +442,15 @@ impl AsMut<ViewNode> for ViewNode {
     self }}
 
 impl ViewNode {
+  pub fn normal_to_phantom (
+    &mut self,
+  ) {
+    if let ViewNodeKind::Vognode (Vognode::Normal (t))
+      = &self . kind
+      { if t . is_phantom ()
+        { self . kind = ViewNodeKind::Vognode (
+            Vognode::Phantom (t . clone () )); }}}
+
   pub fn title (&self) -> &str {
     match &self . kind {
       ViewNodeKind::Vognode (Vognode::Normal (t))
@@ -473,10 +484,10 @@ impl ViewNode {
         | ViewNodeKind::DeadScaffold => None,
     }}
 
-  pub fn is_truenode_and_claims_parentIs_collector (&self) -> bool {
+  pub fn is_truenode_and_parentIs_affected (&self) -> bool {
     match &self . kind {
       ViewNodeKind::Vognode (Vognode::Normal (t)) =>
-        t . parentIs == ParentIs::Collector,
+        t . parentIs == ParentIs::Affected,
       _ => false,
     }}
 
@@ -571,7 +582,8 @@ pub fn default_truenode (
     title,
     id,
     source,
-    parentIs          : ParentIs::Container,
+    parentIs       : ParentIs::Affected,
+    birth          : Birth::Unremarkable,
     graphStats     : GraphNodeStats::default(),
     viewStats      : ViewNodeStats::default(),
     view_requests  : HashSet::new(),
@@ -594,7 +606,7 @@ pub fn mk_phantom_viewnode (
   membership : MembershipAxes,
 ) -> ViewNode {
   let mut viewnode : ViewNode =
-    mk_indefinitive_viewnode ( id, source, title, ParentIs::Container );
+    mk_indefinitive_viewnode ( id, source, title, ParentIs::Affected );
   if let ViewNodeKind::Vognode (Vognode::Normal (mut t)) = viewnode . kind
     { t . existence  = existence;
       t . membership = membership;
@@ -609,7 +621,8 @@ pub fn mk_definitive_viewnode (
 ) -> ViewNode { mk_viewnode ( id,
                             source,
                             title,
-                            ParentIs::Container,
+                            ParentIs::Affected,
+                            Birth::Unremarkable,
                             IndefOrDef::Definitive {
                               body,
                               edit_request : None },
@@ -650,10 +663,21 @@ pub fn mk_indefinitive_viewnode (
   source : SourceName,
   title  : String,
   parentIs  : ParentIs,
+) -> ViewNode {
+  mk_indefinitive_viewnode_with_birth (
+    id, source, title, parentIs, Birth::Unremarkable ) }
+
+pub fn mk_indefinitive_viewnode_with_birth (
+  id       : ID,
+  source   : SourceName,
+  title    : String,
+  parentIs : ParentIs,
+  birth    : Birth,
 ) -> ViewNode { mk_viewnode ( id,
                             source,
                             title,
                             parentIs,
+                            birth,
                             IndefOrDef::Indefinitive,
                             HashSet::new ( )) } // view_requests
 
@@ -663,6 +687,7 @@ pub fn mk_indefinitive_viewnode (
 pub fn mk_indefinitive_from_viewnode (
   viewnode : ViewNode,
   parentIs    : ParentIs,
+  birth       : Birth,
 ) -> Result < ViewNode, String > {
   let ViewNodeKind::Vognode (Vognode::Normal (t)
                              | Vognode::Phantom (t))
@@ -670,10 +695,8 @@ pub fn mk_indefinitive_from_viewnode (
     else { return Err (
       "mk_indefinitive_from_viewnode: expected TrueNode"
         . to_string () ) };
-  Ok ( mk_indefinitive_viewnode ( t . id,
-                                  t . source,
-                                  t . title,
-                                  parentIs )) }
+  Ok ( mk_indefinitive_viewnode_with_birth (
+    t . id, t . source, t . title, parentIs, birth )) }
 
 /// Create a ViewNode with *nearly* full metadata control.
 /// The exception is that the 'GraphNodeStats' and 'ViewNodeStats' are intentionally omitted,
@@ -683,7 +706,8 @@ pub fn mk_viewnode (
   id            : ID,
   source        : SourceName,
   title         : String,
-  parentIs         : ParentIs,
+  parentIs      : ParentIs,
+  birth         : Birth,
   indef_or_def  : IndefOrDef,
   view_requests : HashSet < ViewRequest >,
 ) -> ViewNode {
@@ -693,6 +717,7 @@ pub fn mk_viewnode (
              kind        : ViewNodeKind::Vognode (
                Vognode::Normal (
                  TrueNode { parentIs,
+                            birth,
                             view_requests,
                             indef_or_def,
                             .. default_truenode (

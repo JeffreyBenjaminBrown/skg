@@ -89,6 +89,7 @@ fn process_truenode_diff (
     = node_mut . value() . kind
     { t . existence . staged   = staged_x;
       t . existence . unstaged = unstaged_x; }
+  node_mut . value() . normal_to_phantom ();
   // For an Added or Deleted file we don't read node_changes
   // (the comparison is degenerate). NewHere/RemovedHere on children
   // and IDcol/textChanged scaffolds only apply to Modified files.

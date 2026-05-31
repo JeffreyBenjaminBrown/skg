@@ -274,7 +274,7 @@ Save the view afterward to apply the move.
 Like 'skg-set-source', but it also
 changes the source of every content descendent of the node at point
 whose source matches the original source of the node at point.
-Descendents whose ParentIs is not Container are not traversed.
+Only descendents for which ParentIs=Affected are traversed.
 *** C-c s m : skg-set-merge-request
 (See [[./merging.org][the docs on merging]] for why would you merge two nodes,
 and what it means to do that.)

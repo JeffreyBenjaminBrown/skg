@@ -93,7 +93,10 @@ fn set_membership_unstaged_minus (
     Vognode::Normal (t)
     | Vognode::Phantom (t)) =
     &mut tree . get_mut (target_id) . unwrap() . value() . kind
-  { t . membership . unstaged = Some (Sign::Minus); }}
+  { t . membership . unstaged = Some (Sign::Minus); }
+  tree . get_mut (target_id) . unwrap()
+    . value()
+    . normal_to_phantom (); }
 
 async fn save_instructions_from_org_with_disk (
   org_text : &str,
@@ -417,12 +420,12 @@ fn role_aware_extraction_collects_subscribees_without_hidden_branches (
     indoc! {"
             * (skg (node (id subscriber) (source main))) subscriber
             ** (skg subscribeeCol)
-            *** (skg (node (id subscribee) (source main) (parentIs collector))) subscribee
+            *** (skg (node (id subscribee) (source main))) subscribee
             **** (skg hiddenInSubscribeeCol)
-            ***** (skg (node (id hidden-in) (source main) (parentIs collector))) hidden in child
+            ***** (skg (node (id hidden-in) (source main))) hidden in child
             **** (skg (node (id subscribee-content) (source main))) subscribee content
             *** (skg hiddenOutsideOfSubscribeeCol)
-            **** (skg (node (id hidden-outside) (source main) (parentIs collector))) hidden outside child
+            **** (skg (node (id hidden-outside) (source main))) hidden outside child
         "};
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
@@ -453,8 +456,8 @@ fn role_aware_extraction_collects_overridden_col (
     indoc! {"
             * (skg (node (id overrider) (source main))) overrider
             ** (skg overriddenCol)
-            *** (skg (node (id overridden-a) (source main) (parentIs collector))) overridden A
-            *** (skg (node (id overridden-b) (source main) (parentIs collector))) overridden B
+            *** (skg (node (id overridden-a) (source main))) overridden A
+            *** (skg (node (id overridden-b) (source main))) overridden B
         "};
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
@@ -500,13 +503,13 @@ fn read_only_relation_col_children_do_not_become_save_instructions (
     indoc! {"
             * (skg (node (id owner) (source main))) owner
             ** (skg subscriberCol)
-            *** (skg (node (id subscriber) (source main) (parentIs collector))) subscriber
+            *** (skg (node (id subscriber) (source main))) subscriber
             ** (skg overriderCol)
-            *** (skg (node (id overrider) (source main) (parentIs collector))) overrider
+            *** (skg (node (id overrider) (source main))) overrider
             ** (skg hiderCol)
-            *** (skg (node (id hider) (source main) (parentIs collector))) hider
+            *** (skg (node (id hider) (source main))) hider
             ** (skg hiddenCol)
-            *** (skg (node (id hidden) (source main) (parentIs collector))) hidden
+            *** (skg (node (id hidden) (source main))) hidden
         "};
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
@@ -530,7 +533,7 @@ fn subscribee_hiderel_intent_collects_visible_content (
     indoc! {"
             * (skg (node (id subscriber) (source main))) subscriber
             ** (skg subscribeeCol)
-            *** (skg (node (id subscribee) (source main) (parentIs collector))) subscribee
+            *** (skg (node (id subscribee) (source main))) subscribee
             **** (skg (node (id a) (source main))) a
             **** (skg (node (id b) (source main))) b
             "};
@@ -550,9 +553,9 @@ fn subscribee_hiderel_intents_preserve_subscribee_tree_order (
     indoc! {"
             * (skg (node (id subscriber) (source main))) subscriber
             ** (skg subscribeeCol)
-            *** (skg (node (id first) (source main) (parentIs collector))) first
+            *** (skg (node (id first) (source main))) first
             **** (skg (node (id first-child) (source main))) first child
-            *** (skg (node (id second) (source main) (parentIs collector))) second
+            *** (skg (node (id second) (source main))) second
             **** (skg (node (id second-child) (source main))) second child
             "};
 
@@ -577,7 +580,7 @@ fn subscribee_hiderel_intent_uses_only_children (
     indoc! {"
             * (skg (node (id subscriber) (source main))) subscriber
             ** (skg subscribeeCol)
-            *** (skg (node (id subscribee) (source main) (parentIs collector))) subscribee
+            *** (skg (node (id subscribee) (source main))) subscribee
             **** (skg (node (id child) (source main))) child
             ***** (skg (node (id grandchild) (source main))) grandchild
             "};
@@ -597,7 +600,7 @@ fn subscribee_hiderel_intent_ignores_indefinitive_subscribee (
     indoc! {"
             * (skg (node (id subscriber) (source main))) subscriber
             ** (skg subscribeeCol)
-            *** (skg (node (id subscribee) (source main) (parentIs collector) indef (viewRequests definitiveView))) subscribee
+            *** (skg (node (id subscribee) (source main) indef (viewRequests definitiveView))) subscribee
             "};
 
   assert_eq!(
@@ -611,7 +614,7 @@ fn subscribee_hiderel_intent_excludes_non_content_delete_and_phantom_children (
     indoc! {"
             * (skg (node (id subscriber) (source main))) subscriber
             ** (skg subscribeeCol)
-            *** (skg (node (id subscribee) (source main) (parentIs collector))) subscribee
+            *** (skg (node (id subscribee) (source main))) subscribee
             **** (skg (node (id keep) (source main))) keep
             **** (skg (node (id independent) (source main) (parentIs independent))) independent
             **** (skg (node (id delete-me) (source main) (editRequest delete))) delete me
@@ -641,12 +644,12 @@ fn subscribee_hiderel_intent_ignores_hidden_scaffold_contents (
     indoc! {"
             * (skg (node (id subscriber) (source main))) subscriber
             ** (skg subscribeeCol)
-            *** (skg (node (id subscribee) (source main) (parentIs collector))) subscribee
+            *** (skg (node (id subscribee) (source main))) subscribee
             **** (skg hiddenInSubscribeeCol)
-            ***** (skg (node (id hidden-in) (source main) (parentIs collector))) hidden in child
+            ***** (skg (node (id hidden-in) (source main))) hidden in child
             **** (skg (node (id visible) (source main))) visible
             *** (skg hiddenOutsideOfSubscribeeCol)
-            **** (skg (node (id hidden-outside) (source main) (parentIs collector))) hidden outside child
+            **** (skg (node (id hidden-outside) (source main))) hidden outside child
             "};
 
   assert_eq!(
@@ -669,7 +672,7 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
             ** (skg (node (id child) (source main))) child
             Child body
             ** (skg subscribeeCol)
-            *** (skg (node (id subscribee) (source main) (parentIs collector))) subscribee
+            *** (skg (node (id subscribee) (source main))) subscribee
             * (skg (node (id doomed) (source main) (editRequest delete))) doomed
             Doomed body
         "};
@@ -713,7 +716,7 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
             ** (skg aliasCol) aliases
             *** (skg alias) root alias
             ** (skg subscribeeCol)
-            *** (skg (node (id subscribee) (source main) (parentIs collector))) subscribee
+            *** (skg (node (id subscribee) (source main))) subscribee
             * (skg (node (id doomed) (source main) (editRequest delete))) doomed
             Doomed body
         "};
@@ -760,7 +763,7 @@ fn subscribee_as_such_child_list_removal_does_not_save_subscribee (
         indoc! {"
                 * (skg (node (id r) (source owned))) r
                 ** (skg subscribeeCol)
-                *** (skg (node (id e) (source foreign) (parentIs collector))) subscribee-e
+                *** (skg (node (id e) (source foreign))) subscribee-e
                 **** (skg (node (id e2) (source foreign))) e2
                 "};
       let instructions : Vec<DefineNode> =
@@ -783,7 +786,7 @@ fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
         indoc! {"
                 * (skg (node (id r) (source owned))) r
                 ** (skg subscribeeCol)
-                *** (skg (node (id e) (source foreign) (parentIs collector))) subscribee-e
+                *** (skg (node (id e) (source foreign))) subscribee-e
                 **** (skg (node (id e2) (source foreign))) e2
                 "};
       let instructions : Vec<DefineNode> =
@@ -812,7 +815,7 @@ fn subscribee_as_such_child_list_removal_infers_subscriber_hide (
         indoc! {"
                 * (skg (node (id r) (source owned))) r
                 ** (skg subscribeeCol)
-                *** (skg (node (id e) (source foreign) (parentIs collector))) subscribee-e
+                *** (skg (node (id e) (source foreign))) subscribee-e
                 **** (skg (node (id e2) (source foreign))) e2
                 "};
       let instructions : Vec<DefineNode> =
@@ -839,7 +842,7 @@ fn moving_subscribee_as_such_child_to_subscriber_does_not_hide (
         indoc! {"
                 * (skg (node (id r) (source owned))) r
                 ** (skg subscribeeCol)
-                *** (skg (node (id e) (source foreign) (parentIs collector))) subscribee-e
+                *** (skg (node (id e) (source foreign))) subscribee-e
                 **** (skg (node (id e2) (source foreign))) e2
                 ** (skg (node (id e1) (source foreign) indef)) e1
                 "};
@@ -866,7 +869,7 @@ fn subscribee_as_such_visible_child_removes_subscriber_hide (
         indoc! {"
                 * (skg (node (id R) (source main))) R
                 ** (skg subscribeeCol)
-                *** (skg (node (id E1) (source main) (parentIs collector))) subscribee-1
+                *** (skg (node (id E1) (source main))) subscribee-1
                 **** (skg (node (id E11) (source main))) E11
                 **** (skg (node (id H) (source main))) H
                 **** (skg (node (id E12) (source main))) E12
@@ -895,10 +898,10 @@ fn subscribee_as_such_unhide_preserves_unrelated_hides (
         indoc! {"
                 * (skg (node (id R) (source main))) R
                 ** (skg subscribeeCol)
-                *** (skg (node (id E1) (source main) (parentIs collector))) subscribee-1
+                *** (skg (node (id E1) (source main))) subscribee-1
                 **** (skg (node (id hidden-in-E1) (source main))) hidden-in-E1
                 **** (skg (node (id E11) (source main))) E11
-                *** (skg (node (id E2) (source main) (parentIs collector))) subscribee-2
+                *** (skg (node (id E2) (source main))) subscribee-2
                 **** (skg (node (id E21) (source main))) E21
                 "};
       let instructions : Vec<DefineNode> =
@@ -923,9 +926,9 @@ fn overlapping_subscribee_hiderel_conflict_rejects_save (
         indoc! {"
                 * (skg (node (id R) (source main))) R
                 ** (skg subscribeeCol)
-                *** (skg (node (id E1) (source main) (parentIs collector))) E1
+                *** (skg (node (id E1) (source main))) E1
                 **** (skg (node (id shared) (source main))) shared
-                *** (skg (node (id E2) (source main) (parentIs collector))) E2
+                *** (skg (node (id E2) (source main))) E2
                 "};
       let result : Result<Vec<DefineNode>, Box<dyn Error>> =
         save_instructions_from_org_with_disk (
@@ -975,7 +978,7 @@ fn ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_subscribee (
         indoc! {"
                 * (skg (node (id r) (source owned))) r
                 ** (skg subscribeeCol)
-                *** (skg (node (id e) (source foreign) (parentIs collector))) subscribee-e
+                *** (skg (node (id e) (source foreign))) subscribee-e
                 **** (skg (node (id e2) (source foreign))) e2
                 * (skg (node (id e) (source foreign))) subscribee-e
                 ** (skg (node (id e1) (source foreign))) e1
@@ -1026,7 +1029,7 @@ fn recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
         indoc! {"
                 * (skg (node (id r) (source owned))) r
                 ** (skg subscribeeCol)
-                *** (skg (node (id e) (source foreign) (parentIs collector))) subscribee-e
+                *** (skg (node (id e) (source foreign))) subscribee-e
                 **** (skg (node (id e2) (source foreign))) e2
                 "};
       let instructions : Vec<DefineNode> =
@@ -1052,7 +1055,7 @@ fn foreign_subscribee_as_such_title_edit_is_rejected (
         indoc! {"
                 * (skg (node (id r) (source owned))) r
                 ** (skg subscribeeCol)
-                *** (skg (node (id e) (source foreign) (parentIs collector))) changed title
+                *** (skg (node (id e) (source foreign))) changed title
                 **** (skg (node (id e2) (source foreign))) e2
                 "};
       let result : Result<Vec<DefineNode>, Box<dyn Error>> =
@@ -1085,7 +1088,7 @@ fn owned_as_subscribee_title_edit_is_rejected (
         indoc! {"
                 * (skg (node (id a) (source owned))) a
                 ** (skg subscribeeCol)
-                *** (skg (node (id r) (source owned) (parentIs collector))) changed title
+                *** (skg (node (id r) (source owned))) changed title
                 **** (skg (node (id r1) (source owned))) r1
                 "};
       let result : Result<Vec<DefineNode>, Box<dyn Error>> =
@@ -1118,7 +1121,7 @@ fn owned_as_subscribee_body_edit_is_rejected (
         indoc! {"
                 * (skg (node (id a) (source owned))) a
                 ** (skg subscribeeCol)
-                *** (skg (node (id r) (source owned) (parentIs collector))) r
+                *** (skg (node (id r) (source owned))) r
                 body text that should not be accepted here
                 **** (skg (node (id r1) (source owned))) r1
                 "};

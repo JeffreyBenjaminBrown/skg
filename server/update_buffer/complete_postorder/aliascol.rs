@@ -19,7 +19,7 @@ use std::error::Error;
 /// - Fetch the corresponding NodeComplete from the map
 /// - Read its aliases into 'aliases'
 /// - Partition the AliasCol's children into:
-///   - TrueNodes with parentIs != Container
+///   - TrueNodes with parentIs != Affected
 ///   - Alias scaffold nodes
 ///   (Error if any child does not fit these categories.)
 /// - Reorder children: ignored TrueNodes first, then Alias nodes

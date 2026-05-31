@@ -6,6 +6,7 @@ use skg::types::git::Sign;
 use skg::types::misc::{ID, SourceName};
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, MpViewnodeKind, MpVognode};
+use skg::types::viewnode::ParentIs;
 use ego_tree::Tree;
 
 #[test]
@@ -97,7 +98,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
       MpVognode::Normal (t) | MpVognode::Phantom (t)) => t,
     _ => panic!("expected TrueNode") };
   assert_eq!(unrel_node . title(), "independent root node");
-  assert_eq!(rel_t . parent_ignores_it(), true);
+  assert_eq!(rel_t . parentIs != ParentIs::Affected, true);
   assert_eq!(rel_t . is_indefinitive (), true);
   assert_eq!(unrel_node . body(), None);
 
@@ -161,7 +162,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   assert_eq!(first_node . body(), Some(&"Simple body" . to_string()));
   assert_eq!(first_t . id . as_ref(), None);
   assert_eq!(first_t . viewStats . cycle, false);
-  assert_eq!(first_t . parent_ignores_it(), false);
+  assert_eq!(first_t . parentIs != ParentIs::Affected, false);
   assert_eq!(first_node . focused, false);
   assert_eq!(first_node . folded, false);
   assert_eq!(first_t . is_indefinitive (), false);

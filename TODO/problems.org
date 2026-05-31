@@ -361,3 +361,18 @@
    diffs are fast and repeated one-change reports are much faster. The
    next win is cached inverse indexes or reusable 'GraphFacts' keyed by
    the same endpoint identities.
+
+** GraphStats rendering still lacks parent-kind context
+   Observed on 2026-05-31 while splitting 'ParentIs' from 'Birth'.
+
+   'server/org_to_text.rs' renders a TrueNode's graphStats from only
+   the TrueNode metadata. After 'Container' and 'Collector' collapsed
+   to 'ParentIs::Affected', relation collection children and ordinary
+   content children can no longer be distinguished there.
+
+   The local workaround hides an affected node's container count when
+   it is 0 or 1, which preserves the old rendered behavior for relation
+   collection members and ordinary one-container content. A more exact
+   implementation would pass parent tree context into metadata
+   rendering, so a scaffold child and a normal Vognode child can use
+   different graphStats suppression rules.

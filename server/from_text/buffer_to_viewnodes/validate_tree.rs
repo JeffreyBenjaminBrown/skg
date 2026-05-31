@@ -136,7 +136,7 @@ fn validate_definitive_view_requests (
               node_ref . children () . any ( |child| matches! (
                 &child . value () . kind,
                 MpViewnodeKind::Vognode (MpVognode::Normal (ct))
-                  if ct . parentIs == ParentIs::Container ));
+                  if ct . parentIs == ParentIs::Affected ));
             if has_content_children
             { errors . push(
               BufferValidationError::DefinitiveRequestOnNodeWithContentChildren(

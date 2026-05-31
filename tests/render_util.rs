@@ -2,7 +2,7 @@
 
 use skg::org_to_text::viewnode_to_text;
 use skg::types::misc::{ID, SkgConfig, SourceName};
-use skg::types::viewnode::{ ViewNode, ViewNodeKind, Vognode, TrueNode, IndefOrDef, GraphNodeStats, NodeContainRels, ParentIs, ViewNodeStats, default_truenode };
+use skg::types::viewnode::{ ViewNode, ViewNodeKind, Vognode, TrueNode, IndefOrDef, GraphNodeStats, NodeContainRels, Birth, ParentIs, ViewNodeStats, default_truenode };
 use skg::types::viewnode::QualCol;
 use std::collections::HashMap;
 
@@ -94,16 +94,18 @@ fn test_metadata_ordering () {
 #[test]
 fn test_birth_affects_container_count_emission () {
   // A node with containers=1, contents=0.
-  // The server emits `(containers N)` only when the parentIs-specific
-  // suppression rule doesn't apply:
-  //   - Container:   hide when containers == 1.
-  //   - Independent: hide when containers == 0.
-  //   - Content / LinkTarget: always show.
+  // Birth::Unremarkable itself is omitted from metadata. Non-default
+  // birth values are emitted, and they also override the parentIs-specific
+  // suppression rule for `(graphStats (containers N))`:
+  //   - Affected: hide when containers == 1.
+  //   - Independent/Absent: hide when containers == 0.
+  //   - ContainsParent/LinksToParent birth: always show.
   // The client builds the compound herald from the raw atoms; the
   // `(containsHerald ...)` atom is not emitted server-side.
-  let make_node = | parentIs : ParentIs | -> ViewNode {
+  let make_node = | parentIs : ParentIs, birth : Birth | -> ViewNode {
     let t : TrueNode = TrueNode {
       parentIs,
+      birth,
       graphStats : GraphNodeStats {
         containRels : Some ( NodeContainRels {
           containers : 1, contents : 0 } ),
@@ -116,24 +118,24 @@ fn test_birth_affects_container_count_emission () {
   let cfg : SkgConfig =
     SkgConfig::dummyFromSources ( HashMap::new () );
   let content      : String = viewnode_to_text (
-    1, &make_node (ParentIs::Container),   &cfg ) . unwrap ();
+    1, &make_node (ParentIs::Affected, Birth::Unremarkable), &cfg ) . unwrap ();
   let independent  : String = viewnode_to_text (
-    1, &make_node (ParentIs::Independent), &cfg ) . unwrap ();
+    1, &make_node (ParentIs::Independent, Birth::Unremarkable), &cfg ) . unwrap ();
   let container_of : String = viewnode_to_text (
-    1, &make_node (ParentIs::Content), &cfg ) . unwrap ();
+    1, &make_node (ParentIs::Independent, Birth::ContainsParent), &cfg ) . unwrap ();
   let links_to     : String = viewnode_to_text (
-    1, &make_node (ParentIs::LinkTarget),     &cfg ) . unwrap ();
-  // Container with containers=1: hide.
+    1, &make_node (ParentIs::Independent, Birth::LinksToParent), &cfg ) . unwrap ();
+  // Affected with containers=1: hide.
   assert! ( ! content . contains ("(containers 1)"),
-            "Container should suppress containers=1: {}", content );
+            "ParentIs=Affected should suppress containers=1: {}", content );
   // Independent with containers=1: 1 != 0 so show.
   assert! ( independent . contains ("(containers 1)"),
-            "Independent should show containers>=1: {}", independent );
-  // Content / LinkTarget: always show.
+            "ParentIs=Independent should show containers>=1: {}", independent );
+  // Non-default birth provenance: always show.
   assert! ( container_of . contains ("(containers 1)"),
-            "Content should always show containers: {}", container_of );
+            "ContainsParent should always show containers: {}", container_of );
   assert! ( links_to . contains ("(containers 1)"),
-            "LinkTarget should always show containers: {}", links_to );
+            "LinksToParent should always show containers: {}", links_to );
   // No `containsHerald` atom on any of them.
   for (name, s) in [("content", &content), ("independent", &independent),
                     ("container_of", &container_of), ("links_to", &links_to)] {

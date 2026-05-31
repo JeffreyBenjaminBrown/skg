@@ -13,6 +13,7 @@ pub use viewnodestats::set_viewnodestats_in_viewforest;
 use complete::{complete_viewforest, CompletionContext};
 use crate::dbs::in_rust_graph::{ InRustGraph, scheduled_audit::take_pending_audit_warning};
 use crate::types::env::SkgEnv;
+use crate::types::viewnode::ParentIs;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{ SaveResponse, compute_diff_for_every_source, deleted_ids_to_source};
@@ -263,7 +264,7 @@ pub async fn rerender_view (
   if let Some (snap) = snapshot_global () {
     // Correct any parentIs markers whose claimed relation to the
     // parent doesn't hold in the in-Rust graph (e.g. user moved a
-    // parentIs=linkTarget node under a new parent it doesn't link to).
+    // birth=linksToParent node under a new parent it doesn't link to).
     // No-op when the global graph handle isn't initialized (tests
     // that bypass startup).
     validate_parentIs_relationships (viewforest, &snap); }
@@ -369,7 +370,7 @@ fn strip_stale_diff_state (
 ///   is marked as removed or removed-here.
 /// Exception: Does not strip:
 ///   - top-level branches (forest roots)
-///   - non-content nodes (parentIs != Container)
+///   - non-content nodes (parentIs != Affected)
 /// Uses single-pass DFS: removes branch roots as encountered,
 /// skipping recursion into removed branches.
 ///
@@ -401,7 +402,7 @@ fn remove_branches_that_git_marked_removed (
         match &node . value() . kind {
           ViewNodeKind::Vognode (Vognode::Phantom (t)) =>
             ! is_viewforest_root_child
-            && ! t . parent_ignores_it(),
+            && t . parentIs == ParentIs::Affected,
           _ => false };
       if should_remove {
         node . detach();

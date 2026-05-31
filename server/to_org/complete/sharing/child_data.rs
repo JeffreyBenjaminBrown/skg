@@ -14,7 +14,7 @@
 ///   that `goal_list`, whether it already existed in the buffer or
 ///   was created during reconciliation.
 /// - A relevant child is one this reconciliation pass is allowed to
-///   manage: for sharing scaffolds, a TrueNode marked parentIs=collector.
+///   manage: for sharing scaffolds, a TrueNode marked parentIs=affected.
 ///   Relevant children whose IDs are not in the goal list are removed
 ///   or otherwise demoted by the caller-specific cleanup step.
 /// - `ChildData` is the pre-fetched title/source/phantom metadata
@@ -39,7 +39,7 @@ use std::error::Error;
 /// scaffold's child (subscribee, hidden-in-subscribee, or
 /// hidden-outside-of-subscribees).
 ///
-/// `phantom: None` => normal indef child marked ParentIs::Collector.
+/// `phantom: None` => normal indef child marked ParentIs::Affected.
 /// `phantom: Some(axes)` => diff-view phantom marking removal.
 pub struct ChildData {
   pub source  : SourceName,
@@ -128,7 +128,7 @@ pub fn build_child_data (
 /// `complete_relevant_children_in_viewnodetree` with identical
 /// relevance/key/create closures. Phantom-flagged ChildData entries
 /// produce phantom viewnodes; non-phantom entries produce
-/// indefinitive viewnodes marked ParentIs::Collector.
+/// indefinitive viewnodes marked ParentIs::Affected.
 pub fn reconcile_sharing_scaffold_children (
   tree          : &mut Tree<ViewNode>,
   scaffold_node : NodeId,
@@ -141,7 +141,7 @@ pub fn reconcile_sharing_scaffold_children (
     tree, scaffold_node,
     |vn : &ViewNode| matches! ( &vn . kind,
                                 ViewNodeKind::Vognode (Vognode::Normal (t))
-                                if t . parentIs == ParentIs::Collector ),
+                                if t . parentIs == ParentIs::Affected ),
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Normal (t))
         => t . id . clone (),
@@ -152,15 +152,16 @@ pub fn reconcile_sharing_scaffold_children (
         child_data . get (id) . unwrap_or_else (
           || panic! ( "{}: child data not pre-fetched", label ));
       match d . phantom {
-        None =>
-          mk_indefinitive_viewnode (
-            id . clone (), d . source . clone (),
-            d . title . clone (), ParentIs::Collector ),
+        None => mk_indefinitive_viewnode ( id . clone (),
+                                           d . source . clone (),
+                                           d . title . clone (),
+                                           ParentIs::Affected ),
         Some ((ex, mem)) =>
           mk_phantom_viewnode (
             id . clone (), d . source . clone (),
             d . title . clone (), ex, mem ) } } ) ?;
-  mark_goal_children_as_collectionBranch_members (tree, scaffold_node, goal_list) ?;
+  mark_goal_children_as_collectionBranch_members (
+    tree, scaffold_node, goal_list) ?;
   Ok (( )) }
 
 /// See this module's header for definition of "goal child".
@@ -185,6 +186,6 @@ fn mark_goal_children_as_collectionBranch_members (
     |vn : &mut ViewNode| {
       if let ViewNodeKind::Vognode (Vognode::Normal (t))
         = &mut vn . kind
-        { t . parentIs = ParentIs::Collector; }} )
+        { t . parentIs = ParentIs::Affected; }} )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (( )) }

@@ -1,3 +1,9 @@
+* [[./TODO/better-than-regex-in-emacs-tests.org]]
+* Do we ever really need is_phantom()?
+The places it is used could inline it.
+* suppressed container count rule for subscribees-as-such is wrong
+It suppresses 1, should suppress 0.
+Maybe simplify the rule: always suppress 1 and nothing else.
 * replace type
 Maybe ViewNode should be replaced with a pair
 (Vnode_Viewstate, Vnode),

@@ -54,7 +54,7 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
   reconcile_sharing_scaffold_children(
-    // PITFALL: ('reconcile_hiddenin_subscribee_col_children' has a similar note.) Unlike relation-collection reconciliation, this read-only generated collection does not call mark_managed_children_outside_goal_independent first.  A non-goal child marked parentIs=collector is a stale member, so reconciliation should remove it rather than preserving it as independent.
+    // PITFALL: ('reconcile_hiddenin_subscribee_col_children' has a similar note.) Unlike relation-collection reconciliation, this read-only generated collection does not call mark_managed_children_outside_goal_independent first.  A non-goal child marked parentIs=affected is a stale member, so reconciliation should remove it rather than preserving it as independent.
     tree, node, kind,
     &goal_list, &child_data ) ?;
   detach_scaffold_if_empty (tree, node) ?;

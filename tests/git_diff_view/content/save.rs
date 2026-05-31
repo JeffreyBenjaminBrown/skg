@@ -190,7 +190,7 @@ fn test_diff_mode_as_subscribee_regenerates_phantom_children()
       let input = "\
 * (skg (node (id 1) (source main))) 1
 ** (skg subscribeeCol)
-*** (skg (node (id 11) (source main) (parentIs collector))) 11
+*** (skg (node (id 11) (source main))) 11
 **** (skg (node (id moves) (unstaged newM))) moves
 ";
 
@@ -208,7 +208,7 @@ fn test_diff_mode_as_subscribee_regenerates_phantom_children()
 
       assert_buffer_contains(
         &response . saved_view,
-        "*** (skg (node (id 11) (source main) (parentIs collector))) 11\n\
+        "*** (skg (node (id 11) (source main))) 11\n\
          **** (skg (node (id gets-removed) (source main) indef (unstaged removedX removedM))) gets-removed\n\
          **** (skg (node (id moves) (source main))) moves" );
       Ok (( )) }) })

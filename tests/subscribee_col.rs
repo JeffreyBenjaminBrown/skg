@@ -77,11 +77,11 @@ fn test_subscribee_col_appears_for_subscribers(
       "* (skg (node (id 1) (source home) (parentIs absent) (graphStats (contents 4)) (viewStats (sourceHerald ⌂:home)))) 1
       ** (skg (node (id 11) (source home) (graphStats (contents 1) subscribing))) 11
       *** (skg subscribeeCol)
-      **** (skg (node (id 11-sees) (source away) (parentIs collector) indef (graphStats subscribing) (viewStats (sourceHerald ⌂:away)))) 11-sees
+      **** (skg (node (id 11-sees) (source away) indef (graphStats (containers 0) subscribing) (viewStats (sourceHerald ⌂:away)))) 11-sees
       *** (skg (node (id 111) (source home))) 111
       ** (skg (node (id 12) (source home) (graphStats subscribing))) 12
       *** (skg subscribeeCol)
-      **** (skg (node (id 12-sees) (source away) (parentIs collector) indef (graphStats subscribing) (viewStats (sourceHerald ⌂:away)))) 12-sees
+      **** (skg (node (id 12-sees) (source away) indef (graphStats (containers 0) subscribing) (viewStats (sourceHerald ⌂:away)))) 12-sees
       ** (skg (node (id 13) (source home))) 13
       ** (skg (node (id 14) (source home) (graphStats (contents 1)))) 14
       *** (skg (node (id 141) (source home))) 141

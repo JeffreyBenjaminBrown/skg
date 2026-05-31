@@ -18,9 +18,9 @@ use std::sync::Arc;
 
 /// Reconciles one relation collection branch from a node in the view tree
 /// with the current in-Rust graph snapshot's data about that node.
-/// Makes the scaffold's TrueNode children marked parentIs=collector match a goal list,
+/// Makes the scaffold's TrueNode children marked parentIs=affected match a goal list,
 /// preserving reusable children and creating missing ones,
-/// then demotes stale children marked parentIs=collector to 'parentIs=independent'.
+/// then demotes stale children marked parentIs=affected to 'parentIs=independent'.
 pub fn reconcile_relation_col_children (
   node         : NodeId, // The relation collection scaffold. Its parent is a TrueNode.
   tree         : &mut Tree<ViewNode>,
@@ -49,9 +49,9 @@ pub fn reconcile_relation_col_children (
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
   mark_managed_children_outside_goal_independent (
-    // Do this before reconciliation -- otherwise non-goal children marked parentIs=collector are treated as relevant collection members and discarded.
+    // Do this before reconciliation -- otherwise non-goal children marked parentIs=affected are treated as relevant collection members and discarded.
     tree, node, &goal_list,
-    |t| t . parentIs == ParentIs::Collector ) ?;
+    |t| t . parentIs == ParentIs::Affected ) ?;
   reconcile_sharing_scaffold_children (
     tree, node, kind, &goal_list, &child_data ) ?;
   Ok (( )) }

@@ -107,7 +107,7 @@ and the search results silently update when paths are ready.
 
 The existing containerward-view code
 (in [[./server/to_org/expand/backpath.rs][backpath.rs]])
-already solves this: 'prepend_indefinitive_child_with_parent_ignores'
+already solves this: 'prepend_indef_indep_child_with_parent_ignores'
 calls 'skgnode_and_viewnode_from_id', which resolves the ID
 via TypeDB, reads the SkgNode from disk, and extracts the title.
 

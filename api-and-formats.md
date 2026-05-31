@@ -192,6 +192,21 @@ if and only if it adheres to the following:
   - Extra whitespace is ignored.
   - Keys and values should contain no whitespace.
 
+Inside a `(node ...)` form, `(parentIs ...)` describes whether the
+node participates in the collection represented by its visible parent:
+
+- omitted `parentIs` means `affected`;
+- `(parentIs affected)` is accepted but normally omitted when rendered;
+- `(parentIs independent)` means the node is preserved/displayed but
+  does not alter the parent's collection on save;
+- `(parentIs absent)` is rendered for view roots.
+
+`(birth ...)` records generated-view provenance, not save intent:
+
+- omitted `birth` means `unremarkable`;
+- `(birth containsParent)` marks containerward ancestry;
+- `(birth linksToParent)` marks sourceward link-source ancestry.
+
 # skgconfig.toml
 
 The server's configuration file. See example-data/ for an example.
