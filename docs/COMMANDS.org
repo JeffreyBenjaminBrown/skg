@@ -461,3 +461,11 @@ This may be warranted after a database rebuild.
 Unloads all skg elisp modules and reloads them from disk.
 Useful when you've changed elisp code
 and want to pick up the changes without restarting Emacs.
+* TODO edits for the above
+** division scheme
+Globally change view
+do to Viewnode
+do to Webnode
+do to Text
+Copy
+Paste

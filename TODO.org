@@ -1,7 +1,20 @@
+* each new root view sohuld be drawn with a link sources ancestry
+that is, linksource-ancestry as view-descendents
+* more diff supplement data
+containers before and after
+heralds (alias action, etc.)
+* must (?) stage them separately, but commit all repos at once
+* command to reverse the [where I learned it] contains [it] link
+One can then easily place the source under a branch named 'source'.
 * DONE ? [[./TODO/source-sets.org]]
 Seems to work.
+* the link stack should not be expected to be cleared
+Someone can if they find a way to use it.
+They might never use it.
+It's cheap.
 * [[./TODO/incremental-init-might-be-broken.org]]
-* Need text search across paths.
+* text search across containment paths
+* Bug ? Saving doesn't regenerate heralds if there were no changes?
 * critical
 ** I can't demo without privacy mode.
 The backlinks from skg itself contains unsafe references.
