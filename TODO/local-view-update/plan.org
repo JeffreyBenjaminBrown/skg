@@ -97,6 +97,16 @@ which despite the name attach as indefinitive *descendants* with
 =birth=ContainsParent/LinksToParent= (not ancestors). (problems.org: the BFS
 "Analysis" under "I think ordinary BFS will work, if" -> DONE.)
 
+*** DONE dispatch is not purely on =ViewNodeKind=
+The "dispatch on its =ViewNodeKind=" above is very slightly off: a
+=Vognode::Normal= whose view-parent is a SubscribeeCol takes the
+*subscribee-as-such* updater (§6.1), not the ordinary Normal one. So the driver
+really dispatches on =(kind, parent-kind)= -- reading the parent is legal
+bounded local context. A one-line correction here would stop an implementer
+from coding a pure single-kind match and missing the subscribee-as-such case.
+
+**** DONE sounds good (folded into plan_v2 §3)
+
 *** Jeff here, clarifying language
 The containerward/sourceward ancestries are "graph ancestries"
 depicted as "view descendents".
@@ -168,6 +178,30 @@ if they vanished, the user could not use them for that.
 
 This is not per-node local logic, so it does not compromise the
 "local update" goal. (problems.org: BFS analysis case (e) -> DONE.)
+
+*** DONE the empty-col exceptions contradict §6.7, §6.8, and this list itself
+The "Exceptions" just above (an empty AliasCol / OverriddenCol / SubscribeeCol
+is preserved) disagree with three other places, so all four cannot be right:
+- this sweep's *own* postorder removal list still names =SubscribeeCol= among
+  the "empty-and-self-deletable" cols -- so §3.4 both removes and preserves an
+  empty SubscribeeCol;
+- §6.7 says SubscribeeCol "*Self-delete*: yes, when the goal list is empty";
+- §6.8 says the relation cols "*Self-delete*: yes, when empty", which includes
+  OverriddenCol.
+Only §6.11 (AliasCol self-delete: no) already matches the exceptions.
+My read: the exceptions are the intended behavior -- an empty AliasCol /
+OverriddenCol / SubscribeeCol is an *editable* interface onto the origin
+(aliases, overrides, and the origin's own outgoing subscriptions), so it must
+survive emptiness or the user loses the means to refill it -- and the three
+stragglers are the bug. If so, please (a) drop =SubscribeeCol= from the
+postorder removal list above, (b) flip §6.7 to self-delete:no, and (c) carve
+OverriddenCol out of §6.8 (parallel to the "(so not OverriddenCol)" already in
+the removal list). If instead any of these *should* still vanish when empty,
+name which, because as written the sections cannot be reconciled.
+
+**** DONE yes, that's my intent
+Please make the edits you suggested.
+Done in plan_v2 (§3.4 exceptions; §6.7 self-delete:no; §6.8 carves OverriddenCol).
 
 ** Termination and idempotence
 Termination is structural: each node is visited once; the only new work is
@@ -247,18 +281,24 @@ When a node would be drawn definitive for ID X:
 Jeff's call: the invisible BufferRoot (§6.14) carries no data, so demotion
 would change nothing there; a visible *origin* registers Tentative like any
 ordinary definitive node, with no distinct root-Final state.
-**** ONGOING residual: a visible origin can still be demoted
+**** DONE residual: a visible origin can still be demoted
 Unlike the BufferRoot, a visible origin *does* carry a body and editability.
 If the same ID recurs deeper in the buffer and gets a user DVR, the §5.2 rule
 indefinitizes the origin -- hiding its body and making it read-only. Rare (it
 needs the root ID to repeat *and* a user DVR on the deeper copy) and arguably
 correct (the explicit request wins), but confirm it is acceptable, or pin the
 origin, before closing I2 for good.
-***** TODO yes, that's good
+***** DONE yes, that's good
 The first DVR reached for an ID has precedence,
 regardless of its depth or the depth of the viewnode
 (in this case a "view-root", child of the buffer root)
 that it would indefinitize.
+****** Confirmed (Claude)
+This is exactly what §5.2 already does, so no extra mechanism is needed: an
+origin registers Tentative; only a DVR (=Final=) can demote it; and once an ID
+is Final the "X already Final -> newcomer stays indefinitive" case keeps every
+later DVR out. So "first DVR reached wins, regardless of depth" falls out of the
+existing draw rule. No origin-pinning required.
 ** 5.3 The cascade
 *Only a Final (DVR-made) node hands DVRs to its Normal content children* --
 i.e. the children it draws from its own =contains=. That is what makes one
@@ -579,6 +619,9 @@ completed; retains children so the user's subtree survives.
 *** *Self-delete*: yes, when the goal list is empty -- removal (and the focus
   transfer, =detach_scaffold_transferring_focus=) is the unified sweep's
   (§3.4).
+**** DONE conflicts with the §3.4 empty-col exceptions
+§3.4 now lists an empty SubscribeeCol as *preserved*; this says it self-deletes.
+See the objection under §3.4. (Resolved in plan_v2 §6.7: self-delete:no.)
 *** *Ordering / extra child*: ensures a HiddenOutsideOfSubscribeeCol exists and
   is the *last* child (after all subscribees).
 *** *Subscribee-as-such interpretation*: the SubscribeeCol's subscribee
@@ -609,7 +652,11 @@ which is to modify the view-content of a subscribee-as-such.
 *** *Self-delete*: yes, when empty -- via the unified sweep (§3.4); this is the
   §17 open decision, resolved (Jeff: "yes, but during the sweep-dead-stuff-away
   pass").
-
+**** DONE OverriddenCol conflicts with the §3.4 empty-col exceptions
+§3.4 preserves an empty OverriddenCol; "yes, when empty" here would delete it.
+The read-only relation cols (Subscriber/Overrider/Hider/Hidden) should still
+self-delete; only OverriddenCol needs carving out. See the objection under §3.4.
+***** DONE right, and resolved above (plan_v2 §6.8)
 ** 6.9 PartnerCol(RoleCol::HiddenInSubscribee) -- HiddenInSubscribeeCol
 Child of a subscribee-as-such; the subscribee's content the subscriber hides.
 *** *Reads*: subscribee (ancestor 1) =contains= and subscriber (ancestor 3)
@@ -1084,7 +1131,7 @@ The allcaps will be enough to highlight it to the user.
 ** *A worked subscribee-as-such example* (plan-critique.org A6) is deferred
   ("ignore for now"); the §6.1 contains-minus-hides / contains-intersect-hides
   partition is the spec until one is written.
-*** TODO would this help?
+*** DONE would this help?
 If you need it,
 we can cannibalize something from the test suite.
 Point me at a simple-ish test (sometimes the README is very clear;
@@ -1094,3 +1141,9 @@ the tortuous story of how a tree was created in code)
 that's close to what you need,
 tell me what's missing,
 and I'll give you the worked example.
+**** Confirmed (Claude): not needed
+The §6.1 partition is unambiguous on its own. Post-save, a definitive
+subscribee-as-such shows =contains= MINUS subscriber.hides, and its
+HiddenInSubscribeeCol shows =contains= INTERSECT subscriber.hides; toggling one
+hide and saving simply moves that id between the two. I can write the algorithm
+without a worked example.
