@@ -32,16 +32,37 @@ use std::time;
 use typedb_driver::TypeDBDriver;
 
 
+/// Whether an ID's definitive occurrence is Final (claimed by a
+/// definitive view request, DVR) or merely Tentative (an ordinary
+/// saved/completed definitive). A DVR clobbers a Tentative occurrence
+/// but defers to a Final one (plan_v2 §5.2). The DVR cascade (§5.3) is
+/// not yet implemented, so today no second DVR ever reaches an
+/// already-Final ID (validation forbids two user DVRs per ID); the
+/// defer-to-Final branch is therefore correct-but-dormant until cascade
+/// lands. NodeId is the occurrence's position in the viewforest.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Finalizable {
+  Tentative (NodeId),
+  Final     (NodeId),
+}
+
+impl Finalizable {
+  pub fn node_id (&self) -> NodeId {
+    match self { Finalizable::Tentative (n) | Finalizable::Final (n) => *n } }
+  pub fn is_final (&self) -> bool {
+    matches! (self, Finalizable::Final (_)) }
+}
+
 /// Tracks which IDs have been rendered definitively and where.
 /// - Key: the ID that was visited
-/// - Value: NodeId within the viewforest tree
+/// - Value: Finalizable (its NodeId in the viewforest, tagged Tentative/Final)
 ///
 /// Uses:
 /// - prevent duplicate definitive expansions
 /// - locate the conflict when an earlier definitive view
 ///   conflicts with a new definitive view request
 pub type DefinitiveMap =
-  HashMap < ID, NodeId >;
+  HashMap < ID, Finalizable >;
 
 
 // ======================================================
@@ -157,7 +178,8 @@ pub fn make_indef_if_repeat_then_extend_defmap (
              t . is_indefinitive () } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   if !is_indefinitive {
-    defMap . insert ( pid, node_id ); }
+    // Ordinary completed/saved definitive -> Tentative (§5.2).
+    defMap . insert ( pid, Finalizable::Tentative (node_id) ); }
   Ok (( )) }
 
 /// Check if the node's PID appears in its ancestors,

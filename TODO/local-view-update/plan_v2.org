@@ -888,3 +888,39 @@ touches them:
 ** *A worked subscribee-as-such example* is unneeded for now: the §6.1
   contains-minus-hides / contains-intersect-hides partition is the spec. If a
   test ever needs one, cannibalize a near-match from the suite.
+
+* 18. Implementation log: deviations from this plan
+Append-only, terse. Each entry: what changed vs. the plan above, and why.
+Branch =local-view-updates=.
+** Phase 0c: DiffPhantom field-reduction deferred. The rename
+  =Vognode::Phantom= -> =DiffPhantom= (and =MpVognode=) is done; the *payload*
+  reduction (§6.3/§11: drop view_requests/parentIs/birth/stats/indef_or_def) is
+  deferred to the phase-2/5 diff-overlay rework, where =normal_or_phantom= and
+  the phantom code are rewritten and the reduction is low-risk instead of a
+  100+-site migration on soon-to-be-replaced code. TODO marker left on the
+  variant in =server/types/viewnode.rs=.
+** Phase 1c/1d folded into phase 4. The =Finalizable= (Tentative/Final) enum and
+  the node-limit counter are *not* introduced in phase 1: with "no behavior
+  change yet" they would be unused until phase 4 gives them semantics (cascade,
+  draw rule, limit enforcement), i.e. dead-code scaffolding. Phase 4 introduces
+  them where they are first used. Phase 1's other items (1a SavePlan split, 1b
+  NOT_FOUND + non-Normal source no-abort) are done.
+** Phase 1b: only the diff-phantom (non-Normal) branch of =build_child_data= was
+  switched to the NOT_FOUND fallback. The Normal-member branch still aborts on a
+  missing source (§7.6 says that case is validation/catastrophic); its gentler
+  Unknown-placeholder handling is phase-7 work.
+** Phases 2 and 4 are coupled; will be done together. A true single BFS that
+  dispatches per-kind at each node's visit (phase 2) needs view-requests to run
+  at the Normal node's visit -- because AliasCol is *created* by the Aliases
+  view-request (=to_org/expand/aliases.rs=) and HiddenInSubscribeeCol by the
+  definitive-subscribee visit, and their reconcilers must then run when BFS
+  reaches the freshly-created col. But BFS-ordered view-request correctness
+  depends on the global Finalizable (Tentative/Final) map -- exactly plan §3
+  case (b). The existing =DefinitiveMap= is first-wins and order-sensitive, so
+  moving view-requests into the per-node visit before phase 4 would change DVR
+  resolution. Conclusion: do phase 4 (Tentative/Final model + node
+  limit) FIRST, in the existing pass structure, then phase 2 (BFS conversion),
+  which the Finalizable map makes order-safe. I.e. swap the 2<->4 order.
+  (Today's driver keeps content-expansion as a DFS-preorder pass and
+  view-requests/col-reconciles as later passes precisely to sidestep the order
+  problem; doing 4 first is what lets phase 2 merge them safely.)

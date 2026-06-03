@@ -6,7 +6,7 @@ use crate::to_org::complete::sharing::{ maybe_add_hiddenInSubscribeeCol_branch, 
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::backpath::{ build_and_integrate_containerward_view_then_drop_request_with_source_set, build_and_integrate_sourceward_view_then_drop_request_with_source_set};
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
-use crate::to_org::util::{ DefinitiveMap, build_node_branch_minus_content_with_source_set, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
+use crate::to_org::util::{ DefinitiveMap, Finalizable, build_node_branch_minus_content_with_source_set, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, IndefOrDef, ParentIs, mk_phantom_viewnode };
@@ -89,12 +89,21 @@ async fn execute_definitive_view_request (
   let hidden_ids : HashSet < ID > =
     // If node is a subscribee, we may need to hide some content.
     get_hidden_ids_if_subscribee ( viewforest, node_id, config ) ?;
-  if let Some (&preexisting_node_id) =
-    visited . get (& node_pid)
-  { if preexisting_node_id != node_id {
-    indefinitize_content_subtree ( viewforest,
-                                   preexisting_node_id,
-                                   visited, config ) ?; }}
+  if let Some (&prior) = visited . get (& node_pid) {
+    if prior . is_final () && prior . node_id () != node_id {
+      // §5.2: an existing Final occurrence wins; discard this DVR and
+      // leave the node indefinitive. (Dormant until the §5.3 cascade
+      // can produce a second DVR for one ID; validation forbids two
+      // user DVRs per ID.)
+      write_at_truenode_in_tree (
+        viewforest, node_id,
+        |t| { t . view_requests . remove (& ViewRequest::Definitive); } )
+        . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+      return Ok (( )); }
+    if prior . node_id () != node_id {
+      indefinitize_content_subtree ( viewforest,
+                                     prior . node_id (),
+                                     visited, config ) ?; }}
   { // Remove request, mark definitive, replace title/body, add to visited.
     write_at_truenode_in_tree (
       viewforest, node_id, |t| {
@@ -109,7 +118,8 @@ async fn execute_definitive_view_request (
           viewforest, node_id, config ) ?; }
       else { from_disk_replace_title_body_and_nodecomplete (
                viewforest, node_id, config ) ?; }
-    visited . insert ( node_pid . clone(), node_id ); }
+    // A DVR target is Final (§5.2): later DVRs for this ID defer to it.
+    visited . insert ( node_pid . clone(), Finalizable::Final (node_id) ); }
   if is_removed_node {
     extendDefinitiveSubtree_fromGit (
       viewforest, node_id, config . initial_node_limit,
@@ -360,7 +370,8 @@ async fn extendDefinitiveSubtree_fromGit (
       tree . get_mut (effective_root) . ok_or (
         "Parent not found" ) ?;
     parent_mut . append (child_viewnode);
-    visited . insert ( child_id . clone(), effective_root ); }
+    visited . insert ( child_id . clone(),
+                       Finalizable::Tentative (effective_root) ); }
   Ok (( )) }
 
 /// Derive child-membership-removal axes from parent-existence-removal
