@@ -27,14 +27,14 @@ So far there are these endpoints:
   - Phase 2, enrichment: A three-message sequence:
     1. Rust sends LP response-type "request-snapshot" with `(("content" "TERMS"))` — asking Emacs for a snapshot of the search buffer matching those terms.
     2. Emacs replies with `((request . "snapshot response") (terms . "TERMS"))\n` followed by `Content-Length: N\r\n\r\n<buffer text>` — the current buffer contents, including any unsaved user edits. Emacs sets the buffer to readonly before sending.
-    3. Rust parses the snapshot, inserts containerward ancestry and graphnodestats, and sends LP response-type "search-enrichment" with `(("terms" "TERMS") ("content" "ORG"))`. Emacs replaces the buffer and exits readonly.
+    3. Rust parses the snapshot, inserts containerward ancestry and graphnodestats, and sends LP response-type "search-enrichment" with `(("terms" "TERMS") ("content" "ORG") ("warnings" (...)))`. Emacs replaces the buffer and exits readonly.
     - Enrichment uses the same active source-set as the original
       search. Containerward ancestry truncates before inactive
       containers.
 
 ## Single root content tree view from ID
   - Request: ((request . "single root content view") (id . "NODE_ID") (view-uri . "URI"))
-  - Response: length-prefixed content, formatted `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` constitutes `LENGTH` bytes. PAYLOAD may contain quotation marks; hence the length prefix. The document structure is detailed below, under `Single root content tree view`.
+  - Response: length-prefixed content, formatted `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` constitutes `LENGTH` bytes. PAYLOAD may contain quotation marks; hence the length prefix. The payload shape is `((content "...") (errors ("..." ...)) (warnings ("..." ...)))`. The document structure is detailed below, under `Single root content tree view`.
   - If `NODE_ID` resolves to an inactive source, the server refuses the
     request with a human-readable message and does not open a buffer.
     Following a link to an inactive-source node behaves the same way.
@@ -51,14 +51,14 @@ So far there are these endpoints:
        `Content-Length: N\r\n\r\n((response-type collateral-view) (view-uri "URI") (content "..."))`
        Emacs unlocks and updates each buffer as it arrives.
     3. Final save response:
-       `Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (point-lines-below-focused-headline N) (point-screen-lines-below-window-start M))`
-       `content` is the re-rendered saved buffer (nil on failure). `errors` is a list of error/warning strings (empty list if none).
+       `Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-screen-lines-below-window-start M))`
+       `content` is the re-rendered saved buffer (nil on failure). `errors` is a list of failure-explaining strings. `warnings` is a list of nonfatal messages. Both lists are present and empty if none.
   - If the server errors before sending the early lock message (e.g. malformed request), only one message is sent: the error response in the save-result format.
 
 ## Snapshot response (part of search enrichment; see "Text search" above)
   - Request: First `((request . "snapshot response") (terms . "TERMS"))\n`, then `Content-Length: N\r\n\r\n<buffer text>`.
   - Initiated by the client in response to a "request-snapshot" message from the server.
-  - Response: LP response-type "search-enrichment" with enriched buffer content.
+  - Response: LP response-type "search-enrichment" with enriched buffer content and an explicit `warnings` list.
 
 ## Get file path
   - Request: ((request . "get file path") (id . "THE_ID") (source . "THE_SOURCE"))
@@ -88,7 +88,7 @@ So far there are these endpoints:
     - `include-staged=true`, `include-unstaged=false`: compare HEAD to index.
     - `include-staged=false`, `include-unstaged=true`: compare index to worktree.
     - Both false is rejected.
-  - Response: LP response-type "diff-analysis" with `((content "ORG") (errors ("..." ...)))`.
+  - Response: LP response-type "diff-analysis" with `((content "ORG") (errors ("..." ...)) (warnings ("..." ...)))`.
   - Behavior: Builds a semantic org report of affected nodes across all sources,
     including scalar node fields, aliases, extra IDs, all five schema relations
     in both role directions, text diffs for title/body, duplicate IDs across
@@ -116,7 +116,7 @@ So far there are these endpoints:
        `Content-Length: N\r\n\r\n((response-type rerender-view) (view-uri "URI") (content "..."))`
        Emacs unlocks and updates each buffer as it arrives.
     3. Done message:
-       `Content-Length: N\r\n\r\n((response-type rerender-done) (errors ("..." ...)))`
+       `Content-Length: N\r\n\r\n((response-type rerender-done) (errors ("..." ...)) (warnings ("..." ...)))`
        Emacs removes the rerender-view handler and unlocks any remaining buffers.
   - Behavior: Re-renders every open view from server memory,
     applying diff annotations if diff mode is enabled.
@@ -191,6 +191,21 @@ if and only if it adheres to the following:
   - Whitespace separates all elements.
   - Extra whitespace is ignored.
   - Keys and values should contain no whitespace.
+
+Inside a `(node ...)` form, `(parentIs ...)` describes whether the
+node participates in the collection represented by its visible parent:
+
+- omitted `parentIs` means `affected`;
+- `(parentIs affected)` is accepted but normally omitted when rendered;
+- `(parentIs independent)` means the node is preserved/displayed but
+  does not alter the parent's collection on save;
+- `(parentIs absent)` is rendered for view roots.
+
+`(birth ...)` records generated-view provenance, not save intent:
+
+- omitted `birth` means `unremarkable`;
+- `(birth containsParent)` marks containerward ancestry;
+- `(birth linksToParent)` marks sourceward link-source ancestry.
 
 # skgconfig.toml
 
@@ -294,11 +309,18 @@ and right before another whitespace and the node's title.
 The metadata grammar (which keys are recognized and how they're
 parsed) lives in `server/serve/parse_metadata_sexp.rs`. The
 in-memory types those keys correspond to are in
-`server/types/viewnode.rs` (`TrueNode`, `Scaffold`, `ScaffoldKind`)
+`server/types/viewnode.rs` (`TrueNode`, `Scaffold`, `ScaffoldKind`, `RoleCol`)
 and `server/types/git.rs` (`ExistenceAxes`, `MembershipAxes`, `Sign`).
 
 Metadata is not WYSIWYG; its appearance in the client
 is determined by `elisp/heralds-minor-mode`.
+
+Role collection scaffolds are represented in Rust as
+`Scaffold::RoleCol { roleCol: RoleCol }`, but their external metadata
+remains the established bare scaffold atom:
+`subscribeeCol`, `subscriberCol`, `overriddenCol`, `overriderCol`,
+`hiderCol`, `hiddenCol`, `hiddenInSubscribeeCol`, or
+`hiddenOutsideOfSubscribeeCol`.
 
 ## Diff-related metadata
 

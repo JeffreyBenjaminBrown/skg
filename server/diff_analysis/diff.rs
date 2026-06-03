@@ -313,7 +313,7 @@ fn is_backward_relationship_role (
 ) -> bool {
   matches! (
     role,
-    "container" | "subscribee" | "hidden" | "replaced" | "dest" )
+    "container" | "subscribee" | "hidden" | "overridden" | "dest" )
 }
 
 fn contained_list_diff_for_pid (
@@ -495,11 +495,11 @@ impl GraphFacts {
           continue; }
         facts . add_edge ("hider", &node . pid, hidden);
         facts . add_edge ("hidden", hidden, &node . pid); }
-      for replaced in node . overrides_view_of . or_default () {
-        if ambiguous_pids . contains (replaced) {
+      for overridden in node . overrides_view_of . or_default () {
+        if ambiguous_pids . contains (overridden) {
           continue; }
-        facts . add_edge ("replacement", &node . pid, replaced);
-        facts . add_edge ("replaced", replaced, &node . pid); }
+        facts . add_edge ("overrider", &node . pid, overridden);
+        facts . add_edge ("overridden", overridden, &node . pid); }
       for textlink in textlinks_from_node (node) {
         if ambiguous_pids . contains (&textlink . id) {
           continue; }
@@ -565,13 +565,13 @@ impl GraphFacts {
           facts . add_edge ("hider", &node . pid, hidden); }
         if tracked_pids . contains (hidden) {
           facts . add_edge ("hidden", hidden, &node . pid); }}
-      for replaced in node . overrides_view_of . or_default () {
-        if ambiguous_pids . contains (replaced) {
+      for overridden in node . overrides_view_of . or_default () {
+        if ambiguous_pids . contains (overridden) {
           continue; }
         if track_outbound {
-          facts . add_edge ("replacement", &node . pid, replaced); }
-        if tracked_pids . contains (replaced) {
-          facts . add_edge ("replaced", replaced, &node . pid); }}
+          facts . add_edge ("overrider", &node . pid, overridden); }
+        if tracked_pids . contains (overridden) {
+          facts . add_edge ("overridden", overridden, &node . pid); }}
       for textlink in textlinks_from_node (node) {
         if ambiguous_pids . contains (&textlink . id) {
           continue; }
@@ -602,8 +602,8 @@ const ROLE_NAMES : &[&str] = &[
   "subscribee",
   "hider",
   "hidden",
-  "replacement",
-  "replaced",
+  "overrider",
+  "overridden",
   "source",
   "dest",
 ];

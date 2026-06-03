@@ -21,7 +21,8 @@ use std::net::TcpStream; // handles two-way communication
 /// Gets a node id from the request,
 /// generates an org view of that id's content (recursively),
 /// and sends the response to Emacs (length-prefixed).
-/// Response format: ((content "...") (errors ("error1" "error2" ...)))
+/// Response format:
+/// ((content "...") (errors ("error1" ...)) (warnings ("warning1" ...)))
 /// If the requested ID is already a root of an open view,
 /// returns ((switch-to-view "VIEW_URI")) instead of rendering.
 pub fn handle_single_root_view_request (
@@ -45,7 +46,8 @@ pub fn handle_single_root_view_request (
               &vec! [format! (
                 "Node {} is not in active source-set {}",
                 node_id,
-                active_source_set . name )] );
+                active_source_set . name )],
+              &[] );
           send_response_with_length_prefix (
             stream,
             & tag_sexp_response (
@@ -56,7 +58,8 @@ pub fn handle_single_root_view_request (
             format_buffer_response_sexp (
               &String::new (),
               &vec! [format! (
-                "Error checking source-set visibility: {}", e )] );
+                "Error checking source-set visibility: {}", e )],
+              &[] );
           send_response_with_length_prefix (
             stream,
             & tag_sexp_response (
@@ -95,22 +98,25 @@ pub fn handle_single_root_view_request (
                     view_uri . clone (),
                     viewforest,
                     &pids ); }
-                let errors : Vec<String> =
+                let warnings : Vec<String> =
                   take_pending_audit_warning ()
                     . map ( |w| vec! [w] )
                     . unwrap_or_default ();
                 format_buffer_response_sexp (
                   & buffer_content,
-                  & errors ) },
+                  &[],
+                  & warnings ) },
               Err (e) => { // If we fail to generate the view, ship the generation error (and any pending audit warning) in the errors vec, with empty content so the client skips opening a main buffer.
                 let mut errors : Vec<String> = Vec::new ();
+                let mut warnings : Vec<String> = Vec::new ();
                 if let Some (w) = take_pending_audit_warning ()
-                { errors . push (w); }
+                { warnings . push (w); }
                 errors . push ( format! (
                   "Error generating document: {}", e ));
                 format_buffer_response_sexp (
                   & String::new (),
-                  & errors ) }} } ) };
+                  & errors,
+                  & warnings ) }} } ) };
       send_response_with_length_prefix (
         stream,
         & tag_sexp_response (

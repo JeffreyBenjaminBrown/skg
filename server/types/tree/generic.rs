@@ -1,10 +1,10 @@
 use crate::types::misc::{ID, SourceName};
-use crate::types::viewnode::{Scaffold, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{ViewNode, ViewNodeKind};
 
 use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
 use std::error::Error;
 
-/// ERRORS if the ancestor is not found or is not a TrueNode.
+/// ERRORS if the ancestor is not found or cannot provide both PID and source.
 pub fn pid_and_source_from_ancestor (
   tree       : &Tree<ViewNode>,
   node       : NodeId,
@@ -14,10 +14,14 @@ pub fn pid_and_source_from_ancestor (
   read_at_ancestor_in_tree(
     tree, node, generation,
     |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::True (t) =>
-        Ok(( t . id . clone(), t . source . clone() )),
+      ViewNodeKind::Vognode (v) =>
+        v . pid_and_source ()
+        . map ( |(pid, source)| (pid . clone (), source . clone ()) )
+        . ok_or_else (|| format!(
+          "{}: ancestor {} has no source",
+          caller, generation )),
       _ => Err( format!(
-        "{}: ancestor {} is not a TrueNode",
+        "{}: ancestor {} cannot provide PID and source",
         caller, generation )) } )
   . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
   . map_err( |e| -> Box<dyn Error> { e . into() } ) }
@@ -40,15 +44,15 @@ where F: FnOnce (&T) -> R, {
       . ok_or ("cannot climb that many generations")?; }
   Ok(f(node_ref . value() )) }
 
-/// Find the unique child that matches `scaffold_kind`.
+/// Find the unique child that matches `target_kind`.
 pub fn unique_scaffold_child<T, F> (
   tree          : &Tree<T>,
   node_id       : NodeId,
-  scaffold_kind : &Scaffold,
-  scaffold_from_node : F,
+  target_kind   : &ViewNodeKind,
+  kind_from_node : F,
 ) -> Result<Option<NodeId>, String>
 where
-  F : for<'a> Fn (&'a T) -> Option<&'a Scaffold>,
+  F : for<'a> Fn (&'a T) -> Option<&'a ViewNodeKind>,
 {
   let node_ref : NodeRef<T> =
     tree . get (node_id) . ok_or (
@@ -56,8 +60,8 @@ where
   let matches : Vec<NodeId> =
     node_ref . children()
     . filter (|child|
-      scaffold_from_node (child . value())
-      . map (|scaffold| scaffold . matches_kind (scaffold_kind))
+      kind_from_node (child . value())
+      . map (|kind| kind == target_kind)
       . unwrap_or (false))
     . map (|child| child . id())
     . collect();
@@ -66,7 +70,7 @@ where
     1 => Ok (Some (matches[0])),
     n => Err (format!(
       "Expected at most one {:?} child, found {}",
-      scaffold_kind, n)),
+      target_kind, n)),
   }}
 
 /// Write to an ancestor of a node in a tree, applying a mutating function to it.

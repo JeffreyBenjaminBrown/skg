@@ -33,6 +33,7 @@ pub enum BufferValidationError {
                                    SourceName), // buffer source
   CannotMoveAndMergeSimultaneously (ID),
   SourceNotInConfig              (ID, SourceName),
+  OverrideInvariantViolation     (String),
   DefinitiveRequestOnDefinitiveNode      (ID), // A definitive view request on a node that is already definitive
   DefinitiveRequestOnNodeWithContentChildren (ID), // A definitive view request on a node that has content (parentIs=Container) children. Non-content children (e.g. containerward ancestry stubs) don't trigger this.
   MultipleDefinitiveRequestsForSameId    (ID), // Multiple definitive view requests for the same ID
@@ -91,6 +92,8 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Cannot move and merge node {:?} in the same save", id),
       BufferValidationError::SourceNotInConfig(id, source) =>
         write!(f, "Node {:?} references source '{}' which does not exist in config", id, source),
+      BufferValidationError::OverrideInvariantViolation(msg) =>
+        write!(f, "{}", msg),
       BufferValidationError::DefinitiveRequestOnDefinitiveNode (id) =>
         write!(f, "Definitive view request on a node that is already definitive (ID {:?}). The node already shows its content; no expansion needed.", id),
       BufferValidationError::DefinitiveRequestOnNodeWithContentChildren (id) =>

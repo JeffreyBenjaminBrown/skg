@@ -1,7 +1,8 @@
 // Tests for to_org util functions
 
 use skg::to_org::util::get_id_from_treenode;
-use skg::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, TrueNode, default_truenode};
+use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode, TrueNode, default_truenode};
+use skg::types::viewnode::QualCol;
 use skg::types::misc::{ID, SourceName};
 use ego_tree::{NodeId,Tree};
 
@@ -18,7 +19,7 @@ fn test_get_id_from_treenode_with_id() {
     ViewNode { focused     : false,
               folded      : false,
               body_folded : false,
-              kind        : ViewNodeKind::True (t) };
+              kind        : ViewNodeKind::Vognode (Vognode::Normal (t)) };
   let tree : Tree<ViewNode> = Tree::new (viewnode);
   let root_id : NodeId = tree . root() . id();
   let result : Result<ID, Box<dyn std::error::Error>> =
@@ -36,13 +37,14 @@ fn test_get_id_from_treenode_scaffold() {
       focused     : false,
       folded       : false,
       body_folded : false,
-      kind        : ViewNodeKind::Scaff (Scaffold::AliasCol),
-    };
+      kind        : ViewNodeKind::QualCol (
+        QualCol::Alias) };
   let tree : Tree<ViewNode> = Tree::new (viewnode);
   let root_id : NodeId = tree . root() . id();
   let result :
     Result<ID, Box<dyn std::error::Error>> =
     get_id_from_treenode(&tree, root_id);
-  assert!(result . is_err(), "Should fail for Scaffold node");
-  assert!(result . unwrap_err() . to_string() . contains ("Scaffold"));
+  assert!(result . is_err(), "Should fail for non-vognode node");
+  assert!(result . unwrap_err() . to_string()
+          . contains ("caller must pass a vognode"));
 }

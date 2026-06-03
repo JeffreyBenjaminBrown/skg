@@ -1,50 +1,43 @@
-//! 'SharingScaffoldKind': a discriminator for the three sharing-scaffold
-//! completion paths.
+//! RoleCol metadata used by sharing-scaffold completion paths.
 //!
 //! The three rerender-time completers — for SubscribeeCol,
 //! HiddenInSubscribeeCol, and HiddenOutsideOfSubscribeeCol — share
 //! enough structure (build child data, reconcile against a goal
 //! list) that several pieces of per-kind metadata are worth
-//! capturing as an enum: the caller-label string used in panic
-//! messages, the corresponding 'Scaffold' variant, the number of
+//! capturing as methods: the caller-label string used in panic
+//! messages, the corresponding PartnerCol variant, the number of
 //! ancestor links to the subscriber, and a self-type guard.
 
 use crate::types::tree::generic::error_unless_node_satisfies;
-use crate::types::viewnode::{Scaffold, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{RoleCol, ViewNode, ViewNodeKind};
+use crate::dbs::in_rust_graph::relation_accessors::{
+  BinaryRolePosition,
+  NodeRelation,
+  RelationRole,
+};
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SharingScaffoldKind {
-  SubscribeeCol,
-  HiddenInSubscribeeCol,
-  HiddenOutsideOfSubscribeeCol,
-}
-
-impl SharingScaffoldKind {
+impl RoleCol {
   /// Stable label used in panic messages from
   /// 'reconcile_sharing_scaffold_children' and similar helpers.
   /// Mirrors the function name of the corresponding completer so a
   /// crash gives the reader an immediately greppable hit.
   pub fn caller_label (self) -> &'static str {
     match self {
-      Self::SubscribeeCol =>
+      RoleCol::Subscribee =>
         "reconcile_subscribee_col_children",
-      Self::HiddenInSubscribeeCol =>
+      RoleCol::Subscriber
+        | RoleCol::Overridden
+        | RoleCol::Overrider
+        | RoleCol::Hider
+        | RoleCol::Hidden =>
+        "reconcile_relation_col_children",
+      RoleCol::HiddenInSubscribee =>
         "reconcile_hiddenin_subscribee_col_children",
-      Self::HiddenOutsideOfSubscribeeCol =>
+      RoleCol::HiddenOutsideOfSubscribee =>
         "reconcile_hiddenoutside_subscribee_col_children", } }
-
-  /// The 'Scaffold' variant a node of this kind carries.
-  pub fn scaffold (self) -> Scaffold {
-    match self {
-      Self::SubscribeeCol =>
-        Scaffold::SubscribeeCol,
-      Self::HiddenInSubscribeeCol =>
-        Scaffold::HiddenInSubscribeeCol,
-      Self::HiddenOutsideOfSubscribeeCol =>
-        Scaffold::HiddenOutsideOfSubscribeeCol, } }
 
   /// How many ancestor links *should* separate this scaffold
   /// from the subscriber TrueNode.
@@ -57,11 +50,41 @@ impl SharingScaffoldKind {
   ///          └─ HiddenOutsideOfSubscribeeCol   ← distance 2
   pub fn correct_subscriber_ancestor_distance (self) -> usize {
     match self {
-      Self::SubscribeeCol                => 1,
-      Self::HiddenInSubscribeeCol        => 3,
-      Self::HiddenOutsideOfSubscribeeCol => 2, } }
+      RoleCol::Subscribee
+        | RoleCol::Subscriber
+        | RoleCol::Overridden
+        | RoleCol::Overrider
+        | RoleCol::Hider
+        | RoleCol::Hidden => 1,
+      RoleCol::HiddenInSubscribee => 3,
+      RoleCol::HiddenOutsideOfSubscribee => 2, } }
 
-  /// Error if 'node' is not a 'Scaff' of this kind.
+  pub fn relation_member_role (self) -> Option<RelationRole> {
+    match self {
+      RoleCol::Subscribee =>
+        Some (RelationRole::new (
+          NodeRelation::Subscribes, BinaryRolePosition::Second)),
+      RoleCol::Subscriber =>
+        Some (RelationRole::new (
+          NodeRelation::Subscribes, BinaryRolePosition::First)),
+      RoleCol::Overridden =>
+        Some (RelationRole::new (
+          NodeRelation::OverridesViewOf, BinaryRolePosition::Second)),
+      RoleCol::Overrider =>
+        Some (RelationRole::new (
+          NodeRelation::OverridesViewOf, BinaryRolePosition::First)),
+      RoleCol::Hider =>
+        Some (RelationRole::new (
+          NodeRelation::HidesFromItsSubscriptions, BinaryRolePosition::First)),
+      RoleCol::Hidden =>
+        Some (RelationRole::new (
+          NodeRelation::HidesFromItsSubscriptions, BinaryRolePosition::Second)),
+      RoleCol::HiddenInSubscribee |
+      RoleCol::HiddenOutsideOfSubscribee =>
+        None,
+    } }
+
+  /// Error if 'node' is not a PartnerCol of this kind.
   /// Wraps 'error_unless_node_satisfies' with
   /// - a Box<dyn Error> result
   /// - a per-kind error string of the form
@@ -71,15 +94,14 @@ impl SharingScaffoldKind {
     tree : &Tree<ViewNode>,
     node : NodeId,
   ) -> Result<(), Box<dyn Error>> {
-    let scaffold : Scaffold = self . scaffold ();
     error_unless_node_satisfies (
       tree, node,
       |vn : &ViewNode| matches! (
         &vn . kind,
-        ViewNodeKind::Scaff (s) if *s == scaffold ),
+        ViewNodeKind::PartnerCol (roleCol) if *roleCol == self ),
       &format! ( "{}: expected {:?}",
                  self . caller_label (),
-                 scaffold ),
+                 self ),
     ) . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
     Ok (( )) }
 }

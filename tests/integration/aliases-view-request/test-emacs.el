@@ -10,8 +10,22 @@
   "* (skg (node (id test-node))) Test Node
 ")
 
-(defun strip-metadata-and-bodies (text)
-  "Return TEXT with metadata and body content removed for comparison."
+(defun skg-aliases--trim-left (text)
+  (replace-regexp-in-string "\\`[ \t\n\r]+" "" text))
+
+(defun skg-aliases--metadata-kind (metadata)
+  "Return the kind symbol name from an SKG METADATA sexp string."
+  (let* ((sexp (car (read-from-string metadata)))
+         (payload (cadr sexp)))
+    (symbol-name
+     (if (consp payload)
+         (car payload)
+       payload))))
+
+(defun strip-metadata-details-and-bodies (text)
+  "Return TEXT with metadata details and body content removed.
+The SKG metadata kind is retained, so collection scaffolds remain
+visible in expected strings."
   (with-temp-buffer
     (insert text)
     (goto-char (point-min))
@@ -20,11 +34,19 @@
         (let ((line (buffer-substring-no-properties
                      (line-beginning-position)
                      (line-end-position))))
-          (when (string-match "^\\(\\*+\\) \\((skg .*)\\) \\(.*\\)$" line)
-            (setq result (concat result (match-string 1 line)
-                                 " "
-                                 (match-string 3 line)
-                                 "\n"))))
+          (when (string-match "^\\(\\*+\\) \\(.*\\)$" line)
+            (let* ((stars (match-string 1 line))
+                   (after-stars (match-string 2 line)))
+              (when (string-prefix-p "(skg " after-stars)
+                (let* ((read-result (read-from-string after-stars))
+                       (metadata (substring after-stars 0 (cdr read-result)))
+                       (title (skg-aliases--trim-left
+                               (substring after-stars (cdr read-result))))
+                       (kind (skg-aliases--metadata-kind metadata)))
+                  (setq result (concat result stars " " kind)
+                        result (if (string= title "")
+                                   (concat result "\n")
+                                 (concat result " " title "\n"))))))))
         (forward-line 1))
       result)))
 
@@ -53,7 +75,7 @@ LINE-NUMBER is zero-based."
 (defun skg-aliases--verify-view (line-number expected-full expected-stripped)
   "Run request at LINE-NUMBER and assert resulting text/stripped strings."
   (let* ((buffer-content (skg-aliases--request-on-line line-number))
-         (stripped (strip-metadata-and-bodies buffer-content)))
+         (stripped (strip-metadata-details-and-bodies buffer-content)))
     (message "Line %d buffer content: %s" line-number buffer-content)
     (unless (string= buffer-content expected-full)
       (message "✗ FAIL: Unexpected buffer content for line %d" line-number)
@@ -74,14 +96,14 @@ LINE-NUMBER is zero-based."
 
   (let ((expected-with-aliases
          (concat "* (skg (node (id test-node) (source main) (parentIs absent) (graphStats aliasing))) Test Node\n"
-                 "** (skg aliasCol) its aliases\n"
+                 "** (skg aliasCol)\n"
                  "*** (skg alias) first alias\n"
                  "*** (skg alias) second alias\n"))
         (expected-stripped
-         (concat "* Test Node\n"
-                 "** its aliases\n"
-                 "*** first alias\n"
-                 "*** second alias\n")))
+         (concat "* node Test Node\n"
+                 "** aliasCol\n"
+                 "*** alias first alias\n"
+                 "*** alias second alias\n")))
 
     (setq integration-test-phase "testing-line-0")
     (skg-aliases--verify-view 0 expected-with-aliases expected-stripped)

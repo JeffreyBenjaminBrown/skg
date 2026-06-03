@@ -3,7 +3,8 @@ use crate::from_text::viewnodes_to_instructions::classify::{
 use crate::from_text::viewnodes_to_instructions::to_naive_instructions::{
   collect_savenode_candidates, DefinenodeCandidate, DefinenodeCandidateKind };
 use crate::types::misc::ID;
-use crate::types::viewnode::{EditRequest, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{EditRequest, ParentIs, ViewNode, ViewNodeKind};
+use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeRef, Tree};
 
@@ -47,20 +48,27 @@ pub(crate) fn subscribee_hiderel_intents_from_candidates (
         "subscribee hiderel candidate not found")?;
     let subscribee : ID =
       match &node_ref . value() . viewnode . kind {
-        ViewNodeKind::True (t) => t . id . clone(),
+        ViewNodeKind::Vognode (Vognode::Normal (t))
+          => t . id . clone(),
         _ => return Err (
-          "subscribee-as-such candidate was not a TrueNode"
+          "subscribee-as-such candidate was not a Normal viewnode"
             . to_string()),
       };
     result . push (SubscribeeHiderelIntent {
       subscriber,
       subscribee,
       visible_content :
-        collect_direct_visible_content (&node_ref),
+        collect_visible_content (&node_ref),
     }); }
   Ok (result) }
 
-fn collect_direct_visible_content (
+/// Collect the children that the buffer presents as visible
+/// content of one subscribee-as-such.
+///
+/// This list is not saved as the subscribee's 'contains'.  It is a
+/// signal used to infer what the subscriber should hide or unhide for
+/// this subscription.
+fn collect_visible_content (
   node_ref : &NodeRef<ViewNode_in_Role>,
 ) -> Vec<ID> {
   let mut result : Vec<ID> = Vec::new();
@@ -68,12 +76,11 @@ fn collect_direct_visible_content (
     let child_ref : NodeRef<ViewNode_in_Role> = child_ref;
     let child : &ViewNode = &child_ref . value() . viewnode;
     match &child . kind {
-      ViewNodeKind::True (t) => {
+      ViewNodeKind::Vognode (Vognode::Normal (t)) => {
         if matches!(
              child_ref . value() . role,
              SaveRole::Ordinary)
-           && ! t . parent_ignores_it()
-           && ! t . is_phantom()
+           && ( t . parentIs == ParentIs::Affected )
            && ! matches!(
              t . edit_request(),
              Some (&EditRequest::Delete))

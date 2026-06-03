@@ -11,7 +11,7 @@
    - Deletes =c= from the graph (editRequest delete).
    - Removes =d= from =b='s children (but =d= stays in the graph).
    - Renames =e= to "e, edited".
-   - Appends =f= as a new child of =b=, with =d= under =f=.
+   - Appends =f= as a new child of =b=, with =d= as a child of =f=.
 3. Saves. Verifies =c= gone, structure correct.
 4. Toggles git diff mode ON.
    Verifies diff markers (removed, removed-here, new-here, textChanged)

@@ -1,18 +1,19 @@
 use crate::types::misc::ID;
-use crate::types::viewnode::{Scaffold, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol};
+use crate::types::viewnode::{Vognode, Qual};
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SaveRole {
-  BufferRoot,
   Ordinary,
   Subscribee { subscriber: ID },
+  Overridden { overrider: ID },
   HiddenInSubscribeeCol { subscriber: ID, subscribee: ID },
   HiddenOutsideOfSubscribeeCol { subscriber: ID },
   AliasDisplay,
   IdDisplay,
-  DisplayOnly,
+  NoSaveRole,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -86,20 +87,22 @@ fn saverole_for_node (
   node_ref : NodeRef<ViewNode>,
 ) -> Result<SaveRole, String> {
   match &node_ref . value() . kind {
-    ViewNodeKind::True (_) =>
+    ViewNodeKind::Vognode (Vognode::Normal (_)) =>
       classify_truenode (node_ref),
-    ViewNodeKind::Scaff (Scaffold::BufferRoot) =>
-      Ok (SaveRole::BufferRoot),
-    ViewNodeKind::Scaff (Scaffold::Alias { .. }) =>
+    ViewNodeKind::Qual (Qual::Alias { .. }) =>
       Ok (SaveRole::AliasDisplay),
-    ViewNodeKind::Scaff (Scaffold::ID { .. }) =>
+    ViewNodeKind::Qual (Qual::ID { .. }) =>
       Ok (SaveRole::IdDisplay),
-    ViewNodeKind::Scaff (_)
-      | ViewNodeKind::Inactive (_)
-      | ViewNodeKind::Deleted (_)
-      | ViewNodeKind::DeletedScaff (_)
-      | ViewNodeKind::Unknown (_)
-      => Ok (SaveRole::DisplayOnly), }}
+    ViewNodeKind::QualCol (_)
+      | ViewNodeKind::BufferRoot
+      | ViewNodeKind::DeadScaffold
+      | ViewNodeKind::PartnerCol (_) // involved in save, but no direct save role
+      | ViewNodeKind::Qual (Qual::TextChanged { .. })
+      | ViewNodeKind::Vognode (Vognode::Deleted (_))
+      | ViewNodeKind::Vognode (Vognode::Inactive (_))
+      | ViewNodeKind::Vognode (Vognode::Phantom (_))
+      | ViewNodeKind::Vognode (Vognode::Unknown (_))
+      => Ok (SaveRole::NoSaveRole), }}
 
 fn classify_truenode (
   node_ref : NodeRef<ViewNode>,
@@ -107,64 +110,70 @@ fn classify_truenode (
   let Some (parent_ref) = node_ref . parent()
     else { return Ok (SaveRole::Ordinary); };
   match &parent_ref . value() . kind {
-    ViewNodeKind::Scaff (Scaffold::SubscribeeCol) =>
-      Ok (SaveRole::Subscribee {
-        subscriber : truenode_id (
-          parent_ref . parent(),
-          "SubscribeeCol must have a TrueNode parent")?,
-      }),
-    ViewNodeKind::Scaff (Scaffold::HiddenInSubscribeeCol) => {
-      let subscribee_ref : NodeRef<ViewNode> =
-        parent_ref . parent() . ok_or (
-          "HiddenInSubscribeeCol must have a TrueNode parent")?;
-      let subscribee : ID =
-        truenode_id (
-          Some (subscribee_ref),
-          "HiddenInSubscribeeCol must have a TrueNode parent")?;
-      let subscribeecol_ref : NodeRef<ViewNode> =
-        subscribee_ref . parent() . ok_or (
-          "HiddenInSubscribeeCol subscribee must have a parent")?;
-      if ! matches!(
-        &subscribeecol_ref . value() . kind,
-        ViewNodeKind::Scaff (Scaffold::SubscribeeCol))
-      {
-        return Err (
-          "HiddenInSubscribeeCol subscribee must be under SubscribeeCol"
-            . to_string()); }
-      Ok (SaveRole::HiddenInSubscribeeCol {
-        subscriber : truenode_id (
-          subscribeecol_ref . parent(),
-          "SubscribeeCol must have a TrueNode parent")?,
-        subscribee,
-      }) },
-    ViewNodeKind::Scaff (Scaffold::HiddenOutsideOfSubscribeeCol) => {
-      let subscribeecol_ref : NodeRef<ViewNode> =
-        parent_ref . parent() . ok_or (
-          "HiddenOutsideOfSubscribeeCol must have a SubscribeeCol parent")?;
-      if ! matches!(
-        &subscribeecol_ref . value() . kind,
-        ViewNodeKind::Scaff (Scaffold::SubscribeeCol))
-      {
-        return Err (
-          "HiddenOutsideOfSubscribeeCol must have a SubscribeeCol parent"
-            . to_string()); }
-      Ok (SaveRole::HiddenOutsideOfSubscribeeCol {
-        subscriber : truenode_id (
-          subscribeecol_ref . parent(),
-          "SubscribeeCol must have a TrueNode parent")?,
-      }) },
-    _ => Ok (SaveRole::Ordinary),
-  }}
+    ViewNodeKind::PartnerCol (RoleCol::Subscribee) =>
+      if node_ref . value () . is_truenode_and_parentIs_affected () {
+        Ok (SaveRole::Subscribee {
+          subscriber : vognode_normal_id (
+            parent_ref . parent(),
+            "SubscribeeCol must have a TrueNode parent")?, } )
+      } else { Ok (SaveRole::NoSaveRole) },
+    ViewNodeKind::PartnerCol (RoleCol::Overridden) =>
+      if node_ref . value () . is_truenode_and_parentIs_affected () {
+        Ok (SaveRole::Overridden {
+          overrider : vognode_normal_id (
+            parent_ref . parent(),
+            "OverriddenCol must have a TrueNode parent")?, } )
+      } else { Ok (SaveRole::NoSaveRole) },
+    ViewNodeKind::PartnerCol (RoleCol::Subscriber)
+      | ViewNodeKind::PartnerCol (RoleCol::Overrider)
+      | ViewNodeKind::PartnerCol (RoleCol::Hider)
+      | ViewNodeKind::PartnerCol (RoleCol::Hidden)
+      => Ok (SaveRole::NoSaveRole),
+    ViewNodeKind::PartnerCol (RoleCol::HiddenInSubscribee)
+      => { let subscribee_ref : NodeRef<ViewNode> =
+             parent_ref . parent() . ok_or (
+             "HiddenInSubscribeeCol must have a TrueNode parent")?;
+           let subscribee : ID =
+             vognode_normal_id (
+               Some (subscribee_ref),
+               "HiddenInSubscribeeCol must have a TrueNode parent")?;
+           let subscribeecol_ref : NodeRef<ViewNode> =
+             subscribee_ref . parent() . ok_or (
+               "HiddenInSubscribeeCol subscribee must have a parent")?;
+           if ! matches!(
+             &subscribeecol_ref . value() . kind,
+             ViewNodeKind::PartnerCol (RoleCol::Subscribee) )
+             { return Err (
+                 "HiddenInSubscribeeCol subscribee must be a child of SubscribeeCol"
+                 . to_string()); }
+           Ok (SaveRole::HiddenInSubscribeeCol {
+             subscriber : vognode_normal_id (
+               subscribeecol_ref . parent(),
+               "SubscribeeCol must have a TrueNode parent")?,
+             subscribee } ) },
+    ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee)
+      => { let subscribeecol_ref : NodeRef<ViewNode> =
+             parent_ref . parent() . ok_or (
+               "HiddenOutsideOfSubscribeeCol must have a SubscribeeCol parent")?;
+          if ! matches!(
+            &subscribeecol_ref . value() . kind,
+            ViewNodeKind::PartnerCol (RoleCol::Subscribee))
+          { return Err (
+              "HiddenOutsideOfSubscribeeCol must have a SubscribeeCol parent"
+                . to_string()); }
+          Ok (SaveRole::HiddenOutsideOfSubscribeeCol {
+            subscriber : vognode_normal_id (
+              subscribeecol_ref . parent(),
+              "SubscribeeCol must have a TrueNode parent")? } ) },
+    _ => Ok (SaveRole::Ordinary) }}
 
-fn truenode_id (
+fn vognode_normal_id (
   node_ref : Option<NodeRef<ViewNode>>,
   error    : &str,
 ) -> Result<ID, String> {
   let node_ref : NodeRef<ViewNode> =
     node_ref . ok_or_else (|| error . to_string())?;
   match &node_ref . value() . kind {
-    ViewNodeKind::True (t) =>
-      Ok (t . id . clone()),
-    _ =>
-      Err (error . to_string()),
-  }}
+    ViewNodeKind::Vognode (Vognode::Normal (t))
+      => Ok (t . id . clone()),
+    _ => Err (error . to_string()), }}

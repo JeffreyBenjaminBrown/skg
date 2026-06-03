@@ -1,7 +1,7 @@
 ;;; Integration test for collateral buffer updates: title edit + add child
 ;;;
 ;;; Opens two buffers over a containment cycle (a contains b, b contains a).
-;;; From buffer B, edits a's title and adds a new child "c" under a (no
+;;; From buffer B, edits a's title and adds a new child "c" of a (no
 ;;; metadata — the server reads it as a TrueNode with a random UUID).
 ;;; Verifies that buffer B's save response reflects the changes (title,
 ;;; new node with UUID). Then checks collateral buffer A.
@@ -32,10 +32,10 @@
     (assert-headline-structure
      buf
      '((1 absent "a")
-       (2 content  "b")
-       (3 content  "a")
-       (2 container    "b")
-       (3 container    "a"))
+       (2 containsParent "b")
+       (3 containsParent "a")
+       (2 affected       "b")
+       (3 affected       "a"))
      "phase 1: buffer A initial")))
 
 (defun phase-2-open-buffer-b ()
@@ -51,14 +51,14 @@
     (assert-headline-structure
      buf
      '((1 absent "b")
-       (2 content  "a")
-       (3 content  "b")
-       (2 container    "a")
-       (3 container    "b"))
+       (2 containsParent "a")
+       (3 containsParent "b")
+       (2 affected       "a")
+       (3 affected       "b"))
      "phase 2: buffer B initial")))
 
 (defun phase-3-edit-and-save ()
-  "Edit a's title, add child c under a, and save buffer B."
+  "Edit a's title, add child c of a, and save buffer B."
   (message "=== PHASE 3: Edit a's title, add child c, save ===")
   (setq integration-test-phase "phase-3-edit-and-save")
   (let ((buf (get-buffer "*b*")))
@@ -66,10 +66,10 @@
     (assert-headline-titles
      buf
      '((1 absent "b")
-       (2 content  "a")
-       (3 content  "b")
-       (2 container    "a")
-       (3 container    "b"))
+       (2 containsParent "a")
+       (3 containsParent "b")
+       (2 affected       "a")
+       (3 affected       "b"))
      "phase 3: buffer B before edit")
     (with-current-buffer buf
       ;; Change a's title on line 4 (the definitive a):
@@ -87,11 +87,11 @@
     (assert-headline-titles
      buf
      '((1 absent "b")
-       (2 content  "a")
-       (3 content  "b")
-       (2 container    "Node a was given this longer title")
-       (3 container    "b")
-       (3 container    "c"))
+       (2 containsParent "a")
+       (3 containsParent "b")
+       (2 affected       "Node a was given this longer title")
+       (3 affected       "b")
+       (3 affected       "c"))
      "phase 3: buffer B after edit")
     (with-current-buffer buf
       (skg-request-save-buffer))
@@ -108,11 +108,11 @@
     (assert-headline-titles
      buf
      '((1 absent "b")
-       (2 content  "Node a was given this longer title")
-       (3 content  "b")
-       (2 container    "Node a was given this longer title")
-       (3 container    "b")
-       (3 container    "c"))
+       (2 containsParent "Node a was given this longer title")
+       (3 containsParent "b")
+       (2 affected       "Node a was given this longer title")
+       (3 affected       "b")
+       (3 affected       "c"))
      "phase 4: buffer B after save")
     (with-current-buffer buf ;; Verify the line for c has its title and an ID
       (goto-char (point-min))
@@ -151,11 +151,11 @@ and the new child c."
     (assert-headline-titles
      buf
      '((1 absent "Node a was given this longer title")
-       (2 content  "b")
-       (3 content  "Node a was given this longer title")
-       (2 container    "b")
-       (3 container    "Node a was given this longer title")
-       (2 container    "c"))
+       (2 containsParent "b")
+       (3 containsParent "Node a was given this longer title")
+       (2 affected       "b")
+       (3 affected       "Node a was given this longer title")
+       (2 affected       "c"))
      "phase 5: buffer A after collateral update")))
 
 (defun run-all-tests ()

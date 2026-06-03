@@ -1,0 +1,529 @@
+* progress
+** stage 7 : saving read-only RoleCols
+*** planned
+Wrote 'TODO/full-schema/7_saving-readonly-cols.org',
+a focused implementation plan for the metaplan item
+"Make read-only sets predictable under save and rerender".
+
+The plan distinguishes ordinary read-only RoleCols from the
+hidden-subscription RoleCols, because earlier review settled that
+stale generated members under HiddenIn/HiddenOutside should be
+discarded rather than preserved as independent branches.
+** stage 6 : relation accessors and generated collections
+*** planned
+Wrote 'TODO/full-schema/6_col-buckets-for-everything.org',
+a focused implementation plan for the metaplan item
+"Add relation accessors and generated collections".
+
+The plan separates:
+- in-Rust graph relation/role accessors,
+- metadata for relation collection scaffolds,
+- new Col scaffold parsing/rendering/validation,
+- 'parentIs=collector',
+- writable versus read-only collection save behavior.
+
+Revised the plan after review to:
+- use TypeDB's "relation" versus "relationship" terminology,
+- use "member" rather than "endpoint",
+- reuse the existing relation/role table instead of introducing a
+  separate relation-end abstraction.
+
+Revised the plan again to:
+- make collection scaffold headlines titleless on the server side and
+  uniformly explained by Emacs heralds,
+- restrict auto-add to de-novo view creation and optionally definitive
+  view expansion,
+- require save-triggered completion not to recreate relation
+  collection scaffolds deleted by the user.
+*** implemented
+Added a typed in-Rust relation accessor layer for the ordinary
+node-to-node relations:
+- 'contains',
+- 'textlinks_to',
+- 'subscribes',
+- 'hides_from_its_subscriptions',
+- 'overrides_view_of'.
+
+Added relation collection scaffolds for:
+- 'subscriberCol',
+- 'overriddenCol',
+- 'overriderCol',
+- 'hiderCol',
+- 'hiddenCol'.
+
+Added 'parentIs=collector' and wired parsing, serialization, graph
+stats, local validation, rendering, completion and save extraction to
+understand it as generated-collection membership rather than ordinary
+containment.
+
+Changed server-side collection scaffold headlines to be titleless.
+Updated Emacs heralds so collection metadata supplies the visible
+labels, including the new relation collections.
+
+Initial view construction now auto-adds relation collections under
+definitive TrueNodes when the corresponding relationship set is
+non-empty.  Save-triggered completion reconciles existing relation
+collections but does not recreate ones the user deleted.
+
+Save extraction now treats 'subscribeeCol' and 'overriddenCol' as the
+writable relation collections.  The new read-only relation collection
+children remain display-only and do not become ordinary save
+candidates.
+
+Documented and regression-tested the distinction between an absent
+writable relation collection and a present-but-empty collection:
+absence means no opinion, while an empty collection means the user
+explicitly wants the set to be empty.
+
+Review cleanup: made 'HiddenInSubscribeeCol' and
+'HiddenOutsideOfSubscribeeCol' use the same 'parentIs=collector'
+membership policy as the other generated collection scaffolds.
+Completion now discards stale children marked 'parentIs=collector' in those two
+read-only generated collections during reconciliation, and local
+validation requires their collection members to be TrueNodes marked
+'parentIs=collector'.  'HiddenCol' is a simpler relation collection,
+and follows the simple relation-collection reconciliation policy
+instead.
+
+Review cleanup: clarified language that called a collection member a
+"collector child".  Comments and local helper names now say that the
+child is marked 'parentIs=collector', so collection membership is not
+confused with the child itself being a collector.
+
+Review cleanup: changed 'RelationRole' so its role is represented by
+'BinaryRolePosition' rather than a raw TypeQL role-name string.  The
+TypeQL role names remain derived from the existing relation/role table,
+so role names still have a single source of truth.
+
+Test-runner cleanup: made 'bash/all-tests.sh' sequential and
+conservative rather than suite-parallel.  Its defaults now use two
+Cargo build jobs, one nextest job, one integration test at a time, and
+a low TypeDB operation fanout.  The TypeDB fanout is now runtime
+configurable via 'SKG_TYPEDB_CONCURRENT_TRANSACTIONS'.
+
+RoleCol refactor: replaced the eight standalone role-collection
+scaffold constructors with 'Scaffold::RoleCol { roleCol: RoleCol }'
+and collapsed 'ScaffoldKind' role collection cases the same way.
+The external org metadata strings remain unchanged, and
+'api-and-formats.md' now documents that split between internal Rust
+representation and buffer syntax.
+*** tested
+Focused checks passed:
+- 'cargo check'
+- 'cargo test --test dbs -- --nocapture'
+- 'cargo test --test new viewnodes_to_instructions -- --nocapture'
+- 'cargo test --test save -- --nocapture'
+- 'cargo test --test content_view -- --nocapture'
+- 'cargo test --test subscribee_col -- --nocapture'
+- 'cargo test --test hidden_from_subscriptions -- --nocapture'
+- 'cargo test --test git_diff_view -- --nocapture'
+- 'bash/emacs-tests.sh'
+
+Full suite passed:
+- 'bash/all-tests.sh --no-sound'
+** stage 1 : rename override relationship roles
+*** planned
+Wrote 'TODO/full-schema/1_rename-override-rels.org',
+a focused implementation plan for renaming 'overrides_view_of'
+roles from 'replacement' / 'replaced' to
+'overrider' / 'overridden' across schema, TypeDB queries,
+in-Rust inverse-map vocabulary, tests and docs.
+*** implemented
+Renamed the TypeDB roles for 'overrides_view_of' to
+'overrider' and 'overridden'.
+
+Updated the schema, TypeDB relationship helpers, TypeDB search
+helpers, graph-stats TypeQL, in-Rust inverse-map vocabulary,
+diff-analysis role labels, audit references, override-role tests,
+merge override queries, confusing merge fixture IDs, and the old
+overview doc sentence.
+
+The on-disk field remains 'overrides_view_of'.
+*** verified
+Focused checks passed:
+- 'cargo check'
+- 'cargo test --test typedb'
+- 'cargo test --test merge merge_nodes'
+- 'cargo test --test save none_overrides'
+
+Full suite passed:
+- 'bash/all-tests.sh'
+  - passed once after the role rename
+  - passed again after renaming the merge override fixture IDs
+** stage 2 : explicit warning channel
+*** planned
+Wrote 'TODO/full-schema/2_explicit-warning-channel.org',
+a focused implementation plan for separating protocol warnings from
+errors across structured server responses and Emacs handlers.
+
+The plan also includes the small documentation item from the same
+metaplan section: defining "read-only set" in 'glossary.md'.
+*** implemented
+Added an explicit 'warnings' field alongside 'errors' for the
+structured response shapes used by:
+- save-result
+- single-root content view
+- rerender-done
+- diff-analysis
+- search-enrichment
+
+Updated the shared Rust response-formatting helpers so buffer-like
+responses emit:
+#+begin_example
+((content "...") (errors (...)) (warnings (...)))
+#+end_example
+
+Updated rerender-done formatting to emit:
+#+begin_example
+((errors (...)) (warnings (...)))
+#+end_example
+
+Moved existing nonfatal audit messages out of the save/content-view
+error path and into the warning path.  Existing fatal validation and
+generation failures still travel as errors.
+
+Updated the Emacs handlers to parse 'errors' and 'warnings'
+separately and to show both, when present, in a single org buffer with
+top-level 'errors' and 'warnings' headings.
+
+Updated 'api-and-formats.md' for the new protocol shape and added the
+"read-only set" definition to 'glossary.md'.
+*** tested
+Focused checks passed:
+- 'cargo check'
+- 'cargo test serve::util --lib'
+- 'bash/emacs-tests.sh'
+
+Full suite passed:
+- 'bash/all-tests.sh --no-sound'
+** stage 3 : TypeDB knows source ownership
+*** planned
+Wrote 'TODO/full-schema/3_typedb-knows-ownership.org',
+a focused implementation plan for representing configured source
+ownership in TypeDB.
+
+The first draft kept the existing node 'source' attribute for
+compatibility, but that was rejected as insufficiently clean.
+Rewrote the plan so TypeDB sources are first-class entities and nodes
+belong to sources only through a 'has_source' relationship.
+
+The plan now includes the wider TypeDB query migration, source-move
+updates, direct test-helper setup changes, config-change rebuild
+guard, and tests proving that TypeDB nodes no longer own the old
+string 'source' attribute.
+*** implemented
+Changed the TypeDB schema so configured sources are first-class
+'source' entities with:
+- 'source_name',
+- 'user_owns_it'.
+
+Removed the node-owned TypeDB string 'source' attribute.  Nodes now
+belong to sources through 'has_source', with the node role constrained
+to exactly one source:
+#+begin_example
+plays has_source:node @card(1)
+#+end_example
+
+Added TypeDB source helpers for creating source entities, replacing a
+node's source relation, querying node source names and ownership, and
+counting node-source relations for tests.
+
+Updated TypeDB initialization and direct test setup paths to create
+source entities before creating nodes.  Node insertion now creates the
+node and its 'has_source' relation in the same transaction.
+
+Rewrote 'pid_and_source_from_id' to recover source names through
+'has_source'.  Source moves now update the 'has_source' relation
+instead of a node attribute.
+
+Updated the TypeDB/in-Rust graph audit to compare source membership
+through 'has_source'.
+
+Added the startup incremental-init guard for config changes: a running
+server does not poll 'skgconfig.toml', but on restart a config mtime
+newer than '.skg_init_marker' prevents incremental init.
+
+Collapsed the source-move TypeDB helper surface back to one public
+function, 'update_node_source'.  The implementation still updates the
+'has_source' relation, but the temporary
+'replace_node_source_relation' name is gone.
+*** tested
+Focused checks passed:
+- 'cargo check'
+- 'cargo test --test typedb -- --nocapture'
+- 'cargo test --test move_source -- --nocapture'
+- 'cargo nextest run --test collateral_source_move'
+- 'cargo test --test multi_source_errors -- --nocapture'
+- 'cargo test --test subscribee_col -- --nocapture'
+- 'cargo test --test hidden_from_subscriptions -- --nocapture'
+- 'cargo test --test source_sets -- --nocapture'
+
+Full suite passed:
+- 'bash/all-tests.sh --no-sound'
+
+After the 'update_node_source' helper cleanup:
+- 'cargo check' passed
+- 'cargo test --test move_source -- --nocapture' compiled, but could
+  not run because TypeDB was not accepting TCP connections
+- after TypeDB was restarted,
+  'cargo test --test move_source -- --nocapture' passed
+** stage 4 : validate override invariants
+*** planned
+Wrote 'TODO/full-schema/4_validate-override-invariants.org',
+a focused implementation plan for rejecting ambiguous or recursive
+user-owned override states at rebuild/init and save time.
+
+The plan centers the stage on one shared graph-shaped validator,
+save-time post-apply simulation before persistence, full-graph
+startup validation even after incremental database updates, extra-ID
+resolution before comparison, and client-facing validation errors.
+*** implemented
+Added a shared override-invariant validator for the in-Rust graph.
+It rejects:
+- more than one user-owned overrider for the same resolved overridden
+  PID,
+- user-owned override chains of the form X overrides Y overrides Z
+  where X and Y are user-owned,
+- nodes whose source is absent from the loaded config.
+
+The validator resolves override targets through the graph's primary-ID
+mapping before checking collisions.
+
+Factored the in-Rust graph DefineNode application logic so the save
+path and validation simulation share one mutation semantics.
+
+Save-time validation now simulates the real post-save graph before any
+store is mutated.  The simulation applies the same delete-propagation
+cleanup as the save path, then applies merge DefineNodes, and returns
+a structured buffer validation error if override invariants would be
+violated.
+
+Full TypeDB rebuild/init now validates the full node set before
+populating TypeDB.  Incremental startup validates the full graph after
+the all-node read and before publishing the server environment.
+Manual database rebuild also validates before replacing stores.
+
+Separated graph construction from override-invariant validation in the
+init/rebuild paths.  Callers now build an 'InRustGraph' explicitly and
+then call 'error_unless_override_invariants_hold', so validate-only
+uses no longer look like they are depending on a returned graph.
+*** tested
+Passed:
+- 'cargo check'
+- 'cargo test override --lib -- --nocapture'
+- 'cargo test --lib -- --nocapture'
+- after moving override-invariant validator tests out of the module:
+  - 'cargo test --test dbs -- --nocapture'
+  - 'cargo test --lib -- --nocapture'
+- after moving save-time override-invariant tests out of 'server/save.rs':
+  - 'cargo test --test save override_invariants -- --nocapture'
+  - 'cargo test --lib -- --nocapture'
+
+'cargo fmt' could not be run because the local cargo installation has
+no 'fmt' subcommand.
+
+TypeDB-backed integration test binaries compiled, but the tests could
+not run because TypeDB was not accepting TCP connections:
+- 'cargo test --test save -- --nocapture'
+- 'cargo test --test merge -- --nocapture'
+- 'cargo test --test typedb -- --nocapture'
+** stage 5 : source mismatch representation
+*** planned
+Wrote 'TODO/full-schema/5_source-mismatch-representation.org',
+a focused implementation plan for replacing the audit's set-shaped
+source mismatch adapter with a scalar source mismatch representation.
+
+The plan keeps relationship role-player-set mismatches as sets, adds
+an explicit source mismatch variant, and updates audit formatting so
+source names are not represented as node IDs.
+*** implemented
+Replaced the audit's single set-shaped 'Mismatch' struct with a
+variant representation:
+- relationship mismatches keep relation, role and role-player ID sets,
+- source mismatches carry the node PID, the in-Rust source name, and
+  the TypeDB source name,
+- missing TypeDB nodes are represented as their own mismatch variant.
+
+Updated audit formatting and the ad-hoc audit probe so source
+mismatches are printed as node-level source facts rather than as
+'relation=has_source role=node' relationship-set mismatches.
+
+Updated scheduled-audit org output and audit-store recording to handle
+the new mismatch variants.  The audit store still uses six CSV fields,
+but recorded payloads are now strings, so source names are not forced
+through 'ID'.
+
+The first implementation briefly added an audit-specific TypeDB source
+cardinality helper, but that duplicated the TypeDB schema constraint
+that each node plays 'has_source:node' exactly once.  The implementation
+now uses the existing scalar source-name lookup and represents the
+TypeDB side of source mismatches as a concrete 'SourceName'.  If the
+node+source query returns no row, the audit records a distinct missing
+TypeDB node mismatch instead.
+
+*** tested
+Passed:
+- 'cargo check'
+- 'cargo test --test dbs -- --nocapture'
+- 'cargo test audit --lib -- --nocapture'
+- 'cargo test --lib -- --nocapture'
+- 'cargo test --test typedb -- --nocapture'
+- 'bash/all-tests.sh --no-sound'
+- after moving audit-store tests out of the module:
+  - 'cargo test --test dbs -- --nocapture'
+  - 'cargo test audit --lib -- --nocapture'
+- after simplifying missing-source audit states into a missing-TypeDB-node variant:
+  - 'cargo test --test dbs -- --nocapture'
+  - 'cargo test audit --lib -- --nocapture'
+  - 'cargo test --test typedb -- --nocapture'
+* problems discovered along the way, open
+* problems discovered along the way, solved
+** TypeDB-backed verification was blocked
+After stage 4 implementation, TypeDB-backed integration tests compiled
+but initially failed immediately with:
+#+begin_example
+tcp connect error: Connection refused (os error 111)
+#+end_example
+
+No 'typedb' process or listening TypeDB port was visible from the
+workspace when checked with 'pgrep' and 'ss'.
+
+*** resolution
+After TypeDB was available again, TypeDB-backed verification passed:
+- 'cargo test --test typedb -- --nocapture'
+- 'bash/all-tests.sh --no-sound'
+
+** focused TypeDB tests require a running TypeDB server
+After the 'update_node_source' helper cleanup, the source-move test
+binary compiled, but all tests initially failed immediately with:
+#+begin_example
+tcp connect error: Connection refused (os error 111)
+#+end_example
+
+*** resolution
+After TypeDB was restarted, the focused source-move test passed:
+- 'cargo test --test move_source -- --nocapture'
+
+** global string replacement would be unsafe
+The words "replacement" and "replaced" appear in many unrelated
+contexts, including buffer/string replacement and content-link
+replacement.  The implementation should classify matches before
+editing rather than applying a mechanical global rename.
+*** resolution
+Stage 1 was implemented with targeted edits only.
+Searches for old override role strings confirmed that remaining
+"replacement" / "replaced" language is unrelated to the
+'overrides_view_of' TypeDB roles.
+** fixture IDs may contain stale vocabulary
+Some test fixture IDs appear to include old words such as
+'overrides-view-of-1'.  These are IDs rather than role labels.
+The implementation plan leaves room to keep them if renaming would
+create noisy fixture churn.
+*** resolution
+Renamed the confusing merge fixture IDs:
+- '1-overrides-view-of' -> 'overridden-by-1'
+- 'overrides-view-of-1' -> 'overrider-of-1'
+
+The affected merge tests and the full test suite pass after the rename.
+** content-view handler syntax can be hard to audit after nested response changes
+While updating the single-root content-view handler, an unbalanced
+parenthesis was introduced in the nested condition-case / if / let*
+shape.  The Emacs test loader caught this immediately.
+*** resolution
+Rewrote the changed branch with explicit 'has-errors',
+'has-warnings', and 'has-content' locals, which made the nesting
+shallower and easier to read.
+
+'bash/emacs-tests.sh' passes after the fix.
+** exact Rust sexp formatting differs from the prose examples
+The sexp crate prints symbol-like atoms such as 'content',
+'errors', and 'save-result' without quotes, and prints an empty string
+atom as an empty atom.  The first focused Rust tests expected the more
+documentation-like quoted spelling.
+*** resolution
+Updated the tests to assert the actual protocol strings emitted by the
+existing formatter, while still covering that explicit 'errors' and
+'warnings' fields are present and separated.
+
+'cargo test serve::util --lib' passes after the fix.
+** TypeQL match-insert can silently insert nothing
+When node insertion was rewritten to match a source entity and then
+insert the node plus 'has_source' relation, missing source entities did
+not produce a TypeDB error.  The match simply had no rows, so the
+insert did nothing.  This showed up as source-move tests finding no
+nodes in TypeDB.
+*** resolution
+Node creation now explicitly checks that the source entity exists
+before issuing the insert.  Setup paths were also updated to create
+source entities before nodes.
+
+'cargo test --test move_source -- --nocapture' passes after the fix.
+** direct TypeDB setup helpers are easy to miss
+Most TypeDB setup flows now create source entities before creating
+nodes, but a direct nextest helper in 'tests/collateral_source_move.rs'
+still created nodes immediately after schema load.  The new explicit
+source existence check exposed this as:
+```
+TypeDB source entity 'public' does not exist
+```
+*** resolution
+Updated that helper to call 'create_all_sources' before
+'create_all_nodes'.
+
+'cargo nextest run --test collateral_source_move' passes after the
+fix, and the full test suite passes.
+** TypeDB boolean display is not a bare boolean string
+TypeDB row concepts for 'user_owns_it' display as strings like
+'Attribute(user_owns_it: true)', not just 'true'.  The first source
+entity test expected the bare spelling.
+*** resolution
+Normalized boolean row values by checking whether the TypeDB concept
+string contains 'true'.  The source entity test and full TypeDB target
+pass after the fix.
+** collector membership initially broke subscribee-as-such semantics
+Stage 6 changed generated collection members from implicit container
+children to children explicitly marked 'parentIs=collector'.  That exposed old
+subscribee-as-such code paths that recognized editable subscribees
+only through non-ignored/container parent status.
+
+The symptom was hidden-subscription completion either failing to
+prefetch child data or failing to infer hide/unhide edits after a user
+moved a generated hidden child into visible subscribee content.
+*** resolution
+Changed the generated-collection membership tests so collection
+members must have 'parentIs=collector'.  The older omitted/default
+'parentIs=container' shape is no longer accepted as collection
+membership.
+
+The two affected meanings were:
+- a TrueNode child of 'subscribeeCol' is still a subscribee
+  member only when it is marked 'parentIs=collector',
+- a TrueNode child of a definitive subscribee-as-such branch is
+  still visible subscribee content if it is either an ordinary
+  container child or a generated child marked 'parentIs=collector'.
+
+The change was deliberately split by meaning.  Generated
+collection membership is strict: 'subscribeeCol', 'overriddenCol' and
+the read-only relation Cols count only children marked 'parentIs=collector'.  Ordinary
+content completion and ordinary save extraction still use
+'parentIs=container' / non-ignored when deciding whether a node is real
+containment content.  Visible content inside an expanded
+subscribee-as-such branch can still include a child marked 'parentIs=collector', because
+moving a generated hidden child into the visible branch is the existing
+gesture for inferred unhide.
+
+Local validation now rejects TrueNode children of
+'subscribeeCol' or the relation Cols unless they have
+'parentIs=collector'.  Test fixtures that meant collection membership
+were updated to say so explicitly; test fixtures that meant "extra
+display child, not a collection member" now use 'parentIs=independent'.
+
+Updated the affected rendering and integration fixtures because the
+new intended output is different: collection scaffold headlines have
+empty titles, and generated collection members now print
+'(parentIs collector)' instead of relying on omitted/default
+'parentIs=container'.
+
+The hidden-subscription focused suite and the full test suite pass:
+- 'cargo test --test hidden_from_subscriptions -- --nocapture'
+- 'bash/all-tests.sh --no-sound'

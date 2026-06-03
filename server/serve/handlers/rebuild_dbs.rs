@@ -7,7 +7,10 @@ use crate::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sourc
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::not_nodes::load_config;
 use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
-use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::{
+  InRustGraph,
+  override_invariants::error_unless_override_invariants_hold,
+};
 use crate::types::env::SkgEnv;
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
@@ -38,6 +41,12 @@ pub fn handle_rebuild_dbs_request (
     check_for_duplicate_ids_across_sources (
       &nodes, &fresh_config . data_root)
       . map_err ( |e| format! ("Duplicate ID check failed: {}", e) ) ?;
+    let fresh_graph : InRustGraph =
+      InRustGraph::from_nodecompletes (&nodes);
+    error_unless_override_invariants_hold (
+        &fresh_config, &fresh_graph )
+      . map_err ( |e| format! (
+        "Override invariant validation failed: {}", e) ) ?;
     block_on ( wipe_then_init_typedb_db (
       &fresh_config, &env . driver, &nodes) )
       . map_err ( |e| format! ("TypeDB rebuild failed: {}", e) ) ?;
@@ -61,8 +70,6 @@ pub fn handle_rebuild_dbs_request (
       . map_err ( |e| format! ("Context computation failed: {}", e) ) ?;
     tracing::info!("Context rankings recomputed.");
     { // Rebuild the in-Rust graph from disk too, so it stays in sync with the freshly repopulated TypeDB/Tantivy.
-      let fresh_graph : InRustGraph =
-        InRustGraph::from_nodecompletes (&nodes);
       env . in_rust_graph . store (
         Arc::new (fresh_graph) );
       tracing::info!("In-Rust graph rebuilt."); }

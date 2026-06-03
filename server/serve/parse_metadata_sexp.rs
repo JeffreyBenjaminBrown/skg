@@ -5,7 +5,8 @@
 ///   TrueNodes: (skg [focused] [folded]
 ///                   (node [(id ID)]
 ///                         [(source SOURCE)]
-///                         [(parentIs container|content|linkTarget|independent|absent)]
+///                         [(parentIs affected|independent|absent)]
+///                         [(birth linksToParent|containsParent)]
 ///                         [indef]   ; short for "indefinitive"
 ///                         [cycle]
 ///                         [(stats [containsParent]
@@ -19,9 +20,14 @@ use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
-use crate::types::viewnode::{GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, Scaffold, ScaffoldKind, DeletedNode, InactiveNode, UnknownNode, IndefOrDef, NodeContainRels, NodeLinksourceRels, ParentIs};
+use crate::types::viewnode::{
+  GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest,
+  Qual, QualCol, RoleCol, DeletedNode, InactiveNode, UnknownNode,
+  Birth, IndefOrDef, NodeContainRels, NodeLinksourceRels, ParentIs,
+};
 use crate::types::maybe_placed_viewnode::{
-    MaybePlacedViewnode, MaybePlacedViewnodeKind, MaybePlacedTruenode,
+    MpViewnode, MpViewnodeKind, MpTruenode,
+    MpVognode,
 };
 
 use sexp::Sexp;
@@ -38,12 +44,13 @@ pub struct ViewnodeMetadata {
   pub focused: bool,
   pub folded: bool,
   pub body_folded: bool,
-  // None means TrueNode, Some means Scaffold
-  pub scaffold: Option<Scaffold>,
+  // None means vognode, Some means non-vognode.
+  pub non_vognode: Option<MpViewnodeKind>,
   // TrueNode fields (ignored if scaffold is Some)
   pub id: Option<ID>,
   pub source: Option<SourceName>,
   pub parentIs: ParentIs,
+  pub birth: Birth,
   pub indefinitive: bool,
   pub graphStats: GraphNodeStats,
   pub viewStats: ViewNodeStats,
@@ -57,8 +64,8 @@ pub struct ViewnodeMetadata {
   pub textchanged_unstaged : bool,
   // When true, this is a DeletedNode (id and source are used).
   pub is_deleted_node: bool,
-  // When Some, this is a DeletedScaff carrying its kind.
-  pub deleted_scaff_kind: Option<ScaffoldKind>,
+  // When true, this is a deleted non-vognode placeholder.
+  pub is_dead_scaffold: bool,
   // When Some, this is an UnknownNode (a placeholder for a missing
   // referent). Carries only the id; no source/title/body apply.
   pub unknown_node_id: Option<ID>,
@@ -74,10 +81,11 @@ pub fn default_metadata() -> ViewnodeMetadata {
     focused: false,
     folded: false,
     body_folded: false,
-    scaffold: None,
+    non_vognode: None,
     id: None,
     source: None,
-    parentIs: ParentIs::Container,
+    parentIs: ParentIs::Affected,
+    birth: Birth::Unremarkable,
     indefinitive: false,
     graphStats: GraphNodeStats::default(),
     viewStats: ViewNodeStats::default(),
@@ -90,24 +98,25 @@ pub fn default_metadata() -> ViewnodeMetadata {
     textchanged_staged   : false,
     textchanged_unstaged : false,
     is_deleted_node: false,
-    deleted_scaff_kind: None,
+    is_dead_scaffold: false,
     unknown_node_id: None,
     is_inactive_node: false,
     inactive_membership: MembershipAxes::default(), }}
 
-/// Create an MaybePlacedViewnode from parsed metadata components.
-/// This is the bridge between parsing (ViewnodeMetadata) and runtime (MaybePlacedViewnode).
-/// Returns (MaybePlacedViewnode, Option<BufferValidationError>) - error if Scaffold has body.
+/// Create an MpViewnode from parsed metadata components.
+/// This is the bridge between parsing (ViewnodeMetadata) and runtime (MpViewnode).
+/// Returns (MpViewnode, Option<BufferValidationError>) - error if Scaffold has body.
 pub fn viewnode_from_metadata (
   metadata : &ViewnodeMetadata,
   title    : String,
   body     : Option < String >,
-) -> ( MaybePlacedViewnode, Option < BufferValidationError > ) {
+) -> ( MpViewnode, Option < BufferValidationError > ) {
   let (kind, error)
-    : (MaybePlacedViewnodeKind, Option<BufferValidationError>)
+    : (MpViewnodeKind, Option<BufferValidationError>)
     = if let Some (ref uid) = metadata . unknown_node_id {
-        ( MaybePlacedViewnodeKind::Unknown (
-            UnknownNode { id: uid . clone () } ), None )
+        ( MpViewnodeKind::Vognode (
+            MpVognode::Unknown (
+              UnknownNode { id: uid . clone () } ) ), None )
       } else if metadata . is_inactive_node {
         let error : Option<BufferValidationError> =
           if body . is_some ()
@@ -116,47 +125,52 @@ pub fn viewnode_from_metadata (
               "Inactive placeholder content cannot be edited"
               . to_string () ))
           } else { None };
-        ( MaybePlacedViewnodeKind::Inactive (
-            InactiveNode {
+        ( MpViewnodeKind::Vognode (
+            MpVognode::Inactive (
+              InactiveNode {
               id         : metadata . id . clone ()
                            . unwrap_or_else ( || ID::from ("")),
               source     : metadata . source . clone ()
                            . unwrap_or_else ( || SourceName::from ("")),
-              membership : metadata . inactive_membership } ),
+              membership : metadata . inactive_membership } ) ),
           error )
-      } else if let Some (kind) = metadata . deleted_scaff_kind {
-        ( MaybePlacedViewnodeKind::DeletedScaff (kind), None )
+      } else if metadata . is_dead_scaffold {
+        ( MpViewnodeKind::DeadScaffold, None )
       } else if metadata . is_deleted_node {
-        ( MaybePlacedViewnodeKind::Deleted ( DeletedNode {
+        ( MpViewnodeKind::Vognode (
+            MpVognode::Deleted ( DeletedNode {
             id     : metadata . id . clone ()
                        . unwrap_or_else ( || ID::from ("")),
             source : metadata . source . clone ()
                        . unwrap_or_else ( || SourceName::from ("")),
             title,
             body,
-          } ), None )
-      } else if let Some ( ref scaffold ) = metadata . scaffold {
+          } ) ), None )
+      } else if let Some ( ref non_vognode ) = metadata . non_vognode {
         let error : Option<BufferValidationError> =
           if body . is_some () {
             Some ( BufferValidationError::Body_of_Scaffold (
               title . clone (),
-              scaffold . repr_in_client () ))
+              maybeplaced_kind_error_label (non_vognode) ))
           } else { None };
-        let scaffold_with_title : Scaffold = match scaffold {
+        let non_vognode_with_title : MpViewnodeKind = match non_vognode {
           // Use headline title for string and apply scaffold membership axes
-          Scaffold::Alias { .. } => Scaffold::Alias {
+          MpViewnodeKind::Qual (Qual::Alias { .. }) =>
+            MpViewnodeKind::Qual (Qual::Alias {
                               text: title . clone (),
-                              membership: metadata . scaffold_membership },
-          Scaffold::ID    { .. } => Scaffold::ID {
+                              membership: metadata . scaffold_membership }),
+          MpViewnodeKind::Qual (Qual::ID { .. }) =>
+            MpViewnodeKind::Qual (Qual::ID {
                               id: title . clone () . into (),
-                              membership: metadata . scaffold_membership },
-          Scaffold::TextChanged { .. } => Scaffold::TextChanged {
+                              membership: metadata . scaffold_membership }),
+          MpViewnodeKind::Qual (Qual::TextChanged { .. }) =>
+            MpViewnodeKind::Qual (Qual::TextChanged {
                               staged   : metadata . textchanged_staged,
-                              unstaged : metadata . textchanged_unstaged },
+                              unstaged : metadata . textchanged_unstaged }),
           other => other . clone () };
-        ( MaybePlacedViewnodeKind::Scaff (scaffold_with_title), error )
+        ( non_vognode_with_title, error )
       } else {
-      // MaybePlacedTruenode
+      // MpTruenode
       { let indef_or_def : IndefOrDef =
           if metadata . indefinitive
           { IndefOrDef::Indefinitive }
@@ -177,25 +191,54 @@ pub fn viewnode_from_metadata (
           { metadata . id . clone ()
             . map ( BufferValidationError::EditRequestOnIndefinitive ) }
           else { None };
-        ( MaybePlacedViewnodeKind::True ( MaybePlacedTruenode {
+        let t : MpTruenode = MpTruenode {
             title,
             id               : metadata . id . clone (),
             source           : metadata . source . clone (),
-            parentIs            : metadata . parentIs,
+            parentIs         : metadata . parentIs,
+            birth            : metadata . birth,
             graphStats       : metadata . graphStats . clone (),
             viewStats        : metadata . viewStats . clone (),
             view_requests    : metadata . view_requests . clone (),
             existence        : metadata . truenode_existence,
             membership       : metadata . truenode_membership,
             not_in_git       : metadata . truenode_not_in_git,
-            indef_or_def, } ),
+            indef_or_def, };
+        let vognode =
+          if t . should_be_phantom ()
+          { MpVognode::Phantom (t) }
+          else
+          { MpVognode::Normal (t) };
+        ( MpViewnodeKind::Vognode (vognode),
           error ) }
     };
-  ( MaybePlacedViewnode { focused     : metadata . focused,
+  ( MpViewnode { focused     : metadata . focused,
                        folded      : metadata . folded,
                        body_folded : metadata . body_folded,
                        kind },
     error ) }
+
+fn maybeplaced_kind_error_label (
+  kind : &MpViewnodeKind,
+) -> String {
+  match kind {
+    MpViewnodeKind::QualCol (col) =>
+      col . repr_in_client () . to_string (),
+    MpViewnodeKind::Qual (qual) =>
+      qual . repr_in_client () . to_string (),
+    MpViewnodeKind::PartnerCol (roleCol) =>
+      roleCol . repr_in_client () . to_string (),
+    MpViewnodeKind::BufferRoot =>
+      "forestRoot" . to_string (),
+    MpViewnodeKind::DeadScaffold =>
+      "deadScaffold" . to_string (),
+    MpViewnodeKind::Vognode (_) =>
+      MpViewnode {
+        focused     : false,
+        folded      : false,
+        body_folded : false,
+        kind        : kind . clone (),
+      } . error_label (), } }
 
 
 /// Parse metadata from org-mode headline into ViewnodeMetadata.
@@ -242,7 +285,7 @@ pub fn parse_metadata_to_viewnodemd (
           "inactiveNode" => {
             parse_inactivenode_sexp ( &items[1..], &mut result ) ?; },
           "staged" => {
-            // (staged ATOMS) at top level is for Scaffolds (Alias/ID).
+            // (staged ATOMS) at top level is for Quals (Alias/ID).
             apply_axis_atoms_to_membership_scaffold (
               &items[1..],
               true,  // staged
@@ -253,9 +296,10 @@ pub fn parse_metadata_to_viewnodemd (
               false, // unstaged
               &mut result . scaffold_membership ) ?; },
           "textChanged" => {
-            // (textChanged STAGE_TAGS) for the TextChanged scaffold.
-            result . scaffold = Some (
-              Scaffold::TextChanged { staged: false, unstaged: false } );
+            // (textChanged STAGE_TAGS) for the TextChanged qual.
+            result . non_vognode = Some (
+              MpViewnodeKind::Qual (
+                Qual::TextChanged { staged: false, unstaged: false } ) );
             for tag in &items[1..] {
               let tag_str : String = atom_to_string (tag) ?;
               match tag_str . as_str () {
@@ -266,12 +310,9 @@ pub fn parse_metadata_to_viewnodemd (
           "deletedScaffold" => {
             if items . len () != 2 {
               return Err ( "deletedScaffold requires exactly one kind value" . to_string () ); }
-            let kind_str : String =
+            let _kind_str : String =
               atom_to_string ( &items[1] ) ?;
-            let kind : ScaffoldKind =
-              ScaffoldKind::from_client_string (&kind_str)
-                . ok_or_else ( || format! ( "Invalid ScaffoldKind value: {}", kind_str ) ) ?;
-            result . deleted_scaff_kind = Some (kind); },
+            result . is_dead_scaffold = true; },
           // Note: "alias" as a list like (alias "string") is no longer supported.
           // Use bare "alias" atom instead - the alias string comes from headline title.
           // Legacy format detection - reject with helpful error
@@ -291,22 +332,33 @@ pub fn parse_metadata_to_viewnodemd (
           "folded"   => result . folded = true,
           "bodyFolded" => result . body_folded = true,
           // Scaffold kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
-          "alias"    => result . scaffold = Some ( Scaffold::Alias { text: String::new(), membership: MembershipAxes::default() } ),
-          "aliasCol" => result . scaffold = Some (Scaffold::AliasCol),
-          "forestRoot" => result . scaffold = Some (Scaffold::BufferRoot),
+          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::Alias { text: String::new(), membership: MembershipAxes::default() } ) ),
+          "aliasCol" => result . non_vognode = Some (MpViewnodeKind::QualCol (QualCol::Alias)),
+          "forestRoot" => result . non_vognode = Some (MpViewnodeKind::BufferRoot),
           "hiddenInSubscribeeCol" =>
-            result . scaffold = Some (Scaffold::HiddenInSubscribeeCol),
+            result . non_vognode = Some (MpViewnodeKind::PartnerCol (RoleCol::HiddenInSubscribee)),
           "hiddenOutsideOfSubscribeeCol" =>
-            result . scaffold = Some (Scaffold::HiddenOutsideOfSubscribeeCol),
+            result . non_vognode = Some (MpViewnodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee)),
+          "hiddenCol" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerCol (RoleCol::Hidden)),
+          "hiderCol" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerCol (RoleCol::Hider)),
+          "overriddenCol" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerCol (RoleCol::Overridden)),
+          "overriderCol" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerCol (RoleCol::Overrider)),
+          "subscriberCol" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerCol (RoleCol::Subscriber)),
           "subscribeeCol" =>
-            result . scaffold = Some (Scaffold::SubscribeeCol),
+            result . non_vognode = Some (MpViewnodeKind::PartnerCol (RoleCol::Subscribee)),
           "textChanged" =>
-            result . scaffold = Some (
-              Scaffold::TextChanged { staged: false, unstaged: false } ),
+            result . non_vognode = Some (
+              MpViewnodeKind::Qual (
+                Qual::TextChanged { staged: false, unstaged: false } ) ),
           "idCol" =>
-            result . scaffold = Some (Scaffold::IDCol),
+            result . non_vognode = Some (MpViewnodeKind::QualCol (QualCol::ID)),
           "id" =>
-            result . scaffold = Some ( Scaffold::ID { id: ID::default(), membership: MembershipAxes::default() } ),
+            result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::ID { id: ID::default(), membership: MembershipAxes::default() } ) ),
           "deletedScaffold" =>
             return Err ( "deletedScaffold as bare atom is no longer supported; use (deletedScaffold kindString)" . to_string () ),
           _ => {
@@ -356,13 +408,21 @@ fn parse_node_sexp (
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
             metadata . parentIs = match value . as_str () {
-              "container"   => ParentIs::Container,
-              "content"     => ParentIs::Content,
-              "linkTarget"  => ParentIs::LinkTarget,
+              "affected"    => ParentIs::Affected,
               "independent" => ParentIs::Independent,
               "absent"      => ParentIs::Absent,
               _ => return Err ( format! (
                 "Invalid parentIs value: {}", value )), }; },
+          "birth" => {
+            if subitems . len () != 2 {
+              return Err ( "birth requires exactly one value" . to_string () ); }
+            let value : String =
+              atom_to_string ( &subitems[1] ) ?;
+            metadata . birth = match value . as_str () {
+              "linksToParent"    => Birth::LinksToParent,
+              "containsParent"   => Birth::ContainsParent,
+              _ => return Err ( format! (
+                "Invalid birth value: {}", value )), }; },
           "staged" => {
             apply_axis_atoms_to_truenode (
               &subitems[1..],

@@ -4,10 +4,10 @@ use indoc::indoc;
 use regex::Regex;
 use skg::test_utils::{strip_org_comments, cleanup_test_tantivy_and_typedb_dbs};
 use skg::from_text::buffer_to_validated_saveplan;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_viewforest;
-use skg::types::maybe_placed_viewnode::MaybePlacedViewnode;
+use skg::types::tree::forest::MpViewForest;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::SkgConfig;
 use skg::types::nodes::typedb::NodeTypedb;
@@ -17,8 +17,8 @@ use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
+use skg::dbs::typedb::sources::create_all_sources;
 use skg::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema};
-use ego_tree::Tree;
 use std::error::Error;
 use std::path::PathBuf;
 use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
@@ -51,6 +51,7 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
       . collect ();
     overwrite_new_empty_typedb_db(&config . db_name, &driver) . await?;
     read_and_use_schema(&config . db_name, &driver) . await?;
+    create_all_sources(&config . db_name, &driver, &config) . await?;
     create_all_nodes(&config . db_name, &driver, &typedb_nodes) . await?;
     create_all_relationships(&config . db_name, &driver, &typedb_nodes) . await?;
 
@@ -65,8 +66,8 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
       "};
     let buffer_text: String =
       strip_org_comments (buffer_with_errors);
-    let mut viewforest: Tree<MaybePlacedViewnode> =
-      org_to_uninterpreted_nodes (&buffer_text)?. 0;
+    let mut viewforest: MpViewForest =
+      org_to_uninterpreted_viewforest (&buffer_text)?. 0;
     add_missing_info_to_viewforest(
       &mut viewforest, &config . db_name, &driver
       ) . await?;
@@ -150,6 +151,7 @@ fn test_foreign_node_modification_errors(
       . collect ();
     overwrite_new_empty_typedb_db(&config . db_name, &driver) . await?;
     read_and_use_schema(&config . db_name, &driver) . await?;
+    create_all_sources(&config . db_name, &driver, &config) . await?;
     create_all_nodes(&config . db_name, &driver, &typedb_nodes) . await?;
     create_all_relationships(&config . db_name, &driver, &typedb_nodes) . await?;
 
@@ -327,6 +329,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       . collect ();
     overwrite_new_empty_typedb_db(&config . db_name, &driver) . await?;
     read_and_use_schema(&config . db_name, &driver) . await?;
+    create_all_sources(&config . db_name, &driver, &config) . await?;
     create_all_nodes(&config . db_name, &driver, &typedb_nodes) . await?;
     create_all_relationships(&config . db_name, &driver, &typedb_nodes) . await?;
 

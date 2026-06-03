@@ -171,7 +171,7 @@ No code change was made.
 
 The validation boundary should remain where it is for now:
 
-- =find_buffer_errors_for_saving= runs on =MaybePlacedViewnode= before
+- =find_buffer_errors_for_saving= runs on =MpViewnode= before
   =maybePlaced_to_placed_tree= and therefore before role annotation is
   available;
 - local structural validation is about legal input-tree shape, not

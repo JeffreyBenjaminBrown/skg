@@ -1,0 +1,472 @@
+* plan : add relation accessors and generated collections
+** overview
+This plan implements the metaplan item:
+"Add relation accessors and generated collections".
+
+The stage gives Skg a uniform way to inspect every node-node relation
+type from either role, and uses that uniform model to add the next
+family of generated collection scaffolds.
+
+This is deliberately not the full read-only-set save policy, herald
+work, override rendering, or source-set safety work from later
+metaplan sections.  This stage builds the relation vocabulary and the
+collection buckets those later stages will need.
+** target state
+Every node-node relation type in 'schema.tql' can be queried through a
+small typed relation-access layer:
+- what this node points to through a relation,
+- what points to this node through a relation,
+- whether a displayed child is a real member of a particular
+  generated collection.
+
+The existing 'subscribeeCol' remains the writable collection for
+"this node subscribes to these".
+
+New sharing-relation collection scaffolds exist in the view model,
+parser, serializer, local validation, completion and save
+classification:
+- 'subscriberCol',
+- 'overriddenCol',
+- 'overriderCol',
+- 'hiderCol',
+- 'hiddenCol'.
+
+The existing hide-specific scaffolds remain:
+- 'HiddenInSubscribeeCol',
+- 'HiddenOutsideOfSubscribeeCol'.
+
+'hiddenCol' is not a replacement for those hide-editing views.  It is
+only the raw read-only set "this node hides these nodes".
+
+'hiderCol' is the inbound read-only set "these nodes hide this node".
+
+Generated collection members that are true members of their collection
+render with 'parentIs=collector'.  Nonmembers remain or become
+'parentIs=independent'.  This lets membership in a generated
+collection be represented without pretending the collection is a
+containment parent.
+** terms
+*** Relation and relationship
+Use TypeDB's terminology:
+- a /relation/ is the schema-level type, such as 'subscribes',
+- a /relationship/ is one concrete instance of that relation.
+
+This plan is mostly about relation types and the roles they define.
+It uses "relationship" only when discussing concrete graph facts.
+
+*** Role
+A role is one member position of a TypeDB relation, such as
+'subscriber' or 'subscribee'.  For an audit mismatch or generated
+collection member, the role belongs to the node being discussed, not
+to the other member.
+
+*** Relation collection
+An RCol is a scaffold whose children are nodes that play role R in a
+relationship to the scaffold's grandparent.
+
+For example, a child of 'subscriberCol' plays the 'subscriber' role in
+a 'subscribes' relationship to the grandparent, so that child
+subscribes to the grandparent.
+
+*** Collector parentIs
+'parentIs=collector' means:
+the visible parent is a collection scaffold, and this node was a real
+member of that collection when the buffer was rendered or completed.
+
+It does not say which relation is involved.  The relation is determined
+by the scaffold parent.
+
+** relation model
+*** Central table
+Reuse the central relation table for in-Rust graph accessors.
+
+The existing TypeDB table 'OUTBOUND_RELATIONSHIP_TYPES' already names:
+#+begin_example
+(relation, first_role, second_role)
+#+end_example
+
+The in-Rust graph layer needs the same vocabulary plus local access
+functions.  Prefer making the existing table public enough to reuse
+rather than duplicating the relation and role strings.  If a small
+Rust-side wrapper is useful, it should wrap the existing table instead
+of becoming a second source of truth.
+
+Suggested local shape:
+#+begin_example
+enum NodeRelation {
+  Contains,
+  TextlinksTo,
+  Subscribes,
+  HidesFromItsSubscriptions,
+  OverridesViewOf,
+}
+
+struct RelationRole {
+  relation : NodeRelation,
+  role     : &'static str,
+}
+#+end_example
+
+Exact names can follow local style.  The important points are:
+- callers do not hand-code five separate field/index matches every
+  time they need relation membership,
+- callers identify a node's place in a relationship by relation plus
+  role, not by a separate first/second end value.
+*** Accessor operations
+Expose helpers on or near 'InRustGraph' for:
+- outbound IDs for a node and relation,
+- inbound PIDs for a node and relation,
+- other member PIDs for a node, relation, and role,
+- membership test for collection member versus collection owner.
+
+The helpers should preserve the current canonicalization behavior:
+- outbound fields can contain primary IDs or extra IDs,
+- inbound indexes are keyed by resolved primary IDs,
+- comparisons that need graph identity should resolve through
+  'pid_of'.
+
+Unknown outbound references should keep the current semantics in
+callers that intentionally tolerate them.  Do not make the accessor
+layer globally reject dangling references in this stage.
+*** Scope of relations
+The accessor layer should cover all five ordinary node-to-node
+relation types:
+- 'contains',
+- 'textlinks_to',
+- 'subscribes',
+- 'hides_from_its_subscriptions',
+- 'overrides_view_of'.
+
+Generated collection scaffolds in this stage use only the sharing
+relations:
+- 'subscribes',
+- 'hides_from_its_subscriptions',
+- 'overrides_view_of'.
+
+'contains' and 'textlinks_to' still benefit from the accessors, but
+they do not get new Col scaffolds in this stage.
+** collection table
+Add a collection metadata table that maps each relation collection
+scaffold to:
+- the TypeDB relation,
+- the role played by the collection child,
+- the role played by the collection grandparent,
+- whether the collection is user-writable,
+- the client-side herald text for that scaffold.
+
+The required table is:
+#+begin_example
+scaffold        relation                       child role   owner role    writable
+subscribeeCol   subscribes                     subscribee   subscriber    yes
+subscriberCol   subscribes                     subscriber   subscribee    no
+overriddenCol   overrides_view_of              overridden   overrider     yes
+overriderCol    overrides_view_of              overrider    overridden    no
+hiderCol        hides_from_its_subscriptions   hider        hidden        no
+hiddenCol       hides_from_its_subscriptions   hidden       hider         no
+#+end_example
+
+The existing hide-specific child collections of 'subscribeeCol' are not
+entries in this table.  They have special semantics involving both a
+subscriber and subscribee and should remain separately handled.
+*** Collection titles and heralds
+Collection scaffolds should be titleless on the server side.
+
+The server should emit only scaffold metadata for collection headlines,
+not a user-visible Skg title string.  Emacs should accept those
+titleless collection headlines and display explanatory herald text from
+the metadata.
+
+The herald rules should handle collection scaffolds uniformly.  The
+intended visible labels are:
+- 'subscribeeCol': "it subscribes to these",
+- 'subscriberCol': "these subscribe to it",
+- 'hiddenCol': "it hides these from its subscriptions",
+- 'hiderCol': "these hide it from their subscriptions",
+- 'overriddenCol': "it overrides the view of these",
+- 'overriderCol': "these override the view of it",
+- future outbound text-link collection: "it includes text-links to these",
+- future inbound text-link collection: "these include text-links to it",
+- future inbound containment collection: "these contain it".
+
+There is intentionally no generated collection label "it contains
+these", because ordinary tree children already communicate containment.
+** scaffold representation
+*** Add scaffold variants
+Extend 'Scaffold' and related parsing/printing code for:
+- 'SubscriberCol',
+- 'OverriddenCol',
+- 'OverriderCol',
+- 'HiderCol',
+- 'HiddenCol'.
+
+Update:
+- 'server/types/viewnode.rs',
+- 'server/org_to_text.rs',
+- 'server/from_text/buffer_to_viewnodes/uninterpreted.rs' if needed,
+- 'server/from_text/buffer_to_viewnodes/local.rs',
+- Emacs sexp defaults if scaffold names or metadata fields must be
+  recognized client-side.
+*** Validate local shape
+Each new relation collection scaffold must:
+- have a TrueNode parent,
+- be unique among siblings of that parent,
+- have only TrueNode children unless a later metaplan phase explicitly
+  allows presentation-only children,
+- reject duplicate TrueNode children of the same collection.
+
+For now, keep validation structural.  Do not require local validation
+to query the graph.  Graph membership is handled by completion and
+save classification.
+*** Serialization names
+Use the names from the metaplan:
+- 'subscriberCol',
+- 'overriddenCol',
+- 'overriderCol',
+- 'hiderCol',
+- 'hiddenCol'.
+
+Keep existing spellings for:
+- 'subscribeeCol',
+- 'hiddenInSubscribeeCol',
+- 'hiddenOutsideOfSubscribeeCol'.
+** parentIs=collector
+*** Add enum variant
+Add 'ParentIs::Collector'.
+
+Update parser and serializer support for:
+#+begin_example
+(parentIs collector)
+#+end_example
+
+The default remains 'ParentIs::Container' where parentIs is omitted.
+'Collector' should be explicit in rendered collection members.
+*** Save meaning
+For this stage, 'ParentIs::Collector' means:
+- the node is a generated-collection member,
+- the visible parent scaffold determines which relationship it claims,
+- it should not be treated as ordinary containment.
+
+This means existing "non-container" logic should generally treat
+'Collector' like 'Independent', 'Content', and 'LinkTarget' for
+ordinary contains collection.  Places that currently test
+'parentIs == Container' should remain correct; places that match
+exhaustively on every non-container variant need to be updated.
+** rendering and completion
+*** Generalize relation collection rendering
+Build a shared helper for adding or reconciling a relation collection
+under a TrueNode:
+- find the owner PID,
+- compute the collection goal IDs through the relation accessor,
+- build child render data,
+- reconcile children,
+- set real members to 'parentIs=collector',
+- leave nonmembers as 'parentIs=independent' when completion discovers
+  that the user moved or inserted a node that is not a real member.
+
+The existing 'maybe_add_subscribeeCol_branch' and
+'reconcile_sharing_scaffold_children' are the main prior art.  Prefer
+extending that machinery over creating a parallel implementation.
+*** Which collections are auto-added
+Auto-add collection scaffolds only when their goal set is nonempty, and
+only while creating or expanding a view.
+
+At minimum, add:
+- 'subscribeeCol' for outbound subscriptions, preserving existing
+  behavior,
+- 'subscriberCol' for inbound subscriptions,
+- 'overriddenCol' for outbound overrides,
+- 'overriderCol' for inbound overrides,
+- 'hiderCol' for inbound hiders,
+- 'hiddenCol' for outbound hidden nodes.
+
+Auto-add should be restricted to:
+- de-novo buffer creation,
+- responding to a definitive view request, if that is straightforward.
+
+It is acceptable to leave auto-add out of definitive-view expansion in
+the first implementation if doing it correctly would cause churn.
+
+Saving or save-triggered completion must not recreate a relation
+collection scaffold that the user deleted from the buffer.  If a
+collection scaffold is already present, save completion may reconcile
+it, even when the current goal set is empty.  If it is absent, save
+completion should leave it absent.
+*** Avoid this-stage overreach
+Do not implement the full read-only set ordering policy here beyond
+what is necessary for correctness.  The next metaplan stage owns:
+- preserving user-visible order for read-only sets,
+- warnings for discarded collection edits,
+- view-local read-only-set order semantics.
+
+This stage should nevertheless avoid making that next stage harder:
+all collection kinds should be represented through table metadata, not
+ad hoc branches duplicated across render and save.
+** save classification and instruction extraction
+*** Save roles
+Extend 'SaveRole' so generated relation collection children can be
+distinguished from ordinary nodes and from display-only scaffolds.
+
+Suggested shape:
+#+begin_example
+RelationCollectionMember {
+  owner: ID,
+  collection: RelationCollectionKind,
+}
+#+end_example
+
+The exact shape should be chosen to minimize churn in
+'to_naive_instructions.rs'.
+*** Writable collections
+In this stage, writable relation collections are:
+- 'subscribeeCol',
+- 'overriddenCol'.
+
+Their TrueNode children marked 'parentIs=collector' should write the corresponding
+outbound list on the owner:
+- 'subscribeeCol' writes owner's 'subscribes_to',
+- 'overriddenCol' writes owner's 'overrides_view_of'.
+
+For 'subscribeeCol', preserve the existing hide-specific behavior:
+'HiddenInSubscribeeCol' and 'HiddenOutsideOfSubscribeeCol' continue to
+drive 'hides_from_its_subscriptions' inference as they do now.
+*** Read-only collections
+In this stage, read-only relation collections are:
+- 'subscriberCol',
+- 'overriderCol',
+- 'hiderCol',
+- 'hiddenCol'.
+
+The next stage will make read-only set save/rerender behavior fully
+predictable.  For this stage, their children must not produce graph
+edits.  Treat them as display-only for instruction extraction unless
+and until the next stage adds warning-producing completion semantics.
+*** Existing subscribee behavior
+Do not regress existing subscribee saves.
+
+The current code has specific collectors for:
+- subscribees under 'SubscribeeCol',
+- hidden nodes under 'HiddenInSubscribeeCol',
+- hidden nodes under 'HiddenOutsideOfSubscribeeCol'.
+
+Generalization is welcome only if tests prove those semantics are
+unchanged.
+** tests
+*** Accessor tests
+Add pure in-Rust graph tests proving that the accessor layer returns:
+- outbound subscribees and inbound subscribers,
+- outbound overridden nodes and inbound overriders,
+- outbound hidden nodes and inbound hiders,
+- canonical PIDs when extra IDs are used.
+
+Keep these tests TypeDB-free.
+*** Parser/serializer tests
+Add or update tests proving:
+- each new scaffold name parses,
+- each new scaffold name serializes,
+- '(parentIs collector)' parses and serializes.
+*** Herald/title tests
+Add or update tests proving:
+- collection scaffold headlines can be titleless on the server side,
+- Emacs displays the expected herald text for each collection scaffold,
+- no collection scaffold depends on a server-supplied Skg title for
+  its visible explanation.
+*** Local validation tests
+Add tests that each new collection:
+- must have a TrueNode parent,
+- is unique among siblings,
+- rejects duplicate TrueNode children.
+
+These can mirror existing 'SubscribeeCol' tests.
+*** Rendering/completion tests
+Add content-view tests proving:
+- an owner with outbound subscriptions still renders 'subscribeeCol',
+- a subscribee with inbound subscribers renders 'subscriberCol',
+- an overrider renders 'overriddenCol',
+- an overridden node renders 'overriderCol',
+- a hidden node renders 'hiderCol',
+- a hider renders 'hiddenCol',
+- rendered real members use 'parentIs collector'.
+
+Use small fixtures and avoid TypeDB unless the existing rendering path
+requires it.
+*** Auto-add tests
+Add tests proving:
+- de-novo buffer creation auto-adds nonempty relation collection
+  scaffolds,
+- save-triggered completion reconciles an existing relation collection
+  scaffold,
+- save-triggered completion does not recreate a relation collection
+  scaffold the user deleted.
+*** Save extraction tests
+Add save tests proving:
+- saving 'overriddenCol' updates 'overrides_view_of',
+- saving existing 'subscribeeCol' behavior still updates
+  'subscribes_to',
+- read-only relation collections do not update graph relationships in
+  this stage.
+** implementation steps
+1. Add relation/role metadata and in-Rust graph accessors.
+2. Add the new scaffold variants and org parsing/serialization names.
+3. Add 'ParentIs::Collector' parsing/serialization.
+4. Add titleless collection scaffold rendering and matching Emacs
+   herald rules.
+5. Add collection metadata for sharing-relation scaffolds.
+6. Generalize relation collection rendering/reconciliation from the
+   existing subscribee collection path.
+7. Wire auto-add for de-novo view creation, and for definitive-view
+   expansion only if it is straightforward.
+8. Wire save completion so it reconciles existing collection scaffolds
+   but does not recreate deleted collection scaffolds.
+9. Extend save classification and instruction extraction for writable
+   relation collections.
+10. Keep read-only collection members display-only for this stage.
+11. Add focused tests at each layer before broad integration checks.
+** verification
+Run focused checks first:
+#+begin_example
+cargo check
+cargo test --test dbs -- --nocapture
+cargo test --test content_view -- --nocapture
+cargo test --test save -- --nocapture
+#+end_example
+
+Run parser/client checks if scaffold or parentIs syntax changed in
+Emacs-facing code:
+#+begin_example
+bash/emacs-tests.sh
+#+end_example
+
+If TypeDB is required by the rendering or save tests, make sure the
+server is running and also run:
+#+begin_example
+cargo test --test typedb -- --nocapture
+#+end_example
+
+Finish with:
+#+begin_example
+bash/all-tests.sh --no-sound
+#+end_example
+** risks and pushback
+*** "Outbound relation" vocabulary is easy to misread
+The schema table names relation orientation, but the UI collections
+show both roles.  Be explicit in comments and tests about whose role
+is being named: collection child, collection owner, or opposite
+member.
+*** Read-only save policy belongs to the next stage
+It is tempting to complete all read-only behavior while adding the
+scaffolds.  Keep this stage limited unless a minimal warning/error is
+necessary to prevent data loss.  The next metaplan item owns ordering,
+discarded-edit warnings and rerender predictability.
+*** Hiding has two UI concepts
+'hiderCol' and 'hiddenCol' expose the raw
+'hides_from_its_subscriptions' relation.  The existing
+'HiddenInSubscribeeCol' and 'HiddenOutsideOfSubscribeeCol' expose
+hide editing in the context of subscriptions and subscribee content.
+
+Do not collapse these concepts.  Raw relation inspection and
+subscription-context editing are different views of related facts.
+*** parentIs=collector must not affect containment
+Adding a new parentIs variant risks accidental treatment as
+'Container'.  Audit every place that interprets parentIs, especially
+save instruction extraction and content completion.  The safe default
+is that 'Collector' is not containment.

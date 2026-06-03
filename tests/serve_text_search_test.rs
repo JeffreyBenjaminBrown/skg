@@ -5,7 +5,6 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
 use skg::org_to_text::viewforest_to_string;
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
-use skg::types::viewnode::Scaffold;
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::serve::handlers::text_search::{
   group_matches_by_id, build_search_viewforest};
@@ -13,6 +12,8 @@ use skg::serve::handlers::text_search::{
 use std::collections::HashMap;
 use std::path::Path;
 use std::fs;
+use skg::types::viewnode::Qual;
+use skg::types::maybe_placed_viewnode::MpViewnodeKind;
 
 #[test]
 fn test_text_search_org_format (
@@ -108,8 +109,9 @@ fn test_text_search_org_format (
                     ( id . to_string (), title ) ); }} },
             _ => {
               if let Some (md) = metadata {
-                if let Some ( Scaffold::Alias { .. } )
-                  = md . scaffold
+                if let Some ( MpViewnodeKind::Qual (
+                  Qual::Alias { .. } ) )
+                  = md . non_vognode
                   { aliases_under_current . push (title); }} }, }} }
       if ! aliases_under_current . is_empty () {
         all_alias_groups . push (aliases_under_current); }

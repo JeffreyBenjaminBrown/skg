@@ -42,10 +42,11 @@
          (expanded (skg-truenode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
-    ;; Should have: skg, node, id, abc, source, jeff,
-    ;; indef, false (default), parentIs, container (default),
-    ;; editRequest, none (default), viewRequests, none (default)
-    (should (= (length headlines) 14))
+    ;; Should have: skg, node, id : abc, source : jeff,
+    ;; indef : false (default), parentIs : affected (default),
+    ;; birth : unremarkable (default),
+    ;; editRequest : none (default), viewRequests : none (default)
+    (should (= (length headlines) 16)) ;; each key *and each value* is a separate headline
     ;; Check default fields are present
     (should (cl-find "indef" headlines
                      :key #'cdr :test #'string=))
@@ -74,11 +75,11 @@
     (should (string= (cdr (nth (1+ indef-idx) headlines)) "true"))))
 
 ;;
-;; Expand: sexp without parentIs -> inserts 'container (default)' child
+;; Expand: sexp without parentIs -> inserts 'affected (default)' child
 ;;
 
 (ert-deftest test-expand-parentIs-default-inserted ()
-  "Expanding a sexp without parentIs inserts 'container (default)'."
+  "Expanding a sexp without parentIs inserts 'affected (default)'."
   (let* ((sexp '(skg (node (id abc) (source jeff))))
          (org-text (sexp-to-org sexp))
          (expanded (skg-truenode-expand-defaults-in-org org-text))
@@ -88,7 +89,7 @@
                                  :key #'cdr :test #'string=)))
     (should parentIs-idx)
     (should (string= (cdr (nth (1+ parentIs-idx) headlines))
-                      "container (default)"))))
+                      "affected (default)"))))
 
 ;;
 ;; Strip: unmodified expanded org -> returns original sexp
@@ -118,7 +119,9 @@
                            "*** indef\n"
                            "**** true\n"
                            "*** parentIs\n"
-                           "**** container (default)\n"
+                           "**** affected (default)\n"
+                           "*** birth\n"
+                           "**** unremarkable (default)\n"
                            "*** editRequest\n"
                            "**** none (default)\n"
                            "*** viewRequests\n"
@@ -132,7 +135,7 @@
 ;;
 
 (ert-deftest test-strip-bare-false ()
-  "Stripping accepts bare 'false' and 'container' as default values."
+  "Stripping accepts bare 'false' and 'affected' as default values."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
                            "*** id\n"
@@ -142,7 +145,9 @@
                            "*** indef\n"
                            "**** false\n"
                            "*** parentIs\n"
-                           "**** container\n"
+                           "**** affected\n"
+                           "*** birth\n"
+                           "**** unremarkable\n"
                            "*** editRequest\n"
                            "**** none\n"
                            "*** viewRequests\n"
@@ -206,11 +211,11 @@
                           (cl-remove-if-not
                            (lambda (hl) (= (car hl) 3))
                            headlines))))
-    ;; Order should be: id, source, indef, parentIs,
+    ;; Order should be: id, source, indef, parentIs, birth,
     ;; editRequest, viewRequests, graphStats
     (should (equal level-3
                    '("id" "source" "indef" "parentIs"
-                     "editRequest" "viewRequests" "graphStats")))))
+                     "birth" "editRequest" "viewRequests" "graphStats")))))
 
 ;;
 ;; Strip: editRequest merge with org link

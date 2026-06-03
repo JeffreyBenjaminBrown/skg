@@ -1,0 +1,1559 @@
+* Problems with the local-view-update vision
+
+I like the goal: replacing global, procedural completion with smaller
+local update rules would make this part of Skg easier to reason about.
+But the present spec leaves several important semantics undefined, and
+some of the proposed local rules appear to conflict with behavior that
+the current code relies on.
+
+* New questions arising from your responses
+** Should collateral locking use the saved view's whole node set, or only changed nodes?
+The current early lock message over-approximates by locking every open
+view sharing any PID with the saved view. The later collateral rerender
+pass is narrower: it rerenders views containing PIDs in the produced
+=DefineNode=s. Your response says "Everything that shares any node with
+the saved buffer." That matches the lock behavior, but is broader than
+current collateral rerender selection.
+
+If the new design intentionally makes lock and rerender use the same
+broad set, that is simpler and safer, but may rerender more buffers.
+If not, the plan should distinguish "locked views" from "actually
+rerendered collateral views".
+*** DONE let's narrow it to nodes active in the SavePlan
+There's this line in 'update_from_and_rerender_buffer':
+  let SavePlan { viewforest,
+                 define_nodes       : nonmerge_defineNodes,
+                 merge_instructions : merges,
+                 source_moves }
+    = save_plan;
+If any node mentioned by the last three fields
+(ignore the viewforest -- it's not instructions,
+and I'm not sure why it's part of the SavePlan)
+is in another buffer, that other buffer is collateral.
+I don't think any other buffers need to be.
+**** Resolution (Claude)
+Agreed, and the *rerender* side already does this. The narrowing is
+correct; the only behavior change it implies is to the *lock* side.
+
+- Collateral rerender today (=find_collateral_view_uris=,
+  server/update_buffer.rs:215-237) already selects views by the PIDs in
+  =define_nodes=, and by the time it runs =define_nodes= has been
+  extended to include the merge-generated Save/Delete nodes
+  (save_buffer.rs:282-286, via =Merge::to_vec()=). So
+  =merge_instructions= are already covered.
+- =source_moves= add no new PIDs: every source-moved node also emits a
+  =DefineNode::Save= (viewnodes_to_instructions.rs:269-272 returns an
+  =instruction= alongside the optional =source_move=). So
+  "define_nodes ∪ merges ∪ source_moves" reduces to "define_nodes
+  (incl. merges)".
+- The only thing broader today is the *early lock*
+  (=uris_of_views_to_lock=, save_buffer.rs:370-384), which locks every
+  open view sharing *any* PID with the saved buffer. Narrowing it to the
+  same instruction-PID set makes lock and rerender coincide -- simpler,
+  and it stops locking buffers that will never get a =collateral-view=
+  message. (I checked: the client already unlocks any still-locked buffer
+  on =save-result= via =skg--unlock-all-save-locked=,
+  skg-request-save.el:171, so this is a simplification, not a correctness
+  fix.)
+
+Caveat (pre-existing, *not* introduced by the narrowing): a view rooted
+at B is not rerendered when another save changes B's *relationships*
+without re-saving B itself (e.g. A is saved and A.contains gains B).
+B's graphStats container count then goes briefly stale. Keeping fresh
+would require collateral selection to include neighbors of changed
+nodes, a deliberately larger scope than this issue. Logged in
+TODO/problems.org.
+**** DONE oh that early-lock thing still has to be conservative
+That's what we do before we've computed any of the save pipeline.
+That computation is slow. If we didn't lock those overlapping buffers early,
+the user could have their changes clobbered.
+So we should first lock everything that might overlap,
+and only relax that lock to be more targeted
+once we've computed the SavePlan.
+***** Agreed -- I conflated two moments (Claude)
+You're right. The early lock is sent *before* the SavePlan exists:
+=handle_save_buffer_request= emits =SaveLock= (save_buffer.rs:91-97) and
+only *then* calls =update_from_and_rerender_buffer= (line 101), where
+=buffer_to_validated_saveplan= computes the instructions. So the early
+lock cannot be targeted -- it must stay conservative (lock every view
+sharing any PID), exactly as you say.
+
+The narrowing I described belongs to a *second* step, after the SavePlan
+exists: a "relax lock" message that unlocks everything except the
+changed-PID collateral set (the set =find_collateral_view_uris= already
+computes). So: conservative early lock -> compute SavePlan -> relax to the
+targeted set -> stream collateral rerenders -> save-result unlocks the
+rest. The relax message is the only new wire piece; it lets the user edit
+non-collateral buffers during the slow pipeline instead of waiting for
+save-result.
+*** DONE Why is viewforest part of SavePlan?
+**** Answer (Claude)
+Because one parse produces both, and the rerender consumes it. It is
+*not* removable, though you are right that it is not "instructions".
+
+=buffer_to_validated_saveplan= (from_text.rs:49-119) parses the buffer
+once into a placed =ViewForest= and, from that same pass, extracts the
+three instruction lists; =SavePlan= (from_text.rs:35-40) bundles all
+four. =update_from_and_rerender_buffer= destructures it and hands
+=viewforest= to =update_views_after_save= as =saved_view= -- the tree
+that gets merge-rewritten and rerendered into the buffer the user gets
+back (save_buffer.rs:259-304; update_buffer.rs:132-144). It is also
+used for the early "nothing to save" guard (from_text.rs:256-258).
+
+So =viewforest= is the saved view, carried next to the instructions
+derived from it. If the conflation bothers you, the clean shape is
+=(ViewForest, SaveInstructions)= with
+=SaveInstructions { define_nodes, merge_instructions, source_moves }=,
+rather than flattening all four into one struct. That is a naming nicety,
+not a behavior change -- the field itself is genuinely needed.
+**** Yes, we should separate those two things.
+The viewforest is not used during the save phase itself, right --
+just the update that follows it (and some stuff before it)?
+If that's true, then it is not conceptually part of the SavePlan,
+and the type system should adhere to that platonic reality.
+***** Confirmed (Claude)
+Right -- the viewforest is not touched during the save (graph-mutation)
+phase. After =update_from_and_rerender_buffer= destructures the SavePlan,
+only =define_nodes=/=merges=/=source_moves= go to
+=update_graph_including_merges= (save_buffer.rs:265-273); the viewforest is
+used only (a) before, to *produce* those instructions during
+parsing/validation, and (b) after, as the =saved_view= handed to
+=update_views_after_save=. So splitting =SavePlan= into
+=(ViewForest, SaveInstructions)= matches the platonic reality and is a
+low-risk refactor: the save step takes only =SaveInstructions=, and the
+rerender step takes the =ViewForest= plus the instruction PIDs it needs
+for collateral selection.
+** Should source-set changes delete inactive placeholders from old views?
+You answered that inactive children can be deleted as liars if the
+active source-set changes. That is coherent if update is trying to make
+the current source-set's view exact. It also means inactive placeholders
+are not stable anchors across source-set changes. That seems fine, but
+it is a user-visible behavior worth stating in the plan.
+*** DONE yes, but more specifically, replace
+If a node was from an inactive source, but now that source is active,
+then not only should the inactive viewnode representing it be deleted,
+but it should be replaced by an active representative.
+**** Resolution (Claude)
+This already falls out of how children are built, so the rule to state
+is just "replace, don't preserve". =build_child_creation_data=
+(complete_preorder/truenode.rs:599-679) decides per goal-list ID: if the
+child's source is *not* in the active set it emits a
+=ContentReality::Inactive= placeholder (line 663-671); otherwise it reads
+the node and emits =ContentReality::Real= (line 672-678). Because the
+goal list is rebuilt from the graph each update and the active-source-set
+is an input to that decision, flipping a source active/inactive flips the
+placeholder/real choice on the next render automatically.
+
+So the local-update spec should say: an inactive placeholder is *not* a
+stable anchor across source-set changes; when the active set changes, the
+updater deletes the stale placeholder (a view-leaf) and the rebuilt goal
+list inserts the opposite representative in its place -- inactive→Normal
+when the source becomes active, Normal→inactive when it goes inactive.
+** Should diff mode be implemented as an overlay pass rather than inside every local updater?
+See the suggested approaches under [[*Diff mode is mostly absent][Diff mode is mostly absent]]. My bias is
+to make ordinary local update produce the current worktree view first,
+then run a diff overlay pass that injects phantoms and diff scaffolds.
+That preserves the "local update" simplification without requiring every
+ordinary updater to know every staged/unstaged edge case.
+*** DONE is that really simpler?
+The diff view has a different way of handling every kind of viewnode.
+Maybe they should be separate from the non-diff updating code,
+but in that case the natural way to handle diff-view is
+a separate set of functions that map one-for-one to the kinds of Viewnode.
+**** Answer (Claude)
+You're right, and "overlay pass" vs. "per-kind diff functions" is a false
+choice: an overlay pass *is* implemented as per-kind functions. The real
+question is how many kinds need one, and the answer is reassuring: almost
+all diff logic lives on =Vognode::Normal=.
+
+What carries diff state today:
+- =set_diff_status= sets =existence=/=membership= axes and flips
+  Normal→Phantom (complete_preorder/truenode.rs:682-782).
+- =maybe_prepend_diff_view_scaffolds= emits =Qual::TextChanged=,
+  =QualCol::ID=, =QualCol::Alias= under a Normal node (same file,
+  520-574).
+- Phantom *children* are interleaved into a Normal node's content goal
+  list (=content_goal_list=, =complete_content_children=).
+- =Qual::Alias=/=Qual::ID= and =InactiveNode= carry =membership= axes,
+  but those are *set by the parent Normal node's* diff logic, not by the
+  Qual/Inactive themselves.
+So the diff-bearing kinds reduce to: Normal vognodes, plus the
+phantoms/quals they spawn. That matches your later scoping note (only
+=Vognode::Normal=, reaching ≤4 levels deep). See
+[[*Jeff adds][the "Jeff adds" note under "Diff mode is mostly absent"]].
+
+Is it simpler than today? Yes. Today diff is *not* a clean overlay -- it's
+interleaved into ordinary completion (=set_diff_status= inside content
+expansion, phantom IDs woven into goal lists) plus a stale-diff *pre*-pass
+(=strip_stale_diff_state=, update_buffer.rs:361-367). A single diff BFS
+over Normal vognodes, run after a diff-free ordinary update, removes that
+interleaving from every non-Normal updater.
+
+Two things to keep in mind:
+1. It is not free of graph reads: the diff pass still needs =source_diffs=
+   and must re-derive phantoms by diffing HEAD/index against the worktree
+   goal list. So the ordinary pass must leave enough behind (the worktree
+   content) for the diff pass to diff against.
+2. A uniform Normal-only diff pass *fixes* a latent bug in today's phased
+   code: =ensure_diff_scaffolds= runs once (before view-request
+   execution), so a node made definitive by a definitive request never
+   gets its diff scaffolds. A pass that visits every Normal vognode would
+   cover those too. Logged in TODO/problems.org.
+* The update driver is not specified
+** "Traversal order will matter less" is not enough
+The document says each ViewNode should update itself, and maybe some
+neighbors, in isolation. But many current update steps are only correct
+because they run in a specific order:
+
+- content and SubscribeeCol expansion before postorder scaffold repair
+- view requests after the first content expansion
+- HiddenInSubscribeeCol and HiddenOutsideOfSubscribeeCol after their
+  surrounding subscribee/subscriber structure exists
+- alias/id repair after the parent node's current disk state is known
+- empty scaffold deletion after its children have been reconciled
+
+If the new model is a single pass, a fixed-point loop, or a typed queue
+of local update jobs, that needs to be explicit. Otherwise "local" can
+silently become either order-dependent again or nonterminating.
+*** DONE can you define each of the terms used in this question?
+(I suspect ordinary BFS will work perfectly.)
+**** Definitions
+- A single pass means each node is visited once in some order, e.g. BFS,
+  and no node is revisited because of changes made elsewhere.
+- A fixed-point loop means repeatedly running update passes until a pass
+  makes no changes.
+- A typed queue means update actions enqueue more specific actions, e.g.
+  "update this Vognode's content", "reconcile this HiddenInCol", or
+  "execute this definitive request", and the scheduler drains the queue.
+- A local update job means one such unit of work, usually tied to one
+  ViewNode plus whatever nearby context that kind is allowed to inspect.
+
+Ordinary BFS might work if each update either only affects already-seen
+neighbors in harmless ways or explicitly enqueues later work for newly
+created children/scaffolds. The plan should state which of those two
+rules it uses.
+*** DONE I think ordinary BFS will work, if
+each node is able to create and update view-descendents but not view-ancestors.
+But I have not thought about the five cases given as examples
+in the body of the parent of this org-node.
+Please consider those order problems,
+and any others you see in the completion code,
+and tell me if you see the BFS-ordered local-update approach
+going awry for any of them.
+**** Analysis (Claude)
+Bottom line: ordinary top-down BFS works, with one genuine exception and
+a short list of explicit scheduler rules. Four of your five cases are
+fine; the fifth is fine for the *generated* scaffolds but not for
+=DeadScaffold= chains. Nothing in the current completers violates the
+"create descendants, not ancestors" rule -- including containerward and
+sourceward, which (despite the name) attach as *descendants*, not
+ancestors.
+
+The reason BFS works so well is that the current code is *already* mostly
+top-down: =expand_true_content_until_stable= (complete.rs:101-115) is a
+parent-first recursion that recurses into freshly created children. The
+"postorder" passes that follow are postorder for collection convenience,
+not because each scaffold needs its descendants populated first -- every
+generated collection computes its membership *from the graph* during its
+own visit, never from its view-children. That is the key fact that makes
+order not matter.
+
+***** The five cases:
+
+****** (a) content / SubscribeeCol expansion before postorder scaffold repair.
+   FINE. A Normal node expands its content and creates its SubscribeeCol
+   during its own visit (=expand_true_content_at_truenode=); BFS then
+   descends into the SubscribeeCol, which reconciles from the subscriber's
+   on-disk =subscribes_to= (subscribee_col.rs:69-106) -- not from sibling
+   view-nodes. HiddenOutsideOfSubscribeeCol likewise reads the
+   subscriber's =hides=/=subscribes_to= from disk
+   (hiddenoutsideof_subscribeecol.rs:78-101), never the sibling subscribee
+   view-nodes. So there is no "siblings must already exist" hazard;
+   parent-before-child is all BFS needs.
+
+****** (b) view requests after the first content expansion.
+   FINE, *given a buffer-global definitive map*. A node can run its own
+   view requests during its visit, right after expanding content. The
+   one-definitive-per-ID invariant is what needs global state, and the
+   code already has it: =DefinitiveMap= (=visited=, to_org/util.rs:43-44).
+   Whoever BFS reaches first registers as definitive
+   (=make_indef_if_repeat_then_extend_defmap=, util.rs:144-161); a later
+   duplicate is forced indefinitive. An explicit definitive *request*
+   wins over an incidental occurrence by indefinitizing it via the map
+   (=execute_definitive_view_request=, definitive.rs:92-97). Two explicit
+   requests for one ID can't collide -- validation already rejects that
+   (=MultipleDefinitiveRequestsForSameId=). So order is irrelevant *as
+   long as the map is threaded across the whole BFS*, not reset per
+   subtree.
+
+******* but completion can create more DVRs (Jeff)
+
+At least as I envisioned in vision.org, when creating a definitive node,
+we add DVRs to each of its content children.
+Validation checks that the user did not put contradictory DVRs
+on two ViewNodes with the same ID, but that wouldn't catch this.
+
+One simple solution would be to, instead of a map from ID to NodeId,
+use a map from ID to NodeID_withFinality:
+NodeID_withFinality = Tentative (NodeId) | Final (NodeId).
+The map begins with all values Tentative.
+Each DVR replaces a Tentative with a Final (at a different NodeId).
+
+The rule could then simply be 'if, in executing a DVR,
+you find that the ID associated with that DVR is already at a Final NodeId,
+don't act on the DVR. Remove the request. Let the node the request was on
+remain indefinitive.'
+******** Assessment (Claude): your map works; also consider not making child DVRs at all
+Two viable models; both stay bounded by the node limit:
+
+1. Your Tentative/Final map (= SavedAsDefinitive / UpdatedToDefinitive).
+   Sound, and a real improvement: it makes DVR execution *idempotent* and
+   order-robust. Each ID is "claimed" once -- by a saved-definitive node or
+   by the first DVR to reach it -- and marked Final; later DVRs for that ID
+   are dropped, leaving their nodes indefinitive. That terminates (each ID
+   is indefinitized at most once via a DVR) and keeps exactly one
+   definitive per ID. One thing to pin down: make a *user-submitted* DVR
+   beat a *completion-created* one for the same ID. Simplest guarantee:
+   seed the map Final with the saved-definitive nodes and execute user DVRs
+   before completion creates any; validation already permits at most one
+   user DVR per ID, so the winner is unambiguous. (Without that, raw BFS
+   order decides, and a user DVR on a deep node could lose to a
+   completion-created DVR on a shallower occurrence of the same ID.)
+
+2. Don't create per-child DVRs at all. Today's definitive expansion
+   (=extendDefinitiveSubtreeFromLeaf=, definitive.rs:225-272) does *not*
+   put DVRs on children -- it builds the content subtree directly and marks
+   repeats indefinitive via the map (=make_indef_if_repeat=). If the new
+   completion keeps that, the only DVRs that exist are user-submitted ones,
+   which validation already bounds to one-per-ID, so "completion creates
+   conflicting DVRs" never arises and you need no finality flag at all.
+   Recursion depth is still bounded by the node limit the same way.
+
+Path 2 is strictly simpler (no finality state, no priority rule). Path 1
+is worth it only if you specifically want DVRs to be the *uniform*
+expansion mechanism (vision.org leans that way). Your call.
+********* DONE
+From the server's POV, a DVR from the user seems identical
+to a definitive node whose children need filling in.
+Treating new definitive nodes and DVR-marked nodes the same way
+seems confusing. OTOH calling it a DVR when the server put it there
+is also confusing.
+
+There is also a priority question: DVRs from a user should be prioritized
+over DVRs from the server. In fact even DVRs *resulting* from a user's DVR
+should be prioritized over other DVRs.
+
+I suspect we really do need the Tenative | Final dichotomy
+in the map from ID to definitive NodeId.
+When a DVR makes a node definitive, it should be Final-definitive
+If the mere completion of ordinary definitive nodes does the same thing,
+though, it should be only Tenative-definitive; a DVR can change it.
+
+I guess that's what I want. The server does not generate DVRs
+for most nodes, but it *does* generate DVRs in the Normal children
+of a node that had a DVR. That way not only does the original node with the DVR
+clobber whatever was definitive before it, but so do its descendents --
+thus drawing the entire tree beneath it, which is probably what the user wants.
+
+This means we handle ordinary definitive nodes and DVR nodes
+*almost* identically; the only things that differs is the Tentative | Final
+dichotomy and whether the node's children are also given DVRs.
+********** Conclusion (Claude): yes, this works -- model for the plan
+I stress-tested it; it is sound and complete. Capturing it so we don't
+re-derive it later.
+
+Map: =ID -> Definitiveness=, where =Definitiveness = Tentative(NodeId) | Final(NodeId)=.
+- Completing an *ordinary* definitive node (a saved-definitive node, or
+  gap-fill content drawn directly) registers *Tentative*.
+- Executing a *DVR* registers *Final*.
+
+When a node would be drawn definitive for ID X:
+- X already Final    -> newcomer stays indefinitive (this is the "discard
+  the DVR" rule; it also covers an ordinary node deferring to a Final one).
+- X Tentative, newcomer via DVR  -> indefinitize the old occurrence;
+  newcomer becomes Final (clobber).
+- X Tentative, newcomer ordinary -> newcomer stays indefinitive (first
+  Tentative wins).
+- X absent           -> register Tentative or Final per how it was drawn.
+
+Cascade: *only a Final (DVR-made) node* hands DVRs to its Normal children.
+That is what makes one user request draw its whole subtree -- each
+descendant's DVR clobbers whatever was Tentative there, all the way down,
+bounded by the node limit. Ordinary (Tentative) definitive nodes do *not*
+cascade DVRs; they draw/reconcile their content directly.
+
+Why binary Tentative|Final suffices (your priority worry, resolved by
+construction): the server never invents a DVR on its own -- every DVR is
+either user-typed or a cascade descendant of one. So there are no
+independent "server DVRs" to out-prioritize. Final beats Tentative (an
+explicit request beats incidental definitiveness); Final-vs-Final is
+first-in-BFS-wins, and since both are user-originated it doesn't matter
+which. No finer priority ranking is needed.
+
+Naming (your confusion point): keep =definitiveView= as the user-facing
+request keyword; internally distinguish by *finality* (the map's
+Tentative/Final tag = the result), not by who issued the request. The
+cascade DVRs the server adds under a Final node are an internal scheduling
+detail and need no user-visible name. So "ordinary vs DVR node" stops being
+a type distinction and becomes two map states plus the cascade flag --
+exactly your "almost identical" observation.
+
+One consequence to state in the plan (correct, but worth flagging so it
+doesn't surprise anyone): because a saved-definitive node is Tentative, a
+DVR elsewhere -- or its cascade -- can demote it to indefinitive.
+One-definitive-per-ID has to give somewhere, and giving the explicit
+request precedence is right: the alternative (DVR defers to a saved
+definitive) would leave the requested subtree unexpanded, defeating the
+request.
+
+****** (c) HiddenIn / HiddenOutside after their subscriber/subscribee structure exists.
+   FINE. In BFS the subscriber is an ancestor (visited first) and the
+   subscribee is the col's parent or grandparent (visited first). Both
+   cols read the subscriber's NodeComplete from disk during their own
+   visit. The only requirement is that the cols be *created by their
+   parents during the parents' visits* so BFS descends into them. Today
+   the HiddenInSubscribeeCol is created in a separate Phase-5 sweep
+   (=ensure_hiddenin_cols_under_definitive_subscribees=) *and* during a
+   definitive request (definitive.rs:123-127) -- redundantly. In the BFS
+   model this collapses to "a definitive subscribee creates its
+   HiddenInSubscribeeCol when visited." That is strictly simpler.
+
+****** (d) alias/id repair after the parent's disk state is known.
+   FINE. The AliasCol/IDCol is a child of the Normal node; BFS visits the
+   parent first (which, for collateral views, syncs title/source from disk
+   -- =should_sync_from_disk_even_though_definitive=), then descends and
+   the col reads the parent's pid/source and queries disk for the alias/id
+   goal list (aliascol.rs:43-50). Reading an ancestor is allowed local
+   context; nothing mutates the ancestor.
+
+****** (e) empty scaffold deletion after children reconciled.
+   MOSTLY FINE -- this is the one place BFS needs help, but only for
+   =DeadScaffold=.
+   - Generated cols (SubscribeeCol, HiddenInSubscribeeCol,
+     HiddenOutsideOfSubscribeeCol) decide emptiness from their *graph goal
+     list* during their own visit and self-detach right then
+     (subscribee_col.rs:52-54 =detach_scaffold_transferring_focus=;
+     hiddenoutsideof_subscribeecol.rs:60 =detach_scaffold_if_empty=). They
+     do not wait for BFS to populate/empty their children, so top-down BFS
+     is correct for them. (Self-detach is a self/parent-childlist edit, not
+     an ancestor edit -- allowed.)
+   - =DeadScaffold= is different: it has *no* goal list. Its emptiness
+     depends on whether its children survive, which a top-down visit
+     cannot know before its children are processed. The current code
+     handles this with a *postorder* final sweep
+     (=remove_empty_deleted_scaffolds=, complete.rs:267-283, collected
+     with =preorder=false=), so nested empty dead-scaffold chains collapse
+     bottom-up in one pass. Pure top-down BFS would leave an empty parent
+     dead-scaffold once its last child self-deletes after the parent was
+     visited. MINIMAL FIX: keep =remove_empty_deleted_scaffolds= as a
+     final postorder sweep (or run DeadScaffold cleanup postorder). It is
+     not per-node local logic anyway, so it doesn't compromise the "local
+     update" goal.
+
+***** Other hazards I see in the completion code:
+
+****** Definitive-request cross-tree indefinitization. Already covered by (b):
+   needs the buffer-global =DefinitiveMap=, which exists. Note one map
+   suffices for both jobs you named (dedup + locate-the-conflict) -- see
+   [[*Good catch!][the two-maps proposal]]; the code uses a single
+   =HashMap<ID, NodeId>=. Known accepted limitation (definitive.rs:67):
+   indefinitizing A does not indefinitize a duplicate *descendant* of A
+   elsewhere; you decided that's acceptable.
+
+******* DONE wait, I did?
+That doesn't seem good. But also how is it possible?
+It is an invariant checked during validation that there be
+at most one definitive viewnode of any graphnode.
+
+I think my Tentative and Final proposal
+takes care of this: For each ID, we'll
+only indefinitize anything as a result of a DVR once.
+After that, the definitive node that took its place
+is marked UpdatedToDefinitive, so it will stand;
+later DVRs for the same ID will be silently discarded.
+******** Answer (Claude)
+2. "How is it possible?" -- the at-most-one-definitive-per-graphnode
+   invariant is checked by *validation*, which only inspects the
+   *submitted buffer*. Completion then creates definitive nodes itself
+   (expanding a definitive request, and -- in your vision -- adding DVRs to
+   children), which validation never saw; that runtime layer is guarded by
+   the DefinitiveMap, not by validation. And in fact the PITFALL scenario
+   does *not* produce two definitives: when the new definitive A re-expands
+   its content, its B child hits =make_indef_if_repeat=, finds B already in
+   the map, and becomes indefinitive -- so the B elsewhere stays the sole
+   definitive B. The PITFALL is a benign scoping note (indefinitization is
+   confined to the requested node's own subtree), not an invariant breach.
+Your SavedAsDefinitive / UpdatedToDefinitive idea is the same as the
+Tentative/Final map you sketched under "but completion can create more
+DVRs"; I assessed it (and a simpler alternative) there.
+
+****** Merge / extra_id rewrite.
+   'rewriteInPlace_viewnodes_whose_id_is_newly_extra'
+   (update_buffer.rs:321-356) runs as a whole-tree *pre*-pass before
+   completion, swapping a viewnode whose pid became an acquiree's extra_id
+   to the acquirer's pid. In BFS this could be a per-node self-rewrite at
+   the start of each Normal node's visit, but it's harmless to keep as a
+   pre-pass. Not an ordering hazard.
+
+******* DONE Keeping the pre-pass seems fine.
+******** Noted (Claude)
+Agreed -- it stays a cheap whole-tree pre-pass; folding it into per-node
+visits is possible but buys nothing.
+
+****** Node limit.
+   Today it is enforced only for the initial render
+   (render_initial_viewforest_bfs) and *per definitive-expansion subtree*
+   (definitive.rs:243-254); the ordinary post-save content reconcile
+   enforces no limit (it can't recurse unboundedly anyway, since
+   indefinitive children don't expand). Your per-buffer budget counting
+   only new viewnodes is BFS-natural and a behavior change you already
+   accepted. BFS makes it trivial: one counter, stop creating new nodes
+   past the budget, strip remaining definitive requests.
+
+****** validate_parentIs_relationships= (util.rs:245-307) and attach_containerward_ancestries_to_removedhere_phantoms (update_buffer.rs:470-487) are post-passes.
+   The first is per-node
+   self-correction (reads the graph, flips stale =parentIs=/=birth=); the
+   second attaches ancestry as *children* of phantoms. Both are
+   BFS-compatible (or can stay as targeted passes). Neither mutates a
+   view-ancestor.
+
+****** Diff scaffolds on a definitive transition.
+   =ensure_diff_scaffolds= runs
+   once, before view-request execution, so a node that becomes definitive
+   during a request never gets its TextChanged/IDCol/AliasCol scaffolds.
+   This is a latent bug in the *current* phased design, not a BFS problem;
+   your separate Normal-only diff pass fixes it. Logged in
+   TODO/problems.org. See
+   [[*is that really simpler?][the diff-overlay answer]].
+
+****** A worry that turns out NOT to be a problem: containerward / sourceward
+   ("backpath") views. The name suggests they build *ancestors*, which
+   your rule forbids. They don't: =integrate_linear_portion_of_path=
+   prepends each container/source as an indefinitive, *independent child*
+   with =birth=ContainsParent= / =LinksToParent= (backpath.rs:255-265).
+   So the containerward chain is rendered as descendants with inverted
+   birth semantics -- the descendants-only rule holds.
+
+****** Minimal extra scheduler rules BFS needs
+(everything else is plain per-kind local update):
+- thread a buffer-global =DefinitiveMap= across the whole BFS (dedup +
+  conflict resolution + node-limit eviction);
+- a per-buffer node-limit counter; once exhausted, create no new nodes and
+  strip remaining definitive requests (leaving those nodes indefinitive);
+- a final postorder sweep to delete empty =DeadScaffold= chains (the only
+  emptiness that can't be decided during the node's own visit);
+- run the diff overlay as its own BFS over Normal vognodes after the
+  ordinary update.
+** No termination or idempotence contract
+Each local updater should probably satisfy an idempotence rule:
+running it twice without graph/view changes should produce no further
+changes. The current vision does not state this, but it matters for any
+queue or fixed-point implementation.
+
+Potentially non-idempotent examples include:
+
+- appending newly discovered set members
+- creating HiddenOutsideOfSubscribeeCol and then deleting it if empty
+- adding definitive view requests to all affected children
+- rewriting liar members as independent
+- deleting stale leaves
+
+Without an explicit idempotence/termination contract, the implementation
+could oscillate between "create scaffold" and "delete empty scaffold",
+or keep requeuing descendants.
+*** DONE We should make tests for idempotence
+but it would slow down the production code,
+so 'keep running here until running here changes nothing'
+is not how the update algorithm itself should work.
+**** Termination is structural, not a fixpoint (Claude)
+Agreed -- no fixpoint loop in production. Termination is guaranteed
+structurally once BFS obeys "create/update descendants, never ancestors":
+each node is visited once; the only new work is descendants (and the
+bounded self-deletions), so the frontier strictly shrinks toward the
+leaves; the per-buffer node limit caps how many new nodes can ever be
+created. The only re-entrant-looking pieces -- "create scaffold then
+delete it if empty" -- can't oscillate, because each generated col
+decides emptiness from its graph goal list at its single visit, and the
+DeadScaffold sweep is a one-shot postorder pass, not a loop. So
+idempotence is a *test* property (run completion twice on an unchanged
+graph/view; assert no diff), exactly as you say, not a runtime strategy.
+** "Maybe some neighbors" needs boundaries
+Some update rules inherently inspect ancestors, grandchildren, siblings,
+and global state. For example:
+
+- HiddenInSubscribeeCol needs the subscriber, subscribee, subscribee
+  contents, and subscriber hides.
+- HiddenOutsideOfSubscribeeCol needs all sibling subscribees and their
+  top-level contents.
+- a definitive view request may need to indefinitize another occurrence
+  of the same ID elsewhere in the buffer.
+- source-set filtering can replace an otherwise ordinary goal child with
+  an inactive placeholder.
+
+The vision should say what counts as a legal local dependency. Otherwise
+the "each node updates itself" framing could hide global coupling rather
+than remove it.
+*** DONE definitive requests indeed require global viewtree awareness
+There's no telling how far apart an indef node with a def view request
+and a def node that will need to be indefinitized might be.
+But the other three kinds of collection update in a very local manner.
+I believe you can determine the scope of each.
+For instance, in the course of updating a HiddenOutsideOfSubscribeeCol,
+we update only it and its children (but BFS will recurse into the children),
+and we read its grandparent, the subscriber
+(and maybe as a validation step its parent,
+to be sure it's a SubscribeeCol,
+but I suspect that validation already happens earlier).
+**** Scope of each updater, confirmed against the code (Claude)
+Your read is right, and the bounded-relative reads are exactly what the
+current code does:
+- HiddenOutsideOfSubscribeeCol: reads grandparent (subscriber) via
+  =correct_subscriber_ancestor_distance= and validates parent is a
+  SubscribeeCol (hiddenoutsideof_subscribeecol.rs:63-101). Children come
+  from BFS recursion. Nothing else.
+- HiddenInSubscribeeCol: reads the subscriber up the chain and the
+  subscribee's own contents (hiddeninsubscribee_col.rs). Bounded.
+- SubscribeeCol: reads its parent (the subscriber) only
+  (subscribee_col.rs:69-106).
+- AliasCol/IDCol: read their parent Normal node only
+  (aliascol.rs:43-50, id_col.rs).
+So three of the four classes are purely "self + bounded ancestor/sibling
++ own children". Only definitive-request execution is unbounded, and it
+is the one thing that consults global scheduler state (the DefinitiveMap).
+That is a clean boundary: per-kind updates take bounded local context;
+the global map is the single global affordance.
+**** Remaining concern
+This mostly answers it. The plan can treat the ancestor/sibling cases as
+legal local context, and isolate definitive-request handling as global
+scheduler state. That makes the boundary much clearer:
+
+- normal per-kind update may inspect bounded relatives, e.g. parent,
+  grandparent, children, siblings, and source-set/diff context
+- definitive request execution may consult global maps of type ID -> NodeId
+***** DONE Claude, can you ascertain the 'remaining concern' here?
+ChatGPT entitled the above as if there was some problem left for me to resolve,
+but stated no such problem.
+****** Answer (Claude): there is no remaining concern
+You read it correctly. The "Remaining concern" node states a *conclusion*
+("This mostly answers it ... the boundary is much clearer"), not a
+problem. The heading is mislabeled; nothing under it is unresolved. The
+boundary it draws -- per-kind updates inspect bounded relatives;
+definitive-request execution consults a global ID→NodeId map -- is
+self-contained and matches the code.
+
+The only genuinely open follow-up is the one *you* named elsewhere (under
+"Definitive view requests are dangerous"): say how the global map is
+maintained under delete / merge / node-limit. The code already answers
+that, and one map (not two) suffices -- see my "Map maintenance" note
+under "Definitive view requests are dangerous as a propagation
+mechanism". So: nothing to resolve here; safe to close.
+* Proposed update algorithm for missing variants
+** the proposal
+*** BufferRoot : carries no information to update
+*** =DeadScaffold= : Delete if childless, otherwise retain.
+*** =Vognode::Phantom= : Discard and regenerate.
+If it has children, turn it into a DeadScaffold so they can be retained.
+Otherwise delete it.
+Regardless of whichever of those two happened, respawn it.
+But this is handled by its parent's update, not by it.
+(Maybe by its parent's "diff update",
+if that is separate from its parent's regular update.)
+*** =Vognode:: Deleted = : Delete if childless, otherwise retain.
+*** Vognode::Inactive
+Handled by its parent, whose completion goal-list
+can include many kinds of vognode --
+at least Normal, Inactive and Unknown nodes.
+If the active source set has changed, this might vanish,
+to be replaced with a Normal vognode, or vice-versa.
+*** Vognode::Unknown
+Retain it if it is still a member of the collection the parent defines.
+If it is not and it has content, retain it but change it to DeadScaffold.
+If it is not and has no content, delete it.
+*** =Qual::TextChanged=
+Deleted and respawned. Handled by its parent's update, not itself.
+** Claude's review of these proposed rules against the code
+Most of these match today's behavior; three are new work, flagged below.
+(Leaving this section TODO because implementing the rules is real work.)
+*** BufferRoot: matches -- inert root (=viewforest_root_viewnode=).
+*** DeadScaffold "delete if childless else retain": matches
+  =remove_empty_deleted_scaffolds= + =scaffolds_with_deadOrDeleted_parents_become_dead=.
+  CAVEAT: childless-ness of a parent dead-scaffold can only be known after
+  its children resolve, so this must run postorder (or as a final sweep) --
+  pure top-down BFS leaves nested empty dead-scaffolds. See my BFS analysis,
+  case (e).
+*** Vognode::Phantom "discard and regenerate, by the parent": matches.
+  =remove_branches_that_git_marked_removed= strips non-root,
+  parentIs=Affected phantoms (update_buffer.rs:403-406); the parent's
+  content goal list re-interleaves fresh phantoms. Your "if it has children,
+  turn it into a DeadScaffold so they're retained" is NOT what the strip
+  does today (it detaches the whole branch, pruning recursion); that's a
+  refinement to implement.
+*** Vognode::Deleted "delete if childless else retain": PARTLY new. A Deleted
+  node is kept regardless of children today (=mutate_truenode_to_deletednode=);
+  nothing deletes a *childless* Deleted vognode (the empty-sweep only
+  targets DeadScaffold). The "delete if childless" half is new behavior.
+*** Vognode::Inactive: matches; see the source-set replacement resolution
+  above (=build_child_creation_data= chooses Inactive vs Real per render).
+*** Vognode::Unknown: mostly NEW. Today Unknown is created for an
+  unresolvable id and then no-op'd in completion (complete.rs:145-149); the
+  content reconciler's relevance closure doesn't include Unknown
+  (complete_preorder/truenode.rs:406-423), so an Unknown child is neither
+  re-checked for membership nor removed -- it just persists in place. Your
+  rules (retain if still a member; →DeadScaffold if non-member with content;
+  delete if non-member leaf) are new behavior to add.
+*** Qual::TextChanged "deleted and respawned by parent": matches
+  =remove_diff_only_scaffolds= + =maybe_prepend_diff_view_scaffolds=.
+* DONE Saved-buffer definitive Vognodes still need update work
+The vision says:
+
+#+begin_quote
+definitive Vognode from saved buffer: no need to update
+#+end_quote
+
+That is too strong. It is true that the saved definitive Vognode defines
+its own title/body/source and affected children for save extraction, so
+we should not clobber those fields from disk before interpreting the
+save. But after the save has updated the graph, the saved buffer still
+needs rendering cleanup.
+
+** Examples of required post-save work:
+
+*** assigning IDs and sources to newly created nodes
+
+**** DONE this happens before update (indeed, before even saving)
+
+*** clearing edit requests that were consumed by save
+**** DONE Fair.
+*** normalizing metadata
+**** DONE You right, you right.
+*** updating graphStats and viewStats
+**** DONE Yes
+*** converting nodes deleted by the save into deleted placeholders in overlapping views
+**** DONE Yes
+*** repairing aliases, extra IDs, relationship collections, and generated hidden collections
+**** DONE mostly right
+I don't see how aliases could need repair.
+IDs could, due to merges.
+Almost all the relationship collections could,
+but not the subscribeeCol, because it just got defined here.
+***** Fact-check (Claude): you're right on all three
+- Aliases: CORRECT. A node's aliases (=NodeComplete.aliases=) change only
+  by editing its alias children, which the saved buffer already carries.
+  Crucially, *merge does not combine aliases*: =three_merged_nodecompletes=
+  (merge/mergeInstructionTriple.rs:162-223) clones the acquirer -- keeping
+  its aliases -- and unions extra_ids/contains/subscribes/hides/overrides,
+  but never aliases; the acquiree's aliases are dropped outright
+  (=create_acquiree_text_preserver= sets =aliases: Unspecified=, line 229).
+  So unlike IDs, the saved acquirer's AliasCol needs no repair. (Aside:
+  silently dropping the acquiree's aliases on merge is arguably its own
+  bug -- you can no longer find the merged node by the acquiree's old
+  aliases. Logged in TODO/problems.org.)
+- IDs: CORRECT. The merge unions =extra_ids= (acquiree pid + its extras),
+  so the saved acquirer's IDCol must be repaired.
+- Relationship cols: CORRECT. The subscribeeCol of the saved subscriber
+  reflects the =subscribes_to= it just defined, so it needs no repair; the
+  read-only cols (subscriberCol, overrider/overridden, hider/hidden) can
+  go stale because they're edited from the *other* side of the relation.
+*** applying source-set filtering and inactive placeholders
+**** DONE yes
+*** applying git diff metadata/scaffolds when diff mode is enabled
+**** DONE yes
+*** preserving focus, folding, and point restoration semantics
+**** DONE yes
+** The spec should distinguish
+"do not use graph data to redefine the saved node before save extraction"
+from "do not update this node after save".
+The latter would leave stale or invalid view state.
+*** DONE could you elaborate on this point?
+**** Elaboration
+There are two different moments:
+
+- Before save extraction, the saved buffer is authoritative. If the user
+  changed title/body/children/source in the buffer, update must not first
+  reload that same node from disk and erase those edits.
+- After save extraction and graph update, the graph/disk state is
+  authoritative again. The saved buffer still needs a rerender pass to
+  add generated data, remove consumed requests, refresh stats, apply
+  source-set/diff display, and normalize placeholders.
+
+So "saved definitive Vognodes do not update themselves" is safe only in
+the narrow pre-extraction sense. In the post-save rerender, they should
+still participate in update; they just should not be clobbered from the
+old disk state before their edits have been saved.
+***** DONE agreed
+I may have been prematurely optimizing when I said we shouldn't
+update a definitive ViewNode. Even if that's right, in the scheme
+of things (a buffer might have hundreds of nodes) it's negligible.
+****** Noted (Claude)
+Right -- it's one rerender pass over nodes that already exist, dwarfed by
+the per-node graphStats queries that run afterward. Not worth the
+complexity of special-casing saved definitive nodes out of the update.
+* Collateral-buffer behavior is underspecified
+The document mentions "def Vognode from collateral buffer" but does not
+define the whole collateral lifecycle.
+
+This is dangerous because collateral updates are where stale definitive
+views can contradict the saved graph.
+
+** whether collateral definitive nodes are refreshed from disk even when they were definitive in that buffer
+*** DONE they should be refreshed
+**** Confirmed in code (Claude)
+This is exactly what the mode flag does:
+=should_sync_from_disk_even_though_definitive= returns =!saved_view=
+(complete_preorder/truenode.rs:71-74), so for every *collateral* buffer a
+definitive node has its title/source/body re-synced from disk
+(=sync_truenode_from_disk=, line 149-150). Only the saved view is exempt,
+because it is the authority that just *defined* those fields.
+** what happens if collateral buffers have unsaved edits
+*** DONE warn the user loudly ("DANGER: There are other unsaved buffers. They could clobber these edits when they are saved.") and ask if they mean it.
+If they mean it, then do the save,
+ignore the buffer with unsaved edits, update the others.
+But don't warn about any unsaved buffer;
+just one whose node set overlaps the non-viewforest portion of the SavePlan.
+**** Status & note (Claude): this is new work
+None of this exists today. The save path locks collateral buffers via the
+early lock message (=uris_of_views_to_lock=) but never *detects*
+pre-existing unsaved edits and never asks the user anything; it just
+rerenders them, which can clobber such edits. So the warn-and-confirm
+handshake is new behavior. Two implementation notes:
+- "non-viewforest portion of the SavePlan" = the instruction PIDs
+  (=define_nodes= incl. merges; =source_moves= subsumed), matching the
+  collateral-narrowing resolution above. Overlap with *that* set is what
+  should trigger the warning.
+- The server cannot currently ask the client a question mid-save; the
+  protocol is one request → a stream of responses. A confirm step needs
+  either a new request type ("save with unsaved-collateral override") that
+  Emacs sends after the user confirms, or client-side detection before the
+  save request is sent at all. The latter is simpler and keeps the server
+  stateless.
+***** DONE Emacs can handle the handshake
+It would be cool if we could narrow the set of concerning buffers,
+but since that requires computing the SavePlan, which can be slow,
+let's go the simpler route: Warn if any skg buffer at all is unsaved.
+****** Confirmed (Claude)
+Good -- and it keeps the server stateless. Emacs already knows which
+buffers are modified (=buffer-modified-p= per skg buffer), so before
+sending the save it can scan its open skg buffers and, if any *other* one
+is modified, warn and confirm; on confirm, send the save as usual. No
+SavePlan and no new server message needed, at the cost of occasionally
+warning about an unsaved buffer that wouldn't actually have collided --
+the accepted simplicity tradeoff. (Same theme as the early-lock item:
+don't block the user on the slow SavePlan computation.)
+** how deleted-by-this-save nodes are represented
+*** DONE What do we do currently?
+**** Current behavior
+During =update_views_after_save=, the rerender context builds
+=deleted_by_this_save_pids= from =DefineNode::Delete=. During
+=expand_true_content_at_truenode=, a normal Vognode whose PID appears in
+that set is mutated to =Vognode::Deleted=, preserving its title/body and
+subtree. Scaffolds underneath deleted/dead parents are later converted to
+=DeadScaffold= or pruned if empty.
+
+This is separate from git-diff phantoms: a node can be deleted by this
+save even if it is not a git HEAD deletion case.
+**** DONE that same procedure should work in the new local-update algorithm
+but we'll need to expand what is converted to Deleted.
+An Inactive node could also be deleted.
+(The user really shouldn't do that, but stopping them feels hard.)
+***** Confirmed gap (Claude)
+You're right, and the gap is concrete. The Normal→Deleted conversion
+(=mutate_truenode_to_deletednode=) lives *inside*
+=expand_true_content_at_truenode=, which only ever runs on
+=Vognode::Normal= (complete_preorder/truenode.rs:115-140). Inactive nodes
+are created fresh by the parent's reconcile and never pass through that
+deletion check, so an Inactive node whose pid is in
+=deleted_by_this_save_pids= stays Inactive instead of becoming Deleted.
+In the new model the rule is: when reconciling a parent, any child (Normal
+*or* Inactive) whose pid is in =deleted_by_this_save_pids= becomes a
+DeletedNode, preserving its title/source and subtree. Logged in
+TODO/problems.org as a current-code gap too.
+** how focus/folding survive a streamed collateral replacement
+*** Current behavior
+The server stores a =ViewForest= for each open view. A collateral
+rerender clones that stored forest, mutates it, renders text, and
+replaces the stored forest. Because old ViewNodes are reused when
+reconciliation can reuse them, their =focused=, =folded=, and
+=body_folded= fields often survive moves/reorders.
+
+For destructive scaffold deletion, helpers such as
+=detach_scaffold_transferring_focus= move focus to the parent if the
+deleted subtree contained focus. For reconciliation discards,
+=complete_relevant_children_in_viewnodetree= marks the parent focused if
+it had to discard a focused subtree.
+
+Point/scroll restoration is explicit only for the saved buffer response,
+via the two point fields in the save request/response. Collateral
+streamed replacement does not appear to carry separate point restoration
+metadata; it relies on the rendered buffer replacement and preserved
+focus metadata.
+*** DONE we can do the same thing
+But we ought to treat collateral and saved buffer the same way:
+Transfer point up to the nearest surviving ancestor
+if the viewnode carrying it vanishes.
+Retain every field (folded, body folded, focused) possible.
+Any new node N is created completely unfolded.
+
+(If any ancestor of N's is folded,
+Emacs will restore that ancestor's foldedness,
+and hence I believe will not draw the unfolded content of N,
+regardless of what N says. This is already coded.)
+**** Status against code (Claude)
+Most of this exists; the one new piece is point-transfer for collateral.
+- Focus transfer on vanishing scaffolds already exists
+  (=detach_scaffold_transferring_focus=, used by the self-deleting
+  SubscribeeCol at subscribee_col.rs:53) and reconciliation marks the
+  parent focused when it must discard a focused subtree
+  (=complete_relevant_children_in_viewnodetree=). The uniform rule
+  "hand focus to the nearest surviving ancestor" generalizes these.
+- folded / body_folded are preserved because reconciliation *reuses*
+  existing ViewNodes when it can, carrying those fields across
+  moves/reorders. New nodes are constructed unfolded by the =mk_*=
+  helpers. Both already hold.
+- Point restoration is the gap: today it is explicit only for the saved
+  buffer (the two point fields in the save request/response,
+  api-and-formats §Save buffer). Collateral streamed replacement carries
+  no point metadata, so "transfer point up to the nearest surviving
+  ancestor" in collateral buffers is new work and needs the client's help
+  (the server doesn't know where point is in a collateral buffer). Worth
+  stating in the plan as the single new requirement here.
+* DONE The "ignore ParentIs=Independent" rule needs more precision
+The vision says every kind of ViewNode ignores children marked
+ParentIs=Independent when updating its parent. That sounds reasonable,
+but it does not specify what happens to those children as view objects.
+
+Current code sometimes moves independent normal children before affected
+content, while scaffolds usually precede both. A uniform rule is good,
+but the display-order and recursive-update consequences need to be
+specified.
+
+Questions:
+
+// TODO : I answered each of the following questions in its body.
+
+** Are independent children preserved exactly, including order?
+Yes, among themselves, but they can be moved to precede
+whatever kind of node might be inserted during completion.
+** Are they moved before or after generated/affected members?
+Before.
+** Are their descendants updated recursively?
+Yes, but they should not concern themselves with their descendents.
+The (BFS?) traversal will get to those descendents on its own,
+and the way it updates them depends on the kind of descendent.
+As long as we've specified how to treat each kind, we should be good.
+** Can an independent child under a scaffold keep view requests?
+Yes.
+** Can independent children under generated read-only collections be saved as ordinary graph nodes elsewhere?
+Yes.
+** Are phantoms considered to have meaningful ParentIs at all?
+I believe there is nothing in the code that uses a Phantom's ParentIs.
+But please fact-check me on that.
+*** Fact-check
+Mostly true semantically, but not literally true in code.
+
+Current code treats phantom =parentIs= as vestigial in comments, and
+save extraction ignores phantoms as graph edits. However, a few
+validation/cleanup paths still inspect it:
+
+- parser validation accepts phantoms under some scaffolds regardless of
+  =parentIs= where normal nodes must be affected
+- =remove_branches_that_git_marked_removed= removes non-root phantoms
+  only when =parentIs= is =Affected=
+- tree helpers that skip non-content can exclude phantom children with
+  non-affected =parentIs=
+
+For the new plan, it would be cleaner to declare phantom =parentIs=
+display-only/vestigial and avoid depending on it, except perhaps as a
+temporary cleanup guard while migrating.
+* DONE "Liar member" handling is underspecified and potentially lossy
+The document defines liar members as children claiming
+ParentIs=Affected where the graph disproves the claim. The proposed
+treatments are "delete them or mark them independent".
+
+That needs sharper rules, because deleting a view subtree can discard
+valuable unsaved view state even if it does not directly delete graph
+data.
+
+** questions
+// TODO: I have answered each of these in its body
+*** What exactly is a "leaf"? No org-descendants, no true-node descendants, no body, no user edits, or no generated children?
+A view-leaf, a leaf in the org-mode sense.
+*** Does a phantom count as a liar, or is it explicitly allowed to describe removed membership?
+Phantoms are not liars ... if they're not lying!
+The user could move a phantom from where it is true to where it is false.
+The current code handles this, I think, by creating them anew on each update.
+That seems acceptable.
+It means each viewnode kind needs another aspect defined for its update behavior:
+Does it delete and regenerate any kind of child?
+
+IIRC, Skg puts RemovedHere nodes in the right place among their siblings.
+That behavior is really cool, and should be preserved.
+*** Does =Vognode::Inactive= count as a member for reconciliation?
+I don't know what you mean. To reconcile what against what?
+**** Clarification
+I meant: if a parent/scaffold has a goal list of child IDs, and one goal
+ID belongs to an inactive source, should an existing =Vognode::Inactive=
+with that ID satisfy the goal member, or should the updater create some
+other child and treat the inactive placeholder as stale?
+
+Your later source-set answers resolve this: yes, inactive nodes are
+members for list reconciliation. So an inactive placeholder with the goal
+ID should satisfy the goal and be reordered like a normal member, without
+exposing inactive content.
+*** If a stale child has focus, where does focus move?
+The nearest surviving ancestor.
+*** If a stale child has an AliasCol/IDCol/Hidden* subtree beneath it, is that subtree discarded?
+I guess the simplest rule is probably best:
+If it's not a view-leaf, don't delete it.
+*** Should read-only generated collections delete stale affected members, while editable collections demote them?
+Let's have them *all* delete stale view-leaves,
+but leave any other kind of branch in place, marking it independent.
+** The current code already differs here.
+Some stale generated collection
+members are demoted, while HiddenInSubscribeeCol and
+HiddenOutsideOfSubscribeeCol deliberately delete stale members rather
+than preserving them as independent. The vision mentions this result but
+does not explain the safety rule.
+
+*** DONE That's right, this is a behavior change.
+
+* DONE List vs set update is too coarse
+The document says some collections are ordered lists and some are sets,
+and that set update can ignore order and append new nodes. That is not
+yet precise enough for Skg.
+
+** Examples
+// TODO: I have responded in the body of each question, where I can.
+// But most of these aren't questions, so I don't know what information you need.
+*** =contains= is ordered in the file format and user-facing view.
+*** aliases and extra IDs look set-like semantically, but their rendered order still affects diff stability.
+I don't understand. Consider a set of aliases. Once we update it,
+it will have every alias of the node, and none that aren't of the node,
+in some order. If we update it again, but the graph has not changed,
+it will not change.
+*** SubscribeeCol currently has an order because the subscriber's =subscribes_to= field is stored as a list.
+Subscribee order matters.
+*** HiddenInSubscribeeCol order depends on the subscriber's hides list intersected with subscribee contents.
+Its order is irrelevant to a user. If it's relevant to tests, sort by ID first.
+*** HiddenOutsideOfSubscribeeCol order depends on the subscriber's hides list after subtracting subscribed content.
+Its order is irrelevant to a user. If it's relevant to tests, sort by ID first.
+*** relationship collections like SubscriberCol/OverriderCol may be graph-derived sets, but arbitrary append order can cause needless churn between renders unless the source order is deterministic.
+Its order is irrelevant to a user. If it's relevant to tests, sort by ID first.
+** DONE Resolution
+This closes my concern. The plan should say that user-relevant lists
+preserve graph/file order, while user-irrelevant generated sets use a
+deterministic order such as ID sort.
+* DONE Definitive view requests are dangerous as a propagation mechanism
+For "indef Vognode with a definitive view request, or def Vognode from
+collateral buffer", the vision says all normal affected children should
+be given their own definitive view request.
+
+This is powerful but risky:
+
+- It can turn a small local request into a large transitive expansion.
+- It can create duplicate definitive occurrences unless the definitive
+  map is updated globally.
+- It makes node-limit behavior harder to reason about.
+- It could overwrite a user's intentional indefinitive local view.
+- In a collateral buffer, it might expand far more than the saved change
+  requires.
+
+If this is the intended replacement for BFS rendering, it needs a
+budgeted work-queue definition and an explicit one-definitive-per-ID
+policy. Otherwise it is a hidden recursive renderer.
+** DONE Good catch!
+During update we should maintain a map called
+'definitive view requests' ("dvr"s) from (skg) ID to (ego_tree) NodeId,
+and another called 'definitive nodes' of the same type.
+Each time we would generate a dvr, we first check whether the dvrs map
+already has a dvr for that ID. If so, we leave the old one in place,
+and the would-be usurper is instead rendered indefinitive.
+
+When we execute a dvr, we use the 'definitive nodes' map
+to avoid having to traverse the whole tree to find the
+previously-definitive node that needs to be made indefinitive.
+*** DONE Resolution
+This answers my concern, provided the plan also says how both maps are
+updated when nodes are deleted, rewritten after merge, or skipped by the
+node limit.
+**** Map maintenance, and "both maps" can be one map (Claude)
+First, the simplification: you proposed two maps (a "definitive view
+requests" map and a "definitive nodes" map). The code uses *one*,
+=DefinitiveMap = HashMap<ID, NodeId>= (to_org/util.rs:43-44), and its
+docstring lists both of your uses -- prevent duplicate expansions, and
+locate the conflict to indefinitize. One map suffices; keep it that way.
+
+How the single map stays consistent under each operation:
+- Rebuilt per render. =rerender_view= starts each pass with a fresh
+  =DefinitiveMap::new()= (update_buffer.rs:250), so nothing stale carries
+  across saves.
+- Merge / extra_id rewrite. =rewriteInPlace_viewnodes_whose_id_is_newly_extra=
+  runs *before* completion (update_buffer.rs:133), so the map is populated
+  with post-merge (acquirer) pids -- no acquiree keys ever enter it.
+- Deletion. A node deleted by this save becomes =Vognode::Deleted= and
+  returns early without a map entry (complete_preorder/truenode.rs:137-140);
+  Deleted/Inactive/Unknown are never definitive. And indefinitizing a
+  subtree removes its keys (=indefinitize_content_subtree=,
+  definitive.rs:194-196).
+- Node limit. Truncated nodes are left indefinitive and evicted from the
+  map (truncate_after_node_in_gen.rs), so a skipped node never claims an
+  ID. In the new per-buffer-budget model, the rule is the same: once the
+  budget is hit, stop registering definitive nodes; remaining requests are
+  stripped.
+So the maintenance you asked for is already realized; the plan just needs
+to state these four invariants and that there is one map.
+* DONE Node limit semantics are not yet adequate
+The proposed node-limit rule is:
+
+#+begin_quote
+Never delete from what's in a view already. Regardless of traversal
+order, upon hitting the nodelimit, truncate what remains to be drawn.
+#+end_quote
+
+** questions
+// TODO: My answers are in the bodies
+*** Is the limit per buffer, per update request, per definitive subtree, or per local updater invocation?
+Per buffer, reset to 0 at each update, and only counts new viewnodes.
+*** Do scaffold nodes count?
+yes
+*** Do phantoms, inactive nodes, deleted nodes, aliases, and IDs count?
+yes
+*** If existing nodes are never deleted, can an old huge view remain huge forever even after the graph changes?
+yes
+*** If the limit is hit halfway through a sibling group, do we complete the sibling group as current BFS rendering does?
+nah. render the remaining siblings indef. should be much simpler.
+(the current code is clever while I remember it but atrocious thereafter;
+I need a simpler model.)
+*** What is the deterministic traversal order for "what remains"?
+Will BFS work? (That is, get to the remaining nodes in BFS order.
+If a node's update procedure involves manipulating nearby neighbors,
+we do that during the node's update, rather than waiting for BFS
+to reach those neighbors.)
+*** Are user-requested definitive expansions allowed to exceed the limit when much of the content already exists in the view?
+No. Once the node limit is hit, all remaining dvrs are stripped and ignored,
+the nodes they were on remaining indefinitive.
+*** DONE yes, this changes behavior
+** DONE Resolution
+Your answers define a coherent simpler behavior: per-buffer budget,
+counting only new ViewNodes, all ViewNode kinds count, BFS order, and
+remaining DVRs are stripped after the budget is exhausted.
+* Diff mode is mostly absent
+** the problem
+The vision does not say how local update handles git diff mode.
+
+Important missing details:
+
+- creation and removal of =Qual::TextChanged=
+- IDCol and AliasCol membership axes
+- phantoms for removed content/relationship membership
+- deleted files that are still visible through HEAD
+- moved-twice or staged/unstaged split cases
+- not-in-git sources
+- merge-commit refusal behavior
+- whether diff scaffolds are removed when diff mode is disabled
+
+Diff mode is one of the places where "the graph disproves this child"
+is not enough: a child can be absent from the worktree graph precisely
+because the view is supposed to show a removed membership.
+** DONE do a diff view update after the regular update
+*** what chatgpt wrote
+Run the local view update as if rendering the worktree. Then run a
+separate diff overlay pass that:
+
+- strips stale diff-only state first
+- injects =Qual::TextChanged= under changed definitive nodes
+- injects/reconciles IDCol/AliasCol diff children with membership axes
+- inserts phantoms for removed content/relation membership
+- marks per-node existence/membership axes
+- attaches containerward ancestry for RemovedHere phantoms
+- does nothing when diff mode is off except ensure stale diff state is gone
+
+This matches much of the current shape and keeps ordinary local updaters
+from learning every diff case.
+*** Jeff adds
+This only needs to be defined, I think, for Vognode::Normal.
+It can again be done in BFS order.
+Each Vognode::Normal update can traverse into its descendents,
+and rather far -- at farthest, I think, it reaches 4 levels deep:
+```
+Origini Vognode -> SubscribeeCol -> subscribee Vognode -> HiddenInSubscribeeCol -> hidden Vognode
+```
+**** Confirmed scope (Claude)
+Your scoping is right (and is the same conclusion as my "is that really
+simpler?" answer above). Every diff-bearing field originates on a
+=Vognode::Normal=:
+- =set_diff_status= writes the node's existence/membership axes and flips
+  it to Phantom (complete_preorder/truenode.rs:682-782);
+- =maybe_prepend_diff_view_scaffolds= emits its TextChanged / IDCol /
+  AliasCol children (same file, 520-574);
+- phantom content children are interleaved into its content goal list;
+- the Alias/ID/Inactive =membership= axes are written *by* the parent
+  Normal node, not by those children themselves.
+The 4-level reach is real and is the deepest path: the diff pass at an
+origin Normal node may need to walk Origin → SubscribeeCol → subscribee
+(Normal) → HiddenInSubscribeeCol → hidden (Normal). Containerward /
+sourceward don't deepen this -- they attach as indefinitive independent
+*descendants* (backpath.rs:255-265), and indefinitive nodes don't expand.
+One requirement to note: the diff pass runs *after* the ordinary update,
+so the ordinary update must leave the worktree content in place for the
+diff pass to diff HEAD/index against. It also subsumes today's
+=ensure_diff_scaffolds= phase, which fixes the
+made-definitive-during-a-request gap noted above.
+* DONE Source sets and inactive nodes are absent
+The current API has active source-set filtering. A local update rule must
+say what happens when a goal child exists but belongs to an inactive
+source.
+
+** Questions:
+// TODO: answers in bodies as usual
+*** Does update create =Vognode::Inactive= placeholders?
+Yes
+*** Are inactive nodes considered members for list reconciliation?
+Yes
+*** Do inactive nodes participate in liar-member checks?
+Yes
+*** Can inactive children be deleted as "liars" if the active source-set changes?
+Yes
+*** Should view requests on inactive nodes be rejected, preserved, or dropped?
+Are they representable? If so that seems like a wart. They should be dropped.
+** DONE Resolution
+This answers the source-set behavior. The plan should explicitly say
+inactive placeholders satisfy membership goals, participate in stale
+member checks, can be deleted if stale, and drop view requests.
+
+* DONE Subscribee-as-such save semantics need a separate rule
+The current behavior for a subscribee-as-such is special: when saving a
+view, immediate child edits under the subscribee-as-such are interpreted
+as hide/unhide intent for the subscriber. The current completion code
+preserves that branch during saved-view completion in ordinary non-diff
+mode so the save can interpret it.
+
+The vision says SubscribeeCol uses list update against subscribees and
+HiddenOutsideOfSubscribeeCol, and that children it creates are
+indefinitive and need no update. It does not explicitly preserve the
+subscribee-as-such branch before save interpretation.
+
+This is dangerous. If saved-view update regenerates a subscribee's
+children from the graph too early, the user's hide/unhide edit can be
+erased before it is converted into hiderel instructions.
+
+** DONE
+I thought save was complete before view update began.
+If not we will have to fix that.
+The subscribees-as-such should be preserved if they are still members.
+If they are lying members, they should be deleted if indefinitive leaves,
+and otherwise marked parentis=independent
+*** Current save/update ordering
+You are right about the high-level order. The current save path parses
+the buffer, extracts a =SavePlan=, updates graph/disk/TypeDB/Tantivy and
+context, and only then calls =update_views_after_save= to rerender saved
+and collateral views.
+
+The reason I raised this is that the old/current completion code is
+involved in the rerender path and has special saved-view logic for
+subscribee-as-such branches. In the new design, the important invariant
+is: no local view update rule should run on the user's submitted buffer
+before save extraction. After extraction, preserving subscribees-as-such
+that are still members matches your rule.
+
+* DONE HiddenOutsideOfSubscribeeCol editability is awkward
+The vision says HiddenOutsideOfSubscribeeCol deletes itself if empty and
+otherwise is a read-only generated collection. Current type comments say
+it probably should be editable, because otherwise unhiding unnecessarily
+hidden nodes is baroque.
+
+That does not have to be solved in this refactor, but the new local
+update design should avoid baking in the read-only limitation so deeply
+that later editability becomes harder.
+** DONE
+When this becomes a concrete architectural decision, let me know.
+For now I can only agree in the abstract.
+*** DONE Resolution
+No immediate action needed for this plan, beyond avoiding an
+implementation that makes future editability much harder.
+* AliasCol and IDCol rules are incomplete
+The vision says:
+
+#+begin_quote
+AliasCol & IDCol set update, children are done, delete lying members,
+disregard order
+#+end_quote
+
+** questions
+// TODO answers in bodies again
+*** Alias/ID ordering should be stable for readable diffs.
+Oh! Now I see what you're talking about. You mean the actual git diff
+for the corresponding .skg file. Yes, we should minimize churn in those files.
+But set update should still do the job there.
+If someone deletes an old ID, we delete it in the file.
+If they add a new one, we append it in the file.
+I don't really see a noise opportunity.
+*** IDCol contains the primary ID plus extra IDs; deleting a user-edited ID scaffold may be semantically different from dropping a stale alias.
+IDCol is readonly. User edits to any Qual are ignored.
+If the user deletes the whole collection from the view,
+that only affects the view.
+*** In diff mode, Alias and ID children carry membership axes.
+What's your question?
+**** Clarification
+The question is whether AliasCol/IDCol update should be responsible for
+preserving/rendering staged/unstaged membership axes, or whether that
+belongs to a separate diff overlay pass.
+
+If we use the recommended overlay approach, ordinary AliasCol/IDCol set
+update can ignore axes. The diff overlay then handles axes when diff mode
+is on.
+***** DONE seems good
+****** Confirmed (Claude)
+Matches the code's split. =reconcile_alias_col_children= computes an
+axes_map only when =source_diffs= is present (diff mode) and stamps
+=membership= on the Alias quals it creates; in non-diff mode the axes
+default and the reconcile is a plain set-update against the parent's
+on-disk aliases (aliascol.rs:55-95). So "ordinary set update ignores
+axes; the diff overlay supplies them" is exactly the current shape -- keep
+it.
+*** Normal Vognode children under AliasCol are currently invalid or repaired to independent, not simply "lying members" in the same sense as relation-col children.
+What's your question?
+**** Clarification
+The question is whether the new generic "lying member" rule applies to
+children whose kind is illegal for the collection at all.
+
+For example, a Normal Vognode under AliasCol is not an alias with a stale
+membership claim; it is the wrong kind of child. I think the plan should
+have two categories:
+
+- wrong-kind children: validation error, or preserve as independent only
+  if the parser allows that structure
+- right-kind stale members: delete if view-leaf, otherwise demote to
+  independent
+**** DONE
+Permit independent branches to remain.
+Delete stale members (which are necessarily the right kind).
+Other kinds of children should trigger validation errors.
+***** Confirmed against the code (Claude)
+This three-way split is what the AliasCol reconciler already implements
+(and the right general rule for all generated collections):
+- stale right-kind members: =complete_relevant_children_in_viewnodetree=
+  deletes Alias quals not in the goal list (aliascol.rs:89-95);
+- wrong-kind children: rejected at validation, so they never reach
+  reconcile. The =treat_certain_children= call that would demote a Normal
+  vognode child to Independent is a dead-but-safe net "currently
+  unreachable: validation rejects normal vognode children of AliasCol"
+  (aliascol.rs:96-107);
+- independent branches: untouched (the goal-list set update only acts on
+  the right kind, so an independent branch simply survives).
+So the generic rule for the new model is: per collection kind, (a) delete
+stale view-leaf members of the right kind, (b) leave independent branches,
+(c) error on illegal kinds at validation rather than silently repairing
+them.
+*** =Qual::TextChanged= is a Qual but not covered by "Alias & ID".
+Updates to TextChanged should be governed by the parent Vognode.
+* "Children it creates need no processing" is sometimes false or needs a reason
+Several rules say created children are indefinitive and need no update.
+That can be true for simple relation collection members, but the spec
+should explain when it is safe.
+
+For a newly created child, "no update" means at least:
+
+- title/source/body are already sufficient
+- graphStats/viewStats will still be filled later, or are intentionally
+  absent
+- no children/scaffolds/view requests should be rendered beneath it
+- source-set and diff status have already been applied
+
+If any of those are not true, "created and done" will produce stale or
+incomplete display metadata.
+** DONE I don't understand your question.
+*** Clarification
+I was asking for the invariant behind "created children need no more
+processing".
+
+For example, if SubscribeeCol creates an indefinitive child with a title
+and source, it is probably done because indefinitive nodes intentionally
+have no body/content expansion. But if a Vognode creates a child that is
+supposed to become definitive, then that child is not done; it needs its
+own update/DVR processing.
+
+So the plan should say, per creator:
+
+- what exact kind of child is created
+- whether it is final display-only output
+- whether it should be enqueued/visited later by BFS
+- whether stats/source-set/diff metadata are supplied immediately or by
+  later global passes
+** DONE where I said 'children are done' or 'children need more processing'
+I meant specifically updating.
+Everything in the tree should,
+after this local update/completion/correction step,
+have its stats filled in. That's not part of the local update.
+*** The invariant, per creator (Claude)
+With "done" = "needs no further *updating*" (stats are always a separate
+later pass -- =set_graphnodestats_in_viewforest= /
+=set_viewnodestats_in_viewforest= run after =complete_viewforest= in
+=rerender_view=, update_buffer.rs:277-297), the rule reduces to one test:
+
+  A created child needs no further updating iff it is indefinitive (or a
+  leaf kind: Qual, Inactive, Unknown). A created *definitive* child always
+  needs BFS to expand its content.
+
+Per creator:
+- SubscribeeCol → indefinitive subscribee Vognodes: done. (BFS still
+  visits them, but an indefinitive Normal node's content expansion is a
+  no-op -- =clobberIndefinitiveViewnode= then early return,
+  complete_preorder/truenode.rs:128-136.) Exception: a subscribee that is
+  *definitive* (origin, or a definitive request) is not done -- it expands
+  content and grows a HiddenInSubscribeeCol. But when the SubscribeeCol
+  creates a *new* child, it is always indef, so the new children
+  created by a SubscribeeCol are always done-on-creation.
+- Relation cols (Subscriber/Overrider/Overridden/Hider/Hidden) →
+  indefinitive members: done. Caveat: Again, if one of those was later
+  made definitive, it needs updating, but that was something the user
+  did to it; when the relation col created it, it created it indef.
+- HiddenInSubscribeeCol / HiddenOutsideOfSubscribeeCol → indefinitive
+  hidden Vognodes: done. (Same caveat applies.)
+- AliasCol / IDCol → Qual::Alias / Qual::ID leaves: done (Quals have no
+  update).
+- A definitive Vognode (saved, collateral, or definitive-request target)
+  → definitive content children: NOT done; BFS must expand each.
+So "created and done" is safe exactly when the creator emits indefinitive
+or leaf children, which is true for every generated collection; only
+definitive content expansion produces children that need their own visit.
+* DONE The relation between save extraction and view update is unclear
+The document is about updating a view after saving, but some proposed
+rules affect how the saved buffer is interpreted. That boundary should
+be explicit.
+
+Suggested separation:
+
+- parse and validate the incoming buffer
+- extract save instructions without clobbering user intent
+- update graph, disk, TypeDB/Tantivy/in-Rust graph
+- rerender saved and collateral views using local update rules
+
+Rules that run before save extraction are much more dangerous than rules
+that run after graph update. The vision should label which side each
+rule belongs to.
+** DONE I thought view update came last
+Where do you see update operations that precede save-buffer?
+*** Answer
+You are right that the current high-level save path updates the graph
+before rerendering views. I did not find a current production path where
+the view-update completion pass clobbers the submitted buffer before
+save extraction.
+
+My concern came from wording in the vision, especially "definitive
+Vognode from saved buffer: no need to update" and rules about
+subscribees-as-such. Those rules are safe if they are only post-save
+rerender rules. The plan should explicitly say local view update never
+runs on the submitted buffer before save extraction.
+* DONE The data source for each local update is not defined
+Different current updaters read from different places:
+
+- the saved view
+- NodeComplete from disk
+- in-Rust graph snapshot
+- TypeDB
+- Tantivy/source lookup
+- git HEAD/index/worktree diff
+- active source-set
+- deleted-by-this-save maps
+
+A local updater should declare its inputs. Otherwise the new design can
+accidentally mix stale TypeDB data, freshly updated in-Rust graph data,
+and disk state from the wrong moment.
+** DONE This is another reason we need view update to only start after saving has completed.
+But once that's true, I think the update procedure for each kind of viewnode
+can be made to match the rough equivalent that's already in the code.
+*** DONE Mostly resolved
+Agreed. The remaining useful detail for the plan is to say that each
+updater reads from the post-save coherent graph/disk snapshot, plus the
+active source-set and optional diff state. The current code even has a
+debug assertion that the in-Rust graph must reflect all save/delete
+instructions before rerender starts.
+* Error handling is unspecified
+The local update spec should say, per updater, whether a mismatch is an
+error, warning, placeholder, deletion, or independent demotion.
+
+The current system sometimes refuses, sometimes warns, and sometimes
+renders placeholders:
+
+** invalid metadata should reject save
+Yes. This is before saving, let alone view updating.
+** missing/dangling references can render =Unknown=
+Yes. This is during view update and is not an error.
+** deleted files can render =Deleted= or phantoms
+Yes. This is during view update and is not an error.
+** inactive sources should refuse direct view opens but can appear as placeholders
+Yes. This is during view update and is not an error.
+** source lookup failures may be fatal in some update paths
+Tell me more?
+*** More detail
+Source lookup failures happen when update has an ID it needs to render
+but cannot determine which source owns it. Current examples include
+creating a missing content child or phantom: the code calls source
+lookup helpers and errors if no source can be found.
+
+A reasonable rule:
+
+- If the ID appears in an existing graph relation but no source can be
+  found, render =Unknown= when possible and warn rather than aborting the
+  whole view.
+- If the ID is needed for a git-diff phantom and neither diff metadata
+  nor disk/Tantivy/in-Rust graph can identify a source, warn and skip
+  that phantom.
+- If the parent update cannot preserve a valid graph invariant without
+  the source, return an error for that updater, but avoid corrupting the
+  rest of the view.
+
+This is mainly about deciding when "bad reference in one branch" should
+not prevent the rest of a large view from rendering.
+*** DONE validation should catch this
+If anything in the saved buffer talks about Normal vognodes
+for which no source can be determined, we have to stop before saving.
+If, after saving, we can't find the source for a normal vognode,
+that is catastrophic.
+
+For other kinds of nodes, if we can't find a source,
+let's just give it a source value of NOT_FOUND.
+The herald rules will make that jump out at the user.
+**** Resolution (Claude): a coherent policy; the NOT_FOUND sentinel is new
+This is a clean rule. Where it differs from today:
+- Today a missing source is *fatal to the whole render*: both the phantom
+  branch and the real-child branch of =build_child_creation_data= return
+  =Err("find_source: no source for ...")= (complete_preorder/truenode.rs:643,
+  661), which bubbles up and aborts the entire view. So a single
+  sourceless non-Normal child currently kills the buffer.
+- Your policy fixes that: for non-Normal kinds (phantoms, etc.), assign
+  =source = NOT_FOUND= and let heralds flag it, so one bad reference can't
+  take down a large view. That sentinel does not exist yet -- it's new
+  work (a reserved =SourceName= the herald rules special-case).
+- For Normal vognodes: pre-save validation must reject a buffer whose
+  Normal nodes have no determinable source (there is partial coverage
+  today via =BufferValidationError::SourceNotInConfig=, but not a general
+  "no source determinable anywhere" check); and a post-save Normal node
+  with no source stays a hard error (catastrophic), which is correct.
+This also subsumes ChatGPT's three sub-cases: the "render Unknown and warn"
+suggestion is unnecessary -- Unknown is for unresolvable *ids*, whereas
+this is an unresolvable *source* for a known id, which your NOT_FOUND
+sentinel handles for non-Normal kinds and validation handles for Normal.
+* DONE Focus and folding preservation are omitted
+Local update operations can detach, move, delete, or create nodes.
+The vision does not mention focus transfer, folded/body-folded state, or
+point restoration.
+
+At minimum, destructive local operations need a rule for:
+
+- focused subtree deletion
+- focused scaffold collapse
+- replacing a normal node with Deleted/Inactive/Unknown
+- moving children during list reconciliation
+- preserving folded/body_folded on reused nodes
+
+This is small mechanically but important for making the update feel
+safe to the user.
+
+** DONE
+If the focused node disappears or moves,
+hand focus to the nearest surviving ancestor.
+If the focused node is replaced with a different kind of node,
+the replacement should gain focus.
+
+The folded properties should be reused wherever that is possible.

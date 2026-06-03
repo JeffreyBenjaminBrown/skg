@@ -1,13 +1,14 @@
-/// Node access utilities for ego_tree::Tree<ViewNode> and Tree<MaybePlacedViewnode>
+/// Node access utilities for ego_tree::Tree<ViewNode> and Tree<MpViewnode>
 
 use crate::to_org::util::get_id_from_treenode;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, TrueNode, Scaffold,
-    viewnode_from_scaffold };
+    ViewNode, ViewNodeKind, TrueNode, ParentIs };
+use crate::types::viewnode::{Vognode, QualCol, Qual, RoleCol};
 use crate::types::maybe_placed_viewnode::{
-    MaybePlacedViewnode, MaybePlacedViewnodeKind };
+    MpViewnode, MpViewnodeKind };
+use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::list::dedup_vector;
 use super::generic::{ unique_scaffold_child, write_at_node_in_tree, with_node_mut };
@@ -24,14 +25,17 @@ pub fn write_at_truenode_in_tree<F, R> (
   f      : F,
 ) -> Result<R, String>
 where F: FnOnce (&mut TrueNode) -> R {
-  write_at_node_in_tree ( tree, treeid, |viewnode| {
-    match &mut viewnode . kind {
-      ViewNodeKind::True (t) => Ok ( f (t) ),
+  write_at_node_in_tree (
+    tree, treeid,
+    |viewnode| { match &mut viewnode . kind {
+      ViewNodeKind::Vognode (Vognode::Normal (t)
+                             | Vognode::Phantom (t))
+        => Ok ( f (t) ),
       _ => Err ( "write_at_truenode_in_tree: expected TrueNode"
                    . to_string () ) }} ) ? }
 
-/// Extract (ID, source) from a TrueNode in the tree.
-/// Returns an error if the node is not found or not a TrueNode.
+/// Extract (ID, source) from a vognode that carries both.
+/// Returns an error if the node is not found or cannot provide both fields.
 pub fn pid_and_source_from_treenode (
   tree        : &Tree<ViewNode>,
   treeid      : NodeId,
@@ -41,48 +45,49 @@ pub fn pid_and_source_from_treenode (
     tree . get (treeid) . ok_or_else ( ||
       format! ( "{}: node not found", caller_name ) ) ?;
   match &node_ref . value() . kind {
-    ViewNodeKind::True (t) =>
-      Ok (( t . id . clone(), t . source . clone() )),
-    ViewNodeKind::Deleted (d) =>
-      Ok (( d . id . clone(), d . source . clone() )),
-    _ => Err ( format! ( "{}: expected TrueNode or Deleted",
-                         caller_name ) . into() ),
+    ViewNodeKind::Vognode (v) =>
+      v . pid_and_source ()
+      . map ( |(pid, source)| (pid . clone (), source . clone ()) )
+      . ok_or_else (|| format!(
+        "{}: vognode has no source", caller_name ) . into () ),
+    _ => Err ( format! (
+      "{}: expected a vognode with PID and source",
+      caller_name ) . into() ),
   }}
 
-/// Get the ID from this node if it's an MaybePlacedTruenode with an ID,
+/// Get the ID from this node if it's an MpTruenode with an ID,
 /// otherwise recursively try ancestors.
 /// Returns an error if no ancestor has an ID (e.g., reached BufferRoot).
 pub fn id_from_self_or_nearest_ancestor (
-  tree    : &Tree<MaybePlacedViewnode>,
+  tree    : &Tree<MpViewnode>,
   node_id : NodeId,
 ) -> Result<ID, String> {
-  let mut node : NodeRef<MaybePlacedViewnode> =
+  let mut node : NodeRef<MpViewnode> =
     tree . get (node_id)
     . ok_or ("id_from_self_or_nearest_ancestor: node not found")?;
   loop {
-    if let MaybePlacedViewnodeKind::True (t) = &node . value() . kind {
-      if let Some (id) = &t . id {
-        return Ok(id . clone()); }}
+    if let MpViewnodeKind::Vognode (MpVognode::Normal (t)
+                                    | MpVognode::Phantom (t))
+      = &node . value() . kind
+      { if let Some (id) = &t . id
+        { return Ok(id . clone()); }}
     node = node . parent()
       . ok_or ("id_from_self_or_nearest_ancestor: reached root without finding ID")?; }}
 
-/// Find the unique child of a node with a given Scaffold.
+/// Find the unique child of a node with a given non-vognode kind.
 /// Returns None if no child has the kind,
 /// Some(child_id) if exactly one does,
 /// or an error if multiple children have it.
 pub fn unique_scaffold_child_of_viewnode (
   tree          : &Tree<ViewNode>,
   node_id       : NodeId,
-  scaffold_kind : &Scaffold,
+  scaffold_kind : &ViewNodeKind,
 ) -> Result<Option<NodeId>, Box<dyn Error>> {
   unique_scaffold_child (
     tree,
     node_id,
     scaffold_kind,
-    |child : &ViewNode| match &child . kind {
-      ViewNodeKind::Scaff (s) => Some (s),
-      _ => None,
-    })
+    |child : &ViewNode| Some (&child . kind))
   . map_err (|e| -> Box<dyn Error> { e . into() }) }
 
 /// Extract PIDs for the subscriber and its subscribees.
@@ -115,7 +120,7 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
     node_ref . parent ()
     . ok_or ("Subscribee has no parent (SubscribeeCol)") ?;
   if ! matches! ( &parent_ref . value () . kind,
-                  ViewNodeKind::Scaff (Scaffold::SubscribeeCol)) {
+                  ViewNodeKind::PartnerCol (RoleCol::Subscribee)) {
     return Err ( "Subscribee's parent is not a SubscribeeCol" .
                  into () ); }
   let grandparent_ref : NodeRef < ViewNode > =
@@ -134,11 +139,15 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
 pub fn insert_scaffold_as_child (
   tree          : &mut Tree<ViewNode>,
   parent_id     : NodeId,
-  scaffold_kind : Scaffold,
+  scaffold_kind : ViewNodeKind,
   prepend       : bool, // otherwise, append
 ) -> Result < NodeId, Box<dyn Error> > {
   let viewnode : ViewNode =
-    viewnode_from_scaffold (scaffold_kind);
+    ViewNode {
+      focused     : false,
+      folded      : false,
+      body_folded : false,
+      kind        : scaffold_kind };
   let col_id : NodeId = with_node_mut (
     tree, parent_id,
     |mut parent_mut| {
@@ -159,7 +168,7 @@ pub fn collect_grandchild_aliases_for_viewnode (
 ) -> Result<MSV<String>, String> {
   let alias_col_id : Option<NodeId> =
     unique_scaffold_child_of_viewnode (
-      tree, node_id, &Scaffold::AliasCol )
+      tree, node_id, &ViewNodeKind::QualCol (QualCol::Alias) )
     . map_err ( |e| e . to_string() ) ?;
   match alias_col_id {
     None => Ok (MSV::Unspecified),
@@ -171,7 +180,7 @@ pub fn collect_grandchild_aliases_for_viewnode (
         for alias_child in col_ref . children() {
           { // check for invalid state
             if ! matches!(&alias_child . value() . kind,
-                          ViewNodeKind::Scaff(Scaffold::Alias { .. } )) {
+                          ViewNodeKind::Qual (Qual::Alias { .. } )) {
               return Err ( format! (
                 "AliasCol has non-Alias child with kind: {:?}",
                 alias_child . value() . kind )); }}
@@ -203,27 +212,27 @@ pub fn find_children_by_ids (
   let mut result : HashMap < ID, NodeId > = HashMap::new();
   for child in tree . get (parent_treeid) . unwrap() . children() {
     match &child . value() . kind {
-      ViewNodeKind::True (t) =>
-        if target_skgids . contains(&t . id)
-        { result . insert(t . id . clone(), child . id()); },
-      ViewNodeKind::Deleted (d) =>
-        if target_skgids . contains(&d . id)
-        { result . insert(d . id . clone(), child . id()); },
+      ViewNodeKind::Vognode (
+        v @ (Vognode::Normal (_)
+             | Vognode::Phantom (_)
+             | Vognode::Deleted (_))) =>
+        if target_skgids . contains (v . id ())
+        { result . insert (v . id () . clone (), child . id()); },
       _ => {} } }
   result }
 
 /// Check if all nodes at the specified generation satisfy the predicate.
 /// Returns true if the generation is empty (vacuously true).
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes TrueNodes with parentIs != Container.
+/// If skip_non_content, excludes TrueNodes with parentIs != Affected.
 pub fn generation_includes_only<F> (
-  tree                : &Tree<MaybePlacedViewnode>,
+  tree                : &Tree<MpViewnode>,
   node_id             : NodeId,
   generation          : i32,
   skip_non_content    : bool,
   predicate           : F,
 ) -> bool
-where F: Fn (&MaybePlacedViewnode) -> bool
+where F: Fn (&MpViewnode) -> bool
 { collect_generation( tree, node_id, generation, skip_non_content )
     . iter()
     . all ( |&id| predicate(
@@ -231,15 +240,15 @@ where F: Fn (&MaybePlacedViewnode) -> bool
 
 /// Check if the generation is nonempty and all nodes satisfy the predicate.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes TrueNodes with parentIs != Container.
+/// If skip_non_content, excludes TrueNodes with parentIs != Affected.
 pub fn generation_exists_and_includes<F> (
-  tree                : &Tree<MaybePlacedViewnode>,
+  tree                : &Tree<MpViewnode>,
   node_id             : NodeId,
   generation          : i32,
   skip_non_content    : bool,
   predicate           : F,
 ) -> bool
-where F: Fn (&MaybePlacedViewnode) -> bool
+where F: Fn (&MpViewnode) -> bool
 { let nodes = collect_generation(
     tree, node_id, generation, skip_non_content);
   !nodes . is_empty() &&
@@ -249,9 +258,9 @@ where F: Fn (&MaybePlacedViewnode) -> bool
 
 /// Check if the specified generation is empty.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes TrueNodes with parentIs != Container.
+/// If skip_non_content, excludes TrueNodes with parentIs != Affected.
 pub fn generation_does_not_exist (
-  tree                : &Tree<MaybePlacedViewnode>,
+  tree                : &Tree<MpViewnode>,
   node_id             : NodeId,
   generation          : i32,
   skip_non_content    : bool,
@@ -264,9 +273,9 @@ pub fn generation_does_not_exist (
 /// Positive generation = descendants (1 = children, 2 = grandchildren, etc.)
 /// Generation 0 returns just the node itself.
 /// If 'skip_non_content' is true and generation > 0,
-///   then we exclude TrueNodes with parentIs != Container.
+///   then we exclude TrueNodes with parentIs != Affected.
 fn collect_generation (
-  tree               : &Tree<MaybePlacedViewnode>,
+  tree               : &Tree<MpViewnode>,
   node_id            : NodeId,
   generation         : i32,
   skip_non_content   : bool,
@@ -276,7 +285,7 @@ fn collect_generation (
   let Some (node_ref) = tree . get (node_id)
     else { return vec![]; };
   if generation <= 0 {
-    let mut current : NodeRef<'_, MaybePlacedViewnode> =
+    let mut current : NodeRef<'_, MpViewnode> =
       node_ref;
     for _ in 0..(-generation) {
       match current . parent() {
@@ -295,8 +304,9 @@ fn collect_generation (
             n . children()
               . filter(|c| !skip_non_content ||
                           !matches!(&c . value() . kind,
-                                    MaybePlacedViewnodeKind::True (t)
-                                    if t . parent_ignores_it() ))
+                                    MpViewnodeKind::Vognode (MpVognode::Normal (t)
+                                                             | MpVognode::Phantom (t))
+                                    if t . parentIs != ParentIs::Affected ))
               . map(|c| c . id()) ); }}
       current_gen = next_gen; }
     current_gen } }
@@ -306,11 +316,11 @@ fn collect_generation (
 /// or if the predicate returns false for all siblings.
 /// Short-circuits on the first sibling where the predicate returns true.
 pub fn siblings_cannot_include<F> (
-  tree      : &Tree<MaybePlacedViewnode>,
+  tree      : &Tree<MpViewnode>,
   node_id   : NodeId,
   predicate : F,
 ) -> bool
-where F: Fn (&MaybePlacedViewnode) -> bool
+where F: Fn (&MpViewnode) -> bool
 { let Some (node_ref) = tree . get (node_id)
     else { return true; };
   let Some (parent_ref) = node_ref . parent()

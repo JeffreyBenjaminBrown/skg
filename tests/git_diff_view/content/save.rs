@@ -189,7 +189,7 @@ fn test_diff_mode_as_subscribee_regenerates_phantom_children()
     |config, driver, tantivy, _repo_path| { Box::pin(async move {
       let input = "\
 * (skg (node (id 1) (source main))) 1
-** (skg subscribeeCol) it subscribes to these
+** (skg subscribeeCol)
 *** (skg (node (id 11) (source main))) 11
 **** (skg (node (id moves) (unstaged newM))) moves
 ";

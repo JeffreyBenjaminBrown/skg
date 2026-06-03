@@ -51,10 +51,10 @@ containment edit.
 
 * Pushback
 
-The remaining thing to be precise about is whether explicit
-=(parentIs absent)= is user-editable. If it is, then a user could write
-it under a visible parent. The system should not preserve that as a
-meaningful parent relationship, because it contradicts the tree shape.
+Explicit =(parentIs absent)= is user-editable metadata, so the user
+can write it under a visible parent. The system should not preserve
+that as a meaningful parent relationship, because it contradicts the
+tree shape.
 
 Recommendation: treat =Absent= under a visible parent as a transient
 stale marker and normalize it to =Container= before validation and save
@@ -63,14 +63,7 @@ instruction extraction. That matches the desired move behavior and keeps
 
 I do not see a need for an optional type or a separate
 =ParentIsFromMetadata= wrapper if =Absent= is explicit. The parser can
-default missing =parentIs= directly to =Container=.
-
-** TODO If that happens
-let's change the Absent to Independent.
-The user shouldn't do that, but if they do,
-what they probably meant is to make the node independent of its parent.
-We should also present a warning
-(the usual way non-fatal warnings are presented during a save).
+default missing =parentIs= to =Container=.
 
 * Assignments and mutations
 
@@ -94,7 +87,7 @@ Recommendation:
 Default construction should use =ParentIs::Container=, matching the
 metadata default. That includes the current equivalents of
 =default_truenode=, =mk_definitive_viewnode=, and
-=MaybePlacedTruenode::default=.
+=MpTruenode::default=.
 
 Keep the helper name =parent_ignores_it=. Its current meaning remains
 useful: when saving, a view-child with this property has no graph effect

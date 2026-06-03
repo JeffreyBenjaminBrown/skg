@@ -25,12 +25,12 @@
       (message "✗ FAIL: leaf-b search root is independent during %s: %S"
                phase line)
       (kill-emacs 1))
-    (when (string-match-p "(parentIs content)" line)
+    (when (string-match-p "(parentIs independent) (birth containsParent)" line)
       (message "✗ FAIL: leaf-b search root is content during %s: %S"
                phase line)
       (kill-emacs 1))
-    (when (string-match-p "(parentIs linkTarget)" line)
-      (message "✗ FAIL: leaf-b search root is linkTarget during %s: %S"
+    (when (string-match-p "(parentIs independent) (birth linksToParent)" line)
+      (message "✗ FAIL: leaf-b search root is linksToParent during %s: %S"
                phase line)
       (kill-emacs 1))))
 

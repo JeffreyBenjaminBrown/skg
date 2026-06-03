@@ -20,7 +20,7 @@ use skg::dbs::filesystem::multiple_nodes::check_for_duplicate_ids_across_sources
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::in_rust_graph::{
-  audit::audit_one_node,
+  audit::{Mismatch, audit_one_node},
   InRustGraph, InRustGraphHandle,
   init_global_handle_for_first_time_or_panic, new_handle,
 };
@@ -75,6 +75,18 @@ async fn main () -> Result<(), Box<dyn std::error::Error>> {
       println! ("  NO mismatches — InRustGraph and TypeDB agree.");
     } else {
       for m in &mms {
-        println! ("  MISMATCH: {} {} \n    InRustGraph: {:?}\n    typedb: {:?}",
-                  m . relation, m . role, m . in_rust_graph, m . typedb); } } }
+        match m {
+          Mismatch::Relationship (m) => {
+            println! (
+              "  MISMATCH: {} {} \n    InRustGraph: {:?}\n    typedb: {:?}",
+              m . relation, m . role, m . in_rust_graph, m . typedb); }
+          Mismatch::Source (m) => {
+            println! (
+              "  SOURCE MISMATCH\n    InRustGraph: {}\n    typedb: {}",
+              m . in_rust_graph,
+              m . typedb); }
+          Mismatch::MissingTypedbNode { pid } => {
+            println! (
+              "  MISSING TYPEDB NODE: {}",
+              pid); }} } } }
   Ok (( )) }

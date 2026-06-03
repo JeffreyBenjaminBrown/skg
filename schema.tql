@@ -3,8 +3,11 @@ define
   # Most nodes only have one id, but see `extra_id` below.
   attribute id, value string;
 
-  # The nickname (from the SkgConfig) of this node's source
-  attribute source, value string;
+  # The nickname (from the SkgConfig) of a source entity.
+  attribute source_name, value string;
+
+  # Whether a configured source is writable by the user.
+  attribute user_owns_it, value boolean;
 
   # Like the relationship
   # from a document to a section thereof, or
@@ -37,13 +40,17 @@ define
     relates hider,
     relates hidden;
   relation overrides_view_of,
-    relates replacement,
-    relates replaced;
+    relates overrider,
+    relates overridden;
+
+  # Connects each node to the configured source it came from.
+  relation has_source,
+    relates node,
+    relates source;
 
   # "the graph" is made of nodes, which resemble org-headlines.
   entity node,
     owns id @key,
-    owns source,
     plays contains:container,
     plays contains:contained,
     plays textlinks_to:source,
@@ -52,9 +59,15 @@ define
     plays subscribes:subscribee,
     plays hides_from_its_subscriptions:hider,
     plays hides_from_its_subscriptions:hidden,
-    plays overrides_view_of:replacement,
-    plays overrides_view_of:replaced,
+    plays overrides_view_of:overrider,
+    plays overrides_view_of:overridden,
+    plays has_source:node @card(1),
     plays has_extra_id:node;
+
+  entity source,
+    owns source_name @key,
+    owns user_owns_it,
+    plays has_source:source;
 
   entity extra_id,
     # a typical node only has one id, its primary key. but when nodes are merged, `extra_id` is used to associate more than one id with the merge result. the naming is a little awkward, because an `extra_id` is not itself an `id`; rather, it has an `id` field. (if attributes could be members of relationships, the `extra_id` entity would not be needed.)

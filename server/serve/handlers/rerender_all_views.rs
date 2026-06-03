@@ -1,15 +1,14 @@
 use crate::git_ops::read_repo::open_repo;
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
-use crate::serve::util::{ format_errors_sexp, format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response, tag_text_response};
+use crate::serve::util::{ format_errors_warnings_sexp, format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response, tag_text_response};
 use crate::source_sets::ActiveSourceSet;
 use crate::types::env::SkgEnv;
 use crate::types::misc::SkgConfig;
-use crate::types::viewnode::ViewNode;
+use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::ViewUri;
 use crate::update_buffer::{rerender_view, RerenderAfterSaveContext};
 
-use ego_tree::Tree;
 use futures::executor::block_on;
 use std::net::TcpStream;
 
@@ -48,7 +47,7 @@ pub fn stream_rerender_views (
       env, views_state . diff_mode_enabled, active_source_set );
 
   for uri in uris {
-    let mut viewforest : Tree<ViewNode> = match
+    let mut viewforest : ViewForest = match
       views_state . open_views . viewuri_to_view (&uri) {
         Some (f) => f . clone (),
         None => {
@@ -77,12 +76,14 @@ pub fn stream_rerender_views (
           "View {}: {}",
           uri . repr_in_client (), e )); }} }
 
-  // 3. Send done message with errors.
+  // 3. Send done message with errors and warnings.
   send_response_with_length_prefix (
     stream,
     & tag_sexp_response (
       TcpToClient::RerenderDone,
-      & format_errors_sexp (&context . errors) )); }
+      & format_errors_warnings_sexp (
+        &context . errors,
+        &context . warnings) )); }
 
 /// Handle "git diff mode toggle" request.
 /// Toggles diff mode, sends the GitDiffMode response with warnings,

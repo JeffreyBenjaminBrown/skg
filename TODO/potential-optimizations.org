@@ -47,7 +47,7 @@ the same pattern: find target nodes, look up ancestry, recurse.
 
 The difference is the leaf operation:
 - backpath.rs: async, fetches node data from TypeDB
-  via 'prepend_indefinitive_child'.
+  via 'prepend_indef_indep_child'.
 - render_enriched_search_buffer.rs: sync, fetches from Tantivy
   via 'prepend_containing_child_from_tantivy'.
 

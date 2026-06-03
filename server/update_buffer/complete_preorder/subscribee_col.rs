@@ -1,13 +1,13 @@
 use crate::types::env::SkgEnv;
 use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_scaffold_children};
 use crate::to_org::complete::sharing::goal_list::goal_list_for_subscribee_col;
-use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
 use crate::types::git::SourceDiff;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child_of_viewnode, insert_scaffold_as_child};
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold};
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, RoleCol};
+use crate::types::viewnode::Vognode;
 use crate::update_buffer::util::{ detach_scaffold_transferring_focus, move_child_to_end};
 
 use ego_tree::{NodeId, Tree};
@@ -40,7 +40,7 @@ pub async fn reconcile_subscribee_col_children (
   env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
-  let kind : SharingScaffoldKind = SharingScaffoldKind::SubscribeeCol;
+  let kind : RoleCol = RoleCol::Subscribee;
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
   let context : SubscribeeColContext =
@@ -69,7 +69,7 @@ pub async fn reconcile_subscribee_col_children (
 fn read_subscribee_col_context (
   tree : &Tree<ViewNode>,
   node : NodeId,
-  kind : SharingScaffoldKind,
+  kind : RoleCol,
   env  : &SkgEnv,
 ) -> Result<SubscribeeColContext, Box<dyn Error>> {
   let (parent_pid, parent_source, parent_indefinitive)
@@ -77,10 +77,10 @@ fn read_subscribee_col_context (
     = read_at_ancestor_in_tree(
       tree, node, kind . correct_subscriber_ancestor_distance (),
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::True (t) =>
-          Some(( t . id . clone(),
-                 t . source . clone(),
-                 t . is_indefinitive () )),
+        ViewNodeKind::Vognode (Vognode::Normal (t))
+          => Some(( t . id . clone(),
+                    t . source . clone(),
+                    t . is_indefinitive () )),
         _ => None } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
     . ok_or ("reconcile_subscribee_col_children: parent is not a TrueNode") ?;
@@ -128,12 +128,13 @@ fn ensure_hiddenoutsideofsubscribeecol_is_last (
 ) -> Result<(), Box<dyn Error>> {
   let hidden_outside : Option<NodeId> =
     unique_scaffold_child_of_viewnode(
-      tree, node, &Scaffold::HiddenOutsideOfSubscribeeCol ) ?;
+      tree, node,
+      &ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee) ) ?;
   match hidden_outside {
-    Some (child) => { move_child_to_end(
-                         tree, node, child ) ?; },
-    None => { insert_scaffold_as_child(
-                tree, node,
-                Scaffold::HiddenOutsideOfSubscribeeCol,
-                false ) ?; }, }
+    Some (child) => { move_child_to_end( tree, node, child ) ?; },
+    None => {
+      insert_scaffold_as_child(
+        tree, node,
+        ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee),
+        false ) ?; }}
   Ok (( )) }

@@ -13,7 +13,7 @@ use typedb_driver::{
   TypeDBDriver,
 };
 
-use crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS;
+use crate::consts::typedb_concurrent_transactions;
 use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
 use crate::dbs::typedb::util::ConceptRowStream;
 use crate::dbs::typedb::util::concept_document::extract_id_from_node;
@@ -66,7 +66,7 @@ pub async fn find_container_ids_of_pid (
 /// TypeDB branch below is exercised only by tests that bypass
 /// 'init_global_handle_for_first_time_or_panic'; in the running server the in-Rust graph path is
 /// always taken. The TypeDB path sends one query per input ID,
-/// bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
+/// bounded by 'typedb_concurrent_transactions'.
 pub async fn find_related_nodes (
   db_name     : &str,
   driver      : &TypeDBDriver,
@@ -88,7 +88,7 @@ pub async fn find_related_nodes (
       . map ( |id| find_related_nodes_for_one_id (
                 db_name, driver, id,
                 &relation, &input_role, &output_role )) )
-    . buffer_unordered ( TYPEDB_CONCURRENT_TRANSACTIONS )
+    . buffer_unordered ( typedb_concurrent_transactions () )
     . collect () . await;
   let mut result : HashSet<ID> = HashSet::new ();
   for set in sets {
@@ -132,7 +132,7 @@ pub fn find_related_nodes_from_in_rust_graph (
         if let Some (n) = graph . nodes . get (&pid) {
           out . extend ( n . hides_from_its_subscriptions . or_default ()
                          . iter () . map (&pid_or_self) ); },
-      ("overrides_view_of",            "replacement", "replaced")   =>
+      ("overrides_view_of",            "overrider",   "overridden") =>
         if let Some (n) = graph . nodes . get (&pid) {
           out . extend ( n . overrides_view_of . or_default ()
                          . iter () . map (&pid_or_self) ); },
@@ -150,8 +150,8 @@ pub fn find_related_nodes_from_in_rust_graph (
       ("hides_from_its_subscriptions", "hidden",      "hider")       =>
         if let Some (s) = graph . hiders_of . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
-      ("overrides_view_of",            "replaced",    "replacement") =>
-        if let Some (s) = graph . replacements_of . get (&pid) {
+      ("overrides_view_of",            "overridden",  "overrider")   =>
+        if let Some (s) = graph . overriders_of . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
       ("textlinks_to",                 "dest",        "source")      =>
         if let Some (s) = graph . textlinks_in . get (&pid) {
@@ -300,9 +300,9 @@ pub async fn pid_and_source_from_id (
     let answer : QueryAnswer = tx . query ( {
       let query : String = format! (
         r#"match
-          $node isa node,
-                has id $primary_id,
-                has source $source;
+          $node isa node, has id $primary_id;
+          $src isa source, has source_name $source;
+          $source_rel isa has_source (node: $node, source: $src);
           {{ $node has id "{}"; }} or
           {{ $e   isa     extra_id, has id "{}";
              $rel isa has_extra_id ( node: $node,

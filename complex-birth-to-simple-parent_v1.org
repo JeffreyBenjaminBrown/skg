@@ -53,7 +53,7 @@ visible parent; it simply is not there because of =contains=,
 
 Constructors default to =ParentIs::Container= in
 =default_truenode=, =mk_definitive_viewnode=, and
-=MaybePlacedTruenode::default=. That is tolerable as an internal
+=MpTruenode::default=. That is tolerable as an internal
 construction default, but it becomes unsafe once absence of a metadata
 field means "no visible parent". The parser/rendering boundary should
 not treat an absent =Parent= field as universal =Container=.

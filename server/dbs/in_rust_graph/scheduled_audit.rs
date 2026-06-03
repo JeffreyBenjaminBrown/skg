@@ -40,7 +40,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use typedb_driver::{Transaction, TransactionType, TypeDBDriver};
 
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
-use crate::dbs::in_rust_graph::audit::{audit_one_node, Mismatch};
+use crate::dbs::in_rust_graph::audit::{
+  Mismatch,
+  audit_one_node,
+};
 use crate::dbs::in_rust_graph::audit_store::{
   AuditRecord, RecordedMismatch,
   load, pids_needing_audit_today,
@@ -51,7 +54,7 @@ use crate::types::misc::{ID, SkgConfig};
 
 /// Pids audited per batch before sleeping. At 10 TypeDB queries per
 /// pid, one batch fires ~1280 queries in rapid succession (bounded
-/// by TYPEDB_CONCURRENT_TRANSACTIONS) before we pause.
+/// by 'typedb_concurrent_transactions') before we pause.
 const BATCH_SIZE : usize = 128;
 
 /// Minimum seconds to sleep between batches. The actual sleep is
@@ -338,10 +341,22 @@ fn append_mismatches_to_audits_org (
   if need_heading {
     text . push_str ( & format! ("\n* {}\n", date)); }
   for m in mismatches {
-    text . push_str ( & format! (
-      "** Node '{}': {} {} mismatch\n   InRustGraph: {:?}\n   TypeDB: {:?}\n",
-      m . pid, m . relation, m . role,
-      m . in_rust_graph, m . typedb )); }
+    match m {
+      Mismatch::Relationship (m) => {
+        text . push_str ( & format! (
+          "** Node '{}': {} {} mismatch\n   InRustGraph: {:?}\n   TypeDB: {:?}\n",
+          m . pid, m . relation, m . role,
+          m . in_rust_graph, m . typedb )); }
+      Mismatch::Source (m) => {
+        text . push_str ( & format! (
+          "** Node '{}': source mismatch\n   InRustGraph: {}\n   TypeDB: {}\n",
+          m . pid,
+          m . in_rust_graph,
+          m . typedb )); }
+      Mismatch::MissingTypedbNode { pid } => {
+        text . push_str ( & format! (
+          "** Node '{}': missing TypeDB node\n",
+          pid )); }}}
   if let Err (e) = file . write_all (text . as_bytes ()) {
     tracing::warn! (path = %path . display (), error = %e,
       "auto_audit_daily: failed to append to audits.org"); } }

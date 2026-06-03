@@ -47,13 +47,28 @@
   (condition-case err
       (let* ((response (read payload))
              (content (cadr (assoc 'content response)))
-             (errors-list (cadr (assoc 'errors response))))
+             (errors-list (cadr (assoc 'errors response)))
+             (warnings-list (cadr (assoc 'warnings response)))
+             (has-errors (skg--message-list-nonempty-p errors-list))
+             (has-warnings (skg--message-list-nonempty-p warnings-list)))
         (skg-big-nonfatal-message
          "*skg diff analysis*"
-         (if errors-list
-             "Diff analysis completed with errors"
-           "Diff analysis complete")
+         (cond
+          ((and has-errors has-warnings)
+           "Diff analysis completed with errors and warnings")
+          (has-errors
+           "Diff analysis completed with errors")
+          (has-warnings
+           "Diff analysis completed with warnings")
+          (t
+           "Diff analysis complete"))
          (or content "* diff analysis failed\n** Empty response\n"))
+        (when (or has-errors has-warnings)
+          (skg-big-nonfatal-message
+           "*skg diff analysis messages*"
+           "Diff analysis messages"
+           (skg-errors-and-warnings-to-org-string
+            errors-list warnings-list)))
         (with-current-buffer "*skg diff analysis*"
           (skg-diff-analysis-mode 1)))
     (error

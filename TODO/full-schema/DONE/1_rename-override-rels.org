@@ -1,0 +1,146 @@
+* plan : rename override relationship roles
+This plan implements the metaplan item:
+"Rename the roles of 'overrides_view_of' everywhere."
+
+The stage is deliberately narrow.
+It changes vocabulary and TypeDB role names so later override work can
+be built on clear role language.  It does not implement override
+substitution, override validation, source ownership, new collections,
+or new herald behavior.
+** target state
+The TypeDB schema defines 'overrides_view_of' as:
+```
+relation overrides_view_of,
+  relates overrider,
+  relates overridden;
+```
+
+Every TypeQL query and relationship helper uses those roles:
+- 'overrider' for the node whose 'overrides_view_of' field contains
+  the target ID,
+- 'overridden' for the node whose view is overridden.
+
+Code, tests, comments, fixtures and docs stop using the old
+role-vocabulary pair 'replacement' / 'replaced' for this relationship.
+
+The on-disk field remains 'overrides_view_of'.  This stage does not
+rename the serialized node field, because that is the relationship
+name, not a role name.
+** scope
+This stage covers:
+- 'schema.tql'
+- TypeDB relationship creation constants and insertion calls
+- TypeDB search helpers that accept or emit role names
+- graph-stats TypeQL queries involving 'overrides_view_of'
+- in-Rust graph inverse-map names and comments
+- TypeDB audit labels and comments
+- diff-analysis labels and comments where they use old role terms
+- merge/save tests and fixtures where old role terms describe
+  'overrides_view_of'
+- docs that describe the override relationship using "replacement" or
+  "replaced"
+
+This stage does not cover incidental uses of the English words
+"replacement" or "replaced" that are unrelated to 'overrides_view_of',
+such as string replacement, buffer replacement, or replacing a child
+headline with a link-expanded node.
+** order of work
+*** Identify the exact rename set
+Search for:
+- 'overrides_view_of'
+- 'replacement'
+- 'replaced'
+- 'replacements_of'
+
+Classify hits into:
+- TypeDB role names that must change,
+- Rust identifiers/comments that carry old override vocabulary,
+- tests/fixtures/docs that should change,
+- unrelated uses of the same English words that should be left alone.
+
+Record any ambiguous cases in 'TODO/full-schema/progress.org' under
+"problems discovered along the way" before editing them.
+*** Rename the schema and TypeDB query roles
+Update 'schema.tql':
+- relation roles become 'overrider' and 'overridden',
+- node 'plays' declarations use those roles.
+
+Update all TypeQL strings and role constants that mention
+'replacement' or 'replaced' for 'overrides_view_of'.
+The relationship direction must remain unchanged:
+- 'overrider' is the node with the outgoing 'overrides_view_of' list,
+- 'overridden' is the target node in that list.
+*** Rename in-Rust override inverse-map vocabulary
+Rename the in-Rust graph inverse map from old replacement vocabulary
+to overrider vocabulary.
+
+The target name should communicate the map direction:
+an overridden node ID maps to the set of node IDs that override it.
+For example, 'overriders_of' is clearer than 'replacements_of'.
+
+Update all references, comments, audit code and tests together.
+Do not rename 'overrides_view_of' fields in node types or YAML.
+*** Update tests and fixtures
+Update TypeDB tests that query 'overrides_view_of' roles.
+
+Update merge/save/diff tests where expectations or comments use
+old role vocabulary for override relationships.
+
+Fixture file names and node IDs should be renamed only if doing so
+materially improves clarity and the affected tests are easy to update.
+If renaming fixture IDs would create a large noisy diff, prefer
+updating comments and expected messages while leaving test data IDs
+alone.
+*** Update docs and user-visible text
+Update docs that explain 'overrides_view_of' using "replacement" and
+"replaced".
+
+Prefer "overrider" and "overridden" consistently.
+Avoid "overridee" unless it is already in surrounding prose and clearly
+means "overridden"; the metaplan vocabulary is "overridden".
+*** Run focused verification
+Run the smallest useful checks first:
+- TypeDB-related tests for schema/query role correctness,
+- merge tests that touch 'overrides_view_of',
+- save tests that preserve 'overrides_view_of',
+- diff-analysis tests if any labels changed.
+
+Then run broader Rust tests if the focused checks pass and the local
+TypeDB/test environment is available.
+
+If TypeDB is not running or tests cannot run for environmental reasons,
+record that in the progress file and report it clearly.
+**** TODO
+bash/all-tests.sh currently passes.
+It should pass too once these changes are done.
+** acceptance criteria
+The stage is complete when:
+- no TypeDB query uses 'replacement' or 'replaced' as roles of
+  'overrides_view_of',
+- 'schema.tql' uses only 'overrider' and 'overridden' for that
+  relationship,
+- in-Rust inverse-map vocabulary no longer calls overriders
+  "replacements",
+- tests that exercise override relationships compile and pass,
+- docs touched by this relationship use the new role names,
+- unrelated non-override uses of "replacement" / "replaced" are left
+  alone.
+** risks and guardrails
+*** Old words have unrelated meanings
+The words "replacement" and "replaced" are common in the codebase.
+Do not do a global mechanical rename.  Only rename uses tied to
+'overrides_view_of' role semantics.
+*** TypeDB role names are schema-coupled
+Changing role names without updating every TypeQL query will compile
+Rust but fail at runtime.  The focused TypeDB tests are important.
+*** On-disk compatibility is not part of this rename
+The serialized field 'overrides_view_of' remains unchanged.  Renaming
+it would be a separate data-format change and is outside this stage.
+*** Fixture IDs may remain historically named
+Some existing fixture IDs include old words like
+'overrides-view-of-1'.  Those are IDs, not role names.  Rename them
+only if the benefit outweighs the fixture churn.
+**** TODO I'm not worried about fixture churn.
+I'd prefer readable names and a longer diff
+to something that might confuse me later
+or requires me to read more comments.

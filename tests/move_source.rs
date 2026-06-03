@@ -10,6 +10,7 @@ use skg::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema, create_
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
+use skg::dbs::typedb::sources::create_all_sources;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::save::update_graph_minus_merges;
@@ -61,6 +62,7 @@ async fn setup (
     . collect ();
   overwrite_new_empty_typedb_db (db_name, &driver) . await?;
   read_and_use_schema (db_name, &driver) . await?;
+  create_all_sources (db_name, &driver, &config) . await?;
   create_all_nodes (db_name, &driver, &typedb_nodes) . await?;
   create_all_relationships (db_name, &driver, &typedb_nodes) . await?;
   let tantivy_index : TantivyIndex =
@@ -127,7 +129,7 @@ fn tantivy_source_for_id (
 
 /// Basic move: change b's source from public to private.
 /// Verify FS (old file gone, new file present),
-/// TypeDB (source attribute updated), and Tantivy (source field updated).
+/// TypeDB (has_source relation updated), and Tantivy (source field updated).
 #[test]
 fn test_move_node_to_another_owned_source (
 ) -> Result<(), Box<dyn Error>> {

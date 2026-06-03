@@ -10,7 +10,7 @@
 /// This is always true for the graphnodestats path, which collects
 /// PIDs from the already-built viewnode tree.
 
-use crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS;
+use crate::consts::typedb_concurrent_transactions;
 use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
 use crate::dbs::typedb::util::concept_document::extract_id_from_map;
 use crate::source_sets::ActiveSourceSet;
@@ -144,7 +144,7 @@ pub async fn fetch_all_graphnodestats_with_source_set (
 /// TypeDB-backed implementation. Exercised only by tests that bypass
 /// 'init_global_handle_for_first_time_or_panic'; in the running server the dispatcher routes
 /// to 'fetch_all_graphnodestats_in_rust' instead. Uses
-/// 'buffer_unordered (TYPEDB_CONCURRENT_TRANSACTIONS)' for consistency
+/// 'buffer_unordered (typedb_concurrent_transactions ())' for consistency
 /// with the rest of the TypeDB module.
 async fn fetch_all_graphnodestats_from_typedb (
   db_name : &str,
@@ -155,7 +155,7 @@ async fn fetch_all_graphnodestats_from_typedb (
   let results : Vec < Result < OnePidStats, Box < dyn Error > > > =
     stream::iter ( pids . iter ()
       . map ( |pid| fetch_one_pid_stats ( db_name, driver, pid ) ) )
-    . buffer_unordered ( TYPEDB_CONCURRENT_TRANSACTIONS )
+    . buffer_unordered ( typedb_concurrent_transactions () )
     . collect () . await;
   let mut num_containers : HashMap < ID, usize > = HashMap::new ();
   let mut num_contents   : HashMap < ID, usize > = HashMap::new ();
@@ -294,7 +294,7 @@ fn fetch_all_graphnodestats_in_rust (
                             graph, active, &related_pid) ) )
       . unwrap_or (false);
     let in_ov  : bool = // overrides in-links
-      graph . replacements_of . get (pid)
+      graph . overriders_of . get (pid)
       . map ( |s| s . iter ()
         . any ( |related_pid|
           pid_source_is_active (graph, active, related_pid) ) )
@@ -409,10 +409,10 @@ async fn fetch_one_pid_stats (
           "overrides_related": [
             match
               $ov isa node, has id $ovid;
-              {{ $rel5 isa overrides_view_of ( replacement: $node,
-                                               replaced:    $ov ); }} or
-              {{ $rel5 isa overrides_view_of ( replacement: $ov,
-                                               replaced:    $node ); }};
+              {{ $rel5 isa overrides_view_of ( overrider:  $node,
+                                               overridden: $ov ); }} or
+              {{ $rel5 isa overrides_view_of ( overrider:  $ov,
+                                               overridden: $node ); }};
             fetch {{ "id": $ovid }};
           ]
         }};"#,

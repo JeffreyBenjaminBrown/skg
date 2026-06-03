@@ -10,14 +10,20 @@ use crate::dbs::tantivy::write::update_index_with_nodes;
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::relationships::create_all_relationships;
-use crate::dbs::typedb::relationships::delete_all_outbound_relationships;
+use crate::dbs::typedb::relationships::delete_all_outbound_relationships_to_nodes;
+use crate::dbs::typedb::sources::create_all_sources;
 use crate::dbs::typedb::util::connect_to_typedb;
 use crate::types::env::SkgEnv;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::nodes::complete::NodeComplete;
-use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
+use crate::dbs::in_rust_graph::{
+  InRustGraph,
+  InRustGraphHandle,
+  new_handle,
+  override_invariants::error_unless_override_invariants_hold,
+};
 
 use futures::executor::block_on;
 use std::collections::HashSet;
@@ -66,7 +72,8 @@ pub fn initialize_dbs (
   let can_incremental : bool = block_on ( async {
     can_do_incremental_init_of_dbs (
       &driver, &config . db_name, &marker_path,
-      Path::new ( &config . tantivy_folder )
+      Path::new ( &config . tantivy_folder ),
+      &config . config_path,
     ) . await } );
   let result : (SkgEnv, InitContextHandoff, Vec<NodeComplete>) =
     if can_incremental {
@@ -82,6 +89,13 @@ pub fn initialize_dbs (
           let nodes : Vec<NodeComplete> =
             read_all_skg_files_from_sources (config)
             . unwrap_or_default ();
+          let graph : InRustGraph =
+            InRustGraph::from_nodecompletes (&nodes);
+          if let Err (e)
+            = error_unless_override_invariants_hold (config, &graph)
+            { tracing::error! (
+                "Override invariant validation failed: {}", e);
+              std::process::exit (1); }
           let (env, handoff) : (SkgEnv, InitContextHandoff) =
             env_and_handoff_from_nodes (
               config, &nodes, Arc::new (driver), tantivy_index );
@@ -98,17 +112,19 @@ pub fn initialize_dbs (
 /// DEAD ? See "incremental init" in is-it-dead.org.
 ///
 /// PURPOSE:
-/// Checks the four preconditions for incremental init:
+/// Checks preconditions for incremental init:
 /// 1. TypeDB database exists
 /// 2. Marker file exists
 /// 3. schema.tql mtime <= marker mtime
-/// 4. Tantivy index directory contains files
+/// 4. skgconfig.toml mtime <= marker mtime
+/// 5. Tantivy index directory contains files
 ///    (guards against manual deletion of index contents)
 async fn can_do_incremental_init_of_dbs (
   driver        : &TypeDBDriver,
   db_name       : &str,
   marker_path   : &Path,
   tantivy_path  : &Path,
+  config_path   : &Path,
 ) -> bool {
   let db_exists : bool =
     match driver . databases() . contains (db_name) . await {
@@ -131,6 +147,13 @@ async fn can_do_incremental_init_of_dbs (
       Ok (t)  => t,
       Err (_) => return false, };
   if schema_mtime > marker_mtime { return false; }
+  if ! config_path . as_os_str () . is_empty () {
+    let config_mtime : std::time::SystemTime =
+      match fs::metadata (config_path)
+        . and_then ( |m| m . modified() )
+      { Ok (t)  => t,
+        Err (_) => return false, };
+    if config_mtime > marker_mtime { return false; }}
   let tantivy_has_files : bool =
     tantivy_path . is_dir ()
     && fs::read_dir (tantivy_path)
@@ -181,7 +204,7 @@ fn incremental_init_of_dbs (
       nodes . iter()
       . map ( |n| n . pid . clone() )
       . collect();
-    delete_all_outbound_relationships (
+    delete_all_outbound_relationships_to_nodes (
       &config . db_name, driver, &pids ) . await ?;
     tracing::info! (elapsed_s = ?t1 . elapsed(),
               "Deleted stale relationships");
@@ -250,6 +273,12 @@ fn full_init (
       . unwrap_or_else ( |e| {
         tracing::error! ("Failed to read .skg files: {}", e);
         std::process::exit (1); } ) };
+  let graph : InRustGraph =
+    InRustGraph::from_nodecompletes (&nodes);
+  if let Err (e)
+    = error_unless_override_invariants_hold (config, &graph)
+    { tracing::error! ("Override invariant validation failed: {}", e);
+      std::process::exit (1); }
   tracing::info! (files = nodes . len(),
             sources = config . sources . len(),
             ".skg files read from source(s)");
@@ -291,12 +320,20 @@ pub async fn wipe_then_init_typedb_db (
   driver : &TypeDBDriver,
   nodes  : &[NodeComplete],
 ) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraph =
+    InRustGraph::from_nodecompletes (nodes);
+  error_unless_override_invariants_hold (
+    config, &graph ) ?;
   overwrite_new_empty_typedb_db (
     & config . db_name,
     driver ) . await ?;
   read_and_use_schema (
     & config . db_name,
     driver ) . await ?;
+  create_all_sources (
+    & config . db_name,
+    driver,
+    config ) . await ?;
   let t0 : Instant = Instant::now();
   let typedb_nodes : Vec<NodeTypedb> = // Convert to NodeTypedb (narrow) at the boundary. Parses textlinks from each node's title+body.
     nodes . iter ()

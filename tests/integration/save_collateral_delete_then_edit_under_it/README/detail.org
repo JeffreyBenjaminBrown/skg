@@ -187,14 +187,14 @@ Constructed in two steps:
 ** Expected initial structure (titles)
 
 Scaffold rendering uses fixed titles ("it subscribes to these",
-"hidden from this subscription", etc.) defined in
-=server/types/viewnode.rs= =Scaffold::title()=. The expected
-=headline-titles= output is approximately:
+=server/types/viewnode.rs=. Non-vognode collection headlines no
+longer carry explanatory titles; the client herald rules explain them.
+The expected =headline-titles= output is approximately:
 
 #+begin_example
 ((1 . "1")
  (2 . "11")
- (3 . "its aliases")
+ (3 . "")
  (4 . "eleven")
  (3 . "it subscribes to these")
  (4 . "subee")
@@ -464,7 +464,7 @@ All under =tests/integration/save_collateral_delete_then_edit_under_it/=.
 Use =assert-headline-titles= for structural checks. For
 specific lines (e.g., "line 2 is a DeletedNode"), decompose
 with =skg-split-as-stars-metadata-title= and check the
-metadata sexp directly — e.g., that it contains =(deleted ...)=
+metadata sexp itself — e.g., that it contains =(deleted ...)=
 rather than =(node ...)=.
 
 For =DeletedScaff= lines, check that metadata contains

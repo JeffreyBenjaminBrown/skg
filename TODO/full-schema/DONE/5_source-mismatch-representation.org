@@ -1,0 +1,231 @@
+* plan : represent audit source mismatches as scalar facts
+** overview
+This plan implements the metaplan item:
+"Represent audit source mismatches as scalar facts".
+
+Stage 3 changed source membership in TypeDB from a node-owned string
+attribute into a first-class 'has_source' relationship.  The audit was
+updated to compare source membership, but it currently adapts source
+names into the existing set-shaped relationship-mismatch shape:
+#+begin_example
+HashSet<ID>
+#+end_example
+
+That was a pragmatic bridge, not the right model.  A node source is a
+scalar invariant: each node has exactly one source in the in-Rust graph
+and exactly one source relationship in TypeDB.
+
+This stage makes the audit representation say that directly.
+** terms
+*** A relationship mismatch
+is an audit disagreement about one of the
+ordinary schema relationships whose role players are nodes:
+- 'contains',
+- 'textlinks_to',
+- 'subscribes',
+- 'hides_from_its_subscriptions',
+- 'overrides_view_of'.
+
+For these relationships, comparing sets is the right model.  For a
+given audited node, relation, and role, the audit asks: "which other
+role players does the in-Rust graph report, and which other role
+players does TypeDB report?"
+
+*** A source mismatch
+is an audit disagreement about the source membership
+of one node.  It compares the scalar source name on the in-Rust node
+against the source entity connected through TypeDB's 'has_source'
+relationship.
+
+Although TypeDB represents source membership with a relationship, this
+audit check is not per ordinary schema relationship.  It is exactly one
+node-level check per audited node.
+
+For source membership, a role-player set is the wrong report shape.
+The audit needs to compare the in-Rust source name with the one source
+name TypeDB reports for the node.
+
+If the combined TypeDB node+source query returns no row, the audit
+reports a distinct missing-TypeDB-node mismatch.  It does not model
+"node exists but has no source" as an ordinary state, because the
+schema requires exactly one source for every TypeDB node.
+** target state
+Audit mismatches distinguish relationship role-player-set
+disagreements from node-source disagreements.
+
+Relationship mismatches still report:
+- pid,
+- relation,
+- role,
+- in-Rust role-player set,
+- TypeDB role-player set.
+
+Source mismatches report:
+- pid,
+- in-Rust source name,
+- TypeDB source name.
+
+There is no 'relation' or 'role' field on a source mismatch.  Source
+is a node fact in the audit model, even though TypeDB stores that fact
+with 'has_source'.
+
+Missing TypeDB nodes are represented separately from source mismatches.
+They report:
+- pid.
+
+The schema cardinality constraint is responsible for making multiple
+source relations unrepresentable in committed TypeDB state.  The audit
+does not duplicate that cardinality check.
+
+The audit output should no longer wrap source names in 'ID' or label
+source mismatches as if they were ordinary relationship role-player
+sets.
+** representation
+Replace the single set-shaped 'Mismatch' struct with a sum type.
+
+Suggested shape:
+#+begin_example
+/// A disagreement between the TypeDB and InRustGraph dbs.
+pub enum Mismatch {
+  Relationship (RelationshipMismatch),
+  Source (SourceMismatch),
+  MissingTypedbNode { pid : ID },
+}
+
+pub struct RelationshipMismatch {
+  pub pid            : ID,
+  pub relation       : &'static str,
+  pub role           : &'static str,
+  pub in_rust_graph  : HashSet<ID>,
+  pub typedb         : HashSet<ID>,
+}
+
+pub struct SourceMismatch {
+  pub pid            : ID,
+  pub in_rust_graph  : SourceName,
+  pub typedb         : SourceName,
+}
+#+end_example
+
+The exact names can follow local style.  The important property is
+that source names remain source names rather than being wrapped as
+node IDs.
+** TypeDB source query
+The current helper 'source_name_for_one_node_id_in_tx' returns
+'Option<SourceName>'.  The audit interprets 'Some(source)' as the
+TypeDB source for the node.  It interprets 'None' as a distinct
+missing-TypeDB-node mismatch for this unitary node+source check.
+
+Do not add an audit-specific helper that tries to revalidate TypeDB's
+source cardinality.  The schema already constrains every TypeDB node to
+play 'has_source:node' exactly once.  The audit should rely on that
+schema fact and keep its own source check scalar and simple.
+
+Use the existing helper:
+#+begin_example
+pub(crate) async fn source_name_for_one_node_id_in_tx (
+  tx : &Transaction,
+  id : &ID,
+) -> Result<Option<SourceName>, Box<dyn Error>>
+#+end_example
+** audit rewrite
+*** Relationship mismatches
+Keep the existing ten relationship checks per node.
+
+When a role-player-set mismatch is found, push
+'Mismatch::Relationship (...)' instead of filling the old 'Mismatch'
+struct.
+
+Do not change the semantics of dangling outbound references in this
+stage.  The existing filter that drops outbound references with no
+known pid should remain.
+*** Source mismatches
+Once per audited node, independently of the ordinary relationship
+checks, compare:
+- 'node.source' from the in-Rust graph,
+- the audit-specific TypeDB source state.
+
+Cases:
+- TypeDB returns 'Some(source)' and it equals 'node.source':
+  no mismatch.
+- TypeDB returns 'Some(source)' and it differs from 'node.source':
+  source mismatch.
+- TypeDB returns 'None': missing-TypeDB-node mismatch.
+
+This represents semantic disagreement about a node's source.  It does
+not attempt to re-check TypeDB's source cardinality constraint.
+** formatting
+Update 'format_mismatches' to handle both variants.
+
+Relationship mismatch formatting can stay nearly identical.
+
+Source mismatch formatting should be direct and readable, for example:
+#+begin_example
+pid=X source mismatch in-Rust graph=main typedb=other
+pid=X missing TypeDB node
+#+end_example
+
+Avoid formatting source mismatches as:
+#+begin_example
+relation=has_source role=node in-Rust graph={ID("main")}
+#+end_example
+because that is exactly the adapter this stage removes.
+** tests
+*** Pure formatting tests
+Add or update unit tests for 'format_mismatches':
+- relationship mismatch formatting still includes relation and role,
+- missing TypeDB node formats distinctly,
+- different TypeDB source formats with source names.
+
+These tests should not need TypeDB.
+*** Audit behavior tests
+If there are existing TypeDB audit tests, update them to match the new
+enum.  If not, keep this stage focused and rely on:
+- the existing TypeDB-backed audit callers compiling,
+- pure formatting tests for the new representation,
+- the TypeDB-backed test suite when TypeDB is available.
+
+Add a TypeDB-backed test only if it can be small and direct.
+** implementation steps
+1. Replace the old 'Mismatch' struct with an enum and a
+   relationship-specific struct.
+2. Add a source-specific mismatch struct using 'SourceName' for the
+   TypeDB side.
+3. Add a distinct missing-TypeDB-node mismatch variant for the case
+   where the node+source query returns no row.
+4. Update audit mismatch construction sites.
+5. Update 'format_mismatches'.
+6. Move or add tests for the new formatting shape.
+** verification
+Run focused checks first:
+#+begin_example
+cargo check
+cargo test audit --lib -- --nocapture
+cargo test --test dbs -- --nocapture
+#+end_example
+
+If TypeDB is running, also run the audit-adjacent integration checks:
+#+begin_example
+cargo test --test typedb -- --nocapture
+#+end_example
+
+Finish with the broad suite when TypeDB is available:
+#+begin_example
+bash/all-tests.sh --no-sound
+#+end_example
+** risks and pushback
+*** Public API ripple
+'Mismatch' may be destructured in tests or helper code.  The enum
+rewrite will require those callers to pattern-match.  This is
+desirable: callers should be forced to notice that source mismatches
+are not relationship role-player-set mismatches.
+*** TypeDB cardinality is not revalidated here
+The schema currently constrains 'has_source:node' cardinality, so a
+well-formed database should not contain multiple source relations for a
+node.  This stage deliberately does not re-check that constraint in the
+audit.  Duplicating TypeDB's cardinality invariant added confusing code
+without improving the node-source comparison this audit actually needs.
+*** Avoid over-generalizing
+Do not use this stage to redesign every audit type.  The goal is only
+to split scalar source mismatches from set-shaped relationship
+mismatches while preserving existing relationship audit behavior.

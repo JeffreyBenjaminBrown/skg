@@ -4,7 +4,8 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::git::{SourceDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_truenode};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, viewnode_from_scaffold};
+use crate::types::viewnode::{ViewNode, ViewNodeKind};
+use crate::types::viewnode::{QualCol, Qual};
 use crate::update_buffer::util::complete_relevant_children_in_viewnodetree;
 use ego_tree::{NodeId, Tree};
 use std::collections::HashMap;
@@ -29,7 +30,7 @@ pub fn reconcile_id_col_children (
   error_unless_node_satisfies(
     tree, idcol_node_id,
     |viewnode| matches!( &viewnode . kind,
-                         ViewNodeKind::Scaff (Scaffold::IDCol) ),
+                         ViewNodeKind::QualCol (QualCol::ID) ),
     "reconcile_id_col_children: Node is not an IDCol" )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   let (parent_pid, parent_source) : (ID, SourceName) =
@@ -65,17 +66,22 @@ pub fn reconcile_id_col_children (
       ( goals, amap ) };
   let is_id : fn (&ViewNode) -> bool =
     |viewnode| matches!( &viewnode . kind,
-                         ViewNodeKind::Scaff( Scaffold::ID { .. } ) );
+                         ViewNodeKind::Qual (Qual::ID { .. } ) );
   let view_id_text : fn (&ViewNode) -> ID =
     |viewnode| match &viewnode . kind {
-      ViewNodeKind::Scaff( Scaffold::ID { id, .. } ) =>
+      ViewNodeKind::Qual (Qual::ID { id, .. } ) =>
         id . clone(),
       _ => unreachable!(), };
   let create_id = |id: &ID| -> ViewNode {
     let membership : MembershipAxes =
       axes_map . get (id) . copied () . unwrap_or_default ();
-    viewnode_from_scaffold(
-      Scaffold::ID { id: id . clone(), membership } ) };
+    ViewNode {
+      focused     : false,
+      folded      : false,
+      body_folded : false,
+      kind        : ViewNodeKind::Qual (
+        Qual::ID {
+          id: id . clone(), membership } ) } };
   complete_relevant_children_in_viewnodetree(
     tree,
     idcol_node_id,

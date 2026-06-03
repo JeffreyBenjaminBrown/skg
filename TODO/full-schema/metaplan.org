@@ -1,0 +1,427 @@
+* metaplan : full schema UI
+** overview & goal
+This plan completes the user-facing UI for every relationship in
+'schema.tql':
+- 'contains'
+- 'textlinks_to'
+- 'subscribes'
+- 'hides_from_its_subscriptions'
+- 'overrides_view_of'
+
+The goal is not merely to expose more data.
+The goal is to make every schema relationship inspectable,
+editable where it is owned by the current node,
+safe under source-set filtering,
+clear in heralds,
+and coherent under save, rerender and git diff views.
+
+The implementation should proceed in the order below.
+Each section is large enough to deserve its own dedicated sub-plan.
+* steps, in order
+** DONE Rename the roles of 'overrides_view_of' everywhere:
+```
+relation overrides_view_of,
+  relates overrider,
+  relates overridden;
+```
+
+This rename should be atomic across:
+- 'schema.tql'
+- TypeDB relationship creation constants
+- TypeDB search helpers
+- in-Rust graph relation maps
+- merge and save tests
+- diff analysis relationship labels
+- fixtures and comments
+- any user-visible metadata or herald text
+** DONE Add an explicit warning channel
+to protocol responses that can carry
+nonfatal messages.  The old convention, where 'errors' sometimes
+meant warnings if content was present, is confusing.  Responses that
+currently carry 'errors' should be updated deliberately, including:
+- save-result
+- single-root content view
+- rerender-all done
+- diff-analysis
+- any search enrichment response that can report partial failure
+
+Define "read-only set" in 'glossary.md'.  A read-only set is a
+generated collection whose graph membership cannot be edited through
+that collection.  Reordering may be preserved view-locally.  Children
+inserted by the user that are not real members are relabeled
+'parentIs=Independent'.  Missing real members are restored by
+completion.
+
+Use "read-only set" in prose and user-facing warnings, not an acronym.
+** DONE represent source ownership in TypeDB
+Override behavior depends on whether a source is user-owned.
+The current TypeDB schema already records each node's source name,
+but it does not record whether that source is user-owned.
+
+Add source ownership to the database model.
+This probably means representing sources as TypeDB entities, rather
+than only as string attributes on nodes.  The exact TypeDB shape can
+be decided in the sub-plan, but it must let TypeDB queries distinguish
+user-owned from foreign sources.
+
+Skg does not need to support changing 'skgconfig.toml' while the
+server is running.  A config change that affects source ownership can
+therefore require server restart and database rebuild.
+
+This accomplishes two things:
+- validation can express user-owned override constraints directly
+  against the graph,
+- future code may be simplified where it currently leaves TypeDB to
+  recover source-related facts elsewhere.
+** DONE Validate override invariants at rebuild and save
+Override substitution must be deterministic for user-owned data.
+Validation should reject states that would make effective views
+ambiguous or recursively unstable.
+
+At rebuild/init, reject the graph with an explanatory error if any
+overridden node has more than one user-owned overrider.
+Report all collisions:
+```
+  * node X is overridden by user-owned nodes Y, Z, W, ...
+  * node X2 is overridden ...
+```
+
+At save, reject a buffer if the resulting graph would give any
+overridden node more than one user-owned overrider.
+
+At save, also reject user-owned override chains of the form:
+X overrides Y overrides Z, where X and Y are both user-owned,
+regardless of whether Z is user-owned or foreign.
+This prevents user-owned override cycles and keeps replacement
+semantics simple for valid data.
+
+Only user-owned override edges participate in automatic replacement.
+Foreign override edges are still real graph facts:
+they appear in read-only sets, heralds and override-choice menus,
+but they do not cause Skg to substitute one node for another in
+ordinary recursive content rendering.
+
+Validation should resolve extra IDs to primary IDs before checking
+these constraints, because merges must not allow two apparently distinct
+override targets to become the same effective overridden node.
+** DONE Represent audit source mismatches as scalar facts
+The in-Rust graph audit compares TypeDB facts against the in-memory graph.
+Its existing mismatch type is set-shaped because it was originally used
+to compare relationship peer sets.
+
+Source ownership work gives the audit a new scalar check:
+each node should have exactly one source in Rust and exactly one source
+relationship in TypeDB.
+
+Do not force that scalar fact through the relationship-set mismatch shape.
+Represent source mismatches directly, with optional source names on each
+side, so the audit output reflects the real invariant:
+- missing source in TypeDB,
+- unexpected different source in TypeDB,
+- malformed extra or absent TypeDB source relationship.
+
+This keeps relationship-set auditing and node-source auditing distinct,
+and prevents later validation work from inheriting an accidental
+"source names are node IDs" adapter.
+** DONE Add relation accessors and generated collections
+Before adding more UI, complete relation accessors in both directions
+for every schema relationship.
+The implementation should make it easy to ask:
+- what this node points to by a relation,
+- what points to this node by a relation,
+- whether a particular displayed child is a real member of a generated
+  collection.
+
+Add paired collection scaffolds for sharing relations.
+The names reveal the direction of the relationship:
+an RCol is a collection of nodes which play the R role
+in a relationship to their grandparent.
+
+The direction table is:
+- child N of 'subscribeeCol': N's grandparent subscribes to N.
+  This is writable.
+- child N of 'subscriberCol': N subscribes to N's grandparent.
+  This is a read-only set.
+- child N of 'overriddenCol': N's grandparent overrides N.
+  This is writable.
+- child N of 'overriderCol': N overrides N's grandparent.
+  This is a read-only set.
+- child N of 'hiderCol': N hides N's grandparent.
+  This is a read-only set.
+- child N of 'hiddenCol': N's grandparent hides N.
+  This is a read-only set.
+
+The existing hide-specific child collections of 'subscribeeCol' remain
+the way to edit hiding behavior.  'hiddenCol' is only an inbound
+read-only set; it should explain where to edit instead if the user
+tries to modify it.
+
+Add 'parentIs=collector' for real members of collection scaffolds.
+Its exact graph meaning depends on the scaffold parent, as listed
+above.  This avoids overloading 'parentIs=container' for non-containment
+relationships.
+
+When the buffer is rendered (de novo or rerendered),
+the parentIs herald from each member of each col
+will indicate whether it is truly a member of that col,
+or independent of it. The user can break those parentIs
+heralds by moving the node, but need only refresh the buffer
+in order to correct them.
+** Make read-only sets predictable under save and rerender
+Read-only sets are generated from the graph, but user-visible order
+can matter while the view is open.
+
+For a read-only set, completion should:
+- preserve the user's current visible order for real members in that
+  viewnode,
+- relabel nonmembers as 'parentIs=Independent',
+- append real missing members,
+- discard title/body edits to the collection scaffold,
+- warn about discarded collection edits without aborting a successful
+  save.
+
+This ordering is view-local.
+It lives in the Emacs buffer and in the existing server ViewState.
+It does not reach disk, does not change the graph, and does not need
+to match the order of the same read-only set in another open buffer.
+
+'rerender all views' should preserve the per-view ordering and
+override-bypass context already stored in ViewState.  Closing a buffer
+and opening it again may normalize the view from graph data
+(because nothing persists the changes a user makes to
+the order of a -Col scaffold outside of that -Col scaffold,
+much less outside of the view the scaffold belongs to).
+** Add heralds and view-specific stats
+Heralds should distinguish graph-wide relation presence from
+view-specific facts.
+
+Add an "H" graphStats herald for the presence of any
+'hides_from_its_subscriptions' relationship in either role.  It is
+intentionally broad, like the existing "S" and "O" heralds.
+The user can request relation collections for details.
+
+Keep 'GraphNodeStats::overriding' as the broad "has any override
+relationship in either role" fact.
+
+Add view-specific stats for context-sensitive override/subscription
+facts:
+- 'overridesHere' means the node drawn here was drawn in place of
+  something it overrides.  Its herald is a red "Oh".
+- 'grandparentOverrides' is computed for subscribees-as-such when
+  the collection owner also overrides that node.
+  Its herald is a red "gO".
+- 'grandparentSubscribes' is computed for overridden-as-such nodes
+  when the collection owner also subscribes to that node.  Its herald
+  is a red "gS".
+
+Do not emit redundant context heralds where the collection itself
+already communicates the same relationship --
+so no 'gS' herald for the children of a subscribeeCol,
+and no 'gO' for the children of an overriddenCol.
+
+Read-only set scaffolds should receive the green indef/peace herald.
+This includes 'IDCol', 'HiddenInSubscribeeCol',
+'HiddenOutsideOfSubscribeeCol', and the new inbound read-only set
+collections.
+
+Edits to IDCol should abort save with an explanatory error.
+Editing IDs through the UI is dangerous and unnecessary; direct file
+editing remains available for exceptional manual repair.
+** Define override rendering and navigation
+Ordinary recursive content rendering applies automatic override
+substitution.  When recursive rendering would draw node N, and N has
+a valid user-owned overrider R, draw R instead.
+
+The exception is an overridden-as-such node under 'overriddenCol'.
+Within that existing view, requesting a definitive view for the
+overridden-as-such node
+uses the original overridden node, not its overrider.  This exception
+only applies inside that existing view.  Direct visits (new buffers)
+from that child do not silently open the original.
+
+When the user requests a new single-root content view of a node that
+is overridden, Skg should not silently choose for them.  It should show
+an ordinary Skg buffer containing indefinitive nodes that represent
+the override destinations, and display the explanatory message in the
+minibuffer.  The user can then navigate from the node they want.
+
+The override-choice buffer follows 'overrides_view_of' from overridden
+to overrider recursively and displays all edges, including foreign
+edges.  It must be robust to invalid data:
+if a path repeats an ID, stop that branch and show a cycle marker.
+
+There is already prior art for the creation of such 'ancestries',
+invoked by skg-reveal-containerward and skg-reveal-sourceward.
+The overrides traversal involved here should reuse that machinery,
+rather than reinventing any wheels.
+
+Navigation surfaces follow these rules:
+- following a textlink to an overridden node opens the menu,
+- the skg-goto* commands open the menu
+  - which implies that visiting a search result
+    for an overridden node opens the menu
+- readable-ID jumps from magit go to the original raw node,
+- opening from a child of an 'overriddenCol' opens the menu,
+- requesting a definitive view from an overriddenCol's child
+  bypasses replacement-with-overrider in that existing view
+  (because the overrider is already its grandparent)
+- requesting a definitive view otherwise applies recursive override
+  substitution.
+
+Collateral rerender after save preserves existing viewnodes as they
+were.  If an existing node shows an original overridden node, it
+remains editable as itself and a later save keeps editing that
+original.  New recursive content introduced during rerender, though,
+uses current override substitution.  Closing and reopening the buffer
+normalizes recursive content from current graph data.
+** Preserve source-set safety
+Source-set filtering must not leak inactive-source data unnecessarily
+and must not silently delete hidden relationship members.
+
+For sharing-relation collections, inactive nodes can be omitted
+*from the display* rather than shown as placeholders,
+because order is not semantically
+meaningful for these relationship lists.
+
+However, saving a restricted view must preserve omitted inactive
+relationship targets on active nodes.  For example, saving a visible
+subset of 'subscribes_to' or 'overrides_view_of' must not delete
+inactive targets merely because they were omitted from the view.
+
+JEFF speaking: The easiest approach here is probably:
+when the user saves the buffer, the stage that fills in data
+before applying changes to the graph should fill in any nodes
+that were omitted due to source-set restrictions
+for any write-enabled Col scaffold.
+Then, when those changes are applied, they are applied as sets --
+so if a node somehow got moved in the collection, that change
+(which is meaningless noise) has no effect on the graph.
+Deleted nodes are deleted from wherever they were,
+and new nodes can safely be placed at the end.
+
+Save processing needs two protections:
+- no instruction may write an inactive node's file,
+- active-node relationship fields preserve inactive targets omitted
+  by the restricted view.
+
+Content remains the exception already handled by source-set work:
+inactive content placeholders can participate in active containers
+because content order matters.
+** Define diff-mode policy for the full schema
+Diff mode is raw graph inspection, not effective override rendering.
+Override substitution should not apply in git diff mode or diff
+analysis.
+
+Diff views still need to display changes to sharing relationships
+themselves, including 'subscribes', 'hides_from_its_subscriptions',
+and 'overrides_view_of'.  "No override substitution" must not mean
+"ignore override relationship diffs".
+
+Source-set restriction and diff mode should not compose for this plan.
+Toggling diff mode should refuse unless the active source-set is
+'all'.  Switching away from source-set 'all' should refuse while diff
+mode is enabled.  The refusal must happen before closing buffers for
+a source-set switch.
+** Update save, rebuild and rerender validation
+The save pipeline should reject:
+- edits to IDCol,
+- attempts to create or modify nodes in inactive sources,
+- changes that violate user-owned override monogamy,
+- changes that create a user-owned override chain,
+- malformed read-only set edits that prevent the server from
+  identifying the collection, its owner, or a child node's intended
+  identity.
+
+The save pipeline should warn, without aborting, when it repairs
+ordinary read-only set edits by restoring generated members,
+relabeling independent children to independent,
+or discarding collection title/body edits.
+
+Rebuild/init should validate global graph invariants that are not
+local to one buffer, especially override monogamy and user-owned
+override chains.  If invalid data exists, rebuild should fail with a
+specific explanation rather than starting a server whose override
+rendering is ambiguous.
+** Test the relationship matrix
+The test plan should be organized by relationship and role.
+For every collection type, cover:
+- initial rendering,
+- definitive expansion,
+- save after reorder,
+- insertion of independent children,
+- deletion or mutation of generated members,
+- source-set restricted rendering,
+- collateral rerender after save.
+
+For overrides, additionally cover:
+- one valid user-owned overrider,
+- two user-owned overriders rejected at rebuild,
+- two user-owned overriders rejected at save,
+- foreign overriders displayed but not substituted,
+- user-owned override chains rejected,
+- invalid/cyclic legacy data displayed safely in the menu,
+- extra-ID/merge interactions before monogamy validation,
+- direct visit menu behavior,
+- OverriddenCol definitive-view bypass behavior,
+- diff view showing raw relationship changes without substitution.
+
+For warnings, cover:
+- successful save with warnings,
+- failed save with both warnings and errors,
+- single-root content view warning delivery,
+- rerender-all warning delivery.
+** Document the resulting model
+Update the project docs after the behavior is implemented:
+- 'schema.tql' comments for new role names and source ownership,
+- 'api-and-formats.md' for the warnings channel, new metadata, and
+  diff/source-set restrictions,
+- 'glossary.md' for read-only set and parentIs=collector,
+- sharing docs for inbound read-only sets and where to edit hiding,
+- user command docs for override-choice navigation.
+
+Documentation should use graph-role vocabulary for graph facts:
+container/contained, subscriber/subscribee, hider/hidden,
+overrider/overridden.
+Use parent/child only for org/view parentage.
+** awaits
+These are adjacent opportunities, not part of the plan itself.
+
+*** Reuse richer TypeDB source facts
+Once sources are represented more richly in TypeDB, inspect code that
+currently recovers source facts from the filesystem, Tantivy, or the
+in-Rust graph because TypeDB could not answer source-related questions.
+Some of that code may become simpler.
+
+*** Improvements to the validation of override relationships
+Currently the algorithm is simple but processing-intensive:
+We take the full set of changes and simulate what they would do
+to a full graph, then validate every overide relationship in it.
+
+There are two ways to reduce that work:
+- The SavePlan applied to the simulation can ignore changes to
+  content, subscriptions and hide relationships.
+- The validator can restrict its attention to neighbors of changed nodes.
+
+The algorithm for the latter would be:
+
+**** monogamy constraint:
+For every new user-owned override relationship from X to Y,
+(X was saved; maybe Y was or maybe not)
+if there is another X' overriding Y, reject.
+
+**** no-chains constraint
+For every new user-owned override relationship from X to Y,
+verify that both:
+- there is no W that overrides X
+- there is no Z that Y overrides
+
+*** Revisit source-set and diff-mode composition
+After full-schema relation diffs exist, revisit whether restricted
+source-sets and inline diff mode can compose safely.  The plan above
+forbids that combination to keep the first full-schema implementation
+coherent.
+
+*** Reconsider override-choice view type
+After override-choice buffers exist, consider whether they deserve a
+dedicated view type rather than reusing ordinary indefinitive Skg
+buffers.

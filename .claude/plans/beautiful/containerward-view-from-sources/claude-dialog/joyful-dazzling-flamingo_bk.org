@@ -86,7 +86,7 @@ instead of writing a separate, somewhat-duplicative function?
 *** phase 3 (insert, mutable borrow of tree)
 For each source node whose ancestry is an AncestryTree::Inner,
 iterate its children in reverse
-(reverse because 'prepend_indefinitive_child' prepends)
+(reverse because 'prepend_indef_indep_child' prepends)
 and call 'insert_containerward_ancestry_tree_recursive' for each.
 
 If the ancestry is Root / Repeated / DepthTruncated
@@ -113,10 +113,10 @@ File: [[../../server/to_org/expand/backpath.rs][backpath.rs]].
 Async recursive function (Pin<Box<dyn Future>> pattern,
 same as 'integrate_linear_portion_of_path' at line 156).
 For each AncestryTree node:
-- call the existing 'prepend_indefinitive_child' with Birth::ContainerOf
+- call the existing 'prepend_indef_indep_child' with Birth::ContainerOf
 - if Inner, recurse into children (in reverse, for prepend ordering)
 
-This reuses 'prepend_indefinitive_child' (backpath.rs line 238),
+This reuses 'prepend_indef_indep_child' (backpath.rs line 238),
 which already handles fetching the SkgNode via TypeDB and
 creating an indefinitive ViewNode with the given Birth.
 

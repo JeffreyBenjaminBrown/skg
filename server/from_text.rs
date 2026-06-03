@@ -14,10 +14,10 @@ use crate::merge::mergeInstructionTriple::instructiontriples_from_merge_candidat
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::SkgConfig;
 use crate::types::save::{Merge, DefineNode, SourceMove};
-use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, maybePlaced_to_placed_tree};
-use crate::types::viewnode::ViewNode;
+use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
+use crate::types::tree::forest::{MpViewForest, ViewForest};
 
-use buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest,
   absent_parentIs_under_visible_parent_becomes_isContainer};
@@ -29,12 +29,11 @@ use viewnodes_to_instructions::{
   validate_no_title_or_body_edit_in_subscribeeAsSuch};
 use validate::{validate_and_filter_foreign_instructions, validate_no_simultaneous_move_and_merge};
 
-use ego_tree::Tree;
 use typedb_driver::TypeDBDriver;
 
 #[derive(Debug)]
 pub struct SavePlan {
-  pub viewforest         : Tree<ViewNode>,
+  pub viewforest         : ViewForest,
   pub define_nodes       : Vec<DefineNode>,
   pub merge_instructions : Vec<Merge>,
   pub source_moves       : Vec<SourceMove>,
@@ -53,11 +52,11 @@ pub async fn buffer_to_validated_saveplan (
   driver      : &TypeDBDriver,
 ) -> Result<SavePlan, SaveError> {
   let ( mut maybePlaced_viewforest, parsing_errors )
-    : ( Tree<MaybePlacedViewnode>, Vec<BufferValidationError> )
+    : ( MpViewForest, Vec<BufferValidationError> )
     = { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-          "org_to_uninterpreted_nodes" ). entered();
+          "org_to_uninterpreted_viewforest" ). entered();
         // parse the raw buffer
-        org_to_uninterpreted_nodes (buffer_text) }
+        org_to_uninterpreted_viewforest (buffer_text) }
           . map_err (SaveError::ParseError) ?;
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "add_missing_info_to_viewforest" ). entered();
@@ -80,10 +79,10 @@ pub async fn buffer_to_validated_saveplan (
     if ! validation_errors . is_empty () {
       return Err ( SaveError::BufferValidationErrors (
         validation_errors ) ); }}
-  let viewforest : Tree<ViewNode> =
+  let viewforest : ViewForest =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "maybePlaced_to_placed_tree" ). entered();
-      maybePlaced_to_placed_tree (maybePlaced_viewforest) }
+        "maybePlaced_to_placed_viewforest" ). entered();
+      maybePlaced_to_placed_viewforest (maybePlaced_viewforest) }
         . map_err ( |e| SaveError::ParseError (e) ) ?;
   let save_authority : SaveAuthority =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(

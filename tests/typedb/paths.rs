@@ -74,13 +74,13 @@ async fn test_multi_cycle_fork_impl(
   // so visual order is reversed: f, d, b.
   let expected: &str = indoc! {"
     * (skg (node (id a) (source main))) a
-    ** (skg (node (id b) (source main) (parentIs content) indef)) b
-    *** (skg (node (id c) (source main) (parentIs content) indef)) c
-    **** (skg (node (id d) (source main) (parentIs content) indef)) d
-    ***** (skg (node (id e) (source main) (parentIs content) indef)) e
-    ****** (skg (node (id f) (source main) (parentIs content) indef)) f
-    ****** (skg (node (id d) (source main) (parentIs content) indef)) d
-    ****** (skg (node (id b) (source main) (parentIs content) indef)) b
+    ** (skg (node (id b) (source main) (parentIs independent) (birth containsParent) indef)) b
+    *** (skg (node (id c) (source main) (parentIs independent) (birth containsParent) indef)) c
+    **** (skg (node (id d) (source main) (parentIs independent) (birth containsParent) indef)) d
+    ***** (skg (node (id e) (source main) (parentIs independent) (birth containsParent) indef)) e
+    ****** (skg (node (id f) (source main) (parentIs independent) (birth containsParent) indef)) f
+    ****** (skg (node (id d) (source main) (parentIs independent) (birth containsParent) indef)) d
+    ****** (skg (node (id b) (source main) (parentIs independent) (birth containsParent) indef)) b
   "};
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
   let expected_trees: Tree<ViewNode> =

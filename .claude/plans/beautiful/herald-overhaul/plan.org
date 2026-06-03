@@ -13,7 +13,7 @@
    - Types: [[../server/types/viewnode.rs][viewnode.rs]] — TrueNode, Birth enum, GraphNodeStats, ViewNodeStats
    - Rendering: [[../server/org_to_text.rs][org_to_text.rs]] — 'true_node_metadata_to_string', 'graphnodestats_to_sexp'
    - ViewStats: [[../server/update_buffer/viewnodestats.rs][viewnodestats.rs]] — 'set_viewnodestats_in_forest'
-   - Backpaths: [[../server/to_org/expand/backpath.rs][backpath.rs]] — 'prepend_indefinitive_child'
+   - Backpaths: [[../server/to_org/expand/backpath.rs][backpath.rs]] — 'prepend_indef_indep_child'
    - Save pipeline: [[../server/from_text/viewnodes_to_instructions/to_naive_instructions.rs][to_naive_instructions.rs]]
    - Tree completion: [[../server/update_buffer/complete_parent_first/truenode.rs][truenode.rs]]
    - Elisp: [[../elisp/heralds-minor-mode.el][heralds-minor-mode.el]] — transform rules and overlay display

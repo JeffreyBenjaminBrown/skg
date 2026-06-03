@@ -6,6 +6,7 @@ use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest};
+use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -25,7 +26,8 @@ pub async fn execute_truenode_view_requests (
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
     tree, node,
-    |vn : &ViewNode| matches!( &vn . kind, ViewNodeKind::True (_) ),
+    |vn : &ViewNode| matches!( &vn . kind,
+                                ViewNodeKind::Vognode (Vognode::Normal (_)) ),
     "execute_truenode_view_requests: expected TrueNode" )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   let requests : Vec<(NodeId, ViewRequest)> =
@@ -50,7 +52,8 @@ pub async fn ensure_hiddenin_col_under_definitive_subscribee (
   let is_indefinitive : bool =
     read_at_node_in_tree( tree, node,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::True (t) => t . is_indefinitive (),
+        ViewNodeKind::Vognode (Vognode::Normal (t))
+          => t . is_indefinitive (),
         _ => false } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
   if is_indefinitive { return Ok (( )); }
@@ -66,7 +69,8 @@ fn extract_view_requests_definitive_first (
   let view_requests : HashSet<ViewRequest> =
     read_at_node_in_tree( tree, node,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::True (t) => t . view_requests . clone(),
+        ViewNodeKind::Vognode (Vognode::Normal (t))
+          => t . view_requests . clone(),
         _ => HashSet::new() } )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   let mut result : Vec<(NodeId, ViewRequest)> = Vec::new();

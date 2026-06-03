@@ -33,10 +33,11 @@ use skg::types::misc::{ID, MSV, SourceName};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode};
 use skg::types::viewnode::{
-  ParentIs,
+  Birth,
   ViewNode,
   ViewNodeKind,
   viewforest_root_viewnode};
+use skg::types::viewnode::Vognode;
 use skg::types::views_state::{OpenViews, ViewState, ViewUri};
 
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -83,7 +84,9 @@ fn true_child_ids (
 ) -> BTreeSet<ID> {
   tree . get (parent_id) . unwrap () . children ()
     . filter_map ( |child| match &child . value () . kind {
-      ViewNodeKind::True (node) => Some (node . id . clone ()),
+      ViewNodeKind::Vognode ( Vognode::Normal (node)
+                              | Vognode::Phantom (node))
+        => Some (node . id . clone ()),
       _ => None, })
     . collect () }
 
@@ -147,7 +150,7 @@ fn source_set_switch_closes_views_and_cancels_stale_search_enrichment (
   views_state . open_views . views . insert (
     ViewUri::SearchView ("shared ranking term" . to_string ()),
     ViewState {
-      viewforest : Tree::new (viewforest_root_viewnode ()),
+      viewforest : Tree::new (viewforest_root_viewnode ()) . into (),
       pids       : HashSet::from ([ID::from ("active-search-hit")]), });
   let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::new (Mutex::new (Some (SearchEnrichmentPayload {
@@ -525,7 +528,7 @@ fn sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
         HashSet::new (),
         config,
         driver,
-        ParentIs::LinkTarget,
+        Birth::LinksToParent,
         Some (&active)) . await ?;
       assert_eq! (
         true_child_ids (&viewforest, child_id),
@@ -549,7 +552,7 @@ fn sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
         HashSet::new (),
         config,
         driver,
-        ParentIs::LinkTarget,
+        Birth::LinksToParent,
         Some (&active)) . await ?;
       assert! (
         true_child_ids (&empty_fork_viewforest, empty_fork_child_id)

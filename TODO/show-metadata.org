@@ -41,10 +41,11 @@ For TrueNodes:
 
 ** Parent relation
 
-- missing =parentIs=, or =(parentIs container)= -> ={=
+- missing =parentIs= -> ={=
+- =(parentIs affected)= -> no herald
 - =(parentIs independent)= -> =⊥=
-- =(parentIs content)= -> =}=
-- =(parentIs linkTarget)= -> =←=
+- =(birth containsParent)= -> =}=
+- =(birth linksToParent)= -> =←=
 
 =(parentIs absent)= is consumed by the herald rules but intentionally
 shows no herald.
