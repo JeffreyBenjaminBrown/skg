@@ -206,7 +206,7 @@ pub fn viewnode_from_metadata (
             indef_or_def, };
         let vognode =
           if t . should_be_phantom ()
-          { MpVognode::Phantom (t) }
+          { MpVognode::DiffPhantom (t) }
           else
           { MpVognode::Normal (t) };
         ( MpViewnodeKind::Vognode (vognode),

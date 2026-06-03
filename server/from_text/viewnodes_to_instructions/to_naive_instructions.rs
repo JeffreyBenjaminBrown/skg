@@ -449,7 +449,7 @@ pub(crate) fn collect_savenode_candidates (
               treeid : node_id,
               kind } ); }
           recurse_on_children( tree, node_id, result )?; }},
-      ViewNodeKind::Vognode (Vognode::Phantom (_)) => {} }
+      ViewNodeKind::Vognode (Vognode::DiffPhantom (_)) => {} }
     Ok (( )) }
 
   let mut result: Vec<DefinenodeCandidate> = Vec::new();
@@ -647,7 +647,7 @@ fn collect_subscribees (
                    SaveRole::Subscribee { .. })
                  && member_counts_for_relation_collection (t)
               { subscribees . push(t . id . clone()); }},
-            ViewNodeKind::Vognode (Vognode::Phantom (_))
+            ViewNodeKind::Vognode (Vognode::DiffPhantom (_))
               => continue,
             ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee)
               => continue, // valid child of SubscribeeCol, but not a subscribee
@@ -692,7 +692,7 @@ fn collect_members_from_child_relation_col (
           ViewNodeKind::Vognode (Vognode::Normal (t)) => {
             if member_counts_for_relation_collection (t) {
               members . push (t . id . clone ()); }},
-          ViewNodeKind::Vognode (Vognode::Phantom (_))
+          ViewNodeKind::Vognode (Vognode::DiffPhantom (_))
             | ViewNodeKind::Vognode (Vognode::Deleted (_))
             | ViewNodeKind::DeadScaffold
             | ViewNodeKind::Vognode (Vognode::Inactive (_))

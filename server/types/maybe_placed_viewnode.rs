@@ -44,7 +44,7 @@ pub enum MpViewnodeKind {
 #[derive(Debug, Clone, PartialEq)]
 pub enum MpVognode {
   Normal   (MpTruenode),
-  Phantom  (MpTruenode),
+  DiffPhantom (MpTruenode),
   Inactive (InactiveNode),
   Unknown  (UnknownNode),
   Deleted  (DeletedNode),
@@ -87,9 +87,9 @@ impl TryFrom<MpViewnodeKind> for ViewNodeKind {
       MpViewnodeKind::Vognode (MpVognode::Normal (t)) =>
         Ok (ViewNodeKind::Vognode (
           Vognode::Normal (TrueNode::try_from (t)?))),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (t)) =>
+      MpViewnodeKind::Vognode (MpVognode::DiffPhantom (t)) =>
         Ok (ViewNodeKind::Vognode (
-          Vognode::Phantom (TrueNode::try_from (t)?))),
+          Vognode::DiffPhantom (TrueNode::try_from (t)?))),
       MpViewnodeKind::Vognode (MpVognode::Deleted (d)) =>
         Ok (ViewNodeKind::Vognode (Vognode::Deleted (d))),
       MpViewnodeKind::Vognode (MpVognode::Inactive (i)) =>
@@ -148,9 +148,9 @@ impl From<ViewNodeKind> for MpViewnodeKind {
       ViewNodeKind::Vognode (Vognode::Normal (t)) =>
         MpViewnodeKind::Vognode (
           MpVognode::Normal (MpTruenode::from (t))),
-      ViewNodeKind::Vognode (Vognode::Phantom (t)) =>
+      ViewNodeKind::Vognode (Vognode::DiffPhantom (t)) =>
         MpViewnodeKind::Vognode (
-          MpVognode::Phantom (MpTruenode::from (t))),
+          MpVognode::DiffPhantom (MpTruenode::from (t))),
       ViewNodeKind::Vognode (Vognode::Deleted (d)) =>
         MpViewnodeKind::Vognode (MpVognode::Deleted (d)),
       ViewNodeKind::Vognode (Vognode::Inactive (i)) =>
@@ -334,7 +334,7 @@ impl MpViewnode {
   pub fn title (&self) -> &str {
     match &self . kind {
       MpViewnodeKind::Vognode (MpVognode::Normal (t))
-        | MpViewnodeKind::Vognode (MpVognode::Phantom (t)) =>
+        | MpViewnodeKind::Vognode (MpVognode::DiffPhantom (t)) =>
         &t . title,
       MpViewnodeKind::Vognode (MpVognode::Deleted (d)) =>
         &d . title,
@@ -352,7 +352,7 @@ impl MpViewnode {
   pub fn error_label (&self) -> String {
     match &self . kind {
       MpViewnodeKind::Vognode (MpVognode::Normal (t))
-        | MpViewnodeKind::Vognode (MpVognode::Phantom (t))
+        | MpViewnodeKind::Vognode (MpVognode::DiffPhantom (t))
         => t . title . clone(),
       MpViewnodeKind::Qual (Qual::Alias { text, .. }) =>
         format!("qual:alias({})", text),
@@ -379,7 +379,7 @@ impl MpViewnode {
   pub fn body (&self) -> Option<&String> {
     match &self . kind {
       MpViewnodeKind::Vognode (MpVognode::Normal (t))
-        | MpViewnodeKind::Vognode (MpVognode::Phantom (t))
+        | MpViewnodeKind::Vognode (MpVognode::DiffPhantom (t))
         => t . body (),
       MpViewnodeKind::Vognode (MpVognode::Deleted (d)) =>
         d . body . as_ref(),
@@ -396,7 +396,7 @@ impl MpViewnode {
   pub fn id_opt (&self) -> Option<&ID> {
     match &self . kind {
       MpViewnodeKind::Vognode (MpVognode::Normal (t))
-        | MpViewnodeKind::Vognode (MpVognode::Phantom (t))
+        | MpViewnodeKind::Vognode (MpVognode::DiffPhantom (t))
         => t . id . as_ref(),
       MpViewnodeKind::Vognode (MpVognode::Deleted (d)) =>
         Some (&d . id),

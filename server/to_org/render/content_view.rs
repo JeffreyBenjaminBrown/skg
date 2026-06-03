@@ -116,7 +116,7 @@ async fn multi_root_view_inner (
     let mut ids : Vec<ID> = Vec::new ();
     for node_ref in viewforest . nodes () {
       if let ViewNodeKind::Vognode (Vognode::Normal (t)
-                                    | Vognode::Phantom (t))
+                                    | Vognode::DiffPhantom (t))
         = &node_ref . value () . kind
         { ids . push ( t . id . clone () ); }}
     ids };

@@ -65,7 +65,7 @@ pub enum ViewNodeKind {
 #[derive( Debug, Clone, PartialEq )]
 pub enum Vognode {
   Normal   (TrueNode),
-  Phantom  (TrueNode), // Absent from git worktree but present in git HEAD ("removed"), or still present in worktree but is no longer a member of its parent ("removedHere").
+  DiffPhantom (TrueNode), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO (plan_v2 §6.3/§11): reduce its payload -- a DiffPhantom needs no view requests, parentIs, birth, graphStats, or indef_or_def; only id/source/title + diff axes. Deferred to the phase-2/5 diff-overlay rework, where the phantom-handling code is rewritten and the reduction is low-risk.
   Inactive (InactiveNode), // From a source that is inactive (see "source sets").
   Unknown  (UnknownNode), // If it *ever* existed in the graph, Skg didn't find it.
   Deleted  (DeletedNode), // No longer exists in the graph.
@@ -240,7 +240,7 @@ pub enum ViewRequest {
 
 impl < Id, Src > TrueNode_Generic < Id, Src > {
   /// True when this node's diff axes require displaying it with the
-  /// `Vognode::Phantom` variant. Triggered by either:
+  /// `Vognode::DiffPhantom` variant. Triggered by either:
   /// - any membership axis being '-' (removed in some stage), or
   /// - the worktree existence axis being '-' (file deleted), or
   /// - the "moved twice" pattern: stagedM = +, unstagedM = -.
@@ -377,21 +377,21 @@ impl Vognode {
   pub fn normal_or_phantom (&self) -> Option<&TrueNode> {
     match self {
       Vognode::Normal  (t)
-        | Vognode::Phantom (t) => Some (t),
+        | Vognode::DiffPhantom (t) => Some (t),
       _ => None,
     } }
 
   pub fn normal_or_phantom_mut (&mut self) -> Option<&mut TrueNode> {
     match self {
       Vognode::Normal  (t)
-        | Vognode::Phantom (t) => Some (t),
+        | Vognode::DiffPhantom (t) => Some (t),
       _ => None,
     } }
 
   pub fn id (&self) -> &ID {
     match self {
       Vognode::Normal   (t) => &t . id,
-      Vognode::Phantom  (t) => &t . id,
+      Vognode::DiffPhantom  (t) => &t . id,
       Vognode::Inactive (i) => &i . id,
       Vognode::Unknown  (u) => &u . id,
       Vognode::Deleted  (d) => &d . id,
@@ -402,7 +402,7 @@ impl Vognode {
   ) -> Option<(&ID, &SourceName)> {
     match self {
       Vognode::Normal   (t)
-        | Vognode::Phantom (t) => Some ((&t . id, &t . source)),
+        | Vognode::DiffPhantom (t) => Some ((&t . id, &t . source)),
       Vognode::Inactive (i) => Some ((&i . id, &i . source)),
       Vognode::Deleted  (d) => Some ((&d . id, &d . source)),
       Vognode::Unknown  (_) => None,
@@ -448,12 +448,12 @@ impl ViewNode {
       = &self . kind
       { if t . should_be_phantom ()
         { self . kind = ViewNodeKind::Vognode (
-            Vognode::Phantom (t . clone () )); }}}
+            Vognode::DiffPhantom (t . clone () )); }}}
 
   pub fn title (&self) -> &str {
     match &self . kind {
       ViewNodeKind::Vognode (Vognode::Normal (t))
-        | ViewNodeKind::Vognode (Vognode::Phantom (t)) =>
+        | ViewNodeKind::Vognode (Vognode::DiffPhantom (t)) =>
         &t . title,
       ViewNodeKind::Vognode (Vognode::Deleted (d)) =>
         &d . title,
@@ -472,7 +472,7 @@ impl ViewNode {
   pub fn body (&self) -> Option < &String > {
     match &self . kind {
       ViewNodeKind::Vognode (Vognode::Normal (t))
-        | ViewNodeKind::Vognode (Vognode::Phantom (t)) => t . body (),
+        | ViewNodeKind::Vognode (Vognode::DiffPhantom (t)) => t . body (),
       ViewNodeKind::Vognode (Vognode::Deleted (d)) => d . body . as_ref (),
       ViewNodeKind::Vognode (Vognode::Unknown (_))
         | ViewNodeKind::Vognode (Vognode::Inactive (_))
@@ -609,7 +609,7 @@ pub fn mk_phantom_viewnode (
   if let ViewNodeKind::Vognode (Vognode::Normal (mut t)) = viewnode . kind
     { t . existence  = existence;
       t . membership = membership;
-      viewnode . kind = ViewNodeKind::Vognode (Vognode::Phantom (t)); }
+      viewnode . kind = ViewNodeKind::Vognode (Vognode::DiffPhantom (t)); }
   viewnode }
 
 pub fn mk_definitive_viewnode (
@@ -689,7 +689,7 @@ pub fn mk_indefinitive_from_viewnode (
   birth       : Birth,
 ) -> Result < ViewNode, String > {
   let ViewNodeKind::Vognode (Vognode::Normal (t)
-                             | Vognode::Phantom (t))
+                             | Vognode::DiffPhantom (t))
     = viewnode . kind
     else { return Err (
       "mk_indefinitive_from_viewnode: expected TrueNode"

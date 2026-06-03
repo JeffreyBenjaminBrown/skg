@@ -83,7 +83,7 @@ async fn execute_definitive_view_request (
       viewforest, node_id,
       |n| match &n . kind {
         ViewNodeKind::Vognode (Vognode::Normal (t)
-                               | Vognode::Phantom (t))
+                               | Vognode::DiffPhantom (t))
           => truenode_file_absent_from_worktree (&t . existence),
         _ => false } ) ?;
   let hidden_ids : HashSet < ID > =

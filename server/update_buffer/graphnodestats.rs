@@ -87,7 +87,7 @@ pub fn set_metadata_relationships_in_node_recursive (
       // historical graph context for a placeholder.
       match & tree . get (treeid) . unwrap () . value () . kind {
         ViewNodeKind::Vognode (Vognode::Normal (t)
-                               | Vognode::Phantom (t))
+                               | Vognode::DiffPhantom (t))
           => { let nodecomplete_opt : Option<NodeComplete>
                  = nodecomplete_rustFirst_by_pid_and_source (
                      config, &t . id, &t . source
@@ -102,7 +102,7 @@ pub fn set_metadata_relationships_in_node_recursive (
       match &mut tree . get_mut (treeid)
         . unwrap () . value () . kind
         { ViewNodeKind::Vognode (Vognode::Normal (t)
-                                 | Vognode::Phantom (t))
+                                 | Vognode::DiffPhantom (t))
           => { t . graphStats = gs; },
         _ => {} },
     None => {} }

@@ -121,7 +121,7 @@ impl OpenViews {
         . filter_map ( |n| match &n . value () . kind {
           ViewNodeKind::Vognode (
             v @ (Vognode::Normal (_)
-                 | Vognode::Phantom (_)
+                 | Vognode::DiffPhantom (_)
                  | Vognode::Deleted (_))) =>
             Some ( v . id () . clone () ),
           _ => None } )

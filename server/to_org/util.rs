@@ -630,7 +630,7 @@ pub fn truenode_in_tree_is_indefinitive (
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   match node_kind {
     ViewNodeKind::Vognode (Vognode::Normal (t)
-                           | Vognode::Phantom (t))   => Ok (t . is_indefinitive ()),
+                           | Vognode::DiffPhantom (t))   => Ok (t . is_indefinitive ()),
     ViewNodeKind::Vognode (Vognode::Deleted (_))
       | ViewNodeKind::Vognode (Vognode::Inactive (_))
       | ViewNodeKind::Vognode (Vognode::Unknown (_)) => Ok (false),

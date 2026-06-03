@@ -85,7 +85,7 @@ fn true_child_ids (
   tree . get (parent_id) . unwrap () . children ()
     . filter_map ( |child| match &child . value () . kind {
       ViewNodeKind::Vognode ( Vognode::Normal (node)
-                              | Vognode::Phantom (node))
+                              | Vognode::DiffPhantom (node))
         => Some (node . id . clone ()),
       _ => None, })
     . collect () }

@@ -487,10 +487,10 @@ async fn test_recursive_document (
   // Root node should be "a"
   assert! ( matches! ( &root_node . kind,
                         ViewNodeKind::Vognode ( Vognode::Normal (_)
-                                                | Vognode::Phantom (_) )),
+                                                | Vognode::DiffPhantom (_) )),
     "should be TrueNode" );
   let ViewNodeKind::Vognode (
-    Vognode::Normal (root_t) | Vognode::Phantom (root_t)) =
+    Vognode::Normal (root_t) | Vognode::DiffPhantom (root_t)) =
     &root_node . kind
     else { unreachable!() };
   assert_eq! ( &root_t . id, &ID::from ("a"),
@@ -506,10 +506,10 @@ async fn test_recursive_document (
 
   assert! ( matches! ( &b_node . kind,
                         ViewNodeKind::Vognode ( Vognode::Normal (_)
-                                                | Vognode::Phantom (_) )),
+                                                | Vognode::DiffPhantom (_) )),
     "should be TrueNode" );
   let ViewNodeKind::Vognode ( Vognode::Normal (b_t)
-                              | Vognode::Phantom (b_t))
+                              | Vognode::DiffPhantom (b_t))
     = &b_node . kind
     else { unreachable!() };
   assert_eq! ( &b_t . id, &ID::from ("b"),
@@ -529,10 +529,10 @@ async fn test_recursive_document (
 
   assert! ( matches! ( &c_node . kind,
                         ViewNodeKind::Vognode ( Vognode::Normal (_)
-                                                | Vognode::Phantom (_) )),
+                                                | Vognode::DiffPhantom (_) )),
     "should be TrueNode" );
   let ViewNodeKind::Vognode ( Vognode::Normal (c_t)
-                              | Vognode::Phantom (c_t))
+                              | Vognode::DiffPhantom (c_t))
     = &c_node . kind
     else { unreachable!() };
   assert_eq! ( &c_t . id, &ID::from ("c"),
@@ -548,10 +548,10 @@ async fn test_recursive_document (
 
   assert! ( matches! ( &b_repeat . kind,
                         ViewNodeKind::Vognode ( Vognode::Normal (_)
-                                                | Vognode::Phantom (_) )),
+                                                | Vognode::DiffPhantom (_) )),
     "should be TrueNode" );
   let ViewNodeKind::Vognode ( Vognode::Normal (b_repeat_t)
-                              | Vognode::Phantom (b_repeat_t))
+                              | Vognode::DiffPhantom (b_repeat_t))
     = &b_repeat . kind
     else { unreachable!() };
   assert_eq! ( &b_repeat_t . id, &ID::from ("b"),

@@ -95,7 +95,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   let unrel_node = tree_roots[1] . value();
   let rel_t = match &unrel_node . kind {
     MpViewnodeKind::Vognode (
-      MpVognode::Normal (t) | MpVognode::Phantom (t)) => t,
+      MpVognode::Normal (t) | MpVognode::DiffPhantom (t)) => t,
     _ => panic!("expected TrueNode") };
   assert_eq!(unrel_node . title(), "independent root node");
   assert_eq!(rel_t . parentIs != ParentIs::Affected, true);
@@ -106,7 +106,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   let cycle_node = tree_roots[2] . value();
   let cycle_t = match &cycle_node . kind {
     MpViewnodeKind::Vognode (
-      MpVognode::Normal (t) | MpVognode::Phantom (t)) => t,
+      MpVognode::Normal (t) | MpVognode::DiffPhantom (t)) => t,
     _ => panic!("expected TrueNode") };
   assert_eq!(cycle_node . title(), "cycling node");
   assert_eq!(cycle_t . viewStats . cycle, true);
@@ -156,7 +156,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   let first_node = tree_roots[0] . value();
   let first_t = match &first_node . kind {
     MpViewnodeKind::Vognode (
-      MpVognode::Normal (t) | MpVognode::Phantom (t)) => t,
+      MpVognode::Normal (t) | MpVognode::DiffPhantom (t)) => t,
     _ => panic!("expected TrueNode") };
   assert_eq!(first_node . title(), "simple node");
   assert_eq!(first_node . body(), Some(&"Simple body" . to_string()));

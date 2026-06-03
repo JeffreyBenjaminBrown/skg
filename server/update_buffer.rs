@@ -332,7 +332,7 @@ fn rewriteInPlace_viewnodes_whose_id_is_newly_extra (
         "rewriteInPlace_viewnodes_whose_id_is_newly_extra: node not found") ?;
       match &n_ref . value () . kind {
         ViewNodeKind::Vognode (Vognode::Normal (t)
-                               | Vognode::Phantom (t))
+                               | Vognode::DiffPhantom (t))
           => { match graph_snap . pid_of (&t . id)
                { Some (primary) if primary != t . id => {
                      graph_snap . get (&primary) . map ( |r| (
@@ -400,7 +400,7 @@ fn remove_branches_that_git_marked_removed (
           None => false } };
       let should_remove : bool =
         match &node . value() . kind {
-          ViewNodeKind::Vognode (Vognode::Phantom (t)) =>
+          ViewNodeKind::Vognode (Vognode::DiffPhantom (t)) =>
             ! is_viewforest_root_child
             && t . parentIs == ParentIs::Affected,
           _ => false };
@@ -455,7 +455,7 @@ fn clear_diff_metadata (
         // but they are regenerated from scratch by their postorder
         // completers, so clearing them here is unnecessary.
         if let ViewNodeKind::Vognode (Vognode::Normal (t)
-                                      | Vognode::Phantom (t))
+                                      | Vognode::DiffPhantom (t))
           = &mut node . value() . kind
           { t . existence  = ExistenceAxes::default ();
             t . membership = MembershipAxes::default ();
@@ -478,7 +478,7 @@ async fn attach_containerward_ancestries_to_removedhere_phantoms (
     for edge in viewforest . root () . traverse () {
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
         if let ViewNodeKind::Vognode (Vognode::Normal (t)
-                                      | Vognode::Phantom (t))
+                                      | Vognode::DiffPhantom (t))
           = &node_ref . value () . kind
           { if t . is_removedhere_phantom ()
             { result . push ( node_ref . id () ); }} }}

@@ -132,7 +132,7 @@ pub fn apply_source_set_to_viewforest (
       . and_then (
         |n| match &n . value () . kind {
           ViewNodeKind::Vognode (Vognode::Normal (t)
-                                 | Vognode::Phantom (t))
+                                 | Vognode::DiffPhantom (t))
             if ! active . contains_source (&t . source)
             => Some (( t . id . clone (),
                        t . source . clone (),

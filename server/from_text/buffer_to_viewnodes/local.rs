@@ -39,7 +39,7 @@ pub fn validate_local_structure (
   let errors : Vec<String> =
     match &node_ref . value() . kind
     { MpViewnodeKind::Vognode (MpVognode::Normal (t)
-                                        | MpVognode::Phantom (t)) =>
+                                        | MpVognode::DiffPhantom (t)) =>
         validate_truenode(tree, node_id, t, config),
       MpViewnodeKind::BufferRoot =>
         Vec::new (),
@@ -135,7 +135,7 @@ fn validate_hidden_in_subscribee_col (
     |node| matches!(&node . kind,
                     MpViewnodeKind::Vognode (
                       MpVognode::Normal (_)
-                      | MpVognode::Phantom (_) )))
+                      | MpVognode::DiffPhantom (_) )))
     { errors . push(
         "HiddenInSubscribeeCol must have a TrueNode parent (the subscribee)"
         . to_string()); }
@@ -144,7 +144,7 @@ fn validate_hidden_in_subscribee_col (
     |node| matches!(&node . kind,
                     MpViewnodeKind::Vognode (
                       MpVognode::Normal (_)
-                      | MpVognode::Phantom (_) )))
+                      | MpVognode::DiffPhantom (_) )))
     { errors . push(
         "HiddenInSubscribeeCol's children can only be TrueNodes (to hide)."
         . to_string()); }
@@ -153,7 +153,7 @@ fn validate_hidden_in_subscribee_col (
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Normal (t))
         => t . parentIs == ParentIs::Affected,
-      MpViewnodeKind::Vognode (MpVognode::Phantom (_))
+      MpViewnodeKind::Vognode (MpVognode::DiffPhantom (_))
         => true,
       _ => false, } )
     { errors . push(
@@ -190,14 +190,14 @@ fn validate_hidden_outside_of_subscribee_col (
     |node| matches!(&node . kind,
                     MpViewnodeKind::Vognode (
                       MpVognode::Normal (_)
-                      | MpVognode::Phantom (_) )))
+                      | MpVognode::DiffPhantom (_) )))
     { errors . push("HiddenOutsideOfSubscribeeCol's children must include only TrueNodes." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Normal (t))
         => t . parentIs == ParentIs::Affected,
-      MpViewnodeKind::Vognode (MpVognode::Phantom (_))
+      MpViewnodeKind::Vognode (MpVognode::DiffPhantom (_))
         => true,
       _ => false, } )
     { errors . push(
@@ -227,14 +227,14 @@ fn validate_subscribeecol (
     |node| matches!(&node . kind,
                     MpViewnodeKind::Vognode (
                       MpVognode::Normal (_)
-                      | MpVognode::Phantom (_))))
+                      | MpVognode::DiffPhantom (_))))
     { errors . push("SubscribeeCol must have a TrueNode parent." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| matches!(&node . kind,
                     MpViewnodeKind::Vognode (
                       MpVognode::Normal (_)
-                      | MpVognode::Phantom (_))
+                      | MpVognode::DiffPhantom (_))
                     | MpViewnodeKind::PartnerCol (
                       RoleCol::HiddenOutsideOfSubscribee) ))
     { errors . push( "SubscribeeCol's children must include only TrueNodes or HiddenOutsideOfSubscribeeCol." . to_string()); }
@@ -243,7 +243,7 @@ fn validate_subscribeecol (
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Normal (t)) =>
         t . parentIs == ParentIs::Affected,
-      MpViewnodeKind::Vognode (MpVognode::Phantom (_)) =>
+      MpViewnodeKind::Vognode (MpVognode::DiffPhantom (_)) =>
         true,
       MpViewnodeKind::PartnerCol (
         RoleCol::HiddenOutsideOfSubscribee)
@@ -269,19 +269,19 @@ fn validate_relation_col (
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::Vognode (MpVognode::Normal (_) | MpVognode::Phantom (_))))
+                    MpViewnodeKind::Vognode (MpVognode::Normal (_) | MpVognode::DiffPhantom (_))))
     { errors . push(format!("{} must have a TrueNode parent.", label)); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::Vognode (MpVognode::Normal (_) | MpVognode::Phantom (_))))
+                    MpViewnodeKind::Vognode (MpVognode::Normal (_) | MpVognode::DiffPhantom (_))))
     { errors . push(format!("{}'s children must include only TrueNodes.", label)); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Normal (t))
         => t . parentIs == ParentIs::Affected,
-      MpViewnodeKind::Vognode (MpVognode::Phantom (_))
+      MpViewnodeKind::Vognode (MpVognode::DiffPhantom (_))
         => true,
       _ => false, } )
     { errors . push(format!(
@@ -306,7 +306,7 @@ fn validate_text_changed (
     tree, node_id, -1, false,
     |node| matches!(&node . kind,
                     MpViewnodeKind::Vognode (MpVognode::Normal (_)
-                                             | MpVognode::Phantom (_) )))
+                                             | MpVognode::DiffPhantom (_) )))
     { errors . push("TextChanged must have a TrueNode parent." . to_string()); }
   if !generation_does_not_exist(tree, node_id, 1, true) {
     errors . push("TextChanged must have no (non-ignored) children." . to_string()); }
@@ -326,7 +326,7 @@ fn validate_idcol (
     tree, node_id, -1, false,
     |node| matches!(&node . kind,
                     MpViewnodeKind::Vognode (MpVognode::Normal (_)
-                                             | MpVognode::Phantom (_) )))
+                                             | MpVognode::DiffPhantom (_) )))
     { errors . push("IDCol must have a TrueNode parent." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
@@ -364,7 +364,7 @@ fn validate_inactive_node (
     tree, node_id, -1, false,
     |node| matches!(&node . kind,
                     MpViewnodeKind::Vognode (MpVognode::Normal (_)
-                                             | MpVognode::Phantom (_) )))
+                                             | MpVognode::DiffPhantom (_) )))
     { errors . push("Inactive placeholder must have a TrueNode parent."
                     . to_string()); }
   if !generation_does_not_exist(tree, node_id, 1, true) {

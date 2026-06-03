@@ -29,7 +29,7 @@ where F: FnOnce (&mut TrueNode) -> R {
     tree, treeid,
     |viewnode| { match &mut viewnode . kind {
       ViewNodeKind::Vognode (Vognode::Normal (t)
-                             | Vognode::Phantom (t))
+                             | Vognode::DiffPhantom (t))
         => Ok ( f (t) ),
       _ => Err ( "write_at_truenode_in_tree: expected TrueNode"
                    . to_string () ) }} ) ? }
@@ -67,7 +67,7 @@ pub fn id_from_self_or_nearest_ancestor (
     . ok_or ("id_from_self_or_nearest_ancestor: node not found")?;
   loop {
     if let MpViewnodeKind::Vognode (MpVognode::Normal (t)
-                                    | MpVognode::Phantom (t))
+                                    | MpVognode::DiffPhantom (t))
       = &node . value() . kind
       { if let Some (id) = &t . id
         { return Ok(id . clone()); }}
@@ -214,7 +214,7 @@ pub fn find_children_by_ids (
     match &child . value() . kind {
       ViewNodeKind::Vognode (
         v @ (Vognode::Normal (_)
-             | Vognode::Phantom (_)
+             | Vognode::DiffPhantom (_)
              | Vognode::Deleted (_))) =>
         if target_skgids . contains (v . id ())
         { result . insert (v . id () . clone (), child . id()); },
@@ -305,7 +305,7 @@ fn collect_generation (
               . filter(|c| !skip_non_content ||
                           !matches!(&c . value() . kind,
                                     MpViewnodeKind::Vognode (MpVognode::Normal (t)
-                                                             | MpVognode::Phantom (t))
+                                                             | MpVognode::DiffPhantom (t))
                                     if t . parentIs != ParentIs::Affected ))
               . map(|c| c . id()) ); }}
       current_gen = next_gen; }

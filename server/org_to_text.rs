@@ -155,7 +155,7 @@ pub fn viewnode_to_string (
       Ok ( deleted_scaff_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded )),
-    ViewNodeKind::Vognode (Vognode::Normal (true_node) | Vognode::Phantom (true_node)) =>
+    ViewNodeKind::Vognode (Vognode::Normal (true_node) | Vognode::DiffPhantom (true_node)) =>
       Ok ( true_node_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, true_node, config )),

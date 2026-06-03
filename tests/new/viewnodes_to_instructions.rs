@@ -80,7 +80,7 @@ fn set_membership_unstaged_minus (
       match &node_ref . value() . kind {
         ViewNodeKind::Vognode (
           Vognode::Normal (t)
-          | Vognode::Phantom (t)) =>
+          | Vognode::DiffPhantom (t)) =>
           t . id == ID::from (id),
         _ => false,
       };
@@ -91,7 +91,7 @@ fn set_membership_unstaged_minus (
     panic! ("node not found: {}", id));
   if let ViewNodeKind::Vognode (
     Vognode::Normal (t)
-    | Vognode::Phantom (t)) =
+    | Vognode::DiffPhantom (t)) =
     &mut tree . get_mut (target_id) . unwrap() . value() . kind
   { t . membership . unstaged = Some (Sign::Minus); }
   tree . get_mut (target_id) . unwrap()

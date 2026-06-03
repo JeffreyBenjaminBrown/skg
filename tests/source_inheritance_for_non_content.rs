@@ -66,7 +66,7 @@ fn source_inheritance_across_non_content_same_source () {
     viewforest . get (a_id) . unwrap ()
     . first_child () . unwrap ();
   let ViewNodeKind::Vognode ( Vognode::Normal (t)
-                              | Vognode::Phantom (t))
+                              | Vognode::DiffPhantom (t))
     = & b_ref . value () . kind
     else { panic! ("expected TrueNode") };
   assert! ( ! t . viewStats . sourceAtBoundary,
@@ -105,7 +105,7 @@ fn source_inheritance_across_non_content_different_source () {
     viewforest . get (a_id) . unwrap ()
     . first_child () . unwrap ();
   let ViewNodeKind::Vognode ( Vognode::Normal (t)
-                              | Vognode::Phantom (t))
+                              | Vognode::DiffPhantom (t))
     = & b_ref . value () . kind
     else { panic! ("expected TrueNode") };
   assert! ( t . viewStats . sourceAtBoundary,

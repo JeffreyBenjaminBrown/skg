@@ -406,7 +406,7 @@ fn complete_content_children (
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Normal (t))
         => t . parentIs == ParentIs::Affected,
-      ViewNodeKind::Vognode (Vognode::Phantom (_))
+      ViewNodeKind::Vognode (Vognode::DiffPhantom (_))
         // Existing phantoms are reordered or replaced, not duplicated.
         => true,
       ViewNodeKind::Vognode (Vognode::Inactive (_))
@@ -414,7 +414,7 @@ fn complete_content_children (
       _ => false },
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Normal (t)
-                             | Vognode::Phantom (t))
+                             | Vognode::DiffPhantom (t))
         // Both kinds participate in child-list reconciliation.
         => t . id . clone(),
       ViewNodeKind::Vognode (Vognode::Inactive (i))
@@ -490,7 +490,7 @@ fn order_children_as_scaffolds_then_ignored_then_content (
           | ViewNodeKind::DeadScaffold                => 0,
         ViewNodeKind::Vognode (Vognode::Normal (t))
           if t . parentIs != ParentIs::Affected                  => 1,
-        ViewNodeKind::Vognode (Vognode::Phantom (_))  => 2,
+        ViewNodeKind::Vognode (Vognode::DiffPhantom (_))  => 2,
         ViewNodeKind::Vognode (Vognode::Normal (_))   => 2,
         ViewNodeKind::Vognode (Vognode::Deleted (_))  => 2,
         ViewNodeKind::Vognode (Vognode::Inactive (_)) => 2,
@@ -617,7 +617,7 @@ fn build_child_creation_data (
       for child_ref in node_ref . children() {
         match &child_ref . value() . kind {
           ViewNodeKind::Vognode (Vognode::Normal (t)
-                                 | Vognode::Phantom (t))
+                                 | Vognode::DiffPhantom (t))
             => { m . insert( t . id . clone(),
                              t . source . clone()); },
           ViewNodeKind::Vognode (Vognode::Inactive (i))

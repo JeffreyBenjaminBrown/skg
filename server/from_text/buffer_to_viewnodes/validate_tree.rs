@@ -123,7 +123,7 @@ fn validate_definitive_view_requests (
         node_ref . value();
       if let MpViewnodeKind::Vognode (
         MpVognode::Normal (t)
-        | MpVognode::Phantom (t))
+        | MpVognode::DiffPhantom (t))
       = &viewnode . kind
       { if t . view_requests . contains (&ViewRequest::Definitive)
         { if let Some (id) = &t . id {
