@@ -188,6 +188,14 @@ fn three_merged_nodecompletes(
     setlike_vector_subtraction ( // prevent acquirer from containing itself
       new_contains . clone(),
       &updated_acquirer . all_ids() . cloned() . collect::<Vec<_>>() );
+  { // Union aliases (parallel to extra_ids): a merged node should
+    // still be findable by the acquiree's old aliases.
+    let mut combined : Vec<String> =
+      acquirer_from_disk . aliases . or_default() . to_vec();
+    combined . extend_from_slice(
+      acquiree_from_disk . aliases . or_default() );
+    updated_acquirer . aliases =
+      MSV::Specified(dedup_vector (combined)); }
   { // Combine subscribes_to
     let mut combined : Vec<ID> =
       acquirer_from_disk . subscribes_to . or_default() . to_vec();
