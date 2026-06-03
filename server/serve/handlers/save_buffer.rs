@@ -19,7 +19,7 @@ use crate::types::env::SkgEnv;
 use crate::types::errors::SaveError;
 use crate::types::git::{SourceDiff, GitDiffStatus};
 use crate::types::misc::{ID, SourceName, SkgConfig};
-use crate::types::save::{DefineNode, format_save_error_as_org};
+use crate::types::save::{DefineNode, SaveInstructions, format_save_error_as_org};
 use crate::types::views_state::ViewUri;
 use crate::update_buffer::update_views_after_save;
 
@@ -256,10 +256,12 @@ pub async fn update_from_and_rerender_buffer (
   if save_plan . viewforest . is_empty ()
     { return Err ( "Nothing to save found in org_buffer_text"
                    . into() ); }
-  let SavePlan { viewforest,
-                 define_nodes       : nonmerge_defineNodes,
-                 merge_instructions : merges,
-                 source_moves }
+  let SavePlan {
+    viewforest,
+    instructions : SaveInstructions {
+      define_nodes       : nonmerge_defineNodes,
+      merge_instructions : merges,
+      source_moves } }
     = save_plan;
 
   { // update the graph

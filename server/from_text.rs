@@ -13,7 +13,7 @@ pub mod validate;
 use crate::merge::mergeInstructionTriple::instructiontriples_from_merge_candidates;
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::SkgConfig;
-use crate::types::save::{Merge, DefineNode, SourceMove};
+use crate::types::save::{Merge, DefineNode, SaveInstructions};
 use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
 use crate::types::tree::forest::{MpViewForest, ViewForest};
 
@@ -31,12 +31,14 @@ use validate::{validate_and_filter_foreign_instructions, validate_no_simultaneou
 
 use typedb_driver::TypeDBDriver;
 
+/// The saved view plus the instructions derived from it. The two are
+/// kept apart (plan_v2 §11): the graph-mutation step consumes only
+/// 'instructions'; the rerender step consumes 'viewforest' (plus the
+/// instruction PIDs, for collateral selection). One parse produces both.
 #[derive(Debug)]
 pub struct SavePlan {
-  pub viewforest         : ViewForest,
-  pub define_nodes       : Vec<DefineNode>,
-  pub merge_instructions : Vec<Merge>,
-  pub source_moves       : Vec<SourceMove>,
+  pub viewforest    : ViewForest,
+  pub instructions  : SaveInstructions,
 }
 
 /// Save preparation deliberately validates at several
@@ -113,10 +115,12 @@ pub async fn buffer_to_validated_saveplan (
   validate_no_simultaneous_move_and_merge (
     &nonmerge_plan . source_moves, &merge_instructions )
     . map_err (SaveError::BufferValidationErrors) ?;
-  Ok ( SavePlan { viewforest,
-                  define_nodes,
-                  merge_instructions,
-                  source_moves : nonmerge_plan . source_moves } ) }
+  Ok ( SavePlan {
+    viewforest,
+    instructions : SaveInstructions {
+      define_nodes,
+      merge_instructions,
+      source_moves : nonmerge_plan . source_moves } } ) }
 
 async fn extract_merge_save_plan (
   extraction_forest : &SaveAuthority,

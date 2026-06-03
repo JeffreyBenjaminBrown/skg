@@ -53,10 +53,10 @@ fn test_birth_and_indefinitive(
         update_typedb_from_saveinstructions(
           &config . db_name,
           driver,
-          &save_plan . define_nodes,
+          &save_plan . instructions . define_nodes,
           &[], ). await?;
         update_fs_from_saveinstructions(
-          &save_plan . define_nodes,
+          &save_plan . instructions . define_nodes,
           &[],
           config . clone(), )?;
 

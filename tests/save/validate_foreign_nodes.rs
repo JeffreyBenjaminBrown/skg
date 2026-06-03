@@ -25,7 +25,7 @@ fn test_unmodified_foreign_node_allowed() -> Result<(), Box<dyn Error>> {
       assert!(result . is_ok(), "Unmodified foreign node should be allowed");
       let save_plan = result?;
       // Foreign nodes should be filtered out (no need to write)
-      assert_eq!(save_plan . define_nodes . len(), 0,
+      assert_eq!(save_plan . instructions . define_nodes . len(), 0,
                  "Unmodified foreign nodes should be filtered out");
       Ok(())
     } ))
@@ -99,7 +99,7 @@ fn test_indefinitive_foreign_node_filtered() -> Result<(), Box<dyn Error>> {
       assert!(result . is_ok(), "Indefinitive foreign node should be allowed");
       let save_plan = result?;
       // Indefinitive foreign nodes should be filtered out (no append)
-      assert_eq!(save_plan . define_nodes . len(), 0,
+      assert_eq!(save_plan . instructions . define_nodes . len(), 0,
                  "Indefinitive foreign nodes should be filtered out");
       Ok(())
     } ))
@@ -123,7 +123,7 @@ fn test_owned_node_unchanged_behavior() -> Result<(), Box<dyn Error>> {
       assert!(result . is_ok(), "Owned node modification should be allowed");
       let save_plan = result?;
       // Owned node should be included in instructions
-      assert!(save_plan . define_nodes . len() > 0,
+      assert!(save_plan . instructions . define_nodes . len() > 0,
               "Owned node should be included in save instructions");
       Ok(())
     } ))
@@ -199,9 +199,9 @@ fn test_mixed_owned_and_foreign_nodes() -> Result<(), Box<dyn Error>> {
       assert!(result . is_ok(), "Mixed owned and unmodified foreign should be allowed");
       let save_plan = result?;
       // Only owned node should be in instructions (foreign filtered out)
-      assert!(save_plan . define_nodes . len() > 0, "Should have owned node instructions");
+      assert!(save_plan . instructions . define_nodes . len() > 0, "Should have owned node instructions");
       // Verify no foreign nodes in instructions
-      for instr in &save_plan . define_nodes {
+      for instr in &save_plan . instructions . define_nodes {
         let source: &str = match instr {
           DefineNode::Save(SaveNode (node)) =>
             node . source . as_str(),

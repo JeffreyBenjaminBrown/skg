@@ -45,6 +45,17 @@ pub struct DeleteNode {
   pub source: SourceName,
 }
 
+/// The instructions a save applies to the graph, with no view attached.
+/// The graph-mutation step consumes only this; the rerender step consumes
+/// the ViewForest (held alongside in 'SavePlan') plus these instructions'
+/// PIDs for collateral selection. (plan_v2 §11.)
+#[derive(Debug)]
+pub struct SaveInstructions {
+  pub define_nodes       : Vec<DefineNode>,
+  pub merge_instructions : Vec<Merge>,
+  pub source_moves       : Vec<SourceMove>,
+}
+
 /// When an 'acquiree' merges into an 'acquirer',
 /// we need two SaveNodes and a DeleteNode.
 #[derive(Debug, Clone)]
