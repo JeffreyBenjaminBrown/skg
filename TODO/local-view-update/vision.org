@@ -1,0 +1,128 @@
+* purpose
+The most confusing part of the program, worse even than saving to disk,
+is updating a view after saving. I want to simplify that.
+
+As a side-benefit, once view update were better,
+it can be used for de-novo buffer creation too,
+permitting the removal of a ton of code
+that is currently only used for de-novo creation.
+
+* ways to update a collection
+** overview
+I believe most of the view update code is
+wrapped up in what's called 'completion'.
+That code is very procedural and recursive,
+involving a lot of graph-walking.
+
+This document describes a local update procedure that is, I believe,
+much simpler. Each kind of ViewNode will know how to update itself,
+and maybe some of its neighbors. Traversal order will matter less;
+each update should make sense in isolation.
+
+For every kind of viewnode, we ignore its children marked
+ParentIs=Independent. We might still update those children, or not,
+but they are not involved in the update of their parent.
+This deviates somewhat from current practice,
+which varies in an ad-hoc way.
+
+With that uniform treatment out of the way,
+there remain a number of parameters for how to update,
+each of which must be defined for every kind of viewnode.
+
+** update parameters that can vary across ViewNodes
+*** how to update the node itself
+*** children: set update? list update?
+Some sets are ordered and some aren't.
+When updating a list, we have to preserve that order.
+But when updating a set, we can ignore it -- just make sure
+any deleted nodes are gone (or marked independent, or something --
+this is described in a later section on a different view update parameter)
+and any new nodes are present, appending the new ones.
+
+List update requires all that work, but also requires
+that the order of the relevant set of viewnodes
+match their order in the graph.
+*** If update can create new children, how are they created?
+This depends on the ViewNode.
+I believe the existing code already pins the answer down completely.
+*** Do the children it creates need more processing?
+Updating a ViewNode can give it new children.
+When it does, those new children might need more processing.
+(E.g. new-in-the-view definitive content of a definitive Vognode
+will itself need updating, but IDs in an IDCol are done upon creation.)
+*** how to treat 'liar members'
+These are members claiming parentIs=affected
+for which the graph disproves the claim.
+Typical treatments are to delete them or mark them independent.
+* how to update each kind of ViewNode
+** definitive Vognode from saved buffer: no need to update
+During save, that Vognode just defined the corresponding Gnode.
+"Updating" it would change nothing.
+** indef Vognode with a definitive view request, or def Vognode from collateral buffer
+- update its text
+- list update
+- goal list includes all gContent,
+  plus a subscribeeCol if it subscribes to anything.
+  This can be done in two stages: one that uses a goal list of the gContent,
+  and a second with a singleton subscribeeCol goal list.
+- each child it creates should be indef
+  with its own definitive view request,
+  and will itself need updating
+- *all* its normal children that affect it (not just the new ones)
+  should be given their own definitive view request
+- lying members become independent
+** SubscriberCol, OverriddenCol, OverriderCol, HiddenCol, HiderCol
+- set update
+- any children it creates while updating
+  are indefinitive, and do not need updating
+- lying members
+  - are deleted if indefinitive leaves
+  - are otherwise marked independent
+** SubscribeeCol
+- list update
+- goal list includes the HiddenOutsideOfCol
+  (which might vanish when it updates itself)
+  after all the subscribees.
+  Can be done in two passes with two goal lists,
+  if that's more convenient.
+- children it creates are indefinitive and need no updating
+- lying members are deleted if leaves, otherwise marked independent
+** HiddenInSubscribeeCol
+- set update
+- goal list is complex, not corresponding to any single typedb relation,
+  but its name spells it out: each member of the Col
+  is in the Col's parent and hidden from the Col's grandparent
+  (Check the graph for this information, not the view.)
+- children it creates are indefinitive and need no updating
+- lying members are deleted if leaves, otherwise marked independent
+- unusually, deletes itself if it finds itself empty
+** HiddenOutsideOfSubscribeeCol
+- set update
+- goal list is complex, not corresponding to any single typedb relation,
+  but its name spells it out: each member of the Col
+  is hidden by Col's grandparent
+  and contained in none of the Col's siblings (which are Vognodes).
+  (Check the graph for this information, not the view.)
+- children it creates are indefinitive and need no updating
+- lying members are deleted if leaves, otherwise marked independent
+- unusually, deletes itself if it finds itself empty
+** AliasCol & IDCol
+set update, children are done, delete lying members,
+disregard order
+** Alias & ID: don't update
+Validation already happened,
+so each should have a parent that took care of it.
+* how to implement the node limit in this new update idiom
+Never delete from what's in a view already.
+Regardless of traversal order, upon hitting the nodelimit,
+truncate what remains to be drawn.
+I believe sufficient would be this:
+** change the policy shared by indef Vognodes with def view requests and def Vognodes from collateral buffers
+such that any new Normal Vognode children inserted
+are indefinitive and have no definitive view requests.
+This guarantees that the processing of those nodes will
+only proceed to a height of 1 more than that of the origin Vognode.
+** treat everything else normally
+Nothing else, I believe (please fact-check me)
+could lead to unbounded-depth recursion,
+even if the underlying graph were in fact ifninite-depth.

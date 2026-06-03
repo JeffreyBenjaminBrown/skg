@@ -376,3 +376,81 @@
    implementation would pass parent tree context into metadata
    rendering, so a scaffold child and a normal Vognode child can use
    different graphStats suppression rules.
+
+* Problems found while taking over the local-view-update dialog (2026-06-02)
+  Found while answering the open questions in
+  TODO/local-view-update/problems.org. Each is cross-referenced there.
+
+** Merge silently discards the acquiree's aliases
+   server/merge/mergeInstructionTriple.rs.
+   'three_merged_nodecompletes' (line 162) clones the acquirer and unions
+   extra_ids, contains, subscribes_to, hides_from_its_subscriptions, and
+   overrides_view_of from the acquiree -- but never aliases. The acquiree's
+   title is preserved (mangled to "MERGED: ...") in an
+   acquiree_text_preserver, whose own aliases are set to
+   MSV::Unspecified (create_acquiree_text_preserver, line 229). So after
+   merging X into Y, the result is no longer findable by any of X's
+   aliases.
+
+   This is asymmetric with extra_ids, which ARE unioned so the node stays
+   findable by X's id. Either aliases should be unioned into the acquirer
+   the same way, or the behavior should be a documented decision. Decide
+   what "merge" should preserve.
+
+** Inactive nodes are never converted to Vognode::Deleted
+   server/update_buffer/complete_preorder/truenode.rs.
+   When a save in one buffer deletes a node, collateral views convert a
+   matching Normal vognode to Vognode::Deleted via
+   'mutate_truenode_to_deletednode' (line 137-140). But that check lives
+   inside 'expand_true_content_at_truenode', which only runs on
+   Vognode::Normal (line 115-118). A node shown as Vognode::Inactive (from
+   an inactive source) whose pid is in 'deleted_by_this_save_pids' is never
+   converted, so it lingers as an Inactive placeholder for a node that no
+   longer exists. Rare (the user must delete an inactive-source node), but
+   real. Fix: have the parent's reconcile convert any child -- Normal or
+   Inactive -- whose pid is in 'deleted_by_this_save_pids'.
+
+** Diff scaffolds are not added to nodes made definitive by a view request
+   server/update_buffer/complete.rs, server/to_org/expand/definitive.rs.
+   'ensure_diff_scaffolds' (complete.rs:50) runs once, before
+   'execute_truenode_view_requests' (complete.rs:56), and only for nodes
+   that are already definitive and non-phantom. A node that becomes
+   definitive *during* a definitive view request
+   ('execute_definitive_view_request') is never passed to
+   'maybe_prepend_diff_view_scaffolds', and the content it expands via
+   'extendDefinitiveSubtreeFromLeaf' never gets 'set_diff_status' either.
+   So interactively expanding a node definitively while git diff mode is on
+   yields content with no TextChanged/IDCol/AliasCol scaffolds and no diff
+   axes until the next full rerender.
+
+   Needs a test to confirm reachability (diff mode + a definitive view
+   request on a previously-indefinitive node with changed text/ids/aliases
+   or changed content). The planned "separate diff pass over Vognode::Normal"
+   (TODO/local-view-update) would fix it by visiting every Normal vognode
+   regardless of when it became definitive.
+
+** Collateral graphStats can go stale when only a node's relationships change
+   server/update_buffer.rs / find_collateral_view_uris.
+   Collateral views are selected by the PIDs in the SavePlan's DefineNodes.
+   If saving buffer X changes A.contains to include B (only A is saved),
+   then a different view rooted at B is not rerendered, even though B's
+   container count (graphStats.containRels) changed. B's herald is stale
+   until B's view is next rerendered. Pre-existing and arguably acceptable;
+   fixing it would require selecting collateral by the neighbors of changed
+   nodes, not just the changed nodes.
+
+** (not a bug, but a simplification) Lock over-approximates the rerender set
+   server/serve/handlers/save_buffer.rs, elisp/skg-request-save.el.
+   The early lock message ('uris_of_views_to_lock') locks every open view
+   sharing any PID with the saved buffer, but only views sharing a
+   *changed* PID receive a 'collateral-view' message
+   ('find_collateral_view_uris'). I checked the client: a buffer that is
+   locked but never rerendered is still unlocked, because
+   'skg--save-result-handler' calls 'skg--unlock-all-save-locked' on
+   save-result (skg-request-save.el:171, and again in its unwind-protect at
+   174). So there is no permanently-locked bug.
+
+   It is therefore only an opportunity to simplify: narrowing the lock to
+   the changed-PID set would make lock and rerender coincide, removing the
+   transient lock on buffers that won't change. See the collateral
+   resolution in TODO/local-view-update/problems.org.

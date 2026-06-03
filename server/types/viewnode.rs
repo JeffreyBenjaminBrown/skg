@@ -65,10 +65,10 @@ pub enum ViewNodeKind {
 #[derive( Debug, Clone, PartialEq )]
 pub enum Vognode {
   Normal   (TrueNode),
-  Phantom  (TrueNode),
-  Inactive (InactiveNode),
-  Unknown  (UnknownNode),
-  Deleted  (DeletedNode),
+  Phantom  (TrueNode), // Absent from git worktree but present in git HEAD ("removed"), or still present in worktree but is no longer a member of its parent ("removedHere").
+  Inactive (InactiveNode), // From a source that is inactive (see "source sets").
+  Unknown  (UnknownNode), // If it *ever* existed in the graph, Skg didn't find it.
+  Deleted  (DeletedNode), // No longer exists in the graph.
 }
 
 /// A node whose .skg file was deleted by a save in another buffer.

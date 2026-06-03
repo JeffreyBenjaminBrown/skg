@@ -1,10 +1,20 @@
+* ONGOING [[./TODO/local-view-update/plan-critique.org]]
+claude --resume afa9f264-86a1-475f-9fae-203731cd28a1
+* u
+** the diff report should
+*** explain the maximum badness in each category
+*** include empty top-level categories
+so a reader can remember what those categories are,
+and thus (e.g.) that nothing was orphaned.
+** bugfix : strip last empty line from buffer on save
+Or strip pure-whitespace bodies.
+** bug : graphnodestats are not recalculated in collateral buffers
+** goto in magit should work on raw IDs too
 * [[./TODO/better-than-regex-in-emacs-tests.org]]
 * suppressed container count rule for subscribees-as-such is wrong
 It suppresses 1, should suppress 0.
 Maybe simplify the rule: always suppress 1 and nothing else.
-* replace type
-Maybe ViewNode should be replaced with a pair
-(Vnode_Viewstate, Vnode),
+* ? replace ViewNode with (Vnode_Viewstate, Vnode)
 where Vnode is the new name of what was ViewNodeKind.
 * ParentIs, Birth and maybe other things are vestigial for Phantoms
 * autoload elisp/skg-view-org-ancestry.el
