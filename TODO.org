@@ -1,3 +1,5 @@
+* DiffPhantom should carry less data
+no view requests, parentIs, birth, indef_or_def
 * each new root view sohuld be drawn with a link sources ancestry
 that is, linksource-ancestry as view-descendents
 * more diff supplement data
