@@ -608,6 +608,26 @@ fn subscribee_hiderel_intent_ignores_indefinitive_subscribee (
     Vec::<SubscribeeHiderelIntent>::new()); }
 
 #[test]
+fn subscribee_hiderel_intent_ignores_indefinitive_subscriber (
+) {
+  // At-most-one-writer-per-ID (plan_v2 §6.1): even though the subscribee
+  // here is definitive with visible content, its subscriber instance is
+  // indefinitive, so no hide/unhide edits are inferred for the subscriber
+  // -- those belong only to the SubscribeeCol under the definitive
+  // instance of that subscriber.
+  let input : &str =
+    indoc! {"
+            * (skg (node (id subscriber) (source main) indef (viewRequests definitiveView))) subscriber
+            ** (skg subscribeeCol)
+            *** (skg (node (id subscribee) (source main))) subscribee
+            **** (skg (node (id a) (source main))) a
+            "};
+
+  assert_eq!(
+    hiderel_intents_from_org (input),
+    Vec::<SubscribeeHiderelIntent>::new()); }
+
+#[test]
 fn subscribee_hiderel_intent_excludes_non_content_delete_and_phantom_children (
 ) {
   let input : &str =
