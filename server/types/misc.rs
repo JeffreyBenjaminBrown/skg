@@ -120,6 +120,19 @@ impl SkgConfig {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SourceName ( pub String );
 
+impl SourceName {
+  /// Reserved sentinel source for a *non-Normal* viewnode (e.g. a
+  /// DiffPhantom) whose source could not be determined. It renders like
+  /// any other source -- the all-caps name alone flags it to the user --
+  /// so that one unresolvable reference does not abort an entire render
+  /// (plan_v2 §7.6). Normal-vognode source failures are caught by
+  /// validation (pre-save) or are catastrophic (post-save), never this.
+  pub const NOT_FOUND_STR : &'static str = "NOT_FOUND";
+  pub fn not_found () -> Self {
+    SourceName ( Self::NOT_FOUND_STR . to_string () ) }
+  pub fn is_not_found (&self) -> bool {
+    self . 0 == Self::NOT_FOUND_STR } }
+
 #[derive (Clone)]
 pub struct TantivyIndex {
   // Associates titles and aliases to paths.

@@ -84,11 +84,12 @@ pub fn build_child_data (
   for child_skgid in goal_list {
     if result . contains_key (child_skgid) { continue; }
     if removed_ids . contains (child_skgid) {
+      // A removed-member diff-phantom is a *non-Normal* viewnode. If its
+      // source can't be determined, fall back to the NOT_FOUND sentinel
+      // rather than aborting the whole render (plan_v2 §7.6).
       let child_src : SourceName =
         env . find_source (child_skgid, deleted_since_head_pid_src_map)
-        . ok_or_else ( || -> Box<dyn Error> { format! (
-          "build_child_data: no source found for {}", child_skgid . 0
-        ) . into () } ) ?;
+        . unwrap_or_else ( SourceName::not_found );
       let axes : (ExistenceAxes, MembershipAxes) =
         phantom_axes ( child_skgid, &child_src,
                        parent_skgid, parent_source,
