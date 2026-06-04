@@ -1246,3 +1246,18 @@ Branch =local-view-updates=.
   becomes test-covered once the dangling-reference test routes through the driver.
   Two reverted attempts at this migration are why it's not done: it is tedious
   and wide, not hard; do it as a focused mechanical pass.
+** Phase 8 (§13 unify de-novo) -- COMPLETE. The old de-novo BFS
+  (render_initial_viewforest_bfs + render_generation_and_recurse +
+  add_children_and_collect_their_ids + collect_rels_to_children_from_generation,
+  server/to_org/render/initial_bfs.rs) is DELETED. Both initial and post-save
+  renders run the ONE driver (complete_viewforest). Production wired + validated
+  by the integration suite first; then the unit tests migrated (Arc threading,
+  empty_in_ram_tantivy_index, env in-Rust graph built from the source files for
+  extra_id resolution); §5.5 per-child truncation adopted (5 node-limit tests
+  re-baselined). Full Rust suite (52 ok-blocks) + all 27 integration tests green.
+  WITH THIS, plan_v2 phases 0-8 are all done. Remaining are the smaller deferred
+  cleanups, none blocking: FULL §9 col-descent (sharing-col diff is still inline
+  via the sharing_diffs seam, not in the overlay); Vognode::DiffPhantom payload
+  reduction (§11 / phase-0c); should_sync_from_disk_even_though_definitive removal
+  (§6.1/§8.3, Jeff's original §5 question -- belongs with the §12 context
+  refinement); §5.5 col-node budget accounting (cols don't decrement node_budget).
