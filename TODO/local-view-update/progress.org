@@ -637,7 +637,27 @@ viewStats, view_requests, and the whole =IndefOrDef= enum.
   body read a Normal-only field like viewStats/parentIs/birth/view_requests).
 - Validated: library + all test targets compile; full Rust suite + 27
   integration tests green.
-*** TODO next: #3 -- do all diff locally (pull the after-pass into local update)
+*** TODO #3 -- do all diff locally: REVERSES plan_v2 §9, needs your steer
 Per your clarification: move the content/scaffold diff that =apply_diff_to_viewforest=
 computes AFTER the BFS into the BFS itself, so all diff is computed locally and
 the separate overlay pass goes away. (Opposite direction from my old Q2; agreed.)
+
+FINDING on tracing it into the code: this reverses a deliberate §9 / phase-5
+decision. Today BOTH paths -- de-novo (content_view.rs) and post-save
+(update_buffer.rs) -- compute content/scaffold diff via the overlay
+=apply_diff_to_viewforest=, and BOTH run the BFS with =source_diffs = None=. The
+old inline content-diff branches in the BFS are therefore DORMANT dead code; the
+comment at update_buffer.rs:308 says they "will be deleted once this overlay is
+fully validated." So §9 unified content diff ONTO the overlay on purpose. #3 is
+the opposite unification (everything inline). That is NOT a flag flip:
+- The dormant inline path was superseded and is likely INCOMPLETE -- the overlay
+  does phantom insertion (insert_phantoms_for_missing_contains), IDCol/AliasCol
+  scaffold prepending, and membership marking (process_truenode_diff,
+  mark_membership_on_existing_children) that the inline branches may not replicate.
+- Two viable approaches: (a) resurrect + complete the dormant inline path to
+  match the overlay byte-for-byte, then delete the overlay; or (b) keep the
+  overlay's logic but invoke it per-Normal-node AT its BFS visit instead of as a
+  post-pass (a restructuring, lower risk, but less of a true "one local pass").
+Both are large and reverse a documented decision, so I stopped to ask which you
+want (and to confirm you want §9 reversed) rather than guess. Higher-priority
+work (#1, #2, §11, col budget) is all done + green.
