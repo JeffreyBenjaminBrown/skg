@@ -26,7 +26,6 @@ use crate::types::tree::viewnode_nodecomplete::{
     insert_scaffold_as_child};
 use crate::update_buffer::util::{
     complete_relevant_children_in_viewnodetree,
-    detach_scaffold_transferring_focus,
     partition_children,
     treat_certain_children,
     move_child_to_end};
@@ -147,7 +146,6 @@ pub fn expand_true_content_at_truenode (
     tree, node, &nodecomplete, &pid, &source,
     source_diffs, config, graph_snap,
     deleted_since_head_pid_src_map,
-    deleted_by_this_save_pids,
     active_source_set, node_budget ) ?;
   if cascade {
     attach_cascade_dvrs_to_affected_content( tree, node ) ?; }
@@ -225,7 +223,6 @@ fn reconcile_content_children (
   config                         : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  deleted_by_this_save_pids      : &HashSet<ID>,
   active_source_set              : Option<&ActiveSourceSet>,
   node_budget                    : &mut usize,
 ) -> Result<(), Box<dyn Error>> {
@@ -265,17 +262,12 @@ fn reconcile_content_children (
   let goal_list : Vec<ID> =
     cap_content_goal_to_budget(
       tree, node, &goal_list, &removed_ids, node_budget );
-  // STOPGAP (to be replaced by the leafward death-propagation in
-  // TODO/local-view-update/propagate-death-leafward.org): a content child that
-  // this save deleted and is no longer in the goal is detached here. Demoting
-  // it (the §6.0 branch rule, and the chaos-monkey-safe choice) would keep it
-  // until its visit converts it to a DeletedNode -- but its scaffolds (e.g. an
-  // aliasCol) would first reconcile against a now-missing NodeComplete and
-  // abort the collateral save. Until cols check their own ancestry, detaching
-  // sidesteps that; it over-deletes a user subtree moved under a since-deleted
-  // node, which the planned mechanism will fix.
-  detach_stale_deleted_content (
-    tree, node, &goal_list, deleted_by_this_save_pids ) ?;
+  // A content child this save deleted is no longer detached here (the former
+  // detach_stale_deleted_content stopgap is gone, death-leafward build order
+  // 2/3): it stays, and at its own BFS visit becomes a DeletedNode whose cols
+  // generalized-orphan and deaden -- so no col reconciles against a missing
+  // NodeComplete -- while any user subtree under it is preserved (demoted), and
+  // a now-childless DeletedNode is removed by the §6.6 prune sweep.
   complete_content_children(
     tree, node, &goal_list, &removed_ids,
     source_diffs, config, deleted_since_head_pid_src_map,
@@ -319,33 +311,6 @@ fn cap_content_goal_to_budget (
   }
   kept }
 
-
-/// Detach content children that this save deleted and that are no longer in
-/// the parent's goal (their reference was stripped). They are gone from the
-/// graph, so they must not survive as Independent (§6.0) -- and their
-/// scaffolds must not be reconciled against a missing NodeComplete.
-fn detach_stale_deleted_content (
-  tree                      : &mut Tree<ViewNode>,
-  node                      : NodeId,
-  goal_list                 : &[ID],
-  deleted_by_this_save_pids : &HashSet<ID>,
-) -> Result<(), Box<dyn Error>> {
-  let goal_set : HashSet<ID> =
-    goal_list . iter () . cloned () . collect ();
-  let to_detach : Vec<NodeId> =
-    tree . get (node) . unwrap () . children ()
-    . filter ( |c| match &c . value () . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t)) =>
-          t . parentIs == ParentIs::Affected
-          && ! t . should_be_phantom ()
-          && ! goal_set . contains (&t . id)
-          && deleted_by_this_save_pids . contains (&t . id),
-        _ => false } )
-    . map ( |c| c . id () )
-    . collect ();
-  for cid in to_detach {
-    detach_scaffold_transferring_focus ( tree, cid ) ?; }
-  Ok (( )) }
 
 fn mutate_truenode_to_deletednode (
   tree   : &mut Tree<ViewNode>,
