@@ -1,6 +1,6 @@
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::source_sets::ActiveSourceSet;
-use crate::types::viewnode::{mk_inactive_viewnode, mk_phantom_viewnode};
+use crate::types::viewnode::{mk_inactive_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
 use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap};
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff, NodeChanges, net_diff_from_per_stage, per_stage_node_changes_for_truenode};
 use crate::types::list::{Diff_Item, compute_interleaved_diff, itemlist_and_removedset_from_diff};
@@ -37,6 +37,7 @@ enum ContentReality {
   Real, // Real content: Exists in worktree, and parent contains it at this position.
   Phantom (ExistenceAxes, MembershipAxes), // Is not contained by parent at this position, and might not exist at all.
   Inactive,
+  Unknown, // §7.6: a content id that resolves to nothing (a dangling reference) -> an Unknown placeholder, rather than aborting the whole view.
 }
 
 struct ChildData {
@@ -498,7 +499,9 @@ fn complete_content_children (
             d . title . clone(), ex, mem ),
         ContentReality::Inactive =>
           mk_inactive_viewnode (
-            id . clone(), d . source . clone(), MembershipAxes::default ()) } },
+            id . clone(), d . source . clone(), MembershipAxes::default ()),
+        ContentReality::Unknown =>
+          mk_unknown_viewnode ( id . clone() ) } },
   ) }
 
 /// 'erroneous content children' are children that look like content,
@@ -640,10 +643,20 @@ fn build_child_creation_data (
                                    kind } );
     } else {
       let child_source : SourceName =
-        find_source_with_optional_tantivy (
+        match find_source_with_optional_tantivy (
           id, deleted_since_head_pid_src_map, None, config )
-          . ok_or_else ( || -> Box<dyn Error> { format! (
-            "find_source: no source for {}", id . 0 ) . into () } ) ?;
+        { Some (s) => s,
+          None => {
+            // §7.6: the id resolves to nothing (a dangling reference). Render an
+            // Unknown placeholder rather than aborting the whole view. This is
+            // what lets the one driver serve de-novo (which must tolerate
+            // dangling refs) and makes post-save robust to them too.
+            result . insert ( id . clone (),
+              ChildData { title  : String::new (),
+                          source : SourceName::not_found (),
+                          body   : None,
+                          kind   : ContentReality::Unknown } );
+            continue; } };
       if active_source_set
         . is_some_and ( |active| !active . contains_source (&child_source) )
       {
