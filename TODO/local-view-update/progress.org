@@ -540,11 +540,16 @@ describing. (If you'd rather have the clean one-overlay shape anyway -- e.g.
 because phase 8 now routes everything through the one driver and you want the diff
 story equally unified -- say so and I'll do it; it's a refactor, not a risk.)
 
-*** TODO yes, coupling those does seem better
+*** DONE yes, coupling those does seem better
 But if that's how we're doing some of the diff calculation locally that way,
 can we do all of it locally?
 That seems easier for a reader to understand.
 This is lower priority than refactoring Phantom.
+
+**** done: all diff is computed locally now (see §10 "#3 executed")
+The post-BFS overlay (apply_diff_to_viewforest) is deleted; every node's diff is
+computed at its own BFS visit, for both de-novo and post-save. Byte-identical
+across the full Rust suite + 27 integration tests.
 
 ** extending the col budget is NOT low value -- you're right; I implemented it
 You're correct and my "low value" call was wrong. The premise I leaned on (§18:
@@ -763,3 +768,26 @@ the IDCol/AliasCol RECONCILERS that populate the scaffolds are still diff-aware.
 This reverses §9 and re-baselines the shared oracle, so it is being done as
 deliberate, reviewable work rather than rushed. Status: plan recorded; ready to
 execute.
+
+*** DONE #3 executed -- all diff is now computed locally; overlay deleted
+Landed in three commits, each byte-identical green (full Rust suite + 27
+integration tests, no fixture re-baseline needed -- the cols-under-flipped-phantom
+case does not occur in any fixture, so the self-deadening change was invisible):
+1. "#3 step 1": post-save -- process_truenode_diff (now pub(crate)) called inline
+   at each Normal node's BFS visit (end of visit_normal_node), driven by
+   sharing_diffs; QualCol reconcilers switched to sharing_diffs so they don't
+   clobber the inline scaffolds; rerender_view's overlay call removed.
+2. "#3 step 2": de-novo -- render_initial_view_via_driver takes diff_mode and
+   computes the real diffs itself, feeding the BFS via sharing_diffs; new
+   CompletionContext.diff_tantivy_index (Some de-novo / None post-save);
+   multi_root_view_via_env's overlay call removed.
+3. "#3 step 3": apply_diff_to_viewforest (the whole-tree post-pass) deleted; it
+   was unreferenced. diff.rs is now the per-node inline-diff module.
+Key simplifier: the content member-phantom machinery and the QualCol reconcilers
+had RETAINED their diff-awareness, so B was mostly "feed real diffs + call the
+existing per-node worker inline + delete the post-pass", not a rewrite.
+NOT done (left as the logged hey-jeff.org TODO): the #1 fix (sharing-col member M
+axis computed via phantom_axes against parent.contains rather than the col's own
+relation). It did not "fall out" of this change -- the sharing cols still route
+through phantom_axes -- so it remains a separate, non-blocking improvement, now
+easier since each reconciler holds its relation locally.
