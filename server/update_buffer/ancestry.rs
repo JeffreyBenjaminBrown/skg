@@ -215,20 +215,31 @@ pub fn deaden_generalized_orphan_col (
 /// - an Affected (parentIs=Affected Normal) view-leaf -> delete;
 /// - an Affected branch (has children) -> demote to parentIs=Independent, so
 ///   the user's subtree survives;
-/// - a non-vognode child (Qual / nested QualCol/PartnerCol / DeadScaffold)
-///   -> convert to DeadScaffold;
+/// - a nested col (QualCol / PartnerCol) -> LEAVE it untouched: it is itself a
+///   generalized orphan under this now-dead col, so it deadens itself -- and
+///   disposes ITS OWN children -- at its own BFS visit. (This DEVIATES from
+///   plan.org §5.1.a, which converted nested cols to DeadScaffold here; doing
+///   so would freeze a nested col before it could dispose its own leaf members,
+///   leaving them stranded under a dead chain. Leaving it to self-deaden is
+///   what the plan's §5 note actually intends -- "a nested col ... deadens
+///   itself at its own visit too" -- and is what makes leaf members at every
+///   depth die. A Qual leaf does NOT self-dispatch, so it is still converted
+///   below.)
+/// - any other non-vognode child (a Qual, a DeadScaffold) -> convert to
+///   DeadScaffold;
 /// - any other child (a non-Affected vognode: an Independent Normal, a
 ///   DiffPhantom, an Inactive/Unknown/Deleted) -> keep untouched.
 fn dispose_orphaned_col_child (
   tree  : &mut Tree<ViewNode>,
   child : NodeId,
 ) -> Result<(), Box<dyn Error>> {
-  let (affected, is_leaf, is_vognode) : (bool, bool, bool) = {
+  let (affected, is_leaf, is_vognode, is_col) : (bool, bool, bool, bool) = {
     let c : NodeRef<ViewNode> = tree . get (child)
       . ok_or ("dispose_orphaned_col_child: child not found") ?;
     ( c . value () . is_truenode_and_parentIs_affected (),
       c . children () . next () . is_none (),
-      matches! ( &c . value () . kind, ViewNodeKind::Vognode (_) ) ) };
+      matches! ( &c . value () . kind, ViewNodeKind::Vognode (_) ),
+      is_col_kind (&c . value () . kind) ) };
   if affected {
     if is_leaf {
       detach_scaffold_transferring_focus (tree, child) ?;
@@ -236,6 +247,8 @@ fn dispose_orphaned_col_child (
       write_at_truenode_in_tree ( tree, child,
         |t| { t . parentIs = ParentIs::Independent; } )
         . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
+  } else if is_col {
+    // Leave it: a nested col self-deadens at its own visit (see doc above).
   } else if ! is_vognode {
     write_at_node_in_tree ( tree, child,
       |vn : &mut ViewNode| { vn . kind = ViewNodeKind::DeadScaffold; } )
