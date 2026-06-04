@@ -76,6 +76,65 @@ async fn execute_definitive_view_request (
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result < (), Box<dyn Error> > {
+  // The §5.2 draw rule (defer-to-Final / clobber-Tentative / mark Final +
+  // resync) is factored into 'apply_definitive_draw_rule' so the BFS driver
+  // can run it at a node's visit, before drawing content; here we run it and
+  // then self-expand the subtree, exactly as before. The §5.3 cascade will
+  // replace the present-node self-expansion (extendDefinitiveSubtreeFromLeaf)
+  // with per-child cascade DVRs drawn by the main BFS (plan_v2 §18 monolith).
+  match apply_definitive_draw_rule (
+    viewforest, node_id, config, visited ) ? {
+    DrawOutcome::Deferred => Ok (( )),
+    DrawOutcome::MadeFinal { is_removed_node, hidden_ids } => {
+      if is_removed_node {
+        extendDefinitiveSubtree_fromGit (
+          viewforest, node_id, config . initial_node_limit,
+          visited, source_diffs, config, &hidden_ids, typedb_driver,
+          deleted_since_head_pid_src_map, active_source_set ) . await ?; }
+      else {
+        extendDefinitiveSubtreeFromLeaf (
+          viewforest, node_id, config . initial_node_limit,
+          visited, config, typedb_driver, &hidden_ids,
+          active_source_set ) . await ?;
+        if type_and_parent_type_consistent_with_subscribee (
+          viewforest, node_id ) ?
+        { maybe_add_hiddenInSubscribeeCol_branch (
+            viewforest, node_id, config, typedb_driver
+          ) . await ?; } }
+      Ok (( )) } } }
+
+/// The result of applying the §5.2 Tentative/Final draw rule to a node that
+/// carries a 'ViewRequest::Definitive' (a user DVR, or -- once the §5.3
+/// cascade lands -- a cascade DVR).
+pub enum DrawOutcome {
+  /// An existing Final occurrence of this id won: the DVR was dropped and
+  /// the node left indefinitive. No content expansion should follow.
+  Deferred,
+  /// The node was made Final (and any prior Tentative occurrence of its id
+  /// indefinitized). The caller draws its content next -- via the §5.3
+  /// cascade for a present node, or 'extendDefinitiveSubtree_fromGit' for a
+  /// removed one. 'hidden_ids' is the subscriber's hide set when the node is
+  /// a subscribee, else empty.
+  MadeFinal { is_removed_node : bool,
+              hidden_ids      : HashSet < ID >, },
+}
+
+/// Apply the plan_v2 §5.2 draw rule for a node carrying
+/// 'ViewRequest::Definitive', WITHOUT expanding its content:
+/// - defer to an existing Final occurrence (drop the DVR, stay
+///   indefinitive) -> 'DrawOutcome::Deferred';
+/// - otherwise indefinitize any prior Tentative occurrence of the id, mark
+///   this node Final (resyncing title/body from disk or git), register it in
+///   the map, and clear the request -> 'DrawOutcome::MadeFinal'.
+/// Content drawing is the caller's job (cascade vs fromGit), so the same
+/// rule serves both today's self-expanding path and the BFS driver, which
+/// must settle Final-ness before it draws (and cascades) content.
+pub fn apply_definitive_draw_rule (
+  viewforest : &mut Tree<ViewNode>,
+  node_id    : NodeId,
+  config     : &SkgConfig,
+  visited    : &mut DefinitiveMap,
+) -> Result < DrawOutcome, Box<dyn Error> > {
   let node_pid : ID = get_id_from_treenode (
     viewforest, node_id ) ?;
   let is_removed_node : bool = // for git diff view
@@ -92,14 +151,12 @@ async fn execute_definitive_view_request (
   if let Some (&prior) = visited . get (& node_pid) {
     if prior . is_final () && prior . node_id () != node_id {
       // §5.2: an existing Final occurrence wins; discard this DVR and
-      // leave the node indefinitive. (Dormant until the §5.3 cascade
-      // can produce a second DVR for one ID; validation forbids two
-      // user DVRs per ID.)
+      // leave the node indefinitive.
       write_at_truenode_in_tree (
         viewforest, node_id,
         |t| { t . view_requests . remove (& ViewRequest::Definitive); } )
         . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-      return Ok (( )); }
+      return Ok ( DrawOutcome::Deferred ); }
     if prior . node_id () != node_id {
       indefinitize_content_subtree ( viewforest,
                                      prior . node_id (),
@@ -120,22 +177,7 @@ async fn execute_definitive_view_request (
                viewforest, node_id, config ) ?; }
     // A DVR target is Final (§5.2): later DVRs for this ID defer to it.
     visited . insert ( node_pid . clone(), Finalizable::Final (node_id) ); }
-  if is_removed_node {
-    extendDefinitiveSubtree_fromGit (
-      viewforest, node_id, config . initial_node_limit,
-      visited, source_diffs, config, &hidden_ids, typedb_driver,
-      deleted_since_head_pid_src_map, active_source_set ) . await ?; }
-  else {
-    extendDefinitiveSubtreeFromLeaf (
-      viewforest, node_id, config . initial_node_limit,
-      visited, config, typedb_driver, &hidden_ids,
-      active_source_set ) . await ?;
-    if type_and_parent_type_consistent_with_subscribee (
-      viewforest, node_id ) ?
-    { maybe_add_hiddenInSubscribeeCol_branch (
-        viewforest, node_id, config, typedb_driver
-      ) . await ?; } }
-  Ok (( )) }
+  Ok ( DrawOutcome::MadeFinal { is_removed_node, hidden_ids } ) }
 
 /// If the node is a Subscribee
 /// (child of SubscribeeCol, grandchild of Subscriber),
