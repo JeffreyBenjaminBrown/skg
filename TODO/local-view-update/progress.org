@@ -333,3 +333,79 @@ view-request + diff together.)
 each their own focused effort; none is half-done. Phases 6 (locking -- Emacs +
 wire) and 8 (unify de-novo, which absorbs full col-descent + dormant-code
 deletion) are the big remaining bodies of work.
+
+* 8. Session 2 (2026-06-04, after Jeff said "proceed a lot; 3 then 2 then 1")
+Order Jeff chose, and done: (3) safe cleanup, (2) phase 6 locking, (1) phase 8
+monolith. Categorized below at Jeff's request.
+
+** 8.1 What's done and went well
+- (3) =d010a85a= deleted the now-dead inline content-diff code (set_diff_status,
+  write_truenode_diff, membership_signs_from_parent_contains,
+  maybe_prepend_diff_view_scaffolds, has_list_changes) + their call sites + the
+  set_diff_status unit tests. Pure no-op removal -- the content path has run
+  source_diffs=None since the §9 flip -- so behavior-preserving; full suite + 27
+  integration green. "One diff implementation" is now LITERAL, not just at-runtime.
+- (3) =76c12537= phase-7 §6.5: a no-longer-member Unknown content child (a
+  dangling ref the parent kept) converts to DeadScaffold, which the §3.4 sweep
+  removes; an Unknown still in contains is retained. New
+  convert_nonmember_unknown_children_to_dead + 2 pure (no-DB) unit tests.
+- (2) =376b9abf= phase 6 §8 locking. The conservative early broad lock already
+  existed; this added the two missing pieces: the save-relax-lock message
+  (narrow the lock to the EXACT collateral set once the SavePlan is known, so the
+  user can edit truly-unaffected buffers during the rest of the pipeline) and the
+  §8.4 client handshake (warn + ask before saving if another skg buffer has
+  unsaved edits). The Emacs relax handler cleanly reuses skg--save-lock-handler.
+- A real bug was caught by the integration suite and cleanly fixed: save-relax-lock
+  had to be registered NON-one-shot, because an *invalid* save errors before the
+  server emits it, so a one-shot pending-count increment leaked and hung the NEXT
+  save (broke valid_and_invalid_saves until traced).
+- (1) phase 8 was SCOUTED thoroughly and DE-RISKED: the core gap §13 never named
+  (the driver makes content children bare, with no relation cols) is identified,
+  and the save-round-trip trap is understood with a clean fix (gate relation-col
+  creation behind a de-novo flag). Full coordinated build order in plan_v2 §18.
+- Process: committed per logical unit; full Rust suite (52 ok-blocks) + all 27
+  integration tests green at every commit. Nothing half-done is on the branch.
+
+** 8.2 What's imperfect about what's done
+- Phase 6's actual locking BEHAVIOR is UNVERIFIED by tests. The integration suite
+  confirms the new save-relax-lock message doesn't BREAK saves, but no test
+  asserts the lock LIFECYCLE -- that non-collateral buffers actually unlock
+  earlier, or that the §8.4 handshake fires. The handshake is skipped in batch
+  (noninteractive), so only its no-op path runs. Phase 6's payoff (timing) rests
+  on read-the-code confidence, not tests. A future Emacs-driving test could pin it.
+- save-relax-lock NON-one-shot is a slight asymmetry vs the one-shot save-lock --
+  a workaround for the pending-count mechanism, not a clean symmetry.
+- (3) is only PARTIAL cleanup: content_goal_list / build_child_creation_data /
+  reconcile_content_children still carry dead diff branches and a source_diffs
+  param that is always None -- the content path LOOKS diff-aware but isn't. Left
+  because phase 8 rewrites that area.
+- Carried over from session 1, still imperfect: sharing-col diff is still INLINE
+  (the two-field sharing_diffs seam) -- PARTIAL §9; the overlay does not descend
+  through cols. And the low-frequency PRE-EXISTING parallel-test flake in
+  tests/git_diff_view (shared TypeDB + process-global graph) remains; serial +
+  integration are 100% green.
+- §6.5 is only the member/convert half; Unknowns are not even CREATED on rerender
+  yet (§7.6), so the case it handles is rare today, and its 2 tests exercise the
+  helper directly, not an end-to-end carried-over Unknown.
+
+** 8.3 Choices determining the future
+- PHASE 8 IS DELIBERATELY DEFERRED to a focused effort, not started at the tail of
+  a long session: a coordinated monolith on the PRIMARY view-render path deserves
+  fresh context. Reversible -- nothing is half-done, it's all in §18.
+- DECISION (de-risking, §18): gate the driver's relation-col creation behind a
+  DE-NOVO FLAG (+ the "parent is not a PartnerCol" contextual rule), so POST-SAVE
+  STAYS BYTE-IDENTICAL and only the initial render changes. This is what makes
+  phase 8 safe; it commits us to NOT changing post-save behavior.
+- DECISION (Jeff): phase 8 ADOPTS the §5.5 per-child node-budget truncation,
+  REPLACING de-novo's generation/sibling-complete truncation -- a visible change
+  to how over-large INITIAL views truncate, requiring the initial_view_bfs.rs +
+  content_view.rs node-limit tests to be rewritten to §5.5.
+- Phase 8 ABSORBS the remaining deferrals: full §9 col-descent (overlay through
+  cols), the rest of the dormant content-diff deletion, and the
+  Vognode::DiffPhantom payload reduction (§11 / phase-0c). It also naturally
+  resolves the should_sync_from_disk question (Jeff's original §5 query): removing
+  that carve-out belongs with the §12 CompletionContext refinement.
+- Phase 6 relax semantics are now fixed: the relax message lists the STILL-locked
+  set (saved + exact collateral) and the client unlocks everything else;
+  save-result is the final unlock. Any future change to collateral selection
+  (find_collateral_view_uris) flows automatically into the relax set.
