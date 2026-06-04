@@ -39,6 +39,21 @@ Two per-stage facts git gives us about a node:
 These are stored on the node as small +/- markers and are what the client renders
 as =(staged removedM)=, =(unstaged removedX removedM)=, etc.
 
+*** TODO this surfaces a problem
+The membership axes for a member of a *Col branch (e.g. aliases, subscribees ...)
+need definition, too. They should be defined not against the
+graph-contains relation, but against some other relationship --
+in some cases a compound relationship like 'parent contains and grandparent
+does not hide'.
+
+If we've been defining Phantoms well already in the git diff view,
+then we in fact already have this machinery,
+and we just need to make sure the code uses the right langauge for it.
+But maybe we only look at graph-contains, and not other relationships.
+What's the reality? Do you see a way forward?
+(This seems to be yet another reason that the diff calculation
+should be local.)
+
 ** scaffold / col
 A ViewNode that is NOT a graph node but organizes other nodes. Relevant ones:
 - =IDCol= / =AliasCol= (QualCol): collect a node's extra IDs / aliases.
@@ -47,6 +62,15 @@ A ViewNode that is NOT a graph node but organizes other nodes. Relevant ones:
   node's sharing relationships.
 "Col" is shorthand for these collection scaffolds. They hang off a Vognode as
 children.
+
+*** TODO this deviates from the language I've been using
+wherein Scaffold = anything not a Vognode
+        Col = the particular scaffolds with Col in the name,
+              because they collect stuff
+
+I can figure out what you're talking about in this plan, I think,
+but please append to plan_v2.org that we need to
+homogenize that language in the code.
 
 ** reconcile / completion
 "Completing" a node means filling in everything that should hang off it: its
@@ -61,6 +85,12 @@ A col whose required ancestor Vognode is the wrong kind (e.g. its owner got
 deleted, so the ancestor is now Deleted/Dead). Such a col can't reconcile (there's
 no live owner to read), so the BFS "deadens" it instead. This check reads the
 ancestor; what KIND the ancestor is (Normal vs phantom vs Deleted) matters here.
+
+*** TODO this also seems like a deviation
+"Generalized orphan" should also apply to a node for which
+one of its required scaffold ancestors (e.g. the subscribeeCol) is absent,
+not just absent vognodes.
+Which is the reality in the code?
 
 ** BFS / the driver / complete_viewforest
 =complete_viewforest= is THE function that completes the whole view. It walks the
@@ -77,6 +107,9 @@ The driver can run in two modes, selected by whether it's given =source_diffs=
   graph looks like right now on disk, with no diff decorations.
 - WITH source_diffs: historically it also did diff work inline. (That inline diff
   work was deleted in phase 5 -- see Part 2.)
+
+*** TODO Are you saying the second mode can be deleted?
+Or it can be deleted once we move all diff work into the local BFS update?
 
 ** the overlay / apply_diff_to_viewforest / "post-pass"
 =apply_diff_to_viewforest= is a SECOND traversal that runs AFTER the driver
@@ -128,6 +161,34 @@ check would be looking at a phantom owner. §9 avoided this entire class of
 interaction by running diff only after completion is fully done. That is the
 "phantom-during-completion hazard."
 
+*** TODO This should not happen.
+I'm trying to imagine data where a phantom under a phantom would happen.
+Suppose node A contains node B which contains node C which contains node D,
+and they appear as a content (normal order, parent contains child)
+tree in that order in collateral view V.
+In the saved view S, both B and C were deleted.
+
+In the collateral view, we will first visit A.
+We mark B as a phantom (call it PB now).
+If B was moved within A, then A will regenerate a Normal B
+(call it NB) in the right place,
+and BFS will handle that Normal B normally.
+If B was instead deleted wholesale,
+then we just have PB under A, with no corresponding NB.
+
+When BFS reaches PB, it doesn't care that PB's
+relationship to its parent has ended.
+And because PB is a phantom, PB has no view-content
+that it needs to fill in.
+
+When we get to PC, the same thing happens.
+That is, whether a phantom's parent is itself a phantom or not
+is irrelevant to how the BFS local update treats it.
+
+When we get to D, we do have to act on PC.
+D cannot affect the phantom, so switch D's ParentIs to Independent.
+But that's all -- now we can complete D just like any other
+"graph-contains root" (a root in the graph-contains sense).
 * Part 3 -- the #3 goal and the three options, in the defined terms
 
 Your #3 goal: "do all diff locally ... easier for a reader to understand" --
