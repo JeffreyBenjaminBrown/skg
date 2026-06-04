@@ -712,12 +712,32 @@ Inline destinations (all at the node's own BFS visit, after content reconcile):
   confirm whether normal completion already creates these scaffolds; if not, add a
   "create-if-diff" step (the only genuinely new inline code).
 
-**** open question to resolve first (cheap, do before touching anything)
-Does the CONTENT reconcile already create removed-member phantoms + stamp axes
-when given source_diffs = Some? (truenode.rs content_goal_list takes source_diffs;
-content path currently runs with None.) If those branches are intact, step 8 is
-mostly "pass real source_diffs"; if deleted, step 8 must be re-added. Determine
-this by reading content_goal_list + complete_content_children with source_diffs.
+**** RESOLVED: the content member-phantom machinery is INTACT, just disabled
+Read content_goal_list + complete_content_children + build_child_creation_data.
+The content path ALREADY computes removed_ids from per-stage contains_diff (for
+plain content AND for subscribee content, the latter against the visible-after-
+hidden COMPOUND relation) and ALREADY creates member phantoms for them via
+build_child_creation_data(source_diffs). §9 merely passes source_diffs = None so
+no_diff=true and the branch is dormant; the overlay does it instead. So step 8
+(removed-member content phantoms) is "pass real source_diffs", NOT a rebuild.
+What was actually deleted from the BFS is only the node-SELF pieces: existence-
+axis stamping on the node, the flip (normal_to_phantom), TextChanged emission, and
+ensure-IDCol/AliasCol-when-diff. Those are the only genuinely-new inline lines;
+the IDCol/AliasCol RECONCILERS that populate the scaffolds are still diff-aware.
+=> B is materially smaller than the "rebuild" framing suggested.
+
+**** refined sequencing (keeps the tree green until the atomic switch)
+1. Add the node-self diff pieces (existence axes + TextChanged + ensure
+   IDCol/AliasCol when ids/aliases_diff present + flip LAST) into visit_normal_node,
+   reusing diff.rs helpers. These read source_diffs, which is still None on the
+   content path -> dormant, tree stays byte-identical + green. Commit.
+2. Atomic switch: pass REAL source_diffs to the content path (de-novo + post-save)
+   AND delete apply_diff_to_viewforest + its 2 call sites, in one commit (doing
+   either alone double-creates or drops phantoms). Run cargo + integration;
+   inspect every GIT_DIFF_VIEW re-baseline (cols gone under flipped phantoms; maybe
+   #1 sharing-axis change) to confirm intended bugfix. Commit.
+3. Move any diff.rs helpers the inline code needs into a shared module rather than
+   duplicating; delete now-dead overlay-only helpers.
 
 **** sequencing + safety
 1. Thread real source_diffs into the CONTENT path of the driver context (both
