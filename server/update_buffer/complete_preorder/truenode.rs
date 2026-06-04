@@ -265,25 +265,17 @@ fn reconcile_content_children (
   let goal_list : Vec<ID> =
     cap_content_goal_to_budget(
       tree, node, &goal_list, &removed_ids, node_budget );
-  // A content child that this save deleted and that is no longer in the goal
-  // (its reference was stripped from the parent) must be REMOVED, not demoted
-  // to Independent by the §6.0 branch rule: a deleted node has nothing to
-  // preserve, and keeping it would later reconcile its scaffolds (e.g. its
-  // aliasCol) against a NodeComplete whose .skg file is gone. Detach those
-  // before reconcile. (A still-contained deleted node is left to the
-  // mutate-to-Deleted path at its own visit.)
+  // STOPGAP (to be replaced by the leafward death-propagation in
+  // TODO/local-view-update/propagate-death-leafward.org): a content child that
+  // this save deleted and is no longer in the goal is detached here. Demoting
+  // it (the §6.0 branch rule, and the chaos-monkey-safe choice) would keep it
+  // until its visit converts it to a DeletedNode -- but its scaffolds (e.g. an
+  // aliasCol) would first reconcile against a now-missing NodeComplete and
+  // abort the collateral save. Until cols check their own ancestry, detaching
+  // sidesteps that; it over-deletes a user subtree moved under a since-deleted
+  // node, which the planned mechanism will fix.
   detach_stale_deleted_content (
     tree, node, &goal_list, deleted_by_this_save_pids ) ?;
-  if is_sub {
-    // A subscribee content member that is in 'contains' but hidden (so not in
-    // the visible goal) is *represented elsewhere* -- in the
-    // HiddenInSubscribeeCol -- so it must be REMOVED from the visible content,
-    // not demoted to Independent by the §6.0 branch rule (which would leave a
-    // hidden node visible, sometimes twice). Detach those here, before
-    // reconcile; truly-extra children (not in 'contains') are left for the
-    // reconciler's §6.0 delete-leaf/demote-branch handling.
-    detach_hidden_subscribee_content (
-      tree, node, &content_ids, &goal_list ) ?; }
   complete_content_children(
     tree, node, &goal_list, &removed_ids,
     source_diffs, config, deleted_since_head_pid_src_map,
@@ -327,36 +319,6 @@ fn cap_content_goal_to_budget (
   }
   kept }
 
-/// Detach a subscribee-as-such's content children that are in its 'contains'
-/// but not in the visible goal (i.e. hidden by the subscriber). They are
-/// shown in the HiddenInSubscribeeCol instead, so they must leave the visible
-/// content; demoting them to Independent (the §6.0 branch rule) would leave a
-/// hidden node visible. Truly-extra children (not in 'contains') are NOT
-/// touched here -- the reconciler applies §6.0 to them.
-fn detach_hidden_subscribee_content (
-  tree        : &mut Tree<ViewNode>,
-  node        : NodeId,
-  content_ids : &[ID],
-  goal_list   : &[ID],
-) -> Result<(), Box<dyn Error>> {
-  let goal_set : HashSet<ID> =
-    goal_list . iter () . cloned () . collect ();
-  let hidden : HashSet<ID> =
-    content_ids . iter ()
-    . filter ( |id| ! goal_set . contains (id) )
-    . cloned () . collect ();
-  let to_detach : Vec<NodeId> =
-    tree . get (node) . unwrap () . children ()
-    . filter ( |c| matches! ( &c . value () . kind,
-        ViewNodeKind::Vognode (Vognode::Normal (t))
-          if t . parentIs == ParentIs::Affected
-             && ! t . should_be_phantom ()
-             && hidden . contains (&t . id) ) )
-    . map ( |c| c . id () )
-    . collect ();
-  for cid in to_detach {
-    detach_scaffold_transferring_focus ( tree, cid ) ?; }
-  Ok (( )) }
 
 /// Detach content children that this save deleted and that are no longer in
 /// the parent's goal (their reference was stripped). They are gone from the

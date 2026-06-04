@@ -513,7 +513,23 @@ fn test_collateral_view_reflects_newly_hidden_subscribee_content(
       collateral_views . len(), 1,
       "Expected one collateral view:\n{:?}",
       collateral_views);
-    assert_hides_e1_in_subscribee_col (&collateral_views[0]);
+    // e1 was hidden, so it appears under the HiddenInSubscribeeCol. But e1's
+    // in-view subtree (e11) is a user branch, so §6.0 DEMOTES the visible
+    // occurrence to parentIs=Independent rather than deleting it -- chaos-
+    // monkey safety: the user may have deliberately placed content there, and
+    // we must not lose it. So e1 shows twice: once hidden (indef), once as a
+    // preserved Independent branch.
+    let collateral : &str = &collateral_views[0];
+    assert! (
+      collateral . contains (
+        "**** (skg hiddenInSubscribeeCol)\n***** (skg (node (id e1) (source foreign) indef"),
+      "Expected e1 under HiddenInSubscribeeCol:\n{}", collateral );
+    assert! (
+      collateral . lines() . any ( |line|
+        line . starts_with ("**** (skg (node (id e1)")
+        && line . contains ("(parentIs independent)") ),
+      "Expected hidden branch e1 demoted to Independent (subtree preserved):\n{}",
+      collateral );
 
     cleanup_test (
       db_name, &driver, &config . tantivy_folder ) . await?;
