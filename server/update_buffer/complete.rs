@@ -10,7 +10,7 @@ use crate::to_org::expand::definitive::{ apply_definitive_draw_rule, extendDefin
 use crate::to_org::util::DefinitiveMap;
 use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, SourceName, TantivyIndex};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree};
 use crate::to_org::complete::sharing::maybe_add_relation_col_branches;
 use crate::update_buffer::ancestry::{ col_is_generalized_orphan, deaden_generalized_orphan_col, is_col_kind};
@@ -63,6 +63,11 @@ pub(super) struct CompletionContext<'a> {
   /// the saved buffer and re-creating them would change the buffer and break the
   /// save round-trip (plan_v2 §18). So post-save stays byte-identical.
   pub(super) create_relation_cols_for_fresh_nodes : bool,
+  /// §9 reversal (#3): the tantivy index for the inline diff's phantom-source
+  /// resolution. None on the post-save path (the deleted-id map + disk scan
+  /// suffice, matching the old overlay call); Some on the de-novo path (matching
+  /// the de-novo overlay, which passed the index).
+  pub(super) diff_tantivy_index : Option<&'a TantivyIndex>,
 }
 
 pub(super) async fn complete_viewforest (
@@ -299,7 +304,7 @@ async fn visit_normal_node (
     crate::to_org::render::diff::process_truenode_diff (
       node_mut, real_diffs,
       context . deleted_since_head_pid_src_map,
-      None, // tantivy: post-save resolves phantom sources via the deleted map
+      context . diff_tantivy_index,
       &context . env . config )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   Ok(( )) }

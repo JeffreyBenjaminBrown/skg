@@ -255,9 +255,10 @@ fn find_collateral_view_uris (
 /// Diffs are off here (source_diffs / sharing_diffs = None): a fresh render is
 /// the pure worktree view; the diff overlay is applied afterward by the caller.
 pub async fn render_initial_view_via_driver (
-  env      : &SkgEnv,
-  root_ids : &[ID],
-  active   : Option<&ActiveSourceSet>,
+  env       : &SkgEnv,
+  root_ids  : &[ID],
+  active    : Option<&ActiveSourceSet>,
+  diff_mode : bool,
 ) -> Result<ViewForest, Box<dyn Error>> {
   // Build the stub roots. Its DefinitiveMap is discarded: the driver below uses
   // a FRESH one, so each root is a first occurrence (make_indef_if_repeat treats
@@ -269,21 +270,33 @@ pub async fn render_initial_view_via_driver (
   let graph_snap : Arc<InRustGraph> = env . in_rust_graph . load_full ();
   let mut defmap : DefinitiveMap = DefinitiveMap::new ();
   let mut errors : Vec<String> = Vec::new ();
-  let no_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
-  let empty_deleted_src : HashMap<ID, SourceName> = HashMap::new ();
+  // §9 reversal (#3): de-novo diff is now computed INLINE by the driver, exactly
+  // like post-save -- compute the real diffs here and feed them to the BFS via
+  // sharing_diffs (which drives both the inline process_truenode_diff and the
+  // diff-aware QualCol reconcilers), instead of the caller applying a post-BFS
+  // overlay. The content path stays worktree-only (source_diffs = None).
+  let real_diffs : Option<HashMap<SourceName, SourceDiff>> =
+    if diff_mode { Some ( compute_diff_for_every_source (&env . config) ) }
+    else         { None };
+  let deleted_src : HashMap<ID, SourceName> =
+    real_diffs . as_ref () . map ( |d| deleted_ids_to_source (d) )
+      . unwrap_or_default ();
+  let content_no_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
   let empty_deleted_pids : HashSet<ID> = HashSet::new ();
   let mut context : CompletionContext = CompletionContext {
     defmap                         : &mut defmap,
-    source_diffs                   : &no_diffs,
-    sharing_diffs                  : &no_diffs,
+    source_diffs                   : &content_no_diffs,
+    sharing_diffs                  : &real_diffs,
     env,
     graph_snap                     : &graph_snap,
     errors                         : &mut errors,
-    deleted_since_head_pid_src_map : &empty_deleted_src,
+    deleted_since_head_pid_src_map : &deleted_src,
     deleted_by_this_save_pids      : &empty_deleted_pids,
     active_source_set              : active,
     node_budget                    : env . config . initial_node_limit,
-    create_relation_cols_for_fresh_nodes : true, };
+    create_relation_cols_for_fresh_nodes : true,
+    diff_tantivy_index : if diff_mode { Some (&env . tantivy_index) }
+                         else         { None }, };
   complete_viewforest ( &mut viewforest, &mut context ) . await ?;
   Ok ( viewforest ) }
 
@@ -322,7 +335,10 @@ pub async fn rerender_view (
       node_budget                    : context . env . config . initial_node_limit,
       // Post-save reuses the saved buffer's relation cols; do not re-create them
       // (that would change the buffer and break the save round-trip, §18).
-      create_relation_cols_for_fresh_nodes : false, };
+      create_relation_cols_for_fresh_nodes : false,
+      // Post-save: phantom sources resolve via the deleted-id map + disk scan
+      // (matches the old rerender overlay call, which passed tantivy = None).
+      diff_tantivy_index : None, };
     complete_viewforest (
       viewforest, &mut completion_context ) . await ?; }
   // §9 reversal (#3): the content/scaffold diff is now applied INLINE during the

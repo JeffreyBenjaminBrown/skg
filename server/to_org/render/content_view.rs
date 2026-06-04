@@ -11,14 +11,11 @@
 /// - set_viewnodestats_in_viewforest
 /// - render to string
 
-use crate::serve::handlers::save_buffer::{compute_diff_for_every_source, deleted_ids_to_source};
 use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids_with_source_set;
-use crate::types::git::SourceDiff;
 use crate::org_to_text::viewforest_to_string;
-use crate::to_org::render::diff::apply_diff_to_viewforest;
 use crate::to_org::util::mark_view_roots_parent_absent;
 use crate::types::tree::forest::ViewForest;
-use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
+use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use crate::types::viewnode::Vognode;
 use crate::source_sets::ActiveSourceSet;
@@ -32,7 +29,6 @@ use crate::update_buffer::graphnodestats::{
 use crate::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
 
 use ego_tree::{NodeId, Tree};
-use std::collections::HashMap;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
@@ -113,18 +109,11 @@ pub async fn multi_root_view_via_env (
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result < (String, Vec<ID>, Tree<ViewNode>),
               Box<dyn Error> > {
+  // §9 reversal (#3): the diff (when diff_mode_enabled) is now computed INLINE
+  // by the driver, per Normal node at its BFS visit -- no post-BFS overlay.
   let mut viewforest : ViewForest =
     crate::update_buffer::render_initial_view_via_driver (
-      env, root_ids, active_source_set ) . await ?;
-  if diff_mode_enabled {
-    let source_diffs : HashMap<SourceName, SourceDiff> =
-      compute_diff_for_every_source (&env . config);
-    let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
-      deleted_ids_to_source (&source_diffs);
-    apply_diff_to_viewforest (
-      &mut viewforest, &source_diffs,
-      &deleted_since_head_pid_src_map,
-      Some (&env . tantivy_index), &env . config ) ?; }
+      env, root_ids, active_source_set, diff_mode_enabled ) . await ?;
   attach_containerward_ancestries_to_view_roots (
     &mut viewforest, &env . config, &env . driver, active_source_set ) . await ?;
   let ( container_to_contents, content_to_containers ) =
