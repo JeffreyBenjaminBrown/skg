@@ -47,29 +47,6 @@ struct ChildData {
   kind   : ContentReality,
 }
 
-#[derive(Clone, Copy)]
-struct CompletionMode {
-  saved_view : bool, // false => collateral buffer
-}
-
-impl CompletionMode {
-  fn new (
-    is_saved_view : bool,
-  ) -> CompletionMode {
-    CompletionMode {
-      saved_view : is_saved_view,
-    }}
-
-  /// The saved (definitive) view of a node
-  /// *defines* the title, body, and source.
-  /// Collateral views, though, need those fields updated.
-  fn should_sync_from_disk_even_though_definitive (
-    self,
-  ) -> bool {
-    ! self . saved_view }
-
-}
-
 /// TrueNode content reconcile + content-child creation, for one node, in the
 /// plan_v2 §3 level-order BFS visit. The driver settles the node's
 /// Finalizable state *before* calling this (via 'apply_definitive_draw_rule')
@@ -93,7 +70,6 @@ pub fn expand_true_content_at_truenode (
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   deleted_by_this_save_pids      : &HashSet<ID>,
   active_source_set              : Option<&ActiveSourceSet>,
-  is_saved_view                  : bool,
   settled                        : bool,
   cascade                        : bool,
   node_budget                    : &mut usize,
@@ -135,10 +111,13 @@ pub fn expand_true_content_at_truenode (
       config, &pid, &initial_source ) ?;
   let source : SourceName =
     nodecomplete . source . clone ();
-  let mode : CompletionMode =
-    CompletionMode::new (is_saved_view);
-  if mode . should_sync_from_disk_even_though_definitive () {
-    sync_truenode_from_disk (tree, node, &nodecomplete) ?; }
+  // §8.3: EVERY definitive node re-syncs title/body/source from the snapshot,
+  // saved and collateral alike. (After extraction the snapshot already reflects
+  // the saved buffer's text, so re-syncing the saved node yields the same
+  // content it just defined -- a no-op. The former
+  // should_sync_from_disk_even_though_definitive carve-out, which skipped this
+  // for the saved view, is gone.)
+  sync_truenode_from_disk (tree, node, &nodecomplete) ?;
   reconcile_content_children (
     tree, node, &nodecomplete, &pid, &source,
     source_diffs, config, graph_snap,

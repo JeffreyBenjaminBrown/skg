@@ -139,8 +139,7 @@ pub async fn update_views_after_save (
         "rerender_view (saved)" ). entered();
       rerender_view ( // saved view first; collateral ones later
         &mut saved_view_mut,
-        &mut context,
-        true ) . await } ?;
+        &mut context ) . await } ?;
   if let Ok (uri) = viewuri_from_request_result {
     views_state . open_views . update_view (
       uri, saved_view_mut);
@@ -209,8 +208,7 @@ async fn rerender_collateral_view (
         tracing::info_span!( "rerender_view (collateral)" ). entered();
       rerender_view (
         &mut viewforest,
-        context,
-        false
+        context
       ) . await . map_err (
         |e| format!( "Collateral view {}: {}",
                       uri . repr_in_client (), e)) ? };
@@ -286,7 +284,6 @@ pub async fn render_initial_view_via_driver (
     deleted_since_head_pid_src_map : &empty_deleted_src,
     deleted_by_this_save_pids      : &empty_deleted_pids,
     active_source_set              : active,
-    is_saved_view                  : false,
     node_budget                    : env . config . initial_node_limit,
     create_relation_cols_for_fresh_nodes : true, };
   complete_viewforest ( &mut viewforest, &mut context ) . await ?;
@@ -297,7 +294,6 @@ pub async fn render_initial_view_via_driver (
 pub async fn rerender_view (
   viewforest    : &mut ViewForest,
   context       : &mut RerenderAfterSaveContext<'_>,
-  is_saved_view : bool,
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
   { tracing::debug!("rerender_view: starting");
@@ -325,7 +321,6 @@ pub async fn rerender_view (
       deleted_since_head_pid_src_map : &context . deleted_since_head_pid_src_map,
       deleted_by_this_save_pids      : &context . deleted_by_this_save_pids,
       active_source_set              : context . active_source_set,
-      is_saved_view,
       node_budget                    : context . env . config . initial_node_limit,
       // Post-save reuses the saved buffer's relation cols; do not re-create them
       // (that would change the buffer and break the save round-trip, §18).

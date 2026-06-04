@@ -48,7 +48,6 @@ pub(super) struct CompletionContext<'a> {
   pub(super) deleted_since_head_pid_src_map : &'a HashMap<ID, SourceName>,
   pub(super) deleted_by_this_save_pids      : &'a HashSet<ID>,
   pub(super) active_source_set              : Option<&'a ActiveSourceSet>,
-  pub(super) is_saved_view                  : bool,
   /// §5.5 per-buffer node limit: the remaining budget of *new* ViewNodes
   /// the ordinary update pass may create. Initialized once per rerender to
   /// `config.initial_node_limit` and decremented as content children are
@@ -235,7 +234,7 @@ async fn visit_normal_node (
       &context . env . config, context . graph_snap,
       context . deleted_since_head_pid_src_map,
       context . deleted_by_this_save_pids,
-      context . active_source_set, context . is_saved_view,
+      context . active_source_set,
       settled, cascade, &mut context . node_budget ) ?; }
   // The steps below apply only while the node is still a Normal vognode:
   // content reconcile may have converted it to Deleted (a node this save
