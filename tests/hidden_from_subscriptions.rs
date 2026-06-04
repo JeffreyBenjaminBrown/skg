@@ -330,16 +330,6 @@ fn insert_after_line_containing (
         insertion . lines() . map ( |l| l . to_string() )); }}
   result . join ("\n") + "\n" }
 
-fn assert_line_contains_all (
-  buffer : &str,
-  parts  : &[&str],
-) {
-  assert!(
-    buffer . lines() . any ( |line|
-      parts . iter() . all ( |part| line . contains (part) )),
-    "Expected a line containing {:?}:\n{}",
-    parts, buffer ); }
-
 fn assert_line_order (
   buffer : &str,
   earlier : &str,
@@ -631,7 +621,7 @@ fn test_moving_foreign_subscribee_content_elsewhere_still_hides(
     Ok (( )) }) }
 
 #[test]
-fn test_extra_view_child_under_foreign_subscribee_is_independent(
+fn test_extra_view_child_under_foreign_subscribee_is_deleted(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
     let db_name = "skg-test-extra-foreign-subscribee-child-independent";
@@ -671,9 +661,13 @@ fn test_extra_view_child_under_foreign_subscribee_is_independent(
         &edited, &driver, &config, &mut tantivy, &graph, &mut views_state
       ) . await?;
 
-    assert_line_contains_all (
-      &rerendered,
-      &["(id a)", "(parentIs independent)"]);
+    // §6.0: the extra view-child 'a' is a stale leaf (not in e's contains,
+    // claiming membership, no children), so it is deleted -- not preserved as
+    // an Independent child.
+    assert!(
+      ! rerendered . lines() . any ( |line| line . contains ("(id a)") ),
+      "Extra stale-leaf view-child 'a' should be deleted, not preserved:\n{}",
+      rerendered );
     assert_line_order (&rerendered, "(id e1)", "(id e2)");
     assert_does_not_hide_e1 (&rerendered);
     let e_skg : NodeComplete =
@@ -691,7 +685,7 @@ fn test_extra_view_child_under_foreign_subscribee_is_independent(
     Ok (( )) }) }
 
 #[test]
-fn test_extra_view_child_under_owned_subscribee_is_independent(
+fn test_extra_view_child_under_owned_subscribee_is_deleted(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
     let db_name = "skg-test-extra-owned-subscribee-child-independent";
@@ -721,9 +715,13 @@ fn test_extra_view_child_under_owned_subscribee_is_independent(
         &edited, &driver, &config, &mut tantivy, &graph, &mut views_state
       ) . await?;
 
-    assert_line_contains_all (
-      &rerendered,
-      &["(id e)", "(parentIs independent)"]);
+    // §6.0: the extra view-child 'e' is a stale leaf (not in r's contains,
+    // claiming membership, no children), so it is deleted -- not preserved as
+    // an Independent child.
+    assert!(
+      ! rerendered . lines() . any ( |line| line . contains ("(id e)") ),
+      "Extra stale-leaf view-child 'e' should be deleted, not preserved:\n{}",
+      rerendered );
     assert_line_order (&rerendered, "(id r1)", "(id r2)");
     assert!(
       ! rerendered . contains ("hiddenInSubscribeeCol"),

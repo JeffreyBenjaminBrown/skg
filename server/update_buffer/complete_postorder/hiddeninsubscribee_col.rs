@@ -55,7 +55,11 @@ pub fn reconcile_hiddenin_subscribee_col_children (
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
   reconcile_sharing_scaffold_children(
-    // PITFALL: ('reconcile_hiddenoutside_subscribee_col_children' has a similar note.) Unlike other reconciliation steps, in a HiddenInSubscribeeCol we do not call mark_managed_children_outside_goal_independent before reconciliation. If a user moves a node into a subscribee-as-such, 'unhiding' it from the corresponding subscriber, that would cause one of the children of the HiddenInSubscribeeCol to become stale (because it is no longer hidden). We do not want to mark it independent; we actually want to remove it from the HiddenInSubscribeeCol during reconciliation.
+    // §6.0: a HiddenInSubscribeeCol child that becomes stale (e.g. the user
+    // moved it into the subscribee-as-such, 'unhiding' it) is removed when it
+    // is a view-leaf -- the common case for hidden members -- and demoted to
+    // Independent only if it has a user subtree to preserve. The reconciler
+    // applies this uniformly now; the old mark_managed pre-marking is gone.
     tree, node, kind,
     &goal_list, &child_data ) ?;
   detach_scaffold_if_empty (tree, node) ?;

@@ -981,3 +981,31 @@ Branch =local-view-updates=.
   - removed-file DVR (extendDefinitiveSubtree_fromGit) kept on a defensive
     branch in visit_normal_node; effectively unreachable post-save (removed
     files arrive as DiffPhantoms). Full Rust suite green.
+** Phase 3 (§6.0 unified stale handling) LANDED. The reconciler discard is
+  generalized: complete_relevant_children takes a demote_invalid closure; the
+  ViewNode wrapper demotes a stale member that is a Normal/Affected *branch* to
+  Independent (keep the user's subtree) and deletes everything else stale (a
+  leaf, phantom, qual, inactive). Removed the relation-col mark_managed
+  pre-marking and the M2 subscribee extra-child pre-mark; deleted now-unused
+  mark_managed_children_outside_goal_independent.
+  - DECISION (Jeff, this session): a stale member that is a LEAF is DELETED,
+    uniformly -- including a user-added extra leaf under an editable subscribee
+    (no editable-collection carve-out). Renamed/updated the two
+    extra_view_child_under_*_subscribee tests from "_is_independent" to
+    "_is_deleted".
+  - Subscribee subtlety found + fixed: a content member that is in 'contains'
+    but hidden (so not in the visible goal) is *represented elsewhere* (the
+    HiddenInSubscribeeCol), so it must be REMOVED from visible content, not
+    demoted by §6.0 (else a hidden node stays visible, sometimes twice). Added
+    detach_hidden_subscribee_content as a subscribee pre-pass; §6.0 then governs
+    only the truly-extra (not-in-contains) children. Principle: demote-to-
+    Independent is for stale members with NO other representation.
+  - §16 fixes delivered in passing: relation cols now delete stale leaves
+    (were marking all non-goal members Independent); Hidden* cols now preserve
+    non-leaf branches (were removing outright). Full Rust suite green (51
+    ok-blocks). STILL DEFERRED to later: §3.4 prune-sweep self-deletion routing
+    + empty-col exceptions (SubscribeeCol/OverriddenCol/AliasCol preserved when
+    empty; IDCol/read-only-relation/Hidden* self-delete) -- the cols currently
+    keep their existing self-delete behavior (subscribee_col + Hidden* detach
+    when empty; others don't). And the other §6.1 carve-out
+    (should_sync_from_disk_even_though_definitive).

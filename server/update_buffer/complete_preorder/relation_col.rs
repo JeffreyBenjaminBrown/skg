@@ -8,8 +8,7 @@ use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::pid_and_source_from_ancestor;
-use crate::types::viewnode::{ParentIs, RoleCol, ViewNode};
-use crate::update_buffer::util::mark_managed_children_outside_goal_independent;
+use crate::types::viewnode::{RoleCol, ViewNode};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -48,10 +47,10 @@ pub fn reconcile_relation_col_children (
       tree, node, &owner_pid, &owner_source,
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
-  mark_managed_children_outside_goal_independent (
-    // Do this before reconciliation -- otherwise non-goal children marked parentIs=affected are treated as relevant collection members and discarded.
-    tree, node, &goal_list,
-    |t| t . parentIs == ParentIs::Affected ) ?;
+  // §6.0/§16: no longer pre-mark non-goal members Independent. The reconciler
+  // now deletes a stale member that is a view-leaf and demotes one that is a
+  // branch, so a relation col (read-only from this side) correctly drops a
+  // stale leaf member instead of preserving it.
   reconcile_sharing_scaffold_children (
     tree, node, kind, &goal_list, &child_data ) ?;
   Ok (( )) }
