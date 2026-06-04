@@ -22,6 +22,7 @@ use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use crate::types::viewnode::Vognode;
 use crate::source_sets::{ActiveSourceSet, render_viewforest_with_source_set};
+use crate::types::env::SkgEnv;
 use crate::update_buffer::graphnodestats::{
   set_graphnodestats_in_viewforest,
   set_graphnodestats_in_viewforest_with_source_set};
@@ -124,6 +125,57 @@ async fn multi_root_view_inner (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "viewforest_to_string" ). entered();
       viewforest_to_string (& viewforest, config) } ?;
+  Ok ((buffer_content, pids, viewforest . into_internal_tree ())) }
+
+/// Phase 8 (§13): the de-novo view built through the ONE driver
+/// (render_initial_view_via_driver) instead of render_initial_viewforest_bfs.
+/// Same post-steps as multi_root_view_inner (diff overlay, containerward, stats,
+/// render). Takes a SkgEnv (carries config/driver/tantivy/graph). The legacy
+/// multi_root_view* shims still use the old BFS until the unit tests migrate.
+pub async fn multi_root_view_via_env (
+  env               : &SkgEnv,
+  root_ids          : &[ID],
+  diff_mode_enabled : bool,
+  active_source_set : Option<&ActiveSourceSet>,
+) -> Result < (String, Vec<ID>, Tree<ViewNode>),
+              Box<dyn Error> > {
+  let mut viewforest : ViewForest =
+    crate::update_buffer::render_initial_view_via_driver (
+      env, root_ids, active_source_set ) . await ?;
+  if diff_mode_enabled {
+    let source_diffs : HashMap<SourceName, SourceDiff> =
+      compute_diff_for_every_source (&env . config);
+    let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
+      deleted_ids_to_source (&source_diffs);
+    apply_diff_to_viewforest (
+      &mut viewforest, &source_diffs,
+      &deleted_since_head_pid_src_map,
+      Some (&env . tantivy_index), &env . config ) ?; }
+  attach_containerward_ancestries_to_view_roots (
+    &mut viewforest, &env . config, &env . driver, active_source_set ) . await ?;
+  let ( container_to_contents, content_to_containers ) =
+    match active_source_set {
+      Some (active) =>
+        set_graphnodestats_in_viewforest_with_source_set (
+          &mut viewforest, &env . config, &env . driver, active ) . await,
+      None =>
+        set_graphnodestats_in_viewforest (
+          &mut viewforest, &env . config, &env . driver ) . await,
+    } ?;
+  mark_view_roots_parent_absent ( &mut viewforest );
+  set_viewnodestats_in_viewforest (
+    &mut viewforest, &container_to_contents, &content_to_containers,
+    &env . config );
+  let pids : Vec<ID> = {
+    let mut ids : Vec<ID> = Vec::new ();
+    for node_ref in viewforest . nodes () {
+      if let ViewNodeKind::Vognode (Vognode::Normal (t)
+                                    | Vognode::DiffPhantom (t))
+        = &node_ref . value () . kind
+        { ids . push ( t . id . clone () ); }}
+    ids };
+  let buffer_content : String =
+    viewforest_to_string (& viewforest, &env . config) ?;
   Ok ((buffer_content, pids, viewforest . into_internal_tree ())) }
 
 pub async fn multi_root_view_with_source_set (

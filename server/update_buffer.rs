@@ -248,6 +248,50 @@ fn find_collateral_view_uris (
     . collect ();
   uris . into_iter () . collect () }
 
+/// Phase 8 (§13): build a DE-NOVO (initial) content view by running the ONE
+/// post-save driver (complete_viewforest) over a stub forest of the requested
+/// roots, instead of the separate render_initial_viewforest_bfs. The driver
+/// creates each fresh node's relation cols (create_relation_cols_for_fresh_nodes
+/// = true), expands content, reconciles cols, and applies the §5.5 node budget.
+/// The caller (multi_root_view_via_env) then adds the diff overlay,
+/// containerward ancestry, and stats -- exactly as the old path did.
+///
+/// Diffs are off here (source_diffs / sharing_diffs = None): a fresh render is
+/// the pure worktree view; the diff overlay is applied afterward by the caller.
+pub async fn render_initial_view_via_driver (
+  env      : &SkgEnv,
+  root_ids : &[ID],
+  active   : Option<&ActiveSourceSet>,
+) -> Result<ViewForest, Box<dyn Error>> {
+  // Build the stub roots. Its DefinitiveMap is discarded: the driver below uses
+  // a FRESH one, so each root is a first occurrence (make_indef_if_repeat treats
+  // any pid already in the map as a repeat and would wrongly indefinitize them).
+  let mut stub_defmap : DefinitiveMap = DefinitiveMap::new ();
+  let mut viewforest : ViewForest =
+    crate::to_org::util::stub_viewforest_from_root_ids (
+      root_ids, &env . config, &env . driver, &mut stub_defmap ) . await ?;
+  let graph_snap : Arc<InRustGraph> = env . in_rust_graph . load_full ();
+  let mut defmap : DefinitiveMap = DefinitiveMap::new ();
+  let mut errors : Vec<String> = Vec::new ();
+  let no_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
+  let empty_deleted_src : HashMap<ID, SourceName> = HashMap::new ();
+  let empty_deleted_pids : HashSet<ID> = HashSet::new ();
+  let mut context : CompletionContext = CompletionContext {
+    defmap                         : &mut defmap,
+    source_diffs                   : &no_diffs,
+    sharing_diffs                  : &no_diffs,
+    env,
+    graph_snap                     : &graph_snap,
+    errors                         : &mut errors,
+    deleted_since_head_pid_src_map : &empty_deleted_src,
+    deleted_by_this_save_pids      : &empty_deleted_pids,
+    active_source_set              : active,
+    is_saved_view                  : false,
+    node_budget                    : env . config . initial_node_limit,
+    create_relation_cols_for_fresh_nodes : true, };
+  complete_viewforest ( &mut viewforest, &mut context ) . await ?;
+  Ok ( viewforest ) }
+
 /// Strip stale diff data, re-complete the viewforest,
 /// set graph/view stats, and render to string.
 pub async fn rerender_view (
