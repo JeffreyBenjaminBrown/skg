@@ -22,7 +22,6 @@ use crate::serve::util::{ format_lock_views_sexp, format_single_view_sexp, send_
 use crate::source_sets::{ActiveSourceSet, apply_source_set_to_viewforest};
 use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids_with_source_set;
 use crate::to_org::util::DefinitiveMap;
-use crate::to_org::render::diff::apply_diff_to_viewforest;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::views_state::ViewUri;
 use crate::types::misc::{ID, SourceName, SkgConfig};
@@ -326,14 +325,11 @@ pub async fn rerender_view (
       create_relation_cols_for_fresh_nodes : false, };
     complete_viewforest (
       viewforest, &mut completion_context ) . await ?; }
-  if let Some ( ref source_diffs ) = context . source_diffs {
-    // tantivy = None: phantom source resolution falls back to the deleted-id
-    // map and the on-disk source scan, which suffice post-save.
-    apply_diff_to_viewforest (
-      viewforest, source_diffs,
-      &context . deleted_since_head_pid_src_map,
-      None,
-      &context . env . config ) ?; }
+  // §9 reversal (#3): the content/scaffold diff is now applied INLINE during the
+  // BFS above (process_truenode_diff at each Normal node's visit, driven by
+  // sharing_diffs = the real diffs). The post-BFS overlay call is gone for the
+  // post-save path; apply_diff_to_viewforest now serves only the de-novo path
+  // until that is migrated too.
   mark_view_roots_parent_absent (viewforest);
   if let Some (snap) = snapshot_global () {
     // Correct any parentIs markers whose claimed relation to the

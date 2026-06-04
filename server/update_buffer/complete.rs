@@ -23,7 +23,7 @@ use super::complete_preorder::relation_col::reconcile_relation_col_children;
 use super::complete_preorder::subscribee_col::reconcile_subscribee_col_children;
 use super::complete_preorder::truenode::expand_true_content_at_truenode;
 
-use ego_tree::{Tree, NodeId};
+use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::error::Error;
 use std::sync::Arc;
@@ -161,12 +161,17 @@ async fn expand_true_content_at_node (
         context . env, context . graph_snap,
         context . deleted_since_head_pid_src_map,
         &mut context . node_budget ) ?,
+    // §9 reversal (#3): the IDCol/AliasCol diff scaffolds are now created inline
+    // by process_truenode_diff at the owner's BFS visit, so their reconcilers
+    // must see the REAL diffs (sharing_diffs) -- not the content path's None --
+    // or they would clobber the just-created diff entries. (De-novo still has
+    // sharing_diffs = None until its path is migrated, so it is unaffected.)
     ViewNodeKind::QualCol (QualCol::Alias) =>
       super::complete_postorder::aliascol::reconcile_alias_col_children (
-        tree, treeid, context . source_diffs, &context . env . config ) ?,
+        tree, treeid, context . sharing_diffs, &context . env . config ) ?,
     ViewNodeKind::QualCol (QualCol::ID) =>
       super::complete_postorder::id_col::reconcile_id_col_children (
-        treeid, tree, context . source_diffs, &context . env . config ) ?,
+        treeid, tree, context . sharing_diffs, &context . env . config ) ?,
     ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
       // §6.4/§6.6/§16: an Inactive node deleted by this save becomes Deleted
       // (current code converted only Normal nodes).
@@ -279,6 +284,24 @@ async fn visit_normal_node (
   // it on reaching it.
   super::complete_postorder::truenode::ensure_hiddenin_col_under_definitive_subscribee (
     tree, treeid, &context . env . config, &context . env . driver ) . await ?;
+  // §9 reversal (#3 / Jeff): compute this node's content+scaffold diff LOCALLY,
+  // at its own BFS visit, instead of in the post-BFS overlay. Runs last, after
+  // the node is fully completed as a worktree Normal node (content, cols, view
+  // requests), so process_truenode_diff sees final children -- exactly the state
+  // the overlay saw post-BFS. The flip to a phantom happens here; the node's
+  // cols (visited later, level-order) self-deaden via their own
+  // generalized-orphan check. Gated on diff mode (sharing_diffs = Some), which
+  // is the real diffs on the post-save path; de-novo still has None here and
+  // keeps using its caller's overlay until that path is migrated.
+  if let Some (real_diffs) = context . sharing_diffs {
+    let node_mut : NodeMut<ViewNode> =
+      tree . get_mut (treeid) . unwrap ();
+    crate::to_org::render::diff::process_truenode_diff (
+      node_mut, real_diffs,
+      context . deleted_since_head_pid_src_map,
+      None, // tantivy: post-save resolves phantom sources via the deleted map
+      &context . env . config )
+      . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   Ok(( )) }
 
 /// Whether a node of this kind is *self-deletable when empty* (plan §3.4): the
