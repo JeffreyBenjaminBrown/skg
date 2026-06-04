@@ -54,6 +54,32 @@ What's the reality? Do you see a way forward?
 (This seems to be yet another reason that the diff calculation
 should be local.)
 
+**** the reality: detection is right, the AXIS markers are not
+You're right, and the code half-confirms your hope. There are two layers:
+- PHANTOM DETECTION (which members count as "removed") ALREADY uses the correct,
+  sometimes-compound relationship. =goal_list_for_subscribee_col= uses
+  =subscribes_to=; =goal_list_for_hiddeninsubscribee_col= uses the COMPOUND
+  relation =subscriber.hides_from_its_subscriptions ∩ subscribee.contains=
+  (exactly your "parent contains and grandparent does not hide" shape), with
+  per-stage =contains_diff= folded in; =goal_list_for_hiddenoutsideof= uses
+  hides minus all-subscribee-content. So a removed sharing-col member IS detected
+  against the right relationship -- the machinery you hoped exists, does.
+- But the MEMBERSHIP AXIS markers (the =removedM= +/- you render on the member)
+  are computed by =phantom_axes= (types/phantom.rs), which reads ONLY the
+  PARENT's =contains_diff=. For a content child that's correct; for a sharing-col
+  member it's the WRONG list -- a subscribee lives in =subscribes_to=, not
+  =contains= -- so =phantom_axes= finds nothing and the member's M sign comes back
+  empty. So: detection uses the right relation, but the axis marker is still
+  computed against graph-contains. Your suspicion ("maybe we only look at
+  graph-contains") is correct for the axis layer specifically.
+**** TODO fix: derive the member's M axis from its own relation, not contains
+Way forward: the col reconciler already computed the member's status from the
+right relation (it produced =removed_ids= that way); the axis should come from
+that same computation rather than from the centralized =phantom_axes= (which
+hardcodes parent.contains). And yes -- this is a clean argument FOR local diff:
+a local col reconciler holds the relationship in hand, so the axis falls out
+correctly; the centralized overlay does not and so reaches for contains.
+
 ** scaffold / col
 A ViewNode that is NOT a graph node but organizes other nodes. Relevant ones:
 - =IDCol= / =AliasCol= (QualCol): collect a node's extra IDs / aliases.
@@ -63,7 +89,7 @@ A ViewNode that is NOT a graph node but organizes other nodes. Relevant ones:
 "Col" is shorthand for these collection scaffolds. They hang off a Vognode as
 children.
 
-*** TODO this deviates from the language I've been using
+*** DONE this deviates from the language I've been using
 wherein Scaffold = anything not a Vognode
         Col = the particular scaffolds with Col in the name,
               because they collect stuff
@@ -71,6 +97,12 @@ wherein Scaffold = anything not a Vognode
 I can figure out what you're talking about in this plan, I think,
 but please append to plan_v2.org that we need to
 homogenize that language in the code.
+
+**** done: appended to plan_v2.org as §19
+Recorded your canonical definitions (scaffold = any non-Vognode; col = the
+Col-named collecting scaffolds only) and an action item to audit the code's
+identifiers/comments (=is_col_kind= included) to match. You're right that I'd
+been using "col" loosely in places -- I'll use your definitions from here on.
 
 ** reconcile / completion
 "Completing" a node means filling in everything that should hang off it: its
@@ -81,16 +113,40 @@ SubscribeeCol reads the subscriber node above it) to know what to reconcile
 against.
 
 ** generalized orphan
-A col whose required ancestor Vognode is the wrong kind (e.g. its owner got
-deleted, so the ancestor is now Deleted/Dead). Such a col can't reconcile (there's
-no live owner to read), so the BFS "deadens" it instead. This check reads the
-ancestor; what KIND the ancestor is (Normal vs phantom vs Deleted) matters here.
+A col any of whose required ANCESTORS (the full chain, not just the parent) is
+the wrong kind. The §3 ancestry table spells out, per col kind, what each ancestor
+must be -- and those required ancestors include SCAFFOLDS, not only vognodes: a
+HiddenInSubscribeeCol requires a SubscribeeCol scaffold ancestor in the middle of
+its chain. If any required ancestor is missing or the wrong kind (a deleted owner
+now Deleted/Dead, a phantom owner, or a missing required SubscribeeCol), the col
+can't reconcile, so the BFS "deadens" it. (See the TODO answer under "diff axes"
+below: this is already true for cols; only vognode *members* of a col are not
+orphan-checked.)
 
-*** TODO this also seems like a deviation
+*** DONE this also seems like a deviation
 "Generalized orphan" should also apply to a node for which
 one of its required scaffold ancestors (e.g. the subscribeeCol) is absent,
 not just absent vognodes.
 Which is the reality in the code?
+
+**** reality: the code ALREADY does this (for cols)
+The §3 ancestry table (server/update_buffer/ancestry.rs) is exactly this. An
+=ExpectedAncestor= is either =NormalVognode= OR =Scaffold(RoleCol)=, and the
+table for the Hidden* cols lists a SCAFFOLD ancestor in the middle:
+=ANC_HIDDEN_IN = [NormalVognode (subscribee), Scaffold(Subscribee) (the
+SubscribeeCol), NormalVognode (subscriber)]=. =col_is_generalized_orphan= walks
+the whole chain and =matches_expected= fails if the actual ancestor at that depth
+is not the required SubscribeeCol -- so a HiddenInSubscribeeCol whose SubscribeeCol
+ancestor is missing/wrong IS a generalized orphan and gets deadened. So my
+glossary entry under-stated it: it's not only "absent vognodes"; absent/wrong
+required SCAFFOLD ancestors count too. (I'll fix that glossary wording.)
+**** TODO the one genuine gap: vognode MEMBERS aren't orphan-checked
+The check only runs for COLS (=is_col_kind=: QualCol/PartnerCol). A Vognode that
+is a *member* of a col (e.g. a subscribee Normal node under a SubscribeeCol) is
+NOT orphan-checked, so if its SubscribeeCol parent vanished, nothing deadens the
+member via this path (other mechanisms -- the prune sweep, ParentIs demotion --
+handle it instead). If you want "generalized orphan" to cover col-member vognodes
+too, that's a real extension; say the word and I'll scope it.
 
 ** BFS / the driver / complete_viewforest
 =complete_viewforest= is THE function that completes the whole view. It walks the
@@ -108,8 +164,25 @@ The driver can run in two modes, selected by whether it's given =source_diffs=
 - WITH source_diffs: historically it also did diff work inline. (That inline diff
   work was deleted in phase 5 -- see Part 2.)
 
-*** TODO Are you saying the second mode can be deleted?
+*** DONE Are you saying the second mode can be deleted?
 Or it can be deleted once we move all diff work into the local BFS update?
+
+**** the second mode is already mostly gone; the residue is a dead parameter
+Careful distinction. There were two things:
+1. The driver's INLINE CONTENT-diff LOGIC (scaffold emission + phantom flip
+   inside the BFS). That is ALREADY DELETED (phase 5). Gone.
+2. The =source_diffs= PARAMETER, still threaded through the content path. Today
+   the content path is always called with =source_diffs = None= (the overlay owns
+   content diff), so that parameter is DEAD on the content path -- it carries no
+   information there. (The separate =sharing_diffs= field is NOT dead: the sharing
+   cols still diff inline against it.)
+So: the inline-content "mode" is already deleted; what remains is a dead =None=
+parameter that could be cleaned up now regardless of #3. As for "deleted once we
+move all diff into the local BFS": under Option B we'd RE-ADD real content
+=source_diffs= to the BFS (un-dead the parameter and rebuild the logic); under
+Option A the overlay keeps owning content diff and the content-path =source_diffs=
+parameter can simply be removed as dead. Either way, nothing is lost by the param
+being =None= today -- it's inert.
 
 ** the overlay / apply_diff_to_viewforest / "post-pass"
 =apply_diff_to_viewforest= is a SECOND traversal that runs AFTER the driver
@@ -189,6 +262,32 @@ When we get to D, we do have to act on PC.
 D cannot affect the phantom, so switch D's ParentIs to Independent.
 But that's all -- now we can complete D just like any other
 "graph-contains root" (a root in the graph-contains sense).
+
+**** you're right for CONTENT; the hazard is narrower than I framed it
+Your content-child walkthrough matches the code exactly. A phantom child is a
+no-op at its BFS visit (the dispatch has no work for =DiffPhantom=). And a real
+node under a phantom -- your D under PC -- is handled just as you say: set its
+ParentIs to Independent and complete it as a graph-contains root. So for CONTENT,
+inlining the flip is safe; phantom-under-phantom is genuinely a non-event.
+**** where the hazard actually lives: a flipped node's COLS, via timing
+I over-stated it as "any phantom owner." The real, narrow case is a flipped
+node's COLS (not its content children). When N flips to a phantom, the
+generalized-orphan check treats a phantom owner as a MISMATCH (it requires
+=NormalVognode=), so N's cols would be DEADENED. In today's overlay N flips AFTER
+the whole BFS, so its cols were reconciled while N was Normal and SURVIVE.
+Inlining the flip during the BFS means N flips before its cols are visited, so
+they'd deaden instead. Whether that's a real output difference depends on (a)
+whether a removed node should keep its cols at all -- arguably it shouldn't, it's
+gone -- and (b) whether any fixture exercises a flipped-with-cols node. That is
+precisely what Option B's GIT_DIFF_VIEW oracle run would settle.
+**** net: your push makes Option B more attractive
+Combined with the #1 finding (a local col reconciler would compute its member's M
+axis against the right relation, which the centralized overlay gets wrong), your
+argument shifts my lean: the hazard is narrow and plausibly benign, and "local"
+fixes a real axis bug. I'm now comfortable ATTEMPTING Option B with the oracle as
+the arbiter, falling back to A only if it surfaces a genuine stumper. Your call
+still stands -- tell me A, B, or C in chat (I'd now suggest B).
+
 * Part 3 -- the #3 goal and the three options, in the defined terms
 
 Your #3 goal: "do all diff locally ... easier for a reader to understand" --

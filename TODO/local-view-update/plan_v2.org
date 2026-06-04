@@ -1301,3 +1301,16 @@ Branch =local-view-updates=.
   into the overlay would *duplicate* the col reconcilers, adding code, so not
   worth it). (§5.5 col-node budget accounting is now DONE -- see above.) The
   substantive plan is COMPLETE.
+
+* §19 -- TODO: homogenize "scaffold" vs "col" terminology in the code (Jeff)
+Jeff's canonical language (hey-jeff.org §1):
+  - SCAFFOLD = ANY ViewNode that is not a Vognode (every QualCol, Qual,
+    PartnerCol, BufferRoot, DeadScaffold).
+  - COL = specifically the scaffolds that *collect* things and carry "Col" in
+    their name: QualCol(ID/Alias) and the PartnerCols (Subscribee, the relation
+    cols, the two Hidden* cols). A Qual leaf (Alias/ID/TextChanged) is a scaffold
+    but NOT a col.
+The code and several of my doc comments use "col" loosely (sometimes for any
+reconciled non-vognode, sometimes only for the Col-named kinds). Action: audit
+identifiers, doc comments, and =is_col_kind= naming so "scaffold" and "col" mean
+exactly the above everywhere. Non-blocking cleanup; do it as dedicated work.
