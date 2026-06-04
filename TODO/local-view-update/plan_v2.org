@@ -1081,3 +1081,33 @@ Branch =local-view-updates=.
   Rust suite (52 ok-blocks) + all 27 integration tests green. STILL deferred:
   §6.5 no-longer-member Unknown -> Dead (needs goal-membership info the sweep
   lacks; Unknown is excluded from content-reconcile relevance by design).
+** Phase 5 (§9 git-diff overlay) -- THE FLIP LANDED (post-save converges onto
+  the de-novo overlay). Design: TODO/local-view-update/phase5-design.org.
+  Two prior commits laid the foundation: (a) position-correct removed-member
+  phantom insertion in render/diff.rs (phantom_insertion_plan, replacing the
+  blind prepend; also aligns the overlay's net HEAD->worktree semantics with
+  the inline path). THE FLIP itself: rerender_view (update_buffer.rs) now runs
+  complete_viewforest with source_diffs=None -- so the main BFS produces the
+  *pure worktree view* (every inline diff branch gates on source_diffs being
+  Some, so they go dormant) -- then applies apply_diff_to_viewforest as the one
+  Normal-rooted post-pass, the SAME overlay de-novo uses. Result: a single diff
+  implementation. Validated: full Rust suite green + all 26 git_diff_view tests
+  (de-novo view.rs AND post-save save.rs share the GIT_DIFF_VIEW oracle, so
+  this is a behavior-preserving dedup) + all 27 emacs integration tests
+  (git-diff-view-updates, view-magit{,-phantom,-phantom-deleted-file},
+  containerward-on-phantom).
+  - REVERSIBLE BY DESIGN: the inline diff code in the BFS is left *dormant*
+    (source_diffs=None), not deleted, so the flip is a ~10-line change to undo.
+    Deletion of the dead inline diff comes after col-descent + type reduction.
+  - KNOWN GAP (plan §9 "descends through its cols"): the overlay does NOT yet
+    descend through cols, so diff-mode *removed-member* phantoms for a dropped
+    subscription (SubscribeeCol) / un-hidden node (Hidden* cols) are not yet
+    reproduced. The inline path injected these (goal_list_for_* removed_ids ->
+    build_child_data); they are now absent post-save. NO test covers them
+    (which is why the full suite stays green) -- but it is a real §9 gap and the
+    immediate next task. Content (incl. subscribee-as-such contains-minus-hides
+    phantoms), IDCol, TextChanged, collateral, and newhere_cycle ARE all
+    reproduced by the overlay (tested, green).
+  - STILL TODO after col-descent: AliasCol diff scaffold in the overlay
+    (untested in either path today); delete the dormant inline diff; reduce the
+    Vognode::DiffPhantom payload (§11/§6.3, the deferred phase-0c).

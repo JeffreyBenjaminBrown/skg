@@ -23,6 +23,7 @@ use crate::serve::util::{ format_single_view_sexp, send_response_with_length_pre
 use crate::source_sets::{ActiveSourceSet, apply_source_set_to_viewforest};
 use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids_with_source_set;
 use crate::to_org::util::DefinitiveMap;
+use crate::to_org::render::diff::apply_diff_to_viewforest;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::views_state::ViewUri;
 use crate::types::misc::{ID, SourceName, SkgConfig};
@@ -249,9 +250,17 @@ pub async fn rerender_view (
     strip_stale_diff_state (viewforest) ?; }
   { tracing::debug!("rerender_view: starting complete_viewforest");
     let mut defmap : DefinitiveMap = DefinitiveMap::new ();
+    // PLAN_V2 §9 (phase 5): run the main BFS with NO source_diffs, so it
+    // produces the *pure worktree* view; the git-diff overlay below then
+    // adds every diff effect in a single Normal-rooted post-pass -- the same
+    // 'apply_diff_to_viewforest' the de-novo path uses -- so there is one
+    // diff implementation instead of two. The inline diff branches in the BFS
+    // all gate on source_diffs being Some, so passing None leaves them
+    // dormant (they will be deleted once this overlay is fully validated).
+    let no_source_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
     let mut completion_context : CompletionContext = CompletionContext {
       defmap                         : &mut defmap,
-      source_diffs                   : &context . source_diffs,
+      source_diffs                   : &no_source_diffs,
       env                            : context . env,
       graph_snap                     : &context . graph_snap,
       errors                         : &mut context . errors,
@@ -262,6 +271,14 @@ pub async fn rerender_view (
       node_budget                    : context . env . config . initial_node_limit, };
     complete_viewforest (
       viewforest, &mut completion_context ) . await ?; }
+  if let Some ( ref source_diffs ) = context . source_diffs {
+    // tantivy = None: phantom source resolution falls back to the deleted-id
+    // map and the on-disk source scan, which suffice post-save.
+    apply_diff_to_viewforest (
+      viewforest, source_diffs,
+      &context . deleted_since_head_pid_src_map,
+      None,
+      &context . env . config ) ?; }
   mark_view_roots_parent_absent (viewforest);
   if let Some (snap) = snapshot_global () {
     // Correct any parentIs markers whose claimed relation to the
