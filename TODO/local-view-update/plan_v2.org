@@ -1183,3 +1183,29 @@ Branch =local-view-updates=.
     filter for the collateral-view response-type (the stream gained the
     save-relax-lock message). Full Rust suite (52 ok-blocks) + all 27 integration
     tests green.
+** Phase 8 (§13) -- DE-RISKING INSIGHT for the relation-col gap (refines the
+  earlier "monolith" entry). The save-round-trip breakage in my reverted
+  attempt came from making the driver create relation cols on EVERY invocation,
+  including post-save -- post-save then emitted relation cols on fresh content
+  and the re-save tripped the save.rs consistency check. But phase 8 only needs
+  the driver to create relation cols for DE-NOVO (a fresh initial render); the
+  post-save path correctly REUSES the cols already in the saved buffer and must
+  stay untouched. So gate relation-col creation behind a de-novo flag on
+  CompletionContext (e.g. `create_relation_cols_for_fresh_nodes`, set true only
+  by the de-novo driver entry), AND behind the contextual "parent is not a
+  PartnerCol" rule (a sharing-col MEMBER is rendered bare; only content nodes /
+  roots get relation cols). That leaves post-save byte-identical (no save
+  breakage) while letting de-novo-via-driver match today's
+  build_node_branch_minus_content output. This makes the relation-col piece
+  tractable; the rest of the monolith (SkgEnv threaded into multi_root_view;
+  a de-novo entry that builds the stub + runs complete_viewforest with a de-novo
+  context; node_budget REPLACING the generation-based truncation, rewriting the
+  initial_view_bfs.rs + content_view.rs node-limit tests to §5.5 per Jeff's
+  choice; switch multi_root_view to it; delete render_initial_viewforest_bfs +
+  render_generation_and_recurse + add_children_and_collect_their_ids +
+  collect_rels_to_children_from_generation + stub-only helpers) is a single
+  coordinated change validated by the de-novo tests + integration + the
+  (unchanged) post-save suite. Build order: do the relation-col flag + the
+  de-novo driver entry + the switch together (the flag is only exercised once
+  de-novo routes through the driver), then the node-limit test rewrite, then
+  delete the dead de-novo BFS.
