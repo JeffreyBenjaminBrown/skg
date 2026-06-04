@@ -270,3 +270,66 @@ but I don't think it's worth a commit on its own. Your call.
   =expand_true_content_at_node= in =complete.rs=. The §3 table is the single
   source of truth and the 6 reconciles read through it.
 - plan_v2 §18 is the authoritative deviation log; this report is the narrative.
+
+* 7. Phase 5 (§9 diff overlay) -- session of 2026-06-04 (resumed), DONE-in-core
+Design: =TODO/local-view-update/phase5-design.org=. Deviation log: plan_v2 §18
+(two new entries). Seven commits on =local-view-updates=, all green.
+
+** What landed
+1. =0cd9b6f2= answered Jeff's should_sync question (progress.org §5) + the
+   phase-5 design doc.
+2. =966a8e60= position-correct removed-member phantom insertion in the overlay
+   (=phantom_insertion_plan=, + 4 unit tests) -- the linchpin mechanic.
+3. =ec0db300= THE FLIP. =rerender_view= runs =complete_viewforest= with
+   source_diffs=None (pure worktree view -- the inline diff branches all gate on
+   Some, so they go dormant), then applies =apply_diff_to_viewforest= as the one
+   Normal-rooted post-pass that de-novo already uses. Content axes/phantoms are
+   now produced by a SINGLE diff implementation instead of two.
+4. =c3aefead= no-regression for sharing-col diff: a second CompletionContext
+   field =sharing_diffs= feeds the real diffs to ONLY the four sharing-col
+   reconcilers (they keep injecting removed-member phantoms inline, correctly
+   ordered before the overlay flips members to DiffPhantom), while the content
+   path stays worktree-only.
+5. =e96ad7a7= + =f3d0774b= AliasCol diff scaffold in the overlay (it did IDCol +
+   TextChanged but not AliasCol) + its test (tests/git_diff_view/aliases).
+
+** Validation
+Full Rust suite green; =tests/git_diff_view= 27 tests green (de-novo =view.rs=
+AND post-save =save.rs= assert the SAME =GIT_DIFF_VIEW= oracle, so the
+convergence is a behavior-preserving dedup); all 27 emacs integration tests
+green, incl. git-diff-view-updates, view-magit{,-phantom,-phantom-deleted-file},
+containerward-on-phantom. NOTE a low-frequency PRE-EXISTING parallel-test flake
+in tests/git_diff_view (shared TypeDB + process-global in-Rust graph race under
+multi-threaded =cargo test=); =--test-threads=1= is 100% green, as is the bash
+integration suite. Not introduced by this work.
+
+** Delivered by the flip, for free
+The §16 "diff scaffolds missing on a definitive-by-request transition" bug: the
+overlay visits EVERY Normal node, so a node made definitive by a view-request
+now gets its diff scaffolds regardless of how it entered the tree. (A dedicated
+confirming test was judged low marginal value -- general overlay scaffold
+emission is already covered, and containerward-on-phantom exercises
+view-request + diff together.)
+
+** What remains in phase 5 (each a deliberate, documented deferral)
+*** FULL §9 col-descent: make the overlay descend through cols so SHARING-col
+   removed-member phantoms (dropped subscription, un-hidden node) come from the
+   overlay too, not inline. Deferred because the col reconcilers + their
+   ancestry/env setup live in =update_buffer=; a =to_org= overlay would
+   duplicate that. Best folded into PHASE 8 (unify de-novo), which reorganizes
+   the overlay's home anyway. The =sharing_diffs= field is the transitional
+   seam; today's behavior is correct (no regression), just inline.
+*** DELETE the dormant inline content-diff code (=set_diff_status=,
+   =maybe_prepend_diff_view_scaffolds=, =content_goal_list='s diff branch,
+   =complete_content_children='s phantom branch + their unit tests in
+   truenode.rs). It is now unreachable (source_diffs=None for content), kept
+   dormant for reversibility. Delicate (intertwined with worktree reconcile);
+   do it as a careful dedicated cleanup, ideally with phase 8.
+*** =Vognode::DiffPhantom= payload reduction (§11/§6.3, the deferred phase-0c):
+   still large (100+ sites) and still premature while sharing cols create
+   phantoms inline. Defer.
+
+** Next Claude: the core of §9 is done and green. The remaining items above are
+each their own focused effort; none is half-done. Phases 6 (locking -- Emacs +
+wire) and 8 (unify de-novo, which absorbs full col-descent + dormant-code
+deletion) are the big remaining bodies of work.
