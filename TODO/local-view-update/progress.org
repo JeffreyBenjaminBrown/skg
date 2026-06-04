@@ -661,3 +661,22 @@ the opposite unification (everything inline). That is NOT a flag flip:
 Both are large and reverse a documented decision, so I stopped to ask which you
 want (and to confirm you want §9 reversed) rather than guess. Higher-priority
 work (#1, #2, §11, col budget) is all done + green.
+
+**** You chose "resurrect inline path, delete overlay". Then I found two things:
+1. The inline diff machinery was DELETED, not just dormant. complete.rs says
+   plainly: "Diff scaffolds -- TextChanged / IDCol / AliasCol -- are no longer
+   emitted here" and the node is "no longer flipped to a DiffPhantom here -- that
+   is the post-BFS diff overlay's job now, §9." So (a) is a REBUILD of deleted
+   code, not a re-activation.
+2. §9 made diff a POST-pass for a load-bearing reason: the completion BFS must
+   never see phantoms. process_truenode_diff flips a node to a phantom AND inserts
+   child phantoms; doing that per-node DURING the BFS means a node's cols (visited
+   later, level-order) reconcile against a phantom parent -- the exact entanglement
+   §9 removed. The overlay runs after the whole BFS to avoid it.
+So the choice is really: how LOCAL, given the hazard? Either accept it and lean on
+the GIT_DIFF_VIEW oracle to catch breakage (highest risk, possible stumper), or
+fold the existing process_truenode_diff into complete_viewforest as its final
+phase -- the driver then owns "produce the diff view," the standalone overlay is
+deleted, and §9's safety holds (diff still after completion, but now inside the
+one local entry point, not a caller-invoked post-pass). The latter is what I lean
+to; flagging because it is closer to approach (b) than the (a) you picked.
