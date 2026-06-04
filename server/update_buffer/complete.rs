@@ -11,7 +11,8 @@ use crate::to_org::util::DefinitiveMap;
 use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
-use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree};
+use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree};
+use crate::update_buffer::ancestry::{ col_is_generalized_orphan, deaden_generalized_orphan_col, is_col_kind};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol, ViewRequest, IndefOrDef};
 use crate::types::viewnode::{Vognode, QualCol};
 use super::complete_postorder::hiddeninsubscribee_col::reconcile_hiddenin_subscribee_col_children;
@@ -49,7 +50,6 @@ pub(super) async fn complete_viewforest (
   context    : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
   let root_treeid : NodeId = viewforest . root () . id ();
-  scaffolds_with_deadOrDeleted_parents_become_dead (viewforest) ?;
   // The single plan_v2 §3 level-order BFS: each node's visit
   // (expand_true_content_at_node) does ALL of its own update -- content
   // reconcile, the §5.2 draw rule + §5.3 cascade for definitive-view
@@ -59,40 +59,8 @@ pub(super) async fn complete_viewforest (
   // children created during a node's visit are reached later in the same BFS.
   expand_true_content_until_stable (
     viewforest, root_treeid, context ) . await ?;
-  scaffolds_with_deadOrDeleted_parents_become_dead (viewforest) ?;
   remove_empty_dead_and_deleted (viewforest) ?;
   Ok(( )) }
-
-/// Convert to DeletedScaff every scaffold node
-/// whose parent is deleted (be it scaffold or truenode).
-///
-/// Completion can encounter this in two ways:
-/// - The incoming view already had scaffolds
-///   beneath a node that has since become Deleted.
-/// - An earlier completion phase may add or preserve scaffolds
-///   before a later pass has cleaned up the deleted subtree.
-fn scaffolds_with_deadOrDeleted_parents_become_dead (
-  tree : &mut Tree<ViewNode>,
-) -> Result<(), Box<dyn Error>> {
-  let root_treeid : NodeId = tree . root () . id ();
-  do_everywhere_in_tree_dfs (
-    tree, root_treeid, true,
-    &mut |mut node| -> Result<(), String> {
-      let is_scaffold : bool =
-        ! matches! ( &node . value () . kind,
-                      ViewNodeKind::Vognode(_));
-      if is_scaffold {
-        let parent_is_dead_or_deleted : bool =
-          node . parent ()
-          . map ( |mut p| matches! ( &p . value () . kind,
-            ViewNodeKind::Vognode (Vognode::Deleted (_)) |
-            ViewNodeKind::DeadScaffold ))
-          . unwrap_or (false);
-        if parent_is_dead_or_deleted {
-          node . value () . kind =
-            ViewNodeKind::DeadScaffold; }}
-      Ok (( )) } )
-    . map_err ( |e| -> Box<dyn Error> { e . into () } ) }
 
 /// Parent-first content expansion, in *level order* (BFS).
 ///
@@ -136,6 +104,18 @@ async fn expand_true_content_at_node (
 ) -> Result<(), Box<dyn Error>> {
   let kind : ViewNodeKind =
     tree . get (treeid) . unwrap () . value () . kind . clone ();
+  // Death-leafward (plan propagate-death-leafward §5): before reconciling any
+  // col, self-check its required ancestry. If it is a generalized orphan (some
+  // required ancestor is the wrong viewnode kind -- full chain, not just the
+  // parent), deaden it and dispose its children instead of reconciling, so the
+  // reconcile never reads a since-deleted ancestor's missing NodeComplete.
+  // This subsumes the old scaffolds_with_deadOrDeleted_parents_become_dead
+  // sweep (immediate-parent only): the BFS visits every col, and the ancestry
+  // check is strictly more powerful.
+  if is_col_kind (&kind)
+    && col_is_generalized_orphan (tree, treeid) ? {
+    deaden_generalized_orphan_col (tree, treeid) ?;
+    return Ok (( )); }
   match &kind {
     ViewNodeKind::Vognode (Vognode::Normal (_)) =>
       visit_normal_node (tree, treeid, context) . await ?,

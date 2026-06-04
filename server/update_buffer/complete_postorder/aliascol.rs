@@ -4,7 +4,8 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, ParentIs};
 use crate::types::viewnode::{Vognode, QualCol, Qual};
-use crate::types::tree::generic::{pid_and_source_from_ancestor, read_at_ancestor_in_tree};
+use crate::types::tree::generic::read_at_ancestor_in_tree;
+use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, treat_certain_children};
 use ego_tree::{NodeId, Tree};
 use std::collections::HashMap;
@@ -40,9 +41,10 @@ pub fn reconcile_alias_col_children (
       . map_err( |e| -> Box<dyn Error> { e . into() } )?;
     if !is_aliascol { return Err(
       "reconcile_alias_col_children: Node is not an AliasCol" . into() ); }}
+  // §4: parent Normal vognode read through the §3 ancestry table (index 0).
   let (parent_pid, parent_source) : (ID, SourceName) =
-    pid_and_source_from_ancestor(
-      tree, aliascol_node_id, 1,
+    pid_and_source_from_required_ancestor(
+      tree, aliascol_node_id, 0,
       "reconcile_alias_col_children" ) ?;
   let parent_nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (

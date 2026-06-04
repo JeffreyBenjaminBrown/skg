@@ -7,7 +7,7 @@ use crate::to_org::complete::sharing::child_data::{
 use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
-use crate::types::tree::generic::pid_and_source_from_ancestor;
+use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
 use crate::types::viewnode::{RoleCol, ViewNode};
 
 use ego_tree::{NodeId, Tree};
@@ -30,9 +30,12 @@ pub fn reconcile_relation_col_children (
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   kind . error_unless_node_is_this_kind (tree, node) ?;
+  // §4: read the owner Normal vognode *through* the §3 ancestry table
+  // (index 0 = the parent), so this can never read an ancestor the table
+  // does not list, and the death-check and this read share one spec.
   let (owner_pid, owner_source) : (ID, SourceName) =
-    pid_and_source_from_ancestor (
-      tree, node, 1, kind . caller_label () ) ?;
+    pid_and_source_from_required_ancestor (
+      tree, node, 0, kind . caller_label () ) ?;
   let Some (member_role) = kind . relation_member_role () else {
     return Err (format!(
       "{} called for non-relation collection {:?}",

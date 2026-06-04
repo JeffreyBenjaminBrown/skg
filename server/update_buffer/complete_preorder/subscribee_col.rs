@@ -4,8 +4,9 @@ use crate::to_org::complete::sharing::goal_list::goal_list_for_subscribee_col;
 use crate::types::git::SourceDiff;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SourceName};
-use crate::types::tree::generic::read_at_ancestor_in_tree;
+use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child_of_viewnode, insert_scaffold_as_child};
+use crate::update_buffer::ancestry::required_ancestor;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, RoleCol};
 use crate::types::viewnode::Vognode;
 use crate::update_buffer::util::{ detach_scaffold_transferring_focus, move_child_to_end};
@@ -44,7 +45,7 @@ pub async fn reconcile_subscribee_col_children (
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
   let context : SubscribeeColContext =
-    read_subscribee_col_context (tree, node, kind, env) ?;
+    read_subscribee_col_context (tree, node, env) ?;
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
     compute_subscribee_col_goal (
       &context, source_diffs, env );
@@ -69,13 +70,18 @@ pub async fn reconcile_subscribee_col_children (
 fn read_subscribee_col_context (
   tree : &Tree<ViewNode>,
   node : NodeId,
-  kind : RoleCol,
   env  : &SkgEnv,
 ) -> Result<SubscribeeColContext, Box<dyn Error>> {
+  // §4: read the subscriber Normal vognode through the §3 ancestry table
+  // (index 0 = the parent), rather than at a hard-coded generation.
+  let subscriber : NodeId =
+    required_ancestor (tree, node, 0) ?
+    . ok_or ("reconcile_subscribee_col_children: \
+              subscriber ancestor absent (generalized orphan)") ?;
   let (parent_pid, parent_source, parent_indefinitive)
     : (ID, SourceName, bool)
-    = read_at_ancestor_in_tree(
-      tree, node, kind . correct_subscriber_ancestor_distance (),
+    = read_at_node_in_tree(
+      tree, subscriber,
       |vn : &ViewNode| match &vn . kind {
         ViewNodeKind::Vognode (Vognode::Normal (t))
           => Some(( t . id . clone(),

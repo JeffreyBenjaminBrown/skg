@@ -5,8 +5,8 @@ use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::tree::generic::{pid_and_source_from_ancestor, read_at_ancestor_in_tree};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol};
+use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
+use crate::types::viewnode::{ViewNode, RoleCol};
 use crate::update_buffer::util::detach_scaffold_if_empty;
 
 use ego_tree::{NodeId, Tree};
@@ -43,7 +43,9 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
     RoleCol::HiddenOutsideOfSubscribee;
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
-  validate_hiddenoutside_parent (tree, node) ?;
+  // §4: the parent-is-SubscribeeCol check is subsumed by reading the
+  // subscriber through the §3 ancestry table (index 1 validates the
+  // [SubscribeeCol, Normal] prefix), so a separate validation is unneeded.
   let context : HiddenOutsideContext =
     read_hiddenoutside_context (tree, node, kind, env) ?;
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
@@ -62,31 +64,16 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
   detach_scaffold_if_empty (tree, node) ?;
   Ok(( )) }
 
-fn validate_hiddenoutside_parent (
-  tree : &Tree<ViewNode>,
-  node : NodeId,
-) -> Result<(), Box<dyn Error>> {
-  read_at_ancestor_in_tree(
-      tree, node, 1,
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::PartnerCol (RoleCol::Subscribee)
-          => Ok(( )),
-        _ => Err( "reconcile_hiddenoutside_subscribee_col_children: \
-                   ancestor 1 is not a SubscribeeCol" ) } )
-    . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
-    . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
-  Ok (( )) }
-
 fn read_hiddenoutside_context (
   tree : &Tree<ViewNode>,
   node : NodeId,
   kind : RoleCol,
   env  : &SkgEnv,
 ) -> Result<HiddenOutsideContext, Box<dyn Error>> {
+  // §4: subscriber = ancestry-table index 1 (the [SubscribeeCol, Normal] chain).
   let (subscriber_pid, subscriber_source) : (ID, SourceName) =
-    pid_and_source_from_ancestor(
-      tree, node, kind . correct_subscriber_ancestor_distance (),
-      kind . caller_label () ) ?;
+    pid_and_source_from_required_ancestor(
+      tree, node, 1, kind . caller_label () ) ?;
   let wt_subscriber_nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
       &env . config, &subscriber_pid, &subscriber_source ) ?;

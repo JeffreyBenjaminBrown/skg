@@ -5,7 +5,7 @@ use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::tree::generic::pid_and_source_from_ancestor;
+use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
 use crate::types::viewnode::{ViewNode, RoleCol};
 use crate::update_buffer::util::detach_scaffold_if_empty;
 
@@ -71,13 +71,15 @@ fn read_hiddenin_context (
   kind : RoleCol,
   env  : &SkgEnv,
 ) -> Result<HiddenInContext, Box<dyn Error>> {
+  // §4: ancestry table indices -- subscribee = index 0 (parent), subscriber =
+  // index 2 (the full [Normal, SubscribeeCol, Normal] chain), read through the
+  // helper so this multi-level read shares the death-check's spec.
   let (subscribee_pid, subscribee_source) : (ID, SourceName) =
-    pid_and_source_from_ancestor(
-      tree, node, 1, kind . caller_label () ) ?;
+    pid_and_source_from_required_ancestor(
+      tree, node, 0, kind . caller_label () ) ?;
   let (subscriber_pid, subscriber_source) : (ID, SourceName) =
-    pid_and_source_from_ancestor(
-      tree, node, kind . correct_subscriber_ancestor_distance (),
-      kind . caller_label () ) ?;
+    pid_and_source_from_required_ancestor(
+      tree, node, 2, kind . caller_label () ) ?;
   let subscribee_contains : Vec<ID> = {
     let subscribee_nodecomplete : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (

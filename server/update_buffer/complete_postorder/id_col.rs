@@ -3,7 +3,8 @@ use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::git::{SourceDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_truenode};
-use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor};
+use crate::types::tree::generic::error_unless_node_satisfies;
+use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use crate::types::viewnode::{QualCol, Qual};
 use crate::update_buffer::util::complete_relevant_children_in_viewnodetree;
@@ -33,9 +34,10 @@ pub fn reconcile_id_col_children (
                          ViewNodeKind::QualCol (QualCol::ID) ),
     "reconcile_id_col_children: Node is not an IDCol" )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
+  // §4: parent Normal vognode read through the §3 ancestry table (index 0).
   let (parent_pid, parent_source) : (ID, SourceName) =
-    pid_and_source_from_ancestor(
-      tree, idcol_node_id, 1,
+    pid_and_source_from_required_ancestor(
+      tree, idcol_node_id, 0,
       "reconcile_id_col_children" ) ?;
   let parent_nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
