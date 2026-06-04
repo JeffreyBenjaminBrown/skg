@@ -1,0 +1,126 @@
+#+TITLE: Phase 5 -- the git-diff overlay -- concrete design
+#+STARTUP: content
+
+Written 2026-06-04 (resumed session, after answering the should_sync question
+in progress.org §5). Branch =local-view-updates=. Audience: Jeff, and whatever
+Claude continues this. This is to phase 5 what =monolith-design.org= was to the
+phase-2+4 monolith: the concrete, de-risked design I read before cutting.
+
+Plan reference: plan_v2.org §9 (the overlay), §7.2 (liar/stale phantoms), §11
+(DiffPhantom type reduction), §13 gap 3 (de-novo shares the overlay), §16
+(the made-definitive-during-request bug the overlay fixes). Phase = §14 phase 5.
+
+* 0. One-paragraph statement
+Today diff is computed TWO different ways. (a) *Post-save* (=complete_viewforest=
+in =update_buffer/=) emits diff *inline*, fused into the main BFS: =set_diff_status=
+stamps axes and may flip a Normal node to DiffPhantom mid-visit;
+=content_goal_list= interleaves =removed_ids= into the content goal list so
+=complete_content_children= creates removed-member phantoms at their correct
+positions; the col reconcilers inject their own removed-member phantoms; and
+=maybe_prepend_diff_view_scaffolds= emits TextChanged/IDCol/AliasCol. (b)
+*De-novo* (=render/content_view.rs= -> =render_initial_viewforest_bfs= then
+=apply_diff_to_viewforest= in =render/diff.rs=) runs a *separate* DFS overlay --
+but that overlay is *col-blind* (its own TODO, line 50: "Sharing relationships
+... will need processing here") and *prepends* content phantoms rather than
+positioning them. Phase 5 replaces BOTH with ONE capable Normal-rooted overlay
+pass: the main BFS produces the *pure worktree view* (no diff), then the overlay
+retrofits every diff effect. This is what lets phase 8 (de-novo unify) share one
+driver, and it fixes §16 (a node made definitive by a view-request mid-BFS never
+got diff scaffolds inline; a post-pass that visits *every* Normal node does).
+
+* 1. The inline touch-points to REMOVE from the main BFS
+All in =server/update_buffer/=. The main BFS must end up producing only the
+worktree view; each of these moves into the overlay.
+** =complete.rs= =visit_normal_node=:
+*** the =set_diff_status= call (currently inside =expand_true_content_at_truenode=,
+   truenode.rs ~L119) -- axis stamping + Normal->DiffPhantom flip.
+*** the =maybe_prepend_diff_view_scaffolds= call (complete.rs L236-238) --
+   TextChanged/IDCol/AliasCol emission.
+*** the removed-file DVR branch (=extendDefinitiveSubtree_fromGit=, L198-209):
+   already "effectively unreachable post-save" per §18; the overlay subsumes it.
+** =complete_preorder/truenode.rs=:
+*** =content_goal_list= must return the *pure worktree* content_ids when building
+   the main view -- i.e. the =removed_ids= / =net_diff_from_per_stage= branch
+   moves to the overlay. The main BFS goal list = worktree =contains= (subscribee
+   case = contains-minus-hides), no phantoms.
+*** =complete_content_children= / =build_child_creation_data= drop the
+   =removed_ids= phantom-creation path (=ContentReality::Phantom=).
+*** =cap_content_goal_to_budget='s removed-id exemption becomes moot (no removed
+   ids reach it).
+** the col reconcilers (=to_org/complete/sharing/*=): their =goal_list_for_*=
+   =removed_ids= -> =build_child_data= phantom injection moves to the overlay's
+   col descent. The *worktree* goal list (members actually present) stays in the
+   main BFS reconcile.
+
+* 2. The overlay's responsibilities (the convergence target)
+A single =apply_diff_overlay (viewforest, source_diffs, deleted_since_head_map,
+tantivy/config)=, Normal-rooted, run AFTER the main BFS, for BOTH paths. At each
+=Vognode::Normal= node (visiting every one -- this is the §16 fix):
+1. stamp existence axes from per-stage file status; flip Normal->DiffPhantom when
+   any stage's existence/membership is Minus (=normal_to_phantom=).
+2. emit TextChanged / IDCol / AliasCol diff scaffolds, with per-stage membership
+   axes on their Qual children (Qual::ID / Qual::Alias). [existing overlay does
+   TextChanged + IDCol; ADD Alias.]
+3. stamp per-stage membership axes on existing worktree content children; inject
+   a removed-member content phantom for each removed id *at its correct position*
+   in the parent's contains order. [existing overlay PREPENDS -- must change to
+   position-correct, matching today's inline behavior, §7.2.]
+4. descend through the node's cols (SubscribeeCol, relation cols, Hidden* cols);
+   per col kind inject a removed-member phantom for each id the col's HEAD-vs-
+   worktree goal diff reports removed, and stamp per-stage axes on the col's
+   scaffold children. [NEW -- the existing overlay's missing piece.]
+The overlay is NOT bounded by the §5.5 node budget (every phantom/scaffold is
+created regardless of count). When diff mode is off it is a no-op beyond the §4
+strip pre-pass.
+
+* 3. Staging (each item compiles + tests green before the next)
+The flip itself is one coordinated commit (inline and overlay cannot both be
+live -- double-emission -- nor both absent -- diff lost), exactly like the
+phase-2+4 monolith. Precursors de-risk it; cleanup follows.
+
+** S1 (green, refactor-only). Pull the per-stage diff primitives the inline path
+   uses (=per_stage_node_changes_for_truenode=, =net_diff_from_per_stage=,
+   =itemlist_and_removedset_from_diff=, =phantom_axes=, =title_for_phantom=) into
+   a location the overlay can call, so the flip reuses ONE implementation of each
+   rule. Most already live in =types/git.rs= / =types/phantom.rs=; this is
+   mostly a visibility/move audit. No behavior change.
+** S2 (THE FLIP, one commit). Build the capable overlay (responsibilities §2) in
+   =update_buffer/= (so post-save can call it without a layering inversion; the
+   de-novo caller imports it). Remove every §1 inline touch-point from the main
+   BFS. Call the overlay from =complete_viewforest= (post-save) AND from
+   =content_view.rs= in place of =apply_diff_to_viewforest= (de-novo). Validate
+   against the existing diff suite as the behavior oracle: =tests/git_diff_view/=
+   ({content,ids,text,collateral,newhere_cycle}), the inline text-change unit
+   tests, and the 27 integration tests. Post-save behavior should be *preserved*
+   (same phantoms, same positions, same scaffolds); de-novo *gains* col diff
+   phantoms (previously absent -- inspect/extend de-novo diff tests).
+   DELETE the old =render/diff.rs= =apply_diff_to_viewforest= and
+   =process_truenode_diff= once the de-novo caller is switched.
+** S3 (green, cleanup). Reduce the =Vognode::DiffPhantom= payload (plan §11 /
+   §6.3 / the deferred phase-0c): a DiffPhantom needs only id/source/title + diff
+   axes -- no view_requests/parentIs/birth/graphStats/indef_or_def. Now safe
+   because the phantom-handling code is centralized in the overlay. Migrate the
+   handful of readers (=normal_or_phantom=, the =Vognode::Normal | DiffPhantom=
+   match arms in truenode.rs/child_data.rs that read only id/source). Remove the
+   TODO on the variant.
+
+* 4. Risks / open points (resolved test-driven; STOP+report only if architectural)
+** Position-correctness: the overlay must place each removed content phantom at
+   its HEAD position among surviving siblings. Today the inline path gets this by
+   building the goal list from =net_diff_from_per_stage= (which carries order);
+   the overlay must reconstruct the same order from the parent's contains_diff
+   while the worktree children already sit in worktree order. This is the single
+   trickiest mechanic; =tests/git_diff_view/content= is the oracle.
+** De-novo behavior change: adding col diff phantoms to de-novo is a genuine
+   output change. If no de-novo col-diff test exists, that's fine (new coverage);
+   if one asserts their *absence*, that's a real (intended) update, logged.
+** newhere_cycle / RemovedHere relocation (§7.2): a diff-phantom the user moved is
+   regenerated at its correct slot each pass -- the overlay's regenerate-from-
+   scratch matches this; =tests/git_diff_view/newhere_cycle= is the oracle.
+** The made-definitive-during-request §16 fix is a *behavior change* (new diff
+   scaffolds appear where they were missing). Add the confirming test (plan §16).
+
+* 5. Deviation-log discipline
+Every deviation from plan_v2 (deferral, resequencing, a behavior change beyond
+the intended ones above) gets a terse entry in plan_v2.org §18, per the standing
+directive. This doc is the narrative; §18 is authoritative.

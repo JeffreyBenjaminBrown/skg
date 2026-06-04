@@ -131,6 +131,106 @@ why I did not barrel into it tonight:
    means either an unused field (dead_code warning) or churny plumbing through
    =rerender_view='s saved/collateral callers. Deferred -- it was already
    flagged separable.
+**** ONGOING I don't understand.
+Can you explain from first principles, so that I don't have to review plan_v2.org?
+***** TODO Explanation from first principles (Claude)
+Short version: this whole item is about deleting *one if-statement* and then
+deciding what to do with the now-orphaned boolean that fed it. The reason it's
+"fiddly" is entirely the second part -- the deletion itself is trivial.
+
+****** The vocabulary you need (no plan_v2 required)
+- *Definitive node*: a content node the view is sure about -- it was saved as
+  definitive, or completed as an ordinary child, or hit by a draw rule. Contrast
+  with an *indefinitive* node, which is a placeholder we haven't pinned down.
+- *Sync from disk*: copy a node's =title=, =source=, and =body= out of the
+  freshly-saved snapshot (the post-extraction =NodeComplete=) into the ViewNode
+  in the buffer. I.e. "make the on-screen node match what's now on disk."
+- *Saved view vs collateral view*: when you save buffer A, that's the *saved*
+  view. But the same nodes may also appear in *other* open buffers (B, C, ...).
+  Re-rendering those other buffers off the same save is a *collateral* render.
+  =is_saved_view= is the one bool that says "am I redrawing the buffer that was
+  just saved (true), or a bystander buffer (false)?"
+
+****** What the code does today
+In =server/update_buffer/complete_preorder/truenode.rs= there's a tiny helper:
+
+#+begin_src rust
+  fn should_sync_from_disk_even_though_definitive(self) -> bool {
+    ! self . saved_view }   // i.e. "sync only for collateral views"
+#+end_src
+
+and at the one call site (truenode.rs:143):
+
+#+begin_src rust
+  if mode . should_sync_from_disk_even_though_definitive() {
+    sync_truenode_from_disk(tree, node, &nodecomplete)?; }
+#+end_src
+
+So today the rule is: *a definitive node in a collateral buffer re-syncs its
+title/source/body from disk; a definitive node in the saved buffer does NOT.*
+
+The reasoning behind the carve-out: the node in the saved buffer is the node you
+just typed. The view already holds exactly that text -- it *defined* it. So
+re-reading it off disk felt redundant, and the carve-out skipped it as a
+micro-optimization / "don't touch what's already right."
+
+****** Why the plan wants to delete it
+After extraction, the snapshot on disk *already equals the saved buffer's text*
+(that's what extraction just wrote). So syncing the saved node from disk copies
+the same bytes back onto themselves -- a *no-op*, not a risk. Removing the
+carve-out therefore loses nothing and buys uniformity: *every* definitive node,
+saved or collateral, follows the identical one-line rule "sync from disk."
+One code path instead of two, no special case to reason about. That's the entire
+upside -- it is a tidiness win, not a bug fix.
+
+So the change itself is: delete the helper, delete the =if=, and always call
+=sync_truenode_from_disk=. Five minutes.
+
+****** Why my predecessor called it "fiddly" and skipped it
+Here's the snag, and it's the only real content of the whole item. Trace where
+=is_saved_view= comes from and what reads it:
+
+  update_buffer.rs  -->  CompletionContext field (complete.rs:39)
+                    -->  passed to expand_true_content_at_truenode (complete.rs:218)
+                    -->  CompletionMode::new(is_saved_view)
+                    -->  should_sync_from_disk_even_though_definitive  <-- ONLY reader
+
+That carve-out is the *only thing in the entire server that reads
+is_saved_view.* Delete the carve-out and the bool has no consumer left. Now
+you're forced into a choice, and every option is slightly unsatisfying:
+
+1. *Delete is_saved_view too.* Cleanest in isolation -- but plan_v2 §12 explicitly
+   lists =is_saved_view= as a field the refined CompletionContext should *keep*
+   (the plan anticipates future per-kind rules wanting to know saved-vs-collateral).
+   So deleting it now contradicts a written design decision and may have to be
+   re-added later.
+2. *Keep is_saved_view, just unused.* Then Rust emits a =dead_code= warning, or
+   you silence it with =#[allow(dead_code)]= -- i.e. you carry a field that's
+   wired through three layers (update_buffer -> context -> truenode) for nobody.
+   Ugly, and the plumbing is pure dead weight until some future phase uses it.
+3. *Keep it and find it a real reader.* That means doing some *other* phase-12
+   work now to justify the field -- scope creep onto an item that was supposed to
+   be a one-line cleanup.
+
+None of those is hard; they're just all mildly wrong, and none is clearly right
+*in isolation* from the larger phase-12 context-refinement work. That's the
+"fiddly": a trivial deletion that drags a design question (does the context keep
+=is_saved_view= or not?) which doesn't want to be answered by itself.
+
+****** My recommendation
+This is genuinely low-value, and the cleanest resolution is *not to do it alone*.
+The field-keep-or-drop question belongs to phase 8 (unify de-novo) / the §12
+context refinement, where you're touching CompletionContext anyway and will
+either give =is_saved_view= a second reader or decide it has none. Pulling the
+carve-out then -- in the same change that resolves the field's fate -- avoids the
+dead_code-vs-churn dilemma entirely, because you're already editing those
+signatures. Doing it now just creates a wart you have to revisit.
+
+So: I'd leave it deferred exactly as my predecessor did, and *bundle it into
+phase 8* rather than treat it as a standalone cleanup. If you'd rather see it
+gone now anyway, I'll take option 1 (delete the bool too) -- it's the tidiest of
+the three and §12 can re-introduce the field if a real reader ever materializes;
+but I don't think it's worth a commit on its own. Your call.
 *** §5.5 col-node budget accounting. Today only *content* children decrement
    =node_budget=; col-created members (subscribee/relation/alias/id) do not.
    Plan §5.5 wants all new ViewNodes to count. Threadable, but it will shift
