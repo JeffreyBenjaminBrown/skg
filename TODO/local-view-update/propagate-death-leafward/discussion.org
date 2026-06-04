@@ -1,0 +1,293 @@
+#+TITLE: Propagate death leafward: cols check their ancestry before acting
+#+STARTUP: content
+
+* 1. The concrete problem this solves
+In the new single-visit BFS (commit a88adebb), each col (a non-vognode
+viewnode: QualCol, PartnerCol, etc.) is reconciled at its *own* visit. A col's
+reconcile reads its ancestor vognode(s) -- e.g. =reconcile_alias_col_children=
+reads the parent vognode's =NodeComplete= to list its aliases. If that ancestor
+was deleted by this save, its =.skg= file is gone, the read fails, and the col
+reconcile returns =Err=, which aborts the whole (often *collateral*) rerender
+(=update_buffer.rs= pushes it into the save's =errors=, so the client shows
+"inconsistencies" and the save is rejected).
+
+This bit us in =save_collateral_delete_then_edit_under_it=: node 11 is deleted
+in one buffer; in a collateral buffer 11 had an =aliasCol=; the rerender visited
+11's aliasCol, read deleted-11's NodeComplete, and aborted.
+
+The pre-BFS code dodged this because col reconciliation was a *later, separate
+pass*: by then =scaffolds_with_deadOrDeleted_parents_become_dead= (a bracketing
+sweep) had already turned scaffolds-under-a-Deleted-parent into =DeadScaffold=,
+so they were never reconciled as live cols. The BFS interleaves creation and
+reconciliation, so that bracketing sweep no longer runs "in time".
+
+* 2. Current stopgap (to be replaced by this)
+=detach_stale_deleted_content= (in =complete_preorder/truenode.rs=): when a
+Normal node reconciles its content, any content child whose pid is in
+=deleted_by_this_save_pids= and is no longer in the goal is *detached* before
+reconcile, so it never grows/keeps cols to trip on.
+
+Its flaw (the chaos-monkey case you raised): it deletes the *whole* deleted
+subtree, including any user content the user deliberately moved under a node
+that later got deleted elsewhere. The mechanism below should instead *preserve*
+such user descendants (demote) while killing only the now-meaningless
+col-managed scaffolding.
+
+* 3. The proposed treatment (your idea, restated)
+As part of the BFS update -- *before* the diff overlay and *before* the prune
+sweep -- when the BFS visits a col, it first checks whether it still has an
+*appropriate ancestry chain*. If not:
+- convert the col to a =DeadScaffold= (do not reconcile it); and
+- delete the *non-definitive leaves it would have been responsible for* with a
+  valid ancestry chain.
+A definitive (user) descendant is *not* deleted -- it survives (presumably
+demoted to Independent), so the user never loses authored content.
+Generalize: this is the same shape as =scaffolds_with_deadOrDeleted_parents_become_dead=,
+but (a) keyed on the *full* required ancestry, not just the immediate parent,
+and (b) done *in the BFS visit*, not as a bracketing sweep.
+
+** TODO operationalizing "the non-definitive leaves it would have been responsible for"
+I think that just means any node for which ParentIs=Affected.
+And I changed my mind -- whether it is definitive is not relevant
+to whether it should be deleted. Just member leaves.
+(But keep leaves for which ParentIs is not Affected.)
+
+If it is not a leaf but has ParentIs=Affected,
+it should be remade ParentIs=Independent.
+
+* 4. What I'm missing / need decided
+** 4.1 What is "appropriate ancestry" per col kind?
+Each col kind needs a specific live-ancestor chain. My reading:
+| col                         | required live vognode ancestry                                                      |
+|-----------------------------+-------------------------------------------------------------------------------------|
+| QualCol(Alias), QualCol(ID) | parent Normal vognode                                                               |
+| PartnerCol(relation roles)  | parent Normal vognode                                                               |
+| PartnerCol(Subscribee)      | parent = subscriber (Normal)                                                        |
+| HiddenOutsideOfSubscribee   | parent SubscribeeCol, grandparent subscriber (Normal)                               |
+| HiddenInSubscribee          | parent = subscribee-as-such (Normal), gp = SubscribeeCol, ggp = subscriber (Normal) |
+Q: is "appropriate ancestry" simply "every vognode ancestor the reconcile would
+*read* is alive"? If so I can derive it from what each reconcile reads, rather
+than hard-coding a table. Do you want it derived or tabulated?
+*** that's right, and the table seems good
+Although it is a wart that we have to keep the table and the read code synced.
+If you see a way to deduplicate that logic,
+while retaining the ease with which the table lets a reader see
+what each thing reads, please tell me about it.
+**** RESPONSE (Claude): partial dedup, keeping the table as the source.
+Make the table the *one* declaration and have the reconcile read *through* it.
+Define, per col kind, an ordered =required_ancestry: &[ExpectedKind]= (e.g.
+HiddenInSubscribee -> [Normal, SubscribeeCol, Normal]). Then:
+- the death-check walks it nearest->farthest and deadens on the first mismatch;
+- a single helper =ancestor_vognode(tree, col, i)= returns the i-th required
+  vognode ancestor *iff* the whole prefix matches the spec (else None/dead), and
+  every reconcile gets its ancestors *only* through that helper.
+So the table stays the readable contract, the reconciles can't read an ancestor
+the table doesn't list (they go through the helper), and the death-check and the
+reads share the same spec. It does NOT dedup the *field* each reconcile then
+pulls (subscriber.hides vs subscribee.contains) -- that's genuinely per-col --
+but it removes the "which ancestors, of which kinds" duplication, which is the
+part that would drift. If you want, the helper can even be what *defines* the
+table (each col's reconcile lists its ancestor-kinds inline and the table is
+generated), but I think the explicit table reads better. Your call.
+**** TODO Brilliant, and agreed, explicit table.
+** 4.2 What counts as "dead" for an ancestor vognode?
+Candidates, possibly all: (a) kind is =Vognode::Deleted= or =DeadScaffold=;
+(b) pid in =deleted_by_this_save_pids=; (c) its =NodeComplete= won't load
+(disk/graph miss). (a) is the post-visit marker; (b) is the save's intent
+*before* the node's own visit; (c) is the ground truth the reconcile actually
+trips on. I lean toward: dead iff (a) OR (c) -- i.e. "the data the col needs
+isn't there." Is (b) needed too, or does (a) cover it once the node's visit
+runs (which, in BFS order, is *before* the col's visit)? I think (a) suffices
+because a Normal node converts to Deleted at its own visit, strictly before any
+descendant col is visited. Confirm?
+*** TODO I think rely on the view for this.
+It might feel more procedural than relying on the graph,
+but a viewnode's death really does depend on the death of its view-parents;
+it's not a graph property.
+
+It's useful that we do this BFS.
+
+If its ancestor should be a vognode and it's anything but a Vognode::Normal,
+it's dead.
+If its ancestor should be a scaffold and it's anything but that kind,
+it's dead.
+Any one dead necessary ancestor means it's dead.
+** 4.3 "Non-definitive leaves it would have been responsible for"
+A col with broken ancestry *cannot recompute its goal* (it can't read the gone
+ancestor). So "would have been responsible for" can only mean its *current*
+children. Proposal: delete the col's current *indefinitive* children (its
+managed members are created indefinitive), keep *definitive* ones (user
+content). Is that the intent, or do you mean something it computes from a
+still-readable source?
+Sharp edge: an indefinitive node the user *deliberately* placed under a col is
+indistinguishable from a col-managed indefinitive member. So "delete
+indefinitive leaves" can delete a user-placed indefinitive reference. I think
+that's acceptable (an indefinitive leaf has no subtree to lose, and you already
+ruled stale leaf -> delete), but flagging it.
+*** TODO solved in an earlier TODO
+Affected, not definitive, is what matters.
+Delete affected leaves.
+Make affected children with content dead if they are scaffolds (non-vognodes),
+or independent if they are vognodes.
+** 4.4 Composition with the existing machinery
+*** Does this *replace* =scaffolds_with_deadOrDeleted_parents_become_dead=, or run
+  alongside it? (I'd fold the immediate-parent case into this and drop the
+  separate sweep, but it currently also runs as a *pre*-pass to handle scaffolds
+  that arrived dead in the incoming view -- keep that pre-pass?)
+**** replace it, I think
+It's strictly more powerful and loses nothing, right?
+*** =remove_empty_deleted_scaffolds= (prune sweep) still removes the resulting
+  childless DeadScaffolds afterward -- unchanged.
+**** TODO right
+*** **Dependency on §6.6** (Deleted delete-if-childless, plan phase 7, NOT yet
+  done): for the collateral-delete test's "11 gone entirely" to hold under
+  *demote* (rather than the stopgap's detach), 11 must end up a *childless*
+  Deleted node (its cols died and were pruned) and then be removed. That removal
+  is §6.6. So this treatment likely can't fully replace the stopgap until §6.6
+  lands too. Do you want them done together?
+**** TODO doesn't matter
+sequence them however you like, in separate commits if you like
+** 4.5 BFS interaction after a col is killed mid-visit
+When a col becomes DeadScaffold at its visit, the BFS will still dequeue and
+visit its children. Their visits must no-op (a child under a DeadScaffold).
+Today =scaffolds_with_deadOrDeleted_parents_become_dead= would catch them, but
+in-BFS we'd want the dispatch to treat "parent is DeadScaffold" as no-op, or to
+convert-on-visit. Need to make the child-visit robust to a just-killed parent.
+*** ONGOING Are you sure we should no-op them?
+I don't see why. Does Skg already do something like that?
+Maybe before answering, explain what you're saying in more detail,
+because I didn't really get it.
+**** RESPONSE (Claude): you're right, no special no-op is needed.
+First, what I meant, concretely. The BFS loop is: pop a node, run its update
+(dispatch by kind), then push its *current* children onto the queue. So when we
+visit a col, decide it's orphaned, and turn it into a DeadScaffold, we still
+push its children, and they get visited later. My worry was only about its
+children that are *vognodes* (e.g. a relation col's Normal members): when the
+BFS later pops such a child, =visit_normal_node= would run on it -- reconciling
+its content, running its view-requests -- as if it were live, even though its
+col-parent just died. (Qual/scaffold children are harmless: nothing dispatches
+on them.) "No-op them" meant: skip =visit_normal_node= for a vognode whose
+view-parent is a DeadScaffold.
+
+But your §4.3 rule already disposes of those children *at the col's death*: an
+Affected member leaf is deleted (so never visited), and an Affected member
+branch is demoted to Independent. A demoted-Independent vognode then gets
+visited normally -- which is *fine*: it's preserved user content drawn as its
+own independent subtree. So nothing runs "as if live under a dead parent" in a
+harmful way, and no no-op is needed. Skg does not currently special-case this;
+the old code only avoided it by doing col-reconcile in a later pass.
+
+One residual I want your call on: a demoted-Independent vognode survivor stays a
+*child of* the DeadScaffold (re-parenting it upward to the col's parent would
+violate the descendants-only rule, plan §3). So the DeadScaffold is no longer
+childless and the prune sweep won't remove it -- you'd see a dead col with an
+independent subtree hanging under it. Acceptable? Or should a dead col with a
+surviving demoted child be left *as the col it was* (not deadened) so the
+subtree reads sensibly? I lean: keep it simple -- deaden the col, let the
+survivor hang under it; it's a rare chaos-monkey shape and the alternative
+(re-parent upward) breaks the locality rule.
+***** TODO agreed on all counts
+* 5. Pushback (dumb / awkward / dangerous)
+** Dangerous: aborting a *collateral* save on one bad col is the real bug.
+Even with this treatment, I'd argue a col reconcile that hits a missing
+NodeComplete should *degrade* (skip + mark dead), never return =Err= that aborts
+an unrelated buffer's save. The ancestry pre-check is the clean version of that,
+but I'd also make the reconcile read itself fail-soft as a backstop. A single
+malformed/raced node should never be able to reject the user's save.
+*** ONGOING please elaborate
+What do you mean "hits"? "pre-check"?
+**** RESPONSE (Claude): and your §4.2 answer makes this mostly moot.
+- "pre-check" = the ancestry check we just agreed on: before a col reconciles,
+  it looks at its required ancestors and, if any is the wrong kind, deadens
+  itself instead of reconciling. It runs *before* the reconcile body.
+- "hits a missing NodeComplete" = inside a reconcile body, the code calls
+  =nodecomplete_rustFirst_by_pid_and_source(parent_pid, ...)= to read the
+  ancestor's data (its aliases, contains, hides, etc.). If that ancestor was
+  deleted, its =.skg= is gone and the call returns =Err=. That =Err= propagates
+  out of the rerender and (per §1) gets turned into a save "inconsistency" that
+  rejects the user's save. "Hits" = that failing read.
+Because you chose *view-based* death (§4.2 -- an ancestor is dead iff its
+*viewnode kind* is wrong, no graph read), the pre-check catches the
+save-deletion case purely from the tree and we never even call the reconcile,
+so we never make the failing read. So the dangerous abort is fixed by the
+pre-check alone. My "fail-soft backstop" was: *additionally* wrap the
+NodeComplete reads so that if one ever fails for a reason the view-check didn't
+predict (corruption, a race, a genuinely-missing source), the col degrades to
+dead instead of rejecting the save. It's belt-and-suspenders. I'll skip it for
+now unless you want it -- the view-based pre-check is the real fix; the backstop
+is cheap insurance we can add if a missing-source ever slips through.
+***** TODO agreed, let's just wear the belt
+and if it ever proves to be not enough we can re-derive the suspenders trick
+in the future; no need to record it.
+** Awkward: "before diff, before cleanup" puts a third structural sweep-like
+concern *inside* the per-node BFS. The plan (§3) wants per-node rules local and
+the only non-local cleanup to be the §3.4 prune sweep. An in-visit ancestry
+check is local (a node reading its own ancestors is allowed, §3), so it fits --
+but "delete the leaves it managed" is a small downward mutation, which is fine
+(descendants-only). Just noting it nudges the col rules from "reconcile" toward
+"reconcile or self-euthanize".
+*** TODO I think it's fine.
+Viewnode updates already do things to a viewnode's descendents.
+This is just more of that kind of thing.
+** Possibly-dumb simplification: do we even need a *general* ancestry check, or
+just "is my nearest required vognode ancestor alive"? The only multi-level cases
+are HiddenIn/HiddenOutside (subscribee chains). If a subscribee is Deleted, its
+HiddenInSubscribeeCol's *immediate parent* is that Deleted subscribee, so the
+immediate-parent check already catches it. When is a *non-immediate* ancestor
+dead while the immediate one lives? (e.g. subscriber deleted but subscribee-as-
+such not.) If that's unreachable, the immediate-parent rule (today's, moved
+in-BFS) suffices and we avoid the per-col ancestry table entirely. I suspect the
+immediate-parent check, applied *in-BFS to every scaffold at its visit*, plus
+fail-soft reconciles, plus §6.6, covers everything -- which would make this much
+smaller than a new subsystem. Worth confirming before building the general form.
+*** TODO That feels dangerous to me.
+We'll check the ancestors in order from nearest to farthest,
+so if the condition ok-parent-but-bad-grandparent is uncommon
+(which I suspect you're right about) then it will be uncommon
+that we waste effort looking past the parent -- indeed we'll only ever
+do that when it's justified, because the parent is ok.
+I'd rather spend a little extra compute than risk nonsensical behavior.
+
+* 6. Agreed design (incorporating Jeff's answers)
+** Death is a VIEW property (§4.2). A col is *orphaned* iff, walking its
+   required ancestry nearest->farthest, some required ancestor is the wrong
+   viewnode kind: a position that must be a vognode is anything but
+   =Vognode::Normal=; a position that must be a specific scaffold is anything
+   but that scaffold. First mismatch wins (short-circuit). No graph/NodeComplete
+   read. Full chain, not just the immediate parent (§5: cheap because we only
+   look past the parent when the parent is fine).
+*** TODO yes but let's call this 'generalized-orphaned'
+Traditionally in CS, orphaning only refers to immediate parents.
+In whatever function name the term 'generalized orphan' appears,
+we should include a comment defining it.
+** Required ancestry is the §4.1 table, read *through* a shared helper so the
+   reconciles can only read ancestors the table lists (dedups the structural
+   contract; per-col field reads stay per-col).
+** On an orphaned col, at its BFS visit:
+   1. Dispose of its children by the §6.0-shaped rule (§3/§4.3):
+      - Affected leaf            -> delete.
+      - Affected branch, vognode -> demote to parentIs=Independent (survives).
+      - Affected branch, scaffold-> convert to DeadScaffold.
+      - not-Affected child       -> keep untouched.
+   2. Convert the col itself to =DeadScaffold=. Skip its reconcile.
+   No child-visit no-op is needed (§4.5): the survivors are either gone or
+   Independent, and visiting a demoted-Independent node normally is correct.
+** This REPLACES =scaffolds_with_deadOrDeleted_parents_become_dead= (§4.4):
+   the in-BFS check is strictly more powerful (full ancestry vs immediate
+   parent) and the BFS visits every scaffold, so it subsumes the old pre/inter
+   passes. =remove_empty_deleted_scaffolds= (prune sweep) is unchanged and
+   removes the resulting childless DeadScaffolds.
+** §6.6 (Deleted delete-if-childless) is sequenced separately (§4.4); once both
+   land, drop the =detach_stale_deleted_content= stopgap so a deleted node's
+   subtree demotes/dies leafward instead of being detached wholesale.
+
+* 7. Build order
+1. The ancestry spec + helper + view-based orphan check; wire it into the BFS
+   col dispatch (deaden + dispose children) and DELETE
+   =scaffolds_with_deadOrDeleted_parents_become_dead=. Target: the
+   collateral-delete test passes with =detach_stale_deleted_content= REMOVED.
+   (If it can't fully pass without §6.6, keep the stopgap one more commit.)
+2. §6.6 Deleted delete-if-childless (plan phase 7 item), then drop the stopgap.
+3. (optional, on request) fail-soft NodeComplete reads as a backstop.
+OPEN for Jeff: the §4.5 residual (a demoted-Independent survivor left hanging
+under a DeadScaffold, un-prunable) -- ok, or handle differently?

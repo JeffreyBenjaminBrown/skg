@@ -1,0 +1,142 @@
+#+TITLE: Propagate death leafward -- implementation plan
+#+STARTUP: content
+
+Clean, settled plan. The reasoning and the back-and-forth live in
+[[./discussion.org]]; this states the outcomes. Where this and discussion.org
+disagree, this wins; where this and the code disagree, the code wins.
+
+* 1. Goal
+In the single-visit BFS (commit a88adebb), a col (a non-vognode viewnode:
+QualCol, Qual, PartnerCol) is reconciled at its own visit, and its reconcile
+reads ancestor vognode(s). If a required ancestor died this save, the read hits
+a missing =NodeComplete=, returns =Err=, and aborts the whole (often
+*collateral*) rerender -- rejecting the user's save with a spurious
+"inconsistency". (Seen in =save_collateral_delete_then_edit_under_it=.)
+
+Make every col *self-check its required ancestry at its BFS visit* and, if any
+required ancestor is the wrong viewnode kind, *deaden itself and dispose of its
+children* instead of reconciling. This replaces the bracketing sweep
+=scaffolds_with_deadOrDeleted_parents_become_dead=, which no longer runs "in
+time" now that creation and reconciliation interleave.
+
+* 2. Definitions
+** Generalized orphan
+A col is a *generalized orphan* if any ancestor in its *required ancestry chain*
+-- not only the immediate parent -- is the wrong viewnode kind. (Classic CS
+"orphan" means only the immediate parent is gone; ours is generalized to the
+whole chain.) *Wherever the term appears in code, include a comment saying
+exactly this.*
+** Death is a VIEW property (not a graph property)
+An ancestor at a required position is *dead* iff its *viewnode kind* is wrong:
+- a position that must be a vognode holds anything but =Vognode::Normal=;
+- a position that must be a specific scaffold holds anything but that scaffold.
+No graph / =NodeComplete= read is involved. This is sound because, in BFS order,
+a Normal node converts to =Deleted= at its *own* visit, strictly before any
+descendant col is visited; so by the time a col checks, a dead ancestor already
+shows the wrong kind in the tree.
+
+* 3. The required-ancestry table
+Per col kind, the ordered chain of required ancestor kinds, nearest -> farthest.
+This is the single source of truth (see §4).
+| col kind                                  | required ancestry (nearest -> farthest) |
+|-------------------------------------------+-----------------------------------------|
+| QualCol(Alias), QualCol(ID)               | [Normal]                                |
+| Qual(Alias/ID) leaves                     | (handled via their QualCol; see §5)     |
+| PartnerCol(Subscriber/Overridden/Overrider/Hider/Hidden) | [Normal]                 |
+| PartnerCol(Subscribee)                    | [Normal]  (the subscriber)              |
+| PartnerCol(HiddenOutsideOfSubscribee)     | [Subscribee-col, Normal]                |
+| PartnerCol(HiddenInSubscribee)            | [Normal, Subscribee-col, Normal]        |
+"Normal" = =Vognode::Normal=. "Subscribee-col" = =PartnerCol(RoleCol::Subscribee)=.
+A position is matched against the *actual ancestor at that tree depth*.
+
+* 4. The ancestry helper (dedup the structural contract)
+Keep the table explicit and readable, but make the reconciles read their
+ancestors *through* it, so the table can't drift from the reads:
+- =required_ancestry(kind) -> &'static [ExpectedAncestor]= : the §3 table.
+- =col_is_generalized_orphan(tree, col) -> bool= : walk =required_ancestry=
+  nearest->farthest; return true on the first position whose actual ancestor is
+  the wrong kind (short-circuit). Carry the "generalized orphan" comment here.
+- =required_ancestor(tree, col, i) -> Option<NodeId>= : the i-th required
+  ancestor, *Some only if the whole prefix [0..=i] matches the spec*, else None.
+  Every col reconcile obtains its ancestor vognodes *only* through this (so a
+  reconcile can never read an ancestor the table does not list).
+This dedups *which ancestors of which kinds*; the per-col *field* each reconcile
+then pulls (subscriber.hides vs subscribee.contains, ...) stays per-col.
+
+* 5. The BFS col rule
+At a col's BFS visit (in =expand_true_content_at_node='s dispatch):
+1. If =col_is_generalized_orphan(tree, col)=:
+   a. *Dispose each direct child*:
+      - vognode, parentIs=Affected, view-leaf      -> delete;
+      - vognode, parentIs=Affected, has children   -> demote to
+        parentIs=Independent (the user subtree survives);
+      - vognode, parentIs!=Affected                -> keep untouched;
+      - non-vognode child (Qual / nested QualCol/PartnerCol / DeadScaffold)
+                                                   -> convert to =DeadScaffold=.
+   b. Convert the col itself to =DeadScaffold=; do *not* reconcile.
+   (A nested col under a dead ancestor is *also* a generalized orphan, so it
+   deadens itself at its own visit too; converting it here is just consistent
+   and harmless. Quals do not self-dispatch, so deadening them here is what
+   removes them.)
+2. Else: reconcile as today.
+No child-visit no-op is needed: a disposed child is either gone, kept-Independent
+(correct to visit normally), or a DeadScaffold (no-op at its visit).
+
+* 6. Cleanup composition (unchanged sweeps)
+- =remove_empty_deleted_scaffolds= (the §3.4 prune sweep) still runs after the
+  BFS and removes *childless* DeadScaffolds bottom-up: a deadened col whose
+  children all died becomes childless and is pruned; a deadened col that kept a
+  demoted-Independent survivor stays (an accepted, rare shape -- a dead col with
+  an independent subtree hanging under it; re-parenting upward would break the
+  descendants-only rule, plan §3).
+- *Delete* =scaffolds_with_deadOrDeleted_parents_become_dead= entirely (both its
+  pre-pass and inter-pass call sites in =complete.rs=). The §5 in-BFS check is
+  strictly more powerful (full ancestry vs immediate parent) and the BFS visits
+  every scaffold, so it subsumes it.
+
+* 7. §6.6 dependency and the stopgap
+The collateral-delete test wants the deleted node "gone entirely". Under the new
+mechanism a deleted node N (e.g. 11): is demoted by §6.0 (stale branch) -> at
+its visit becomes =Vognode::Deleted= -> its cols generalized-orphan and deaden
+-> prune removes the (now childless) dead cols -> N is a *childless Deleted*
+node. Removing N then requires *§6.6 (Deleted delete-if-childless)*, which is
+plan_v2 phase 7 and not yet done. So:
+- The =detach_stale_deleted_content= stopgap (in
+  =complete_preorder/truenode.rs=) can only be dropped once §6.6 lands.
+- While the stopgap is in place it *pre-empts* the mechanism for the deleted-
+  node path (it detaches N before its cols exist), so the mechanism must be
+  exercised by a *separate* test (a col whose required ancestor died but the
+  node itself isn't deleted-content of its parent -- e.g. a subscribee made
+  Deleted while its HiddenInSubscribeeCol exists).
+
+* 8. Build order
+1. *§6.6 first* (plan_v2 phase 7 item, small): a childless =Vognode::Deleted=
+   is removed by the prune sweep (generalize =remove_empty_deleted_scaffolds=,
+   or add a sibling rule). Commit on its own.
+2. *The mechanism* (§3-§6): the table + helper + =col_is_generalized_orphan= +
+   the §5 dispose-and-deaden in the col dispatch; route col reconciles' ancestor
+   reads through =required_ancestor=; DELETE
+   =scaffolds_with_deadOrDeleted_parents_become_dead=; then *drop the
+   =detach_stale_deleted_content= stopgap*. Validate that the collateral-delete
+   test passes via the real path (not the stopgap).
+3. No fail-soft NodeComplete backstop (decided: wear the belt -- the view-based
+   pre-check -- not the suspenders).
+
+* 9. Tests
+- =save_collateral_delete_then_edit_under_it= must stay green via the real
+  mechanism after the stopgap is dropped ("11 gone entirely").
+- New unit test(s): a col whose required ancestor is dead is itself deadened and
+  *its* Affected member leaves deleted / member branches demoted to Independent
+  / non-member-Independent children preserved. Include a *multi-level* case
+  (HiddenInSubscribeeCol whose subscriber, not its immediate subscribee, is
+  Deleted) so the generalized (not just immediate-parent) check is covered.
+- Idempotence (plan_v2 §15): running twice yields no diff.
+
+* 10. Risks / watch
+- Deleting =scaffolds_with_deadOrDeleted_parents_become_dead= must not lose its
+  incoming-view-dead case: confirm the BFS visits, and §5-checks, scaffolds that
+  arrived dead in the incoming viewforest (it should -- the BFS visits every
+  node). Keep an eye on the two existing call sites in =complete.rs=.
+- A col that is *itself* fine but whose member vognodes were independently
+  deleted is handled by §6.0 at the *parent Normal* node, not here; this rule is
+  only about a col with a dead *ancestor*. Keep the two concerns distinct.
