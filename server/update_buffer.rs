@@ -257,7 +257,8 @@ pub async fn rerender_view (
       deleted_since_head_pid_src_map : &context . deleted_since_head_pid_src_map,
       deleted_by_this_save_pids      : &context . deleted_by_this_save_pids,
       active_source_set              : context . active_source_set,
-      is_saved_view, };
+      is_saved_view,
+      node_budget                    : context . env . config . initial_node_limit, };
     complete_viewforest (
       viewforest, &mut completion_context ) . await ?; }
   mark_view_roots_parent_absent (viewforest);

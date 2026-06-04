@@ -150,11 +150,15 @@ pub fn apply_definitive_draw_rule (
     get_hidden_ids_if_subscribee ( viewforest, node_id, config ) ?;
   if let Some (&prior) = visited . get (& node_pid) {
     if prior . is_final () && prior . node_id () != node_id {
-      // §5.2: an existing Final occurrence wins; discard this DVR and
-      // leave the node indefinitive.
+      // §5.2: an existing Final occurrence wins; discard this DVR and make
+      // the node indefinitive. (Setting indefinitive matters for a §5.3
+      // cascade DVR landing on a freshly-created definitive child whose id
+      // is already Final elsewhere; for a user DVR on an already-indefinitive
+      // node it is a no-op. The expand step then clobbers/refreshes it.)
       write_at_truenode_in_tree (
         viewforest, node_id,
-        |t| { t . view_requests . remove (& ViewRequest::Definitive); } )
+        |t| { t . view_requests . remove (& ViewRequest::Definitive);
+              t . indef_or_def = IndefOrDef::Indefinitive; } )
         . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
       return Ok ( DrawOutcome::Deferred ); }
     if prior . node_id () != node_id {
@@ -362,7 +366,7 @@ fn truenode_file_absent_from_worktree (
 /// by loading content from git HEAD.
 /// Children that exist in TypeDB are marked as RemovedHere.
 /// Children that don't exist in TypeDB are marked as Removed.
-async fn extendDefinitiveSubtree_fromGit (
+pub async fn extendDefinitiveSubtree_fromGit (
   tree           : &mut Tree<ViewNode>,
   effective_root : NodeId,
   limit          : usize,

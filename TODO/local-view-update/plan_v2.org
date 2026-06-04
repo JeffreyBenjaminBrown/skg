@@ -946,3 +946,38 @@ Branch =local-view-updates=.
   updates when the BFS lands. Staging: M2 = driver-as-BFS + cascade + node
   budget together (one large commit); M3 = §6.0 stale handling (phase 3,
   separable). Baseline build green at fb7786b before this effort.
+** Phase-2+4 monolith LANDED (single-visit BFS + §5.3 cascade + §5.5 budget).
+  complete.rs is now one level-order BFS; each Normal visit settles the §5.2
+  draw rule (apply_definitive_draw_rule) before drawing content, cascades
+  ViewRequest::Definitive to affected content children when Final, emits diff
+  scaffolds, runs the remaining view-requests, and ensures a definitive
+  subscribee's HiddenInSubscribeeCol; cols reconcile at their own visit. The
+  fixed postorder pass-sequence and extendDefinitiveSubtreeFromLeaf are gone.
+  Decisions/deviations made while landing it:
+  - §5.5 budget: only *content* children decrement node_budget; nodes created
+    by col reconcilers (subscribee/relation/alias/id members) are NOT yet
+    counted. Content cascade is the explosion risk and is bounded; col-node
+    budget accounting is DEFERRED (cols create few nodes). Revisit if needed.
+  - §5.5 truncation differs from the old per-DVR FromLeaf: the budget is now
+    granular (each unit = one node) with NO "complete the sibling group"
+    padding; once spent, remaining DVRs are stripped and those nodes left
+    indefinitive. Updated tests/extend_definitive_from_leaf.rs limit_1_to_4 &
+    limit_5_or_6 (limits that used to coincide now differ by one node).
+  - §5.3 cascade-steal now demotes a Tentative origin/root when a deeper
+    cascade DVR reaches the same id (plan §5.2, "the explicit request wins").
+    Updated the `repeat` test to the new (root-demoted) expectation.
+  - §6.1 PULLED FORWARD (was deferred): removed
+    should_preserve_saved_as_subscribee_branch + correct_the_viewChildren_of_subscribee.
+    A definitive subscribee-as-such now regenerates contains-minus-hides for
+    saved AND collateral views. REQUIRED because the cascade draws subscribee
+    content through reconcile_content_children, not the old FromLeaf which
+    bypassed the carve-out. (should_sync_from_disk_even_though_definitive --
+    the other §6.1 carve-out -- is KEPT for now; separable.)
+  - §7.1/§6.0 partial: a subscribee-as-such still marks user-added *extra*
+    children Independent (pre-marking before reconcile) to preserve them, as
+    the old code did. The §6.0 unified delete-if-leaf/demote-if-branch for ALL
+    collections is still phase 3 (M3). Regular Normal nodes keep dropping
+    stale affected children.
+  - removed-file DVR (extendDefinitiveSubtree_fromGit) kept on a defensive
+    branch in visit_normal_node; effectively unreachable post-save (removed
+    files arrive as DiffPhantoms). Full Rust suite green.

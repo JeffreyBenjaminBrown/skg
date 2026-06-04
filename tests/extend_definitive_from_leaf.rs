@@ -91,11 +91,12 @@ fn test_definitive_view_limit_10
       Ok (( )) } )) }
 
 // ===================================================
-// Test: Definitive view with limit=5 or limit=6
+// Test: Definitive view with limit=5 vs limit=6
 // ===================================================
-// - Hits limit at 1211 or 1212
-// - Completes 1211's sibling group: 1211, 1212 both indefinitive
-// - Truncates (renders indef) nodes after 121 in gen 2: 122, 123, 124
+// §5.5 budget is granular: limit=5 spends its last unit on 1211 (1212 not
+// created); limit=6 affords both 1211 and 1212. Nodes whose DVR is reached
+// after the budget is spent are stripped to indefinitive. (No sibling-group
+// padding: the two limits now differ by one created node.)
 
 #[test]
 fn test_definitive_view_limit_5_or_6
@@ -147,14 +148,33 @@ fn test_definitive_view_limit_5_or_6
       println!("Result with limit=5:\n{}", result_5);
       println!("Result with limit=6:\n{}", result_6);
 
-      // With limit=5 or 6:
-      // - 121, 122, 123, 124 are added (4 nodes)
-      // - Then 1211 is the 5th node, limit hit (or 6th slot available)
-      // - Complete sibling group: 1211, 1212 both indefinitive
-      // - Truncate after 121 in parent gen: 122, 123, 124 indefinitive
-      // Both limits produce the same result because truncation
-      // completes the sibling group.
-      let expected = indoc! {"
+      // §5.5 (one per-buffer budget, BFS order, no sibling-group padding):
+      // 121,122,123,124 are created (budget -4), then 121's gen-3 children
+      // are created up to the remaining budget; once spent, remaining DVRs
+      // are stripped (those nodes left indefinitive). 121 itself is reached
+      // while budget>0, so it stays definitive. limit=5 and limit=6 now
+      // differ by exactly one created gen-3 node (the old code padded both
+      // to the whole 1211/1212 sibling group).
+      //
+      // limit=5: budget 5 -> 1 after gen 2; 121 draws 1211 (budget ->0),
+      // 1212 not created; 122/123/124 and 1211 have DVRs stripped -> indef.
+      let expected_5 = indoc! {"
+        * (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
+        ** (skg (node (id 11) (source main))) 11
+        ** (skg (node (id 12) (source main) (graphStats (contents 4)))) 12
+        12 body
+        *** (skg (node (id 121) (source main) (graphStats (contents 2)))) 121
+        121 body
+        **** (skg (node (id 1211) (source main) indef)) 1211
+        *** (skg (node (id 122) (source main) indef (graphStats (contents 1)))) 122
+        *** (skg (node (id 123) (source main) indef)) 123
+        *** (skg (node (id 124) (source main) indef)) 124
+        ** (skg (node (id 13) (source main))) 13
+        * (skg (node (id 2) (source main) (parentIs absent))) 2
+      "};
+      // limit=6: budget 6 -> 2 after gen 2; 121 draws both 1211 and 1212
+      // (budget ->0), each then DVR-stripped -> indef.
+      let expected_6 = indoc! {"
         * (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
         ** (skg (node (id 11) (source main))) 11
         ** (skg (node (id 12) (source main) (graphStats (contents 4)))) 12
@@ -170,10 +190,10 @@ fn test_definitive_view_limit_5_or_6
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
 
-      assert_eq!(result_5, expected,
-        "Definitive view with limit=5 should truncate at gen 3, complete sibling group");
-      assert_eq!(result_6, expected,
-        "Definitive view with limit=6 should produce the same result as limit=5");
+      assert_eq!(result_5, expected_5,
+        "limit=5: 121 expands one gen-3 child (1211), rest indefinitive (§5.5)");
+      assert_eq!(result_6, expected_6,
+        "limit=6: 121 expands both gen-3 children, rest indefinitive (§5.5)");
 
       Ok (( )) } )) }
 
@@ -233,11 +253,27 @@ fn test_definitive_view_limit_1_to_4
       println!("Result with limit=1:\n{}", result_1);
       println!("Result with limit=4:\n{}", result_4);
 
-      // With limit=1 or limit=4:
-      // - Node 12 has 4 children (121, 122, 123, 124)
-      // - Limit is hit on the first generation
-      // - Sibling group is completed, all are indefinitive
-      let expected = indoc! {"
+      // §5.5 (one per-buffer budget, no "complete the sibling group"
+      // cleverness): node 12 has 4 content children (121..124). The budget
+      // caps how many *new* children are created in BFS order; once it is
+      // spent, remaining DVRs are stripped and those nodes left indefinitive.
+      // So limit=1 and limit=4 now differ (the old behavior padded both out
+      // to the whole sibling group).
+      //
+      // limit=1: only 121 is created (budget 1->0); 122,123,124 are not
+      // created at all, and 121's own DVR is stripped (budget 0) -> indef.
+      let expected_1 = indoc! {"
+        * (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
+        ** (skg (node (id 11) (source main))) 11
+        ** (skg (node (id 12) (source main) (graphStats (contents 4)))) 12
+        12 body
+        *** (skg (node (id 121) (source main) indef (graphStats (contents 2)))) 121
+        ** (skg (node (id 13) (source main))) 13
+        * (skg (node (id 2) (source main) (parentIs absent))) 2
+      "};
+      // limit=4: all four gen-2 children are created (budget 4->0), then each
+      // has its DVR stripped (budget 0) -> all indefinitive, no grandchildren.
+      let expected_4 = indoc! {"
         * (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
         ** (skg (node (id 11) (source main))) 11
         ** (skg (node (id 12) (source main) (graphStats (contents 4)))) 12
@@ -250,10 +286,10 @@ fn test_definitive_view_limit_1_to_4
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
 
-      assert_eq!(result_1, expected,
-        "Definitive view with limit=1 should mark all gen 2 children indefinitive");
-      assert_eq!(result_4, expected,
-        "Definitive view with limit=4 should produce the same result as limit=1");
+      assert_eq!(result_1, expected_1,
+        "limit=1 creates only the first gen-2 child, indefinitive (§5.5)");
+      assert_eq!(result_4, expected_4,
+        "limit=4 creates all four gen-2 children, all indefinitive (§5.5)");
 
       Ok (( )) } )) }
 
@@ -407,13 +443,17 @@ fn test_definitive_view_with_repeat
 
       let expected = indoc! {
         // Upon saving, the indef view of node 12 had no effect,
-        // but the definitive view of 121 deleted its children.
-        // The new 121 under 12 is rendered indefinitive,
-        // because it was already rendered as a sibling of 12.
-        "* (skg (node (id 121) (source main) (parentIs absent) (graphStats (containers 1)))) 121
+        // but the definitive view of 121 (definitive in the *buffer*)
+        // deleted its children at extraction. In the rerender, node 12's
+        // definitiveView cascades (§5.3) a DVR onto its content child 121,
+        // which is Final and so clobbers the Tentative bare root 121 (§5.2:
+        // "the explicit request wins; the origin is demoted"). So the bare
+        // root 121 is now indefinitive and 12's child 121 is the definitive
+        // occurrence (childless, since the save emptied 121's contains).
+        "* (skg (node (id 121) (source main) (parentIs absent) indef (graphStats (containers 1)))) 121
          * (skg (node (id 12) (source main) (parentIs absent) (graphStats (containers 1) (contents 4)))) 12
          12 body
-         ** (skg (node (id 121) (source main) indef)) 121
+         ** (skg (node (id 121) (source main))) 121
          ** (skg (node (id 122) (source main) (graphStats (contents 1)))) 122
          122 body
          *** (skg (node (id 1221) (source main))) 1221

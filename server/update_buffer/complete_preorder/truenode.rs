@@ -16,7 +16,7 @@ use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, DeletedNode, IndefOrDef,
-    ParentIs, mk_definitive_viewnode};
+    ParentIs, ViewRequest, mk_definitive_viewnode};
 use crate::types::viewnode::{Vognode, QualCol, Qual, RoleCol};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_nodecomplete::{
@@ -52,17 +52,14 @@ struct ChildData {
 #[derive(Clone, Copy)]
 struct CompletionMode {
   saved_view : bool, // false => collateral buffer
-  diff_view  : bool,
 }
 
 impl CompletionMode {
   fn new (
     is_saved_view : bool,
-    source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
   ) -> CompletionMode {
     CompletionMode {
       saved_view : is_saved_view,
-      diff_view  : source_diffs . is_some(),
     }}
 
   /// The saved (definitive) view of a node
@@ -73,31 +70,21 @@ impl CompletionMode {
   ) -> bool {
     ! self . saved_view }
 
-  /// A subscribee-as-such -- that is, a definitive TrueNode child
-  /// of a SubscribeeCol -- is editable,
-  /// but only in the sense that those edits let a user modify what the
-  /// subscriber hides. Saved-view completion must not regenerate
-  /// that child list from disk before the branch can be interpreted.
-  ///
-  /// This applies only to a saved-view axis, and only when diff view is off.
-  /// Collateral views and new buffer completion should refresh from the graph.
-  /// Diff completions, whether saved or collateral,
-  /// must regenerate phantom/removed children from source_diffs.
-  fn should_preserve_saved_as_subscribee_branch (
-    self,
-    is_subscribee : bool,
-  ) -> bool {
-    self . saved_view
-      && ! self . diff_view
-      && is_subscribee }
 }
 
-/// TrueNode content expansion.
-///
-/// INTENDED USE: Use in the first, DFS preorder (parent-first)
-/// buffer-update pass through the tree.
-/// That's because the second, DFS-postorder (child-first)
-/// pass would be wrong if any truenode were missing children.
+/// TrueNode content reconcile + content-child creation, for one node, in the
+/// plan_v2 §3 level-order BFS visit. The driver settles the node's
+/// Finalizable state *before* calling this (via 'apply_definitive_draw_rule')
+/// and passes:
+/// - `settled`: the §5.2 draw rule already ran for this node (it carried a
+///   ViewRequest::Definitive), so its map entry and indef/def are already
+///   correct -- skip 'make_indef_if_repeat_then_extend_defmap', which would
+///   otherwise indefinitize a just-made-Final node against its own entry.
+/// - `cascade`: this node is Final (DVR-made); per §5.3 it hands a
+///   ViewRequest::Definitive to each of its affected content children so the
+///   BFS draws each Final (clobbering competing Tentative occurrences).
+/// - `node_budget`: the §5.5 remaining budget of new ViewNodes; content-child
+///   creation is capped against it.
 pub fn expand_true_content_at_truenode (
   node               : NodeId,
   tree               : &mut Tree<ViewNode>,
@@ -109,6 +96,9 @@ pub fn expand_true_content_at_truenode (
   deleted_by_this_save_pids      : &HashSet<ID>,
   active_source_set              : Option<&ActiveSourceSet>,
   is_saved_view                  : bool,
+  settled                        : bool,
+  cascade                        : bool,
+  node_budget                    : &mut usize,
 ) -> Result<(), Box<dyn Error>> {
   // Phantoms are diff placeholders; this pass mutates and expands
   // real content nodes.
@@ -117,8 +107,12 @@ pub fn expand_true_content_at_truenode (
     |vn : &ViewNode| matches!( &vn . kind,
                                 ViewNodeKind::Vognode (Vognode::Normal (_))),
     "expand_true_content_at_truenode: expected normal vognode" ) ?;
-  make_indef_if_repeat_then_extend_defmap(
-    tree, node, defmap ) ?;
+  if ! settled {
+    // A DVR node was already resolved by apply_definitive_draw_rule; running
+    // the dedup here would indefinitize it against its own (just-inserted)
+    // map entry. Ordinary nodes still dedup first-wins (Tentative).
+    make_indef_if_repeat_then_extend_defmap(
+      tree, node, defmap ) ?; }
   let (pid, initial_source) : (ID, SourceName) =
     pid_and_source_from_treenode( tree, node,
                                   "expand_true_content_at_truenode" ) ?;
@@ -145,17 +139,44 @@ pub fn expand_true_content_at_truenode (
   let source : SourceName =
     nodecomplete . source . clone ();
   let mode : CompletionMode =
-    CompletionMode::new (is_saved_view, source_diffs);
+    CompletionMode::new (is_saved_view);
   if mode . should_sync_from_disk_even_though_definitive () {
     sync_truenode_from_disk (tree, node, &nodecomplete) ?; }
   reconcile_content_children (
     tree, node, &nodecomplete, &pid, &source,
     source_diffs, config, graph_snap,
     deleted_since_head_pid_src_map,
-    active_source_set, mode ) ?;
+    active_source_set, node_budget ) ?;
+  if cascade {
+    attach_cascade_dvrs_to_affected_content( tree, node ) ?; }
   order_children_as_scaffolds_then_ignored_then_content(
     tree, node ) ?;
   Ok(( )) }
+
+/// §5.3 cascade: hand a ViewRequest::Definitive to each affected,
+/// non-phantom Normal content child of a Final node -- new and existing
+/// alike -- so the main BFS draws each Final (and it in turn cascades to its
+/// own content). The cascade does *not* flow through scaffolds, so only
+/// parentIs=Affected content children receive it.
+fn attach_cascade_dvrs_to_affected_content (
+  tree : &mut Tree<ViewNode>,
+  node : NodeId,
+) -> Result<(), Box<dyn Error>> {
+  let child_ids : Vec<NodeId> =
+    tree . get (node) . unwrap ()
+    . children ()
+    . filter ( |c| matches!( &c . value () . kind,
+        ViewNodeKind::Vognode (Vognode::Normal (t))
+          if t . parentIs == ParentIs::Affected
+             && ! t . should_be_phantom () ) )
+    . map ( |c| c . id () )
+    . collect ();
+  for cid in child_ids {
+    write_at_truenode_in_tree (
+      tree, cid,
+      |t| { t . view_requests . insert ( ViewRequest::Definitive ); } )
+      . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
+  Ok (( )) }
 
 /// The edit request should have been used by now.
 fn clear_edit_request (
@@ -203,7 +224,7 @@ fn reconcile_content_children (
   graph_snap                     : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   active_source_set              : Option<&ActiveSourceSet>,
-  mode                           : CompletionMode,
+  node_budget                    : &mut usize,
 ) -> Result<(), Box<dyn Error>> {
   // Resolve each id through the in-Rust-graph extra_id map so that an
   // id appearing in a node's 'contains' after merging into another
@@ -223,16 +244,35 @@ fn reconcile_content_children (
     per_stage_node_changes_for_truenode (
       source_diffs, pid, source );
   let is_sub : bool = is_subscribee (tree, node) ?;
-  if mode . should_preserve_saved_as_subscribee_branch (is_sub)
-    { correct_the_viewChildren_of_subscribee (
-        tree, node, &content_ids ) ?;
-      return Ok (( )); }
+  // §6.1: a definitive subscribee-as-such regenerates its content as
+  // contains-minus-hides, saved and collateral views alike. (The former
+  // "do not regenerate a saved subscribee's children" carve-out is gone:
+  // view-update is strictly post-extraction, so the hide edits are already
+  // in the graph and regenerating is correct -- and required, since the
+  // §5.3 cascade now draws subscribee content through this path rather than
+  // the old extendDefinitiveSubtreeFromLeaf.)
   let (goal_list, removed_ids, apparent_content_ids) =
     // git diff view makes a difference
     content_goal_list(
       tree, node, &content_ids,
       staged_nc, unstaged_nc,
       is_sub, config ) ?;
+  // §5.5: cap how many *new* content children this node may create against
+  // the per-buffer budget (existing children and diff phantoms are free).
+  let goal_list : Vec<ID> =
+    cap_content_goal_to_budget(
+      tree, node, &goal_list, &removed_ids, node_budget );
+  if is_sub {
+    // §7.1: preserve a user-added *extra* child under a subscribee-as-such by
+    // demoting it to Independent *before* reconcile, so the goal-list
+    // reconciler does not detach it as a stale member. Keyed on the full
+    // 'contains' (not the visible goal), so a merely-hidden child stays
+    // Affected and is reconciled into the HiddenInSubscribeeCol instead of
+    // being stranded here. (Regular non-subscribee nodes keep their existing
+    // behavior of dropping stale affected children; the §6.0 unified
+    // delete-if-leaf rule is phase 3.)
+    mark_erroneous_content_children_as_indep(
+      tree, node, &content_ids ) ?; }
   complete_content_children(
     tree, node, &goal_list, &removed_ids,
     source_diffs, config, deleted_since_head_pid_src_map,
@@ -241,35 +281,40 @@ fn reconcile_content_children (
     tree, node, &apparent_content_ids ) ?;
   Ok (( )) }
 
-/// Changes the ParentIs of non-content children to Independent,
-/// and reorders the remaining content to match what's on disk.
-/// (The visible content is likely a subset of that on-disk content.)
-fn correct_the_viewChildren_of_subscribee (
-  tree        : &mut Tree<ViewNode>,
+/// §5.5 node-limit: cap a content goal list so this node creates at most
+/// `*node_budget` *new* content children (ids not already present as
+/// children). Existing children cost nothing (no new node), and removed-id
+/// diff phantoms are exempt (the diff overlay is not budget-bound, §5.5), so
+/// both are always kept. Decrements `*node_budget` by the number of new ids
+/// kept and drops the rest from the goal list (so they are simply not
+/// created -- and, in a cascade, not expanded). Preserves order.
+fn cap_content_goal_to_budget (
+  tree        : &Tree<ViewNode>,
   node        : NodeId,
-  content_ids : &[ID],
-) -> Result<(), Box<dyn Error>> {
-  mark_erroneous_content_children_as_indep (
-    tree, node, content_ids ) ?;
-  let content_id_set : HashSet<ID> =
-    content_ids . iter() . cloned() . collect();
-  let content_child_ids : Vec<(ID, NodeId)> =
-    tree . get (node) . unwrap()
-    . children()
-    . filter_map ( |child| match &child . value() . kind {
-      ViewNodeKind::Vognode (Vognode::Normal (t))
-        if t . parentIs == ParentIs::Affected
-           && !t . should_be_phantom()
-           && content_id_set . contains (&t . id) =>
-        Some ((t . id . clone(), child . id())),
-      _ => None,
-    })
-    . collect();
-  for content_id in content_ids {
-    for (_id, child_id) in content_child_ids . iter()
-      . filter ( |(id, _)| id == content_id )
-    { move_child_to_end (tree, node, *child_id) ?; }}
-  Ok (( )) }
+  goal_list   : &[ID],
+  removed_ids : &HashSet<ID>,
+  node_budget : &mut usize,
+) -> Vec<ID> {
+  let existing : HashSet<ID> =
+    tree . get (node) . unwrap () . children ()
+    . filter_map ( |c| match &c . value () . kind {
+        ViewNodeKind::Vognode (Vognode::Normal (t)
+                               | Vognode::DiffPhantom (t)) =>
+          Some ( t . id . clone () ),
+        ViewNodeKind::Vognode (Vognode::Inactive (i)) =>
+          Some ( i . id . clone () ),
+        _ => None } )
+    . collect ();
+  let mut kept : Vec<ID> = Vec::with_capacity ( goal_list . len () );
+  for id in goal_list {
+    if existing . contains (id) || removed_ids . contains (id) {
+      kept . push ( id . clone () ); // free: not a new ordinary node
+    } else if *node_budget > 0 {
+      *node_budget -= 1;
+      kept . push ( id . clone () );
+    } // else: budget exhausted -- drop this new id
+  }
+  kept }
 
 fn mutate_truenode_to_deletednode (
   tree   : &mut Tree<ViewNode>,

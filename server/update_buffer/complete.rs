@@ -6,12 +6,13 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
+use crate::to_org::expand::definitive::{ apply_definitive_draw_rule, extendDefinitiveSubtree_fromGit, DrawOutcome};
 use crate::to_org::util::DefinitiveMap;
 use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
-use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_readonly};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol};
+use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol, ViewRequest, IndefOrDef};
 use crate::types::viewnode::{Vognode, QualCol};
 use super::complete_postorder::hiddeninsubscribee_col::reconcile_hiddenin_subscribee_col_children;
 use super::complete_postorder::hiddenoutsideof_subscribeecol::reconcile_hiddenoutside_subscribee_col_children;
@@ -34,6 +35,13 @@ pub(super) struct CompletionContext<'a> {
   pub(super) deleted_by_this_save_pids      : &'a HashSet<ID>,
   pub(super) active_source_set              : Option<&'a ActiveSourceSet>,
   pub(super) is_saved_view                  : bool,
+  /// §5.5 per-buffer node limit: the remaining budget of *new* ViewNodes
+  /// the ordinary update pass may create. Initialized once per rerender to
+  /// `config.initial_node_limit` and decremented as content children are
+  /// created; when it reaches 0 no further new content is drawn (and the
+  /// cascade stops). Unifies what was extendDefinitiveSubtreeFromLeaf's
+  /// per-DVR limit. The diff overlay is exempt (§5.5).
+  pub(super) node_budget                    : usize,
 }
 
 pub(super) async fn complete_viewforest (
@@ -42,23 +50,16 @@ pub(super) async fn complete_viewforest (
 ) -> Result<(), Box<dyn Error>> {
   let root_treeid : NodeId = viewforest . root () . id ();
   scaffolds_with_deadOrDeleted_parents_become_dead (viewforest) ?;
+  // The single plan_v2 §3 level-order BFS: each node's visit
+  // (expand_true_content_at_node) does ALL of its own update -- content
+  // reconcile, the §5.2 draw rule + §5.3 cascade for definitive-view
+  // requests, diff scaffolds, the other view requests, ensuring a definitive
+  // subscribee's HiddenInSubscribeeCol, and per-col reconciliation -- so the
+  // former fixed sequence of postorder passes is gone. Cols and content
+  // children created during a node's visit are reached later in the same BFS.
   expand_true_content_until_stable (
     viewforest, root_treeid, context ) . await ?;
   scaffolds_with_deadOrDeleted_parents_become_dead (viewforest) ?;
-  ensure_diff_scaffolds (viewforest, context) ?;
-  let postorder_true_nodes : Vec<NodeId> =
-    collect_matching_nodeids (
-      viewforest, false,
-      |vn| matches! ( &vn . kind,
-                       ViewNodeKind::Vognode (Vognode::Normal (_)) )) ?;
-  execute_truenode_view_requests (
-    viewforest, context, &postorder_true_nodes ) . await ?;
-  ensure_hiddenin_cols_under_definitive_subscribees (
-    viewforest, context, &postorder_true_nodes ) . await ?;
-  reconcile_alias_cols (viewforest, context) ?;
-  reconcile_id_cols (viewforest, context) ?;
-  reconcile_hiddenin_cols (viewforest, context) ?;
-  reconcile_hiddenoutside_cols (viewforest, context) ?;
   remove_empty_deleted_scaffolds (viewforest) ?;
   Ok(( )) }
 
@@ -124,6 +125,10 @@ async fn expand_true_content_until_stable (
         queue . push_back (child . id ()); }}}
   Ok(( )) }
 
+/// One BFS visit: dispatch on (kind, parent-kind) to the node's update rule
+/// (plan_v2 §3/§4). Cols are reconciled at their own visit (the BFS reaches a
+/// col after its Normal parent created it), so the former separate col-sweep
+/// passes are gone.
 async fn expand_true_content_at_node (
   tree    : &mut Tree<ViewNode>,
   treeid  : NodeId,
@@ -131,148 +136,133 @@ async fn expand_true_content_at_node (
 ) -> Result<(), Box<dyn Error>> {
   let kind : ViewNodeKind =
     tree . get (treeid) . unwrap () . value () . kind . clone ();
-  if matches!( kind, ViewNodeKind::Vognode (Vognode::Normal (_)) ) {
+  match &kind {
+    ViewNodeKind::Vognode (Vognode::Normal (_)) =>
+      visit_normal_node (tree, treeid, context) . await ?,
+    ViewNodeKind::PartnerCol (RoleCol::Subscribee) =>
+      reconcile_subscribee_col_children (
+        treeid, tree, context . source_diffs, context . env,
+        context . deleted_since_head_pid_src_map ) . await ?,
+    ViewNodeKind::PartnerCol (RoleCol::HiddenInSubscribee) =>
+      reconcile_hiddenin_subscribee_col_children (
+        treeid, tree, context . source_diffs, context . env,
+        context . deleted_since_head_pid_src_map ) ?,
+    ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee) =>
+      reconcile_hiddenoutside_subscribee_col_children (
+        treeid, tree, context . source_diffs, context . env,
+        context . deleted_since_head_pid_src_map ) ?,
+    ViewNodeKind::PartnerCol (role)
+      if role . relation_member_role () . is_some () =>
+      reconcile_relation_col_children (
+        treeid, tree, *role, context . source_diffs,
+        context . env, context . graph_snap,
+        context . deleted_since_head_pid_src_map ) ?,
+    ViewNodeKind::QualCol (QualCol::Alias) =>
+      super::complete_postorder::aliascol::reconcile_alias_col_children (
+        tree, treeid, context . source_diffs, &context . env . config ) ?,
+    ViewNodeKind::QualCol (QualCol::ID) =>
+      super::complete_postorder::id_col::reconcile_id_col_children (
+        treeid, tree, context . source_diffs, &context . env . config ) ?,
+    _ => {
+      // No-op for: Unknown (unresolvable-id placeholder), Deleted,
+      // DeadScaffold, Qual leaves, BufferRoot, DiffPhantom (owned by the
+      // diff overlay, §6.3). The prune sweep handles empty/dead nodes.
+    } }
+  Ok(( )) }
+
+/// The Normal-node visit (plan_v2 §6.1/§6.2): settle the Finalizable state
+/// for a definitive-view request *before* drawing content (so a Final node
+/// can cascade), reconcile content, then -- while still a Normal node --
+/// emit diff scaffolds, run the remaining (non-Definitive) view requests,
+/// and ensure a definitive subscribee's HiddenInSubscribeeCol. The BFS
+/// reaches every col/child this creates and reconciles it in turn.
+async fn visit_normal_node (
+  tree    : &mut Tree<ViewNode>,
+  treeid  : NodeId,
+  context : &mut CompletionContext<'_>,
+) -> Result<(), Box<dyn Error>> {
+  let had_dvr : bool =
+    read_at_node_in_tree ( tree, treeid,
+      |vn : &ViewNode| match &vn . kind {
+        ViewNodeKind::Vognode (Vognode::Normal (t)) =>
+          t . view_requests . contains (& ViewRequest::Definitive),
+        _ => false } ) ?;
+  let mut settled    : bool = false; // §5.2 draw rule already ran
+  let mut cascade    : bool = false; // node is Final -> hand DVRs to children
+  let mut do_content : bool = true;
+  if had_dvr && context . node_budget == 0 {
+    // §5.5: budget exhausted -- strip the (user or cascade) DVR and leave the
+    // node indefinitive instead of making it Final. The content engine
+    // (settled) then clobbers+returns, drawing no further content. This is
+    // the BFS-order truncation: earlier siblings expand, later ones stay
+    // indefinitive once the budget is spent.
+    crate::types::tree::viewnode_nodecomplete::write_at_truenode_in_tree (
+      tree, treeid,
+      |t| { t . view_requests . remove (& ViewRequest::Definitive);
+            t . indef_or_def = IndefOrDef::Indefinitive; } )
+      . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+    settled = true;
+  } else if had_dvr {
+    match apply_definitive_draw_rule (
+      tree, treeid, &context . env . config, context . defmap ) ? {
+      DrawOutcome::Deferred => {
+        // Deferred to an existing Final occurrence: the node is now
+        // indefinitive; the content engine (settled) will clobber+return.
+        settled = true; }
+      DrawOutcome::MadeFinal { is_removed_node : true, hidden_ids } => {
+        // Removed-file DVR: keep the git-phantom self-expansion (diff
+        // overlay territory, §9). Effectively unreachable in the post-save
+        // pass -- removed-file nodes arrive as DiffPhantoms -- but handled
+        // defensively; the content engine is skipped.
+        extendDefinitiveSubtree_fromGit (
+          tree, treeid, context . env . config . initial_node_limit,
+          context . defmap, context . source_diffs, &context . env . config,
+          &hidden_ids, &context . env . driver,
+          context . deleted_since_head_pid_src_map,
+          context . active_source_set ) . await ?;
+        settled = true; do_content = false; }
+      DrawOutcome::MadeFinal { is_removed_node : false, .. } => {
+        settled = true; cascade = true; } } }
+  if do_content {
     expand_true_content_at_truenode (
       treeid, tree, context . defmap, context . source_diffs,
       &context . env . config, context . graph_snap,
       context . deleted_since_head_pid_src_map,
       context . deleted_by_this_save_pids,
-      context . active_source_set,
-      context . is_saved_view ) ?;
-  } else if matches!( kind,
-      ViewNodeKind::PartnerCol (RoleCol::Subscribee))
-      { reconcile_subscribee_col_children (
-          treeid, tree, context . source_diffs, context . env,
-          context . deleted_since_head_pid_src_map
-        ) . await ?;
-  } else if let ViewNodeKind::PartnerCol (sharing_kind) = kind {
-    if sharing_kind . relation_member_role () . is_some ()
-       && sharing_kind != RoleCol::Subscribee
-    { reconcile_relation_col_children (
-        treeid, tree, sharing_kind, context . source_diffs,
-        context . env, context . graph_snap,
-        context . deleted_since_head_pid_src_map ) ?; }
-  } else if matches!( kind, ViewNodeKind::Vognode (Vognode::Unknown (_))) {
-    // No-op: Unknown is a placeholder for an unresolvable id and
-    // has no completion to do. Listed explicitly so a reader sees
-    // the variant covered.
-  }
-  // No-op for: Deleted, DeletedScaff (whose parent is not
-  // Deleted/DeletedScaff -- occurs on re-save of a buffer
-  // containing them).
-  Ok(( )) }
-
-fn ensure_diff_scaffolds (
-  tree    : &mut Tree<ViewNode>,
-  context : &mut CompletionContext<'_>,
-) -> Result<(), Box<dyn Error>> {
-  let true_nodes : Vec<NodeId> =
-    collect_matching_nodeids (
-      tree, true,
-      |vn| matches! ( &vn . kind,
-                       ViewNodeKind::Vognode (Vognode::Normal (_)) )) ?;
-  for treeid in true_nodes {
-    let ready : Option<(ID, SourceName)> = {
-      let node_ref =
-        tree . get (treeid) . unwrap ();
-      match &node_ref . value () . kind {
+      context . active_source_set, context . is_saved_view,
+      settled, cascade, &mut context . node_budget ) ?; }
+  // The steps below apply only while the node is still a Normal vognode:
+  // content reconcile may have converted it to Deleted, or set_diff_status
+  // to a DiffPhantom.
+  let still_normal : bool =
+    read_at_node_in_tree ( tree, treeid,
+      |vn : &ViewNode| matches! ( &vn . kind,
+        ViewNodeKind::Vognode (Vognode::Normal (_)) ) ) ?;
+  if ! still_normal { return Ok (( )); }
+  // Diff scaffolds for a definitive, non-phantom node (was ensure_diff_scaffolds).
+  let ready : Option<(ID, SourceName)> =
+    read_at_node_in_tree ( tree, treeid,
+      |vn : &ViewNode| match &vn . kind {
         ViewNodeKind::Vognode (Vognode::Normal (t))
           if ! t . should_be_phantom () && ! t . is_indefinitive () =>
             Some (( t . id . clone (), t . source . clone () )),
-        _ => None }};
-    if let Some ((pid, source)) = ready {
-      maybe_prepend_diff_view_scaffolds (
-        tree, treeid, context . source_diffs, &pid, &source ) ?; }}
-  Ok (( )) }
-
-async fn execute_truenode_view_requests (
-  tree       : &mut Tree<ViewNode>,
-  context    : &mut CompletionContext<'_>,
-  true_nodes : &[NodeId],
-) -> Result<(), Box<dyn Error>> {
-  for treeid in true_nodes {
-    super::complete_postorder::truenode::
-    execute_truenode_view_requests (
-      *treeid, tree, context . defmap, context . source_diffs,
-      &context . env . config, &context . env . driver,
-      context . errors, context . deleted_since_head_pid_src_map,
-      context . active_source_set )
-    . await ?; }
-  Ok (( )) }
-
-async fn ensure_hiddenin_cols_under_definitive_subscribees (
-  tree       : &mut Tree<ViewNode>,
-  context    : &CompletionContext<'_>,
-  true_nodes : &[NodeId],
-) -> Result<(), Box<dyn Error>> {
-  for treeid in true_nodes {
-    super::complete_postorder::truenode::
-    ensure_hiddenin_col_under_definitive_subscribee (
-      tree, *treeid, &context . env . config,
-      &context . env . driver ) . await ?; }
-  Ok (( )) }
-
-fn reconcile_alias_cols (
-  tree    : &mut Tree<ViewNode>,
-  context : &CompletionContext<'_>,
-) -> Result<(), Box<dyn Error>> {
-  let nodes : Vec<NodeId> =
-    collect_matching_nodeids (
-      tree, false,
-      |vn| matches! ( &vn . kind,
-        ViewNodeKind::QualCol (QualCol::Alias) )) ?;
-  for treeid in nodes {
-      super::complete_postorder::aliascol::
-      reconcile_alias_col_children (
-        tree, treeid, context . source_diffs, &context . env . config ) ?;
-  }
-  Ok (( )) }
-
-fn reconcile_id_cols (
-  tree    : &mut Tree<ViewNode>,
-  context : &CompletionContext<'_>,
-) -> Result<(), Box<dyn Error>> {
-  let nodes : Vec<NodeId> =
-    collect_matching_nodeids (
-      tree, false,
-      |vn| matches! ( &vn . kind,
-        ViewNodeKind::QualCol (QualCol::ID) )) ?;
-  for treeid in nodes {
-    super::complete_postorder::id_col::
-    reconcile_id_col_children (
-      treeid, tree, context . source_diffs,
-      &context . env . config ) ?; }
-  Ok (( )) }
-
-fn reconcile_hiddenin_cols (
-  tree    : &mut Tree<ViewNode>,
-  context : &CompletionContext<'_>,
-) -> Result<(), Box<dyn Error>> {
-  let nodes : Vec<NodeId> =
-    collect_matching_nodeids (
-      tree, false,
-      |vn| matches! ( &vn . kind,
-        ViewNodeKind::PartnerCol (RoleCol::HiddenInSubscribee) )) ?;
-  for treeid in nodes
-    { reconcile_hiddenin_subscribee_col_children (
-        treeid, tree, context . source_diffs, context . env,
-        context . deleted_since_head_pid_src_map ) ?; }
-  Ok (( )) }
-
-fn reconcile_hiddenoutside_cols (
-  tree    : &mut Tree<ViewNode>,
-  context : &CompletionContext<'_>,
-) -> Result<(), Box<dyn Error>> {
-  let nodes : Vec<NodeId> =
-    collect_matching_nodeids (
-      tree, false,
-      |vn| matches! ( &vn . kind,
-        ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee) )) ?;
-  for treeid in nodes
-    { reconcile_hiddenoutside_subscribee_col_children (
-        treeid, tree, context . source_diffs, context . env,
-        context . deleted_since_head_pid_src_map ) ?; }
-  Ok (( )) }
+        _ => None } ) ?;
+  if let Some ((pid, source)) = ready {
+    maybe_prepend_diff_view_scaffolds (
+      tree, treeid, context . source_diffs, &pid, &source ) ?; }
+  // Remaining view requests (Aliases / Containerward / Sourceward); the
+  // Definitive request was already consumed by apply_definitive_draw_rule.
+  super::complete_postorder::truenode::execute_truenode_view_requests (
+    treeid, tree, context . defmap, context . source_diffs,
+    &context . env . config, &context . env . driver,
+    context . errors, context . deleted_since_head_pid_src_map,
+    context . active_source_set ) . await ?;
+  // Ensure a definitive subscribee's HiddenInSubscribeeCol (was
+  // ensure_hiddenin_cols_under_definitive_subscribees); the BFS reconciles
+  // it on reaching it.
+  super::complete_postorder::truenode::ensure_hiddenin_col_under_definitive_subscribee (
+    tree, treeid, &context . env . config, &context . env . driver ) . await ?;
+  Ok(( )) }
 
 fn remove_empty_deleted_scaffolds (
   tree : &mut Tree<ViewNode>,
