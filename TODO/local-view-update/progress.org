@@ -568,3 +568,47 @@ rest are not drawn). Now a 10,000-subscriber col truncates at the budget like an
 other generation. The id/alias cols stay unbudgeted: they're bounded by a node's
 own id/alias count, which is small by construction. Details in the commit after
 this doc + plan_v2 §18.
+
+* 10. Acting on Jeff's §9 TODOs (2026-06-04, later session)
+You moved hey-jeff into §9 and left three TODO comments. Status + report below.
+** What's done and went well
+- *TODO #1 (phantom strip)* -- DONE, commit "strip every stale phantom, not just
+  content ones". =remove_branches_that_git_marked_removed= no longer reads
+  parentIs; any non-root phantom is stripped (childless -> deleted, with-children
+  -> demoted to DeadScaffold so a real subtree survives). See §9 inline note.
+- *TODO #2 (let go of both distinctions)* -- DONE, commit "a phantom is always
+  indefinitive and bodyless". =normal_to_phantom= now drops body/edit_request;
+  every phantom is indefinitive by construction. See §9 inline note.
+- Both validated: full Rust suite + 27 integration tests green at each commit.
+- Together #1 and #2 removed the two genuine reads (parentIs, indef_or_def) that
+  I'd said blocked the §11 DiffPhantom *payload* reduction. It is now UNBLOCKED.
+** Changes to the plan's envisioned order
+- #1 and #2 were not plan_v2 items; they are your TODOs, done first because they
+  are the behavioral core of "refactoring Phantom" and they gate §11.
+** What's imperfect about what's done
+- The forest-root guard in the strip survives (a phantom that is a *view root* is
+  not stripped, because the diff overlay regenerates content phantoms but never a
+  root, so stripping one would silently empty the view). This is the one
+  surviving relation-to-parent test. Easily reversed if you want roots stripped.
+** Choices determining the future -- the §11 type reduction (NEEDS YOUR CALL)
+Now that #1+#2 land, I investigated the actual scope of the §11 DiffPhantom
+*payload* reduction (=DiffPhantom(TrueNode)= -> =DiffPhantom(DiffPhantomNode)=).
+Findings:
+- It is COHERENT and doable. The data says a phantom needs exactly
+  ={id, source, title, existence, membership, not_in_git, graphStats}=. NOTE
+  graphStats IS rendered on phantoms (e.g. =(graphStats (containers 0))=), so it
+  stays. Everything else -- parentIs, birth, viewStats, view_requests, and the
+  whole =IndefOrDef= enum -- is invariant on a phantom and drops (5 fields).
+- It is LARGE and ZERO-behavior-change: needs a parallel slim =MpDiffPhantomNode=
+  for the parse side (parse_metadata_sexp builds =MpVognode::DiffPhantom(MpTruenode)=
+  the same way), render + parse + classify changes, and splitting ~60
+  =Normal(t) | DiffPhantom(t)= arms across ~22 files. It breaks the
+  =normal_or_phantom() -> &TrueNode= abstraction those arms lean on.
+- No oracle re-baseline: verified zero phantom test lines carry parentIs/birth/
+  viewStats/viewRequests, so the slim render is byte-identical. The one
+  =(editRequest delete)= on a phantom (validate_tree.rs) is a *parse* test of the
+  EditRequestOnIndefinitive rejection, which the reduction keeps.
+This is a hard-to-reverse, ~22-file refactor whose only payoff is type honesty
+(now that the behavior is already enforced by #1+#2). Per when-to-stop.org that
+is an "architectural decision," and its ordering vs TODO #3 is your priority
+call -- so I'm surfacing it rather than grinding it speculatively.
