@@ -1,0 +1,197 @@
+#+TITLE: The phase-2+4 monolith: unified single-visit BFS driver
+#+STARTUP: content
+
+This is the working design for the "monolith" step of plan_v2.org: fuse the
+phase-2 BFS conversion with the §5.3 DVR cascade and §5.5 node limit. It records
+the decisions and (importantly) the *insight that lets the pieces separate
+cleanly*, so the implementation is lower-risk than "rewrite everything at once".
+
+See plan_v2.org for the spec; this is the how. Branch =local-view-updates=.
+
+* 1. Why it is one step (the double-processing insight)
+Today =complete_viewforest= runs fixed passes: (1) DFS-preorder content
+expansion, ... (5) postorder view-requests [DVRs], ... (7-10) per-col reconcile
+sweeps. Each node is touched once per pass.
+
+A single level-order BFS that runs *both* content-reconcile *and* view-requests
+at each Normal node's visit would **double-process** any subtree that a DVR
+self-expands: =extendDefinitiveSubtreeFromLeaf= creates a whole definitive
+content subtree at the DVR node's visit; the main BFS then visits each of those
+new nodes and re-runs content expansion on them. At that re-visit
+=make_indef_if_repeat_then_extend_defmap= sees the node's pid *already in the
+map (pointing at itself)* and wrongly marks it indefinitive. So you cannot merge
+the passes while DVRs self-expand.
+
+The §5.3 cascade dissolves this: a Final (DVR-made) node does **not** self-expand.
+It hands a DVR to each of its Normal content children (literally attaches
+=ViewRequest::Definitive=), creating only the *immediate* children; the main BFS
+then visits each child, which runs the DVR draw rule and in turn hands DVRs to
+*its* children. Each node is drawn exactly once. That is why BFS + cascade are
+inseparable, and why the node limit (now governing in-BFS content creation) comes
+along.
+
+* 2. What actually stays simple (scope relief)
+- *The ordinary (Tentative) content path was already single-visit.* Today's
+  pass-1 DFS-preorder visits each content node once and expands one level;
+  map registration is at *visit* time (=make_indef_if_repeat=), not creation
+  time. Converting that recursion DFS->BFS and merging the col/view-request
+  passes into the visit is safe *given the Finalizable draw rule is already in*
+  (commit fb7786b). Only DVR *resolution* order was the hazard, and the draw
+  rule (defer-to-Final / clobber-Tentative, order-independent) handles it.
+- *The cascade reuses the existing DVR machinery.* "Hand a DVR to a content
+  child" = attach =ViewRequest::Definitive= to it. The child's visit runs the
+  *existing* =execute_definitive_view_request= draw rule
+  (=to_org/expand/definitive.rs=). We only stop calling
+  =extendDefinitiveSubtreeFromLeaf= (the self-expansion); the immediate children
+  are drawn by the normal content-draw, tagged with a cascade DVR.
+- *The removed-node git expansion stays as-is for now.*
+  =extendDefinitiveSubtree_fromGit= self-expands *diff-phantoms*; phantom visits
+  are no-ops in the ordinary BFS (§6.3, owned by the diff overlay), so it does
+  *not* double-process. Keep it on the removed-node DVR branch until the phase-5
+  diff overlay. Only =extendDefinitiveSubtreeFromLeaf= is replaced.
+- *The per-col reconcilers are reused verbatim* (subscribee_col, relation_col,
+  alias/id/hiddenin/hiddenout). The BFS just calls them at each col's own visit
+  instead of in a dedicated sweep. They already read ancestors/graph and create
+  their own children; BFS reaches a col after its Normal parent created it.
+
+* 3. The driver
+#+begin_src
+complete_viewforest(forest, ctx):
+  scaffolds_with_deadOrDeleted_parents_become_dead(forest)          // pre-pass, keep
+  ctx.node_budget = config.initial_node_limit                       // §5.5 one counter
+  bfs_level_order(forest, ctx)                                      // the new core
+  scaffolds_with_deadOrDeleted_parents_become_dead(forest)          // keep (dead subtrees)
+  remove_empty_deleted_scaffolds(forest)                           // prune sweep (phase-3 generalizes)
+
+bfs_level_order:
+  queue := [ children of BufferRoot ]            // FIFO
+  while queue nonempty:
+    n := queue.pop_front()
+    visit(n, ctx)                                // may append children to n
+    queue.extend( current children of n, in order )   // includes new ones
+#+end_src
+Level-order with a FIFO is what makes §5.5 (BFS-order budget) correct; a DFS
+would truncate the wrong nodes.
+
+* 4. visit(n) dispatch on (kind, parent-kind)
+- =Vognode::Normal=, parent is =PartnerCol(Subscribee)=, parentIs=Affected
+    -> =visit_subscribee_as_such= (§6.1; separate updater)
+- =Vognode::Normal=, else                     -> =visit_normal=
+- =PartnerCol(Subscribee)=                     -> =reconcile_subscribee_col_children= (async)
+- =PartnerCol(relation role)=                  -> =reconcile_relation_col_children= (sync)
+- =PartnerCol(HiddenInSubscribee)=             -> =reconcile_hiddenin_subscribee_col_children= (sync)
+- =PartnerCol(HiddenOutsideOfSubscribee)=      -> =reconcile_hiddenoutside_subscribee_col_children= (sync)
+- =QualCol(Alias)=                             -> =reconcile_alias_col_children= (sync)
+- =QualCol(ID)=                                -> =reconcile_id_col_children= (sync)
+- =Unknown / Deleted / DeadScaffold / Qual / DiffPhantom / BufferRoot= -> no-op
+  (the prune sweep and the phase-5 diff overlay handle these)
+
+* 5. visit_normal(n)  (merges expand_true_content_at_truenode + diff scaffolds +
+  view-requests + ensure_hiddenin)
+1. resolve (pid, source); =set_diff_status=.
+2. *Draw-rule / Finalizable resolution* for n's own id:
+   - if n carries =ViewRequest::Definitive= (a user DVR *or* a cascade DVR):
+       run the existing DVR draw rule (=execute_definitive_view_request= logic):
+       defer-to-Final (drop DVR, stay indefinitive, recurse existing children,
+       return) | clobber prior Tentative (indefinitize old subtree) | mark
+       Final, register map, clear the DVR, resync title/body.
+       Set =cascade := true=.
+   - else if n is Definitive (ordinary/Tentative):
+       =make_indef_if_repeat_then_extend_defmap= -- if pid already in map, this
+       becomes indefinitive (defer); clobber + recurse existing children;
+       return. Else register Tentative. Set =cascade := false=.
+   - else (indefinitive): =clobberIndefinitiveViewnode=; recurse existing
+     children; return. (No content, no scaffolds; §6.2.)
+3. if =deleted_by_this_save_pids.contains(pid)=: mutate to =Deleted=; return.
+4. =clear_edit_request=; resync title/body/source from snapshot (§6.1: saved
+   *and* collateral; =should_sync_from_disk_even_though_definitive= goes away --
+   but for the behavior-preserving first cut, keep the saved-view carve-out and
+   remove it as a tracked §16/§6.1 follow-up to keep the diff small).
+5. *Draw content children* (=draw_content(n, cascade)=):
+   - if n is the removed-node DVR case (file absent from worktree): keep
+     =extendDefinitiveSubtree_fromGit= (phantoms; no double-process). [DVR only]
+   - else: compute =content_goal_list= (diff-aware, subscribee-aware);
+     =complete_content_children= as today (creates Tentative-definitive /
+     phantom / inactive immediate children); **if cascade**, attach
+     =ViewRequest::Definitive= to each affected content child (new or existing
+     non-Final) so the BFS draws it Final. Each *new* node decrements
+     =ctx.node_budget=; on exhaustion: create no more, strip remaining DVRs,
+     leave the rest indefinitive (§5.5).
+   - =mark_erroneous_content_children_as_indep=;
+     =order_children_as_scaffolds_then_ignored_then_content=.
+6. *Other view-requests* (definitive nodes): run =Aliases= (creates AliasCol),
+   =Containerward=/=Sourceward= (=to_org/expand/{aliases,backpath}.rs=), then
+   clear them. BFS reaches the newly-created cols afterward.
+7. =maybe_prepend_diff_view_scaffolds= (TextChanged / IDCol / AliasCol) for
+   definitive non-phantom nodes (inline until phase-5 overlay).
+8. if n is a *definitive subscribee* (parent SubscribeeCol): ensure its
+   =HiddenInSubscribeeCol= exists (=maybe_add_hiddenInSubscribeeCol_branch=);
+   BFS reaches and reconciles it. (Replaces the
+   =ensure_hiddenin_cols_under_definitive_subscribees= sweep + the duplicate
+   call in the old DVR path, §6.9.)
+
+* 6. visit_subscribee_as_such(n) (§6.1)
+parent is SubscribeeCol, parentIs=Affected.
+- indefinitive: title/body only (clobber); recurse existing children.
+- definitive: content = subscribee.contains MINUS subscriber.hides (the existing
+  =content_goal_list= subscribee branch already computes this); reconcile as a
+  list. Stale children (now-hidden or dropped): §6.0 (phase-3) -- for the first
+  cut keep today's behavior. Ensure HiddenInSubscribeeCol (step 8 above).
+NOTE: today this is handled inside =expand_true_content_at_truenode= via
+=should_preserve_saved_as_subscribee_branch= / =correct_the_viewChildren_of_subscribee=.
+The separate updater just makes the dispatch explicit; reuse those helpers.
+
+* 7. Node limit (§5.5)
+One =&mut usize= (or =node_budget: usize=) field on =CompletionContext=,
+initialized once per buffer to =config.initial_node_limit=, decremented on every
+new ViewNode created in =draw_content= and in the col reconcilers' child
+creation. Replaces both =extendDefinitiveSubtreeFromLeaf='s internal limit and
+=render_initial_viewforest_bfs='s per-buffer limit (the de-novo unification is
+phase 8; for now just thread the counter through the post-save BFS). On
+exhaustion: stop creating, strip remaining DVRs, render remaining siblings
+indefinitive. *Diff overlay is exempt* (phase 5).
+
+* 8. Old -> new mapping (what each old pass becomes)
+| old (complete.rs)                              | new                                  |
+|------------------------------------------------+--------------------------------------|
+| scaffolds_with_deadOrDeleted_parents_become_dead | kept as pre/inter pass             |
+| expand_true_content_until_stable (DFS pre)     | bfs_level_order + visit_normal step 5 |
+| ensure_diff_scaffolds                          | visit_normal step 7                  |
+| execute_truenode_view_requests (postorder)     | visit_normal steps 2,5,6 (in-visit)  |
+| ensure_hiddenin_cols_under_def_subscribees     | visit_normal step 8                  |
+| reconcile_alias_cols / id / hiddenin / hiddenout | col visits (§4 dispatch)           |
+| remove_empty_deleted_scaffolds                 | kept as post pass                    |
+| extendDefinitiveSubtreeFromLeaf                | REPLACED by cascade DVRs (step 5)    |
+| extendDefinitiveSubtree_fromGit                | kept (removed-node DVR branch)       |
+
+* 9. Risks / things to watch
+- *Map registration timing.* Ordinary children are registered at *visit*
+  (make_indef_if_repeat), DVR children at the DVR draw rule. Must ensure a
+  cascade DVR child is not *also* double-registered by a Tentative path. Since a
+  cascade child carries =ViewRequest::Definitive=, its visit takes the DVR
+  branch, not the Tentative branch -- mutually exclusive by step 2's ordering
+  (check DVR first). Verify.
+- *Indefinitize-old subtree* on a clobber must remove the old keys from the map
+  (=indefinitize_content_subtree= already does). With BFS the "old" occurrence
+  may not yet be visited; clobbering an *unvisited* Tentative node is fine (it
+  was registered at *creation*? no -- ordinary nodes register at visit, so an
+  unvisited Tentative isn't in the map yet, so there is nothing to clobber, and
+  the DVR simply wins; the later ordinary visit then defers to Final). Consistent.
+- *order_children* must run after both content and scaffold creation so the
+  scaffolds-first/independent/affected order holds.
+- The =should_preserve_saved_as_subscribee_branch= carve-out and the saved-view
+  =sync= carve-out are §6.1 behavior the plan *removes*; keep them in the first
+  cut to minimize the behavior delta, then remove as tracked follow-ups.
+- Idempotence test (§15) is the acceptance check: run twice, assert no diff.
+
+* 10. Staging (green commits)
+M1. Add =node_budget= to CompletionContext (threaded, not yet enforced) + the
+    new =complete.rs= driver skeleton (bfs_level_order + dispatch) that
+    reproduces today's behavior by calling the existing reconcilers in-visit,
+    keeping DVR self-expansion for now BUT guarding against the double-process
+    (skip content-reconcile for nodes already Final-in-map pointing at self).
+    -- Actually M1 may not be cleanly green without the cascade; if so, fold
+    into M2. Decide during implementation.
+M2. Replace =extendDefinitiveSubtreeFromLeaf= with cascade DVRs; enforce the
+    node budget. This is the load-bearing commit.
+M3 (phase 3, separable): §6.0 unified stale handling.

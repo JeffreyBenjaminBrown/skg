@@ -924,3 +924,25 @@ Branch =local-view-updates=.
   (Today's driver keeps content-expansion as a DFS-preorder pass and
   view-requests/col-reconciles as later passes precisely to sidestep the order
   problem; doing 4 first is what lets phase 2 merge them safely.)
+** Phase-2+4 monolith design settled (see [[./monolith-design.org]]). Refinements
+  to the above, found by reading the driver + DVR core + reconcilers end-to-end:
+  (1) The pieces are *inseparable* for a concrete reason: a single-visit BFS that
+  runs content-reconcile AND view-requests at each Normal visit would
+  double-process any subtree a DVR self-expands -- the re-visit's
+  =make_indef_if_repeat= would indefinitize a node against its own map entry. The
+  §5.3 cascade dissolves this by making a Final node hand DVRs to its immediate
+  content children (no self-expansion); the BFS draws each node once.
+  (2) The cascade *reuses the existing DVR machinery*: "hand a DVR to a child" =
+  attach =ViewRequest::Definitive= to it; the child's visit runs the existing
+  =execute_definitive_view_request= draw rule and cascades onward. Only
+  =extendDefinitiveSubtreeFromLeaf= (normal-content self-expansion) is replaced.
+  (3) =extendDefinitiveSubtree_fromGit= (removed-node -> diff-phantom expansion)
+  is *kept* on the removed-node DVR branch -- phantom visits are no-ops in the
+  ordinary BFS, so it does not double-process; it becomes diff-overlay (phase 5)
+  later. (4) The ordinary (Tentative) content path was *already* single-visit
+  per node; only its DFS->BFS reorder changes duplicate-ID dedup order, which is
+  the *intended* BFS order the draw rule makes safe -- so there is no
+  behavior-preserving smaller increment, and existing dedup-order tests may need
+  updates when the BFS lands. Staging: M2 = driver-as-BFS + cascade + node
+  budget together (one large commit); M3 = §6.0 stale handling (phase 3,
+  separable). Baseline build green at fb7786b before this effort.

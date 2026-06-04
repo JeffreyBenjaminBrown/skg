@@ -20,10 +20,8 @@ use super::complete_preorder::subscribee_col::reconcile_subscribee_col_children;
 use super::complete_preorder::truenode::{ expand_true_content_at_truenode, maybe_prepend_diff_view_scaffolds};
 
 use ego_tree::{Tree, NodeId};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::error::Error;
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
 
 pub(super) struct CompletionContext<'a> {
@@ -95,24 +93,36 @@ fn scaffolds_with_deadOrDeleted_parents_become_dead (
       Ok (( )) } )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) }
 
-/// Parent-first content expansion. This remains a narrow manual async
-/// recursion because a parent can insert content or subscribee children
-/// that must be completed before later passes run.
-fn expand_true_content_until_stable<'a> (
-  tree    : &'a mut Tree<ViewNode>,
-  treeid  : NodeId,
-  context : &'a mut CompletionContext<'_>,
-) -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>> + 'a>> {
-  Box::pin ( async move {
+/// Parent-first content expansion, in *level order* (BFS).
+///
+/// This is the first step of the plan_v2 §3 driver: a single top-down
+/// level-order traversal in which each node, when visited, may create
+/// view-descendants (content children, subscribee/relation members) that
+/// are then visited later in the same traversal. A FIFO queue (rather than
+/// the previous DFS-preorder recursion) is what makes the §5.5 node-limit
+/// and §5.2 draw-rule semantics order-correct: the first occurrence of a
+/// duplicate id reached in BFS order -- not in depth-first order -- is the
+/// one that wins. The Finalizable draw rule (commit fb7786b) makes this
+/// reorder safe (plan_v2 §18). A node's expansion depends only on its
+/// ancestors and the graph, never on siblings or descendants, so it can be
+/// processed the moment it is dequeued.
+async fn expand_true_content_until_stable (
+  tree     : &mut Tree<ViewNode>,
+  root_treeid : NodeId,
+  context  : &mut CompletionContext<'_>,
+) -> Result<(), Box<dyn Error>> {
+  let mut queue : VecDeque<NodeId> = VecDeque::new ();
+  queue . push_back (root_treeid);
+  while let Some (treeid) = queue . pop_front () {
     expand_true_content_at_node (tree, treeid, context) . await ?;
-    { // Recursion boilerplate. See 'MANUAL RECURSION' comment at top of file.
-      let child_treeids : Vec<NodeId> =
-        tree . get (treeid) . unwrap ()
-        . children () . map ( |c| c . id () ) . collect ();
-      for child_treeid in child_treeids {
-        expand_true_content_until_stable (
-          tree, child_treeid, context ) . await ?; }}
-    Ok(( )) }) }
+    // Enqueue the node's *current* children -- including any this visit
+    // just created -- so they are completed after every node already in
+    // their level. (See 'MANUAL RECURSION' comment at top of file: the
+    // dispatch is async, so we hand-roll the traversal.)
+    if let Some (node) = tree . get (treeid) {
+      for child in node . children () {
+        queue . push_back (child . id ()); }}}
+  Ok(( )) }
 
 async fn expand_true_content_at_node (
   tree    : &mut Tree<ViewNode>,
