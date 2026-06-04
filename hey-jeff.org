@@ -147,7 +147,9 @@ NOT orphan-checked, so if its SubscribeeCol parent vanished, nothing deadens the
 member via this path (other mechanisms -- the prune sweep, ParentIs demotion --
 handle it instead). If you want "generalized orphan" to cover col-member vognodes
 too, that's a real extension; say the word and I'll scope it.
-
+***** TODO I guess we can leave it that way.
+But we need to be sure that any non-dead generalized orphan
+has its ParentIs set to Independent.
 ** BFS / the driver / complete_viewforest
 =complete_viewforest= is THE function that completes the whole view. It walks the
 tree in LEVEL-ORDER (breadth-first: all depth-1 nodes, then all depth-2, ...).
@@ -280,6 +282,28 @@ they'd deaden instead. Whether that's a real output difference depends on (a)
 whether a removed node should keep its cols at all -- arguably it shouldn't, it's
 gone -- and (b) whether any fixture exercises a flipped-with-cols node. That is
 precisely what Option B's GIT_DIFF_VIEW oracle run would settle.
+***** DONE ah. let's deaden them earlier, in the local BFS update
+rather than the cleanup sweep that follows it.
+But the phantom does not need to do that during its own update;
+instead, there should be a generalized orphan check run by each col,
+which then deadens itself if appropriate.
+
+****** exactly right -- and that mechanism already exists
+This is precisely how the BFS works today. The dispatch in
+=expand_true_content_at_node= already runs, for EVERY col at its own visit,
+=if is_col_kind && col_is_generalized_orphan { deaden_generalized_orphan_col }=
+-- during the local BFS update, not in a later sweep. The phantom does nothing to
+its cols; each col self-checks and self-deadens when its required ancestor (now a
+phantom) fails =matches_expected=. So your resolution needs NO new mechanism. It
+also resolves the only B wrinkle: with the flip done at N's visit (level k), N's
+cols (level k+1) self-deaden when the BFS reaches them. The orphan check requires
+a =NormalVognode= ancestor, and a phantom isn't one, so they deaden -- which is
+the correct outcome (a removed node should not show its cols).
+The only consequence is that any oracle fixture which currently shows cols UNDER a
+flipped phantom (because today's overlay flips after completion, keeping them)
+re-baselines to NOT show them. That's a deliberate bugfix, not a regression -- I'll
+inspect each re-baseline to confirm it's exactly "removed node's cols vanished."
+With this, B is fully de-risked in design. Proceeding with B.
 **** net: your push makes Option B more attractive
 Combined with the #1 finding (a local col reconciler would compute its member's M
 axis against the right relation, which the centralized overlay gets wrong), your
@@ -308,9 +332,13 @@ FINAL STEP INSIDE =complete_viewforest=, instead of being called separately by
   inside the driver rather than after it. §9's safety is preserved.
 - Risk: LOW. The diff logic itself is unchanged and oracle-validated; only its
   call site moves.
-- Honest caveat: the diff is still a distinct traversal, now nested inside the
-  driver. It's "local" in the sense of "one entry point owns it," not in the
-  sense of "computed at each node's first visit."
+- Honest caveat (you caught this): A is a SECOND FULL TRAVERSAL of the entire
+  tree -- =apply_diff_to_viewforest= is =do_everywhere_in_tree_dfs= over the whole
+  forest. Nesting it inside the driver only changes WHO invokes that second
+  whole-tree sweep; node N's diff is still computed in a separate pass, not when
+  the BFS first reaches N. So A is NOT actually "local" in any meaningful sense --
+  it's cosmetic relocation, and it does not deliver the #3 goal. I mis-framed it
+  as a real contender; it isn't.
 
 ** Option B -- true per-node inline
 Genuinely compute each node's diff at that node's FIRST visit during the BFS:
@@ -318,13 +346,16 @@ flip it to a phantom, emit its scaffolds, insert its phantom children, right
 there. Delete the overlay.
 - What changes for a reader: the most "local" outcome -- a node's worktree state
   and its diff are handled together, in one place, as the BFS reaches it.
-- Hazard: PRESENT. This is exactly the phantom-during-completion case. It MIGHT
-  be harmless (a removed node's cols deaden anyway), but I can't promise that
-  without building it and watching the oracle.
-- Risk: HIGH. Plan: build it, run the GIT_DIFF_VIEW oracle + integration tests.
-  If byte-identical green, you get the purest "local" and we keep it. If it
-  breaks in ways I can't cleanly fix, I stop and report it as a stumper (no
-  half-broken state committed).
+- Hazard: RESOLVED (see the #5 thread above). The flip happens at N's visit; N's
+  cols self-deaden via the existing per-col generalized-orphan check when the BFS
+  reaches them -- which is correct (a removed node's cols should vanish). No new
+  mechanism needed; the phantom does nothing to its cols.
+- Risk: MODERATE, mostly execution. Plan: build it, run the GIT_DIFF_VIEW oracle +
+  integration tests. Expect SOME fixtures to re-baseline (cols no longer shown
+  under a flipped phantom) -- I'll inspect each to confirm it's the intended
+  bugfix, not a regression. If something genuinely can't be made correct, I stop
+  and report it as a stumper (no half-broken state committed).
+- THIS IS THE CHOSEN OPTION (per your #5-thread direction). Proceeding.
 
 ** Option C -- defer #3
 Leave today's overlay as-is. Everything higher-priority (#1 phantom strip, #2
