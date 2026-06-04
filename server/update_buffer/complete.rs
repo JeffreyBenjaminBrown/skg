@@ -60,7 +60,7 @@ pub(super) async fn complete_viewforest (
   expand_true_content_until_stable (
     viewforest, root_treeid, context ) . await ?;
   scaffolds_with_deadOrDeleted_parents_become_dead (viewforest) ?;
-  remove_empty_deleted_scaffolds (viewforest) ?;
+  remove_empty_dead_and_deleted (viewforest) ?;
   Ok(( )) }
 
 /// Convert to DeletedScaff every scaffold node
@@ -264,20 +264,39 @@ async fn visit_normal_node (
     tree, treeid, &context . env . config, &context . env . driver ) . await ?;
   Ok(( )) }
 
-fn remove_empty_deleted_scaffolds (
+/// The §3.4 postorder prune sweep. Removes, bottom-up:
+/// - a childless `DeadScaffold` (a deadened col whose members all died), and
+/// - a childless `Vognode::Deleted` (§6.6: a node deleted by this save whose
+///   cols generalized-orphaned, deadened, and pruned, leaving nothing behind).
+/// A Deleted node that *kept* a user subtree (e.g. a demoted-Independent
+/// survivor) is retained, as is a Deleted *view root* -- the user should still
+/// see that their root was deleted, so a childless root is never removed.
+/// Postorder so a `Dead -> Deleted` (or `Dead -> Dead`) chain collapses
+/// completely in one pass: a parent emptied by the removal of its last child
+/// is itself removed.
+fn remove_empty_dead_and_deleted (
   tree : &mut Tree<ViewNode>,
 ) -> Result<(), Box<dyn Error>> {
   let nodes : Vec<NodeId> =
     collect_matching_nodeids (
       tree, false,
       |vn| matches! ( &vn . kind,
-        ViewNodeKind::DeadScaffold )) ?;
+        ViewNodeKind::DeadScaffold |
+        ViewNodeKind::Vognode (Vognode::Deleted (_)) )) ?;
   for treeid in nodes {
+    let node = match tree . get (treeid) {
+      Some (node) => node,
+      None => continue };
     let has_children : bool =
-      match tree . get (treeid) {
-        Some (node) => node . children () . next () . is_some (),
-        None => continue };
-    if ! has_children {
+      node . children () . next () . is_some ();
+    // Never prune a view root (child of the invisible BufferRoot): removing it
+    // would silently drop the user's whole view of that root.
+    let parent_is_buffer_root : bool =
+      node . parent ()
+      . map ( |p| matches! ( &p . value () . kind,
+                             ViewNodeKind::BufferRoot ) )
+      . unwrap_or (false);
+    if ! has_children && ! parent_is_buffer_root {
       tree . get_mut (treeid) . unwrap () . detach (); }
   }
   Ok (( )) }
