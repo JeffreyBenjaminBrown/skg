@@ -2,7 +2,8 @@ use crate::dbs::filesystem::one_node::fetch_aliases_from_file;
 use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
 use crate::types::git::MembershipAxes;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::viewnode::{ViewNode, ViewRequest, Scaffold};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest};
+use crate::types::viewnode::{QualCol, Qual};
 use crate::types::tree::viewnode_nodecomplete::{
   insert_scaffold_as_child, unique_scaffold_child_of_viewnode};
 
@@ -26,7 +27,7 @@ pub async fn build_and_integrate_aliases_view_then_drop_request (
     "Failed to integrate aliases view",
     errors, result ) }
 
-/// Integrate an AliasCol child and, under it, Alias grandchildren
+/// Integrate an AliasCol child with its Alias grandchildren
 /// into the ViewNode tree containing the target node.
 ///
 /// PITFALL: This function fetches aliases from disk and
@@ -47,7 +48,8 @@ pub async fn build_and_integrate_aliases (
   let node_id_val : ID =
     get_id_from_treenode ( tree, node_id ) ?;
   if unique_scaffold_child_of_viewnode (
-    tree, node_id, &Scaffold::AliasCol )? . is_some ()
+    tree, node_id,
+    &ViewNodeKind::QualCol (QualCol::Alias) )? . is_some ()
   { // If it already has an AliasCol child,
     // then reconcile_alias_col_children (in update_buffer) already handled it.
     return Ok (( )); }
@@ -56,11 +58,12 @@ pub async fn build_and_integrate_aliases (
       config, driver, node_id_val ) . await;
   let aliascol_id : ego_tree::NodeId =
     insert_scaffold_as_child ( tree, node_id,
-      Scaffold::AliasCol, true ) ?;
+      ViewNodeKind::QualCol (QualCol::Alias), true ) ?;
   for alias in & aliases {
     insert_scaffold_as_child (
       tree, aliascol_id,
-      Scaffold::Alias { text: alias . clone (),
-                        membership: MembershipAxes::default () },
+      ViewNodeKind::Qual (
+        Qual::Alias { text: alias . clone (),
+                      membership: MembershipAxes::default () } ),
       false ) ?; }
   Ok (( )) }

@@ -62,6 +62,11 @@ and for Emacs to let the user know how to interpret it.
 
 ## mk = make / create
 
+## mp = maybe-placed
+
+A viewnode that might have an ID and source,
+but might not, is maybe-placed.
+
 ## "subscribee as such"
 
 In Skg some nodes are "subscribers", which "subscribe" to "subscribees".
@@ -82,6 +87,41 @@ They are not just subscribees, but they are being shown *as* subscribees.
 This changes the way edits are interpreted:
 Edits to a "subscribee as such" can only affect
 what the relevant subscriber hides, nothing else.
+
+## read-only set
+
+A read-only set is a generated collection whose membership follows
+from graph facts rather than direct edits to that collection.  A view
+may preserve an order for the set locally, but adding or removing an
+item in the generated collection does not add or remove the underlying
+graph membership fact.  If a user labels a nonmember inside such a set,
+the save treats that item as independent of the generated membership.
+If completion discovers that a real member is missing from the view, it
+restores that member.
+
+For instance, if nodes R and T subscribe to nodes N, the user might land
+at a view like the following:
+```
+  * N
+  ** subscriberCol
+  *** R
+  *** T
+```
+The subscriberCol ("collection of subscribees") is a read-only set.
+Thus the user could flip the order of R and T in the subscribeeCol,
+and this change would be respected in the display, but have no effect
+in the graph. The user could insert X under subscriberCol,
+but because it is a read-only set, X will have its parentIs field
+rewritten to 'Independent', and have no effect on N.
+(If the user wants X to subscribe to N, they must modify X, not N.)
+The user could delete R, but it will respawn as soon as they save,
+because, again, the subscriberCol is a read-only set.
+
+## scaffold
+
+A view of a graph consists of viewnodes.
+Some of these correspond to individual graphnodes.
+The rest are "scaffolds".
 
 ## title != headline
 

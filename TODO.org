@@ -1,6 +1,46 @@
-* DONE ? [[./TODO/source-sets.org]]
+* DiffPhantom should carry less data
+no view requests, parentIs, birth, indef_or_def
+* each new root view sohuld be drawn with a link sources ancestry
+that is, linksource-ancestry as view-descendents
+* more diff supplement data
+containers before and after
+heralds (alias action, etc.)
+* must (?) stage them separately, but commit all repos at once
+* command to reverse the [where I learned it] contains [it] link
+One can then easily place the source under a branch named 'source'.
+* the link stack should not be expected to be cleared
+Someone can if they find a way to use it.
+They might never use it.
+It's cheap.
+* text search across containment paths
+* Bug ? Saving doesn't regenerate heralds if there were no changes?
+* ONGOING [[./TODO/local-view-update/plan-critique.org]]
+claude --resume afa9f264-86a1-475f-9fae-203731cd28a1
+* u
+** the diff report should
+*** explain the maximum badness in each category
+*** include empty top-level categories
+so a reader can remember what those categories are,
+and thus (e.g.) that nothing was orphaned.
+** bugfix : strip last empty line from buffer on save
+Or strip pure-whitespace bodies.
+** bug : graphnodestats are not recalculated in collateral buffers
+** goto in magit should work on raw IDs too
+* [[./TODO/better-than-regex-in-emacs-tests.org]]
+* suppressed container count rule for subscribees-as-such is wrong
+It suppresses 1, should suppress 0.
+Maybe simplify the rule: always suppress 1 and nothing else.
+* ? replace ViewNode with (Vnode_Viewstate, Vnode)
+where Vnode is the new name of what was ViewNodeKind.
+* ParentIs, Birth and maybe other things are vestigial for Phantoms
+* autoload elisp/skg-view-org-ancestry.el
+* PAUSED [[./TODO/full-schema]]
+codex resume 019e64c9-1ff6-75a3-91c5-2c54b644440b
+* DONE ? [[./TODO/source-sets/]]
 Seems to work.
 * [[./TODO/incremental-init-might-be-broken.org]]
+* return point to not just the same line but the same* char
+  * or max within that line if too big)
 * Need text search across paths.
 * critical
 ** I can't demo without privacy mode.
@@ -47,11 +87,10 @@ That was so that M-? would
 not interpret comments as search hits.
 * easy
 ** beep also once the db has rebuilt
-** rename shutdown->stop server
 ** remap C-c C-o during Skg
 in skg buffers
 ** show the herald it is responsible for next to each field in the metadata
-** ? request containerward paths, excluding the view-rootward one
+** ? request containerward paths *excluding* the view-rootward one
 ** IDs should not be writeable in the metadata view
 And what about extra-ids?
 ** Is it a misfeature to let config_path differ from data_root?

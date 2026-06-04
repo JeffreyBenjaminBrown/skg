@@ -193,7 +193,7 @@ fn is_backward_relationship_role (
 ) -> bool {
   matches! (
     role,
-    "container" | "subscribee" | "hidden" | "replaced" | "dest" )
+    "container" | "subscribee" | "hidden" | "overridden" | "dest" )
 }
 
 fn render_contained_list_diff (

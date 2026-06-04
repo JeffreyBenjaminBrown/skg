@@ -3,7 +3,7 @@ use crate::serve::util::{
   value_from_request_sexp,
   send_response_with_length_prefix,
   tag_text_response};
-use crate::source_sets::ActiveSourceSet;
+use crate::source_sets::{ActiveSourceSet, SourceSetName};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::util::path_from_pid_and_source;
 
@@ -21,7 +21,7 @@ pub fn handle_get_file_path_request (
   let active : ActiveSourceSet =
     ActiveSourceSet::named (
       config,
-      crate::source_sets::SourceSetName::from ("all"))
+      SourceSetName::from ("all"))
     . expect ("reserved source-set all should always resolve");
   handle_get_file_path_request_with_source_set (
     stream, request, config, &active ) }

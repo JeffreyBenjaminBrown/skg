@@ -5,7 +5,7 @@
 (require 'skg-log)
 (require 'skg-length-prefix)
 (require 'skg-buffer)
-(require 'skg-request-save) ; For skg-show-save-errors and skg-show-save-warnings
+(require 'skg-request-save) ; For message formatting/display helpers
 
 (defun skg-request-single-root-content-view-from-id (node-id &optional tcp-proc)
   "Ask Rust for an single root content view view of NODE-ID.
@@ -33,7 +33,8 @@ Optional TCP-PROC allows reusing an existing connection."
     (process-send-string tcp-proc request-s-exp)) )
 
 (defun skg-handle-content-view-sexp (tcp-proc sexp-string view-uri)
-  "Parse and handle content view response s-exp: ((content ...) (errors ...)).
+  "Parse and handle content view response s-exp.
+Expected shape: ((content ...) (errors ...) (warnings ...)).
 If the server returns ((switch-to-view URI)) instead, switch to the
 existing buffer for that view rather than opening a new one.
 VIEW-URI is the pre-generated UUID to assign to the new buffer."
@@ -52,18 +53,28 @@ VIEW-URI is the pre-generated UUID to assign to the new buffer."
           ;; Normal content view response.
           (let* ((content-value (cadr (assoc 'content response)))
                  (errors-list (cadr (assoc 'errors response)))
+                 (warnings-list (cadr (assoc 'warnings response)))
+                 (has-errors (skg--message-list-nonempty-p errors-list))
+                 (has-warnings (skg--message-list-nonempty-p warnings-list))
                  (has-content (and content-value
-                                   (not (string-empty-p content-value)))))
+                                   (not (string= content-value "")))))
             (when has-content
               (let ((buf-name (skg-content-view-buffer-name
                                content-value)))
                 (skg-open-org-buffer-from-text
                  tcp-proc content-value buf-name view-uri)))
-            (when (and errors-list (not (equal errors-list nil)))
-              (let ((errors-text (skg-errors-to-org-string errors-list)))
-                (if has-content
-                    (skg-show-save-warnings errors-text)
-                  (skg-show-save-errors errors-text)))))))
+            (when (or has-errors has-warnings)
+              (skg-big-nonfatal-message
+               "*SKG Content View Messages*"
+               (cond
+                ((and has-errors has-warnings)
+                 "Content view reported errors and warnings")
+                (has-errors
+                 "Content view failed")
+                (t
+                 "Content view completed with warnings"))
+               (skg-errors-and-warnings-to-org-string
+                errors-list warnings-list))))))
     (error
      (message "skg content view error: %S" err)
      (skg-log 'error 'view "parsing content view response: %S" err)

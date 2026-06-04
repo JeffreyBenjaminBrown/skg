@@ -343,16 +343,16 @@ Async recursive function (Pin<Box<dyn Future>> pattern,
 same as 'integrate_linear_portion_of_path' at line 156).
 
 For each AncestryTree node:
-- call the existing 'prepend_indefinitive_child' with Birth::ContainerOf
+- call the existing 'prepend_indef_indep_child' with Birth::ContainerOf
 - if Inner (i.e. this container itself has containers),
   recurse for each of its containers
 
-Reuses 'prepend_indefinitive_child' (backpath.rs line 238),
+Reuses 'prepend_indef_indep_child' (backpath.rs line 238),
 which already handles fetching the SkgNode via TypeDB and
 creating an indefinitive ViewNode with the given Birth.
 
 The containers are iterated in reverse order.
-Since 'prepend_indefinitive_child' prepends
+Since 'prepend_indef_indep_child' prepends
 (inserts at the front of the sibling list),
 reversing the iteration preserves the original order.
 

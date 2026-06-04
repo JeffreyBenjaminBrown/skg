@@ -1,19 +1,27 @@
 ;;; Shared helpers for save_collateral integration tests.
 ;;; Load with (load-file "path/to/test-helpers.el").
 
-(defun headline--parentIs-from-sexp (sexp)
-  "Read the (parentIs X) clause from a parsed metadata SEXP, defaulting
-to the symbol `container' if absent. With ancestry-prepending and
-sourceward views, viewnodes can carry parentIs=content, linkTarget,
-or independent in addition to the implicit default."
+(defun headline--relation-from-sexp (sexp)
+  "Classify a parsed metadata SEXP using current parent/provenance vocab.
+Birth provenance is more specific than parentIs: birth=containsParent
+returns `containsParent', birth=linksToParent returns `linksToParent',
+otherwise the result is the explicit parentIs or the implicit `affected'."
   (let ((parentIs-list (when sexp
-                      (skg-sexp-cdr-at-path sexp '(skg node parentIs)))))
-    (if parentIs-list (car parentIs-list) 'container)))
+                         (skg-sexp-cdr-at-path sexp
+                                               '(skg node parentIs))))
+        (birth-list (when sexp
+                      (skg-sexp-cdr-at-path sexp '(skg node birth)))))
+    (cond
+     ((eq (car birth-list) 'containsParent) 'containsParent)
+     ((eq (car birth-list) 'linksToParent) 'linksToParent)
+     ((or (not parentIs-list)
+          (eq (car parentIs-list) 'affected)) 'affected)
+     (t (car parentIs-list)))))
 
 (defun headline-structure (buffer)
-  "Extract (depth parentIs id) triples from every headline in BUFFER.
-Depth is the number of asterisks. ParentIs is a symbol (independent,
-container, content, linkTarget) — see `headline--parentIs-from-sexp'.
+  "Extract (depth relation id) triples from every headline in BUFFER.
+Depth is the number of asterisks. Relation is a parentIs or birth symbol;
+see `headline--relation-from-sexp'.
 ID comes from the (skg (node (id X) ...)) metadata. Headlines
 without metadata are skipped."
   (with-current-buffer buffer
@@ -35,16 +43,16 @@ without metadata are skipped."
                                 (skg-sexp-cdr-at-path sexp '(skg node id))))
                      (id (when id-list
                            (format "%s" (car id-list))))
-                     (parentIs (headline--parentIs-from-sexp sexp)))
+                     (relation (headline--relation-from-sexp sexp)))
                 (when id
-                  (push (list depth parentIs id) result)))))
+                  (push (list depth relation id) result)))))
           (forward-line 1)))
       (nreverse result))))
 
 (defun headline-titles (buffer)
-  "Extract (depth parentIs title) triples from every headline in BUFFER.
-Depth is the number of asterisks. ParentIs is a symbol (see
-`headline--parentIs-from-sexp'). Title is the text after metadata."
+  "Extract (depth relation title) triples from every headline in BUFFER.
+Depth is the number of asterisks. Relation is a symbol (see
+`headline--relation-from-sexp'). Title is the text after metadata."
   (with-current-buffer buffer
     (let ((result '()))
       (save-excursion
@@ -61,13 +69,13 @@ Depth is the number of asterisks. ParentIs is a symbol (see
                      (sexp (condition-case nil
                                (car (read-from-string metadata-str))
                              (error nil)))
-                     (parentIs (headline--parentIs-from-sexp sexp)))
-                (push (list depth parentIs title) result))))
+                     (relation (headline--relation-from-sexp sexp)))
+                (push (list depth relation title) result))))
           (forward-line 1)))
       (nreverse result))))
 
 (defun format-headline-triples (triples)
-  "Format a list of (depth parentIs string) triples for display."
+  "Format a list of (depth relation string) triples for display."
   (mapconcat
    (lambda (triple)
      (format "(%d %s %S)"
@@ -76,8 +84,7 @@ Depth is the number of asterisks. ParentIs is a symbol (see
 
 (defun assert-headline-structure (buffer expected phase-label)
   "Assert that BUFFER's headline structure matches EXPECTED.
-EXPECTED is a list of (depth parentIs id) triples; parentIs is a symbol
-(independent, container, content, linkTarget).
+EXPECTED is a list of (depth relation id) triples.
 PHASE-LABEL is used in log messages. Kills emacs with exit 1 on failure."
   (let ((actual (headline-structure buffer)))
     (if (equal actual expected)
@@ -94,7 +101,7 @@ PHASE-LABEL is used in log messages. Kills emacs with exit 1 on failure."
 
 (defun assert-headline-titles (buffer expected phase-label)
   "Assert that BUFFER's headline titles match EXPECTED exactly.
-EXPECTED is a list of (depth parentIs title) triples; parentIs is a symbol.
+EXPECTED is a list of (depth relation title) triples.
 PHASE-LABEL is used in log messages. Kills emacs with exit 1 on failure."
   (let ((actual (headline-titles buffer)))
     (if (equal actual expected)

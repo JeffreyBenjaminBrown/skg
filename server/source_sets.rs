@@ -6,6 +6,7 @@ use crate::dbs::init::{
   read_and_use_schema};
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
+use crate::dbs::typedb::sources::create_all_sources;
 use crate::org_to_text::viewforest_to_string;
 use crate::types::env::find_source_with_optional_tantivy;
 use crate::types::git::MembershipAxes;
@@ -14,6 +15,7 @@ pub use crate::types::misc::SourceSetName;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, mk_inactive_viewnode};
+use crate::types::viewnode::Vognode;
 use crate::test_utils::cleanup_test_tantivy_and_typedb_dbs;
 
 use ego_tree::{NodeId, NodeMut, Tree};
@@ -127,13 +129,15 @@ pub fn apply_source_set_to_viewforest (
   for id in ids {
     let inactive : Option<(ID, SourceName, MembershipAxes)> =
       viewforest . get (id)
-      . and_then ( |n| match &n . value () . kind {
-        ViewNodeKind::True (t)
-          if ! active . contains_source (&t . source) =>
-            Some (( t . id . clone (),
-                    t . source . clone (),
-                    t . membership )),
-        _ => None } );
+      . and_then (
+        |n| match &n . value () . kind {
+          ViewNodeKind::Vognode (Vognode::Normal (t)
+                                 | Vognode::Phantom (t))
+            if ! active . contains_source (&t . source)
+            => Some (( t . id . clone (),
+                       t . source . clone (),
+                       t . membership )),
+          _ => None } );
     if let Some ((pid, source, membership)) = inactive {
       let mut node_mut : NodeMut<ViewNode> =
         viewforest . get_mut (id) . unwrap ();
@@ -220,6 +224,8 @@ where
       . collect ();
     overwrite_new_empty_typedb_db (db_name, &driver) . await?;
     read_and_use_schema (db_name, &driver) . await?;
+    create_all_sources (
+      db_name, &driver, &config ) . await?;
     create_all_nodes (db_name, &driver, &typedb_nodes) . await?;
     create_all_relationships (db_name, &driver, &typedb_nodes) . await?;
     let mut tantivy : TantivyIndex =

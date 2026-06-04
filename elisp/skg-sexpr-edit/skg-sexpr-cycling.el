@@ -49,7 +49,7 @@ Returns nil if the field is not cycleable."
    ((string= field-name "indef")
    '("false (default)" "true"))
    ((string= field-name "parentIs")
-    '("container (default)" "content" "linkTarget" "independent" "absent"))
+    '("affected (default)" "independent" "absent"))
    ((string= field-name "editRequest")
     '("none (default)" "delete" "merge"))
    ((string= field-name "source") ;; from the config

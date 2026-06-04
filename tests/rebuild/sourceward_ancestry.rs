@@ -1,7 +1,7 @@
 // cargo test --test rebuild -- sourceward_ancestry
 //
 // Tests that sourceward view expansion inserts containerward
-// ancestry beneath each ParentIs::LinkTarget source node.
+// ancestry beneath each Birth::LinksToParent source node.
 //
 // Graph (see fixtures-sourceward-ancestry/):
 //   Links:        b -> a,  c -> b,  d -> a
@@ -32,7 +32,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nod
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::SkgConfig;
-use skg::types::viewnode::{ViewNode, ViewNodeKind, ParentIs};
+use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode, Birth};
 
 
 use ego_tree::{NodeId, Tree};
@@ -43,11 +43,13 @@ use typedb_driver::TypeDBDriver;
 fn children_info (
   tree : &Tree<ViewNode>,
   node_id : NodeId,
-) -> Vec<(String, ParentIs)> {
+) -> Vec<(String, Birth)> {
   tree . get (node_id) . unwrap () . children ()
     . filter_map ( |child| {
-      if let ViewNodeKind::True (t) = &child . value () . kind {
-        Some (( t.id.0 . clone (), t.parentIs ))
+      if let ViewNodeKind::Vognode (
+        Vognode::Normal (t) | Vognode::Phantom (t)) =
+        &child . value () . kind {
+        Some (( t.id.0 . clone (), t.birth ))
       } else { None } } )
     . collect () }
 
@@ -59,7 +61,9 @@ fn find_child (
 ) -> Option<NodeId> {
   tree . get (parent) . unwrap () . children ()
     . find ( |child| {
-      if let ViewNodeKind::True (t) = &child . value () . kind {
+      if let ViewNodeKind::Vognode (
+        Vognode::Normal (t) | Vognode::Phantom (t)) =
+        &child . value () . kind {
         t.id.0 == pid
       } else { false } } )
     . map ( |n| n . id () ) }
@@ -98,10 +102,10 @@ async fn test_sourceward_ancestry_impl (
   // --- a should have exactly 2 LinkTarget children: b and d ---
   let a_children = children_info (&viewforest, node_a);
   assert! ( a_children . contains (&("b" . into (),
-                                     ParentIs::LinkTarget)),
+                                     Birth::LinksToParent)),
             "a should have LinkTarget child b" );
   assert! ( a_children . contains (&("d" . into (),
-                                     ParentIs::LinkTarget)),
+                                     Birth::LinksToParent)),
             "a should have LinkTarget child d" );
   assert_eq! ( a_children . len (), 2,
                "a should have exactly 2 children" );
@@ -111,10 +115,10 @@ async fn test_sourceward_ancestry_impl (
     . expect ("a should have child b");
   let b_children = children_info (&viewforest, node_b);
   assert! ( b_children . contains (&("bb" . into (),
-                                     ParentIs::Content)),
+                                     Birth::ContainsParent)),
             "b should have Content child bb" );
   assert! ( b_children . contains (&("c" . into (),
-                                     ParentIs::LinkTarget)),
+                                     Birth::LinksToParent)),
             "b should have LinkTarget child c" );
   assert_eq! ( b_children . len (), 2,
                "b should have exactly 2 children" );
@@ -130,7 +134,7 @@ async fn test_sourceward_ancestry_impl (
     . expect ("b should have child c");
   let c_children = children_info (&viewforest, node_c);
   assert! ( c_children . contains (&("cc" . into (),
-                                 ParentIs::Content)),
+                                 Birth::ContainsParent)),
             "c should have Content child cc" );
   assert_eq! ( c_children . len (), 1,
                "c should have exactly 1 child" );
@@ -140,10 +144,10 @@ async fn test_sourceward_ancestry_impl (
     . expect ("c should have child cc");
   let cc_children = children_info (&viewforest, node_cc);
   assert! ( cc_children . contains (&("ccc" . into (),
-                                      ParentIs::Content)),
+                                      Birth::ContainsParent)),
             "cc should have child ccc (Content)" );
   assert! ( cc_children . contains (&("d" . into (),
-                                      ParentIs::Content)),
+                                      Birth::ContainsParent)),
             "cc should have child d (Content)" );
   assert_eq! ( cc_children . len (), 2,
                "cc should have exactly 2 children" );

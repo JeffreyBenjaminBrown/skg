@@ -10,7 +10,9 @@ use typedb_driver::{
 use futures::stream::{self, StreamExt};
 use ego_tree::{NodeRef, NodeMut, NodeId, Tree};
 
-use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
+use crate::consts::typedb_concurrent_transactions;
+use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
+use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::misc::ID;
 use crate::dbs::in_rust_graph::snapshot_global;
 use crate::dbs::typedb::util::concept_document::extract_id_from_node;
@@ -19,7 +21,7 @@ use crate::dbs::typedb::util::concept_document::extract_id_from_node;
 /// Only query TypeDB for nodes not already resolvable in the in-Rust
 /// in-Rust graph snapshot.
 pub async fn replace_ids_with_pids(
-  viewforest  : &mut Tree<MaybePlacedViewnode>,
+  viewforest  : &mut Tree<MpViewnode>,
   root_id : NodeId,
   db_name : &str,
   driver  : &TypeDBDriver,
@@ -52,23 +54,25 @@ pub async fn replace_ids_with_pids(
 
 /// Collect IDs for bulk PID lookup
 pub fn collect_ids_in_tree (
-  node_ref : NodeRef < MaybePlacedViewnode >,
+  node_ref : NodeRef < MpViewnode >,
   ids_to_lookup : & mut Vec < ID >
 ) {
-  if let MaybePlacedViewnodeKind::True (t) =
-    &node_ref . value () . kind
-  { if let Some (id) = &t . id
-    { ids_to_lookup . push ( id . clone () ); }}
-  for child in node_ref . children () { // Recurse
+  if let MpViewnodeKind::Vognode (
+       MpVognode::Normal (t))
+    = &node_ref . value () . kind
+    { if let Some (id) = &t . id
+      { ids_to_lookup . push ( id . clone () ); }}
+  for child in node_ref . children () { // recurse
     collect_ids_in_tree (
       child,
-      ids_to_lookup ); } }
+      ids_to_lookup ); }}
 
 pub fn assign_pids_throughout_tree_from_map (
-  mut node_ref : NodeMut < MaybePlacedViewnode >,
+  mut node_ref : NodeMut < MpViewnode >,
   pid_map : & HashMap < ID, Option < ID > >
 ) {
-  if let MaybePlacedViewnodeKind::True (t)
+  if let MpViewnodeKind::Vognode (
+       MpVognode::Normal (t))
     = &mut node_ref . value() . kind
     { let pid_opt : Option < ID > = t . id . as_ref ()
         . and_then ( |id| pid_map . get (id) )
@@ -79,7 +83,7 @@ pub fn assign_pids_throughout_tree_from_map (
     for child_treeid in {
       let treeid : NodeId = node_ref . id ();
       let child_treeids : Vec < NodeId > = {
-        let tree : &Tree<MaybePlacedViewnode> = node_ref . tree ();
+        let tree : &Tree<MpViewnode> = node_ref . tree ();
         tree . get (treeid) . unwrap ()
           . children () . map ( | child | child . id () )
           . collect () };
@@ -90,7 +94,7 @@ pub fn assign_pids_throughout_tree_from_map (
         child_mut, pid_map ); }} }}
 
 /// Look up PIDs for multiple IDs.
-/// Sends one query per ID, bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
+/// Sends one query per ID, bounded by 'typedb_concurrent_transactions'.
 /// Returns a HashMap mapping each ID to its PID (or None if not found).
 pub async fn pids_from_ids (
   db_name  : &str,
@@ -104,7 +108,7 @@ pub async fn pids_from_ids (
       . map ( |id| pid_from_one_id (
                 db_name, driver, id . clone () )) )
     . buffer_unordered (
-        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+        typedb_concurrent_transactions () )
     . collect () . await;
   let result : HashMap < ID, Option < ID > > =
     results . into_iter () . collect ();

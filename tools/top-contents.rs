@@ -32,7 +32,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
     . map ( |n| (n . contains . len (), n) )
     . collect ();
   by_contents_len . sort_by ( |a, b| b . 0 . cmp (&a . 0) );
-  println! ("Top {} nodes by direct contents count (out of {}):",
+  println! ("Top {} nodes by contents count (out of {}):",
            top_n, nodes . len ());
   for (count, node) in by_contents_len . iter () . take (top_n) {
     println! ("{:>5}  {}  {}",

@@ -9,7 +9,8 @@ use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_t
 use crate::to_org::util::{ DefinitiveMap, build_node_branch_minus_content_with_source_set, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, IndefOrDef, ParentIs, mk_indefinitive_viewnode };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, IndefOrDef, ParentIs, mk_phantom_viewnode };
+use crate::types::viewnode::Vognode;
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::tree::generic::read_at_node_in_tree;
@@ -65,7 +66,7 @@ pub async fn execute_view_requests (
 /// .
 /// PITFALL: The indefinitization step can miss things: If definitive A contains indefinitive B, and elsewhere there is a definitive B, then when one requests a definitive view of A somewhere else, it will indefinitize the earlier A, but it will not indefinitize the earlier B. This seems fine -- searching through the whole tree for duplicates of A's recursive content would be expensive, and unless the user has strange habits they will at most rarely encounter this behavior.
 async fn execute_definitive_view_request (
-  viewforest        : &mut Tree<ViewNode>, // "viewforest" = tree with BufferRoot
+  viewforest    : &mut Tree<ViewNode>, // "viewforest" = tree with BufferRoot
   node_id       : NodeId,
   source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
   config        : &SkgConfig,
@@ -81,10 +82,9 @@ async fn execute_definitive_view_request (
     read_at_node_in_tree (
       viewforest, node_id,
       |n| match &n . kind {
-        ViewNodeKind::True (t) =>
-        // The truenode's '.skg' file is gone in the worktree.
-        // Body must be loaded from index (preferred) or HEAD.
-          t . existence . unstaged == Some (Sign::Minus),
+        ViewNodeKind::Vognode (Vognode::Normal (t)
+                               | Vognode::Phantom (t))
+          => truenode_file_absent_from_worktree (&t . existence),
         _ => false } ) ?;
   let hidden_ids : HashSet < ID > =
     // If node is a subscribee, we may need to hide some content.
@@ -186,8 +186,8 @@ fn indefinitize_content_subtree (
       let content_child_treeids : Vec < NodeId > =
         node_ref . children ()
         . filter ( |c| matches! ( &c . value() . kind,
-                                  ViewNodeKind::True (t)
-                                  if !t . parent_ignores_it() ))
+                                  ViewNodeKind::Vognode (Vognode::Normal (t))
+                                  if t . parentIs == ParentIs::Affected ))
         . map ( |c| c . id () )
         . collect ();
       (node_pid, content_child_treeids) };
@@ -288,13 +288,23 @@ fn from_disk_replace_title_body_and_nodecomplete (
   if title . is_empty () {
     return Err ( format! ( "NodeComplete {} has empty title", pid ) . into () ); }
   let body : Option < String > = nodecomplete . body . clone ();
-  write_at_truenode_in_tree ( tree, node_id, |t| {
-    t . title = title;
-    if let IndefOrDef::Definitive { body: ref mut b, .. }
-      = t . indef_or_def
-      { *b = body; } } )
+  write_at_truenode_in_tree
+    ( tree, node_id,
+      |t| { t . title = title;
+            if let IndefOrDef::Definitive { body: ref mut b, .. }
+              = t . indef_or_def
+              { *b = body; }} )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (( )) }
+
+fn truenode_file_absent_from_worktree (
+  existence : &ExistenceAxes,
+) -> bool {
+  match existence . unstaged {
+    Some (Sign::Minus) => true,
+    Some (Sign::Plus)  => false,
+    None               => matches! (existence . staged, Some (Sign::Minus)),
+  } }
 
 /// Expand children for a removed node,
 /// by loading content from git HEAD.
@@ -367,7 +377,7 @@ fn membership_minus_from_existence_minus (
     staged:   sign_minus (ex . staged),
     unstaged: sign_minus (ex . unstaged), } }
 
-/// Build an ViewNode for a child of
+/// Build a ViewNode for a child of
 /// a removed (in the git diff sense) node.
 /// The child is loaded from the worktree if it exists there,
 /// and otherwise from git HEAD.
@@ -382,11 +392,11 @@ async fn mk_removed_child_viewnode (
   typedb_driver      : &TypeDBDriver,
 ) -> Result<ViewNode, Box<dyn Error>> {
   let in_worktree : bool =
-    contents_in_worktree . contains ( &child_id . 0 );
-  // The child is a phantom either way
-  // (absent from its parent's worktree content). Existence depends
+  // The child is a phantom (absent from its parent's worktree content)
+  // regardless of the value of 'in_worktree'. Existence depends
   // on whether the child's own file is gone; if gone, stage(s) of
   // its deletion come from the source_diff for the child's file.
+    contents_in_worktree . contains ( &child_id . 0 );
   let (existence, child_opt_nodecomplete)
     : (ExistenceAxes, Option<NodeComplete>)
     = if in_worktree
@@ -396,8 +406,9 @@ async fn mk_removed_child_viewnode (
       else
       { ( file_existence_axes_from_source_diff (
             source_diffs, child_id, parent_src ),
-          nodecomplete_from_index_or_head ( child_id, parent_src, config
-                                     ) . ok() ) };
+          nodecomplete_from_index_or_head (
+            child_id, parent_src, config
+          ) . ok() ) };
   // Child's membership in this removed parent's contains mirrors
   // the stages in which the parent was removed: if the parent's
   // file was deleted staged, the child's membership-as-contained-by
@@ -409,21 +420,18 @@ async fn mk_removed_child_viewnode (
     . ok_or_else ( || format! (
       "mk_removed_child_viewnode: no NodeComplete for child {}",
       child_id ) ) ?;
-  let child_source : Option<SourceName> =
+  let child_source : SourceName =
     if in_worktree { Some ( child_nodecomplete . source . clone() ) }
     else           { deleted_since_head_pid_src_map . get (child_id)
-                       . cloned() };
-  let mut child_viewnode : ViewNode =
-    mk_indefinitive_viewnode (
+                       . cloned() }
+    . unwrap_or_else (|| child_nodecomplete . source . clone());
+  let child_viewnode : ViewNode =
+    mk_phantom_viewnode (
       child_id . clone(),
-      child_nodecomplete . source . clone(),
+      child_source,
       child_nodecomplete . title . clone(),
-      ParentIs::Container );
-  if let ViewNodeKind::True ( ref mut t ) = child_viewnode . kind {
-    if let Some (source) = child_source {
-      t . source = source; }
-    t . existence  = existence;
-    t . membership = membership; }
+      existence,
+      membership );
   Ok (child_viewnode) }
 
 /// Load title and body from index (preferred) or HEAD for a node

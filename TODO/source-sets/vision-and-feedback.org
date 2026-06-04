@@ -68,7 +68,7 @@ and disallow use of that name for an ordinary source set.
    That means display filtering has to define which endpoint controls
    visibility:
 
-   - For content: probably show child C under parent P only if C's node
+   - For content: probably show child C of parent P only if C's node
      source is active. But then active children of inactive parents have
      no visible containerward context.
    - For textlinks-in: probably show link source L only if L's source is

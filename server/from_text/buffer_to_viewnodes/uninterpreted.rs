@@ -4,7 +4,8 @@
 use crate::types::sexp::find_sexp_end;
 use crate::types::errors::BufferValidationError;
 use crate::serve::parse_metadata_sexp::{ parse_metadata_to_viewnodemd, default_metadata, viewnode_from_metadata, ViewnodeMetadata };
-use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, maybePlaced_viewforest_root_viewnode};
+use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
+use crate::types::tree::forest::MpViewForest;
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use regex::Regex;
@@ -23,8 +24,8 @@ struct ViewNodeLineCol {
   body: Vec<String>,
 }
 
-/// Parse org text into a "viewforest": a tree with a BufferRoot.
-/// Each level-1 headline becomes a child of the BufferRoot.
+/// Parse org text into a view forest.
+/// Each level-1 headline becomes a forest root.
 /// The result takes the org-buffer at face value,
 /// without changing the tree (e.g. without absorbing aliases
 /// into the relevant ancestor) and without supplementing information
@@ -35,36 +36,50 @@ struct ViewNodeLineCol {
 /// SHARES RESPONSIBILITY for error detection
 /// with 'find_buffer_errors_for_saving', which runs later.
 /// That function detects the majority of possible errors,
-/// but it can't detect them all because it uses a tree of MaybePlacedViewnodes,
+/// but it can't detect them all because it uses a tree of MpViewnodes,
 /// which permit fewer kinds of invalid state than the raw text.
 /// (For instance, Alias and AliasCol cannot have bodies,
 /// but they can in the raw text, and that's an error.)
 pub fn org_to_uninterpreted_nodes(
   input: &str
-) -> Result < ( Tree<MaybePlacedViewnode>,
+) -> Result < ( Tree<MpViewnode>,
                 Vec<BufferValidationError> ),
               String > {
-  let mut viewforest: Tree<MaybePlacedViewnode> =
-    Tree::new(maybePlaced_viewforest_root_viewnode());
+  let (viewforest, parsing_errors)
+    : (MpViewForest, Vec<BufferValidationError>) =
+    org_to_uninterpreted_viewforest (input)?;
+  Ok ( ( viewforest . into_internal_tree (), parsing_errors ) ) }
+
+pub fn org_to_uninterpreted_viewforest(
+  input: &str
+) -> Result < ( MpViewForest,
+                Vec<BufferValidationError> ),
+              String > {
+  let mut viewforest: MpViewForest =
+    MpViewForest::new();
   let mut parsing_errors: Vec<BufferValidationError> = Vec::new();
-  // treeid_stack[0] is the BufferRoot, treeid_stack[1] is the current tree root, etc.
+  // treeid_stack[0] is the internal forest root,
+  // treeid_stack[1] is the current view root, etc.
   let mut treeid_stack: Vec<NodeId> = vec![ {
-    let viewforest_root_treeid: NodeId = viewforest . root() . id();
+    let viewforest_root_treeid: NodeId =
+      viewforest . internal_root_id ();
     viewforest_root_treeid } ];
   for view_node_line_col in & {
     let view_node_line_cols: Vec<ViewNodeLineCol> =
       divide_into_viewNodeLineCols (input)?;
     view_node_line_cols } {
     let (level, viewnode, error_opt)
-      : (usize, MaybePlacedViewnode, Option<BufferValidationError>)
+      : (usize, MpViewnode, Option<BufferValidationError>)
       = linecol_to_viewnode (view_node_line_col)?;
     if let Some (error) = error_opt {
       parsing_errors . push (error); }
-    // Adjust treeid_stack to proper level (BufferRoot is level 0, tree roots are level 1)
+    // Adjust treeid_stack to proper level
+    // (the internal forest root is level 0; view roots are level 1).
     while treeid_stack . len() > level {
       treeid_stack . pop(); }
     // Check for orphaned headlines (e.g., ** without preceding *)
-    // treeid_stack.len() should equal level (because BufferRoot is at level 0)
+    // treeid_stack.len() should equal level
+    // because the internal forest root is at level 0.
     if treeid_stack . len() < level {
       return Err(format!(
         "Node \"{}\" at level {} jumps too far between levels (no valid parent at level {}).",
@@ -72,7 +87,7 @@ pub fn org_to_uninterpreted_nodes(
     treeid_stack . push( {
       let parent_treeid: NodeId = *treeid_stack . last() . unwrap();
       let new_treeid: NodeId = {
-        let mut parent_mut : NodeMut<MaybePlacedViewnode> =
+        let mut parent_mut : NodeMut<MpViewnode> =
           viewforest . get_mut (parent_treeid) . unwrap();
         parent_mut . append (viewnode) . id() };
       new_treeid } ); }
@@ -117,12 +132,12 @@ fn divide_into_viewNodeLineCols (
   }
   Ok (result) }
 
-/// Create an MaybePlacedViewnode from an ViewNodeLineCol.
+/// Create an MpViewnode from an ViewNodeLineCol.
 /// This helper extracts the node creation logic from the main parsing function.
-/// Returns (level, MaybePlacedViewnode, Option<BufferValidationError>).
+/// Returns (level, MpViewnode, Option<BufferValidationError>).
 fn linecol_to_viewnode(
   view_node_line_col: &ViewNodeLineCol
-) -> Result < ( usize, MaybePlacedViewnode, Option<BufferValidationError> ),
+) -> Result < ( usize, MpViewnode, Option<BufferValidationError> ),
               String > {
   let (level, metadata_option, title): HeadlineInfo =
     view_node_line_col . headline . clone();
@@ -136,8 +151,14 @@ fn linecol_to_viewnode(
     } else { // No metadata, so use defaults.
       default_metadata () };
   let ( viewnode, error_opt )
-    : ( MaybePlacedViewnode, Option<BufferValidationError> )
+    : ( MpViewnode, Option<BufferValidationError> )
     = viewnode_from_metadata ( &metadata, title, body_text );
+  if matches! (
+    &viewnode . kind,
+    MpViewnodeKind::BufferRoot)
+  { return Err (
+      "forestRoot metadata is internal and cannot appear in buffer text"
+      . to_string () ); }
   Ok ( ( level, viewnode, error_opt ) ) }
 
 /// Check if a line is a valid headline and extract level, metadata, and title.

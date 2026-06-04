@@ -5,6 +5,8 @@ use futures::executor::block_on;
 use typedb_driver::answer::ConceptRow;
 use typedb_driver::{Credentials, DatabaseManager, DriverOptions, TypeDBDriver};
 
+use crate::consts::TYPEDB_ADDRESS;
+
 pub type ConceptRowStream =
   futures::stream::BoxStream<'static,
                              typedb_driver::Result<ConceptRow>>;
@@ -13,7 +15,7 @@ pub fn connect_to_typedb () -> TypeDBDriver {
   tracing::info! ("Connecting to TypeDB...");
   block_on ( async {
     TypeDBDriver::new (
-      crate::consts::TYPEDB_ADDRESS,
+      TYPEDB_ADDRESS,
       Credentials::new ("admin", "password"),
       DriverOptions::new (false, None) . unwrap() )
       . await
@@ -46,4 +48,3 @@ pub fn extract_payload_from_typedb_string_rep (
         . to_string (); }}
   panic! ( "Failed to extract payload from TypeDB output: {}",
             attribute_str ) }
-

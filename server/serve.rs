@@ -33,7 +33,8 @@ use crate::types::env::SkgEnv;
 use crate::types::errors::BufferValidationError;
 use crate::source_sets::ActiveSourceSet;
 use crate::source_sets::apply_source_set_to_viewforest;
-use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode,maybePlaced_to_placed_tree};
+use crate::types::maybe_placed_viewnode::{MpViewnode,maybePlaced_to_placed_tree};
+use crate::types::misc::SourceSetName;
 use crate::types::viewnode::ViewNode;
 use crate::types::views_state::{OpenViews, ViewUri};
 use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
@@ -95,7 +96,7 @@ fn handle_emacs (
           "failed to initialize active source-set; falling back to all");
         ActiveSourceSet::named (
           &env . config,
-          crate::types::misc::SourceSetName::from ("all"))
+          SourceSetName::from ("all"))
         . expect ("reserved source-set all should always resolve") });
 
   let enrichment_slot // To update search results once the 'enrichment' (containerward paths + graphnodestats) has been computed.
@@ -287,7 +288,7 @@ fn handle_snapshot_response (
     tracing::warn! ("snapshot response: terms mismatch ('{}' vs '{}')",
                     payload . terms, terms);
     return; }
-  let parse_result : Result<(Tree<MaybePlacedViewnode>,
+  let parse_result : Result<(Tree<MpViewnode>,
                              Vec<BufferValidationError>), String>
     = org_to_uninterpreted_nodes (&buffer_text);
   let mut viewforest : Tree<ViewNode> = match parse_result {

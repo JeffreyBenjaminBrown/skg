@@ -16,17 +16,22 @@ use ego_tree::Tree;
 use skg::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use skg::dbs::typedb::relationships::delete_out_links;
 use skg::dbs::typedb::search::pid_and_source_from_id;
+use skg::dbs::typedb::sources::{
+  node_source_relation_count,
+  source_name_for_node_ids,
+  source_ownership_for_node_ids,
+};
 use skg::dbs::typedb::util::ConceptRowStream;
 use skg::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::{run_with_test_db, run_with_test_db_from_config};
 use skg::to_org::render::content_view::single_root_view;
-use skg::types::misc::{ID, SkgConfig};
+use skg::types::misc::{ID, SkgConfig, SourceName};
 
 use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
-use skg::types::maybe_placed_viewnode::{MaybePlacedViewnode, maybePlaced_to_placed_tree};
-use skg::types::viewnode::{ViewNode, ViewNodeKind};
+use skg::types::maybe_placed_viewnode::{MpViewnode, maybePlaced_to_placed_tree};
+use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode};
 
 use futures::StreamExt;
 use std::collections::HashSet;
@@ -81,6 +86,17 @@ fn test_typedb_delete_out_links (
     |config, driver, _tantivy| Box::pin ( async move {
       test_delete_out_links_contains_container (
         & config . db_name, driver ) . await ?;
+      Ok (( )) } ) ) }
+
+#[test]
+fn test_typedb_source_entities_and_node_sources (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db_from_config (
+    "skg-test-typedb-source-entities",
+    "tests/save/validate_foreign_nodes/skgconfig.toml",
+    |config, driver| Box::pin ( async move {
+      test_source_entities_and_node_sources (
+        &config . db_name, driver ) . await ?;
       Ok (( )) } ) ) }
 
 async fn test_all_relationships (
@@ -188,24 +204,24 @@ async fn test_all_relationships (
     "1" . to_string(), "5" . to_string()));
   assert_eq!(hides_pairs, expected_hides_from_its_subscriptions);
 
-  let replacement_pairs = collect_all_of_some_binary_rel(
+  let overrider_pairs = collect_all_of_some_binary_rel(
     & config . db_name,
     & driver,
     r#" match
-          $replacement isa node, has id $from;
-          $replaced isa node, has id $to;
-          $rel isa overrides_view_of (replacement: $replacement,
-                                      replaced:    $replaced);
+          $overrider isa node, has id $from;
+          $overridden isa node, has id $to;
+          $rel isa overrides_view_of (overrider:  $overrider,
+                                      overridden: $overridden);
         select $from, $to;"#,
     "from",
     "to"
   ) . await?;
-  let mut expected_replacements = HashSet::new();
-  expected_replacements . insert((
+  let mut expected_overriders = HashSet::new();
+  expected_overriders . insert((
     "5" . to_string(), "3" . to_string()));
-  expected_replacements . insert((
+  expected_overriders . insert((
     "5" . to_string(), "4" . to_string()));
-  assert_eq!(replacement_pairs, expected_replacements);
+  assert_eq!(overrider_pairs, expected_overriders);
 
   Ok (( )) }
 
@@ -328,6 +344,95 @@ async fn test_create_only_nodes_with_no_ids_present (
 
   Ok ( () ) }
 
+async fn test_source_entities_and_node_sources (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+) -> Result<(), Box<dyn Error>> {
+  let source_rows : HashSet<(String, String)> =
+    collect_source_entities (db_name, driver) . await ?;
+  let expected_sources : HashSet<(String, String)> =
+    [ ("main" . to_string (), "true" . to_string ()),
+      ("foreign" . to_string (), "false" . to_string ()) ]
+    . into_iter ()
+    . collect ();
+  assert_eq! (source_rows, expected_sources);
+
+  let relation_counts =
+    node_source_relation_count (db_name, driver) . await ?;
+  assert_eq! (
+    relation_counts . values () . filter ( |count| **count != 1 ) . count (),
+    0,
+    "Every node should have exactly one has_source relation: {:?}",
+    relation_counts );
+  assert_eq! (relation_counts . len (), 7);
+
+  let source_names =
+    source_name_for_node_ids (
+      db_name, driver,
+      &[ID::from ("node1"), ID::from ("foreign1"), ID::from ("absent")]
+    ) . await ?;
+  assert_eq! (
+    source_names . get (&ID::from ("node1")),
+    Some (&SourceName::from ("main")) );
+  assert_eq! (
+    source_names . get (&ID::from ("foreign1")),
+    Some (&SourceName::from ("foreign")) );
+  assert! ( ! source_names . contains_key (&ID::from ("absent")) );
+
+  let ownership =
+    source_ownership_for_node_ids (
+      db_name, driver,
+      &[ID::from ("node1"), ID::from ("foreign1"), ID::from ("absent")]
+    ) . await ?;
+  assert_eq! (ownership . get (&ID::from ("node1")), Some (&true));
+  assert_eq! (ownership . get (&ID::from ("foreign1")), Some (&false));
+  assert! ( ! ownership . contains_key (&ID::from ("absent")) );
+
+  let schema : String =
+    std::fs::read_to_string ("schema.tql") ?;
+  assert! (
+    ! schema . contains ("attribute source,"),
+    "TypeDB schema should not define the old node string source attribute" );
+
+  Ok (( )) }
+
+async fn collect_source_entities (
+  db_name : &str,
+  driver  : &TypeDBDriver,
+) -> Result<HashSet<(String, String)>, Box<dyn Error>> {
+  let tx : Transaction =
+    driver . transaction (
+      db_name, TransactionType::Read ) . await ?;
+  let answer : QueryAnswer =
+    tx . query (
+      r#"match
+           $src isa source,
+             has source_name $source_name,
+             has user_owns_it $owned;
+         select $source_name, $owned;"# ) . await ?;
+  let mut stream : ConceptRowStream = answer . into_rows ();
+  let mut rows : HashSet<(String, String)> = HashSet::new ();
+  while let Some (row_result) = stream . next () . await {
+    let row : ConceptRow = row_result ?;
+    let source_name : String =
+      row . get ("source_name")?
+      . map ( |c| extract_payload_from_typedb_string_rep (
+        &c . to_string () ))
+      . unwrap_or_default ();
+    let owned : String =
+      row . get ("owned")?
+      . map ( |c| {
+        if c . to_string () . contains ("true") {
+          "true" . to_string ()
+        } else {
+          "false" . to_string ()
+        }
+      } )
+      . unwrap_or_default ();
+    rows . insert ((source_name, owned));
+  }
+  Ok (rows) }
+
 /// Helper: count all `node` entities in the DB by streaming rows.
 /// (Avoids reliance on `count;` semantics.)
 async fn count_nodes (
@@ -364,7 +469,7 @@ async fn test_recursive_document (
     = single_root_view (
           driver, config, None, &ID ( "a" . to_string () ), false
         ) . await ?;
-  let unchecked_viewforest : Tree<MaybePlacedViewnode> =
+  let unchecked_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (& result_org_text)
     . map_err ( |e| format! ( "Parse error: {}", e ) ) ? . 0;
   let result_viewforest : Tree<ViewNode> =
@@ -380,9 +485,13 @@ async fn test_recursive_document (
   let root_node : &ViewNode = root_node_ref . value ();
 
   // Root node should be "a"
-  assert! ( matches! ( &root_node . kind, ViewNodeKind::True (_) ),
+  assert! ( matches! ( &root_node . kind,
+                        ViewNodeKind::Vognode ( Vognode::Normal (_)
+                                                | Vognode::Phantom (_) )),
     "should be TrueNode" );
-  let ViewNodeKind::True (root_t) = &root_node . kind
+  let ViewNodeKind::Vognode (
+    Vognode::Normal (root_t) | Vognode::Phantom (root_t)) =
+    &root_node . kind
     else { unreachable!() };
   assert_eq! ( &root_t . id, &ID::from ("a"),
     "Root node should have id 'a'" );
@@ -395,9 +504,13 @@ async fn test_recursive_document (
     . expect ("Root should have child 'b'");
   let b_node : &ViewNode = b_node_ref . value ();
 
-  assert! ( matches! ( &b_node . kind, ViewNodeKind::True (_) ),
+  assert! ( matches! ( &b_node . kind,
+                        ViewNodeKind::Vognode ( Vognode::Normal (_)
+                                                | Vognode::Phantom (_) )),
     "should be TrueNode" );
-  let ViewNodeKind::True (b_t) = &b_node . kind
+  let ViewNodeKind::Vognode ( Vognode::Normal (b_t)
+                              | Vognode::Phantom (b_t))
+    = &b_node . kind
     else { unreachable!() };
   assert_eq! ( &b_t . id, &ID::from ("b"),
     "First child should have id 'b'" );
@@ -414,9 +527,13 @@ async fn test_recursive_document (
     . expect ("Node 'b' should have child 'c'");
   let c_node : &ViewNode = c_node_ref . value ();
 
-  assert! ( matches! ( &c_node . kind, ViewNodeKind::True (_) ),
+  assert! ( matches! ( &c_node . kind,
+                        ViewNodeKind::Vognode ( Vognode::Normal (_)
+                                                | Vognode::Phantom (_) )),
     "should be TrueNode" );
-  let ViewNodeKind::True (c_t) = &c_node . kind
+  let ViewNodeKind::Vognode ( Vognode::Normal (c_t)
+                              | Vognode::Phantom (c_t))
+    = &c_node . kind
     else { unreachable!() };
   assert_eq! ( &c_t . id, &ID::from ("c"),
     "Child of 'b' should have id 'c'" );
@@ -429,9 +546,13 @@ async fn test_recursive_document (
     . expect ("Node 'c' should have child 'b' (repeated)");
   let b_repeat : &ViewNode = b_repeat_ref . value ();
 
-  assert! ( matches! ( &b_repeat . kind, ViewNodeKind::True (_) ),
+  assert! ( matches! ( &b_repeat . kind,
+                        ViewNodeKind::Vognode ( Vognode::Normal (_)
+                                                | Vognode::Phantom (_) )),
     "should be TrueNode" );
-  let ViewNodeKind::True (b_repeat_t) = &b_repeat . kind
+  let ViewNodeKind::Vognode ( Vognode::Normal (b_repeat_t)
+                              | Vognode::Phantom (b_repeat_t))
+    = &b_repeat . kind
     else { unreachable!() };
   assert_eq! ( &b_repeat_t . id, &ID::from ("b"),
     "Child of 'c' should have id 'b'" );

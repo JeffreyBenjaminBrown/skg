@@ -19,10 +19,20 @@ pub const TANTIVY_PER_ID_LOOKUP_LIMIT : usize = 100;
 /// The default is too short for bulk init.
 pub const TYPEDB_TRANSACTION_TIMEOUT_SECS : u64 = 600;
 
-/// Max concurrent TypeDB transactions during bulk operations.
+/// Default max concurrent TypeDB transactions during bulk operations.
 /// (Massively improves performance --
 /// initial relationship creation fell from > 10 min to ~20 sec.)
-pub const TYPEDB_CONCURRENT_TRANSACTIONS : usize = 64;
+pub const DEFAULT_TYPEDB_CONCURRENT_TRANSACTIONS : usize = 64;
+
+/// Runtime TypeDB transaction fanout.
+/// Tests can lower this with 'SKG_TYPEDB_CONCURRENT_TRANSACTIONS'
+/// so the full suite does not overwhelm an interactive machine.
+pub fn typedb_concurrent_transactions () -> usize {
+  std::env::var ("SKG_TYPEDB_CONCURRENT_TRANSACTIONS")
+    . ok ()
+    . and_then ( |s| s . parse::<usize> () . ok () )
+    . filter ( |n| *n > 0 )
+    . unwrap_or (DEFAULT_TYPEDB_CONCURRENT_TRANSACTIONS) }
 
 /// TypeDB server address.
 pub const TYPEDB_ADDRESS : &str = "127.0.0.1:1729";

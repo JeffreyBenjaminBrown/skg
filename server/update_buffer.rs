@@ -13,6 +13,7 @@ pub use viewnodestats::set_viewnodestats_in_viewforest;
 use complete::{complete_viewforest, CompletionContext};
 use crate::dbs::in_rust_graph::{ InRustGraph, scheduled_audit::take_pending_audit_warning};
 use crate::types::env::SkgEnv;
+use crate::types::viewnode::ParentIs;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{ SaveResponse, compute_diff_for_every_source, deleted_ids_to_source};
@@ -26,9 +27,11 @@ use crate::types::views_state::ViewUri;
 use crate::types::misc::{ID, SourceName, SkgConfig};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
+use crate::types::tree::forest::ViewForest;
 use crate::to_org::util::{mark_view_roots_parent_absent, validate_parentIs_relationships};
 use crate::dbs::in_rust_graph::snapshot_global;
-use crate::types::viewnode::{IndefOrDef, ViewNode, ViewNodeKind, Scaffold};
+use crate::types::viewnode::{IndefOrDef, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{Vognode, QualCol, Qual};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -42,6 +45,7 @@ pub struct RerenderAfterSaveContext<'a> {
   pub source_diffs : Option<HashMap<SourceName, SourceDiff>>,
   pub graph_snap   : Arc<InRustGraph>,
   pub errors       : Vec<String>,
+  pub warnings     : Vec<String>,
   /// Files deleted since HEAD, keyed by pid, for diff-mode rendering.
   pub deleted_since_head_pid_src_map : HashMap<ID, SourceName>,
   /// Pids deleted by this save; not necessarily a subset of git deletes.
@@ -78,6 +82,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
       source_diffs,
       graph_snap : env . in_rust_graph . load_full (),
       errors : Vec::new (),
+      warnings : Vec::new (),
       deleted_since_head_pid_src_map,
       deleted_by_this_save_pids,
       active_source_set,
@@ -95,7 +100,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
 struct RenderedCollateralView {
   uri        : ViewUri,
   text       : String,
-  viewforest : Tree<ViewNode>,
+  viewforest : ViewForest,
 }
 
 /// PURPOSE:
@@ -108,7 +113,7 @@ struct RenderedCollateralView {
 /// the graph was already updated. The reverse order would be bad.
 pub async fn update_views_after_save (
   stream                      : &mut std::net::TcpStream,
-  saved_view                  : Tree<ViewNode>,
+  saved_view                  : ViewForest,
   define_nodes                : Vec<DefineNode>,
   diff_mode_enabled           : bool,
   env                         : &SkgEnv,
@@ -124,7 +129,7 @@ pub async fn update_views_after_save (
     // point at the acquiree id).
     RerenderAfterSaveContext::for_save (
       env, diff_mode_enabled, &define_nodes, active_source_set );
-  let mut saved_view_mut : Tree<ViewNode> = saved_view;
+  let mut saved_view_mut : ViewForest = saved_view;
   rewriteInPlace_viewnodes_whose_id_is_newly_extra (
     &mut saved_view_mut, &context . graph_snap ) ?;
   let saved_text : String =
@@ -163,10 +168,11 @@ pub async fn update_views_after_save (
                 &rendered . uri, &rendered . text) )); },
         Err (e) => { context . errors . push (e); }} }}
   if let Some (w) = take_pending_audit_warning () {
-    context . errors . insert (0, w); }
+    context . warnings . insert (0, w); }
   Ok ( SaveResponse {
     saved_view          : saved_text,
     errors              : context . errors,
+    warnings            : context . warnings,
     save_point_position : None, } ) }
 
 async fn rerender_collateral_view (
@@ -174,7 +180,7 @@ async fn rerender_collateral_view (
   views_state : &ViewsState,
   context     : &mut RerenderAfterSaveContext<'_>,
 ) -> Result<RenderedCollateralView, String> {
-  let mut viewforest : Tree<ViewNode> = match
+  let mut viewforest : ViewForest = match
     views_state . open_views . viewuri_to_view (&uri) {
       Some (f) => f . clone (),
       None => {
@@ -233,7 +239,7 @@ fn find_collateral_view_uris (
 /// Strip stale diff data, re-complete the viewforest,
 /// set graph/view stats, and render to string.
 pub async fn rerender_view (
-  viewforest    : &mut Tree<ViewNode>,
+  viewforest    : &mut ViewForest,
   context       : &mut RerenderAfterSaveContext<'_>,
   is_saved_view : bool,
 ) -> Result<String, Box<dyn Error>> {
@@ -258,7 +264,7 @@ pub async fn rerender_view (
   if let Some (snap) = snapshot_global () {
     // Correct any parentIs markers whose claimed relation to the
     // parent doesn't hold in the in-Rust graph (e.g. user moved a
-    // parentIs=linkTarget node under a new parent it doesn't link to).
+    // birth=linksToParent node under a new parent it doesn't link to).
     // No-op when the global graph handle isn't initialized (tests
     // that bypass startup).
     validate_parentIs_relationships (viewforest, &snap); }
@@ -325,33 +331,35 @@ fn rewriteInPlace_viewnodes_whose_id_is_newly_extra (
       let n_ref = viewforest . get (nid) . ok_or (
         "rewriteInPlace_viewnodes_whose_id_is_newly_extra: node not found") ?;
       match &n_ref . value () . kind {
-        ViewNodeKind::True (t) => {
-          match graph_snap . pid_of (&t . id) {
-            Some (primary) if primary != t . id => {
-              graph_snap . get (&primary) . map ( |r| (
-                primary . clone (),
-                r . source . clone (),
-                r . title . clone (),
-                r . body . clone () )) },
-            _ => None } },
+        ViewNodeKind::Vognode (Vognode::Normal (t)
+                               | Vognode::Phantom (t))
+          => { match graph_snap . pid_of (&t . id)
+               { Some (primary) if primary != t . id => {
+                     graph_snap . get (&primary) . map ( |r| (
+                       primary . clone (),
+                       r . source . clone (),
+                       r . title . clone (),
+                       r . body . clone () )) },
+                 _ => None } },
         _ => None } };
     if let Some ((new_pid, new_source, new_title, new_body)) = swap
     { let mut n_mut = viewforest . get_mut (nid)
         . ok_or ("rewriteInPlace_viewnodes_whose_id_is_newly_extra: node_mut failed") ?;
-      if let ViewNodeKind::True (t) = &mut n_mut . value () . kind {
-        t . id = new_pid;
+      if let ViewNodeKind::Vognode (Vognode::Normal (t))
+      = &mut n_mut . value () . kind
+      { t . id = new_pid;
         t . source = new_source;
         t . title = new_title;
         if let IndefOrDef::Definitive { body, .. }
-          = &mut t . indef_or_def {
-            *body = new_body; }} }}
+        = &mut t . indef_or_def
+        { *body = new_body; }} }}
   Ok (( )) }
 
 /// Reset all traces of a prior diff-view rendering so the viewforest
 /// is ready for a fresh pass. Three independent traversals today;
 /// could be fused if traversal cost ever mattered.
 fn strip_stale_diff_state (
-  viewforest : &mut Tree<ViewNode>
+  viewforest : &mut ViewForest
 ) -> Result<(), Box<dyn Error>> {
   remove_branches_that_git_marked_removed (viewforest) ?;
   remove_diff_only_scaffolds (viewforest) ?;
@@ -361,8 +369,8 @@ fn strip_stale_diff_state (
 /// Strip from the viewforest every branch whose root
 ///   is marked as removed or removed-here.
 /// Exception: Does not strip:
-///   - top-level branches (children of BufferRoot)
-///   - non-content nodes (parentIs != Container)
+///   - top-level branches (forest roots)
+///   - non-content nodes (parentIs != Affected)
 /// Uses single-pass DFS: removes branch roots as encountered,
 /// skipping recursion into removed branches.
 ///
@@ -377,26 +385,24 @@ fn strip_stale_diff_state (
 /// -- it is no longer missing here.
 /// Etc. Much easier to just regenerate them at each save.
 fn remove_branches_that_git_marked_removed (
-  viewforest : &mut Tree<ViewNode>
+  viewforest : &mut ViewForest
 ) -> Result<(), Box<dyn Error>> {
   let viewforest_root_id : NodeId =
-    viewforest . root() . id();
+    viewforest . internal_root_id ();
   do_everywhere_in_tree_dfs_prunable (
     viewforest,
     viewforest_root_id,
     &mut |mut node : NodeMut<ViewNode>| -> Result<bool, String> {
       let is_viewforest_root_child : bool = {
         match node . parent() {
-          Some (mut p) =>
-            matches! ( &p . value() . kind,
-                       ViewNodeKind::Scaff (Scaffold::BufferRoot)),
+          Some (p) =>
+            p . id () == viewforest_root_id,
           None => false } };
       let should_remove : bool =
         match &node . value() . kind {
-          ViewNodeKind::True (t) =>
-            t . is_phantom ()
-            && ! is_viewforest_root_child
-            && ! t . parent_ignores_it(),
+          ViewNodeKind::Vognode (Vognode::Phantom (t)) =>
+            ! is_viewforest_root_child
+            && t . parentIs == ParentIs::Affected,
           _ => false };
       if should_remove {
         node . detach();
@@ -414,18 +420,18 @@ fn remove_branches_that_git_marked_removed (
 /// diff mode) are cleaned up by reconcile_alias_col_children during the postorder
 /// pass: its goal list won't include them, so they are detached.
 fn remove_diff_only_scaffolds (
-  viewforest : &mut Tree<ViewNode>
+  viewforest : &mut ViewForest
 ) -> Result<(), Box<dyn Error>> {
   let viewforest_root_id : NodeId =
-    viewforest . root() . id();
+    viewforest . internal_root_id ();
   do_everywhere_in_tree_dfs_prunable (
     viewforest,
     viewforest_root_id,
     &mut |mut node : NodeMut<ViewNode>| -> Result<bool, String> {
       let is_diff_scaffold : bool =
         matches! ( &node . value() . kind,
-          ViewNodeKind::Scaff (Scaffold::TextChanged { .. }) |
-          ViewNodeKind::Scaff (Scaffold::IDCol) );
+          ViewNodeKind::Qual (Qual::TextChanged { .. }) |
+          ViewNodeKind::QualCol (QualCol::ID) );
       if is_diff_scaffold {
         node . detach();
         Ok (false) // pruned — don't recurse into detached children
@@ -436,10 +442,10 @@ fn remove_diff_only_scaffolds (
 /// Diff-only scaffolds (TextChanged, IDCol) are
 /// removed by 'remove_diff_only_scaffolds' before this runs.
 fn clear_diff_metadata (
-  viewforest : &mut Tree<ViewNode>
+  viewforest : &mut ViewForest
 ) -> Result<(), Box<dyn Error>> {
   let viewforest_root_id : NodeId =
-    viewforest . root() . id();
+    viewforest . internal_root_id ();
   do_everywhere_in_tree_dfs (
     viewforest,
     viewforest_root_id,
@@ -448,7 +454,8 @@ fn clear_diff_metadata (
       { // Ignores scaffolds: some (Alias, ID) carry diff data,
         // but they are regenerated from scratch by their postorder
         // completers, so clearing them here is unnecessary.
-        if let ViewNodeKind::True (t)
+        if let ViewNodeKind::Vognode (Vognode::Normal (t)
+                                      | Vognode::Phantom (t))
           = &mut node . value() . kind
           { t . existence  = ExistenceAxes::default ();
             t . membership = MembershipAxes::default ();
@@ -470,9 +477,11 @@ async fn attach_containerward_ancestries_to_removedhere_phantoms (
     let mut result : Vec<NodeId> = Vec::new ();
     for edge in viewforest . root () . traverse () {
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
-        if let ViewNodeKind::True (t) = &node_ref . value () . kind {
-          if t . is_removedhere_phantom () {
-            result . push ( node_ref . id () ); }} }}
+        if let ViewNodeKind::Vognode (Vognode::Normal (t)
+                                      | Vognode::Phantom (t))
+          = &node_ref . value () . kind
+          { if t . is_removedhere_phantom ()
+            { result . push ( node_ref . id () ); }} }}
     result };
   attach_containerward_ancestries_at_nodeids_with_source_set (
     viewforest, &phantom_nodeids, config, typedb_driver, active ) . await }

@@ -1,0 +1,456 @@
+* current state
+
+** type and metadata
+
+'server/types/viewnode.rs' currently defines:
+
+#+begin_src rust
+  pub enum ParentIs {
+    Container,
+    Collector,
+    Content,
+    LinkTarget,
+    Independent,
+    Absent,
+  }
+#+end_src
+
+'Container' is omitted from rendered metadata.  The parser defaults a
+missing '(parentIs ...)' to 'Container'.  'Absent' is rendered
+explicitly for view roots.  The Emacs herald code injects implicit
+'container' for omitted metadata.
+
+The current helper 'parent_ignores_it' is already almost the target
+predicate:
+
+#+begin_src rust
+  self.parentIs != ParentIs::Container
+#+end_src
+
+Under the new model, do not preserve that helper.  Inlining the
+comparison is clearer:
+
+#+begin_src rust
+  t . parentIs == ParentIs::Affected
+#+end_src
+
+and, for the inverse:
+
+#+begin_src rust
+  t . parentIs != ParentIs::Affected
+#+end_src
+
+** current variant meanings
+
+The mechanical mapping is:
+
+| current       | new 'ParentIs' | new 'Birth'      | notes                                                 |
+|---------------+----------------+------------------+-------------------------------------------------------|
+| 'Container'   | 'Affected'     | 'Unremarkable'   | ordinary content of a TrueNode parent                 |
+| 'Collector'   | 'Affected'     | 'Unremarkable'   | member of a scaffold-defined relation collection      |
+| 'Content'     | 'Independent'  | 'ContainsParent' | child contains visible parent; does not affect parent |
+| 'LinkTarget'  | 'Independent'  | 'LinksToParent'  | child links to visible parent; does not affect parent |
+| 'Independent' | 'Independent'  | 'Unremarkable'   | visible parent exists, no collection membership       |
+| 'Absent'      | 'Absent'       | 'Unremarkable'   | no visible parent                                     |
+
+The important semantic choice is that current 'Content' and
+'LinkTarget' remain non-affecting.  They explain why a generated node is
+present, but saving the buffer should not add that node to the visible
+parent's primary content collection.
+
+* target semantics
+
+** ParentIs becomes collection membership only
+
+'ParentIs' should say nothing about how the node was discovered.  It
+should say only whether the node participates in the collection
+represented by its visible parent.
+
+The parent decides what collection it represents:
+
+- a normal Vognode parent represents its primary content collection;
+- a relation collection scaffold represents the relation collection
+  named by that scaffold;
+- 'BufferRoot' represents no visible parent collection.
+
+Then:
+
+- child of normal Vognode, 'Affected': save it in the parent's
+  'contains' list when the parent is save-authoritative;
+- child of relation collection scaffold, 'Affected': use the scaffold
+  and save role to decide the corresponding relationship membership;
+- child anywhere visible, 'Independent': preserve/display the child but
+  do not let it alter the parent's collection;
+- child under 'BufferRoot', 'Absent': no visible parent relation.
+
+** collection kind must come from tree context
+
+The current 'Collector' variant records that the parent is a collection
+scaffold.  After the collapse, that fact must come from the parent node
+kind and save role, not from the child.
+
+This is already mostly how the code is shaped:
+
+- 'classify.rs' looks at the parent scaffold type;
+- relation collection extraction already walks scaffold children;
+- local validation already knows whether a node is a child of
+  'SubscribeeCol', 'HiddenInSubscribeeCol', etc.
+
+The plan should therefore remove child-side 'Collector' checks by
+replacing them with:
+
+#+begin_src rust
+  child.parentIs == ParentIs::Affected
+  && parent_is_the_expected_collection_scaffold
+#+end_src
+
+** Birth records inverse-relation display history
+
+'Content' and 'LinkTarget' currently carry useful facts:
+
+- the child was inserted as containerward ancestry;
+- the child was inserted as a textlink source;
+- rerender validation can verify whether that original graph relation
+  still exists;
+- heralds can show '}' or '<-' for those cases.
+
+Those facts should move to 'Birth':
+
+#+begin_src rust
+  pub enum Birth {
+    Unremarkable,
+    LinksToParent,
+    ContainsParent,
+  }
+#+end_src
+
+The field should be scoped as narrowly as the code allows.  The likely
+home is 'TrueNode_Generic', because current 'ParentIs::Content' and
+'ParentIs::LinkTarget' live there and normal/phantom Vognodes already
+carry that structure.  Avoid putting 'Birth' on all 'ViewNode' variants:
+scaffolds, aliases, IDs, dead scaffolds, inactive nodes, unknown nodes,
+and deleted nodes do not need it.
+
+If later inspection shows only 'Vognode::Normal' can meaningfully use
+'Birth', narrow it further.  But starting at 'TrueNode_Generic' is the
+lowest-risk first cut because it mirrors the current field placement
+without infecting scaffold types.
+
+* implementation plan
+
+** decide the serialization policy first
+
+Choose the wire/client spelling before code edits.  Recommended:
+
+- keep key name '(parentIs ...)' to avoid a larger metadata-key churn;
+- render 'Affected' as omitted, preserving the current default shape;
+- accept explicit '(parentIs affected)';
+- render and parse '(parentIs independent)' and '(parentIs absent)';
+- introduce '(birth linksToParent)' and '(birth containsParent)';
+- omit 'Birth::Unremarkable';
+- during a transition in tests only, replace old strings directly
+  rather than supporting old runtime spellings.
+
+Per 'coding-advice/for-ai.md', do not add legacy support for old
+spellings unless there is a concrete reason.  This repo owns the client
+and server.
+
+** change the core enum and helpers
+
+In 'server/types/viewnode.rs':
+
+- replace the enum variants;
+- add 'Birth';
+- add a 'birth' field to the narrowest Vognode/TrueNode type that
+  supports the current use cases;
+- update comments so the type is only about parent collection
+  membership;
+- update constructors to default to 'ParentIs::Affected' and
+  'Birth::Unremarkable';
+- delete 'parent_ignores_it' and inline the comparison against
+  'ParentIs::Affected' at call sites;
+- update 'is_truenode_and_claims_parentIs_collector' into a helper
+  that checks only child affectedness, or delete it and make call sites
+  inspect parent scaffold context directly.
+
+Keep this patch small enough to compile errors into a useful worklist.
+
+** update parser and renderer
+
+In 'server/serve/parse_metadata_sexp.rs':
+
+- default missing 'parentIs' to 'Affected';
+- parse 'affected', 'independent', and 'absent';
+- default missing 'birth' to 'Unremarkable';
+- parse 'linksToParent' and 'containsParent';
+- remove 'container', 'collector', 'content', and 'linkTarget' from the
+  accepted final syntax unless a short local migration step proves
+  necessary.
+
+In 'server/org_to_text.rs':
+
+- omit 'Affected';
+- render 'Independent' and 'Absent';
+- omit 'Birth::Unremarkable';
+- render 'Birth::LinksToParent' and 'Birth::ContainsParent';
+- move parentIs-specific container-count behavior for current 'Content'
+  and 'LinkTarget' to 'Birth'.
+
+** preserve root handling
+
+'mark_view_roots_parent_absent' is already aligned with the target
+model.  Keep it, but update its comments and enum variant names.
+
+The existing save-side normalization
+'absent_parentIs_under_visible_parent_becomes_isContainer' should become
+'absent_parentIs_under_visible_parent_becomes_affected':
+
+- 'Absent' under a visible parent becomes 'Affected';
+- no warning is needed;
+- the parser does not need to preserve whether 'Absent' was explicit.
+
+This matches the updated v3 plan: 'Absent' contradicts the visible tree
+shape, so it is treated as stale top-level metadata after movement.
+
+** update relation collection handling
+
+Replace 'Collector' with 'Affected' in collection-member logic, but do
+not simply search-and-replace.
+
+Important files:
+
+- 'server/from_text/buffer_to_viewnodes/local.rs';
+- 'server/from_text/viewnodes_to_instructions/classify.rs';
+- 'server/from_text/viewnodes_to_instructions/to_naive_instructions.rs';
+- 'server/from_text/viewnodes_to_instructions/subscribee_hiderel_intents.rs';
+- 'server/update_buffer/complete_preorder/relation_col.rs';
+- 'server/update_buffer/complete_preorder/truenode.rs';
+- 'server/to_org/complete/sharing/child_data.rs'.
+
+For each collection scaffold validator:
+
+- require TrueNode children to be 'Affected';
+- require the parent to be the expected scaffold;
+- keep duplicate-member validation as-is;
+- demote non-goal scaffold children to 'Independent' rather than
+  preserving accidental 'Affected' membership.
+
+This preserves the useful part of 'Collector' without encoding the
+parent's scaffold kind in the child.
+
+** update ordinary content save extraction
+
+In ordinary Vognode children, 'Affected' means content.  Existing
+'parent_ignores_it' call sites should become direct tests against
+'ParentIs::Affected'.
+
+Audit these files especially:
+
+- 'server/from_text/buffer_to_viewnodes/validate_tree.rs';
+- 'server/from_text/buffer_to_viewnodes/local.rs';
+- 'server/from_text/viewnodes_to_instructions/to_naive_instructions.rs';
+- 'server/types/tree/viewnode_nodecomplete.rs';
+- 'server/types/errors.rs'.
+
+The invariant after the change should be:
+
+- ordinary parent + affected child can alter 'contains';
+- ordinary parent + independent child cannot alter 'contains';
+- scaffold parent + affected child can alter that scaffold's supported
+  relation, if the scaffold is writable;
+- scaffold parent + independent child is display-only.
+
+** replace Content and LinkTarget with Birth
+
+Add 'Birth' before deleting 'ParentIs::Content' and
+'ParentIs::LinkTarget', then migrate their users:
+
+- generated containerward ancestry should be
+  'parentIs = Independent, birth = ContainsParent';
+- generated sourceward link sources should be
+  'parentIs = Independent, birth = LinksToParent';
+- ordinary content and relation collection members should be
+  'birth = Unremarkable';
+- stale relation-claim validation should inspect 'Birth', not
+  'ParentIs'.
+
+Important files:
+
+- 'server/to_org/expand/backpath.rs';
+- 'server/serve/handlers/text_search/render_enriched_search_buffer.rs';
+- 'server/to_org/util.rs' validation of parent relation claims;
+- tests under 'tests/rebuild', 'tests/typedb/paths.rs', and integration
+  tests for sourceward/containerward view requests.
+
+After this migration, 'validate_parentIs_relationships' should probably
+be renamed, because it will validate 'Birth' relation claims and
+'ParentIs::Affected' content claims.
+
+** update Emacs support
+
+In Elisp:
+
+- keep omitted 'parentIs' mapped to the existing content herald, but do
+  not render a visible herald for explicit 'affected';
+- move herald rules for old 'content' and 'linkTarget' to the new
+  'birth' metadata;
+- update 'skg-sexpr-edit/skg-sexpr-cycling.el' parentIs cycle values;
+- make 'birth' non-cycleable;
+- update 'skg-sexpr/skg-truenode-defaults.el';
+- update 'skg-metadata.el' predicates so "content of parent" means
+  'Affected' under a normal Vognode parent, not merely omitted
+  'parentIs'.
+
+Be careful with 'skg-metadata.el': it traverses descendants whose
+'parentIs' is content-like.  Under the new model, relation collection
+members are also 'Affected', so traversal may need tree context to
+avoid treating scaffold members as ordinary content descendants.
+
+For metadata editing, 'birth' should be rendered and parsed, but not
+promoted as an ordinary editable/cycleable field.  If enforcing
+non-editability would require introducing a new metadata-view concept,
+skip that for this refactor and only make it non-cycleable.
+
+** update docs and examples
+
+Update at least:
+
+- 'api-and-formats.md';
+- 'glossary.md' if it mentions 'parentIs';
+- 'TODO/show-metadata.org';
+- old TODO documents only where stale instructions would confuse future
+  work.
+
+Do not rewrite historical DONE plans unless they are actively used as
+current guidance.
+
+** update tests in layers
+
+Run focused tests between layers instead of trying to fix the whole
+suite in one pass.
+
+Suggested order:
+
+- parser/serializer tests for the new enum spellings;
+- Rust tests around 'buffer_to_viewnodes' and local validation;
+- save extraction tests under 'tests/new/viewnodes_to_instructions.rs';
+- rendering tests under 'tests/content_view.rs',
+  'tests/initial_view_bfs.rs', 'tests/rebuild', and sourceward/
+  containerward integration tests;
+- Elisp unit tests for heralds, metadata traversal, and sexp defaults;
+- broader 'cargo nextest run' and 'bash/emacs-tests.sh';
+- integration tests if the required servers are available.
+
+Expect most churn in rendered expected strings containing:
+
+- '(parentIs absent)' stays;
+- omitted or '(parentIs container)' becomes omitted or
+  '(parentIs affected)';
+- '(parentIs collector)' becomes omitted or '(parentIs affected)';
+- '(parentIs content)' becomes '(parentIs independent) (birth containsParent)';
+- '(parentIs linkTarget)' becomes '(parentIs independent) (birth linksToParent)'.
+
+* migration checkpoints
+
+** checkpoint: enum compiles
+
+Goal: no old enum variants remain in Rust code except possibly in a
+temporary parser test.  The code may still have failing tests.
+
+** checkpoint: save semantics pass
+
+Goal: ordinary content save, relation collection save, subscribee
+hide/unhide behavior, and source inheritance still work.
+
+This is the highest-risk checkpoint because 'Collector' currently
+selects collection save roles.
+
+** checkpoint: view semantics pass
+
+Goal: content views, sourceward views, containerward views, search
+enrichment, and rerender-after-save still produce coherent buffers.
+
+Verify that 'Birth' preserves the old 'Content'/'LinkTarget' heralds
+and relation-claim validation.
+
+** checkpoint: client semantics pass
+
+Goal: Emacs heralds, metadata cycling, and metadata-based traversal
+match the new model.
+
+* problems
+
+** closed: Collector and Container can collapse to Affected
+
+They are synonymous in one narrow way: both mean the child participates
+in a parent-defined collection.  They are not synonymous operationally:
+'Container' under a Vognode means 'contains'; 'Collector' under a
+relation scaffold means the scaffold chooses the relation and save role.
+
+The new model can still work, but only if every 'Collector' use is
+replaced with "parent is a relation scaffold and child is 'Affected'".
+A blind rename might look suspicious, but this is expected to be fine:
+the places that rely on current 'Collector' should already be inside
+code whose surrounding tree context guarantees that the parent is some
+kind of collection scaffold.
+
+During implementation, if a tree-context-free call site would actually
+be harmed by the collapse, flag it with a code comment and handle it
+locally.  Do not preserve 'Collector' merely for theoretical clarity.
+
+** closed unless implementation finds a concrete tree-context-free hazard
+
+Some code reads only a metadata sexp or a TrueNode, not its parent.  The
+new meaning depends more heavily on the parent kind:
+
+- 'Affected' under a Vognode is content;
+- 'Affected' under 'SubscribeeCol' is a subscribee relation member;
+- 'Affected' under other relation scaffolds means other relations.
+
+Any consumer that currently interprets parentIs without tree context
+can usually be narrowed to "affected at all".  This is expected not to
+matter in practice.  During implementation, flag concrete harmful cases
+with a code comment instead of complicating the design in advance.
+
+** closed: Affected is acceptable with a constructor comment
+
+'Affected' says that saving this child affects the parent, but it does
+not say what domain it affects.  Names like 'Member' or
+'CollectionMember' would more directly match the proposed definition.
+
+If the enum remains named 'ParentIs', 'ParentIs::Affected' also reads a
+little oddly, but the name is acceptable.  Add a clear constructor
+comment explaining that 'Affected' means the child is a member of the
+collection represented by its visible parent, which in the case of a
+Vognode is its content.
+
+** closed: Birth is not save-editable and not cycleable
+
+'Birth' sounds historical and view-derived, not user-intent-bearing.
+That suggests users should not casually edit it to change save
+semantics.  But the old 'ParentIs::Content' and 'ParentIs::LinkTarget'
+were visible metadata and could technically be edited.
+
+The intended policy is:
+
+- render it;
+- parse it;
+- use it for display and relation-claim validation;
+- do not use it for save extraction;
+- do not hide it in 'viewStats';
+- do not make it cycleable;
+- do not make it editable if the metadata view already supports
+  non-editable fields;
+- if making it non-editable would require inventing non-editability for
+  the metadata view, skip that and only make it non-cycleable.
+
+** Birth placement still needs confirmation
+
+The likely implementation home is 'TrueNode_Generic', because that is
+where all current source fields live.  That is not perfectly narrow:
+phantoms inherit it, and not every TrueNode needs it.  A more precise
+home might be only the normal/phantom Vognode cases that can currently
+carry 'ParentIs::Content' or 'ParentIs::LinkTarget'.
+
+This is worth checking during implementation, but it should not block
+the plan.  Do not put 'Birth' on top-level 'ViewNode' unless forced.

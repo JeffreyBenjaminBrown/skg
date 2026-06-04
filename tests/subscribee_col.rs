@@ -6,6 +6,7 @@ use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::typedb::nodes::create_all_nodes;
 use skg::dbs::typedb::relationships::create_all_relationships;
+use skg::dbs::typedb::sources::create_all_sources;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID};
 
@@ -36,6 +37,7 @@ async fn setup_multi_source_test(
     . collect ();
   overwrite_new_empty_typedb_db(db_name, &driver) . await?;
   read_and_use_schema(db_name, &driver) . await?;
+  create_all_sources(db_name, &driver, &config) . await?;
   create_all_nodes(db_name, &driver, &typedb_nodes) . await?;
   create_all_relationships(db_name, &driver, &typedb_nodes) . await?;
   Ok((config, driver)) }
@@ -74,11 +76,11 @@ fn test_subscribee_col_appears_for_subscribers(
     let expected = indoc! {
       "* (skg (node (id 1) (source home) (parentIs absent) (graphStats (contents 4)) (viewStats (sourceHerald ⌂:home)))) 1
       ** (skg (node (id 11) (source home) (graphStats (contents 1) subscribing))) 11
-      *** (skg subscribeeCol) it subscribes to these
+      *** (skg subscribeeCol)
       **** (skg (node (id 11-sees) (source away) indef (graphStats (containers 0) subscribing) (viewStats (sourceHerald ⌂:away)))) 11-sees
       *** (skg (node (id 111) (source home))) 111
       ** (skg (node (id 12) (source home) (graphStats subscribing))) 12
-      *** (skg subscribeeCol) it subscribes to these
+      *** (skg subscribeeCol)
       **** (skg (node (id 12-sees) (source away) indef (graphStats (containers 0) subscribing) (viewStats (sourceHerald ⌂:away)))) 12-sees
       ** (skg (node (id 13) (source home))) 13
       ** (skg (node (id 14) (source home) (graphStats (contents 1)))) 14

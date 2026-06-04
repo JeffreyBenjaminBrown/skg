@@ -348,7 +348,7 @@ That suggests a narrower completion contract:
   not caught by the validation step
   will still have no effect; those non-editable things
   will respawn during completion to be as they were before.
-- A definitive subscribee shown under SubscribeeCol has user-edited
+- A definitive subscribee shown as a child of SubscribeeCol has user-edited
   visible children whose absence/presence matters for fork inference.
 - HiddenInSubscribeeCol and HiddenOutsideOfSubscribeeCol remain
   generated display for now.
@@ -658,7 +658,7 @@ installed.
 
 The current DefineNode pipeline now has a focused prerequisite for
 future fork-edit work: a SaveNode for a node whose own buffer position
-is directly under SubscribeeCol no longer uses that position's child
+is as a child of SubscribeeCol no longer uses that position's child
 list as the node's real graph 'contains' list. This is a guardrail,
 not the final semantics for that child list.
 
@@ -676,7 +676,7 @@ is 'AsSubscribee'. During
 and disk supplementation, those subscribee-as-such SaveNodes get
 their 'contains' restored from the pre-save disk node.
 
-Important correction: the buffer child list under a subscribee-as-such
+Important correction: the buffer child list of a subscribee-as-such
 is not meaningless and should not be discarded conceptually. It is
 user input whose eventual meaning is subscriber visibility:
 
@@ -762,7 +762,7 @@ struct SubscribeeVisibilityEdit {
 }
 #+end_src
 
-The pass should compare the buffer's visible children under
+The pass should compare the buffer's visible children of
 the subscribee against the subscribee's pre-save graph 'contains' and
 the subscriber's current 'hides_from_its_subscriptions':
 
@@ -1070,7 +1070,7 @@ Results:
 * Update 2026-05-12: SubscribeeCol preservation done
 
 Saved-view completion now preserves visible children of a
-definitive TrueNode directly under SubscribeeCol instead of
+definitive TrueNode child of SubscribeeCol instead of
 regenerating that child list from disk. This keeps user-authored
 as-subscribee branch edits in the returned saved view, so the later
 hide/unhide inference work has a stable surface to interpret.
@@ -1078,7 +1078,7 @@ hide/unhide inference work has a stable surface to interpret.
 The rule is intentionally narrow:
 
 - only saved-view rerender;
-- only subscribee-as-suchs under SubscribeeCol;
+- only subscribee-as-suchs that are children of SubscribeeCol;
 - only normal non-diff mode;
 - collateral views and diff views still reconcile from graph/diff
   data.
@@ -1127,7 +1127,7 @@ The first hide-inference feature slice is implemented:
   'contains' edits for the subscribee;
 - saved-view rerender now inserts HiddenInSubscribeeCol under
   expanded subscribees when the updated subscriber hides intersect
-  the subscribee's direct content.
+  the subscribee's content.
 
 Indefinitive subscribees with a pending definitive-view request do
 not produce visibility intents. That prevents the expansion request

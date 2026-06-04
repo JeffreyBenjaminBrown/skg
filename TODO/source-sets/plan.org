@@ -219,7 +219,7 @@ Other surfaces:
   source-set is =all= or the ID is active
 - =get file path= should not expose inactive-source paths through Skg
   commands
-- direct file visits remain outside Skg's control
+- raw file visits remain outside Skg's control
 ** 10. Heralds and stats
 Prefer source-set-aware stats where practical.
 
@@ -260,7 +260,7 @@ Do not use broad comments like "heralds lie"; name each lie.
 - moving inactive placeholder reorders =contains=
 - deleting inactive placeholder removes it from =contains=
 - editing inactive placeholder title/body/metadata/source/id is rejected
-- adding active child under inactive placeholder is rejected
+- adding active child of inactive placeholder is rejected
 - duplicating inactive placeholder is either rejected or has defined
   duplicate-content behavior
 ** Backward view tests

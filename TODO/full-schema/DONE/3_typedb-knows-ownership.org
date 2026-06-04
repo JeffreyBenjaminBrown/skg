@@ -1,0 +1,370 @@
+* plan : represent source ownership in TypeDB
+** overview
+This plan implements the metaplan item:
+"represent source ownership in TypeDB".
+
+The stage makes sources first-class TypeDB entities.  Nodes should no
+longer own a string 'source' attribute in TypeDB.  Instead, every
+TypeDB node belongs to exactly one configured source through a
+relationship.
+
+This is intentionally broader than merely adding an ownership flag.
+It rewrites TypeDB source modeling so later override validation can
+ask ownership questions directly in graph terms.
+
+This stage does not yet implement override monogamy,
+override-chain validation, or override substitution.  It builds the
+database model those stages need.
+** target state
+TypeDB contains one entity for each configured Skg source.  Each
+source entity owns:
+- the source name,
+- whether the user owns that source.
+
+Each node is connected to exactly one source entity by a relationship.
+The node's source is no longer represented in TypeDB as a string
+attribute on the node.
+
+Queries can distinguish:
+- nodes from user-owned sources,
+- nodes from foreign sources,
+- source names for nodes,
+- all nodes belonging to a source.
+
+The Rust filesystem, org metadata, Tantivy documents, and in-Rust
+graph may still use 'SourceName' and source strings.  This stage
+changes the TypeDB representation and every TypeDB query that depends
+on it.
+** schema design
+Use a first-class source entity:
+#+begin_example
+attribute source_name, value string;
+attribute user_owns_it, value boolean;
+
+entity source,
+  owns source_name @key,
+  owns user_owns_it,
+  plays has_source:source;
+
+relation has_source,
+  relates node,
+  relates source;
+#+end_example
+
+Change 'node' from:
+#+begin_example
+owns source,
+#+end_example
+
+to:
+#+begin_example
+plays has_source:node @card(1),
+#+end_example
+
+Remove the old TypeDB attribute:
+#+begin_example
+attribute source, value string;
+#+end_example
+
+The existing 'textlinks_to:source' role name can remain.  TypeDB labels
+can distinguish a role name from an entity type, but the implementation
+should be careful in code and comments to avoid ambiguity.  When prose
+would be unclear, say "source entity" for the new entity and
+"'textlinks_to' source role" for the textlink role.
+*** Enforce exactly one source per node in TypeDB
+Use a TypeDB cardinality constraint on the node role:
+#+begin_example
+plays has_source:node @card(1),
+#+end_example
+
+This means a node cannot be committed without exactly one source
+relationship, and cannot be committed with more than one.
+
+This constraint is stronger and cleaner than checking only in Rust,
+but it affects transaction boundaries:
+- newly-created nodes must be inserted and attached to their source in
+  the same transaction,
+- source moves must delete the old 'has_source' relation and insert
+  the new one in the same transaction,
+- tests or setup helpers may not create bare nodes and attach sources
+  in a later transaction.
+
+Keep Rust-side tests and audits anyway, because they produce clearer
+failure messages than a raw TypeDB constraint violation.
+** TypeDB migration scope
+This is not an on-disk data migration.  The server already rebuilds
+TypeDB from '.skg' files and 'skgconfig.toml'.  The implementation can
+change the schema and rebuild TypeDB from source files.
+
+The on-disk '.skg' node metadata still carries source names where it
+does today.  The TypeDB loader converts those source names into
+'has_source' relations.
+** Rust implementation work
+*** Add TypeDB source helpers
+Create a small TypeDB source module, probably
+'server/dbs/typedb/sources.rs', responsible for:
+- inserting source entities from 'SkgConfig.sources',
+- creating a node's 'has_source' relation,
+- replacing a node's 'has_source' relation on source moves,
+- querying source name and ownership for nodes,
+- test helpers for source entity counts and relation integrity.
+
+Suggested public helpers:
+- 'create_all_sources(db_name, driver, config)'
+- 'create_node_source_relation(tx, node_pid, source_name)'
+- 'replace_node_source_relation(db_name, driver, pid, new_source)'
+- 'source_name_for_node_ids(db_name, driver, ids)'
+- 'source_ownership_for_node_ids(db_name, driver, ids)'
+
+The exact names can follow local conventions.
+*** Initialize source entities before nodes
+In full TypeDB initialization:
+1. overwrite database,
+2. read schema,
+3. create source entities from config,
+4. create nodes together with their node-source relations,
+5. create graph relationships.
+
+Source entities must exist before any node can be inserted, because
+the 'has_source:node @card(1)' constraint requires each node to have
+exactly one source relation at commit time.
+*** Attach new nodes to source entities
+Update TypeDB node creation so every newly inserted node gets exactly
+one 'has_source' relation to the source entity matching
+'NodeTypedb.source'.
+
+If a node refers to a source name absent from the config, fail loudly.
+That indicates either invalid input data or a setup path that forgot to
+create source entities.
+*** Rewrite TypeDB source queries
+Find every TypeQL query that matches or selects the old node source
+attribute:
+#+begin_example
+$n isa node, has source $source;
+#+end_example
+
+Rewrite it through the source entity:
+#+begin_example
+$n isa node;
+$src isa source, has source_name $source;
+$rel isa has_source (node: $n, source: $src);
+#+end_example
+
+Expected affected areas include:
+- 'pid_and_source_from_id',
+- title/source lookup helpers,
+- source-set filtering queries,
+- graph stats or ancestry queries that read source,
+- tests that directly query source attributes,
+- any TypeDB audit comparing TypeDB to the in-Rust graph.
+
+Do not rewrite non-TypeDB source handling merely for style.  The
+required rewrite is for TypeDB schema/query correctness.
+*** Rewrite node insertion
+The TypeDB insertion for a node should no longer include:
+#+begin_example
+has source "..."
+#+end_example
+
+It should insert the node with its id, then attach the source relation.
+For example:
+#+begin_example
+match
+  $src isa source, has source_name "main";
+insert
+  $n isa node, has id "node-id";
+  $r isa has_source (node: $n, source: $src);
+#+end_example
+
+Node insertion and source-relation insertion must run in the same
+transaction for a newly-created node, otherwise the cardinality
+constraint will reject the commit.
+*** Update source moves
+'update_node_source' should stop editing a node string attribute.
+It should instead, in one transaction:
+- match the node,
+- delete its old 'has_source' relation,
+- match the new source entity by 'source_name',
+- insert the new 'has_source' relation.
+
+The function name may remain if it is still the local convention, but
+its comment must say that it updates the TypeDB 'has_source'
+relationship.
+*** Keep outbound relationship deletion scoped
+'delete_all_outbound_relationships_to_nodes' should continue deleting only the
+five schema graph relationships:
+- 'contains'
+- 'textlinks_to'
+- 'subscribes'
+- 'hides_from_its_subscriptions'
+- 'overrides_view_of'
+
+It must not delete 'has_source'.  Source membership is maintained by
+node creation and explicit source moves, not by ordinary outbound
+relationship refresh.
+*** Update TypeDB audit
+Any audit that compares the in-Rust graph against TypeDB should verify
+source membership through 'has_source', not through a node source
+attribute.
+
+The audit should catch:
+- node with no source relation,
+- node with more than one source relation,
+- node whose source relation disagrees with in-Rust graph source,
+- source entity whose ownership disagrees with config if the audit has
+  access to config.
+*** Incremental initialization
+Config changes that affect sources or ownership need not be noticed by
+a running server.  A running server can keep using the config it loaded
+at startup.
+
+At server startup, when deciding whether incremental init is allowed,
+check 'skgconfig.toml' mtime, or an equivalent config fingerprint.  If
+the config changed since the last successful init, do a full rebuild
+instead of incremental init.
+
+This is broader than source ownership alone, but it is the conservative
+behavior the metaplan permits.  There is no polling and no dynamic
+config reload.  User changes to 'skgconfig.toml' are simply ignored
+until the user restarts the server.
+*** Test helpers and direct TypeDB setup
+Several test helpers call:
+- 'read_and_use_schema',
+- 'create_all_nodes',
+- 'create_all_relationships'
+directly.
+
+Update those helpers so source entities are created before nodes.
+Any helper that loads a config should use that config's sources.  Any
+helper that only points at one fixture directory should create a
+minimal config with one owned source named 'main', matching today's
+fixture convention.
+** Query contract for later stages
+The stage should leave behind one clear ownership-aware TypeQL pattern
+for later override validation:
+#+begin_example
+match
+  $n isa node, has id $id;
+  $src isa source, has user_owns_it true;
+  $rel isa has_source (node: $n, source: $src);
+select $id;
+#+end_example
+
+Later stages should be able to compose this with override queries:
+#+begin_example
+match
+  $overrider isa node, has id $overrider_id;
+  $overridden isa node, has id $overridden_id;
+  $override isa overrides_view_of
+    (overrider: $overrider, overridden: $overridden);
+  $src isa source, has user_owns_it true;
+  $source_rel isa has_source (node: $overrider, source: $src);
+select $overrider_id, $overridden_id;
+#+end_example
+** Tests
+*** Schema and initialization tests
+Add a focused TypeDB test that initializes from a multi-source config
+with one owned source and one foreign source, then verifies:
+- one source entity exists for each configured source,
+- 'source_name' values match config names,
+- 'user_owns_it' values match config,
+- each node has exactly one 'has_source' relation,
+- no node has the old TypeDB 'source' attribute.
+
+Use an existing multi-source fixture if it is clear and stable, such
+as 'tests/save/validate_foreign_nodes/skgconfig.toml'.  Otherwise add
+a tiny dedicated fixture for this stage.
+*** Query behavior tests
+Add tests for source query helpers:
+- a node from an owned source reports owned,
+- a node from a foreign source reports foreign,
+- a node's source name can be recovered,
+- an absent node is absent from the result rather than treated as
+  owned or foreign.
+*** Existing source lookup tests
+Update tests that currently assert source lookup through the old
+attribute, especially tests around 'pid_and_source_from_id'.  Their
+behavior should remain the same from Rust's perspective: given an ID,
+the code still recovers the node PID and source name.
+*** Source move test
+Extend an existing source-move TypeDB test, or add a focused one, so
+after moving a node from one source to another:
+- the old 'has_source' relation is gone,
+- the new 'has_source' relation points to the new source entity,
+- the node no longer has any old TypeDB string source attribute,
+- ownership queries reflect the new source.
+*** Incremental-init guard test
+Add a focused unit or integration-level test for the incremental
+precondition if practical:
+- at startup, when 'skgconfig.toml' is newer than '.skg_init_marker',
+  incremental init is refused and full init is chosen.
+
+If this precondition is hard to test without exposing too much private
+state, keep the code small and rely on the full suite, but record the
+gap in 'progress.org'.
+*** Regression suite
+Run focused checks first:
+#+begin_example
+cargo check
+cargo test --test typedb source
+cargo test --test typedb pid_and_source
+cargo test --test move_source
+#+end_example
+
+Then run:
+#+begin_example
+bash/all-tests.sh
+#+end_example
+** Docs
+Update 'schema.tql' comments to explain:
+- source entities represent configured Skg sources,
+- 'source_name' is the config source name,
+- 'user_owns_it' comes from 'skgconfig.toml',
+- nodes belong to sources through 'has_source',
+- nodes do not own a TypeDB string source attribute.
+
+Update any docs that describe the TypeDB schema or TypeDB source
+queries.  Do not change user-facing org metadata docs unless the
+implementation changes org metadata, which this stage should avoid.
+** acceptance criteria
+This stage is complete when:
+- TypeDB schema represents sources as entities,
+- TypeDB nodes no longer own a string 'source' attribute,
+- every TypeDB node has exactly one 'has_source' relation,
+- source entities carry 'source_name' and 'user_owns_it',
+- all TypeDB source queries use 'has_source',
+- source moves update 'has_source',
+- ownership-aware TypeQL queries distinguish owned and foreign nodes,
+- incremental init falls back to full rebuild after config changes,
+- existing user-visible behavior is otherwise unchanged,
+- focused tests pass,
+- 'bash/all-tests.sh' passes.
+** risks and guardrails
+*** This is a broad TypeDB query migration
+Expect more files to change than in the compatibility plan.  Keep the
+blast radius limited to TypeDB schema, TypeDB query helpers, TypeDB
+setup, TypeDB tests, and docs unless a caller must change to preserve
+the same public behavior.
+*** The word 'source' now names several things
+There will be:
+- a TypeDB 'source' entity,
+- a 'has_source:source' role,
+- a 'textlinks_to:source' role,
+- Rust 'SourceName' values,
+- org metadata '(source ...)'.
+
+Use precise local names in code when ambiguity would hurt readability.
+*** Source relations must be total and singular
+Every node should have exactly one 'has_source' relation.  Tests should
+catch zero-source and multi-source states.
+*** Save-time node creation needs source entities
+If a code path creates nodes after schema setup but before source
+entities exist, node creation should fail.  Fix the setup path rather
+than weakening the invariant.
+*** Config changes during a running server are out of scope
+The server may require restart and rebuild for source ownership
+changes.  Do not add dynamic config reload behavior here.
+*** Override validation belongs to the next stage
+This stage should prove that TypeDB knows ownership.  It should not
+start rejecting override shapes yet except for errors directly caused
+by missing or inconsistent source entities or source relations.

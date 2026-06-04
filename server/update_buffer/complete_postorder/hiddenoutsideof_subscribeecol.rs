@@ -1,14 +1,13 @@
 use crate::types::env::SkgEnv;
 use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_scaffold_children};
 use crate::to_org::complete::sharing::goal_list::goal_list_for_hiddenoutsideof_subscribeecol;
-use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::tree::generic::{pid_and_source_from_ancestor, read_at_ancestor_in_tree};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Scaffold, ParentIs};
-use crate::update_buffer::util::{detach_scaffold_if_empty, treat_certain_children};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol};
+use crate::update_buffer::util::detach_scaffold_if_empty;
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -40,8 +39,8 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
   env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
-  let kind : SharingScaffoldKind =
-    SharingScaffoldKind::HiddenOutsideOfSubscribeeCol;
+  let kind : RoleCol =
+    RoleCol::HiddenOutsideOfSubscribee;
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
   validate_hiddenoutside_parent (tree, node) ?;
@@ -54,12 +53,10 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
       tree, node, &context,
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
-
   reconcile_sharing_scaffold_children(
+    // PITFALL: ('reconcile_hiddenin_subscribee_col_children' has a similar note.) Unlike relation-collection reconciliation, this read-only generated collection does not call mark_managed_children_outside_goal_independent first.  A non-goal child marked parentIs=affected is a stale member, so reconciliation should remove it rather than preserving it as independent.
     tree, node, kind,
     &goal_list, &child_data ) ?;
-  mark_children_outside_goal_independent (
-    tree, node, &goal_list ) ?;
   detach_scaffold_if_empty (tree, node) ?;
   Ok(( )) }
 
@@ -70,7 +67,8 @@ fn validate_hiddenoutside_parent (
   read_at_ancestor_in_tree(
       tree, node, 1,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Scaff (Scaffold::SubscribeeCol) => Ok(( )),
+        ViewNodeKind::PartnerCol (RoleCol::Subscribee)
+          => Ok(( )),
         _ => Err( "reconcile_hiddenoutside_subscribee_col_children: \
                    ancestor 1 is not a SubscribeeCol" ) } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
@@ -80,7 +78,7 @@ fn validate_hiddenoutside_parent (
 fn read_hiddenoutside_context (
   tree : &Tree<ViewNode>,
   node : NodeId,
-  kind : SharingScaffoldKind,
+  kind : RoleCol,
   env  : &SkgEnv,
 ) -> Result<HiddenOutsideContext, Box<dyn Error>> {
   let (subscriber_pid, subscriber_source) : (ID, SourceName) =
@@ -130,24 +128,3 @@ fn build_hiddenoutside_child_data (
     tree, node, &context . subscriber_pid, &context . subscriber_source,
     goal_list, removed_ids,
     source_diffs, deleted_since_head_pid_src_map, env ) }
-
-fn mark_children_outside_goal_independent (
-  tree      : &mut Tree<ViewNode>,
-  node      : NodeId,
-  goal_list : &[ID],
-) -> Result<(), Box<dyn Error>> {
-  let goal_set : HashSet<ID> =
-    goal_list . iter() . cloned() . collect();
-  treat_certain_children(
-    tree, node,
-    |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::True (t) =>
-        !t . parent_ignores_it()
-        && !goal_set . contains( &t . id )
-        && !t . is_phantom(),
-      _ => false },
-    |vn : &mut ViewNode| {
-      if let ViewNodeKind::True( ref mut t ) = vn . kind {
-        t . parentIs = ParentIs::Independent; } },
-  ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
-  Ok (( )) }

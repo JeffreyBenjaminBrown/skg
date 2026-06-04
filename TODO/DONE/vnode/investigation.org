@@ -1,0 +1,441 @@
+* Investigation: restructuring ViewNode around Vnode/Gnode/collections/diff
+
+** Summary
+
+The proposed shape is directionally right.  The current code has been
+accumulating several different axes inside two broad labels,
+'TrueNode' and 'Scaffold':
+
+- persistent graph-node displays, with different liveness/editability
+  states;
+- generated collection headers;
+- generated collection members such as aliases and IDs;
+- git-diff display markers;
+- unresolvable or inactive graph-node placeholders.
+
+Splitting those concepts would make the type names match the mental
+model much better.  The benefit is not mainly fewer lines.  The benefit
+is that validation, save-role classification, completion, and rendering
+would stop rediscovering the same distinctions with large match
+expressions.
+
+The cost is moderate-to-high because 'ViewNodeKind::True' and
+'ViewNodeKind::Scaff' are part of the core parse/render/save/completion
+surface.  A naive one-shot rename and enum rewrite would touch many
+files.  A staged refactor can get most of the benefit with much less
+risk.
+
+** Current shape
+
+The current central type is:
+
+- 'ViewNode' = display flags plus 'ViewNodeKind'.
+- 'ViewNodeKind' =
+  'True', 'Scaff', 'Deleted', 'DeletedScaff', 'Unknown', 'Inactive'.
+- 'TrueNode' is a graph-node display with title, id, source,
+  'parentIs', graph/view stats, view requests, diff axes, git state,
+  and definitive/indefinitive editability.
+- 'Scaffold' =
+  'Alias', 'AliasCol', 'BufferRoot', 'RoleCol', 'ID', 'IDCol',
+  'TextChanged'.
+- 'RoleCol' is the eight relationship collection headers:
+  Subscribee, Subscriber, Overridden, Overrider, Hider, Hidden,
+  HiddenInSubscribee, HiddenOutsideOfSubscribee.
+
+The main definition is in 'server/types/viewnode.rs'.  The names already
+show the strain: 'Scaffold' contains both collection headers
+('AliasCol', 'IDCol', 'RoleCol') and collection leaves ('Alias', 'ID'),
+while 'ViewNodeKind' separately carries inactive, unknown, and deleted
+graph-node states.
+
+** Evidence that the program wants this structure
+
+*** Validation is already organized by the proposed categories
+
+'validate_local_structure' first separates true nodes from scaffolds,
+then immediately subdivides scaffolds into alias leaves, alias columns,
+ID leaves, ID columns, relation columns, and text-change nodes.  The
+special cases for 'HiddenInSubscribee', 'HiddenOutsideOfSubscribee',
+and 'Subscribee' are particularly telling: they are collection kinds
+with distinct origin-node depths, not just generic scaffolds.
+
+The proposed 'QualCol', 'Qual', 'PartnerCol', and 'Diff' split would
+make these validation branches more explicit:
+
+- 'QualCol' validates its own children are matching 'Qual' leaves.
+- 'PartnerCol' validates its children are graph-node-ish members, with
+  per-kind rules for special nested partner columns.
+- 'Diff' validates no semantic children, or only whatever diff-display
+  structure is intentionally allowed.
+- 'Gnode' validation owns source/id/title/body/editability concerns.
+
+*** Save-role classification already treats scaffolds as several things
+
+'server/from_text/viewnodes_to_instructions/classify.rs' maps:
+
+- ordinary graph nodes to save candidates;
+- alias and ID leaves to display roles;
+- most scaffolds to no-save;
+- relation columns to save-role context for their graph-node children.
+
+That is close to the proposed model, but implemented as parent/child
+pattern matching on 'ViewNodeKind::Scaff (Scaffold::RoleCol ...)'.
+Making relation collection headers first-class would make the save
+surface easier to audit.
+
+*** 'originDepth' already exists in substance
+
+'RoleCol::correct_subscriber_ancestor_distance' in
+'server/to_org/complete/sharing/kind.rs' is nearly the proposed
+'originDepth'.  It returns:
+
+- 1 for ordinary relation columns;
+- 2 for 'HiddenOutsideOfSubscribee';
+- 3 for 'HiddenInSubscribee'.
+
+The current name is specifically about subscriber ancestor distance.
+If generalized, the same method could become 'origin_depth' or
+'origin_ancestor_depth' on the partner-collection enum.
+
+*** Rendering and parsing are stringly but already bijective
+
+The client metadata strings already distinguish all of the proposed
+surface cases: 'aliasCol', 'idCol', 'subscribeeCol',
+'hiddenInSubscribeeCol', 'textChanged', '(inactiveNode ...)',
+'(unknownNode ...)', and so on.  The wire format therefore does not
+need to change just because the Rust enum structure changes.
+
+This is important: the refactor can be mostly internal if the
+parse/render functions preserve the same metadata sexps.
+
+** Benefits
+
+*** More accurate names
+
+'Gnode' or 'GraphNodeView' would say what 'TrueNode' currently means
+without implying that other view nodes are false.  'Vnode' is also less
+Emacs-specific than 'ViewNode' but keeps the central idea.
+
+'PartnerCol' is a better abstraction than a generic 'RoleCol' when the
+question is "which other graph nodes are being collected around this
+origin graph node?"  It fits subscribers, subscribees, overrides,
+hiders, and hidden nodes.
+
+*** Less duplicated tree-depth logic
+
+The special depths for hidden subscription collections are currently
+encoded in completion and save-role code.  A single
+'PartnerCol::origin_depth' would let consumers ask the type where its
+origin graph node lives.
+
+That would improve:
+
+- completion of partner columns;
+- save-role classification;
+- local validation error messages;
+- future UI commands that act on a collection's origin node.
+
+*** Cleaner parse/render boundary
+
+The current parser fills a large 'ViewnodeMetadata' struct with many
+optional fields, then chooses among Unknown, Inactive, Deleted,
+DeletedScaff, Scaff, and True.  A more structured target enum would let
+the conversion step express incompatibilities more directly.
+
+For example, 'Inactive' should not carry editable title/body;
+'Qual' should get its value from the headline title;
+'Diff::TextChanged' should carry staged/unstaged booleans; and a normal
+'Gnode::Active' should require id/source after the missing-info phase.
+
+*** Better compiler help
+
+Today, adding a new collection-ish kind means remembering to update:
+
+- 'Scaffold';
+- 'ScaffoldKind';
+- client string parsing;
+- client string rendering;
+- title/default-title logic;
+- local validation;
+- completion dispatch;
+- save-role classification;
+- test utilities.
+
+A nested enum will not eliminate those updates, but it can localize
+them.  For instance, every partner collection kind could share one
+string representation table and one set of semantic methods.
+
+** Costs and risks
+
+*** Broad mechanical churn
+
+The obvious blast radius includes:
+
+- 'server/types/viewnode.rs';
+- 'server/types/maybe_placed_viewnode.rs';
+- 'server/serve/parse_metadata_sexp.rs';
+- 'server/org_to_text.rs';
+- 'server/from_text/buffer_to_viewnodes/local.rs';
+- 'server/from_text/viewnodes_to_instructions/classify.rs';
+- 'server/from_text/viewnodes_to_instructions/to_naive_instructions.rs';
+- 'server/update_buffer/complete.rs';
+- completion modules under 'server/update_buffer/complete_*';
+- sharing completion under 'server/to_org/complete/sharing/';
+- diff rendering under 'server/to_org/render/diff.rs';
+- Emacs helpers that inspect metadata shape, especially
+  'elisp/skg-metadata.el' and 'elisp/skg-sexpr/*'.
+
+The compiler will catch many Rust omissions, but not semantic mistakes
+in tree-shape interpretation.
+
+*** Mp duplication doubles the work
+
+The parsed-buffer stage has parallel 'MpViewnode' and
+'MpViewnodeKind' types.  Any public enum reshaping has to be
+mirrored there or hidden behind conversions.  This is a strong argument
+for introducing helper methods before replacing variants.
+
+*** The proposed Gnode variants do not map 1:1 to current data
+
+Current graph-node-ish variants are:
+
+- 'True' with 'IndefOrDef::Definitive';
+- 'True' with 'IndefOrDef::Indefinitive';
+- 'Inactive';
+- 'Unknown';
+- 'Deleted';
+- phantoms represented as 'True' plus negative diff axes.
+
+The first implementation should use 'Vognode' ("view of graph node")
+for the view-level category, with 'Vognode::Normal' covering current
+definitive and indefinitive 'TrueNode' values, but not phantoms.
+'Vognode::Unknown' is clearer than 'Nonexistent' for the current
+'UnknownNode' case, especially because deleted nodes should remain
+separate.
+
+*** Diff state should be absorbed into Vognode and Qual
+
+'TextChanged' is a display node, but it behaves more like a generated
+qualifier of a graph node than like an independent diff tree.  'Phantom'
+is currently a graph node with membership/existence axes whose helper
+'is_phantom' returns true.  The cleaner target is therefore:
+
+- make 'TextChanged' a 'Qual' variant;
+- absorb phantoms into 'Vognode', preserving their graph-node payload.
+
+This avoids a separate 'Diff' top-level category.
+
+*** Wire compatibility must be preserved
+
+The Emacs client and tests expect existing metadata atoms.  I would keep
+the on-wire names stable during the first refactor:
+
+- keep 'subscribeeCol', not a new 'PartnerCol(Subscribee)' atom;
+- keep 'aliasCol', 'idCol', 'alias', 'id';
+- keep '(textChanged staged unstaged)';
+- keep '(inactiveNode ...)' and '(unknownNode ...)'.
+
+Renaming wire atoms can be a later, explicit compatibility project if
+it is still wanted.
+
+** Candidate target shape
+
+The vision's shape can be refined like this:
+
+#+begin_src rust
+  pub enum VnodeKind {
+    Vognode (Vognode),
+    QualCol (QualCol),
+    Qual (Qual),
+    PartnerCol (PartnerCol),
+    BufferRoot,
+    DeadScaffold,
+  }
+
+  pub enum Vognode { // View Of Gnode
+    Normal (Gnode),
+    Phantom (Gnode),
+    Inactive (InactiveGnode),
+    Unknown (UnknownGnode),
+    Deleted (DeletedGnode),
+  }
+
+  pub enum QualCol {
+    ID,
+    Alias,
+  }
+
+  pub enum Qual {
+    ID { id: ID, membership: MembershipAxes },
+    Alias { text: String, membership: MembershipAxes },
+    TextChanged { staged: bool, unstaged: bool },
+  }
+
+  pub enum PartnerCol {
+    Subscribee,
+    Subscriber,
+    Overridden,
+    Overrider,
+    Hider,
+    Hidden,
+    HiddenInSubscribee,
+    HiddenOutsideOfSubscribee,
+  }
+
+#+end_src
+
+This is a sketch, not final Rust.  The important point is to keep
+graph-node payload available for phantoms and to make every non-vognode
+kind a direct 'VnodeKind' variant, rather than preserving a catch-all
+'Scaffold' type.
+
+** Recommended path
+
+*** Stage 1: Rename and add semantic helper methods, no enum rewrite
+
+Do the low-risk wins first:
+
+- Add 'RoleCol::origin_depth' as a clearer alias or replacement for
+  'correct_subscriber_ancestor_distance'.
+- Add 'QualCol::origin_depth', because ID and alias collections also
+  collect data for an origin graph node.
+- Add methods such as 'ViewNodeKind::as_partner_col',
+  'ViewNodeKind::as_qual_col', 'ViewNodeKind::as_qual', and
+  'ViewNodeKind::id_if_vognode' or a similarly plain
+  helper for the mechanical "has an ID field" test.
+- Rename comments/docs from "TrueNode" toward "graph-node view" where
+  no wire/API name changes are involved.
+
+This lets save, validation, and completion start depending on semantic
+queries rather than raw nested matches.
+
+*** Stage 2: Promote scaffold variants into VnodeKind
+
+Introduce:
+
+- 'QualCol';
+- 'Qual';
+- 'PartnerCol' as a rename of 'RoleCol'
+- 'TextChanged' as a 'Qual' variant
+
+Then replace the broad 'Scaffold' category with direct 'VnodeKind'
+variants:
+
+#+begin_src rust
+  pub enum VnodeKind {
+    Vognode (Vognode),
+    QualCol (QualCol),
+    Qual (Qual),
+    PartnerCol (PartnerCol),
+    BufferRoot,
+  }
+#+end_src
+
+This is noisier than merely splitting 'Scaffold' internally, but it
+matches the desired model: 'Scaffold' is not a real conceptual category;
+it is just the current collection of non-vognode vnode kinds.
+
+*** Stage 3: Introduce the Vognode state model
+
+Before changing 'ViewNodeKind::True/Inactive/Unknown/Deleted', encode
+the distinction that a Vognode is a Vnode corresponding to
+a whole node from the graph,
+rather than a mere aspect of one or collection thereof.
+Mechanically, a Vnode is a Vognode if and only if it has an ID field.
+
+That suggests:
+
+- 'Vognode::Normal(Gnode)' for current non-phantom 'True';
+- 'Vognode::Phantom(Gnode)' for phantom graph-node displays;
+- 'Vognode::Inactive(InactiveGnode)' for current 'Inactive';
+- 'Vognode::Unknown(UnknownGnode)' for current 'Unknown';
+- 'Vognode::Deleted(DeletedGnode)' for current 'Deleted'.
+
+Then generic code like "collect IDs from tree" can match one branch.
+
+*** Stage 4: Rename public Rust types
+
+Only after the shape is settled:
+
+- 'ViewNode' -> 'Vnode';
+- 'ViewNodeKind' -> 'VnodeKind';
+- 'TrueNode' -> 'Gnode' once 'Vognode' owns the view-state enum role;
+- 'MpViewnode' -> 'MpVnode'.
+
+This is mostly mechanical but noisy.  It is best done after semantic
+helpers have reduced the amount of pattern-matching churn.
+
+** Testing strategy
+
+This refactor should have focused coverage around stable behavior:
+
+- parse/render round trips for every metadata kind;
+- validation errors for each collection shape;
+- save-role classification for ordinary content, alias/id displays,
+  subscribee-as-such, overridden, hidden-in-subscribee, and
+  hidden-outside;
+- diff rendering for 'TextChanged' and phantoms;
+- active-source-set rendering for inactive nodes;
+- unknown/deleted node preservation through rerender/save.
+
+I would not start by broadening integration tests.  First preserve the
+small Rust unit surfaces that define the tree and metadata semantics.
+Then run the existing save/content/diff integration tests as regression
+coverage.
+
+** problems
+
+*** 'Nonexistent' should distinguish unknown from deleted unless there is a reason not to
+
+Current 'UnknownNode' and 'DeletedNode' are intentionally different.
+'DeletedNode' knows source/title/body and preserves a deleted subtree.
+'UnknownNode' only knows an ID.  Collapsing both into 'Nonexistent'
+would lose useful semantics unless 'Nonexistent' has subvariants.  The
+current plan avoids this by using separate 'Vognode::Unknown' and
+'Vognode::Deleted' variants.
+
+*** TextChanged as Qual has an unusual origin distance
+
+If 'TextChanged' becomes a 'Qual', it differs from ID and Alias in tree
+shape.  ID and Alias live under a 'QualCol', so their origin is two
+ancestor links away.  TextChanged is directly under the origin node, so
+its origin is one ancestor link away.  This is fine if 'originDepth' is
+defined on 'QualCol' rather than every 'Qual', but it should be stated
+where the type is defined.
+
+*** 'PartnerCol' needs an editability/read-only policy
+
+Some partner collections are writable from this side
+('Subscribee', 'Overridden').  Others are read-only displays
+('Subscriber', 'Overrider', 'Hider', 'Hidden'), while hidden subscription
+collections are semantically editable through a different surface.  This
+should probably be a method on the enum, not scattered comments.
+
+*** There is already an origin-depth implementation to preserve
+
+Do not reimplement the depth table from the vision from scratch without
+checking 'RoleCol::correct_subscriber_ancestor_distance'.  It already
+has the values the vision calls for, with tests likely relying on its
+callers.
+
+*** DeadScaffold might need more rendering context
+
+Eliminating 'Scaffold' does not eliminate the "deleted scaffolding"
+problem.  Any non-vognode kind can have view-descendents.  If such a
+node is deleted but its descendents must be preserved in the buffer, the
+deleted parent needs to remain as an inert placeholder.  Current code
+does this with 'DeletedScaff(ScaffoldKind)'.
+
+The current code does use the old 'ScaffoldKind': it renders
+'(deletedScaffold kind)' and uses 'kind.default_title()' as the title.
+So a bare 'DeadScaffold' is sufficient only if we are willing to render
+all deleted non-vognodes with generic metadata/title, or if we preserve
+the old headline title elsewhere.  That is probably acceptable, but it
+is a real wire/rendering decision rather than a purely type-level
+simplification.
+
+**** TODO I don't see any problem with it.
+
+When you adjust the tests, if I see any bad consequences
+I haven't thought of yet, we can respond to them.
+For now I think it's safe to proceed.

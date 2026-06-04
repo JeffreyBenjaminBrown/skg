@@ -4,16 +4,32 @@
 /// HiddenInSubscribeeCol, and HiddenOutsideOfSubscribeeCol. Each
 /// completer used to define a near-identical local copy of this
 /// struct and a near-identical `build_*_child_data` helper.
+///
+/// Vocabulary for this module:
+///
+/// - A `goal_list` is the ordered list of node IDs that a scaffold
+///   should present after completion.  The list is computed from the
+///   graph and, in diff views, from git-diff state.
+/// - A goal child is a child ViewNode whose TrueNode ID appears in
+///   that `goal_list`, whether it already existed in the buffer or
+///   was created during reconciliation.
+/// - A relevant child is one this reconciliation pass is allowed to
+///   manage: for sharing scaffolds, a TrueNode marked parentIs=affected.
+///   Relevant children whose IDs are not in the goal list are removed
+///   or otherwise demoted by the caller-specific cleanup step.
+/// - `ChildData` is the pre-fetched title/source/phantom metadata
+///   needed to create any missing goal child without querying while
+///   the tree is being mutated.
 
-use crate::to_org::complete::sharing::kind::SharingScaffoldKind;
 use crate::types::env::SkgEnv;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::misc::{ID, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_viewnode, mk_phantom_viewnode};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Vognode, ParentIs, RoleCol, mk_indefinitive_viewnode, mk_phantom_viewnode};
 use crate::update_buffer::util::complete_relevant_children_in_viewnodetree;
+use crate::update_buffer::util::treat_certain_children;
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -23,7 +39,7 @@ use std::error::Error;
 /// scaffold's child (subscribee, hidden-in-subscribee, or
 /// hidden-outside-of-subscribees).
 ///
-/// `phantom: None` => normal indef Container child.
+/// `phantom: None` => normal indef child marked ParentIs::Affected.
 /// `phantom: Some(axes)` => diff-view phantom marking removal.
 pub struct ChildData {
   pub source  : SourceName,
@@ -58,10 +74,11 @@ pub fn build_child_data (
         . ok_or ("build_child_data: node not found") ?;
     let mut m : HashMap<ID, (SourceName, String)> = HashMap::new ();
     for child_ref in node_ref . children () {
-      if let ViewNodeKind::True (t) = & child_ref . value () . kind {
-        m . insert ( t . id . clone (),
-                     ( t . source . clone (),
-                       t . title . clone () )); }}
+      if let ViewNodeKind::Vognode (Vognode::Normal (t))
+        = & child_ref . value () . kind
+        { m . insert ( t . id . clone (),
+                       ( t . source . clone (),
+                         t . title . clone () )); }}
     m };
   let mut result : HashMap<ID, ChildData> = HashMap::new ();
   for child_skgid in goal_list {
@@ -111,11 +128,11 @@ pub fn build_child_data (
 /// `complete_relevant_children_in_viewnodetree` with identical
 /// relevance/key/create closures. Phantom-flagged ChildData entries
 /// produce phantom viewnodes; non-phantom entries produce
-/// indefinitive Container viewnodes.
+/// indefinitive viewnodes marked ParentIs::Affected.
 pub fn reconcile_sharing_scaffold_children (
   tree          : &mut Tree<ViewNode>,
   scaffold_node : NodeId,
-  kind          : SharingScaffoldKind,
+  kind          : RoleCol,
   goal_list     : &[ID],
   child_data    : &HashMap<ID, ChildData>,
 ) -> Result<(), Box<dyn Error>> {
@@ -123,22 +140,52 @@ pub fn reconcile_sharing_scaffold_children (
   complete_relevant_children_in_viewnodetree (
     tree, scaffold_node,
     |vn : &ViewNode| matches! ( &vn . kind,
-                                ViewNodeKind::True (t)
-                                if !t . parent_ignores_it () ),
+                                ViewNodeKind::Vognode (Vognode::Normal (t))
+                                if t . parentIs == ParentIs::Affected ),
     |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::True (t) => t . id . clone (),
-      _ => panic! ( "{}: relevant child not TrueNode", label ) },
+      ViewNodeKind::Vognode (Vognode::Normal (t))
+        => t . id . clone (),
+      _ => panic! ( "{}: relevant child not a normal graph node", label ) },
     goal_list,
     |id : &ID| {
       let d : &ChildData =
         child_data . get (id) . unwrap_or_else (
           || panic! ( "{}: child data not pre-fetched", label ));
       match d . phantom {
-        None =>
-          mk_indefinitive_viewnode (
-            id . clone (), d . source . clone (),
-            d . title . clone (), ParentIs::Container ),
+        None => mk_indefinitive_viewnode ( id . clone (),
+                                           d . source . clone (),
+                                           d . title . clone (),
+                                           ParentIs::Affected ),
         Some ((ex, mem)) =>
           mk_phantom_viewnode (
             id . clone (), d . source . clone (),
-            d . title . clone (), ex, mem ) } } ) }
+            d . title . clone (), ex, mem ) } } ) ?;
+  mark_goal_children_as_collectionBranch_members (
+    tree, scaffold_node, goal_list) ?;
+  Ok (( )) }
+
+/// See this module's header for definition of "goal child".
+///
+/// This funciton repairs surviving or newly matched goal children whose
+/// membership marker is stale, so the scaffold continues to own them
+/// as generated collection members.
+fn mark_goal_children_as_collectionBranch_members (
+  tree          : &mut Tree<ViewNode>,
+  scaffold_node : NodeId,
+  goal_list     : &[ID],
+) -> Result<(), Box<dyn Error>> {
+  let goal_set : HashSet<ID> =
+    goal_list . iter () . cloned () . collect ();
+  treat_certain_children (
+    tree, scaffold_node,
+    |vn : &ViewNode| match &vn . kind {
+      ViewNodeKind::Vognode (Vognode::Normal (t)) =>
+        goal_set . contains (&t . id)
+        && ! t . should_be_phantom (),
+      _ => false },
+    |vn : &mut ViewNode| {
+      if let ViewNodeKind::Vognode (Vognode::Normal (t))
+        = &mut vn . kind
+        { t . parentIs = ParentIs::Affected; }} )
+    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+  Ok (( )) }

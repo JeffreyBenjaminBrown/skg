@@ -1,0 +1,233 @@
+#+TITLE: Critique of plan.org: awkward and incomplete spots
+#+STARTUP: content
+
+* About
+Things I (Claude) noticed while writing and reviewing [[./plan.org][plan.org]] that the
+[[./problems.org][problems.org]] dialog did not catch. Two kinds: *awkward / contradictory*
+(internal tension or a place the elegant story breaks when you try to write
+the Rust) and *incomplete* (a place a developer hits "the plan doesn't say
+what to do"). Action items are marked =TODO= so they show up in a "* TODO"
+search; the rest are notes. Section numbers below refer to plan.org.
+
+Some of these are errors I introduced during the adversarial-review fix pass;
+I call those out.
+
+* Awkward / contradictory
+** A1. "Indefinitive" is overloaded, and §5.4 contradicts §6.2
+plan.org §6.2 says an indefinitive node *does not expand content* ("this is
+why indefinitive nodes bound recursion"). But §5.4 (cross-buffer composition)
+says a node deferred to another buffer "renders indefinitive *but is still
+recursed into to draw its content*." Those cannot both hold.
+
+- *Within* a buffer it is fine: an indefinitive repeat is collapsed because
+  its content shows at the definitive sibling *in the same buffer*.
+- *Cross-buffer*, the definitive occurrence is in another buffer, invisible to
+  this user, so the deferred node must still show its subtree read-only. The
+  [[../one-definitive-view/plan.org][one-definitive-view plan]] explicitly wants this ("rendered indefinitive but
+  still depicted with children").
+
+So "indefinitive" is doing two jobs -- /collapsed-because-shown-elsewhere-here/
+and /read-only-but-expanded/ -- which diverge exactly at the buffer boundary.
+
+*Lean*: gate content expansion not on "indefinitive" but on "is there a
+definitive occurrence of this ID *in this buffer*?" An indefinitive node
+expands read-only iff no in-buffer definitive sibling exists. Recursion stays
+bounded (the node limit still caps it) and the two plans then compose. This is
+the one I would fix in the spec before coding.
+*** DONE What?
+What is 'deferred'?
+The rule seems clear to me: We always update indefinitive children.
+We always update title and source.
+If it has a DVR, we do the DVR.
+If it's a leaf, we're done.
+If it has children, we're still done with it,
+but must recurse into its children.
+
+We should not bring absent content into an indefinitive node,
+even if there is no definitive representative in this buffer,
+unless it has a DVR.
+
+We don't need to worry about cross-buffer interactions at all.
+I believe the same rules can be applied to collateral and saved buffers --
+that is another benefit of this refactor.
+(Please fact-check me on that.)
+** DONE A2. "Level-order BFS" vs. the traversal we actually have
+plan.org §3 says "level order, parent before child." But the current ordinary
+content expansion ([[../../server/update_buffer/complete.rs][expand_true_content_until_stable]]) is *DFS-preorder with no
+node limit*; only the de-novo render ([[../../server/to_org/render/initial_bfs.rs][render_initial_viewforest_bfs]]) and the
+definitive-request expander ([[../../server/to_org/expand/definitive.rs][extendDefinitiveSubtreeFromLeaf]]) are true
+generation-by-generation BFS.
+
+The node-limit semantics in §5.5 ("draw the shallow stuff, render the deep
+remainder indefinitive") only make sense breadth-first; DFS would draw a deep
+spine and truncate siblings arbitrarily. So unifying de-novo onto the
+post-save driver (§13) is not "add per-kind dispatch to the existing
+recursion" -- it is converting the ordinary reconcile from DFS to a real
+queue-based level-order BFS. That is a meatier change than the plan's tone
+implies, and it is the prerequisite for the limit behaving as specified.
+
+*Lean*: commit to true level-order BFS explicitly in §3 and phase 2, and name
+it as the load-bearing change it is.
+*** DONE so this is just a language change in the plan?
+If so, fine :)
+** DONE A3. Every content updater is two-phase (async prefetch, then sync reconcile)
+The core reconciler [[../../server/update_buffer/util.rs][complete_relevant_children_in_viewnodetree]] takes a *sync*
+=create_child: Fn(&Key) -> ViewNode=. But creating a child needs its
+title/source/body from disk (async). The current code works around this by
+pre-fetching everything into a =child_data= map (=build_child_creation_data=,
+async) and *then* calling the sync reconciler.
+
+So every per-kind rule that creates children is really "*async*: compute goal
+list + fetch all child data -> *sync*: reconcile." The plan's "thin per-kind
+rules call the toolkit" (§10) hides this; the prefetch-then-reconcile split is
+the main day-to-day implementation friction, and it is error-prone (the
+prefetch must anticipate exactly which children the reconcile will create).
+
+*Lean*: state the two-phase contract in §10, or change the reconciler to take
+an already-resolved =Vec<(Key, ViewNode)>= so the async/sync seam is explicit
+rather than a closure-capture trick.
+*** DONE
+It only *might* read from disk, right?
+Hopefully the (faster) InRustGraph has everything it would need from disk.
+If we can expect to rely on the InRustGraph, we should be good, right?
+** DONE A4. The shared node-limit budget starves the diff overlay
+During the review I "fixed" the node-limit/diff interaction (§5.5) by making
+one counter span both passes. But the diff overlay runs *last* (§9), so on a
+large view the ordinary (worktree) pass eats the whole budget and the diff
+overlay adds nothing -- meaning removed-content phantoms, the entire reason
+you turned on diff mode, are the first thing cut. That is backwards.
+
+*Lean*: diff annotations should get their own (small) budget, or be counted
+separately, so a big tree does not silently drop its diff. Decide rather than
+inherit "one counter."
+*** DONE I think I solved this in plan.org
+** A5. "Bounded local context" is bounded in tree-distance, not in work (note)
+HiddenOutsideOfSubscribeeCol reads *every* subscribee's =contains=; relation
+cols read *all* members. So a "local" updater can issue O(members) graph reads
+per render -- the same shape as the existing [[../../server/dbs/typedb/search/all_graphnodestats.rs][fetch_all_graphnodestats]] perf
+problem logged in [[../../TODO/problems.org][TODO/problems.org]]. The "local = cheap" framing oversells it;
+per-render graph-read cost is a real characteristic to watch.
+
+** DONE A6. Subscribee-as-such is the corner I am least sure the plan nails
+§6.1's "do not regenerate a saved subscribee's children," §6.7's SubscribeeCol
+reconcile, and §6.9's HiddenInSubscribeeCol-from-graph have a three-way
+interaction about *what a subscribee-as-such actually shows after a save that
+changed the hide set*. The dialog marked this DONE fairly quickly; when I try
+to state the exact post-save child set I end up hand-waving.
+
+*Lean*: write a concrete worked example before trusting it -- e.g. "user
+toggles one hide and saves; what does the rerendered subscribee-as-such plus
+its HiddenInSubscribeeCol look like?" -- and pin the spec to that.
+
+*** DONE Is it clear after my recent edits to plan.org?
+If not, what remains unclear?
+
+** A7. Diff-regenerated nodes cannot preserve folding (note)
+§7.2 regenerates phantoms (and §4 regenerates TextChanged/IDCol) every pass,
+so those nodes are new each render and *cannot* carry folded/focused state.
+The §7.4 folding-preservation rule therefore has a phantom-shaped hole.
+Probably acceptable (diff artifacts), but it is a real exception the rule does
+not name.
+
+*** DONE let's ignore for now
+
+* Incomplete
+** DONE I1. The diff overlay is *not* actually "Normal-only" (also fixes my §9 wording)
+This is the most important one, and partly my fault. In the review pass I
+rewrote §9 to say "diff work happens only at =Vognode::Normal= nodes;
+scaffolds are passed through untouched." That is wrong, and it contradicts
+your own "4 levels deep" scoping (Origin -> SubscribeeCol -> subscribee ->
+HiddenInSubscribeeCol -> hidden). The cols carry real diff work the overlay
+must do:
+- *removed-member phantoms*: a subscribee removed from =subscribes_to=, a
+  relation member removed, a hidden node un-hidden -- each needs a phantom,
+  and deciding "removed" requires the col's own HEAD-vs-worktree goal-list
+  diff (the =goal_list_for_*= functions already return a =removed_ids= set).
+- *scaffold membership axes*: [[../../api-and-formats.md][api-and-formats.md]] says even Alias/ID scaffold
+  children carry =(staged/unstaged newM/removedM)=.
+
+Your original framing was right and mine flattened it: the overlay is *rooted
+at* Normal nodes, but each Normal node's diff update *descends through its
+cols* (the 4 levels) to inject their phantoms and stamp their axes.
+"Normal-only" means "no diff logic originates on a bare scaffold," not
+"scaffolds are skipped."
+
+*Lean*: restate §9 as "the diff pass is driven from Normal nodes and reaches
+down through their scaffold descendants," and list, per col kind, what diff it
+produces (removed-member phantoms + membership axes).
+*** DONE sure
+This is, again, just a language question, right?
+The algorithm is clear to you?
+** DONE I2. View-root pinning is unspecified
+A buffer's root arrives definitive as the *origin*, so by §5.1 it is
+*Tentative*. But §5.2 says a DVR can clobber a Tentative occurrence. So if the
+same ID appears deeper in the buffer with a DVR (or a cascade reaches it), the
+buffer's own *root could be demoted to indefinitive* -- its body and
+editability vanish. The current code has the same exposure
+(=execute_definitive_view_request= indefinitizes any prior definitive, root or
+not). The plan never says whether roots are pinned.
+
+*Lean*: pin a view's roots as =Final= (or a distinct root-definitive state) so
+they cannot be clobbered within their own buffer. Either way the plan must say
+it.
+*** DONE there's no problem, because
+a buffer root has no data to update.
+** DONE I3. Only the Definitive view request has a rule
+§5 specifies =Definitive= exhaustively, but =ViewRequest= also has *=Aliases=,
+=Containerward=, =Sourceward=* ([[../../server/types/viewnode.rs][viewnode.rs]]). Today =execute_truenode_view_requests=
+runs all four in one pass. In the new model a Normal node should execute its
+own non-Definitive requests at its visit, but §6.1 never says so -- it does not
+say when they run, that they create descendants (AliasCol+children; backpath
+ancestry-as-descendants), that they are consumed/cleared after, or that they
+are subject to the node limit. They would silently fall through the per-kind
+dispatch.
+
+*Lean*: add a "view-request execution" step to §6.1: at a Normal node's visit,
+run its =Aliases=/=Containerward=/=Sourceward= requests (creating the
+corresponding descendants) and clear them; =Definitive= per §5.
+*** DONE yes please
+** DONE I4. Search-result views are unaddressed
+[[../../server/update_buffer.rs][find_collateral_view_uris]] includes search views, and the API says search
+results are editable, indefinitive TrueNodes that can carry containerward
+ancestry and graphnodestats. So they ride the same rerender/collateral path --
+but the plan is entirely about content views. Are search views in scope for
+the local-update driver (a forest of §6.2 indefinitive nodes), or rerendered
+by a separate path? Unstated.
+
+*Lean*: one sentence in §1/§2 saying search views ride the same driver as
+indefinitive-node forests, with enrichment (ancestry/stats) as the existing
+separate step -- or explicitly scope them out.
+*** DONE good point!
+Yes, search result buffers can be just as collateral as any other buffer.
+In fact a search buffer can even be the saved buffer.
+Won't happen often, but reasonable, should be (and I think it already is) legal.
+** I5. Smaller per-kind omissions (each one line in §6)
+*** §6.1 does not list *clearing the consumed =edit_request=* (Merge/Delete),
+  which the current =clear_edit_request= does -- easy to forget in the rewrite.
+**** DONE good point, yes
+*** *"view-leaf" (§6.0) is not pinned down*: does a stale node whose only
+  children are *scaffolds* (e.g. an AliasCol) count as a leaf? It has
+  org-children, so presumably not-a-leaf -> demote-not-delete. Worth stating,
+  since it changes whether such nodes survive.
+**** DONE I think this is solved
+as a result of my idea in plan.org of a pass, after view update,
+that deletes all dead things in postorder
+(after converting some things to dead in preorder).
+*** *Empty =AliasCol=/=IDCol=* (§6.11/6.12 say "self-delete: no") will render as
+  empty =aliasCol=/=idCol= headlines if the node has none. Probably intended
+  (you asked to see aliases, you get "none"), but the plan should say so
+  rather than leave it as a surprise.
+**** DONE Empty IDCol should be deleted, but empty AliasCol should stay.
+The user can meaningfully interact with the AliasCol,
+and might want to empty it entirely.
+If they do, seeing it disappear would be confusing;
+they should have to delete it manually.
+
+I'm not sure an empty IDCol is possible -- doesn't it contain the PID?
+But it's really not important; let's not worry about it.
+* Suggested next step
+The ones I would fold into plan.org now: *I1* (fix the §9 wording -- it is an
+outright error), *A1* (resolve the indefinitive/expansion contradiction),
+*I2* (root pinning in §5), and *I3* (a view-request step in §6.1). The rest
+(*A2, A3, A4, A6, I4, I5*) can become =TODO= entries under plan.org §17 (open
+decisions) so they are not lost. Say the word and I will make those edits.

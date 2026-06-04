@@ -129,4 +129,56 @@ isolate the fold-processing path from the focus-processing path."
                     (line-end-position)))))
       (kill-buffer buf))))
 
+(ert-deftest test-save-response-success-with-warnings-shows_warning_channel ()
+  (let ((buf (generate-new-buffer "*test-save-response-warning*"))
+        (shown nil))
+    (unwind-protect
+        (with-current-buffer buf
+          (org-mode)
+          (cl-letf (((symbol-function 'skg-replace-buffer-with-new-content)
+                     (lambda (_tcp-proc new-content &optional _position)
+                       (erase-buffer)
+                       (insert new-content)))
+                    ((symbol-function 'skg-big-nonfatal-message)
+                     (lambda (buffer-name message-text content)
+                       (setq shown
+                             (list buffer-name message-text content)))))
+            (skg-handle-save-sexp
+             (prin1-to-string
+              '((content "* root\n")
+                (errors ())
+                (warnings ("audit warning")))))
+            (should (string= (buffer-string) "* root\n"))
+            (should (equal (car shown) "*SKG Save Warnings*"))
+            (should (string-match-p "^\\* warnings\n\\*\\* audit warning"
+                                    (nth 2 shown)))))
+      (kill-buffer buf))))
+
+(ert-deftest test-save-response-failure-with-errors-and-warnings-shows_both ()
+  (let ((buf (generate-new-buffer "*test-save-response-errors-warnings*"))
+        (shown nil)
+        (replaced nil))
+    (unwind-protect
+        (with-current-buffer buf
+          (org-mode)
+          (cl-letf (((symbol-function 'skg-replace-buffer-with-new-content)
+                     (lambda (&rest _args)
+                       (setq replaced t)))
+                    ((symbol-function 'skg-big-nonfatal-message)
+                     (lambda (buffer-name message-text content)
+                       (setq shown
+                             (list buffer-name message-text content)))))
+            (skg-handle-save-sexp
+             (prin1-to-string
+              '((content nil)
+                (errors ("fatal save error"))
+                (warnings ("audit warning")))))
+            (should-not replaced)
+            (should (equal (car shown) "*SKG Save Errors and Warnings*"))
+            (should (string-match-p "^\\* errors\n\\*\\* fatal save error"
+                                    (nth 2 shown)))
+            (should (string-match-p "^\\* warnings\n\\*\\* audit warning"
+                                    (nth 2 shown)))))
+      (kill-buffer buf))))
+
 (provide 'test-skg-save-response-folded-root)

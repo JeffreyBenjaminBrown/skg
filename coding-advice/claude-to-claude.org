@@ -79,7 +79,7 @@ There are three ways to test the code:
   9. Re-renders saved view and collateral views ('update_views_after_save')
 
   Key entry point: 'handle_save_buffer_request' in server/serve/handlers/save_buffer.rs.
-  Key data flow: buffer text -> MaybePlacedViewnode -> ViewNode -> DefineNode (Save|Delete) -> FS/TypeDB/Tantivy.
+  Key data flow: buffer text -> MpViewnode -> ViewNode -> DefineNode (Save|Delete) -> FS/TypeDB/Tantivy.
 
 * Source (SourceName)
 

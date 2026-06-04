@@ -62,7 +62,9 @@
       (progn
         (skg--diff-analysis-handler
          nil
-         (prin1-to-string '((content "* affected nodes\n"))))
+         (prin1-to-string '((content "* affected nodes\n")
+                            (errors ())
+                            (warnings ()))))
         (with-current-buffer "*skg diff analysis*"
           (should skg-diff-analysis-mode)
           (should (eq (lookup-key skg-diff-analysis-mode-map
@@ -85,3 +87,29 @@
                       #'skg-pop-link))))
     (when (get-buffer "*skg diff analysis*")
       (kill-buffer "*skg diff analysis*"))))
+
+(ert-deftest test-skg-diff-analysis-handler-shows-warnings-separately ()
+  (unwind-protect
+      (let ((messages nil))
+        (cl-letf (((symbol-function 'skg-big-nonfatal-message)
+                   (lambda (buffer-name message-text content)
+                     (push (list buffer-name message-text content) messages)
+                     (with-current-buffer (get-buffer-create buffer-name)
+                       (erase-buffer)
+                       (insert content)))))
+          (skg--diff-analysis-handler
+           nil
+           (prin1-to-string
+            '((content "* affected nodes\n")
+              (errors ("fatal detail"))
+              (warnings ("nonfatal detail")))))
+          (should (= 2 (length messages)))
+          (let ((message-content (nth 2 (car messages))))
+            (should (string-match-p "^\\* errors\n\\*\\* fatal detail"
+                                    message-content))
+            (should (string-match-p "^\\* warnings\n\\*\\* nonfatal detail"
+                                    message-content)))))
+    (dolist (name '("*skg diff analysis*"
+                   "*skg diff analysis messages*"))
+      (when (get-buffer name)
+        (kill-buffer name)))))

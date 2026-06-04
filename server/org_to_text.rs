@@ -1,18 +1,77 @@
 use crate::types::git::MembershipAxes;
 use crate::types::misc::SkgConfig;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, Scaffold, ScaffoldKind, TrueNode, DeletedNode, UnknownNode, InactiveNode, EditRequest, GraphNodeStats, ParentIs };
+use crate::types::tree::forest::ViewForest;
+use crate::types::viewnode::{
+  ViewNode, ViewNodeKind, Vognode, Qual, QualCol, TrueNode,
+  DeletedNode, UnknownNode, InactiveNode, EditRequest, GraphNodeStats,
+  Birth, ParentIs,
+};
 
 use ego_tree::{NodeRef, Tree};
 use std::error::Error;
 
-/// PURPOSE: Render a "viewforest" -- a tree with BufferRoot at root
-/// -- to org-mode text.
-/// BufferRoot is not rendered; its children start at level 1.
+/// PURPOSE: Render a view forest to org-mode text.
+/// Each forest root starts at level 1.
 ///
 /// ASSUMES: metadata has already been enriched with relationship data.
-/// ERRORS: if root is not a BufferRoot.
-pub fn viewforest_to_string (
+pub trait ViewForestRenderRoots {
+  fn render_roots<'a> (
+    &'a self,
+  ) -> Result<Box<dyn Iterator<Item = NodeRef<'a, ViewNode>> + 'a>,
+              Box<dyn Error>>;
+}
+
+impl ViewForestRenderRoots for ViewForest {
+  fn render_roots<'a> (
+    &'a self,
+  ) -> Result<Box<dyn Iterator<Item = NodeRef<'a, ViewNode>> + 'a>,
+              Box<dyn Error>> {
+    Ok (Box::new (self . roots ())) }
+}
+
+impl ViewForestRenderRoots for Tree<ViewNode> {
+  fn render_roots<'a> (
+    &'a self,
+  ) -> Result<Box<dyn Iterator<Item = NodeRef<'a, ViewNode>> + 'a>,
+              Box<dyn Error>> {
+    let root_ref : NodeRef<ViewNode> = self . root ();
+    let is_viewforest_root : bool =
+      matches! (
+        & root_ref . value () . kind,
+        ViewNodeKind::BufferRoot);
+    if ! is_viewforest_root {
+      return Err (
+        "viewforest_to_string: root is not a BufferRoot" . into() ); }
+    Ok (Box::new (root_ref . children ())) }
+}
+
+pub fn viewforest_to_string <R> (
+  viewforest : &R,
+  config : &SkgConfig,
+) -> Result < String, Box<dyn Error> >
+where R : ViewForestRenderRoots + ?Sized {
+  render_view_roots_to_string (
+    viewforest . render_roots () ?, config ) }
+
+/// Compatibility helper for callers that still hold the old
+/// single-tree representation with an internal BufferRoot.
+pub fn viewforest_tree_to_string (
   viewforest : &Tree<ViewNode>,
+  config : &SkgConfig,
+) -> Result < String, Box<dyn Error> > {
+  let root_ref : NodeRef<ViewNode> = viewforest . root ();
+  let is_viewforest_root : bool =
+    matches! (
+      & root_ref . value () . kind,
+      ViewNodeKind::BufferRoot);
+  if ! is_viewforest_root {
+    return Err (
+      "viewforest_tree_to_string: root is not a BufferRoot" . into() ); }
+  render_view_roots_to_string (
+    root_ref . children (), config ) }
+
+fn render_view_roots_to_string <'a> (
+  roots  : impl Iterator<Item = NodeRef<'a, ViewNode>>,
   config : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   fn render_node_subtree_to_org (
@@ -30,17 +89,9 @@ pub fn viewforest_to_string (
           level + 1,
           config )? ); }
     Ok (out) }
-  let root_ref : NodeRef<ViewNode> = viewforest . root ();
-  let is_viewforest_root : bool =
-    matches! (
-      & root_ref . value () . kind,
-      ViewNodeKind::Scaff (Scaffold::BufferRoot));
-  if ! is_viewforest_root {
-    return Err (
-      "viewforest_to_string: root is not a BufferRoot" . into() ); }
   let mut result : String =
     String::new ();
-  for child in root_ref . children () {
+  for child in roots {
     result . push_str (
       & render_node_subtree_to_org ( child, 1, config )? ); }
   Ok (result) }
@@ -86,60 +137,78 @@ pub fn viewnode_to_string (
   config   : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   match &viewnode . kind {
-    ViewNodeKind::Scaff (scaffold) =>
-      scaffold_metadata_to_string (
+    ViewNodeKind::QualCol (col) =>
+      qualcol_metadata_to_string (
         viewnode . focused, viewnode . folded,
-        viewnode . body_folded, scaffold ),
-    ViewNodeKind::True (true_node) =>
+        viewnode . body_folded, col ),
+    ViewNodeKind::Qual (qual) =>
+      qual_metadata_to_string (
+        viewnode . focused, viewnode . folded,
+        viewnode . body_folded, qual ),
+    ViewNodeKind::PartnerCol (roleCol) =>
+      Ok ( non_vognode_atom_metadata_to_string (
+        viewnode . focused, viewnode . folded,
+        viewnode . body_folded, roleCol . repr_in_client () ) ),
+    ViewNodeKind::BufferRoot =>
+      Err ( "viewnode_to_string: BufferRoot should never be rendered" . into () ),
+    ViewNodeKind::DeadScaffold =>
+      Ok ( deleted_scaff_metadata_to_string (
+        viewnode . focused, viewnode . folded,
+        viewnode . body_folded )),
+    ViewNodeKind::Vognode (Vognode::Normal (true_node) | Vognode::Phantom (true_node)) =>
       Ok ( true_node_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, true_node, config )),
-    ViewNodeKind::Deleted (deleted_node) =>
+    ViewNodeKind::Vognode (Vognode::Deleted (deleted_node)) =>
       Ok ( deleted_node_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, deleted_node )),
-    ViewNodeKind::DeletedScaff (kind) =>
-      Ok ( deleted_scaff_metadata_to_string (
-        viewnode . focused, viewnode . folded,
-        viewnode . body_folded, kind )),
-    ViewNodeKind::Unknown (unknown_node) =>
+    ViewNodeKind::Vognode (Vognode::Unknown (unknown_node)) =>
       Ok ( unknown_node_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, unknown_node )),
-    ViewNodeKind::Inactive (inactive_node) =>
+    ViewNodeKind::Vognode (Vognode::Inactive (inactive_node)) =>
       Ok ( inactive_node_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, inactive_node )) } }
 
-/// Render metadata for a Scaffold:
-///   (skg [focused] [folded] scaffoldKind)
-/// where scaffoldKind is a bare atom.
-/// ERRORS: if scaffold is BufferRoot.
-fn scaffold_metadata_to_string (
+fn non_vognode_atom_metadata_to_string (
   focused     : bool,
   folded      : bool,
   body_folded : bool,
-  scaffold    : &Scaffold
+  atom        : &str,
+) -> String {
+  let mut parts : Vec < String > = Vec::new ();
+  if focused     { parts . push ( "focused"    . to_string () ); }
+  if folded      { parts . push ( "folded"     . to_string () ); }
+  if body_folded { parts . push ( "bodyFolded" . to_string () ); }
+  parts . push (atom . to_string ());
+  parts . join (" ") }
+
+fn qualcol_metadata_to_string (
+  focused     : bool,
+  folded      : bool,
+  body_folded : bool,
+  col         : &QualCol,
+) -> Result < String, Box<dyn Error> > {
+  Ok ( non_vognode_atom_metadata_to_string (
+    focused, folded, body_folded, col . repr_in_client () ) ) }
+
+fn qual_metadata_to_string (
+  focused     : bool,
+  folded      : bool,
+  body_folded : bool,
+  qual        : &Qual,
 ) -> Result < String, Box<dyn Error> > {
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  match scaffold {
-    Scaffold::Alias { membership, .. } => {
+  match qual {
+    Qual::Alias { membership, .. } => {
       parts . push ( "alias" . to_string () );
       append_membership_stage_forms (&mut parts, membership); }
-    Scaffold::AliasCol =>
-      parts . push ( "aliasCol" . to_string () ),
-    Scaffold::BufferRoot =>
-      return Err ( "scaffold_metadata_to_string: BufferRoot should never be rendered" . into () ),
-    Scaffold::HiddenInSubscribeeCol =>
-      parts . push ( "hiddenInSubscribeeCol" . to_string () ),
-    Scaffold::HiddenOutsideOfSubscribeeCol =>
-      parts . push ( "hiddenOutsideOfSubscribeeCol" . to_string () ),
-    Scaffold::SubscribeeCol =>
-      parts . push ( "subscribeeCol" . to_string () ),
-    Scaffold::TextChanged { staged, unstaged } => {
+    Qual::TextChanged { staged, unstaged } => {
       let mut tags : Vec<&'static str> = Vec::new ();
       if *staged   { tags . push ("staged"); }
       if *unstaged { tags . push ("unstaged"); }
@@ -147,9 +216,7 @@ fn scaffold_metadata_to_string (
       { parts . push ( "textChanged" . to_string () ); }
       else
       { parts . push ( format! ( "(textChanged {})", tags . join (" ") )); } }
-    Scaffold::IDCol =>
-      parts . push ( "idCol" . to_string () ),
-    Scaffold::ID { membership, .. } => {
+    Qual::ID { membership, .. } => {
       parts . push ( "id" . to_string () );
       append_membership_stage_forms (&mut parts, membership); }
   }
@@ -180,8 +247,9 @@ fn true_node_metadata_to_string (
     config    : & SkgConfig,
   ) -> String {
     fn graph_stats ( true_node : & TrueNode ) -> Option < String > {
-      graphnodestats_to_sexp (
-        & true_node . graphStats, true_node . parentIs ) }
+      graphnodestats_to_sexp ( & true_node . graphStats,
+                                 true_node . parentIs,
+                                 true_node . birth ) }
     fn view_stats (
       true_node : & TrueNode,
       config    : & SkgConfig,
@@ -239,18 +307,20 @@ fn true_node_metadata_to_string (
       vec! [ "node" . to_string () ];
     parts . push ( format! ( "(id {})", true_node . id . 0 ));
     parts . push ( format! ( "(source {})", true_node . source ));
-    // ParentIs::Container is left implicit in the emitted sexp because
-    // it is the default parent relationship.
+    // ParentIs::Affected is left implicit because it is the default
+    // membership relation.
     match true_node . parentIs {
-      ParentIs::Container => {},
+      ParentIs::Affected => {},
       ParentIs::Absent =>
         parts . push ( "(parentIs absent)" . to_string () ),
       ParentIs::Independent =>
-        parts . push ( "(parentIs independent)" . to_string () ),
-      ParentIs::Content =>
-        parts . push ( "(parentIs content)" . to_string () ),
-      ParentIs::LinkTarget =>
-        parts . push ( "(parentIs linkTarget)" . to_string () ) }
+        parts . push ( "(parentIs independent)" . to_string () ) }
+    match true_node . birth {
+      Birth::Unremarkable => {},
+      Birth::ContainsParent =>
+        parts . push ( "(birth containsParent)" . to_string () ),
+      Birth::LinksToParent =>
+        parts . push ( "(birth linksToParent)" . to_string () ) }
     if true_node . is_indefinitive () {
       // "indef" is short for "indefinitive" -- a read-only view of
       // a node (see IndefOrDef in types/viewnode.rs). The metadata
@@ -340,41 +410,40 @@ fn deleted_scaff_metadata_to_string (
   focused     : bool,
   folded      : bool,
   body_folded : bool,
-  kind        : &ScaffoldKind,
 ) -> String {
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  parts . push ( format! ( "(deletedScaffold {})",
-                           kind . repr_in_client () ) );
+  parts . push ( "(deletedScaffold deadScaffold)" . to_string () );
   parts . join (" ") }
 
 fn graphnodestats_to_sexp (
-  gs    : &GraphNodeStats,
+  gs       : &GraphNodeStats,
   parentIs : ParentIs,
+  birth    : Birth,
 ) -> Option < String > {
   let mut parts : Vec < String > = Vec::new ();
   if let Some (ref c) = gs . containRels {
     // Per-parentIs suppression of the containers count. The client
     // INTERCs (containers N) and (contents M) into a combined
-    // herald with `{` between them; we just decide whether each
-    // raw atom is worth emitting.
-    // - Container  : hide the common case of exactly 1 container
+    // herald with `{` between them; here, the server merely decides
+    // whether each raw atom is worth emitting.
+    // - Affected   : hide the common case of exactly 1 container
     //                (every content-child has at least one
     //                container; the number only matters when it's
     //                0 or >1).
-    // - Independent: hide the common case of 0 containers (a view
-    //                root is typically standalone).
-    // - Content / LinkTarget: always show (these heralds indicate
-    //                that the node is *related* to the view root
-    //                via the graph, so the count is always
+    // - Independent|Absent: hide the common case of 0 containers (a view
+    //                       root is typically standalone).
+    // - Non-default birth provenance: always show (the birth metadata
+    //                indicates that the node is *related* to the view
+    //                root via the graph, so the count is always
     //                informative).
-    let show_containers : bool = match parentIs {
-      ParentIs::Container                      => c . containers != 1,
-      ParentIs::Independent                    => c . containers != 0,
-      ParentIs::Absent                         => c . containers != 0,
-      ParentIs::Content | ParentIs::LinkTarget => true, };
+    let show_containers : bool =
+      if birth != Birth::Unremarkable { true
+      } else { match parentIs {
+        ParentIs::Affected                       => c . containers != 1,
+        ParentIs::Independent | ParentIs::Absent => c . containers != 0 }};
     let show_contents : bool = c . contents != 0;
     if show_containers {
       parts . push ( format! ("(containers {})", c . containers) ); }

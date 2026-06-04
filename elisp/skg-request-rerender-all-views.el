@@ -61,7 +61,7 @@ Shared by 'skg-request-rerender-all-views' and 'skg-view-diff-mode'."
         (skg-log 'error 'rerender "rerender-view handler error: %S" err))))
    nil) ;; non-one-shot: fires for each streamed view
   (skg-register-response-handler
-   ;; 3. Done message: clean up and show errors.
+   ;; 3. Done message: clean up and show errors/warnings.
    'rerender-done
    (lambda (_tcp-proc payload)
      (setq skg-response-handler-map
@@ -70,12 +70,22 @@ Shared by 'skg-request-rerender-all-views' and 'skg-view-diff-mode'."
      (skg--unlock-all-save-locked) ;; safety net
      (condition-case err
          (let* ((response (read payload))
-                (errors-list (cadr (assoc 'errors response))))
-           (when (and errors-list (not (null errors-list)))
+                (errors-list (cadr (assoc 'errors response)))
+                (warnings-list (cadr (assoc 'warnings response))))
+           (when (or (skg--message-list-nonempty-p errors-list)
+                     (skg--message-list-nonempty-p warnings-list))
              (skg-big-nonfatal-message
-              "*skg rerender errors*"
-              "Rerender completed with errors"
-              (mapconcat 'identity errors-list "\n\n"))))
+              "*skg rerender messages*"
+              (cond
+               ((and (skg--message-list-nonempty-p errors-list)
+                     (skg--message-list-nonempty-p warnings-list))
+                "Rerender completed with errors and warnings")
+               ((skg--message-list-nonempty-p errors-list)
+                "Rerender completed with errors")
+               (t
+                "Rerender completed with warnings"))
+              (skg-errors-and-warnings-to-org-string
+               errors-list warnings-list))))
        (error
         (message "skg: rerender-done handler error: %S" err))))
    t))

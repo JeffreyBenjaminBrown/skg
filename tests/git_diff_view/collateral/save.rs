@@ -60,7 +60,7 @@ fn test_collateral_view_preserves_diff_annotations()
       views_state . open_views . register_view (
         uri_2 . clone (), viewforest . clone (), &pids );
 
-      // 4. Save buffer 1 with a new child "c" under "a".
+      // 4. Save buffer 1 with a new child "c" of "a".
       //    This also updates the in-Rust graph and re-renders collateral views.
       let save_input : String = insert_after (
         &initial_buffer, "(id a)",

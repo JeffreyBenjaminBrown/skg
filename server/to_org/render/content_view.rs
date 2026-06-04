@@ -15,12 +15,12 @@ use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids_
 use crate::types::git::SourceDiff;
 use crate::org_to_text::viewforest_to_string;
 use crate::to_org::render::diff::apply_diff_to_viewforest;
-use crate::to_org::render::initial_bfs::{
-  render_initial_viewforest_bfs,
-  render_initial_viewforest_bfs_with_source_set};
+use crate::to_org::render::initial_bfs::render_initial_viewforest_bfs;
 use crate::to_org::util::mark_view_roots_parent_absent;
+use crate::types::tree::forest::ViewForest;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
+use crate::types::viewnode::Vognode;
 use crate::source_sets::{ActiveSourceSet, render_viewforest_with_source_set};
 use crate::update_buffer::graphnodestats::{
   set_graphnodestats_in_viewforest,
@@ -71,16 +71,16 @@ async fn multi_root_view_inner (
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result < (String, Vec<ID>, Tree<ViewNode>),
               Box<dyn Error> > {
-  let mut viewforest : Tree<ViewNode> =
+  let mut viewforest : ViewForest =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "render_initial_viewforest_bfs" ). entered();
       match active_source_set {
         Some (active) =>
-          render_initial_viewforest_bfs_with_source_set (
-            root_ids, config, driver, active ) . await,
+          render_initial_viewforest_bfs (
+            root_ids, config, driver, Some (active) ) . await,
         None =>
           render_initial_viewforest_bfs (
-            root_ids, config, driver ) . await,
+            root_ids, config, driver, None ) . await,
       }} ?;
   if diff_mode_enabled {
     let source_diffs : HashMap<SourceName, SourceDiff> =
@@ -114,15 +114,17 @@ async fn multi_root_view_inner (
   let pids : Vec<ID> = {
     // Collect PIDs from viewforest before rendering to string.
     let mut ids : Vec<ID> = Vec::new ();
-    for node_ref in viewforest . root () . descendants () {
-      if let ViewNodeKind::True (t) = &node_ref . value () . kind
+    for node_ref in viewforest . nodes () {
+      if let ViewNodeKind::Vognode (Vognode::Normal (t)
+                                    | Vognode::Phantom (t))
+        = &node_ref . value () . kind
         { ids . push ( t . id . clone () ); }}
     ids };
   let buffer_content : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "viewforest_to_string" ). entered();
       viewforest_to_string (& viewforest, config) } ?;
-  Ok ((buffer_content, pids, viewforest)) }
+  Ok ((buffer_content, pids, viewforest . into_internal_tree ())) }
 
 pub async fn multi_root_view_with_source_set (
   driver            : &TypeDBDriver,
@@ -133,27 +135,28 @@ pub async fn multi_root_view_with_source_set (
   active_source_set : &ActiveSourceSet,
 ) -> Result < (String, Vec<ID>, Tree<ViewNode>),
               Box<dyn Error> > {
-  let ( _buffer_content, pids, mut viewforest )
+  let ( _buffer_content, pids, viewforest )
     : (String, Vec<ID>, Tree<ViewNode>) =
     multi_root_view_inner (
       driver, config, tantivy_index, root_ids,
       diff_mode_enabled, Some (active_source_set) ) . await ?;
+  let mut viewforest : ViewForest =
+    ViewForest::from_internal_tree (viewforest);
   let buffer_content : String =
     render_viewforest_with_source_set (
       &mut viewforest, config, active_source_set ) ?;
-  Ok ((buffer_content, pids, viewforest)) }
+  Ok ((buffer_content, pids, viewforest . into_internal_tree ())) }
 
-/// For each view-root in the forest (= each TrueNode child of
-/// BufferRoot), if the graph says it has containers, prepend its
-/// full containerward ancestry as that root's first children.
+/// For each view root in the forest, if the graph says it has
+/// containers, prepend its full containerward ancestry as that root's
+/// first children.
 async fn attach_containerward_ancestries_to_view_roots (
-  viewforest : &mut Tree<ViewNode>,
+  viewforest : &mut ViewForest,
   config     : &SkgConfig,
   driver     : &TypeDBDriver,
   active     : Option<&ActiveSourceSet>,
 ) -> Result < (), Box<dyn Error> > {
   let view_root_nodeids : Vec<NodeId> =
-    viewforest . root () . children () . map ( |c| c . id () )
-      . collect ();
+    viewforest . root_ids ();
   attach_containerward_ancestries_at_nodeids_with_source_set (
     viewforest, &view_root_nodeids, config, driver, active ) . await }

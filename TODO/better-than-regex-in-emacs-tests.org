@@ -1,0 +1,101 @@
+* Better than regex in Emacs tests
+
+Some Emacs tests assert on rendered SKG buffers with plain substring or
+regex checks. That is fragile when the buffer text contains nearby words
+that look like the intended target.
+
+The concrete case that exposed this: =containerward-on-phantom= wanted to
+verify that a containerward ancestry node had been inserted under a
+removed-here phantom. The test searched for the string ="content"=. After
+the parentIs/birth split, the natural exact metadata marker would be
+=containsParent=, but the earlier check was already weak: ="content"= can
+match unrelated text such as =(graphStats (contents 2))=.
+
+The right fix is not a better regex. The tests should parse metadata sexps
+and assert on their structure.
+
+** Existing tools
+
+The useful pieces already exist in =elisp/=:
+
+- =skg-sexp-at-or-after-point= and =skg-first-sexpr-on-line=, in
+  =elisp/skg-sexpr/skg-sexpr-search.el=, read metadata sexps from buffer
+  text. They use =skg-find-sexp-end= rather than plain =forward-sexp=, so
+  herald characters do not confuse parsing.
+- =skg-sexp-cdr-at-path=, also in =skg-sexpr-search.el=, extracts values
+  at paths such as =(skg node id)= or =(skg node birth)=.
+- =skg-sexp-subtree-p=, in =elisp/skg-sexpr/skg-compare-sexpr.el=, checks
+  whether one sexp contains a semantic subtree of another. It ignores
+  sibling order except for list heads, which is usually what metadata tests
+  want.
+- =skg--metadata-sexp-at-point-or-nil= and related predicates in
+  =elisp/skg-metadata.el= are useful higher-level entry points when point
+  is already on an Org headline.
+
+Before adding new test helpers, check whether =skg-sexp-subtree-p= already
+does enough. If wildcard matching is needed for patterns like
+=(skg (node (id _)))=, add it deliberately to the sexp comparison layer or
+wrap it in a test-only helper, instead of encoding that with regex.
+
+** Proposed test helpers
+
+Add shared helpers for integration tests, probably near
+=tests/integration/save_collateral_break_cycle/test-helpers.el= or in a new
+common file loaded by integration tests:
+
+- =skg-test-headline-metadata-sexps=: return parsed metadata sexps for all
+  headlines in a buffer.
+- =skg-test-headline-records=: return structured records with depth,
+  metadata sexp, id, title, parentIs, birth, staged/unstaged axes, and
+  scaffold kind. This can replace ad hoc =(depth relation title)= triples
+  where tests need more precision.
+- =skg-test-find-node-line=: find a headline by exact metadata structure,
+  for example id plus optional parent relation and title.
+- =skg-test-assert-metadata-present= and
+  =skg-test-assert-metadata-absent=: assert that some parsed headline sexp
+  contains a semantic subtree.
+- =skg-test-assert-child-metadata=: assert that a matching parent headline
+  has a matching child or descendant headline at the expected depth.
+
+The helpers should report the actual parsed sexps on failure, not just the
+raw buffer string. Raw buffer output is still useful as secondary context.
+
+** Migration targets
+
+Start with tests that currently use broad substring or regex checks against
+the whole buffer:
+
+- =tests/integration/containerward-on-phantom/test-emacs.el=: assert on an
+  actual descendant sexp containing =(skg (node (birth containsParent)))=,
+  rather than searching for text.
+- Diff-mode tests: assert exact staged/unstaged axes with
+  =skg-sexp-cdr-at-path=, e.g. =(skg node unstaged)= contains =removedM=,
+  instead of looking for ="(unstaged removedM)"= in the whole buffer.
+- Search tests: when checking that a result is for a specific node, parse
+  the headline metadata and check =(skg node id)= rather than searching for
+  ="(id ...)"=.
+- Save/update tests that inspect generated UUID lines: parse the new node's
+  metadata and title separately, rather than relying on a headline regex
+  that couples Org stars, metadata order, and title text.
+- Herald tests can still use display text assertions, but metadata presence
+  should be checked structurally before testing presentation.
+
+** Why this matters
+
+Metadata order is mostly an implementation detail. Regex tests tend to
+encode that order accidentally. They also confuse semantic terms
+=(containsParent)= with adjacent display or stats terms =(contents)=.
+
+Sexps are the actual protocol between Rust and Emacs. Tests should mostly
+assert on that protocol as parsed data, then reserve regex/string checks for
+things that are genuinely textual: visible titles, body text, display
+heralds, buffer names, and shell output.
+
+** Suggested rollout
+
+1. Add the shared helpers and unit-test them with small buffers.
+2. Convert one integration test that currently has a known weak assertion.
+3. Convert clusters of similar checks: diff axes, node ids, relation
+   provenance, generated UUID lines.
+4. Keep exact full-buffer string comparisons only where the full rendering
+   is intentionally the contract.

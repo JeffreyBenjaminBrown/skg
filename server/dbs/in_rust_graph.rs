@@ -9,6 +9,8 @@
 
 pub mod audit;
 pub mod audit_store;
+pub mod override_invariants;
+pub mod relation_accessors;
 pub mod scheduled_audit;
 
 use arc_swap::ArcSwap;
@@ -65,7 +67,7 @@ pub struct InRustGraph {
   /// 'X → {pids of nodes whose hides_from_its_subscriptions includes X}'
   pub hiders_of        : im::HashMap<ID, im::HashSet<ID>>,
   /// 'X → {pids of nodes whose overrides_view_of includes X}'
-  pub replacements_of  : im::HashMap<ID, im::HashSet<ID>>,
+  pub overriders_of    : im::HashMap<ID, im::HashSet<ID>>,
   /// 'X → {pids of nodes whose textlinks_to includes X}'
   pub textlinks_in     : im::HashMap<ID, im::HashSet<ID>>,
   /// Maps any of a node's extra_ids to that node's pid. Invariant:
@@ -80,7 +82,7 @@ impl InRustGraph {
       contained_by     : im::HashMap::new (),
       subscribers_of   : im::HashMap::new (),
       hiders_of        : im::HashMap::new (),
-      replacements_of  : im::HashMap::new (),
+      overriders_of    : im::HashMap::new (),
       textlinks_in     : im::HashMap::new (),
       extra_id_to_pid  : im::HashMap::new (), } }
 
@@ -171,7 +173,7 @@ fn add_to_inverse_indexes (
     add_to_inverse_map (&mut g . hiders_of, &corresponding_pid, pid); }
   for second_member in node . overrides_view_of . or_default () {
     let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
-    add_to_inverse_map (&mut g . replacements_of, &corresponding_pid, pid); }
+    add_to_inverse_map (&mut g . overriders_of, &corresponding_pid, pid); }
   for second_member in &node . textlinks_to {
     let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
     add_to_inverse_map (&mut g . textlinks_in, &corresponding_pid, pid); } }
@@ -200,7 +202,7 @@ fn remove_from_inverse_indexes (g: &mut InRustGraph, node: &NodeRust) {
     remove_from_inverse_map (&mut g . hiders_of, &corresponding_pid, pid); }
   for second_member in node . overrides_view_of . or_default () {
     let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
-    remove_from_inverse_map (&mut g . replacements_of, &corresponding_pid, pid); }
+    remove_from_inverse_map (&mut g . overriders_of, &corresponding_pid, pid); }
   for second_member in &node . textlinks_to {
     let corresponding_pid : ID = id_to_pid_if_found (g, second_member);
     remove_from_inverse_map (&mut g . textlinks_in, &corresponding_pid, pid); }
@@ -243,7 +245,7 @@ fn migrate_inverse_entries_for_new_extraids (
     migrate_one (&mut g . contained_by, extraid, target_pid);
     migrate_one (&mut g . subscribers_of, extraid, target_pid);
     migrate_one (&mut g . hiders_of, extraid, target_pid);
-    migrate_one (&mut g . replacements_of, extraid, target_pid);
+    migrate_one (&mut g . overriders_of, extraid, target_pid);
     migrate_one (&mut g . textlinks_in, extraid, target_pid); } }
 
 fn add_to_inverse_map (
@@ -305,6 +307,19 @@ pub fn apply_definenodes (
 ) {
   let old : Arc<InRustGraph> = graph . load_full ();
   let mut new_graph : InRustGraph = (*old) . clone ();
+  apply_definenodes_to_inRustGraph (&mut new_graph, node_defs);
+  graph . store ( Arc::new (new_graph) ); }
+
+/// Apply a batch of DefineNodes to an ordinary in-memory graph value.
+///
+/// This is the shared mutation path for the live graph update and for
+/// save-time validation simulations.  Keep graph mutation semantics in
+/// this helper so the validator asks the same "what graph would this
+/// produce?" question as the real save path.
+pub fn apply_definenodes_to_inRustGraph (
+  mut new_graph : &mut InRustGraph,
+  node_defs : &[DefineNode],
+) {
   for instr in node_defs {
     match instr {
       DefineNode::Save (SaveNode (node)) => {
@@ -322,8 +337,7 @@ pub fn apply_definenodes (
       DefineNode::Delete (DeleteNode { id, .. }) => {
         if let Some (old_rust) = new_graph . nodes . get (id) . cloned () {
           remove_from_inverse_indexes (&mut new_graph, &old_rust); }
-        new_graph . nodes . remove (id); } } }
-  graph . store ( Arc::new (new_graph) ); }
+        new_graph . nodes . remove (id); }} }}
 
 /// Check that in-Rust graph reflects the expected post-apply state
 /// for a batch of save instructions: every Save's pid is present in

@@ -1,0 +1,29 @@
+Conceptually, I think the ViewNode type
+ought to have (tell me if I'm missing any)
+the following constructors.
+Also I'm renaming Viewnode -> Vnode,
+and using Gnode for "graph node".
+```
+  Vnode
+    = Gnode
+    | QualCol
+    | Qual
+    | PartnerCol
+    | Diff
+
+  Gnode
+    = Active // what we've been calling TrueNode
+    | Inactive // from an intactive source
+    | Nonexistent // I can't remember how these happen, or what they're called, but I think they do.
+
+  QualCol = ID | Alias
+  Qual = ID (ID) | Alias (String)
+  PartnerCol = <eight of them, obvious from viewnode.rs>
+  Diff = TextChanged | Phantom
+```
+
+It is likely we will want a function 'originDepth' which, given a PartnerCol,
+returns the depth of the node for which partners are collected:
+origin depth = 1 for subscribeeCol and most other Cols, but
+2 for hiddenOutisde,
+3 for hiddenIn

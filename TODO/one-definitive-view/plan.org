@@ -101,7 +101,7 @@ Suppose O (the origin) is requested definitive in buffer A.
    b. If yes (in view B at some location), indefinitize N's subtree in B's forest, and update the registry (N -> ViewUri(A)).
    c. If no, just register N -> ViewUri(A).
 
-3. Preorder matters (as you noted): if definitive N in buffer B has a definitive child M under it, and we indefinitize N first (which recurses into its subtree via 'indefinitize_content_subtree'), M is already handled — it gets indefinitized as part of N's subtree collapse. If we did postorder, we'd redundantly process M's subtree first, then process N's subtree which includes M again.
+3. Preorder matters (as you noted): if definitive N in buffer B has a definitive child M, and we indefinitize N first (which recurses into its subtree via 'indefinitize_content_subtree'), M is already handled — it gets indefinitized as part of N's subtree collapse. If we did postorder, we'd redundantly process M's subtree first, then process N's subtree which includes M again.
 
 *** Where this fits in the code
 This is an extension of 'execute_definitive_view_request' in [[../../server/to_org/expand/definitive.rs][definitive.rs]]. After expanding O's subtree (step 1), a second pass (step 2) checks the /global/ registry for every newly-definitive node and indefinitizes cross-buffer conflicts. This second pass is a separate function called immediately after expansion.

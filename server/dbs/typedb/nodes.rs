@@ -1,3 +1,4 @@
+use crate::consts::typedb_concurrent_transactions;
 use crate::types::misc::{ID, SourceName};
 use crate::types::nodes::typedb::NodeTypedb;
 
@@ -14,7 +15,7 @@ use typedb_driver::{
 use typedb_driver::answer::QueryAnswer;
 
 /// Maps `create_one_node_in_own_tx` over `nodes`,
-/// bounded by TYPEDB_CONCURRENT_TRANSACTIONS
+/// bounded by 'typedb_concurrent_transactions'
 /// to avoid overwhelming TypeDB with concurrent transactions.
 /// Creates all `node` entities, all `extra_id` entities,
 /// and all `has_extra_id` relationships.
@@ -32,7 +33,7 @@ pub async fn create_all_nodes (
       . map ( |node| create_one_node_in_own_tx (
                 db_name, driver, node )) )
     . buffer_unordered (
-        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+        typedb_concurrent_transactions () )
     . collect () . await;
   for result in results {
     result ?; }
@@ -69,7 +70,7 @@ pub async fn create_only_nodes_with_no_ids_present (
       . map ( |node| create_one_node_in_own_tx (
                 db_name, driver, node )) )
     . buffer_unordered (
-        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+        typedb_concurrent_transactions () )
     . collect () . await;
   for result in &results {
     if let Err (e) = result {
@@ -91,7 +92,7 @@ async fn create_one_node_in_own_tx (
 /// Parallel existence check:
 /// Given a set of candidate ID strings,
 /// return the subset that already exist in the DB.
-/// Sends one query per ID, bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
+/// Sends one query per ID, bounded by 'typedb_concurrent_transactions'.
 pub async fn which_ids_exist (
   db_name : &str,
   driver  : &TypeDBDriver,
@@ -150,16 +151,37 @@ pub async fn create_node (
 ) -> Result < (), Box<dyn Error> > {
 
   let primary_id : &ID = &node . pid;
+  error_unless_source_exists (tx, &node . source) . await ?;
   tx . query ( {
     let insert_node_query : String = format! (
-      r#"insert $n isa node,
-                   has id "{}",
-                   has source "{}";"#,
-      primary_id . as_str (),
-      node . source );
+      r#"match
+           $src isa source, has source_name "{}";
+         insert
+           $n isa node, has id "{}";
+           $rel isa has_source (node: $n, source: $src);"#,
+      node . source,
+      primary_id . as_str (), );
     insert_node_query } ) . await ?;
   insert_extra_ids ( &node, tx ) . await ?; // PITFALL: This creates has_extra_id relationships, so you might expect it to belong in `create_relationships_from_node`. But it's important that these relationships be created before any others, because the others might refer to nodes via their `extra_id`s. They are basically optional attributes of a node; they have no meaning beyond being another way to refer to a node.
   Ok (()) }
+
+async fn error_unless_source_exists (
+  tx     : &typedb_driver::Transaction,
+  source : &SourceName,
+) -> Result<(), Box<dyn Error>> {
+  let answer : QueryAnswer =
+    tx . query ( format! (
+      r#"match
+           $src isa source, has source_name "{}";
+         select $src;"#,
+      source ) ) . await ?;
+  let mut rows : ConceptRowStream = answer . into_rows ();
+  match rows . next () . await {
+    Some (Ok (_)) => Ok (()),
+    Some (Err (e)) => Err (e . into ()),
+    None => Err (format! (
+      "TypeDB source entity '{}' does not exist", source ) . into ()),
+  } }
 
 async fn insert_extra_ids (
   node : &NodeTypedb,
@@ -221,7 +243,7 @@ pub async fn overwrite_extra_ids_of_node (
 /// PURPOSE: Delete the node corresponding to every ID it receives,
 /// including its extra IDs.
 /// Sends one transaction per node,
-/// bounded by TYPEDB_CONCURRENT_TRANSACTIONS.
+/// bounded by 'typedb_concurrent_transactions'.
 pub async fn delete_nodes_from_pids (
   db_name : &str,
   driver  : &TypeDBDriver,
@@ -233,7 +255,7 @@ pub async fn delete_nodes_from_pids (
       . map ( |id| delete_one_node_from_pid (
                 db_name, driver, id )) )
     . buffer_unordered (
-        crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS )
+        typedb_concurrent_transactions () )
     . collect () . await;
   for result in results {
     result ?; }
@@ -262,29 +284,5 @@ async fn delete_one_node_from_pid (
     r#"match $node isa node, has id "{}";
        delete $node;"#,
     id . as_str () ) ) . await ?;
-  tx . commit () . await ?;
-  Ok (()) }
-
-/// Updates the source attribute of a node in TypeDB.
-/// Deletes the old source and inserts the new one in a single transaction.
-pub async fn update_node_source (
-  db_name    : &str,
-  driver     : &TypeDBDriver,
-  pid        : &ID,
-  new_source : &SourceName,
-) -> Result<(), Box<dyn Error>> {
-  let tx : Transaction =
-    driver . transaction (
-      db_name, TransactionType::Write ) . await ?;
-  tx . query ( format! (
-    r#"match
-         $n isa node, has id "{}";
-         $n has source $old_src;
-       delete
-         has $old_src of $n;
-       insert
-         $n has source "{}";"#,
-    pid . as_str(),
-    new_source ) ) . await ?;
   tx . commit () . await ?;
   Ok (()) }

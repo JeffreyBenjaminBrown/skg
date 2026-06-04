@@ -11,7 +11,7 @@ use typedb_driver::TypeDBDriver;
 use crate::types::misc::ID;
 use crate::dbs::typedb::search::find_related_nodes;
 
-/// Partition E's direct content into visible and hidden portions,
+/// Partition E's content into visible and hidden portions,
 /// based on what R hides_from_its_subscriptions.
 ///
 /// Returns (visible, hidden) where:
@@ -55,7 +55,7 @@ pub async fn what_node_hides (
     "hider",
     "hidden" ) . await }
 
-/// Returns the union of all subscribees' direct content.
+/// Returns the union of all subscribees' content.
 /// Uses a single batched query.
 pub async fn what_nodes_contain (
   db_name         : &str,

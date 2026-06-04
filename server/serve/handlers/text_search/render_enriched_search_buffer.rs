@@ -2,7 +2,8 @@ use crate::dbs::tantivy::title_and_source_by_id;
 use crate::dbs::typedb::ancestry::AncestryTree;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_viewnode};
+use crate::types::viewnode::{Birth, ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_viewnode_with_birth};
+use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::HashMap;
@@ -11,21 +12,21 @@ use std::collections::HashMap;
 /// under each level-1 result TrueNode.
 /// Ancestry children are prepended (inserted first among siblings).
 pub(crate) fn insert_containerward_ancestries_into_search_view (
-  viewforest         : &mut Tree<ViewNode>,
+  viewforest     : &mut Tree<ViewNode>,
   search_results : &[ID],
   ancestry_by_id : &HashMap<ID, AncestryTree>,
   tantivy_index  : &TantivyIndex,
   config         : &SkgConfig,
   active         : &ActiveSourceSet,
 ) {
-  // Search results ("hits") are level-1 BufferRoot children.
+  // Search results ("hits") are forest roots.
   // Match them by ID from search_results.
   let level1_ids : Vec<(NodeId, ID)> = {
     let root_ref : NodeRef<ViewNode> = viewforest . root ();
     root_ref . children ()
     . filter_map ( |c| match &c . value () . kind {
-      ViewNodeKind::True (t) =>
-        Some (( c . id (), t . id . clone () )),
+      ViewNodeKind::Vognode (Vognode::Normal (t))
+        => Some (( c . id (), t . id . clone () )),
       _ => None } )
     . collect () };
   for (node_nid, node_id) in &level1_ids {
@@ -82,12 +83,14 @@ fn prepend_containing_child_from_tantivy (
         if ! active . contains_source (&source) {
           return None;
         } else {
-          mk_indefinitive_viewnode (
-            node_id . clone (), source, title, ParentIs::Content ) }},
+          mk_indefinitive_viewnode_with_birth (
+            node_id . clone (), source, title,
+            ParentIs::Independent, Birth::ContainsParent ) }},
       None =>
-        mk_indefinitive_viewnode (
+        mk_indefinitive_viewnode_with_birth (
           node_id . clone (), SourceName::from ("search"),
-          node_id . as_str () . to_string (), ParentIs::Content ) };
+          node_id . as_str () . to_string (),
+          ParentIs::Independent, Birth::ContainsParent ) };
   let mut parent_mut : NodeMut<ViewNode> =
     viewforest . get_mut (parent_treeid) . unwrap ();
   Some (parent_mut . prepend (viewnode) . id ()) }

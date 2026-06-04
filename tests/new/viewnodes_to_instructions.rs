@@ -6,7 +6,9 @@
 use indoc::indoc;
 use ego_tree::Tree;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_viewforest;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::{
+  org_to_uninterpreted_nodes,
+  org_to_uninterpreted_viewforest};
 use skg::from_text::validate::validate_and_filter_foreign_instructions;
 use skg::from_text::viewnodes_to_instructions::classify::{
   viewforest_with_saveroles, ViewNode_in_Role };
@@ -21,8 +23,13 @@ use skg::types::git::Sign;
 use skg::types::misc::{ID, MSV};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
-use skg::types::maybe_placed_viewnode::{MaybePlacedViewnode, maybePlaced_to_placed_tree};
+use skg::types::maybe_placed_viewnode::{
+  MpViewnode,
+  maybePlaced_to_placed_tree,
+  maybePlaced_to_placed_viewforest};
+use skg::types::tree::forest::{MpViewForest, ViewForest};
 use skg::types::viewnode::{ViewNode, ViewNodeKind, viewforest_root_viewnode};
+use skg::types::viewnode::Vognode;
 use std::error::Error;
 
 const SUBSCRIBEE_EDIT_CONFIG: &str =
@@ -49,7 +56,7 @@ fn saved_node_by_id<'a> (
 fn checked_viewforest_from_org (
   input : &str,
 ) -> Tree<ViewNode> {
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap() }
 
@@ -71,7 +78,10 @@ fn set_membership_unstaged_minus (
   for node_ref in tree . nodes() {
     let is_target : bool =
       match &node_ref . value() . kind {
-        ViewNodeKind::True (t) => t . id == ID::from (id),
+        ViewNodeKind::Vognode (
+          Vognode::Normal (t)
+          | Vognode::Phantom (t)) =>
+          t . id == ID::from (id),
         _ => false,
       };
     if is_target {
@@ -79,24 +89,30 @@ fn set_membership_unstaged_minus (
       break; }}
   let target_id = target_id . unwrap_or_else (||
     panic! ("node not found: {}", id));
-  if let ViewNodeKind::True (t) =
+  if let ViewNodeKind::Vognode (
+    Vognode::Normal (t)
+    | Vognode::Phantom (t)) =
     &mut tree . get_mut (target_id) . unwrap() . value() . kind
-  { t . membership . unstaged = Some (Sign::Minus); }}
+  { t . membership . unstaged = Some (Sign::Minus); }
+  tree . get_mut (target_id) . unwrap()
+    . value()
+    . normal_to_phantom (); }
 
 async fn save_instructions_from_org_with_disk (
   org_text : &str,
   config   : &skg::types::misc::SkgConfig,
   driver   : &typedb_driver::TypeDBDriver,
 ) -> Result<Vec<DefineNode>, Box<dyn Error>> {
-  let (mut maybePlaced_viewforest, _parsing_errors) =
-    org_to_uninterpreted_nodes (org_text) ?;
+  let (mut maybePlaced_viewforest, _parsing_errors)
+    : (MpViewForest, Vec<BufferValidationError>) =
+    org_to_uninterpreted_viewforest (org_text) ?;
   add_missing_info_to_viewforest (
     &mut maybePlaced_viewforest, &config . db_name, driver) . await?;
-  let viewforest : Tree<ViewNode> =
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) ?;
+  let viewforest : ViewForest =
+    maybePlaced_to_placed_viewforest (maybePlaced_viewforest) ?;
   let save_plan =
     extract_nonmergeSavePlan (
-      &viewforest, config, driver) . await?;
+      viewforest . as_internal_tree (), config, driver) . await?;
   Ok (save_plan . define_nodes) }
 
 #[test]
@@ -111,7 +127,7 @@ fn test_extract_nonmergeSavePlan_basic() {
             Root 2 body
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -164,7 +180,7 @@ fn test_extract_nonmergeSavePlan_with_aliases() {
             Content body
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -205,7 +221,7 @@ fn test_extract_nonmergeSavePlan_no_aliases() {
             Child body
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -300,7 +316,7 @@ fn test_extract_nonmergeSavePlan_multiple_alias_cols() {
             ** (skg (node (id content1) (source main))) content node
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -324,7 +340,7 @@ fn test_extract_nonmergeSavePlan_mixed_relations() {
             ** (skg (node (id unrelated2) (source main) (parentIs independent))) another unrelated child
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -353,7 +369,7 @@ fn role_aware_extraction_preserves_content_and_independent_children (
             ** (skg (node (id independent) (source main) (parentIs independent))) independent
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -380,7 +396,7 @@ fn role_aware_extraction_skips_alias_and_id_display_nodes (
             ** (skg (node (id child) (source main))) child
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -403,16 +419,16 @@ fn role_aware_extraction_collects_subscribees_without_hidden_branches (
   let input: &str =
     indoc! {"
             * (skg (node (id subscriber) (source main))) subscriber
-            ** (skg subscribeeCol) subscribees
+            ** (skg subscribeeCol)
             *** (skg (node (id subscribee) (source main))) subscribee
-            **** (skg hiddenInSubscribeeCol) hidden in
+            **** (skg hiddenInSubscribeeCol)
             ***** (skg (node (id hidden-in) (source main))) hidden in child
             **** (skg (node (id subscribee-content) (source main))) subscribee content
-            *** (skg hiddenOutsideOfSubscribeeCol) hidden outside
+            *** (skg hiddenOutsideOfSubscribeeCol)
             **** (skg (node (id hidden-outside) (source main))) hidden outside child
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -434,12 +450,89 @@ fn role_aware_extraction_collects_subscribees_without_hidden_branches (
     ! save_ids (&instructions) . contains (&ID::from ("subscribee"))); }
 
 #[test]
-fn subscribee_hiderel_intent_collects_direct_visible_content (
+fn role_aware_extraction_collects_overridden_col (
+) {
+  let input: &str =
+    indoc! {"
+            * (skg (node (id overrider) (source main))) overrider
+            ** (skg overriddenCol)
+            *** (skg (node (id overridden-a) (source main))) overridden A
+            *** (skg (node (id overridden-b) (source main))) overridden B
+        "};
+
+  let maybePlaced_viewforest : Tree<MpViewnode> =
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let viewforest: Tree<ViewNode> =
+    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let instructions: Vec<DefineNode> =
+    naive_saveinstructions_from_tree (viewforest) . unwrap();
+
+  assert_eq!(
+    save_ids (&instructions),
+    vec![ID::from ("overrider")]);
+  assert_eq!(
+    saved_node_by_id (&instructions, "overrider") . overrides_view_of,
+    MSV::Specified (vec![
+      ID::from ("overridden-a"),
+      ID::from ("overridden-b")])); }
+
+#[test]
+fn empty_overridden_col_means_empty_override_set (
+) {
+  let input: &str =
+    indoc! {"
+            * (skg (node (id overrider) (source main))) overrider
+            ** (skg overriddenCol)
+        "};
+
+  let maybePlaced_viewforest : Tree<MpViewnode> =
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let viewforest: Tree<ViewNode> =
+    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let instructions: Vec<DefineNode> =
+    naive_saveinstructions_from_tree (viewforest) . unwrap();
+
+  assert_eq!(
+    saved_node_by_id (&instructions, "overrider") . overrides_view_of,
+    MSV::Specified (vec![])); }
+
+#[test]
+fn read_only_relation_col_children_do_not_become_save_instructions (
+) {
+  let input: &str =
+    indoc! {"
+            * (skg (node (id owner) (source main))) owner
+            ** (skg subscriberCol)
+            *** (skg (node (id subscriber) (source main))) subscriber
+            ** (skg overriderCol)
+            *** (skg (node (id overrider) (source main))) overrider
+            ** (skg hiderCol)
+            *** (skg (node (id hider) (source main))) hider
+            ** (skg hiddenCol)
+            *** (skg (node (id hidden) (source main))) hidden
+        "};
+
+  let maybePlaced_viewforest : Tree<MpViewnode> =
+    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let viewforest: Tree<ViewNode> =
+    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let instructions: Vec<DefineNode> =
+    naive_saveinstructions_from_tree (viewforest) . unwrap();
+
+  assert_eq!(
+    save_ids (&instructions),
+    vec![ID::from ("owner")]);
+  assert_eq!(
+    saved_node_by_id (&instructions, "owner") . contains,
+    Vec::<ID>::new()); }
+
+#[test]
+fn subscribee_hiderel_intent_collects_visible_content (
 ) {
   let input : &str =
     indoc! {"
             * (skg (node (id subscriber) (source main))) subscriber
-            ** (skg subscribeeCol) subscribees
+            ** (skg subscribeeCol)
             *** (skg (node (id subscribee) (source main))) subscribee
             **** (skg (node (id a) (source main))) a
             **** (skg (node (id b) (source main))) b
@@ -459,7 +552,7 @@ fn subscribee_hiderel_intents_preserve_subscribee_tree_order (
   let input : &str =
     indoc! {"
             * (skg (node (id subscriber) (source main))) subscriber
-            ** (skg subscribeeCol) subscribees
+            ** (skg subscribeeCol)
             *** (skg (node (id first) (source main))) first
             **** (skg (node (id first-child) (source main))) first child
             *** (skg (node (id second) (source main))) second
@@ -481,12 +574,12 @@ fn subscribee_hiderel_intents_preserve_subscribee_tree_order (
       }]); }
 
 #[test]
-fn subscribee_hiderel_intent_uses_only_direct_children (
+fn subscribee_hiderel_intent_uses_only_children (
 ) {
   let input : &str =
     indoc! {"
             * (skg (node (id subscriber) (source main))) subscriber
-            ** (skg subscribeeCol) subscribees
+            ** (skg subscribeeCol)
             *** (skg (node (id subscribee) (source main))) subscribee
             **** (skg (node (id child) (source main))) child
             ***** (skg (node (id grandchild) (source main))) grandchild
@@ -506,7 +599,7 @@ fn subscribee_hiderel_intent_ignores_indefinitive_subscribee (
   let input : &str =
     indoc! {"
             * (skg (node (id subscriber) (source main))) subscriber
-            ** (skg subscribeeCol) subscribees
+            ** (skg subscribeeCol)
             *** (skg (node (id subscribee) (source main) indef (viewRequests definitiveView))) subscribee
             "};
 
@@ -520,7 +613,7 @@ fn subscribee_hiderel_intent_excludes_non_content_delete_and_phantom_children (
   let input : &str =
     indoc! {"
             * (skg (node (id subscriber) (source main))) subscriber
-            ** (skg subscribeeCol) subscribees
+            ** (skg subscribeeCol)
             *** (skg (node (id subscribee) (source main))) subscribee
             **** (skg (node (id keep) (source main))) keep
             **** (skg (node (id independent) (source main) (parentIs independent))) independent
@@ -550,12 +643,12 @@ fn subscribee_hiderel_intent_ignores_hidden_scaffold_contents (
   let input : &str =
     indoc! {"
             * (skg (node (id subscriber) (source main))) subscriber
-            ** (skg subscribeeCol) subscribees
+            ** (skg subscribeeCol)
             *** (skg (node (id subscribee) (source main))) subscribee
-            **** (skg hiddenInSubscribeeCol) hidden in
+            **** (skg hiddenInSubscribeeCol)
             ***** (skg (node (id hidden-in) (source main))) hidden in child
             **** (skg (node (id visible) (source main))) visible
-            *** (skg hiddenOutsideOfSubscribeeCol) hidden outside
+            *** (skg hiddenOutsideOfSubscribeeCol)
             **** (skg (node (id hidden-outside) (source main))) hidden outside child
             "};
 
@@ -578,13 +671,13 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
             *** (skg alias) root alias
             ** (skg (node (id child) (source main))) child
             Child body
-            ** (skg subscribeeCol) subscribees
+            ** (skg subscribeeCol)
             *** (skg (node (id subscribee) (source main))) subscribee
             * (skg (node (id doomed) (source main) (editRequest delete))) doomed
             Doomed body
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -622,13 +715,13 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
             ** (skg (node (id content) (source main))) content
             ** (skg aliasCol) aliases
             *** (skg alias) root alias
-            ** (skg subscribeeCol) subscribees
+            ** (skg subscribeeCol)
             *** (skg (node (id subscribee) (source main))) subscribee
             * (skg (node (id doomed) (source main) (editRequest delete))) doomed
             Doomed body
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -669,7 +762,7 @@ fn subscribee_as_such_child_list_removal_does_not_save_subscribee (
       let input : &str =
         indoc! {"
                 * (skg (node (id r) (source owned))) r
-                ** (skg subscribeeCol) subscribees
+                ** (skg subscribeeCol)
                 *** (skg (node (id e) (source foreign))) subscribee-e
                 **** (skg (node (id e2) (source foreign))) e2
                 "};
@@ -692,7 +785,7 @@ fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
       let input : &str =
         indoc! {"
                 * (skg (node (id r) (source owned))) r
-                ** (skg subscribeeCol) subscribees
+                ** (skg subscribeeCol)
                 *** (skg (node (id e) (source foreign))) subscribee-e
                 **** (skg (node (id e2) (source foreign))) e2
                 "};
@@ -721,7 +814,7 @@ fn subscribee_as_such_child_list_removal_infers_subscriber_hide (
       let input : &str =
         indoc! {"
                 * (skg (node (id r) (source owned))) r
-                ** (skg subscribeeCol) subscribees
+                ** (skg subscribeeCol)
                 *** (skg (node (id e) (source foreign))) subscribee-e
                 **** (skg (node (id e2) (source foreign))) e2
                 "};
@@ -748,7 +841,7 @@ fn moving_subscribee_as_such_child_to_subscriber_does_not_hide (
       let input : &str =
         indoc! {"
                 * (skg (node (id r) (source owned))) r
-                ** (skg subscribeeCol) subscribees
+                ** (skg subscribeeCol)
                 *** (skg (node (id e) (source foreign))) subscribee-e
                 **** (skg (node (id e2) (source foreign))) e2
                 ** (skg (node (id e1) (source foreign) indef)) e1
@@ -775,7 +868,7 @@ fn subscribee_as_such_visible_child_removes_subscriber_hide (
       let input : &str =
         indoc! {"
                 * (skg (node (id R) (source main))) R
-                ** (skg subscribeeCol) subscribees
+                ** (skg subscribeeCol)
                 *** (skg (node (id E1) (source main))) subscribee-1
                 **** (skg (node (id E11) (source main))) E11
                 **** (skg (node (id H) (source main))) H
@@ -804,7 +897,7 @@ fn subscribee_as_such_unhide_preserves_unrelated_hides (
       let input : &str =
         indoc! {"
                 * (skg (node (id R) (source main))) R
-                ** (skg subscribeeCol) subscribees
+                ** (skg subscribeeCol)
                 *** (skg (node (id E1) (source main))) subscribee-1
                 **** (skg (node (id hidden-in-E1) (source main))) hidden-in-E1
                 **** (skg (node (id E11) (source main))) E11
@@ -832,7 +925,7 @@ fn overlapping_subscribee_hiderel_conflict_rejects_save (
       let input : &str =
         indoc! {"
                 * (skg (node (id R) (source main))) R
-                ** (skg subscribeeCol) subscribees
+                ** (skg subscribeeCol)
                 *** (skg (node (id E1) (source main))) E1
                 **** (skg (node (id shared) (source main))) shared
                 *** (skg (node (id E2) (source main))) E2
@@ -884,7 +977,7 @@ fn ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_subscribee (
       let input : &str =
         indoc! {"
                 * (skg (node (id r) (source owned))) r
-                ** (skg subscribeeCol) subscribees
+                ** (skg subscribeeCol)
                 *** (skg (node (id e) (source foreign))) subscribee-e
                 **** (skg (node (id e2) (source foreign))) e2
                 * (skg (node (id e) (source foreign))) subscribee-e
@@ -935,7 +1028,7 @@ fn recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
       let input : &str =
         indoc! {"
                 * (skg (node (id r) (source owned))) r
-                ** (skg subscribeeCol) subscribees
+                ** (skg subscribeeCol)
                 *** (skg (node (id e) (source foreign))) subscribee-e
                 **** (skg (node (id e2) (source foreign))) e2
                 "};
@@ -961,7 +1054,7 @@ fn foreign_subscribee_as_such_title_edit_is_rejected (
       let input : &str =
         indoc! {"
                 * (skg (node (id r) (source owned))) r
-                ** (skg subscribeeCol) subscribees
+                ** (skg subscribeeCol)
                 *** (skg (node (id e) (source foreign))) changed title
                 **** (skg (node (id e2) (source foreign))) e2
                 "};
@@ -994,7 +1087,7 @@ fn owned_as_subscribee_title_edit_is_rejected (
       let input : &str =
         indoc! {"
                 * (skg (node (id a) (source owned))) a
-                ** (skg subscribeeCol) subscribees
+                ** (skg subscribeeCol)
                 *** (skg (node (id r) (source owned))) changed title
                 **** (skg (node (id r1) (source owned))) r1
                 "};
@@ -1027,7 +1120,7 @@ fn owned_as_subscribee_body_edit_is_rejected (
       let input : &str =
         indoc! {"
                 * (skg (node (id a) (source owned))) a
-                ** (skg subscribeeCol) subscribees
+                ** (skg subscribeeCol)
                 *** (skg (node (id r) (source owned))) r
                 body text that should not be accepted here
                 **** (skg (node (id r1) (source owned))) r1
@@ -1062,7 +1155,7 @@ fn test_extract_nonmergeSavePlan_deep_nesting() {
             ** (skg (node (id level2b) (source main))) level 2b
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -1101,7 +1194,7 @@ fn test_extract_nonmergeSavePlan_error_missing_id() {
             * node without ID
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let result : Result<Tree<ViewNode>, String> =
     // This conversion fails because of missing ID
@@ -1132,7 +1225,7 @@ fn test_extract_nonmergeSavePlan_only_aliases() {
             *** (skg alias) alias two
         "};
 
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
@@ -1165,7 +1258,7 @@ fn test_extract_nonmergeSavePlan_complex_scenario() {
             * (skg (node (id doc2) (source main))) Document 2
             ** (skg (node (id ref_section) (source main) (parentIs independent))) Reference Section
         "};
-  let maybePlaced_viewforest : Tree<MaybePlacedViewnode> =
+  let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();

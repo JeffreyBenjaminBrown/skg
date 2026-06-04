@@ -2,14 +2,16 @@ pub mod contradictory_instructions;
 
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{ParentIs, ViewRequest};
-use crate::types::maybe_placed_viewnode::{MaybePlacedViewnode, MaybePlacedViewnodeKind};
+use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
+use crate::types::maybe_placed_viewnode::MpVognode;
+use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::errors::BufferValidationError;
 use crate::merge::validate_merge::validate_merge_requests;
 use contradictory_instructions::find_inconsistent_instructions;
 use super::local;
-use ego_tree::Tree;
 use ego_tree::iter::Edge;
+use ego_tree::NodeId;
 use std::collections::HashSet;
 use typedb_driver::TypeDBDriver;
 
@@ -19,10 +21,10 @@ use typedb_driver::TypeDBDriver;
 /// SHARES RESPONSIBILITY for error detection
 /// with 'org_to_uninterpreted_nodes',
 /// which runs earlier and detects a few errors that this one can't,
-/// because this one acts on a tree of MaybePlacedViewnodes rather than raw text.
+/// because this one acts on a tree of MpViewnodes rather than raw text.
 /// (Namely, Alias and AliasCol should not have body text.)
 ///
-/// ASSUMES that in the "viewforest" (tree with BufferRoot):
+/// ASSUMES that in the viewforest:
 /// - IDs have been replaced with PIDs, per
 ///   'assign_pids_throughout_viewforest'. (Otherwise two org nodes
 ///   might refer to the same skg node, yet appear not to.)
@@ -32,7 +34,7 @@ use typedb_driver::TypeDBDriver;
 /// but role classification, save-intent extraction, and disk
 /// supplementation have not happened yet.
 pub async fn find_buffer_errors_for_saving (
-  viewforest: &Tree<MaybePlacedViewnode>,
+  viewforest: &MpViewForest,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<BufferValidationError>,
@@ -69,17 +71,36 @@ pub async fn find_buffer_errors_for_saving (
         BufferValidationError::Other (error_msg)); }}
   validate_definitive_view_requests(
     viewforest, &mut errors);
+  validate_view_roots (
+      viewforest, &mut errors);
   { // local structure validation
-    let _ = do_everywhere_in_tree_dfs_readonly(
-      viewforest, viewforest . root() . id(), true,
-      &mut |node_ref| {
-        if let Err (e) = local::validate_local_structure(
-               viewforest, node_ref . id(), config) {
-          errors . push(
-            BufferValidationError::LocalStructureViolation(
-              e . message, e . id )); }
-        Ok(( )) }); }
+    let root_ids : Vec<NodeId> =
+      viewforest . root_ids ();
+    for root_id in root_ids {
+      let _ = do_everywhere_in_tree_dfs_readonly(
+        viewforest, root_id, true,
+        &mut |node_ref| {
+          if let Err (e) = local::validate_local_structure(
+                 viewforest, node_ref . id(), config) {
+            errors . push(
+              BufferValidationError::LocalStructureViolation(
+                e . message, e . id )); }
+          Ok(( )) }); }}
   Ok (errors) }
+
+fn validate_view_roots (
+  viewforest : &MpViewForest,
+  errors     : &mut Vec<BufferValidationError>,
+) {
+  for root in viewforest . roots () {
+    if ! matches! (
+      &root . value () . kind,
+      MpViewnodeKind::Vognode (MpVognode::Normal (_))
+        | MpViewnodeKind::Vognode (MpVognode::Deleted (_)))
+    { errors . push (
+        BufferValidationError::Other (
+          "View roots must be TrueNodes or DeletedNodes."
+          . to_string () )); }}}
 
 /// For each node in the viewforest, if it has a definitive view request,
 /// verify that:
@@ -91,29 +112,36 @@ pub async fn find_buffer_errors_for_saving (
 /// - No other node with the same ID has a definitive view request,
 ///   because there can only be one definitive view.
 fn validate_definitive_view_requests (
-  viewforest : &Tree<MaybePlacedViewnode>, // "viewforest" = tree with BufferRoot
+  viewforest : &MpViewForest,
   errors : &mut Vec<BufferValidationError>,
 ) {
   let mut ids_with_requests : HashSet<ID> =
     HashSet::new();
   for edge in viewforest . root() . traverse()
   { if let Edge::Open (node_ref) = edge
-    { let viewnode : &MaybePlacedViewnode =
+    { let viewnode : &MpViewnode =
         node_ref . value();
-      if let MaybePlacedViewnodeKind::True (t) = &viewnode . kind
+      if let MpViewnodeKind::Vognode (
+        MpVognode::Normal (t)
+        | MpVognode::Phantom (t))
+      = &viewnode . kind
       { if t . view_requests . contains (&ViewRequest::Definitive)
         { if let Some (id) = &t . id {
-          { // Error: must be indefinitive
+          { // Must be indefinitive
             if ! t . is_indefinitive ()
-            { errors . push( BufferValidationError::DefinitiveRequestOnDefinitiveNode( id . clone() )); }}
-          { // Error: must have no content children.
+            { errors . push( BufferValidationError::DefinitiveRequestOnDefinitiveNode(
+              id . clone() )); }}
+          { // Must have no content children.
             let has_content_children : bool =
               node_ref . children () . any ( |child| matches! (
                 &child . value () . kind,
-                MaybePlacedViewnodeKind::True (ct)
-                  if ct . parentIs == ParentIs::Container ));
+                MpViewnodeKind::Vognode (MpVognode::Normal (ct))
+                  if ct . parentIs == ParentIs::Affected ));
             if has_content_children
-            { errors . push( BufferValidationError::DefinitiveRequestOnNodeWithContentChildren( id . clone() )); }}
-          { // Error: at most one request per ID
+            { errors . push(
+              BufferValidationError::DefinitiveRequestOnNodeWithContentChildren(
+                id . clone() )); }}
+          { // At most one request per ID
             if ! ids_with_requests . insert(id . clone())
-            { errors . push( BufferValidationError::MultipleDefinitiveRequestsForSameId( id . clone() )); }} }}} }} }
+            { errors . push( BufferValidationError::MultipleDefinitiveRequestsForSameId(
+              id . clone() )); }} }}} }}}

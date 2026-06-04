@@ -130,7 +130,7 @@ fn test_move_id_scaffolds_to_child_respawns()
       let input = "\
 * (skg (node (id 1) (source main))) 1
 ** (skg (node (id child) (source main))) child
-*** (skg idCol) its IDs
+*** (skg idCol)
 **** (skg id) 1
 **** (skg id (unstaged removedM)) 2
 **** (skg id (unstaged newM)) 2'

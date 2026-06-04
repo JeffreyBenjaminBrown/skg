@@ -10,7 +10,7 @@
 /// This is always true for the graphnodestats path, which collects
 /// PIDs from the already-built viewnode tree.
 
-use crate::consts::TYPEDB_CONCURRENT_TRANSACTIONS;
+use crate::consts::typedb_concurrent_transactions;
 use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
 use crate::dbs::typedb::util::concept_document::extract_id_from_map;
 use crate::source_sets::ActiveSourceSet;
@@ -144,7 +144,7 @@ pub async fn fetch_all_graphnodestats_with_source_set (
 /// TypeDB-backed implementation. Exercised only by tests that bypass
 /// 'init_global_handle_for_first_time_or_panic'; in the running server the dispatcher routes
 /// to 'fetch_all_graphnodestats_in_rust' instead. Uses
-/// 'buffer_unordered (TYPEDB_CONCURRENT_TRANSACTIONS)' for consistency
+/// 'buffer_unordered (typedb_concurrent_transactions ())' for consistency
 /// with the rest of the TypeDB module.
 async fn fetch_all_graphnodestats_from_typedb (
   db_name : &str,
@@ -155,7 +155,7 @@ async fn fetch_all_graphnodestats_from_typedb (
   let results : Vec < Result < OnePidStats, Box < dyn Error > > > =
     stream::iter ( pids . iter ()
       . map ( |pid| fetch_one_pid_stats ( db_name, driver, pid ) ) )
-    . buffer_unordered ( TYPEDB_CONCURRENT_TRANSACTIONS )
+    . buffer_unordered ( typedb_concurrent_transactions () )
     . collect () . await;
   let mut num_containers : HashMap < ID, usize > = HashMap::new ();
   let mut num_contents   : HashMap < ID, usize > = HashMap::new ();
@@ -269,16 +269,15 @@ fn fetch_all_graphnodestats_in_rust (
                                             from_containers );
     num_links_in_from_leaves     . insert ( pid . clone (),
                                             from_leaves );
-    // has_subscribes / has_overrides: either role.
-    let out_sub : bool =
-      node_opt . map ( |n| ! n . subscribes_to
+    let out_sub : bool = // subscription out-links
+      node_opt . map ( |n| n . subscribes_to
                         . or_default () . iter ()
                         . filter_map ( |id| graph . pid_of (id) )
                         . any ( |related_pid|
                           pid_source_is_active (
                             graph, active, &related_pid) ) )
       . unwrap_or (false);
-    let in_sub  : bool =
+    let in_sub  : bool = // subscription in-links
       graph . subscribers_of . get (pid)
       . map ( |s| s . iter ()
         . any ( |related_pid|
@@ -286,16 +285,16 @@ fn fetch_all_graphnodestats_in_rust (
       . unwrap_or (false);
     if out_sub || in_sub { has_subscribes
                            . insert ( pid . clone () ); }
-    let out_ov : bool =
-      node_opt . map ( |n| ! n . overrides_view_of
+    let out_ov : bool = // overrides out-links
+      node_opt . map ( |n| n . overrides_view_of
                         . or_default () . iter ()
                         . filter_map ( |id| graph . pid_of (id) )
                         . any ( |related_pid|
                           pid_source_is_active (
                             graph, active, &related_pid) ) )
       . unwrap_or (false);
-    let in_ov  : bool =
-      graph . replacements_of . get (pid)
+    let in_ov  : bool = // overrides in-links
+      graph . overriders_of . get (pid)
       . map ( |s| s . iter ()
         . any ( |related_pid|
           pid_source_is_active (graph, active, related_pid) ) )
@@ -410,10 +409,10 @@ async fn fetch_one_pid_stats (
           "overrides_related": [
             match
               $ov isa node, has id $ovid;
-              {{ $rel5 isa overrides_view_of ( replacement: $node,
-                                               replaced:    $ov ); }} or
-              {{ $rel5 isa overrides_view_of ( replacement: $ov,
-                                               replaced:    $node ); }};
+              {{ $rel5 isa overrides_view_of ( overrider:  $node,
+                                               overridden: $ov ); }} or
+              {{ $rel5 isa overrides_view_of ( overrider:  $ov,
+                                               overridden: $node ); }};
             fetch {{ "id": $ovid }};
           ]
         }};"#,

@@ -11,4 +11,4 @@ hides_from_its_subscriptions:
 - hidden-from-1s-subscriptions
 - hidden-from-subscriptions-of-1-but-in-content-of-2
 overrides_view_of:
-- 1-overrides-view-of
+- overridden-by-1

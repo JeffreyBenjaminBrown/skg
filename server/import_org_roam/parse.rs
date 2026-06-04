@@ -17,8 +17,8 @@
 ///    (This is described in more detail in ./super-indentation-rules.org .)
 ///    And the test 'test_super_indentation_creates_grouping_nodes'
 ///    might be clearer than any explanation.)
-///    Org-roam allows "super-indentation": a headline like `*** c` directly under
-///    `* a`, skipping level 2. When a node's children span
+///    Org-roam allows "super-indentation": a headline like `*** c`
+///    as a child of `* a`, skipping level 2. When a node's children span
 ///    more than one headline level, we wrap them in **synthetic
 ///    grouping nodes** — `SectionTree` nodes that do not correspond
 ///    to any line in the file. They carry an `override_body` instead

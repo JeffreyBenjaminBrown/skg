@@ -2,7 +2,11 @@ use crate::dbs::tantivy::titles_by_ids;
 use crate::serve::handlers::save_buffer::compute_diff_for_every_source;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::send_response_with_length_prefix;
-use crate::source_sets::{ActiveSourceSet, titles_for_source_set_for_test};
+use crate::source_sets::{
+  ActiveSourceSet,
+  SourceSetName,
+  titles_for_source_set_for_test,
+};
 use crate::types::env::find_source_with_optional_tantivy;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName, SkgConfig, TantivyIndex};
@@ -33,7 +37,7 @@ pub fn handle_titles_by_ids_request (
   let active : ActiveSourceSet =
     ActiveSourceSet::named (
       config,
-      crate::source_sets::SourceSetName::from ("all"))
+      SourceSetName::from ("all"))
     . expect ("reserved source-set all should always resolve");
   handle_titles_by_ids_request_with_source_set (
     stream, request, tantivy_index, config,

@@ -20,6 +20,7 @@
 use crate::to_org::util::{stub_viewforest_from_root_ids, content_ids_if_definitive_else_empty, build_node_branch_minus_content_with_source_set, DefinitiveMap};
 use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
 use crate::source_sets::ActiveSourceSet;
+use crate::types::tree::forest::ViewForest;
 use crate::types::misc::{SkgConfig, ID};
 use crate::types::viewnode::ViewNode;
 
@@ -30,48 +31,27 @@ use std::future::Future;
 use typedb_driver::TypeDBDriver;
 
 /// See file header comment.
-/// Returns a "viewforest" (tree with BufferRoot).
 pub async fn render_initial_viewforest_bfs (
   root_ids : &[ID],
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
-) -> Result < Tree<ViewNode>, Box<dyn Error> > {
-  render_initial_viewforest_bfs_inner (
-    root_ids, config, driver, None ) . await
-}
-
-pub async fn render_initial_viewforest_bfs_with_source_set (
-  root_ids : &[ID],
-  config   : &SkgConfig,
-  driver   : &TypeDBDriver,
-  active   : &ActiveSourceSet,
-) -> Result < Tree<ViewNode>, Box<dyn Error> > {
-  render_initial_viewforest_bfs_inner (
-    root_ids, config, driver, Some (active) ) . await
-}
-
-async fn render_initial_viewforest_bfs_inner (
-  root_ids : &[ID],
-  config   : &SkgConfig,
-  driver   : &TypeDBDriver,
   active   : Option<&ActiveSourceSet>,
-) -> Result < Tree<ViewNode>, Box<dyn Error> > {
+) -> Result < ViewForest, Box<dyn Error> > {
   let mut visited : DefinitiveMap = DefinitiveMap::new();
-  let mut viewforest : Tree<ViewNode> =
+  let mut viewforest : ViewForest =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "stub_viewforest_from_root_ids" ). entered();
       stub_viewforest_from_root_ids (
         root_ids, config, driver, &mut visited ) . await } ?;
-  let viewforest_root_id : NodeId = viewforest . root () . id ();
+  let viewforest_root_id : NodeId =
+    viewforest . internal_root_id ();
   let root_nodes : Vec < NodeId > =
-    viewforest . root () . children ()
-    . map ( |c| c . id () )
-    . collect ();
+    viewforest . root_ids ();
   render_generation_and_recurse (
     &mut viewforest,
     root_nodes, // the last complete generation
     1,          // the last complete generation's number
-    0, // nodes_rendered (BufferRoot doesn't count)
+    0, // nodes_rendered (the internal forest root doesn't count)
     config . initial_node_limit,
     viewforest_root_id, // effective_root for truncation
     &mut visited,
@@ -88,7 +68,7 @@ fn render_generation_and_recurse<'a> (
   gen_int        : usize,          // number of deepest generation rendered so far (0 = root)
   rendered_count : usize,
   limit          : usize,
-  effective_root : NodeId,         // BufferRoot for initial rendering
+  effective_root : NodeId,         // internal forest root for initial rendering
   visited        : &'a mut DefinitiveMap,
   config         : &'a SkgConfig,
   driver         : &'a TypeDBDriver,
