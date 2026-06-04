@@ -270,7 +270,32 @@ fn reconcile_content_children (
     active_source_set ) ?;
   mark_erroneous_content_children_as_indep(
     tree, node, &apparent_content_ids ) ?;
+  convert_nonmember_unknown_children_to_dead(
+    tree, node, &apparent_content_ids ) ?;
   Ok (( )) }
+
+/// §6.5: an Unknown content placeholder (a dangling reference the parent kept
+/// rather than failing the whole view) that is *no longer a member* of the
+/// parent's contains converts to a DeadScaffold; the §3.4 postorder prune sweep
+/// then removes it. An Unknown still in contains is retained (a present-but-
+/// unresolvable reference). Self-deletion is the sweep's job -- this only
+/// decides member-vs-convert, so a Dead -> Unknown -> Dead chain collapses in
+/// one sweep.
+fn convert_nonmember_unknown_children_to_dead (
+  tree       : &mut Tree<ViewNode>,
+  node       : NodeId,
+  member_ids : &[ID],
+) -> Result<(), Box<dyn Error>> {
+  let member_set : HashSet<ID> =
+    member_ids . iter () . cloned () . collect ();
+  treat_certain_children(
+    tree, node,
+    |vn : &ViewNode| match &vn . kind {
+      ViewNodeKind::Vognode (Vognode::Unknown (u)) =>
+        ! member_set . contains (&u . id),
+      _ => false },
+    |vn : &mut ViewNode| { vn . kind = ViewNodeKind::DeadScaffold; },
+  ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
 
 /// §5.5 node-limit: cap a content goal list so this node creates at most
 /// `*node_budget` *new* content children (ids not already present as
@@ -717,5 +742,43 @@ mod tests {
     let src = source_name ("public");
     let pid = id ("n");
     assert_eq! ( text_changed_both (&None, &pid, &src), (false, false) );
+  }
+
+  // §6.5: an Unknown content child whose id is no longer in the parent's
+  // contains converts to DeadScaffold; one still in contains is retained.
+  fn parent_with_unknown_child (child : &ID) -> (Tree<ViewNode>, NodeId, NodeId) {
+    use crate::types::viewnode::{mk_definitive_viewnode, mk_unknown_viewnode};
+    let mut tree : Tree<ViewNode> =
+      Tree::new ( mk_definitive_viewnode (
+        id ("p"), source_name ("main"), "p" . to_string (), None ) );
+    let parent : NodeId = tree . root () . id ();
+    let child_nid : NodeId =
+      tree . root_mut () . append ( mk_unknown_viewnode (child . clone ()) ) . id ();
+    (tree, parent, child_nid) }
+
+  fn is_dead (tree : &Tree<ViewNode>, nid : NodeId) -> bool {
+    matches! ( tree . get (nid) . unwrap () . value () . kind,
+               ViewNodeKind::DeadScaffold ) }
+
+  fn is_unknown (tree : &Tree<ViewNode>, nid : NodeId) -> bool {
+    matches! ( & tree . get (nid) . unwrap () . value () . kind,
+               ViewNodeKind::Vognode (Vognode::Unknown (_)) ) }
+
+  #[test]
+  fn nonmember_unknown_child_becomes_dead () {
+    let (mut tree, parent, child) = parent_with_unknown_child (& id ("ghost"));
+    convert_nonmember_unknown_children_to_dead (
+      &mut tree, parent, &[ id ("kept") ] ) . unwrap ();
+    assert! ( is_dead (&tree, child),
+              "an Unknown no longer in contains should become DeadScaffold" );
+  }
+
+  #[test]
+  fn member_unknown_child_is_retained () {
+    let (mut tree, parent, child) = parent_with_unknown_child (& id ("ghost"));
+    convert_nonmember_unknown_children_to_dead (
+      &mut tree, parent, &[ id ("ghost") ] ) . unwrap ();
+    assert! ( is_unknown (&tree, child),
+              "an Unknown still in contains should be retained" );
   }
 }
