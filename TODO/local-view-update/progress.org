@@ -802,3 +802,26 @@ With this, every item Jeff raised in the hey-jeff.org dialog (#1-#5 + the big
 non-blocking: per-stage sharing-relation diffs (#1 extension); the plan_v2 §19
 scaffold/col terminology audit; the §3-table extension of "generalized orphan" to
 vognode col-members (only if wanted).
+
+*** §19 terminology: clear part DONE
+Doc fixes at the definitional core (is_col_kind), reconcile_relation_col_children
+comments, and two compiler-checked renames: reconcile_sharing_scaffold_children ->
+_col_children (7 files) and ExpectedAncestor::Scaffold -> Col. The remaining
+helpers (unique_scaffold_child_of_viewnode / insert_scaffold_as_child) are
+correctly GENERIC over scaffolds (a col IS a scaffold), so left as-is. §19's safe
+homogenization is complete; any further is cosmetic.
+
+*** Test-coverage gap discovered: sharing-col git-diff is UNTESTED
+The git_diff_view suite has modules for content / text / ids / aliases /
+newhere_cycle / collateral, but NONE for sharing-col diff (subscribee / hidden /
+relation removals). So the #1 fix (removed sharing-col member shows removedM) is
+correct-but-untested, and sharing-col diff generally has no oracle. Closing this
+means a new git_diff_view/sharing fixture module (a git repo whose HEAD vs
+worktree differ on a subscribes_to / hides list). Logged; substantial, deferred.
+
+*** STATE: plan_v2 complete. Open items all require Jeff's direction:
+- generalized-orphan extension to col-member vognodes -- Jeff reserved scoping
+  ("say the word and I'll scope it").
+- per-stage sharing-relation diff infra (NodeChanges gains subscribes_to/hides
+  per-stage) -- large, would let #1 split staged vs unstaged.
+- a git_diff_view/sharing test module (covers the #1 fix + sharing diff at large).
