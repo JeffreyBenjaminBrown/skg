@@ -101,6 +101,16 @@ suite (52 ok-blocks) + all 27 integration tests green:
 - =268b0298= phase 7 §6.4/§16: an *Inactive node deleted by this save converts
   to Deleted* (the BFS Inactive dispatch was a no-op; the code only ever
   converted Normal nodes). Unit-tested in =complete.rs=.
+- =63647bd7= §3.4: *route ALL self-deletion through the one postorder prune
+  sweep* (=prune_self_deletable_when_empty=, gated by
+  =is_self_deletable_when_empty=, with focus transfer). Removed the inline
+  =detach_scaffold_if_empty= from HiddenIn/HiddenOut. Behavior: empty read-only
+  relation cols (Subscriber/Overrider/Hider/Hidden) now REMOVED; empty
+  Hidden*/IDCol removed via the sweep; empty Subscribee/Overridden/Alias
+  PRESERVED. Safe because de-novo gates relation-col creation on non-empty
+  members (=to_org/complete/sharing/mod.rs:240=). New contrasting test. This
+  completes §3.4 except §6.5 (no-longer-member Unknown -> Dead), which needs
+  goal-membership info the sweep lacks.
 I also *investigated* §6.5 (Unknown member/branch) and found it is NOT a clean
 standalone: Unknown ids are unresolvable by design, so Unknown is deliberately
 excluded from the content reconcile's "relevant" set (it can't be re-created /
@@ -130,33 +140,17 @@ why I did not barrel into it tonight:
    relevance by design (unresolvable id, cannot be re-created), so it belongs
    with the §3.4 routing below, not as a standalone. (See §4b.)
 
-** §3.4 prune-sweep self-deletion routing + empty-col exceptions (the next
-   coherent unit -- and the one I want your read on before I push it)
-   Plan §3.4/§6.7/§6.8 want ALL self-deletion centralized into the one postorder
-   sweep, with these *behavior changes*:
-   - empty =SubscribeeCol= : today self-deletes (=subscribee_col.rs=,
-     =if goal_list.is_empty() { detach }=); plan wants it *preserved* (the
-     editable interface onto the origin's subscriptions).
-   - empty read-only relation cols (Subscriber/Overrider/Hider/Hidden, NOT
-     Overridden): today *preserved*; plan wants them *removed* by the sweep.
-   - empty Hidden*/IDCol: route the existing inline =detach_scaffold_if_empty=
-     through the sweep (same effect).
-   - preserved-when-empty exceptions: AliasCol, OverriddenCol, SubscribeeCol.
-   The risk that stopped me: the empty-SubscribeeCol detach and the relation-col
-   creation gating are *shared with the de-novo (initial render) path*
-   (=to_org/=, =to_org/expand/=, =to_org/complete/sharing/=), which is exactly
-   what phase 8 (unify de-novo) is meant to fold onto the same driver. Removing
-   the rerender-side empty-detach in isolation could change de-novo output
-   (e.g. =tests/subscribee_col.rs= asserts nodes with no subscriptions show no
-   SubscribeeCol -- is that "never created" or "created then empty-detached"?
-   the two paths answer differently). Doing §3.4 *right* wants the de-novo
-   creation gating and the rerender sweep settled together, or at least the
-   de-novo creation confirmed to gate on non-empty before the rerender detach is
-   removed. That is real work with real test fallout, not a rushed nightly edit.
-   My recommendation: do §3.4 as its own focused unit, starting by mapping the
-   SubscribeeCol/relation-col *creation* sites in =to_org/= and confirming each
-   gates on a non-empty goal; then move all self-deletion into the sweep and
-   re-baseline =tests/subscribee_col.rs= / =tests/hidden_from_subscriptions.rs=.
+** §3.4 prune-sweep self-deletion routing -- DONE this session (=49f49b92= +
+   =63647bd7=). The de-novo entanglement I worried about turned out *not* to
+   bite: =to_org/complete/sharing/mod.rs= gates relation-col AND subscribee-col
+   creation on a non-empty member list, so an empty read-only col can only arise
+   from a post-edit rerender, and removing it there is safe (the de-novo
+   "no-subscription -> no SubscribeeCol" tests are about *never creating*, which
+   is unchanged). All self-deletion now lives in the one sweep, with the
+   editable-interface exceptions (Subscribee/Overridden/Alias preserved). The
+   ONLY remaining §3.4 item is §6.5 (no-longer-member leaf Unknown -> Dead),
+   deferred because the sweep has no goal-membership info and Unknown is
+   excluded from content-reconcile relevance by design (see §4b).
 
 ** Large remaining phases (each its own effort)
 *** Phase 5: diff overlay (§9) -- extract diff into a separate Normal-rooted BFS.
