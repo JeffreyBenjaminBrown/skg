@@ -461,7 +461,7 @@ async fn count_nodes (
   Ok (n) }
 
 async fn test_recursive_document (
-  driver  : &TypeDBDriver,
+  driver  : &std::sync::Arc<TypeDBDriver>,
   config  : &SkgConfig
 ) -> Result<(), Box<dyn Error>> {
   let (result_org_text, _pids, _)

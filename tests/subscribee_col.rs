@@ -65,6 +65,8 @@ fn test_subscribee_col_appears_for_subscribers(
     let db_name = "skg-test-subscribee-col";
     let (config, driver) =
       setup_multi_source_test (db_name) . await?;
+    let driver : std::sync::Arc<TypeDBDriver> =
+      std::sync::Arc::new (driver);
     let (result, _pids, _) : (String, Vec<ID>, _) =
       single_root_view( &driver, &config, None, &ID("1" . to_string()), false
                       ) . await?;
