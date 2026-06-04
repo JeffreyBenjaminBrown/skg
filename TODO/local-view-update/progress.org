@@ -436,12 +436,22 @@ position (parentIs=Independent), or a phantom that is itself a view root
 kept. A phantom can be non-Affected because =normal_to_phantom= clones the flipped
 node's parentIs, and =mark_view_roots_parent_absent= can leave a root phantom Absent.
 
-**** TODO phantoms should be stripped regardless of their relation to parent
+**** DONE phantoms should be stripped regardless of their relation to parent
 If they have children, they should be demoted to DeadScaffold;
 otherwise, deleted.
 This is a behavior change, yes, but also a bugfix.
 In particular,
 a phantom in the wrong place is pointless and dangerous (confusing).
+***** DONE done in remove_branches_that_git_marked_removed
+=remove_branches_that_git_marked_removed= (update_buffer.rs) no longer reads
+=parentIs=: ANY phantom that is not a forest root is stripped -- childless ->
+detached, with-children -> demoted to DeadScaffold (real subtree preserved,
+recurse so nested phantoms are also stripped). The §3.4 prune sweep removes a
+resulting childless DeadScaffold. The ONE surviving relation-to-parent test is
+the forest-root guard, which is about tree position + regeneration (the diff
+overlay regenerates content phantoms but never a root, so stripping a root
+would silently empty the view), NOT about parentIs. Easily reversible if you
+want roots stripped too. Full Rust suite + 27 integration tests green.
 
 *** indef_or_def -- read by the renderer, in two places
 A phantom is rendered by =true_node_metadata_to_string= (server/org_to_text.rs;

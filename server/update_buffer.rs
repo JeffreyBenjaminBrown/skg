@@ -14,7 +14,6 @@ pub use viewnodestats::set_viewnodestats_in_viewforest;
 use complete::{complete_viewforest, CompletionContext};
 use crate::dbs::in_rust_graph::{ InRustGraph, scheduled_audit::take_pending_audit_warning};
 use crate::types::env::SkgEnv;
-use crate::types::viewnode::ParentIs;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{ SaveResponse, compute_diff_for_every_source, deleted_ids_to_source};
@@ -441,13 +440,24 @@ fn strip_stale_diff_state (
   clear_diff_metadata (viewforest) ?;
   Ok (( )) }
 
-/// Strip from the viewforest every branch whose root
-///   is marked as removed or removed-here.
-/// Exception: Does not strip:
-///   - top-level branches (forest roots)
-///   - non-content nodes (parentIs != Affected)
-/// Uses single-pass DFS: removes branch roots as encountered,
-/// skipping recursion into removed branches.
+/// Strip every stale diff phantom from the viewforest, REGARDLESS of its
+/// relation to its parent (Jeff's progress.org §9 TODO): a phantom anywhere
+/// but a forest root is removed, whatever its parentIs. Disposal depends on
+/// whether it has children:
+///   - childless phantom -> detached (deleted) and its branch pruned;
+///   - phantom WITH children -> demoted to DeadScaffold, so any real user
+///     subtree parented under it survives (the §3.4 postorder prune sweep
+///     later removes the DeadScaffold if it ends up childless). We recurse
+///     into it so nested phantoms are stripped too.
+/// Exception: a forest root (top-level view node) is NOT stripped -- stripping
+/// it would empty the view, and unlike a content phantom the diff overlay does
+/// not regenerate a root. (This is the only surviving relation-to-parent test;
+/// it is about tree position and regeneration, not parentIs.)
+///
+/// Previously this stripped only content phantoms (parentIs == Affected),
+/// preserving Independent/Absent ones. But a phantom dragged out of position
+/// is a confusing lie -- it claims a node is missing somewhere it never was --
+/// so we now drop it too; parentIs is no longer read here at all.
 ///
 /// PITFALL:
 /// Beware, ye who would preserve phantom nodes across save-buffer ops:
@@ -473,16 +483,20 @@ fn remove_branches_that_git_marked_removed (
           Some (p) =>
             p . id () == viewforest_root_id,
           None => false } };
-      let should_remove : bool =
-        match &node . value() . kind {
-          ViewNodeKind::Vognode (Vognode::DiffPhantom (t)) =>
-            ! is_viewforest_root_child
-            && t . parentIs == ParentIs::Affected,
-          _ => false };
-      if should_remove {
+      let is_phantom : bool =
+        matches! ( &node . value() . kind,
+          ViewNodeKind::Vognode (Vognode::DiffPhantom (_)) );
+      if ! is_phantom || is_viewforest_root_child {
+        return Ok (true); } // not a strippable phantom: recurse normally
+      if node . has_children () {
+        // Keep any real subtree the user parented here; mark this dead and
+        // recurse so nested phantoms are still stripped.
+        node . value() . kind = ViewNodeKind::DeadScaffold;
+        Ok (true)
+      } else {
         node . detach();
         Ok (false) // Prune: branch removed, so don't recurse
-      } else { Ok (true) }} )? ; // recurse into children
+      }} )? ;
   Ok (( )) }
 
 /// Remove scaffolds that exist only to display diff information:
