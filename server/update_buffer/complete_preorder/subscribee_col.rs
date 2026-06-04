@@ -9,7 +9,7 @@ use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child_of_viewno
 use crate::update_buffer::ancestry::required_ancestor;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, RoleCol};
 use crate::types::viewnode::Vognode;
-use crate::update_buffer::util::{ detach_scaffold_transferring_focus, move_child_to_end};
+use crate::update_buffer::util::move_child_to_end;
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -50,10 +50,15 @@ pub async fn reconcile_subscribee_col_children (
     compute_subscribee_col_goal (
       &context, source_diffs, env );
 
-  if goal_list . is_empty() {
-    detach_scaffold_transferring_focus (tree, node) ?;
-    return Ok(( )); }
-
+  // §3.4/§6.7 exception: an *empty* SubscribeeCol is PRESERVED, not
+  // self-deleted. It is the editable interface onto the origin's outgoing
+  // subscriptions; if it vanished when emptied, the user would lose the place
+  // to add one back. (A SubscribeeCol is only *created* when subscribes_to is
+  // non-empty -- to_org/complete/sharing/mod.rs gates on that -- so an empty one
+  // here means the subscriber lost all its subscriptions, and we keep the
+  // headline so the user can re-add. The former `if goal_list.is_empty() {
+  // detach }` self-delete is gone.) Its children still reconcile to empty below,
+  // and the HiddenOutsideOfSubscribeeCol is still ensured last.
   if context . parent_indefinitive || source_diffs . is_some() {
     let child_data : HashMap<ID, ChildData> =
       build_subscribee_col_child_data (

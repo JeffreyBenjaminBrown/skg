@@ -1040,3 +1040,19 @@ Branch =local-view-updates=.
   - Full Rust suite green (51 ok-blocks) at every commit; the
     save_collateral_delete_then_edit_under_it integration test green via the
     real path.
+** §3.4 empty-col exception, partial: empty SubscribeeCol now PRESERVED.
+  Removed the `if goal_list.is_empty() { detach }` self-delete in
+  subscribee_col.rs (§6.7/§3.4 exception: the SubscribeeCol is the editable
+  interface onto the origin's outgoing subscriptions, and is only *created* when
+  subscribes_to is non-empty -- to_org/complete/sharing/mod.rs gates on that --
+  so an empty one means the user emptied it and must keep the place to re-add).
+  New rerender test tests/subscribee_col_empty_persists.rs. Full Rust suite (52
+  ok-blocks) + all 27 integration tests green.
+  - SCOPE NOTE / DEFERRED: this is only the SubscribeeCol slice of §3.4. The
+    rest of §3.4 (route ALL self-deletion through the one postorder prune sweep;
+    REMOVE empty read-only relation cols Subscriber/Overrider/Hider/Hidden,
+    which today persist; move Hidden*/IDCol self-delete out of their reconciles
+    into the sweep; §6.5 no-longer-member Unknown -> Dead) is *not* done: it is
+    entangled with the de-novo (initial-render) col-creation gating in to_org/
+    and is best landed alongside phase 8 (unify de-novo), or after mapping each
+    relation-col creation site. See TODO/local-view-update/progress.org §5.

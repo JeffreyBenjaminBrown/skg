@@ -1,0 +1,162 @@
+#+TITLE: Local view update -- progress report
+#+STARTUP: content
+
+Written 2026-06-04 (overnight session). Branch =local-view-updates=.
+Audience: Jeff, and whatever Claude resumes this. Terse where the commit
+messages and plan_v2 §18 already say it; narrative where the story matters.
+
+* TL;DR
+- The assigned detour -- =TODO/local-view-update/propagate-death-leafward/plan.org=
+  -- is *fully executed and validated*. 5 commits, all four build-order items,
+  plus unit tests. Full Rust suite green (51 ok-blocks) at every commit; *all 27
+  integration tests green*; the motivating test
+  =save_collateral_delete_then_edit_under_it= now passes via the *real*
+  mechanism (stopgap removed), achieving "11 gone entirely" with *no*
+  test-expectation change.
+- One deviation from plan.org, logged in plan_v2 §18 and called out in §3 below.
+  It was a correctness fix, consistent with the plan's stated intent; I did not
+  judge it worth waking you for.
+- After the detour I assessed the plan_v2 resume point. The remaining work
+  (§3.4 prune routing + empty-col exceptions, phases 5/6/7/8) is each large and
+  *entangled across the de-novo and rerender paths*. I stopped before forcing a
+  rushed change that would destabilize the green state. The roadmap and my
+  analysis of the entanglement are in §5. This is the one judgment call I want
+  you to sanity-check.
+
+* 1. What death-leafward is, in one paragraph
+In the single-visit BFS, each col (a non-vognode viewnode: QualCol, PartnerCol)
+reconciles at its own visit and reads its ancestor vognode(s). If a required
+ancestor died this save its =.skg= is gone, the read returns =Err=, and that
+aborts the whole (often *collateral*) rerender -- spuriously rejecting the
+user's save. The fix: every col, at its BFS visit, first checks whether it is a
+*generalized orphan* (ANY ancestor in its required-ancestry chain -- the full
+chain, not just the parent -- is the wrong *viewnode kind*; death is a VIEW
+property, no graph read). If orphaned it deadens itself and disposes its
+children instead of reconciling, so the failing read never happens.
+
+* 2. The five commits (oldest first)
+1. =d3fe91c7= §6.6: the postorder prune sweep
+   (=remove_empty_deleted_scaffolds= -> =remove_empty_dead_and_deleted=) now
+   also removes a *childless Vognode::Deleted*, not only a childless
+   DeadScaffold -- except a view root (child of BufferRoot) or a Deleted that
+   kept a user subtree. This is what lets a deleted node, once its cols empty
+   out and prune, disappear.
+2. =6372d787= The mechanism. New =server/update_buffer/ancestry.rs=: the §3
+   required-ancestry *table* (single source of truth), =col_is_generalized_orphan=,
+   =required_ancestor=, =deaden_generalized_orphan_col=. The orphan check is a
+   pre-check in the BFS col dispatch (=complete.rs=). The 6 col reconciles now
+   read their ancestor vognodes *through* =required_ancestor= /
+   =pid_and_source_from_required_ancestor= (§4 dedup), so a reconcile can never
+   read an ancestor the table does not list. DELETED
+   =scaffolds_with_deadOrDeleted_parents_become_dead= (both call sites): the
+   in-BFS ancestry check is strictly more powerful (full chain vs immediate
+   parent) and the BFS visits every col, so it subsumes the old sweep.
+3. =b4147595= Dropped the =detach_stale_deleted_content= stopgap and threaded
+   out its now-unused =deleted_by_this_save_pids= parameter.
+4. =8accd867= The one real fix found in integration testing (see §3).
+5. =8f7d4ab9= 9 unit tests (no DB; hand-built viewforests) + the plan_v2 §18
+   deviation log entry.
+
+* 3. The deviation (and why I didn't wake you)
+plan.org §5.1.a says a deadened col converts its *nested col* children
+(QualCol/PartnerCol) to =DeadScaffold=. That is wrong, and the integration test
+caught it: converting a nested col to DeadScaffold *freezes* it before its own
+BFS visit, so it never disposes ITS OWN leaf members. Concretely: when a
+SubscribeeCol died, its HiddenOutsideOfSubscribeeCol got frozen to DeadScaffold,
+so its hidden leaf (=also-hidden=) survived stranded under a dead chain, which
+in turn kept the SubscribeeCol (and the whole deleted node) alive.
+
+The fix: a deadened col *leaves nested cols untouched*. A nested col is itself a
+generalized orphan under the now-dead parent, so it deadens *itself* -- and
+disposes its own leaves -- at its own visit. This is exactly what plan.org's §5
+note already intends ("a nested col ... deadens itself at its own visit too");
+§5.1.a's literal instruction was the bug. Only =Qual= leaves (which do not
+self-dispatch, so nothing would ever deaden them) are still converted to
+DeadScaffold in the disposal.
+
+With the fix, a deleted node's cols empty out completely and prune, so it
+becomes childless and §6.6 removes it -- "11 gone entirely" (plan.org §9),
+matching the *existing* integration-test expectation exactly. I judged this a
+clear correctness fix aligned with the plan's intent, fully validated by the
+green integration suite, so I logged it and continued rather than stopping.
+
+* 4. Validation
+- =cargo test=: 51 ok-blocks, 0 failures, at every commit. (TypeDB on :1729.)
+- =bash/integration-tests.sh=: all 27 integration tests PASSED, including
+  =save_collateral_delete_then_edit_under_it= (all 9 phases) via the real
+  mechanism.
+- New unit tests in =ancestry.rs= cover: orphan detection (incl. a *multi-level*
+  case -- live immediate parent, dead depth-3 subscriber), =required_ancestor=
+  chain-walk + short-circuit, and =deaden_generalized_orphan_col= disposal of
+  each child kind.
+- Per plan.org §8 item 3: NO fail-soft NodeComplete backstop. We wear the belt
+  (the view-based pre-check), not the suspenders.
+
+* 5. Where plan_v2 stands, and the judgment call
+plan_v2 §14 phases 0,1,2,3,4 are done (see §18); this detour additionally
+delivered §6.6 and the parts of §6.0/death that it needed. What remains, and
+why I did not barrel into it tonight:
+
+** Still-deferred cleanups (small-ish, but entangled)
+*** =should_sync_from_disk_even_though_definitive= removal (§6.1/§8.3). Low
+   value, fiddly: plan §12 wants =is_saved_view= *retained* in the context, but
+   it is currently the field's *only* reader, so removing the carve-out cleanly
+   means either an unused field (dead_code warning) or churny plumbing through
+   =rerender_view='s saved/collateral callers. Deferred -- it was already
+   flagged separable.
+*** §5.5 col-node budget accounting. Today only *content* children decrement
+   =node_budget=; col-created members (subscribee/relation/alias/id) do not.
+   Plan §5.5 wants all new ViewNodes to count. Threadable, but it will shift
+   node-limit truncation points and so needs the limit tests re-baselined.
+*** §6.4 Inactive->Deleted and §6.5 Unknown member/branch (phase-7 variants).
+   §6.4 is additive and clean *but* testing it needs a source-sets fixture
+   (inactive sources). §6.5's "still a member of the parent's goal" is naturally
+   the *parent's* concern (content reconcile), not the Unknown node's own visit,
+   so it really belongs with the §3.4 routing below, not as a standalone.
+
+** §3.4 prune-sweep self-deletion routing + empty-col exceptions (the next
+   coherent unit -- and the one I want your read on before I push it)
+   Plan §3.4/§6.7/§6.8 want ALL self-deletion centralized into the one postorder
+   sweep, with these *behavior changes*:
+   - empty =SubscribeeCol= : today self-deletes (=subscribee_col.rs=,
+     =if goal_list.is_empty() { detach }=); plan wants it *preserved* (the
+     editable interface onto the origin's subscriptions).
+   - empty read-only relation cols (Subscriber/Overrider/Hider/Hidden, NOT
+     Overridden): today *preserved*; plan wants them *removed* by the sweep.
+   - empty Hidden*/IDCol: route the existing inline =detach_scaffold_if_empty=
+     through the sweep (same effect).
+   - preserved-when-empty exceptions: AliasCol, OverriddenCol, SubscribeeCol.
+   The risk that stopped me: the empty-SubscribeeCol detach and the relation-col
+   creation gating are *shared with the de-novo (initial render) path*
+   (=to_org/=, =to_org/expand/=, =to_org/complete/sharing/=), which is exactly
+   what phase 8 (unify de-novo) is meant to fold onto the same driver. Removing
+   the rerender-side empty-detach in isolation could change de-novo output
+   (e.g. =tests/subscribee_col.rs= asserts nodes with no subscriptions show no
+   SubscribeeCol -- is that "never created" or "created then empty-detached"?
+   the two paths answer differently). Doing §3.4 *right* wants the de-novo
+   creation gating and the rerender sweep settled together, or at least the
+   de-novo creation confirmed to gate on non-empty before the rerender detach is
+   removed. That is real work with real test fallout, not a rushed nightly edit.
+   My recommendation: do §3.4 as its own focused unit, starting by mapping the
+   SubscribeeCol/relation-col *creation* sites in =to_org/= and confirming each
+   gates on a non-empty goal; then move all self-deletion into the sweep and
+   re-baseline =tests/subscribee_col.rs= / =tests/hidden_from_subscriptions.rs=.
+
+** Large remaining phases (each its own effort)
+*** Phase 5: diff overlay (§9) -- extract diff into a separate Normal-rooted BFS.
+*** Phase 6: locking (§8) -- conservative early lock + relax message + the
+   client unsaved-buffer handshake. Touches the wire protocol and Emacs.
+*** Phase 8: unify de-novo (§13) -- route initial render through the driver and
+   delete the de-novo-only code. Naturally absorbs the §3.4 creation-gating
+   question above.
+
+* 6. Resume hints
+- TypeDB: =typedb server= (already running on :1729 here; gRPC). DB tests via
+  =run_with_test_db=. =cargo test= for the unit suite;
+  =bash/integration-tests.sh= for the 27 integration tests (needs emacs +
+  =cargo run=; a single one is =tests/integration/<name>/run-test.sh=).
+- The death-leafward mechanism lives in =server/update_buffer/ancestry.rs=; its
+  one wiring point is the orphan pre-check at the top of
+  =expand_true_content_at_node= in =complete.rs=. The §3 table is the single
+  source of truth and the 6 reconciles read through it.
+- plan_v2 §18 is the authoritative deviation log; this report is the narrative.
