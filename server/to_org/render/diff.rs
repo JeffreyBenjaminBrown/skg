@@ -122,6 +122,15 @@ fn process_truenode_diff (
       unstaged_changes . map ( |c| c . ids_diff . as_slice () ) );
   if merged_ids . iter () . any ( |(_, m)| ! m . is_empty () ) {
     prepend_idcol_with_children ( &mut node_mut, &merged_ids ); }
+  // AliasCol diff scaffold, mirroring the IDCol above (the inline path's
+  // maybe_prepend_diff_view_scaffolds emitted this; the overlay must too, or
+  // alias changes would silently vanish from the diff post-flip).
+  let merged_aliases : Vec<(String, MembershipAxes)> =
+    axes_from_per_stage_diffs (
+      staged_changes   . map ( |c| c . aliases_diff . as_slice () ),
+      unstaged_changes . map ( |c| c . aliases_diff . as_slice () ) );
+  if merged_aliases . iter () . any ( |(_, m)| ! m . is_empty () ) {
+    prepend_aliascol_with_children ( &mut node_mut, &merged_aliases ); }
   // Compute per-stage contains diff for the parent so we can decorate
   // worktree children with M axes and insert phantoms.
   let merged_contains : Vec<(ID, MembershipAxes)> =
@@ -191,6 +200,33 @@ fn prepend_idcol_with_children (
           Qual::ID {
             id: id . clone (), membership: *membership } ) };
     idcol_mut . append (id_viewnode); } }
+
+/// Prepend an AliasCol scaffold populated with per-alias Alias scaffolds.
+/// Mirror of 'prepend_idcol_with_children' for the aliases-list diff.
+fn prepend_aliascol_with_children (
+  node_mut       : &mut NodeMut<ViewNode>,
+  merged_aliases : &[(String, MembershipAxes)],
+) {
+  let aliascol_node : ViewNode =
+    ViewNode {
+      focused     : false,
+      folded      : false,
+      body_folded : false,
+      kind        : ViewNodeKind::QualCol (QualCol::Alias) };
+  let aliascol_treeid : NodeId =
+    node_mut . prepend (aliascol_node) . id();
+  let mut aliascol_mut : NodeMut<ViewNode> =
+    node_mut . tree() . get_mut (aliascol_treeid) . unwrap();
+  for (text, membership) in merged_aliases {
+    let alias_viewnode : ViewNode =
+      ViewNode {
+        focused     : false,
+        folded      : false,
+        body_folded : false,
+        kind        : ViewNodeKind::Qual (
+          Qual::Alias {
+            text: text . clone (), membership: *membership } ) };
+    aliascol_mut . append (alias_viewnode); } }
 
 /// For each existing child in the worktree's contains list, copy any
 /// per-stage M-axis values from the merged contains diff.
