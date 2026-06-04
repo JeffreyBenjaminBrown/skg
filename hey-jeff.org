@@ -72,13 +72,25 @@ You're right, and the code half-confirms your hope. There are two layers:
   empty. So: detection uses the right relation, but the axis marker is still
   computed against graph-contains. Your suspicion ("maybe we only look at
   graph-contains") is correct for the axis layer specifically.
-**** TODO fix: derive the member's M axis from its own relation, not contains
-Way forward: the col reconciler already computed the member's status from the
-right relation (it produced =removed_ids= that way); the axis should come from
-that same computation rather than from the centralized =phantom_axes= (which
-hardcodes parent.contains). And yes -- this is a clean argument FOR local diff:
-a local col reconciler holds the relationship in hand, so the axis falls out
-correctly; the centralized overlay does not and so reaches for contains.
+**** DONE fix: a removed sharing-col member now gets a removedM marker
+Implemented in build_child_data (sharing-col-only). Refined finding while fixing:
+the diff infra (=NodeChanges=) tracks ONLY contains/ids/aliases PER STAGE -- it
+does NOT track =subscribes_to= or =hides= per stage. So:
+- a HiddenInSubscribeeCol member IS in the subscribee's contains, so
+  =phantom_axes= already gives it the CORRECT per-stage M. (Not actually buggy.)
+- a Subscribee / HiddenOutsideOfSubscribee / relation-col member is NOT in the
+  parent's contains, so =phantom_axes= returns an EMPTY M -- the bug you spotted.
+  Its removal IS known (it's in =removed_ids=, from the col's own net HEAD->worktree
+  relation diff), but with no per-stage relation diff we can't split staged vs
+  unstaged. So the fix: when =phantom_axes= yields no contains-based membership
+  for a removed member, mark it =removedM= as a NET removal (unstaged axis).
+Byte-identical to all existing fixtures (none currently exercise a removed
+Subscribee/HiddenOutside/relation member), so this is a latent-correctness fix --
+the marker now appears in the real-world case the tests don't yet cover.
+***** TODO (future, needs new infra) per-stage sharing-relation diffs
+To split staged vs unstaged for sharing removals (rather than always net/unstaged)
+the diff computation would need to track subscribes_to_diff / hides_diff per stage
+in =NodeChanges=, like contains_diff. Logged; not done here.
 
 ** scaffold / col
 A ViewNode that is NOT a graph node but organizes other nodes. Relevant ones:
