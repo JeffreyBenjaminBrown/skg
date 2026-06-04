@@ -786,8 +786,19 @@ case does not occur in any fixture, so the self-deadening change was invisible):
 Key simplifier: the content member-phantom machinery and the QualCol reconcilers
 had RETAINED their diff-awareness, so B was mostly "feed real diffs + call the
 existing per-node worker inline + delete the post-pass", not a rewrite.
-NOT done (left as the logged hey-jeff.org TODO): the #1 fix (sharing-col member M
-axis computed via phantom_axes against parent.contains rather than the col's own
-relation). It did not "fall out" of this change -- the sharing cols still route
-through phantom_axes -- so it remains a separate, non-blocking improvement, now
-easier since each reconciler holds its relation locally.
+#1 fix DONE too (commit "#1: a removed sharing-col member now shows removedM").
+Refined finding: the diff infra (NodeChanges) tracks only contains/ids/aliases
+per stage, NOT subscribes_to/hides, so the sharing relations have no per-stage
+diff. phantom_axes(parent.contains) is therefore correct for HiddenInSubscribeeCol
+members (they ARE in the subscribee's contains) but empty for Subscribee/
+HiddenOutside/relation members. Fix (in the sharing-only build_child_data): when
+phantom_axes yields no contains-based membership for a removed member, mark it
+removedM as a net removal (unstaged axis). Byte-identical (no fixture exercises
+that case today) -- a latent fix. Per-stage sharing-relation diffs logged as
+future infra work.
+
+With this, every item Jeff raised in the hey-jeff.org dialog (#1-#5 + the big
+"do all diff locally") is DONE and green. Remaining logged future work, all
+non-blocking: per-stage sharing-relation diffs (#1 extension); the plan_v2 §19
+scaffold/col terminology audit; the §3-table extension of "generalized orphan" to
+vognode col-members (only if wanted).
