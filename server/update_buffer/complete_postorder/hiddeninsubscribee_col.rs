@@ -7,7 +7,6 @@ use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
 use crate::types::viewnode::{ViewNode, RoleCol};
-use crate::update_buffer::util::detach_scaffold_if_empty;
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -62,7 +61,8 @@ pub fn reconcile_hiddenin_subscribee_col_children (
     // applies this uniformly now; the old mark_managed pre-marking is gone.
     tree, node, kind,
     &goal_list, &child_data ) ?;
-  detach_scaffold_if_empty (tree, node) ?;
+  // §3.4: an emptied HiddenInSubscribeeCol is removed by the single postorder
+  // prune sweep (prune_self_deletable_when_empty), not self-deleted here.
   Ok(( )) }
 
 fn read_hiddenin_context (

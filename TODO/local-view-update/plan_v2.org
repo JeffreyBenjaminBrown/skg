@@ -1064,3 +1064,20 @@ Branch =local-view-updates=.
   (an InactiveNode carries none). Unit test in complete.rs. Remaining phase-7
   variants still deferred: §6.5 Unknown member/branch (belongs with §3.4
   Unknown->Dead routing). Full Rust suite green (52 ok-blocks).
+** §3.4 self-deletion routing LANDED (the rest of the empty-col work). All
+  self-deletion is now in the *one* postorder prune sweep in complete.rs
+  (renamed remove_empty_dead_and_deleted -> prune_self_deletable_when_empty,
+  gated by is_self_deletable_when_empty), with focus transfer. Removed the
+  inline detach_scaffold_if_empty from the HiddenIn/HiddenOut reconcilers.
+  Behavior changes vs. before: empty read-only relation cols
+  (Subscriber/Overrider/Hider/Hidden) are now REMOVED (were preserved); empty
+  Hidden*/IDCol removed via the sweep (same outcome, was inline); PRESERVED when
+  empty: Subscribee, Overridden, Alias (editable interfaces). Safe because
+  de-novo GATES relation-col creation on non-empty members
+  (to_org/complete/sharing/mod.rs:240), so an empty read-only col only ever
+  arises from a post-edit rerender. New test
+  tests/subscribee_col_empty_persists.rs::test_empty_subscriber_col_is_removed
+  (contrasts the removed subscriberCol with the preserved subscribeeCol). Full
+  Rust suite (52 ok-blocks) + all 27 integration tests green. STILL deferred:
+  §6.5 no-longer-member Unknown -> Dead (needs goal-membership info the sweep
+  lacks; Unknown is excluded from content-reconcile relevance by design).

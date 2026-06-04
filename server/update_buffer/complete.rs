@@ -13,6 +13,7 @@ use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, write_at_node_in_tree};
 use crate::update_buffer::ancestry::{ col_is_generalized_orphan, deaden_generalized_orphan_col, is_col_kind};
+use crate::update_buffer::util::detach_scaffold_transferring_focus;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol, ViewRequest, IndefOrDef, DeletedNode};
 use crate::types::viewnode::{Vognode, QualCol};
 use super::complete_postorder::hiddeninsubscribee_col::reconcile_hiddenin_subscribee_col_children;
@@ -59,7 +60,7 @@ pub(super) async fn complete_viewforest (
   // children created during a node's visit are reached later in the same BFS.
   expand_true_content_until_stable (
     viewforest, root_treeid, context ) . await ?;
-  remove_empty_dead_and_deleted (viewforest) ?;
+  prune_self_deletable_when_empty (viewforest) ?;
   Ok(( )) }
 
 /// Parent-first content expansion, in *level order* (BFS).
@@ -249,40 +250,62 @@ async fn visit_normal_node (
     tree, treeid, &context . env . config, &context . env . driver ) . await ?;
   Ok(( )) }
 
-/// The §3.4 postorder prune sweep. Removes, bottom-up:
-/// - a childless `DeadScaffold` (a deadened col whose members all died), and
-/// - a childless `Vognode::Deleted` (§6.6: a node deleted by this save whose
-///   cols generalized-orphaned, deadened, and pruned, leaving nothing behind).
-/// A Deleted node that *kept* a user subtree (e.g. a demoted-Independent
-/// survivor) is retained, as is a Deleted *view root* -- the user should still
-/// see that their root was deleted, so a childless root is never removed.
-/// Postorder so a `Dead -> Deleted` (or `Dead -> Dead`) chain collapses
-/// completely in one pass: a parent emptied by the removal of its last child
-/// is itself removed.
-fn remove_empty_dead_and_deleted (
+/// Whether a node of this kind is *self-deletable when empty* (plan §3.4): the
+/// single postorder prune sweep removes it once it is childless. This is the
+/// one place self-deletion lives -- per-kind reconcilers no longer detach
+/// themselves when empty.
+/// - DeadScaffold and a childless Vognode::Deleted (§6.6).
+/// - the read-only relation cols Subscriber/Overrider/Hider/Hidden (a graph
+///   relationship the user cannot edit from this side, so an emptied one is
+///   just noise) -- but NOT Overridden (the editable interface for adding
+///   overrides, preserved when empty like AliasCol).
+/// - HiddenInSubscribeeCol / HiddenOutsideOfSubscribeeCol.
+/// - QualCol::ID (largely moot -- an IDCol always holds at least the PID).
+/// PRESERVED when empty (so NOT here): PartnerCol(Subscribee), PartnerCol
+/// (Overridden), QualCol(Alias) -- each an *editable interface onto the origin*
+/// that the user must be able to refill, removed only by hand (§3.4 exception).
+fn is_self_deletable_when_empty (
+  kind : &ViewNodeKind,
+) -> bool {
+  matches! ( kind,
+    ViewNodeKind::DeadScaffold
+    | ViewNodeKind::Vognode (Vognode::Deleted (_))
+    | ViewNodeKind::PartnerCol (RoleCol::Subscriber)
+    | ViewNodeKind::PartnerCol (RoleCol::Overrider)
+    | ViewNodeKind::PartnerCol (RoleCol::Hider)
+    | ViewNodeKind::PartnerCol (RoleCol::Hidden)
+    | ViewNodeKind::PartnerCol (RoleCol::HiddenInSubscribee)
+    | ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee)
+    | ViewNodeKind::QualCol (QualCol::ID) ) }
+
+/// The §3.4 postorder prune sweep -- the *one* place self-deletion happens.
+/// Removes, bottom-up, every childless `is_self_deletable_when_empty` node:
+/// deadened cols whose members all died, a §6.6 childless Deleted, and empty
+/// read-only relation / Hidden* / ID cols. Postorder so a chain (e.g.
+/// Dead -> Deleted, or a col emptied by the removal of its last member)
+/// collapses completely in one pass. Focus is transferred to the surviving
+/// parent if the removed node held it. Never prunes a *view root* (child of the
+/// invisible BufferRoot): the user should still see a deleted root.
+fn prune_self_deletable_when_empty (
   tree : &mut Tree<ViewNode>,
 ) -> Result<(), Box<dyn Error>> {
   let nodes : Vec<NodeId> =
     collect_matching_nodeids (
       tree, false,
-      |vn| matches! ( &vn . kind,
-        ViewNodeKind::DeadScaffold |
-        ViewNodeKind::Vognode (Vognode::Deleted (_)) )) ?;
+      |vn| is_self_deletable_when_empty (&vn . kind) ) ?;
   for treeid in nodes {
     let node = match tree . get (treeid) {
       Some (node) => node,
       None => continue };
     let has_children : bool =
       node . children () . next () . is_some ();
-    // Never prune a view root (child of the invisible BufferRoot): removing it
-    // would silently drop the user's whole view of that root.
     let parent_is_buffer_root : bool =
       node . parent ()
       . map ( |p| matches! ( &p . value () . kind,
                              ViewNodeKind::BufferRoot ) )
       . unwrap_or (false);
     if ! has_children && ! parent_is_buffer_root {
-      tree . get_mut (treeid) . unwrap () . detach (); }
+      detach_scaffold_transferring_focus (tree, treeid) ?; }
   }
   Ok (( )) }
 

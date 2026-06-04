@@ -77,3 +77,52 @@ async fn empty_subscribee_col_persists_impl (
     "rerender of a node with an empty SubscribeeCol must not error; got: {:?}",
     response . errors );
   Ok (( )) }
+
+// Contrast (plan_v2 §3.4/§6.8): an empty *read-only* relation col -- here a
+// subscriberCol -- IS removed by the postorder prune sweep, because (unlike the
+// SubscribeeCol) it is not an editable interface; an emptied one is just noise.
+#[test]
+fn test_empty_subscriber_col_is_removed
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-subscriber-col-empty-removed",
+    "tests/subscribee_col_empty_persists/fixtures",
+    "/tmp/tantivy-test-subscriber-col-empty-removed",
+    |config, driver, tantivy| Box::pin ( async move {
+      empty_subscriber_col_removed_impl (
+        config, driver, tantivy ) . await
+    } )) }
+
+async fn empty_subscriber_col_removed_impl (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  // Nobody subscribes to s, but the buffer carries a subscriberCol under it.
+  let input_org_text : &str = indoc! {"
+    * (skg (node (id s) (source main))) s
+    ** (skg subscriberCol)
+  "};
+
+  let graph : InRustGraphHandle =
+    graph_handle_from_config (config) ?;
+  let mut views_state : ViewsState = ViewsState {
+    diff_mode_enabled : false,
+    open_views        : OpenViews::new (),
+  };
+  let listener : std::net::TcpListener =
+    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
+  let mut stream : TcpStream =
+    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
+  let response = update_from_and_rerender_buffer (
+    &mut stream,
+    input_org_text, driver, config, tantivy, &graph, false,
+    &Err ( String::new () ), &mut views_state ) . await ?;
+
+  println!("Rendered buffer:\n{}", response . saved_view);
+  assert! ( ! response . saved_view . contains ("subscriberCol"),
+    "an empty read-only subscriberCol must be REMOVED by the §3.4 prune sweep; \
+     got:\n{}", response . saved_view );
+  assert! ( response . errors . is_empty (),
+    "rerender must not error; got: {:?}", response . errors );
+  Ok (( )) }
