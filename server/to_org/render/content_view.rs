@@ -174,6 +174,12 @@ pub async fn multi_root_view_via_env (
         = &node_ref . value () . kind
         { ids . push ( t . id . clone () ); }}
     ids };
+  // Match the old multi_root_view_with_source_set, which finished with
+  // render_viewforest_with_source_set (= apply_source_set_to_viewforest + render).
+  // A no-op when every source is active; under a restricted set it annotates/
+  // filters, so skipping it would drop source-set rendering for the handler.
+  if let Some (active) = active_source_set {
+    crate::source_sets::apply_source_set_to_viewforest (&mut viewforest, active); }
   let buffer_content : String =
     viewforest_to_string (& viewforest, &env . config) ?;
   Ok ((buffer_content, pids, viewforest . into_internal_tree ())) }
