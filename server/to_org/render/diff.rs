@@ -1,5 +1,9 @@
-/// Diff application module for git diff view.
-/// Applies diff information to a viewforest of ViewNodes.
+/// Per-node git-diff decoration for the git diff view.
+/// process_truenode_diff decorates one Normal vognode and generates its
+/// diff-only children. §9 reversal (#3): it is now called INLINE, at each
+/// node's own BFS visit (server/update_buffer/complete.rs), for both the
+/// post-save and de-novo paths -- there is no longer a separate post-BFS
+/// overlay traversal.
 ///
 /// Each TrueNode and Scaffold is decorated with per-stage diff axes:
 ///   X (existence) describes whether the node's '.skg' file changed
@@ -16,36 +20,11 @@ use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::phantom::title_for_phantom;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, mk_phantom_viewnode };
 use crate::types::viewnode::{Vognode, QualCol, Qual};
-use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::types::tree::viewnode_nodecomplete::pid_and_source_from_treenode;
 
-use ego_tree::{Tree, NodeMut, NodeRef, NodeId};
+use ego_tree::{NodeMut, NodeRef, NodeId};
 use std::collections::HashMap;
-use std::error::Error;
 use std::path::PathBuf;
-
-/// Apply diff information to a viewforest of ViewNodes.
-/// Modifies nodes in place to add per-stage diff axes
-/// and insert phantom nodes for positions missing from worktree.
-pub fn apply_diff_to_viewforest (
-  viewforest                     : &mut Tree<ViewNode>,
-  source_diffs                   : &HashMap<SourceName, SourceDiff>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  tantivy_index                  : Option<&TantivyIndex>,
-  config                         : &SkgConfig,
-) -> Result<(), Box<dyn Error>> {
-  let root_id : NodeId =
-    viewforest . root() . id();
-  do_everywhere_in_tree_dfs (
-    viewforest, root_id, true,
-    &mut |mut node_mut| {
-      match &node_mut . value() . kind . clone() {
-        ViewNodeKind::Vognode (Vognode::Normal (_)) =>
-          process_truenode_diff (
-            node_mut, source_diffs, deleted_since_head_pid_src_map,
-            tantivy_index, config ),
-        _ => Ok (( )) }} )?;
-  Ok (( )) }
 
 /// Decorate a normal vognode and generate any diff-only children
 /// implied by staged and unstaged NodeCompleteDiffs. Called per Normal node --

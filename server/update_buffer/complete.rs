@@ -30,17 +30,18 @@ use std::sync::Arc;
 
 pub(super) struct CompletionContext<'a> {
   pub(super) defmap                         : &'a mut DefinitiveMap,
-  /// Diffs for the *content/scaffold* path. Phase 5 (§9) runs the main BFS
-  /// content+scaffold update with this set to None, so the BFS produces the
-  /// pure worktree view and the diff overlay (apply_diff_to_viewforest) adds
-  /// content axes, content phantoms, and TextChanged/IDCol/AliasCol scaffolds
-  /// afterward.
+  /// Diffs for the CONTENT goal-list path (content_goal_list). Always None:
+  /// the content reconcile builds the pure WORKTREE child list, and all diff
+  /// (axes, flip, content phantoms, TextChanged/IDCol/AliasCol) is applied
+  /// inline by process_truenode_diff at the node's visit, driven by
+  /// `sharing_diffs`. Kept as a field (rather than removed) because several
+  /// content helpers still take a source_diffs argument; here it is always None.
   pub(super) source_diffs                   : &'a Option<HashMap<SourceName, SourceDiff>>,
-  /// Diffs for the *sharing cols* (Subscribee / HiddenIn / HiddenOut /
-  /// relation). These reconcile their removed-member phantoms *inline*, while
-  /// the col's members are still Normal (before the overlay flips any to
-  /// DiffPhantom) -- the overlay does not descend through cols (§9 gap, see
-  /// plan_v2 §18). Set to the real diffs even when `source_diffs` is None.
+  /// The REAL git diffs (Some in diff mode), driving ALL inline diff since the
+  /// §9 reversal (#3): the per-node process_truenode_diff, the diff-aware
+  /// QualCol reconcilers, and the sharing cols' removed-member phantoms. None
+  /// outside diff mode. (Named `sharing_diffs` historically, when only the
+  /// sharing cols read it; it is now the single real-diffs handle.)
   pub(super) sharing_diffs                  : &'a Option<HashMap<SourceName, SourceDiff>>,
   pub(super) env                            : &'a SkgEnv,
   pub(super) graph_snap                     : &'a Arc<InRustGraph>,
