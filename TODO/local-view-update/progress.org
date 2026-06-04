@@ -476,7 +476,7 @@ The value is NOT constant across phantoms. The two phantom constructors differ:
   =indef_or_def=, which can be =Definitive { body }= -- so it would render WITHOUT
   =indef= and WITH its body.
 
-**** TODO We can safely let go of both distinctions.
+**** DONE We can safely let go of both distinctions.
 There's no need to render a phantom's body text --
 we presume the person using git diff view understands git,
 and there's already a command to view the node in magit.
@@ -484,6 +484,15 @@ And a phantom should never be the definitive instance of a node.
 If it's Removed, it has nothing to define,
 and if it's RemovedHere, it's dangerously confusing to the user
 ("edit this node in a place where it isn't").
+***** DONE phantoms are now indefinitive by construction (behavior)
+=normal_to_phantom= now sets =indef_or_def = Indefinitive= when it flips a
+(possibly Definitive) Normal node, dropping body + edit_request. The other
+constructor, =mk_phantom_viewnode=, already builds from an Indefinitive base.
+So EVERY DiffPhantom is now indefinitive and bodyless -- =ViewNode::body()=
+returns None and =is_indefinitive()= returns true for a phantom with no
+renderer change. This removes the last reader of =indef_or_def= that varied on
+a phantom, the second enabler for the §11 payload reduction (next).
+Full Rust suite + 27 integration tests green.
 *** Bottom line for the reduction
 The §11 plan said a DiffPhantom needs "no parentIs ... no indef_or_def." That is
 the part that's wrong: both are read, and parentIs genuinely changes a strip

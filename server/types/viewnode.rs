@@ -447,8 +447,19 @@ impl ViewNode {
     if let ViewNodeKind::Vognode (Vognode::Normal (t))
       = &self . kind
       { if t . should_be_phantom ()
-        { self . kind = ViewNodeKind::Vognode (
-            Vognode::DiffPhantom (t . clone () )); }}}
+        { // A phantom is ALWAYS indefinitive and renders no body (Jeff's
+          // progress.org §9 TODO): the diff view presumes git literacy (magit
+          // shows the real node), and a phantom must never be a node's
+          // definitive instance -- if Removed it has nothing to define, and if
+          // RemovedHere "edit it here, where it isn't" is dangerously
+          // confusing. So drop body/edit_request when flipping a (possibly
+          // Definitive) Normal node to a phantom. mk_phantom_viewnode already
+          // builds from an Indefinitive base, so now every phantom is
+          // indefinitive by construction.
+          let mut phantom : TrueNode = t . clone ();
+          phantom . indef_or_def = IndefOrDef::Indefinitive;
+          self . kind = ViewNodeKind::Vognode (
+            Vognode::DiffPhantom (phantom)); }}}
 
   pub fn title (&self) -> &str {
     match &self . kind {
