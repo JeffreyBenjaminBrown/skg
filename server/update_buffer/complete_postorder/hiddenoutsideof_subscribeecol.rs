@@ -1,5 +1,5 @@
 use crate::types::env::SkgEnv;
-use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_scaffold_children};
+use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_col_children};
 use crate::to_org::complete::sharing::goal_list::goal_list_for_hiddenoutsideof_subscribeecol;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
@@ -61,7 +61,7 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
       tree, node, &context,
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
-  reconcile_sharing_scaffold_children(
+  reconcile_sharing_col_children(
     // §6.0: a stale member of this read-only col is removed when a view-leaf
     // (the common case) and demoted to Independent only if it has a user
     // subtree. Handled uniformly by the reconciler; no mark_managed pre-pass.

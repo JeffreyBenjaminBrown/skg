@@ -1314,3 +1314,23 @@ The code and several of my doc comments use "col" loosely (sometimes for any
 reconciled non-vognode, sometimes only for the Col-named kinds). Action: audit
 identifiers, doc comments, and =is_col_kind= naming so "scaffold" and "col" mean
 exactly the above everywhere. Non-blocking cleanup; do it as dedicated work.
+
+** §19 progress + the invasive remainder (identifier renames)
+Done (safe, doc/comment-only -- no behavior, no API change):
+- =is_col_kind= docstring now states the col-vs-scaffold distinction precisely.
+- =reconcile_relation_col_children= doc/comments say "col", not "scaffold".
+Remaining (INVASIVE identifier renames -- deferred, do as one mechanical pass so
+the churn is reviewable in isolation; each is a misnomer where the thing is
+specifically a COL but is named "scaffold"):
+- =reconcile_sharing_scaffold_children= -> ...=_col_children= (used by all four
+  sharing-col reconcilers + child_data.rs).
+- =ExpectedAncestor::Scaffold(RoleCol)= (ancestry.rs) -- it is always a col
+  (the SubscribeeCol); consider =ExpectedAncestor::Col(RoleCol)=.
+- =unique_scaffold_child_of_viewnode= / =insert_scaffold_as_child= -- these
+  operate on cols in their current callers but are generic over scaffolds; either
+  keep generic names (a col IS a scaffold, so these are correct generalizations)
+  or split. Decide per call site.
+Note: "scaffold" for a col is a GENERALIZATION, not an error (every col is a
+scaffold), so these renames are precision/clarity, not bug fixes -- hence safe to
+defer. The DeadScaffold/Qual-leaf cases are already correct (genuinely scaffolds,
+not cols).

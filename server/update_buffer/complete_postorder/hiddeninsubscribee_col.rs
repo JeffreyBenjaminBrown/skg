@@ -1,5 +1,5 @@
 use crate::types::env::SkgEnv;
-use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_scaffold_children};
+use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_col_children};
 use crate::to_org::complete::sharing::goal_list::goal_list_for_hiddeninsubscribee_col;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
@@ -60,7 +60,7 @@ pub fn reconcile_hiddenin_subscribee_col_children (
       tree, node, &context,
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
-  reconcile_sharing_scaffold_children(
+  reconcile_sharing_col_children(
     // §6.0: a HiddenInSubscribeeCol child that becomes stale (e.g. the user
     // moved it into the subscribee-as-such, 'unhiding' it) is removed when it
     // is a view-leaf -- the common case for hidden members -- and demoted to

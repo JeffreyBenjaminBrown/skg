@@ -21,7 +21,7 @@ use std::error::Error;
 
 impl RoleCol {
   /// Stable label used in panic messages from
-  /// 'reconcile_sharing_scaffold_children' and similar helpers.
+  /// 'reconcile_sharing_col_children' and similar helpers.
   /// Mirrors the function name of the corresponding completer so a
   /// crash gives the reader an immediately greppable hit.
   pub fn caller_label (self) -> &'static str {

@@ -95,9 +95,11 @@ fn matches_expected (
       matches! ( actual, ViewNodeKind::PartnerCol (r) if r == rc ),
   } }
 
-/// Whether `kind` is a col (a reconciled non-vognode viewnode): a QualCol or a
-/// PartnerCol. These are the kinds that carry a required ancestry and so are
-/// subject to the generalized-orphan check.
+/// Whether `kind` is a COL -- in Jeff's terminology (plan_v2 §19) a col is a
+/// *collecting* scaffold, i.e. a QualCol (ID/Alias) or a PartnerCol. (A SCAFFOLD
+/// is any non-Vognode viewnode; the non-col scaffolds -- Qual leaves, BufferRoot,
+/// DeadScaffold -- are excluded here.) Cols are the kinds that carry a required
+/// ancestry and so are subject to the generalized-orphan check.
 pub fn is_col_kind (
   kind : &ViewNodeKind,
 ) -> bool {

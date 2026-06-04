@@ -2,7 +2,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::complete::sharing::child_data::{
   build_child_data,
   ChildData,
-  reconcile_sharing_scaffold_children,
+  reconcile_sharing_col_children,
 };
 use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
@@ -16,13 +16,14 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::sync::Arc;
 
-/// Reconciles one relation collection branch from a node in the view tree
-/// with the current in-Rust graph snapshot's data about that node.
-/// Makes the scaffold's TrueNode children marked parentIs=affected match a goal list,
+/// Reconciles one relation col (§19 terminology: a col = a collecting scaffold)
+/// from a node in the view tree with the current in-Rust graph snapshot's data
+/// about that node.
+/// Makes the col's TrueNode children marked parentIs=affected match a goal list,
 /// preserving reusable children and creating missing ones,
 /// then demotes stale children marked parentIs=affected to 'parentIs=independent'.
 pub fn reconcile_relation_col_children (
-  node         : NodeId, // The relation collection scaffold. Its parent is a TrueNode.
+  node         : NodeId, // The relation col. Its parent is a TrueNode.
   tree         : &mut Tree<ViewNode>,
   kind         : RoleCol,
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
@@ -62,6 +63,6 @@ pub fn reconcile_relation_col_children (
   // now deletes a stale member that is a view-leaf and demotes one that is a
   // branch, so a relation col (read-only from this side) correctly drops a
   // stale leaf member instead of preserving it.
-  reconcile_sharing_scaffold_children (
+  reconcile_sharing_col_children (
     tree, node, kind, &goal_list, &child_data ) ?;
   Ok (( )) }

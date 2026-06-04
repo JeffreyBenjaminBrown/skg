@@ -1,5 +1,5 @@
 use crate::types::env::SkgEnv;
-use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_scaffold_children};
+use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_col_children};
 use crate::to_org::complete::sharing::goal_list::goal_list_for_subscribee_col;
 use crate::types::git::SourceDiff;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
@@ -73,7 +73,7 @@ pub async fn reconcile_subscribee_col_children (
         tree, node, &context,
         &goal_list, &removed_ids,
         source_diffs, deleted_since_head_pid_src_map, env ) ?;
-    reconcile_sharing_scaffold_children(
+    reconcile_sharing_col_children(
       tree, node, kind,
       &goal_list, &child_data ) ?; }
 

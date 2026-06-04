@@ -145,7 +145,7 @@ pub fn build_child_data (
 /// relevance/key/create closures. Phantom-flagged ChildData entries
 /// produce phantom viewnodes; non-phantom entries produce
 /// indefinitive viewnodes marked ParentIs::Affected.
-pub fn reconcile_sharing_scaffold_children (
+pub fn reconcile_sharing_col_children (
   tree          : &mut Tree<ViewNode>,
   scaffold_node : NodeId,
   kind          : RoleCol,
