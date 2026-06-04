@@ -131,12 +131,16 @@ pub fn apply_source_set_to_viewforest (
       viewforest . get (id)
       . and_then (
         |n| match &n . value () . kind {
-          ViewNodeKind::Vognode (Vognode::Normal (t)
-                                 | Vognode::DiffPhantom (t))
+          ViewNodeKind::Vognode (Vognode::Normal (t))
             if ! active . contains_source (&t . source)
             => Some (( t . id . clone (),
                        t . source . clone (),
                        t . membership )),
+          ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
+            if ! active . contains_source (&p . source)
+            => Some (( p . id . clone (),
+                       p . source . clone (),
+                       p . membership )),
           _ => None } );
     if let Some ((pid, source, membership)) = inactive {
       let mut node_mut : NodeMut<ViewNode> =

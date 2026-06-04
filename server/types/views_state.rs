@@ -176,11 +176,11 @@ fn root_ids_from_viewforest (
   let graph_snap = snapshot_global ();
   for child in viewforest . roots () {
     if let ViewNodeKind::Vognode (v) = &child . value () . kind {
-      let Some (t) = v . normal_or_phantom ()
+      let Some (vid) = v . normal_or_phantom_id ()
         else { continue; };
-      ids . insert ( t . id . clone () );
+      ids . insert ( vid . clone () );
       if let Some (graph) = graph_snap . as_ref () {
-        if let Some (pid) = graph . pid_of ( &t . id ) {
+        if let Some (pid) = graph . pid_of ( vid ) {
           if let Some (node) = graph . nodes . get (&pid) {
             ids . insert ( pid . clone () );
             for extra_id in &node . extra_ids {

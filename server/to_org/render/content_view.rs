@@ -143,10 +143,12 @@ pub async fn multi_root_view_via_env (
   let pids : Vec<ID> = {
     let mut ids : Vec<ID> = Vec::new ();
     for node_ref in viewforest . nodes () {
-      if let ViewNodeKind::Vognode (Vognode::Normal (t)
-                                    | Vognode::DiffPhantom (t))
-        = &node_ref . value () . kind
-        { ids . push ( t . id . clone () ); }}
+      match &node_ref . value () . kind {
+        ViewNodeKind::Vognode (Vognode::Normal (t))
+          => ids . push ( t . id . clone () ),
+        ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
+          => ids . push ( p . id . clone () ),
+        _ => {} }}
     ids };
   // Match the old multi_root_view_with_source_set, which finished with
   // render_viewforest_with_source_set (= apply_source_set_to_viewforest + render).

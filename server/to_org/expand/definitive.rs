@@ -141,9 +141,10 @@ pub fn apply_definitive_draw_rule (
     read_at_node_in_tree (
       viewforest, node_id,
       |n| match &n . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t)
-                               | Vognode::DiffPhantom (t))
+        ViewNodeKind::Vognode (Vognode::Normal (t))
           => truenode_file_absent_from_worktree (&t . existence),
+        ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
+          => truenode_file_absent_from_worktree (&p . existence),
         _ => false } ) ?;
   let hidden_ids : HashSet < ID > =
     // If node is a subscribee, we may need to hide some content.

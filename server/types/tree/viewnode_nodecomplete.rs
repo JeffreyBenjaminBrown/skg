@@ -28,8 +28,9 @@ where F: FnOnce (&mut TrueNode) -> R {
   write_at_node_in_tree (
     tree, treeid,
     |viewnode| { match &mut viewnode . kind {
-      ViewNodeKind::Vognode (Vognode::Normal (t)
-                             | Vognode::DiffPhantom (t))
+      // §11: a phantom is no longer a TrueNode, so this Normal-only mutator
+      // cannot apply to one (a phantom has no view_requests/indef_or_def/etc).
+      ViewNodeKind::Vognode (Vognode::Normal (t))
         => Ok ( f (t) ),
       _ => Err ( "write_at_truenode_in_tree: expected TrueNode"
                    . to_string () ) }} ) ? }
@@ -66,11 +67,12 @@ pub fn id_from_self_or_nearest_ancestor (
     tree . get (node_id)
     . ok_or ("id_from_self_or_nearest_ancestor: node not found")?;
   loop {
-    if let MpViewnodeKind::Vognode (MpVognode::Normal (t)
-                                    | MpVognode::DiffPhantom (t))
-      = &node . value() . kind
-      { if let Some (id) = &t . id
-        { return Ok(id . clone()); }}
+    match &node . value() . kind {
+      MpViewnodeKind::Vognode (MpVognode::Normal (t)) =>
+        { if let Some (id) = &t . id { return Ok(id . clone()); }}
+      MpViewnodeKind::Vognode (MpVognode::DiffPhantom (p)) =>
+        { if let Some (id) = &p . id { return Ok(id . clone()); }}
+      _ => {} }
     node = node . parent()
       . ok_or ("id_from_self_or_nearest_ancestor: reached root without finding ID")?; }}
 
@@ -303,9 +305,10 @@ fn collect_generation (
           next_gen . extend(
             n . children()
               . filter(|c| !skip_non_content ||
+                          // §11: a phantom has no parentIs and is implicitly
+                          // Affected (content), so it is never filtered here.
                           !matches!(&c . value() . kind,
-                                    MpViewnodeKind::Vognode (MpVognode::Normal (t)
-                                                             | MpVognode::DiffPhantom (t))
+                                    MpViewnodeKind::Vognode (MpVognode::Normal (t))
                                     if t . parentIs != ParentIs::Affected ))
               . map(|c| c . id()) ); }}
       current_gen = next_gen; }

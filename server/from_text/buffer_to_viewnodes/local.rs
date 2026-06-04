@@ -2,7 +2,7 @@
 /// These check structural properties of individual nodes
 /// without requiring global context.
 
-use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpTruenode};
+use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpTruenode, MpDiffPhantomNode};
 use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::git::Sign;
 use crate::types::viewnode::{EditRequest, IndefOrDef, ParentIs, RoleCol, Qual, QualCol};
@@ -38,9 +38,10 @@ pub fn validate_local_structure (
 
   let errors : Vec<String> =
     match &node_ref . value() . kind
-    { MpViewnodeKind::Vognode (MpVognode::Normal (t)
-                                        | MpVognode::DiffPhantom (t)) =>
+    { MpViewnodeKind::Vognode (MpVognode::Normal (t)) =>
         validate_truenode(tree, node_id, t, config),
+      MpViewnodeKind::Vognode (MpVognode::DiffPhantom (p)) =>
+        validate_phantom(tree, node_id, p, config),
       MpViewnodeKind::BufferRoot =>
         Vec::new (),
       MpViewnodeKind::Qual (Qual::Alias { .. }) =>
@@ -392,6 +393,31 @@ fn validate_truenode (
     errors . push("TrueNode's non-ignored content children must be unique (no two sharing the same ID)." . to_string()); }
   if has_empty_title (t) {
     errors . push("Definitive node has an empty title." . to_string()); }
+  errors }
+
+/// Validate a phantom (§11): same identity and child-structure checks as a
+/// TrueNode, but the "definitive node must have a non-empty title" rule does
+/// not apply -- a phantom is always indefinitive, hence exempt (as
+/// has_empty_title would conclude for it).
+fn validate_phantom (
+  tree    : &Tree<MpViewnode>,
+  node_id : NodeId,
+  p       : &MpDiffPhantomNode,
+  config  : &SkgConfig,
+) -> Vec<String> {
+  let mut errors : Vec<String> = Vec::new();
+  if p . id . is_none() {
+    errors . push("TrueNode must have an ID." . to_string()); }
+  if ! p . source . as_ref()
+       . is_some_and( |s| config . sources . contains_key (s) ) {
+    errors . push("TrueNode must have a source that exists in the config."
+                . to_string() ); }
+  if !generation_includes_only(
+    tree, node_id, 1, true,
+    |node| !cannot_be_child_of_gnode (node))
+    { errors . push("TrueNode has a child whose structure belongs elsewhere: BufferRoot, Alias, ID, HiddenInSubscribeeCol, or HiddenOutsideOfSubscribeeCol." . to_string()); }
+  if !nonignored_children_have_distinct_ids(tree, node_id) {
+    errors . push("TrueNode's non-ignored content children must be unique (no two sharing the same ID)." . to_string()); }
   errors }
 
 fn cannot_be_child_of_gnode (

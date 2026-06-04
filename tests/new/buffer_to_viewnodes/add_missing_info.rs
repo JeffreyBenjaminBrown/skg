@@ -111,12 +111,12 @@ fn test_absent_parentIs_under_visible_parent_becomes_isContainer () {
 
   match &root_node . value() . kind {
     MpViewnodeKind::Vognode (
-      MpVognode::Normal (t) | MpVognode::DiffPhantom (t)) =>
+      MpVognode::Normal (t)) =>
       assert_eq! (t . parentIs, ParentIs::Absent),
     _ => panic! ("expected root TrueNode") }
   match &moved_node . value() . kind {
     MpViewnodeKind::Vognode (
-      MpVognode::Normal (t) | MpVognode::DiffPhantom (t)) =>
+      MpVognode::Normal (t)) =>
       assert_eq! (t . parentIs, ParentIs::Affected),
     _ => panic! ("expected moved TrueNode") }
 }

@@ -387,8 +387,8 @@ pub fn ids_that_can_have_graphnodestats (
     if let Edge::Open (node_ref) = edge {
       match &node_ref . value () . kind {
         ViewNodeKind::Vognode (v) =>
-          if let Some (t) = v . normal_or_phantom ()
-          { ids . push ( t . id . clone () ); },
+          if let Some (vid) = v . normal_or_phantom_id ()
+          { ids . push ( vid . clone () ); },
         _ => {} }}}
   ids }
 
@@ -651,8 +651,8 @@ pub fn truenode_in_tree_is_indefinitive (
                            |viewnode| viewnode . kind . clone() )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   match node_kind {
-    ViewNodeKind::Vognode (Vognode::Normal (t)
-                           | Vognode::DiffPhantom (t))   => Ok (t . is_indefinitive ()),
+    ViewNodeKind::Vognode (Vognode::Normal (t))   => Ok (t . is_indefinitive ()),
+    ViewNodeKind::Vognode (Vognode::DiffPhantom (p)) => Ok (p . is_indefinitive ()),
     ViewNodeKind::Vognode (Vognode::Deleted (_))
       | ViewNodeKind::Vognode (Vognode::Inactive (_))
       | ViewNodeKind::Vognode (Vognode::Unknown (_)) => Ok (false),

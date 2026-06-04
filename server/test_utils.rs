@@ -478,15 +478,18 @@ fn compare_two_viewnode_branches_recursively_modulo_id (
   match (&n1 . kind, &n2 . kind) {
     ( MpViewnodeKind::Vognode (MpVognode::Normal (_)
                                | MpVognode::DiffPhantom (_)),
-      MpViewnodeKind::Vognode (MpVognode::Normal (t2)
-                               | MpVognode::DiffPhantom (t2))) =>
-    { // Copy the ID from one to the other, then compare.
+      MpViewnodeKind::Vognode (MpVognode::Normal (_)
+                               | MpVognode::DiffPhantom (_))) =>
+    { // Copy the ID from one to the other, then compare. §11: Normal and
+      // DiffPhantom payloads are now different types, so read n2's id via the
+      // shared accessor and write n1_copy's per variant.
+      let id2 : Option<ID> = n2 . id_opt () . cloned ();
       let mut n1_copy : MpViewnode =
         n1 . clone();
-      if let MpViewnodeKind::Vognode (MpVognode::Normal (t)
-                                      | MpVognode::DiffPhantom (t))
-        = &mut n1_copy . kind
-        { t . id = t2 . id . clone(); }
+      match &mut n1_copy . kind {
+        MpViewnodeKind::Vognode (MpVognode::Normal (t)) => t . id = id2,
+        MpViewnodeKind::Vognode (MpVognode::DiffPhantom (p)) => p . id = id2,
+        _ => {} }
       if n1_copy != *n2 { return false; }}
     ( MpViewnodeKind::QualCol (_)
       | MpViewnodeKind::Qual (_)

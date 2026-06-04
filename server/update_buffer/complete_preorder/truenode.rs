@@ -300,9 +300,10 @@ pub(in crate::update_buffer) fn cap_goal_list_to_budget (
   let existing : HashSet<ID> =
     tree . get (node) . unwrap () . children ()
     . filter_map ( |c| match &c . value () . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t)
-                               | Vognode::DiffPhantom (t)) =>
+        ViewNodeKind::Vognode (Vognode::Normal (t)) =>
           Some ( t . id . clone () ),
+        ViewNodeKind::Vognode (Vognode::DiffPhantom (p)) =>
+          Some ( p . id . clone () ),
         ViewNodeKind::Vognode (Vognode::Inactive (i)) =>
           Some ( i . id . clone () ),
         _ => None } )
@@ -461,10 +462,11 @@ fn complete_content_children (
         => true,
       _ => false },
     |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::Vognode (Vognode::Normal (t)
-                             | Vognode::DiffPhantom (t))
-        // Both kinds participate in child-list reconciliation.
+      // Both kinds participate in child-list reconciliation.
+      ViewNodeKind::Vognode (Vognode::Normal (t))
         => t . id . clone(),
+      ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
+        => p . id . clone(),
       ViewNodeKind::Vognode (Vognode::Inactive (i))
         => i . id . clone(),
       _ => panic!(
@@ -588,10 +590,12 @@ fn build_child_creation_data (
       let mut m : HashMap<ID, SourceName> = HashMap::new();
       for child_ref in node_ref . children() {
         match &child_ref . value() . kind {
-          ViewNodeKind::Vognode (Vognode::Normal (t)
-                                 | Vognode::DiffPhantom (t))
+          ViewNodeKind::Vognode (Vognode::Normal (t))
             => { m . insert( t . id . clone(),
                              t . source . clone()); },
+          ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
+            => { m . insert( p . id . clone(),
+                             p . source . clone()); },
           ViewNodeKind::Vognode (Vognode::Inactive (i))
             => { m . insert( i . id . clone(),
                              i . source . clone()); },

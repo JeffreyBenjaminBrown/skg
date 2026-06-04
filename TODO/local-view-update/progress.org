@@ -612,3 +612,32 @@ This is a hard-to-reverse, ~22-file refactor whose only payoff is type honesty
 (now that the behavior is already enforced by #1+#2). Per when-to-stop.org that
 is an "architectural decision," and its ordering vs TODO #3 is your priority
 call -- so I'm surfacing it rather than grinding it speculatively.
+*** DONE you chose §11-now-then-#3; the §11 reduction landed
+=Vognode::DiffPhantom= now carries a slim =DiffPhantomNode= (id, source, title,
+existence, membership, not_in_git, graphStats) instead of a full =TrueNode=;
+=MpVognode::DiffPhantom= likewise carries =MpDiffPhantomNode=. Modeled both as
+=DiffPhantomNode_Generic<Id,Src>= so the placed/maybe-placed pair and their
+conversions fall out symmetrically. Dropped from a phantom: parentIs, birth,
+viewStats, view_requests, and the whole =IndefOrDef= enum.
+- Render: a dedicated =diffphantom_metadata_to_string= emits exactly what the
+  old shared renderer did for a phantom (id, source, indef, graphStats, staged,
+  unstaged, notInGit). Verified byte-identical: NO phantom oracle line carried
+  parentIs / birth / viewStats / viewRequests, so nothing changed.
+- Parse: =parse_metadata_sexp= builds the slim =MpDiffPhantomNode=; the
+  EditRequestOnIndefinitive validation still fires first, so a client marking a
+  phantom toDelete is still rejected with the same message. A new
+  =validate_phantom= mirrors =validate_truenode= minus the title rule (a phantom
+  is indefinitive, hence title-exempt -- exactly what =has_empty_title= concluded).
+- =normal_or_phantom() -> &TrueNode= (only 2 callers, both wanting just the id)
+  became =normal_or_phantom_id() -> &ID=; the unused =normal_or_phantom_mut= was
+  deleted. =write_at_truenode_in_tree= is now Normal-only (a phantom has no
+  TrueNode fields to write).
+- ~20 combined =Normal(t) | DiffPhantom(t)= arms across server + tests were split
+  (most into two identical-bodied arms; a few collapsed to Normal-only where the
+  body read a Normal-only field like viewStats/parentIs/birth/view_requests).
+- Validated: library + all test targets compile; full Rust suite + 27
+  integration tests green.
+*** TODO next: #3 -- do all diff locally (pull the after-pass into local update)
+Per your clarification: move the content/scaffold diff that =apply_diff_to_viewforest=
+computes AFTER the BFS into the BFS itself, so all diff is computed locally and
+the separate overlay pass goes away. (Opposite direction from my old Q2; agreed.)

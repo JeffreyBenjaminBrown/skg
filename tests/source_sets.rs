@@ -84,9 +84,10 @@ fn true_child_ids (
 ) -> BTreeSet<ID> {
   tree . get (parent_id) . unwrap () . children ()
     . filter_map ( |child| match &child . value () . kind {
-      ViewNodeKind::Vognode ( Vognode::Normal (node)
-                              | Vognode::DiffPhantom (node))
+      ViewNodeKind::Vognode ( Vognode::Normal (node) )
         => Some (node . id . clone ()),
+      ViewNodeKind::Vognode ( Vognode::DiffPhantom (p) )
+        => Some (p . id . clone ()),
       _ => None, })
     . collect () }
 

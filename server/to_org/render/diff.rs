@@ -287,9 +287,10 @@ fn insert_phantoms_for_missing_contains (
     let mut m : HashMap<ID, NodeId> = HashMap::new ();
     for c in node_ref . children () {
       match &c . value () . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t)
-                               | Vognode::DiffPhantom (t))
+        ViewNodeKind::Vognode (Vognode::Normal (t))
           => { m . insert ( t . id . clone (), c . id () ); },
+        ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
+          => { m . insert ( p . id . clone (), c . id () ); },
         ViewNodeKind::Vognode (Vognode::Inactive (i))
           => { m . insert ( i . id . clone (), c . id () ); },
         _ => {}, }}
