@@ -1209,3 +1209,40 @@ Branch =local-view-updates=.
   de-novo driver entry + the switch together (the flag is only exercised once
   de-novo routes through the driver), then the node-limit test rewrite, then
   delete the dead de-novo BFS.
+** Phase 8 (§13 unify de-novo) -- CORE LANDED + VALIDATED; deletion of the old
+  BFS remains. Commits this session:
+  - foundation: CompletionContext.create_relation_cols_for_fresh_nodes (false for
+    post-save -> byte-identical; true for de-novo). visit_normal_node creates a
+    fresh CONTENT node's relation cols (gated "parent is not a PartnerCol") so the
+    driver can expand a bare stub the way build_node_branch_minus_content does.
+  - render_initial_view_via_driver (update_buffer): stub forest + complete_viewforest
+    with a de-novo context (fresh DefinitiveMap, node_budget=initial_node_limit).
+    multi_root_view_via_env (content_view): that + diff overlay + containerward +
+    stats + render. The single-root-view HANDLER calls it. VALIDATED by ALL 27
+    integration tests (real de-novo) -- the driver reproduces correct de-novo
+    output. This is the side-benefit: ONE driver for initial + post-save.
+  - fix: multi_root_view_via_env applies the source set before rendering
+    (parity with the old render_viewforest_with_source_set).
+  - §7.6: the driver renders Unknown (mk_unknown_viewnode, new ContentReality::
+    Unknown) for an unresolvable content id instead of aborting -- required
+    because de-novo must tolerate dangling refs (the dangling-reference test).
+  REMAINING to finish §13 (delete render_initial_viewforest_bfs +
+  render_generation_and_recurse + add_children_and_collect_their_ids +
+  collect_rels_to_children_from_generation + stub-only helpers): route the
+  ~handful of de-novo UNIT tests through the driver too. The blocker is purely
+  mechanical but wide: the driver path needs an Arc<TypeDBDriver> for the SkgEnv,
+  and TypeDBDriver is NOT Clone, so each de-novo test file that holds a plain
+  &TypeDBDriver (via an intermediate helper or an owned-driver setup --
+  content_view's test_multi_root_view_logic, typedb's test_recursive_document,
+  subscribee_col's setup_multi_source_test, and any like them) must thread an
+  Arc. Tests that already use run_with_test_db's &Arc<TypeDBDriver> closure are
+  fine. The mechanism is ready: change multi_root_view/single_root_view/
+  multi_root_view_with_source_set to take &Arc<TypeDBDriver> and build the env
+  internally (empty in-RAM tantivy via new dbs::init::empty_in_ram_tantivy_index;
+  fresh empty in-Rust graph), delegating to multi_root_view_via_env. THEN rewrite
+  the 5 node-limit tests (initial_view_bfs.rs x3, content_view.rs x2) to the §5.5
+  per-child node_budget truncation (Jeff approved the UX change) -- run them, they
+  fail with the new truncation, re-baseline to it. The §7.6 Unknown path also
+  becomes test-covered once the dangling-reference test routes through the driver.
+  Two reverted attempts at this migration are why it's not done: it is tedious
+  and wide, not hard; do it as a focused mechanical pass.
