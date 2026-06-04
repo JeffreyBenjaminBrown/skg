@@ -42,9 +42,9 @@ use std::error::Error;
 enum ExpectedAncestor {
   /// Must be a `Vognode::Normal` (anything else at this depth means death).
   NormalVognode,
-  /// Must be exactly this scaffold kind (the only intermediate-chain scaffold
-  /// the table uses is the SubscribeeCol).
-  Scaffold (RoleCol),
+  /// Must be exactly this col kind (§19: a col = a collecting scaffold). The
+  /// only intermediate-chain col the table uses is the SubscribeeCol.
+  Col (RoleCol),
 }
 
 // The §3 required-ancestry table, nearest -> farthest. required_ancestry[i] is
@@ -52,11 +52,11 @@ enum ExpectedAncestor {
 const ANC_NORMAL : &[ExpectedAncestor] =
   &[ ExpectedAncestor::NormalVognode ];
 const ANC_HIDDEN_OUTSIDE : &[ExpectedAncestor] =
-  &[ ExpectedAncestor::Scaffold (RoleCol::Subscribee),
+  &[ ExpectedAncestor::Col (RoleCol::Subscribee),
      ExpectedAncestor::NormalVognode ];
 const ANC_HIDDEN_IN : &[ExpectedAncestor] =
   &[ ExpectedAncestor::NormalVognode,
-     ExpectedAncestor::Scaffold (RoleCol::Subscribee),
+     ExpectedAncestor::Col (RoleCol::Subscribee),
      ExpectedAncestor::NormalVognode ];
 const ANC_NONE : &[ExpectedAncestor] = &[];
 
@@ -91,7 +91,7 @@ fn matches_expected (
   match expected {
     ExpectedAncestor::NormalVognode =>
       matches! ( actual, ViewNodeKind::Vognode (Vognode::Normal (_)) ),
-    ExpectedAncestor::Scaffold (rc) =>
+    ExpectedAncestor::Col (rc) =>
       matches! ( actual, ViewNodeKind::PartnerCol (r) if r == rc ),
   } }
 
