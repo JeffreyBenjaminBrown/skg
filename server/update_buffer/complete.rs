@@ -11,9 +11,9 @@ use crate::to_org::util::DefinitiveMap;
 use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
-use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree};
+use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, write_at_node_in_tree};
 use crate::update_buffer::ancestry::{ col_is_generalized_orphan, deaden_generalized_orphan_col, is_col_kind};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol, ViewRequest, IndefOrDef};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol, ViewRequest, IndefOrDef, DeletedNode};
 use crate::types::viewnode::{Vognode, QualCol};
 use super::complete_postorder::hiddeninsubscribee_col::reconcile_hiddenin_subscribee_col_children;
 use super::complete_postorder::hiddenoutsideof_subscribeecol::reconcile_hiddenoutside_subscribee_col_children;
@@ -143,6 +143,11 @@ async fn expand_true_content_at_node (
     ViewNodeKind::QualCol (QualCol::ID) =>
       super::complete_postorder::id_col::reconcile_id_col_children (
         treeid, tree, context . source_diffs, &context . env . config ) ?,
+    ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
+      // §6.4/§6.6/§16: an Inactive node deleted by this save becomes Deleted
+      // (current code converted only Normal nodes).
+      convert_inactive_to_deleted_if_deleted (
+        tree, treeid, context . deleted_by_this_save_pids ) ?,
     _ => {
       // No-op for: Unknown (unresolvable-id placeholder), Deleted,
       // DeadScaffold, Qual leaves, BufferRoot, DiffPhantom (owned by the
@@ -281,6 +286,34 @@ fn remove_empty_dead_and_deleted (
   }
   Ok (( )) }
 
+/// §6.4/§6.6/§16: convert an Inactive node whose pid is in
+/// `deleted_by_this_save_pids` into a Deleted node, mirroring the Normal-node
+/// conversion in expand_true_content_at_truenode (which only ever handled
+/// Normal). An InactiveNode carries no title/body of its own (its .skg is now
+/// gone), so the Deleted placeholder is built with an empty title. Inert
+/// thereafter; the §6.6 prune removes it if it ends childless.
+fn convert_inactive_to_deleted_if_deleted (
+  tree                      : &mut Tree<ViewNode>,
+  treeid                    : NodeId,
+  deleted_by_this_save_pids : &HashSet<ID>,
+) -> Result<(), Box<dyn Error>> {
+  let to_delete : Option<(ID, SourceName)> =
+    read_at_node_in_tree ( tree, treeid,
+      |vn : &ViewNode| match &vn . kind {
+        ViewNodeKind::Vognode (Vognode::Inactive (i))
+          if deleted_by_this_save_pids . contains (&i . id) =>
+            Some (( i . id . clone (), i . source . clone () )),
+        _ => None } )
+    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+  if let Some ((id, source)) = to_delete {
+    write_at_node_in_tree ( tree, treeid,
+      |vn : &mut ViewNode| {
+        vn . kind = ViewNodeKind::Vognode ( Vognode::Deleted (
+          DeletedNode { id, source,
+                        title : String::new (), body : None } )); } )
+      . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
+  Ok (( )) }
+
 fn collect_matching_nodeids<Predicate> (
   tree      : &Tree<ViewNode>,
   preorder  : bool,
@@ -297,3 +330,38 @@ where Predicate : Fn (&ViewNode) -> bool {
       Ok (( )) } )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (result) }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::types::misc::SourceName;
+  use crate::types::viewnode::{ mk_inactive_viewnode, viewforest_root_viewnode };
+  use crate::types::git::MembershipAxes;
+  use ego_tree::Tree;
+
+  // §6.4/§6.6/§16: an Inactive node whose pid this save deleted converts to a
+  // Deleted node (so the prune sweep can later remove it if childless), while
+  // an Inactive node NOT deleted by this save is left untouched.
+  #[test]
+  fn inactive_deleted_by_save_becomes_deleted () {
+    let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = t . root () . id ();
+    let inact : NodeId = t . get_mut (root) . unwrap () . append (
+      mk_inactive_viewnode ( ID::from ("x"), SourceName::from ("main"),
+                             MembershipAxes::default () ) ) . id ();
+    let kept : NodeId = t . get_mut (root) . unwrap () . append (
+      mk_inactive_viewnode ( ID::from ("y"), SourceName::from ("main"),
+                             MembershipAxes::default () ) ) . id ();
+    let deleted : HashSet<ID> =
+      [ ID::from ("x") ] . into_iter () . collect ();
+
+    convert_inactive_to_deleted_if_deleted (&mut t, inact, &deleted) . unwrap ();
+    convert_inactive_to_deleted_if_deleted (&mut t, kept,  &deleted) . unwrap ();
+
+    assert! ( matches! ( &t . get (inact) . unwrap () . value () . kind,
+      ViewNodeKind::Vognode (Vognode::Deleted (d)) if d . id == ID::from ("x") ),
+      "an Inactive node deleted by this save must become Deleted" );
+    assert! ( matches! ( &t . get (kept) . unwrap () . value () . kind,
+      ViewNodeKind::Vognode (Vognode::Inactive (_)) ),
+      "an Inactive node NOT deleted by this save must be left untouched" ); }
+}

@@ -1056,3 +1056,11 @@ Branch =local-view-updates=.
     entangled with the de-novo (initial-render) col-creation gating in to_org/
     and is best landed alongside phase 8 (unify de-novo), or after mapping each
     relation-col creation site. See TODO/local-view-update/progress.org §5.
+** Phase 7 §6.4/§16: Inactive node deleted by this save -> Deleted. The BFS
+  Inactive dispatch (was a no-op) now calls convert_inactive_to_deleted_if_deleted
+  in complete.rs: an Inactive vognode whose pid is in deleted_by_this_save_pids
+  becomes a Vognode::Deleted (mirrors the Normal-node conversion, which was the
+  only one the code did -- §16 bug). The Deleted placeholder has an empty title
+  (an InactiveNode carries none). Unit test in complete.rs. Remaining phase-7
+  variants still deferred: §6.5 Unknown member/branch (belongs with §3.4
+  Unknown->Dead routing). Full Rust suite green (52 ok-blocks).
