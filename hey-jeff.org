@@ -1,0 +1,179 @@
+#+TITLE: hey jeff -- glossary for the "make diff local" (#3) decision
+#+STARTUP: content
+
+Written 2026-06-04. You asked me to define every term in the #3 options before
+you choose. This document is that glossary, then the architecture those terms
+describe, then the three options restated in plain language. No choice is
+embedded here -- read and then tell me which option (in the chat) you want.
+
+* Part 1 -- the vocabulary, from the ground up
+
+** node, ViewNode, Vognode
+The view you see in the editor is a TREE of =ViewNode=. A =ViewNode= is one line
+(plus its body) in that tree. Some ViewNodes correspond to an actual graph node
+(these are =Vognode=); others are structural decorations (see "scaffold/col").
+
+** Normal node
+A =Vognode::Normal= is the ordinary case: a graph node shown as itself, editable,
+present in the worktree. Most lines you see are Normal nodes.
+
+** phantom (DiffPhantom)
+A =Vognode::DiffPhantom= is a DIFF-ONLY placeholder. It marks a node that git
+says was there but isn't now: either its =.skg= file is gone ("removed"), or the
+file still exists but the node is no longer a member of this parent's contains
+list ("removedHere"). A phantom exists ONLY in the git-diff view; it is never
+saved. (After this week's §11 work a phantom carries a slim payload and is always
+read-only / indefinitive.)
+
+** "flip" / normal_to_phantom
+The act of turning a Normal node into a phantom is a "flip" -- the function is
+=normal_to_phantom=. Whether a node should flip is decided from its diff axes
+(below): if some stage shows the node removed, it flips.
+
+** existence axis / membership axis (the "diff axes")
+Two per-stage facts git gives us about a node:
+- EXISTENCE: did the node's =.skg= FILE change between HEAD↔index ("staged") or
+  index↔worktree ("unstaged")?
+- MEMBERSHIP: did the node's APPEARANCE in this parent's contains list change, in
+  each of those two stages?
+These are stored on the node as small +/- markers and are what the client renders
+as =(staged removedM)=, =(unstaged removedX removedM)=, etc.
+
+** scaffold / col
+A ViewNode that is NOT a graph node but organizes other nodes. Relevant ones:
+- =IDCol= / =AliasCol= (QualCol): collect a node's extra IDs / aliases.
+- =TextChanged= (Qual): a diff-only marker that a node's title/body changed.
+- partner cols (=SubscribeeCol=, relation cols, the two Hidden* cols): collect a
+  node's sharing relationships.
+"Col" is shorthand for these collection scaffolds. They hang off a Vognode as
+children.
+
+** reconcile / completion
+"Completing" a node means filling in everything that should hang off it: its
+content children, its cols, its view-request expansions. Each col "reconciles"
+by comparing what's currently under it to what the graph says should be, and
+adding/removing/reordering to match. A col reads its ancestor Vognode (e.g. a
+SubscribeeCol reads the subscriber node above it) to know what to reconcile
+against.
+
+** generalized orphan
+A col whose required ancestor Vognode is the wrong kind (e.g. its owner got
+deleted, so the ancestor is now Deleted/Dead). Such a col can't reconcile (there's
+no live owner to read), so the BFS "deadens" it instead. This check reads the
+ancestor; what KIND the ancestor is (Normal vs phantom vs Deleted) matters here.
+
+** BFS / the driver / complete_viewforest
+=complete_viewforest= is THE function that completes the whole view. It walks the
+tree in LEVEL-ORDER (breadth-first: all depth-1 nodes, then all depth-2, ...).
+This single walk is what we've been calling "local update" or "the driver." When
+it visits a Normal node it reconciles that node's content; when it later reaches
+that node's cols (one level deeper) it reconciles each col. Because it's
+level-order, a node is visited BEFORE its own cols are.
+
+** worktree view / source_diffs
+The driver can run in two modes, selected by whether it's given =source_diffs=
+(git's per-stage diff data):
+- WITHOUT source_diffs (=None=): it produces the pure WORKTREE view -- what the
+  graph looks like right now on disk, with no diff decorations.
+- WITH source_diffs: historically it also did diff work inline. (That inline diff
+  work was deleted in phase 5 -- see Part 2.)
+
+** the overlay / apply_diff_to_viewforest / "post-pass"
+=apply_diff_to_viewforest= is a SECOND traversal that runs AFTER the driver
+finishes. It walks the completed worktree tree and, for each Normal node, adds
+every diff effect: stamps the diff axes, flips removed nodes to phantoms, prepends
+the TextChanged/IDCol/AliasCol scaffolds, marks membership on surviving children,
+and inserts removed-member phantoms at their correct positions. Because it is a
+separate pass invoked by the CALLER (rerender_view for post-save; content_view for
+de-novo) AFTER the driver, I've been calling it the "overlay" or "post-pass." The
+per-node worker inside it is =process_truenode_diff=.
+
+** de-novo vs post-save
+Two situations that both build a view:
+- DE-NOVO: opening a fresh view from scratch (=content_view.rs=).
+- POST-SAVE: re-rendering after the user saved a buffer (=rerender_view= in
+  =update_buffer.rs=).
+As of phase 8 both use the SAME driver, and both call the SAME overlay afterward.
+
+** GIT_DIFF_VIEW oracle / byte-identical
+A shared expected-output fixture both a de-novo test and a post-save test assert
+against. "Byte-identical" means the text the server renders is exactly unchanged.
+It is my safety net: if a refactor changes any rendered byte, these tests fail.
+
+** stumper
+Your term (from when-to-stop.org): a goal I don't see how to achieve, or can't
+without something ugly. A reason for me to stop and report rather than push on.
+
+* Part 2 -- how diff is computed TODAY, and the §9 history
+
+Phase 5 (plan_v2 §9) made a deliberate choice: compute the WORKTREE view first
+(driver with =source_diffs = None=), then add ALL content/scaffold diff in the
+single overlay post-pass. The goal was "one diff implementation instead of two."
+To get there, phase 5 DELETED the old inline diff code from the driver -- the
+in-BFS scaffold emission and the in-BFS phantom flip are gone (the driver's own
+comments now say so). The sharing-col diff is the one exception that still runs
+inline.
+
+So today:
+- driver (=complete_viewforest=): builds the pure worktree view. No phantoms.
+- overlay (=apply_diff_to_viewforest=): runs after, adds all content diff.
+
+** Why "after" is load-bearing (the hazard)
+The overlay flips nodes to phantoms and inserts phantom children. If that happened
+DURING the driver's BFS instead of after it, then: the driver visits node N at
+level k, flips N to a phantom and gives it phantom children; later (level k+1) the
+driver reaches N's cols and tries to reconcile them -- but now their owner N is a
+phantom, not a Normal node. The col's ancestor-read and the generalized-orphan
+check would be looking at a phantom owner. §9 avoided this entire class of
+interaction by running diff only after completion is fully done. That is the
+"phantom-during-completion hazard."
+
+* Part 3 -- the #3 goal and the three options, in the defined terms
+
+Your #3 goal: "do all diff locally ... easier for a reader to understand" --
+i.e. stop having a separate after-the-fact overlay; have the diff be part of the
+one local pass. You picked "resurrect inline path, delete overlay," and I then
+found the inline path was deleted (Part 2) and that true inlining hits the hazard.
+Here are the three options, restated:
+
+** Option A -- driver-owned diff phase
+Move the existing overlay worker (=process_truenode_diff=) so it runs as the
+FINAL STEP INSIDE =complete_viewforest=, instead of being called separately by
+=rerender_view= / =content_view= afterward. Delete the standalone
+=apply_diff_to_viewforest= entry point.
+- What changes for a reader: there is now ONE function that produces the diff
+  view (the driver), and it does worktree-completion then diff, in that order,
+  in one place. No separate caller-invoked overlay.
+- Hazard: AVOIDED. Diff still runs after the worktree BFS completes -- just
+  inside the driver rather than after it. §9's safety is preserved.
+- Risk: LOW. The diff logic itself is unchanged and oracle-validated; only its
+  call site moves.
+- Honest caveat: the diff is still a distinct traversal, now nested inside the
+  driver. It's "local" in the sense of "one entry point owns it," not in the
+  sense of "computed at each node's first visit."
+
+** Option B -- true per-node inline
+Genuinely compute each node's diff at that node's FIRST visit during the BFS:
+flip it to a phantom, emit its scaffolds, insert its phantom children, right
+there. Delete the overlay.
+- What changes for a reader: the most "local" outcome -- a node's worktree state
+  and its diff are handled together, in one place, as the BFS reaches it.
+- Hazard: PRESENT. This is exactly the phantom-during-completion case. It MIGHT
+  be harmless (a removed node's cols deaden anyway), but I can't promise that
+  without building it and watching the oracle.
+- Risk: HIGH. Plan: build it, run the GIT_DIFF_VIEW oracle + integration tests.
+  If byte-identical green, you get the purest "local" and we keep it. If it
+  breaks in ways I can't cleanly fix, I stop and report it as a stumper (no
+  half-broken state committed).
+
+** Option C -- defer #3
+Leave today's overlay as-is. Everything higher-priority (#1 phantom strip, #2
+phantom indefinitive, §11 payload reduction, the col budget) is already done and
+green across the commits on this branch. Revisit #3 later, deliberately, when
+your power is stable and you can review.
+
+* What I need from you
+Just reply in the chat with A, B, or C (or describe something else). If you want,
+I can also just proceed with A on my own judgment -- it delivers your stated #3
+intent (one local owner of the diff view, standalone overlay deleted) at low risk
+-- but since this reverses a documented §9 decision I'd rather you pick.
