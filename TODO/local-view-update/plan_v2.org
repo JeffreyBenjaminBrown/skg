@@ -1009,3 +1009,34 @@ Branch =local-view-updates=.
     keep their existing self-delete behavior (subscribee_col + Hidden* detach
     when empty; others don't). And the other §6.1 carve-out
     (should_sync_from_disk_even_though_definitive).
+** Death-leafward LANDED (detour, plan in
+  TODO/local-view-update/propagate-death-leafward/plan.org). Cols now self-check
+  their required ancestry at their BFS visit and deaden if a generalized orphan.
+  Four commits: (1) §6.6 -- the prune sweep removes a childless Vognode::Deleted
+  (not just childless DeadScaffolds), except a view root; (2) the mechanism --
+  new server/update_buffer/ancestry.rs (the §3 ancestry table,
+  col_is_generalized_orphan, required_ancestor, deaden_generalized_orphan_col),
+  wired as a pre-check in the BFS col dispatch; the 6 col reconciles read their
+  ancestor vognodes *through* required_ancestor (§4 dedup); DELETED
+  scaffolds_with_deadOrDeleted_parents_become_dead (subsumed -- full chain vs
+  immediate parent, BFS visits every col); (3) dropped the
+  detach_stale_deleted_content stopgap; (4) a fix found via the collateral-delete
+  integration test.
+  - DEVIATION from plan.org §5.1.a: a deadened col does NOT convert its nested
+    col children (QualCol/PartnerCol) to DeadScaffold. Converting them froze a
+    nested col before its own visit, so it never disposed ITS leaf members --
+    they survived stranded (a HiddenOutsideOfSubscribeeCol's hidden leaf
+    lingering after its SubscribeeCol died). Instead a nested col is left
+    untouched and self-deadens at its visit (it is a generalized orphan under
+    the now-dead parent), disposing its own leaves. This is what plan.org's §5
+    note actually intends ("a nested col ... deadens itself at its own visit
+    too"); §5.1.a's literal "convert nested cols to DeadScaffold" was the bug.
+    Only Qual leaves (which do not self-dispatch) are still converted here.
+  - With the fix, save_collateral_delete_then_edit_under_it passes via the real
+    mechanism: a deleted node's cols all empty out and prune, so it becomes
+    childless and §6.6 removes it -- "11 gone entirely" (plan.org §9), matching
+    the existing test expectation; NO test-expectation change was needed.
+  - NO fail-soft NodeComplete backstop (plan.org §8 item 3: wear the belt).
+  - Full Rust suite green (51 ok-blocks) at every commit; the
+    save_collateral_delete_then_edit_under_it integration test green via the
+    real path.
