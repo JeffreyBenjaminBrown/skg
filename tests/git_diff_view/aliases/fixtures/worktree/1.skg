@@ -1,0 +1,7 @@
+pid: '1'
+aliases:
+  - new-alias
+  - keep
+title: "1"
+contains:
+  - "child"
