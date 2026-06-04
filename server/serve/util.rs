@@ -136,7 +136,7 @@ pub(crate) fn format_single_view_sexp (
     . to_string () }
 
 /// Format: ((lock-views ("URI1" "URI2" ...)))
-pub(super) fn format_lock_views_sexp (
+pub(crate) fn format_lock_views_sexp (
   uris : &[ViewUri],
 ) -> String {
   let uri_sexps : Vec<Sexp> =

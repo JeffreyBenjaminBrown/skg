@@ -8,15 +8,47 @@
 (require 'skg-buffer)
 (require 'skg-lock-buffers)
 
+(defun skg--other-unsaved-skg-buffers ()
+  "Return the list of skg view buffers OTHER than the current one that
+have unsaved modifications (`buffer-modified-p')."
+  (let ((self (current-buffer))
+        (result nil))
+    (dolist (buf (buffer-list))
+      (when (and (not (eq buf self))
+                 (buffer-local-value 'skg-view-uri buf)
+                 (buffer-modified-p buf))
+        (push buf result)))
+    result))
+
+(defun skg--confirm-save-despite-other-unsaved ()
+  "plan_v2 §8.4: if other skg buffers have unsaved edits that this save's
+collateral rerenders might overwrite, warn loudly and ask before sending.
+Signals an error (aborting the save) if the user declines. Skipped in
+batch mode (`noninteractive'), where there is no user to ask -- and the
+over-warning is the accepted tradeoff (narrowing to the truly-affected set
+would need the slow SavePlan we don't have yet)."
+  (when (not noninteractive)
+    (let ((others (skg--other-unsaved-skg-buffers)))
+      (when others
+        (unless (yes-or-no-p
+                 (format
+                  "DANGER: %d other skg buffer(s) have unsaved edits (%s) this save may overwrite. Save anyway? "
+                  (length others)
+                  (mapconcat #'buffer-name others ", ")))
+          (error "Save aborted: other skg buffers have unsaved edits"))))))
+
 (defun skg-request-save-buffer ()
   "Send the current buffer contents to Rust for processing.
 Before sending, adds 'folded' markers to folded headlines and 'focused' marker to current headline.
-The server sends two LP messages:
-  1. Early lock message with collateral view URIs.
-  2. Full save response (content + errors + collateral updates).
+The server sends three LP messages around the save:
+  1. save-lock: early, broad lock (every buffer sharing a pid).
+  2. save-relax-lock: narrows the lock to the exact collateral set once
+     the SavePlan is known, plus a collateral-view per rerendered buffer.
+  3. save-result: the saved buffer's final content (+ errors/warnings).
 All skg buffers are locked immediately; non-collateral buffers are
-unlocked when the early response arrives."
+unlocked as save-lock / save-relax-lock / collateral-view arrive."
   (interactive)
+  (skg--confirm-save-despite-other-unsaved)
   (let ((focused-had-metadata ;; Whether the focused headline already has metadata. Storing this lets us clean up the bare (skg) that removal leaves behind.
          (save-excursion
            (org-back-to-heading t)
@@ -65,6 +97,20 @@ unlocked when the early response arrives."
        (lambda (_tcp-proc payload)
          (skg--save-lock-handler saved-uri save-buffer payload))
        t)
+      ;; save-relax-lock: same shape/handling as save-lock, but with the
+      ;; EXACT collateral set (post-SavePlan), so buffers locked early that
+      ;; aren't actually collateral get unlocked. The saved buffer stays
+      ;; locked (skg--unlock-non-collateral-buffers keeps saved-uri) until
+      ;; save-result. Registered NON-one-shot (like collateral-view) so it does
+      ;; NOT add to skg-lp--pending-count: an *invalid* save errors before the
+      ;; server reaches the point that emits save-relax-lock, so a one-shot
+      ;; count would leak (never decremented) and hang the next save's wait.
+      ;; save-result removes it.
+      (skg-register-response-handler
+       'save-relax-lock
+       (lambda (_tcp-proc payload)
+         (skg--save-lock-handler saved-uri save-buffer payload))
+       nil)
       (skg-register-response-handler
        'collateral-view
        (lambda (_tcp-proc payload)
@@ -165,6 +211,8 @@ Unlock must happen BEFORE `skg-handle-save-sexp' because
 which would trigger overlay modification-hooks if still present."
   (setq skg-response-handler-map
         (assoc-delete-all 'collateral-view skg-response-handler-map))
+  (setq skg-response-handler-map
+        (assoc-delete-all 'save-relax-lock skg-response-handler-map))
   (skg--end-stream)
   (unwind-protect
       (progn

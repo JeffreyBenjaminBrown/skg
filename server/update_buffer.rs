@@ -19,7 +19,7 @@ use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{ SaveResponse, compute_diff_for_every_source, deleted_ids_to_source};
 use crate::serve::protocol::TcpToClient;
-use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
+use crate::serve::util::{ format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::source_sets::{ActiveSourceSet, apply_source_set_to_viewforest};
 use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids_with_source_set;
 use crate::to_org::util::DefinitiveMap;
@@ -147,6 +147,16 @@ pub async fn update_views_after_save (
     let collateral_uris : Vec<ViewUri> =
       find_collateral_view_uris (
         uri, &define_nodes, views_state);
+    // plan_v2 §8.1 step 3: relax the early (broad) lock to the EXACT collateral
+    // set now that the SavePlan is known. Emacs keeps saved + these locked and
+    // unlocks everything else it locked early, so the user can edit truly-
+    // unaffected buffers during the rest of the pipeline. Symmetric with the
+    // save-lock message; sent before the collateral-view stream.
+    send_response_with_length_prefix (
+      stream,
+      & tag_sexp_response (
+        TcpToClient::SaveRelaxLock,
+        & format_lock_views_sexp ( &collateral_uris )));
     if collateral_uris . is_empty () {
       tracing::debug!("update_views_after_save: no collateral views");
     } else {

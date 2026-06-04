@@ -81,8 +81,13 @@ fn test_collateral_view_preserves_diff_annotations()
   //    There should be exactly one, for buffer 2.
   let mut reader : BufReader<TcpStream> =
     BufReader::new (read_end);
+  // The stream also carries a save-relax-lock message (plan_v2 §8.1) before
+  // the collateral-view(s); select the collateral-view by its response-type.
   let collateral_msgs : Vec<String> =
-    skg::test_utils::read_all_lp_messages (&mut reader);
+    skg::test_utils::read_all_lp_messages (&mut reader)
+    . into_iter ()
+    . filter ( |m| m . contains ("collateral-view") )
+    . collect ();
   assert_eq! ( collateral_msgs . len (), 1,
     "Expected 1 collateral view, got {}", collateral_msgs . len () );
   let body : &str = &collateral_msgs[0];
@@ -191,8 +196,13 @@ fn test_collateral_view_staged_text_and_unstaged_add()
 
   let mut reader : BufReader<TcpStream> =
     BufReader::new (read_end);
+  // The stream also carries a save-relax-lock message (plan_v2 §8.1) before
+  // the collateral-view(s); select the collateral-view by its response-type.
   let collateral_msgs : Vec<String> =
-    skg::test_utils::read_all_lp_messages (&mut reader);
+    skg::test_utils::read_all_lp_messages (&mut reader)
+    . into_iter ()
+    . filter ( |m| m . contains ("collateral-view") )
+    . collect ();
   assert_eq! ( collateral_msgs . len (), 1,
     "Expected 1 collateral view, got {}", collateral_msgs . len () );
   let body : &str = &collateral_msgs[0];

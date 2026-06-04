@@ -56,6 +56,7 @@ impl RequestType {
 pub enum TcpToClient {
   ContentView,
   SaveLock, // Sent before the expensive save pipeline. Lists collateral view URIs so Emacs can lock those buffers against edits while the save is in progress.
+  SaveRelaxLock, // Sent after the SavePlan is computed and the graph updated, before the collateral-view stream. Lists the now-narrowed still-locked set (the EXACT collateral set), symmetric with SaveLock, so Emacs unlocks every buffer it locked early that turned out not to be collateral. Lets the user edit those during the rest of the pipeline (plan_v2 §8.1).
   SaveResult,
   CollateralView, // One streamed collateral-view update during save. Sent per-view between SaveLock and SaveResult.
   CloseView,
@@ -84,6 +85,7 @@ impl TcpToClient {
     match self {
       TcpToClient::ContentView      => "content-view",
       TcpToClient::SaveLock         => "save-lock",
+      TcpToClient::SaveRelaxLock    => "save-relax-lock",
       TcpToClient::SaveResult       => "save-result",
       TcpToClient::CollateralView   => "collateral-view",
       TcpToClient::CloseView        => "close-view",

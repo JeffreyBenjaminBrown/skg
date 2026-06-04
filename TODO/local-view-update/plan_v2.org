@@ -1157,3 +1157,29 @@ Branch =local-view-updates=.
   SkgEnv) + a de-novo driver entry exposed from update_buffer; (4) containerward
   ancestry kept as a root-only post-step (already independent). Deferred pending
   Jeff's steer on scope/approach (see progress.org §7 + this entry).
+** Phase 6 (§8 locking) -- LANDED (the relax-lock message + the §8.4 handshake).
+  The conservative EARLY broad lock already existed (save_buffer.rs sends a
+  save-lock with uris_of_views_to_lock before the pipeline; the client locks all
+  skg buffers up front). This adds the two missing pieces:
+  - §8.1 step 3 RELAX: new TcpToClient::SaveRelaxLock ("save-relax-lock"), sent
+    from update_views_after_save right after find_collateral_view_uris (so the
+    EXACT collateral set is known) and before the collateral-view stream. Same
+    ((lock-views (...))) shape as save-lock. The Emacs handler is literally the
+    same as save-lock's (skg--save-lock-handler keeps saved + the listed set
+    locked, unlocks the rest), so buffers locked early that turned out not to be
+    collateral are freed for editing during the rest of the pipeline.
+    format_lock_views_sexp widened pub(super)->pub(crate) for update_buffer.
+  - §8.4 HANDSHAKE: before sending a save, skg--confirm-save-despite-other-unsaved
+    scans open skg buffers; if any OTHER is buffer-modified-p it warns loudly and
+    asks (yes-or-no-p), aborting on decline. Guarded by (not noninteractive) so
+    batch/integration Emacs never blocks; over-warning is the accepted tradeoff.
+  - PITFALL fixed: save-relax-lock must be registered NON-one-shot. An *invalid*
+    save errors before update_views_after_save, so the server never emits
+    save-relax-lock; a one-shot registration's skg-lp--pending-count increment
+    would then never be decremented and would hang the NEXT save's wait (this
+    actually broke valid_and_invalid_saves until fixed). Non-one-shot doesn't
+    touch the count; save-result also assoc-delete-all's it for hygiene.
+  - Tests: 3 collateral tests read the save stream and counted messages; they now
+    filter for the collateral-view response-type (the stream gained the
+    save-relax-lock message). Full Rust suite (52 ok-blocks) + all 27 integration
+    tests green.

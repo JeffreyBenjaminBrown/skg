@@ -194,6 +194,9 @@ async fn save_buffer_and_read_collateral_views (
   let collateral_views : Vec<String> =
     read_all_lp_messages (&mut reader)
     . into_iter()
+    // Skip the save-relax-lock message (plan_v2 §8.1); only collateral-views
+    // carry a content field.
+    . filter ( |msg| msg . contains ("collateral-view") )
     . map ( |msg|
       extract_string_field_from_sexp (&msg, "content")
       . unwrap_or_else (||
