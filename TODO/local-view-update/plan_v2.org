@@ -1123,3 +1123,37 @@ Branch =local-view-updates=.
   - STILL TODO after col-descent: AliasCol diff scaffold in the overlay
     (untested in either path today); delete the dormant inline diff; reduce the
     Vognode::DiffPhantom payload (§11/§6.3, the deferred phase-0c).
+** Phase 8 (§13 unify de-novo) -- SCOUTED, found to be a coordinated MONOLITH,
+  not the thin "stub + run the same driver" §13 implies. Two empirical attempts
+  (both reverted to green; nothing committed):
+  - The driver creates content children as *bare* nodes (mk_definitive_viewnode)
+    and never gives them relation cols; relation cols (Subscriber/Overrider/
+    Hider/Hidden/Overridden + SubscribeeCol) are added only at node *birth* by
+    build_node_branch_minus_content, which the de-novo path calls and the driver
+    does not. So a stub root expanded by the driver would LOSE all relation cols
+    -- the unification's core gap §13 did not name.
+  - Attempt 1 (call maybe_add_relation_col_branches on every Normal visit) broke
+    a unit test: it over-expands, giving a *subscribee member* (e.g. node r under
+    a SubscribeeCol) its OWN nested SubscribeeCol -- de-novo renders sharing-col
+    members bare. The correct rule is CONTEXTUAL: only content nodes/roots get
+    relation cols, not members under a PartnerCol.
+  - Attempt 2 (gate on "parent is not a PartnerCol") passed the full Rust suite
+    but BROKE THE SAVE ROUND-TRIP: the multi-root-save integration test failed
+    ("headline-types-and-titles mismatch" + "Save failed - Inconsistencies
+    Found"). Adding relation cols to fresh content during rerender produces a
+    buffer that does not cleanly re-save. So even the contextual driver change is
+    NOT a safe standalone increment -- it changes post-save buffer output and
+    intersects save validation.
+  CONCLUSION: phase 8 must be a single COORDINATED change (like the phase-2+4
+  monolith), done with the de-novo switch together, NOT as standalone driver
+  prep, and it needs: (1) the driver to create relation cols contextually for
+  fresh content *in a way that round-trips through save* (the save-validation
+  interaction must be understood first); (2) the §5.5 node_budget to REPLACE
+  de-novo's generation-based truncation (initial_view_bfs.rs + content_view.rs
+  node-limit tests assert the old per-generation/sibling-complete truncation and
+  will be rewritten to §5.5 per-child semantics -- a user-visible initial-view
+  truncation UX change, sanctioned by §13); (3) SkgEnv threaded into the de-novo
+  entry (multi_root_view takes driver/config/tantivy; CompletionContext needs
+  SkgEnv) + a de-novo driver entry exposed from update_buffer; (4) containerward
+  ancestry kept as a root-only post-step (already independent). Deferred pending
+  Jeff's steer on scope/approach (see progress.org §7 + this entry).
