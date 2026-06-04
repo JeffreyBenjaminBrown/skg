@@ -65,7 +65,7 @@ pub enum ViewNodeKind {
 #[derive( Debug, Clone, PartialEq )]
 pub enum Vognode {
   Normal   (TrueNode),
-  DiffPhantom (TrueNode), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO (plan_v2 §6.3/§11): reduce its payload -- a DiffPhantom needs no view requests, parentIs, birth, graphStats, or indef_or_def; only id/source/title + diff axes. Deferred to the phase-2/5 diff-overlay rework, where the phantom-handling code is rewritten and the reduction is low-risk.
+  DiffPhantom (TrueNode), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. NOTE (plan_v2 §6.3/§11, finding 2026-06-04): the planned payload reduction was found NOT worth doing -- a phantom genuinely uses parentIs (remove_branches_that_git_marked_removed) AND indef_or_def (its body() + is_indefinitive() read it; a phantom flipped from a Definitive node carries that body). Only view_requests/birth/graphStats/viewStats are unused on a phantom, so a reduction drops just 4 fields for a deep ~19-site refactor. Left as TrueNode. See plan_v2 §18.
   Inactive (InactiveNode), // From a source that is inactive (see "source sets").
   Unknown  (UnknownNode), // If it *ever* existed in the graph, Skg didn't find it.
   Deleted  (DeletedNode), // No longer exists in the graph.

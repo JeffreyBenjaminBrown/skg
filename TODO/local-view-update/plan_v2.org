@@ -1261,3 +1261,29 @@ Branch =local-view-updates=.
   reduction (§11 / phase-0c); should_sync_from_disk_even_though_definitive removal
   (§6.1/§8.3, Jeff's original §5 question -- belongs with the §12 context
   refinement); §5.5 col-node budget accounting (cols don't decrement node_budget).
+** Phase 8 + cleanups done; §8.3 should_sync REMOVED (Jeff's original §5 question
+  resolved -- every definitive node re-syncs from disk; CompletionMode + the
+  is_saved_view field deleted). With that, ALL of plan_v2 phases 0-8 plus the
+  meaningful cleanups are complete and validated (full Rust suite + 27 integration
+  tests green).
+** FINDING -- the §11/§6.3 DiffPhantom payload reduction is NOT worth doing; its
+  premise is partly wrong. The plan said a DiffPhantom "needs no view requests,
+  parentIs, birth, graphStats, or indef_or_def." I attempted the reduction
+  (DiffPhantom(TrueNode) -> DiffPhantom(DiffPhantomNode), ~19 sites) and found
+  that phantoms GENUINELY USE two of those: parentIs (read by
+  remove_branches_that_git_marked_removed in update_buffer.rs, to distinguish a
+  content phantom from others) and indef_or_def (a phantom's body() AND
+  is_indefinitive() both read it -- a phantom flipped from a Definitive Normal via
+  normal_to_phantom carries that node's body, and IndefOrDef::Indefinitive holds
+  no body). So only view_requests/birth/graphStats/viewStats safely drop -- 4
+  rarely-touched fields, for a deep ~19-site refactor (it breaks the
+  normal_or_phantom abstraction; every combined `Normal(t)|DiffPhantom(t)` arm
+  must split since the inner types differ). Low value, real behavior risk.
+  Reverted to green. RECOMMENDATION: leave DiffPhantom(TrueNode) as is, or do the
+  4-field reduction only as dedicated work if memory ever matters. The TODO on the
+  variant in server/types/viewnode.rs is corrected accordingly.
+** REMAINING deferred items, all deliberately low-value (none blocking): full §9
+  col-descent (sharing-col diff is inline via the sharing_diffs seam -- moving it
+  into the overlay would *duplicate* the col reconcilers, adding code, so not
+  worth it); §5.5 col-node budget accounting (cols create few nodes -- "revisit if
+  needed", §18). The substantive plan is COMPLETE.
