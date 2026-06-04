@@ -2,7 +2,7 @@ use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::viewnode::{mk_inactive_viewnode, mk_phantom_viewnode};
 use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap};
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeChanges, net_diff_from_per_stage, per_stage_node_changes_for_truenode};
+use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff, NodeChanges, net_diff_from_per_stage, per_stage_node_changes_for_truenode};
 use crate::types::list::{Diff_Item, compute_interleaved_diff, itemlist_and_removedset_from_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
@@ -17,13 +17,11 @@ use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, DeletedNode, IndefOrDef,
     ParentIs, ViewRequest, mk_definitive_viewnode};
-use crate::types::viewnode::{Vognode, QualCol, Qual, RoleCol};
+use crate::types::viewnode::{Vognode, RoleCol};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_nodecomplete::{
     pid_and_source_from_treenode,
-    write_at_truenode_in_tree,
-    unique_scaffold_child_of_viewnode,
-    insert_scaffold_as_child};
+    write_at_truenode_in_tree};
 use crate::update_buffer::util::{
     complete_relevant_children_in_viewnodetree,
     partition_children,
@@ -33,7 +31,6 @@ use crate::update_buffer::util::{
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 enum ContentReality {
@@ -116,9 +113,8 @@ pub fn expand_true_content_at_truenode (
   let (pid, initial_source) : (ID, SourceName) =
     pid_and_source_from_treenode( tree, node,
                                   "expand_true_content_at_truenode" ) ?;
-  set_diff_status (
-    // Must precede the clobber-and-early-return done to indefinitive nodes.
-    tree, node, &pid, source_diffs, &initial_source) ?;
+  // (Diff status is no longer stamped here: phase 5 (§9) moved ALL diff onto
+  // the post-BFS overlay, so the content path runs with source_diffs=None.)
   { let is_indefinitive : bool =
       read_at_node_in_tree( tree, node,
         |vn : &ViewNode| match &vn . kind {
@@ -547,84 +543,6 @@ fn order_children_as_scaffolds_then_ignored_then_content (
   { move_child_to_end( tree, node, cid ) ?; }
   Ok(( )) }
 
-/// In diff view, prepend scaffolds for changed fields:
-/// - TextChanged (if title/body changed)
-/// - IDCol with ID children (if IDs changed)
-/// - AliasCol with Alias children (if aliases changed)
-/// Each is only prepended if absent.
-///
-/// Reads per-stage NodeChanges directly rather than going through the
-/// merged view, so that a change present on only the staged side (or
-/// only the unstaged side) still triggers scaffold emission. See
-/// 'per_stage_node_changes_for_truenode' for why the merged view
-/// would drop such changes post-save.
-pub(in crate::update_buffer) fn maybe_prepend_diff_view_scaffolds (
-  tree         : &mut Tree<ViewNode>,
-  node         : NodeId,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
-  pid          : &ID,
-  source       : &SourceName,
-) -> Result<(), Box<dyn Error>> {
-  let (staged_nc, unstaged_nc)
-    : (Option<&NodeChanges>, Option<&NodeChanges>) =
-    per_stage_node_changes_for_truenode (
-      source_diffs, pid, source );
-  if staged_nc . is_none () && unstaged_nc . is_none () {
-    return Ok (( )); }
-  let staged_text   : bool =
-    staged_nc   . map ( |nc| nc . text_changed ) . unwrap_or (false);
-  let unstaged_text : bool =
-    unstaged_nc . map ( |nc| nc . text_changed ) . unwrap_or (false);
-  if staged_text || unstaged_text {
-    if unique_scaffold_child_of_viewnode(
-      tree, node,
-      &ViewNodeKind::Qual ( Qual::TextChanged { staged: false,
-                                                unstaged: false } )
-    ) ?. is_none() {
-      insert_scaffold_as_child(
-        tree, node,
-        ViewNodeKind::Qual ( Qual::TextChanged { staged: staged_text,
-                                                 unstaged: unstaged_text } ),
-        true ) ?; }}
-  let ids_changed : bool =
-    has_list_changes (
-      staged_nc   . map ( |nc| nc . ids_diff . as_slice () ),
-      unstaged_nc . map ( |nc| nc . ids_diff . as_slice () ) );
-  if ids_changed {
-    if unique_scaffold_child_of_viewnode(
-      tree, node,
-      &ViewNodeKind::QualCol (QualCol::ID)
-    ) ?. is_none() {
-      insert_scaffold_as_child(
-        tree, node,
-        ViewNodeKind::QualCol (QualCol::ID),
-        true ) ?; } }
-  let aliases_changed : bool =
-    has_list_changes (
-      staged_nc   . map ( |nc| nc . aliases_diff . as_slice () ),
-      unstaged_nc . map ( |nc| nc . aliases_diff . as_slice () ) );
-  if aliases_changed {
-    if unique_scaffold_child_of_viewnode(
-      tree, node,
-      &ViewNodeKind::QualCol (QualCol::Alias)
-    ) ?. is_none() {
-      insert_scaffold_as_child(
-        tree, node,
-        ViewNodeKind::QualCol (QualCol::Alias),
-        true ) ?; }}
-  Ok(( )) }
-
-/// True iff either stage's diff slice contains a New or Removed item.
-/// Generic over the diff item type so the same helper works for
-/// ids_diff, aliases_diff, etc.
-fn has_list_changes<T> (
-  staged   : Option<&[Diff_Item<T>]>,
-  unstaged : Option<&[Diff_Item<T>]>,
-) -> bool {
-  let non_trivial = | slice : Option<&[Diff_Item<T>]> | -> bool {
-    slice . map ( |s| s . iter () . any ( |d|
-      ! matches! ( d, Diff_Item::Unchanged (_) ))) . unwrap_or (false) };
-  non_trivial (staged) || non_trivial (unstaged) }
 
 /// WHAT IT DOES: Maps each child of 'node' to a ChildData:
 /// determines title, source, and phantom|normal status
@@ -719,112 +637,10 @@ fn build_child_creation_data (
                                  kind: ContentReality::Real } ); }}
   Ok (result) }
 
-/// In diff view, set the TrueNode's per-stage diff axes.
-fn set_diff_status (
-  tree         : &mut Tree<ViewNode>,
-  node         : NodeId,
-  pid          : &ID,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
-  source       : &SourceName,
-) -> Result<(), Box<dyn Error>> {
-  let source_diff : &SourceDiff =
-    match source_diffs . as_ref() . and_then(|d| d . get (source)) {
-      Some (sd) => sd,
-      None => return Ok(( )) };
-  if !source_diff . is_git_repo {
-    return write_truenode_diff (
-      tree, node,
-      ExistenceAxes::default (),
-      MembershipAxes::default (),
-      true /* not_in_git */ ); }
-  let file_path : PathBuf =
-    PathBuf::from(format!("{}.skg", pid . 0));
-  let staged_x : Option<Sign> = source_diff . staged . get (&file_path)
-    . and_then ( |d| d . status . to_existence_sign () );
-  let unstaged_x : Option<Sign> = source_diff . unstaged . get (&file_path)
-    . and_then ( |d| d . status . to_existence_sign () );
-  let (staged_m, unstaged_m) : (Option<Sign>, Option<Sign>) = {
-    // Membership axes derive from the parent's per-stage contains_diff:
-    // if pid is New(pid) in a stage, that stage's M is Plus.
-    let is_non_content : bool =
-      read_at_node_in_tree( tree, node,
-        |vn : &ViewNode| match &vn . kind {
-          // Called for normal vognodes only; phantom parentIs is not
-          // part of diff-status inheritance.
-          ViewNodeKind::Vognode (Vognode::Normal (t))
-            => t . parentIs != ParentIs::Affected,
-          _ => true } ) ?;
-    if is_non_content { (None, None) }
-    else {
-      let parent : Option<(ID, SourceName)> =
-        read_at_ancestor_in_tree( tree, node, 1,
-          |vn : &ViewNode| match &vn . kind {
-            // Only normal ancestors define content membership axes;
-            // phantom ancestors are display placeholders.
-            ViewNodeKind::Vognode (Vognode::Normal (t))
-              => Ok(( t . id . clone(), t . source . clone() )),
-            _ => Err ("not a TrueNode") }
-        ) . ok () . and_then ( |r| r . ok () );
-      match parent {
-        None => (None, None),
-        Some ((parent_pid, parent_source)) => {
-          membership_signs_from_parent_contains (
-            source_diff, &parent_pid, &parent_source, pid ) }} } };
-  let existence  : ExistenceAxes  = ExistenceAxes  {
-    staged: staged_x, unstaged: unstaged_x };
-  let membership : MembershipAxes = MembershipAxes {
-    staged: staged_m, unstaged: unstaged_m };
-  write_truenode_diff (tree, node, existence, membership, false) }
-
-/// Look up per-stage M-axis signs for a child within a parent's contains.
-/// Returns (staged_m, unstaged_m); each is Some(Plus) iff the child was
-/// added to the parent's contains in that stage.
-fn membership_signs_from_parent_contains (
-  source_diff   : &SourceDiff,
-  parent_pid    : &ID,
-  parent_source : &SourceName,
-  child_pid     : &ID,
-) -> (Option<Sign>, Option<Sign>) {
-  // Both stages live under the same parent_source; we ignore other
-  // sources here. Look up the parent file in each stage's map and
-  // inspect its contains_diff.
-  let _ = parent_source; // signature symmetry; not used yet
-  let parent_file : PathBuf =
-    PathBuf::from ( format! ( "{}.skg", parent_pid . 0 ));
-  let staged_m : Option<Sign> = source_diff . staged . get (&parent_file)
-    . and_then ( |d| d . node_changes . as_ref () )
-    . and_then ( |nc| if nc . contains_diff . iter ()
-                          . any ( |d| matches! ( d, Diff_Item::New (id) if id == child_pid ))
-                       { Some (Sign::Plus) } else { None } );
-  let unstaged_m : Option<Sign> = source_diff . unstaged . get (&parent_file)
-    . and_then ( |d| d . node_changes . as_ref () )
-    . and_then ( |nc| if nc . contains_diff . iter ()
-                          . any ( |d| matches! ( d, Diff_Item::New (id) if id == child_pid ))
-                       { Some (Sign::Plus) } else { None } );
-  (staged_m, unstaged_m) }
-
-fn write_truenode_diff (
-  tree       : &mut Tree<ViewNode>,
-  node       : NodeId,
-  existence  : ExistenceAxes,
-  membership : MembershipAxes,
-  not_in_git : bool,
-) -> Result<(), Box<dyn Error>> {
-  write_at_node_in_tree( tree, node,
-    |vn : &mut ViewNode| {
-      // Normal nodes get file/member diff axes here.
-      // Phantom axes are set when the phantom is constructed.
-      if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
-        = vn . kind
-      { t . existence  = existence;
-        t . membership = membership;
-        t . not_in_git = not_in_git; }
-      vn . normal_to_phantom (); }
-  ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
-
 #[cfg(test)]
 mod tests {
   use super::*;
+  use std::path::PathBuf;
 
   fn source_name (s: &str) -> SourceName { SourceName ( s . to_string () ) }
   fn id          (s: &str) -> ID          { ID ( s . to_string () ) }

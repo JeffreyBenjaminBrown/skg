@@ -20,7 +20,7 @@ use super::complete_postorder::hiddeninsubscribee_col::reconcile_hiddenin_subscr
 use super::complete_postorder::hiddenoutsideof_subscribeecol::reconcile_hiddenoutside_subscribee_col_children;
 use super::complete_preorder::relation_col::reconcile_relation_col_children;
 use super::complete_preorder::subscribee_col::reconcile_subscribee_col_children;
-use super::complete_preorder::truenode::{ expand_true_content_at_truenode, maybe_prepend_diff_view_scaffolds};
+use super::complete_preorder::truenode::expand_true_content_at_truenode;
 
 use ego_tree::{Tree, NodeId};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -229,24 +229,16 @@ async fn visit_normal_node (
       context . active_source_set, context . is_saved_view,
       settled, cascade, &mut context . node_budget ) ?; }
   // The steps below apply only while the node is still a Normal vognode:
-  // content reconcile may have converted it to Deleted, or set_diff_status
-  // to a DiffPhantom.
+  // content reconcile may have converted it to Deleted (a node this save
+  // deleted). (It is no longer flipped to a DiffPhantom here -- that is the
+  // post-BFS diff overlay's job now, §9.)
   let still_normal : bool =
     read_at_node_in_tree ( tree, treeid,
       |vn : &ViewNode| matches! ( &vn . kind,
         ViewNodeKind::Vognode (Vognode::Normal (_)) ) ) ?;
   if ! still_normal { return Ok (( )); }
-  // Diff scaffolds for a definitive, non-phantom node (was ensure_diff_scaffolds).
-  let ready : Option<(ID, SourceName)> =
-    read_at_node_in_tree ( tree, treeid,
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t))
-          if ! t . should_be_phantom () && ! t . is_indefinitive () =>
-            Some (( t . id . clone (), t . source . clone () )),
-        _ => None } ) ?;
-  if let Some ((pid, source)) = ready {
-    maybe_prepend_diff_view_scaffolds (
-      tree, treeid, context . source_diffs, &pid, &source ) ?; }
+  // (Diff scaffolds -- TextChanged / IDCol / AliasCol -- are no longer emitted
+  // here: phase 5 (§9) moved them onto the post-BFS diff overlay.)
   // Remaining view requests (Aliases / Containerward / Sourceward); the
   // Definitive request was already consumed by apply_definitive_draw_rule.
   super::complete_postorder::truenode::execute_truenode_view_requests (
