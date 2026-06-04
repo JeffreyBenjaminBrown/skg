@@ -10,7 +10,8 @@
 /// child but the worktree's parent.contains lacks it.
 
 use crate::types::env::find_source_with_optional_tantivy;
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges, axes_from_per_stage_diffs};
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges, axes_from_per_stage_diffs, net_diff_from_per_stage};
+use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::phantom::title_for_phantom;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, mk_phantom_viewnode };
@@ -129,11 +130,41 @@ fn process_truenode_diff (
       unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
   mark_membership_on_existing_children (
     &mut node_mut, tree_node_id, &merged_contains );
+  // Net HEAD->worktree contains order: the same ordered list the inline
+  // post-save path builds (via content_goal_list), so a removed-member
+  // phantom lands at its correct HEAD position among surviving siblings
+  // rather than being blindly prepended.
+  let net_contains : Vec<Diff_Item<ID>> =
+    net_diff_from_per_stage (
+      staged_changes   . map ( |c| c . contains_diff . as_slice () ),
+      unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
+  let membership_by_id : HashMap<ID, MembershipAxes> =
+    merged_contains . iter () . cloned () . collect ();
   insert_phantoms_for_missing_contains (
-    &mut node_mut, &merged_contains,
+    &mut node_mut, tree_node_id, &net_contains, &membership_by_id,
     source_diff, source_diffs,
     deleted_since_head_pid_src_map, tantivy_index, config ) ?;
   Ok (( )) }
+
+/// Decide where each removed-member phantom belongs among its surviving
+/// siblings: insert it immediately before the *next* surviving child in
+/// net HEAD->worktree order, or append it (anchor = None) when no surviving
+/// child follows. Returns (removed_id, anchor_id) pairs in the order the
+/// phantoms should be created, so consecutive removals before the same
+/// survivor keep their relative order.
+fn phantom_insertion_plan (
+  net_contains : &[Diff_Item<ID>],
+) -> Vec<(ID, Option<ID>)> {
+  let mut plan : Vec<(ID, Option<ID>)> = Vec::new ();
+  let mut next_survivor : Option<ID> = None;
+  for item in net_contains . iter () . rev () {
+    match item {
+      Diff_Item::Unchanged (id) | Diff_Item::New (id)
+        => { next_survivor = Some ( id . clone () ); },
+      Diff_Item::Removed (id)
+        => { plan . push ( ( id . clone (), next_survivor . clone () )); }, }}
+  plan . reverse ();
+  plan }
 
 /// Prepend an IDCol scaffold populated with per-id ID scaffolds.
 fn prepend_idcol_with_children (
@@ -193,41 +224,113 @@ fn mark_membership_on_existing_children (
         if m . unstaged == Some (Sign::Plus)
           { membership . unstaged = Some (Sign::Plus); }}}} }
 
-/// Insert phantoms for IDs that appear in the merged contains diff with
-/// any '-' (Removed) sign on any stage. These are positions missing
-/// from worktree.contains. Each phantom carries the appropriate M axes
-/// (and X axes if its file is also gone in some stage).
+/// Insert a removed-member phantom for each net-Removed id in the parent's
+/// contains diff (ids present in HEAD but absent from worktree.contains).
+/// Each phantom is placed at its correct HEAD position among surviving
+/// siblings (per 'phantom_insertion_plan'), carrying its M axes (from the
+/// merged contains diff) and X axes (if its file is also gone in some stage).
 fn insert_phantoms_for_missing_contains (
   node_mut                       : &mut NodeMut<ViewNode>,
-  merged_contains                : &[(ID, MembershipAxes)],
+  parent_node_id                 : NodeId,
+  net_contains                   : &[Diff_Item<ID>],
+  membership_by_id               : &HashMap<ID, MembershipAxes>,
   source_diff                    : &SourceDiff,
   source_diffs                   : &HashMap<SourceName, SourceDiff>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   tantivy_index                  : Option<&TantivyIndex>,
   config                         : &SkgConfig,
 ) -> Result<(), String> {
-  for (id, membership) in merged_contains {
-    let has_negative : bool =
-      membership . staged   == Some (Sign::Minus)
-      || membership . unstaged == Some (Sign::Minus);
-    if ! has_negative { continue; }
+  let plan : Vec<(ID, Option<ID>)> =
+    phantom_insertion_plan (net_contains);
+  if plan . is_empty () { return Ok (( )); }
+  // Map each surviving child's id to its NodeId, so an anchor id resolves
+  // to the tree node we insert the phantom before.
+  let child_node_by_id : HashMap<ID, NodeId> = {
+    let node_ref : NodeRef<ViewNode> =
+      node_mut . tree () . get (parent_node_id) . unwrap ();
+    let mut m : HashMap<ID, NodeId> = HashMap::new ();
+    for c in node_ref . children () {
+      match &c . value () . kind {
+        ViewNodeKind::Vognode (Vognode::Normal (t)
+                               | Vognode::DiffPhantom (t))
+          => { m . insert ( t . id . clone (), c . id () ); },
+        ViewNodeKind::Vognode (Vognode::Inactive (i))
+          => { m . insert ( i . id . clone (), c . id () ); },
+        _ => {}, }}
+    m };
+  for (id, anchor) in plan {
+    let membership : MembershipAxes =
+      membership_by_id . get (&id) . copied () . unwrap_or_default ();
     let child_source : SourceName =
       find_source_with_optional_tantivy (
-        id, deleted_since_head_pid_src_map,
+        &id, deleted_since_head_pid_src_map,
         tantivy_index, config )
         . ok_or_else ( || format! (
           "find_source: no source for {}", id . 0 )) ?;
     let child_existence : ExistenceAxes =
-      existence_axes_for_phantom (id, &child_source, source_diff, source_diffs);
+      existence_axes_for_phantom (&id, &child_source, source_diff, source_diffs);
     let child_title : String =
       title_for_phantom (
-        id, &child_source,
+        &id, &child_source,
         Some (source_diffs), config );
-    node_mut . prepend (
+    let phantom : ViewNode =
       mk_phantom_viewnode (
         id . clone (), child_source, child_title,
-        child_existence, *membership )); }
+        child_existence, membership );
+    match anchor . and_then ( |a| child_node_by_id . get (&a) . copied () ) {
+      Some (anchor_nid) =>
+        { node_mut . tree () . get_mut (anchor_nid) . unwrap ()
+            . insert_before (phantom); },
+      None =>
+        { node_mut . tree () . get_mut (parent_node_id) . unwrap ()
+            . append (phantom); }, }}
   Ok (( )) }
+
+#[cfg(test)]
+mod phantom_insertion_plan_tests {
+  use super::*;
+
+  fn id (s: &str) -> ID { ID ( s . to_string () ) }
+
+  #[test]
+  fn removed_anchors_to_the_next_survivor () {
+    // HEAD [a, gone, b] -> worktree [a, b]: the phantom 'gone' sits
+    // between its surviving siblings, not at the front.
+    let net = vec! [
+      Diff_Item::Unchanged (id ("a")),
+      Diff_Item::Removed   (id ("gone")),
+      Diff_Item::Unchanged (id ("b")) ];
+    assert_eq! ( phantom_insertion_plan (&net),
+                 vec! [ ( id ("gone"), Some (id ("b")) ) ] ); }
+
+  #[test]
+  fn trailing_removed_appends () {
+    // HEAD [a, gone] -> worktree [a]: nothing survives after 'gone',
+    // so it appends (anchor None).
+    let net = vec! [
+      Diff_Item::Unchanged (id ("a")),
+      Diff_Item::Removed   (id ("gone")) ];
+    assert_eq! ( phantom_insertion_plan (&net),
+                 vec! [ ( id ("gone"), None ) ] ); }
+
+  #[test]
+  fn consecutive_removed_keep_order_before_shared_anchor () {
+    // HEAD [x, y, s] -> worktree [s]: x then y, both before s.
+    let net = vec! [
+      Diff_Item::Removed   (id ("x")),
+      Diff_Item::Removed   (id ("y")),
+      Diff_Item::New       (id ("s")) ];
+    assert_eq! ( phantom_insertion_plan (&net),
+                 vec! [ ( id ("x"), Some (id ("s")) ),
+                        ( id ("y"), Some (id ("s")) ) ] ); }
+
+  #[test]
+  fn no_removals_is_empty_plan () {
+    let net = vec! [
+      Diff_Item::Unchanged (id ("a")),
+      Diff_Item::New       (id ("b")) ];
+    assert! ( phantom_insertion_plan (&net) . is_empty () ); }
+}
 
 /// Compute existence axes for a phantom: derived from whether the
 /// child's '.skg' file shows up as Deleted in either stage.
