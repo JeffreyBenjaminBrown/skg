@@ -680,3 +680,66 @@ phase -- the driver then owns "produce the diff view," the standalone overlay is
 deleted, and §9's safety holds (diff still after completion, but now inside the
 one local entry point, not a caller-invoked post-pass). The latter is what I lean
 to; flagging because it is closer to approach (b) than the (a) you picked.
+
+*** DECIDED: Option B (true per-node-inline diff). Implementation plan.
+After the hey-jeff.org dialog, Jeff chose B and resolved its only wrinkle: a
+flipped node's cols self-deaden via each col's existing generalized-orphan check
+(no new mechanism). He also correctly noted Option A is a SECOND FULL TRAVERSAL
+(=apply_diff_to_viewforest= = =do_everywhere_in_tree_dfs= over the whole forest),
+so A is not actually local. B it is. Key enabling finding: the QualCol reconcilers
+(=reconcile_id_col_children=, =reconcile_alias_col_children=) RETAINED their
+diff-awareness -- they already take =source_diffs= and build diff entries via
+=axes_from_per_stage_diffs=. So B redistributes the overlay's pieces back into the
+(mostly still diff-aware) BFS reconcilers rather than rewriting from scratch.
+
+**** the pieces of process_truenode_diff and where each goes inline
+process_truenode_diff (server/to_org/render/diff.rs) does, per Normal node:
+1. stamp existence axes (staged_x/unstaged_x) from file status
+2. flip to phantom (normal_to_phantom)
+3. not_in_git flag when source isn't a git repo
+4. prepend TextChanged scaffold when title/body changed
+5. prepend IDCol + children from ids_diff   -> reconcilers already diff-aware
+6. prepend AliasCol + children from aliases_diff -> reconcilers already diff-aware
+7. mark membership (+) on existing content children from contains_diff
+8. insert removed-member content phantoms at correct positions (phantom_insertion_plan)
+Inline destinations (all at the node's own BFS visit, after content reconcile):
+- 1,2,3,4,7,8 belong in the CONTENT path (expand_true_content_at_truenode /
+  visit_normal_node): stamp axes, mark child membership, insert content phantoms,
+  emit TextChanged, then flip LAST (so the node is Normal throughout its own
+  content reconcile; its cols self-deaden at their later visits).
+- 5,6: ensure an IDCol/AliasCol scaffold exists when ids_diff/aliases_diff is
+  non-empty, then let the existing diff-aware reconcilers populate them. Need to
+  confirm whether normal completion already creates these scaffolds; if not, add a
+  "create-if-diff" step (the only genuinely new inline code).
+
+**** open question to resolve first (cheap, do before touching anything)
+Does the CONTENT reconcile already create removed-member phantoms + stamp axes
+when given source_diffs = Some? (truenode.rs content_goal_list takes source_diffs;
+content path currently runs with None.) If those branches are intact, step 8 is
+mostly "pass real source_diffs"; if deleted, step 8 must be re-added. Determine
+this by reading content_goal_list + complete_content_children with source_diffs.
+
+**** sequencing + safety
+1. Thread real source_diffs into the CONTENT path of the driver context (both
+   de-novo render_initial_view_via_driver and post-save rerender_view). Keep
+   sharing_diffs as-is.
+2. Add/confirm the inline steps above in the content + qualcol reconcilers,
+   reusing the diff.rs helpers (axes_from_per_stage_diffs, phantom_insertion_plan,
+   existence_axes_for_phantom, phantom_axes, title_for_phantom). Move helpers out
+   of diff.rs into a shared module as needed; do NOT duplicate.
+3. Flip LAST in visit_normal_node (after content + scaffolds), so cols self-deaden
+   at their own later visits.
+4. Delete apply_diff_to_viewforest + its two call sites (content_view.rs:124,
+   update_buffer.rs:332). Keep the post-BFS steps that are NOT diff
+   (mark_view_roots_parent_absent, validate_parentIs_relationships,
+   attach_containerward_ancestries_to_removedhere_phantoms, stats).
+5. Run cargo + integration. EXPECT some GIT_DIFF_VIEW fixtures to re-baseline
+   (cols no longer shown under a flipped phantom; possibly the #1 membership-axis
+   fix changing sharing-col removed markers). Inspect EACH re-baseline to confirm
+   it is the intended bugfix, not a regression, before accepting.
+6. Opportunistically fix #1 (sharing-col member M axis against its own relation)
+   since each reconciler now holds its relation locally -- but only if it falls
+   out cleanly; otherwise leave the logged #1 TODO.
+This reverses §9 and re-baselines the shared oracle, so it is being done as
+deliberate, reviewable work rather than rushed. Status: plan recorded; ready to
+execute.
