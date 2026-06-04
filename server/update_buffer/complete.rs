@@ -11,7 +11,8 @@ use crate::to_org::util::DefinitiveMap;
 use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
-use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, write_at_node_in_tree};
+use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree};
+use crate::to_org::complete::sharing::maybe_add_relation_col_branches;
 use crate::update_buffer::ancestry::{ col_is_generalized_orphan, deaden_generalized_orphan_col, is_col_kind};
 use crate::update_buffer::util::detach_scaffold_transferring_focus;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol, ViewRequest, IndefOrDef, DeletedNode};
@@ -55,6 +56,14 @@ pub(super) struct CompletionContext<'a> {
   /// cascade stops). Unifies what was extendDefinitiveSubtreeFromLeaf's
   /// per-DVR limit. The diff overlay is exempt (§5.5).
   pub(super) node_budget                    : usize,
+  /// Phase 8 (§13): true only for a DE-NOVO (initial) render driven through
+  /// this driver. When set, a fresh CONTENT node (parent is not a PartnerCol)
+  /// gets its relation cols created at its visit, the way
+  /// build_node_branch_minus_content does at node birth in the old de-novo BFS.
+  /// FALSE for post-save rerender, where relation cols are already present in
+  /// the saved buffer and re-creating them would change the buffer and break the
+  /// save round-trip (plan_v2 §18). So post-save stays byte-identical.
+  pub(super) create_relation_cols_for_fresh_nodes : bool,
 }
 
 pub(super) async fn complete_viewforest (
@@ -237,6 +246,22 @@ async fn visit_normal_node (
       |vn : &ViewNode| matches! ( &vn . kind,
         ViewNodeKind::Vognode (Vognode::Normal (_)) ) ) ?;
   if ! still_normal { return Ok (( )); }
+  // Phase 8 (§13): for a DE-NOVO render, create this node's relation cols the
+  // way build_node_branch_minus_content does at node birth, so the one driver
+  // can expand a bare stub. Only CONTENT nodes/roots get them (a sharing-col
+  // MEMBER is rendered bare), so gate on "parent is not a PartnerCol";
+  // maybe_add_relation_col_branches is itself idempotent + skips empties. OFF
+  // for post-save (flag false), keeping that path byte-identical.
+  if context . create_relation_cols_for_fresh_nodes {
+    let parent_is_partner_col : bool =
+      read_at_ancestor_in_tree ( tree, treeid, 1,
+        |vn : &ViewNode| matches! ( &vn . kind,
+          ViewNodeKind::PartnerCol (_) ) )
+      . unwrap_or (false);
+    if ! parent_is_partner_col {
+      maybe_add_relation_col_branches (
+        tree, treeid, &context . env . config,
+        &context . env . driver ) . await ?; } }
   // (Diff scaffolds -- TextChanged / IDCol / AliasCol -- are no longer emitted
   // here: phase 5 (§9) moved them onto the post-BFS diff overlay.)
   // Remaining view requests (Aliases / Containerward / Sourceward); the

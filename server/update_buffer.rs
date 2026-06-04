@@ -282,7 +282,10 @@ pub async fn rerender_view (
       deleted_by_this_save_pids      : &context . deleted_by_this_save_pids,
       active_source_set              : context . active_source_set,
       is_saved_view,
-      node_budget                    : context . env . config . initial_node_limit, };
+      node_budget                    : context . env . config . initial_node_limit,
+      // Post-save reuses the saved buffer's relation cols; do not re-create them
+      // (that would change the buffer and break the save round-trip, §18).
+      create_relation_cols_for_fresh_nodes : false, };
     complete_viewforest (
       viewforest, &mut completion_context ) . await ?; }
   if let Some ( ref source_diffs ) = context . source_diffs {
