@@ -375,15 +375,16 @@ monolith. Categorized below at Jeff's request.
   on read-the-code confidence, not tests. A future Emacs-driving test could pin it.
 - save-relax-lock NON-one-shot is a slight asymmetry vs the one-shot save-lock --
   a workaround for the pending-count mechanism, not a clean symmetry.
-- (3) is only PARTIAL cleanup: content_goal_list / build_child_creation_data /
-  reconcile_content_children still carry dead diff branches and a source_diffs
-  param that is always None -- the content path LOOKS diff-aware but isn't. Left
-  because phase 8 rewrites that area.
 - Carried over from session 1, still imperfect: sharing-col diff is still INLINE
   (the two-field sharing_diffs seam) -- PARTIAL §9; the overlay does not descend
   through cols. And the low-frequency PRE-EXISTING parallel-test flake in
   tests/git_diff_view (shared TypeDB + process-global graph) remains; serial +
   integration are 100% green.
+*** TODO We just get these later, right?
+- (3) is only PARTIAL cleanup: content_goal_list / build_child_creation_data /
+  reconcile_content_children still carry dead diff branches and a source_diffs
+  param that is always None -- the content path LOOKS diff-aware but isn't. Left
+  because phase 8 rewrites that area.
 - §6.5 is only the member/convert half; Unknowns are not even CREATED on rerender
   yet (§7.6), so the case it handles is rare today, and its 2 tests exercise the
   helper directly, not an end-to-end carried-over Unknown.
@@ -409,3 +410,142 @@ monolith. Categorized below at Jeff's request.
   set (saved + exact collateral) and the client unlocks everything else;
   save-result is the final unlock. Any future change to collateral selection
   (find_collateral_view_uris) flows automatically into the relax set.
+
+* 9. Discussion
+** How do phantoms use parentIs and indef_or_def?
+Two real decisions read these off a =Vognode::DiffPhantom=. (When I first called
+the §11 reduction "not worth it" I was right that the plan's premise was wrong,
+but I should have named the exact decisions -- here they are.)
+
+*** parentIs -- one decision, and it genuinely varies
+=remove_branches_that_git_marked_removed= (server/update_buffer.rs ~462), run by
+=strip_stale_diff_state= at the very start of every =rerender_view=, walks the
+incoming buffer and DETACHES a phantom branch iff:
+#+begin_src rust
+  ViewNodeKind::Vognode (Vognode::DiffPhantom (t)) =>
+    ! is_viewforest_root_child
+    && t . parentIs == ParentIs::Affected,
+#+end_src
+Its own docstring states the rule: "Does not strip: top-level branches (forest
+roots); non-content nodes (parentIs != Affected)." The point is to throw away
+STALE diff phantoms so the diff overlay can regenerate fresh ones -- but only the
+CONTENT ones (parentIs=Affected). A phantom the user dragged out of content
+position (parentIs=Independent), or a phantom that is itself a view root
+(parentIs=Absent), is preserved. So the decision genuinely varies by parentIs:
+=Affected= phantom -> stripped + regenerated; =Independent=/=Absent= phantom ->
+kept. A phantom can be non-Affected because =normal_to_phantom= clones the flipped
+node's parentIs, and =mark_view_roots_parent_absent= can leave a root phantom Absent.
+
+**** TODO phantoms should be stripped regardless of their relation to parent
+If they have children, they should be demoted to DeadScaffold;
+otherwise, deleted.
+This is a behavior change, yes, but also a bugfix.
+In particular,
+a phantom in the wrong place is pointless and dangerous (confusing).
+
+*** indef_or_def -- read by the renderer, in two places
+A phantom is rendered by =true_node_metadata_to_string= (server/org_to_text.rs;
+the =Normal | DiffPhantom= arm at ~161 feeds the phantom's TrueNode to it). That
+function reads =indef_or_def= twice:
+1. =org_to_text.rs:324= -- =if true_node.is_indefinitive() { push "indef" }=.
+   =is_indefinitive()= is =matches!(indef_or_def, Indefinitive)=. So the phantom's
+   =indef_or_def= decides whether the =indef= marker appears in its metadata sexp
+   (e.g. =(skg (node (id gets-removed) (source main) indef (unstaged removedX
+   removedM)))=).
+2. =org_to_text.rs:110,128= -- =let body = viewnode.body(); if Some(body) { render
+   it }=. =ViewNode::body()= reads the phantom's TrueNode body, which lives inside
+   =indef_or_def= (=Definitive { body }= vs =Indefinitive= which holds no body).
+   So the phantom's =indef_or_def= decides whether its body text is rendered.
+
+The value is NOT constant across phantoms. The two phantom constructors differ:
+- A REMOVED-MEMBER phantom (=mk_phantom_viewnode=, e.g. a dropped =contains= entry)
+  is =Indefinitive= -- so it shows =indef= and no body. This is what all the
+  =tests/git_diff_view= fixtures exercise.
+- A phantom FLIPPED from a live node (=normal_to_phantom=, when a worktree-present
+  content node is staged-removed from its parent) inherits that node's
+  =indef_or_def=, which can be =Definitive { body }= -- so it would render WITHOUT
+  =indef= and WITH its body.
+
+**** TODO We can safely let go of both distinctions.
+There's no need to render a phantom's body text --
+we presume the person using git diff view understands git,
+and there's already a command to view the node in magit.
+And a phantom should never be the definitive instance of a node.
+If it's Removed, it has nothing to define,
+and if it's RemovedHere, it's dangerously confusing to the user
+("edit this node in a place where it isn't").
+*** Bottom line for the reduction
+The §11 plan said a DiffPhantom needs "no parentIs ... no indef_or_def." That is
+the part that's wrong: both are read, and parentIs genuinely changes a strip
+decision. A reduction is still *possible*, but it would have to (a) keep parentIs,
+and (b) either keep indef_or_def or replace it with an explicit =body: Option<String>=
+plus a hardcoded =is_indefinitive=true= (only valid if flipped-Definitive phantoms
+never reach the renderer -- which I did not prove). So it drops at most
+=view_requests / birth / graphStats / viewStats= -- 4 fields nothing reads on a
+phantom -- across a ~19-site refactor that breaks the =normal_or_phantom=
+abstraction. I judged that trade poor, but it's a judgment, not an impossibility;
+happy to do the 4-field version if you want the type honesty.
+
+** What do you mean by "moving sharing-col diff from inline into the overlay"?
+Background: git-diff used to be computed two different ways; phase 5 (§9)
+converged the CONTENT/scaffold part onto ONE post-pass, =apply_diff_to_viewforest=
+(the "overlay"). It runs after the main BFS and, per Normal node, stamps the diff
+axes, injects removed-member CONTENT phantoms, and emits the TextChanged/IDCol/
+AliasCol scaffolds.
+
+But the SHARING cols -- SubscribeeCol, HiddenInSubscribeeCol,
+HiddenOutsideOfSubscribeeCol, and the relation cols -- compute THEIR diff a
+different way: INLINE, during the main BFS. When the driver visits a SubscribeeCol
+it runs =reconcile_subscribee_col_children=, which calls =goal_list_for_subscribee_col=;
+that returns =(goal_list, removed_ids)=, and the removed ones (a subscription
+dropped since HEAD, an un-hidden node, a dropped relation member) become phantoms
+right there via =build_child_data=. I wired this with a second CompletionContext
+field, =sharing_diffs= (the real diffs), distinct from =source_diffs= (=None= on
+the content path so the overlay owns content diff). That's the "inline" path.
+
+So "the overlay does not descend through its cols" (the §9 wording) means: the
+single overlay pass touches Normal nodes but not the cols hanging off them. "Moving
+sharing-col diff into the overlay" = making =apply_diff_to_viewforest= ALSO walk
+into each Normal node's cols and inject their removed-member phantoms there, so the
+col reconcilers would stop doing it and =sharing_diffs= could go away -- "one
+overlay does all diff," which is what §9 literally asks for.
+
+Why I called it not-worth-it: the overlay would have to RE-DO the col reconcilers'
+work -- the same =goal_list_for_*= + =build_child_data= it already runs inline.
+That's duplicating ~four reconcilers' setup (read the subscriber/subscribee pids
+and worktree members, diff vs HEAD, build phantom child-data) in a second place,
+i.e. it ADDS code for an architectural-purity win, with no user-visible change.
+The inline version reuses the reconcilers and already works (validated by
+git-diff-view-updates + the magit integration tests). That's the trade I was
+describing. (If you'd rather have the clean one-overlay shape anyway -- e.g.
+because phase 8 now routes everything through the one driver and you want the diff
+story equally unified -- say so and I'll do it; it's a refactor, not a risk.)
+
+*** TODO yes, coupling those does seem better
+But if that's how we're doing some of the diff calculation locally that way,
+can we do all of it locally?
+That seems easier for a reader to understand.
+This is lower priority than refactoring Phantom.
+
+** extending the col budget is NOT low value -- you're right; I implemented it
+You're correct and my "low value" call was wrong. The premise I leaned on (§18:
+"cols create few nodes") is false exactly in the case you named: a famous node
+that thousands of people subscribe to. Concretely =reconcile_relation_col_children=
+does
+#+begin_src rust
+  let goal_list : Vec<ID> = graph_snap . other_member_pids (&owner_pid, owner_role);
+  // ... then creates a child ViewNode for EVERY id in goal_list
+#+end_src
+=other_member_pids= returns ALL subscribers (or all members of any relation), with
+NO budget check -- so opening that node would try to render thousands of member
+ViewNodes, and the §5.5 node limit (which only ever counted CONTENT children)
+would not stop it. Same risk for a SubscribeeCol with thousands of subscriptions
+and for the Hidden* cols. That's a real DoS-shaped blowup, not a niche.
+
+So I threaded the §5.5 =node_budget= through the four sharing-col reconcilers and
+cap their goal lists against it (existing members and removed-member phantoms stay
+free, exactly as for content; genuinely-new members decrement the budget and the
+rest are not drawn). Now a 10,000-subscriber col truncates at the budget like any
+other generation. The id/alias cols stay unbudgeted: they're bounded by a node's
+own id/alias count, which is small by construction. Details in the commit after
+this doc + plan_v2 §18.

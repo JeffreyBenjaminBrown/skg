@@ -236,7 +236,7 @@ fn reconcile_content_children (
   // §5.5: cap how many *new* content children this node may create against
   // the per-buffer budget (existing children and diff phantoms are free).
   let goal_list : Vec<ID> =
-    cap_content_goal_to_budget(
+    cap_goal_list_to_budget(
       tree, node, &goal_list, &removed_ids, node_budget );
   // A content child this save deleted is no longer detached here (the former
   // detach_stale_deleted_content stopgap is gone, death-leafward build order
@@ -277,14 +277,20 @@ fn convert_nonmember_unknown_children_to_dead (
     |vn : &mut ViewNode| { vn . kind = ViewNodeKind::DeadScaffold; },
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
 
-/// §5.5 node-limit: cap a content goal list so this node creates at most
-/// `*node_budget` *new* content children (ids not already present as
+/// §5.5 node-limit: cap a goal list so this scaffold creates at most
+/// `*node_budget` *new* TrueNode children (ids not already present as
 /// children). Existing children cost nothing (no new node), and removed-id
 /// diff phantoms are exempt (the diff overlay is not budget-bound, §5.5), so
 /// both are always kept. Decrements `*node_budget` by the number of new ids
 /// kept and drops the rest from the goal list (so they are simply not
 /// created -- and, in a cascade, not expanded). Preserves order.
-fn cap_content_goal_to_budget (
+///
+/// Shared by content reconciliation (here) and the four sharing-col
+/// reconcilers (§18): a famous node's relation/subscribee col can list
+/// thousands of unbounded members, so cols must spend the same budget as
+/// content rather than draw every member. The id/alias cols stay unbudgeted --
+/// they are bounded by a node's own id/alias count.
+pub(in crate::update_buffer) fn cap_goal_list_to_budget (
   tree        : &Tree<ViewNode>,
   node        : NodeId,
   goal_list   : &[ID],

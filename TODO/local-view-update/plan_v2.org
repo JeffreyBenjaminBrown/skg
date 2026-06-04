@@ -954,10 +954,17 @@ Branch =local-view-updates=.
   subscribee's HiddenInSubscribeeCol; cols reconcile at their own visit. The
   fixed postorder pass-sequence and extendDefinitiveSubtreeFromLeaf are gone.
   Decisions/deviations made while landing it:
-  - §5.5 budget: only *content* children decrement node_budget; nodes created
-    by col reconcilers (subscribee/relation/alias/id members) are NOT yet
-    counted. Content cascade is the explosion risk and is bounded; col-node
-    budget accounting is DEFERRED (cols create few nodes). Revisit if needed.
+  - §5.5 budget: content children decrement node_budget; the FOUR sharing-col
+    reconcilers (subscribee / relation / hidden-in / hidden-outside) now also
+    spend it -- their goal lists are capped by the shared
+    cap_goal_list_to_budget (existing members and removed-member phantoms are
+    free, each genuinely-new member decrements). The earlier "cols create few
+    nodes" deferral was WRONG for the unbounded case Jeff named: a famous note
+    thousands of people subscribe to has an unbounded relation/subscribee col
+    (other_member_pids returns all of them), a real DoS-shaped blowup the old
+    content-only budget could not stop. Now byte-identical for small cols (the
+    budget is never exhausted) and truncated like content for huge ones. The
+    id/alias cols stay UNbudgeted -- bounded by a node's own id/alias count.
   - §5.5 truncation differs from the old per-DVR FromLeaf: the budget is now
     granular (each unit = one node) with NO "complete the sibling group"
     padding; once spent, remaining DVRs are stripped and those nodes left
@@ -1260,7 +1267,14 @@ Branch =local-view-updates=.
   via the sharing_diffs seam, not in the overlay); Vognode::DiffPhantom payload
   reduction (§11 / phase-0c); should_sync_from_disk_even_though_definitive removal
   (§6.1/§8.3, Jeff's original §5 question -- belongs with the §12 context
-  refinement); §5.5 col-node budget accounting (cols don't decrement node_budget).
+  refinement).
+** §5.5 col-node budget accounting DONE (Jeff: "extending the col budget is not
+  'low value' ... what if someone is famous, and thousands of people subscribe to
+  one of their notes?"). The four sharing-col reconcilers now spend node_budget
+  via the shared cap_goal_list_to_budget, so an unbounded relation/subscribee col
+  truncates like content instead of drawing thousands of members. Byte-identical
+  for small cols (budget never exhausted); id/alias cols stay unbudgeted. Full
+  Rust suite + 27 integration tests green. Rationale in hey-jeff.org §3 + §18 above.
 ** Phase 8 + cleanups done; §8.3 should_sync REMOVED (Jeff's original §5 question
   resolved -- every definitive node re-syncs from disk; CompletionMode + the
   is_saved_view field deleted). With that, ALL of plan_v2 phases 0-8 plus the
@@ -1285,5 +1299,5 @@ Branch =local-view-updates=.
 ** REMAINING deferred items, all deliberately low-value (none blocking): full §9
   col-descent (sharing-col diff is inline via the sharing_diffs seam -- moving it
   into the overlay would *duplicate* the col reconcilers, adding code, so not
-  worth it); §5.5 col-node budget accounting (cols create few nodes -- "revisit if
-  needed", §18). The substantive plan is COMPLETE.
+  worth it). (§5.5 col-node budget accounting is now DONE -- see above.) The
+  substantive plan is COMPLETE.

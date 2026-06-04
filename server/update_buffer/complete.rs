@@ -142,21 +142,25 @@ async fn expand_true_content_at_node (
     ViewNodeKind::PartnerCol (RoleCol::Subscribee) =>
       reconcile_subscribee_col_children (
         treeid, tree, context . sharing_diffs, context . env,
-        context . deleted_since_head_pid_src_map ) . await ?,
+        context . deleted_since_head_pid_src_map,
+        &mut context . node_budget ) . await ?,
     ViewNodeKind::PartnerCol (RoleCol::HiddenInSubscribee) =>
       reconcile_hiddenin_subscribee_col_children (
         treeid, tree, context . sharing_diffs, context . env,
-        context . deleted_since_head_pid_src_map ) ?,
+        context . deleted_since_head_pid_src_map,
+        &mut context . node_budget ) ?,
     ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee) =>
       reconcile_hiddenoutside_subscribee_col_children (
         treeid, tree, context . sharing_diffs, context . env,
-        context . deleted_since_head_pid_src_map ) ?,
+        context . deleted_since_head_pid_src_map,
+        &mut context . node_budget ) ?,
     ViewNodeKind::PartnerCol (role)
       if role . relation_member_role () . is_some () =>
       reconcile_relation_col_children (
         treeid, tree, *role, context . sharing_diffs,
         context . env, context . graph_snap,
-        context . deleted_since_head_pid_src_map ) ?,
+        context . deleted_since_head_pid_src_map,
+        &mut context . node_budget ) ?,
     ViewNodeKind::QualCol (QualCol::Alias) =>
       super::complete_postorder::aliascol::reconcile_alias_col_children (
         tree, treeid, context . source_diffs, &context . env . config ) ?,
