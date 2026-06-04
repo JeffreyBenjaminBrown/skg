@@ -261,6 +261,10 @@ pub async fn rerender_view (
     let mut completion_context : CompletionContext = CompletionContext {
       defmap                         : &mut defmap,
       source_diffs                   : &no_source_diffs,
+      // Sharing cols (Subscribee/HiddenIn/HiddenOut/relation) still reconcile
+      // their removed-member diff phantoms inline, with the real diffs, while
+      // their members are Normal -- the overlay does not yet descend cols (§9).
+      sharing_diffs                  : &context . source_diffs,
       env                            : context . env,
       graph_snap                     : &context . graph_snap,
       errors                         : &mut context . errors,

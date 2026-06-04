@@ -1099,15 +1099,27 @@ Branch =local-view-updates=.
   - REVERSIBLE BY DESIGN: the inline diff code in the BFS is left *dormant*
     (source_diffs=None), not deleted, so the flip is a ~10-line change to undo.
     Deletion of the dead inline diff comes after col-descent + type reduction.
-  - KNOWN GAP (plan §9 "descends through its cols"): the overlay does NOT yet
-    descend through cols, so diff-mode *removed-member* phantoms for a dropped
-    subscription (SubscribeeCol) / un-hidden node (Hidden* cols) are not yet
-    reproduced. The inline path injected these (goal_list_for_* removed_ids ->
-    build_child_data); they are now absent post-save. NO test covers them
-    (which is why the full suite stays green) -- but it is a real §9 gap and the
-    immediate next task. Content (incl. subscribee-as-such contains-minus-hides
-    phantoms), IDCol, TextChanged, collateral, and newhere_cycle ARE all
-    reproduced by the overlay (tested, green).
+  - PARTIAL §9 (sharing-col diff stays inline, transitionally). The overlay does
+    NOT descend through cols, so the SHARING cols (Subscribee / HiddenIn /
+    HiddenOut / relation) keep reconciling their removed-member diff phantoms
+    *inline* in the BFS, with the real diffs, via a SECOND CompletionContext
+    field `sharing_diffs` (= the real diffs) distinct from `source_diffs` (= None
+    for the content/scaffold path). So: content axes/phantoms + TextChanged +
+    IDCol + AliasCol-scaffold-emission are unified into the overlay; sharing-col
+    removed-member phantoms remain inline. This is *no-regression* (sharing-col
+    diff behaves exactly as before the flip) and correctly ordered (cols
+    reconcile while their members are still Normal, before the overlay flips any
+    to DiffPhantom). Validated: full Rust suite + the diff/magit integration
+    tests (git-diff-view-updates, view-magit{,-phantom,-phantom-deleted-file},
+    containerward-on-phantom). FULL §9 (the overlay descending through cols) is
+    deferred: the col reconcilers + their ancestry/env setup live in
+    update_buffer, so a to_org-resident overlay would have to duplicate that
+    setup -- best folded into phase 8 (unify de-novo), where the driver/overlay
+    home is reorganized anyway. The two-field split is the transitional seam.
+    NOTE: a low-frequency PRE-EXISTING parallel-test flake exists in
+    tests/git_diff_view (shared TypeDB + the process-global in-Rust graph race
+    under multi-threaded `cargo test`); serial (`--test-threads=1`) is 100%
+    green, as is the bash integration suite. Not introduced by this work.
   - STILL TODO after col-descent: AliasCol diff scaffold in the overlay
     (untested in either path today); delete the dormant inline diff; reduce the
     Vognode::DiffPhantom payload (§11/§6.3, the deferred phase-0c).

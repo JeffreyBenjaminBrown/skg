@@ -29,7 +29,18 @@ use std::sync::Arc;
 
 pub(super) struct CompletionContext<'a> {
   pub(super) defmap                         : &'a mut DefinitiveMap,
+  /// Diffs for the *content/scaffold* path. Phase 5 (§9) runs the main BFS
+  /// content+scaffold update with this set to None, so the BFS produces the
+  /// pure worktree view and the diff overlay (apply_diff_to_viewforest) adds
+  /// content axes, content phantoms, and TextChanged/IDCol/AliasCol scaffolds
+  /// afterward.
   pub(super) source_diffs                   : &'a Option<HashMap<SourceName, SourceDiff>>,
+  /// Diffs for the *sharing cols* (Subscribee / HiddenIn / HiddenOut /
+  /// relation). These reconcile their removed-member phantoms *inline*, while
+  /// the col's members are still Normal (before the overlay flips any to
+  /// DiffPhantom) -- the overlay does not descend through cols (§9 gap, see
+  /// plan_v2 §18). Set to the real diffs even when `source_diffs` is None.
+  pub(super) sharing_diffs                  : &'a Option<HashMap<SourceName, SourceDiff>>,
   pub(super) env                            : &'a SkgEnv,
   pub(super) graph_snap                     : &'a Arc<InRustGraph>,
   pub(super) errors                         : &'a mut Vec<String>,
@@ -122,20 +133,20 @@ async fn expand_true_content_at_node (
       visit_normal_node (tree, treeid, context) . await ?,
     ViewNodeKind::PartnerCol (RoleCol::Subscribee) =>
       reconcile_subscribee_col_children (
-        treeid, tree, context . source_diffs, context . env,
+        treeid, tree, context . sharing_diffs, context . env,
         context . deleted_since_head_pid_src_map ) . await ?,
     ViewNodeKind::PartnerCol (RoleCol::HiddenInSubscribee) =>
       reconcile_hiddenin_subscribee_col_children (
-        treeid, tree, context . source_diffs, context . env,
+        treeid, tree, context . sharing_diffs, context . env,
         context . deleted_since_head_pid_src_map ) ?,
     ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee) =>
       reconcile_hiddenoutside_subscribee_col_children (
-        treeid, tree, context . source_diffs, context . env,
+        treeid, tree, context . sharing_diffs, context . env,
         context . deleted_since_head_pid_src_map ) ?,
     ViewNodeKind::PartnerCol (role)
       if role . relation_member_role () . is_some () =>
       reconcile_relation_col_children (
-        treeid, tree, *role, context . source_diffs,
+        treeid, tree, *role, context . sharing_diffs,
         context . env, context . graph_snap,
         context . deleted_since_head_pid_src_map ) ?,
     ViewNodeKind::QualCol (QualCol::Alias) =>
