@@ -92,6 +92,23 @@ green integration suite, so I logged it and continued rather than stopping.
 - Per plan.org §8 item 3: NO fail-soft NodeComplete backstop. We wear the belt
   (the view-based pre-check), not the suspenders.
 
+* 4b. Plan_v2 increments landed after the detour (this same session)
+Two clean, isolated, plan-mandated items, each its own commit + test, full Rust
+suite (52 ok-blocks) + all 27 integration tests green:
+- =49f49b92= §3.4/§6.7: an *empty SubscribeeCol is preserved* (the editable
+  interface), not self-deleted. Only the SubscribeeCol slice of §3.4 -- the rest
+  is deferred (see §5). New test =tests/subscribee_col_empty_persists.rs=.
+- =268b0298= phase 7 §6.4/§16: an *Inactive node deleted by this save converts
+  to Deleted* (the BFS Inactive dispatch was a no-op; the code only ever
+  converted Normal nodes). Unit-tested in =complete.rs=.
+I also *investigated* §6.5 (Unknown member/branch) and found it is NOT a clean
+standalone: Unknown ids are unresolvable by design, so Unknown is deliberately
+excluded from the content reconcile's "relevant" set (it can't be re-created /
+data-fetched). Handling a no-longer-member Unknown therefore means either
+duplicating the parent's content goal computation (with its diff-mode +
+extra_id subtleties) at the Unknown's own visit, or routing it through the §3.4
+sweep with membership info. Left deferred with §3.4 below.
+
 * 5. Where plan_v2 stands, and the judgment call
 plan_v2 §14 phases 0,1,2,3,4 are done (see §18); this detour additionally
 delivered §6.6 and the parts of §6.0/death that it needed. What remains, and
@@ -108,11 +125,10 @@ why I did not barrel into it tonight:
    =node_budget=; col-created members (subscribee/relation/alias/id) do not.
    Plan §5.5 wants all new ViewNodes to count. Threadable, but it will shift
    node-limit truncation points and so needs the limit tests re-baselined.
-*** §6.4 Inactive->Deleted and §6.5 Unknown member/branch (phase-7 variants).
-   §6.4 is additive and clean *but* testing it needs a source-sets fixture
-   (inactive sources). §6.5's "still a member of the parent's goal" is naturally
-   the *parent's* concern (content reconcile), not the Unknown node's own visit,
-   so it really belongs with the §3.4 routing below, not as a standalone.
+*** §6.4 Inactive->Deleted: DONE this session (=268b0298=). §6.5 Unknown
+   member/branch: still deferred -- Unknown is excluded from content-reconcile
+   relevance by design (unresolvable id, cannot be re-created), so it belongs
+   with the §3.4 routing below, not as a standalone. (See §4b.)
 
 ** §3.4 prune-sweep self-deletion routing + empty-col exceptions (the next
    coherent unit -- and the one I want your read on before I push it)
