@@ -6,7 +6,7 @@ use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use super::git::{ExistenceAxes, MembershipAxes, NodeCompleteDiff, Sign, SourceDiff};
+use super::git::{ExistenceAxes, MembershipAxes, NodeCompleteDiff, Sign, SourceDiff, existence_axes_in_source_diff};
 use super::list::Diff_Item;
 use super::misc::{ID, SkgConfig, SourceName};
 
@@ -50,16 +50,10 @@ pub fn phantom_axes (
   // Existence: the child's own file-level status in each stage.
   let child_file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", child_id . 0 ) );
-  let child_sd : Option<&SourceDiff> =
-    source_diffs . and_then ( |d| d . get (child_source) );
-  let ex_staged : Option<Sign> =
-    child_sd . and_then ( |sd| sd . staged . get (&child_file) )
-      . and_then ( |d| d . status . to_existence_sign () );
-  let ex_unstaged : Option<Sign> =
-    child_sd . and_then ( |sd| sd . unstaged . get (&child_file) )
-      . and_then ( |d| d . status . to_existence_sign () );
   let existence : ExistenceAxes =
-    ExistenceAxes { staged: ex_staged, unstaged: ex_unstaged };
+    existence_axes_in_source_diff (
+      source_diffs . and_then ( |d| d . get (child_source) ),
+      &child_file );
 
   // Membership: the child's presence in the parent's contains list
   // in each stage. New(id) -> Plus; Removed(id) -> Minus.

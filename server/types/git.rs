@@ -264,15 +264,25 @@ pub fn file_existence_axes_from_source_diff (
   pid          : &ID,
   source       : &SourceName,
 ) -> ExistenceAxes {
-  let sd : Option<&SourceDiff> =
-    source_diffs . as_ref () . and_then ( |d| d . get (source) );
   let file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-  let staged : Option<Sign> = sd
-    . and_then ( |sd| sd . staged . get (&file) )
+  existence_axes_in_source_diff (
+    source_diffs . as_ref () . and_then ( |d| d . get (source) ),
+    &file ) }
+
+/// The staged (HEAD->index) and unstaged (index->worktree) EXISTENCE signs for a
+/// `.skg` file within a single source's diff. The one place that reads a file's
+/// per-stage status; the callers differ only in how they pick the SourceDiff to
+/// read (by the node's own source, or with a fallback).
+pub fn existence_axes_in_source_diff (
+  source_diff : Option<&SourceDiff>,
+  file        : &PathBuf,
+) -> ExistenceAxes {
+  let staged : Option<Sign> = source_diff
+    . and_then ( |sd| sd . staged . get (file) )
     . and_then ( |d| d . status . to_existence_sign () );
-  let unstaged : Option<Sign> = sd
-    . and_then ( |sd| sd . unstaged . get (&file) )
+  let unstaged : Option<Sign> = source_diff
+    . and_then ( |sd| sd . unstaged . get (file) )
     . and_then ( |d| d . status . to_existence_sign () );
   ExistenceAxes { staged, unstaged } }
 
