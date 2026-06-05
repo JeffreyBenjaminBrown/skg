@@ -6,7 +6,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
-use crate::to_org::expand::definitive::{ apply_definitive_draw_rule, extendDefinitiveSubtree_fromGit, DrawOutcome};
+use crate::to_org::expand::definitive::{ apply_definitive_draw_rule, DrawOutcome};
 use crate::to_org::util::DefinitiveMap;
 use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
@@ -198,9 +198,8 @@ async fn visit_normal_node (
         ViewNodeKind::Vognode (Vognode::Normal (t)) =>
           t . view_requests . contains (& ViewRequest::Definitive),
         _ => false } ) ?;
-  let mut settled    : bool = false; // §5.2 draw rule already ran
-  let mut cascade    : bool = false; // node is Final -> hand DVRs to children
-  let mut do_content : bool = true;
+  let mut settled : bool = false; // §5.2 draw rule already ran
+  let mut cascade : bool = false; // node is Final -> hand DVRs to children
   if had_dvr && context . node_budget == 0 {
     // §5.5: budget exhausted -- strip the (user or cascade) DVR and leave the
     // node indefinitive instead of making it Final. The content engine
@@ -220,29 +219,15 @@ async fn visit_normal_node (
         // Deferred to an existing Final occurrence: the node is now
         // indefinitive; the content engine (settled) will clobber+return.
         settled = true; }
-      DrawOutcome::MadeFinal { is_removed_node : true, hidden_ids } => {
-        // Removed-file DVR: expand the removed node's content from git HEAD as
-        // diff phantoms. Effectively unreachable -- a node's existence axes are
-        // only stamped by process_truenode_diff at the end of its own visit, so
-        // is_removed_node is false while the draw rule runs -- but handled
-        // defensively; the content engine is skipped.
-        extendDefinitiveSubtree_fromGit (
-          tree, treeid, context . env . config . initial_node_limit,
-          context . defmap, context . source_diffs, &context . env . config,
-          &hidden_ids, &context . env . driver,
-          context . deleted_since_head_pid_src_map,
-          context . active_source_set ) . await ?;
-        settled = true; do_content = false; }
-      DrawOutcome::MadeFinal { is_removed_node : false, .. } => {
+      DrawOutcome::MadeFinal => {
         settled = true; cascade = true; } } }
-  if do_content {
-    expand_true_content_at_truenode (
-      treeid, tree, context . defmap,
-      &context . env . config, context . graph_snap,
-      context . deleted_since_head_pid_src_map,
-      context . deleted_by_this_save_pids,
-      context . active_source_set,
-      settled, cascade, &mut context . node_budget ) ?; }
+  expand_true_content_at_truenode (
+    treeid, tree, context . defmap,
+    &context . env . config, context . graph_snap,
+    context . deleted_since_head_pid_src_map,
+    context . deleted_by_this_save_pids,
+    context . active_source_set,
+    settled, cascade, &mut context . node_budget ) ?;
   // The steps below apply only while the node is still a Normal vognode:
   // content reconcile may have converted it to Deleted (a node this save
   // deleted). The flip to a DiffPhantom happens at the END of this visit
