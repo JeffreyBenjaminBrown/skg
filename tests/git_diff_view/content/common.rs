@@ -46,6 +46,21 @@ pub fn setup_git_repo_with_subscribee_fixtures(
   )
 }
 
+/// #1 fix coverage: a subscriber whose subscribes_to dropped node 22 between
+/// HEAD and worktree (22's .skg file still present, so the removal is
+/// membership-only). The removed subscribee 22 must render as a phantom with
+/// (unstaged removedM) -- its relation is subscribes_to, not contains, so the
+/// marker comes from build_child_data's net-removal fallback, not phantom_axes.
+pub fn setup_git_repo_with_removed_subscribee_fixtures(
+  repo_path: &Path,
+) -> Result<Repository, Box<dyn Error>> {
+  super::super::common::setup_git_repo_with_fixtures(
+    repo_path,
+    "tests/git_diff_view/content/fixtures-removed-subscribee/head",
+    "tests/git_diff_view/content/fixtures-removed-subscribee/worktree",
+  )
+}
+
 /// Expected output when the transition is staged rather than unstaged.
 pub const GIT_DIFF_VIEW_STAGED: &str = "\
 * (skg (node (id 1) (source main))) 1
