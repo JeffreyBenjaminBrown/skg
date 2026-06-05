@@ -517,7 +517,14 @@ fn build_child_creation_data (
       let mut m : HashMap<ID, SourceName> = HashMap::new();
       for child_ref in node_ref . children() {
         match &child_ref . value() . kind {
+          // Only an Affected Normal child counts as "already present" -- the
+          // same predicate complete_content_children's reconcile applies. An
+          // Independent same-id child is a distinct occurrence (e.g. a
+          // containerward ancestor, or a §6.0-demoted branch), so its goal id
+          // must still be pre-fetched here; otherwise the reconcile sends it to
+          // the create closure and child_data.get(id).expect(..) panics.
           ViewNodeKind::Vognode (Vognode::Normal (t))
+            if t . parentIs == ParentIs::Affected
             => { m . insert( t . id . clone(),
                              t . source . clone()); },
           ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
