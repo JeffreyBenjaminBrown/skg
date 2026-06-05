@@ -4,6 +4,7 @@
 // this module and `context_update`.
 
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
+use crate::dbs::tantivy::background_writer::lock_tantivy_writes;
 use crate::types::misc::{ID, TantivyIndex};
 use crate::types::nodes::complete::FileProperty;
 use crate::types::nodes::tantivy::NodeTantivy;
@@ -22,6 +23,8 @@ pub fn update_index_with_nodes (
   tantivy_index: &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {
 
+  let _wlock = // serialize with the background save-index worker & other writers
+    lock_tantivy_writes ();
   let mut writer: IndexWriter =
     tantivy_index . index . writer (
       TANTIVY_WRITER_BUFFER_BYTES)?;

@@ -155,6 +155,31 @@ on-disk/segment state. A periodic background consolidation or rebuild
 keeps it near the ~63 ms floor — but the commit dominates even when
 compact, so backgrounding it is the bigger lever.
 
+** DONE: the Tantivy commit is now off the critical path
+
+Implemented in 'server/dbs/tantivy/background_writer.rs'. Each save
+ENQUEUES its index update to a single background worker and returns;
+the worker commits in FIFO order (so two rapid saves of the same node
+can't reorder). A search blocks on 'wait_for_tantivy_writes_idle'
+until the queue drains, so it always reflects every save issued so far
+(read-your-writes); the save itself never waits. A global write-lock
+serializes the worker with the other Tantivy writers (search-make-link,
+the init/rebuild context pass), which can now run concurrently with it.
+
+Measured: the insert-a-child save dropped from ~106-149 ms to a stable
+*~63 ms* (median; min 48), and 'update_graph_including_merges' went
+from Tantivy-gated (~98 ms) to TypeDB-gated (~28 ms). The save is also
+no longer subject to the rapid-fire commit drift, since the commit is
+no longer on the response path. Read-your-writes verified: 6/6 searches
+issued immediately after a save (on a separate connection) saw the
+just-saved node. All 488 nextest tests pass.
+
+Trade-off: a background commit failure is now logged rather than
+auto-rebuilt inline (the filesystem is the source of truth, so
+'rebuild dbs' resyncs). After backgrounding, the remaining save cost is
+TypeDB (~28 ms, the new critical path) and parse+rerender (~28 ms);
+none is dominant.
+
 * Test case and environment
 
 - *Operation*: open a single-root content view of node

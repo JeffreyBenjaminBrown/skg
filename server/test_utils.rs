@@ -163,6 +163,10 @@ async fn guarded_test_then_cleanup(
   let test_result: Result<Result<(), Box<dyn Error>>, _> =
     AssertUnwindSafe(test_future)
     . catch_unwind() . await;
+  // A save's Tantivy write now commits in the background and outlives
+  // update_from_and_rerender_buffer; drain it before deleting the test
+  // index out from under the worker.
+  crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
   let cleanup_result: Result<(), Box<dyn Error>> =
     cleanup_test_tantivy_and_typedb_dbs(
       db_name, driver,

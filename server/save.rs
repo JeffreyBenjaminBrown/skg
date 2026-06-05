@@ -5,7 +5,7 @@ use crate::dbs::filesystem::multiple_nodes::{
   delete_all_nodes_from_fs,
   read_all_skg_files_from_sources,
   write_all_nodes_to_fs};
-use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
+use crate::dbs::init::wipe_then_init_typedb_db;
 use crate::dbs::in_rust_graph::{
   InRustGraph,
   InRustGraphHandle,
@@ -16,6 +16,7 @@ use crate::dbs::in_rust_graph::{
     validate_touched_override_invariants,
   },
 };
+use crate::dbs::tantivy::background_writer::{enqueue_tantivy_write, lock_tantivy_writes, TantivyWriteTask};
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
 use crate::merge::merge_nodes;
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
@@ -39,7 +40,6 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::io;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 use tantivy::IndexWriter;
 use typedb_driver::TypeDBDriver;
 
@@ -113,20 +113,10 @@ async fn apply_define_nodes_to_stores (
       context_origin_types_for_saved_from_in_rust_graph (
         & graph . load_full (), &node_defs ) };
 
-  // TypeDB (async) and Tantivy (sync) in parallel.
-  // Both are independent after the FS update.
-  let tantivy_instructions : Vec<DefineNode> = node_defs . clone ();
-  let tantivy_idx : TantivyIndex = tantivy_index . clone ();
-  let tantivy_handle : std::thread::JoinHandle<(Result<usize, String>, Duration)> =
-    std::thread::spawn ( move || {
-      let t0 : Instant = Instant::now ();
-      let result : Result<usize, String> =
-        update_tantivy_from_saveinstructions (
-          &tantivy_instructions, &tantivy_idx, &context_types )
-        . map_err ( |e| e . to_string () );
-      (result, t0 . elapsed ()) });
-
-  if let Err (e) = { // TypeDB
+  // TypeDB (foreground): only TypeDB must finish before the save
+  // responds, because the response is re-rendered from the in-Rust
+  // graph (never from Tantivy).
+  if let Err (e) = {
     let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "update_typedb_from_saveinstructions") . entered ();
     update_typedb_from_saveinstructions (
@@ -152,39 +142,17 @@ async fn apply_define_nodes_to_stores (
     } else {
       tracing::info!("   TypeDB update complete."); }
 
-  // Collect Tantivy result from its thread.
-  let (tantivy_result, tantivy_duration)
-    : (Result<usize, String>, Duration) =
-    tantivy_handle . join ()
-    . map_err (|_| -> Box<dyn Error> {
-      "Tantivy thread panicked" . into () }) ?;
-  tracing::info!("{}: {:.3}s", "update_tantivy_from_saveinstructions",
-    tantivy_duration . as_secs_f64 ());
-  match tantivy_result
-    { Ok (indexed_count) => {
-        tracing::info!( "   Tantivy updated for {} document(s).",
-                  indexed_count );
-        tracing::info!("All updates finished successfully.");
-        Ok (None) }
-      Err (e) => {
-        tracing::error!("Tantivy update failed: {}. Rebuilding from disk...", e);
-        let nodes : Vec<NodeComplete> =
-          read_all_skg_files_from_sources (&config)
-          . map_err (|e2| -> Box<dyn Error> {
-            format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
-            . into () }) ?;
-        check_for_duplicate_ids_across_sources (
-          &nodes, &config . data_root)
-          . map_err (|e2| -> Box<dyn Error> {
-            format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
-            . into () }) ?;
-        let new_index : TantivyIndex =
-          rebuild_tantivy_from_nodes (&config, &nodes)
-          . map_err (|e2| -> Box<dyn Error> {
-            format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
-            . into () }) ?;
-        tracing::warn!("Save succeeded, but Tantivy had to be rebuilt from disk.");
-        Ok (Some (new_index)) } } }
+  // Tantivy (background): the search index is a derived cache that the
+  // save's response never reads, so enqueue the index update to commit
+  // off the critical path, in FIFO order (a single worker). Searches
+  // block on 'wait_for_tantivy_writes_idle' until it lands. A
+  // background failure is logged, not propagated — the filesystem is
+  // the source of truth, so 'rebuild dbs' resyncs the index.
+  enqueue_tantivy_write ( TantivyWriteTask {
+    tantivy_index : tantivy_index . clone (),
+    instructions  : node_defs . clone (),
+    context_types, } );
+  Ok (None) }
 
 /// Runs 'update_graph_minus_merges' and then 'merge_nodes' in that
 /// order, applying any Tantivy rebuild from either step to the
@@ -529,12 +497,14 @@ pub fn update_fs_from_saveinstructions (
 /// Deletes IDs from the index for every instruction,
 /// but only adds documents for instructions where is_save.
 /// Returns the number of documents processed.
-pub(super) fn update_tantivy_from_saveinstructions (
+pub(crate) fn update_tantivy_from_saveinstructions (
   instructions  : &[DefineNode],
   tantivy_index : &TantivyIndex,
   context_types : &HashMap<ID, String>, // pid -> context_origin_type label, so each doc is indexed once with its final type (no second context pass needed). Empty for the merge path.
 ) -> Result<usize, Box<dyn Error>> {
 
+  let _wlock = // one IndexWriter per directory; serialize all Tantivy writers
+    lock_tantivy_writes ();
   let mut writer: IndexWriter =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "tantivy_writer_create" ). entered();
