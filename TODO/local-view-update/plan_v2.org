@@ -1375,7 +1375,17 @@ review.org §3.3.
 subscribee ancestor accessor -- were first left out as risky, but Jeff resolved
 the risks; they are now §20.3 and §20.4.)
 
-** 20.2 Add the locking-lifecycle integration test (review §2.5)
+** DONE 20.2 Add the locking-lifecycle integration test (review §2.5)
+DONE 2026-06-05 (Jeff's scope call: do the tractable assertions (a) and (c),
+skip the timing-sensitive (b)). Added tests/integration/save_lock_lifecycle/
+(opens *a* saved / *b* collateral / *solo* non-collateral; after the save settles
+asserts every view's save-lock is released and *solo* is genuinely editable -- it
+both checks the overlay var is nil and actually edits *solo*) for (a), and
+extended tests/integration/valid_and_invalid_saves/ for (c) (asserts no leaked
+lock/stream state -- skg--stream-in-progress nil, no save-lock overlay -- wedges
+the second save). (b) -- "saved buffer stays locked UNTIL save-result" -- is NOT
+asserted: mid-stream lock timing is not observable deterministically from a batch
+Emacs test (it would need a client-side hook on save-relax-lock, fragile/flaky).
 Today only the lock-related wire MESSAGE is exercised; nothing asserts the lock
 BEHAVIOR over time. Add one Emacs-driving integration test (a new
 tests/integration/<name>/ with run-test.sh + an Emacs test, mirroring the

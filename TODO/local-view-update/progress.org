@@ -1839,3 +1839,36 @@ You pointed me at the existing "integrate" machinery, and it unblocked §20.3.
    bare indefinitive root gets its containerward. Easily reversed with a one-line
    indef filter if you'd rather indef roots stay bare. (Deleted/Unknown roots are
    already skipped -- the attach only processes =Vognode::Normal=.)
+
+* 16. §20.2 -- locking-lifecycle integration test (2026-06-05)
+
+You chose the tractable scope: do assertions (a) and (c), skip the
+timing-sensitive (b). Done.
+
+** What's done and went well
+- (a): new tests/integration/save_lock_lifecycle/ -- opens three overlapping
+  views (*a* saved, *b* collateral, *solo* truly non-collateral), saves *a*, and
+  after the stream settles asserts every view's =skg--save-lock-overlay= is nil
+  AND that *solo* is genuinely editable (it actually inserts text into it, so the
+  overlay's modification-hook is proven gone, not just the bookkeeping var). A
+  buffer is "locked" iff that buffer-local overlay is non-nil (defined in
+  elisp/skg-request-save/skg-lock-buffers.el).
+- (c): extended tests/integration/valid_and_invalid_saves/ -- after the
+  invalid-then-valid sequence, asserts =skg--stream-in-progress= is nil and the
+  content buffer carries no lock overlay, proving the invalid save left no leaked
+  state to wedge the next save. (Reaching phase 2 already proved the second save's
+  wait RETURNED; this makes the no-leak invariant explicit.)
+- All 28 integration tests green (the 27 + the new one); 478 Rust unchanged.
+
+** What's imperfect about what's done
+- (b) is unimplemented by design (your call): "the saved buffer stays locked UNTIL
+  the final save-result" needs mid-stream observation of lock state, which a batch
+  Emacs test can't do deterministically without a fragile client-side hook on
+  save-relax-lock. So (a) asserts the post-settle END state (no view left locked),
+  not the intermediate narrowing.
+
+** Choices determining the future
+- save_lock_lifecycle doubles as an end-to-end check of §20.3: *b* is collateral
+  to saving *a* precisely BECAUSE its view now shows a as containerward (its pid
+  set includes a). If a future change stops attaching root containerward, *b*
+  would become non-collateral and this test's role labels would need revisiting.
