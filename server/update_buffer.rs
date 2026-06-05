@@ -28,7 +28,7 @@ use crate::types::misc::{ID, SourceName, SkgConfig};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
 use crate::types::tree::forest::ViewForest;
-use crate::to_org::util::{mark_view_roots_parent_absent, validate_parentIs_relationships};
+use crate::to_org::util::{mark_view_roots_parent_absent, validate_parentIs_relationships, mark_orphans_under_dead_parents_independent};
 use crate::dbs::in_rust_graph::snapshot_global;
 use crate::types::viewnode::{IndefOrDef, ViewNode, ViewNodeKind};
 use crate::types::viewnode::{Vognode, QualCol, Qual};
@@ -341,12 +341,14 @@ pub async fn rerender_view (
       diff_tantivy_index : None, };
     complete_viewforest (
       viewforest, &mut completion_context ) . await ?; }
-  // §9 reversal (#3): the content/scaffold diff is now applied INLINE during the
+  // §9 reversal (#3): the content/scaffold diff was applied INLINE during the
   // BFS above (process_truenode_diff at each Normal node's visit, driven by
-  // sharing_diffs = the real diffs). The post-BFS overlay call is gone for the
-  // post-save path; apply_diff_to_viewforest now serves only the de-novo path
-  // until that is migrated too.
+  // sharing_diffs = the real diffs). The post-BFS overlay is deleted entirely.
   mark_view_roots_parent_absent (viewforest);
+  // §A (Jeff's invariant): a Normal survivor left under a non-container parent
+  // (a phantom / Deleted / DeadScaffold) is a non-dead generalized orphan and
+  // must become Independent.
+  mark_orphans_under_dead_parents_independent (viewforest);
   if let Some (snap) = snapshot_global () {
     // Correct any parentIs markers whose claimed relation to the
     // parent doesn't hold in the in-Rust graph (e.g. user moved a

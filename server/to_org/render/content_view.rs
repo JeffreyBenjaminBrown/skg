@@ -13,7 +13,7 @@
 
 use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids_with_source_set;
 use crate::org_to_text::viewforest_to_string;
-use crate::to_org::util::mark_view_roots_parent_absent;
+use crate::to_org::util::{mark_view_roots_parent_absent, mark_orphans_under_dead_parents_independent};
 use crate::types::tree::forest::ViewForest;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
@@ -126,6 +126,9 @@ pub async fn multi_root_view_via_env (
           &mut viewforest, &env . config, &env . driver ) . await,
     } ?;
   mark_view_roots_parent_absent ( &mut viewforest );
+  // §A (Jeff's invariant): demote any Normal survivor left under a non-container
+  // parent (phantom / Deleted / DeadScaffold) to Independent.
+  mark_orphans_under_dead_parents_independent ( &mut viewforest );
   set_viewnodestats_in_viewforest (
     &mut viewforest, &container_to_contents, &content_to_containers,
     &env . config );

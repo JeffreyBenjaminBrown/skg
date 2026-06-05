@@ -328,6 +328,53 @@ pub fn validate_parentIs_relationships (
       = node_mut . value () . kind
     { t . birth = Birth::Unremarkable; } } }
 
+/// Jeff's invariant (progress.org §11 thread): a *non-dead generalized orphan*
+/// must have ParentIs=Independent. A Normal node whose PARENT is a
+/// non-container -- a DiffPhantom, a Deleted, or a DeadScaffold -- is exactly
+/// that: it survives (is not itself dead) but its container is gone, so its
+/// =Affected= claim (that it is part of that parent's collection) cannot hold.
+/// Demote it to Independent so it renders as its own graph-contains root rather
+/// than claiming to affect a parent that no longer contains anything.
+///
+/// Scope, deliberately narrow:
+/// - PARENT is DiffPhantom / Deleted / DeadScaffold -> demote an Affected child.
+/// - PARENT is a Col (QualCol / PartnerCol): the child is a legitimate col
+///   MEMBER; Affected is correct -> leave. (A col whose own ancestry broke is
+///   deadened to DeadScaffold first, and then THIS pass catches its members.)
+/// - PARENT is a Normal vognode: handled by validate_parentIs_relationships.
+/// - PARENT is BufferRoot: the child is a forest root, handled by
+///   mark_view_roots_parent_absent.
+/// Belt-and-suspenders: most cases are already demoted during the BFS
+/// (mark_erroneous_content_children_as_indep for content children;
+/// dispose_orphaned_col_child for a deadened col's members). This final pass
+/// GUARANTEES the invariant for any survivor those miss (e.g. a removedHere
+/// phantom's content children), in both the post-save and de-novo paths. Purely
+/// structural -- no graph read.
+pub fn mark_orphans_under_dead_parents_independent (
+  viewforest : &mut Tree<ViewNode>,
+) {
+  let mut targets : Vec<NodeId> = Vec::new ();
+  for edge in viewforest . root () . traverse () {
+    if let Edge::Open (child_ref) = edge {
+      let is_affected_normal : bool =
+        matches! ( & child_ref . value () . kind,
+          ViewNodeKind::Vognode (Vognode::Normal (t))
+            if t . parentIs == ParentIs::Affected );
+      if ! is_affected_normal { continue; }
+      let parent_is_non_container : bool =
+        child_ref . parent () . map_or ( false, |p|
+          matches! ( & p . value () . kind,
+            ViewNodeKind::Vognode (Vognode::DiffPhantom (_))
+              | ViewNodeKind::Vognode (Vognode::Deleted (_))
+              | ViewNodeKind::DeadScaffold ) );
+      if parent_is_non_container { targets . push ( child_ref . id () ); }}}
+  for id in targets {
+    let mut node_mut : NodeMut<ViewNode> =
+      viewforest . get_mut (id) . unwrap ();
+    if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
+      = node_mut . value () . kind
+    { t . parentIs = ParentIs::Independent; } } }
+
 /// Does 'child's 'contains' list include 'parent' (modulo
 /// extra_id aliasing on either side)?
 fn child_contains_parent (
@@ -823,6 +870,45 @@ mod validate_parentIs_relationships_tests {
     validate_parentIs_relationships (&mut viewforest, &graph);
 
     assert_eq! (parentIs_if_normal (&viewforest, c_id), ParentIs::Independent);
+  }
+
+  #[test]
+  fn orphan_under_dead_parent_demoted_member_under_col_kept () {
+    // §A (Jeff's invariant): an Affected Normal node under a non-container
+    // parent (DiffPhantom / DeadScaffold) demotes to Independent; a legitimate
+    // col MEMBER (Affected Normal under a PartnerCol) is left untouched.
+    use crate::types::viewnode::{ mk_phantom_viewnode, RoleCol };
+    use crate::types::git::{ ExistenceAxes, MembershipAxes };
+    let mut vf : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+    let root : NodeId = vf . root () . id ();
+    let phantom : NodeId = vf . get_mut (root) . unwrap () . append (
+      mk_phantom_viewnode ( id ("PH"), src (), "PH" . to_string (),
+                            ExistenceAxes::default (), MembershipAxes::default () )
+    ) . id ();
+    let under_phantom : NodeId = vf . get_mut (phantom) . unwrap () . append (
+      mk_indefinitive_viewnode (id ("A"), src (), "A" . to_string (),
+                                ParentIs::Affected) ) . id ();
+    let dead : NodeId = vf . get_mut (root) . unwrap () . append (
+      ViewNode { focused: false, folded: false, body_folded: false,
+                 kind: ViewNodeKind::DeadScaffold } ) . id ();
+    let under_dead : NodeId = vf . get_mut (dead) . unwrap () . append (
+      mk_indefinitive_viewnode (id ("B"), src (), "B" . to_string (),
+                                ParentIs::Affected) ) . id ();
+    let col : NodeId = vf . get_mut (root) . unwrap () . append (
+      ViewNode { focused: false, folded: false, body_folded: false,
+                 kind: ViewNodeKind::PartnerCol (RoleCol::Subscribee) } ) . id ();
+    let member : NodeId = vf . get_mut (col) . unwrap () . append (
+      mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
+                                ParentIs::Affected) ) . id ();
+
+    mark_orphans_under_dead_parents_independent (&mut vf);
+
+    assert_eq! (parentIs_if_normal (&vf, under_phantom), ParentIs::Independent,
+      "Affected child under a DiffPhantom must demote to Independent");
+    assert_eq! (parentIs_if_normal (&vf, under_dead), ParentIs::Independent,
+      "Affected child under a DeadScaffold must demote to Independent");
+    assert_eq! (parentIs_if_normal (&vf, member), ParentIs::Affected,
+      "Affected member under a PartnerCol must stay Affected (legitimate membership)");
   }
 
   #[test]
