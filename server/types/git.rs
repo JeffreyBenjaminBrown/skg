@@ -96,6 +96,13 @@ pub struct NodeChanges {
   pub aliases_diff  : Vec<Diff_Item<String>>,
   pub ids_diff      : Vec<Diff_Item<ID>>,
   pub contains_diff : Vec<Diff_Item<ID>>,
+  /// §C: per-stage diff of the node's sharing relations, so a sharing-col
+  /// member removed from subscribes_to / hides can carry a PER-STAGE membership
+  /// axis (staged vs unstaged) instead of only the net-removal fallback. A
+  /// member appears in exactly one of contains/subscribes_to/hides, so
+  /// phantom_axes consults all three.
+  pub subscribes_to_diff : Vec<Diff_Item<ID>>,
+  pub hides_diff         : Vec<Diff_Item<ID>>,
 }
 
 //

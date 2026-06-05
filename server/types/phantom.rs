@@ -67,15 +67,24 @@ pub fn phantom_axes (
     PathBuf::from ( format! ( "{}.skg", parent_id . 0 ) );
   let parent_sd : Option<&SourceDiff> =
     source_diffs . and_then ( |d| d . get (parent_source) );
+  // §C: the child appears in exactly one of the parent's relations -- contains
+  // (content / hidden-in member), subscribes_to (subscribee member), or hides
+  // (hidden-outside member) -- so check the per-stage diff of all three and use
+  // whichever carries this child. This gives a PER-STAGE membership axis for
+  // sharing-col members too, not only content children.
   let sign_from_parent_stage =
     | stage_map : &HashMap<PathBuf, NodeCompleteDiff> | -> Option<Sign> {
-      stage_map . get (&parent_file)
-        . and_then ( |d| d . node_changes . as_ref () )
-        . and_then ( |nc| nc . contains_diff . iter ()
-                            . find_map ( |d| match d {
+      let nc = stage_map . get (&parent_file)
+        . and_then ( |d| d . node_changes . as_ref () ) ?;
+      for diff_list in [ & nc . contains_diff,
+                         & nc . subscribes_to_diff,
+                         & nc . hides_diff ] {
+        if let Some (sign) = diff_list . iter () . find_map ( |d| match d {
           Diff_Item::New     (id) if id == child_id => Some (Sign::Plus),
           Diff_Item::Removed (id) if id == child_id => Some (Sign::Minus),
-          _ => None, } ) ) };
+          _ => None, } )
+        { return Some (sign); } }
+      None };
   let mem_staged : Option<Sign> =
     parent_sd . and_then ( |sd| sign_from_parent_stage (&sd . staged) );
   let mem_unstaged : Option<Sign> =
@@ -83,10 +92,12 @@ pub fn phantom_axes (
   let membership : MembershipAxes =
     MembershipAxes { staged: mem_staged, unstaged: mem_unstaged };
 
-  // Fall back to the old "unstaged Minus" assumption when we have
-  // zero per-stage signal for membership. Subscription phantoms go
-  // through this function too, and there's no contains_diff to read
-  // for them — preserve existing behavior in that case.
+  // Fall back to a net "unstaged Minus" only when NO per-stage signal exists in
+  // any of the parent's three relation diffs. The remaining case is a relation
+  // col (e.g. a Subscriber member): its removal lives in the MEMBER's own
+  // subscribes_to diff, not the owner's, so the owner's NodeChanges can't
+  // express it per-stage -- net removal is the best we can do there. (§C note:
+  // per-stage for relation cols would need the member's own diff threaded in.)
   let membership : MembershipAxes =
     if membership . is_empty ()
       { MembershipAxes { staged: None, unstaged: Some (Sign::Minus) } }

@@ -196,8 +196,20 @@ fn compare_nodecompletes (
     compute_interleaved_diff (
       &old . contains,
       &new . contains );
+  // §C: per-stage diffs of the sharing relations, so a removed
+  // subscribee / hidden-outside member gets a per-stage membership axis.
+  let subscribes_to_diff : Vec<Diff_Item<ID>> =
+    compute_interleaved_diff (
+      old . subscribes_to . or_default (),
+      new . subscribes_to . or_default () );
+  let hides_diff : Vec<Diff_Item<ID>> =
+    compute_interleaved_diff (
+      old . hides_from_its_subscriptions . or_default (),
+      new . hides_from_its_subscriptions . or_default () );
   NodeChanges {
     text_changed,
     aliases_diff,
     ids_diff,
-    contains_diff }}
+    contains_diff,
+    subscribes_to_diff,
+    hides_diff }}

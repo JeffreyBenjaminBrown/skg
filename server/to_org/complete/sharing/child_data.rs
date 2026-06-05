@@ -22,7 +22,7 @@
 ///   the tree is being mutated.
 
 use crate::types::env::SkgEnv;
-use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff, Sign};
+use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::misc::{ID, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
@@ -90,25 +90,16 @@ pub fn build_child_data (
       let child_src : SourceName =
         env . find_source (child_skgid, deleted_since_head_pid_src_map)
         . unwrap_or_else ( SourceName::not_found );
-      let mut axes : (ExistenceAxes, MembershipAxes) =
+      // §C: phantom_axes derives the membership axis from the parent's per-stage
+      // relation diffs -- contains_diff, subscribes_to_diff, AND hides_diff -- so
+      // a removed sharing-col member (subscribee / hidden-outside) now gets a
+      // PER-STAGE removedM, and phantom_axes itself net-falls-back to unstaged
+      // Minus for the relation-col case it can't express per-stage. (An earlier
+      // net-removal fallback HERE was redundant with that and is gone.)
+      let axes : (ExistenceAxes, MembershipAxes) =
         phantom_axes ( child_skgid, &child_src,
                        parent_skgid, parent_source,
                        source_diffs . as_ref () );
-      // §9/#1 (Jeff): phantom_axes derives the MEMBERSHIP axis from the PARENT's
-      // contains-list diff. That is correct for a HiddenInSubscribeeCol member
-      // (it IS in the subscribee's contains, so contains_diff carries its
-      // per-stage M), but EMPTY for a member whose relation is not contains --
-      // a Subscribee (in subscribes_to), a HiddenOutsideOfSubscribee (in hides),
-      // or a relation-col member. Those removals are detected by the col's own
-      // goal_list (a net HEAD->worktree diff of its relation), but the diff
-      // infrastructure does not track those relations PER STAGE (NodeChanges has
-      // only contains/ids/aliases), so we cannot split staged vs unstaged here.
-      // This member is in `removed_ids`, i.e. removed from its relation, so mark
-      // it removedM as a net removal (unstaged axis) when phantom_axes found no
-      // contains-based membership. (Per-stage sharing-relation diffs would need
-      // new infra -- see the §1 note; logged for later.)
-      if axes . 1 . staged . is_none () && axes . 1 . unstaged . is_none () {
-        axes . 1 . unstaged = Some (Sign::Minus); }
       let child_title : String =
         title_for_phantom ( child_skgid, &child_src,
                             source_diffs . as_ref (), &env . config );

@@ -61,6 +61,19 @@ pub fn setup_git_repo_with_removed_subscribee_fixtures(
   )
 }
 
+/// §C: the same removed-subscribee transition, but STAGED -- so the phantom's
+/// membership axis must report (staged removedM), proving per-stage works for a
+/// sharing relation (subscribes_to), not just the net unstaged fallback.
+pub fn setup_git_repo_with_removed_subscribee_fixtures_staged(
+  repo_path: &Path,
+) -> Result<Repository, Box<dyn Error>> {
+  super::super::common::setup_git_repo_with_fixtures_staged(
+    repo_path,
+    "tests/git_diff_view/content/fixtures-removed-subscribee/head",
+    "tests/git_diff_view/content/fixtures-removed-subscribee/worktree",
+  )
+}
+
 /// Expected output when the transition is staged rather than unstaged.
 pub const GIT_DIFF_VIEW_STAGED: &str = "\
 * (skg (node (id 1) (source main))) 1
