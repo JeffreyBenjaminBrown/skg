@@ -123,7 +123,10 @@ which takes priority over subee.skg on disk."
                (buffer-substring-no-properties (point-min) (point-max))))
     (assert-headline-types-and-titles
      buf
+     ;; §20.3: post-save now attaches root 11's containerward ancestry (node 1,
+     ;; its container) as a child, matching the de-novo render.
      '((1 node "11")
+       (2 node "1")
        (1 node "subee")
        (2 node "subee-1"))
      "phase 3: buffer 2 initial")))
@@ -157,7 +160,10 @@ which takes priority over subee.skg on disk."
                (buffer-substring-no-properties (point-min) (point-max))))
     (assert-headline-types-and-titles
      buf2
+     ;; §20.3: node 1, attached as 11's containerward in phase 3, is retained as a
+     ;; child of the now-DeletedNode 11 (a DeletedNode keeps its subtree).
      '((1 deleted "11")
+       (2 node "1")
        (1 node "subee")
        (2 node "subee-1"))
      "phase 5: buffer 2 after delete"))
@@ -242,7 +248,9 @@ which takes priority over subee.skg on disk."
                 (point-min) (point-max))))
     (assert-headline-types-and-titles
      buf2
+     ;; §20.3: node 1 (11's phase-3 containerward) is retained under DeletedNode 11.
      '((1 deleted "11")
+       (2 node "1")
        (1 node "subee")
        (2 node "subee-1")
        (2 node "subee-2"))

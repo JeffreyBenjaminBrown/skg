@@ -340,10 +340,14 @@ fn test_definitive_view_conflicting
         // The second 12 (root with request) should be expanded.
         // NOTE: The first 12 redefines the children of 12 as [122]
         // rather than [121,122,123,124].
+        // §20.3: each view-root now also gets its containerward ancestry
+        // attached (here root 12 gains node 1, its container), matching the
+        // de-novo render; post-save used to attach containerward to phantoms only.
         "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 1)))) 1
          ** (skg (node (id 12) (source main) indef (graphStats (contents 1)))) 12
          *** (skg (node (id 122) (source main) indef (graphStats (contents 1)))) 122
          * (skg (node (id 12) (source main) (parentIs absent) (graphStats (containers 1) (contents 1)))) 12
+         ** (skg (node (id 1) (source main) (parentIs independent) (birth containsParent) indef (graphStats (containers 0) (contents 1)) (viewStats containsParent))) 1
          ** (skg (node (id 122) (source main) (graphStats (contents 1)))) 122
          122 body
          *** (skg (node (id 1221) (source main))) 1221
@@ -391,10 +395,15 @@ fn test_definitive_view_with_cycle
 
       println!("Result with cycle:\n{}", result);
 
-      // a should expand to show b, and b's child a should be marked as cycle
+      // a should expand to show b, and b's child a should be marked as cycle.
+      // §20.3: root cyc-a also gets its containerward ancestry attached as a
+      // separate subtree (cyc-b -> cyc-a, the cycle), matching the de-novo
+      // render; post-save used to attach containerward to phantoms only.
       let expected = indoc! {"
         * (skg (node (id cyc-a) (source main) (parentIs absent) (graphStats (containers 1) (contents 1)))) cyc-a
         cyc-a body
+        ** (skg (node (id cyc-b) (source main) (parentIs independent) (birth containsParent) indef (graphStats (containers 1) (contents 1)) (viewStats containsParent))) cyc-b
+        *** (skg (node (id cyc-a) (source main) (parentIs independent) (birth containsParent) indef (graphStats (containers 1) (contents 1)) (viewStats cycle containsParent))) cyc-a
         ** (skg (node (id cyc-b) (source main) (graphStats (contents 1)) (viewStats containsParent))) cyc-b
         cyc-b body
         *** (skg (node (id cyc-a) (source main) indef (graphStats (contents 1)) (viewStats cycle containsParent))) cyc-a
@@ -450,9 +459,16 @@ fn test_definitive_view_with_repeat
         // "the explicit request wins; the origin is demoted"). So the bare
         // root 121 is now indefinitive and 12's child 121 is the definitive
         // occurrence (childless, since the save emptied 121's contains).
+        // §20.3: each view-root now also gets its containerward ancestry
+        // attached (root 121 gains its 12 -> 1 chain; root 12 gains node 1),
+        // matching the de-novo render; post-save used to attach containerward to
+        // phantoms only.
         "* (skg (node (id 121) (source main) (parentIs absent) indef (graphStats (containers 1)))) 121
+         ** (skg (node (id 12) (source main) (parentIs independent) (birth containsParent) indef (graphStats (containers 1) (contents 4)) (viewStats containsParent))) 12
+         *** (skg (node (id 1) (source main) (parentIs independent) (birth containsParent) indef (graphStats (containers 0) (contents 3)) (viewStats containsParent))) 1
          * (skg (node (id 12) (source main) (parentIs absent) (graphStats (containers 1) (contents 4)))) 12
          12 body
+         ** (skg (node (id 1) (source main) (parentIs independent) (birth containsParent) indef (graphStats (containers 0) (contents 3)) (viewStats containsParent))) 1
          ** (skg (node (id 121) (source main))) 121
          ** (skg (node (id 122) (source main) (graphStats (contents 1)))) 122
          122 body

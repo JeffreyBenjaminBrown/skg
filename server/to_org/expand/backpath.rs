@@ -437,6 +437,25 @@ async fn attach_containerward_ancestries_from_map (
 /// Content subheadlines under the given parent.
 /// Iterates children in reverse so that prepending
 /// preserves the original order.
+/// Like `find_child_by_id`, but matches ONLY a previously-attached containerward
+/// child: a Normal node of the given id whose birth is `ContainsParent`. Used to
+/// keep containerward attachment idempotent without conflating it with a content
+/// child of the same id (which co-occurs in a cycle). Returns None if no such
+/// containerward child exists, even when a content child of that id does.
+fn find_containerward_child_by_id (
+  tree          : & Tree<ViewNode>,
+  parent_treeid : NodeId,
+  target_skgid  : & ID,
+) -> Option < NodeId > {
+  tree . get (parent_treeid) ?
+    . children ()
+    . find_map ( |child| match &child . value () . kind {
+      ViewNodeKind::Vognode (Vognode::Normal (t))
+        if & t . id == target_skgid
+           && t . birth == Birth::ContainsParent
+        => Some ( child . id () ),
+      _ => None } ) }
+
 pub fn insert_containerward_ancestry_tree_recursive<'a> (
   node       : &'a AncestryTree,
   parent_nid : NodeId,
@@ -447,13 +466,18 @@ pub fn insert_containerward_ancestry_tree_recursive<'a> (
 ) -> Pin<Box<dyn Future<Output = Result<(),
                                         Box<dyn Error>>> + 'a>> {
   Box::pin ( async move {
-    // Dedup-aware insertion, like integrate_linear_portion_of_path: reuse an
-    // ancestry node already present under this parent rather than prepending a
-    // duplicate. This makes containerward attachment idempotent, so re-attaching
-    // to a node that already carries its ancestry (e.g. a post-save root, whose
-    // submitted buffer already holds it) is a no-op rather than a duplication.
+    // Dedup-aware insertion: reuse a containerward node ALREADY present under
+    // this parent rather than prepending a duplicate. This makes containerward
+    // attachment idempotent, so re-attaching to a node that already carries its
+    // ancestry (e.g. a post-save root, whose submitted buffer already holds it)
+    // is a no-op rather than a duplication. We match only a prior CONTAINERWARD
+    // child (birth == ContainsParent), NOT just any child of the same id: in a
+    // cycle (a contains b AND b contains a) the same id occurs as both a content
+    // child and a containerward node, and those two occurrences must stay
+    // distinct view nodes -- reusing the content child would collapse the
+    // containerward subtree into it.
     let child_nid : NodeId =
-      match find_child_by_id ( tree, parent_nid, node . id () ) {
+      match find_containerward_child_by_id ( tree, parent_nid, node . id () ) {
         Some (existing) => existing,
         None => match
           prepend_indef_indep_child_with_source_set (

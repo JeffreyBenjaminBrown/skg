@@ -87,6 +87,9 @@
     (assert-headline-titles
      buf
      '((1 absent "b")
+       ;; §20.3: post-save now attaches root b's containerward ancestry (a),
+       ;; matching the de-novo view-b in phase 2.
+       (2 containsParent "a")
        (2 affected   "e, edited")
        (2 affected   "f")
        (3 affected   "d"))
@@ -196,6 +199,8 @@
     (assert-headline-titles
      buf-b
      '((1 absent "b")
+       ;; §20.3: root b's containerward ancestry (a), as in phases 2 and 4.
+       (2 containsParent "a")
        (2 affected   "e, edited")
        (2 affected   "f")
        (3 affected   "d"))
