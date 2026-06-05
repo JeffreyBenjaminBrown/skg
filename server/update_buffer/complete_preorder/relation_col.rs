@@ -8,7 +8,7 @@ use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
-use crate::update_buffer::complete_preorder::truenode::cap_goal_list_to_budget;
+use crate::update_buffer::util::cap_goal_list_to_budget;
 use crate::types::viewnode::{RoleCol, ViewNode};
 
 use ego_tree::{NodeId, Tree};

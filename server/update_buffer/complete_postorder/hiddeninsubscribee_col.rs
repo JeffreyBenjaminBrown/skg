@@ -6,7 +6,7 @@ use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
-use crate::update_buffer::complete_preorder::truenode::cap_goal_list_to_budget;
+use crate::update_buffer::util::cap_goal_list_to_budget;
 use crate::types::viewnode::{ViewNode, RoleCol};
 
 use ego_tree::{NodeId, Tree};

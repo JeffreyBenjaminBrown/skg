@@ -7,7 +7,7 @@ use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child_of_viewnode, insert_scaffold_as_child};
 use crate::update_buffer::ancestry::required_ancestor;
-use crate::update_buffer::complete_preorder::truenode::cap_goal_list_to_budget;
+use crate::update_buffer::util::cap_goal_list_to_budget;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, RoleCol};
 use crate::types::viewnode::Vognode;
 use crate::update_buffer::util::move_child_to_end;

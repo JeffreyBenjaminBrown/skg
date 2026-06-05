@@ -18,6 +18,7 @@ use crate::types::tree::viewnode_nodecomplete::{
     pid_and_source_from_treenode,
     write_at_truenode_in_tree};
 use crate::update_buffer::util::{
+    cap_goal_list_to_budget,
     complete_relevant_children_in_viewnodetree,
     partition_children,
     treat_certain_children,
@@ -254,49 +255,6 @@ fn convert_nonmember_unknown_children_to_dead (
       _ => false },
     |vn : &mut ViewNode| { vn . kind = ViewNodeKind::DeadScaffold; },
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
-
-/// §5.5 node-limit: cap a goal list so this scaffold creates at most
-/// `*node_budget` *new* TrueNode children (ids not already present as
-/// children). Existing children cost nothing (no new node), and removed-id
-/// diff phantoms are exempt (the diff overlay is not budget-bound, §5.5), so
-/// both are always kept. Decrements `*node_budget` by the number of new ids
-/// kept and drops the rest from the goal list (so they are simply not
-/// created -- and, in a cascade, not expanded). Preserves order.
-///
-/// Shared by content reconciliation (here) and the four sharing-col
-/// reconcilers (§18): a famous node's relation/subscribee col can list
-/// thousands of unbounded members, so cols must spend the same budget as
-/// content rather than draw every member. The id/alias cols stay unbudgeted --
-/// they are bounded by a node's own id/alias count.
-pub(in crate::update_buffer) fn cap_goal_list_to_budget (
-  tree        : &Tree<ViewNode>,
-  node        : NodeId,
-  goal_list   : &[ID],
-  removed_ids : &HashSet<ID>,
-  node_budget : &mut usize,
-) -> Vec<ID> {
-  let existing : HashSet<ID> =
-    tree . get (node) . unwrap () . children ()
-    . filter_map ( |c| match &c . value () . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t)) =>
-          Some ( t . id . clone () ),
-        ViewNodeKind::Vognode (Vognode::DiffPhantom (p)) =>
-          Some ( p . id . clone () ),
-        ViewNodeKind::Vognode (Vognode::Inactive (i)) =>
-          Some ( i . id . clone () ),
-        _ => None } )
-    . collect ();
-  let mut kept : Vec<ID> = Vec::with_capacity ( goal_list . len () );
-  for id in goal_list {
-    if existing . contains (id) || removed_ids . contains (id) {
-      kept . push ( id . clone () ); // free: not a new ordinary node
-    } else if *node_budget > 0 {
-      *node_budget -= 1;
-      kept . push ( id . clone () );
-    } // else: budget exhausted -- drop this new id
-  }
-  kept }
-
 
 fn mutate_truenode_to_deletednode (
   tree   : &mut Tree<ViewNode>,
