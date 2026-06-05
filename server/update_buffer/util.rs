@@ -85,20 +85,6 @@ pub fn detach_scaffold_transferring_focus (
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (()) }
 
-/// Like `detach_scaffold_transferring_focus`, but only acts if the
-/// scaffold has no children.
-pub fn detach_scaffold_if_empty (
-  tree : &mut Tree<ViewNode>,
-  node : NodeId,
-) -> Result<(), Box<dyn Error>> {
-  let has_children : bool =
-    tree . get (node)
-      . ok_or ("detach_scaffold_if_empty: node not found") ?
-      . children () . next () . is_some ();
-  if !has_children {
-    detach_scaffold_transferring_focus (tree, node) ?; }
-  Ok (()) }
-
 /// Move an existing child to the end of its parent's children list.
 /// Uses detach() + append_id() to move without cloning.
 pub fn move_child_to_end<Node> (

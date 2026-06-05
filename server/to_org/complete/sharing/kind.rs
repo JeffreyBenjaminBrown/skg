@@ -5,8 +5,8 @@
 //! enough structure (build child data, reconcile against a goal
 //! list) that several pieces of per-kind metadata are worth
 //! capturing as methods: the caller-label string used in panic
-//! messages, the corresponding PartnerCol variant, the number of
-//! ancestor links to the subscriber, and a self-type guard.
+//! messages, the corresponding PartnerCol variant, and a self-type
+//! guard.
 
 use crate::types::tree::generic::error_unless_node_satisfies;
 use crate::types::viewnode::{RoleCol, ViewNode, ViewNodeKind};
@@ -38,26 +38,6 @@ impl RoleCol {
         "reconcile_hiddenin_subscribee_col_children",
       RoleCol::HiddenOutsideOfSubscribee =>
         "reconcile_hiddenoutside_subscribee_col_children", } }
-
-  /// How many ancestor links *should* separate this scaffold
-  /// from the subscriber TrueNode.
-  ///
-  /// Tree shape:
-  ///   subscriber (TrueNode)
-  ///     └─ SubscribeeCol                       ← distance 1
-  ///          ├─ Subscribee (TrueNode)          ← distance 2
-  ///          │    └─ HiddenInSubscribeeCol     ← distance 3
-  ///          └─ HiddenOutsideOfSubscribeeCol   ← distance 2
-  pub fn correct_subscriber_ancestor_distance (self) -> usize {
-    match self {
-      RoleCol::Subscribee
-        | RoleCol::Subscriber
-        | RoleCol::Overridden
-        | RoleCol::Overrider
-        | RoleCol::Hider
-        | RoleCol::Hidden => 1,
-      RoleCol::HiddenInSubscribee => 3,
-      RoleCol::HiddenOutsideOfSubscribee => 2, } }
 
   pub fn relation_member_role (self) -> Option<RelationRole> {
     match self {

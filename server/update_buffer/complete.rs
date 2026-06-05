@@ -336,7 +336,7 @@ fn prune_self_deletable_when_empty (
 ) -> Result<(), Box<dyn Error>> {
   let nodes : Vec<NodeId> =
     collect_matching_nodeids (
-      tree, false,
+      tree,
       |vn| is_self_deletable_when_empty (&vn . kind) ) ?;
   for treeid in nodes {
     let node = match tree . get (treeid) {
@@ -384,14 +384,15 @@ fn convert_inactive_to_deleted_if_deleted (
 
 fn collect_matching_nodeids<Predicate> (
   tree      : &Tree<ViewNode>,
-  preorder  : bool,
   predicate : Predicate,
 ) -> Result<Vec<NodeId>, Box<dyn Error>>
 where Predicate : Fn (&ViewNode) -> bool {
   let root_treeid : NodeId = tree . root () . id ();
   let mut result : Vec<NodeId> = Vec::new ();
   do_everywhere_in_tree_dfs_readonly (
-    tree, root_treeid, preorder,
+    tree, root_treeid,
+    false, // postorder: a chain (Dead -> Deleted, or a col emptied by the
+           // removal of its last child) collapses bottom-up in one sweep.
     &mut |node| {
       if predicate (node . value ()) {
         result . push (node . id ()); }
