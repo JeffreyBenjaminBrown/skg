@@ -1,4 +1,3 @@
-use crate::context::update_context_types_for_saved_nodes;
 use crate::dbs::in_rust_graph::in_rust_graph_coherent_with_save_instructions;
 use crate::from_text::{ SavePlan, buffer_to_validated_saveplan};
 use crate::git_ops::diff::compute_diff_for_source;
@@ -265,7 +264,9 @@ pub async fn update_from_and_rerender_buffer (
       source_moves } }
     = save_plan;
 
-  { // update the graph
+  { // update the graph. Context origin types (for search ranking) are
+    // computed from the post-save in-Rust graph and written inside the
+    // single Tantivy index pass, so there is no separate context pass.
     update_graph_including_merges (
       nonmerge_defineNodes . clone(),
       &merges,
@@ -273,14 +274,7 @@ pub async fn update_from_and_rerender_buffer (
       env . config . clone(),
       &mut env . tantivy_index,
       &env . driver,
-      &env . in_rust_graph ) . await ?;
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "update_context_types_for_saved_nodes" ). entered();
-      update_context_types_for_saved_nodes (
-        &env . tantivy_index, &env . config . db_name,
-        &env . driver, &nonmerge_defineNodes ) . await
-      . unwrap_or_else ( |e| tracing::warn! (
-        "context type recomputation failed: {}", e )); }}
+      &env . in_rust_graph ) . await ?; }
 
   let define_nodes : Vec<DefineNode> = // includes the merges
     nonmerge_defineNodes . iter () . cloned ()

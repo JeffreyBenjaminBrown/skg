@@ -10,6 +10,7 @@ use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::textlinks::replace_each_link_with_its_label;
 
 use tantivy::{IndexWriter, Term, TantivyDocument, doc};
+use std::collections::HashMap;
 use std::error::Error;
 
 /// Updates the index with the provided NodeTantivys.
@@ -29,7 +30,7 @@ pub fn update_index_with_nodes (
     nodes . iter(), &mut writer, tantivy_index)?;
   let processed_count: usize = // Add new associations.
     add_documents_to_tantivy_writer (
-      nodes, &mut writer, tantivy_index)?;
+      nodes, &mut writer, tantivy_index, &HashMap::new ())?;
   commit_with_status(
     &mut writer, tantivy_index, processed_count, "Updated")?;
   Ok (processed_count) }
@@ -63,6 +64,7 @@ pub fn add_documents_to_tantivy_writer<'a, I> (
   nodes         : I,
   writer        : &mut IndexWriter,
   tantivy_index : &TantivyIndex,
+  context_types : &HashMap<ID, String>, // pid -> context_origin_type label; pids absent here index with "" (filled at init/rebuild).
 ) -> Result<usize, Box<dyn Error>>
 where I: IntoIterator<Item = &'a NodeTantivy>, {
 
@@ -70,7 +72,7 @@ where I: IntoIterator<Item = &'a NodeTantivy>, {
   for node in nodes {
     let documents: Vec<TantivyDocument> =
       create_documents_from_node(
-        node, tantivy_index )?;
+        node, tantivy_index, context_types )?;
     for document in documents {
       writer . add_document (document)?;
       indexed_count += 1; }}
@@ -79,9 +81,13 @@ where I: IntoIterator<Item = &'a NodeTantivy>, {
 fn create_documents_from_node (
   node: &NodeTantivy,
   tantivy_index: &TantivyIndex,
+  context_types : &HashMap<ID, String>,
 ) -> Result < Vec < TantivyDocument >,
               Box < dyn Error >> {
   let primary_id : &ID = &node . pid;
+  let context_origin_type : &str =
+    context_types . get (primary_id)
+    . map ( |s| s . as_str () ) . unwrap_or ("");
   let had_id : &str =
     if node . misc . contains (
       &FileProperty::Had_ID_Before_Import )
@@ -122,7 +128,7 @@ fn create_documents_from_node (
         tantivy_index . source_field =>
           node . source . as_str(),
         tantivy_index . context_origin_type_field =>
-          "",
+          context_origin_type,
         tantivy_index . is_title_field =>
           is_title_str,
         tantivy_index . had_id_field =>

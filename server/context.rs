@@ -12,23 +12,16 @@ use crate::consts::{
   MULTIPLIER_MULTI_CONTAINED,
   MULTIPLIER_ROOT,
   MULTIPLIER_TARGET,
-  typedb_concurrent_transactions,
 };
-use crate::dbs::tantivy::subset_with_hadid;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::tantivy::context_update::update_context_origin_types;
-use crate::dbs::typedb::paths::containerward_path_stats_bulk;
-use crate::dbs::typedb::search::find_container_ids_of_pid;
-use crate::dbs::typedb::util::ConceptRowStream;
 use crate::types::misc::{ID, TantivyIndex};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::textlinks::textlinks_from_node;
-use crate::types::viewnode::ContainerwardPathStats;
 
-use futures::stream::{self, StreamExt};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use typedb_driver as tdbd;
 
 //
 // Types
@@ -125,136 +118,78 @@ pub fn compute_and_store_context_types (
             updated);
   Ok (context_types_by_id) }
 
-/// Recompute context origin types
-/// (used to rank search results) for saved nodes,
-pub async fn update_context_types_for_saved_nodes (
-  tantivy_index : &TantivyIndex,
-  db_name       : &str,
-  driver        : &tdbd::TypeDBDriver,
-  instructions  : &[DefineNode],
-) -> Result<(), Box<dyn Error>> {
-  let saved_ids : HashSet<ID> =
-    instructions . iter ()
+/// Context origin types (used to rank search results) for the nodes a
+/// save touched, read straight from the post-save in-Rust graph — no
+/// TypeDB round-trips. Returns a pid -> origin-type-label map that the
+/// save's single Tantivy index pass writes directly into each document,
+/// so no second writer/commit is needed.
+///
+/// Like the previous save-time version this is best-effort for cycles:
+/// it does a containerward walk from each still-untyped saved node
+/// rather than the whole-graph cycle expansion, which stays at
+/// init/rebuild ('compute_and_store_context_types').
+pub fn context_origin_types_for_saved_from_in_rust_graph (
+  graph     : &InRustGraph,
+  node_defs : &[DefineNode],
+) -> HashMap<ID, String> {
+  let saved : Vec<&NodeComplete> =
+    node_defs . iter ()
     . filter_map ( |instr| match instr {
-      DefineNode::Save (SaveNode (node)) =>
-        Some (node . pid . clone ()),
+      DefineNode::Save (SaveNode (node)) => Some (node),
       DefineNode::Delete (_) => None } )
     . collect ();
-  if saved_ids . is_empty () { return Ok (( )); }
-
-  // Build the inputs that `identify_origins` expects,
-  // using TypeDB for graph structure and Tantivy for had_id.
-  let map_to_containers : MapToContainers =
-    map_to_containers_from_typedb (
-      db_name, driver, &saved_ids ) . await ?;
-  let link_targets : HashSet<ID> =
-    link_targets_from_typedb (
-      db_name, driver, &saved_ids ) . await ?;
-  let hadid_set : HashSet<ID> =
-    subset_with_hadid (tantivy_index, &saved_ids);
+  if saved . is_empty () { return HashMap::new (); }
+  let saved_ids : HashSet<ID> =
+    saved . iter () . map ( |n| n . pid . clone () ) . collect ();
+  let map_to_containers : MapToContainers = // each saved pid -> its containers
+    saved_ids . iter ()
+    . filter_map ( |id| graph . contained_by . get (id)
+      . map ( |cs| ( id . clone (),
+                     cs . iter () . cloned () . collect () )) )
+    . collect ();
+  let link_targets : HashSet<ID> = // saved nodes that anything links to
+    saved_ids . iter ()
+    . filter ( |id| graph . textlinks_in . get (id)
+               . map ( |s| ! s . is_empty () ) . unwrap_or (false) )
+    . cloned () . collect ();
+  let had_id_set : HashSet<ID> = // from each node's own file properties
+    saved . iter ()
+    . filter ( |n| n . misc . contains (
+        &FileProperty::Had_ID_Before_Import ) )
+    . map ( |n| n . pid . clone () )
+    . collect ();
   let mut origin_types : HashMap<ID, ContextOriginType> =
     identify_origins (
-      &saved_ids, &map_to_containers, &link_targets, &hadid_set );
-
-  { // identify_origins does not handle cycles. (The init path uses extend_contexts_for_cycles, which covers the whole graph and hence won't work here). For nodes that still have no origin type and are singly contained, check for cycles via the existing bulk BFS in paths.rs.
-    let ids_to_check : Vec<ID> =
-      saved_ids . iter ()
-      . filter ( |id| ! origin_types . contains_key (id) )
-      . cloned () . collect ();
-    let path_stats : HashMap<ID, ContainerwardPathStats> =
-      containerward_path_stats_bulk (
-        db_name, driver, &ids_to_check ) . await ?;
-    for (id, stats) in &path_stats {
-      if stats . cycles {
-        origin_types . insert (
-          id . clone (), ContextOriginType::CycleMember ); }} }
-  let origin_types_typedb_can_read : HashMap<ID, String> =
-    // convert each ContextOriginType to String
-    origin_types . iter ()
+      &saved_ids, &map_to_containers, &link_targets, &had_id_set );
+  for id in &saved_ids {
+    // CycleMember, only for nodes not already a higher-priority origin.
+    if ! origin_types . contains_key (id)
+       && node_is_in_containerward_cycle (graph, id) {
+      origin_types . insert (
+        id . clone (), ContextOriginType::CycleMember ); } }
+  origin_types . iter ()
     . map ( |(id, ct)| (id . clone (),
-                        ct . label () . to_string () ))
-    . collect ();
-  if ! origin_types_typedb_can_read . is_empty () {
-    update_context_origin_types (
-      tantivy_index, &origin_types_typedb_can_read ) ?; }
-  Ok (( )) }
+                        ct . label () . to_string ()) )
+    . collect () }
 
-/// Build a content-to-containers map for a set of node IDs
-/// by querying TypeDB in parallel.
-async fn map_to_containers_from_typedb (
-  db_name : &str,
-  driver  : &tdbd::TypeDBDriver,
-  ids     : &HashSet<ID>,
-) -> Result<MapToContainers, Box<dyn Error>> {
-  let results : Vec<Result<(ID, HashSet<ID>),
-                           Box<dyn Error>>> =
-    stream::iter ( ids . iter () . map ( |id| {
-      let id : ID = id . clone ();
-      async move {
-        let containers : HashSet<ID> =
-          find_container_ids_of_pid (
-            db_name, driver, &id ) . await ?;
-        Ok ((id, containers)) }} ))
-    . buffer_unordered (
-      typedb_concurrent_transactions () )
-    . collect () . await;
-  let mut map_to_containers : MapToContainers =
-    HashMap::new ();
-  for r in results {
-    let (id, containers) : (ID, HashSet<ID>) = r ?;
-    if ! containers . is_empty () {
-      map_to_containers . insert (
-        id, containers . into_iter () . collect () ); }}
-  Ok (map_to_containers) }
-
-/// Returns a subset of the input IDs
-/// that are textlink targets, querying TypeDB in parallel.
-async fn link_targets_from_typedb (
-  db_name : &str,
-  driver  : &tdbd::TypeDBDriver,
-  ids     : &HashSet<ID>,
-) -> Result<HashSet<ID>, Box<dyn Error>> {
-  let results : Vec<Result<(ID, bool),
-                           Box<dyn Error>>> =
-    stream::iter ( ids . iter () . map ( |id| {
-      let id : ID = id . clone ();
-      async move {
-        let hit : bool =
-          is_textlink_target (
-            db_name, driver, &id ) . await ?;
-        Ok ((id, hit)) }} ))
-    . buffer_unordered (
-      typedb_concurrent_transactions () )
-    . collect () . await;
-  let mut targets : HashSet<ID> = HashSet::new ();
-  for r in results {
-    let (id, hit) : (ID, bool) = r ?;
-    if hit { targets . insert (id); }}
-  Ok (targets) }
-
-async fn is_textlink_target (
-  db_name : &str,
-  driver  : &tdbd::TypeDBDriver,
-  pid     : &ID,
-) -> Result<bool, Box<dyn Error>> {
-  use futures::StreamExt;
-  let tx : tdbd::Transaction =
-    driver . transaction (
-      db_name, tdbd::TransactionType::Read
-    ) . await ?;
-  let answer : tdbd::answer::QueryAnswer =
-    tx . query ( format! (
-      r#"match
-         $dest isa node, has id "{}";
-         $rel isa textlinks_to ( source: $src,
-                                 dest:   $dest );
-         select $rel; limit 1;"#,
-      pid ) ) . await ?;
-  let mut stream : ConceptRowStream =
-    answer . into_rows ();
-  let has_any : bool =
-    stream . next () . await . is_some ();
-  Ok (has_any) }
+/// True when 'start' lies on a containerward cycle: following
+/// 'contained_by' edges from 'start' can return to 'start'. The in-Rust
+/// analogue of the 'cycles' flag from 'containerward_path_stats_bulk'.
+fn node_is_in_containerward_cycle (
+  graph : &InRustGraph,
+  start : &ID,
+) -> bool {
+  let mut stack : Vec<ID> =
+    graph . contained_by . get (start)
+    . map ( |cs| cs . iter () . cloned () . collect () )
+    . unwrap_or_default ();
+  let mut visited : HashSet<ID> = HashSet::new ();
+  while let Some (cur) = stack . pop () {
+    if &cur == start { return true; }
+    if ! visited . insert (cur . clone ()) { continue; }
+    if let Some (containers) = graph . contained_by . get (&cur) {
+      for c in containers { stack . push (c . clone ()); } } }
+  false }
 
 //
 // Step 1: identify origins (using the in-Rust graph)

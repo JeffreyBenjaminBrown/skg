@@ -100,7 +100,8 @@ pub async fn merge_nodes (
 
   { // Tantivy.
     match update_tantivy_from_saveinstructions (
-      &primary_definenodes, tantivy_index )
+      &primary_definenodes, tantivy_index,
+      &std::collections::HashMap::new () ) // merged nodes index with "" context type; refreshed at next rebuild
     { Ok (_count) => {
         tracing::info!("   Tantivy merge complete.");
         Ok (None) }

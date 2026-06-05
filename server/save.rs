@@ -1,4 +1,5 @@
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
+use crate::context::context_origin_types_for_saved_from_in_rust_graph;
 use crate::dbs::filesystem::multiple_nodes::{
   check_for_duplicate_ids_across_sources,
   delete_all_nodes_from_fs,
@@ -34,7 +35,7 @@ use crate::types::save::{DefineNode, SaveNode, DeleteNode, Merge, SourceMove};
 use crate::types::nodes::complete::NodeComplete;
 use crate::util::path_from_pid_and_source;
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::io;
 use std::sync::Arc;
@@ -100,6 +101,14 @@ async fn apply_define_nodes_to_stores (
       "apply_definenodes_to_inRustGraph") . entered ();
     apply_definenodes (graph, &node_defs); }
 
+  // Context origin types, read from the post-apply in-Rust graph, so
+  // the Tantivy pass below indexes each saved doc once with its final
+  // type — no separate context writer/commit. Computed here (not on the
+  // Tantivy thread) so the read happens before any further mutation.
+  let context_types : HashMap<ID, String> =
+    context_origin_types_for_saved_from_in_rust_graph (
+      & graph . load_full (), &node_defs );
+
   // TypeDB (async) and Tantivy (sync) in parallel.
   // Both are independent after the FS update.
   let tantivy_instructions : Vec<DefineNode> = node_defs . clone ();
@@ -109,7 +118,7 @@ async fn apply_define_nodes_to_stores (
       let t0 : Instant = Instant::now ();
       let result : Result<usize, String> =
         update_tantivy_from_saveinstructions (
-          &tantivy_instructions, &tantivy_idx )
+          &tantivy_instructions, &tantivy_idx, &context_types )
         . map_err ( |e| e . to_string () );
       (result, t0 . elapsed ()) });
 
@@ -514,6 +523,7 @@ pub fn update_fs_from_saveinstructions (
 pub(super) fn update_tantivy_from_saveinstructions (
   instructions  : &[DefineNode],
   tantivy_index : &TantivyIndex,
+  context_types : &HashMap<ID, String>, // pid -> context_origin_type label, so each doc is indexed once with its final type (no second context pass needed). Empty for the merge path.
 ) -> Result<usize, Box<dyn Error>> {
 
   let mut writer: IndexWriter =
@@ -538,7 +548,8 @@ pub(super) fn update_tantivy_from_saveinstructions (
     . collect();
   let processed_count: usize =
     add_documents_to_tantivy_writer(
-      & nodes_to_add, &mut writer, tantivy_index )? ;
+      & nodes_to_add, &mut writer, tantivy_index,
+      context_types )? ;
   commit_with_status(
     &mut writer, tantivy_index, processed_count, "Updated")?;
   Ok (processed_count) }

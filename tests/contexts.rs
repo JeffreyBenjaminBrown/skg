@@ -6,6 +6,7 @@ use skg::context::{
   MapToContent,
   MapToContainers,
   content_maps_from_nodes,
+  context_origin_types_for_saved_from_in_rust_graph,
   had_id_set_from_nodes,
   link_targets_from_nodes,
   find_roots_and_multiply_contained,
@@ -13,8 +14,10 @@ use skg::context::{
   extend_contexts_for_cycles,
 };
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::in_rust_graph::InRustGraph;
 use skg::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
 use skg::types::nodes::complete::{FileProperty, NodeComplete, empty_node_complete};
+use skg::types::save::{DefineNode, SaveNode};
 
 #[test]
 fn test_from_label_unknown () {
@@ -88,6 +91,48 @@ fn test_origin_type_priority () {
   assert_eq! (
     origin_types . get (&ID::new ("a")),
     Some (&ContextOriginType::Root) ); }
+
+#[test]
+fn in_rust_context_types_for_saved_nodes () {
+  // The save-time, in-Rust-graph origin-type computation. One node of
+  // each kind, plus an ordinary (untyped) node and a 2-node cycle.
+  let mk = | pid : &str, title : &str,
+            contains : &[&str], had_id : bool | -> NodeComplete {
+    let mut n : NodeComplete = empty_node_complete ();
+    n . pid = ID::new (pid);
+    n . title = title . to_string ();
+    n . source = SourceName::from ("main");
+    n . contains = contains . iter () . map ( |c| ID::new (*c) ) . collect ();
+    if had_id { n . misc = vec![FileProperty::Had_ID_Before_Import]; }
+    n };
+  let nodes : Vec<NodeComplete> = vec![
+    mk ("root",   "root",                &["ord","multi","hadid","tgt"], false),
+    mk ("other",  "other",               &["multi"],                     false),
+    mk ("ord",    "ordinary",            &[],                            false),
+    mk ("multi",  "multi",               &[],                            false),
+    mk ("hadid",  "hadid",               &[],                            true ),
+    mk ("tgt",    "target",              &[],                            false),
+    mk ("linker", "see [[id:tgt][t]]",   &[],                            false),
+    mk ("cyc1",   "cyc1",                &["cyc2"],                      false),
+    mk ("cyc2",   "cyc2",                &["cyc1"],                      false), ];
+  let graph : InRustGraph =
+    InRustGraph::from_nodecompletes (&nodes);
+  let defs : Vec<DefineNode> =
+    nodes . iter () . cloned ()
+    . map ( |n| DefineNode::Save ( SaveNode (n) )) . collect ();
+  let types : HashMap<ID, String> =
+    context_origin_types_for_saved_from_in_rust_graph (&graph, &defs);
+  let got = |id : &str| types . get (&ID::new (id)) . map ( |s| s . as_str () );
+  assert_eq! (got ("root"),   Some ("Root"));
+  assert_eq! (got ("other"),  Some ("Root"));
+  assert_eq! (got ("linker"), Some ("Root"));
+  assert_eq! (got ("multi"),  Some ("MultiContained"));
+  assert_eq! (got ("hadid"),  Some ("HadID"));
+  assert_eq! (got ("tgt"),    Some ("Target"));
+  assert_eq! (got ("ord"),    None,
+    "a singly-contained ordinary node is not an origin");
+  assert_eq! (got ("cyc1"),   Some ("CycleMember"));
+  assert_eq! (got ("cyc2"),   Some ("CycleMember")); }
 
 #[test]
 fn test_find_roots_and_multiply_contained () {
