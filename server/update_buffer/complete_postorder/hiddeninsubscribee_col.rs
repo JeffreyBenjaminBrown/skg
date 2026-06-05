@@ -69,7 +69,7 @@ pub fn reconcile_hiddenin_subscribee_col_children (
     // moved it into the subscribee-as-such, 'unhiding' it) is removed when it
     // is a view-leaf -- the common case for hidden members -- and demoted to
     // Independent only if it has a user subtree to preserve. The reconciler
-    // applies this uniformly now; the old mark_managed pre-marking is gone.
+    // applies this uniformly.
     tree, node, kind,
     &goal_list, &child_data ) ?;
   // §3.4: an emptied HiddenInSubscribeeCol is removed by the single postorder

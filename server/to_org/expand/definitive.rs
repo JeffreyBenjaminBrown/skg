@@ -248,10 +248,10 @@ fn truenode_file_absent_from_worktree (
     None               => matches! (existence . staged, Some (Sign::Minus)),
   } }
 
-/// Expand children for a removed node,
-/// by loading content from git HEAD.
-/// Children that exist in TypeDB are marked as RemovedHere.
-/// Children that don't exist in TypeDB are marked as Removed.
+/// Expand children for a removed node, by loading content from git HEAD. Each
+/// child is a DiffPhantom; whether it still exists in the worktree (a
+/// removed-here member) or not (fully removed) is encoded in its
+/// existence/membership axes, not in a named state.
 pub async fn extendDefinitiveSubtree_fromGit (
   tree           : &mut Tree<ViewNode>,
   effective_root : NodeId,

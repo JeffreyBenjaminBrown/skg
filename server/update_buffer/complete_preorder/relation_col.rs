@@ -59,10 +59,9 @@ pub fn reconcile_relation_col_children (
       tree, node, &owner_pid, &owner_source,
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
-  // §6.0/§16: no longer pre-mark non-goal members Independent. The reconciler
-  // now deletes a stale member that is a view-leaf and demotes one that is a
-  // branch, so a relation col (read-only from this side) correctly drops a
-  // stale leaf member instead of preserving it.
+  // §6.0/§16: the reconciler deletes a stale member that is a view-leaf and
+  // demotes one that is a branch, so a relation col (read-only from this side)
+  // drops a stale leaf member instead of preserving it.
   reconcile_sharing_col_children (
     tree, node, kind, &goal_list, &child_data ) ?;
   Ok (( )) }

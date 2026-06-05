@@ -57,9 +57,8 @@ pub async fn reconcile_subscribee_col_children (
   // to add one back. (A SubscribeeCol is only *created* when subscribes_to is
   // non-empty -- to_org/complete/sharing/mod.rs gates on that -- so an empty one
   // here means the subscriber lost all its subscriptions, and we keep the
-  // headline so the user can re-add. The former `if goal_list.is_empty() {
-  // detach }` self-delete is gone.) Its children still reconcile to empty below,
-  // and the HiddenOutsideOfSubscribeeCol is still ensured last.
+  // headline so the user can re-add.) Its children still reconcile to empty
+  // below, and the HiddenOutsideOfSubscribeeCol is still ensured last.
   if context . parent_indefinitive || source_diffs . is_some() {
     // §5.5/§18: each genuinely-new subscribee is a new TrueNode; spend the
     // per-buffer budget so a node with thousands of subscriptions truncates

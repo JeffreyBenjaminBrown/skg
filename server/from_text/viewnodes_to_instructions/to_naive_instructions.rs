@@ -273,7 +273,7 @@ pub(crate) fn naive_node_edit_intents_from_role_viewforest (
 /// - filtered for no-op saves
 /// - ignorant of the special hiderel interpretation in the case of
 ///   DefinenodeCandidateKind::Subscribee
-///   ('ubscribee_hiderel_intents_from_candidates' does that)
+///   ('subscribee_hiderel_intents_from_candidates' does that)
 pub(crate) fn naive_node_edit_intents_from_candidates (
   role_viewforest : &Tree<ViewNode_in_Role>,
   candidates      : &[DefinenodeCandidate],

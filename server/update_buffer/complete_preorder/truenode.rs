@@ -156,9 +156,10 @@ fn clear_edit_request (
           { *edit_request = None; }} ) ?;
   Ok (( )) }
 
-/// Phase 3 (non-saved views only): overwrite the viewnode's title
-/// and body with the fresh values from disk. The saved view is the
-/// one that *defines* those fields, so it is excluded.
+/// Overwrite the viewnode's title, source, and body with the fresh values from
+/// the snapshot. §8.3: every definitive node re-syncs, saved and collateral
+/// alike -- after extraction the snapshot already holds the saved buffer's text,
+/// so the saved node re-syncs to the same content it just defined.
 fn sync_truenode_from_disk (
   tree         : &mut Tree<ViewNode>,
   node         : NodeId,
@@ -218,12 +219,11 @@ fn reconcile_content_children (
   let goal_list : Vec<ID> =
     cap_goal_list_to_budget(
       tree, node, &apparent_content_ids, &no_removed, node_budget );
-  // A content child this save deleted is no longer detached here (the former
-  // detach_stale_deleted_content stopgap is gone, death-leafward build order
-  // 2/3): it stays, and at its own BFS visit becomes a DeletedNode whose cols
-  // generalized-orphan and deaden -- so no col reconciles against a missing
-  // NodeComplete -- while any user subtree under it is preserved (demoted), and
-  // a now-childless DeletedNode is removed by the §6.6 prune sweep.
+  // A content child this save deleted stays here; at its own BFS visit it
+  // becomes a DeletedNode whose cols generalized-orphan and deaden -- so no col
+  // reconciles against a missing NodeComplete -- while any user subtree under it
+  // is preserved (demoted), and a now-childless DeletedNode is removed by the
+  // §6.6 prune sweep.
   complete_content_children(
     tree, node, &goal_list, config,
     deleted_since_head_pid_src_map, active_source_set ) ?;

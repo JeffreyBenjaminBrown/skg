@@ -2,8 +2,7 @@
 /// process_truenode_diff decorates one Normal vognode and generates its
 /// diff-only children. §9 reversal (#3): it is now called INLINE, at each
 /// node's own BFS visit (server/update_buffer/complete.rs), for both the
-/// post-save and de-novo paths -- there is no longer a separate post-BFS
-/// overlay traversal.
+/// post-save and de-novo paths.
 ///
 /// Each TrueNode and Scaffold is decorated with per-stage diff axes:
 ///   X (existence) describes whether the node's '.skg' file changed

@@ -67,7 +67,7 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
   reconcile_sharing_col_children(
     // §6.0: a stale member of this read-only col is removed when a view-leaf
     // (the common case) and demoted to Independent only if it has a user
-    // subtree. Handled uniformly by the reconciler; no mark_managed pre-pass.
+    // subtree. Handled uniformly by the reconciler.
     tree, node, kind,
     &goal_list, &child_data ) ?;
   // §3.4: an emptied HiddenOutsideOfSubscribeeCol is removed by the single

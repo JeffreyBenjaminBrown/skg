@@ -1,4 +1,4 @@
-//! RoleCol metadata used by sharing-scaffold completion paths.
+//! RoleCol metadata used by sharing-col completion paths.
 //!
 //! The three rerender-time completers — for SubscribeeCol,
 //! HiddenInSubscribeeCol, and HiddenOutsideOfSubscribeeCol — share
@@ -68,7 +68,7 @@ impl RoleCol {
   /// Wraps 'error_unless_node_satisfies' with
   /// - a Box<dyn Error> result
   /// - a per-kind error string of the form
-  ///   "<caller_label>: expected <Scaffold>".
+  ///   "<caller_label>: expected <col-kind>".
   pub fn error_unless_node_is_this_kind (
     self,
     tree : &Tree<ViewNode>,
