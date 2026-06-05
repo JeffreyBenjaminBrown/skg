@@ -127,11 +127,15 @@ pub async fn update_views_after_save (
     // to acquirer pids before rerender) and by content_goal_list
     // resolution during reconcile (neighbors' on-disk contains still
     // point at the acquiree id).
-    RerenderAfterSaveContext::for_save (
-      env, diff_mode_enabled, &define_nodes, active_source_set );
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "RerenderAfterSaveContext::for_save" ). entered();
+      RerenderAfterSaveContext::for_save (
+        env, diff_mode_enabled, &define_nodes, active_source_set ) };
   let mut saved_view_mut : ViewForest = saved_view;
-  rewriteInPlace_viewnodes_whose_id_is_newly_extra (
-    &mut saved_view_mut, &context . graph_snap ) ?;
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "rewriteInPlace_viewnodes_whose_id_is_newly_extra" ). entered();
+    rewriteInPlace_viewnodes_whose_id_is_newly_extra (
+      &mut saved_view_mut, &context . graph_snap ) ? };
   let saved_text : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "rerender_view (saved)" ). entered();
@@ -340,17 +344,21 @@ pub async fn rerender_view (
       // Post-save: phantom sources resolve via the deleted-id map + disk scan
       // (the de-novo path passes the tantivy index instead).
       diff_tantivy_index : None, };
-    complete_viewforest (
-      viewforest, &mut completion_context ) . await ?; }
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "complete_viewforest" ). entered();
+      complete_viewforest (
+        viewforest, &mut completion_context ) . await ? }; }
   // §9 reversal (#3): the content/scaffold diff was applied INLINE during the
   // BFS above (process_truenode_diff at each Normal node's visit, driven by
   // source_diffs = the real diffs).
   let result : String =
-    finish_viewforest (
-      viewforest,
-      &context . env . config,
-      &context . env . driver,
-      context . active_source_set ) . await ?;
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "finish_viewforest" ). entered();
+      finish_viewforest (
+        viewforest,
+        &context . env . config,
+        &context . env . driver,
+        context . active_source_set ) . await } ?;
   tracing::debug!("rerender_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
   Ok (result) }
@@ -380,10 +388,14 @@ pub async fn finish_viewforest (
   driver            : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result<String, Box<dyn Error>> {
-  fulfill_root_containerward_requests (
-    viewforest, config, driver, active_source_set ) . await ?;
-  attach_containerward_ancestries_to_removedhere_phantoms (
-    viewforest, config, driver, active_source_set ) . await ?;
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "fulfill_root_containerward_requests" ). entered();
+    fulfill_root_containerward_requests (
+      viewforest, config, driver, active_source_set ) . await ? ; }
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "attach_containerward_ancestries_to_removedhere_phantoms" ). entered();
+    attach_containerward_ancestries_to_removedhere_phantoms (
+      viewforest, config, driver, active_source_set ) . await ? ; }
   mark_view_roots_parent_absent ( viewforest );
   // §A (Jeff's invariant): a Normal survivor left under a non-container parent
   // (a phantom / Deleted / DeadScaffold) is a non-dead generalized orphan and
@@ -407,7 +419,9 @@ pub async fn finish_viewforest (
     viewforest, &container_to_contents, &content_to_containers, config );
   if let Some (active) = active_source_set {
     apply_source_set_to_viewforest ( viewforest, active ); }
-  viewforest_to_string ( viewforest, config ) }
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "viewforest_to_string" ). entered();
+    viewforest_to_string ( viewforest, config ) } }
 
 /// When the server first receives the buffer, it replaces
 /// each ViewNode's ID with a PID (`replace_ids_with_pids`).

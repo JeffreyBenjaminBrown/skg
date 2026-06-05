@@ -58,9 +58,11 @@ pub async fn update_graph_minus_merges (
   graph         : &InRustGraphHandle,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
   tracing::info!("Updating FS, in-Rust graph, TypeDB, and Tantivy ...");
-  let graph_snap : Arc<InRustGraph> = graph . load_full ();
-  apply_delete_propagation_cleanup (&mut node_defs,
-                                    &graph_snap);
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "apply_delete_propagation_cleanup" ). entered();
+    let graph_snap : Arc<InRustGraph> = graph . load_full ();
+    apply_delete_propagation_cleanup (&mut node_defs,
+                                      &graph_snap); }
   apply_define_nodes_to_stores ( node_defs,
                                  source_moves,
                                  config,
@@ -106,8 +108,10 @@ async fn apply_define_nodes_to_stores (
   // type — no separate context writer/commit. Computed here (not on the
   // Tantivy thread) so the read happens before any further mutation.
   let context_types : HashMap<ID, String> =
-    context_origin_types_for_saved_from_in_rust_graph (
-      & graph . load_full (), &node_defs );
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "context_origin_types_for_saved" ). entered();
+      context_origin_types_for_saved_from_in_rust_graph (
+        & graph . load_full (), &node_defs ) };
 
   // TypeDB (async) and Tantivy (sync) in parallel.
   // Both are independent after the FS update.
@@ -196,11 +200,13 @@ pub async fn update_graph_including_merges (
   driver             : &TypeDBDriver,
   graph              : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
-  validate_override_invariants_after_save (
-    &save_instructions,
-    merge_instructions,
-    &config,
-    graph ) ?;
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "validate_override_invariants_after_save" ). entered();
+    validate_override_invariants_after_save (
+      &save_instructions,
+      merge_instructions,
+      &config,
+      graph ) } ?;
   let save_replacement : Option<TantivyIndex> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "update_graph_minus_merges" ). entered();
@@ -310,6 +316,8 @@ pub async fn update_typedb_from_saveinstructions (
       . map (NodeTypedb::from_complete_parsing_textlinks)
       . collect ();
     let pre_existing_pids : HashSet<String> = { // "Pre-existing" = not being created now. Existing ones need their has_extra_id relations re-synced below; create_only_nodes_with_no_ids_present handles extra_ids only for newly-created nodes via its internal call to 'create_node'.
+      let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "which_ids_exist" ). entered();
       let pids_btreeset : BTreeSet<String> =
         to_write_pids . iter ()
         . map ( |p| p . to_string () )
@@ -528,16 +536,20 @@ pub(super) fn update_tantivy_from_saveinstructions (
 ) -> Result<usize, Box<dyn Error>> {
 
   let mut writer: IndexWriter =
-    tantivy_index . index . writer (
-      TANTIVY_WRITER_BUFFER_BYTES)?;
-  delete_nodes_by_id_from_index(
-    // Delete all IDs, be they from Saves or Deletes.
-    // (The entry for each Save is then recreated.)
-    instructions . iter() . map(|instr| match instr {
-      DefineNode::Save(SaveNode (node)) => &node . pid,
-      DefineNode::Delete(DeleteNode { id, .. }) => id }),
-    &mut writer,
-    tantivy_index)?;
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "tantivy_writer_create" ). entered();
+      tantivy_index . index . writer (
+        TANTIVY_WRITER_BUFFER_BYTES)? };
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "tantivy_delete" ). entered();
+    delete_nodes_by_id_from_index(
+      // Delete all IDs, be they from Saves or Deletes.
+      // (The entry for each Save is then recreated.)
+      instructions . iter() . map(|instr| match instr {
+        DefineNode::Save(SaveNode (node)) => &node . pid,
+        DefineNode::Delete(DeleteNode { id, .. }) => id }),
+      &mut writer,
+      tantivy_index)? ; }
   // Add documents only for non-deletion instructions.
   // Convert to NodeTantivy (narrow) at the boundary.
   let nodes_to_add: Vec<NodeTantivy> =
@@ -548,9 +560,13 @@ pub(super) fn update_tantivy_from_saveinstructions (
         DefineNode::Delete (_) => None } )
     . collect();
   let processed_count: usize =
-    add_documents_to_tantivy_writer(
-      & nodes_to_add, &mut writer, tantivy_index,
-      context_types )? ;
-  commit_with_status(
-    &mut writer, tantivy_index, processed_count, "Updated")?;
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "tantivy_add" ). entered();
+      add_documents_to_tantivy_writer(
+        & nodes_to_add, &mut writer, tantivy_index,
+        context_types )? };
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "tantivy_commit" ). entered();
+    commit_with_status(
+      &mut writer, tantivy_index, processed_count, "Updated")? ; }
   Ok (processed_count) }

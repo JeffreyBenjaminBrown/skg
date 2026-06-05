@@ -146,14 +146,18 @@ pub fn commit_with_status (
   if indexed_count > 0 {
     tracing::info!( "{} {} documents. Committing changes...",
               operation, indexed_count );
-    writer . commit () ?;
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "tantivy_writer_commit" ). entered();
+      writer . commit () ? ; }
     // Force the shared reader to see the new commit. With the
     // default 'ReloadPolicy::OnCommitWithDelay', the reader
     // refreshes asynchronously after a small delay, which races
     // with code (notably tests) that searches immediately after a
     // commit. Manual reload makes the post-commit state visible
     // synchronously.
-    tantivy_index . reader . reload () ?;
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "tantivy_reader_reload" ). entered();
+      tantivy_index . reader . reload () ? ; }
   } else {
     tracing::debug!("No documents to process found."); }
   Ok (( )) }

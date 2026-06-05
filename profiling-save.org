@@ -101,6 +101,60 @@ save. If real-world drift ever appears, the correct fix is a long-lived
 the critical path) — a larger change worth doing only if the need is
 demonstrated at human save cadence.
 
+* Round 2 (after F1-F3 shipped): the save is now Tantivy-commit-bound
+
+Re-profiled the same insert-a-child save with finer spans (Tantivy and
+rerender internals now broken out). The save is much faster; the
+remaining cost has ONE dominant, mostly-irreducible-by-drilling leaf.
+
+Per-save breakdown at a realistic save cadence (~3 s apart, where
+there is no segment-fragmentation drift), median total ~106 ms:
+
+| leaf                                   |   ms | of save | note                                   |
+|----------------------------------------+------+---------+----------------------------------------|
+| tantivy 'writer.commit()'              |  ~63 |   ~60%  | the one big cost; see below            |
+| update_typedb (which_ids_exist, create, edge delta) | ~26 | (hidden) | runs in PARALLEL with the Tantivy thread, so it adds NO latency |
+| org_to_uninterpreted_viewforest (parse) | ~8.6 |   ~8%   | CPU parse of the ~100-line buffer      |
+| rerender_view (complete + finish)      |  ~11 |   ~10%  | complete_viewforest ~4.7, graphnodestats ~2.5, render ~0.7 |
+| extract_nonmergeSavePlan               | ~5.0 |   ~5%   |                                        |
+| tantivy reader.reload()                | ~3.7 |   ~3.5% | cheap — segment count is NOT the issue |
+| validate_override (F1, now scoped)     | ~0.9 |   ~0.8% | the round-1 fix, confirmed negligible  |
+
+Everything except the Tantivy commit is now under ~5% of the save (and
+the TypeDB work, though ~26 ms, is hidden under the commit). The
+parse and rerender leaves are small and CPU/round-trip bound.
+
+** The one big thing left: the Tantivy commit is on the critical path but the result doesn't need it
+
+Each save spawns a Tantivy index-update thread and *joins* it before
+returning. That join waits for 'writer.commit()' — a stable ~63 ms
+(fsync + segment-meta write; 'reader.reload()' is only ~4 ms, and
+'tantivy_add'/'tantivy_delete' are <0.3 ms — committing 2 documents is
+~all of it). update_typedb runs concurrently and finishes first, so
+the save's graph-update phase is gated entirely by the commit.
+
+But the save's RESULT — the re-rendered buffer — is built from the
+in-Rust graph, not from Tantivy. The Tantivy index is a derived,
+rebuildable cache used only by *search*. So the save does not need to
+wait for the commit at all.
+
+→ *Move the Tantivy commit off the critical path* (don't join the
+thread; let it commit in the background). That would drop the save's
+graph-update phase from ~63 ms to the ~26 ms TypeDB cost, i.e. the
+whole save from ~106 ms to ~60 ms (~40%). This is the same shape as
+the (reverted) F4: it needs a write-lock so the next save's writer
+can't race the in-flight commit, and a background-failure path (log +
+flag for rebuild; the FS write already succeeded, so the index stays
+recoverable). Unlike F4's consolidation — which chased an artifactual
+drift — this removes a *real, stable* ~63 ms from every save.
+
+Secondary: on a long-lived, never-consolidated index the commit
+inflates (measured ~217 ms at 22 segments / 186 MB vs ~63 ms just
+after a rebuild), because 'writer.commit()' scales with the index's
+on-disk/segment state. A periodic background consolidation or rebuild
+keeps it near the ~63 ms floor — but the commit dominates even when
+compact, so backgrounding it is the bigger lever.
+
 * Test case and environment
 
 - *Operation*: open a single-root content view of node
