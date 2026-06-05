@@ -276,15 +276,11 @@ async fn visit_normal_node (
       maybe_add_relation_col_branches (
         tree, treeid, &context . env . config,
         &context . env . driver ) . await ?; } }
-  // (Diff scaffolds -- TextChanged / IDCol / AliasCol -- are no longer emitted
-  // here: phase 5 (§9) moved them onto the post-BFS diff overlay.)
   // Remaining view requests (Aliases / Containerward / Sourceward); the
   // Definitive request was already consumed by apply_definitive_draw_rule.
   super::complete_postorder::truenode::execute_truenode_view_requests (
-    treeid, tree, context . defmap, context . source_diffs,
-    &context . env . config, &context . env . driver,
-    context . errors, context . deleted_since_head_pid_src_map,
-    context . active_source_set ) . await ?;
+    treeid, tree, &context . env . config, &context . env . driver,
+    context . errors, context . active_source_set ) . await ?;
   // Ensure a definitive subscribee's HiddenInSubscribeeCol (was
   // ensure_hiddenin_cols_under_definitive_subscribees); the BFS reconciles
   // it on reaching it.

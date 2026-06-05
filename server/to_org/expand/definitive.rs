@@ -2,11 +2,10 @@ use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
 use crate::dbs::typedb::nodes::which_ids_exist;
 use crate::git_ops::read_repo::nodecomplete_from_index_or_head;
 use crate::source_sets::ActiveSourceSet;
-use crate::to_org::complete::sharing::{ maybe_add_hiddenInSubscribeeCol_branch, type_and_parent_type_consistent_with_subscribee };
+use crate::to_org::complete::sharing::type_and_parent_type_consistent_with_subscribee;
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::backpath::{ build_and_integrate_containerward_view_then_drop_request_with_source_set, build_and_integrate_sourceward_view_then_drop_request_with_source_set};
-use crate::to_org::render::truncate_after_node_in_gen::add_last_generation_and_truncate_some_of_previous;
-use crate::to_org::util::{ DefinitiveMap, Finalizable, build_node_branch_minus_content_with_source_set, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive, content_ids_if_definitive_else_empty };
+use crate::to_org::util::{ DefinitiveMap, Finalizable, get_id_from_treenode, makeIndefinitiveAndClobber, truenode_in_tree_is_indefinitive };
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, IndefOrDef, ParentIs, mk_phantom_viewnode };
@@ -22,14 +21,11 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 pub async fn execute_view_requests (
-  viewforest        : &mut Tree<ViewNode>,
+  viewforest    : &mut Tree<ViewNode>,
   requests      : Vec < (NodeId, ViewRequest) >,
-  source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
-  visited       : &mut DefinitiveMap,
   errors        : &mut Vec < String >,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result < (), Box<dyn Error> > {
   for (node_id, request) in requests {
@@ -48,60 +44,15 @@ pub async fn execute_view_requests (
           viewforest, node_id, config, typedb_driver, errors,
           active_source_set )
           . await ?; },
-      ViewRequest::Definitive => {
-        execute_definitive_view_request (
-          viewforest, node_id, source_diffs, config, typedb_driver,
-          visited, errors,
-          deleted_since_head_pid_src_map, active_source_set ) . await ?; }, }}
+      ViewRequest::Definitive =>
+        // The BFS driver settles every Definitive request at the node's own
+        // visit (apply_definitive_draw_rule, the §5.2 draw rule + §5.3 cascade),
+        // before this post-content view-request pass runs, so none should reach
+        // here. Fail loudly if one does, rather than silently dropping it.
+        return Err ( "execute_view_requests: a ViewRequest::Definitive survived \
+          to the view-request pass; it should have been consumed by the draw \
+          rule at the node's visit" . into () ), }}
   Ok (( )) }
-
-/// BEHAVIOR:
-/// In serial, this function:
-/// - 'Indefinitizes' any previously definitive ViewNode with that ID, and its *entire content subtree*. (Otherwise the requested definitive view would have indefinitive children and expand no further.)
-/// - marks this ViewNode definitive
-/// - expands (BFS) its content from disk (or from latest git commit for removed nodes), applying the node limit
-/// - removes its ViewRequest::Definitive
-/// For Subscribee nodes: the subscriber's 'hides_from_its_subscriptions' list is used to filter out content that should be hidden.
-/// For nodes with `diff: Some(Removed)`: loads content from git HEAD instead of disk, and marks children as removed if they don't exist on disk.
-/// .
-/// PITFALL: The indefinitization step can miss things: If definitive A contains indefinitive B, and elsewhere there is a definitive B, then when one requests a definitive view of A somewhere else, it will indefinitize the earlier A, but it will not indefinitize the earlier B. This seems fine -- searching through the whole tree for duplicates of A's recursive content would be expensive, and unless the user has strange habits they will at most rarely encounter this behavior.
-async fn execute_definitive_view_request (
-  viewforest    : &mut Tree<ViewNode>, // "viewforest" = tree with BufferRoot
-  node_id       : NodeId,
-  source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
-  config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
-  visited       : &mut DefinitiveMap,
-  _errors       : &mut Vec < String >,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  active_source_set : Option<&ActiveSourceSet>,
-) -> Result < (), Box<dyn Error> > {
-  // The §5.2 draw rule (defer-to-Final / clobber-Tentative / mark Final +
-  // resync) is factored into 'apply_definitive_draw_rule' so the BFS driver
-  // can run it at a node's visit, before drawing content; here we run it and
-  // then self-expand the subtree, exactly as before. The §5.3 cascade will
-  // replace the present-node self-expansion (extendDefinitiveSubtreeFromLeaf)
-  // with per-child cascade DVRs drawn by the main BFS (plan_v2 §18 monolith).
-  match apply_definitive_draw_rule (
-    viewforest, node_id, config, visited ) ? {
-    DrawOutcome::Deferred => Ok (( )),
-    DrawOutcome::MadeFinal { is_removed_node, hidden_ids } => {
-      if is_removed_node {
-        extendDefinitiveSubtree_fromGit (
-          viewforest, node_id, config . initial_node_limit,
-          visited, source_diffs, config, &hidden_ids, typedb_driver,
-          deleted_since_head_pid_src_map, active_source_set ) . await ?; }
-      else {
-        extendDefinitiveSubtreeFromLeaf (
-          viewforest, node_id, config . initial_node_limit,
-          visited, config, typedb_driver, &hidden_ids,
-          active_source_set ) . await ?;
-        if type_and_parent_type_consistent_with_subscribee (
-          viewforest, node_id ) ?
-        { maybe_add_hiddenInSubscribeeCol_branch (
-            viewforest, node_id, config, typedb_driver
-          ) . await ?; } }
-      Ok (( )) } } }
 
 /// The result of applying the §5.2 Tentative/Final draw rule to a node that
 /// carries a 'ViewRequest::Definitive' (a user DVR, or -- once the §5.3
@@ -254,78 +205,6 @@ fn indefinitize_content_subtree (
   for child_treeid in content_child_treeids { // recurse
     indefinitize_content_subtree (
       tree, child_treeid, visited, config ) ?; }
-  Ok (( )) }
-
-/// Expands content for a node using BFS with a node limit.
-///
-/// This is similar to `render_initial_viewforest_bfs`
-/// but operates on an existing PairTree.
-///
-/// The starting node is already definitive. This function:
-/// - Reads content children from the NodeComplete in the tree
-/// - Adds them as children using BFS
-/// - Marks repeats (nodes already in `visited`) as indefinitive
-/// - Adds new definitive nodes to `visited`
-/// - Truncates when the node limit is exceeded:
-///   - Adds children in that last gen up to the limit as indefinitive
-///   - Completes the sibling group of the limit-hitting node
-///   - After limit-hitting node's parent, rewrite nodes in that second-to-last gen as indefinitive
-///
-/// Generations are relative to the effective root (generation 0),
-/// *not* the tree's true root. This way, truncation only affects
-/// nodes within this subtree, not siblings of ancestors.
-///
-/// `hidden_ids` contains IDs to filter from a subscribee's
-/// top-level children (without recursing into grandchildren, etc.)
-/// If the view was requested from a non-subscribee,
-/// 'hidden_ids' will be empty.
-async fn extendDefinitiveSubtreeFromLeaf (
-  tree           : &mut Tree<ViewNode>,
-  effective_root : NodeId, // It contained the request and is already in the tree. it was indefinitive when the request was issued, but was made definitive by 'execute_definitive_view_request'.
-  limit          : usize,
-  visited        : &mut DefinitiveMap,
-  config         : &SkgConfig,
-  driver         : &TypeDBDriver,
-  hidden_ids     : &HashSet < ID >,
-  active_source_set : Option<&ActiveSourceSet>,
-) -> Result < (), Box<dyn Error> > {
-  let mut gen_with_children : Vec < (NodeId, // effective root
-                                     ID) > = // one of its children
-    content_ids_if_definitive_else_empty (
-      tree, effective_root, config ) ?
-    . into_iter ()
-    . filter ( |skgid| ! hidden_ids . contains (skgid) )
-    . map ( |child_skgid| (effective_root, child_skgid) )
-    . collect ();
-  let mut nodes_rendered : usize = 0;
-  let mut generation : usize = 1; // children of effective root
-  while ! gen_with_children . is_empty () {
-    if nodes_rendered + gen_with_children . len () >= limit {
-      // Limit hit. Complete this sibling group
-      // and truncate later parents.
-      let space_left : usize = limit - nodes_rendered;
-      add_last_generation_and_truncate_some_of_previous (
-        tree, generation, &gen_with_children,
-        space_left, effective_root, visited, config, driver,
-        active_source_set ) . await ?;
-      return Ok (( )); }
-    let mut next_gen : Vec < (NodeId, ID) > = Vec::new ();
-    for (parent_treeid, child_skgid) in gen_with_children {
-      let (new_treeid, should_recurse) = build_node_branch_minus_content_with_source_set (
-        Some((tree, parent_treeid)),
-        &child_skgid, config, driver, visited,
-        active_source_set ) . await ?;
-      nodes_rendered += 1;
-      if should_recurse
-      && ! truenode_in_tree_is_indefinitive ( tree, new_treeid ) ? {
-        // No filtering here; 'hidden_ids' only applies to top-level.
-        let grandchild_skgids : Vec < ID > =
-          content_ids_if_definitive_else_empty (
-            tree, new_treeid, config ) ?;
-        for grandchild_skgid in grandchild_skgids {
-          next_gen . push ( (new_treeid, grandchild_skgid) ); }} }
-    gen_with_children = next_gen;
-    generation += 1; }
   Ok (( )) }
 
 /// Fetches NodeComplete from the in-Rust graph or disk.

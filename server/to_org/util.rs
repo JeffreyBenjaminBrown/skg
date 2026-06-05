@@ -11,9 +11,8 @@ use crate::types::misc::MSV;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
-use crate::types::tree::generations::collect_generation_ids;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
-use crate::types::tree::viewnode_nodecomplete::{pid_and_source_from_treenode, write_at_truenode_in_tree};
+use crate::types::tree::viewnode_nodecomplete::write_at_truenode_in_tree;
 #[cfg(test)]
 use crate::types::viewnode::{ mk_indefinitive_viewnode, mk_indefinitive_viewnode_with_birth };
 use crate::types::viewnode::ViewRequest;
@@ -599,89 +598,6 @@ pub async fn build_node_branch_minus_content (
                  format! ("build_node_branch_minus_content({})", skgid),
                  t0 . elapsed () . as_secs_f64());
   result }
-
-pub async fn build_node_branch_minus_content_with_source_set (
-  tree_and_parent : Option<(&mut Tree<ViewNode>, NodeId)>,
-  skgid           : &ID,
-  config          : &SkgConfig,
-  driver          : &TypeDBDriver,
-  visited         : &mut DefinitiveMap,
-  active          : Option<&ActiveSourceSet>,
-) -> Result < (NodeId, bool), Box<dyn Error> > {
-  if let Some (active) = active {
-    if ! active . is_all () {
-      let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
-        HashMap::new ();
-      if let Some (source) =
-        find_source_with_optional_tantivy (
-          skgid, &deleted_since_head_pid_src_map, None, config )
-      {
-        if ! active . contains_source (&source) {
-          let inactive : ViewNode =
-            mk_inactive_viewnode (
-              skgid . clone (), source, MembershipAxes::default () );
-          let node_id : NodeId =
-            match tree_and_parent {
-              Some ((tree, parent_treeid)) =>
-                with_node_mut (
-                  tree, parent_treeid,
-                  ( |mut parent_mut|
-                    parent_mut . append (inactive) . id () ))
-                . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
-              None =>
-                return Err (
-                  "build_node_branch_minus_content_with_source_set: inactive root"
-                  . into () ) };
-          return Ok ((node_id, false)); }}}}
-  let node_id : NodeId =
-    build_node_branch_minus_content (
-      tree_and_parent, skgid, config, driver, visited ) . await ?;
-  Ok ((node_id, true)) }
-
-/// Collect content child IDs from a node.
-/// Returns empty vec if the node is indefinitive or has no NodeComplete.
-/// Errors if passed a Scaffold.
-pub(super) fn content_ids_if_definitive_else_empty (
-  tree   : &Tree<ViewNode>,
-  treeid : NodeId,
-  config : &SkgConfig,
-) -> Result < Vec < ID >, Box<dyn Error> > {
-  if truenode_in_tree_is_indefinitive ( tree, treeid ) ? {
-    return Ok ( Vec::new () ); }
-  let (pid, source) : (ID, SourceName) =
-    match pid_and_source_from_treenode (
-      tree, treeid, "content_ids_if_definitive_else_empty" ) {
-      Ok (p) => p,
-      Err (_) => return Ok ( Vec::new () ), };
-  Ok ( nodecomplete_rustFirst_by_pid_and_source ( config, &pid, &source )
-    . map ( |nodecomplete| nodecomplete . contains . clone () )
-    . unwrap_or_default () ) }
-
-/// Collect ego_tree::NodeIds after
-///   some member of some generation of a tree.
-/// 'effective_root' should be some ancestor.
-/// It affects both the meaning of generation numbers,
-/// and the scope of which nodes are collected
-/// (only its descendents are collected).
-/// If effective root is None,
-/// the true root is used as the effective root.
-pub(super) fn nodes_after_in_generation (
-  tree                     : &Tree<ViewNode>,
-  generation               : usize,
-  generation_member_treeid : NodeId,
-  effective_root           : Option < NodeId >,
-) -> Result < Vec < NodeId >, Box<dyn Error> > {
-  let treeids_in_gen : Vec < NodeId > =
-    collect_generation_ids ( tree, generation, effective_root ) ?;
-  let mut result : Vec < NodeId > = Vec::new ();
-  let mut found_target : bool = false;
-  for treeid in treeids_in_gen {
-    if found_target {
-      result . push (treeid);
-    } else if treeid == generation_member_treeid {
-      found_target = true; } }
-  Ok (result) }
-
 
 // ==============================================
 // Reading from NodeCompletes and ViewNodes, esp. in trees
