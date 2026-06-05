@@ -30,19 +30,14 @@ use std::sync::Arc;
 
 pub(super) struct CompletionContext<'a> {
   pub(super) defmap                         : &'a mut DefinitiveMap,
-  /// Diffs for the CONTENT goal-list path (content_goal_list). Always None:
-  /// the content reconcile builds the pure WORKTREE child list, and all diff
-  /// (axes, flip, content phantoms, TextChanged/IDCol/AliasCol) is applied
-  /// inline by process_truenode_diff at the node's visit, driven by
-  /// `sharing_diffs`. Kept as a field (rather than removed) because several
-  /// content helpers still take a source_diffs argument; here it is always None.
+  /// The per-source git diffs (Some in diff mode, None otherwise). This is the
+  /// single diff handle: it drives the per-node process_truenode_diff (content
+  /// axes, the phantom flip, TextChanged/IDCol/AliasCol), the diff-aware QualCol
+  /// reconcilers, and the sharing cols' removed-member phantoms. The content
+  /// reconcile itself produces only the pure worktree view; process_truenode_diff
+  /// applies every content diff effect afterward at the node's own visit (§9
+  /// reversal / #3).
   pub(super) source_diffs                   : &'a Option<HashMap<SourceName, SourceDiff>>,
-  /// The REAL git diffs (Some in diff mode), driving ALL inline diff since the
-  /// §9 reversal (#3): the per-node process_truenode_diff, the diff-aware
-  /// QualCol reconcilers, and the sharing cols' removed-member phantoms. None
-  /// outside diff mode. (Named `sharing_diffs` historically, when only the
-  /// sharing cols read it; it is now the single real-diffs handle.)
-  pub(super) sharing_diffs                  : &'a Option<HashMap<SourceName, SourceDiff>>,
   pub(super) env                            : &'a SkgEnv,
   pub(super) graph_snap                     : &'a Arc<InRustGraph>,
   pub(super) errors                         : &'a mut Vec<String>,
@@ -147,37 +142,36 @@ async fn expand_true_content_at_node (
       visit_normal_node (tree, treeid, context) . await ?,
     ViewNodeKind::PartnerCol (RoleCol::Subscribee) =>
       reconcile_subscribee_col_children (
-        treeid, tree, context . sharing_diffs, context . env,
+        treeid, tree, context . source_diffs, context . env,
         context . deleted_since_head_pid_src_map,
         &mut context . node_budget ) . await ?,
     ViewNodeKind::PartnerCol (RoleCol::HiddenInSubscribee) =>
       reconcile_hiddenin_subscribee_col_children (
-        treeid, tree, context . sharing_diffs, context . env,
+        treeid, tree, context . source_diffs, context . env,
         context . deleted_since_head_pid_src_map,
         &mut context . node_budget ) ?,
     ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee) =>
       reconcile_hiddenoutside_subscribee_col_children (
-        treeid, tree, context . sharing_diffs, context . env,
+        treeid, tree, context . source_diffs, context . env,
         context . deleted_since_head_pid_src_map,
         &mut context . node_budget ) ?,
     ViewNodeKind::PartnerCol (role)
       if role . relation_member_role () . is_some () =>
       reconcile_relation_col_children (
-        treeid, tree, *role, context . sharing_diffs,
+        treeid, tree, *role, context . source_diffs,
         context . env, context . graph_snap,
         context . deleted_since_head_pid_src_map,
         &mut context . node_budget ) ?,
-    // §9 reversal (#3): the IDCol/AliasCol diff scaffolds are now created inline
-    // by process_truenode_diff at the owner's BFS visit, so their reconcilers
-    // must see the REAL diffs (sharing_diffs) -- not the content path's None --
-    // or they would clobber the just-created diff entries. (De-novo still has
-    // sharing_diffs = None until its path is migrated, so it is unaffected.)
+    // §9 reversal (#3): the IDCol/AliasCol diff scaffolds are created inline by
+    // process_truenode_diff at the owner's BFS visit, so their reconcilers must
+    // see the real diffs (source_diffs) or they would clobber the just-created
+    // diff entries. Diffs flow inline for both de-novo and post-save.
     ViewNodeKind::QualCol (QualCol::Alias) =>
       super::complete_postorder::aliascol::reconcile_alias_col_children (
-        tree, treeid, context . sharing_diffs, &context . env . config ) ?,
+        tree, treeid, context . source_diffs, &context . env . config ) ?,
     ViewNodeKind::QualCol (QualCol::ID) =>
       super::complete_postorder::id_col::reconcile_id_col_children (
-        treeid, tree, context . sharing_diffs, &context . env . config ) ?,
+        treeid, tree, context . source_diffs, &context . env . config ) ?,
     ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
       // §6.4/§6.6/§16: an Inactive node deleted by this save becomes Deleted
       // (current code converted only Normal nodes).
@@ -230,9 +224,10 @@ async fn visit_normal_node (
         // indefinitive; the content engine (settled) will clobber+return.
         settled = true; }
       DrawOutcome::MadeFinal { is_removed_node : true, hidden_ids } => {
-        // Removed-file DVR: keep the git-phantom self-expansion (diff
-        // overlay territory, §9). Effectively unreachable in the post-save
-        // pass -- removed-file nodes arrive as DiffPhantoms -- but handled
+        // Removed-file DVR: expand the removed node's content from git HEAD as
+        // diff phantoms. Effectively unreachable -- a node's existence axes are
+        // only stamped by process_truenode_diff at the end of its own visit, so
+        // is_removed_node is false while the draw rule runs -- but handled
         // defensively; the content engine is skipped.
         extendDefinitiveSubtree_fromGit (
           tree, treeid, context . env . config . initial_node_limit,
@@ -245,7 +240,7 @@ async fn visit_normal_node (
         settled = true; cascade = true; } } }
   if do_content {
     expand_true_content_at_truenode (
-      treeid, tree, context . defmap, context . source_diffs,
+      treeid, tree, context . defmap,
       &context . env . config, context . graph_snap,
       context . deleted_since_head_pid_src_map,
       context . deleted_by_this_save_pids,
@@ -253,8 +248,8 @@ async fn visit_normal_node (
       settled, cascade, &mut context . node_budget ) ?; }
   // The steps below apply only while the node is still a Normal vognode:
   // content reconcile may have converted it to Deleted (a node this save
-  // deleted). (It is no longer flipped to a DiffPhantom here -- that is the
-  // post-BFS diff overlay's job now, §9.)
+  // deleted). The flip to a DiffPhantom happens at the END of this visit
+  // (process_truenode_diff, below), after content + cols + view requests.
   let still_normal : bool =
     read_at_node_in_tree ( tree, treeid,
       |vn : &ViewNode| matches! ( &vn . kind,
@@ -287,15 +282,13 @@ async fn visit_normal_node (
   super::complete_postorder::truenode::ensure_hiddenin_col_under_definitive_subscribee (
     tree, treeid, &context . env . config, &context . env . driver ) . await ?;
   // §9 reversal (#3 / Jeff): compute this node's content+scaffold diff LOCALLY,
-  // at its own BFS visit, instead of in the post-BFS overlay. Runs last, after
-  // the node is fully completed as a worktree Normal node (content, cols, view
-  // requests), so process_truenode_diff sees final children -- exactly the state
-  // the overlay saw post-BFS. The flip to a phantom happens here; the node's
-  // cols (visited later, level-order) self-deaden via their own
-  // generalized-orphan check. Gated on diff mode (sharing_diffs = Some), which
-  // is the real diffs on the post-save path; de-novo still has None here and
-  // keeps using its caller's overlay until that path is migrated.
-  if let Some (real_diffs) = context . sharing_diffs {
+  // at its own BFS visit. Runs last, after the node is fully completed as a
+  // worktree Normal node (content, cols, view requests), so process_truenode_diff
+  // sees its final children. The flip to a phantom happens here; the node's cols
+  // (visited later, level-order) self-deaden via their own generalized-orphan
+  // check. Gated on diff mode (source_diffs = Some); both de-novo and post-save
+  // feed the real diffs here, so the diff is computed inline for both.
+  if let Some (real_diffs) = context . source_diffs {
     let node_mut : NodeMut<ViewNode> =
       tree . get_mut (treeid) . unwrap ();
     crate::to_org::render::diff::process_truenode_diff (

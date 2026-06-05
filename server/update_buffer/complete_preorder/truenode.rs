@@ -1,17 +1,14 @@
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::source_sets::ActiveSourceSet;
-use crate::types::viewnode::{mk_inactive_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::{mk_inactive_viewnode, mk_unknown_viewnode};
 use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap};
-use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff, NodeChanges, net_diff_from_per_stage, per_stage_node_changes_for_truenode};
-use crate::types::list::{Diff_Item, compute_interleaved_diff, itemlist_and_removedset_from_diff};
+use crate::types::git::MembershipAxes;
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::env::find_source_with_optional_tantivy;
 #[cfg(test)]
-use crate::types::git::{GitDiffStatus, NodeCompleteDiff};
+use crate::types::git::{GitDiffStatus, NodeChanges, NodeCompleteDiff, SourceDiff, per_stage_node_changes_for_truenode};
 use crate::types::nodes::complete::NodeComplete;
-use crate::git_ops::read_repo::nodecomplete_from_git_head;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
@@ -35,7 +32,6 @@ use std::sync::Arc;
 
 enum ContentReality {
   Real, // Real content: Exists in worktree, and parent contains it at this position.
-  Phantom (ExistenceAxes, MembershipAxes), // Is not contained by parent at this position, and might not exist at all.
   Inactive,
   Unknown, // §7.6: a content id that resolves to nothing (a dangling reference) -> an Unknown placeholder, rather than aborting the whole view.
 }
@@ -64,7 +60,6 @@ pub fn expand_true_content_at_truenode (
   node               : NodeId,
   tree               : &mut Tree<ViewNode>,
   defmap             : &mut DefinitiveMap,
-  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
@@ -109,8 +104,6 @@ pub fn expand_true_content_at_truenode (
   let nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
       config, &pid, &initial_source ) ?;
-  let source : SourceName =
-    nodecomplete . source . clone ();
   // §8.3: EVERY definitive node re-syncs title/body/source from the snapshot,
   // saved and collateral alike. (After extraction the snapshot already reflects
   // the saved buffer's text, so re-syncing the saved node yields the same
@@ -119,8 +112,7 @@ pub fn expand_true_content_at_truenode (
   // for the saved view, is gone.)
   sync_truenode_from_disk (tree, node, &nodecomplete) ?;
   reconcile_content_children (
-    tree, node, &nodecomplete, &pid, &source,
-    source_diffs, config, graph_snap,
+    tree, node, &nodecomplete, config, graph_snap,
     deleted_since_head_pid_src_map,
     active_source_set, node_budget ) ?;
   if cascade {
@@ -193,9 +185,6 @@ fn reconcile_content_children (
   tree                           : &mut Tree<ViewNode>,
   node                           : NodeId,
   nodecomplete                   : &NodeComplete,
-  pid                            : &ID,
-  source                         : &SourceName,
-  source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   config                         : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
@@ -215,10 +204,6 @@ fn reconcile_content_children (
     . map ( |id| graph_snap . pid_of (id)
                  . unwrap_or_else ( || id . clone () ))
     . collect ();
-  let (staged_nc, unstaged_nc)
-    : (Option<&NodeChanges>, Option<&NodeChanges>) =
-    per_stage_node_changes_for_truenode (
-      source_diffs, pid, source );
   let is_sub : bool = is_subscribee (tree, node) ?;
   // §6.1: a definitive subscribee-as-such regenerates its content as
   // contains-minus-hides, saved and collateral views alike. (The former
@@ -227,17 +212,16 @@ fn reconcile_content_children (
   // in the graph and regenerating is correct -- and required, since the
   // §5.3 cascade now draws subscribee content through this path rather than
   // the old extendDefinitiveSubtreeFromLeaf.)
-  let (goal_list, removed_ids, apparent_content_ids) =
-    // git diff view makes a difference
-    content_goal_list(
-      tree, node, &content_ids,
-      staged_nc, unstaged_nc,
-      is_sub, config ) ?;
-  // §5.5: cap how many *new* content children this node may create against
-  // the per-buffer budget (existing children and diff phantoms are free).
+  let apparent_content_ids : Vec<ID> =
+    content_goal_list( tree, node, &content_ids, is_sub, config ) ?;
+  // §5.5: cap how many *new* content children this node may create against the
+  // per-buffer budget (existing children are free). The content path has no
+  // removed-member phantoms (the diff overlay owns those, §9), so the cap's
+  // removed-id exemption set is empty here.
+  let no_removed : HashSet<ID> = HashSet::new ();
   let goal_list : Vec<ID> =
     cap_goal_list_to_budget(
-      tree, node, &goal_list, &removed_ids, node_budget );
+      tree, node, &apparent_content_ids, &no_removed, node_budget );
   // A content child this save deleted is no longer detached here (the former
   // detach_stale_deleted_content stopgap is gone, death-leafward build order
   // 2/3): it stays, and at its own BFS visit becomes a DeletedNode whose cols
@@ -245,9 +229,8 @@ fn reconcile_content_children (
   // NodeComplete -- while any user subtree under it is preserved (demoted), and
   // a now-childless DeletedNode is removed by the §6.6 prune sweep.
   complete_content_children(
-    tree, node, &goal_list, &removed_ids,
-    source_diffs, config, deleted_since_head_pid_src_map,
-    active_source_set ) ?;
+    tree, node, &goal_list, config,
+    deleted_since_head_pid_src_map, active_source_set ) ?;
   mark_erroneous_content_children_as_indep(
     tree, node, &apparent_content_ids ) ?;
   convert_nonmember_unknown_children_to_dead(
@@ -362,33 +345,22 @@ fn is_subscribee (
     . unwrap_or (false);
   Ok( is_member_of_parent && parent_is_subscribee_col ) }
 
-/// Reads per-stage contains_diff (rather than the merged view from
-/// 'node_changes_for_truenode') so that a contains-list removal that
-/// lives on only the staged side still produces phantoms. The net
-/// HEAD→worktree diff is recomposed via 'net_diff_from_per_stage'
-/// before being fed to the goal-list logic.
+/// The worktree content goal list for a node: the (extra-id-resolved) contains,
+/// in order. For a subscribee-as-such (§6.1) it is contains MINUS what the
+/// subscriber hides -- the hidden remainder shows in the HiddenInSubscribeeCol.
+/// The git-diff decorations (removed-member phantoms, membership axes) are NOT
+/// computed here: they are applied per node by process_truenode_diff at its BFS
+/// visit (§9 reversal / #3), so the main content path produces only the pure
+/// worktree view.
 fn content_goal_list (
   tree          : &Tree<ViewNode>,
   node          : NodeId,
   content_ids   : &[ID],
-  staged_nc     : Option<&NodeChanges>,
-  unstaged_nc   : Option<&NodeChanges>,
   is_subscribee : bool,
   config        : &SkgConfig,
-) -> Result<(Vec<ID>, HashSet<ID>, Vec<ID>), Box<dyn Error>> {
-  let no_diff : bool =
-    staged_nc . is_none () && unstaged_nc . is_none ();
+) -> Result<Vec<ID>, Box<dyn Error>> {
   if !is_subscribee {
-    let apparent_content_ids : Vec<ID> = content_ids . to_vec();
-    let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
-      if no_diff {
-        ( content_ids . to_vec (), HashSet::new () )
-      } else {
-        let net : Vec<Diff_Item<ID>> = net_diff_from_per_stage (
-          staged_nc   . map ( |c| c . contains_diff . as_slice () ),
-          unstaged_nc . map ( |c| c . contains_diff . as_slice () ));
-        itemlist_and_removedset_from_diff (&net) };
-    Ok(( goal_list, removed_ids, apparent_content_ids ))
+    Ok ( content_ids . to_vec () )
   } else {
     let (grandparent_pid, grandparent_source) : (ID, SourceName) =
       pid_and_source_from_ancestor( tree, node, 2,
@@ -399,36 +371,8 @@ fn content_goal_list (
             config, &grandparent_pid, &grandparent_source ) ?;
         grandparent_nodecomplete . hides_from_its_subscriptions
           . or_default() . to_vec() };
-    let apparent_content_ids : Vec<ID> =
-      setlike_vector_subtraction (
-        content_ids . to_vec(), &worktree_hidden );
-    let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
-      if no_diff {
-        ( apparent_content_ids . clone (), HashSet::new () )
-      } else {
-        let net : Vec<Diff_Item<ID>> = net_diff_from_per_stage (
-          staged_nc   . map ( |c| c . contains_diff . as_slice () ),
-          unstaged_nc . map ( |c| c . contains_diff . as_slice () ));
-        let head_hidden : Vec<ID> =
-          nodecomplete_from_git_head(
-              &grandparent_pid, &grandparent_source, config )
-            . ok()
-            . map( |skg| skg . hides_from_its_subscriptions . into_vec() )
-            . unwrap_or_default();
-        let head_visible : Vec<ID> =
-          setlike_vector_subtraction(
-            net . iter () . filter_map (
-                |d| match d { // Items that were in HEAD: Unchanged or Removed.
-                  Diff_Item::Unchanged (id) |
-                    Diff_Item::Removed (id) => Some( id . clone() ),
-                  Diff_Item::New (_) => None } )
-              . collect(),
-            &head_hidden );
-        let visible_diff : Vec<Diff_Item<ID>> =
-          compute_interleaved_diff(
-            &head_visible, &apparent_content_ids );
-        itemlist_and_removedset_from_diff (&visible_diff) };
-    Ok(( goal_list, removed_ids, apparent_content_ids ))
+    Ok ( setlike_vector_subtraction (
+           content_ids . to_vec(), &worktree_hidden ) )
   } }
 
 /// Reconcile the node's non-parentIgnored TrueNode children
@@ -439,17 +383,14 @@ fn complete_content_children (
   tree               : &mut Tree<ViewNode>,
   node               : NodeId,
   goal_list          : &[ID],
-  removed_ids        : &HashSet<ID>,
-  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   active_source_set  : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
   let child_data : HashMap<ID, ChildData> =
     build_child_creation_data(
-      tree, node, goal_list, removed_ids,
-      source_diffs, config, deleted_since_head_pid_src_map,
-      active_source_set ) ?;
+      tree, node, goal_list, config,
+      deleted_since_head_pid_src_map, active_source_set ) ?;
   complete_relevant_children_in_viewnodetree(
     tree, node,
     |vn : &ViewNode| match &vn . kind {
@@ -480,10 +421,6 @@ fn complete_content_children (
           mk_definitive_viewnode(
             id . clone(), d . source . clone(),
             d . title . clone(), d . body . clone() ),
-        ContentReality::Phantom (ex, mem) =>
-          mk_phantom_viewnode(
-            id . clone(), d . source . clone(),
-            d . title . clone(), ex, mem ),
         ContentReality::Inactive =>
           mk_inactive_viewnode (
             id . clone(), d . source . clone(), MembershipAxes::default ()),
@@ -574,15 +511,10 @@ fn build_child_creation_data (
   tree               : &Tree<ViewNode>,
   node               : NodeId,
   goal_list          : &[ID],
-  removed_ids        : &HashSet<ID>,
-  source_diffs       : &Option<HashMap<SourceName, SourceDiff>>,
   config             : &SkgConfig,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   active_source_set  : Option<&ActiveSourceSet>,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
-  let (parent_pid, parent_source) : (ID, SourceName) =
-    pid_and_source_from_treenode (
-      tree, node, "build_child_creation_data" ) ?;
   let child_sources : HashMap<ID, SourceName> =
     { let node_ref : NodeRef<ViewNode> =
         tree . get (node)
@@ -611,57 +543,37 @@ fn build_child_creation_data (
     // every goal_list ID would fail (ENOENT) for children that
     // this save just deleted, since their .skg file is gone.
     if child_sources . contains_key (id) { continue; }
-    let is_phantom : bool = removed_ids . contains (id);
-    if is_phantom {
-      let phantom_source : SourceName =
-        find_source_with_optional_tantivy (
-          id, deleted_since_head_pid_src_map, None, config )
-          . ok_or_else ( || -> Box<dyn Error> { format! (
-            "find_source: no source for {}", id . 0 ) . into () } ) ?;
-      let (ex, mem) : (ExistenceAxes, MembershipAxes) =
-        phantom_axes ( id, &phantom_source,
-                       &parent_pid, &parent_source,
-                       source_diffs . as_ref () );
-      let kind : ContentReality = ContentReality::Phantom (ex, mem);
-      let title : String = title_for_phantom(
-        id, &phantom_source, source_diffs . as_ref(), config );
+    let child_source : SourceName =
+      match find_source_with_optional_tantivy (
+        id, deleted_since_head_pid_src_map, None, config )
+      { Some (s) => s,
+        None => {
+          // §7.6: the id resolves to nothing (a dangling reference). Render an
+          // Unknown placeholder rather than aborting the whole view. This is
+          // what lets the one driver serve de-novo (which must tolerate
+          // dangling refs) and makes post-save robust to them too.
+          result . insert ( id . clone (),
+            ChildData { title  : String::new (),
+                        source : SourceName::not_found (),
+                        body   : None,
+                        kind   : ContentReality::Unknown } );
+          continue; } };
+    if active_source_set
+      . is_some_and ( |active| !active . contains_source (&child_source) )
+    {
       result . insert( id . clone(),
-                       ChildData { title,
-                                   source: phantom_source,
-                                   body: None,
-                                   kind } );
-    } else {
-      let child_source : SourceName =
-        match find_source_with_optional_tantivy (
-          id, deleted_since_head_pid_src_map, None, config )
-        { Some (s) => s,
-          None => {
-            // §7.6: the id resolves to nothing (a dangling reference). Render an
-            // Unknown placeholder rather than aborting the whole view. This is
-            // what lets the one driver serve de-novo (which must tolerate
-            // dangling refs) and makes post-save robust to them too.
-            result . insert ( id . clone (),
-              ChildData { title  : String::new (),
-                          source : SourceName::not_found (),
-                          body   : None,
-                          kind   : ContentReality::Unknown } );
-            continue; } };
-      if active_source_set
-        . is_some_and ( |active| !active . contains_source (&child_source) )
-      {
-        result . insert( id . clone(),
-                       ChildData { title: String::new (),
-                                   source: child_source,
-                                   body: None,
-                                   kind: ContentReality::Inactive } );
-        continue; }
-      let skg : NodeComplete =
-        nodecomplete_rustFirst_by_pid_and_source ( config, id, &child_source ) ?;
-      result . insert( id . clone(),
-                     ChildData { title: skg . title . clone(),
-                                 source: skg . source . clone(),
-                                 body: skg . body . clone(),
-                                 kind: ContentReality::Real } ); }}
+                     ChildData { title: String::new (),
+                                 source: child_source,
+                                 body: None,
+                                 kind: ContentReality::Inactive } );
+      continue; }
+    let skg : NodeComplete =
+      nodecomplete_rustFirst_by_pid_and_source ( config, id, &child_source ) ?;
+    result . insert( id . clone(),
+                   ChildData { title: skg . title . clone(),
+                               source: skg . source . clone(),
+                               body: skg . body . clone(),
+                               kind: ContentReality::Real } ); }
   Ok (result) }
 
 #[cfg(test)]

@@ -249,11 +249,10 @@ fn find_collateral_view_uris (
 /// roots, instead of the separate render_initial_viewforest_bfs. The driver
 /// creates each fresh node's relation cols (create_relation_cols_for_fresh_nodes
 /// = true), expands content, reconciles cols, and applies the §5.5 node budget.
-/// The caller (multi_root_view_via_env) then adds the diff overlay,
-/// containerward ancestry, and stats -- exactly as the old path did.
-///
-/// Diffs are off here (source_diffs / sharing_diffs = None): a fresh render is
-/// the pure worktree view; the diff overlay is applied afterward by the caller.
+/// When diff_mode, the git diff is computed inline by the driver (per node, at
+/// its BFS visit, via process_truenode_diff) -- the same path post-save uses.
+/// The caller (multi_root_view_via_env) then adds containerward ancestry and
+/// stats.
 pub async fn render_initial_view_via_driver (
   env       : &SkgEnv,
   root_ids  : &[ID],
@@ -270,23 +269,20 @@ pub async fn render_initial_view_via_driver (
   let graph_snap : Arc<InRustGraph> = env . in_rust_graph . load_full ();
   let mut defmap : DefinitiveMap = DefinitiveMap::new ();
   let mut errors : Vec<String> = Vec::new ();
-  // §9 reversal (#3): de-novo diff is now computed INLINE by the driver, exactly
-  // like post-save -- compute the real diffs here and feed them to the BFS via
-  // sharing_diffs (which drives both the inline process_truenode_diff and the
-  // diff-aware QualCol reconcilers), instead of the caller applying a post-BFS
-  // overlay. The content path stays worktree-only (source_diffs = None).
+  // §9 reversal (#3): de-novo diff is computed INLINE by the driver, exactly
+  // like post-save -- compute the real diffs here and feed them via source_diffs
+  // (which drives the inline process_truenode_diff and the diff-aware QualCol /
+  // sharing-col reconcilers).
   let real_diffs : Option<HashMap<SourceName, SourceDiff>> =
     if diff_mode { Some ( compute_diff_for_every_source (&env . config) ) }
     else         { None };
   let deleted_src : HashMap<ID, SourceName> =
     real_diffs . as_ref () . map ( |d| deleted_ids_to_source (d) )
       . unwrap_or_default ();
-  let content_no_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
   let empty_deleted_pids : HashSet<ID> = HashSet::new ();
   let mut context : CompletionContext = CompletionContext {
     defmap                         : &mut defmap,
-    source_diffs                   : &content_no_diffs,
-    sharing_diffs                  : &real_diffs,
+    source_diffs                   : &real_diffs,
     env,
     graph_snap                     : &graph_snap,
     errors                         : &mut errors,
@@ -311,21 +307,13 @@ pub async fn rerender_view (
     strip_stale_diff_state (viewforest) ?; }
   { tracing::debug!("rerender_view: starting complete_viewforest");
     let mut defmap : DefinitiveMap = DefinitiveMap::new ();
-    // PLAN_V2 §9 (phase 5): run the main BFS with NO source_diffs, so it
-    // produces the *pure worktree* view; the git-diff overlay below then
-    // adds every diff effect in a single Normal-rooted post-pass -- the same
-    // 'apply_diff_to_viewforest' the de-novo path uses -- so there is one
-    // diff implementation instead of two. The inline diff branches in the BFS
-    // all gate on source_diffs being Some, so passing None leaves them
-    // dormant (they will be deleted once this overlay is fully validated).
-    let no_source_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
     let mut completion_context : CompletionContext = CompletionContext {
       defmap                         : &mut defmap,
-      source_diffs                   : &no_source_diffs,
-      // Sharing cols (Subscribee/HiddenIn/HiddenOut/relation) still reconcile
-      // their removed-member diff phantoms inline, with the real diffs, while
-      // their members are Normal -- the overlay does not yet descend cols (§9).
-      sharing_diffs                  : &context . source_diffs,
+      // The real per-source diffs drive ALL diff inline: process_truenode_diff
+      // (content axes + phantom flip + TextChanged/IDCol/AliasCol) and the
+      // diff-aware QualCol / sharing-col reconcilers, each at its own BFS visit
+      // (§9 reversal / #3). The content reconcile itself stays worktree-only.
+      source_diffs                   : &context . source_diffs,
       env                            : context . env,
       graph_snap                     : &context . graph_snap,
       errors                         : &mut context . errors,
@@ -337,13 +325,13 @@ pub async fn rerender_view (
       // (that would change the buffer and break the save round-trip, §18).
       create_relation_cols_for_fresh_nodes : false,
       // Post-save: phantom sources resolve via the deleted-id map + disk scan
-      // (matches the old rerender overlay call, which passed tantivy = None).
+      // (the de-novo path passes the tantivy index instead).
       diff_tantivy_index : None, };
     complete_viewforest (
       viewforest, &mut completion_context ) . await ?; }
   // §9 reversal (#3): the content/scaffold diff was applied INLINE during the
   // BFS above (process_truenode_diff at each Normal node's visit, driven by
-  // sharing_diffs = the real diffs). The post-BFS overlay is deleted entirely.
+  // source_diffs = the real diffs).
   mark_view_roots_parent_absent (viewforest);
   // §A (Jeff's invariant): a Normal survivor left under a non-container parent
   // (a phantom / Deleted / DeadScaffold) is a non-dead generalized orphan and
