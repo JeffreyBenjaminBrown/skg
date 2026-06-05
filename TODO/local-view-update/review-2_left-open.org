@@ -18,7 +18,7 @@ You answered all eight inline; I closed seven and a half. Each is committed on
 - #1 KEEP the removed-node expansion -> parked it in =to_org/expand/unused_but_nice.rs= with the "held for someday" header you asked for; unwired the dead branch from the live draw rule. =[1a695755]=
 - #2 merge the dirs -> =update_buffer/reconcile/= (the two colliding =truenode.rs= became =content.rs= + =view_requests.rs=). =[efc93768]=
 - #3 scaffold->col renames -> =scaffold_node= became =col_node=; generic helpers kept generic. =[a5bb5183, 6fbf3836]=
-- #4a the diff IDCol/AliasCol dedup -> diff worker emits EMPTY cols, the reconciler fills them, with the filler-naming comment you asked for. =[7a4...]= **#4b is the one thing still open -- see its TODO below; it turned out NOT to be a clean dedup.**
+- #4a the diff IDCol/AliasCol dedup -> diff worker emits EMPTY cols, the reconciler fills them, with the filler-naming comment you asked for. =[3de70c15]= **#4b is the one thing still open -- see its TODO below; it turned out NOT to be a clean dedup.**
 - #5 two-stage phantom mis-placement -> fixed (reconstruct HEAD/worktree, LCS-diff), with a regression test. =[7a554ad2]=
 - #6 idempotence net -> extended the existing test to render+reconcile a relation col (no new test). =[3101e0ff]=
 - #7 plan_v2 drift -> corrected §5.5 and §19. =[a3c62b44, 6fbf3836]=
@@ -186,7 +186,7 @@ byte-identical.
 *** TODO yes
 and comment where the empties are created
 indicating the name of the function that fills them in later.
-*** DONE (4a) the IDCol/AliasCol dedup is done, with the filler-naming comment. =[7a4...]=
+*** DONE (4a) the IDCol/AliasCol dedup is done, with the filler-naming comment. =[3de70c15]=
 *** TODO (4b) -- I need your call: the SECOND double-reconcile is NOT a clean dedup.
 The first half (4a -- the diff worker's IDCol/AliasCol) was clean and byte-identical;
 done. The second half I described -- "=maybe_add_*= fills a fresh col to test
