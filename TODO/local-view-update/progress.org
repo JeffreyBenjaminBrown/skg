@@ -1441,38 +1441,273 @@ removing it first narrowed the collapse). Otherwise the order matches.
   field) instead of None -- byte-identical since unreachable, more correct if ever
   reached.
 
-** Choices determining the future (deferred, with rationale)
-*** §3.3 remaining dedups -- DEFERRED (low value; some less clean than the review
-   implied). I did the two cleanest+safest (phantom predicate, tantivy builder).
-   The rest are independent and cherry-pickable:
-   - finish_viewforest (the de-novo and post-save post-completion tails): I traced
-     both and they are NOT verbatim -- the order of (mark_view_roots/mark_orphans)
-     vs (graphnodestats) differs between the two paths, and post-save also runs
-     validate_parentIs while de-novo collects pids. A shared helper would have to
-     reconcile those order differences on the PRIMARY render path; risk > cosmetic
-     reward, so left alone.
-   - col_is_generalized_orphan / required_ancestor share a prefix-walk: clean to
-     extract, but it is the death-leafward critical path; low value, skipped to
-     avoid risk on critical code.
-   - validate_phantom is a near-copy of validate_truenode; the build_*_child_data /
-     compute_*_goal sharing-reconciler wrappers; the three existence-axis lookups;
-     the save/rerender elisp stream handlers + the one-shot-flag conflation. All
-     genuine, all low-value polish.
-*** §5.4 cross-buffer registry_owner seam -- DELIBERATELY NOT ADDED. The plan asked
-   for a no-op stub (returns None) so the future one-definitive-view plan has an
-   attach point. Adding a function that returns None and a call site that does
-   nothing-on-None is speculative dead code with no current use; per "no legacy/
-   speculative code" I left it out and note here that when that plan lands, the
-   seam belongs in apply_definitive_draw_rule's absent-id branch (definitive.rs).
-*** §2.5 locking-lifecycle integration test -- DEFERRED. The relax-lock message is
-   exercised (3 collateral tests filter it), but no test asserts the lock LIFECYCLE
-   (non-collateral buffers unlock early; saved stays locked till save-result; an
-   invalid save doesn't hang the next save's wait). Writing it is a substantial new
-   Emacs-driving integration fixture; flagged, not built this session.
-*** §2.6 deviation-log drift -- I did NOT rewrite plan_v2 §18's historical entries
-   (it is an append-only log; "leave the original plan as is"). Note for the record
-   that, with this session's work, the §18 "extendDefinitiveSubtreeFromLeaf are
-   gone" claim is now actually true, and the other stale §18 entries the review
-   flagged (Phase 8 "deferred" but landed; §11 "not worth doing" but done;
-   ExpectedAncestor::Col rename "remaining" but done) remain as historical
-   artifacts -- the CODE is the source of truth and is correct.
+** Choices determining the future (work I deliberately did NOT do, and why)
+This section is written to be read cold, by someone who did not follow the
+review or my commits. The glossary defines every term it uses; then each
+deferred item explains what the thing is, what doing it would mean, and why I
+left it.
+
+*** Glossary for this section
+- 'the review': review.org -- a fresh, from-scratch evaluation of this whole
+  branch (written by another instance) that I then worked through. Its findings
+  carry numbers like "review §3.3"; those are just pointers into review.org, not
+  anything you need to have read.
+- 'plan_v2 §N': a numbered section of the design document plan_v2.org. Its §18
+  is the 'deviation log' -- an append-only record of where the implementation
+  ended up diverging from the original plan.
+- 'de-novo render': building a view from scratch, the first time you open it.
+- 'rerender' (a.k.a. 'post-save'): redrawing an already-open view after a save,
+  to reflect the new state. De-novo and rerender now run through one shared
+  engine (the BFS 'driver').
+- 'dedup' / 'quasi-duplicate': two chunks of near-identical, copy-pasted code;
+  to 'dedup' them is to replace both with one shared helper function. Safe when
+  the two chunks are byte-for-byte identical; riskier when they merely look
+  alike but differ in detail.
+- 'col': a structural (non-content) node in the view tree that collects related
+  things -- e.g. a node's list of aliases, or the list of nodes that subscribe
+  to it.
+- 'phantom': a display-only placeholder shown only in the git-diff view, marking
+  a node that git says was removed.
+- 'collateral buffer': an open view OTHER than the one being saved, which the
+  save nonetheless affects and so must also be re-rendered.
+- 'the lock lifecycle': on save, the server first locks every possibly-affected
+  open buffer (so you can't edit one mid-save), then 'relaxes' the lock down to
+  just the truly-affected (collateral) buffers (so you can edit the rest again
+  promptly), then unlocks everything once the save finishes (the final
+  'save-result' message).
+- 'death-leafward': the mechanism that decides when a structural col has lost a
+  required ancestor and must be torn down. I call it a 'critical path' because a
+  bug there would corrupt views, so I refactor it only cautiously.
+- 'the one-definitive-view plan': a SEPARATE, not-yet-started effort to ensure a
+  given node is shown as editable in at most one open buffer at a time.
+- 'a seam' / 'hook': an intentionally-empty extension point left in the code so
+  a future feature has an obvious place to plug in.
+
+*** Some leftover copy-paste I mostly chose not to remove (review §3.3)
+The review found roughly six places where similar code is duplicated and could
+be collapsed into one shared helper. I did the two safest -- the two where the
+duplicated code was byte-for-byte identical (a small phantom-axis predicate, and
+the builder that constructs a Tantivy search index). I left the rest, because
+they are cosmetic and two of them are riskier than they first appear. Each is
+independent and can be done later on its own; the exact function names are in
+review.org §3.3.
+**** The two view-building paths (de-novo and rerender) end with a SIMILAR sequence
+  of clean-up-and-render steps, so they look mergeable into one 'finish' helper.
+  But I traced them and they are not the same: the steps run in a DIFFERENT ORDER
+  in the two paths, and each path does one extra step the other doesn't. Merging
+  them would risk changing behavior on the main rendering path for a purely
+  cosmetic gain, so I left them as two functions.
+***** DONE please elaborate
+How do they differ?
+****** The two render tails differ in step ORDER and in three path-specific steps.
+After the BFS driver finishes, both paths run roughly the same finishing steps --
+attach containerward ancestry, compute graphnodestats, mark the view-roots'
+parentIs Absent and demote orphans-under-dead-parents, set viewnodestats, apply
+the source set, render to a string. But:
+- ORDER. The post-save path ('rerender_view', server/update_buffer.rs) does the
+  two parentIs marks BEFORE graphnodestats; the de-novo path
+  ('multi_root_view_via_env', server/to_org/render/content_view.rs) does
+  graphnodestats FIRST and the marks after. A single shared 'finish' helper must
+  pick one order; whichever path got forced onto the other order could change its
+  output if stats or rendering ever depend on those marks (or vice versa) -- and
+  no test pins that, so it would be an unguarded risk on the primary render path.
+- The containerward step targets DIFFERENT nodes: rerender attaches containerward
+  ancestry only to removed-here phantoms; de-novo attaches it to the view roots.
+- rerender additionally runs validate_parentIs_relationships against the global
+  graph snapshot; de-novo does not.
+- de-novo additionally collects the list of pids it returns; rerender does not.
+So the shared core is real, but the wrapper would have to parameterize the order
+plus three steps -- enough that the purely-cosmetic win isn't worth the risk here.
+******* DONE
+The order question won't matter. ParentIs is a view property, independent of graph stats.
+Let's attach those ancestries to both kinds, phantoms and view-roots.
+Let's validate (and correct, right?) ParentIs in both branches,
+but adding a comment that it could be left out of the de-novo path for speed.
+******** Confirmed, and queued in plan_v2 §20.3.
+You're right on all counts: graphnodestats is computed from the in-Rust graph and
+does NOT read parentIs (verified), so reordering the parentIs marks relative to
+graphnodestats cannot change the output -- the order risk I flagged is moot. And
+yes, validate_parentIs_relationships CORRECTS as well as validates (it flips stale
+parentIs/birth claims against the graph), despite the "validate" name. So the
+unified 'finish' helper will attach containerward ancestry to BOTH removed-here
+phantoms AND view-roots, run validate_parentIs in both branches (with a comment
+that de-novo could skip it for speed), then graphnodestats + viewnodestats +
+source-set + render. Spec in plan_v2 §20.3.
+******* DONE why does de-novo return a list of PIDs?
+******** To register the view's node-set in ViewsState. The single_root_view handler
+calls open_views.register_view(view_uri, viewforest, &pids) (single_root_view.rs:95)
+-- recording which pids this open view contains, so a LATER save can find the
+'collateral' views (those containing a pid the save changed) and re-render them.
+Post-save rerender doesn't return pids because the view is already registered and
+updated in place. (If the unified helper returns pids from both branches, post-save
+just ignores them.)
+********* TODO
+So there are two different mechanisms for updating the set of PIDs
+registered for a given view -- one for new views, and another for updates?
+If so, that seems suboptimal; is there an obvious way to unify them?
+********** Yes (two mechanisms) and yes (an obvious unification). Queued as plan_v2 §20.5.
+In OpenViews (server/types/views_state.rs): register_view (new views) takes the
+pid list EXPLICITLY -- the de-novo caller passes what multi_root_view returned --
+while update_view (post-save) DERIVES the pids from the viewforest by iterating its
+nodes. register_view already RECEIVES the viewforest, so have it derive its own
+pids (a shared 'pids_from_viewforest' helper that update_view also uses) and drop
+the explicit pids param. Then multi_root_view / render_initial_view_via_driver /
+multi_root_view_via_env need not RETURN a pids list at all -- which also dissolves
+the "why does de-novo return pids" point in the sibling thread above. Bonus: it
+fixes a latent inconsistency -- de-novo's pid collection omits DeletedNode ids,
+while update_view (and the documented definition at views_state.rs ~39) includes
+them; the shared helper makes both correct. Low-risk. (Say the word and I'll drop
+§20.5 if you'd rather not.)
+*********** TODO I don't think we need anything but vognodes and inactive nodes in that list.
+If two buffers share a DeletedNode,
+and one of them changes anything about the DeletedNode,
+there's nothing for the other buffer to reflect.
+The change can only be "I moved it out of one container and/or into another",
+but in either case it's a lie -- it's only a view-member. It can't be a graph-member,
+because it doesn't exist.
+The same argument holds for Unknown,
+and a similar flavored one for DiffPhantom
+(phantoms are not updated; they are deleted and respawned).
+************ Agreed -- the set should be exactly the vognode kinds backed by a real,
+current graph node: Normal and Inactive. Your reasoning holds: Deleted and Unknown
+aren't in the graph, so a save can change nothing a view showing them would need to
+reflect (their only possible "change" is view-position, meaningless for a
+non-existent node); and a DiffPhantom is diff-only and respawned each render, not
+kept in sync. So none of Deleted/Unknown/DiffPhantom belongs in the collateral set.
+Fact-check of the current code: update_view collects {Normal, DiffPhantom, Deleted}
+and de-novo collects {Normal, DiffPhantom} -- so BOTH wrongly include DiffPhantom,
+update_view also includes Deleted, and NEITHER includes Inactive. The §20.5 shared
+helper now specifies exactly {Normal, Inactive}, fixing all three plus the doc
+comment at views_state.rs ~39. One consequence, consistent with your intent (not an
+objection): a diff view showing X only as a phantom won't be collateral-matched when
+a save changes X -- fine, since phantoms are regenerated each render. Folded into §20.5.
+**** Two functions inside the death-leafward mechanism walk a node's ancestor chain
+  in the same way. Extracting one shared walk is clean, but it sits in
+  safety-critical code and the payoff is tiny, so I skipped it.
+***** ONGOING again please elaborate
+You say similar, which suggests they are not identical.
+What's the difference?
+****** Right -- they share one loop body but differ in what they return and how far
+they walk. Both functions ('col_is_generalized_orphan' and 'required_ancestor', in
+server/update_buffer/ancestry.rs) read the col's kind, look up its required
+ancestry (the §3 table), and walk that chain position by position, at each step
+checking whether the actual ancestor at that depth is the kind the table demands
+(read_at_ancestor_in_tree + matches_expected, short-circuiting on the first
+mismatch). That per-position check is the identical, copy-pasted part. They differ
+in:
+- return type: 'col_is_generalized_orphan' returns a bool ("is any required
+  ancestor the wrong kind?"); 'required_ancestor' returns Option<NodeId> (the
+  tree-id of the i-th required ancestor).
+- how far they walk: 'col_is_generalized_orphan' scans the WHOLE chain;
+  'required_ancestor(i)' scans only the prefix up to position i.
+- the verdict on a mismatch: the first returns 'true' (orphan), the second 'None'.
+So they are "similar" (same inner check) not "identical" (different signatures and
+traversal extent). The clean dedup is to extract a tiny helper -- e.g. "index of
+the first mismatched position, or None" -- that both call. Safe in isolation, but
+it lives in the death-leafward path (a bug there silently strands or corrupts view
+subtrees) and saves only a few lines, so I left it.
+******* TODO
+It looks like required_ancestor is only used at one call site,
+to get a subscriber. I don't think it deserves to exist.
+All it does is validate the ancestry and ffetch the subscriber's ID.
+Since the subscriber is the last ancestor,
+it is validating the entire required ancestry, which the other function is for.
+And fetching an ID from an ancestor is something we have a generalized
+'read from ancestor' function for.
+We should create a new 'get_subscriber_id' function that calls 'read_from_ancestor'
+(whatever the latter's true name is),
+delete 'required_ancestor', and replace the single call to 'required_ancestor'
+with a call to 'get_subscriber_id'.
+(I'm guessing blindly that we don't need to validate the ancestry,
+because that's done elsewhere, but please fact-check me on that.
+If I'm wrong, then we also need to validate the ancestry before getting the subscriber ID.)
+******** Fact-check + refined plan; queued in plan_v2 §20.4.
+- You're right that 'required_ancestor' is called DIRECTLY only once
+  (subscribee_col.rs:89, fetching the subscriber). The generic "read from an
+  ancestor" you mean is 'read_at_ancestor_in_tree'.
+- You're right that the validation is redundant here: the BFS dispatch runs
+  'col_is_generalized_orphan' as a PRE-CHECK and deadens an orphan BEFORE any
+  reconcile runs, so by the time subscribee_col's reconcile executes its ancestry
+  is already valid -- a non-validating 'get_subscriber_id' is safe.
+- ONE correction: 'required_ancestor' is NOT single-use. Besides subscribee_col it
+  is the engine inside 'pid_and_source_from_required_ancestor' (ancestry.rs), which
+  5 other reconcilers call (relation / hidden-in / hidden-out / alias / id). So it
+  can't be deleted outright -- only its direct subscribee_col use goes away; keep
+  it (or fold it) as that wrapper's engine.
+- Caveat to weigh: death-leafward intentionally routes reconciles' ancestor reads
+  THROUGH the §3 table so they can't drift from the orphan check; the generic read
+  relaxes that for this one call (fine, given the pre-check -- add a one-line
+  comment noting the reliance). Full spec in plan_v2 §20.4.
+********* TODO ah let's keep it then.
+I misread the results of M-? as showing only one minor call site,
+but you pointed out another major call site.
+That's enough to justify keeping it. It's a good function.
+It still doesn't need to validate the ancestry, though.
+********** Agreed -- keep it; I've rewritten plan_v2 §20.4 accordingly (the
+get_subscriber_id / delete idea is dropped). And you're right it needn't validate:
+the orphan pre-check (col_is_generalized_orphan) deadens any wrong-kind ancestry
+BEFORE a reconcile runs, and every required_ancestor call is inside a reconcile, so
+the chain is already known-valid. So §20.4 is now: keep required_ancestor + its
+wrapper, but simplify it to just read the table-indexed ancestor (drop the prefix
+re-walk / re-validation), with a one-line comment that it relies on the orphan
+pre-check. Nice side effect: once required_ancestor stops walking the chain, the
+duplicate walk it shared with col_is_generalized_orphan vanishes on its own -- so
+that earlier dedup concern is resolved by this change, not a separate one.
+**** DONE Smaller, genuinely-cosmetic copy-pastes: a validator for phantom nodes that
+  mirrors the validator for ordinary nodes; a few thin wrapper functions in the
+  subscription/relationship reconcilers; three near-identical "does this file
+  exist in git" lookups; and two near-identical Emacs save-stream handlers.
+***** DONE please dedup
+This is the one you said is not risky, yes?
+****** Yes -- this group is the low-risk one (low, not literally zero). Queued in
+plan_v2 §20.1, which lists the exact targets. In short:
+- phantom-node validator vs ordinary-node validator: near-identical (the phantom
+  one is the node one minus the title check) -- extract the shared checks.
+- thin wrapper fns in the sharing reconcilers: pure pass-throughs -- inline them.
+- three "does this file exist in git" existence-axis lookups: there is already a
+  canonical helper (file_existence_axes_from_source_diff) that two of the three
+  bypass; deduping = routing those two through it.
+- two Emacs save-stream handlers: near-identical -- factor a shared per-view handler.
+None of these touches the BFS draw logic or death-leafward, so they are the safest
+of the §3.3 group. Captured in plan_v2 §20.1.
+******* DONE you have added this dedup to the plan, correct?
+If not, please do; if so, please mark this and its ancestors DONE.
+******** Yes -- it is plan_v2 §20.1 (added last turn). Marked this and its ancestors
+(the 'please dedup' note and the 'Smaller cosmetic copy-pastes' item) DONE.
+*** A future hook the plan asked for, which I chose not to add (review §5.4)
+The plan wanted me to pre-install an empty extension point for the separate,
+not-yet-started one-definitive-view effort: a function that for now just returns
+"nothing", consulted at one spot in the view's draw logic. I left it out: a
+function that does nothing and changes no behavior is speculative dead code,
+which this project's conventions say to avoid. For the record, when the
+one-definitive-view effort actually begins, the place to add it is the draw-rule
+function ('apply_definitive_draw_rule' in server/to_org/expand/definitive.rs),
+on the branch that handles a node id not yet seen elsewhere in the buffer.
+**** DONE yeah we can ignore that
+****** Agreed -- not adding the hook. No plan_v2 follow-up; when one-definitive-view
+is actually built, its author adds the seam then (the spot is noted just above).
+*** A locking test I did not write (review §2.5)
+On save, the server locks and then progressively unlocks other affected buffers
+(see 'the lock lifecycle' in the glossary). There ARE tests confirming the
+lock-related message is sent over the wire, but none that check the BEHAVIOR over
+time: that an unaffected buffer becomes editable early, that the saved buffer
+stays locked until the save finishes, and -- the subtle one -- that a FAILED save
+does not leave the next save hung waiting for a message that never comes.
+Verifying that requires a new, fairly involved Emacs-driving integration test. I
+flagged it; I did not build it this session.
+**** DONE let's do it
+****** Queued in plan_v2 §20.2 -- the three behaviors to assert and the harness to
+use are spelled out there. (The implementation itself is for a coding session.)
+*** Stale notes in the design log, left as history (review §2.6)
+plan_v2.org §18 is an append-only "deviation log". The review noticed that a few
+of its entries had gone stale -- e.g. one said a function had been "deleted" when
+it actually still existed, another called a piece of work "deferred" when it had
+in fact been finished. I did NOT rewrite those entries, because the log is meant
+to be append-only history (the standing instruction is "leave the original plan
+as is"). For the record: one of those stale claims -- that the function
+'extendDefinitiveSubtreeFromLeaf' was gone -- is now actually TRUE, because I
+deleted that function this session. The others remain as out-of-date historical
+notes. In every case the CODE is the source of truth and is correct; only those
+old log notes lag behind it.
+**** DONE that's fine
+****** Good -- leaving plan_v2 §18 as append-only history, unedited.
