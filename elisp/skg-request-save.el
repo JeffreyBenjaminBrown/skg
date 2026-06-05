@@ -187,9 +187,10 @@ Unlocks non-collateral buffers."
      (skg--unlock-all-save-locked)
      (skg-log 'error 'save "save-lock handler error: %S" err)) ))
 
-(defun skg--collateral-view-handler (payload)
-  "Handle one streamed collateral-view update.
-Unlocks and updates the buffer for the given view URI."
+(defun skg--apply-streamed-view-update (payload log-category handler-name)
+  "Apply one streamed view update from PAYLOAD: unlock and replace the buffer for
+its view URI.  Shared by the save (collateral-view) and rerender (rerender-view)
+streams; LOG-CATEGORY and HANDLER-NAME label any error."
   (condition-case err
       (let* ((response (read payload))
              (uri (cadr (assoc 'view-uri response)))
@@ -199,8 +200,13 @@ Unlocks and updates the buffer for the given view URI."
           (with-current-buffer buf
             (skg--unlock-after-save)
             (skg-replace-buffer-with-new-content nil content))))
-    (error (skg-log 'error 'save
-                    "collateral-view handler error: %S" err))))
+    (error (skg-log 'error log-category
+                    "%s handler error: %S" handler-name err))))
+
+(defun skg--collateral-view-handler (payload)
+  "Handle one streamed collateral-view update.
+Unlocks and updates the buffer for the given view URI."
+  (skg--apply-streamed-view-update payload 'save "collateral-view"))
 
 (defun skg--save-result-handler (save-buffer payload)
   "Handle the full save-result LP message (tagged with response-type).
