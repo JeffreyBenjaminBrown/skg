@@ -333,7 +333,8 @@ pub async fn update_typedb_from_saveinstructions (
         let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "apply_relationship_deltas_for_nodes") . entered ();
         apply_relationship_deltas_for_nodes (
-          db_name, driver, old_graph, & to_write_typedb )
+          db_name, driver, old_graph, & to_write_typedb,
+          & pre_existing_pids )
         . await ? ; }
       None => {
         { // Delete all 5 outbound relation types before recreating. Otherwise re-saves of existing nodes duplicate every outbound relation except 'contains'.

@@ -186,3 +186,57 @@ fn delta_writes_only_the_changed_edges (
         "db should still exist as a node after being un-contained" );
       Ok (( )) } )
   ) }
+
+/// Regression: even when the in-Rust 'old' snapshot is EMPTY while
+/// TypeDB already holds the node's edges (a recovery, or a test that
+/// loads fixtures into TypeDB but starts from an empty in-Rust graph),
+/// the incremental path must still land the exact new edge set — clear
+/// the stale edge it drops, and not duplicate the one it keeps.
+#[test]
+fn delta_with_empty_in_rust_graph_clears_stale_edges (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-delta-empty-graph",
+    "tests/typedb/update_typedb_from_saveinstructions/fixtures",
+    "/tmp/tantivy-test-delta-empty-graph",
+    |config, driver, _tantivy| Box::pin ( async move {
+      let nc = |pid : &str, contains : &[&str]| -> NodeComplete {
+        let mut n : NodeComplete = empty_node_complete ();
+        n . pid = ID::from (pid);
+        n . title = pid . to_string ();
+        n . source = SourceName::from ("main");
+        n . contains =
+          contains . iter () . map ( |c| ID::from (*c) ) . collect ();
+        n };
+
+      // Seed (bulk path): container ec contains [ea, eb].
+      let seed : Vec<DefineNode> = vec![
+        DefineNode::Save ( SaveNode ( nc ("ec", &["ea", "eb"]) )),
+        DefineNode::Save ( SaveNode ( nc ("ea", &[]) )),
+        DefineNode::Save ( SaveNode ( nc ("eb", &[]) )), ];
+      update_typedb_from_saveinstructions (
+        & config . db_name, & driver, & seed, &[], None ) . await ?;
+
+      // Re-save ec as [ea, ed] (drop eb, add ed) through the incremental
+      // path, but with an EMPTY in-Rust snapshot — it knows nothing of
+      // ec's existing edges.
+      let empty : InRustGraph = InRustGraph::new ();
+      let resave : Vec<DefineNode> = vec![
+        DefineNode::Save ( SaveNode ( nc ("ec", &["ea", "ed"]) )),
+        DefineNode::Save ( SaveNode ( nc ("ed", &[]) )), ];
+      update_typedb_from_saveinstructions (
+        & config . db_name, & driver, & resave, &[],
+        Some (& empty) ) . await ?;
+
+      let ec_contains : HashSet<ID> = find_related_nodes (
+        & config . db_name, & driver,
+        & [ ID::from ("ec") ], "contains", "container", "contained"
+      ) . await ?;
+      assert_eq! (
+        ec_contains,
+        HashSet::from ([ ID::from ("ea"), ID::from ("ed") ]),
+        "with an empty in-Rust snapshot ec must still end up containing \
+         exactly {{ea, ed}} (eb cleared, ea not duplicated), got {:?}",
+        ec_contains );
+      Ok (( )) } )
+  ) }
