@@ -62,7 +62,7 @@ pub(crate) struct DefinenodeCandidate {
 pub(crate) enum DefinenodeCandidateKind {
   Ordinary,
   Subscribee { subscriber : ID },
-  Overridden { overrider : ID }, }
+  Overridden, }
 
 impl NodeIntent {
   pub(crate) fn pid (
@@ -285,7 +285,7 @@ pub(crate) fn naive_node_edit_intents_from_candidates (
         Some (candidate . treeid),
       DefinenodeCandidateKind::Subscribee { .. } =>
         None,
-      DefinenodeCandidateKind::Overridden { .. } =>
+      DefinenodeCandidateKind::Overridden =>
         None,
     })
     . collect();
@@ -439,9 +439,8 @@ pub(crate) fn collect_savenode_candidates (
             SaveRole::Subscribee { subscriber } =>
               Some (DefinenodeCandidateKind::Subscribee {
                 subscriber }),
-            SaveRole::Overridden { overrider } =>
-              Some (DefinenodeCandidateKind::Overridden {
-                overrider }),
+            SaveRole::Overridden { .. } =>
+              Some (DefinenodeCandidateKind::Overridden),
             _ => None };
         if let Some (kind) = candidate_kind {
           if ! t . is_indefinitive() {

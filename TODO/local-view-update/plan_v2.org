@@ -279,8 +279,10 @@ the registry's maintenance here.
 
 ** 5.5 Node limit
 - *Per buffer*, reset to 0 at each update; counts only *new* ViewNodes created
-  *during the ordinary update pass*; all such kinds count (scaffolds, inactive,
-  deleted, aliases, ids).
+  *during the ordinary update pass*. Most kinds count (content, the sharing-col
+  members, inactive, deleted). The id/alias cols are EXEMPT: a node's own
+  id/alias count is naturally bounded, so capping them buys nothing, and
+  cap_goal_list_to_budget is never called from the id/alias reconcilers.
 - *The counter covers only the ordinary update pass.* The diff overlay (§9) is
   *not* subject to it: every necessary diff-phantom and diff scaffold is always
   created, regardless of node count. (A shared counter would let a big worktree
