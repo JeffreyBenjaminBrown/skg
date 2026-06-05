@@ -45,8 +45,16 @@ pub fn reconcile_relation_col_children (
       kind . caller_label (), kind) . into ()); };
   let owner_role =
     member_role . opposite_role ();
-  let goal_list : Vec<ID> =
-    graph_snap . other_member_pids (&owner_pid, owner_role);
+  let goal_list : Vec<ID> = {
+    let mut goal_list : Vec<ID> =
+      graph_snap . other_member_pids (&owner_pid, owner_role);
+    // A relation col is a set (order user-irrelevant, plan §6.8/§7.3), but the
+    // member list arrives in HashSet iteration order for the inbound relations.
+    // Sort by ID so that when the budget truncates a famous node's relation col
+    // (thousands of members), the surviving subset is deterministic rather than
+    // an arbitrary run-to-run slice.
+    goal_list . sort_by ( |a, b| a . 0 . cmp (&b . 0) );
+    goal_list };
   let removed_ids : HashSet<ID> = HashSet::new ();
   // §5.5/§18: a relation member is a new TrueNode, so spend the per-buffer
   // node budget on it -- a node thousands of people relate to (e.g. a famous
