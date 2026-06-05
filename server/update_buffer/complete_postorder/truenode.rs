@@ -62,11 +62,25 @@ fn extract_view_requests (
   tree : &Tree<ViewNode>,
   node : NodeId,
 ) -> Result<Vec<(NodeId, ViewRequest)>, Box<dyn Error>> {
-  let view_requests : HashSet<ViewRequest> =
+  let mut view_requests : HashSet<ViewRequest> =
     read_at_node_in_tree( tree, node,
       |vn : &ViewNode| match &vn . kind {
         ViewNodeKind::Vognode (Vognode::Normal (t))
           => t . view_requests . clone(),
         _ => HashSet::new() } )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
+  // A view-ROOT's Containerward request is NOT fulfilled here. finish_viewforest
+  // builds root containerward as a separate AncestryTree subtree (handling a
+  // cyclic root) and drops the request; routing a root through
+  // build_and_integrate_containerward here would instead merge the ancestry into
+  // existing content and panic on a cyclic root (one whose containerward cycles
+  // back to the root). So leave view-root Containerward for the tail. A
+  // Containerward request a USER put on a non-root node still expands here.
+  let is_view_root : bool =
+    tree . get (node)
+      . and_then ( |n| n . parent () )
+      . map ( |p| matches! ( p . value () . kind, ViewNodeKind::BufferRoot ) )
+      . unwrap_or (false);
+  if is_view_root {
+    view_requests . remove (& ViewRequest::Containerward); }
   Ok ( view_requests . into_iter () . map ( |req| (node, req) ) . collect () ) }

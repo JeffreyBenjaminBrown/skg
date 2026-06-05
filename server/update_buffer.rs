@@ -31,7 +31,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::to_org::util::{mark_view_roots_parent_absent, validate_parentIs_relationships, mark_orphans_under_dead_parents_independent};
 use crate::dbs::in_rust_graph::snapshot_global;
 use crate::types::viewnode::{IndefOrDef, ViewNode, ViewNodeKind};
-use crate::types::viewnode::{Vognode, QualCol, Qual};
+use crate::types::viewnode::{Vognode, QualCol, Qual, ViewRequest};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -266,6 +266,19 @@ pub async fn render_initial_view_via_driver (
   let mut viewforest : ViewForest =
     crate::to_org::util::stub_viewforest_from_root_ids (
       root_ids, &env . config, &env . driver, &mut stub_defmap ) . await ?;
+  // De-novo (and ONLY de-novo) asks each view-root for its containerward
+  // ancestry, as a self-consuming view request. The during-completion dispatch
+  // leaves view-root Containerward alone (extract_view_requests); finish_viewforest
+  // fulfills it via the AncestryTree attach and drops it. So root containerward is
+  // generated once, here, and round-trips in the saved buffer as ordinary content
+  // -- a later save never re-generates it. (Roots are already definitive by
+  // construction -- first occurrence in the defmap -- so they need no
+  // ViewRequest::Definitive; adding one would over-trigger the §5.3 cascade.)
+  for root_nid in viewforest . root_ids () {
+    if let Some (mut node_mut) = viewforest . get_mut (root_nid) {
+      if let ViewNodeKind::Vognode (Vognode::Normal (t)) =
+        &mut node_mut . value () . kind
+      { t . view_requests . insert ( ViewRequest::Containerward ); }} }
   let graph_snap : Arc<InRustGraph> = env . in_rust_graph . load_full ();
   let mut defmap : DefinitiveMap = DefinitiveMap::new ();
   let mut errors : Vec<String> = Vec::new ();
@@ -332,52 +345,69 @@ pub async fn rerender_view (
   // §9 reversal (#3): the content/scaffold diff was applied INLINE during the
   // BFS above (process_truenode_diff at each Normal node's visit, driven by
   // source_diffs = the real diffs).
-  mark_view_roots_parent_absent (viewforest);
+  let result : String =
+    finish_viewforest (
+      viewforest,
+      &context . env . config,
+      &context . env . driver,
+      context . active_source_set ) . await ?;
+  tracing::debug!("rerender_view: done ({:.3}s)",
+            t_rerender . elapsed () . as_secs_f64 ());
+  Ok (result) }
+
+/// The shared post-completion tail for BOTH render paths (§20.3): the de-novo
+/// view (multi_root_view_via_env, server/to_org/render/content_view.rs) and the
+/// post-save re-render (rerender_view, above). Given a viewforest whose TrueNode
+/// content + git diff have already been completed, it:
+///   - fulfills a ViewRequest::Containerward carried by a view-ROOT (only de-novo
+///     sets it; see render_initial_view_via_driver), building that root's
+///     containerward ancestry and dropping the request. This is data-driven:
+///     post-save roots come from the saved buffer WITHOUT the request, so a save
+///     never re-generates the containerward (it round-trips as ordinary content).
+///   - attaches containerward ancestry to every removed-here phantom,
+///   - marks view-root and orphan parentIs,
+///   - validates parentIs against the in-Rust graph (a no-op when markers
+///     already agree, and when the global handle isn't initialized; the de-novo
+///     path could skip it for speed, but running it in both keeps the tails one),
+///   - computes graph- then view-node stats,
+///   - applies the active source set, and renders to a buffer string.
+/// Step order is immaterial between the parentIs marks and graphnodestats:
+/// parentIs is a view property and graphnodestats reads only the in-Rust graph,
+/// never parentIs, so the final state is identical either way.
+pub async fn finish_viewforest (
+  viewforest        : &mut ViewForest,
+  config            : &SkgConfig,
+  driver            : &TypeDBDriver,
+  active_source_set : Option<&ActiveSourceSet>,
+) -> Result<String, Box<dyn Error>> {
+  fulfill_root_containerward_requests (
+    viewforest, config, driver, active_source_set ) . await ?;
+  attach_containerward_ancestries_to_removedhere_phantoms (
+    viewforest, config, driver, active_source_set ) . await ?;
+  mark_view_roots_parent_absent ( viewforest );
   // §A (Jeff's invariant): a Normal survivor left under a non-container parent
   // (a phantom / Deleted / DeadScaffold) is a non-dead generalized orphan and
   // must become Independent.
-  mark_orphans_under_dead_parents_independent (viewforest);
+  mark_orphans_under_dead_parents_independent ( viewforest );
   if let Some (snap) = snapshot_global () {
-    // Correct any parentIs markers whose claimed relation to the
-    // parent doesn't hold in the in-Rust graph (e.g. user moved a
-    // birth=linksToParent node under a new parent it doesn't link to).
-    // No-op when the global graph handle isn't initialized (tests
-    // that bypass startup).
-    validate_parentIs_relationships (viewforest, &snap); }
-  attach_containerward_ancestries_to_removedhere_phantoms (
-    viewforest, &context . env . config,
-    &context . env . driver,
-    context . active_source_set ) . await ?;
-  tracing::debug!("rerender_view: complete_viewforest done ({:.3}s), starting graphnodestats",
-                  t_rerender . elapsed () . as_secs_f64 ());
+    // Correct any parentIs markers whose claimed relation to the parent doesn't
+    // hold in the in-Rust graph (e.g. user moved a birth=linksToParent node
+    // under a new parent it doesn't link to).
+    validate_parentIs_relationships ( viewforest, &snap ); }
   let ( container_to_contents, content_to_containers ) =
-    match context . active_source_set {
+    match active_source_set {
       Some (active) =>
         set_graphnodestats_in_viewforest_with_source_set (
-          viewforest,
-          &context . env . config,
-          &context . env . driver,
-          active ) . await,
+          viewforest, config, driver, active ) . await,
       None =>
         set_graphnodestats_in_viewforest (
-          viewforest,
-          &context . env . config,
-          &context . env . driver ) . await,
+          viewforest, config, driver ) . await,
     } ?;
-  tracing::debug!("rerender_view: graphnodestats done ({:.3}s), rendering to string",
-                  t_rerender . elapsed () . as_secs_f64 ());
   set_viewnodestats_in_viewforest (
-    viewforest,
-    &container_to_contents,
-    &content_to_containers,
-    &context . env . config );
-  if let Some (active) = context . active_source_set {
-    apply_source_set_to_viewforest (viewforest, active); }
-  let result : Result<String, Box<dyn Error>> =
-    viewforest_to_string (viewforest, &context . env . config);
-  tracing::debug!("rerender_view: done ({:.3}s)",
-            t_rerender . elapsed () . as_secs_f64 ());
-  result }
+    viewforest, &container_to_contents, &content_to_containers, config );
+  if let Some (active) = active_source_set {
+    apply_source_set_to_viewforest ( viewforest, active ); }
+  viewforest_to_string ( viewforest, config ) }
 
 /// When the server first receives the buffer, it replaces
 /// each ViewNode's ID with a PID (`replace_ids_with_pids`).
@@ -559,12 +589,49 @@ fn clear_diff_metadata (
         Ok (( )) } ) ?;
   Ok (( )) }
 
-/// For every RemovedHere phantom in the viewforest,
-/// fetch its containerward ancestry from TypeDB
-/// and insert it as indefinitive Content children.
+/// Fulfill a ViewRequest::Containerward carried by a view-ROOT: attach that
+/// root's full containerward ancestry as its first children, then DROP the
+/// request so it does not round-trip into the saved buffer (a later save must not
+/// re-generate the containerward -- it round-trips as ordinary content instead).
+///
+/// Only the de-novo render sets this request (render_initial_view_via_driver), so
+/// this is a no-op post-save. The during-completion view-request dispatch
+/// deliberately leaves view-root Containerward alone (extract_view_requests) so it
+/// reaches here: this AncestryTree-based attach builds a SEPARATE containerward
+/// subtree and handles a cyclic root, whereas the dispatch's
+/// build_and_integrate_containerward would merge it into existing content and
+/// panic on a cyclic root (one whose containerward path cycles back to the root,
+/// e.g. a contains b contains a). See progress.org §17.
+async fn fulfill_root_containerward_requests (
+  viewforest : &mut ViewForest,
+  config     : &SkgConfig,
+  driver     : &TypeDBDriver,
+  active     : Option<&ActiveSourceSet>,
+) -> Result<(), Box<dyn Error>> {
+  let requesting_root_nodeids : Vec<NodeId> =
+    viewforest . root_ids () . into_iter ()
+      . filter ( |nid| viewforest . get (*nid)
+          . map ( |n| match &n . value () . kind {
+              ViewNodeKind::Vognode (Vognode::Normal (t)) =>
+                t . view_requests . contains (& ViewRequest::Containerward),
+              _ => false } )
+          . unwrap_or (false) )
+      . collect ();
+  if requesting_root_nodeids . is_empty () { return Ok (( )); }
+  attach_containerward_ancestries_at_nodeids_with_source_set (
+    viewforest, &requesting_root_nodeids, config, driver, active ) . await ?;
+  for nid in requesting_root_nodeids { // drop the now-fulfilled request
+    if let Some (mut node_mut) = viewforest . get_mut (nid) {
+      if let ViewNodeKind::Vognode (Vognode::Normal (t)) =
+        &mut node_mut . value () . kind
+      { t . view_requests . remove (& ViewRequest::Containerward); }} }
+  Ok (( )) }
+
+/// For every RemovedHere phantom in the viewforest, fetch its containerward
+/// ancestry from TypeDB and insert it as indefinitive Content children.
 /// Short-circuits when no RemovedHere phantoms exist.
 async fn attach_containerward_ancestries_to_removedhere_phantoms (
-  viewforest    : &mut Tree<ViewNode>,
+  viewforest    : &mut ViewForest,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
   active        : Option<&ActiveSourceSet>,
@@ -573,14 +640,14 @@ async fn attach_containerward_ancestries_to_removedhere_phantoms (
     let mut result : Vec<NodeId> = Vec::new ();
     for edge in viewforest . root () . traverse () {
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
-        { let is_removedhere : bool = match &node_ref . value () . kind {
-            ViewNodeKind::Vognode (Vognode::Normal (t)) =>
-              t . is_removedhere_phantom (),
-            ViewNodeKind::Vognode (Vognode::DiffPhantom (p)) =>
-              p . is_removedhere_phantom (),
-            _ => false };
-          if is_removedhere
-          { result . push ( node_ref . id () ); }} }}
+        let is_removedhere : bool = match &node_ref . value () . kind {
+          ViewNodeKind::Vognode (Vognode::Normal (t)) =>
+            t . is_removedhere_phantom (),
+          ViewNodeKind::Vognode (Vognode::DiffPhantom (p)) =>
+            p . is_removedhere_phantom (),
+          _ => false };
+        if is_removedhere
+        { result . push ( node_ref . id () ); }} }
     result };
   attach_containerward_ancestries_at_nodeids_with_source_set (
     viewforest, &phantom_nodeids, config, typedb_driver, active ) . await }

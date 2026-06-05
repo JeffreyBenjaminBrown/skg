@@ -1711,3 +1711,260 @@ notes. In every case the CODE is the source of truth and is correct; only those
 old log notes lag behind it.
 **** DONE that's fine
 ****** Good -- leaving plan_v2 §18 as append-only history, unedited.
+
+* 14. Plowing through §20 (2026-06-05) -- when-to-stop report
+Stopping to surface one architectural decision (the §20.3 containerward wrinkle).
+Everything below is committed; full Rust suite (478) + all 27 integration tests
+green at each commit.
+
+** What's done and went well
+- §20.4 (958c74f3): dropped required_ancestor's redundant ancestry re-validation
+  (the orphan pre-check already guarantees validity); the duplicate chain-walk it
+  shared with col_is_generalized_orphan vanished with it.
+- §20.1 dedups, in three commits: the phantom/truenode validators + the three
+  existence-axis lookups (a2c2973c); the per-kind sharing-reconciler wrappers
+  inlined (e972c5cc); the two Emacs save/rerender stream handlers + the two
+  unlock helpers (7afa9015).
+- §20.5 (f8e784ec): one shared OpenViews::pids_from_viewforest, and BOTH
+  production pid paths route through it, fixing the collateral pid set to
+  {Normal, Inactive} (was {Normal, DiffPhantom, Deleted} post-save / {Normal,
+  DiffPhantom} de-novo). This is a real latent-bug fix (collateral detection).
+
+** Changes to the plan's envisioned order
+- Did the safe correctness/cleanup items (§20.4, §20.1) before §20.5.
+- §20.5 was REDUCED from "drop register_view's pids param + multi_root_view's
+  returned pids list" to "route both pid computations through the one shared
+  helper, keeping the param + return". Reason: the full version ripples to ~39
+  test call sites across ~15 files -- disproportionate churn against the
+  minimize-tests-diff preference -- for a cosmetic gain. The substantive goal
+  (single source of which-kinds-count + the {Normal, Inactive} fix) is achieved
+  with zero test churn. Recorded in plan_v2 §20.5's deviation note.
+
+** What's imperfect about what's done
+- §20.5 leaves register_view still taking an explicit pids param and
+  multi_root_view still returning a (now production-unused) pids list -- a small
+  redundancy the deviation accepted to avoid the test churn. Search views still
+  pass their own match-id list rather than the helper (the match list IS the
+  right member set for a search view, so this is intentional, not a wart).
+
+** Choices determining the future (the one thing I need from you)
+- §20.3 (unify the render tails) is BLOCKED on an architectural decision. The plan
+  says to "attach BOTH containerwards (phantoms AND view-roots) in BOTH paths".
+  But =attach_containerward_ancestries_*= is NOT idempotent -- it prepends the
+  ancestry unconditionally -- and the post-save path's submitted buffer already
+  contains the root's containerward ancestry (the user sees it; it survives the
+  round-trip into rerender_view's viewforest). So attaching root-containerward in
+  post-save would DUPLICATE it. I did not want to ship that, nor silently change
+  the behavior you specified, so I stopped. Options (in plan_v2 §20.3's BLOCKED
+  note): (a) parameterize finish_viewforest by which containerward step --
+  behavior-preserving dedup of the shared steps, dropping "both in both"; (b) make
+  attach idempotent first, then both-in-both; (c) confirm post-save roots do NOT
+  retain containerward, making both-in-both a safe ADD. The order-independence
+  half of §20.3 (your correct point) is unaffected.
+- §20.2 (locking-lifecycle integration test) is not started. Heads-up: asserting
+  the lock TIMING (a non-collateral buffer becomes editable mid-stream; the saved
+  buffer stays locked until save-result) from an Emacs batch integration test is
+  genuinely hard -- it means observing async overlay state at specific moments.
+  The invalid-save-doesn't-hang assertion (c) is tractable on its own. Worth a
+  word on scope before I sink time into (a)/(b).
+
+* 15. Implementing §20.3 -- unifying the render tails (2026-06-05)
+
+You pointed me at the existing "integrate" machinery, and it unblocked §20.3.
+
+** Glossary (so this section reads standalone)
+- de-novo render: building a view from scratch (you open a node). Entry point
+  =multi_root_view_via_env= (server/to_org/render/content_view.rs).
+- post-save / collateral render: rebuilding an already-open view after a save.
+  Entry point =rerender_view= (server/update_buffer.rs).
+- containerward ancestry: a node's containers (its parents in the graph), shown
+  in a view as indented CHILDREN of the node, each marked =(birth containsParent)=.
+- view-root: a top-level node of a view. removed-here phantom: a diff-only
+  placeholder for a node a save removed from this container.
+
+** What's done and went well
+- §20.3 is DONE. The two post-completion tails (de-novo and post-save) are now
+  one shared =finish_viewforest= in server/update_buffer.rs: attach containerward
+  to BOTH view-roots AND removed-here phantoms, mark/validate parentIs, graph- and
+  view-node stats, apply the source set, render to string. =multi_root_view_via_env=
+  and =rerender_view= both call it; their bespoke tails are gone.
+- The blocker resolved exactly as you hinted. The dedup-aware "integrate"
+  machinery already existed: =integrate_linear_portion_of_path= does find-or-insert
+  (reuse a child already present under the parent; insert only when missing). So
+  =insert_containerward_ancestry_tree_recursive= now does the same, making
+  containerward attachment idempotent -- re-attaching a root that already carries
+  its ancestry is a no-op rather than a duplication.
+- Full suite green: 478/478 Rust + 27/27 integration.
+
+** Changes to the plan's envisioned order
+- §20.3 was BLOCKED at the end of §14; this was the first thing done this session.
+- §20.5 (register_view derives its own pids) had already removed the de-novo
+  "return a pids list" oddity, so =finish_viewforest= returns just the String; the
+  de-novo caller computes its pids itself afterward.
+
+** What's imperfect about what's done
+- STALE CONTAINERWARD UNDER A DELETED NODE. Once a root's containerward is
+  attached (now in post-save too) it lives in the buffer and round-trips. If the
+  node is later deleted, the DeletedNode RETAINS its subtree (documented
+  behavior), so the containerward child lingers under the deleted node even though
+  the container relationship no longer holds -- e.g.
+  save_collateral_delete_then_edit_under_it phase 5: deleted 11 still shows node 1
+  as =(birth containsParent)= though 1 no longer contains 11. This is not new to
+  §20.3 in principle (a de-novo-opened-then-deleted buffer would do the same,
+  since de-novo already attaches root containerward), but §20.3 makes the
+  post-save / synthetic path exhibit it. Pruning stale containerward is out of
+  §20.3's scope; flagging in case you want a follow-up.
+
+** Choices determining the future
+1. CONTAINERWARD-ONLY idempotence, not plain find-by-id. My first cut reused ANY
+   child of the same id; in a CYCLE (a contains b AND b contains a) that collapsed
+   the containerward subtree into the content child of the same id -- the two
+   occurrences must stay distinct view nodes. Fixed with
+   =find_containerward_child_by_id=, which matches only a prior child whose
+   =birth == ContainsParent= (content children are born =Unremarkable=). Verified
+   by the de-novo cycle test (save_collateral_break_cycle) and the post-save cycle
+   test (test_definitive_view_with_cycle), which now agree.
+2. POST-SAVE VIEWS NOW SHOW ROOT CONTAINERWARD (user-visible). de-novo already
+   did; post-save did not. They now match. For a real de-novo-opened buffer this
+   is a no-op (the buffer already carries it; the idempotent attach reuses it); it
+   changes only synthetic / freshly-typed roots. Proof it's a consistency FIX, not
+   a regression: git-diff-view-updates phase-4 and phase-11 (post-save) now EQUAL
+   phase-2 (de-novo). Re-baselined 6 tests for this -- 3 unit (definitive-view
+   conflicting / repeat / cycle) and 3 integration (containerward-view-request,
+   git-diff-view-updates, save_collateral_delete_then_edit_under_it). Two further
+   integration tests (save_collateral_break_cycle, _add_content_and_modify_text)
+   were the cycle-COLLAPSE bug in choice 1, now fixed -- no re-baseline.
+3. ATTACH TO ALL view-roots, including INDEFINITIVE ones. The combined attach
+   targets all root_ids (like the old de-novo =attach_to_view_roots=), so even a
+   bare indefinitive root gets its containerward. Easily reversed with a one-line
+   indef filter if you'd rather indef roots stay bare. (Deleted/Unknown roots are
+   already skipped -- the attach only processes =Vognode::Normal=.)
+
+* 16. §20.2 -- locking-lifecycle integration test (2026-06-05)
+
+You chose the tractable scope: do assertions (a) and (c), skip the
+timing-sensitive (b). Done.
+
+** What's done and went well
+- (a): new tests/integration/save_lock_lifecycle/ -- opens three overlapping
+  views (*a* saved, *b* collateral, *solo* truly non-collateral), saves *a*, and
+  after the stream settles asserts every view's =skg--save-lock-overlay= is nil
+  AND that *solo* is genuinely editable (it actually inserts text into it, so the
+  overlay's modification-hook is proven gone, not just the bookkeeping var). A
+  buffer is "locked" iff that buffer-local overlay is non-nil (defined in
+  elisp/skg-request-save/skg-lock-buffers.el).
+- (c): extended tests/integration/valid_and_invalid_saves/ -- after the
+  invalid-then-valid sequence, asserts =skg--stream-in-progress= is nil and the
+  content buffer carries no lock overlay, proving the invalid save left no leaked
+  state to wedge the next save. (Reaching phase 2 already proved the second save's
+  wait RETURNED; this makes the no-leak invariant explicit.)
+- All 28 integration tests green (the 27 + the new one); 478 Rust unchanged.
+
+** What's imperfect about what's done
+- (b) is unimplemented by design (your call): "the saved buffer stays locked UNTIL
+  the final save-result" needs mid-stream observation of lock state, which a batch
+  Emacs test can't do deterministically without a fragile client-side hook on
+  save-relax-lock. So (a) asserts the post-settle END state (no view left locked),
+  not the intermediate narrowing.
+
+** Choices determining the future
+- save_lock_lifecycle doubles as an end-to-end check of §20.3: *b* is collateral
+  to saving *a* precisely BECAUSE its view now shows a as containerward (its pid
+  set includes a). If a future change stops attaching root containerward, *b*
+  would become non-collateral and this test's role labels would need revisiting.
+
+* 17. §20.3 revised -- root containerward is de-novo-only (2026-06-05)
+
+You caught that §20.3 as first shipped re-generates a containerward history for
+each view-root on every SAVE. Fixed: root containerward is now DE-NOVO-only.
+
+** What's done and went well
+- =finish_viewforest= gained =attach_root_containerward: bool=. De-novo
+  (multi_root_view_via_env) passes true; post-save (rerender_view) passes false.
+  Phantom containerward is still attached in both. So a view-root's containerward
+  is generated once, at open, then round-trips in the buffer as ordinary content;
+  a save never re-makes it.
+- This restores the §15 user-visible behavior to pre-§20.3 and reverts all 6 of
+  its test re-baselines (3 unit definitive-view + 3 integration) to their original
+  expectations. De-novo uses the same proven AncestryTree attach path as before,
+  just gated by the flag, so there is NO test churn.
+- Full suite green: 478 Rust + 28 integration.
+- save_lock_lifecycle (§20.2a) still passes: *b* is collateral to saving *a*
+  because de-novo view-b shows a as containerward, exactly as before.
+
+** Changes to the plan's envisioned order
+- Supersedes §15's "choice 2" (post-save shows root containerward), "choice 3"
+  (indef roots get containerward), and its "stale containerward under a deleted
+  node" imperfection: post-save no longer attaches root containerward at all, so
+  none of those arise from a SAVE. (A real de-novo-opened buffer can still carry
+  root containerward that goes stale if its node is later deleted -- but that is
+  the original, pre-§20.3 behavior, unchanged by this work.)
+
+** What's imperfect about what's done
+- The de-novo/post-save difference is a bool param on finish_viewforest, not a
+  fully data-driven seam. You suggested a ViewRequest::Containerward on each
+  de-novo root instead; that is cleaner in spirit but PANICS on a cyclic root:
+  the request routes through =build_and_integrate_containerward= during
+  completion, which hits "child data not pre-fetched" when the containerward path
+  cycles back to the root (a contains b contains a). The AncestryTree tail attach
+  handles that case, so the flag uses it. Making the ViewRequest path work would
+  mean fixing that integrate-path cycle bug (or special-casing view-roots in the
+  request dispatch so the tail attach fulfills them). Deferred unless you want it.
+
+** Choices determining the future
+- The view_requests field is a HashSet, so it already permits DVR + Containerward
+  together -- no list expansion was needed (you'd wondered). If the
+  ViewRequest::Containerward approach is ever pursued, the field is ready; the only
+  blocker is the integrate-path cycle panic above.
+
+* 18. §20.3 final -- root containerward via a self-consuming view request (2026-06-05)
+
+The §17 bool flag (=attach_root_containerward=) was ad-hoc -- it encoded caller
+identity (de-novo vs post-save) as a positional bool on =finish_viewforest=. You
+asked for the data-driven version you'd suggested: a view request on each de-novo
+root. Done, after researching the panic that had blocked it.
+
+** What's done and went well
+- Root containerward is now a self-consuming =ViewRequest::Containerward=:
+  - =render_initial_view_via_driver= (de-novo ONLY) sets it on each view-root.
+  - =extract_view_requests= (the during-completion dispatch) LEAVES view-root
+    Containerward alone -- it detects a view-root as a node whose parent is the
+    BufferRoot.
+  - =finish_viewforest='s =fulfill_root_containerward_requests= attaches each
+    requesting root's containerward via the AncestryTree attach path (separate
+    subtrees, handles cyclic roots) and DROPS the request, so it never round-trips
+    and a save never re-generates the containerward.
+  - =finish_viewforest= no longer takes the =attach_root_containerward= bool; it
+    is caller-agnostic. The de-novo/post-save difference now lives entirely in data
+    (a root either carries the request or it doesn't).
+- Behavior is IDENTICAL to the §17 flag version (de-novo attaches to all roots via
+  the same attach path; post-save roots carry no request), so there is NO test
+  churn. 478 Rust + 28 integration green, including save_collateral_break_cycle
+  (the cyclic root that had panicked).
+
+** Why the request had seemed blocked (the panic research)
+- =ViewRequest::Containerward= dispatches to =build_and_integrate_containerward=
+  (the "integrate" path), which is the RIGHT mechanism for a USER's explicit
+  containerward VIEW of a node -- it MERGES ancestry into the existing tree (its
+  find_child_by_id reuses an existing child) -- but the WRONG mechanism for a
+  content view's ROOT, which wants a SEPARATE containerward subtree. On a cyclic
+  root it also panicked. So view-root Containerward is fulfilled by the tail
+  attach instead; non-root (user) Containerward still uses integrate.
+- The panic itself is a predicate mismatch in the content reconciler:
+  =complete_relevant_children_in_viewnodetree= treats only parentIs=Affected Normal
+  children as "already present" (and CREATES any other goal id via mk_node), but
+  =build_child_creation_data= skipped pre-fetching ChildData for ANY child of the
+  same id (incl. Independent). So a goal id present only as an Independent child
+  (which the integrate path adds for containerward) was created without pre-fetched
+  data -> .expect("child data not pre-fetched") panic. VERIFIED that gating
+  build_child_creation_data's Normal arm on parentIs=Affected removes the panic.
+  NOT applied (option 1 sidesteps the integrate path for roots), but it is a latent
+  crash worth fixing on its own -- recorded for whoever wants it.
+
+** Choices determining the future
+- There are now two containerward fulfillments, used deliberately: the AncestryTree
+  ATTACH path (separate subtree; render tail; phantoms + requesting roots) and the
+  INTEGRATE/merge path (=build_and_integrate_containerward=; explicit user
+  containerward-view requests on non-root nodes). =extract_view_requests= is the
+  fork: it routes user (non-root) Containerward to integrate, leaves view-root
+  Containerward for the tail attach.

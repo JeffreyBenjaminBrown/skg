@@ -373,24 +373,41 @@ fn validate_inactive_node (
                   . to_string()); }
   errors }
 
+/// The identity + child-structure checks shared by a TrueNode and a phantom
+/// (§20.4 dedup): id present, source in config, no wrong-structure child, and
+/// distinct content-child ids. `label` ("TrueNode" / "Phantom") is woven into the
+/// messages so each kind reports itself. (validate_truenode appends the
+/// definitive-title check; a phantom is title-exempt, being indefinitive.)
+fn validate_gnode_identity_and_structure (
+  tree         : &Tree<MpViewnode>,
+  node_id      : NodeId,
+  id_present   : bool,
+  source_valid : bool,
+  label        : &str,
+) -> Vec<String> {
+  let mut errors : Vec<String> = Vec::new();
+  if !id_present {
+    errors . push( format!("{} must have an ID.", label) ); }
+  if !source_valid {
+    errors . push( format!(
+      "{} must have a source that exists in the config.", label) ); }
+  if !generation_includes_only(
+    tree, node_id, 1, true,
+    |node| !cannot_be_child_of_gnode (node))
+    { errors . push( format!("{} has a child whose structure belongs elsewhere: BufferRoot, Alias, ID, HiddenInSubscribeeCol, or HiddenOutsideOfSubscribeeCol.", label) ); }
+  if !nonignored_children_have_distinct_ids(tree, node_id) {
+    errors . push( format!("{}'s non-ignored content children must be unique (no two sharing the same ID).", label) ); }
+  errors }
+
 fn validate_truenode (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
   t       : &MpTruenode,
   config  : &SkgConfig,
 ) -> Vec<String> {
-  let mut errors : Vec<String> = Vec::new();
-  if !has_id (t) {
-    errors . push("TrueNode must have an ID." . to_string()); }
-  if !has_valid_source(t, config) {
-    errors . push("TrueNode must have a source that exists in the config."
-                . to_string() ); }
-  if !generation_includes_only(
-    tree, node_id, 1, true,
-    |node| !cannot_be_child_of_gnode (node))
-    { errors . push("TrueNode has a child whose structure belongs elsewhere: BufferRoot, Alias, ID, HiddenInSubscribeeCol, or HiddenOutsideOfSubscribeeCol." . to_string()); }
-  if !nonignored_children_have_distinct_ids(tree, node_id) {
-    errors . push("TrueNode's non-ignored content children must be unique (no two sharing the same ID)." . to_string()); }
+  let mut errors : Vec<String> =
+    validate_gnode_identity_and_structure (
+      tree, node_id, has_id (t), has_valid_source (t, config), "TrueNode" );
   if has_empty_title (t) {
     errors . push("Definitive node has an empty title." . to_string()); }
   errors }
@@ -405,20 +422,12 @@ fn validate_phantom (
   p       : &MpDiffPhantomNode,
   config  : &SkgConfig,
 ) -> Vec<String> {
-  let mut errors : Vec<String> = Vec::new();
-  if p . id . is_none() {
-    errors . push("Phantom must have an ID." . to_string()); }
-  if ! p . source . as_ref()
-       . is_some_and( |s| config . sources . contains_key (s) ) {
-    errors . push("Phantom must have a source that exists in the config."
-                . to_string() ); }
-  if !generation_includes_only(
-    tree, node_id, 1, true,
-    |node| !cannot_be_child_of_gnode (node))
-    { errors . push("Phantom has a child whose structure belongs elsewhere: BufferRoot, Alias, ID, HiddenInSubscribeeCol, or HiddenOutsideOfSubscribeeCol." . to_string()); }
-  if !nonignored_children_have_distinct_ids(tree, node_id) {
-    errors . push("Phantom's non-ignored content children must be unique (no two sharing the same ID)." . to_string()); }
-  errors }
+  validate_gnode_identity_and_structure (
+    tree, node_id,
+    p . id . is_some (),
+    p . source . as_ref () . is_some_and (
+      |s| config . sources . contains_key (s) ),
+    "Phantom" ) }
 
 fn cannot_be_child_of_gnode (
   node : &MpViewnode,

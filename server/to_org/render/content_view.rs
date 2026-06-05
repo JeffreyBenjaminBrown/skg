@@ -6,30 +6,21 @@
 /// (multi_root_view_via_env -> render_initial_view_via_driver) over a stub
 /// forest. The driver completes each node at its BFS visit -- including, when
 /// diff_mode_enabled, that node's git diff inline (§9 reversal / #3). After the
-/// driver:
-/// - prepend each view-root's containerward ancestry (if any)
-/// - set_graphnodestats_in_viewforest
-/// - set_viewnodestats_in_viewforest
-/// - render to string
+/// driver, the shared finish_viewforest tail (server/update_buffer.rs, §20.3)
+/// attaches containerward ancestry (roots + removed-here phantoms),
+/// marks/validates parentIs, sets graph/view stats, applies the source set,
+/// and renders to string.
 
-use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids_with_source_set;
-use crate::org_to_text::viewforest_to_string;
-use crate::to_org::util::{mark_view_roots_parent_absent, mark_orphans_under_dead_parents_independent};
 use crate::types::tree::forest::ViewForest;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
-use crate::types::viewnode::{ViewNode, ViewNodeKind};
-use crate::types::viewnode::Vognode;
+use crate::types::viewnode::ViewNode;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::env::SkgEnv;
 use crate::dbs::in_rust_graph::{InRustGraph, new_handle};
 use crate::dbs::init::empty_in_ram_tantivy_index;
 use std::sync::Arc;
-use crate::update_buffer::graphnodestats::{
-  set_graphnodestats_in_viewforest,
-  set_graphnodestats_in_viewforest_with_source_set};
-use crate::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
 
-use ego_tree::{NodeId, Tree};
+use ego_tree::Tree;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
@@ -114,42 +105,20 @@ pub async fn multi_root_view_via_env (
   let mut viewforest : ViewForest =
     crate::update_buffer::render_initial_view_via_driver (
       env, root_ids, active_source_set, diff_mode_enabled ) . await ?;
-  attach_containerward_ancestries_to_view_roots (
-    &mut viewforest, &env . config, &env . driver, active_source_set ) . await ?;
-  let ( container_to_contents, content_to_containers ) =
-    match active_source_set {
-      Some (active) =>
-        set_graphnodestats_in_viewforest_with_source_set (
-          &mut viewforest, &env . config, &env . driver, active ) . await,
-      None =>
-        set_graphnodestats_in_viewforest (
-          &mut viewforest, &env . config, &env . driver ) . await,
-    } ?;
-  mark_view_roots_parent_absent ( &mut viewforest );
-  // §A (Jeff's invariant): demote any Normal survivor left under a non-container
-  // parent (phantom / Deleted / DeadScaffold) to Independent.
-  mark_orphans_under_dead_parents_independent ( &mut viewforest );
-  set_viewnodestats_in_viewforest (
-    &mut viewforest, &container_to_contents, &content_to_containers,
-    &env . config );
-  let pids : Vec<ID> = {
-    let mut ids : Vec<ID> = Vec::new ();
-    for node_ref in viewforest . nodes () {
-      match &node_ref . value () . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t))
-          => ids . push ( t . id . clone () ),
-        ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
-          => ids . push ( p . id . clone () ),
-        _ => {} }}
-    ids };
-  // Match the old multi_root_view_with_source_set, which finished with
-  // render_viewforest_with_source_set (= apply_source_set_to_viewforest + render).
-  // A no-op when every source is active; under a restricted set it annotates/
-  // filters, so skipping it would drop source-set rendering for the handler.
-  if let Some (active) = active_source_set {
-    crate::source_sets::apply_source_set_to_viewforest (&mut viewforest, active); }
+  // §20.3: the de-novo and post-save render tails are one shared helper now.
+  // Root containerward is requested per-root in render_initial_view_via_driver
+  // (de-novo only) and fulfilled + dropped inside finish_viewforest, so the tail
+  // itself is caller-agnostic -- no mode flag.
   let buffer_content : String =
-    viewforest_to_string (& viewforest, &env . config) ?;
+    crate::update_buffer::finish_viewforest (
+      &mut viewforest, &env . config, &env . driver,
+      active_source_set ) . await ?;
+  // §20.5: the pids the caller registers for this view -- the {Normal, Inactive}
+  // set, via the one shared source of which-kinds-count
+  // (OpenViews::pids_from_viewforest), the same helper update_view uses post-save.
+  let pids : Vec<ID> =
+    crate::types::views_state::pids_from_viewforest (&viewforest)
+      . into_iter () . collect ();
   Ok ((buffer_content, pids, viewforest . into_internal_tree ())) }
 
 pub async fn multi_root_view_with_source_set (
@@ -168,16 +137,3 @@ pub async fn multi_root_view_with_source_set (
     driver, config, tantivy_index, root_ids,
     diff_mode_enabled, Some (active_source_set) ) . await }
 
-/// For each view root in the forest, if the graph says it has
-/// containers, prepend its full containerward ancestry as that root's
-/// first children.
-async fn attach_containerward_ancestries_to_view_roots (
-  viewforest : &mut ViewForest,
-  config     : &SkgConfig,
-  driver     : &TypeDBDriver,
-  active     : Option<&ActiveSourceSet>,
-) -> Result < (), Box<dyn Error> > {
-  let view_root_nodeids : Vec<NodeId> =
-    viewforest . root_ids ();
-  attach_containerward_ancestries_at_nodeids_with_source_set (
-    viewforest, &view_root_nodeids, config, driver, active ) . await }

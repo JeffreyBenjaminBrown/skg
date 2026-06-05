@@ -1348,7 +1348,7 @@ not cols).
 These are the items Jeff said to do after reviewing the branch-review report
 (progress.org §13). Recorded here as the to-do spec; no code written yet.
 
-** 20.1 Do the small, low-risk de-duplications (review §3.3)
+** DONE 20.1 Do the small, low-risk de-duplications (review §3.3)
 The cosmetic copy-pastes that carry no real risk (they do not touch the BFS draw
 logic or the death-leafward mechanism). Each is independent. Exact identifiers in
 review.org §3.3.
@@ -1375,7 +1375,17 @@ review.org §3.3.
 subscribee ancestor accessor -- were first left out as risky, but Jeff resolved
 the risks; they are now §20.3 and §20.4.)
 
-** 20.2 Add the locking-lifecycle integration test (review §2.5)
+** DONE 20.2 Add the locking-lifecycle integration test (review §2.5)
+DONE 2026-06-05 (Jeff's scope call: do the tractable assertions (a) and (c),
+skip the timing-sensitive (b)). Added tests/integration/save_lock_lifecycle/
+(opens *a* saved / *b* collateral / *solo* non-collateral; after the save settles
+asserts every view's save-lock is released and *solo* is genuinely editable -- it
+both checks the overlay var is nil and actually edits *solo*) for (a), and
+extended tests/integration/valid_and_invalid_saves/ for (c) (asserts no leaked
+lock/stream state -- skg--stream-in-progress nil, no save-lock overlay -- wedges
+the second save). (b) -- "saved buffer stays locked UNTIL save-result" -- is NOT
+asserted: mid-stream lock timing is not observable deterministically from a batch
+Emacs test (it would need a client-side hook on save-relax-lock, fragile/flaky).
 Today only the lock-related wire MESSAGE is exercised; nothing asserts the lock
 BEHAVIOR over time. Add one Emacs-driving integration test (a new
 tests/integration/<name>/ with run-test.sh + an Emacs test, mirroring the
@@ -1390,7 +1400,45 @@ and asserts:
    harness already exercises an invalid-then-valid sequence; extend it to assert
    the second save's wait returns.
 
-** 20.3 Unify the de-novo/post-save render tails (review §3.3, "finish_viewforest")
+** DONE 20.3 Unify the de-novo/post-save render tails (review §3.3, "finish_viewforest")
+REVISED 2026-06-05 (Jeff, after seeing the user-visible effect): "attach
+root-containerward in BOTH paths" was wrong -- it re-generates a containerward
+history for every view-root on every SAVE. Root containerward is a DE-NOVO-only
+concern: generated once at open, it then round-trips in the buffer as ordinary
+content, so a save must not re-make it. FINAL design (progress.org §18): root
+containerward is a self-consuming =ViewRequest::Containerward=. De-novo (and only
+de-novo) sets it on each view-root (render_initial_view_via_driver); the
+during-completion dispatch leaves view-root Containerward alone
+(=extract_view_requests=); =finish_viewforest='s =fulfill_root_containerward_requests=
+attaches each requesting root's containerward via the AncestryTree attach path
+(separate subtree, handles a cyclic root) and DROPS the request, so it never
+round-trips and a save never re-generates it. =finish_viewforest= is thus
+caller-agnostic (no mode flag); the de-novo/post-save difference lives entirely in
+data (whether a root carries the request). An intermediate
+=attach_root_containerward: bool= flag did the same thing but was ad-hoc
+(caller-identity-as-bool), so it was replaced. This reverts the "both in both"
+user-visible change and its 6 test re-baselines (post-save no longer shows root
+containerward; §15's choices 2/3 and its stale-under-deleted note are superseded).
+NB the dispatch routes a USER's Containerward request on a NON-root node through
+the integrate/merge path (=build_and_integrate_containerward=) as before; only
+view-ROOT Containerward is fulfilled by the tail attach -- because the integrate
+path merges ancestry into existing content and panics on a cyclic root (the panic
+is a latent build_child_creation_data predicate bug, see progress.org §18). See
+progress.org §17 (the flag) and §18 (this final design + the research).
+
+ORIGINAL (option-b) attempt, now superseded: make attach idempotent first, then
+both-in-both. The blocker was that =attach_containerward_ancestries_*= was NOT
+idempotent (it prepended the ancestry unconditionally), so attaching
+root-containerward post-save would DUPLICATE the buffer's already-present root
+ancestry. Jeff's hint pointed at the existing dedup-aware "integrate" machinery:
+=integrate_linear_portion_of_path= already does find-or-insert (reuse a child
+already present under the parent; insert only when missing). So the underlying
+=insert_containerward_ancestry_tree_recursive= now uses that same find-or-insert,
+making containerward attachment idempotent. With that, "attach both in both" is
+safe: a root that already carries its containerward (the common post-save case,
+where the de-novo open put it there and it round-trips) is a no-op; a root that
+lacks it (a synthetic / freshly-typed root) GAINS it, matching de-novo. See
+progress.org §15.
 First deferred as risky because the two tails run their steps in a different ORDER
 (the parentIs marks run before graphnodestats in post-save, after it in de-novo).
 Jeff resolved it: parentIs is a view property, and graphnodestats is computed from
@@ -1412,7 +1460,7 @@ post-completion tails of =rerender_view= (server/update_buffer.rs) and
 Validate against the full Rust suite + the 27 integration tests -- this is the
 primary render path, guarded by the idempotence + git_diff_view oracles.
 
-** 20.4 Drop required_ancestor's redundant ancestry validation (review §3.3)
+** DONE 20.4 Drop required_ancestor's redundant ancestry validation (review §3.3)
 Jeff first considered deleting =required_ancestor= (it has a single DIRECT caller,
 subscribee_col.rs:89, fetching the subscriber) but retracted that: it is also the
 engine inside =pid_and_source_from_required_ancestor= (ancestry.rs), which FIVE
@@ -1430,7 +1478,8 @@ runs only after that pre-check.
    so the earlier "extract a shared walk" dedup is resolved by this change rather
    than a separate one. =col_is_generalized_orphan= keeps its walk (it IS the check).
 
-** 20.5 Unify the two view-PID-registration mechanisms (from the §20.3 pids thread)
+** DONE 20.5 Unify the two view-PID-registration mechanisms (from the §20.3 pids thread)
+(Implemented with a deviation -- see the note at the end of this subsection.)
 =OpenViews= (server/types/views_state.rs) populates a view's pid set two different
 ways: =register_view= (new views) takes the pid list EXPLICITLY (the de-novo
 caller passes what =multi_root_view= returned), while =update_view= (post-save)
@@ -1455,3 +1504,14 @@ already receives the viewforest, so:
 *** Consequence to note (consistent with the above, not a problem): a diff view
    showing X only as a phantom will not be collateral-matched when a save changes
    X -- fine, since phantoms are regenerated each render, not incrementally updated.
+DEVIATION as implemented (commit f8e784ec): the first two bullets above (drop
+register_view's pids param; drop multi_root_view's returned pids list) were NOT
+done -- they ripple to ~39 test call sites across ~15 files, disproportionate
+churn against the "minimize tests/ diff" preference for a cosmetic gain. Instead,
+register_view keeps its pids param and multi_root_view keeps its 3-tuple return,
+but BOTH production pid computations now route through the one shared
+=pids_from_viewforest= ({Normal, Inactive}): update_view calls it directly, and
+the de-novo via_env computes the pids it passes to register_view through it. That
+achieves the substantive goal -- a single source of which-kinds-count, and the
+{Normal, Inactive} fix -- with zero test churn. (Search views still pass their own
+match-id list; that is the correct member set for a search view.)

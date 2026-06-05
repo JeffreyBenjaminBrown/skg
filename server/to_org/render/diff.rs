@@ -14,7 +14,7 @@
 /// child but the worktree's parent.contains lacks it.
 
 use crate::types::env::find_source_with_optional_tantivy;
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges, axes_from_per_stage_diffs, net_diff_from_per_stage};
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges, axes_from_per_stage_diffs, existence_axes_in_source_diff, net_diff_from_per_stage};
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::phantom::title_for_phantom;
@@ -325,11 +325,7 @@ fn existence_axes_for_phantom (
   // otherwise fall back to the parent's source_diff.
   let resolved : &SourceDiff =
     source_diffs . get (source) . unwrap_or (source_diff);
-  let staged_x : Option<Sign> = resolved . staged   . get (&file_path)
-    . and_then ( |d| d . status . to_existence_sign ());
-  let unstaged_x : Option<Sign> = resolved . unstaged . get (&file_path)
-    . and_then ( |d| d . status . to_existence_sign ());
-  ExistenceAxes { staged: staged_x, unstaged: unstaged_x } }
+  existence_axes_in_source_diff ( Some (resolved), &file_path ) }
 
 #[cfg(test)]
 #[path = "../../../tests/unit/render_diff.rs"]

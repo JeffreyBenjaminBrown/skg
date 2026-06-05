@@ -48,17 +48,7 @@ Shared by 'skg-request-rerender-all-views' and 'skg-view-diff-mode'."
    ;; 2. Per-view update: unlock and update each buffer.
    'rerender-view
    (lambda (_tcp-proc payload)
-     (condition-case err
-         (let* ((response (read payload))
-                (uri (cadr (assoc 'view-uri response)))
-                (content (cadr (assoc 'content response)))
-                (buf (skg-find-buffer-by-uri uri)))
-           (when buf
-             (with-current-buffer buf
-               (skg--unlock-after-save)
-               (skg-replace-buffer-with-new-content nil content))))
-       (error
-        (skg-log 'error 'rerender "rerender-view handler error: %S" err))))
+     (skg--apply-streamed-view-update payload 'rerender "rerender-view"))
    nil) ;; non-one-shot: fires for each streamed view
   (skg-register-response-handler
    ;; 3. Done message: clean up and show errors/warnings.
