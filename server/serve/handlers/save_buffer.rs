@@ -69,8 +69,9 @@ impl SaveResponse {
 
 /// Handles save buffer requests from Emacs.
 /// - Reads the buffer content (with length prefix).
-/// - Builds an initial NodeCompleteMap from the ViewsState.s open views. It can change during the save process.
-/// - 'update_from_and_rerender_buffer'
+/// - Sends the early broad lock (uris_of_views_to_lock) before the slow pipeline.
+/// - Runs 'update_from_and_rerender_buffer' (parse + validate -> SavePlan, update
+///   the graph, then rerender + stream the saved and collateral views).
 /// - Responds to Emacs (with length prefix).
 pub fn handle_save_buffer_request (
   reader     : &mut BufReader <TcpStream>,

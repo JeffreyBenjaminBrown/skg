@@ -679,6 +679,11 @@ pub fn mk_phantom_viewnode (
       t . membership = membership;
       viewnode . kind = ViewNodeKind::Vognode (
         Vognode::DiffPhantom ( DiffPhantomNode::from_truenode (t) )); }
+  else
+    // mk_indefinitive_viewnode always yields a Normal vognode; if that ever
+    // changes, fail loudly rather than silently return a non-phantom.
+    { unreachable! (
+        "mk_phantom_viewnode: mk_indefinitive_viewnode did not yield a Normal vognode" ); }
   viewnode }
 
 pub fn mk_definitive_viewnode (

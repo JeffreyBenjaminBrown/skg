@@ -407,17 +407,17 @@ fn validate_phantom (
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if p . id . is_none() {
-    errors . push("TrueNode must have an ID." . to_string()); }
+    errors . push("Phantom must have an ID." . to_string()); }
   if ! p . source . as_ref()
        . is_some_and( |s| config . sources . contains_key (s) ) {
-    errors . push("TrueNode must have a source that exists in the config."
+    errors . push("Phantom must have a source that exists in the config."
                 . to_string() ); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| !cannot_be_child_of_gnode (node))
-    { errors . push("TrueNode has a child whose structure belongs elsewhere: BufferRoot, Alias, ID, HiddenInSubscribeeCol, or HiddenOutsideOfSubscribeeCol." . to_string()); }
+    { errors . push("Phantom has a child whose structure belongs elsewhere: BufferRoot, Alias, ID, HiddenInSubscribeeCol, or HiddenOutsideOfSubscribeeCol." . to_string()); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
-    errors . push("TrueNode's non-ignored content children must be unique (no two sharing the same ID)." . to_string()); }
+    errors . push("Phantom's non-ignored content children must be unique (no two sharing the same ID)." . to_string()); }
   errors }
 
 fn cannot_be_child_of_gnode (
