@@ -447,14 +447,22 @@ pub fn insert_containerward_ancestry_tree_recursive<'a> (
 ) -> Pin<Box<dyn Future<Output = Result<(),
                                         Box<dyn Error>>> + 'a>> {
   Box::pin ( async move {
-    let child_nid : NodeId = match
-      prepend_indef_indep_child_with_source_set (
-        tree, parent_nid, node . id (),
-        config, driver, Birth::ContainsParent, active
-      ) . await ?
-    {
-      Some (child_nid) => child_nid,
-      None => return Ok (()), };
+    // Dedup-aware insertion, like integrate_linear_portion_of_path: reuse an
+    // ancestry node already present under this parent rather than prepending a
+    // duplicate. This makes containerward attachment idempotent, so re-attaching
+    // to a node that already carries its ancestry (e.g. a post-save root, whose
+    // submitted buffer already holds it) is a no-op rather than a duplication.
+    let child_nid : NodeId =
+      match find_child_by_id ( tree, parent_nid, node . id () ) {
+        Some (existing) => existing,
+        None => match
+          prepend_indef_indep_child_with_source_set (
+            tree, parent_nid, node . id (),
+            config, driver, Birth::ContainsParent, active
+          ) . await ?
+        {
+          Some (child_nid) => child_nid,
+          None => return Ok (()), }, };
     if let AncestryTree::Inner ( _, children ) = node {
       for child in children . iter () . rev () {
         insert_containerward_ancestry_tree_recursive (
