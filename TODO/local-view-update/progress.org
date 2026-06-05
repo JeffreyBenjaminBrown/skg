@@ -1343,3 +1343,136 @@ A, then B, then stop and show you -- because A is your stated invariant (possibl
 live gap from #3), B is the highest-value safety net and needs no decisions, and C
 is a large behavior change I should not start without your explicit yes. But this
 is your call: mark the items above.
+
+* 13. Acting on the branch review (2026-06-05)
+A fresh Claude reviewed the whole branch and wrote 'review.org'; you then asked me
+to fix everything I'd found, in whatever order and commit granularity I judged
+best, using when-to-stop.org. This section is the when-to-stop report for that
+work. 10 commits landed, fe8e119b..550a4f9d, each compiling + (where DB-backed)
+green; the full Rust suite is 478 (was 477; +1 idempotence test) and the 27
+integration tests pass. The review and its workflow digest are in review.org.
+
+** What's done and went well
+*** THE MUST-FIX: the Rust test crate did not compile at HEAD.
+   Item C (cc28a8df) added 'subscribes_to_diff'/'hides_diff' to NodeChanges but
+   left two '#[cfg(test)]' NodeChanges literals (phantom.rs, complete_preorder/
+   truenode.rs) on the old field set, so 'cargo test --no-run' failed E0063 even
+   though 'cargo build' was clean -- meaning NO Rust unit/integration test had run
+   since cc28a8df, falsifying the "suite green" claims. Fixed first (fe8e119b);
+   re-established a green baseline (477) before touching anything else.
+*** The big elegance win: collapsed the source_diffs/sharing_diffs two-field seam
+   (0afcc7b9). After #3 made all diff inline, CompletionContext carried an
+   always-None 'source_diffs' threaded through the whole content-expansion chain
+   PLUS a 'sharing_diffs' that actually held the real diffs (a self-admitted
+   misnomer, with the boundary inverted: the reconcilers' param was already named
+   source_diffs and received the real diffs, while the field named source_diffs was
+   None). Deleted the dead content-path diff machinery (content_goal_list collapses
+   to the pure worktree list; the ContentReality::Phantom variant + the phantom
+   branch of build_child_creation_data go; dropped the source_diffs/removed_ids/
+   pid/source params from the content chain), deleted the always-None field, and
+   reclaimed the natural name (sharing_diffs -> source_diffs). One name, one value,
+   end to end. Byte-identical (Rust + integration green).
+*** Deleted the dead DVR self-expansion path (33bbfb75). §18 claimed
+   'extendDefinitiveSubtreeFromLeaf are gone'; it was still present and statically
+   reachable (no dead_code warning), just unreachable at runtime. Deleted it +
+   execute_definitive_view_request + the orphaned helper chain
+   (build_node_branch_minus_content_with_source_set, content_ids_if_definitive_else_empty,
+   nodes_after_in_generation, the whole truncate_after_node_in_gen.rs). The §18
+   "gone" claim is now TRUE. execute_view_requests keeps a loud-error Definitive
+   arm as a regression guard.
+*** A real latent bug: a removed sharing-col member's truncation order was
+   HashSet-nondeterministic. First attempt (sort in the reconciler, ab7398e8)
+   over-reached and reordered the OUTBOUND Hidden/Overridden cols -- whose Vec
+   order is meaningful -- which the integration suite caught
+   (save_collateral_delete_then_edit_under_it, hiddenCol members swapped). Moved
+   the sort to its true source (inbound_pids_for_relation, 6a602a85): only the
+   inbound HashSet-derived relations sort; outbound Vec order is untouched.
+*** Smaller correctness/clarity: a flipped phantom no longer emits IDCol/AliasCol
+   scaffolds it would immediately deaden (cfb2fac0, byte-identical waste removal);
+   phantom validation says "Phantom" not "TrueNode"; mk_phantom_viewnode asserts
+   its contract; save_buffer's stale NodeCompleteMap doc fixed (cc557a26).
+*** Clarity sweep (abc71255): renamed expand_true_content_until_stable ->
+   complete_nodes_in_level_order (it is a single BFS, not a fixpoint loop); removed
+   ~25 comments naming deleted machinery (apply_diff_to_viewforest,
+   render_initial_viewforest_bfs, maybe_prepend_diff_view_scaffolds,
+   should_sync_from_disk, extendDefinitiveSubtreeFromLeaf), several of which had
+   come to contradict the code (e.g. rerender_view had two opposing comment blocks
+   about whether an overlay still ran); fixed the preorder/postorder "pass"
+   docstrings to describe the one BFS visit.
+*** §15 idempotence test (ad08f249): the property the whole refactor rests on had
+   no regression guard. Added one (tests/idempotence.rs): render de-novo, then run
+   the buffer through save+rerender twice, assert the two rerenders are
+   byte-identical. Exercises content + AliasCol + IDCol + SubscribeeCol +
+   subscribee-as-such + HiddenOutsideOfSubscribeeCol. It passes: completion is a
+   fixpoint for these kinds.
+*** Two clean dedups (550a4f9d): shared diff_axes_require_phantom predicate (was
+   duplicated across the two node generics); shared tantivy_index_from_index
+   builder (was triplicated -- phase 8 added the third copy).
+
+** Changes to the plan's envisioned order
+review.org §7 proposed: fix test build -> collapse source_diffs/sharing_diffs ->
+delete dead DVR path -> comment sweep -> tests -> §5.1/§5.2 -> dedup -> reconcile
+§18. I did the small high-confidence correctness fixes (§5.1/§5.2) FIRST (right
+after the test-build fix), before the big refactors, so each big refactor landed
+on a green base it could be diffed against. I also deleted the dead DVR path
+BEFORE the source_diffs collapse (the DVR path was a source_diffs reader, so
+removing it first narrowed the collapse). Otherwise the order matches.
+
+** What's imperfect about what's done
+- The §5.2 sort lives at inbound_pids_for_relation, so it changes the rendered
+  order of inbound relation cols (Subscriber/Hider/Overrider) from HashSet order
+  to ID order for ALL renders, not just truncated ones. That is strictly more
+  deterministic (HashSet order was nondeterministic) and no fixture asserts a
+  non-sorted inbound order, but it is a slightly broader behavior change than the
+  truncation-only concern that motivated it.
+- The §5.1 phantom-flip guard is byte-identical (the deaden+prune already removed
+  those cols), so it has no fixture exercising the flipped-with-ids case; it is a
+  waste/clarity fix, not newly-tested behavior. A dedicated git fixture (removed
+  node + ids_diff) would lock the intent in -- low value, not added.
+- The idempotence test covers one rich fixture, not "one per ViewNode kind" as
+  §15 literally asks. It does exercise most kinds in a single view; per-kind tests
+  and the §15 "five order cases" tests are still not written.
+- extendDefinitiveSubtree_fromGit (the removed-file DVR branch) is KEPT but is
+  unreachable in the live driver (a node's existence axes aren't set until
+  process_truenode_diff runs at the END of its visit, so is_removed_node is always
+  false when the draw rule runs). The review's §5.3 take(limit) fragility lives
+  there; I left the branch as defensive code rather than delete a second "removed
+  node" mechanism this session. It now receives the real diffs (via the unified
+  field) instead of None -- byte-identical since unreachable, more correct if ever
+  reached.
+
+** Choices determining the future (deferred, with rationale)
+*** §3.3 remaining dedups -- DEFERRED (low value; some less clean than the review
+   implied). I did the two cleanest+safest (phantom predicate, tantivy builder).
+   The rest are independent and cherry-pickable:
+   - finish_viewforest (the de-novo and post-save post-completion tails): I traced
+     both and they are NOT verbatim -- the order of (mark_view_roots/mark_orphans)
+     vs (graphnodestats) differs between the two paths, and post-save also runs
+     validate_parentIs while de-novo collects pids. A shared helper would have to
+     reconcile those order differences on the PRIMARY render path; risk > cosmetic
+     reward, so left alone.
+   - col_is_generalized_orphan / required_ancestor share a prefix-walk: clean to
+     extract, but it is the death-leafward critical path; low value, skipped to
+     avoid risk on critical code.
+   - validate_phantom is a near-copy of validate_truenode; the build_*_child_data /
+     compute_*_goal sharing-reconciler wrappers; the three existence-axis lookups;
+     the save/rerender elisp stream handlers + the one-shot-flag conflation. All
+     genuine, all low-value polish.
+*** §5.4 cross-buffer registry_owner seam -- DELIBERATELY NOT ADDED. The plan asked
+   for a no-op stub (returns None) so the future one-definitive-view plan has an
+   attach point. Adding a function that returns None and a call site that does
+   nothing-on-None is speculative dead code with no current use; per "no legacy/
+   speculative code" I left it out and note here that when that plan lands, the
+   seam belongs in apply_definitive_draw_rule's absent-id branch (definitive.rs).
+*** §2.5 locking-lifecycle integration test -- DEFERRED. The relax-lock message is
+   exercised (3 collateral tests filter it), but no test asserts the lock LIFECYCLE
+   (non-collateral buffers unlock early; saved stays locked till save-result; an
+   invalid save doesn't hang the next save's wait). Writing it is a substantial new
+   Emacs-driving integration fixture; flagged, not built this session.
+*** §2.6 deviation-log drift -- I did NOT rewrite plan_v2 §18's historical entries
+   (it is an append-only log; "leave the original plan as is"). Note for the record
+   that, with this session's work, the §18 "extendDefinitiveSubtreeFromLeaf are
+   gone" claim is now actually true, and the other stale §18 entries the review
+   flagged (Phase 8 "deferred" but landed; §11 "not worth doing" but done;
+   ExpectedAncestor::Col rename "remaining" but done) remain as historical
+   artifacts -- the CODE is the source of truth and is correct.
