@@ -45,6 +45,62 @@ Tied to fix #2.
 
 Full detail, evidence, and ranked recommendations below.
 
+* Implementation outcomes (added after the fixes landed)
+
+Three of the four fixes were implemented and committed; the fourth
+turned out to be unnecessary. End-to-end, a fresh save of the test node
+went from ~343 ms to *~85–110 ms* (≈ 3–4×).
+
+** F1 — scope override validation to touched nodes (done)
+
+'validate_touched_override_invariants' replaces the whole-graph scan,
+checking only the saved nodes' override edges (monogamy at the target
+end; no-chains at both ends). Measured: disabling the old scan dropped
+the save 343 → 256 ms; the new scoped check is negligible. The
+full-graph validator is kept for init/rebuild.
+
+** F2 — one Tantivy commit per save (done)
+
+Context origin types are now computed from the post-save in-Rust graph
+('context_origin_types_for_saved_from_in_rust_graph') and written
+directly in the single index pass, deleting the second 50 MB
+IndexWriter + commit. Measured: the context phase fell from ~80 ms to
+~4 ms; total ~244 → ~107 ms.
+
+** F3 — incremental TypeDB relationship updates (done)
+
+'apply_relationship_deltas_for_nodes' writes only the per-node
+add/remove edge delta (and opens no transaction when a node's edges are
+unchanged), since all five relations are orderless sets in TypeDB.
+Measured: 'update_graph_minus_merges' fell from ~232 ms to ~99 ms on
+the test case, and the O(N²)-while-building-a-node behavior is gone.
+
+** F4 — background consolidation: investigated, then dropped as unnecessary
+
+The "3–4× session degradation" (F4 below) turned out to be a
+*measurement artifact of rapid-fire saving*, not a real-world problem:
+
+- The original profiling drove saves back-to-back (~10/sec). Re-running
+  the degradation test at a realistic cadence (2 s between saves) shows
+  *no drift at all* — flat ~120–150 ms across many saves.
+- The drift is also NOT segment proliferation: with a constant buffer
+  and a stable segment count (~13), the Tantivy commit still drifted
+  under rapid fire (0.08 → 0.29 s), and a background segment
+  consolidation did not help (consolidation on ≈ off). It is internal
+  Tantivy delete/reader-refresh settling that simply can't keep up with
+  ~10 commits/sec — a condition real editing never produces.
+- F2 independently halved per-save Tantivy churn (one commit, not two),
+  which is the part that mattered.
+
+A background-consolidation implementation was written and measured, then
+*reverted*: it added a global write-lock and a background merge thread
+but did not improve the (artifactual) drift, and an aggressive
+full-merge variant caused a multi-second stall by blocking the next
+save. If real-world drift ever appears, the correct fix is a long-lived
+'IndexWriter' (so Tantivy's own merge threads clear fragmentation off
+the critical path) — a larger change worth doing only if the need is
+demonstrated at human save cadence.
+
 * Test case and environment
 
 - *Operation*: open a single-root content view of node
