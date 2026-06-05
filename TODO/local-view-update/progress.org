@@ -1872,3 +1872,47 @@ timing-sensitive (b). Done.
   to saving *a* precisely BECAUSE its view now shows a as containerward (its pid
   set includes a). If a future change stops attaching root containerward, *b*
   would become non-collateral and this test's role labels would need revisiting.
+
+* 17. §20.3 revised -- root containerward is de-novo-only (2026-06-05)
+
+You caught that §20.3 as first shipped re-generates a containerward history for
+each view-root on every SAVE. Fixed: root containerward is now DE-NOVO-only.
+
+** What's done and went well
+- =finish_viewforest= gained =attach_root_containerward: bool=. De-novo
+  (multi_root_view_via_env) passes true; post-save (rerender_view) passes false.
+  Phantom containerward is still attached in both. So a view-root's containerward
+  is generated once, at open, then round-trips in the buffer as ordinary content;
+  a save never re-makes it.
+- This restores the §15 user-visible behavior to pre-§20.3 and reverts all 6 of
+  its test re-baselines (3 unit definitive-view + 3 integration) to their original
+  expectations. De-novo uses the same proven AncestryTree attach path as before,
+  just gated by the flag, so there is NO test churn.
+- Full suite green: 478 Rust + 28 integration.
+- save_lock_lifecycle (§20.2a) still passes: *b* is collateral to saving *a*
+  because de-novo view-b shows a as containerward, exactly as before.
+
+** Changes to the plan's envisioned order
+- Supersedes §15's "choice 2" (post-save shows root containerward), "choice 3"
+  (indef roots get containerward), and its "stale containerward under a deleted
+  node" imperfection: post-save no longer attaches root containerward at all, so
+  none of those arise from a SAVE. (A real de-novo-opened buffer can still carry
+  root containerward that goes stale if its node is later deleted -- but that is
+  the original, pre-§20.3 behavior, unchanged by this work.)
+
+** What's imperfect about what's done
+- The de-novo/post-save difference is a bool param on finish_viewforest, not a
+  fully data-driven seam. You suggested a ViewRequest::Containerward on each
+  de-novo root instead; that is cleaner in spirit but PANICS on a cyclic root:
+  the request routes through =build_and_integrate_containerward= during
+  completion, which hits "child data not pre-fetched" when the containerward path
+  cycles back to the root (a contains b contains a). The AncestryTree tail attach
+  handles that case, so the flag uses it. Making the ViewRequest path work would
+  mean fixing that integrate-path cycle bug (or special-casing view-roots in the
+  request dispatch so the tail attach fulfills them). Deferred unless you want it.
+
+** Choices determining the future
+- The view_requests field is a HashSet, so it already permits DVR + Containerward
+  together -- no list expansion was needed (you'd wondered). If the
+  ViewRequest::Containerward approach is ever pursued, the field is ready; the only
+  blocker is the integrate-path cycle panic above.

@@ -1401,7 +1401,28 @@ and asserts:
    the second save's wait returns.
 
 ** DONE 20.3 Unify the de-novo/post-save render tails (review §3.3, "finish_viewforest")
-RESOLVED 2026-06-05 via option (b) -- make attach idempotent first, then
+REVISED 2026-06-05 (Jeff, after seeing the user-visible effect): "attach
+root-containerward in BOTH paths" was wrong -- it re-generates a containerward
+history for every view-root on every SAVE. Root containerward is a DE-NOVO-only
+concern: generated once at open, it then round-trips in the buffer as ordinary
+content, so a save must not re-make it. FINAL design: =finish_viewforest= takes
+=attach_root_containerward: bool= -- de-novo (multi_root_view_via_env) passes
+true, post-save (rerender_view) passes false. Phantom containerward is attached in
+both. This reverts the "both in both" user-visible change and its 6 test
+re-baselines (post-save no longer shows root containerward; §15's choices 2/3 and
+its stale-under-deleted note are superseded). Jeff suggested expressing this as a
+ViewRequest::Containerward on each de-novo root (the field is a HashSet, so it
+already permits DVR + Containerward -- no list expansion needed); that was tried
+but PANICS on a cyclic root (one whose containerward path cycles back to the root,
+e.g. a contains b contains a): the request routes through the integrate path
+(=build_and_integrate_containerward=) during completion, which hits
+"child data not pre-fetched", whereas the AncestryTree tail attach handles it. So
+the flag uses the proven attach path. The idempotence machinery from the first
+attempt (find_containerward_child_by_id) is reverted -- with post-save no longer
+re-attaching roots, the attach only runs on fresh de-novo roots, so blind prepend
+is correct again. See progress.org §17.
+
+ORIGINAL (option-b) attempt, now superseded: make attach idempotent first, then
 both-in-both. The blocker was that =attach_containerward_ancestries_*= was NOT
 idempotent (it prepended the ancestry unconditionally), so attaching
 root-containerward post-save would DUPLICATE the buffer's already-present root
