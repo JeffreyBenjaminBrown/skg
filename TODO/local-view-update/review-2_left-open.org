@@ -12,6 +12,18 @@ I tend to invent shorthand while working solo, so the glossary below defines the
 terms these questions use. Skim it or skip it; each question also re-explains its
 own machinery.
 
+* Status (2026-06-05): all closed but one
+You answered all eight inline; I closed seven and a half. Each is committed on
+=local-view-updates= (full Rust suite 490/490 + the integration suite green).
+- #1 KEEP the removed-node expansion -> parked it in =to_org/expand/unused_but_nice.rs= with the "held for someday" header you asked for; unwired the dead branch from the live draw rule. =[1a695755]=
+- #2 merge the dirs -> =update_buffer/reconcile/= (the two colliding =truenode.rs= became =content.rs= + =view_requests.rs=). =[efc93768]=
+- #3 scaffold->col renames -> =scaffold_node= became =col_node=; generic helpers kept generic. =[a5bb5183, 6fbf3836]=
+- #4a the diff IDCol/AliasCol dedup -> diff worker emits EMPTY cols, the reconciler fills them, with the filler-naming comment you asked for. =[7a4...]= **#4b is the one thing still open -- see its TODO below; it turned out NOT to be a clean dedup.**
+- #5 two-stage phantom mis-placement -> fixed (reconstruct HEAD/worktree, LCS-diff), with a regression test. =[7a554ad2]=
+- #6 idempotence net -> extended the existing test to render+reconcile a relation col (no new test). =[3101e0ff]=
+- #7 plan_v2 drift -> corrected §5.5 and §19. =[a3c62b44, 6fbf3836]=
+- #8 dead =overrider= field -> dropped. =[a3c62b44]=
+
 * Glossary
 - *view* / *buffer* :: an org-mode buffer showing a slice of the graph as an
   indented tree. The user reads and edits the graph through these.
@@ -174,6 +186,33 @@ byte-identical.
 *** TODO yes
 and comment where the empties are created
 indicating the name of the function that fills them in later.
+*** DONE (4a) the IDCol/AliasCol dedup is done, with the filler-naming comment. =[7a4...]=
+*** TODO (4b) -- I need your call: the SECOND double-reconcile is NOT a clean dedup.
+The first half (4a -- the diff worker's IDCol/AliasCol) was clean and byte-identical;
+done. The second half I described -- "=maybe_add_*= fills a fresh col to test
+emptiness, then the BFS reconciles it again" -- turned out NOT to be a pure dedup
+once I looked closely, so I stopped rather than silently change behavior:
+
+Today, when a view is first opened (de-novo), =maybe_add_*= creates each relation /
+subscribee col and *fills in all its members eagerly*. The node budget (the cap
+that stops a famous node from drawing thousands of subscribers) is NOT charged for
+those members, because they already exist by the time the budgeted BFS reconcile
+runs. If I make =maybe_add_*= create an EMPTY col and let the BFS fill it, the BFS
+*would* charge the budget -- so a de-novo view of a famous node would start
+truncating its relation/subscribee cols, the way a post-save rerender already does.
+
+That is arguably MORE correct (it's what §5.5 -- the budget rule -- intends: sharing
+cols should be budgeted), and for every small graph (i.e. the whole test suite) it
+is byte-identical, so the tests wouldn't catch the difference. But it is a real,
+untested behavior change for huge cols, and =maybe_add_hiddenInSubscribeeCol= runs
+on the post-save path too, so it's not even de-novo-only.
+
+*What I need from you*: do you WANT de-novo (and the ensure-hidden-in step) to start
+budgeting their sharing cols like post-save does? If yes, I'll do 4b and we accept
+that a famous node's freshly-opened view truncates its big cols (a UX change, but a
+consistent one). If you'd rather keep de-novo drawing all sharing-col members
+regardless of budget, I'll leave 4b alone and we treat it as intended, not a wart.
+Either way it's a behavior decision, not a mechanical cleanup.
 
 * 5. A cosmetic mis-placement of phantoms in partially-staged diffs
 ** Context

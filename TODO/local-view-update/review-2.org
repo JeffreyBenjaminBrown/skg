@@ -469,7 +469,7 @@ green at every step (489/489 at the end). Commits are on =local-view-updates=.
 *** DONE §5.2/§5.3/§5.4 sweep -- present-tensed ~14 history comments, fixed the sync_truenode_from_disk docstring contradiction, the "<Scaffold>"/"sharing-scaffold" col-vs-scaffold wording, the moved-file path in ancestry.rs, two typos, and the unnecessary #[allow(non_snake_case)]. =[7665a4cf]=
 *** DONE §2.2 (comment half) -- qualified the diff.rs "correct HEAD position" claim to admit the two-stage edge. =[pending with this doc]=
 
-** OPEN -- your call
+** OPEN -- your call  (RESOLVED 2026-06-05: Jeff answered all eight; 7.5 are now done + committed, only #4b still needs a call -- see the Status section of [[./review-2_left-open.org]])
 The eight open items are MOVED to a standalone, self-contained file -- prefaced
 with a glossary and plain-language context for each, so it reads without having
 followed today's work: [[./review-2_left-open.org]]. In brief:
