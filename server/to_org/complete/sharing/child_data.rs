@@ -1,18 +1,18 @@
-/// Shared per-child information for sharing-scaffold reconciliation.
+/// Shared per-child information for sharing-col reconciliation.
 ///
 /// Used by the rerender-time completers for SubscribeeCol,
 /// HiddenInSubscribeeCol, and HiddenOutsideOfSubscribeeCol.
 ///
 /// Vocabulary for this module:
 ///
-/// - A `goal_list` is the ordered list of node IDs that a scaffold
+/// - A `goal_list` is the ordered list of node IDs that a col
 ///   should present after completion.  The list is computed from the
 ///   graph and, in diff views, from git-diff state.
 /// - A goal child is a child ViewNode whose TrueNode ID appears in
 ///   that `goal_list`, whether it already existed in the buffer or
 ///   was created during reconciliation.
 /// - A relevant child is one this reconciliation pass is allowed to
-///   manage: for sharing scaffolds, a TrueNode marked parentIs=affected.
+///   manage: for sharing cols, a TrueNode marked parentIs=affected.
 ///   Relevant children whose IDs are not in the goal list are removed
 ///   or otherwise demoted by the caller-specific cleanup step.
 /// - `ChildData` is the pre-fetched title/source/phantom metadata
@@ -34,7 +34,7 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
 /// Per-child information needed to build a viewnode for a sharing
-/// scaffold's child (subscribee, hidden-in-subscribee, or
+/// col's child (subscribee, hidden-in-subscribee, or
 /// hidden-outside-of-subscribees).
 ///
 /// `phantom: None` => normal indef child marked ParentIs::Affected.
@@ -49,7 +49,7 @@ pub struct ChildData {
 /// closure of `complete_relevant_children_in_viewnodetree`.
 /// The sharing completers build this before mutation so their flow
 /// stays explicit: read tree and graph facts, compute the goal list,
-/// prepare child data, then reconcile scaffold children.
+/// prepare child data, then reconcile col children.
 ///
 /// `parent_skgid` and `parent_source` are the col's containing
 /// node (the subscribee for HiddenIn; the subscriber for
@@ -57,7 +57,7 @@ pub struct ChildData {
 /// `phantom_axes`'s membership-side axes.
 pub fn build_child_data (
   tree                           : &Tree<ViewNode>,
-  scaffold_node                  : NodeId,
+  col_node                       : NodeId,
   parent_skgid                   : &ID,
   parent_source                  : &SourceName,
   goal_list                      : &[ID],
@@ -68,7 +68,7 @@ pub fn build_child_data (
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
   let existing_children : HashMap<ID, (SourceName, String)> = {
     let node_ref : NodeRef<ViewNode> =
-      tree . get (scaffold_node)
+      tree . get (col_node)
         . ok_or ("build_child_data: node not found") ?;
     let mut m : HashMap<ID, (SourceName, String)> = HashMap::new ();
     for child_ref in node_ref . children () {
@@ -123,9 +123,9 @@ pub fn build_child_data (
                                     phantom : None } ); }}
   Ok (result) }
 
-/// Reconcile a sharing-scaffold's children against a goal list.
+/// Reconcile a sharing-col's children against a goal list.
 ///
-/// All three rerender-time sharing-scaffold completers
+/// All three rerender-time sharing-col completers
 /// (SubscribeeCol, HiddenInSubscribeeCol,
 /// HiddenOutsideOfSubscribeeCol) share the same call shape: build
 /// per-child data before mutation, then call
@@ -135,14 +135,14 @@ pub fn build_child_data (
 /// indefinitive viewnodes marked ParentIs::Affected.
 pub fn reconcile_sharing_col_children (
   tree          : &mut Tree<ViewNode>,
-  scaffold_node : NodeId,
+  col_node      : NodeId,
   kind          : RoleCol,
   goal_list     : &[ID],
   child_data    : &HashMap<ID, ChildData>,
 ) -> Result<(), Box<dyn Error>> {
   let label : &'static str = kind . caller_label ();
   complete_relevant_children_in_viewnodetree (
-    tree, scaffold_node,
+    tree, col_node,
     |vn : &ViewNode| matches! ( &vn . kind,
                                 ViewNodeKind::Vognode (Vognode::Normal (t))
                                 if t . parentIs == ParentIs::Affected ),
@@ -165,23 +165,23 @@ pub fn reconcile_sharing_col_children (
             id . clone (), d . source . clone (),
             d . title . clone (), ex, mem ) } } ) ?;
   mark_goal_children_as_collectionBranch_members (
-    tree, scaffold_node, goal_list) ?;
+    tree, col_node, goal_list) ?;
   Ok (( )) }
 
 /// See this module's header for definition of "goal child".
 ///
 /// This function repairs surviving or newly matched goal children whose
-/// membership marker is stale, so the scaffold continues to own them
+/// membership marker is stale, so the col continues to own them
 /// as generated collection members.
 fn mark_goal_children_as_collectionBranch_members (
   tree          : &mut Tree<ViewNode>,
-  scaffold_node : NodeId,
+  col_node      : NodeId,
   goal_list     : &[ID],
 ) -> Result<(), Box<dyn Error>> {
   let goal_set : HashSet<ID> =
     goal_list . iter () . cloned () . collect ();
   treat_certain_children (
-    tree, scaffold_node,
+    tree, col_node,
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Normal (t)) =>
         goal_set . contains (&t . id)
