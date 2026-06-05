@@ -1,0 +1,278 @@
+#+TITLE: Local view update -- the questions I left open for you
+#+STARTUP: content
+
+These are the eight items from the branch review (review-2.org) that I did NOT
+just do, because each needs a decision, an opinion, or a judgment call that is
+yours to make. I've pulled them out of the big report and rewritten them to
+stand on their own: you should be able to read this without having followed any
+of today's work. Everything I *did* do is already committed and is listed (with
+commit hashes) under review-2.org §8; this file is only the open part.
+
+I tend to invent shorthand while working solo, so the glossary below defines the
+terms these questions use. Skim it or skip it; each question also re-explains its
+own machinery.
+
+* Glossary
+- *view* / *buffer* :: an org-mode buffer showing a slice of the graph as an
+  indented tree. The user reads and edits the graph through these.
+- *viewnode* :: one node (one headline) in that tree.
+- *vognode* :: a viewnode that stands for a real graph node (it has an ID).
+- *scaffold* :: a viewnode that is NOT a vognode -- pure display structure (a
+  column header, a marker), with no graph node of its own.
+- *col* :: a scaffold that *collects* members and carries "Col" in its name:
+  IDCol, AliasCol, SubscribeeCol, the relation cols (Subscriber / Hider /
+  Hidden / Overrider / Overridden), and the two Hidden-in/outside-subscribee
+  cols. A single alias entry or ID entry is a scaffold but NOT a col. (This is
+  the scaffold-vs-col distinction from plan_v2 §19.)
+- *completion* / *the driver* :: the server step that takes a view tree -- freshly
+  opened, or rebuilt after a save -- and fills in everything derived from the
+  graph: content children, the scaffolds/cols and their members, and the
+  git-diff marks, repairing anything stale. It is now a single top-down
+  breadth-first pass (I call it "the one BFS driver"); "completion" is the older
+  name still used in the code.
+- *reconcile* :: within completion, bringing one col's members into line with
+  what the graph currently says they should be -- adding missing ones, dropping or
+  demoting stale ones.
+- *de-novo* vs *post-save* (a.k.a. *rerender*) :: de-novo = building a view from
+  scratch when you open a node; post-save / rerender = rebuilding already-open
+  views after a save changed the graph. Both now run the same driver.
+- *definitive* / *indefinitive* :: a definitive viewnode is the editable,
+  fully-expanded occurrence of a node (its body shows, its content is drawn); an
+  indefinitive one is read-only and collapsed and does not pull in absent
+  content. An ID is definitive in at most one place per buffer.
+- *definitive view request* (DVR) :: an internal marker meaning "draw this node
+  definitively." Opening a node sets one.
+- *draw rule* / *cascade* :: the rule deciding, when an ID appears more than once
+  in a buffer, which occurrence gets the single definitive slot; the cascade is
+  how a definitive node hands "be definitive" down to its own content children.
+- *node budget* :: a per-view cap on how many new viewnodes one render may
+  create, so a node that (say) thousands of people subscribe to does not try to
+  draw all of them at once.
+- *git-diff view* :: a mode that overlays git status onto a view, marking what
+  changed since the last commit.
+- *phantom* (DiffPhantom) :: a diff-only placeholder for something git shows as
+  removed -- a node whose file was deleted, or a child removed from a parent's
+  list ("removed-here"). It exists only in the diff view.
+- *existence* / *membership* axes; *staged* / *unstaged* :: how a node or phantom
+  records its git status. Existence = did the node's file appear or disappear;
+  membership = did the node appear or disappear from a particular parent's
+  child-list. Each is tracked per git stage: staged compares HEAD vs index,
+  unstaged compares index vs worktree. (HEAD = last commit; worktree = the files
+  on disk right now.)
+- *IDCol* / *AliasCol* :: scaffolds that list a node's IDs / aliases; in the diff
+  view they mark which were added or removed.
+- *idempotence* :: running completion twice on an unchanged graph yields the
+  identical view. The refactor depends on this -- it is what makes traversal order
+  not matter.
+
+* 1. Delete the dead "removed-node" expansion, or keep it for a future feature?
+** Context
+When you open a node, the renderer expands its content. There is a special
+variant for a node that *git says was deleted*: instead of reading the node's
+children from the live graph, it reads them from the last commit (HEAD) and
+shows them as phantoms. That variant is a ~150-line function
+(=extendDefinitiveSubtree_fromGit=) plus a flag (=is_removed_node=) threaded
+through the draw rule.
+
+In today's architecture this branch can never actually run. The git-diff marks
+are stamped at the *end* of a node's visit, but the draw rule that would trigger
+this variant runs at the *start* of the visit -- so when it checks "is this a
+removed node?", the mark isn't there yet and the answer is always "no." The code
+even has a comment admitting it's "effectively unreachable." So it is ~150 lines
+of dead, untested code that can silently rot.
+
+But it wasn't an accident: it was deliberately kept as scaffolding for a feature
+we discussed -- letting you open a node that has been deleted and read its content
+as of the last commit. Deleting it forecloses that (until someone rebuilds it).
+
+I already removed the one concrete waste here: the branch made a disk read on
+*every* definitive view request even though only the dead branch consumed it; I
+made that lazy. I did not touch the branch itself.
+*** TODO oh that's cool!
+I didn't know we had that. Definitely keep it,
+in a new file 'unused_but_nice.rs'
+The header comment on that file should say that we're holding onto it
+because it would be a nice thing to use someday.
+** The question
+Delete it (it stays in git history if the feature is ever wanted), or keep it as
+a real, tested path?
+
+** My lean
+Delete it, and replace the unreachable branch with an assertion that it's
+unreachable -- so if the architecture ever changes such that it *could* run, a
+test fails loudly instead of silently entering 150 lines of un-exercised code.
+This is the only edit in the whole review I felt a pang about, which is why I
+asked rather than just did it.
+
+* 2. Merge the two reconciler folders into one?
+** Context
+The view-update code lives in two folders, =complete_preorder/= and
+=complete_postorder/=. Those names are left over from the old design, which made
+two separate passes over the tree -- one parent-first (preorder), one child-first
+(postorder). The new design is a *single* breadth-first pass, so the
+preorder/postorder split no longer means anything: files are now sorted into the
+two folders essentially at random (one folder's file even imports a helper from
+the other), and a couple of docstrings still describe the retired two-pass model.
+
+** The question
+Collapse the two folders into one (I'd suggest =update_buffer/reconcile/=)?
+
+** My lean
+Yes -- the split actively misleads a reader now. It's a mechanical but wide change
+(many =mod= / =use= paths move), and it touches how you like modules laid out
+(your "old-style mod files" preference), so I didn't want to swing it unasked. Is
+=reconcile/= the name you'd want, or something else?
+
+*** TODO yes please
+
+* 3. The "scaffold" vs "col" rename pass -- now, or later?
+** Context
+You drew a distinction (plan_v2 §19): a *scaffold* is any display-only viewnode,
+while a *col* is specifically a scaffold that collects members. Some function and
+parameter names still say "scaffold" where they specifically mean a col -- e.g. a
+parameter named =scaffold_node= that is, in every caller, a col. Today I fixed
+the *comment and docstring* wording everywhere I found it. The remaining work is
+the actual *identifier* renames, which you had earmarked as a separate dedicated
+pass (because they're mechanical churn across many call sites).
+
+** The question
+Do the identifier renames now, as one mechanical commit, or keep them as the
+standalone pass you'd planned?
+
+** My lean
+Either is fine; it's pure clarity, no behavior. If you want a quiet, reviewable
+diff, a dedicated commit that does *only* these renames is the cleanest. I'm
+happy to do it whenever you say go.
+
+*** TODO let's do it
+
+* 4. Two places where the diff computes the same thing twice
+** Context
+In the git-diff view, when a node's list of IDs or aliases changed, the renderer
+shows an IDCol / AliasCol marking which entries were added or removed. Two pieces
+of code currently derive that same add/remove information independently:
+- the per-node diff worker builds the col *and fills in its members*, and then
+- the col's own reconciler (reached later in the same pass) recomputes the exact
+  same members from scratch.
+Separately, a freshly-created col is populated once just to test whether it's
+empty, then reconciled again at its own visit -- two graph reads where one would
+do. Neither is a bug today (both derivations agree), but they're two copies of
+one rule that could drift apart if someone edits one and not the other.
+
+** The question
+Collapse each to a single computation (have the diff worker create an *empty*
+col and let the reconciler be the sole place that fills it; have the
+emptiness-check not fully populate)?
+
+** My lean
+Worth doing -- it removes a real drift hazard. The catch is that it changes
+diff-render code paths, so I'd want to validate against the git-diff test suite
+before trusting it. I can do that (the test infrastructure is up and green), so
+if you're fine with me touching diff-render output, I'll take it and prove it
+byte-identical.
+
+*** TODO yes
+and comment where the empties are created
+indicating the name of the function that fills them in later.
+
+* 5. A cosmetic mis-placement of phantoms in partially-staged diffs
+** Context
+In the diff view, a child removed from its parent's list shows as a phantom,
+ideally sitting in the slot it used to occupy among its surviving siblings. The
+code computes that slot by stitching together git's two stages (staged =
+HEAD-vs-index, unstaged = index-vs-worktree). When the *same parent's* child-list
+was edited in *both* stages at once, the stitching can drop a removed item at the
+*bottom* of its siblings instead of in its original slot.
+
+It is purely cosmetic: the item is still correctly labeled "removed"; nothing
+breaks, no data is wrong, and it only happens in a fairly specific partially-
+staged state. I made the code's comment honest about the limitation today.
+
+** The question
+Do the real fix, or leave it with the honest comment?
+
+** My lean
+Low priority. The proper fix is to stop stitching the two stages and instead
+compute the slot by diffing the HEAD child-list directly against the worktree
+child-list (which preserves the interleaved order). It's a contained change but
+not free, for a cosmetic payoff. I'd leave it unless partially-staged diffs are a
+workflow you actually use.
+
+*** TODO worth doing unless it proves hard
+A noisy diff is okay. Only abort if you fear for the code's correctness.
+It's useful because to a reader,
+seeing something "missing" where it never was is confusing.
+
+* 6. Build out the rest of the idempotence test net?
+** Context
+The whole refactor rests on completion being *idempotent*: run it twice on an
+unchanged graph and you get the identical view, regardless of traversal order.
+The plan asked for one idempotence test per kind of viewnode, plus a few
+"tricky-order" cases, as the regression net that guards this property. Today
+there's one combined test covering several kinds (ordinary content, AliasCol,
+IDCol, SubscribeeCol, one Hidden col). The kinds NOT covered include the relation
+cols and the death-cleanup path (a col whose owning node was deleted in the same
+save). I added one targeted regression test today, for the crash I found.
+
+** The question
+Build out the full per-kind set, or is the single combined test the scope you
+want now?
+
+** My lean
+Add at least two: a relation-col idempotence fixture, and one exercising a
+deleted node whose cols must clean themselves up (a "nested dead scaffold"). The
+current fixture never touches the death-cleanup machinery, which is exactly the
+subtle part most worth a guard. The full per-kind matrix is nice-to-have but I
+wouldn't insist on all of it.
+
+*** TODO extend but without increasing cpu load much
+The test suite is already kind of crushing -- maybe a minute long?
+It really disrupts my flow. So if you can extend an extant test
+to test those things too, that's ideal.
+(That's predicated on my belief that there is
+a substantial fixed cost per new test; please correct me if I'm wrong.)
+
+* 7. Two stale statements in plan_v2.org
+** Context
+Two things the plan says no longer match the code:
+- The "remaining work" list in the terminology section (§19) names two renames as
+  still-to-do, but they were in fact completed on this branch.
+- The node-budget section (§5.5) says the budget counts alias- and ID-scaffolds,
+  but the code deliberately *exempts* those (a node's own id/alias count is
+  naturally bounded, so they don't need a cap).
+I did NOT edit plan_v2.org, because you'd said to keep its deviation log (§18)
+append-only as history, and I wasn't sure how far that preference extends. These
+two spots are NOT in §18 -- they're in the spec/status sections -- so correcting
+them wouldn't touch the append-only log.
+*** TODO let's correct hose
+If the log lies, that deserves correction.
+If we merely changed direction, that does not.
+** The question
+Want me to correct §19 and §5.5 to match the code, or would you rather do it (or
+leave them)?
+
+** My lean
+I'm happy to fix both -- they're small and they currently mislead. I just didn't
+want to start editing your planning narrative without a nod.
+
+* 8. A dead field left from an unbuilt feature
+** Context
+The save pipeline has a half-built notion of "override" relationships (one node
+overriding another's view -- the =overrides_view_of= relation, which the data
+model lists as "not yet fully implemented"). One internal structure carries an
+=overrider= field that is constructed but never read anywhere -- scaffolding for
+that unfinished feature. It predates today's work entirely; I only noticed it in
+passing.
+
+** The question
+Leave the seam (ideally with a one-line "deliberately not yet consumed" note), or
+drop the field until the override-write feature actually lands?
+
+** My lean
+Mildly prefer dropping it (dead data that mirrors the live Subscribee/Ordinary
+cases invites a reader to assume it's wired up when it isn't), but it's genuinely
+your call -- if the override feature is near-term, leaving the seam with a note is
+just as reasonable.
+
+*** TODO agreed
+We'll figure that out easily if we need it.

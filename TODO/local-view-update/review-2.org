@@ -469,47 +469,19 @@ green at every step (489/489 at the end). Commits are on =local-view-updates=.
 *** DONE §5.2/§5.3/§5.4 sweep -- present-tensed ~14 history comments, fixed the sync_truenode_from_disk docstring contradiction, the "<Scaffold>"/"sharing-scaffold" col-vs-scaffold wording, the moved-file path in ancestry.rs, two typos, and the unnecessary #[allow(non_snake_case)]. =[7665a4cf]=
 *** DONE §2.2 (comment half) -- qualified the diff.rs "correct HEAD position" claim to admit the two-stage edge. =[pending with this doc]=
 
-** OPEN -- your call (I did the safe part of each; these need a decision, an opinion, or, per your offer, a puzzle we solve together)
-*** TODO §3.3 -- delete the dead removed-node =extendDefinitiveSubtree_fromGit= branch, or keep it?
-   It is structurally dead now (is_removed_node is always false at draw-rule time),
-   so it is ~150 untested lines that can bit-rot. BUT monolith-design deliberately
-   *kept* it for a future "view a git-removed node's HEAD content" DVR, so deleting
-   it forecloses that feature. I made the wasted hide-set read lazy already; I did
-   NOT delete the branch. *My lean*: delete it (it's in git history if the feature
-   ever lands) and =debug_assert!= the unreachable arm. Your call on the product
-   question. (Deleting it also retires review-2 §5.3's fromGit-docstring + review §5.3's
-   take-limit hazard.)
-*** TODO §3.2/§4.2 -- collapse =complete_preorder/= + =complete_postorder/= into one dir?
-   The split is fiction under one BFS, but the move is invasive and it touches your
-   module-organization preferences (the "old-style mod files" rant). *My lean*: yes,
-   into =update_buffer/reconcile/=. Want me to, and is that the name you'd want?
-*** TODO §5.4/§19 -- the invasive "scaffold" -> "col" identifier renames.
-   I did the comment/doc-level ones. The plan_v2 §19 "dedicated pass" is the
-   identifier churn (=scaffold_node= params in child_data.rs, =insert_scaffold_as_child=,
-   etc.). Do them now as one mechanical commit, or leave them as the standalone §19 pass?
-*** TODO §4 -- the two diff double-computations (medium elegance, behavior-sensitive).
-   (a) process_truenode_diff fully populates the IDCol/AliasCol that the col reconciler
-   then recomputes; (b) maybe_add_* fills a fresh col to test emptiness, then the BFS
-   reconciles it again. Both change diff/render output paths, so I'd want to validate
-   against the git_diff_view suite (I can -- TypeDB is up). Worth it, or leave as-is?
-*** TODO §2.2 -- the real two-stage phantom-ordering fix.
-   Cosmetic only (a removed-member phantom can render at the bottom instead of its HEAD
-   slot, in a partially-staged diff). The fix is to build net_contains by diffing HEAD
-   vs worktree contains directly (interleaved LCS) instead of stitching two per-stage
-   diffs. Worth doing, or leave the (now-honest) comment and move on?
-*** TODO §3.4 -- the rest of the §15 test net.
-   I added the §2.1 regression test. §15 still wants per-ViewNode-kind idempotence and
-   the "five order cases". Do you want the full set (I'd start with relation-cols +
-   a nested-DeadScaffold idempotence fixture, which the current single fixture never
-   hits), or is one combined idempotence fixture the intended scope now?
-*** TODO §3.5 -- plan_v2 doc drift. I did NOT edit plan_v2.org, because you said to
-   leave §18 as append-only history. The two stale spots are NOT in §18: §19 lists the
-   scaffold->col renames as "Remaining" though they're done, and §5.5's budget bullet
-   still says aliases/ids count (they don't). Want me to correct §19/§5.5, or will you?
-*** TODO §3.6 -- =DefinenodeCandidateKind::Overridden='s unused =overrider= field.
-   Pre-existing scaffolding for an unimplemented override-write feature, out of this
-   branch's scope. Leave the seam (with a one-line "not yet consumed" note), or drop
-   the payload until the feature lands?
+** OPEN -- your call
+The eight open items are MOVED to a standalone, self-contained file -- prefaced
+with a glossary and plain-language context for each, so it reads without having
+followed today's work: [[./review-2_left-open.org]]. In brief:
+1. Delete the dead removed-node "fromGit" expansion, or keep it for a future feature?
+2. Merge =complete_preorder/= + =complete_postorder/= into one folder?
+3. The invasive "scaffold" -> "col" identifier renames now, or as their own pass?
+4. Collapse the two places the diff recomputes the same add/remove info?
+5. Do the real fix for the cosmetic two-stage phantom mis-placement?
+6. Build out the rest of the §15 per-kind idempotence tests?
+7. Correct the two stale statements in plan_v2.org (§19 / §5.5)?
+8. Drop the dead =Overridden.overrider= field, or leave the seam?
+My lean on each is in that file.
 
 ** Emotional support
 Taken in the spirit offered :) For the record, deleting your deliberately-kept
