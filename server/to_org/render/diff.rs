@@ -2,8 +2,7 @@
 /// process_truenode_diff decorates one Normal vognode and generates its
 /// diff-only children. §9 reversal (#3): it is now called INLINE, at each
 /// node's own BFS visit (server/update_buffer/complete.rs), for both the
-/// post-save and de-novo paths -- there is no longer a separate post-BFS
-/// overlay traversal.
+/// post-save and de-novo paths.
 ///
 /// Each TrueNode and Scaffold is decorated with per-stage diff axes:
 ///   X (existence) describes whether the node's '.skg' file changed
@@ -126,10 +125,11 @@ pub(crate) fn process_truenode_diff (
       unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
   mark_membership_on_existing_children (
     &mut node_mut, tree_node_id, &merged_contains );
-  // Net HEAD->worktree contains order: the same ordered list the inline
-  // post-save path builds (via content_goal_list), so a removed-member
-  // phantom lands at its correct HEAD position among surviving siblings
-  // rather than being blindly prepended.
+  // Net HEAD->worktree contains order, used to place each removed-member phantom
+  // among its surviving siblings. For a single-stage diff (the common case) this
+  // is the correct HEAD position; a two-stage (partially-staged) diff can list a
+  // staged-only removed id at the tail rather than interleaved -- a cosmetic
+  // misplacement (review-2 §2.2), not a misclassification.
   let net_contains : Vec<Diff_Item<ID>> =
     net_diff_from_per_stage (
       staged_changes   . map ( |c| c . contains_diff . as_slice () ),

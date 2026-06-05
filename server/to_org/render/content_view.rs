@@ -13,11 +13,15 @@
 
 use crate::types::tree::forest::ViewForest;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
+use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::ViewNode;
+use crate::types::views_state::pids_from_viewforest;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::env::SkgEnv;
 use crate::dbs::in_rust_graph::{InRustGraph, new_handle};
 use crate::dbs::init::empty_in_ram_tantivy_index;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use crate::update_buffer::{finish_viewforest, render_initial_view_via_driver};
 use std::sync::Arc;
 
 use ego_tree::Tree;
@@ -54,9 +58,9 @@ pub async fn multi_root_view (
     diff_mode_enabled, None ) . await
 }
 
-/// Phase 8 (§13): the legacy parts-based de-novo entry is now a thin shim that
-/// assembles a SkgEnv and routes through the ONE driver (multi_root_view_via_env).
-/// Used only by tests now (production calls multi_root_view_via_env directly).
+/// Phase 8 (§13): the parts-based de-novo entry -- a thin shim that assembles a
+/// SkgEnv and routes through the ONE driver (multi_root_view_via_env). Used only
+/// by tests (production calls multi_root_view_via_env directly).
 /// The env's in-Rust graph is fresh+empty -- de-novo callers/tests don't merge,
 /// so there are no extra_ids to resolve, and content is fetched from the
 /// in-Rust-graph *global* / disk -- and tantivy, when not supplied, is an empty
@@ -75,12 +79,11 @@ async fn multi_root_view_inner (
     None     => empty_in_ram_tantivy_index () ?, };
   // Build the in-Rust graph from the source .skg files so the driver's content
   // reconcile can resolve extra_ids (graph_snap.pid_of) -- a node's contains may
-  // reference another node by an extra_id, and the old de-novo BFS resolved
-  // those via TypeDB. Production's env carries the real (global) graph already;
-  // this shim is test-only, so a per-call file read is fine.
-  let nodes : Vec<crate::types::nodes::complete::NodeComplete> =
-    crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources (config)
-    . unwrap_or_default ();
+  // reference another node by an extra_id. Production's env carries the real
+  // (global) graph already; this shim is test-only, so a per-call file read is
+  // fine.
+  let nodes : Vec<NodeComplete> =
+    read_all_skg_files_from_sources (config) ?;
   let env : SkgEnv = SkgEnv {
     config        : config . clone (),
     in_rust_graph : new_handle ( InRustGraph::from_nodecompletes (&nodes) ),
@@ -103,21 +106,21 @@ pub async fn multi_root_view_via_env (
   // §9 reversal (#3): the diff (when diff_mode_enabled) is computed inline by
   // the driver, per Normal node at its BFS visit.
   let mut viewforest : ViewForest =
-    crate::update_buffer::render_initial_view_via_driver (
+    render_initial_view_via_driver (
       env, root_ids, active_source_set, diff_mode_enabled ) . await ?;
   // §20.3: the de-novo and post-save render tails are one shared helper now.
   // Root containerward is requested per-root in render_initial_view_via_driver
   // (de-novo only) and fulfilled + dropped inside finish_viewforest, so the tail
   // itself is caller-agnostic -- no mode flag.
   let buffer_content : String =
-    crate::update_buffer::finish_viewforest (
+    finish_viewforest (
       &mut viewforest, &env . config, &env . driver,
       active_source_set ) . await ?;
   // §20.5: the pids the caller registers for this view -- the {Normal, Inactive}
   // set, via the one shared source of which-kinds-count
-  // (OpenViews::pids_from_viewforest), the same helper update_view uses post-save.
+  // (views_state::pids_from_viewforest), the same helper update_view uses post-save.
   let pids : Vec<ID> =
-    crate::types::views_state::pids_from_viewforest (&viewforest)
+    pids_from_viewforest (&viewforest)
       . into_iter () . collect ();
   Ok ((buffer_content, pids, viewforest . into_internal_tree ())) }
 
@@ -130,9 +133,8 @@ pub async fn multi_root_view_with_source_set (
   active_source_set : &ActiveSourceSet,
 ) -> Result < (String, Vec<ID>, Tree<ViewNode>),
               Box<dyn Error> > {
-  // multi_root_view_inner now applies the source set during rendering (via
-  // multi_root_view_via_env), so the former extra render_viewforest_with_source_set
-  // pass is redundant.
+  // multi_root_view_inner applies the source set during rendering (inside
+  // multi_root_view_via_env), so this wrapper just forwards it.
   multi_root_view_inner (
     driver, config, tantivy_index, root_ids,
     diff_mode_enabled, Some (active_source_set) ) . await }

@@ -1,9 +1,7 @@
 /// Shared per-child information for sharing-scaffold reconciliation.
 ///
 /// Used by the rerender-time completers for SubscribeeCol,
-/// HiddenInSubscribeeCol, and HiddenOutsideOfSubscribeeCol. Each
-/// completer used to define a near-identical local copy of this
-/// struct and a near-identical `build_*_child_data` helper.
+/// HiddenInSubscribeeCol, and HiddenOutsideOfSubscribeeCol.
 ///
 /// Vocabulary for this module:
 ///
@@ -94,8 +92,7 @@ pub fn build_child_data (
       // relation diffs -- contains_diff, subscribes_to_diff, AND hides_diff -- so
       // a removed sharing-col member (subscribee / hidden-outside) now gets a
       // PER-STAGE removedM, and phantom_axes itself net-falls-back to unstaged
-      // Minus for the relation-col case it can't express per-stage. (An earlier
-      // net-removal fallback HERE was redundant with that and is gone.)
+      // Minus for the relation-col case it can't express per-stage.
       let axes : (ExistenceAxes, MembershipAxes) =
         phantom_axes ( child_skgid, &child_src,
                        parent_skgid, parent_source,
@@ -173,7 +170,7 @@ pub fn reconcile_sharing_col_children (
 
 /// See this module's header for definition of "goal child".
 ///
-/// This funciton repairs surviving or newly matched goal children whose
+/// This function repairs surviving or newly matched goal children whose
 /// membership marker is stale, so the scaffold continues to own them
 /// as generated collection members.
 fn mark_goal_children_as_collectionBranch_members (

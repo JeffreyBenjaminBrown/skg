@@ -1,12 +1,12 @@
-//! RoleCol metadata used by sharing-scaffold completion paths.
+//! RoleCol metadata used by sharing-col completion paths.
 //!
 //! The three rerender-time completers — for SubscribeeCol,
 //! HiddenInSubscribeeCol, and HiddenOutsideOfSubscribeeCol — share
 //! enough structure (build child data, reconcile against a goal
 //! list) that several pieces of per-kind metadata are worth
 //! capturing as methods: the caller-label string used in panic
-//! messages, the corresponding PartnerCol variant, the number of
-//! ancestor links to the subscriber, and a self-type guard.
+//! messages, the corresponding PartnerCol variant, and a self-type
+//! guard.
 
 use crate::types::tree::generic::error_unless_node_satisfies;
 use crate::types::viewnode::{RoleCol, ViewNode, ViewNodeKind};
@@ -39,26 +39,6 @@ impl RoleCol {
       RoleCol::HiddenOutsideOfSubscribee =>
         "reconcile_hiddenoutside_subscribee_col_children", } }
 
-  /// How many ancestor links *should* separate this scaffold
-  /// from the subscriber TrueNode.
-  ///
-  /// Tree shape:
-  ///   subscriber (TrueNode)
-  ///     └─ SubscribeeCol                       ← distance 1
-  ///          ├─ Subscribee (TrueNode)          ← distance 2
-  ///          │    └─ HiddenInSubscribeeCol     ← distance 3
-  ///          └─ HiddenOutsideOfSubscribeeCol   ← distance 2
-  pub fn correct_subscriber_ancestor_distance (self) -> usize {
-    match self {
-      RoleCol::Subscribee
-        | RoleCol::Subscriber
-        | RoleCol::Overridden
-        | RoleCol::Overrider
-        | RoleCol::Hider
-        | RoleCol::Hidden => 1,
-      RoleCol::HiddenInSubscribee => 3,
-      RoleCol::HiddenOutsideOfSubscribee => 2, } }
-
   pub fn relation_member_role (self) -> Option<RelationRole> {
     match self {
       RoleCol::Subscribee =>
@@ -88,7 +68,7 @@ impl RoleCol {
   /// Wraps 'error_unless_node_satisfies' with
   /// - a Box<dyn Error> result
   /// - a per-kind error string of the form
-  ///   "<caller_label>: expected <Scaffold>".
+  ///   "<caller_label>: expected <col-kind>".
   pub fn error_unless_node_is_this_kind (
     self,
     tree : &Tree<ViewNode>,

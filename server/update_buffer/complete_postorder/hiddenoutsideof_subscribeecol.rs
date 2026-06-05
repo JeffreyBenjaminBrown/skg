@@ -6,7 +6,7 @@ use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
-use crate::update_buffer::complete_preorder::truenode::cap_goal_list_to_budget;
+use crate::update_buffer::util::cap_goal_list_to_budget;
 use crate::types::viewnode::{ViewNode, RoleCol};
 
 use ego_tree::{NodeId, Tree};
@@ -67,7 +67,7 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
   reconcile_sharing_col_children(
     // §6.0: a stale member of this read-only col is removed when a view-leaf
     // (the common case) and demoted to Independent only if it has a user
-    // subtree. Handled uniformly by the reconciler; no mark_managed pre-pass.
+    // subtree. Handled uniformly by the reconciler.
     tree, node, kind,
     &goal_list, &child_data ) ?;
   // §3.4: an emptied HiddenOutsideOfSubscribeeCol is removed by the single

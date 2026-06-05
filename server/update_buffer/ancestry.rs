@@ -1,6 +1,6 @@
 //! Death-leafward: a col self-checks its required ancestry at its BFS visit.
 //!
-//! See TODO/local-view-update/propagate-death-leafward/plan.org. In the
+//! See TODO/local-view-update/DONE/propagate-death-leafward/plan.org. In the
 //! single-visit BFS (complete.rs), each col (a non-vognode viewnode: QualCol,
 //! PartnerCol) is reconciled at its own visit, and that reconcile reads its
 //! ancestor vognode(s). If a required ancestor died this save, the read would
@@ -15,7 +15,7 @@
 //! required-ancestry chain -- not only the parent -- is the wrong viewnode
 //! kind. Death is a VIEW property, not a graph property: a position that must
 //! be a vognode holding anything but Vognode::Normal, or a position that must
-//! be a specific scaffold holding anything but that scaffold, is dead. No
+//! be a specific col holding anything but that col, is dead. No
 //! graph / NodeComplete read is involved. This is sound because, in BFS order,
 //! a Normal node converts to Deleted at its own visit, strictly before any
 //! descendant col is visited; so by the time a col checks, a dead ancestor

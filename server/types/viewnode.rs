@@ -135,9 +135,8 @@ pub type MpDiffPhantomNode = DiffPhantomNode_Generic < Option < ID >,
 /// or rendered (always implicit Affected). So it carries NONE of TrueNode's
 /// parentIs / birth / viewStats / view_requests / indef_or_def -- only what a
 /// phantom actually uses: identity, title, the diff axes, the not_in_git flag,
-/// and graphStats (which IS rendered on phantoms). The two genuine readers that
-/// once forced a full TrueNode here are gone: parentIs (the strip no longer
-/// reads it) and indef_or_def (every phantom is now indefinitive).
+/// and graphStats (which IS rendered on phantoms). It needs neither parentIs
+/// (nothing reads a phantom's) nor indef_or_def (every phantom is indefinitive).
 #[derive( Debug, Clone, PartialEq )]
 pub struct DiffPhantomNode_Generic < Id, Src > {
   pub title      : String,
@@ -173,7 +172,8 @@ impl < Id, Src > DiffPhantomNode_Generic < Id, Src > {
   pub fn body (&self) -> Option < &String > { None }
   pub fn is_indefinitive (&self) -> bool { true }
 
-  /// Always true for an actual phantom, but some shared code asks regardless.
+  /// True iff this node's diff axes require phantom display; for a correctly
+  /// constructed phantom this holds, but some shared code asks regardless.
   pub fn should_be_phantom (&self) -> bool {
     diff_axes_require_phantom (&self . existence, &self . membership) }
 

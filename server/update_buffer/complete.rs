@@ -15,6 +15,8 @@ use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_n
 use crate::to_org::complete::sharing::maybe_add_relation_col_branches;
 use crate::update_buffer::ancestry::{ col_is_generalized_orphan, deaden_generalized_orphan_col, is_col_kind};
 use crate::update_buffer::util::detach_scaffold_transferring_focus;
+use crate::to_org::render::diff::process_truenode_diff;
+use crate::types::tree::viewnode_nodecomplete::write_at_truenode_in_tree;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol, ViewRequest, IndefOrDef, DeletedNode};
 use crate::types::viewnode::{Vognode, QualCol};
 use super::complete_postorder::hiddeninsubscribee_col::reconcile_hiddenin_subscribee_col_children;
@@ -54,7 +56,7 @@ pub(super) struct CompletionContext<'a> {
   /// Phase 8 (§13): true only for a DE-NOVO (initial) render driven through
   /// this driver. When set, a fresh CONTENT node (parent is not a PartnerCol)
   /// gets its relation cols created at its visit, the way
-  /// build_node_branch_minus_content does at node birth in the old de-novo BFS.
+  /// build_node_branch_minus_content does at node birth.
   /// FALSE for post-save rerender, where relation cols are already present in
   /// the saved buffer and re-creating them would change the buffer and break the
   /// save round-trip (plan_v2 §18). So post-save stays byte-identical.
@@ -71,7 +73,7 @@ pub(super) async fn complete_viewforest (
 ) -> Result<(), Box<dyn Error>> {
   let root_treeid : NodeId = viewforest . root () . id ();
   // The single plan_v2 §3 level-order BFS: each node's visit
-  // (expand_true_content_at_node) does ALL of its own update -- content
+  // (dispatch_node_update) does ALL of its own update -- content
   // reconcile, the §5.2 draw rule + §5.3 cascade for definitive-view
   // requests, the inline diff, the other view requests, ensuring a definitive
   // subscribee's HiddenInSubscribeeCol, and per-col reconciliation. Cols and
@@ -101,7 +103,7 @@ async fn complete_nodes_in_level_order (
   let mut queue : VecDeque<NodeId> = VecDeque::new ();
   queue . push_back (root_treeid);
   while let Some (treeid) = queue . pop_front () {
-    expand_true_content_at_node (tree, treeid, context) . await ?;
+    dispatch_node_update (tree, treeid, context) . await ?;
     // Enqueue the node's *current* children -- including any this visit
     // just created -- so they are completed after every node already in
     // their level. (See 'MANUAL RECURSION' comment at top of file: the
@@ -114,7 +116,7 @@ async fn complete_nodes_in_level_order (
 /// One BFS visit: dispatch on (kind, parent-kind) to the node's update rule
 /// (plan_v2 §3/§4). Cols are reconciled at their own visit (the BFS reaches a
 /// col after its Normal parent created it).
-async fn expand_true_content_at_node (
+async fn dispatch_node_update (
   tree    : &mut Tree<ViewNode>,
   treeid  : NodeId,
   context : &mut CompletionContext<'_>,
@@ -126,9 +128,8 @@ async fn expand_true_content_at_node (
   // required ancestor is the wrong viewnode kind -- full chain, not just the
   // parent), deaden it and dispose its children instead of reconciling, so the
   // reconcile never reads a since-deleted ancestor's missing NodeComplete.
-  // This subsumes the old scaffolds_with_deadOrDeleted_parents_become_dead
-  // sweep (immediate-parent only): the BFS visits every col, and the ancestry
-  // check is strictly more powerful.
+  // The BFS visits every col, and the check walks the col's whole required
+  // ancestry, so a col whose grandparent (not just its parent) died is deadened.
   if is_col_kind (&kind)
     && col_is_generalized_orphan (tree, treeid) ? {
     deaden_generalized_orphan_col (tree, treeid) ?;
@@ -169,8 +170,8 @@ async fn expand_true_content_at_node (
       super::complete_postorder::id_col::reconcile_id_col_children (
         treeid, tree, context . source_diffs, &context . env . config ) ?,
     ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
-      // §6.4/§6.6/§16: an Inactive node deleted by this save becomes Deleted
-      // (current code converted only Normal nodes).
+      // §6.4/§6.6/§16: an Inactive node deleted by this save becomes Deleted,
+      // parallel to the Normal-node deletion in expand_true_content_at_truenode.
       convert_inactive_to_deleted_if_deleted (
         tree, treeid, context . deleted_by_this_save_pids ) ?,
     _ => {
@@ -206,7 +207,7 @@ async fn visit_normal_node (
     // (settled) then clobbers+returns, drawing no further content. This is
     // the BFS-order truncation: earlier siblings expand, later ones stay
     // indefinitive once the budget is spent.
-    crate::types::tree::viewnode_nodecomplete::write_at_truenode_in_tree (
+    write_at_truenode_in_tree (
       tree, treeid,
       |t| { t . view_requests . remove (& ViewRequest::Definitive);
             t . indef_or_def = IndefOrDef::Indefinitive; } )
@@ -272,9 +273,8 @@ async fn visit_normal_node (
   super::complete_postorder::truenode::execute_truenode_view_requests (
     treeid, tree, &context . env . config, &context . env . driver,
     context . errors, context . active_source_set ) . await ?;
-  // Ensure a definitive subscribee's HiddenInSubscribeeCol (was
-  // ensure_hiddenin_cols_under_definitive_subscribees); the BFS reconciles
-  // it on reaching it.
+  // Ensure a definitive subscribee's HiddenInSubscribeeCol exists; the BFS
+  // reconciles it on reaching it.
   super::complete_postorder::truenode::ensure_hiddenin_col_under_definitive_subscribee (
     tree, treeid, &context . env . config, &context . env . driver ) . await ?;
   // §9 reversal (#3 / Jeff): compute this node's content+scaffold diff LOCALLY,
@@ -287,7 +287,7 @@ async fn visit_normal_node (
   if let Some (real_diffs) = context . source_diffs {
     let node_mut : NodeMut<ViewNode> =
       tree . get_mut (treeid) . unwrap ();
-    crate::to_org::render::diff::process_truenode_diff (
+    process_truenode_diff (
       node_mut, real_diffs,
       context . deleted_since_head_pid_src_map,
       context . diff_tantivy_index,
@@ -336,7 +336,7 @@ fn prune_self_deletable_when_empty (
 ) -> Result<(), Box<dyn Error>> {
   let nodes : Vec<NodeId> =
     collect_matching_nodeids (
-      tree, false,
+      tree,
       |vn| is_self_deletable_when_empty (&vn . kind) ) ?;
   for treeid in nodes {
     let node = match tree . get (treeid) {
@@ -356,10 +356,10 @@ fn prune_self_deletable_when_empty (
 
 /// §6.4/§6.6/§16: convert an Inactive node whose pid is in
 /// `deleted_by_this_save_pids` into a Deleted node, mirroring the Normal-node
-/// conversion in expand_true_content_at_truenode (which only ever handled
-/// Normal). An InactiveNode carries no title/body of its own (its .skg is now
-/// gone), so the Deleted placeholder is built with an empty title. Inert
-/// thereafter; the §6.6 prune removes it if it ends childless.
+/// conversion in expand_true_content_at_truenode. An InactiveNode carries no
+/// title/body of its own (its .skg is now gone), so the Deleted placeholder is
+/// built with an empty title. Inert thereafter; the §6.6 prune removes it if it
+/// ends childless.
 fn convert_inactive_to_deleted_if_deleted (
   tree                      : &mut Tree<ViewNode>,
   treeid                    : NodeId,
@@ -384,14 +384,15 @@ fn convert_inactive_to_deleted_if_deleted (
 
 fn collect_matching_nodeids<Predicate> (
   tree      : &Tree<ViewNode>,
-  preorder  : bool,
   predicate : Predicate,
 ) -> Result<Vec<NodeId>, Box<dyn Error>>
 where Predicate : Fn (&ViewNode) -> bool {
   let root_treeid : NodeId = tree . root () . id ();
   let mut result : Vec<NodeId> = Vec::new ();
   do_everywhere_in_tree_dfs_readonly (
-    tree, root_treeid, preorder,
+    tree, root_treeid,
+    false, // postorder: a chain (Dead -> Deleted, or a col emptied by the
+           // removal of its last child) collapses bottom-up in one sweep.
     &mut |node| {
       if predicate (node . value ()) {
         result . push (node . id ()); }

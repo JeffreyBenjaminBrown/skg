@@ -21,7 +21,6 @@ use std::error::Error;
 /// - Read its IDs into a goal list
 /// - In diff view, also build a diff-status map from NodeChanges.ids_diff
 /// - Reconcile children via complete_relevant_children_in_viewnodetree
-#[allow (non_snake_case)]
 pub fn reconcile_id_col_children (
   idcol_node_id : NodeId,
   tree          : &mut Tree<ViewNode>,

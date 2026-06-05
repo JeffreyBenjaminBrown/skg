@@ -18,6 +18,7 @@ use crate::types::tree::viewnode_nodecomplete::{
     pid_and_source_from_treenode,
     write_at_truenode_in_tree};
 use crate::update_buffer::util::{
+    cap_goal_list_to_budget,
     complete_relevant_children_in_viewnodetree,
     partition_children,
     treat_certain_children,
@@ -155,9 +156,10 @@ fn clear_edit_request (
           { *edit_request = None; }} ) ?;
   Ok (( )) }
 
-/// Phase 3 (non-saved views only): overwrite the viewnode's title
-/// and body with the fresh values from disk. The saved view is the
-/// one that *defines* those fields, so it is excluded.
+/// Overwrite the viewnode's title, source, and body with the fresh values from
+/// the snapshot. §8.3: every definitive node re-syncs, saved and collateral
+/// alike -- after extraction the snapshot already holds the saved buffer's text,
+/// so the saved node re-syncs to the same content it just defined.
 fn sync_truenode_from_disk (
   tree         : &mut Tree<ViewNode>,
   node         : NodeId,
@@ -217,12 +219,11 @@ fn reconcile_content_children (
   let goal_list : Vec<ID> =
     cap_goal_list_to_budget(
       tree, node, &apparent_content_ids, &no_removed, node_budget );
-  // A content child this save deleted is no longer detached here (the former
-  // detach_stale_deleted_content stopgap is gone, death-leafward build order
-  // 2/3): it stays, and at its own BFS visit becomes a DeletedNode whose cols
-  // generalized-orphan and deaden -- so no col reconciles against a missing
-  // NodeComplete -- while any user subtree under it is preserved (demoted), and
-  // a now-childless DeletedNode is removed by the §6.6 prune sweep.
+  // A content child this save deleted stays here; at its own BFS visit it
+  // becomes a DeletedNode whose cols generalized-orphan and deaden -- so no col
+  // reconciles against a missing NodeComplete -- while any user subtree under it
+  // is preserved (demoted), and a now-childless DeletedNode is removed by the
+  // §6.6 prune sweep.
   complete_content_children(
     tree, node, &goal_list, config,
     deleted_since_head_pid_src_map, active_source_set ) ?;
@@ -254,49 +255,6 @@ fn convert_nonmember_unknown_children_to_dead (
       _ => false },
     |vn : &mut ViewNode| { vn . kind = ViewNodeKind::DeadScaffold; },
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
-
-/// §5.5 node-limit: cap a goal list so this scaffold creates at most
-/// `*node_budget` *new* TrueNode children (ids not already present as
-/// children). Existing children cost nothing (no new node), and removed-id
-/// diff phantoms are exempt (the diff overlay is not budget-bound, §5.5), so
-/// both are always kept. Decrements `*node_budget` by the number of new ids
-/// kept and drops the rest from the goal list (so they are simply not
-/// created -- and, in a cascade, not expanded). Preserves order.
-///
-/// Shared by content reconciliation (here) and the four sharing-col
-/// reconcilers (§18): a famous node's relation/subscribee col can list
-/// thousands of unbounded members, so cols must spend the same budget as
-/// content rather than draw every member. The id/alias cols stay unbudgeted --
-/// they are bounded by a node's own id/alias count.
-pub(in crate::update_buffer) fn cap_goal_list_to_budget (
-  tree        : &Tree<ViewNode>,
-  node        : NodeId,
-  goal_list   : &[ID],
-  removed_ids : &HashSet<ID>,
-  node_budget : &mut usize,
-) -> Vec<ID> {
-  let existing : HashSet<ID> =
-    tree . get (node) . unwrap () . children ()
-    . filter_map ( |c| match &c . value () . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t)) =>
-          Some ( t . id . clone () ),
-        ViewNodeKind::Vognode (Vognode::DiffPhantom (p)) =>
-          Some ( p . id . clone () ),
-        ViewNodeKind::Vognode (Vognode::Inactive (i)) =>
-          Some ( i . id . clone () ),
-        _ => None } )
-    . collect ();
-  let mut kept : Vec<ID> = Vec::with_capacity ( goal_list . len () );
-  for id in goal_list {
-    if existing . contains (id) || removed_ids . contains (id) {
-      kept . push ( id . clone () ); // free: not a new ordinary node
-    } else if *node_budget > 0 {
-      *node_budget -= 1;
-      kept . push ( id . clone () );
-    } // else: budget exhausted -- drop this new id
-  }
-  kept }
-
 
 fn mutate_truenode_to_deletednode (
   tree   : &mut Tree<ViewNode>,
@@ -517,7 +475,14 @@ fn build_child_creation_data (
       let mut m : HashMap<ID, SourceName> = HashMap::new();
       for child_ref in node_ref . children() {
         match &child_ref . value() . kind {
+          // Only an Affected Normal child counts as "already present" -- the
+          // same predicate complete_content_children's reconcile applies. An
+          // Independent same-id child is a distinct occurrence (e.g. a
+          // containerward ancestor, or a §6.0-demoted branch), so its goal id
+          // must still be pre-fetched here; otherwise the reconcile sends it to
+          // the create closure and child_data.get(id).expect(..) panics.
           ViewNodeKind::Vognode (Vognode::Normal (t))
+            if t . parentIs == ParentIs::Affected
             => { m . insert( t . id . clone(),
                              t . source . clone()); },
           ViewNodeKind::Vognode (Vognode::DiffPhantom (p))

@@ -28,8 +28,9 @@ where F: FnOnce (&mut TrueNode) -> R {
   write_at_node_in_tree (
     tree, treeid,
     |viewnode| { match &mut viewnode . kind {
-      // §11: a phantom is no longer a TrueNode, so this Normal-only mutator
-      // cannot apply to one (a phantom has no view_requests/indef_or_def/etc).
+      // §11: a phantom is not a TrueNode (it carries a slim DiffPhantomNode), so
+      // this Normal-only mutator cannot apply to one (a phantom has no
+      // view_requests/indef_or_def/etc).
       ViewNodeKind::Vognode (Vognode::Normal (t))
         => Ok ( f (t) ),
       _ => Err ( "write_at_truenode_in_tree: expected TrueNode"

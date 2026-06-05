@@ -255,10 +255,9 @@ pub fn axes_from_per_stage_diffs<T: Clone + Eq + std::hash::Hash> (
 /// from the file's git status in that stage (Added → Plus,
 /// Deleted → Minus, Modified / absent → None).
 ///
-/// Used by both the de-novo diff-application path (for the TrueNode
-/// itself) and the save-rerender expand path (for phantoms of a
-/// removed parent's children). Previously each caller rolled its own
-/// lookup; extract lets them share + test it.
+/// Used by the definitive-expand path (extendDefinitiveSubtree_fromGit, for the
+/// TrueNode's own existence axes and for phantoms of a removed parent's
+/// children).
 pub fn file_existence_axes_from_source_diff (
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
   pid          : &ID,

@@ -9,9 +9,7 @@ Phantom = Diff | Deleted | Unknown
 
 Promote Phantom to be one of the variants of ViewNode.
 What's the difference between the three kinds of phantom?
-* DiffPhantom should carry less data
-no view requests, parentIs, birth, indef_or_def.
-This was deferred in [[./TODO/local-view-update/]] because it's messy.
+* The AIs want jq, perl
 * each new root view sohuld be drawn with a link sources ancestry
 that is, linksource-ancestry as view-descendents
 * more diff supplement data

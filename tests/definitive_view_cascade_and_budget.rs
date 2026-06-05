@@ -1,4 +1,4 @@
-// cargo test --test extend_definitive_from_leaf -- --nocapture
+// cargo test --test definitive_view_cascade_and_budget -- --nocapture
 //
 // Tests for definitive view request expansion.
 // These tests verify that when a node has a "Definitive" view request,
@@ -32,7 +32,7 @@ fn test_definitive_view_limit_10
   () -> Result<(), Box<dyn Error>> {
   run_with_test_db (
     "skg-test-definitive-view-limit-10",
-    "tests/extend_definitive_from_leaf/fixtures",
+    "tests/definitive_view_cascade_and_budget/fixtures",
     "/tmp/tantivy-test-definitive-view-limit-10",
     |config, driver, tantivy| Box::pin ( async move {
       let input_org_text = indoc! {"
@@ -103,7 +103,7 @@ fn test_definitive_view_limit_5_or_6
   () -> Result<(), Box<dyn Error>> {
   run_with_test_db (
     "skg-test-definitive-view-limit-5-or-6",
-    "tests/extend_definitive_from_leaf/fixtures",
+    "tests/definitive_view_cascade_and_budget/fixtures",
     "/tmp/tantivy-test-definitive-view-limit-5-or-6",
     |config, driver, tantivy| Box::pin ( async move {
       let input_org_text = indoc! {"
@@ -210,7 +210,7 @@ fn test_definitive_view_limit_1_to_4
   () -> Result<(), Box<dyn Error>> {
   run_with_test_db (
     "skg-test-definitive-view-limit-1-to-4",
-    "tests/extend_definitive_from_leaf/fixtures",
+    "tests/definitive_view_cascade_and_budget/fixtures",
     "/tmp/tantivy-test-definitive-view-limit-1-to-4",
     |config, driver, tantivy| Box::pin ( async move {
       let input_org_text = indoc! {"
@@ -305,7 +305,7 @@ fn test_definitive_view_conflicting
   () -> Result<(), Box<dyn Error>> {
   run_with_test_db (
     "skg-test-definitive-view-conflict",
-    "tests/extend_definitive_from_leaf/fixtures",
+    "tests/definitive_view_cascade_and_budget/fixtures",
     "/tmp/tantivy-test-definitive-view-conflict",
     |config, driver, tantivy| Box::pin ( async move {
       // Node 12 appears twice:
@@ -365,7 +365,7 @@ fn test_definitive_view_with_cycle
   () -> Result<(), Box<dyn Error>> {
   run_with_test_db (
     "skg-test-definitive-view-cycle",
-    "tests/extend_definitive_from_leaf/fixtures-cycle",
+    "tests/definitive_view_cascade_and_budget/fixtures-cycle",
     "/tmp/tantivy-test-definitive-view-cycle",
     |config, driver, tantivy| Box::pin ( async move {
       // Node a has definitive request
@@ -416,7 +416,7 @@ fn test_definitive_view_with_repeat
   () -> Result<(), Box<dyn Error>> {
   run_with_test_db (
     "skg-test-definitive-view-repeat",
-    "tests/extend_definitive_from_leaf/fixtures",
+    "tests/definitive_view_cascade_and_budget/fixtures",
     "/tmp/tantivy-test-definitive-view-repeat",
     |config, driver, tantivy| Box::pin ( async move {
       let input_org_text = indoc! {"
@@ -478,7 +478,7 @@ fn test_definitive_view_request_cleared
   () -> Result<(), Box<dyn Error>> {
   run_with_test_db (
     "skg-test-definitive-view-cleared",
-    "tests/extend_definitive_from_leaf/fixtures",
+    "tests/definitive_view_cascade_and_budget/fixtures",
     "/tmp/tantivy-test-definitive-view-cleared",
     |config, driver, tantivy| Box::pin ( async move {
       let input_org_text = indoc! {"

@@ -129,9 +129,7 @@ impl SourceName {
   /// validation (pre-save) or are catastrophic (post-save), never this.
   pub const NOT_FOUND_STR : &'static str = "NOT_FOUND";
   pub fn not_found () -> Self {
-    SourceName ( Self::NOT_FOUND_STR . to_string () ) }
-  pub fn is_not_found (&self) -> bool {
-    self . 0 == Self::NOT_FOUND_STR } }
+    SourceName ( Self::NOT_FOUND_STR . to_string () ) } }
 
 #[derive (Clone)]
 pub struct TantivyIndex {

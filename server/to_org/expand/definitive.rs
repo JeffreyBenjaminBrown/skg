@@ -88,18 +88,6 @@ pub fn apply_definitive_draw_rule (
 ) -> Result < DrawOutcome, Box<dyn Error> > {
   let node_pid : ID = get_id_from_treenode (
     viewforest, node_id ) ?;
-  let is_removed_node : bool = // for git diff view
-    read_at_node_in_tree (
-      viewforest, node_id,
-      |n| match &n . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t))
-          => truenode_file_absent_from_worktree (&t . existence),
-        ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
-          => truenode_file_absent_from_worktree (&p . existence),
-        _ => false } ) ?;
-  let hidden_ids : HashSet < ID > =
-    // If node is a subscribee, we may need to hide some content.
-    get_hidden_ids_if_subscribee ( viewforest, node_id, config ) ?;
   if let Some (&prior) = visited . get (& node_pid) {
     if prior . is_final () && prior . node_id () != node_id {
       // §5.2: an existing Final occurrence wins; discard this DVR and make
@@ -117,6 +105,18 @@ pub fn apply_definitive_draw_rule (
       indefinitize_content_subtree ( viewforest,
                                      prior . node_id (),
                                      visited, config ) ?; }}
+  // Past here the node WILL be made Final, so the git-diff existence read
+  // happens now -- after the Deferred early return above, so a deferring node
+  // does no extra work.
+  let is_removed_node : bool = // for git diff view
+    read_at_node_in_tree (
+      viewforest, node_id,
+      |n| match &n . kind {
+        ViewNodeKind::Vognode (Vognode::Normal (t))
+          => truenode_file_absent_from_worktree (&t . existence),
+        ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
+          => truenode_file_absent_from_worktree (&p . existence),
+        _ => false } ) ?;
   { // Remove request, mark definitive, replace title/body, add to visited.
     write_at_truenode_in_tree (
       viewforest, node_id, |t| {
@@ -133,6 +133,12 @@ pub fn apply_definitive_draw_rule (
                viewforest, node_id, config ) ?; }
     // A DVR target is Final (§5.2): later DVRs for this ID defer to it.
     visited . insert ( node_pid . clone(), Finalizable::Final (node_id) ); }
+  let hidden_ids : HashSet < ID > =
+    // Only the removed-node branch (extendDefinitiveSubtree_fromGit) consumes
+    // this, and computing it is a NodeComplete fetch (a possible disk read), so
+    // a present node -- the common case -- skips it.
+    if is_removed_node { get_hidden_ids_if_subscribee ( viewforest, node_id, config ) ? }
+    else               { HashSet::new () };
   Ok ( DrawOutcome::MadeFinal { is_removed_node, hidden_ids } ) }
 
 /// If the node is a Subscribee
@@ -242,10 +248,10 @@ fn truenode_file_absent_from_worktree (
     None               => matches! (existence . staged, Some (Sign::Minus)),
   } }
 
-/// Expand children for a removed node,
-/// by loading content from git HEAD.
-/// Children that exist in TypeDB are marked as RemovedHere.
-/// Children that don't exist in TypeDB are marked as Removed.
+/// Expand children for a removed node, by loading content from git HEAD. Each
+/// child is a DiffPhantom; whether it still exists in the worktree (a
+/// removed-here member) or not (fully removed) is encoded in its
+/// existence/membership axes, not in a named state.
 pub async fn extendDefinitiveSubtree_fromGit (
   tree           : &mut Tree<ViewNode>,
   effective_root : NodeId,

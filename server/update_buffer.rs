@@ -588,8 +588,8 @@ fn clear_diff_metadata (
     true,
     &mut |mut node : NodeMut<ViewNode>| -> Result<(), String>
       { // Ignores scaffolds: some (Alias, ID) carry diff data,
-        // but they are regenerated from scratch by their postorder
-        // completers, so clearing them here is unnecessary.
+        // but they are regenerated from scratch by their reconcilers at their
+        // own BFS visit, so clearing them here is unnecessary.
         match &mut node . value() . kind {
           ViewNodeKind::Vognode (Vognode::Normal (t)) => {
             t . existence  = ExistenceAxes::default ();

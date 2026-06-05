@@ -95,7 +95,7 @@ unlocked as save-lock / save-relax-lock / collateral-view arrive."
       (skg-register-response-handler
        'save-lock
        (lambda (_tcp-proc payload)
-         (skg--save-lock-handler saved-uri save-buffer payload))
+         (skg--save-lock-handler saved-uri payload))
        t)
       ;; save-relax-lock: same shape/handling as save-lock, but with the
       ;; EXACT collateral set (post-SavePlan), so buffers locked early that
@@ -109,7 +109,7 @@ unlocked as save-lock / save-relax-lock / collateral-view arrive."
       (skg-register-response-handler
        'save-relax-lock
        (lambda (_tcp-proc payload)
-         (skg--save-lock-handler saved-uri save-buffer payload))
+         (skg--save-lock-handler saved-uri payload))
        nil)
       (skg-register-response-handler
        'collateral-view
@@ -173,7 +173,7 @@ before the add/remove cycle."
     (when (looking-at "\\(\\*+ \\)(skg) ")
       (replace-match "\\1"))))
 
-(defun skg--save-lock-handler (saved-uri save-buffer payload)
+(defun skg--save-lock-handler (saved-uri payload)
   "Handle the save-lock LP message (tagged with response-type).
 Unlocks non-collateral buffers."
   (condition-case err
@@ -184,7 +184,10 @@ Unlocks non-collateral buffers."
             (skg--unlock-non-collateral-buffers
              saved-uri collateral-uris))))
     (error
-     (skg--unlock-all-save-locked)
+     ;; Keep the saved buffer locked until save-result (unlocking everything
+     ;; here would let the user edit it during the rest of the pipeline, and the
+     ;; subsequent erase+insert would silently drop those edits); free the rest.
+     (skg--unlock-non-collateral-buffers saved-uri nil)
      (skg-log 'error 'save "save-lock handler error: %S" err)) ))
 
 (defun skg--apply-streamed-view-update (payload log-category handler-name)

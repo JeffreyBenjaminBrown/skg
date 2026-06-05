@@ -6,7 +6,7 @@ use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
-use crate::update_buffer::complete_preorder::truenode::cap_goal_list_to_budget;
+use crate::update_buffer::util::cap_goal_list_to_budget;
 use crate::types::viewnode::{ViewNode, RoleCol};
 
 use ego_tree::{NodeId, Tree};
@@ -69,7 +69,7 @@ pub fn reconcile_hiddenin_subscribee_col_children (
     // moved it into the subscribee-as-such, 'unhiding' it) is removed when it
     // is a view-leaf -- the common case for hidden members -- and demoted to
     // Independent only if it has a user subtree to preserve. The reconciler
-    // applies this uniformly now; the old mark_managed pre-marking is gone.
+    // applies this uniformly.
     tree, node, kind,
     &goal_list, &child_data ) ?;
   // §3.4: an emptied HiddenInSubscribeeCol is removed by the single postorder

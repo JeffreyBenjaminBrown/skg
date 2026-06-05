@@ -119,3 +119,37 @@ fn member_unknown_child_is_retained () {
   assert! ( is_unknown (&tree, child),
             "an Unknown still in contains should be retained" );
 }
+
+// review-2 §2.1 regression: a content goal id present only as a
+// parentIs=Independent child must still get ChildData pre-fetched.
+// complete_content_children counts only parentIs=Affected Normal children as
+// "already present", so an Independent same-id child is sent to the create
+// closure; if build_child_creation_data skipped pre-fetching it (because it
+// collected the skip-set from ALL Normal children, Independent included), the
+// closure's child_data.get(id).expect(..) panics. The skip-set must match the
+// present-set: an Independent same-id child must NOT be skipped.
+#[test]
+fn independent_same_id_child_is_prefetched () {
+  use crate::types::viewnode::{ mk_definitive_viewnode, ParentIs };
+  let goal : ID = id ("regression_independent_child");
+  let mut tree : Tree<ViewNode> =
+    Tree::new ( mk_definitive_viewnode (
+      id ("p"), source_name ("main"), "p" . to_string (), None ));
+  let parent : NodeId = tree . root () . id ();
+  let mut child : ViewNode =
+    mk_definitive_viewnode (
+      goal . clone (), source_name ("main"), "c" . to_string (), None );
+  if let ViewNodeKind::Vognode (Vognode::Normal (t)) = &mut child . kind
+    { t . parentIs = ParentIs::Independent; }
+  tree . root_mut () . append (child);
+  let config : SkgConfig =
+    SkgConfig::dummyFromSources ( HashMap::new () );
+  let no_deletes : HashMap<ID, SourceName> = HashMap::new ();
+  let data : HashMap<ID, ChildData> =
+    build_child_creation_data (
+      &tree, parent, &[ goal . clone () ], &config, &no_deletes, None )
+      . unwrap ();
+  assert! ( data . contains_key (&goal),
+            "an Independent same-id child's goal id must be pre-fetched, not \
+             skipped -- else complete_content_children panics on it" );
+}
