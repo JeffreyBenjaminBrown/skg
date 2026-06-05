@@ -2,8 +2,12 @@
 
 use skg::test_utils::run_with_test_db;
 use skg::save::update_typedb_from_saveinstructions;
+use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::typedb::search::find_related_nodes;
 use skg::dbs::typedb::nodes::which_ids_exist;
+use skg::types::misc::SourceName;
+use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
+use skg::types::save::{DefineNode, SaveNode};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::viewnodes_to_instructions::extract_nonmergeSavePlan;
 use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
@@ -60,7 +64,8 @@ fn test_update_nodes_and_relationships2 (
       & config . db_name,
       & driver,
       & nonmerge_plan . define_nodes,
-      &[] ). await ?;
+      &[],
+      None ). await ?;
 
     // Node 3 should not exist (deleted)
     let existing_node3_ids : HashSet<String> = which_ids_exist (
@@ -116,5 +121,68 @@ fn test_update_nodes_and_relationships2 (
       "Node 2 should only contain node 1, but contains: {:?}",
       node2_contains );
 
+      Ok (( )) } )
+  ) }
+
+/// The incremental (Some(old_graph)) relationship path writes only the
+/// edge delta: an added child is created, a removed child's edge is
+/// dropped (but the child node itself survives), an unchanged child is
+/// left alone, and no edge is duplicated.
+#[test]
+fn delta_writes_only_the_changed_edges (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-delta-edges",
+    "tests/typedb/update_typedb_from_saveinstructions/fixtures",
+    "/tmp/tantivy-test-delta-edges",
+    |config, driver, _tantivy| Box::pin ( async move {
+      let nc = |pid : &str, contains : &[&str]| -> NodeComplete {
+        let mut n : NodeComplete = empty_node_complete ();
+        n . pid = ID::from (pid);
+        n . title = pid . to_string ();
+        n . source = SourceName::from ("main");
+        n . contains =
+          contains . iter () . map ( |c| ID::from (*c) ) . collect ();
+        n };
+
+      // Seed (bulk path): container dc contains [da, db].
+      let seed_nodes : Vec<NodeComplete> = vec![
+        nc ("dc", &["da", "db"]),
+        nc ("da", &[]),
+        nc ("db", &[]), ];
+      let seed : Vec<DefineNode> =
+        seed_nodes . iter () . cloned ()
+        . map ( |n| DefineNode::Save ( SaveNode (n) )) . collect ();
+      update_typedb_from_saveinstructions (
+        & config . db_name, & driver, & seed, &[], None ) . await ?;
+      let old_graph : InRustGraph =
+        InRustGraph::from_nodecompletes (& seed_nodes);
+
+      // Re-save (delta path): dc now contains [da, dd]; db removed,
+      // dd added & new, da unchanged.
+      let resave : Vec<DefineNode> = vec![
+        DefineNode::Save ( SaveNode ( nc ("dc", &["da", "dd"]) )),
+        DefineNode::Save ( SaveNode ( nc ("dd", &[]) )), ];
+      update_typedb_from_saveinstructions (
+        & config . db_name, & driver, & resave, &[],
+        Some (& old_graph) ) . await ?;
+
+      let dc_contains : HashSet<ID> = find_related_nodes (
+        & config . db_name, & driver,
+        & [ ID::from ("dc") ], "contains", "container", "contained"
+      ) . await ?;
+      assert_eq! (
+        dc_contains,
+        HashSet::from ([ ID::from ("da"), ID::from ("dd") ]),
+        "after the delta dc should contain exactly {{da, dd}}, got {:?}",
+        dc_contains );
+
+      // db was only removed from dc's contains, not deleted.
+      let still_exists : HashSet<String> = which_ids_exist (
+        & config . db_name, & driver,
+        & [ "db" . to_string () ] . iter () . cloned () . collect ()
+      ) . await ?;
+      assert! ( still_exists . contains ("db"),
+        "db should still exist as a node after being un-contained" );
       Ok (( )) } )
   ) }

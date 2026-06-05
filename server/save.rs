@@ -22,6 +22,7 @@ use crate::dbs::typedb::nodes::delete_nodes_from_pids;
 use crate::dbs::typedb::nodes::overwrite_extra_ids_of_node;
 use crate::dbs::typedb::sources::update_node_source;
 use crate::dbs::typedb::nodes::which_ids_exist;
+use crate::dbs::typedb::relationships::apply_relationship_deltas_for_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_all_outbound_relationships_to_nodes;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName, TantivyIndex};
@@ -75,6 +76,8 @@ async fn apply_define_nodes_to_stores (
   graph         : &InRustGraphHandle,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
   let db_name : &str = &config . db_name;
+  let old_graph_snap : Arc<InRustGraph> = // pre-apply state, for edge deltas
+    graph . load_full ();
 
   { // FS (source of truth)
     // TODO: Print per-source write information
@@ -114,7 +117,8 @@ async fn apply_define_nodes_to_stores (
     let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "update_typedb_from_saveinstructions") . entered ();
     update_typedb_from_saveinstructions (
-      db_name, driver, &node_defs, source_moves ) . await }
+      db_name, driver, &node_defs, source_moves,
+      Some ( old_graph_snap . as_ref () )) . await }
     { tracing::error!(
         "TypeDB update failed: {}. Rebuilding from disk...", e);
       let nodes : Vec<NodeComplete> =
@@ -256,6 +260,7 @@ pub async fn update_typedb_from_saveinstructions (
   driver       : &TypeDBDriver,
   node_defs    : &[DefineNode],
   source_moves : &[SourceMove],
+  old_graph    : Option<&InRustGraph>, // Some → write only the edge delta vs this pre-save snapshot; None → bulk delete-all + recreate-all (the merge path, where pid migration makes a set-diff subtle).
 ) -> Result<(), Box<dyn Error>> {
 
   // PITFALL: Below, each get(0) on an 'ids' field
@@ -314,17 +319,25 @@ pub async fn update_typedb_from_saveinstructions (
         if pre_existing_pids . contains (node . pid . as_str ()) {
           overwrite_extra_ids_of_node (
             db_name, driver, node ) . await ?; } } }
-    { // Delete all 5 outbound relation types before recreating. Otherwise re-saves of existing nodes duplicate every outbound relation except 'contains'.
-      let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "delete_all_outbound_relationships_to_nodes") . entered ();
-      delete_all_outbound_relationships_to_nodes (
-        db_name, driver, & to_write_pids )
-      . await ?; }
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "create_all_relationships") . entered ();
-      create_all_relationships (
-        db_name, driver, & to_write_typedb )
-      . await } ?; }
+    match old_graph {
+      Some (old_graph) => { // incremental: write only the changed edges
+        let _span : tracing::span::EnteredSpan = tracing::info_span!(
+          "apply_relationship_deltas_for_nodes") . entered ();
+        apply_relationship_deltas_for_nodes (
+          db_name, driver, old_graph, & to_write_typedb )
+        . await ? ; }
+      None => {
+        { // Delete all 5 outbound relation types before recreating. Otherwise re-saves of existing nodes duplicate every outbound relation except 'contains'.
+          let _span : tracing::span::EnteredSpan = tracing::info_span!(
+            "delete_all_outbound_relationships_to_nodes") . entered ();
+          delete_all_outbound_relationships_to_nodes (
+            db_name, driver, & to_write_pids )
+          . await ?; }
+        { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+            "create_all_relationships") . entered ();
+          create_all_relationships (
+            db_name, driver, & to_write_typedb )
+          . await ?; } } } }
 
   for sm in source_moves { // TODO ? parallelize
     update_node_source (

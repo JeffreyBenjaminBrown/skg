@@ -75,7 +75,8 @@ pub async fn merge_nodes (
         v . push ( DefineNode::Save ( sn . clone () )); }
       v };
     if let Err (e) = update_typedb_from_saveinstructions (
-      db_name, driver, &typedb_definenodes, &[] ) . await
+      db_name, driver, &typedb_definenodes, &[],
+      None ) . await // bulk recreate: pid migration makes a set-diff subtle
     { tracing::error!(
         "   TypeDB merge failed: {}. Rebuilding from disk...", e);
       let nodes : Vec<NodeComplete> =
