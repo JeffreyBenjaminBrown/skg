@@ -93,11 +93,13 @@ pub fn phantom_axes (
     MembershipAxes { staged: mem_staged, unstaged: mem_unstaged };
 
   // Fall back to a net "unstaged Minus" only when NO per-stage signal exists in
-  // any of the parent's three relation diffs. The remaining case is a relation
-  // col (e.g. a Subscriber member): its removal lives in the MEMBER's own
-  // subscribes_to diff, not the owner's, so the owner's NodeChanges can't
-  // express it per-stage -- net removal is the best we can do there. (§C note:
-  // per-stage for relation cols would need the member's own diff threaded in.)
+  // any of the parent's three relation diffs -- a defensive net for a removed
+  // phantom whose removal the parent's per-stage NodeChanges can't express (e.g.
+  // the parent's source_diff is absent, or a net-only removal). The sharing
+  // cols that DO diff membership -- Subscribee (subscribes_to), HiddenIn
+  // (contains), HiddenOutside (hides) -- are all now covered per-stage above;
+  // the relation cols (Subscriber/Overrider/...) never produce removed members
+  // (their reconcile passes empty removed_ids), so they never reach this path.
   let membership : MembershipAxes =
     if membership . is_empty ()
       { MembershipAxes { staged: None, unstaged: Some (Sign::Minus) } }

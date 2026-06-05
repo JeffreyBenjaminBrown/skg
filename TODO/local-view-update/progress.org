@@ -1308,9 +1308,11 @@ now reads a phantom's membership from ALL THREE relation diffs (contains /
 subscribes_to / hides), so a removed Subscribee or HiddenOutside member gets a
 PER-STAGE removedM. SURPRISE found while doing it: the #1 build_child_data
 fallback was redundant all along -- phantom_axes already net-fell-back to unstaged
-Minus for empty membership -- so that dead code is removed; the net fallback now
-fires only for relation cols (whose removal lives in the MEMBER's own diff, not
-the owner's -- the remaining documented limitation). New staged test proves
+Minus for empty membership -- so that dead code is removed; the net fallback is
+now a defensive net only. CORRECTION to my first take: relation cols
+(Subscriber/Overrider/...) never produce removed members at all (their reconcile
+passes empty removed_ids), so there is NO relation-col per-stage gap -- C is
+complete for every col that actually diffs membership. New staged test proves
 per-stage (same removed subscribee, staged -> (staged removedM)), which the old
 net fallback could not produce. Content fixtures byte-identical (contains_diff
 checked first). Original analysis below (it judged C "needs your call" -- you said
