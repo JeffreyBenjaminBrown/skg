@@ -677,9 +677,11 @@ mod tests {
       status: GitDiffStatus::Modified,
       node_changes: Some ( NodeChanges {
         text_changed,
-        aliases_diff:  Vec::new (),
-        ids_diff:      Vec::new (),
-        contains_diff: Vec::new (), } ),
+        aliases_diff:       Vec::new (),
+        ids_diff:           Vec::new (),
+        contains_diff:      Vec::new (),
+        subscribes_to_diff: Vec::new (),
+        hides_diff:         Vec::new (), } ),
       before_node: None,
       after_node: None, } }
 
