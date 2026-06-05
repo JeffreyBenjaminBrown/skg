@@ -84,17 +84,22 @@ pub fn handle_save_buffer_request (
     view_uri_from_request (request);
   let save_point_position : Option<SavePointPosition> =
     save_point_position_from_request (request);
+  { // Send the early broad lock BEFORE reading the buffer, so the client's
+    // one-shot save-lock handler always fires exactly once and balances its
+    // pending-count -- even when the read below fails (otherwise only
+    // save-result would arrive, leaving the count unbalanced and wedging the
+    // next save's wait). save-result unlocks regardless. Conservative/broad
+    // here: the SavePlan is not yet computed.
+    let uris_to_lock : Vec<ViewUri> =
+      uris_of_views_to_lock (
+        &viewuri_from_request_result, views_state );
+    let lock_sexp : String =
+      format_lock_views_sexp ( &uris_to_lock );
+    send_response_with_length_prefix (
+      stream,
+      & tag_sexp_response ( TcpToClient::SaveLock, &lock_sexp )); }
   match read_length_prefixed_content (reader) {
     Ok (initial_buffer_content) => {
-      { // Send early lock message before the expensive pipeline.
-        let uris_to_lock : Vec<ViewUri> =
-          uris_of_views_to_lock (
-            &viewuri_from_request_result, views_state );
-        let lock_sexp : String =
-          format_lock_views_sexp ( &uris_to_lock );
-        send_response_with_length_prefix (
-          stream,
-          & tag_sexp_response ( TcpToClient::SaveLock, &lock_sexp )); }
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "update_from_and_rerender_buffer" ). entered();
         match block_on(
