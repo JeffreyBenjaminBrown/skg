@@ -1348,7 +1348,7 @@ not cols).
 These are the items Jeff said to do after reviewing the branch-review report
 (progress.org §13). Recorded here as the to-do spec; no code written yet.
 
-** 20.1 Do the small, low-risk de-duplications (review §3.3)
+** DONE 20.1 Do the small, low-risk de-duplications (review §3.3)
 The cosmetic copy-pastes that carry no real risk (they do not touch the BFS draw
 logic or the death-leafward mechanism). Each is independent. Exact identifiers in
 review.org §3.3.
@@ -1390,7 +1390,20 @@ and asserts:
    harness already exercises an invalid-then-valid sequence; extend it to assert
    the second save's wait returns.
 
-** 20.3 Unify the de-novo/post-save render tails (review §3.3, "finish_viewforest")
+** TODO 20.3 Unify the de-novo/post-save render tails (review §3.3, "finish_viewforest")
+BLOCKED 2026-06-05 on an architectural wrinkle (needs Jeff's call; see chat /
+progress.org §14): the "attach BOTH containerwards in BOTH paths" step below is
+unsafe as written. =attach_containerward_ancestries_*= is NOT idempotent (it
+prepends the ancestry unconditionally, no already-present check), and the
+post-save path's submitted buffer already CONTAINS the root's containerward
+ancestry (the user sees it as the root's first children, and it survives the
+save round-trip into rerender_view's viewforest). So attaching root-containerward
+in post-save would DUPLICATE it. Options: (a) parameterize finish_viewforest by
+which containerward step (behavior-preserving dedup of the SHARED steps; drop the
+"both in both" change); (b) make attach idempotent first, then both-in-both;
+(c) confirm post-save roots do NOT retain containerward (then both-in-both is a
+safe ADD, not a duplicate). The order-independence reasoning below still holds;
+only the containerward-target merge is blocked.
 First deferred as risky because the two tails run their steps in a different ORDER
 (the parentIs marks run before graphnodestats in post-save, after it in de-novo).
 Jeff resolved it: parentIs is a view property, and graphnodestats is computed from
@@ -1412,7 +1425,7 @@ post-completion tails of =rerender_view= (server/update_buffer.rs) and
 Validate against the full Rust suite + the 27 integration tests -- this is the
 primary render path, guarded by the idempotence + git_diff_view oracles.
 
-** 20.4 Drop required_ancestor's redundant ancestry validation (review §3.3)
+** DONE 20.4 Drop required_ancestor's redundant ancestry validation (review §3.3)
 Jeff first considered deleting =required_ancestor= (it has a single DIRECT caller,
 subscribee_col.rs:89, fetching the subscriber) but retracted that: it is also the
 engine inside =pid_and_source_from_required_ancestor= (ancestry.rs), which FIVE
@@ -1430,7 +1443,8 @@ runs only after that pre-check.
    so the earlier "extract a shared walk" dedup is resolved by this change rather
    than a separate one. =col_is_generalized_orphan= keeps its walk (it IS the check).
 
-** 20.5 Unify the two view-PID-registration mechanisms (from the §20.3 pids thread)
+** DONE 20.5 Unify the two view-PID-registration mechanisms (from the §20.3 pids thread)
+(Implemented with a deviation -- see the note at the end of this subsection.)
 =OpenViews= (server/types/views_state.rs) populates a view's pid set two different
 ways: =register_view= (new views) takes the pid list EXPLICITLY (the de-novo
 caller passes what =multi_root_view= returned), while =update_view= (post-save)
@@ -1455,3 +1469,14 @@ already receives the viewforest, so:
 *** Consequence to note (consistent with the above, not a problem): a diff view
    showing X only as a phantom will not be collateral-matched when a save changes
    X -- fine, since phantoms are regenerated each render, not incrementally updated.
+DEVIATION as implemented (commit f8e784ec): the first two bullets above (drop
+register_view's pids param; drop multi_root_view's returned pids list) were NOT
+done -- they ripple to ~39 test call sites across ~15 files, disproportionate
+churn against the "minimize tests/ diff" preference for a cosmetic gain. Instead,
+register_view keeps its pids param and multi_root_view keeps its 3-tuple return,
+but BOTH production pid computations now route through the one shared
+=pids_from_viewforest= ({Normal, Inactive}): update_view calls it directly, and
+the de-novo via_env computes the pids it passes to register_view through it. That
+achieves the substantive goal -- a single source of which-kinds-count, and the
+{Normal, Inactive} fix -- with zero test churn. (Search views still pass their own
+match-id list; that is the correct member set for a search view.)

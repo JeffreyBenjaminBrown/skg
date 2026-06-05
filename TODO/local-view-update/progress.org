@@ -1711,3 +1711,59 @@ notes. In every case the CODE is the source of truth and is correct; only those
 old log notes lag behind it.
 **** DONE that's fine
 ****** Good -- leaving plan_v2 §18 as append-only history, unedited.
+
+* 14. Plowing through §20 (2026-06-05) -- when-to-stop report
+Stopping to surface one architectural decision (the §20.3 containerward wrinkle).
+Everything below is committed; full Rust suite (478) + all 27 integration tests
+green at each commit.
+
+** What's done and went well
+- §20.4 (958c74f3): dropped required_ancestor's redundant ancestry re-validation
+  (the orphan pre-check already guarantees validity); the duplicate chain-walk it
+  shared with col_is_generalized_orphan vanished with it.
+- §20.1 dedups, in three commits: the phantom/truenode validators + the three
+  existence-axis lookups (a2c2973c); the per-kind sharing-reconciler wrappers
+  inlined (e972c5cc); the two Emacs save/rerender stream handlers + the two
+  unlock helpers (7afa9015).
+- §20.5 (f8e784ec): one shared OpenViews::pids_from_viewforest, and BOTH
+  production pid paths route through it, fixing the collateral pid set to
+  {Normal, Inactive} (was {Normal, DiffPhantom, Deleted} post-save / {Normal,
+  DiffPhantom} de-novo). This is a real latent-bug fix (collateral detection).
+
+** Changes to the plan's envisioned order
+- Did the safe correctness/cleanup items (§20.4, §20.1) before §20.5.
+- §20.5 was REDUCED from "drop register_view's pids param + multi_root_view's
+  returned pids list" to "route both pid computations through the one shared
+  helper, keeping the param + return". Reason: the full version ripples to ~39
+  test call sites across ~15 files -- disproportionate churn against the
+  minimize-tests-diff preference -- for a cosmetic gain. The substantive goal
+  (single source of which-kinds-count + the {Normal, Inactive} fix) is achieved
+  with zero test churn. Recorded in plan_v2 §20.5's deviation note.
+
+** What's imperfect about what's done
+- §20.5 leaves register_view still taking an explicit pids param and
+  multi_root_view still returning a (now production-unused) pids list -- a small
+  redundancy the deviation accepted to avoid the test churn. Search views still
+  pass their own match-id list rather than the helper (the match list IS the
+  right member set for a search view, so this is intentional, not a wart).
+
+** Choices determining the future (the one thing I need from you)
+- §20.3 (unify the render tails) is BLOCKED on an architectural decision. The plan
+  says to "attach BOTH containerwards (phantoms AND view-roots) in BOTH paths".
+  But =attach_containerward_ancestries_*= is NOT idempotent -- it prepends the
+  ancestry unconditionally -- and the post-save path's submitted buffer already
+  contains the root's containerward ancestry (the user sees it; it survives the
+  round-trip into rerender_view's viewforest). So attaching root-containerward in
+  post-save would DUPLICATE it. I did not want to ship that, nor silently change
+  the behavior you specified, so I stopped. Options (in plan_v2 §20.3's BLOCKED
+  note): (a) parameterize finish_viewforest by which containerward step --
+  behavior-preserving dedup of the shared steps, dropping "both in both"; (b) make
+  attach idempotent first, then both-in-both; (c) confirm post-save roots do NOT
+  retain containerward, making both-in-both a safe ADD. The order-independence
+  half of §20.3 (your correct point) is unaffected.
+- §20.2 (locking-lifecycle integration test) is not started. Heads-up: asserting
+  the lock TIMING (a non-collateral buffer becomes editable mid-stream; the saved
+  buffer stays locked until save-result) from an Emacs batch integration test is
+  genuinely hard -- it means observing async overlay state at specific moments.
+  The invalid-save-doesn't-hang assertion (c) is tractable on its own. Worth a
+  word on scope before I sink time into (a)/(b).
