@@ -269,7 +269,7 @@ where
 /// kept and drops the rest from the goal list (so they are simply not
 /// created -- and, in a cascade, not expanded). Preserves order.
 ///
-/// Shared by content reconciliation (complete_preorder::truenode) and the four
+/// Shared by content reconciliation (reconcile::content) and the four
 /// sharing-col reconcilers (§18): a famous node's relation/subscribee col can
 /// list thousands of unbounded members, so cols must spend the same budget as
 /// content rather than draw every member. The id/alias cols stay unbudgeted --

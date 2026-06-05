@@ -537,5 +537,5 @@ fn build_child_creation_data (
   Ok (result) }
 
 #[cfg(test)]
-#[path = "../../../tests/unit/complete_preorder_truenode.rs"]
+#[path = "../../../tests/unit/reconcile_content.rs"]
 mod tests;

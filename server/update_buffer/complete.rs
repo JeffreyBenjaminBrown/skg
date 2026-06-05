@@ -19,11 +19,11 @@ use crate::to_org::render::diff::process_truenode_diff;
 use crate::types::tree::viewnode_nodecomplete::write_at_truenode_in_tree;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol, ViewRequest, IndefOrDef, DeletedNode};
 use crate::types::viewnode::{Vognode, QualCol};
-use super::complete_postorder::hiddeninsubscribee_col::reconcile_hiddenin_subscribee_col_children;
-use super::complete_postorder::hiddenoutsideof_subscribeecol::reconcile_hiddenoutside_subscribee_col_children;
-use super::complete_preorder::relation_col::reconcile_relation_col_children;
-use super::complete_preorder::subscribee_col::reconcile_subscribee_col_children;
-use super::complete_preorder::truenode::expand_true_content_at_truenode;
+use super::reconcile::hiddeninsubscribee_col::reconcile_hiddenin_subscribee_col_children;
+use super::reconcile::hiddenoutsideof_subscribeecol::reconcile_hiddenoutside_subscribee_col_children;
+use super::reconcile::relation_col::reconcile_relation_col_children;
+use super::reconcile::subscribee_col::reconcile_subscribee_col_children;
+use super::reconcile::content::expand_true_content_at_truenode;
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -164,10 +164,10 @@ async fn dispatch_node_update (
     // see the real diffs (source_diffs) or they would clobber the just-created
     // diff entries. Diffs flow inline for both de-novo and post-save.
     ViewNodeKind::QualCol (QualCol::Alias) =>
-      super::complete_postorder::aliascol::reconcile_alias_col_children (
+      super::reconcile::aliascol::reconcile_alias_col_children (
         tree, treeid, context . source_diffs, &context . env . config ) ?,
     ViewNodeKind::QualCol (QualCol::ID) =>
-      super::complete_postorder::id_col::reconcile_id_col_children (
+      super::reconcile::id_col::reconcile_id_col_children (
         treeid, tree, context . source_diffs, &context . env . config ) ?,
     ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
       // §6.4/§6.6/§16: an Inactive node deleted by this save becomes Deleted,
@@ -255,12 +255,12 @@ async fn visit_normal_node (
         &context . env . driver ) . await ?; } }
   // Remaining view requests (Aliases / Containerward / Sourceward); the
   // Definitive request was already consumed by apply_definitive_draw_rule.
-  super::complete_postorder::truenode::execute_truenode_view_requests (
+  super::reconcile::view_requests::execute_truenode_view_requests (
     treeid, tree, &context . env . config, &context . env . driver,
     context . errors, context . active_source_set ) . await ?;
   // Ensure a definitive subscribee's HiddenInSubscribeeCol exists; the BFS
   // reconciles it on reaching it.
-  super::complete_postorder::truenode::ensure_hiddenin_col_under_definitive_subscribee (
+  super::reconcile::view_requests::ensure_hiddenin_col_under_definitive_subscribee (
     tree, treeid, &context . env . config, &context . env . driver ) . await ?;
   // §9 reversal (#3 / Jeff): compute this node's content+scaffold diff LOCALLY,
   // at its own BFS visit. Runs last, after the node is fully completed as a
