@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/ubuntu/host/.claude/beep-if-main-agent.sh"
+            "command": "/home/ubuntu/host/.claude/beep-if-main-agent.sh soothing-beep"
           }
         ]
       }

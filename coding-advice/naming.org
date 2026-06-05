@@ -1,0 +1,9 @@
+I prefer clear, verbose names.
+
+Also I mix camelcase and snake case,
+so that compound words like _inRustGraph_ can look like one token,
+because that can make names much clearer. For instance
+(continuing that example) if a function name includes _in_rust_graph_,
+those three words look like an adjective phrase, when in fact they form a noun.
+Sometimes it is similarly clarifying to camel-case
+adjective or verb phrases into a single underscore-bracketed token.

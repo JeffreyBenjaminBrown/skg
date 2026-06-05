@@ -15,7 +15,6 @@ It's cheap.
 * text search across containment paths
 * Bug ? Saving doesn't regenerate heralds if there were no changes?
 * ONGOING [[./TODO/local-view-update/plan-critique.org]]
-claude --resume afa9f264-86a1-475f-9fae-203731cd28a1
 * u
 ** the diff report should
 *** explain the maximum badness in each category
