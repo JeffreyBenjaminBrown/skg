@@ -141,12 +141,15 @@ pub fn col_is_generalized_orphan (
   Ok (false) }
 
 /// The NodeId of the col's i-th required ancestor (per the §3 table for its
-/// kind), `Some` only if the whole prefix [0..=i] of the required ancestry
-/// matches the actual ancestors; `None` if any prefix position is the wrong
-/// viewnode kind (i.e. the col is a generalized orphan up to depth i+1) or i is
-/// past the end of the table. This is the single read path: every col reconcile
-/// obtains its ancestor vognodes only through this, so a reconcile can never
-/// read an ancestor the table does not list.
+/// kind); `None` if i is past the end of the table for this kind.
+///
+/// RELIES ON THE ORPHAN PRE-CHECK: it does NOT re-validate that each ancestor is
+/// the kind the table demands. 'col_is_generalized_orphan' runs in the BFS
+/// dispatch and deadens any col with a wrong-kind required ancestry *before* its
+/// reconcile runs, and every caller of this is inside a reconcile -- so by the
+/// time we get here the chain is already known-valid, and we can read the
+/// table-indexed ancestor directly. (The kind-validation lives in exactly one
+/// place, 'col_is_generalized_orphan'.)
 pub fn required_ancestor (
   tree : &Tree<ViewNode>,
   col  : NodeId,
@@ -157,14 +160,6 @@ pub fn required_ancestor (
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   let spec : &[ExpectedAncestor] = required_ancestry (&kind);
   if i >= spec . len () { return Ok (None); }
-  for (j, expected) in spec [ ..= i ] . iter () . enumerate () {
-    let depth : usize = j + 1;
-    let matches : bool =
-      read_at_ancestor_in_tree (
-        tree, col, depth,
-        |vn : &ViewNode| matches_expected (&vn . kind, expected) )
-      . unwrap_or (false);
-    if ! matches { return Ok (None); } }
   Ok ( ancestor_nodeid (tree, col, i + 1) ) }
 
 /// The (pid, source) of the col's i-th required ancestor, read *through* the

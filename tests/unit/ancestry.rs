@@ -117,13 +117,19 @@ fn required_ancestor_walks_the_chain () {
   assert_eq! ( required_ancestor (&t, hin, 3) . unwrap (), None ); }
 
 #[test]
-fn required_ancestor_none_when_chain_broken () {
-  let (t, _sber, _scol, sbee, hin) =
+fn required_ancestor_reads_without_revalidating_kind () {
+  // §20.4: required_ancestor no longer re-validates each ancestor's KIND -- the
+  // orphan pre-check (col_is_generalized_orphan) does that before any reconcile
+  // runs. So on a broken chain (dead subscriber) it still returns the
+  // table-indexed ancestor; detecting the break is the orphan check's job (see
+  // hiddenin_dead_far_subscriber_is_orphan).
+  let (t, sber, _scol, sbee, hin) =
     build_subscribee_chain (deleted ("subscriber"));
-  // Prefix up to the live subscribee still resolves...
   assert_eq! ( required_ancestor (&t, hin, 0) . unwrap (), Some (sbee) );
-  // ...but the full chain to the dead subscriber does not.
-  assert_eq! ( required_ancestor (&t, hin, 2) . unwrap (), None ); }
+  assert_eq! ( required_ancestor (&t, hin, 2) . unwrap (), Some (sber),
+    "reads through a wrong-kind ancestor instead of returning None" );
+  assert_eq! ( required_ancestor (&t, hin, 3) . unwrap (), None,
+    "still None past the end of the table" ); }
 
 // ---- deaden_generalized_orphan_col (child disposal) ----
 
