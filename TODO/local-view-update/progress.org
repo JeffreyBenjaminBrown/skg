@@ -1767,3 +1767,75 @@ green at each commit.
   genuinely hard -- it means observing async overlay state at specific moments.
   The invalid-save-doesn't-hang assertion (c) is tractable on its own. Worth a
   word on scope before I sink time into (a)/(b).
+
+* 15. Implementing §20.3 -- unifying the render tails (2026-06-05)
+
+You pointed me at the existing "integrate" machinery, and it unblocked §20.3.
+
+** Glossary (so this section reads standalone)
+- de-novo render: building a view from scratch (you open a node). Entry point
+  =multi_root_view_via_env= (server/to_org/render/content_view.rs).
+- post-save / collateral render: rebuilding an already-open view after a save.
+  Entry point =rerender_view= (server/update_buffer.rs).
+- containerward ancestry: a node's containers (its parents in the graph), shown
+  in a view as indented CHILDREN of the node, each marked =(birth containsParent)=.
+- view-root: a top-level node of a view. removed-here phantom: a diff-only
+  placeholder for a node a save removed from this container.
+
+** What's done and went well
+- §20.3 is DONE. The two post-completion tails (de-novo and post-save) are now
+  one shared =finish_viewforest= in server/update_buffer.rs: attach containerward
+  to BOTH view-roots AND removed-here phantoms, mark/validate parentIs, graph- and
+  view-node stats, apply the source set, render to string. =multi_root_view_via_env=
+  and =rerender_view= both call it; their bespoke tails are gone.
+- The blocker resolved exactly as you hinted. The dedup-aware "integrate"
+  machinery already existed: =integrate_linear_portion_of_path= does find-or-insert
+  (reuse a child already present under the parent; insert only when missing). So
+  =insert_containerward_ancestry_tree_recursive= now does the same, making
+  containerward attachment idempotent -- re-attaching a root that already carries
+  its ancestry is a no-op rather than a duplication.
+- Full suite green: 478/478 Rust + 27/27 integration.
+
+** Changes to the plan's envisioned order
+- §20.3 was BLOCKED at the end of §14; this was the first thing done this session.
+- §20.5 (register_view derives its own pids) had already removed the de-novo
+  "return a pids list" oddity, so =finish_viewforest= returns just the String; the
+  de-novo caller computes its pids itself afterward.
+
+** What's imperfect about what's done
+- STALE CONTAINERWARD UNDER A DELETED NODE. Once a root's containerward is
+  attached (now in post-save too) it lives in the buffer and round-trips. If the
+  node is later deleted, the DeletedNode RETAINS its subtree (documented
+  behavior), so the containerward child lingers under the deleted node even though
+  the container relationship no longer holds -- e.g.
+  save_collateral_delete_then_edit_under_it phase 5: deleted 11 still shows node 1
+  as =(birth containsParent)= though 1 no longer contains 11. This is not new to
+  §20.3 in principle (a de-novo-opened-then-deleted buffer would do the same,
+  since de-novo already attaches root containerward), but §20.3 makes the
+  post-save / synthetic path exhibit it. Pruning stale containerward is out of
+  §20.3's scope; flagging in case you want a follow-up.
+
+** Choices determining the future
+1. CONTAINERWARD-ONLY idempotence, not plain find-by-id. My first cut reused ANY
+   child of the same id; in a CYCLE (a contains b AND b contains a) that collapsed
+   the containerward subtree into the content child of the same id -- the two
+   occurrences must stay distinct view nodes. Fixed with
+   =find_containerward_child_by_id=, which matches only a prior child whose
+   =birth == ContainsParent= (content children are born =Unremarkable=). Verified
+   by the de-novo cycle test (save_collateral_break_cycle) and the post-save cycle
+   test (test_definitive_view_with_cycle), which now agree.
+2. POST-SAVE VIEWS NOW SHOW ROOT CONTAINERWARD (user-visible). de-novo already
+   did; post-save did not. They now match. For a real de-novo-opened buffer this
+   is a no-op (the buffer already carries it; the idempotent attach reuses it); it
+   changes only synthetic / freshly-typed roots. Proof it's a consistency FIX, not
+   a regression: git-diff-view-updates phase-4 and phase-11 (post-save) now EQUAL
+   phase-2 (de-novo). Re-baselined 6 tests for this -- 3 unit (definitive-view
+   conflicting / repeat / cycle) and 3 integration (containerward-view-request,
+   git-diff-view-updates, save_collateral_delete_then_edit_under_it). Two further
+   integration tests (save_collateral_break_cycle, _add_content_and_modify_text)
+   were the cycle-COLLAPSE bug in choice 1, now fixed -- no re-baseline.
+3. ATTACH TO ALL view-roots, including INDEFINITIVE ones. The combined attach
+   targets all root_ids (like the old de-novo =attach_to_view_roots=), so even a
+   bare indefinitive root gets its containerward. Easily reversed with a one-line
+   indef filter if you'd rather indef roots stay bare. (Deleted/Unknown roots are
+   already skipped -- the attach only processes =Vognode::Normal=.)
