@@ -1916,3 +1916,55 @@ each view-root on every SAVE. Fixed: root containerward is now DE-NOVO-only.
   together -- no list expansion was needed (you'd wondered). If the
   ViewRequest::Containerward approach is ever pursued, the field is ready; the only
   blocker is the integrate-path cycle panic above.
+
+* 18. §20.3 final -- root containerward via a self-consuming view request (2026-06-05)
+
+The §17 bool flag (=attach_root_containerward=) was ad-hoc -- it encoded caller
+identity (de-novo vs post-save) as a positional bool on =finish_viewforest=. You
+asked for the data-driven version you'd suggested: a view request on each de-novo
+root. Done, after researching the panic that had blocked it.
+
+** What's done and went well
+- Root containerward is now a self-consuming =ViewRequest::Containerward=:
+  - =render_initial_view_via_driver= (de-novo ONLY) sets it on each view-root.
+  - =extract_view_requests= (the during-completion dispatch) LEAVES view-root
+    Containerward alone -- it detects a view-root as a node whose parent is the
+    BufferRoot.
+  - =finish_viewforest='s =fulfill_root_containerward_requests= attaches each
+    requesting root's containerward via the AncestryTree attach path (separate
+    subtrees, handles cyclic roots) and DROPS the request, so it never round-trips
+    and a save never re-generates the containerward.
+  - =finish_viewforest= no longer takes the =attach_root_containerward= bool; it
+    is caller-agnostic. The de-novo/post-save difference now lives entirely in data
+    (a root either carries the request or it doesn't).
+- Behavior is IDENTICAL to the §17 flag version (de-novo attaches to all roots via
+  the same attach path; post-save roots carry no request), so there is NO test
+  churn. 478 Rust + 28 integration green, including save_collateral_break_cycle
+  (the cyclic root that had panicked).
+
+** Why the request had seemed blocked (the panic research)
+- =ViewRequest::Containerward= dispatches to =build_and_integrate_containerward=
+  (the "integrate" path), which is the RIGHT mechanism for a USER's explicit
+  containerward VIEW of a node -- it MERGES ancestry into the existing tree (its
+  find_child_by_id reuses an existing child) -- but the WRONG mechanism for a
+  content view's ROOT, which wants a SEPARATE containerward subtree. On a cyclic
+  root it also panicked. So view-root Containerward is fulfilled by the tail
+  attach instead; non-root (user) Containerward still uses integrate.
+- The panic itself is a predicate mismatch in the content reconciler:
+  =complete_relevant_children_in_viewnodetree= treats only parentIs=Affected Normal
+  children as "already present" (and CREATES any other goal id via mk_node), but
+  =build_child_creation_data= skipped pre-fetching ChildData for ANY child of the
+  same id (incl. Independent). So a goal id present only as an Independent child
+  (which the integrate path adds for containerward) was created without pre-fetched
+  data -> .expect("child data not pre-fetched") panic. VERIFIED that gating
+  build_child_creation_data's Normal arm on parentIs=Affected removes the panic.
+  NOT applied (option 1 sidesteps the integrate path for roots), but it is a latent
+  crash worth fixing on its own -- recorded for whoever wants it.
+
+** Choices determining the future
+- There are now two containerward fulfillments, used deliberately: the AncestryTree
+  ATTACH path (separate subtree; render tail; phantoms + requesting roots) and the
+  INTEGRATE/merge path (=build_and_integrate_containerward=; explicit user
+  containerward-view requests on non-root nodes). =extract_view_requests= is the
+  fork: it routes user (non-root) Containerward to integrate, leaves view-root
+  Containerward for the tail attach.
