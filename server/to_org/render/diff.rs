@@ -72,6 +72,9 @@ pub(crate) fn process_truenode_diff (
     { t . existence . staged   = staged_x;
       t . existence . unstaged = unstaged_x; }
   node_mut . value() . normal_to_phantom ();
+  let node_flipped_to_phantom : bool =
+    matches! ( node_mut . value() . kind,
+      ViewNodeKind::Vognode (Vognode::DiffPhantom (_)) );
   // For an Added or Deleted file we don't read node_changes
   // (the comparison is degenerate). NewHere/RemovedHere on children
   // and IDcol/textChanged scaffolds only apply to Modified files.
@@ -97,21 +100,25 @@ pub(crate) fn process_truenode_diff (
           Qual::TextChanged {
             staged   : staged_text,
             unstaged : unstaged_text } ) } ); }
-  let merged_ids : Vec<(ID, MembershipAxes)> =
-    axes_from_per_stage_diffs (
-      staged_changes   . map ( |c| c . ids_diff . as_slice () ),
-      unstaged_changes . map ( |c| c . ids_diff . as_slice () ) );
-  if merged_ids . iter () . any ( |(_, m)| ! m . is_empty () ) {
-    prepend_idcol_with_children ( &mut node_mut, &merged_ids ); }
-  // AliasCol diff scaffold, mirroring the IDCol above (the inline path's
-  // maybe_prepend_diff_view_scaffolds emitted this; the overlay must too, or
-  // alias changes would silently vanish from the diff post-flip).
-  let merged_aliases : Vec<(String, MembershipAxes)> =
-    axes_from_per_stage_diffs (
-      staged_changes   . map ( |c| c . aliases_diff . as_slice () ),
-      unstaged_changes . map ( |c| c . aliases_diff . as_slice () ) );
-  if merged_aliases . iter () . any ( |(_, m)| ! m . is_empty () ) {
-    prepend_aliascol_with_children ( &mut node_mut, &merged_aliases ); }
+  // The IDCol/AliasCol diff scaffolds are cols, so if this node flipped to a
+  // phantom they would be generalized orphans (a col requires a Normal-vognode
+  // ancestor) and get deadened + pruned at their own BFS visit -- i.e. emitted
+  // here only to be destroyed before render. Skip creating them on a flipped
+  // node: same final tree, without the wasted work. (The node's id/alias
+  // sub-diffs are noise on a removed node anyway.)
+  if ! node_flipped_to_phantom {
+    let merged_ids : Vec<(ID, MembershipAxes)> =
+      axes_from_per_stage_diffs (
+        staged_changes   . map ( |c| c . ids_diff . as_slice () ),
+        unstaged_changes . map ( |c| c . ids_diff . as_slice () ) );
+    if merged_ids . iter () . any ( |(_, m)| ! m . is_empty () ) {
+      prepend_idcol_with_children ( &mut node_mut, &merged_ids ); }
+    let merged_aliases : Vec<(String, MembershipAxes)> =
+      axes_from_per_stage_diffs (
+        staged_changes   . map ( |c| c . aliases_diff . as_slice () ),
+        unstaged_changes . map ( |c| c . aliases_diff . as_slice () ) );
+    if merged_aliases . iter () . any ( |(_, m)| ! m . is_empty () ) {
+      prepend_aliascol_with_children ( &mut node_mut, &merged_aliases ); } }
   // Compute per-stage contains diff for the parent so we can decorate
   // worktree children with M axes and insert phantoms.
   let merged_contains : Vec<(ID, MembershipAxes)> =
