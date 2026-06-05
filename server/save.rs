@@ -12,7 +12,7 @@ use crate::dbs::in_rust_graph::{
   apply_definenodes_to_inRustGraph,
   override_invariants::{
     format_override_invariant_violations,
-    validate_override_invariants,
+    validate_touched_override_invariants,
   },
 };
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
@@ -225,8 +225,14 @@ pub fn validate_override_invariants_after_save (
     . flat_map ( |merge| merge . to_vec () )
     . collect ();
   apply_definenodes_to_inRustGraph (&mut simulated, &merge_definenodes);
+  let touched : HashSet<ID> = // every node this save actually wrote
+    nonmerge . iter () . chain ( merge_definenodes . iter () )
+    . map ( |dn| match dn {
+        DefineNode::Save (SaveNode (n)) => n . pid . clone (),
+        DefineNode::Delete (DeleteNode { id, .. }) => id . clone (), } )
+    . collect ();
   let violations =
-    validate_override_invariants (config, &simulated);
+    validate_touched_override_invariants (config, &simulated, &touched);
   if violations . is_empty () {
     Ok (( ))
   } else {
