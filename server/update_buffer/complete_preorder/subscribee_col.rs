@@ -47,8 +47,9 @@ pub async fn reconcile_subscribee_col_children (
   let context : SubscribeeColContext =
     read_subscribee_col_context (tree, node, env) ?;
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
-    compute_subscribee_col_goal (
-      &context, source_diffs, env );
+    goal_list_for_subscribee_col (
+      &context . parent_pid, &context . parent_source,
+      source_diffs, &context . worktree_subscribees, &env . config );
 
   // §3.4/§6.7 exception: an *empty* SubscribeeCol is PRESERVED, not
   // self-deleted. It is the editable interface onto the origin's outgoing
@@ -67,8 +68,8 @@ pub async fn reconcile_subscribee_col_children (
       cap_goal_list_to_budget (
         tree, node, &goal_list, &removed_ids, node_budget );
     let child_data : HashMap<ID, ChildData> =
-      build_subscribee_col_child_data (
-        tree, node, &context,
+      build_child_data (
+        tree, node, &context . parent_pid, &context . parent_source,
         &goal_list, &removed_ids,
         source_diffs, deleted_since_head_pid_src_map, env ) ?;
     reconcile_sharing_col_children(
@@ -112,32 +113,6 @@ fn read_subscribee_col_context (
     parent_source,
     parent_indefinitive,
     worktree_subscribees }) }
-
-fn compute_subscribee_col_goal (
-  context      : &SubscribeeColContext,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
-  env          : &SkgEnv,
-) -> (Vec<ID>, HashSet<ID>) {
-  goal_list_for_subscribee_col(
-    &context . parent_pid, &context . parent_source,
-    source_diffs, &context . worktree_subscribees, &env . config ) }
-
-fn build_subscribee_col_child_data (
-  tree                           : &Tree<ViewNode>,
-  node                           : NodeId,
-  context                        : &SubscribeeColContext,
-  goal_list                      : &[ID],
-  removed_ids                    : &HashSet<ID>,
-  source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  env                            : &SkgEnv,
-) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
-  // Build child data after the read phase and before mutation, so the
-  // completion steps stay auditable as read, compute, then reconcile.
-  build_child_data(
-    tree, node, &context . parent_pid, &context . parent_source,
-    goal_list, removed_ids,
-    source_diffs, deleted_since_head_pid_src_map, env ) }
 
 fn ensure_hiddenoutsideofsubscribeecol_is_last (
   tree : &mut Tree<ViewNode>,

@@ -50,15 +50,18 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
   let context : HiddenOutsideContext =
     read_hiddenoutside_context (tree, node, kind, env) ?;
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
-    compute_hiddenoutside_goal (&context, source_diffs, env);
+    goal_list_for_hiddenoutsideof_subscribeecol (
+      &context . subscriber_pid, &context . subscriber_source,
+      &context . subscriber_hides, &context . subscribees,
+      source_diffs, &env . config );
   // §5.5/§18: each newly-hidden member is a new TrueNode -- spend the
   // per-buffer budget (existing children and removed-member phantoms are free).
   let goal_list : Vec<ID> =
     cap_goal_list_to_budget (
       tree, node, &goal_list, &removed_ids, node_budget );
   let child_data : HashMap<ID, ChildData> =
-    build_hiddenoutside_child_data (
-      tree, node, &context,
+    build_child_data (
+      tree, node, &context . subscriber_pid, &context . subscriber_source,
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
   reconcile_sharing_col_children(
@@ -96,31 +99,3 @@ fn read_hiddenoutside_context (
     subscriber_hides : wt_subscriber_hides,
     subscribees      : wt_subscribees }) }
 
-fn compute_hiddenoutside_goal (
-  context      : &HiddenOutsideContext,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
-  env          : &SkgEnv,
-) -> (Vec<ID>, HashSet<ID>) {
-  let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
-    goal_list_for_hiddenoutsideof_subscribeecol(
-      &context . subscriber_pid, &context . subscriber_source,
-      &context . subscriber_hides, &context . subscribees,
-      source_diffs, &env . config );
-  (goal_list, removed_ids) }
-
-fn build_hiddenoutside_child_data (
-  tree                           : &Tree<ViewNode>,
-  node                           : NodeId,
-  context                        : &HiddenOutsideContext,
-  goal_list                      : &[ID],
-  removed_ids                    : &HashSet<ID>,
-  source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  env                            : &SkgEnv,
-) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
-  // Build child data after the read phase and before mutation, so the
-  // completion steps stay auditable as read, compute, then reconcile.
-  build_child_data(
-    tree, node, &context . subscriber_pid, &context . subscriber_source,
-    goal_list, removed_ids,
-    source_diffs, deleted_since_head_pid_src_map, env ) }
