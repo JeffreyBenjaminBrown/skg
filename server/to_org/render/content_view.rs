@@ -106,12 +106,15 @@ pub async fn multi_root_view_via_env (
     crate::update_buffer::render_initial_view_via_driver (
       env, root_ids, active_source_set, diff_mode_enabled ) . await ?;
   // §20.3: the de-novo and post-save render tails are one shared helper now --
-  // attach containerward ancestry (roots + removed-here phantoms), mark/validate
-  // parentIs, graph/view stats, apply source set, render to string.
+  // attach containerward ancestry (root + removed-here phantoms), mark/validate
+  // parentIs, graph/view stats, apply source set, render to string. The `true`
+  // is attach_root_containerward: root containerward is a de-novo-only concern
+  // (generated once here, then round-trips in the buffer); post-save passes false
+  // so a save never re-generates it.
   let buffer_content : String =
     crate::update_buffer::finish_viewforest (
       &mut viewforest, &env . config, &env . driver,
-      active_source_set ) . await ?;
+      active_source_set, true ) . await ?;
   // §20.5: the pids the caller registers for this view -- the {Normal, Inactive}
   // set, via the one shared source of which-kinds-count
   // (OpenViews::pids_from_viewforest), the same helper update_view uses post-save.

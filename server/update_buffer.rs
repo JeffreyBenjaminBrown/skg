@@ -337,7 +337,8 @@ pub async fn rerender_view (
       viewforest,
       &context . env . config,
       &context . env . driver,
-      context . active_source_set ) . await ?;
+      context . active_source_set,
+      false ) . await ?; // post-save: do NOT re-generate root containerward
   tracing::debug!("rerender_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
   Ok (result) }
@@ -346,10 +347,12 @@ pub async fn rerender_view (
 /// view (multi_root_view_via_env, server/to_org/render/content_view.rs) and the
 /// post-save re-render (rerender_view, above). Given a viewforest whose TrueNode
 /// content + git diff have already been completed, it:
-///   - attaches containerward ancestry to every view-root AND removed-here
-///     phantom (both, in both paths -- de-novo used to attach only roots,
-///     post-save only phantoms; the attach is idempotent, so this never
-///     duplicates a root's already-present ancestry),
+///   - attaches containerward ancestry to every removed-here phantom, and -- ONLY
+///     when `attach_root_containerward` is set (de-novo) -- to every view-root.
+///     Root containerward is a de-novo-only concern: it is generated once at open
+///     and then round-trips in the buffer as ordinary content, so a later SAVE
+///     must NOT re-generate it (that is why post-save passes `false`). See the
+///     note on attach_containerward_ancestries_to_removedhere_phantoms.
 ///   - marks view-root and orphan parentIs,
 ///   - validates parentIs against the in-Rust graph (a no-op when markers
 ///     already agree, and when the global handle isn't initialized; the de-novo
@@ -360,12 +363,16 @@ pub async fn rerender_view (
 /// parentIs is a view property and graphnodestats reads only the in-Rust graph,
 /// never parentIs, so the final state is identical either way.
 pub async fn finish_viewforest (
-  viewforest        : &mut ViewForest,
-  config            : &SkgConfig,
-  driver            : &TypeDBDriver,
-  active_source_set : Option<&ActiveSourceSet>,
+  viewforest              : &mut ViewForest,
+  config                  : &SkgConfig,
+  driver                  : &TypeDBDriver,
+  active_source_set       : Option<&ActiveSourceSet>,
+  attach_root_containerward : bool,
 ) -> Result<String, Box<dyn Error>> {
-  attach_containerward_ancestries_to_roots_and_removedhere_phantoms (
+  if attach_root_containerward {
+    attach_containerward_ancestries_to_view_roots (
+      viewforest, config, driver, active_source_set ) . await ?; }
+  attach_containerward_ancestries_to_removedhere_phantoms (
     viewforest, config, driver, active_source_set ) . await ?;
   mark_view_roots_parent_absent ( viewforest );
   // §A (Jeff's invariant): a Normal survivor left under a non-container parent
@@ -572,24 +579,36 @@ fn clear_diff_metadata (
         Ok (( )) } ) ?;
   Ok (( )) }
 
-/// Attach containerward ancestry to BOTH the view roots AND every removed-here
-/// phantom (§20.3 -- de-novo used to attach only roots, post-save only phantoms),
-/// inserting each as indefinitive Content children. Idempotent: the underlying
-/// insert_containerward_ancestry_tree_recursive is find-or-insert, so a node that
-/// already carries its containerward ancestry (e.g. a post-save root, whose
-/// submitted buffer already holds it) is left as-is rather than duplicated.
-async fn attach_containerward_ancestries_to_roots_and_removedhere_phantoms (
+/// For each view-root, attach its full containerward ancestry as that root's
+/// first children. Called by finish_viewforest ONLY for the de-novo render (the
+/// `attach_root_containerward` arm): root containerward is generated once at open
+/// and then round-trips in the saved buffer as ordinary content, so a later SAVE
+/// must NOT re-generate it. (We deliberately use this AncestryTree-based attach,
+/// not the ViewRequest::Containerward / build_and_integrate_containerward path:
+/// the latter runs during completion and panics on a cyclic root -- one whose
+/// containerward path cycles back to the root itself, e.g. a contains b contains
+/// a -- whereas this tail attach handles that case. See progress.org §17.)
+async fn attach_containerward_ancestries_to_view_roots (
+  viewforest : &mut ViewForest,
+  config     : &SkgConfig,
+  driver     : &TypeDBDriver,
+  active     : Option<&ActiveSourceSet>,
+) -> Result<(), Box<dyn Error>> {
+  let view_root_nodeids : Vec<NodeId> = viewforest . root_ids ();
+  attach_containerward_ancestries_at_nodeids_with_source_set (
+    viewforest, &view_root_nodeids, config, driver, active ) . await }
+
+/// For every RemovedHere phantom in the viewforest, fetch its containerward
+/// ancestry from TypeDB and insert it as indefinitive Content children.
+/// Short-circuits when no RemovedHere phantoms exist.
+async fn attach_containerward_ancestries_to_removedhere_phantoms (
   viewforest    : &mut ViewForest,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
   active        : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
-  let target_nodeids : Vec<NodeId> = {
-    let mut seen   : HashSet<NodeId> = HashSet::new ();
-    let mut result : Vec<NodeId>     = Vec::new ();
-    for nid in viewforest . root_ids () {
-      if seen . insert (nid)
-      { result . push (nid); }}
+  let phantom_nodeids : Vec<NodeId> = {
+    let mut result : Vec<NodeId> = Vec::new ();
     for edge in viewforest . root () . traverse () {
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
         let is_removedhere : bool = match &node_ref . value () . kind {
@@ -598,8 +617,8 @@ async fn attach_containerward_ancestries_to_roots_and_removedhere_phantoms (
           ViewNodeKind::Vognode (Vognode::DiffPhantom (p)) =>
             p . is_removedhere_phantom (),
           _ => false };
-        if is_removedhere && seen . insert ( node_ref . id () )
+        if is_removedhere
         { result . push ( node_ref . id () ); }} }
     result };
   attach_containerward_ancestries_at_nodeids_with_source_set (
-    viewforest, &target_nodeids, config, typedb_driver, active ) . await }
+    viewforest, &phantom_nodeids, config, typedb_driver, active ) . await }

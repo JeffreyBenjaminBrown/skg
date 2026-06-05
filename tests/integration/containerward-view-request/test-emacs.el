@@ -109,7 +109,6 @@
            (expected-without-metadata
             ;; It's easier to read this way, without metadata.
             (concat "* 1\n"
-                    "** 0\n" ;; §20.3: root 1's own containerward (node 0)
                     "** 11\n"
                     "** 12\n" ;; backpath was requested here
                     "*** 1\n" ;; its first element
@@ -118,9 +117,6 @@
                     "** 13\n"))
            (expected
             (concat "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (containers 1) (contents 3)))) 1\n"
-                    ;; §20.3: post-save now attaches root 1's containerward (node 0),
-                    ;; matching the de-novo render.
-                    "** (skg (node (id 0) (source main) (parentIs independent) (birth containsParent) indef (graphStats (containers 0) (contents 1)) (viewStats containsParent))) 0\n"
                     "** (skg (node (id 11) (source main))) 11\n"
                     "** (skg (node (id 12) (source main) (graphStats (contents 1)))) 12\n"
                     "*** (skg (node (id 1) (source main) (parentIs independent) (birth containsParent) indef (graphStats (containers 1) (contents 3)) (viewStats cycle containsParent))) 1\n"
