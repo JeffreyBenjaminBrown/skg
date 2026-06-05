@@ -173,12 +173,9 @@ impl < Id, Src > DiffPhantomNode_Generic < Id, Src > {
   pub fn body (&self) -> Option < &String > { None }
   pub fn is_indefinitive (&self) -> bool { true }
 
-  /// Mirror of TrueNode_Generic::should_be_phantom (always true for an actual
-  /// phantom, but some shared code asks regardless).
+  /// Always true for an actual phantom, but some shared code asks regardless.
   pub fn should_be_phantom (&self) -> bool {
-    self    . membership . staged   == Some (Sign::Minus)
-    || self . membership . unstaged == Some (Sign::Minus)
-    || self . existence  . unstaged == Some (Sign::Minus) }
+    diff_axes_require_phantom (&self . existence, &self . membership) }
 
   /// A "removed-here" phantom whose '.skg' file is still in the worktree.
   pub fn is_removedhere_phantom (&self) -> bool {
@@ -299,18 +296,26 @@ pub enum ViewRequest {
 // Implementations
 //
 
+/// True when a node's diff axes require displaying it with the
+/// `Vognode::DiffPhantom` variant. Triggered by either:
+/// - any membership axis being '-' (removed in some stage), or
+/// - the worktree existence axis being '-' (file deleted), or
+/// - the "moved twice" pattern: stagedM = +, unstagedM = -.
+/// Shared by TrueNode_Generic and DiffPhantomNode_Generic, which both carry
+/// these axes.
+pub fn diff_axes_require_phantom (
+  existence  : &ExistenceAxes,
+  membership : &MembershipAxes,
+) -> bool {
+  membership . staged   == Some (Sign::Minus)
+  || membership . unstaged == Some (Sign::Minus)
+  || existence  . unstaged == Some (Sign::Minus) }
+
 impl < Id, Src > TrueNode_Generic < Id, Src > {
-  /// True when this node's diff axes require displaying it with the
-  /// `Vognode::DiffPhantom` variant. Triggered by either:
-  /// - any membership axis being '-' (removed in some stage), or
-  /// - the worktree existence axis being '-' (file deleted), or
-  /// - the "moved twice" pattern: stagedM = +, unstagedM = -.
   pub fn should_be_phantom (
     &self,
   ) -> bool {
-    self    . membership . staged   == Some (Sign::Minus)
-    || self . membership . unstaged == Some (Sign::Minus)
-    || self . existence  . unstaged == Some (Sign::Minus) }
+    diff_axes_require_phantom (&self . existence, &self . membership) }
 
   /// A "removed-here" phantom: a phantom whose '.skg' file is still
   /// present in the worktree (so TypeDB still knows the node and can
