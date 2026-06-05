@@ -23,10 +23,8 @@ struct SubscribeeColContext {
   worktree_subscribees   : Vec<ID>,
 }
 
-/// SubscribeeCol completion.
-///
-/// INTENDED USE: Use in the first, DFS preorder (parent-first)
-/// buffer-update pass through the tree.
+/// SubscribeeCol completion. Called at this col's own visit in the level-order
+/// BFS (after its Normal parent has been visited and created it).
 ///
 /// WHAT IT DOES:
 /// - Error unless it's a SubscribeeCol.

@@ -27,11 +27,10 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Decorate a normal vognode and generate any diff-only children
-/// implied by staged and unstaged NodeCompleteDiffs. Called per Normal node --
-/// either by the legacy de-novo overlay (apply_diff_to_viewforest) or, for the
-/// post-save path, INLINE at the node's own BFS visit (§9 reversal / #3: diff is
-/// now computed locally; the node flips to a phantom here and its cols then
-/// self-deaden via their own generalized-orphan check at their later visits).
+/// implied by staged and unstaged NodeCompleteDiffs. Called inline per Normal
+/// node at its own BFS visit (for both de-novo and post-save), §9 reversal / #3:
+/// the node flips to a phantom here and its cols then self-deaden via their own
+/// generalized-orphan check at their later visits.
 pub(crate) fn process_truenode_diff (
   mut node_mut                   : NodeMut<ViewNode>,
   source_diffs                   : &HashMap<SourceName, SourceDiff>,

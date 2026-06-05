@@ -229,7 +229,7 @@ fn nat_from_request (
 /// COMPLEX:
 /// - Validation must happen at many stages.
 /// - Merges must follow the execution of other save instructions, because the user may have updated one of the nodes to be merged.
-/// - complete_viewforest is complex: it runs a preorder pass (completing and reconciling each node) followed by a postorder pass (populating scaffolds like IDCol, AliasCol, etc.).
+/// - complete_viewforest is complex: it is one level-order BFS in which each node is completed at its own visit (content, cols, view requests, inline diff), then a postorder prune sweep removes the empty self-deletable nodes.
 pub async fn update_from_and_rerender_buffer (
   stream                      : &mut TcpStream,
   org_buffer_text             : &str,

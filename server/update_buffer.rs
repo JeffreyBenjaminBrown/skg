@@ -246,7 +246,7 @@ fn find_collateral_view_uris (
 
 /// Phase 8 (§13): build a DE-NOVO (initial) content view by running the ONE
 /// post-save driver (complete_viewforest) over a stub forest of the requested
-/// roots, instead of the separate render_initial_viewforest_bfs. The driver
+/// roots. The driver
 /// creates each fresh node's relation cols (create_relation_cols_for_fresh_nodes
 /// = true), expands content, reconciles cols, and applies the §5.5 node budget.
 /// When diff_mode, the git diff is computed inline by the driver (per node, at
@@ -504,8 +504,8 @@ fn remove_branches_that_git_marked_removed (
 
 /// Remove scaffolds that exist only to display diff information:
 /// TextChanged and IDCol.
-/// These are regenerated from scratch by 'maybe_prepend_diff_view_scaffolds'
-/// and their postorder completers, so stale ones must be stripped first.
+/// These are regenerated from scratch by 'process_truenode_diff' (the inline
+/// per-node diff) at each node's BFS visit, so stale ones must be stripped first.
 /// AliasCol is NOT removed: it may have been requested by the user
 /// (not just injected by diff mode), and tracking which case applies
 /// is not worth the complexity. Phantom Alias children (injected by

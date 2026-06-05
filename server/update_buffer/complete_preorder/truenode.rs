@@ -85,8 +85,9 @@ pub fn expand_true_content_at_truenode (
   let (pid, initial_source) : (ID, SourceName) =
     pid_and_source_from_treenode( tree, node,
                                   "expand_true_content_at_truenode" ) ?;
-  // (Diff status is no longer stamped here: phase 5 (§9) moved ALL diff onto
-  // the post-BFS overlay, so the content path runs with source_diffs=None.)
+  // This content path produces the pure worktree view; the node's git diff
+  // (axes, phantom flip, diff scaffolds) is applied by process_truenode_diff at
+  // the end of the node's BFS visit (§9 reversal / #3).
   { let is_indefinitive : bool =
       read_at_node_in_tree( tree, node,
         |vn : &ViewNode| match &vn . kind {
@@ -107,9 +108,7 @@ pub fn expand_true_content_at_truenode (
   // §8.3: EVERY definitive node re-syncs title/body/source from the snapshot,
   // saved and collateral alike. (After extraction the snapshot already reflects
   // the saved buffer's text, so re-syncing the saved node yields the same
-  // content it just defined -- a no-op. The former
-  // should_sync_from_disk_even_though_definitive carve-out, which skipped this
-  // for the saved view, is gone.)
+  // content it just defined -- a no-op.)
   sync_truenode_from_disk (tree, node, &nodecomplete) ?;
   reconcile_content_children (
     tree, node, &nodecomplete, config, graph_snap,
@@ -206,17 +205,15 @@ fn reconcile_content_children (
     . collect ();
   let is_sub : bool = is_subscribee (tree, node) ?;
   // §6.1: a definitive subscribee-as-such regenerates its content as
-  // contains-minus-hides, saved and collateral views alike. (The former
-  // "do not regenerate a saved subscribee's children" carve-out is gone:
-  // view-update is strictly post-extraction, so the hide edits are already
-  // in the graph and regenerating is correct -- and required, since the
-  // §5.3 cascade now draws subscribee content through this path rather than
-  // the old extendDefinitiveSubtreeFromLeaf.)
+  // contains-minus-hides, saved and collateral views alike. (View-update is
+  // strictly post-extraction, so the hide edits are already in the graph and
+  // regenerating contains-minus-hides is correct. The §5.3 cascade draws
+  // subscribee content through this same path.)
   let apparent_content_ids : Vec<ID> =
     content_goal_list( tree, node, &content_ids, is_sub, config ) ?;
   // §5.5: cap how many *new* content children this node may create against the
   // per-buffer budget (existing children are free). The content path has no
-  // removed-member phantoms (the diff overlay owns those, §9), so the cap's
+  // removed-member phantoms (the inline diff owns those), so the cap's
   // removed-id exemption set is empty here.
   let no_removed : HashSet<ID> = HashSet::new ();
   let goal_list : Vec<ID> =

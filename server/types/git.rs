@@ -206,8 +206,8 @@ pub fn per_stage_node_changes_for_truenode<'a> (
 
 /// Union the per-stage signs for a list-field diff into a single
 /// (item, MembershipAxes) list. Order comes from whichever stage is
-/// present (prefers unstaged if both, matching apply_diff_to_viewforest's
-/// baseline choice). Items present in only one stage's diff are
+/// present (prefers unstaged if both -- the worktree-relative baseline).
+/// Items present in only one stage's diff are
 /// included with their stage's sign and the other stage unset.
 ///
 /// 'Unchanged' in a single stage contributes an unset axis for that

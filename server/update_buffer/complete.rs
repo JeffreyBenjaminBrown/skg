@@ -48,8 +48,8 @@ pub(super) struct CompletionContext<'a> {
   /// the ordinary update pass may create. Initialized once per rerender to
   /// `config.initial_node_limit` and decremented as content children are
   /// created; when it reaches 0 no further new content is drawn (and the
-  /// cascade stops). Unifies what was extendDefinitiveSubtreeFromLeaf's
-  /// per-DVR limit. The diff overlay is exempt (§5.5).
+  /// cascade stops). The inline diff is exempt (§5.5): every diff phantom and
+  /// diff scaffold is created regardless of the budget.
   pub(super) node_budget                    : usize,
   /// Phase 8 (§13): true only for a DE-NOVO (initial) render driven through
   /// this driver. When set, a fresh CONTENT node (parent is not a PartnerCol)
@@ -61,8 +61,7 @@ pub(super) struct CompletionContext<'a> {
   pub(super) create_relation_cols_for_fresh_nodes : bool,
   /// §9 reversal (#3): the tantivy index for the inline diff's phantom-source
   /// resolution. None on the post-save path (the deleted-id map + disk scan
-  /// suffice, matching the old overlay call); Some on the de-novo path (matching
-  /// the de-novo overlay, which passed the index).
+  /// suffice); Some on the de-novo path.
   pub(super) diff_tantivy_index : Option<&'a TantivyIndex>,
 }
 
@@ -74,29 +73,27 @@ pub(super) async fn complete_viewforest (
   // The single plan_v2 §3 level-order BFS: each node's visit
   // (expand_true_content_at_node) does ALL of its own update -- content
   // reconcile, the §5.2 draw rule + §5.3 cascade for definitive-view
-  // requests, diff scaffolds, the other view requests, ensuring a definitive
-  // subscribee's HiddenInSubscribeeCol, and per-col reconciliation -- so the
-  // former fixed sequence of postorder passes is gone. Cols and content
-  // children created during a node's visit are reached later in the same BFS.
-  expand_true_content_until_stable (
+  // requests, the inline diff, the other view requests, ensuring a definitive
+  // subscribee's HiddenInSubscribeeCol, and per-col reconciliation. Cols and
+  // content children created during a node's visit are reached later in the
+  // same BFS.
+  complete_nodes_in_level_order (
     viewforest, root_treeid, context ) . await ?;
   prune_self_deletable_when_empty (viewforest) ?;
   Ok(( )) }
 
-/// Parent-first content expansion, in *level order* (BFS).
+/// Visit every node in *level order* (BFS), completing each at its own visit.
 ///
-/// This is the first step of the plan_v2 §3 driver: a single top-down
-/// level-order traversal in which each node, when visited, may create
-/// view-descendants (content children, subscribee/relation members) that
-/// are then visited later in the same traversal. A FIFO queue (rather than
-/// the previous DFS-preorder recursion) is what makes the §5.5 node-limit
-/// and §5.2 draw-rule semantics order-correct: the first occurrence of a
-/// duplicate id reached in BFS order -- not in depth-first order -- is the
-/// one that wins. The Finalizable draw rule (commit fb7786b) makes this
-/// reorder safe (plan_v2 §18). A node's expansion depends only on its
-/// ancestors and the graph, never on siblings or descendants, so it can be
-/// processed the moment it is dequeued.
-async fn expand_true_content_until_stable (
+/// This is the core of the plan_v2 §3 driver: a single top-down level-order
+/// traversal in which each node, when visited, may create view-descendants
+/// (content children, subscribee/relation members) that are then visited later
+/// in the same traversal. A FIFO queue (not depth-first recursion) is what makes
+/// the §5.5 node-limit and §5.2 draw-rule semantics order-correct: the first
+/// occurrence of a duplicate id reached in BFS order -- not in depth-first order
+/// -- is the one that wins, and the Finalizable draw rule makes that safe. A
+/// node's expansion depends only on its ancestors and the graph, never on
+/// siblings or descendants, so it can be processed the moment it is dequeued.
+async fn complete_nodes_in_level_order (
   tree     : &mut Tree<ViewNode>,
   root_treeid : NodeId,
   context  : &mut CompletionContext<'_>,
@@ -116,8 +113,7 @@ async fn expand_true_content_until_stable (
 
 /// One BFS visit: dispatch on (kind, parent-kind) to the node's update rule
 /// (plan_v2 §3/§4). Cols are reconciled at their own visit (the BFS reaches a
-/// col after its Normal parent created it), so the former separate col-sweep
-/// passes are gone.
+/// col after its Normal parent created it).
 async fn expand_true_content_at_node (
   tree    : &mut Tree<ViewNode>,
   treeid  : NodeId,
@@ -179,17 +175,17 @@ async fn expand_true_content_at_node (
         tree, treeid, context . deleted_by_this_save_pids ) ?,
     _ => {
       // No-op for: Unknown (unresolvable-id placeholder), Deleted,
-      // DeadScaffold, Qual leaves, BufferRoot, DiffPhantom (owned by the
-      // diff overlay, §6.3). The prune sweep handles empty/dead nodes.
+      // DeadScaffold, Qual leaves, BufferRoot, and DiffPhantom (a diff-only
+      // placeholder, inert here, §6.3). The prune sweep handles empty/dead nodes.
     } }
   Ok(( )) }
 
 /// The Normal-node visit (plan_v2 §6.1/§6.2): settle the Finalizable state
 /// for a definitive-view request *before* drawing content (so a Final node
-/// can cascade), reconcile content, then -- while still a Normal node --
-/// emit diff scaffolds, run the remaining (non-Definitive) view requests,
-/// and ensure a definitive subscribee's HiddenInSubscribeeCol. The BFS
-/// reaches every col/child this creates and reconciles it in turn.
+/// can cascade), reconcile content, run the remaining (non-Definitive) view
+/// requests, ensure a definitive subscribee's HiddenInSubscribeeCol, and
+/// finally (in diff mode) compute this node's diff inline. The BFS reaches
+/// every col/child this creates and reconciles it in turn.
 async fn visit_normal_node (
   tree    : &mut Tree<ViewNode>,
   treeid  : NodeId,

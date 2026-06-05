@@ -20,7 +20,7 @@ struct HiddenOutsideContext {
   subscribees         : Vec<ID>,
 }
 
-/// HiddenOutsideOfSubscribeeCol completion (child-first / postorder pass).
+/// HiddenOutsideOfSubscribeeCol completion (called at this col's own BFS visit).
 ///
 /// Tree structure:
 ///   Subscriber (TrueNode)                       <- ancestor 2

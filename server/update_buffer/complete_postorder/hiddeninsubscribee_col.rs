@@ -22,7 +22,7 @@ struct HiddenInContext {
   subscriber_hides    : Vec<ID>,
 }
 
-/// HiddenInSubscribeeCol completion (child-first / postorder pass).
+/// HiddenInSubscribeeCol completion (called at this col's own BFS visit).
 ///
 /// Tree structure:
 ///   Subscriber (TrueNode)            <- ancestor 3

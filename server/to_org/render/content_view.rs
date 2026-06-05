@@ -2,10 +2,11 @@
 /// Build a string intended as buffer-text,
 /// to represent an 'inital view' (content relationships only).
 ///
-/// METHOD (phase 8 §13): the de-novo render now runs the ONE post-save driver
+/// METHOD (phase 8 §13): the de-novo render runs the ONE post-save driver
 /// (multi_root_view_via_env -> render_initial_view_via_driver) over a stub
-/// forest, then:
-/// - if diff_mode_enabled, apply diff markers
+/// forest. The driver completes each node at its BFS visit -- including, when
+/// diff_mode_enabled, that node's git diff inline (§9 reversal / #3). After the
+/// driver:
 /// - prepend each view-root's containerward ancestry (if any)
 /// - set_graphnodestats_in_viewforest
 /// - set_viewnodestats_in_viewforest
@@ -97,11 +98,10 @@ async fn multi_root_view_inner (
   multi_root_view_via_env (
     &env, root_ids, diff_mode_enabled, active_source_set ) . await }
 
-/// Phase 8 (§13): the de-novo view built through the ONE driver
-/// (render_initial_view_via_driver) instead of render_initial_viewforest_bfs.
-/// Same post-steps as multi_root_view_inner (diff overlay, containerward, stats,
-/// render). Takes a SkgEnv (carries config/driver/tantivy/graph). The legacy
-/// multi_root_view* shims still use the old BFS until the unit tests migrate.
+/// Phase 8 (§13): the de-novo view, built through the ONE driver
+/// (render_initial_view_via_driver). Takes a SkgEnv (carries
+/// config/driver/tantivy/graph), runs the driver over a stub forest of the
+/// requested roots, then attaches containerward ancestry and stats and renders.
 pub async fn multi_root_view_via_env (
   env               : &SkgEnv,
   root_ids          : &[ID],
@@ -109,8 +109,8 @@ pub async fn multi_root_view_via_env (
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result < (String, Vec<ID>, Tree<ViewNode>),
               Box<dyn Error> > {
-  // §9 reversal (#3): the diff (when diff_mode_enabled) is now computed INLINE
-  // by the driver, per Normal node at its BFS visit -- no post-BFS overlay.
+  // §9 reversal (#3): the diff (when diff_mode_enabled) is computed inline by
+  // the driver, per Normal node at its BFS visit.
   let mut viewforest : ViewForest =
     crate::update_buffer::render_initial_view_via_driver (
       env, root_ids, active_source_set, diff_mode_enabled ) . await ?;
