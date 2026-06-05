@@ -1243,7 +1243,17 @@ Four items. For each: what it is, why it matters, size/risk, whether it needs a
 decision from you, and my recommendation. They are roughly independent; B is the
 one I'd do first.
 
-*** TODO A -- invariant: a non-dead generalized orphan must be ParentIs=Independent
+*** DONE A -- invariant: a non-dead generalized orphan must be ParentIs=Independent
+DONE (commit "A: enforce ParentIs=Independent for a non-dead generalized
+orphan"). Confirmed the gap was real: validate_parentIs_relationships SKIPS
+non-Normal parents and runs only post-save, so a Normal survivor left under a
+phantom / Deleted / DeadScaffold (e.g. a removedHere phantom's content children)
+kept its Affected claim. New structural pass
+mark_orphans_under_dead_parents_independent demotes exactly those (col members
+under a PartnerCol and roots under BufferRoot are correctly left alone), wired
+into BOTH paths after mark_view_roots_parent_absent. Byte-identical (no current
+fixture left such a survivor Affected) + a unit test. Original analysis below.
+
 This is YOUR requirement from the §11 dialog ("I guess we can leave [col-member
 vognodes un-orphan-checked] that way. But we need to be sure that any non-dead
 generalized orphan has its ParentIs set to Independent."). It is a correctness
@@ -1269,7 +1279,14 @@ invariant, not a feature.
 **** MY REC: do this. It is your explicit correctness requirement and the one item
   with a potential live gap introduced by the #3 change.
 
-*** TODO B -- test coverage for sharing-col git-diff (covers #1, and more)
+*** DONE B -- test coverage for sharing-col git-diff (covers #1, and more)
+DONE (commit "B: test coverage for a removed subscribee (the #1 fix)"). Found
+that content/ already had partial subscribee infra (content-inside-a-subscribee),
+but NOT a removed subscribee MEMBERSHIP. New fixture fixtures-removed-subscribee
+(subscriber drops node 22 from subscribes_to, 22's file stays) + a post-save diff
+test asserting 22 renders (unstaged removedM). git_diff_view 27 -> 28 (then 29
+with C's staged test). Original analysis below.
+
 **** WHAT: the git_diff_view oracle suite has modules for content / text / ids /
   aliases / newhere_cycle / collateral, but NONE for sharing-col diff (subscribee
   / hidden / relation removals). So sharing-col diff has no oracle at all, and the
@@ -1284,7 +1301,21 @@ invariant, not a feature.
 **** MY REC: do this, ideally right after A. It is the highest-value safety addition
   and needs no decision from you.
 
-*** TODO C -- per-stage sharing-relation diffs (the #1 extension)
+*** DONE C -- per-stage sharing-relation diffs (the #1 extension)
+DONE (commit "C: per-stage diffs for the sharing relations"). NodeChanges gained
+subscribes_to_diff + hides_diff (computed in compare_nodecompletes); phantom_axes
+now reads a phantom's membership from ALL THREE relation diffs (contains /
+subscribes_to / hides), so a removed Subscribee or HiddenOutside member gets a
+PER-STAGE removedM. SURPRISE found while doing it: the #1 build_child_data
+fallback was redundant all along -- phantom_axes already net-fell-back to unstaged
+Minus for empty membership -- so that dead code is removed; the net fallback now
+fires only for relation cols (whose removal lives in the MEMBER's own diff, not
+the owner's -- the remaining documented limitation). New staged test proves
+per-stage (same removed subscribee, staged -> (staged removedM)), which the old
+net fallback could not produce. Content fixtures byte-identical (contains_diff
+checked first). Original analysis below (it judged C "needs your call" -- you said
+do all three).
+
 **** WHAT: today NodeChanges tracks only contains/ids/aliases PER STAGE, so a removed
   subscribee/hidden/relation member can only be marked as a NET removal (the #1
   fix puts it on the unstaged axis). To split staged vs unstaged for these, the
