@@ -214,10 +214,13 @@ fn content_view_renders_inactive_contained_nodes_as_placeholders (
         ! actual . contains ("private title must not leak"),
         "inactive placeholder must not reveal title: {}",
         actual );
+      // §20.5: the view's pid set (for collateral detection) is {Normal,
+      // Inactive} -- an inactive node is a real graph member, so it IS tracked,
+      // even though it renders as a placeholder (asserted above). The excluded
+      // kinds are Deleted / Unknown / DiffPhantom.
       assert! (
-        ! pids . contains (&ID::from ("private-a")),
-        "initial content traversal should not render inactive-source \
-         children as TrueNodes: {:?}",
+        pids . contains (&ID::from ("private-a")),
+        "an inactive contained node should be in the view's pid set (§20.5): {:?}",
         pids );
       Ok (( )) } )) }
 

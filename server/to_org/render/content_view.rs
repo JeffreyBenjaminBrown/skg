@@ -17,8 +17,7 @@ use crate::org_to_text::viewforest_to_string;
 use crate::to_org::util::{mark_view_roots_parent_absent, mark_orphans_under_dead_parents_independent};
 use crate::types::tree::forest::ViewForest;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
-use crate::types::viewnode::{ViewNode, ViewNodeKind};
-use crate::types::viewnode::Vognode;
+use crate::types::viewnode::ViewNode;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::env::SkgEnv;
 use crate::dbs::in_rust_graph::{InRustGraph, new_handle};
@@ -132,16 +131,6 @@ pub async fn multi_root_view_via_env (
   set_viewnodestats_in_viewforest (
     &mut viewforest, &container_to_contents, &content_to_containers,
     &env . config );
-  let pids : Vec<ID> = {
-    let mut ids : Vec<ID> = Vec::new ();
-    for node_ref in viewforest . nodes () {
-      match &node_ref . value () . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t))
-          => ids . push ( t . id . clone () ),
-        ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
-          => ids . push ( p . id . clone () ),
-        _ => {} }}
-    ids };
   // Match the old multi_root_view_with_source_set, which finished with
   // render_viewforest_with_source_set (= apply_source_set_to_viewforest + render).
   // A no-op when every source is active; under a restricted set it annotates/
@@ -150,6 +139,12 @@ pub async fn multi_root_view_via_env (
     crate::source_sets::apply_source_set_to_viewforest (&mut viewforest, active); }
   let buffer_content : String =
     viewforest_to_string (& viewforest, &env . config) ?;
+  // §20.5: the pids the caller registers for this view -- the {Normal, Inactive}
+  // set, via the one shared source of which-kinds-count
+  // (OpenViews::pids_from_viewforest), the same helper update_view uses post-save.
+  let pids : Vec<ID> =
+    crate::types::views_state::pids_from_viewforest (&viewforest)
+      . into_iter () . collect ();
   Ok ((buffer_content, pids, viewforest . into_internal_tree ())) }
 
 pub async fn multi_root_view_with_source_set (

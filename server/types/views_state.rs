@@ -36,7 +36,9 @@ pub struct OpenViews {
 /// Direct viewforest mutation would make pids stale.
 pub struct ViewState {
   pub viewforest : ViewForest,
-  pub pids   : HashSet<ID>, // all the TrueNodes (and DeletedNodes) in the buffer
+  pub pids   : HashSet<ID>, // the Normal + Inactive vognodes in the buffer (the
+                            // kinds backed by a real graph node; see
+                            // pids_from_viewforest)
 }
 
 //
@@ -105,9 +107,10 @@ impl OpenViews {
       for rid in &rids {
         self . root_ids . insert (
           rid . clone (), uri . clone () ); }
+      let pids : HashSet<ID> =
+        pids . iter () . cloned () . collect ();
       let state : ViewState =
-        ViewState { viewforest,
-                    pids : pids . iter () . cloned () . collect () };
+        ViewState { viewforest, pids };
       self . views . insert ( uri, state ); }
 
   pub fn update_view (
@@ -117,15 +120,7 @@ impl OpenViews {
   ) { let new_viewforest : ViewForest =
         new_viewforest . into ();
       let pids : HashSet<ID> =
-        new_viewforest . nodes ()
-        . filter_map ( |n| match &n . value () . kind {
-          ViewNodeKind::Vognode (
-            v @ (Vognode::Normal (_)
-                 | Vognode::DiffPhantom (_)
-                 | Vognode::Deleted (_))) =>
-            Some ( v . id () . clone () ),
-          _ => None } )
-        . collect ();
+        pids_from_viewforest ( &new_viewforest );
       self . root_ids . remove_right (uri);
       let rids : HashSet<ID> =
         root_ids_from_viewforest ( &new_viewforest );
@@ -160,6 +155,24 @@ impl OpenViews {
 //
 // Functions
 //
+
+/// The pids a view "contains" for collateral detection (views_containing): the
+/// primary ids of its Normal and Inactive vognodes -- the kinds backed by a
+/// real, current graph node. Deleted / Unknown / DiffPhantom are excluded: they
+/// are not graph members, so a save can change nothing a view showing them would
+/// need to reflect. The single source of which kinds count: update_view derives
+/// its pids through it, and the de-novo caller (multi_root_view_via_env) computes
+/// the pids it passes to register_view through it too.
+pub fn pids_from_viewforest (
+  viewforest : &ViewForest,
+) -> HashSet<ID> {
+  viewforest . nodes ()
+    . filter_map ( |n| match &n . value () . kind {
+      ViewNodeKind::Vognode (
+        v @ (Vognode::Normal (_) | Vognode::Inactive (_))) =>
+        Some ( v . id () . clone () ),
+      _ => None } )
+    . collect () }
 
 /// Collect all IDs (primary + extras) for every root
 /// -- i.e. every level-1 headline -- in the view.
