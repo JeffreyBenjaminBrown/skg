@@ -1,6 +1,6 @@
 /// Git-related types for diff view functionality.
 
-use crate::types::list::Diff_Item;
+use crate::types::list::{Diff_Item, compute_interleaved_diff};
 use crate::types::misc::{ID, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 
@@ -285,59 +285,52 @@ pub fn existence_axes_in_source_diff (
     . and_then ( |d| d . status . to_existence_sign () );
   ExistenceAxes { staged, unstaged } }
 
-/// Compose two stage diffs into a single HEAD→worktree diff.
+/// Compose two stage diffs into a single HEAD→worktree diff, with each item at
+/// its correct position.
 ///
-/// Classifies each item by presence at HEAD and at worktree:
-///   present in HEAD    iff staged   is None OR Minus
-///   present in worktree iff unstaged is None OR Plus
-/// and emits Unchanged / New / Removed accordingly. Items absent
-/// from both HEAD and worktree (Plus then Minus: added staged, then
-/// removed unstaged) are dropped — they're not part of the net diff.
+/// Reconstructs the HEAD and worktree item-lists from the per-stage diffs --
+/// HEAD = the items a stage marks Unchanged or Removed, worktree = those it
+/// marks Unchanged or New -- then LCS-diffs the two lists directly. This keeps a
+/// cross-stage change at its real position. (Composing the two stages' signs
+/// classifies each item correctly but can mis-ORDER an item that changed in one
+/// stage relative to siblings that changed in the other -- it lands at the tail
+/// rather than interleaved.)
 ///
-/// Used by consumers that need a flat "what changed HEAD vs
-/// worktree" view across both stages. For consumers that need the
-/// per-stage signs separately, use 'axes_from_per_stage_diffs'.
+/// Items absent from both HEAD and worktree (added staged, then removed
+/// unstaged) are dropped — they're not part of the net diff.
+///
+/// Used by consumers that need a flat "what changed HEAD vs worktree" view. For
+/// the per-stage signs separately, use 'axes_from_per_stage_diffs'.
 pub fn net_diff_from_per_stage<T: Clone + Eq + std::hash::Hash> (
   staged_diff   : Option<&[Diff_Item<T>]>,
   unstaged_diff : Option<&[Diff_Item<T>]>,
 ) -> Vec<Diff_Item<T>> {
-  // Determine membership at each snapshot -- HEAD, index, worktree
-  // -- by treating each stage as a transition:
-  //   staged:   HEAD   -> index    (None = same)
-  //   unstaged: index  -> worktree (None = same)
-  // A Plus arrow means "not present before, present after"; Minus
-  // is the reverse; None means "present before iff present after".
-  // When a stage's sign is None we need to decide whether "present
-  // before = present after" resolves to "both present" or "both
-  // absent" -- and that's determined by the OTHER stage, or (if
-  // both stages are None) by the fact that the item appears in
-  // axes at all, which happens via 'Unchanged' in the baseline
-  // diff and therefore means present throughout.
-  let axes : Vec<(T, MembershipAxes)> =
-    axes_from_per_stage_diffs (staged_diff, unstaged_diff);
-  let mut out : Vec<Diff_Item<T>> = Vec::with_capacity (axes . len ());
-  for (id, m) in axes {
-    let in_head : bool = match m . staged {
-      Some (Sign::Plus)  => false,
-      Some (Sign::Minus) => true,
-      None               => match m . unstaged {
-        Some (Sign::Plus)  => false,
-        Some (Sign::Minus) => true,
-        None               => true, }, }; // present throughout
-    let in_wt : bool = match m . unstaged {
-      Some (Sign::Plus)  => true,
-      Some (Sign::Minus) => false,
-      None               => match m . staged {
-        Some (Sign::Plus)  => true,
-        Some (Sign::Minus) => false,
-        None               => true, }, }; // present throughout
-    let item : Option<Diff_Item<T>> = match (in_head, in_wt) {
-      (true,  true)  => Some (Diff_Item::Unchanged (id)),
-      (false, true)  => Some (Diff_Item::New       (id)),
-      (true,  false) => Some (Diff_Item::Removed   (id)),
-      (false, false) => None, };
-    if let Some (d) = item { out . push (d); } }
-  out }
+  // A present-but-EMPTY stage diff carries no list (it lists items only when
+  // that stage actually changed something), so treat empty as absent and read
+  // the list from the other stage.
+  let staged   : Option<&[Diff_Item<T>]> =
+    staged_diff   . filter ( |s| ! s . is_empty () );
+  let unstaged : Option<&[Diff_Item<T>]> =
+    unstaged_diff . filter ( |s| ! s . is_empty () );
+  let head : Vec<T> =
+    // HEAD = items present before the change: a stage marks them Unchanged or
+    // Removed. Prefer the staged stage (HEAD->index); if it is empty/absent then
+    // HEAD == index, so the unstaged stage's before-state (index) serves.
+    staged . or (unstaged) . unwrap_or (&[]) . iter ()
+      . filter_map ( |item| match item {
+          Diff_Item::Unchanged (v) | Diff_Item::Removed (v) => Some (v . clone ()),
+          Diff_Item::New (_) => None } )
+      . collect ();
+  let worktree : Vec<T> =
+    // worktree = items present after the change: a stage marks them Unchanged or
+    // New. Prefer the unstaged stage (index->worktree); if it is empty/absent
+    // then worktree == index, so the staged stage's after-state (index) serves.
+    unstaged . or (staged) . unwrap_or (&[]) . iter ()
+      . filter_map ( |item| match item {
+          Diff_Item::Unchanged (v) | Diff_Item::New (v) => Some (v . clone ()),
+          Diff_Item::Removed (_) => None } )
+      . collect ();
+  compute_interleaved_diff (&head, &worktree) }
 
 #[cfg(test)]
 #[path = "../../tests/unit/types_git.rs"]

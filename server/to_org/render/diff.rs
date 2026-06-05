@@ -128,11 +128,10 @@ pub(crate) fn process_truenode_diff (
       unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
   mark_membership_on_existing_children (
     &mut node_mut, tree_node_id, &merged_contains );
-  // Net HEAD->worktree contains order, used to place each removed-member phantom
-  // among its surviving siblings. For a single-stage diff (the common case) this
-  // is the correct HEAD position; a two-stage (partially-staged) diff can list a
-  // staged-only removed id at the tail rather than interleaved -- a cosmetic
-  // misplacement (review-2 §2.2), not a misclassification.
+  // Net HEAD->worktree contains order (an LCS of the reconstructed HEAD and
+  // worktree contains lists), so each removed-member phantom lands at its
+  // correct HEAD position among surviving siblings -- even when contains changed
+  // in both git stages.
   let net_contains : Vec<Diff_Item<ID>> =
     net_diff_from_per_stage (
       staged_changes   . map ( |c| c . contains_diff . as_slice () ),
