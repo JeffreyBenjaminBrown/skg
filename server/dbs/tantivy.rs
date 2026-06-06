@@ -10,6 +10,7 @@
 // GLOSSARY:
 // See the Tantivy section in glossary.md.
 
+pub mod background_writer;
 pub mod context_update;
 pub mod escape;
 pub mod search;

@@ -272,6 +272,8 @@ pub async fn update_from_and_rerender_buffer (
   { // update the graph. Context origin types (for search ranking) are
     // computed from the post-save in-Rust graph and written inside the
     // single Tantivy index pass, so there is no separate context pass.
+    let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "update_graph_including_merges" ). entered();
     update_graph_including_merges (
       nonmerge_defineNodes . clone(),
       &merges,
@@ -282,28 +284,34 @@ pub async fn update_from_and_rerender_buffer (
       &env . in_rust_graph ) . await ?; }
 
   let define_nodes : Vec<DefineNode> = // includes the merges
-    nonmerge_defineNodes . iter () . cloned ()
-    . chain ( merges . iter ()
-              . flat_map ( |merge| merge . to_vec () ))
-    . collect ();
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "define_nodes_build" ). entered();
+      nonmerge_defineNodes . iter () . cloned ()
+      . chain ( merges . iter ()
+                . flat_map ( |merge| merge . to_vec () ))
+      . collect () };
 
-  debug_assert! (
-    // TODO | PITFALL: This is quite a weak assertion.
-    // PURPOSE: The in-Rust graph must already reflect every Save and Delete in 'define_nodes' by the time this function runs. Violating this invariant (e.g. by reordering the save pipeline so that 'update_views_after_save' runs before 'apply_definenodes') would let the rerender read stale NodeCompletes from the in-Rust graph.
-    in_rust_graph_coherent_with_save_instructions (
-        &define_nodes
-      ) . is_ok (),
-    "update_views_after_save: in-Rust graph not coherent with define_nodes" );
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "coherence_debug_assert" ). entered();
+    debug_assert! (
+      // TODO | PITFALL: This is quite a weak assertion.
+      // PURPOSE: The in-Rust graph must already reflect every Save and Delete in 'define_nodes' by the time this function runs. Violating this invariant (e.g. by reordering the save pipeline so that 'update_views_after_save' runs before 'apply_definenodes') would let the rerender read stale NodeCompletes from the in-Rust graph.
+      in_rust_graph_coherent_with_save_instructions (
+          &define_nodes
+        ) . is_ok (),
+      "update_views_after_save: in-Rust graph not coherent with define_nodes" ); }
 
-  update_views_after_save (
-    stream,
-    viewforest,
-    define_nodes,
-    diff_mode_enabled,
-    env,
-    viewuri_from_request_result,
-    views_state,
-    active_source_set ) . await }
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "update_views_after_save" ). entered();
+    update_views_after_save (
+      stream,
+      viewforest,
+      define_nodes,
+      diff_mode_enabled,
+      env,
+      viewuri_from_request_result,
+      views_state,
+      active_source_set ) . await } }
 
 /// Check if any source's HEAD is a merge commit.
 /// Returns an error message if so,

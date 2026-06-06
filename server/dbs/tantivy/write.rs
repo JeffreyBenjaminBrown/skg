@@ -4,6 +4,7 @@
 // this module and `context_update`.
 
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
+use crate::dbs::tantivy::background_writer::lock_tantivy_writes;
 use crate::types::misc::{ID, TantivyIndex};
 use crate::types::nodes::complete::FileProperty;
 use crate::types::nodes::tantivy::NodeTantivy;
@@ -22,6 +23,8 @@ pub fn update_index_with_nodes (
   tantivy_index: &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {
 
+  let _wlock = // serialize with the background save-index worker & other writers
+    lock_tantivy_writes ();
   let mut writer: IndexWriter =
     tantivy_index . index . writer (
       TANTIVY_WRITER_BUFFER_BYTES)?;
@@ -146,14 +149,18 @@ pub fn commit_with_status (
   if indexed_count > 0 {
     tracing::info!( "{} {} documents. Committing changes...",
               operation, indexed_count );
-    writer . commit () ?;
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "tantivy_writer_commit" ). entered();
+      writer . commit () ? ; }
     // Force the shared reader to see the new commit. With the
     // default 'ReloadPolicy::OnCommitWithDelay', the reader
     // refreshes asynchronously after a small delay, which races
     // with code (notably tests) that searches immediately after a
     // commit. Manual reload makes the post-commit state visible
     // synchronously.
-    tantivy_index . reader . reload () ?;
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "tantivy_reader_reload" ). entered();
+      tantivy_index . reader . reload () ? ; }
   } else {
     tracing::debug!("No documents to process found."); }
   Ok (( )) }
