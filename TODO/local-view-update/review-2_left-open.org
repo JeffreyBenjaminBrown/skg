@@ -183,11 +183,13 @@ before trusting it. I can do that (the test infrastructure is up and green), so
 if you're fine with me touching diff-render output, I'll take it and prove it
 byte-identical.
 
-*** TODO yes
+*** DONE yes
 and comment where the empties are created
 indicating the name of the function that fills them in later.
 *** DONE (4a) the IDCol/AliasCol dedup is done, with the filler-naming comment. =[3de70c15]=
-*** TODO (4b) -- I need your call: the SECOND double-reconcile is NOT a clean dedup.
+*** ONGOING (4b) -- I need your call: the SECOND double-reconcile is NOT a clean dedup.
+these are listed in serial, earliest at top
+**** Claude
 The first half (4a -- the diff worker's IDCol/AliasCol) was clean and byte-identical;
 done. The second half I described -- "=maybe_add_*= fills a fresh col to test
 emptiness, then the BFS reconciles it again" -- turned out NOT to be a pure dedup
@@ -213,7 +215,79 @@ that a famous node's freshly-opened view truncates its big cols (a UX change, bu
 consistent one). If you'd rather keep de-novo drawing all sharing-col members
 regardless of budget, I'll leave 4b alone and we treat it as intended, not a wart.
 Either way it's a behavior decision, not a mechanical cleanup.
+**** Jeff: I'm worried that Skg might create half of the members
+of a group and then stop for node budget reasons,
+without giving the user any indication that there are siblings missing.
+There was code like that once (it's still in main, I think)
+and we ditched it; I must be rediscovering why that was like that.
 
+I would like both pathways treated the same, subject to that condition.
+Do you see how?
+**** Claude: yes. Your instinct is right: the partial-group truncation IS the
+ditched behavior resurfacing. Here is the diagnosis and the fix I propose.
+
+DIAGNOSIS. The two paths differ precisely because de-novo AVOIDS the partial-group
+problem and post-save RE-INTRODUCES it:
+- de-novo: maybe_add_* fills a fresh col with ALL its members (unbudgeted), so a
+  group is always whole. This is almost certainly *why* the eager fill exists -- it
+  sidesteps mid-group truncation. (So unifying by deleting the eager fill, as 4b
+  proposed, would spread the bad behavior, not remove it. Good thing I stopped.)
+- post-save: the BFS col reconcile calls cap_goal_list_to_budget, which truncates
+  the goal list PER MEMBER -- it will draw 5 of 1000 subscribers and create no node
+  for the other 995. That is exactly the silent half-a-group you remember ditching;
+  it is live today on the post-save path.
+So today neither "draws half and indicates it" -- de-novo draws all, post-save
+drops the tail silently. To unify them honestly we need a third behavior.
+
+THE CONDITION, stated sharply: a generated collection (a col) must never render a
+strict, unlabeled subset of its members. Either all of them, or a header that says
+how many are hidden.
+
+PROPOSAL ("both the same, subject to the condition"):
+1. ONE rule, ONE place. Both paths run the single BFS col reconcile. maybe_add_*
+   stops pre-filling members; it keeps only its cheap "is this col non-empty?" gate
+   (which decides whether the col exists at all). So de-novo and post-save become
+   the same code.
+2. Budget the col ATOMICALLY, not per-member. At the col's reconcile: count its NEW
+   members (existing ones are already drawn and cost nothing). If they all fit the
+   remaining budget -> create them all, spend the budget. If they do NOT fit ->
+   create NONE of them, and flag the col as budget-truncated. Never a partial set.
+   This both bounds the famous-node blowup (a 4000-member col costs ~1, not 4000)
+   AND is never silent.
+3. The flag renders as an unmissable indicator on the col header, e.g.
+   =subscriberCol (truncated: 4000 not shown)=. The user can then open the col
+   definitively (a DVR on it) to pull the members in on demand, under a fresh
+   budget. (Folding-safe, local, and it round-trips as ordinary metadata.)
+
+THE ONE THING I NEED FROM YOU: the indicator's form. My lean is the header suffix
+in (3). Alternatives: (a) an explicit =...4000 more= leaf appended to the col; (b) a
+view-level warning in the render response ("view truncated; some members hidden").
+(a) clutters the tree; (b) is easy to miss. I'd ship the header suffix unless you
+prefer one of those.
+
+SCOPING QUESTION BACK: do you want the SAME atomic-or-indicate rule applied to a
+Normal node's *content* children (its contains list), or only to the sharing/
+relation cols? Content is milder -- the parent node stays visible and expandable, so
+a deep tree truncating isn't as silent as a flat group losing siblings -- so I lean
+"cols now, content later if you want it." But a very long contains list truncated
+mid-way has the same smell, so your call.
+
+(Once you pick the indicator form + the content scope, this is a focused change:
+replace cap_goal_list_to_budget's per-member drop with an atomic decision + the
+flag, drop maybe_add_*'s eager member fill, render the flag. I'll validate that
+small cols stay byte-identical and add a famous-node truncation test.)
+**** TODO Jeff: Simpler, I think
+would be to permit exceeding the budget once.
+Whenever we start filling in children, we do so to completion.
+(Not their descendents, just the children.)
+If at that point we have exceeded the budget,
+we stop. This way we don't need a 'some hidden' indicator.
+
+The tricky bit is that we may have written those new children
+as definitive or DVRd, planning to recurse into them.
+So we need to hold onto the list of new children we wrote,
+and if we find the budget was exceeded,
+mark them all indefinitive instead.
 * 5. A cosmetic mis-placement of phantoms in partially-staged diffs
 ** Context
 In the diff view, a child removed from its parent's list shows as a phantom,

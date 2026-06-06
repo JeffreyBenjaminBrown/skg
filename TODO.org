@@ -1,3 +1,4 @@
+* git add for both sides of moved source
 * Emacs, not the server, should remember foldedness and point.
 Keep a tree of IDs.
 If the ID that had point is lost,
