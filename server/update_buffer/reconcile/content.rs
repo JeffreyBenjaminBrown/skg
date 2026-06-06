@@ -18,7 +18,6 @@ use crate::types::tree::viewnode_nodecomplete::{
     pid_and_source_from_treenode,
     write_at_truenode_in_tree};
 use crate::update_buffer::util::{
-    cap_goal_list_to_budget,
     complete_relevant_children_in_viewnodetree,
     partition_children,
     treat_certain_children,
@@ -100,6 +99,12 @@ pub fn expand_true_content_at_truenode (
     mutate_truenode_to_deletednode (
       tree, node, &pid, &initial_source ) ?;
     return Ok (( )); }
+  // §5.5: this vognode is definitive and about to expand -- draw its whole
+  // content group, and (via the BFS) its cols. Each expansion costs ONE budget
+  // unit; an indefinitive node (returned above) costs nothing, and a col fills
+  // for free. visit_normal_node already forced this node indefinitive if the
+  // budget was 0, so here it is > 0; saturating_sub is defensive.
+  *node_budget = node_budget . saturating_sub (1);
   clear_edit_request (tree, node) ?;
   let nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
@@ -112,7 +117,7 @@ pub fn expand_true_content_at_truenode (
   reconcile_content_children (
     tree, node, &nodecomplete, config, graph_snap,
     deleted_since_head_pid_src_map,
-    active_source_set, node_budget ) ?;
+    active_source_set ) ?;
   if cascade {
     attach_cascade_dvrs_to_affected_content( tree, node ) ?; }
   order_children_as_scaffolds_then_ignored_then_content(
@@ -188,7 +193,6 @@ fn reconcile_content_children (
   graph_snap                     : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   active_source_set              : Option<&ActiveSourceSet>,
-  node_budget                    : &mut usize,
 ) -> Result<(), Box<dyn Error>> {
   // Resolve each id through the in-Rust-graph extra_id map so that an
   // id appearing in a node's 'contains' after merging into another
@@ -211,21 +215,17 @@ fn reconcile_content_children (
   // subscribee content through this same path.)
   let apparent_content_ids : Vec<ID> =
     content_goal_list( tree, node, &content_ids, is_sub, config ) ?;
-  // §5.5: cap how many *new* content children this node may create against the
-  // per-buffer budget (existing children are free). The content path has no
-  // removed-member phantoms (the inline diff owns those), so the cap's
-  // removed-id exemption set is empty here.
-  let no_removed : HashSet<ID> = HashSet::new ();
-  let goal_list : Vec<ID> =
-    cap_goal_list_to_budget(
-      tree, node, &apparent_content_ids, &no_removed, node_budget );
+  // §5.5: the content group is drawn WHOLE -- never truncated mid-group. The
+  // budget is spent once per expanding vognode (in expand_true_content_at_truenode),
+  // not per child, so a node either fully expands or is left indefinitive; we
+  // never create a silent partial sibling set.
   // A content child this save deleted stays here; at its own BFS visit it
   // becomes a DeletedNode whose cols generalized-orphan and deaden -- so no col
   // reconciles against a missing NodeComplete -- while any user subtree under it
   // is preserved (demoted), and a now-childless DeletedNode is removed by the
   // §6.6 prune sweep.
   complete_content_children(
-    tree, node, &goal_list, config,
+    tree, node, &apparent_content_ids, config,
     deleted_since_head_pid_src_map, active_source_set ) ?;
   mark_erroneous_content_children_as_indep(
     tree, node, &apparent_content_ids ) ?;
@@ -537,5 +537,5 @@ fn build_child_creation_data (
   Ok (result) }
 
 #[cfg(test)]
-#[path = "../../../tests/unit/complete_preorder_truenode.rs"]
+#[path = "../../../tests/unit/reconcile_content.rs"]
 mod tests;

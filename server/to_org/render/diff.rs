@@ -105,18 +105,21 @@ pub(crate) fn process_truenode_diff (
   // node: same final tree, without the wasted work. (The node's id/alias
   // sub-diffs are noise on a removed node anyway.)
   if ! node_flipped_to_phantom {
-    let merged_ids : Vec<(ID, MembershipAxes)> =
-      axes_from_per_stage_diffs (
-        staged_changes   . map ( |c| c . ids_diff . as_slice () ),
-        unstaged_changes . map ( |c| c . ids_diff . as_slice () ) );
-    if merged_ids . iter () . any ( |(_, m)| ! m . is_empty () ) {
-      prepend_idcol_with_children ( &mut node_mut, &merged_ids ); }
-    let merged_aliases : Vec<(String, MembershipAxes)> =
-      axes_from_per_stage_diffs (
-        staged_changes   . map ( |c| c . aliases_diff . as_slice () ),
-        unstaged_changes . map ( |c| c . aliases_diff . as_slice () ) );
-    if merged_aliases . iter () . any ( |(_, m)| ! m . is_empty () ) {
-      prepend_aliascol_with_children ( &mut node_mut, &merged_aliases ); } }
+    // Emit an EMPTY IDCol / AliasCol when this node's id-list / alias-list
+    // changed. Their per-id / per-alias children (each carrying its membership
+    // axes) are filled when the BFS later reaches the col, by
+    // reconcile_id_col_children / reconcile_alias_col_children -- the single
+    // place that derives them from the per-stage diff. So we only DECIDE here
+    // (cheaply: did any entry get added or removed?), and do not duplicate the
+    // per-stage merge.
+    if list_diff_has_change (
+         staged_changes   . map ( |c| c . ids_diff . as_slice () ),
+         unstaged_changes . map ( |c| c . ids_diff . as_slice () ) ) {
+      prepend_empty_diff_col ( &mut node_mut, QualCol::ID ); }
+    if list_diff_has_change (
+         staged_changes   . map ( |c| c . aliases_diff . as_slice () ),
+         unstaged_changes . map ( |c| c . aliases_diff . as_slice () ) ) {
+      prepend_empty_diff_col ( &mut node_mut, QualCol::Alias ); } }
   // Compute per-stage contains diff for the parent so we can decorate
   // worktree children with M axes and insert phantoms.
   let merged_contains : Vec<(ID, MembershipAxes)> =
@@ -125,11 +128,10 @@ pub(crate) fn process_truenode_diff (
       unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
   mark_membership_on_existing_children (
     &mut node_mut, tree_node_id, &merged_contains );
-  // Net HEAD->worktree contains order, used to place each removed-member phantom
-  // among its surviving siblings. For a single-stage diff (the common case) this
-  // is the correct HEAD position; a two-stage (partially-staged) diff can list a
-  // staged-only removed id at the tail rather than interleaved -- a cosmetic
-  // misplacement (review-2 §2.2), not a misclassification.
+  // Net HEAD->worktree contains order (an LCS of the reconstructed HEAD and
+  // worktree contains lists), so each removed-member phantom lands at its
+  // correct HEAD position among surviving siblings -- even when contains changed
+  // in both git stages.
   let net_contains : Vec<Diff_Item<ID>> =
     net_diff_from_per_stage (
       staged_changes   . map ( |c| c . contains_diff . as_slice () ),
@@ -162,58 +164,33 @@ fn phantom_insertion_plan (
   plan . reverse ();
   plan }
 
-/// Prepend an IDCol scaffold populated with per-id ID scaffolds.
-fn prepend_idcol_with_children (
-  node_mut   : &mut NodeMut<ViewNode>,
-  merged_ids : &[(ID, MembershipAxes)],
-) {
-  let idcol_node : ViewNode =
-    ViewNode {
-      focused     : false,
-      folded      : false,
-      body_folded : false,
-      kind        : ViewNodeKind::QualCol (QualCol::ID) };
-  let idcol_treeid : NodeId =
-    node_mut . prepend (idcol_node) . id();
-  let mut idcol_mut : NodeMut<ViewNode> =
-    node_mut . tree() . get_mut (idcol_treeid) . unwrap();
-  for (id, membership) in merged_ids {
-    let id_viewnode : ViewNode =
-      ViewNode {
-        focused     : false,
-        folded      : false,
-        body_folded : false,
-        kind        : ViewNodeKind::Qual (
-          Qual::ID {
-            id: id . clone (), membership: *membership } ) };
-    idcol_mut . append (id_viewnode); } }
+/// True iff either stage's list-field diff actually added or removed an entry
+/// (an Unchanged-only diff is no change). The cheap decision used to emit an
+/// empty diff col; reconcile_id_col_children / reconcile_alias_col_children
+/// then fills the col from the same per-stage diff.
+fn list_diff_has_change<T> (
+  staged   : Option<&[Diff_Item<T>]>,
+  unstaged : Option<&[Diff_Item<T>]>,
+) -> bool {
+  let changed = | slice : Option<&[Diff_Item<T>]> | -> bool {
+    slice . is_some_and ( |s| s . iter () . any (
+      |item| matches! ( item,
+        Diff_Item::New (_) | Diff_Item::Removed (_) ) )) };
+  changed (staged) || changed (unstaged) }
 
-/// Prepend an AliasCol scaffold populated with per-alias Alias scaffolds.
-/// Mirror of 'prepend_idcol_with_children' for the aliases-list diff.
-fn prepend_aliascol_with_children (
-  node_mut       : &mut NodeMut<ViewNode>,
-  merged_aliases : &[(String, MembershipAxes)],
+/// Prepend an EMPTY QualCol diff scaffold (an IDCol or AliasCol). Its per-entry
+/// children -- each carrying its membership axes -- are filled when the BFS
+/// reaches the col, by reconcile_id_col_children / reconcile_alias_col_children.
+fn prepend_empty_diff_col (
+  node_mut : &mut NodeMut<ViewNode>,
+  kind     : QualCol,
 ) {
-  let aliascol_node : ViewNode =
+  node_mut . prepend (
     ViewNode {
       focused     : false,
       folded      : false,
       body_folded : false,
-      kind        : ViewNodeKind::QualCol (QualCol::Alias) };
-  let aliascol_treeid : NodeId =
-    node_mut . prepend (aliascol_node) . id();
-  let mut aliascol_mut : NodeMut<ViewNode> =
-    node_mut . tree() . get_mut (aliascol_treeid) . unwrap();
-  for (text, membership) in merged_aliases {
-    let alias_viewnode : ViewNode =
-      ViewNode {
-        focused     : false,
-        folded      : false,
-        body_folded : false,
-        kind        : ViewNodeKind::Qual (
-          Qual::Alias {
-            text: text . clone (), membership: *membership } ) };
-    aliascol_mut . append (alias_viewnode); } }
+      kind        : ViewNodeKind::QualCol (kind) } ); }
 
 /// For each existing child in the worktree's contains list, copy any
 /// per-stage M-axis values from the merged contains diff.

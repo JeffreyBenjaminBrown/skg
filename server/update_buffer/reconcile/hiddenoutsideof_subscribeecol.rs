@@ -6,7 +6,6 @@ use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
-use crate::update_buffer::util::cap_goal_list_to_budget;
 use crate::types::viewnode::{ViewNode, RoleCol};
 
 use ego_tree::{NodeId, Tree};
@@ -38,7 +37,6 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  node_budget                    : &mut usize,
 ) -> Result<(), Box<dyn Error>> {
   let kind : RoleCol =
     RoleCol::HiddenOutsideOfSubscribee;
@@ -54,11 +52,9 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
       &context . subscriber_pid, &context . subscriber_source,
       &context . subscriber_hides, &context . subscribees,
       source_diffs, &env . config );
-  // §5.5/§18: each newly-hidden member is a new TrueNode -- spend the
-  // per-buffer budget (existing children and removed-member phantoms are free).
-  let goal_list : Vec<ID> =
-    cap_goal_list_to_budget (
-      tree, node, &goal_list, &removed_ids, node_budget );
+  // §5.5: a col fills its members WHOLE and is budget-neutral -- the owning
+  // subscriber already spent its budget unit when it expanded, so drawing all
+  // these hidden members here costs nothing and never truncates the group.
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
       tree, node, &context . subscriber_pid, &context . subscriber_source,

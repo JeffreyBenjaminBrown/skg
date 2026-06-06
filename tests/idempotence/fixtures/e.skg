@@ -1,0 +1,4 @@
+pid: e
+title: e
+subscribes_to:
+  - b

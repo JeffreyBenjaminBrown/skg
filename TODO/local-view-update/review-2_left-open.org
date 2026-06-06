@@ -12,6 +12,23 @@ I tend to invent shorthand while working solo, so the glossary below defines the
 terms these questions use. Skim it or skip it; each question also re-explains its
 own machinery.
 
+* Status: all eight closed (last updated 2026-06-06)
+You answered all eight inline; all are now done and committed on
+=local-view-updates= (full Rust suite 491/491 + the integration suite green).
+#4b (the last one) landed as the node-budget redesign we worked out below: the
+budget now counts vognode EXPANSIONS (cost 1 each), cols fill whole and
+budget-neutral, a view root is never truncated, and on hitting 0 the rest are
+drawn indefinitive -- whole groups, no silent partial, no "N hidden" indicator.
+- #1 KEEP the removed-node expansion -> parked it in =to_org/expand/unused_but_nice.rs= with the "held for someday" header you asked for; unwired the dead branch from the live draw rule. =[1a695755]=
+- #2 merge the dirs -> =update_buffer/reconcile/= (the two colliding =truenode.rs= became =content.rs= + =view_requests.rs=). =[efc93768]=
+- #3 scaffold->col renames -> =scaffold_node= became =col_node=; generic helpers kept generic. =[a5bb5183, 6fbf3836]=
+- #4a the diff IDCol/AliasCol dedup -> diff worker emits EMPTY cols, the reconciler fills them, with the filler-naming comment you asked for. =[3de70c15]=
+- #4b the node-budget redesign (the dialog below) -> budget counts EXPANSIONS (cost 1/vognode), cols budget-neutral, roots never truncated, whole-groups-then-indefinitive. Re-baselined the node-limit tests + added a content-wins-the-budget test; §5.5 rewritten.
+- #5 two-stage phantom mis-placement -> fixed (reconstruct HEAD/worktree, LCS-diff), with a regression test. =[7a554ad2]=
+- #6 idempotence net -> extended the existing test to render+reconcile a relation col (no new test). =[3101e0ff]=
+- #7 plan_v2 drift -> corrected §5.5 and §19. =[a3c62b44, 6fbf3836]=
+- #8 dead =overrider= field -> dropped. =[a3c62b44]=
+
 * Glossary
 - *view* / *buffer* :: an org-mode buffer showing a slice of the graph as an
   indented tree. The user reads and edits the graph through these.
@@ -171,9 +188,237 @@ before trusting it. I can do that (the test infrastructure is up and green), so
 if you're fine with me touching diff-render output, I'll take it and prove it
 byte-identical.
 
-*** TODO yes
+*** DONE yes
 and comment where the empties are created
 indicating the name of the function that fills them in later.
+*** DONE (4a) the IDCol/AliasCol dedup is done, with the filler-naming comment. =[3de70c15]=
+*** DONE (4b) -- redesigned the node budget (dialog below); landed + tested.
+these are listed in serial, earliest at top.
+**** Claude
+The first half (4a -- the diff worker's IDCol/AliasCol) was clean and byte-identical;
+done. The second half I described -- "=maybe_add_*= fills a fresh col to test
+emptiness, then the BFS reconciles it again" -- turned out NOT to be a pure dedup
+once I looked closely, so I stopped rather than silently change behavior:
+
+Today, when a view is first opened (de-novo), =maybe_add_*= creates each relation /
+subscribee col and *fills in all its members eagerly*. The node budget (the cap
+that stops a famous node from drawing thousands of subscribers) is NOT charged for
+those members, because they already exist by the time the budgeted BFS reconcile
+runs. If I make =maybe_add_*= create an EMPTY col and let the BFS fill it, the BFS
+*would* charge the budget -- so a de-novo view of a famous node would start
+truncating its relation/subscribee cols, the way a post-save rerender already does.
+
+That is arguably MORE correct (it's what §5.5 -- the budget rule -- intends: sharing
+cols should be budgeted), and for every small graph (i.e. the whole test suite) it
+is byte-identical, so the tests wouldn't catch the difference. But it is a real,
+untested behavior change for huge cols, and =maybe_add_hiddenInSubscribeeCol= runs
+on the post-save path too, so it's not even de-novo-only.
+
+*What I need from you*: do you WANT de-novo (and the ensure-hidden-in step) to start
+budgeting their sharing cols like post-save does? If yes, I'll do 4b and we accept
+that a famous node's freshly-opened view truncates its big cols (a UX change, but a
+consistent one). If you'd rather keep de-novo drawing all sharing-col members
+regardless of budget, I'll leave 4b alone and we treat it as intended, not a wart.
+Either way it's a behavior decision, not a mechanical cleanup.
+**** Jeff: I'm worried that Skg might create half of the members
+of a group and then stop for node budget reasons,
+without giving the user any indication that there are siblings missing.
+There was code like that once (it's still in main, I think)
+and we ditched it; I must be rediscovering why that was like that.
+
+I would like both pathways treated the same, subject to that condition.
+Do you see how?
+**** Claude: yes. Your instinct is right: the partial-group truncation IS the
+ditched behavior resurfacing. Here is the diagnosis and the fix I propose.
+
+DIAGNOSIS. The two paths differ precisely because de-novo AVOIDS the partial-group
+problem and post-save RE-INTRODUCES it:
+- de-novo: maybe_add_* fills a fresh col with ALL its members (unbudgeted), so a
+  group is always whole. This is almost certainly *why* the eager fill exists -- it
+  sidesteps mid-group truncation. (So unifying by deleting the eager fill, as 4b
+  proposed, would spread the bad behavior, not remove it. Good thing I stopped.)
+- post-save: the BFS col reconcile calls cap_goal_list_to_budget, which truncates
+  the goal list PER MEMBER -- it will draw 5 of 1000 subscribers and create no node
+  for the other 995. That is exactly the silent half-a-group you remember ditching;
+  it is live today on the post-save path.
+So today neither "draws half and indicates it" -- de-novo draws all, post-save
+drops the tail silently. To unify them honestly we need a third behavior.
+
+THE CONDITION, stated sharply: a generated collection (a col) must never render a
+strict, unlabeled subset of its members. Either all of them, or a header that says
+how many are hidden.
+
+PROPOSAL ("both the same, subject to the condition"):
+1. ONE rule, ONE place. Both paths run the single BFS col reconcile. maybe_add_*
+   stops pre-filling members; it keeps only its cheap "is this col non-empty?" gate
+   (which decides whether the col exists at all). So de-novo and post-save become
+   the same code.
+2. Budget the col ATOMICALLY, not per-member. At the col's reconcile: count its NEW
+   members (existing ones are already drawn and cost nothing). If they all fit the
+   remaining budget -> create them all, spend the budget. If they do NOT fit ->
+   create NONE of them, and flag the col as budget-truncated. Never a partial set.
+   This both bounds the famous-node blowup (a 4000-member col costs ~1, not 4000)
+   AND is never silent.
+3. The flag renders as an unmissable indicator on the col header, e.g.
+   =subscriberCol (truncated: 4000 not shown)=. The user can then open the col
+   definitively (a DVR on it) to pull the members in on demand, under a fresh
+   budget. (Folding-safe, local, and it round-trips as ordinary metadata.)
+
+THE ONE THING I NEED FROM YOU: the indicator's form. My lean is the header suffix
+in (3). Alternatives: (a) an explicit =...4000 more= leaf appended to the col; (b) a
+view-level warning in the render response ("view truncated; some members hidden").
+(a) clutters the tree; (b) is easy to miss. I'd ship the header suffix unless you
+prefer one of those.
+
+SCOPING QUESTION BACK: do you want the SAME atomic-or-indicate rule applied to a
+Normal node's *content* children (its contains list), or only to the sharing/
+relation cols? Content is milder -- the parent node stays visible and expandable, so
+a deep tree truncating isn't as silent as a flat group losing siblings -- so I lean
+"cols now, content later if you want it." But a very long contains list truncated
+mid-way has the same smell, so your call.
+
+(Once you pick the indicator form + the content scope, this is a focused change:
+replace cap_goal_list_to_budget's per-member drop with an atomic decision + the
+flag, drop maybe_add_*'s eager member fill, render the flag. I'll validate that
+small cols stay byte-identical and add a famous-node truncation test.)
+**** Jeff: Simpler, I think
+would be to permit exceeding the budget once.
+Whenever we start filling in children, we do so to completion.
+(Not their descendents, just the children.)
+If at that point we have exceeded the budget,
+we stop. This way we don't need a 'some hidden' indicator.
+
+The tricky bit is that we may have written those new children
+as definitive or DVRd, planning to recurse into them.
+So we need to hold onto the list of new children we wrote,
+and if we find the budget was exceeded,
+mark them all indefinitive instead.
+**** -- I like it. It drops the indicator entirely, and it's actually
+what plan_v2 §5.5 originally INTENDED ("on hitting the budget ... render the
+remaining siblings indefinitive") -- the per-member =cap_goal_list_to_budget=
+drifted away from that into silent drops. So this is a return to the design, not a
+new one. I'll delete the per-member truncation.
+
+ONE GIFT FROM THE BFS: your "tricky bit" is nearly free. The driver doesn't recurse
+into a child inline; it ENQUEUES it and recurses later. So "we wrote children as
+definitive/DVR, then found we're over budget" resolves itself: once the budget is
+spent, the guard at each child's OWN dequeue draws it indefinitive (and strips its
+DVR). We don't have to hold the written list and retro-flip it -- the deferred visit
+does it. (Today only a DVR'd node has that guard; I'd generalize it to every node:
+"dequeued with budget already 0 -> indefinitive, create nothing.") I can do the
+eager retro-flip instead if you'd rather see it explicit in the code, but the lazy
+guard is less machinery for the same result. Your call.
+
+ONE WRINKLE WORTH SETTLING -- cols. Your rule is clean for a vognode's CONTENT
+children: over budget -> mark them indefinitive, done (an indefinitive headline is
+visible, so nothing's hidden). But a node's immediate "children" also include its
+col scaffolds (SubscribeeCol, the relation cols, ...), and a col's MEMBERS are a
+group one level deeper, filled at the col's own visit. "Indefinitive" doesn't apply
+to a col (it's not a vognode), and -- the trap -- a col that fills to EMPTY because
+the budget ran out gets pruned by the §3.4 sweep (read-only relation / Hidden* /
+ID cols self-delete when empty). So it VANISHES with no trace: exactly the silent
+omission you're avoiding, just one level up (you'd see the parent, but not that it
+has, say, 4000 subscribers). An empty SubscribeeCol is worse-ish: it survives but
+now reads as "no subscriptions," a lie.
+
+So cols need their own clause. My proposal: the budget is checked at NODE
+boundaries, and a col, once it exists, ALWAYS fills its members whole. Concretely:
+- A node dequeued with budget > 0 expands fully: it creates its content children
+  AND its col scaffolds (whole), and each col, when later dequeued, fills ALL its
+  members (whole, decrementing the budget, allowed to overshoot).
+- A node dequeued with budget == 0 is a bare indefinitive headline: it creates no
+  content children and no cols. So there are never empty-from-budget cols to vanish.
+That keeps your invariant ("never a partial/silent group") at every level: you
+either see a node fully expanded, or you see it as one collapsed headline.
+
+THE PRICE (so it's a choice, not a surprise): the budget becomes a soft floor, not
+a cap. Worst case is roughly =budget + one fully-expanded node= -- and for a famous
+node that one expansion could be thousands of indefinitive subscriber/relation
+headlines, drawn once and not recursed into. I think that's the right trade for a
+knowledge tool (whole groups, no indicator, nothing silently missing), but it does
+mean opening a famous node can produce a big-but-bounded one-shot view. Good with
+that?
+
+If you confirm (lazy guard is fine; cols fill-whole / budget gates at node
+boundaries; soft-floor price accepted), it's a focused change: delete
+=cap_goal_list_to_budget='s per-member drop; have each group-fill take all members
+and decrement by the count (saturating); generalize the budget-0 guard to every
+node visit; rewrite §5.5's wording; add a famous-node test asserting the big col is
+WHOLE and everything after it is indefinitive.
+**** yes, let's do that
+I think. But first let me be sure I understand you:
+
+Suppose we create a vognode, and it has subscribers,
+and we have exactly 2 nodes left in the budget when we get to it.
+We create all its content, and all its subscribers,
+without even looking at the budget until we're done.
+Then we decrement the budget by 1.
+
+The content should be queued before the subscribers,
+because the content is closer to the root than the subscribers,
+even though the subscriber branch precedes the content.
+(Is this how the queue works already? If not, it should.)
+
+Then we work through the queue. For the first content node,
+we give it the same treatment -- draw all its content,
+and all its subscribers if it has those, queuing them.
+Then we decrement budget again. Now budget is at 0.
+
+The rest of the vognodes in the queue are drawn indefinitive.
+
+If this is not what you mean, please explain the difference
+between what I just said and what you meant.
+**** -- your OUTCOME is exactly right. Two bookkeeping points where the
+*code* differs from your phrasing, but they land on the result you described:
+
+1. BUDGET GRANULARITY: "decrement by 1" (per fully-expanded vognode) is your model,
+   and it's better than what I'd loosely said earlier ("decrement by the number of
+   children created"). Let's use yours. So the budget counts EXPANSIONS, not
+   viewnodes: each vognode we fully draw costs 1; a vognode drawn indefinitive (a
+   leaf) costs 0. Your trace is then exactly right: V costs 1 (budget 2->1), the
+   first content node costs 1 (1->0), the rest indefinitive.
+   - Heads-up consequence: the number then means something new. Today
+     =initial_node_limit= is roughly "how many viewnodes"; under your rule it's "how
+     many vognodes get expanded", and one expansion can emit a whole big group. So
+     we may want to retune that constant -- minor, but I'll flag it where it's set.
+
+2. "CREATE ALL ITS SUBSCRIBERS" happens a beat later than your phrasing, but
+   equivalently. In the code V's own visit does NOT create the subscribers; it
+   creates the SubscribeeCol *scaffold*, and the subscribers are filled when the BFS
+   later reaches that col. That matches your model as long as a col fill is
+   BUDGET-NEUTRAL: it draws all its members whole and neither costs nor checks the
+   budget -- the owning vognode already paid its 1. (So a col never truncates and
+   never competes with content for budget.) I'll make col-fills budget-neutral.
+
+QUEUE ORDER: yes, it already works the way you want, and for a sturdy reason --
+subscribers sit one level DEEPER than content. Content children are direct children
+of V (depth 1); a subscriber is V -> SubscribeeCol -> subscriber (depth 2). BFS is
+breadth-first by depth, so all of V's content (depth 1) is dequeued before any
+subscriber (depth 2), even though the SubscribeeCol sits *before* content in sibling
+order. Trace: after V, queue = [SubCol, c1, c2]; dequeuing SubCol fills s1,s2 and
+pushes them to the BACK -> queue = [c1, c2, s1, s2]. So c1,c2 hit the budget check
+before s1,s2. Combined with point (2) -- the SubCol itself spends nothing -- content
+always gets first claim on the budget. I'll pin this with a test (a node with both
+content and subscribers, budget just big enough for the content: content expands,
+subscribers stay whole-but-indefinitive).
+
+So: same outcome you wrote, with the budget counting expansions (cost 1 each), cols
+filling whole for free, and content winning the budget race by being shallower.
+Confirm this and I'll build it.
+**** DONE -- built it.
+Implemented exactly that: deleted cap_goal_list_to_budget (the per-member
+truncation); expand_true_content_at_truenode now charges 1 per vognode expansion
+(saturating, so a whole group can overshoot once); the budget-0 guard in
+visit_normal_node draws any non-root vognode indefinitive (view roots exempt); the
+four sharing-col reconcilers no longer take or spend the budget (whole + neutral).
+Re-baselined the node-limit tests (definitive_view_cascade_and_budget,
+initial_view_bfs, content_view) to the new accounting -- each now shows whole groups
+with expansion stopping at the budget, and collapsed nodes keep their
+graphStats(contents N) so nothing is silently missing. Added
+test_budget_content_beats_subscribers (a node with a content chain + 2 subscribers,
+budget = the chain length: the chain fully expands AND both subscribers show whole +
+indefinitive, proving cols don't spend the budget). Rewrote plan_v2 §5.5. Full Rust
+suite 491/491 + all 28 integration tests green.
 
 * 5. A cosmetic mis-placement of phantoms in partially-staged diffs
 ** Context

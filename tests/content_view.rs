@@ -272,10 +272,12 @@ fn test_limit_with_multiple_sibling_groups
       //   └─ 12 (gen 2)
       //      └─ 121 (gen 3)
       //
-      // §5.5 node budget, limit=4: level-order creation spends the budget on
-      // 11,12 (gen 2 = 2) then 111,112 (the two gen-3 children of node 11) = 4.
-      // node 12's child 121 is not drawn. All created nodes are definitive (with
-      // bodies); only 12's contents are truncated (graphStats flags it).
+      // §5.5 node budget, limit=4 (cost 1 per vognode EXPANSION): expansions are
+      // 1, 11, 12, 111. Each parent draws its WHOLE child group (never a partial
+      // sibling set), and once the budget is spent the remaining children stay
+      // indefinitive: 11's group 111,112 is whole (111 expanded, 112 indef), and
+      // 12's group 121 is whole (indef). graphStats(contents N) flags the
+      // collapsed nodes, so nothing is silently missing.
 
       let mut test_config = config . clone();
       test_config . initial_node_limit = 4;
@@ -294,12 +296,12 @@ fn test_limit_with_multiple_sibling_groups
                               11 body
                               *** (skg (node (id 111) (source main))) 111
                               111 body
-                              *** (skg (node (id 112) (source main))) 112
-                              112 body
+                              *** (skg (node (id 112) (source main) indef)) 112
                               ** (skg (node (id 12) (source main) (graphStats (contents 1)))) 12
                               12 body
+                              *** (skg (node (id 121) (source main) indef)) 121
                               "};
       assert_eq!(result, expected,
-                 "limit=4 spends the §5.5 budget on 11,12,111,112; 121 not drawn");
+                 "limit=4: whole groups drawn (111,112 and 121); expansion stops at the budget");
 
       Ok (( )) } )) }

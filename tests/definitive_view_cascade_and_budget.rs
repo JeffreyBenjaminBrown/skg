@@ -24,16 +24,18 @@ fn mk_test_tcp_stream ()
   TcpStream::connect (addr) . unwrap () }
 
 // ===================================================
-// Test: Definitive view with limit=10
-// Gives room for all 7 descendents.
+// Test: Definitive view with an ample budget -> everything expands.
+// §5.5 budget counts vognode EXPANSIONS (cost 1 each); the full subtree here is
+// 12 expansions (1,2,11,12,13,121,122,123,124,1211,1212,1221), so a budget of
+// 20 is ample and nothing is left indefinitive.
 // ===================================================
 #[test]
-fn test_definitive_view_limit_10
+fn test_definitive_view_ample_budget
   () -> Result<(), Box<dyn Error>> {
   run_with_test_db (
-    "skg-test-definitive-view-limit-10",
+    "skg-test-definitive-view-ample-budget",
     "tests/definitive_view_cascade_and_budget/fixtures",
-    "/tmp/tantivy-test-definitive-view-limit-10",
+    "/tmp/tantivy-test-definitive-view-ample-budget",
     |config, driver, tantivy| Box::pin ( async move {
       let input_org_text = indoc! {"
         * (skg (node (id 1) (source main))) 1
@@ -45,7 +47,7 @@ fn test_definitive_view_limit_10
 
       let result = {
         let mut config = config . clone();
-        config . initial_node_limit = 10;
+        config . initial_node_limit = 20;
         let graph : InRustGraphHandle =
           new_handle (InRustGraph::new ());
         let mut views_state : ViewsState = ViewsState {
@@ -59,9 +61,9 @@ fn test_definitive_view_limit_10
           &Err ( String::new () ), &mut views_state ) . await ?;
         response . saved_view };
 
-      println!("Result with limit=10:\n{}", result);
+      println!("Result with ample budget (20):\n{}", result);
 
-      // With limit=10, all children should be expanded
+      // With an ample budget, all children should be expanded
       let expected = indoc! {"
         * (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
         ** (skg (node (id 11) (source main))) 11
@@ -86,7 +88,7 @@ fn test_definitive_view_limit_10
       "};
 
       assert_eq!(result, expected,
-        "Definitive view with limit=10 should expand all children");
+        "Definitive view with an ample budget should expand all children");
 
       Ok (( )) } )) }
 
@@ -148,32 +150,30 @@ fn test_definitive_view_limit_5_or_6
       println!("Result with limit=5:\n{}", result_5);
       println!("Result with limit=6:\n{}", result_6);
 
-      // §5.5 (one per-buffer budget, BFS order, no sibling-group padding):
-      // 121,122,123,124 are created (budget -4), then 121's gen-3 children
-      // are created up to the remaining budget; once spent, remaining DVRs
-      // are stripped (those nodes left indefinitive). 121 itself is reached
-      // while budget>0, so it stays definitive. limit=5 and limit=6 now
-      // differ by exactly one created gen-3 node (the old code padded both
-      // to the whole 1211/1212 sibling group).
+      // §5.5: the budget counts vognode EXPANSIONS (cost 1 each), in BFS order.
+      // The expansion order here is 1, 2, 11, 12, 13, 121, 122, ... A col fills
+      // WHOLE for free, so a node's whole content group is always drawn -- the
+      // budget only governs how many of those children then EXPAND in turn; the
+      // rest stay indefinitive (visible, collapsed). Never a partial group.
       //
-      // limit=5: budget 5 -> 1 after gen 2; 121 draws 1211 (budget ->0),
-      // 1212 not created; 122/123/124 and 1211 have DVRs stripped -> indef.
+      // limit=5: expansions 1,2,11,12,13 spend the budget. 12 (the 4th) expanded
+      // and drew its WHOLE group 121..124, but the budget hit 0 at 13, so when
+      // 121..124 are visited they stay indefinitive (none expands -> no gen-3).
       let expected_5 = indoc! {"
         * (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
         ** (skg (node (id 11) (source main))) 11
         ** (skg (node (id 12) (source main) (graphStats (contents 4)))) 12
         12 body
-        *** (skg (node (id 121) (source main) (graphStats (contents 2)))) 121
-        121 body
-        **** (skg (node (id 1211) (source main) indef)) 1211
+        *** (skg (node (id 121) (source main) indef (graphStats (contents 2)))) 121
         *** (skg (node (id 122) (source main) indef (graphStats (contents 1)))) 122
         *** (skg (node (id 123) (source main) indef)) 123
         *** (skg (node (id 124) (source main) indef)) 124
         ** (skg (node (id 13) (source main))) 13
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
-      // limit=6: budget 6 -> 2 after gen 2; 121 draws both 1211 and 1212
-      // (budget ->0), each then DVR-stripped -> indef.
+      // limit=6: one more expansion than limit=5 -- 121 (the 6th) now expands and
+      // draws its whole gen-3 group 1211,1212 (both then indefinitive, budget
+      // spent); 122..124 remain indefinitive.
       let expected_6 = indoc! {"
         * (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
         ** (skg (node (id 11) (source main))) 11
@@ -253,26 +253,24 @@ fn test_definitive_view_limit_1_to_4
       println!("Result with limit=1:\n{}", result_1);
       println!("Result with limit=4:\n{}", result_4);
 
-      // §5.5 (one per-buffer budget, no "complete the sibling group"
-      // cleverness): node 12 has 4 content children (121..124). The budget
-      // caps how many *new* children are created in BFS order; once it is
-      // spent, remaining DVRs are stripped and those nodes left indefinitive.
-      // So limit=1 and limit=4 now differ (the old behavior padded both out
-      // to the whole sibling group).
+      // §5.5: the budget counts vognode EXPANSIONS (cost 1 each), in BFS order:
+      // 1, 2, 11, 12, 13, then 12's content 121..124, ... A view ROOT is never
+      // truncated (the user opened it), so roots 1 and 2 always expand; other
+      // vognodes reached after the budget is spent are left indefinitive.
       //
-      // limit=1: only 121 is created (budget 1->0); 122,123,124 are not
-      // created at all, and 121's own DVR is stripped (budget 0) -> indef.
+      // limit=1: root 1 expands (budget 1->0) and draws its WHOLE group 11,12,13;
+      // all three are then indefinitive (budget spent), so 12 never expands and
+      // none of 121.. is created. Root 2 still expands (root exemption).
       let expected_1 = indoc! {"
         * (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
-        ** (skg (node (id 11) (source main))) 11
-        ** (skg (node (id 12) (source main) (graphStats (contents 4)))) 12
-        12 body
-        *** (skg (node (id 121) (source main) indef (graphStats (contents 2)))) 121
-        ** (skg (node (id 13) (source main))) 13
+        ** (skg (node (id 11) (source main) indef)) 11
+        ** (skg (node (id 12) (source main) indef (graphStats (contents 4)))) 12
+        ** (skg (node (id 13) (source main) indef)) 13
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
-      // limit=4: all four gen-2 children are created (budget 4->0), then each
-      // has its DVR stripped (budget 0) -> all indefinitive, no grandchildren.
+      // limit=4: expansions 1, 2, 11, 12 spend the budget. 12 (the 4th) drew its
+      // whole group 121..124, all indefinitive (budget spent); 13 is reached
+      // after the budget is gone, so it too is indefinitive.
       let expected_4 = indoc! {"
         * (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 3)))) 1
         ** (skg (node (id 11) (source main))) 11
@@ -282,7 +280,7 @@ fn test_definitive_view_limit_1_to_4
         *** (skg (node (id 122) (source main) indef (graphStats (contents 1)))) 122
         *** (skg (node (id 123) (source main) indef)) 123
         *** (skg (node (id 124) (source main) indef)) 124
-        ** (skg (node (id 13) (source main))) 13
+        ** (skg (node (id 13) (source main) indef)) 13
         * (skg (node (id 2) (source main) (parentIs absent))) 2
       "};
 
