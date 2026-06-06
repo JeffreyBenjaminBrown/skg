@@ -539,4 +539,13 @@ pub(crate) fn update_tantivy_from_saveinstructions (
       "tantivy_commit" ). entered();
     commit_with_status(
       &mut writer, tantivy_index, processed_count, "Updated")? ; }
+  // Wait out the writer's background merge threads before returning, so
+  // the index is fully quiescent: 'commit()' alone can leave merge
+  // threads writing segment files, which (when this runs on the
+  // background worker) would race a test's index-directory cleanup, and
+  // makes 'wait_for_tantivy_writes_idle' mean what it says.
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "tantivy_wait_merging_threads" ). entered();
+    writer . wait_merging_threads ()
+      . map_err ( |e| -> Box<dyn Error> { e . into () }) ? ; }
   Ok (processed_count) }
