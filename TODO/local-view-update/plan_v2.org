@@ -278,26 +278,36 @@ plan is implemented this hook returns =None= for everything. Do not re-specify
 the registry's maintenance here.
 
 ** 5.5 Node limit
-- *Per buffer*, reset to 0 at each update; counts only *new* ViewNodes created
-  *during the ordinary update pass*. Most kinds count (content, the sharing-col
-  members, inactive, deleted). The id/alias cols are EXEMPT: a node's own
-  id/alias count is naturally bounded, so capping them buys nothing, and
-  cap_goal_list_to_budget is never called from the id/alias reconcilers.
-- *The counter covers only the ordinary update pass.* The diff overlay (§9) is
-  *not* subject to it: every necessary diff-phantom and diff scaffold is always
-  created, regardless of node count. (A shared counter would let a big worktree
-  pass starve the diff overlay, cutting exactly the removed-content diff-phantoms
-  diff mode exists to show.) The counter is a plain =&mut usize= threaded through
-  the single-threaded async recursion; no Arc/Mutex.
-- BFS order. On hitting the budget: create no more new nodes; render the
-  remaining siblings indefinitive; *strip all remaining DVRs* (the nodes they
-  were on stay indefinitive). No "complete the whole sibling group" cleverness.
+The budget counts vognode *EXPANSIONS*, not ViewNodes. A vognode "expands" when
+it is drawn definitive and fills in its children; each expansion costs ONE unit
+(charged in expand_true_content_at_truenode). A vognode drawn indefinitive -- a
+leaf of the view -- costs nothing. The point is to bound how deep/wide the view
+expands while NEVER showing a partial, silently-truncated group.
+- *Per buffer*, initialized once per render to =config.initial_node_limit=, a
+  plain =&mut usize= (no Arc/Mutex; single-threaded async recursion).
+- *Whole groups, never partial.* When a vognode expands it draws its ENTIRE
+  child group(s) to completion -- content children and, via the BFS, its cols.
+  We never create a strict subset of a group, so a reader never sees siblings
+  silently missing.
+- *Cols are budget-NEUTRAL.* A col (SubscribeeCol, the relation cols, Hidden*,
+  IDCol, AliasCol) fills all its members WHOLE and neither costs nor checks the
+  budget: the owning vognode already paid its 1 when it expanded. So content
+  always wins the budget over a node's sharing members (and the members, being
+  one tree level deeper, are reached after content in BFS order anyway).
+- *On hitting 0:* every vognode reached afterward is drawn indefinitive (a
+  visible, collapsed headline; its graphStats still show it has hidden content,
+  so nothing is silently lost) and has any DVR stripped. The group that crossed
+  zero is still whole -- "permit exceeding the budget once" -- so the worst case
+  is roughly =budget + one fully-expanded vognode's groups=, drawn once and not
+  recursed into. EXCEPTION: a view root (child of the BufferRoot) is never
+  truncated -- the user explicitly opened it.
+- *The budget covers only the ordinary update pass.* The inline diff is exempt:
+  every diff-phantom and diff scaffold is always created, regardless of count.
 - Existing nodes are never deleted to satisfy the limit; an old huge view can
   stay huge until the graph changes it. Acceptable.
-- Unify today's two separate node-limit implementations (initial-render
-  per-buffer in [[../../server/to_org/render/initial_bfs.rs][render_initial_viewforest_bfs]], and per-definitive-subtree in
-  [[../../server/to_org/expand/definitive.rs][extendDefinitiveSubtreeFromLeaf]]) into one per-buffer counter threaded
-  through the BFS.
+- One per-buffer counter threaded through the single BFS, replacing the two old
+  node-limit implementations (the deleted de-novo BFS and the parked
+  extendDefinitiveSubtree_fromGit).
 
 ** 5.6 Map maintenance invariants
 - Rebuilt per render (fresh map each pass; nothing stale carries across saves).

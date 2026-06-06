@@ -138,27 +138,26 @@ async fn dispatch_node_update (
     ViewNodeKind::Vognode (Vognode::Normal (_)) =>
       visit_normal_node (tree, treeid, context) . await ?,
     ViewNodeKind::PartnerCol (RoleCol::Subscribee) =>
+      // A col fills its members WHOLE and is budget-neutral (§5.5): the owning
+      // vognode already spent its 1 budget unit when it expanded, so drawing all
+      // the members here costs nothing more and never truncates a group.
       reconcile_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
-        context . deleted_since_head_pid_src_map,
-        &mut context . node_budget ) . await ?,
+        context . deleted_since_head_pid_src_map ) . await ?,
     ViewNodeKind::PartnerCol (RoleCol::HiddenInSubscribee) =>
       reconcile_hiddenin_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
-        context . deleted_since_head_pid_src_map,
-        &mut context . node_budget ) ?,
+        context . deleted_since_head_pid_src_map ) ?,
     ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee) =>
       reconcile_hiddenoutside_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
-        context . deleted_since_head_pid_src_map,
-        &mut context . node_budget ) ?,
+        context . deleted_since_head_pid_src_map ) ?,
     ViewNodeKind::PartnerCol (role)
       if role . relation_member_role () . is_some () =>
       reconcile_relation_col_children (
         treeid, tree, *role, context . source_diffs,
         context . env, context . graph_snap,
-        context . deleted_since_head_pid_src_map,
-        &mut context . node_budget ) ?,
+        context . deleted_since_head_pid_src_map ) ?,
     // §9 reversal (#3): the IDCol/AliasCol diff scaffolds are created inline by
     // process_truenode_diff at the owner's BFS visit, so their reconcilers must
     // see the real diffs (source_diffs) or they would clobber the just-created
@@ -200,12 +199,20 @@ async fn visit_normal_node (
         _ => false } ) ?;
   let mut settled : bool = false; // §5.2 draw rule already ran
   let mut cascade : bool = false; // node is Final -> hand DVRs to children
-  if had_dvr && context . node_budget == 0 {
-    // §5.5: budget exhausted -- strip the (user or cascade) DVR and leave the
-    // node indefinitive instead of making it Final. The content engine
-    // (settled) then clobbers+returns, drawing no further content. This is
-    // the BFS-order truncation: earlier siblings expand, later ones stay
-    // indefinitive once the budget is spent.
+  // §5.5: the budget counts vognode *expansions* (each costs 1, charged in
+  // expand_true_content_at_truenode); once it hits 0 every later vognode is left
+  // indefinitive -- a visible, collapsed headline. We never truncate a group
+  // mid-way (whole groups already drawn keep all their members); we only stop
+  // STARTING new expansions. EXCEPTION: a view root (child of the BufferRoot) is
+  // the node the user explicitly opened, so it always expands -- never truncated.
+  // (The ancestor read is short-circuited to only run when the budget is spent.)
+  if context . node_budget == 0
+    && ! read_at_ancestor_in_tree ( tree, treeid, 1,
+           |vn : &ViewNode| matches! ( &vn . kind, ViewNodeKind::BufferRoot ) )
+         . unwrap_or (false) {
+    // Budget spent and this is not a view root: draw it indefinitive and expand
+    // nothing under it; strip any DVR so it is not treated as Final. The content
+    // engine (settled) then clobbers+returns.
     write_at_truenode_in_tree (
       tree, treeid,
       |t| { t . view_requests . remove (& ViewRequest::Definitive);

@@ -1,0 +1,7 @@
+pid: r
+title: r
+contains:
+  - c1
+subscribes_to:
+  - s1
+  - s2
