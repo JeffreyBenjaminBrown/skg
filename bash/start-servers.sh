@@ -54,6 +54,37 @@ is_typedb_healthy() {
   typedb_process_exists && typedb_grpc_is_up
 }
 
+preflight_check_config() {
+  # Validate the config BEFORE touching TypeDB, using skg's own loader
+  # (the 'check-config' subcommand runs the same load_config the server
+  # runs at startup). A malformed skgconfig.toml otherwise makes skg
+  # exit(1) before binding port 1730, and -- because cargo-watch only
+  # watches server/ -- it crash-loops with the error buried in
+  # logs/cargo-watch.log, which presents as "can't connect / TypeDB is
+  # down". Catching it here, in red, turns that into an obvious fix.
+  echo ""
+  echo "Validating config: $SKG_CONFIG"
+  if ! cargo build -q --bin skg; then
+    printf '\033[1;31m%s\033[0m\n' \
+      "ERROR: skg failed to compile (see errors above). Servers NOT started."
+    exit 1
+  fi
+  local config_err
+  if ! config_err="$( cargo run -q --bin skg -- check-config "$SKG_CONFIG" 2>&1 )"; then
+    printf '\033[1;31m'   # bold red
+    echo "=================================================================="
+    echo "ERROR: invalid skg config '$SKG_CONFIG' -- servers NOT started:"
+    echo "------------------------------------------------------------------"
+    echo "$config_err"
+    echo "------------------------------------------------------------------"
+    echo "Fix the problem above, then re-run ./bash/start-servers.sh"
+    echo "=================================================================="
+    printf '\033[0m'      # reset color
+    exit 1
+  fi
+  echo "Config OK."
+}
+
 start_typedb() {
   # PITFALL: we kill TypeDB before the rm -rf, because deleting database
   # files out from under a running TypeDB would crash it — see
@@ -135,6 +166,10 @@ echo "#!/bin/bash" >     bash/stop-servers.sh
 echo "kill -TERM -$$" >> bash/stop-servers.sh
 chmod +x                 bash/stop-servers.sh
 echo "Created bash/stop-servers.sh - run it to stop all servers"
+
+# Abort with a red error if the config is invalid, before any TypeDB
+# side effects, so a typo can't silently crash-loop skg later.
+preflight_check_config
 
 # Check and start TypeDB server if needed. A zombie TypeDB whose gRPC
 # thread has died is treated as not-running — start_typedb will kill it
