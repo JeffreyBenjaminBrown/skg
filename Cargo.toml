@@ -87,7 +87,12 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-appender = "0.2"
 tempfile = "3.3.0"
 tokio = { version = "1", features = ["full"] }
-typedb-driver = "3.4.4"
+# Pinned exactly to the TypeDB server version in
+# docker-typedb-rust/typedb.nix. The driver makes breaking API changes
+# within its 3.x series (see that repo's PITFALLS.org), so an exact pin
+# keeps a stray `cargo update` from drifting the driver out of step with
+# the server. Bump both together.
+typedb-driver = "=3.11.5"
 uuid = { version = "1.4.1", features = ["v4"] }
 walkdir = "2.4"
 zstd = "0.13"

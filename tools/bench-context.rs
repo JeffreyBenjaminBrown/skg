@@ -18,8 +18,10 @@ use std::env;
 use std::time::Instant;
 use typedb_driver::{
   answer::{ConceptRow, QueryAnswer},
+  Addresses,
   Credentials,
   DriverOptions,
+  DriverTlsConfig,
   Transaction,
   TransactionType,
   TypeDBDriver,
@@ -39,9 +41,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   println!("Database: {}", db_name);
 
   let driver: TypeDBDriver = TypeDBDriver::new(
-    "127.0.0.1:1729",
+    Addresses::try_from_address_str("127.0.0.1:1729")?,
     Credentials::new("admin", "password"),
-    DriverOptions::new(false, None)?
+    DriverOptions::new(DriverTlsConfig::disabled())
   ).await?;
 
   // First: count nodes

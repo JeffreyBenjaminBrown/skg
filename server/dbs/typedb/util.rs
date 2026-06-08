@@ -3,7 +3,7 @@ pub mod concept_document;
 
 use futures::executor::block_on;
 use typedb_driver::answer::ConceptRow;
-use typedb_driver::{Credentials, DatabaseManager, DriverOptions, TypeDBDriver};
+use typedb_driver::{Addresses, Credentials, DatabaseManager, DriverOptions, DriverTlsConfig, TypeDBDriver};
 
 use crate::consts::TYPEDB_ADDRESS;
 
@@ -15,9 +15,9 @@ pub fn connect_to_typedb () -> TypeDBDriver {
   tracing::info! ("Connecting to TypeDB...");
   block_on ( async {
     TypeDBDriver::new (
-      TYPEDB_ADDRESS,
+      Addresses::try_from_address_str (TYPEDB_ADDRESS) . unwrap (),
       Credentials::new ("admin", "password"),
-      DriverOptions::new (false, None) . unwrap() )
+      DriverOptions::new (DriverTlsConfig::disabled ()) )
       . await
       . unwrap_or_else ( |e| {
         tracing::error! ("Error connecting to TypeDB: {}", e);
