@@ -1,7 +1,6 @@
 pub mod ancestry;
 pub mod complete;
-pub mod complete_postorder;
-pub mod complete_preorder;
+pub mod reconcile;
 pub mod graphnodestats;
 pub mod util;
 pub mod viewnodestats;

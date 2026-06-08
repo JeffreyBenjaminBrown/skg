@@ -370,6 +370,14 @@ pub async fn cleanup_test_tantivy_and_typedb_dbs(
   driver: &TypeDBDriver,
   tantivy_folder: Option<&Path>,
 ) -> Result<(), Box<dyn Error>> {
+  // The Tantivy index is written by a background worker
+  // (server/dbs/tantivy/background_writer.rs). Drain it before touching
+  // the index directory, so no commit or merge thread is still creating
+  // files when we delete it -- otherwise remove_dir_all races them and
+  // fails with DirectoryNotEmpty. (guarded_test_then_cleanup drains too,
+  // but many tests call this helper directly.)
+  crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
+
   { // Delete TypeDB database (with retry).
     let databases : &DatabaseManager = driver . databases();
     if databases . contains (db_name) . await? {
@@ -391,10 +399,21 @@ pub async fn cleanup_test_tantivy_and_typedb_dbs(
             else { last_err = Some ( Box::new (e) ); break; }} } }
       if let Some (e) = last_err { return Err (e); } } }
 
-  // Delete Tantivy index if path provided and exists
+  // Delete Tantivy index if path provided and exists. Belt-and-suspenders:
+  // even after draining the worker, retry on DirectoryNotEmpty in case the
+  // OS or Tantivy is still finishing background file cleanup.
   if let Some (tantivy_path) = tantivy_folder {
     if tantivy_path . exists() {
-      fs::remove_dir_all (tantivy_path)?; }}
+      let max_attempts : usize = 20; // 20 * 50ms = 1s total
+      for attempt in 0 .. max_attempts {
+        match fs::remove_dir_all (tantivy_path) {
+          Ok (()) => break,
+          Err (e)
+            if e . raw_os_error() == Some (39) // ENOTEMPTY
+               && attempt + 1 < max_attempts => {
+            std::thread::sleep (
+              std::time::Duration::from_millis (50) ); }
+          Err (e) => return Err ( Box::new (e) ), } } } }
 
   Ok (( )) }
 

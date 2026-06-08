@@ -6,7 +6,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
-use crate::to_org::expand::definitive::{ apply_definitive_draw_rule, extendDefinitiveSubtree_fromGit, DrawOutcome};
+use crate::to_org::expand::definitive::{ apply_definitive_draw_rule, DrawOutcome};
 use crate::to_org::util::DefinitiveMap;
 use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
@@ -19,11 +19,11 @@ use crate::to_org::render::diff::process_truenode_diff;
 use crate::types::tree::viewnode_nodecomplete::write_at_truenode_in_tree;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol, ViewRequest, IndefOrDef, DeletedNode};
 use crate::types::viewnode::{Vognode, QualCol};
-use super::complete_postorder::hiddeninsubscribee_col::reconcile_hiddenin_subscribee_col_children;
-use super::complete_postorder::hiddenoutsideof_subscribeecol::reconcile_hiddenoutside_subscribee_col_children;
-use super::complete_preorder::relation_col::reconcile_relation_col_children;
-use super::complete_preorder::subscribee_col::reconcile_subscribee_col_children;
-use super::complete_preorder::truenode::expand_true_content_at_truenode;
+use super::reconcile::hiddeninsubscribee_col::reconcile_hiddenin_subscribee_col_children;
+use super::reconcile::hiddenoutsideof_subscribeecol::reconcile_hiddenoutside_subscribee_col_children;
+use super::reconcile::relation_col::reconcile_relation_col_children;
+use super::reconcile::subscribee_col::reconcile_subscribee_col_children;
+use super::reconcile::content::expand_true_content_at_truenode;
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -138,36 +138,35 @@ async fn dispatch_node_update (
     ViewNodeKind::Vognode (Vognode::Normal (_)) =>
       visit_normal_node (tree, treeid, context) . await ?,
     ViewNodeKind::PartnerCol (RoleCol::Subscribee) =>
+      // A col fills its members WHOLE and is budget-neutral (§5.5): the owning
+      // vognode already spent its 1 budget unit when it expanded, so drawing all
+      // the members here costs nothing more and never truncates a group.
       reconcile_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
-        context . deleted_since_head_pid_src_map,
-        &mut context . node_budget ) . await ?,
+        context . deleted_since_head_pid_src_map ) . await ?,
     ViewNodeKind::PartnerCol (RoleCol::HiddenInSubscribee) =>
       reconcile_hiddenin_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
-        context . deleted_since_head_pid_src_map,
-        &mut context . node_budget ) ?,
+        context . deleted_since_head_pid_src_map ) ?,
     ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee) =>
       reconcile_hiddenoutside_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
-        context . deleted_since_head_pid_src_map,
-        &mut context . node_budget ) ?,
+        context . deleted_since_head_pid_src_map ) ?,
     ViewNodeKind::PartnerCol (role)
       if role . relation_member_role () . is_some () =>
       reconcile_relation_col_children (
         treeid, tree, *role, context . source_diffs,
         context . env, context . graph_snap,
-        context . deleted_since_head_pid_src_map,
-        &mut context . node_budget ) ?,
+        context . deleted_since_head_pid_src_map ) ?,
     // §9 reversal (#3): the IDCol/AliasCol diff scaffolds are created inline by
     // process_truenode_diff at the owner's BFS visit, so their reconcilers must
     // see the real diffs (source_diffs) or they would clobber the just-created
     // diff entries. Diffs flow inline for both de-novo and post-save.
     ViewNodeKind::QualCol (QualCol::Alias) =>
-      super::complete_postorder::aliascol::reconcile_alias_col_children (
+      super::reconcile::aliascol::reconcile_alias_col_children (
         tree, treeid, context . source_diffs, &context . env . config ) ?,
     ViewNodeKind::QualCol (QualCol::ID) =>
-      super::complete_postorder::id_col::reconcile_id_col_children (
+      super::reconcile::id_col::reconcile_id_col_children (
         treeid, tree, context . source_diffs, &context . env . config ) ?,
     ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
       // §6.4/§6.6/§16: an Inactive node deleted by this save becomes Deleted,
@@ -198,15 +197,22 @@ async fn visit_normal_node (
         ViewNodeKind::Vognode (Vognode::Normal (t)) =>
           t . view_requests . contains (& ViewRequest::Definitive),
         _ => false } ) ?;
-  let mut settled    : bool = false; // §5.2 draw rule already ran
-  let mut cascade    : bool = false; // node is Final -> hand DVRs to children
-  let mut do_content : bool = true;
-  if had_dvr && context . node_budget == 0 {
-    // §5.5: budget exhausted -- strip the (user or cascade) DVR and leave the
-    // node indefinitive instead of making it Final. The content engine
-    // (settled) then clobbers+returns, drawing no further content. This is
-    // the BFS-order truncation: earlier siblings expand, later ones stay
-    // indefinitive once the budget is spent.
+  let mut settled : bool = false; // §5.2 draw rule already ran
+  let mut cascade : bool = false; // node is Final -> hand DVRs to children
+  // §5.5: the budget counts vognode *expansions* (each costs 1, charged in
+  // expand_true_content_at_truenode); once it hits 0 every later vognode is left
+  // indefinitive -- a visible, collapsed headline. We never truncate a group
+  // mid-way (whole groups already drawn keep all their members); we only stop
+  // STARTING new expansions. EXCEPTION: a view root (child of the BufferRoot) is
+  // the node the user explicitly opened, so it always expands -- never truncated.
+  // (The ancestor read is short-circuited to only run when the budget is spent.)
+  if context . node_budget == 0
+    && ! read_at_ancestor_in_tree ( tree, treeid, 1,
+           |vn : &ViewNode| matches! ( &vn . kind, ViewNodeKind::BufferRoot ) )
+         . unwrap_or (false) {
+    // Budget spent and this is not a view root: draw it indefinitive and expand
+    // nothing under it; strip any DVR so it is not treated as Final. The content
+    // engine (settled) then clobbers+returns.
     write_at_truenode_in_tree (
       tree, treeid,
       |t| { t . view_requests . remove (& ViewRequest::Definitive);
@@ -220,29 +226,15 @@ async fn visit_normal_node (
         // Deferred to an existing Final occurrence: the node is now
         // indefinitive; the content engine (settled) will clobber+return.
         settled = true; }
-      DrawOutcome::MadeFinal { is_removed_node : true, hidden_ids } => {
-        // Removed-file DVR: expand the removed node's content from git HEAD as
-        // diff phantoms. Effectively unreachable -- a node's existence axes are
-        // only stamped by process_truenode_diff at the end of its own visit, so
-        // is_removed_node is false while the draw rule runs -- but handled
-        // defensively; the content engine is skipped.
-        extendDefinitiveSubtree_fromGit (
-          tree, treeid, context . env . config . initial_node_limit,
-          context . defmap, context . source_diffs, &context . env . config,
-          &hidden_ids, &context . env . driver,
-          context . deleted_since_head_pid_src_map,
-          context . active_source_set ) . await ?;
-        settled = true; do_content = false; }
-      DrawOutcome::MadeFinal { is_removed_node : false, .. } => {
+      DrawOutcome::MadeFinal => {
         settled = true; cascade = true; } } }
-  if do_content {
-    expand_true_content_at_truenode (
-      treeid, tree, context . defmap,
-      &context . env . config, context . graph_snap,
-      context . deleted_since_head_pid_src_map,
-      context . deleted_by_this_save_pids,
-      context . active_source_set,
-      settled, cascade, &mut context . node_budget ) ?; }
+  expand_true_content_at_truenode (
+    treeid, tree, context . defmap,
+    &context . env . config, context . graph_snap,
+    context . deleted_since_head_pid_src_map,
+    context . deleted_by_this_save_pids,
+    context . active_source_set,
+    settled, cascade, &mut context . node_budget ) ?;
   // The steps below apply only while the node is still a Normal vognode:
   // content reconcile may have converted it to Deleted (a node this save
   // deleted). The flip to a DiffPhantom happens at the END of this visit
@@ -270,12 +262,12 @@ async fn visit_normal_node (
         &context . env . driver ) . await ?; } }
   // Remaining view requests (Aliases / Containerward / Sourceward); the
   // Definitive request was already consumed by apply_definitive_draw_rule.
-  super::complete_postorder::truenode::execute_truenode_view_requests (
+  super::reconcile::view_requests::execute_truenode_view_requests (
     treeid, tree, &context . env . config, &context . env . driver,
     context . errors, context . active_source_set ) . await ?;
   // Ensure a definitive subscribee's HiddenInSubscribeeCol exists; the BFS
   // reconciles it on reaching it.
-  super::complete_postorder::truenode::ensure_hiddenin_col_under_definitive_subscribee (
+  super::reconcile::view_requests::ensure_hiddenin_col_under_definitive_subscribee (
     tree, treeid, &context . env . config, &context . env . driver ) . await ?;
   // §9 reversal (#3 / Jeff): compute this node's content+scaffold diff LOCALLY,
   // at its own BFS visit. Runs last, after the node is fully completed as a

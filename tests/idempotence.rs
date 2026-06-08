@@ -12,7 +12,11 @@
 //
 // Fixture exercises several ViewNode kinds in one view: Normal content (a -> b,
 // c), an AliasCol + Alias (b has alias "bee"), the IDCols, a SubscribeeCol +
-// subscribee-as-such (c subscribes to d), and the HiddenOutsideOfSubscribeeCol.
+// subscribee-as-such (c subscribes to d), the HiddenOutsideOfSubscribeeCol, and
+// a relation col -- e subscribes to b, so b shows a SubscriberCol listing e.
+// (The death-cleanup / generalized-orphan path -- a col whose owning node was
+// deleted -- is covered separately by the save_collateral_delete_then_edit_under_it
+// integration test, which only a delete can trigger, not an unchanged-graph rerender.)
 
 use std::error::Error;
 use std::net::TcpStream;
@@ -71,6 +75,11 @@ async fn rerender_is_idempotent_impl (
   driver  : &Arc<TypeDBDriver>,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
+  // Install the process-global in-Rust graph so the de-novo render creates
+  // relation cols (maybe_add_one_relation_col reads snapshot_global). nextest
+  // runs each test in its own process, so this OnceCell set is safe here.
+  skg::dbs::in_rust_graph::init_global_handle_for_first_time_or_panic (
+    graph_handle_from_config (config) ? );
   // The complete de-novo view of root `a`, which we then feed back through the
   // pipeline as if the user saved it unchanged.
   let (complete_buffer, _pids, _tree)

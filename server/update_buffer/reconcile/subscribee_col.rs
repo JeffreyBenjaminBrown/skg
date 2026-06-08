@@ -7,7 +7,6 @@ use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child_of_viewnode, insert_scaffold_as_child};
 use crate::update_buffer::ancestry::required_ancestor;
-use crate::update_buffer::util::cap_goal_list_to_budget;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, RoleCol};
 use crate::types::viewnode::Vognode;
 use crate::update_buffer::util::move_child_to_end;
@@ -39,7 +38,6 @@ pub async fn reconcile_subscribee_col_children (
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  node_budget                    : &mut usize,
 ) -> Result<(), Box<dyn Error>> {
   let kind : RoleCol = RoleCol::Subscribee;
   kind . error_unless_node_is_this_kind (tree, node) ?;
@@ -60,12 +58,9 @@ pub async fn reconcile_subscribee_col_children (
   // headline so the user can re-add.) Its children still reconcile to empty
   // below, and the HiddenOutsideOfSubscribeeCol is still ensured last.
   if context . parent_indefinitive || source_diffs . is_some() {
-    // §5.5/§18: each genuinely-new subscribee is a new TrueNode; spend the
-    // per-buffer budget so a node with thousands of subscriptions truncates
-    // here rather than drawing every one (removed-member phantoms are free).
-    let goal_list : Vec<ID> =
-      cap_goal_list_to_budget (
-        tree, node, &goal_list, &removed_ids, node_budget );
+    // §5.5: a col fills its members WHOLE and is budget-neutral -- the owning
+    // subscriber already spent its budget unit when it expanded, so drawing all
+    // its subscribees here costs nothing and never truncates the group.
     let child_data : HashMap<ID, ChildData> =
       build_child_data (
         tree, node, &context . parent_pid, &context . parent_source,

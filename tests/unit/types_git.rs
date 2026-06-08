@@ -76,3 +76,30 @@ fn removed_staged_then_readded_unstaged_is_unchanged () {
     net_diff_from_per_stage (
       Some (&staged), Some (&unstaged) ),
     vec! [ Diff_Item::Unchanged ("x") ] ); }
+
+// When the SAME parent's contains changed in BOTH stages, a removed member must
+// keep its HEAD position among surviving siblings, not get tail-appended.
+// HEAD=[a,x,b], index=[a,b] (x removed staged), worktree=[a,c,b] (c added
+// unstaged): x must land between a and b. (review-2 §2.2)
+#[test]
+fn two_stage_removed_member_keeps_head_position () {
+  let staged   : Vec<Diff_Item<&str>> =
+    vec! [ same ("a"), removed ("x"), same ("b") ];
+  let unstaged : Vec<Diff_Item<&str>> =
+    vec! [ same ("a"), new_ ("c"), same ("b") ];
+  let net : Vec<Diff_Item<&str>> =
+    net_diff_from_per_stage ( Some (&staged), Some (&unstaged) );
+  let pos = |needle : Diff_Item<&str>| -> usize {
+    net . iter () . position ( |it| *it == needle )
+      . unwrap_or_else ( || panic! (
+        "net diff missing {:?}; got {:?}", needle, net ) ) };
+  // every item is classified correctly ...
+  let a : usize = pos ( Diff_Item::Unchanged ("a") );
+  let x : usize = pos ( Diff_Item::Removed    ("x") );
+  let c : usize = pos ( Diff_Item::New        ("c") );
+  let b : usize = pos ( Diff_Item::Unchanged  ("b") );
+  // ... and the removed x sits between a and b, not after b.
+  assert! ( a < x && x < b,
+            "removed x should keep its HEAD slot (a < x < b); got {:?}", net );
+  assert! ( c < b,
+            "new c should precede b; got {:?}", net ); }

@@ -106,6 +106,10 @@ fn tantivy_source_for_id (
   query         : &str,
   expected_id   : &str,
 ) -> Result<Option<String>, Box<dyn Error>> {
+  // A save commits its Tantivy index update in the background, so wait
+  // for it to land before reading — mirroring the production search
+  // handler. (See server/dbs/tantivy/background_writer.rs.)
+  skg::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
   let (matches, searcher)
     : (Vec<(f32, DocAddress)>, tantivy::Searcher) =
     search_index (tantivy_index, query, &SearchOptions::default ())?;
