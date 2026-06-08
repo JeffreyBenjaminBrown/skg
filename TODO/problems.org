@@ -500,32 +500,6 @@
   Found while updating docker-typedb-rust/typedb.nix from 3.10.3 to 3.11.5
   and adding missing CLI tools to docker.nix.
 
-** (OPEN) Server (3.11.5) outruns skg's pinned typedb-driver (3.8.0)
-   Cargo.toml constrains 'typedb-driver = "3.4.4"' (>=3.4.4,<4.0.0);
-   Cargo.lock (gitignored) pins 3.8.0, while the image's TypeDB *server*
-   is now 3.11.5.
-
-   2026-06-08: tried to automate this with 'cargo update -p
-   typedb-driver' -- first in bash/start-servers.sh, then the image
-   build. Both are dead ends, and the auto-update was reverted:
-   - The image build has no skg Cargo.toml to act on. skg is compiled at
-     runtime from a bind mount, so the driver version lives only in the
-     skg repo, never in the image.
-   - Updating to the matching 3.11.5 does NOT compile: typedb-driver made
-     breaking API changes within its major series. 'TypeDBDriver::new'
-     now takes 'Addresses' (not '&str') + 'Credentials' + 'DriverOptions';
-     'DriverOptions::new' now takes a 'DriverTlsConfig' and returns Self
-     (not Result). 16 errors across 5 call sites: server/source_sets.rs:219,
-     server/dbs/typedb/util.rs:17, server/test_utils.rs:127 & 341,
-     server/test_utils/guard.rs:55.
-
-   So the driver can only be bumped by a manual code migration of those
-   call sites, pinned to match the server -- not a 'cargo update'. Left
-   the driver at 3.8.0 (compiles) pending a decision: migrate to 3.11.5,
-   pin the server back to a 3.8-compatible TypeDB, or run 3.8.0<->3.11.5
-   and test interop. Also still unverified: whether driver 3.8.0 even
-   connects to a 3.11.5 server at the protocol level.
-
 ** (fixed) docker-typedb-rust docs described a Dockerfile that no longer exists
    There is no Dockerfile in docker-typedb-rust/ (the build is Nix-only:
    'nix-build docker.nix' + 'docker load'). Yet README.md and
