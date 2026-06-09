@@ -1,37 +1,4 @@
 {
-  "hooks": {
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/home/ubuntu/host/my-dot-claude/hooks/beep-if-main-agent.sh beep-soothing"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "ExitPlanMode",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/home/ubuntu/host/my-dot-claude/hooks/beep-if-main-agent.sh beep-harsh"
-          }
-        ]
-      },
-      {
-        "matcher": "AskUserQuestion",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/home/ubuntu/host/my-dot-claude/hooks/beep-if-main-agent.sh beep-harsh"
-          }
-        ]
-      }
-    ]
-  },
   "enabledPlugins": {
     "rust-analyzer-lsp@claude-plugins-official": true
   },
