@@ -1,0 +1,29 @@
+* vision : local BFS instruction collection
+This change is in the same spirit of the recently completed work
+now memorialized at [[./TODO/DONE/local-view-update/]].
+That changed the way views are updated after saving.
+This would change the way instructions are collected prior to saving.
+
+Each vnode in the view can emit save instructions --
+some for the gnode they represent, some for a gnode represented by an ancestor.
+Currently instruction collection is so complex I don't want to think about it.
+But in principle it could be a simple BFS preorder procedure.
+
+When it visits a definitive vnode that is not a subscribee-as-such,
+'local BFS instruction collection' would emits instructions for that vnode.
+(For absolute specificity, we should use that term when referring to the procedure.)
+It reads the vnode and its vnode children, and *that's all".
+That creates some instructions, in a map from IDs to sets of instructions.
+
+Then it recurses into the vnode's children.
+Any collections that can generate instructions --
+I think that's just AliasCol and OverridddenCol, but I'm not sure --
+generate their own instructions, which are merged into the map
+value keyed by their parent's ID.
+
+If it recurses into a SubscribeeCol, the col itself doesn't generate instructions,
+but each child of that col that is a subscribee-as-such does,
+and they affect the relevant ancestor subscriber.
+Again they are merged into the map.
+
+I'm not sure I've covered all the relevant cases, but that's the idea.
