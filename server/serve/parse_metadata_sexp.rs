@@ -22,11 +22,11 @@ use crate::types::errors::BufferValidationError;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
 use crate::types::viewnode::{
   GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest,
-  Qual, QualCol, RoleCol, DeletedNode, InactiveNode, UnknownNode,
+  Qual, QualCol, RoleCol, PhantomDeleted, InactiveNode, PhantomUnknown,
   Birth, IndefOrDef, NodeContainRels, NodeLinksourceRels, ParentIs,
 };
 use crate::types::maybe_placed_viewnode::{
-    MpViewnode, MpViewnodeKind, MpTruenode, MpDiffPhantomNode,
+    MpViewnode, MpViewnodeKind, MpTruenode, MpPhantomDiff,
     MpVognode,
 };
 
@@ -62,11 +62,11 @@ pub struct ViewnodeMetadata {
   pub scaffold_membership : MembershipAxes,
   pub textchanged_staged   : bool,
   pub textchanged_unstaged : bool,
-  // When true, this is a DeletedNode (id and source are used).
+  // When true, this is a PhantomDeleted (id and source are used).
   pub is_deleted_node: bool,
   // When true, this is a deleted non-vognode placeholder.
   pub is_dead_scaffold: bool,
-  // When Some, this is an UnknownNode (a placeholder for a missing
+  // When Some, this is an PhantomUnknown (a placeholder for a missing
   // referent). Carries only the id; no source/title/body apply.
   pub unknown_node_id: Option<ID>,
   // When true, this is an inactive-source placeholder. It carries id,
@@ -116,7 +116,7 @@ pub fn viewnode_from_metadata (
     = if let Some (ref uid) = metadata . unknown_node_id {
         ( MpViewnodeKind::Vognode (
             MpVognode::Unknown (
-              UnknownNode { id: uid . clone () } ) ), None )
+              PhantomUnknown { id: uid . clone () } ) ), None )
       } else if metadata . is_inactive_node {
         let error : Option<BufferValidationError> =
           if body . is_some ()
@@ -138,7 +138,7 @@ pub fn viewnode_from_metadata (
         ( MpViewnodeKind::DeadScaffold, None )
       } else if metadata . is_deleted_node {
         ( MpViewnodeKind::Vognode (
-            MpVognode::Deleted ( DeletedNode {
+            MpVognode::Deleted ( PhantomDeleted {
             id     : metadata . id . clone ()
                        . unwrap_or_else ( || ID::from ("")),
             source : metadata . source . clone ()
@@ -206,12 +206,12 @@ pub fn viewnode_from_metadata (
             indef_or_def, };
         let vognode =
           if t . should_be_diffPhantom ()
-          { // TODO/DONE/local-view-update/plan_v2.org §11: a phantom carries only the slim MpDiffPhantomNode. The
+          { // TODO/DONE/local-view-update/plan_v2.org §11: a phantom carries only the slim MpPhantomDiff. The
             // EditRequestOnIndefinitive validation above already fired if this
             // phantom (indefinitive) carried an edit_request, so dropping
             // indef_or_def/parentIs/etc. here loses nothing.
             MpVognode::DiffPhantom (
-              MpDiffPhantomNode::from_truenode (t) ) }
+              MpPhantomDiff::from_truenode (t) ) }
           else
           { MpVognode::Normal (t) };
         ( MpViewnodeKind::Vognode (vognode),

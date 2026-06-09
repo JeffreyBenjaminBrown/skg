@@ -429,7 +429,7 @@ pub(crate) fn collect_savenode_candidates (
         recurse_on_children( tree, node_id, result )?,
       ViewNodeKind::Vognode (Vognode::Inactive (_)) => {},
       ViewNodeKind::Vognode (Vognode::Unknown (_)) =>
-        // An UnknownNode is a placeholder for a missing referent. It cannot generate save instructions itself, but its descendents might, so we recurse.
+        // An PhantomUnknown is a placeholder for a missing referent. It cannot generate save instructions itself, but its descendents might, so we recurse.
         recurse_on_children( tree, node_id, result )?,
       ViewNodeKind::Vognode (Vognode::Normal (t)) => {
         let candidate_kind : Option<DefinenodeCandidateKind> =

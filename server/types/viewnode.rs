@@ -65,15 +65,15 @@ pub enum ViewNodeKind {
 #[derive( Debug, Clone, PartialEq )]
 pub enum Vognode {
   Normal   (TrueNode),
-  DiffPhantom (DiffPhantomNode), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim DiffPhantomNode, not a TrueNode -- a phantom is always indefinitive/bodyless and its parentIs is never read or rendered, so it needs none of TrueNode's parentIs/birth/viewStats/view_requests/indef_or_def. See DiffPhantomNode_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
+  DiffPhantom (PhantomDiff), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim PhantomDiff, not a TrueNode -- a phantom is always indefinitive/bodyless and its parentIs is never read or rendered, so it needs none of TrueNode's parentIs/birth/viewStats/view_requests/indef_or_def. See PhantomDiff_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
   Inactive (InactiveNode), // From a source that is inactive (see "source sets").
-  Unknown  (UnknownNode), // If it *ever* existed in the graph, Skg didn't find it.
-  Deleted  (DeletedNode), // No longer exists in the graph.
+  Unknown  (PhantomUnknown), // If it *ever* existed in the graph, Skg didn't find it.
+  Deleted  (PhantomDeleted), // No longer exists in the graph.
 }
 
 /// A placeholder ("phantom") Vognode for a node whose .skg file a save just
-/// removed -- one of the three placeholder kinds, alongside DiffPhantomNode and
-/// UnknownNode. All three stand in for something that is NOT a current graph
+/// removed -- one of the three placeholder kinds, alongside PhantomDiff and
+/// PhantomUnknown. All three stand in for something that is NOT a current graph
 /// member (so all three are inert on save and excluded from the view's
 /// collateral pids, `pids_from_viewforest`); they differ in *why* the node is
 /// absent and thus in how much they can still say about it.
@@ -93,13 +93,13 @@ pub enum Vognode {
 /// pruned by the postorder sweep (`is_self_deletable_when_empty`), and a Deleted
 /// may stand as a view root (validate_tree) so a deleted root still shows.
 ///
-/// DISTINCT INFO: unlike UnknownNode it knows its `source`, and unlike either
+/// DISTINCT INFO: unlike PhantomUnknown it knows its `source`, and unlike either
 /// other phantom it keeps the `title`/`body` it last displayed -- because it was
 /// a fully materialized node right up until the save deleted it, so that text is
 /// still worth showing. (The title is empty for one promoted from an Inactive
 /// node, which carried none.) It holds no diff axes: it is not about git stages.
 #[derive( Debug, Clone, PartialEq )]
-pub struct DeletedNode {
+pub struct PhantomDeleted {
   pub id     : ID,
   pub source : SourceName,
   pub title  : String,
@@ -107,8 +107,8 @@ pub struct DeletedNode {
 }
 
 /// A placeholder ("phantom") Vognode for a reference that resolves to nothing --
-/// one of the three placeholder kinds, alongside DiffPhantomNode and DeletedNode
-/// (see DeletedNode for the shared framing).
+/// one of the three placeholder kinds, alongside PhantomDiff and PhantomDeleted
+/// (see PhantomDeleted for the shared framing).
 ///
 /// ARISES: when some node's `contains` (or similar list) names an ID that has no
 /// record anywhere -- not a primary pid, not an extra_id, not in TypeDB, not on
@@ -125,12 +125,12 @@ pub struct DeletedNode {
 /// converts to a DeadScaffold (`convert_nonmember_unknown_children_to_dead`) and
 /// is pruned.
 ///
-/// DISTINCT INFO: it carries ONLY the `id`. Unlike DeletedNode it has no source
+/// DISTINCT INFO: it carries ONLY the `id`. Unlike PhantomDeleted it has no source
 /// (it is the one Vognode kind for which `pid_and_source` returns None) and no
-/// last-seen text; unlike DiffPhantomNode it has no diff axes. That emptiness IS
+/// last-seen text; unlike PhantomDiff it has no diff axes. That emptiness IS
 /// the information: a reference exists, but we have no record of its target.
 #[derive( Debug, Clone, PartialEq )]
-pub struct UnknownNode {
+pub struct PhantomUnknown {
   pub id : ID,
 }
 
@@ -170,13 +170,13 @@ pub struct TrueNode_Generic < Id, Src > {
   pub indef_or_def  : IndefOrDef,
 }
 
-pub type DiffPhantomNode   = DiffPhantomNode_Generic < ID, SourceName >;
-pub type MpDiffPhantomNode = DiffPhantomNode_Generic < Option < ID >,
+pub type PhantomDiff   = PhantomDiff_Generic < ID, SourceName >;
+pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
                                                        Option < SourceName >>;
 
 /// The slim payload of a `Vognode::DiffPhantom` -- one of the three placeholder
-/// ("phantom") Vognode kinds, alongside DeletedNode and UnknownNode (see
-/// DeletedNode for the shared framing).
+/// ("phantom") Vognode kinds, alongside PhantomDeleted and PhantomUnknown (see
+/// PhantomDeleted for the shared framing).
 ///
 /// ARISES: only in git diff mode, from the diff-completion code. Two shapes,
 /// both detected by `diff_axes_require_phantom`: a "removed" member (present in
@@ -202,7 +202,7 @@ pub type MpDiffPhantomNode = DiffPhantomNode_Generic < Option < ID >,
 /// view_requests / indef_or_def (TODO/DONE/local-view-update/plan_v2.org §11 reduction; see §18): nothing
 /// reads a phantom's parentIs, and every phantom is indefinitive.
 #[derive( Debug, Clone, PartialEq )]
-pub struct DiffPhantomNode_Generic < Id, Src > {
+pub struct PhantomDiff_Generic < Id, Src > {
   pub title      : String,
   pub id         : Id,
   pub source     : Src,
@@ -216,13 +216,13 @@ pub struct DiffPhantomNode_Generic < Id, Src > {
   pub graphStats : GraphNodeStats,
 }
 
-impl < Id, Src > DiffPhantomNode_Generic < Id, Src > {
+impl < Id, Src > PhantomDiff_Generic < Id, Src > {
   /// Build a phantom payload from a TrueNode, keeping only the phantom-relevant
   /// fields and discarding parentIs / birth / viewStats / view_requests /
   /// indef_or_def. Used when flipping a Normal node to a phantom and by the
   /// placed<->maybe-placed conversions.
   pub fn from_truenode ( t : TrueNode_Generic < Id, Src > ) -> Self {
-    DiffPhantomNode_Generic {
+    PhantomDiff_Generic {
       title      : t . title,
       id         : t . id,
       source     : t . source,
@@ -365,7 +365,7 @@ pub enum ViewRequest {
 /// - any membership axis being '-' (removed in some stage), or
 /// - the worktree existence axis being '-' (file deleted), or
 /// - the "moved twice" pattern: stagedM = +, unstagedM = -.
-/// Shared by TrueNode_Generic and DiffPhantomNode_Generic, which both carry
+/// Shared by TrueNode_Generic and PhantomDiff_Generic, which both carry
 /// these axes.
 pub fn diff_axes_require_phantom (
   existence  : &ExistenceAxes,
@@ -583,8 +583,8 @@ impl ViewNode {
           // Definitive) Normal node to a phantom. mk_phantom_viewnode already
           // builds from an Indefinitive base, so now every phantom is
           // indefinitive by construction.
-          let phantom : DiffPhantomNode =
-            DiffPhantomNode::from_truenode ( t . clone () );
+          let phantom : PhantomDiff =
+            PhantomDiff::from_truenode ( t . clone () );
           self . kind = ViewNodeKind::Vognode (
             Vognode::DiffPhantom (phantom)); }}}
 
@@ -747,7 +747,7 @@ pub fn mk_phantom_viewnode (
     { t . existence  = existence;
       t . membership = membership;
       viewnode . kind = ViewNodeKind::Vognode (
-        Vognode::DiffPhantom ( DiffPhantomNode::from_truenode (t) )); }
+        Vognode::DiffPhantom ( PhantomDiff::from_truenode (t) )); }
   else
     // mk_indefinitive_viewnode always yields a Normal vognode; if that ever
     // changes, fail loudly rather than silently return a non-phantom.
@@ -770,7 +770,7 @@ pub fn mk_definitive_viewnode (
                               edit_request : None },
                             HashSet::new () ) } // view_requests
 
-/// Build an UnknownNode wrapper. Use when a referenced ID resolves
+/// Build an PhantomUnknown wrapper. Use when a referenced ID resolves
 /// to nothing in in_rust_graph, on disk, or via any phantom/diff procedure
 /// -- the placeholder lets the view render the line as a herald
 /// rather than aborting the whole BFS expansion.
@@ -782,7 +782,7 @@ pub fn mk_unknown_viewnode (
     folded      : false,
     body_folded : false,
     kind        : ViewNodeKind::Vognode (
-      Vognode::Unknown ( UnknownNode { id } ) ),
+      Vognode::Unknown ( PhantomUnknown { id } ) ),
   }}
 
 pub fn mk_inactive_viewnode (

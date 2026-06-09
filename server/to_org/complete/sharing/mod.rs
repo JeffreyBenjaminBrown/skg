@@ -60,7 +60,7 @@ async fn build_initial_render_child_data (
           nc . title . clone () ),
       None => // No record anywhere; 'reconcile' will still need an
               // entry, but downstream rendering would treat this as
-              // an UnknownNode case. We pass the raw id through with
+              // an PhantomUnknown case. We pass the raw id through with
               // a sentinel source/title so the reconcile call can
               // still run.
         ( id . clone (), SourceName::from (""), String::new () ), };

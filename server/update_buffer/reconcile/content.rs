@@ -10,7 +10,7 @@ use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, DeletedNode, IndefOrDef,
+    ViewNode, ViewNodeKind, PhantomDeleted, IndefOrDef,
     ParentIs, ViewRequest, mk_definitive_viewnode};
 use crate::types::viewnode::{Vognode, RoleCol};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
@@ -221,9 +221,9 @@ fn reconcile_content_children (
   // not per child, so a node either fully expands or is left indefinitive; we
   // never create a silent partial sibling set.
   // A content child this save deleted stays here; at its own BFS visit it
-  // becomes a DeletedNode whose cols generalized-orphan and deaden -- so no col
+  // becomes a PhantomDeleted whose cols generalized-orphan and deaden -- so no col
   // reconciles against a missing NodeComplete -- while any user subtree under it
-  // is preserved (demoted), and a now-childless DeletedNode is removed by the
+  // is preserved (demoted), and a now-childless PhantomDeleted is removed by the
   // TODO/DONE/local-view-update/plan_v2.org §6.6 prune sweep.
   complete_content_children(
     tree, node, &apparent_content_ids, config,
@@ -273,7 +273,7 @@ fn mutate_truenode_to_deletednode (
   write_at_node_in_tree ( tree, node,
     |vn : &mut ViewNode| {
       vn . kind = ViewNodeKind::Vognode (
-        Vognode::Deleted ( DeletedNode {
+        Vognode::Deleted ( PhantomDeleted {
         id     : pid . clone(),
         source : source . clone(),
         title,
@@ -437,7 +437,7 @@ fn order_children_as_scaffolds_then_ignored_then_content (
         ViewNodeKind::Vognode (Vognode::Normal (_))   => 2,
         ViewNodeKind::Vognode (Vognode::Deleted (_))  => 2,
         ViewNodeKind::Vognode (Vognode::Inactive (_)) => 2,
-        // UnknownNode is a content-position placeholder: order it
+        // PhantomUnknown is a content-position placeholder: order it
         // alongside the Deleted/True content children rather than as
         // a scaffold.
         ViewNodeKind::Vognode (Vognode::Unknown (_))  => 2,

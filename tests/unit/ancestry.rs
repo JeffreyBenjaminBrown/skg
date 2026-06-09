@@ -2,7 +2,7 @@ use super::*;
 use crate::types::git::MembershipAxes;
 use crate::types::viewnode::{
   mk_indefinitive_viewnode, viewforest_root_viewnode,
-  DeletedNode, Qual, QualCol };
+  PhantomDeleted, Qual, QualCol };
 
 fn sid (s : &str) -> ID { ID::from (s) }
 fn src () -> SourceName { SourceName::from ("main") }
@@ -12,7 +12,7 @@ fn normal (title : &str, pi : ParentIs) -> ViewNode {
 
 fn deleted (title : &str) -> ViewNode {
   ViewNode { focused : false, folded : false, body_folded : false,
-    kind : ViewNodeKind::Vognode (Vognode::Deleted (DeletedNode {
+    kind : ViewNodeKind::Vognode (Vognode::Deleted (PhantomDeleted {
       id : sid (title), source : src (),
       title : title . to_string (), body : None })) } }
 

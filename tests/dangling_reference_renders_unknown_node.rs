@@ -10,7 +10,7 @@
 // arise in real use).
 //
 // Expected: rendering the view of `parent` succeeds, with `ghost`
-// represented as an UnknownNode (skg metadata `(unknownNode (id ghost))`)
+// represented as an PhantomUnknown (skg metadata `(unknownNode (id ghost))`)
 // rather than killing the view.
 
 use indoc::indoc;
@@ -42,7 +42,7 @@ fn test_dangling_reference_renders_unknown_node
           false ) . await ?;
       println!("Rendered:\n{}", rendered);
       // graphStats is empty because contents/containers counters
-      // count only resolvable nodes (UnknownNode is a placeholder,
+      // count only resolvable nodes (PhantomUnknown is a placeholder,
       // not an actual contained node), and the per-parentIs filter
       // hides (containers 0) for absent-parentIs.
       // The unknown line has no headline title -- the id already
@@ -52,13 +52,13 @@ fn test_dangling_reference_renders_unknown_node
                               "};
       assert_eq! (rendered, expected,
                   "view should render the dangling child as an \
-                   UnknownNode rather than aborting");
+                   PhantomUnknown rather than aborting");
       Ok (( ))
     } )) }
 
-// A view that the server rendered with an UnknownNode line in it
+// A view that the server rendered with an PhantomUnknown line in it
 // must round-trip through save without tripping the local-structure
-// validator. Previously, TrueNode parent + UnknownNode child
+// validator. Previously, TrueNode parent + PhantomUnknown child
 // triggered LocalStructureViolation.
 #[test]
 fn test_buffer_with_unknownnode_child_saves_cleanly

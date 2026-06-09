@@ -2,7 +2,7 @@
 /// These check structural properties of individual nodes
 /// without requiring global context.
 
-use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpTruenode, MpDiffPhantomNode};
+use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpTruenode, MpPhantomDiff};
 use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::git::Sign;
 use crate::types::viewnode::{EditRequest, IndefOrDef, ParentIs, RoleCol, Qual, QualCol};
@@ -419,7 +419,7 @@ fn validate_truenode (
 fn validate_phantom (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
-  p       : &MpDiffPhantomNode,
+  p       : &MpPhantomDiff,
   config  : &SkgConfig,
 ) -> Vec<String> {
   validate_gnode_identity_and_structure (

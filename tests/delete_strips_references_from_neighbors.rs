@@ -3,7 +3,7 @@
 // When a node is deleted via a save buffer, every other on-disk
 // node that referenced it in an outbound list field should have
 // that reference stripped. Without this, deletes leave dangling
-// references which surface as UnknownNode placeholders -- correct
+// references which surface as PhantomUnknown placeholders -- correct
 // rendering, but the inconsistency shouldn't have been left on
 // disk in the first place.
 //

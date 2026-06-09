@@ -2,8 +2,8 @@ use crate::types::git::MembershipAxes;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ViewNode, ViewNodeKind, Vognode, Qual, QualCol, TrueNode, DiffPhantomNode,
-  DeletedNode, UnknownNode, InactiveNode, EditRequest, GraphNodeStats,
+  ViewNode, ViewNodeKind, Vognode, Qual, QualCol, TrueNode, PhantomDiff,
+  PhantomDeleted, PhantomUnknown, InactiveNode, EditRequest, GraphNodeStats,
   Birth, ParentIs,
 };
 
@@ -160,15 +160,15 @@ pub fn viewnode_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, true_node, config )),
     ViewNodeKind::Vognode (Vognode::DiffPhantom (phantom)) =>
-      Ok ( diffphantom_metadata_to_string (
+      Ok ( phantomDiff_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, phantom, config )),
     ViewNodeKind::Vognode (Vognode::Deleted (deleted_node)) =>
-      Ok ( deleted_node_metadata_to_string (
+      Ok ( phantomDeleted_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, deleted_node )),
     ViewNodeKind::Vognode (Vognode::Unknown (unknown_node)) =>
-      Ok ( unknown_node_metadata_to_string (
+      Ok ( phantomUnknown_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, unknown_node )),
     ViewNodeKind::Vognode (Vognode::Inactive (inactive_node)) =>
@@ -352,7 +352,7 @@ fn true_node_metadata_to_string (
   parts . push ( node_sexp (true_node, config));
   parts . join (" ") }
 
-/// Render metadata for a DiffPhantomNode (TODO/DONE/local-view-update/plan_v2.org §11). A phantom is always
+/// Render metadata for a PhantomDiff (TODO/DONE/local-view-update/plan_v2.org §11). A phantom is always
 /// indefinitive (so always emits `indef` and never a body, editRequest, or
 /// viewRequests) and its parentIs is implicit Affected and birth Unremarkable
 /// (so neither atom appears, and graphStats is rendered as if Affected /
@@ -361,15 +361,15 @@ fn true_node_metadata_to_string (
 /// byte-identical to what the old shared TrueNode renderer produced for a
 /// phantom (verified: no phantom ever carried parentIs/birth/viewStats/
 /// viewRequests in any oracle).
-fn diffphantom_metadata_to_string (
+fn phantomDiff_metadata_to_string (
   focused     : bool,
   folded      : bool,
   body_folded : bool,
-  phantom     : & DiffPhantomNode,
+  phantom     : & PhantomDiff,
   config      : & SkgConfig,
 ) -> String {
   fn node_sexp (
-    phantom : & DiffPhantomNode,
+    phantom : & PhantomDiff,
     config  : & SkgConfig,
   ) -> String {
     let mut parts : Vec < String > =
@@ -403,13 +403,13 @@ fn diffphantom_metadata_to_string (
   parts . push ( node_sexp (phantom, config));
   parts . join (" ") }
 
-/// Render metadata for a DeletedNode:
+/// Render metadata for a PhantomDeleted:
 ///   (skg [focused] [folded] (deleted (id X) (source S)))
-fn deleted_node_metadata_to_string (
+fn phantomDeleted_metadata_to_string (
   focused      : bool,
   folded       : bool,
   body_folded  : bool,
-  deleted_node : &DeletedNode,
+  deleted_node : &PhantomDeleted,
 ) -> String {
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
@@ -420,14 +420,14 @@ fn deleted_node_metadata_to_string (
                             deleted_node . source ));
   parts . join (" ") }
 
-/// Render metadata for an UnknownNode:
+/// Render metadata for an PhantomUnknown:
 ///   (skg [focused] [folded] (unknownNode (id X)))
 /// Triggered when a referenced ID resolved to nothing in any db.
-fn unknown_node_metadata_to_string (
+fn phantomUnknown_metadata_to_string (
   focused      : bool,
   folded       : bool,
   body_folded  : bool,
-  unknown_node : &UnknownNode,
+  unknown_node : &PhantomUnknown,
 ) -> String {
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }

@@ -67,7 +67,7 @@ pub type DefinitiveMap =
 /// validated title. Returns both.
 /// Returns Ok(None) when SKGID has no record anywhere -- not as a
 /// primary pid, not as an extra_id, and not via TypeDB lookup.
-/// Callers should substitute an UnknownNode placeholder. A real
+/// Callers should substitute an PhantomUnknown placeholder. A real
 /// query error still surfaces as Err.
 pub async fn nodecomplete_and_viewnode_from_id (
   config : &SkgConfig,
@@ -583,7 +583,7 @@ pub async fn build_node_branch_minus_content (
               &mut tree, root_treeid, visited,
               config, driver ) . await ?;
             Ok (root_treeid) },
-          None => { // A singleton tree with an UnknownNode.
+          None => { // A singleton tree with an PhantomUnknown.
             let viewnode : ViewNode =
               mk_unknown_viewnode (skgid . clone ());
             let tree : Tree<ViewNode> = Tree::new (viewnode);

@@ -99,7 +99,7 @@ fn validate_view_roots (
         | MpViewnodeKind::Vognode (MpVognode::Deleted (_)))
     { errors . push (
         BufferValidationError::Other (
-          "View roots must be TrueNodes or DeletedNodes."
+          "View roots must be TrueNodes or PhantomDeleteds."
           . to_string () )); }}}
 
 /// For each node in the viewforest, if it has a definitive view request,

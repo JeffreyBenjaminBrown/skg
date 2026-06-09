@@ -17,7 +17,7 @@ use crate::update_buffer::ancestry::{ col_is_generalized_orphan, deaden_generali
 use crate::update_buffer::util::detach_scaffold_transferring_focus;
 use crate::to_org::render::diff::process_truenode_diff;
 use crate::types::tree::viewnode_nodecomplete::write_at_truenode_in_tree;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol, ViewRequest, IndefOrDef, DeletedNode};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol, ViewRequest, IndefOrDef, PhantomDeleted};
 use crate::types::viewnode::{Vognode, QualCol};
 use super::reconcile::hiddeninsubscribee_col::reconcile_hiddenin_subscribee_col_children;
 use super::reconcile::hiddenoutsideof_subscribeecol::reconcile_hiddenoutside_subscribee_col_children;
@@ -369,7 +369,7 @@ fn convert_inactive_to_deleted_if_deleted (
     write_at_node_in_tree ( tree, treeid,
       |vn : &mut ViewNode| {
         vn . kind = ViewNodeKind::Vognode ( Vognode::Deleted (
-          DeletedNode { id, source,
+          PhantomDeleted { id, source,
                         title : String::new (), body : None } )); } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   Ok (( )) }

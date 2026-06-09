@@ -19,7 +19,7 @@
 // reconcile_content_children -> content_goal_list) does NOT
 // resolve extra_ids. It walks a.contains = [b] verbatim, matches
 // the existing pid=b child in a's viewforest, and lets the
-// deleted_by_this_save_pids check mutate it into a DeletedNode.
+// deleted_by_this_save_pids check mutate it into a PhantomDeleted.
 // Result: the saved-view rerender shows a -> (deleted b) instead
 // of a -> d.
 //

@@ -8,7 +8,7 @@
 //   aa contains [x]
 //
 // Buffer merges a into aa.
-// Expected: a becomes a DeletedNode, aa gains a's children (b, c)
+// Expected: a becomes a PhantomDeleted, aa gains a's children (b, c)
 // plus a text preserver ("MERGED: a"),
 // and the editRequest is stripped from aa's metadata.
 
@@ -165,14 +165,14 @@ async fn merge_container_into_content_impl (
       "editRequest persists after merge execution"
       . to_string() ); }
 
-  // a should NOT appear as a DeletedNode: the preprocessing pass
+  // a should NOT appear as a PhantomDeleted: the preprocessing pass
   // 'rewriteInPlace_viewnodes_whose_id_is_newly_extra' rewrites viewnodes whose pid
   // became an extra-id (here, a is an extra-id of aa after the
   // merge) to carry the acquirer's pid instead. The acquiree line
   // is displayed as a view of the acquirer, not as a tombstone.
   if view . contains ("(deleted") {
     failures . push (
-      "acquiree 'a' was rendered as a DeletedNode; expected the \
+      "acquiree 'a' was rendered as a PhantomDeleted; expected the \
        viewnode to have been rewritten to (id aa)"
       . to_string() ); }
 

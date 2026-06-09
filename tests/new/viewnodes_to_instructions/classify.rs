@@ -12,7 +12,7 @@ use skg::types::viewnode::{
   mk_definitive_viewnode,
   mk_unknown_viewnode,
   viewforest_root_viewnode,
-  DeletedNode,
+  PhantomDeleted,
   Vognode,
   Qual,
   QualCol,
@@ -184,7 +184,7 @@ fn classifies_deleted_unknown_and_deleted_scaffolds_as_display_only (
       focused     : false,
       folded      : false,
       body_folded : false,
-      kind        : ViewNodeKind::Vognode (Vognode::Deleted (DeletedNode {
+      kind        : ViewNodeKind::Vognode (Vognode::Deleted (PhantomDeleted {
         id     : ID::from ("deleted"),
         source : SourceName::from ("main"),
         title  : "deleted" . to_string(),

@@ -4,13 +4,13 @@
 /// Only needed briefly after parsing a buffer from the client;
 /// after validation, converted to placed types.
 
-pub use super::viewnode::{MpTruenode, MpDiffPhantomNode};
-use super::viewnode::DiffPhantomNode;
+pub use super::viewnode::{MpTruenode, MpPhantomDiff};
+use super::viewnode::PhantomDiff;
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
 use super::git::{ExistenceAxes, MembershipAxes};
-use super::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Vognode, QualCol, Qual, RoleCol, DeletedNode, InactiveNode, UnknownNode, GraphNodeStats, ViewNodeStats, Birth, IndefOrDef, ParentIs, };
+use super::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Vognode, QualCol, Qual, RoleCol, PhantomDeleted, InactiveNode, PhantomUnknown, GraphNodeStats, ViewNodeStats, Birth, IndefOrDef, ParentIs, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -45,10 +45,10 @@ pub enum MpViewnodeKind {
 #[derive(Debug, Clone, PartialEq)]
 pub enum MpVognode {
   Normal   (MpTruenode),
-  DiffPhantom (MpDiffPhantomNode),
+  DiffPhantom (MpPhantomDiff),
   Inactive (InactiveNode),
-  Unknown  (UnknownNode),
-  Deleted  (DeletedNode),
+  Unknown  (PhantomUnknown),
+  Deleted  (PhantomDeleted),
 }
 
 //
@@ -80,15 +80,15 @@ impl TryFrom<MpTruenode> for TrueNode {
   }
 }
 
-impl TryFrom<MpDiffPhantomNode> for DiffPhantomNode {
+impl TryFrom<MpPhantomDiff> for PhantomDiff {
   type Error = String;
 
-  fn try_from(u: MpDiffPhantomNode) -> Result<Self, Self::Error> {
+  fn try_from(u: MpPhantomDiff) -> Result<Self, Self::Error> {
     let id = u . id . ok_or_else(
       || format!("Phantom '{}' has no ID", u . title))?;
     let source = u . source . ok_or_else(
       || format!("Phantom '{}' has no source", u . title))?;
-    Ok(DiffPhantomNode {
+    Ok(PhantomDiff {
       title      : u . title,
       id,
       source,
@@ -100,9 +100,9 @@ impl TryFrom<MpDiffPhantomNode> for DiffPhantomNode {
   }
 }
 
-impl From<DiffPhantomNode> for MpDiffPhantomNode {
-  fn from(p: DiffPhantomNode) -> Self {
-    MpDiffPhantomNode {
+impl From<PhantomDiff> for MpPhantomDiff {
+  fn from(p: PhantomDiff) -> Self {
+    MpPhantomDiff {
       title      : p . title,
       id         : Some(p . id),
       source     : Some(p . source),
@@ -124,7 +124,7 @@ impl TryFrom<MpViewnodeKind> for ViewNodeKind {
           Vognode::Normal (TrueNode::try_from (t)?))),
       MpViewnodeKind::Vognode (MpVognode::DiffPhantom (p)) =>
         Ok (ViewNodeKind::Vognode (
-          Vognode::DiffPhantom (DiffPhantomNode::try_from (p)?))),
+          Vognode::DiffPhantom (PhantomDiff::try_from (p)?))),
       MpViewnodeKind::Vognode (MpVognode::Deleted (d)) =>
         Ok (ViewNodeKind::Vognode (Vognode::Deleted (d))),
       MpViewnodeKind::Vognode (MpVognode::Inactive (i)) =>
@@ -185,7 +185,7 @@ impl From<ViewNodeKind> for MpViewnodeKind {
           MpVognode::Normal (MpTruenode::from (t))),
       ViewNodeKind::Vognode (Vognode::DiffPhantom (p)) =>
         MpViewnodeKind::Vognode (
-          MpVognode::DiffPhantom (MpDiffPhantomNode::from (p))),
+          MpVognode::DiffPhantom (MpPhantomDiff::from (p))),
       ViewNodeKind::Vognode (Vognode::Deleted (d)) =>
         MpViewnodeKind::Vognode (MpVognode::Deleted (d)),
       ViewNodeKind::Vognode (Vognode::Inactive (i)) =>

@@ -12,11 +12,28 @@ Pure token rename across 6 server files (11 occ), plus sibling
 'is_removedhere_phantom' -> 'is_removedhere_diffPhantom' (5 occ). 'cargo build'
 and 'cargo test --no-run' both green. No surprises.
 
+** Commit 0b -- struct renames ('DiffPhantomNode'/'DeletedNode'/'UnknownNode')
+-> 'PhantomDiff'/'PhantomDeleted'/'PhantomUnknown' (and '_Generic'/'Mp*' forms),
+plus the renderer helper fns ('diffphantom_metadata_to_string' ->
+'phantomDiff_metadata_to_string', etc.). 21 '.rs' files. 'cargo build' +
+'cargo test --no-run' green. Note: 23 prose mentions of 'DeletedNode' remain in
+NON-rust files ('.el'/'.org'/'.sh') under tests/integration -- these are the
+plan's "DO NOT TOUCH" wire-format oracle files, so they are deliberately left
+(see "What's imperfect").
+
 * Changes to the plan's envisioned order
 (appended as they happen)
 
 * What's imperfect about what's done
-(appended as discovered)
+
+** Stale prose mentions of 'DeletedNode' in DO-NOT-TOUCH oracle files (0b)
+After the 0b struct rename, 23 references to the old name 'DeletedNode' remain in
+'.el'/'.org'/'.sh' narrative under tests/integration/save_collateral_*/ (e.g.
+README/detail.org, test-emacs.el). These are prose descriptions of the concept,
+not Rust identifiers and not wire-format strings. The plan lists these exact
+files under "Group 8 -- DO NOT TOUCH" (a diff there during the refactor signals a
+wire-format break), so I left them untouched. They are now mildly stale-named but
+harmless; a future doc pass could update them outside this refactor.
 
 * Choices determining the future
 (appended as made)
