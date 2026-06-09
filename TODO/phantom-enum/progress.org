@@ -1,0 +1,25 @@
+#+TITLE: Phantom-enum split -- execution progress
+
+Live log of executing 1_plan.org. Newest entries appended under each heading.
+The plan (1_plan.org) is left as-is; deviations in *how* are recorded here.
+
+Baseline: on branch 'phantom-enum', 'cargo build' green before any change.
+
+* What's done and went well
+
+** Commit 0a -- method rename ('should_be_phantom' -> 'should_be_diffPhantom')
+Pure token rename across 6 server files (11 occ), plus sibling
+'is_removedhere_phantom' -> 'is_removedhere_diffPhantom' (5 occ). 'cargo build'
+and 'cargo test --no-run' both green. No surprises.
+
+* Changes to the plan's envisioned order
+(appended as they happen)
+
+* What's imperfect about what's done
+(appended as discovered)
+
+* Choices determining the future
+(appended as made)
+
+* TODO obstacles needing Jeff
+(empty so far -- architectural surprises / stumper mysteries go here, marked TODO)

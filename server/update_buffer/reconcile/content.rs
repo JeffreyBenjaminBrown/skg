@@ -140,7 +140,7 @@ fn attach_cascade_dvrs_to_affected_content (
     . filter ( |c| matches!( &c . value () . kind,
         ViewNodeKind::Vognode (Vognode::Normal (t))
           if t . parentIs == ParentIs::Affected
-             && ! t . should_be_phantom () ) )
+             && ! t . should_be_diffPhantom () ) )
     . map ( |c| c . id () )
     . collect ();
   for cid in child_ids {
@@ -406,7 +406,7 @@ fn mark_erroneous_content_children_as_indep (
       ViewNodeKind::Vognode (Vognode::Normal (t)) =>
         t . parentIs == ParentIs::Affected
         && !content_id_set . contains( &t . id )
-        && !t . should_be_phantom(), // see this function's docstring
+        && !t . should_be_diffPhantom(), // see this function's docstring
       _ => false },
     |vn : &mut ViewNode| {
       if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))

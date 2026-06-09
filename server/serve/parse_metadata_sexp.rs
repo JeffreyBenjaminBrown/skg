@@ -205,7 +205,7 @@ pub fn viewnode_from_metadata (
             not_in_git       : metadata . truenode_not_in_git,
             indef_or_def, };
         let vognode =
-          if t . should_be_phantom ()
+          if t . should_be_diffPhantom ()
           { // TODO/DONE/local-view-update/plan_v2.org §11: a phantom carries only the slim MpDiffPhantomNode. The
             // EditRequestOnIndefinitive validation above already fired if this
             // phantom (indefinitive) carried an edit_request, so dropping

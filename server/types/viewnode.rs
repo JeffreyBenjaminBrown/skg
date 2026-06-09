@@ -185,7 +185,7 @@ pub type MpDiffPhantomNode = DiffPhantomNode_Generic < Option < ID >,
 /// node flipped in place by `normal_to_phantom` because its own membership/
 /// existence axes went negative. "removed" vs "removedHere" (its .skg file is
 /// still in the worktree, so TypeDB can still answer about it) is told apart by
-/// `is_removedhere_phantom`.
+/// `is_removedhere_diffPhantom`.
 ///
 /// USED: as a read-only diff annotation. It depicts a removed member at its
 /// correct HEAD position among surviving siblings, decorated with per-stage diff
@@ -238,12 +238,12 @@ impl < Id, Src > DiffPhantomNode_Generic < Id, Src > {
 
   /// True iff this node's diff axes require phantom display; for a correctly
   /// constructed phantom this holds, but some shared code asks regardless.
-  pub fn should_be_phantom (&self) -> bool {
+  pub fn should_be_diffPhantom (&self) -> bool {
     diff_axes_require_phantom (&self . existence, &self . membership) }
 
   /// A "removed-here" phantom whose '.skg' file is still in the worktree.
-  pub fn is_removedhere_phantom (&self) -> bool {
-    self . should_be_phantom ()
+  pub fn is_removedhere_diffPhantom (&self) -> bool {
+    self . should_be_diffPhantom ()
     && self . existence . unstaged != Some (Sign::Minus) }
 }
 
@@ -376,7 +376,7 @@ pub fn diff_axes_require_phantom (
   || existence  . unstaged == Some (Sign::Minus) }
 
 impl < Id, Src > TrueNode_Generic < Id, Src > {
-  pub fn should_be_phantom (
+  pub fn should_be_diffPhantom (
     &self,
   ) -> bool {
     diff_axes_require_phantom (&self . existence, &self . membership) }
@@ -385,10 +385,10 @@ impl < Id, Src > TrueNode_Generic < Id, Src > {
   /// present in the worktree (so TypeDB still knows the node and can
   /// answer queries about it). Distinguished from a phantom whose file
   /// is also gone, for which graph queries would fail.
-  pub fn is_removedhere_phantom (
+  pub fn is_removedhere_diffPhantom (
     &self,
   ) -> bool {
-    self . should_be_phantom ()
+    self . should_be_diffPhantom ()
     && self . existence . unstaged != Some (Sign::Minus) }
 
   pub fn is_indefinitive (&self) -> bool {
@@ -573,7 +573,7 @@ impl ViewNode {
   ) {
     if let ViewNodeKind::Vognode (Vognode::Normal (t))
       = &self . kind
-      { if t . should_be_phantom ()
+      { if t . should_be_diffPhantom ()
         { // A phantom is ALWAYS indefinitive and renders no body (Jeff's
           // TODO/DONE/local-view-update/progress.org §9 TODO): the diff view presumes git literacy (magit
           // shows the real node), and a phantom must never be a node's

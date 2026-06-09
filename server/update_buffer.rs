@@ -655,9 +655,9 @@ async fn attach_containerward_ancestries_to_removedhere_phantoms (
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
         let is_removedhere : bool = match &node_ref . value () . kind {
           ViewNodeKind::Vognode (Vognode::Normal (t)) =>
-            t . is_removedhere_phantom (),
+            t . is_removedhere_diffPhantom (),
           ViewNodeKind::Vognode (Vognode::DiffPhantom (p)) =>
-            p . is_removedhere_phantom (),
+            p . is_removedhere_diffPhantom (),
           _ => false };
         if is_removedhere
         { result . push ( node_ref . id () ); }} }
