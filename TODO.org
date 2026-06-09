@@ -1,6 +1,11 @@
-* ONGOING Phantom = Diff | Deleted | Unknown
-[[./TODO/phantom-enum/1_plan.org]]
+* DONE , probably :: Phantom = Diff | Deleted | Unknown
+[[./TODO/DONE/phantom-enum/]]
 claude --resume 51f722b5-8564-4c61-9d86-c1b98945f07a
+  in skg2
+* AWAITS TypeDB polls too much, burns 16% of a CPU.
+claude --resume a2d5b32b-876e-4236-997e-3a0a8582b1f1
+  in skg (not skg2, not skg3)
+Simple upstream fix would be to make the poll frequency configurable,
 * TODO fix sound
 crestart in newer container.
 * git add for both sides of moved source
