@@ -14,8 +14,10 @@
  */
 
 use typedb_driver::{
+  Addresses,
   Credentials,
   DriverOptions,
+  DriverTlsConfig,
   TypeDBDriver,
 };
 
@@ -24,9 +26,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   println!("Connecting to TypeDB...");
 
   let driver = TypeDBDriver::new(
-    "127.0.0.1:1729",
+    Addresses::try_from_address_str("127.0.0.1:1729")?,
     Credentials::new("admin", "password"),
-    DriverOptions::new(false, None)?
+    DriverOptions::new(DriverTlsConfig::disabled())
   ).await?;
 
   println!("Fetching database list...");

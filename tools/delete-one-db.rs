@@ -3,7 +3,7 @@
  * Usage: cargo run --bin delete-one-db test-manual
  */
 
-use typedb_driver::{Credentials, DriverOptions, TypeDBDriver};
+use typedb_driver::{Addresses, Credentials, DriverOptions, DriverTlsConfig, TypeDBDriver};
 use std::env;
 
 #[tokio::main]
@@ -17,9 +17,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let db_name = &args[1];
 
     let driver = TypeDBDriver::new(
-        "127.0.0.1:1729",
+        Addresses::try_from_address_str("127.0.0.1:1729")?,
         Credentials::new("admin", "password"),
-        DriverOptions::new(false, None)?
+        DriverOptions::new(DriverTlsConfig::disabled())
     ).await?;
 
     let databases = driver.databases();

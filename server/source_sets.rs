@@ -29,7 +29,7 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::process::Command;
 use std::sync::Arc;
-use typedb_driver::{Credentials, DriverOptions, TypeDBDriver};
+use typedb_driver::{Addresses, Credentials, DriverOptions, DriverTlsConfig, TypeDBDriver};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ActiveSourceSet {
@@ -217,9 +217,9 @@ where
     config . tantivy_folder = PathBuf::from (tantivy_folder);
     let driver : TypeDBDriver =
       TypeDBDriver::new (
-        TYPEDB_ADDRESS,
+        Addresses::try_from_address_str (TYPEDB_ADDRESS)?,
         Credentials::new ("admin", "password"),
-        DriverOptions::new (false, None)? ) . await?;
+        DriverOptions::new (DriverTlsConfig::disabled ()) ) . await?;
     let nodes : Vec<NodeComplete> =
       read_all_skg_files_from_sources (&config)?;
     let typedb_nodes : Vec<NodeTypedb> =

@@ -26,7 +26,7 @@ use std::path::{Path, PathBuf};
 use std::fs;
 use tantivy::{DocAddress, TantivyDocument};
 use tantivy::schema::document::Value;
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
+use typedb_driver::{TypeDBDriver, Addresses, Credentials, DriverOptions, DriverTlsConfig};
 
 /// Set up a fresh test environment: copy fixtures to temp,
 /// create TypeDB + Tantivy, return (config, driver, tantivy).
@@ -51,9 +51,9 @@ async fn setup (
          ("foreign", temp_fixtures . join ("foreign")) ] )?;
   let driver : TypeDBDriver =
     TypeDBDriver::new (
-      "127.0.0.1:1729",
+      Addresses::try_from_address_str ("127.0.0.1:1729")?,
       Credentials::new ("admin", "password"),
-      DriverOptions::new (false, None)? ) . await?;
+      DriverOptions::new (DriverTlsConfig::disabled ()) ) . await?;
   let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config)?;
   let typedb_nodes : Vec<NodeTypedb> =

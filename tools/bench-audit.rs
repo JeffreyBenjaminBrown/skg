@@ -30,7 +30,7 @@ use std::env;
 use std::sync::Arc;
 use std::time::Instant;
 use typedb_driver::{
-  Credentials, DriverOptions, Transaction, TransactionType, TypeDBDriver,
+  Addresses, Credentials, DriverOptions, DriverTlsConfig, Transaction, TransactionType, TypeDBDriver,
 };
 
 #[tokio::main]
@@ -63,9 +63,9 @@ async fn main () -> Result<(), Box<dyn std::error::Error>> {
 
   // Connect to TypeDB.
   let driver : TypeDBDriver = TypeDBDriver::new (
-    "127.0.0.1:1729",
+    Addresses::try_from_address_str ("127.0.0.1:1729") ?,
     Credentials::new ("admin", "password"),
-    DriverOptions::new (false, None) ?
+    DriverOptions::new (DriverTlsConfig::disabled ())
   ) . await ?;
 
   // Pick a deterministic sample of pids (first N by sort order).

@@ -34,7 +34,7 @@ use futures::executor::block_on;
 use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
+use typedb_driver::{TypeDBDriver, Addresses, Credentials, DriverOptions, DriverTlsConfig};
 
 fn mk_test_tcp_stream ()
   -> TcpStream
@@ -68,9 +68,9 @@ async fn setup_test(
   let config: SkgConfig =
     load_config_with_overrides(config_path, Some (db_name), &[])?;
   let driver: TypeDBDriver = TypeDBDriver::new(
-    "127.0.0.1:1729",
+    Addresses::try_from_address_str("127.0.0.1:1729")?,
     Credentials::new("admin", "password"),
-    DriverOptions::new(false, None)?,
+    DriverOptions::new(DriverTlsConfig::disabled()),
   ) . await?;
   let nodes: Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config)?;

@@ -44,13 +44,31 @@ fn main() -> Result<(), Box<dyn Error>> {
       . init ();
     return run_import (&args); }
 
-  let config: SkgConfig = load_config (
-    & { let config_path: String =
-          if args . len() > 1 { // config from command line, if given
-            args[1] . clone()
-          } else { // default config
-            "data/skgconfig.toml" . to_string() };
-        config_path } ) ?;
+  if args . len() > 1 && args[1] == "check-config" {
+    // Pre-flight used by bash/start-servers.sh: run the same
+    // 'load_config' the server runs at startup (TOML parse +
+    // source-set/path validation) and exit 0/1, reporting a bad config
+    // exactly the way the real startup does (via 'die_bad_config'). No
+    // tracing, no TypeDB, no file walk.
+    let config_path: String =
+      if args . len() > 2 { args[2] . clone() }
+      else { "data/skgconfig.toml" . to_string() };
+    return match load_config (&config_path) {
+      Ok (_)  => Ok (( )),
+      Err (e) => die_bad_config (&config_path, e) }; }
+
+  // The real server start. load_config runs on EVERY launch -- via
+  // start-servers.sh, a cargo-watch auto-restart, or a manual
+  // 'cargo run' -- so routing its failure through 'die_bad_config'
+  // guarantees a bad skgconfig.toml is reported clearly (in red on a
+  // terminal) no matter how skg was (re)started, rather than the
+  // default '?' that dumps an unreadable Debug blob of the whole file.
+  let config_path: String =
+    if args . len() > 1 { args[1] . clone() } // config from command line, if given
+    else { "data/skgconfig.toml" . to_string() }; // default config
+  let config: SkgConfig = match load_config (&config_path) {
+    Ok (c)  => c,
+    Err (e) => die_bad_config (&config_path, e) };
 
   init_tracing (&config);
 
@@ -126,6 +144,24 @@ fn main() -> Result<(), Box<dyn Error>> {
     . map_err ( |e| Box::new (e)
                  as Box<dyn Error>) ?;
   Ok (( )) }
+
+/// Report a config-load failure and exit(1). Bold red when stderr is a
+/// terminal; plain text otherwise (e.g. cargo-watch.log), so the
+/// message reads cleanly wherever skg's stderr points. Routing every
+/// 'load_config' failure here -- the real startup and the
+/// 'check-config' pre-flight alike -- means a bad skgconfig.toml is
+/// reported identically no matter how skg was launched.
+fn die_bad_config (
+  config_path : &str,
+  err         : Box<dyn Error>,
+) -> ! {
+  let msg : String = format! (
+    "Invalid skg config '{}': {}", config_path, err);
+  if std::io::IsTerminal::is_terminal (&std::io::stderr ()) {
+    eprintln! ("\x1b[1;31m{}\x1b[0m", msg); // bold red on a terminal
+  } else {
+    eprintln! ("{}", msg); }
+  std::process::exit (1); }
 
 /// During initialization, accept connections and reply
 /// with an "initializing" message to every request line.

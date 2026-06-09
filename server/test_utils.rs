@@ -36,7 +36,7 @@ use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use typedb_driver::answer::{QueryAnswer, ConceptRow};
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Transaction, TransactionType, Database, DatabaseManager};
+use typedb_driver::{TypeDBDriver, Addresses, Credentials, DriverOptions, DriverTlsConfig, Transaction, TransactionType, Database, DatabaseManager};
 use crate::dbs::typedb::util::ConceptRowStream;
 use std::sync::Arc;
 use tantivy::{DocAddress, Searcher, TantivyDocument};
@@ -125,9 +125,9 @@ where
     let config: SkgConfig =
       load_config_with_overrides(config_path, Some (db_name), &[])?;
     let driver: TypeDBDriver = TypeDBDriver::new(
-        TYPEDB_ADDRESS,
+        Addresses::try_from_address_str(TYPEDB_ADDRESS)?,
         Credentials::new("admin", "password"),
-        DriverOptions::new(false, None)?,
+        DriverOptions::new(DriverTlsConfig::disabled()),
       ). await?;
     let nodes: Vec<NodeComplete> =
       read_all_skg_files_from_sources (&config)?;
@@ -339,9 +339,9 @@ pub async fn setup_test_tantivy_and_typedb_dbs (
     SkgConfig::fromSourcesAndDbName (
       sources, db_name, tantivy_folder ) };
   let driver: TypeDBDriver = TypeDBDriver::new(
-    TYPEDB_ADDRESS,
+    Addresses::try_from_address_str(TYPEDB_ADDRESS)?,
     Credentials::new("admin", "password"),
-    DriverOptions::new(false, None)?
+    DriverOptions::new(DriverTlsConfig::disabled())
   ) . await ?;
   populate_test_db_from_fixtures(
     fixtures_folder,

@@ -14,7 +14,7 @@ use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::nodes::complete::NodeComplete;
 use futures::executor::block_on;
 use std::error::Error;
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
+use typedb_driver::{TypeDBDriver, Addresses, Credentials, DriverOptions, DriverTlsConfig};
 
 const CONFIG_PATH: &str = "tests/subscribee_col/fixtures/skgconfig.toml";
 
@@ -25,9 +25,9 @@ async fn setup_multi_source_test(
   let config: SkgConfig =
     load_config_with_overrides(CONFIG_PATH, Some (db_name), &[])?;
   let driver: TypeDBDriver = TypeDBDriver::new(
-    "127.0.0.1:1729",
+    Addresses::try_from_address_str("127.0.0.1:1729")?,
     Credentials::new("admin", "password"),
-    DriverOptions::new(false, None)?,
+    DriverOptions::new(DriverTlsConfig::disabled()),
   ) . await?;
   let nodes: Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config)?;
