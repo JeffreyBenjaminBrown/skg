@@ -1,0 +1,1123 @@
+#+TITLE: Vognode/Phantom split -- implementation plan
+#+AUTHOR: plan for Jeff + future AI implementer
+
+This document is the implementation plan for splitting the placeholder
+("phantom") kinds out of 'Vognode' into a new sibling enum 'Phantom', and
+renaming 'Vognode::Normal' to 'Vognode::Active'. The same split is mirrored on
+the maybe-placed side ('MpVognode' / new 'MpPhantom' / 'MpViewnodeKind::Phantom').
+
+Code references are wrapped in single apostrophes (e.g. 'Vognode::Active'). All
+file paths are absolute.
+
+* Goal
+
+Three moves, all internal to Rust; the external wire format does not change.
+
+** (a) 'Vognode::Normal' becomes 'Vognode::Active'.
+** (b) The three display-only placeholder kinds leave 'Vognode' for a NEW sibling enum 'Phantom', reached as 'ViewNodeKind::Phantom (Phantom::Diff (..))' etc. 'DiffPhantom' is renamed to 'Diff' in the move.
+** (c) 'Inactive' STAYS in 'Vognode'. 'Active' and 'Inactive' are the two graph-backed kinds.
+
+** Before
+
+#+begin_src rust
+pub enum ViewNodeKind {
+  Vognode       (Vognode),
+  QualCol       (QualCol),
+  Qual          (Qual),
+  PartnerCol    (RoleCol),
+  BufferRoot,
+  DeadScaffold,
+}
+
+pub enum Vognode {
+  Normal      (TrueNode),
+  DiffPhantom (DiffPhantomNode),
+  Inactive    (InactiveNode),
+  Unknown     (UnknownNode),
+  Deleted     (DeletedNode),
+}
+#+end_src
+
+** After
+
+#+begin_src rust
+pub enum ViewNodeKind {
+  Vognode       (Vognode),
+  Phantom       (Phantom),
+  QualCol       (QualCol),
+  Qual          (Qual),
+  PartnerCol    (RoleCol),
+  BufferRoot,
+  DeadScaffold,
+}
+
+pub enum Vognode {           // the two graph-backed kinds
+  Active   (TrueNode),
+  Inactive (InactiveNode),
+}
+
+pub enum Phantom {           // the three display-only placeholders
+  Diff    (DiffPhantomNode),
+  Deleted (DeletedNode),
+  Unknown (UnknownNode),
+}
+#+end_src
+
+The struct payload types ('TrueNode', 'DiffPhantomNode', 'DeletedNode',
+'UnknownNode', 'InactiveNode', and their 'Mp*' twins) keep their names. Only the
+enum *variant* names ('Normal' -> 'Active', 'DiffPhantom' -> 'Diff') and the
+*containing enum* for the three placeholders change.
+
+* Hard constraints
+
+** Wire-format invariance
+The external metadata wire format is the Emacs client API and MUST stay
+byte-identical. Concretely, the atoms emitted in
+'/home/ubuntu/host/server/org_to_text.rs' and parsed in
+'/home/ubuntu/host/server/serve/parse_metadata_sexp.rs' -- '(node ...)',
+'(deleted (id X)(source S))', '(unknownNode (id X))', 'inactiveNode', the
+scaffold atoms -- must not change by a single byte. Only the internal Rust match
+structure changes; never the emitted/accepted strings, and never the bodies or
+signatures of the '*_metadata_to_string' helpers.
+
+The internal error-label strings ('deleted:', 'unknown:', 'inactive:' in
+'MpViewnode::error_label') and the validation-message text are NOT wire format,
+but should also stay byte-identical to avoid changing diagnostic output.
+
+** Jeff's formatting/naming rules
+- Verbose names; mixed camel/snake so compound words read as one token.
+- Every 'let' and 'let-else' gets a type signature.
+- In a type signature, the name, each argument, and the return type each go on
+  their own line.
+- NO internal 'use' statements or '::'-qualified paths outside a file's top 'use'
+  preamble. The new 'Phantom' / 'MpPhantom' names MUST be added to the relevant
+  files' top preambles wherever they are pattern-matched.
+- Trailing brackets sit on the last line of what they close.
+- Group adjacent punctuation.
+- PRESERVE existing comments (relocate rather than delete unless truly obsolete).
+- Do NOT reformat untouched code.
+- Never add history-narration comments ("we used to...").
+- Callers go before callees within a module.
+
+** Two collision/scope warnings
+- '/home/ubuntu/host/server/types/phantom.rs' ALREADY EXISTS. It is the
+  unrelated git-diff phantom-lookup module (a child of 'crate::types::git',
+  exporting 'title_for_phantom' / 'phantom_axes'). It does NOT hold the new
+  'Phantom' enum. Define the new 'enum Phantom' INSIDE 'viewnode.rs' -- do not
+  create or overwrite a 'phantom' module.
+- The struct payload types are NOT renamed. Only the enum variant and the
+  containing enum change.
+
+* New type layer
+
+All paste-ready in Jeff's style. File paths are absolute.
+
+** 1. /home/ubuntu/host/server/types/viewnode.rs
+
+*** 1a. 'ViewNodeKind' (replaces lines 56-63) -- add the 'Phantom' arm right after 'Vognode'
+
+#+begin_src rust
+#[derive( Debug, Clone, PartialEq )]
+pub enum ViewNodeKind {
+  Vognode       (Vognode),
+  Phantom       (Phantom),
+  QualCol       (QualCol),
+  Qual          (Qual),
+  PartnerCol    (RoleCol),
+  BufferRoot,
+  DeadScaffold,
+}
+#+end_src
+
+*** 1b. 'Vognode' + new sibling 'Phantom' (replaces lines 65-72)
+
+The long 'DiffPhantom' comment (old line 68) is relocated onto 'Phantom::Diff';
+the 'Unknown' / 'Deleted' line comments move onto their 'Phantom' arms; the
+'Inactive' comment stays in 'Vognode'.
+
+#+begin_src rust
+#[derive( Debug, Clone, PartialEq )]
+pub enum Vognode {
+  Active   (TrueNode),
+  Inactive (InactiveNode), // From a source that is inactive (see "source sets").
+}
+
+/// The three display-only placeholder kinds. None of them is a current graph
+/// member: all are inert on save and excluded from the view's collateral pids
+/// (`pids_from_viewforest`). They differ in *why* the node is absent and thus
+/// in how much they can still say about it.
+#[derive( Debug, Clone, PartialEq )]
+pub enum Phantom {
+  Diff    (DiffPhantomNode), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim DiffPhantomNode, not a TrueNode -- a phantom is always indefinitive/bodyless and its parentIs is never read or rendered, so it needs none of TrueNode's parentIs/birth/viewStats/view_requests/indef_or_def. See DiffPhantomNode_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
+  Deleted (DeletedNode),     // No longer exists in the graph.
+  Unknown (UnknownNode),     // If it *ever* existed in the graph, Skg didn't find it.
+}
+#+end_src
+
+*** 1c. Doc-comment-only edits on struct definitions (lines 73-87, 109-131, 177-203, 219-233, 363-369)
+
+'DeletedNode' doc (lines 74, 83):
+
+#+begin_src rust
+/// A placeholder ("phantom") for a node whose .skg file a save just
+/// removed -- one of the three placeholder kinds, alongside DiffPhantomNode and
+/// UnknownNode. All three stand in for something that is NOT a current graph
+/// member (so all three are inert on save and excluded from the view's
+/// collateral pids, `pids_from_viewforest`); they differ in *why* the node is
+/// absent and thus in how much they can still say about it.
+///
+/// ARISES: during post-save / collateral re-render (NOT in git diff mode), when
+/// a node already materialized in the view turns up in
+/// `deleted_by_this_save_pids`. An Active content child flips here via
+/// `mutate_truenode_to_deletednode`; an Inactive node via
+/// `convert_inactive_to_deleted_if_deleted`. So it marks a node that genuinely
+#+end_src
+
+(Lines 96-100 "DISTINCT INFO" paragraph: unchanged -- "phantom" is generic there.)
+
+'UnknownNode' doc (lines 109, 128-129):
+
+#+begin_src rust
+/// A placeholder ("phantom") for a reference that resolves to nothing --
+/// one of the three placeholder kinds, alongside DiffPhantomNode and DeletedNode
+/// (see DeletedNode for the shared framing).
+#+end_src
+#+begin_src rust
+/// DISTINCT INFO: it carries ONLY the `id`. Unlike DeletedNode it has no source
+/// (it is the one Phantom kind for which `pid_and_source` returns None) and no
+/// last-seen text; unlike DiffPhantomNode it has no diff axes. That emptiness IS
+/// the information: a reference exists, but we have no record of its target.
+#+end_src
+
+'DiffPhantomNode_Generic' doc (lines 177, 184):
+
+#+begin_src rust
+/// The slim payload of a `Phantom::Diff` -- one of the three placeholder
+/// ("phantom") kinds, alongside DeletedNode and UnknownNode (see
+/// DeletedNode for the shared framing).
+#+end_src
+#+begin_src rust
+/// `insert_phantoms_for_missing_contains` / `mk_phantom_viewnode`), or an Active
+/// node flipped in place by `normal_to_phantom` because its own membership/
+#+end_src
+
+'from_truenode' doc (line 222):
+
+#+begin_src rust
+  /// fields and discarding parentIs / birth / viewStats / view_requests /
+  /// indef_or_def. Used when flipping an Active node to a phantom and by the
+  /// placed<->maybe-placed conversions.
+#+end_src
+
+'diff_axes_require_phantom' doc (lines 363-364):
+
+#+begin_src rust
+/// True when a node's diff axes require displaying it with the
+/// `Phantom::Diff` variant. Triggered by either:
+#+end_src
+
+*** 1d. 'impl Vognode' (replaces lines 506-537) -- now only 'Active'/'Inactive'
+
+'normal_or_phantom_id' cannot reach a phantom from a '&Vognode' anymore, so the
+cross-enum facade moves up to 'ViewNode' (see 1f). Within 'impl Vognode', the
+Active-id half stays as a focused 'active_id'; 'id' and 'pid_and_source' shrink
+to two arms.
+
+#+begin_src rust
+impl Vognode {
+  /// The id of an Active vognode, or None for Inactive. (The diff-phantom half of
+  /// the former `normal_or_phantom_id` now lives on ViewNode, since Diff left
+  /// Vognode for the Phantom enum.)
+  pub fn active_id (&self) -> Option<&ID> {
+    match self {
+      Vognode::Active   (t) => Some (&t . id),
+      Vognode::Inactive (_) => None,
+    } }
+
+  pub fn id (&self) -> &ID {
+    match self {
+      Vognode::Active   (t) => &t . id,
+      Vognode::Inactive (i) => &i . id,
+    } }
+
+  pub fn pid_and_source (
+    &self,
+  ) -> Option<(&ID, &SourceName)> {
+    match self {
+      Vognode::Active   (t) => Some ((&t . id, &t . source)),
+      Vognode::Inactive (i) => Some ((&i . id, &i . source)),
+    } }
+}
+#+end_src
+
+*** 1e. New 'impl Phantom' -- the arms that left 'Vognode' (place directly after 'impl Vognode')
+
+'Unknown' still yields 'None' for source, exactly as before; this preserves the
+wire/save invariant that Unknown is excluded from collateral pids.
+
+#+begin_src rust
+impl Phantom {
+  pub fn id (&self) -> &ID {
+    match self {
+      Phantom::Diff    (p) => &p . id,
+      Phantom::Deleted (d) => &d . id,
+      Phantom::Unknown (u) => &u . id,
+    } }
+
+  pub fn pid_and_source (
+    &self,
+  ) -> Option<(&ID, &SourceName)> {
+    match self {
+      Phantom::Diff    (p) => Some ((&p . id, &p . source)),
+      Phantom::Deleted (d) => Some ((&d . id, &d . source)),
+      Phantom::Unknown (_) => None,
+    } }
+}
+#+end_src
+
+*** 1f. 'impl ViewNode' facade (replaces lines 570-635)
+
+These re-dispatch across BOTH enums so the maximum number of call sites are
+untouched. 'normal_or_phantom_id''s job is recovered by a new
+'ViewNode::active_or_diff_phantom_id'; 'id_if_vognode' keeps its narrowed meaning
+(Vognode-only), with the phantom-reaching logic on the separate accessor.
+
+#+begin_src rust
+impl ViewNode {
+  pub fn normal_to_phantom (
+    &mut self,
+  ) {
+    if let ViewNodeKind::Vognode (Vognode::Active (t))
+      = &self . kind
+      { if t . should_be_phantom ()
+        { // A phantom is ALWAYS indefinitive and renders no body (Jeff's
+          // TODO/DONE/local-view-update/progress.org §9 TODO): the diff view presumes git literacy (magit
+          // shows the real node), and a phantom must never be a node's
+          // definitive instance -- if Removed it has nothing to define, and if
+          // RemovedHere "edit it here, where it isn't" is dangerously
+          // confusing. So drop body/edit_request when flipping a (possibly
+          // Definitive) Active node to a phantom. mk_phantom_viewnode already
+          // builds from an Indefinitive base, so now every phantom is
+          // indefinitive by construction.
+          let phantom : DiffPhantomNode =
+            DiffPhantomNode::from_truenode ( t . clone () );
+          self . kind = ViewNodeKind::Phantom (
+            Phantom::Diff (phantom)); }}}
+
+  pub fn title (&self) -> &str {
+    match &self . kind {
+      ViewNodeKind::Vognode (Vognode::Active (t)) => &t . title,
+      ViewNodeKind::Phantom (Phantom::Diff (p)) => &p . title,
+      ViewNodeKind::Phantom (Phantom::Deleted (d)) =>
+        &d . title,
+      ViewNodeKind::Qual (q) =>
+        q . title (),
+      ViewNodeKind::QualCol (_)
+        | ViewNodeKind::PartnerCol (_)
+        | ViewNodeKind::BufferRoot
+        | ViewNodeKind::DeadScaffold
+        | ViewNodeKind::Phantom (Phantom::Unknown (_))
+        | ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
+        "",
+    }}
+
+  /// Reasonable for both TrueNodes and Scaffolds.
+  pub fn body (&self) -> Option < &String > {
+    match &self . kind {
+      ViewNodeKind::Vognode (Vognode::Active (t)) => t . body (),
+      ViewNodeKind::Phantom (Phantom::Diff (p)) => p . body (),
+      ViewNodeKind::Phantom (Phantom::Deleted (d)) => d . body . as_ref (),
+      ViewNodeKind::Phantom (Phantom::Unknown (_))
+        | ViewNodeKind::Vognode (Vognode::Inactive (_))
+        | ViewNodeKind::QualCol (_)
+        | ViewNodeKind::Qual (_)
+        | ViewNodeKind::PartnerCol (_)
+        | ViewNodeKind::BufferRoot
+        | ViewNodeKind::DeadScaffold => None,
+    }}
+
+  pub fn is_truenode_and_parentIs_affected (&self) -> bool {
+    match &self . kind {
+      ViewNodeKind::Vognode (Vognode::Active (t)) =>
+        t . parentIs == ParentIs::Affected,
+      _ => false,
+    }}
+
+  pub fn id_if_vognode (&self) -> Option<&ID> {
+    match &self . kind {
+      ViewNodeKind::Vognode (v) => Some (v . id ()),
+      _ => None,
+    }}
+
+  /// The id of an Active vognode or a Diff phantom -- the two TrueNode-ish kinds,
+  /// which before the Vognode/Phantom split both lived in Vognode and were
+  /// reached by `Vognode::normal_or_phantom_id`. None for everything else
+  /// (Inactive, Deleted/Unknown phantoms, cols, scaffolds, BufferRoot).
+  pub fn active_or_diff_phantom_id (&self) -> Option<&ID> {
+    match &self . kind {
+      ViewNodeKind::Vognode (Vognode::Active (t)) => Some (&t . id),
+      ViewNodeKind::Phantom (Phantom::Diff (p))   => Some (&p . id),
+      _ => None,
+    }}
+}
+#+end_src
+
+*** 1g. Constructors (lines 746-799, 836-869)
+
+'mk_phantom_viewnode' (746-756):
+
+#+begin_src rust
+  let mut viewnode : ViewNode =
+    mk_indefinitive_viewnode ( id, source, title, ParentIs::Affected );
+  if let ViewNodeKind::Vognode (Vognode::Active (mut t)) = viewnode . kind
+    { t . existence  = existence;
+      t . membership = membership;
+      viewnode . kind = ViewNodeKind::Phantom (
+        Phantom::Diff ( DiffPhantomNode::from_truenode (t) )); }
+  else
+    // mk_indefinitive_viewnode always yields an Active vognode; if that ever
+    // changes, fail loudly rather than silently return a non-phantom.
+    { unreachable! (
+        "mk_phantom_viewnode: mk_indefinitive_viewnode did not yield an Active vognode" ); }
+  viewnode }
+#+end_src
+
+'mk_unknown_viewnode' (784-785):
+
+#+begin_src rust
+    kind        : ViewNodeKind::Phantom (
+      Phantom::Unknown ( UnknownNode { id } ) ),
+#+end_src
+
+'mk_inactive_viewnode' (797-798): UNCHANGED -- stays
+'ViewNodeKind::Vognode (Vognode::Inactive (...))'.
+
+'mk_indefinitive_from_viewnode' (835-839):
+
+#+begin_src rust
+    match viewnode . kind {
+      ViewNodeKind::Vognode (Vognode::Active (t)) =>
+        ( t . id, t . source, t . title ),
+      ViewNodeKind::Phantom (Phantom::Diff (p)) =>
+        ( p . id, p . source, p . title ),
+      _ => return Err (
+#+end_src
+
+'mk_viewnode' (862-863):
+
+#+begin_src rust
+             kind        : ViewNodeKind::Vognode (
+               Vognode::Active (
+#+end_src
+
+** 2. /home/ubuntu/host/server/types/maybe_placed_viewnode.rs
+
+*** 2a. Import (line 13) -- add 'Phantom'
+
+#+begin_src rust
+use super::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Vognode, Phantom, QualCol, Qual, RoleCol, DeletedNode, InactiveNode, UnknownNode, GraphNodeStats, ViewNodeStats, Birth, IndefOrDef, ParentIs, };
+#+end_src
+
+*** 2b. 'MpViewnodeKind' (replaces 35-43) -- add 'Phantom' arm after 'Vognode'
+
+#+begin_src rust
+#[derive(Debug, Clone, PartialEq)]
+pub enum MpViewnodeKind {
+  Vognode      (MpVognode),
+  Phantom      (MpPhantom),
+  QualCol      (QualCol),
+  Qual         (Qual),
+  PartnerCol   (RoleCol),
+  BufferRoot,
+  DeadScaffold,
+}
+#+end_src
+
+*** 2c. 'MpVognode' + new 'MpPhantom' (replaces 45-52)
+
+#+begin_src rust
+#[derive(Debug, Clone, PartialEq)]
+pub enum MpVognode {
+  Active   (MpTruenode),
+  Inactive (InactiveNode),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum MpPhantom {
+  Diff    (MpDiffPhantomNode),
+  Deleted (DeletedNode),
+  Unknown (UnknownNode),
+}
+#+end_src
+
+*** 2d. 'TryFrom<MpViewnodeKind> for ViewNodeKind' (replaces the match body, 121-143)
+
+#+begin_src rust
+    match u {
+      MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
+        Ok (ViewNodeKind::Vognode (
+          Vognode::Active (TrueNode::try_from (t)?))),
+      MpViewnodeKind::Vognode (MpVognode::Inactive (i)) =>
+        Ok (ViewNodeKind::Vognode (Vognode::Inactive (i))),
+      MpViewnodeKind::Phantom (MpPhantom::Diff (p)) =>
+        Ok (ViewNodeKind::Phantom (
+          Phantom::Diff (DiffPhantomNode::try_from (p)?))),
+      MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>
+        Ok (ViewNodeKind::Phantom (Phantom::Deleted (d))),
+      MpViewnodeKind::Phantom (MpPhantom::Unknown (u)) =>
+        Ok (ViewNodeKind::Phantom (Phantom::Unknown (u))),
+      MpViewnodeKind::QualCol (c) =>
+        Ok (ViewNodeKind::QualCol (c)),
+      MpViewnodeKind::Qual (q) =>
+        Ok (ViewNodeKind::Qual (q)),
+      MpViewnodeKind::PartnerCol (r) =>
+        Ok (ViewNodeKind::PartnerCol (r)),
+      MpViewnodeKind::BufferRoot =>
+        Ok (ViewNodeKind::BufferRoot),
+      MpViewnodeKind::DeadScaffold =>
+        Ok (ViewNodeKind::DeadScaffold), }}
+#+end_src
+
+*** 2e. 'From<ViewNodeKind> for MpViewnodeKind' (replaces the match body, 182-204)
+
+#+begin_src rust
+    match k {
+      ViewNodeKind::Vognode (Vognode::Active (t)) =>
+        MpViewnodeKind::Vognode (
+          MpVognode::Active (MpTruenode::from (t))),
+      ViewNodeKind::Vognode (Vognode::Inactive (i)) =>
+        MpViewnodeKind::Vognode (MpVognode::Inactive (i)),
+      ViewNodeKind::Phantom (Phantom::Diff (p)) =>
+        MpViewnodeKind::Phantom (
+          MpPhantom::Diff (MpDiffPhantomNode::from (p))),
+      ViewNodeKind::Phantom (Phantom::Deleted (d)) =>
+        MpViewnodeKind::Phantom (MpPhantom::Deleted (d)),
+      ViewNodeKind::Phantom (Phantom::Unknown (u)) =>
+        MpViewnodeKind::Phantom (MpPhantom::Unknown (u)),
+      ViewNodeKind::QualCol (c) =>
+        MpViewnodeKind::QualCol (c),
+      ViewNodeKind::Qual (q) =>
+        MpViewnodeKind::Qual (q),
+      ViewNodeKind::PartnerCol (r) =>
+        MpViewnodeKind::PartnerCol (r),
+      ViewNodeKind::BufferRoot =>
+        MpViewnodeKind::BufferRoot,
+      ViewNodeKind::DeadScaffold =>
+        MpViewnodeKind::DeadScaffold, }}
+#+end_src
+
+*** 2f. 'Default for MpViewnode' (replaces 358-359)
+
+#+begin_src rust
+      kind        : MpViewnodeKind::Vognode (
+        MpVognode::Active (MpTruenode::default())),
+#+end_src
+
+*** 2g. 'MpViewnode::title' (replaces 370-383)
+
+#+begin_src rust
+    match &self . kind {
+      MpViewnodeKind::Vognode (MpVognode::Active (t)) => &t . title,
+      MpViewnodeKind::Phantom (MpPhantom::Diff (p)) => &p . title,
+      MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>
+        &d . title,
+      MpViewnodeKind::Qual (q) =>
+        q . title (),
+      MpViewnodeKind::QualCol (_)
+        | MpViewnodeKind::PartnerCol (_)
+        | MpViewnodeKind::BufferRoot
+        | MpViewnodeKind::DeadScaffold
+        | MpViewnodeKind::Vognode (MpVognode::Inactive (_))
+        | MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) =>
+        "", }}
+#+end_src
+
+*** 2h. 'MpViewnode::error_label' (replaces 387-411) -- labels stay byte-identical
+
+#+begin_src rust
+    match &self . kind {
+      MpViewnodeKind::Vognode (MpVognode::Active (t))
+        => t . title . clone(),
+      MpViewnodeKind::Phantom (MpPhantom::Diff (p))
+        => p . title . clone(),
+      MpViewnodeKind::Qual (Qual::Alias { text, .. }) =>
+        format!("qual:alias({})", text),
+      MpViewnodeKind::Qual (Qual::ID { id, .. }) =>
+        format!("qual:id({})", id),
+      MpViewnodeKind::Qual (Qual::TextChanged { .. }) =>
+        "qual:textChanged" . to_string (),
+      MpViewnodeKind::QualCol (col) =>
+        format!("qualCol:{}", col . repr_in_client ()),
+      MpViewnodeKind::PartnerCol (roleCol) =>
+        format!("partnerCol:{}", roleCol . repr_in_client ()),
+      MpViewnodeKind::BufferRoot =>
+        "forestRoot" . to_string (),
+      MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>
+        format!("deleted:{}", d . id . 0),
+      MpViewnodeKind::DeadScaffold =>
+        "deadScaffold" . to_string (),
+      MpViewnodeKind::Vognode (MpVognode::Inactive (i)) =>
+        format!("inactive:{}", i . id . 0),
+      MpViewnodeKind::Phantom (MpPhantom::Unknown (u)) =>
+        format!("unknown:{}", u . id . 0), }}
+#+end_src
+
+*** 2i. 'MpViewnode::body' (replaces 415-429)
+
+#+begin_src rust
+    match &self . kind {
+      MpViewnodeKind::Vognode (MpVognode::Active (t))
+        => t . body (),
+      MpViewnodeKind::Phantom (MpPhantom::Diff (p))
+        => p . body (),
+      MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>
+        d . body . as_ref(),
+      MpViewnodeKind::QualCol (_)
+        | MpViewnodeKind::Qual (_)
+        | MpViewnodeKind::PartnerCol (_)
+        | MpViewnodeKind::BufferRoot
+        | MpViewnodeKind::DeadScaffold
+        | MpViewnodeKind::Vognode (MpVognode::Inactive (_))
+        | MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) =>
+        None, }}
+#+end_src
+
+*** 2j. 'MpViewnode::id_opt' (replaces 433-449)
+
+#+begin_src rust
+    match &self . kind {
+      MpViewnodeKind::Vognode (MpVognode::Active (t))
+        => t . id . as_ref(),
+      MpViewnodeKind::Phantom (MpPhantom::Diff (p))
+        => p . id . as_ref(),
+      MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>
+        Some (&d . id),
+      MpViewnodeKind::Vognode (MpVognode::Inactive (i)) =>
+        Some (&i . id),
+      MpViewnodeKind::Phantom (MpPhantom::Unknown (u)) =>
+        Some (&u . id),
+      MpViewnodeKind::QualCol (_)
+        | MpViewnodeKind::Qual (_)
+        | MpViewnodeKind::PartnerCol (_)
+        | MpViewnodeKind::BufferRoot
+        | MpViewnodeKind::DeadScaffold =>
+        None, }}
+#+end_src
+
+The 'TryFrom'/'From' for 'MpTruenode', 'MpDiffPhantomNode', the tree-walk
+converters, and 'maybePlaced_viewforest_root_viewnode' need no change -- they
+name structs, not the moved variants.
+
+* Open naming decisions
+
+** 'should_be_phantom' rename -- RECOMMEND: defer (separate mechanical commit)
+The predicate ('diff_axes_require_phantom') is now genuinely about the
+'Phantom::Diff' case only -- Deleted/Unknown are not derived from diff axes -- so
+'should_be_diff_phantom' would be more honest. But it is a
+'TrueNode_Generic'/'DiffPhantomNode_Generic' method touched at ~6 call sites
+across reconcile/diff and is orthogonal to the enum move. Renaming it here widens
+the blast radius for no compile-correctness gain. Same verdict for the related
+local var 'still_normal' -> 'still_active' and helper 'vognode_normal_id' ->
+'vognode_active_id': nice, optional, separate commit. DO NOT do these as part of
+this split.
+
+** Struct names ('DiffPhantomNode'/'DeletedNode'/'UnknownNode' -> 'PhantomDiff'/...) -- RECOMMEND: NO
+Every cluster counts on these struct names (and their 'Mp*' twins) staying fixed
+so that dozens of constructor call sites, helper signatures
+('diffphantom_metadata_to_string', 'validate_phantom'), and the
+'from_truenode'/'try_from' conversions need no edit. The variant rename
+'DiffPhantom -> Diff' already carries the readability win ('Phantom::Diff
+(DiffPhantomNode)' reads cleanly). Renaming the structs would multiply the diff
+with zero semantic benefit. Keep the struct names.
+
+** Unified 'ViewNode::id()' over both enums -- RECOMMEND: NO; keep the three precise accessors
+Today three callers want three different id-sets:
+- 'id_if_vognode' -> Active/Inactive only (cycle detection, 'pids_from_viewforest').
+- 'active_or_diff_phantom_id' -> Active + Diff (the old 'normal_or_phantom_id',
+  used by 'root_ids_from_viewforest' / graphnodestats eligibility).
+- 'Phantom::id' -> any phantom (used by 'find_children_by_ids', which wants
+  Diff+Deleted but must still exclude Unknown via the arm, not the accessor).
+
+A unified 'id()' covering Vognode + all three Phantom kinds would silently paper
+over the very distinctions the split exists to make, and would tempt callers to
+reintroduce the Unknown-inclusion bugs the reports flag. The narrow, named
+accessors make each call site's intent legible and keep the "Unknown is special"
+invariant enforced at the match. If a truly-any-id helper is ever wanted, add it
+as an explicit 'ViewNode::any_id()' with a doc-comment spelling out that it
+includes Unknown -- but no current caller needs it.
+
+* Blast radius by module
+
+Tick each box. Every site names file + line + the edit. "rename" = 'Normal' ->
+'Active' (or 'MpVognode::Normal' -> 'MpVognode::Active'), variant stays in
+Vognode. "move" = the placeholder leaves Vognode for the new Phantom enum, so the
+OUTER 'ViewNodeKind::Vognode (...)' wrapper changes to 'ViewNodeKind::Phantom
+(...)'. "stays" = leave unchanged (Inactive, or a confirmed non-site).
+
+** Core types -- /home/ubuntu/host/server/types/viewnode.rs
+
+- [ ] 56-63 'ViewNodeKind': add the 'Phantom (Phantom),' arm directly after 'Vognode (Vognode),'.
+- [ ] 65-72 'Vognode': rewrite to '{ Active(TrueNode), Inactive(InactiveNode) }'; drop Diff/Unknown/Deleted; relocate line-68 long comment onto 'Phantom::Diff'.
+- [ ] 65-72 (new) add sibling 'enum Phantom { Diff(DiffPhantomNode), Deleted(DeletedNode), Unknown(UnknownNode) }' with '#[derive(Debug, Clone, PartialEq)]'.
+- [ ] 73-87 'DeletedNode' doc: 'placeholder ("phantom") Vognode' -> 'placeholder ("phantom")'; 'A Normal content child flips' -> 'An Active content child flips'.
+- [ ] 96-100 'DeletedNode' DISTINCT INFO paragraph: NO change (generic "phantom"); confirm not touched.
+- [ ] 109-131 'UnknownNode' doc: 'placeholder ("phantom") Vognode' -> 'placeholder ("phantom")'; 'the one Vognode kind for which pid_and_source returns None' -> 'the one Phantom kind...'.
+- [ ] 177-203 'DiffPhantomNode_Generic' doc: 'slim payload of a `Vognode::DiffPhantom`' -> '`Phantom::Diff`'; 'a Normal node flipped' -> 'an Active node flipped'.
+- [ ] 219-233 'from_truenode' doc (line 222): 'flipping a Normal node' -> 'flipping an Active node'. Body/signature unchanged.
+- [ ] 363-369 'diff_axes_require_phantom' doc: '`Vognode::DiffPhantom` variant' -> '`Phantom::Diff` variant'.
+- [ ] 506-516 'Vognode::normal_or_phantom_id': remove; replace with focused 'Vognode::active_id' (Active/Inactive only). Promote the diff-phantom-reaching job to 'ViewNode::active_or_diff_phantom_id' (1f).
+- [ ] 518-525 'Vognode::id': keep only 'Active'/'Inactive' arms.
+- [ ] 527-536 'Vognode::pid_and_source': keep only 'Active'/'Inactive' (both Some). Add new 'impl Phantom::pid_and_source' (Diff/Deleted Some, Unknown None).
+- [ ] (new) add 'impl Phantom { id, pid_and_source }' directly after 'impl Vognode'.
+- [ ] 570-589 'ViewNode::normal_to_phantom': pattern 'Vognode::Normal(t)' -> 'Vognode::Active(t)'; assignment target -> 'ViewNodeKind::Phantom (Phantom::Diff(phantom))'. Preserve the long inline comment.
+- [ ] 591-606 'ViewNode::title': rename Active arm; move Diff/Deleted to 'Phantom'; move Unknown into empty arm as 'Phantom::Unknown'; keep Inactive. No catch-all -- all three Phantom sub-variants must be explicit.
+- [ ] 609-621 'ViewNode::body': same shape as title; Unknown in the None arm; keep Inactive.
+- [ ] 623-628 'ViewNode::is_truenode_and_parentIs_affected': rename Active arm; '_ => false' absorbs Phantom.
+- [ ] 630-634 'ViewNode::id_if_vognode': keep 'Vognode(v) => Some(v.id())' (now Active/Inactive only). Phantoms fall to '_ => None' BY DESIGN.
+- [ ] (new) add 'ViewNode::active_or_diff_phantom_id' (Active + Diff) per 1f.
+- [ ] 746-755 'mk_phantom_viewnode': pattern 'Vognode::Normal(mut t)' -> 'Vognode::Active(mut t)'; assignment -> 'ViewNodeKind::Phantom (Phantom::Diff(...))'; update unreachable! message and inline comment ('Normal' -> 'Active').
+- [ ] 777-786 'mk_unknown_viewnode': '...Vognode(Vognode::Unknown(...))' -> 'ViewNodeKind::Phantom (Phantom::Unknown(...))'.
+- [ ] 788-799 'mk_inactive_viewnode': STAYS 'Vognode::Inactive'; confirm not touched.
+- [ ] 835-842 'mk_indefinitive_from_viewnode': rename Active arm; move Diff arm to 'Phantom::Diff'; '_ => Err' absorbs the rest.
+- [ ] 850-869 'mk_viewnode': inner 'Vognode::Normal(...)' -> 'Vognode::Active(...)'; outer wrapper unchanged.
+- [ ] 15-19 'ParentIs' doc: NO change ("Vognode" generic); confirm not touched.
+
+** Maybe-placed mirror + parser -- mp-mirror-and-parse
+
+*** /home/ubuntu/host/server/types/maybe_placed_viewnode.rs
+- [ ] 13 import: add 'Phantom' to the 'super::viewnode' list.
+- [ ] 36-43 'MpViewnodeKind': add 'Phantom (MpPhantom),' after 'Vognode (MpVognode),'.
+- [ ] 45-52 'MpVognode': rewrite to '{ Active(MpTruenode), Inactive(InactiveNode) }'.
+- [ ] 45-52 (new) add 'enum MpPhantom { Diff(MpDiffPhantomNode), Deleted(DeletedNode), Unknown(UnknownNode) }' with matching derives.
+- [ ] 117-144 'TryFrom<MpViewnodeKind> for ViewNodeKind': route the three placeholders through 'Phantom'/'MpPhantom'; keep Inactive under Vognode (per 2d).
+- [ ] 180-205 'From<ViewNodeKind> for MpViewnodeKind': mirror of above (per 2e).
+- [ ] 352-362 'Default for MpViewnode': rename 'MpVognode::Normal' -> 'MpVognode::Active'.
+- [ ] 368-383 'MpViewnode::title': rename Active; move Diff/Deleted; Unknown into "" arm; keep Inactive (per 2g).
+- [ ] 385-411 'MpViewnode::error_label': route placeholders to 'MpPhantom'; keep 'deleted:'/'unknown:'/'inactive:' byte-identical (per 2h).
+- [ ] 413-429 'MpViewnode::body': rename Active; move Diff/Deleted; Unknown into None arm; keep Inactive (per 2i).
+- [ ] 431-449 'MpViewnode::id_opt': rename Active; move Diff/Deleted/Unknown to 'MpPhantom'; keep Inactive in Vognode (per 2j).
+- [ ] 456-461 'maybePlaced_viewforest_root_viewnode': NO change (BufferRoot only); confirm.
+
+*** /home/ubuntu/host/server/types/tree/viewnode_nodecomplete.rs
+- [ ] 6-11 preamble: add 'Phantom' and 'MpPhantom'.
+- [ ] 31-37 'write_at_truenode_in_tree': rename Active arm (34); doc 'this Normal-only mutator' -> 'this Active-only mutator'.
+- [ ] 60-78 'id_from_self_or_nearest_ancestor': rename 'MpVognode::Normal' (72); move 'MpVognode::DiffPhantom' -> 'MpViewnodeKind::Phantom(MpPhantom::Diff(..))' (74).
+- [ ] 217-225 'find_children_by_ids' (HOTSPOT): the 'v @ (Normal|DiffPhantom|Deleted)' binding spans two enums now. Split into a 'Vognode(v @ Active(_))' arm calling 'Vognode::id()' and a 'Phantom(p @ (Diff(_)|Deleted(_)))' arm calling 'Phantom::id()'. MUST still exclude Unknown (now in Phantom) and Inactive (in Vognode).
+- [ ] 308-314 'collect_generation': rename 'MpVognode::Normal' (312); §11 comment unchanged.
+- [ ] 39-58 'pid_and_source_from_treenode': NO textual change ('Vognode(v) => v.pid_and_source()' still valid for Active/Inactive); confirm.
+
+*** /home/ubuntu/host/server/serve/parse_metadata_sexp.rs
+- [ ] 28-31 preamble: add 'MpPhantom'.
+- [ ] 23-27 preamble: NO change (DeletedNode/InactiveNode/UnknownNode structs still imported).
+- [ ] 116-119 unknown construction: '...Vognode(MpVognode::Unknown(..))' -> 'MpViewnodeKind::Phantom(MpPhantom::Unknown(..))'.
+- [ ] 128-136 inactive construction: STAYS 'MpVognode::Inactive'; confirm not touched.
+- [ ] 139-148 deleted construction: move to 'MpViewnodeKind::Phantom(MpPhantom::Deleted(..))'.
+- [ ] 207-217 (STRUCTURAL): 'let vognode = if should_be_phantom() {DiffPhantom} else {Normal}' no longer type-checks (two enums). Rewrite as 'if/else' yielding the full 'MpViewnodeKind' directly ('Phantom(MpPhantom::Diff(..))' vs 'Vognode(MpVognode::Active(..))'), keeping the '(kind, error)' tuple. Preserve §11 comment.
+- [ ] 226-246 'maybeplaced_kind_error_label': change 'MpViewnodeKind::Vognode(_) =>' to 'MpViewnodeKind::Vognode(_) | MpViewnodeKind::Phantom(_) =>' or exhaustiveness breaks.
+- [ ] 281-291 string-key dispatch ('"node"'/'"deleted"'/'"unknownNode"'/'"inactiveNode"'): NO change -- wire format. Confirm zero edits.
+
+** Wire emitter -- render-and-format
+
+*** /home/ubuntu/host/server/org_to_text.rs
+- [ ] 4-8 preamble: add 'Phantom'.
+- [ ] 158-161 'viewnode_to_string' Active arm: 'Vognode::Normal' -> 'Vognode::Active'.
+- [ ] 162-165 Diff arm: move to 'ViewNodeKind::Phantom(Phantom::Diff(..))'; same 'diffphantom_metadata_to_string' call.
+- [ ] 166-169 Deleted arm: move to 'ViewNodeKind::Phantom(Phantom::Deleted(..))'; same helper.
+- [ ] 170-173 Unknown arm: move to 'ViewNodeKind::Phantom(Phantom::Unknown(..))'; same helper.
+- [ ] 174-177 Inactive arm: STAYS 'Vognode::Inactive'; confirm not moved.
+- [ ] 355-372 metadata-renderer helper fns + signatures: NO change (struct names unchanged).
+
+*** /home/ubuntu/host/server/types/misc.rs
+- [ ] 124-129 'SourceName::NOT_FOUND' doc: '*non-Normal* viewnode (e.g. a DiffPhantom)' -> '*non-Active* (e.g. a Phantom::Diff)'; 'Normal-vognode source failures' -> 'Active-vognode'. 'NOT_FOUND' literal unchanged.
+
+** Diff creation -- diff-creation
+
+*** /home/ubuntu/host/server/to_org/render/diff.rs
+- [ ] 20-21 preamble: add 'Phantom' to an existing viewnode use-group.
+- [ ] 1-2, 28-32, 101-106 doc-comments: 'Normal vognode' -> 'Active vognode'.
+- [ ] 51-53 if-let: rename 'Vognode::Normal' -> 'Vognode::Active'.
+- [ ] 68-71 if-let: rename Active.
+- [ ] 73-75 matches! (load-bearing): 'Vognode::DiffPhantom(_)' -> 'ViewNodeKind::Phantom(Phantom::Diff(_))'. Must match what 'normal_to_phantom' now produces or 'node_flipped_to_phantom' is permanently false and IDCol/AliasCol skip regresses.
+- [ ] 213-214 match arm: rename Active; '_ => None' absorbs rest.
+- [ ] 215-216 Inactive arm: STAYS; confirm.
+- [ ] 253-260 compound match: 254-255 rename Active; 256-257 move Diff (outer wrapper Vognode -> Phantom); 258-259 Inactive STAYS.
+
+*** /home/ubuntu/host/server/to_org/expand/unused_but_nice.rs
+- [ ] 1-8, 113-116 doc-comments: 'DiffPhantom' -> 'Diff phantom'. 'mk_phantom_viewnode' calls (233-239) are facade-stable; no code edit.
+
+*** /home/ubuntu/host/server/to_org/expand/backpath.rs
+- [ ] 362-365 if-let: rename Active.
+- [ ] 398-401 match arm: rename Active; '_ => None' absorbs rest.
+- [ ] 482 'mk_unknown_viewnode' call + line 19/20 imports: facade-stable; no code edit.
+
+** Completion / reconcile -- completion-reconcile
+
+*** /home/ubuntu/host/server/update_buffer.rs
+- [ ] 282-284 if-let: rename Active.
+- [ ] 455-463 read-side match arm: rename Active.
+- [ ] 468-475 write-side if-let: rename Active.
+- [ ] 532-534 'is_phantom' matches!: 'Vognode::DiffPhantom(_)' -> 'ViewNodeKind::Phantom(Phantom::Diff(_))'. Do NOT broaden to all Phantom variants.
+- [ ] 593-596 'clear_diff_metadata' Active arm: rename.
+- [ ] 597-600 'clear_diff_metadata' Diff arm: move to 'Phantom::Diff'; '_ => {}' keeps exhaustiveness.
+- [ ] 626-630 filter Active arm: rename.
+- [ ] 638-640 drop-loop if-let: rename Active.
+- [ ] 656-661 'is_removedhere' two-arm match: rename Active; move Diff to 'Phantom::Diff'.
+- [ ] 238-241, 350-352, 399-402, 452-454 doc-comments: 'Normal' -> 'Active'.
+
+*** /home/ubuntu/host/server/update_buffer/complete.rs
+- [ ] 20-21 preamble: add 'Phantom'.
+- [ ] 137-139 dispatch Active arm: rename.
+- [ ] 171-175 Inactive dispatch arm: STAYS; confirm.
+- [ ] 176-180 '_ => {}' catch-all: absorbs new Phantom variants; comment 'DiffPhantom' -> 'Diff phantom' only.
+- [ ] 196-199 'had_dvr' Active arm: rename.
+- [ ] 238-245 'still_normal' matches! (244): rename Active; comment 'Normal vognode'/'DiffPhantom' -> 'Active vognode'/'Diff phantom'.
+- [ ] 290-303, 318-325, 349-354 doc-comments: 'Vognode::Deleted' -> 'Phantom::Deleted' where it names the variant.
+- [ ] 307-316 'is_self_deletable_when_empty' arm: 'Vognode::Deleted(_)' -> 'Phantom::Deleted(_)'.
+- [ ] 362-366 Inactive read arm: STAYS; confirm.
+- [ ] 369-374 Deleted construction: '...Vognode(Vognode::Deleted(..))' -> 'ViewNodeKind::Phantom(Phantom::Deleted(..))'.
+- [ ] 183-189 doc + optional fn-rename 'visit_normal_node' -> 'visit_active_node': DEFER (optional; if renamed update call at 139).
+
+*** /home/ubuntu/host/server/update_buffer/reconcile/content.rs
+- [ ] 12-15 preamble: add 'Phantom'.
+- [ ] 73-77 guard matches! Active arm: rename; message string optional.
+- [ ] 91-95 'is_indefinitive' Active arm: rename.
+- [ ] 139-143 cascade filter Active arm: rename.
+- [ ] 253-257 'convert_nonmember_unknown_children_to_dead' Unknown arm: move to 'Phantom::Unknown'.
+- [ ] 267-272 'mutate_truenode_to_deletednode' read Active arm: rename.
+- [ ] 273-281 Deleted construction: move to 'ViewNodeKind::Phantom(Phantom::Deleted(..))'.
+- [ ] 290-294 'is_subscribee' Active arm: rename.
+- [ ] 350-358 'complete_content_children' relevance closure: rename Active; move Diff to 'Phantom::Diff'; Inactive STAYS. Keep in lockstep with the id closure below.
+- [ ] 359-368 id closure: rename Active; move Diff to 'Phantom::Diff'; Inactive STAYS; '_ => panic!' hazard if the two closures diverge.
+- [ ] 370-382 create-closure ('mk_*' calls): NO change (constructors facade-stable).
+- [ ] 405-414 'mark_erroneous...as_indep': rename Active in both predicate (406) and mutation (412).
+- [ ] 428-444 'order_children_as_scaffolds_then_ignored_then_content' (NO-WILDCARD HOTSPOT): rename both Active arms; add explicit 'Phantom::Diff/Deleted/Unknown' arms; Inactive STAYS. Won't compile without all three Phantom arms.
+- [ ] 485-494 'build_child_creation_data': rename Active; move Diff to 'Phantom::Diff'; Inactive STAYS. Mirror the 350-368 set.
+- [ ] 31-35 'ContentReality' enum: NO change (unrelated local enum); confirm.
+
+*** /home/ubuntu/host/server/update_buffer/ancestry.rs (BEHAVIORAL HAZARD)
+- [ ] 33 preamble: NO 'Phantom' import needed (only 'Vognode::Normal' is matched here).
+- [ ] 91-96 'matches_expected': rename Active. 'ExpectedAncestor::NormalVognode' rename optional/DEFER.
+- [ ] 229-254 'dispose_orphaned_col_child' (NON-MECHANICAL): broaden the 'is_vognode' test at line 238 from 'matches!(.., ViewNodeKind::Vognode(_))' to 'matches!(.., ViewNodeKind::Vognode(_) | ViewNodeKind::Phantom(_))' (or add 'is_phantom'). Otherwise phantom children under a deadened orphan col are silently demoted to DeadScaffold instead of kept untouched. Flag in the commit message.
+- [ ] 17-22, 44, 69-79, 211-228 doc-comments: 'Normal' -> 'Active'; reword the Inactive/Unknown/Deleted listing across the two enums.
+- [ ] 183-187 'pid_and_source_from_required_ancestor': NO change ('Vognode(v)' covers Active/Inactive); confirm.
+
+*** /home/ubuntu/host/server/update_buffer/graphnodestats.rs
+- [ ] 12 preamble: add 'Phantom'.
+- [ ] 89-95 read Active arm: rename; 96-102 Diff arm: move to 'Phantom::Diff'. Only Diff has graphStats -- do NOT broaden.
+- [ ] 110-111 write Active arm: rename; 112-113 Diff arm: move to 'Phantom::Diff'. Keep aligned with read block.
+
+** Save instructions -- save-instructions
+
+*** /home/ubuntu/host/server/from_text/viewnodes_to_instructions/classify.rs
+- [ ] 3 preamble: add placed 'Phantom'.
+- [ ] 90-91 'saverole_for_node' Active arm: rename.
+- [ ] 101-104 NoSaveRole OR-group: move Deleted/DiffPhantom/Unknown to 'Phantom' arms; Inactive (102) STAYS.
+- [ ] 176-179 'vognode_normal_id' body arm: rename Active. Fn-name rename optional/DEFER.
+
+*** /home/ubuntu/host/server/from_text/viewnodes_to_instructions/to_naive_instructions.rs
+- [ ] 6 preamble: add placed 'Phantom'.
+- [ ] 426-427 'collect_savenode_candidates' Deleted arm: move to 'Phantom::Deleted'.
+- [ ] 430 Inactive arm: STAYS.
+- [ ] 431-433 Unknown arm: move to 'Phantom::Unknown'; preserve placeholder comment.
+- [ ] 434-450 Active arm: rename.
+- [ ] 451 DiffPhantom arm: move to 'Phantom::Diff'.
+- [ ] 471-475 'collect_node_edit_basics' Active arm: rename.
+- [ ] 643-648 'collect_subscribees' Active arm: rename.
+- [ ] 649-650 DiffPhantom arm: move to 'Phantom::Diff'.
+- [ ] 653-657 mixed OR-group: partition -- Deleted/Unknown to 'Phantom'; Inactive + DeadScaffold STAY. Preserve '// inert in this context'.
+- [ ] 691-693 'collect_members_from_child_relation_col' Active arm: rename.
+- [ ] 694-699 mixed OR-group: partition -- Diff/Deleted/Unknown to 'Phantom'; Inactive + DeadScaffold STAY.
+- [ ] 730-738 'collect_contents_to_save_from_children' Active arm: rename.
+- [ ] 739-741 Inactive arm: STAYS.
+
+*** /home/ubuntu/host/server/from_text/buffer_to_viewnodes/validate_tree.rs
+- [ ] 5-6 preamble: add 'MpPhantom'.
+- [ ] 41-44, 70-71, 73-76 'validate_local_structure' dispatch (NO-WILDCARD): rename Active (41-42); move Diff (43-44), Deleted (70-71), Unknown (75-76) to 'MpPhantom'; Inactive (73-74) STAYS. Must stay exhaustive.
+- [ ] 116-119 'validate_aliascol' matches!: rename Active.
+- [ ] 134-139, 143-148, 152-159 'validate_hidden_in_subscribee_col': split cross-enum OR-patterns into 'Vognode(MpVognode::Active(_)) | Phantom(MpPhantom::Diff(_))'; the full match (152-159) has '_ => false' so only the named arms change.
+- [ ] 189-195, 196-203 'validate_hidden_outside_of_subscribee_col': same cross-enum split.
+- [ ] 226-231, 233-241, 242-252 'validate_subscribeecol': same; keep the PartnerCol alternative.
+- [ ] 270-273, 275-278, 280-287 'validate_relation_col': same cross-enum split.
+- [ ] 306-310 'validate_text_changed' matches!: same split.
+- [ ] 326-330 'validate_idcol' matches!: same split.
+- [ ] 364-368 'validate_inactive_node' matches!: same split.
+- [ ] 402-413 'validate_truenode' / 419-430 'validate_phantom': NO code change ("TrueNode"/"Phantom" labels are diagnostic text; 'MpDiffPhantomNode' struct unchanged).
+- [ ] 479-485 'nonignored_children_have_distinct_ids': rename Active; Inactive STAYS; '_ => None' absorbs phantoms.
+- [ ] 501-505 'relation_col_children_have_distinct_ids': rename Active.
+
+*** /home/ubuntu/host/server/from_text/buffer_to_viewnodes/local.rs
+- [ ] 5-6 preamble: add 'MpPhantom'.
+- [ ] 96-103 'validate_view_roots' matches!: rename Active; move the Deleted alternative to 'MpViewnodeKind::Phantom(MpPhantom::Deleted(_))'. Error string stays.
+- [ ] 124-128 'validate_definitive_view_requests' if-let: rename Active; update §11 comment 'Normal' -> 'Active' (keep the §-ref + phantom rationale).
+- [ ] 137-140 inner matches!: rename Active.
+
+** Sharing / util -- sharing-and-util
+
+*** /home/ubuntu/host/server/to_org/complete/sharing/child_data.rs
+- [ ] 28 preamble: NO 'Phantom' needed (only Active/TrueNode matched). Verify only if 'mk_phantom_viewnode' is ever renamed (it is not).
+- [ ] 75-79, 146-148, 149-152, 185-189, 190-193 Active arms/matches!: rename. Panic-message 'normal' wording optional.
+- [ ] 18, 40, 85-87 doc-comments: 'normal'/'non-Normal' -> 'active'/'non-Active' (prose).
+
+*** /home/ubuntu/host/server/to_org/complete/sharing/mod.rs
+- [ ] 16 preamble: NO 'Phantom' needed (only Active matched).
+- [ ] 108-110, 114-116, 184-185, 190-192, 228-231 Active arms/matches!: rename.
+- [ ] 61-66 comment naming 'UnknownNode' (struct): NO change.
+
+*** /home/ubuntu/host/server/to_org/util.rs
+- [ ] 16 preamble: add 'Phantom' (needed by 357-362 and 610-618).
+- [ ] 228-230, 275-277, 280-284, 305-322, 352-355, 365-369 Active arms/if-lets: rename. Line 283 comment 'Deleted' may stay.
+- [ ] 324-345 'mark_orphans_under_dead_parents_independent' doc: 'Normal'/'DiffPhantom' -> 'Active'/'Diff phantom'.
+- [ ] 357-362 'parent_is_non_container' (STRUCTURAL): 'Vognode::DiffPhantom(_)' -> 'Phantom::Diff(_)', 'Vognode::Deleted(_)' -> 'Phantom::Deleted(_)'; 'DeadScaffold' stays; Unknown deliberately omitted.
+- [ ] 610-618 'truenode_in_tree_is_indefinitive' (HIGHEST CARE): rename Active (611); move Diff to 'Phantom::Diff' (612); split the combined arm -- Inactive STAYS in Vognode, Deleted+Unknown move to 'Phantom::Deleted | Phantom::Unknown' (Ok(false)); keep '_ => Err(..)'. All three Phantom variants must be explicit or the wildcard silently absorbs them and changes behavior.
+- [ ] 429-431 'ids_that_can_have_graphnodestats': 'Vognode(v) => v.normal_or_phantom_id()' -- this calls the REMOVED method. Switch to matching the whole node and calling 'ViewNode::active_or_diff_phantom_id' (behavioral: pre-split it also collected DiffPhantom ids; post-split those are Phantom). See Risks.
+- [ ] 448-449 'is_ancestor_id' closure ('id_if_vognode'): no edit; confirm post-split semantics (phantoms no longer contribute an ancestor id) are acceptable for cycle detection.
+- [ ] 464-468 'get_id_from_treenode': 'Vognode(v) => Ok(v.id())' -- no edit; phantoms now fall to '_ => Err'. Confirm callers only pass graph-backed nodes.
+- [ ] 487-519 'mk_unknown_viewnode'/'mk_inactive_viewnode' calls: NO change (facade-stable).
+- [ ] 63-71 doc naming 'UnknownNode' (struct): NO change.
+
+** State / sources -- state-and-sources
+
+*** /home/ubuntu/host/server/types/views_state.rs
+- [ ] 171-173 'pids_from_viewforest': rename 'Vognode::Normal(_)' -> 'Vognode::Active(_)'. Keep Active|Inactive ONLY; do NOT add a Phantom arm (phantoms are deliberately excluded from collateral pids). The 'v @ (..)' or-binding stays valid (both alternatives remain Vognode).
+- [ ] 191-194 'root_ids_from_viewforest' (CROSS-FILE HAZARD): 'normal_or_phantom_id' is gone. A Diff phantom root is no longer inside 'Vognode', so the 'if let ViewNodeKind::Vognode(v)' guard would silently stop registering diff-phantom roots. Rework to match the whole '&child.value()' and call 'ViewNode::active_or_diff_phantom_id'. Must still yield 'Option<&ID>' for the 'vid.clone()' / 'graph.pid_of(vid)' below.
+- [ ] 39 'pids' field doc: 'Normal + Inactive' -> 'Active + Inactive'.
+- [ ] 160-161 'pids_from_viewforest' doc: 'Normal' -> 'Active'; 'DiffPhantom' -> 'Diff'.
+
+*** /home/ubuntu/host/server/source_sets.rs
+- [ ] 18 preamble: add 'Phantom'.
+- [ ] 134-138 Active arm: rename.
+- [ ] 139-143 Diff arm: move to 'ViewNodeKind::Phantom(Phantom::Diff(p))'; keep body/guard; '_ => None' absorbs rest. Confirm the new arm sits before '_ => None'.
+
+*** /home/ubuntu/host/server/save.rs
+- [ ] 363-364 doc naming 'UnknownNode' (struct): NO change. Line 96 log string "Deleted" is unrelated English; confirm not a site.
+
+** Completeness-sweep stragglers (NOT in the cluster map -- pure renames unless noted)
+
+- [ ] /home/ubuntu/host/server/dbs/typedb/util/pids_from_ids.rs 60-61, 74-75: 'MpVognode::Normal' -> 'Active'.
+- [ ] /home/ubuntu/host/server/from_text/buffer_to_viewnodes/add_missing_info.rs 62,69,79,90,107,114,118,127: 'MpVognode::Normal' -> 'Active'.
+- [ ] /home/ubuntu/host/server/from_text/buffer_to_viewnodes/validate_tree/contradictory_instructions.rs 84: 'MpVognode::Normal' -> 'Active'.
+- [ ] /home/ubuntu/host/server/from_text/viewnodes_to_instructions.rs 188: 'Vognode::Normal' -> 'Active'.
+- [ ] /home/ubuntu/host/server/from_text/viewnodes_to_instructions/subscribee_hiderel_intents.rs 60,86,104: 'Vognode::Normal' -> 'Active'.
+- [ ] /home/ubuntu/host/server/merge/mergeInstructionTriple.rs 127: 'Vognode::Normal' -> 'Active'.
+- [ ] /home/ubuntu/host/server/merge/validate_merge.rs 39,74: 'MpVognode::Normal' -> 'Active'.
+- [ ] /home/ubuntu/host/server/serve/handlers/text_search/render_enriched_search_buffer.rs 28: 'Vognode::Normal' -> 'Active'.
+- [ ] /home/ubuntu/host/server/to_org/expand/definitive.rs 134: 'Vognode::Normal' -> 'Active'.
+- [ ] /home/ubuntu/host/server/types/tree/generic.rs 16-19 (BEHAVIORAL CHECK): 'ViewNodeKind::Vognode(v) => v.pid_and_source()' now only sees Active/Inactive. If a Phantom must also yield 'pid_and_source' via 'pid_and_source_from_ancestor', add a 'ViewNodeKind::Phantom(p) => p.pid_and_source()' arm; otherwise confirm phantoms are intentionally excluded here.
+- [ ] /home/ubuntu/host/server/update_buffer/reconcile/aliascol.rs 104,106: 'Vognode::Normal' -> 'Active'.
+- [ ] /home/ubuntu/host/server/update_buffer/reconcile/subscribee_col.rs 92: 'Vognode::Normal' -> 'Active'.
+- [ ] /home/ubuntu/host/server/update_buffer/reconcile/view_requests.rs 25,49,69: 'Vognode::Normal' -> 'Active'.
+- [ ] /home/ubuntu/host/server/update_buffer/util.rs 139,143: 'Vognode::Normal' -> 'Active'.
+- [ ] /home/ubuntu/host/server/update_buffer/viewnodestats.rs 35,75,85,99,112,135: 'Vognode::Normal' -> 'Active'.
+
+** Tests -- tests + sweep stragglers
+
+*** /home/ubuntu/host/server/test_utils.rs
+- [ ] 24 (or 25) preamble: add 'MpPhantom'.
+- [ ] 502-505 'compare_two_viewnode_branches_recursively_modulo_id' paired or-pattern: lift to the 'MpViewnodeKind' layer -- each side becomes 'Vognode(MpVognode::Active(_)) | Phantom(MpPhantom::Diff(_))'. Keep mixed Active/Diff pairs comparable.
+- [ ] 506-507 in-body comment: 'Normal'/'DiffPhantom' -> 'Active'/'Diff'; keep §11 reference.
+- [ ] 513 write arm: rename 'MpVognode::Normal' -> 'Active'.
+- [ ] 514 write arm: move 'MpVognode::DiffPhantom' -> 'MpViewnodeKind::Phantom(MpPhantom::Diff(p))'.
+- [ ] 526-528 deleted-pair arms (both sides): move to 'MpViewnodeKind::Phantom(MpPhantom::Deleted(_))'.
+
+*** Integration / unit tests under /home/ubuntu/host/tests
+- [ ] tests/render_util.rs 15,37,68,88,117: rename Active (constructors). Asserted strings at 22,41,55,72,92 are WIRE FORMAT -- do NOT change.
+- [ ] tests/source_sets.rs 87 (Active rename), 89 (Diff -> 'Phantom::Diff'). Comment 218-220 DiffPhantom -> Diff if touched.
+- [ ] tests/source_inheritance_for_non_content.rs 68,106: rename Active (let-else).
+- [ ] tests/merge/merge_nodes.rs 38: rename Active.
+- [ ] tests/to_org/util.rs 22: rename Active.
+- [ ] tests/typedb.rs 489-490/492, 507-508/510, 529-530/532, 547-548/550: each mixed 'Normal|DiffPhantom' or-pattern splits into 'Vognode(Vognode::Active(_)) | Phantom(Phantom::Diff(_))'; each 'let Vognode::Normal(..)' -> 'Active'.
+- [ ] tests/rebuild/integrate_backpath.rs 123,207: rename Active.
+- [ ] tests/rebuild/sourceward_ancestry.rs 50,65: rename Active.
+- [ ] tests/unit/ancestry.rs 5,15 (Deleted construction -> 'Phantom::Deleted'), 43 (Active rename).
+- [ ] tests/unit/complete.rs 27 ('Vognode::Deleted(d)' -> 'Phantom::Deleted(d)'), 30 (Inactive STAYS).
+- [ ] tests/unit/reconcile_content.rs 103 ('Vognode::Unknown(_)' -> 'Phantom::Unknown(_)'), 142 (Active rename).
+- [ ] tests/unit/to_org_util.rs 48,56 (Active rename); 135,140 'mk_phantom_viewnode' facade-stable.
+- [ ] tests/new/viewnodes_to_instructions.rs 81 (Active), 83 (Diff -> 'Phantom::Diff'), 93 (Active), 98 ('normal_to_phantom' call -- facade-stable).
+- [ ] tests/new/viewnodes_to_instructions/classify.rs 15 (import DeletedNode), 187 (Deleted construction -> 'Phantom::Deleted'), 203 ('mk_unknown_viewnode' facade-stable).
+- [ ] tests/new/buffer_to_viewnodes/add_missing_info.rs 113-119: 'MpVognode::Normal' -> 'Active'.
+- [ ] tests/new/buffer_to_viewnodes/uninterpreted2.rs 97-98,108-109,158-159 ('MpVognode::Normal' -> 'Active'); 130-132 Inactive STAYS (panic string at 132 may stay).
+- [ ] tests/new/buffer_to_viewnodes/validate_tree.rs 688-689: 'MpVognode::Inactive' STAYS; surrounding context only. Strings at 138/146 etc. are messages -- leave.
+
+*** Comment/doc-only test artifacts (NO edit)
+- [ ] tests/dangling_reference_renders_unknown_node.rs, tests/delete_strips_references_from_neighbors.rs: 'UnknownNode' in comments only.
+- [ ] tests/merge/merge_acquiree_as_independent_root.rs, .../merge_acquiree_in_sibling_subtree.rs, .../merge_container_into_content.rs: 'DeletedNode' in comments/messages only.
+- [ ] tests/unit/render_diff.rs: confirmed OUT of scope (tests 'Diff_Item' ordering; no Vognode/Phantom refs).
+
+* Implementation sequence
+
+Compiler-driven, big-bang: redefine both enum pairs, then burn down 'cargo
+build''s error list. NO temporary bridges -- the change is non-additive, so the
+tree is red until every arm is fixed regardless of approach, and a catch-all
+bridge would HIDE the exhaustiveness errors (the silent-behavior-change cases at
+'id_if_vognode', 'dispose_orphaned_col_child', 'find_children_by_ids') that the
+compiler is otherwise forced to surface. Plan for one long red window; the
+earliest legitimate green is after the entire core + mirror + all-consumers pass.
+
+** Step 1 -- Core types: viewnode.rs (definition site)
+Do New-type-layer sections 1a-1g in one edit pass. Add 'impl Phantom' and
+'ViewNode::active_or_diff_phantom_id' up front so consumer arms can call
+'Phantom::id()' / the new facade immediately.
+CHECKPOINT: 'cargo build 2>&1 | grep "viewnode.rs"' should show ZERO errors
+originating in this file (the rest of the tree is still red).
+
+** Step 2 -- Maybe-placed mirror + parser: mp-mirror-and-parse
+Sections 2a-2j, plus 'viewnode_nodecomplete.rs' and 'parse_metadata_sexp.rs'
+(including the structural rewrite at 207-217 and the exhaustiveness fix at 240).
+CHECKPOINT: the type-definition errors (E0599 "no variant Normal", E0004
+missing-arm) should now come only from consumer files.
+
+** Step 3 -- Wire emitter: org_to_text.rs + misc.rs doc
+Fix this immediately after the parser so the emit/parse pair is internally
+consistent before any render oracle runs. Re-route the dispatch; do not touch the
+helper bodies or any emitted string.
+
+** Step 4 -- Remaining library consumers (burn-down)
+Loop on:
+#+begin_src sh
+cargo build 2>&1 | grep -E '^error|-->' | grep -v '/tests/'
+#+end_src
+Fix in clusters: diff-creation, completion-reconcile, save-instructions,
+sharing-and-util, state-and-sources, and the completeness-sweep stragglers. Order
+within the burn-down does not affect correctness (core/mirror are done). Trust
+the error list over any map for the stragglers.
+Call out the two BEHAVIORAL (non-mechanical) edits as you make them:
+'ancestry.rs:dispose_orphaned_col_child' (broaden 'is_vognode') and
+'views_state.rs:root_ids_from_viewforest' + 'to_org/util.rs:ids_that_can_have_graphnodestats'
+(switch to 'active_or_diff_phantom_id'); also 'types/tree/generic.rs:16-19'
+(confirm phantom pid_and_source intent).
+CHECKPOINT (first full GREEN): 'cargo build' (lib + bins) succeeds. COMMIT on
+'phantom-enum'.
+
+** Step 5 -- Tests
+#+begin_src sh
+cargo test --no-run 2>&1 | grep -E '^error|-->'
+#+end_src
+Fix 'server/test_utils.rs' and the 'tests/' files per the checklist (the mixed
+or-patterns in 'tests/typedb.rs' need the same restructuring as the core
+methods).
+CHECKPOINT (test GREEN): COMMIT.
+
+** Step 6 -- Full suite
+Bring up TypeDB first (many Rust tests open a gRPC session and hang/panic
+without it), then run the suite via nextest, then the full pass.
+
+** Commit cadence
+Commit at step-4 first-green, step-5 test-green, and a final commit after the
+full nextest + integration pass. Never commit a red tree. In each commit body,
+explicitly flag the behavioral edits above for review.
+
+* Verification
+
+** Build + tests
+#+begin_src sh
+cargo build                 # lib + all bins green
+cargo test --no-run         # test crate compiles (catches every tests/ straggler)
+#+end_src
+Then, with TypeDB up:
+#+begin_src sh
+./bash/docker.sh            # bring up the TypeDB container (bind-mount source must pre-exist)
+cargo nextest run           # or ./bash/nextest.sh -- the Rust suite
+#+end_src
+Use nextest (the repo's 'bash/nextest.sh' / 'SKG_NEXTEST_JOBS'); the suite is
+tuned for serialized TypeDB transactions
+('SKG_TYPEDB_CONCURRENT_TRANSACTIONS', default 4). For the final pass,
+'./bash/all-tests.sh' runs emacs + nextest + integration and writes
+'tests/results/ALL.org'.
+
+** Wire-format oracle (the hard constraint)
+1. STATIC: 'git diff server/org_to_text.rs server/serve/parse_metadata_sexp.rs'
+   must show ONLY match-arm re-routing and preamble imports -- ZERO changes to
+   any string literal and zero changes to the '*_metadata_to_string' helper
+   bodies/signatures. Prove with:
+   #+begin_src sh
+   git diff -U0 server/org_to_text.rs | grep -E '^[-+]' | grep -E '"\(|node|deleted|unknownNode|inactiveNode'
+   #+end_src
+   should return nothing but identical +/- pairs (or nothing at all).
+2. RENDER ORACLE tests (behavioral proof emit is unchanged): the
+   'tests/content_view*' suite, 'tests/render_util.rs' golden strings (22/41/55/72/92),
+   'tests/hidden_from_subscriptions.rs', 'tests/dangling_reference_renders_unknown_node.rs',
+   and the 'tests/integration/save_collateral_delete_then_edit_under_it' expected
+   org. A single altered byte fails them.
+3. ROUND-TRIP: parse ('parse_metadata_sexp' -> 'MpViewnodeKind' -> 'TryFrom' ->
+   'ViewNodeKind') then emit must reproduce the input for
+   'node'/'deleted'/'unknownNode'/'inactiveNode' fixtures -- covered by
+   'tests/new/buffer_to_viewnodes/*' and 'viewnodes_to_instructions'.
+4. CLIENT: the integration '.el' tests re-validate the wire format end-to-end
+   through the real Emacs client ('view-magit-phantom-deleted-file',
+   'containerward-on-phantom', 'git-diff-view-updates', etc.); no enum names
+   appear in them, so any diff there is a red flag.
+
+If any oracle fixture changed, the refactor leaked into the wire format and must
+be reverted to a pure dispatch re-route.
+
+* Risks and subtleties
+
+** Cross-file silent-drop: 'root_ids_from_viewforest' (views_state.rs:191-194)
+The single behavioral hazard that is NOT a compile error. 'normal_or_phantom_id'
+is removed; a Diff phantom is no longer inside 'Vognode', so the existing 'if let
+ViewNodeKind::Vognode(v)' guard simply fails to match phantom roots and silently
+stops registering them. Fix: match the whole node and call
+'ViewNode::active_or_diff_phantom_id'.
+
+** Behavioral, not mechanical: 'dispose_orphaned_col_child' (ancestry.rs:229-254)
+'is_vognode = matches!(.., ViewNodeKind::Vognode(_))' returns 'true' for phantoms
+today (they were vognodes). Post-split phantoms are 'ViewNodeKind::Phantom', so
+'is_vognode' goes 'false' and a phantom under a deadened orphan col would be
+demoted to 'DeadScaffold' instead of kept untouched. Broaden the test to
+'Vognode(_) | Phantom(_)' (or add 'is_phantom'). Flag in the commit message.
+
+** Narrowed-id accessors: 'get_id_from_treenode', 'is_ancestor_id', 'ids_that_can_have_graphnodestats' (to_org/util.rs)
+Pre-split, phantom viewnodes lived in 'Vognode' and so yielded ids via
+'Vognode::id()' / 'id_if_vognode()' / 'normal_or_phantom_id()'. Post-split:
+- 'get_id_from_treenode' (464-468): phantoms now fall to '_ => Err'. Confirm
+  callers only pass graph-backed (Active/Inactive) nodes.
+- 'is_ancestor_id' (448-449, 'id_if_vognode'): a phantom ancestor no longer
+  contributes an id to cycle detection. Confirm acceptable.
+- 'ids_that_can_have_graphnodestats' (429-431): must switch from the removed
+  'normal_or_phantom_id' to 'active_or_diff_phantom_id' to keep collecting
+  DiffPhantom ids; otherwise the graphnodestats-eligible id set silently shrinks.
+
+** No-wildcard matches MUST gain explicit Phantom arms (compile errors, but easy to mis-handle)
+- 'reconcile/content.rs:428-444' ('order_children_as_scaffolds_then_ignored_then_content')
+  enumerates every variant; add 'Phantom::Diff/Deleted/Unknown'.
+- 'to_org/util.rs:610-618' ('truenode_in_tree_is_indefinitive'): the previously
+  explicit DiffPhantom/Deleted/Unknown arms must be re-expressed as Phantom arms;
+  otherwise the '_ => Err' wildcard silently absorbs a phantom that used to
+  return Ok.
+- 'classify.rs:90-105', 'to_naive_instructions.rs:419-451',
+  'validate_tree.rs:40-76' (the three dispatch matches): stay exhaustive across
+  the new Active/Inactive + Diff/Deleted/Unknown layout.
+
+** Cross-enum OR-patterns cannot stay nested under one 'Vognode(..)'
+Any 'Vognode(Normal(_) | DiffPhantom(_))' idiom (common in 'validate_tree.rs',
+'tests/typedb.rs', 'test_utils.rs:502-505') must split into two top-level
+alternatives: 'Vognode(Active(_)) | Phantom(Diff(_))'. Mixed OR-groups that
+contain both a staying kind (Inactive) and moving kinds
+('to_naive_instructions.rs:653-657, 694-699') must be partitioned so Inactive
+remains under 'Vognode' while Deleted/Unknown/Diff move under 'Phantom'.
+
+** Paired closures must move in lockstep
+'reconcile/content.rs' 'complete_content_children' (350-368) and
+'build_child_creation_data' (485-494) pre-fetch and reconcile the same child set;
+move 'DiffPhantom -> Phantom::Diff' in both or the '_ => panic!' at 367 trips.
+Likewise 'graphnodestats.rs' read/write arms (89-102 / 110-113) must stay aligned.
+
+** Do not over-broaden Diff-only / Active-only logic
+Several sites intentionally test ONLY 'Diff' (not Deleted/Unknown): the
+'is_phantom' matches! ('update_buffer.rs:532'), the diff-skip matches!
+('diff.rs:73-75'), the graphStats arms ('graphnodestats.rs') -- only
+'DiffPhantomNode' has 'graphStats'/diff axes. Keep them as 'Phantom::Diff' only.
+'pids_from_viewforest' (views_state.rs:171-173) intentionally collects only
+Active/Inactive -- do NOT add a Phantom arm.
+
+** Unknown stays special
+'Phantom::pid_and_source' must keep returning 'None' for 'Unknown' (the
+collateral-pid / save exclusion invariant). 'find_children_by_ids' must keep
+EXCLUDING Unknown (and Inactive) via the arm, not via a catch-all accessor.
+
+** Facade stability (no edits, but load-bearing)
+The constructors 'mk_phantom_viewnode', 'mk_unknown_viewnode',
+'mk_inactive_viewnode', 'mk_definitive_viewnode', and 'mk_indefinitive_viewnode'
+keep their signatures, so their many call sites need no edit -- only the
+constructor bodies in 'viewnode.rs' change. Do not rename them as part of this
+split.

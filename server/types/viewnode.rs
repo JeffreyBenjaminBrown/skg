@@ -71,10 +71,33 @@ pub enum Vognode {
   Deleted  (DeletedNode), // No longer exists in the graph.
 }
 
-/// A node whose .skg file was deleted by a save in another buffer.
-/// Inert: generates no save instructions, excluded from parent's
-/// contains list, never "completed".
-/// Retains its children so the user's subtree is preserved.
+/// A placeholder ("phantom") Vognode for a node whose .skg file a save just
+/// removed -- one of the three placeholder kinds, alongside DiffPhantomNode and
+/// UnknownNode. All three stand in for something that is NOT a current graph
+/// member (so all three are inert on save and excluded from the view's
+/// collateral pids, `pids_from_viewforest`); they differ in *why* the node is
+/// absent and thus in how much they can still say about it.
+///
+/// ARISES: during post-save / collateral re-render (NOT in git diff mode), when
+/// a node already materialized in the view turns up in
+/// `deleted_by_this_save_pids`. A Normal content child flips here via
+/// `mutate_truenode_to_deletednode`; an Inactive node via
+/// `convert_inactive_to_deleted_if_deleted`. So it marks a node that genuinely
+/// no longer exists in the graph, killed by a completed save (this buffer's or a
+/// shared one's) -- not a git artifact.
+///
+/// USED: inert -- it generates no save instructions and is excluded from its
+/// parent's contains list. It is never "completed", yet it retains its children
+/// (which `mark_orphans_under_dead_parents_independent` demotes to Independent)
+/// so the user's subtree under a vanished node survives. A childless Deleted is
+/// pruned by the postorder sweep (`is_self_deletable_when_empty`), and a Deleted
+/// may stand as a view root (validate_tree) so a deleted root still shows.
+///
+/// DISTINCT INFO: unlike UnknownNode it knows its `source`, and unlike either
+/// other phantom it keeps the `title`/`body` it last displayed -- because it was
+/// a fully materialized node right up until the save deleted it, so that text is
+/// still worth showing. (The title is empty for one promoted from an Inactive
+/// node, which carried none.) It holds no diff axes: it is not about git stages.
 #[derive( Debug, Clone, PartialEq )]
 pub struct DeletedNode {
   pub id     : ID,
@@ -83,7 +106,29 @@ pub struct DeletedNode {
   pub body   : Option < String >,
 }
 
-/// A node referenced by some other node's `contains` (or similar list) for which neither in-Rust graph nor disk has any record -- not as a primary pid, not as an extra_id, and not recoverable through any phantom/diff-view procedure either. Distinct from DeletedNode, which knows its source and last-seen text; an UnknownNode is a dangling pointer with no metadata of its own. Carrying it as its own ViewNodeKind variant (rather than failing the whole view) is what keeps a single bad reference deep in a subtree from killing the view at the root.
+/// A placeholder ("phantom") Vognode for a reference that resolves to nothing --
+/// one of the three placeholder kinds, alongside DiffPhantomNode and DeletedNode
+/// (see DeletedNode for the shared framing).
+///
+/// ARISES: when some node's `contains` (or similar list) names an ID that has no
+/// record anywhere -- not a primary pid, not an extra_id, not in TypeDB, not on
+/// disk, and not recoverable through any phantom/diff procedure. Built by
+/// `mk_unknown_viewnode`, e.g. when `nodecomplete_and_viewnode_from_id` returns
+/// None. A genuine dangling pointer.
+///
+/// USED: it lets the view degrade gracefully -- carrying the bad reference as
+/// its own kind, rather than erroring, is what keeps a single bad reference deep
+/// in a subtree from killing the whole view at its root. Inert on save (it emits
+/// no instructions, though its descendants still might, so extraction recurses
+/// through it). If it is still a member of its parent's contains it is retained
+/// (a present-but-unresolvable reference); if it is no longer a member it
+/// converts to a DeadScaffold (`convert_nonmember_unknown_children_to_dead`) and
+/// is pruned.
+///
+/// DISTINCT INFO: it carries ONLY the `id`. Unlike DeletedNode it has no source
+/// (it is the one Vognode kind for which `pid_and_source` returns None) and no
+/// last-seen text; unlike DiffPhantomNode it has no diff axes. That emptiness IS
+/// the information: a reference exists, but we have no record of its target.
 #[derive( Debug, Clone, PartialEq )]
 pub struct UnknownNode {
   pub id : ID,
@@ -129,14 +174,33 @@ pub type DiffPhantomNode   = DiffPhantomNode_Generic < ID, SourceName >;
 pub type MpDiffPhantomNode = DiffPhantomNode_Generic < Option < ID >,
                                                        Option < SourceName >>;
 
-/// The slim payload of a `Vognode::DiffPhantom` (TODO/DONE/local-view-update/plan_v2.org §11 reduction). A phantom is a
-/// diff-only placeholder that is ALWAYS indefinitive and bodyless (enforced by
-/// `normal_to_phantom` / `mk_phantom_viewnode`) and whose parentIs is never read
-/// or rendered (always implicit Affected). So it carries NONE of TrueNode's
-/// parentIs / birth / viewStats / view_requests / indef_or_def -- only what a
-/// phantom actually uses: identity, title, the diff axes, the not_in_git flag,
-/// and graphStats (which IS rendered on phantoms). It needs neither parentIs
-/// (nothing reads a phantom's) nor indef_or_def (every phantom is indefinitive).
+/// The slim payload of a `Vognode::DiffPhantom` -- one of the three placeholder
+/// ("phantom") Vognode kinds, alongside DeletedNode and UnknownNode (see
+/// DeletedNode for the shared framing).
+///
+/// ARISES: only in git diff mode, from the diff-completion code. Two shapes,
+/// both detected by `diff_axes_require_phantom`: a "removed" member (present in
+/// the parent's HEAD/index contains but gone from the worktree's, inserted by
+/// `insert_phantoms_for_missing_contains` / `mk_phantom_viewnode`), or a Normal
+/// node flipped in place by `normal_to_phantom` because its own membership/
+/// existence axes went negative. "removed" vs "removedHere" (its .skg file is
+/// still in the worktree, so TypeDB can still answer about it) is told apart by
+/// `is_removedhere_phantom`.
+///
+/// USED: as a read-only diff annotation. It depicts a removed member at its
+/// correct HEAD position among surviving siblings, decorated with per-stage diff
+/// atoms. Always indefinitive and bodyless (enforced by `normal_to_phantom` /
+/// `mk_phantom_viewnode`); its parentIs is never read or rendered (implicit
+/// Affected); a Normal child left under it is demoted to Independent.
+///
+/// DISTINCT INFO: it is the only phantom that carries the git-diff coordinates
+/// -- per-stage `existence` and `membership` axes plus `not_in_git` -- because
+/// it exists solely to show a change between git snapshots. It keeps a `title`
+/// and `source` (resolved via `title_for_phantom`; the source may be the
+/// SourceName NOT_FOUND sentinel) and `graphStats`, which IS rendered on
+/// phantoms. It needs NONE of TrueNode's parentIs / birth / viewStats /
+/// view_requests / indef_or_def (TODO/DONE/local-view-update/plan_v2.org §11 reduction; see §18): nothing
+/// reads a phantom's parentIs, and every phantom is indefinitive.
 #[derive( Debug, Clone, PartialEq )]
 pub struct DiffPhantomNode_Generic < Id, Src > {
   pub title      : String,
