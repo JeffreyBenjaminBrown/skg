@@ -528,3 +528,44 @@
    3.10.3 by version. Left as-is because it records a dated observation,
    but worth re-measuring on 3.11.5 — its release notes mention query
    profiling and server-config changes that could move that baseline.
+
+* Problems found while researching local instruction collection (2026-06-09)
+  Found while reading the save-extraction code for
+  TODO/local-instruction-collection/. These all support that vision's
+  premise; if the rewrite happens they die with the old code, but they
+  are real today.
+
+** 'DefinenodeCandidateKind::Overridden' is computed and discarded everywhere
+   'collect_savenode_candidates' pushes candidates of kind Overridden,
+   but every consumer filters them out:
+   - 'naive_node_edit_intents_from_candidates' keeps only Ordinary;
+   - 'subscribee_hiderel_intents_from_candidates' keeps only Subscribee;
+   - 'instructiontriples_from_merge_candidates' keeps only Ordinary.
+   So OverriddenCol members are classified, candidate-listed, and then
+   ignored as instruction owners. Either that is intended (members of
+   an OverriddenCol are inert, like read-only col members), in which
+   case the variant should be removed, or their subtrees were meant to
+   be searched for instruction owners and are not — a latent bug.
+
+** Four 'SaveRole' variants are computed but never consumed
+   'classify.rs' computes 'AliasDisplay', 'IdDisplay',
+   'HiddenInSubscribeeCol { subscriber, subscribee }', and
+   'HiddenOutsideOfSubscribeeCol { subscriber }'. The latter two do
+   nontrivial grandparent/great-grandparent walks that can return Err
+   and abort a save. No code ever pattern-matches on any of the four
+   (they are handled only by catch-all arms). Wasted work on every
+   save, and an error surface with no corresponding feature.
+
+** 'viewforest_with_saveroles' deep-clones the whole buffer per save
+   It clones every ViewNode in the viewforest just to pair it with a
+   SaveRole ('ViewNode_in_Role'), and 'SaveAuthority::from_viewforest'
+   runs on every save (and again in the legacy test wrappers). For
+   large buffers this is a meaningful allocation on the save critical
+   path; profiling-save.org may already reflect it.
+
+** 'contains' is the one collected list that is not deduplicated
+   'collect_aliases...', 'collect_subscribees', and
+   'collect_members_from_child_relation_col' all apply 'dedup_vector';
+   'collect_contents_to_save_from_children' does not. Repeated content
+   under one parent may be legal by design (repeated nodes exist), but
+   the asymmetry is undocumented at the collection site.
