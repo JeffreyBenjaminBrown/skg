@@ -135,10 +135,9 @@ impl InRustGraph {
   ) -> Vec<ID> {
     // The inbound members are stored as a set, so their iteration order is
     // nondeterministic (run-to-run). Sort by ID so every consumer gets a stable
-    // order -- in particular, when the §5.5 node budget truncates a famous
-    // node's inbound relation col (e.g. thousands of subscribers), the surviving
-    // subset is deterministic rather than an arbitrary slice. Inbound relation
-    // order is user-irrelevant (plan §6.8/§7.3), unlike the outbound relations,
+    // order: a node's inbound relation col (e.g. thousands of subscribers) then
+    // renders the same way every time, rather than in an arbitrary shuffle.
+    // Inbound relation order is user-irrelevant, unlike the outbound relations,
     // whose meaningful Vec order (e.g. a node's hides list) is left untouched.
     let mut pids : Vec<ID> =
       inbound_pid_set (self, pid, relation)
