@@ -506,3 +506,64 @@ fn test_definitive_view_request_cleared
         "viewRequests should be cleared after processing");
 
       Ok (( )) } )) }
+
+// ===================================================
+// Test: an AliasCol fills WHOLE and is budget-NEUTRAL (§5.5).
+// ===================================================
+// Companion to initial_view_bfs::test_budget_content_beats_subscribers (which
+// pins the same neutrality for the auto-rendered SubscribeeCol). An AliasCol,
+// unlike a SubscribeeCol, is NOT auto-rendered de-novo -- it appears only on an
+// explicit `aliases` view request -- so this exercises the request path through
+// the rerender (build_and_integrate_aliases / reconcile_alias_col_children),
+// neither of which takes node_budget.
+//
+// Fixture: root r contains the chain c1 -> c2, and r has two aliases. The budget
+// counts vognode EXPANSIONS (cost 1), so the whole content here is exactly 3
+// expansions: r, c1, c2. With limit=3 the chain fully expands (c2 definitive)
+// AND the AliasCol shows BOTH aliases. The alias members are scaffolds, so they
+// cost nothing: were they charged, the 3 units could not also cover c2, which
+// would then be left indefinitive (verified: at limit=2 c2 *is* indefinitive
+// while the AliasCol stays whole). That c2 is definitive here is the guarantee
+// this test pins.
+#[test]
+fn test_budget_aliascol_is_neutral
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-budget-aliascol-neutral",
+    "tests/definitive_view_cascade_and_budget/fixtures-aliases",
+    "/tmp/tantivy-test-budget-aliascol-neutral",
+    |config, driver, tantivy| Box::pin ( async move {
+      let input_org_text = indoc! {"
+        * (skg (node (id r) (source main) (viewRequests aliases))) r
+        ** (skg (node (id c1) (source main))) c1
+        *** (skg (node (id c2) (source main))) c2
+      "};
+      let result = {
+        let mut config = config . clone();
+        config . initial_node_limit = 3;
+        let graph : InRustGraphHandle =
+          new_handle (InRustGraph::new ());
+        let mut views_state : ViewsState = ViewsState {
+          diff_mode_enabled : false,
+          open_views            : OpenViews::new (),};
+        let mut stream : TcpStream = mk_test_tcp_stream ();
+        let response = update_from_and_rerender_buffer (
+          &mut stream,
+          input_org_text, driver, &config, tantivy, &graph, false,
+          &Err ( String::new () ), &mut views_state ) . await ?;
+        response . saved_view };
+
+      println!("alias-budget (budget 3):\n{}", result);
+
+      let expected = indoc! {"
+        * (skg (node (id r) (source main) (parentIs absent) (graphStats (contents 1) aliasing))) r
+        ** (skg aliasCol)
+        *** (skg alias) first alias
+        *** (skg alias) second alias
+        ** (skg (node (id c1) (source main) (graphStats (contents 1)))) c1
+        *** (skg (node (id c2) (source main))) c2
+      "};
+      assert_eq!(result, expected,
+        "budget 3 expands the whole content chain; the AliasCol is whole + budget-neutral");
+
+      Ok (( )) } )) }
