@@ -1,5 +1,5 @@
 use crate::dbs::in_rust_graph::in_rust_graph_coherent_with_save_instructions;
-use crate::from_text::{ SavePlan, buffer_to_validated_saveplan};
+use crate::from_text::buffer_to_validated_saveplan;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
 use crate::save::update_graph_including_merges;
@@ -18,7 +18,8 @@ use crate::types::env::SkgEnv;
 use crate::types::errors::SaveError;
 use crate::types::git::{SourceDiff, GitDiffStatus};
 use crate::types::misc::{ID, SourceName, SkgConfig};
-use crate::types::save::{DefineNode, SaveInstructions, format_save_error_as_org};
+use crate::types::save::{DefineNode, SavePlan, format_save_error_as_org};
+use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::ViewUri;
 use crate::update_buffer::update_views_after_save;
 
@@ -250,7 +251,7 @@ pub async fn update_from_and_rerender_buffer (
     validate_no_merge_commits ( &sources, &env . config )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
 
-  let save_plan : SavePlan =
+  let ( viewforest, save_plan ) : ( ViewForest, SavePlan ) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
             "buffer_to_validated_saveplan"
           ) . entered();
@@ -258,15 +259,13 @@ pub async fn update_from_and_rerender_buffer (
           org_buffer_text, &env . config, &env . driver ) . await
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
-  if save_plan . viewforest . is_empty ()
+  if viewforest . is_empty ()
     { return Err ( "Nothing to save found in org_buffer_text"
                    . into() ); }
   let SavePlan {
-    viewforest,
-    instructions : SaveInstructions {
-      define_nodes       : nonmerge_defineNodes,
-      merge_instructions : merges,
-      source_moves } }
+    define_nodes       : nonmerge_defineNodes,
+    merge_instructions : merges,
+    source_moves }
     = save_plan;
 
   { // update the graph. Context origin types (for search ranking) are

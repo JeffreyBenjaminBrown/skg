@@ -354,12 +354,12 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
               "Source move between owned sources should succeed, got: {:?}",
               result . err());
 
-      let save_plan = result?;
-      assert_eq!(save_plan . instructions . source_moves . len(), 1,
+      let ( _viewforest, save_plan ) = result?;
+      assert_eq!(save_plan . source_moves . len(), 1,
                  "Expected exactly 1 source move");
-      assert_eq!(save_plan . instructions . source_moves[0] . pid . 0, "priv-1");
-      assert_eq!(save_plan . instructions . source_moves[0] . old_source . as_str(), "private");
-      assert_eq!(save_plan . instructions . source_moves[0] . new_source . as_str(), "public");
+      assert_eq!(save_plan . source_moves[0] . pid . 0, "priv-1");
+      assert_eq!(save_plan . source_moves[0] . old_source . as_str(), "private");
+      assert_eq!(save_plan . source_moves[0] . new_source . as_str(), "public");
     }
 
     // Test 2: InconsistentSources

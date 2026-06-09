@@ -45,12 +45,15 @@ pub struct DeleteNode {
   pub source: SourceName,
 }
 
-/// The instructions a save applies to the graph, with no view attached.
-/// The graph-mutation step consumes only this; the rerender step consumes
-/// the ViewForest (held alongside in 'SavePlan') plus these instructions'
-/// PIDs for collateral selection. (plan_v2 §11.)
+/// The whole plan a save applies to the graph, with no view attached: the
+/// graph-mutation step consumes only this. (Named 'SavePlan', not e.g.
+/// 'SaveInstructions', because the plan is whole -- a bare list of instructions
+/// might not be.) The rerender step consumes the ViewForest -- returned
+/// alongside this as the other half of 'buffer_to_validated_saveplan's pair,
+/// not stored here -- plus this plan's PIDs, for collateral selection.
+/// (TODO/DONE/local-view-update/plan_v2.org §11.)
 #[derive(Debug)]
-pub struct SaveInstructions {
+pub struct SavePlan {
   pub define_nodes       : Vec<DefineNode>,
   pub merge_instructions : Vec<Merge>,
   pub source_moves       : Vec<SourceMove>,
