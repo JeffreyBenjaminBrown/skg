@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/ubuntu/host/.claude/beep-if-main-agent.sh soothing-beep"
+            "command": "/home/ubuntu/host/my-dot-claude/hooks/beep-if-main-agent.sh beep-soothing"
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/sound/play-beep.sh"
+            "command": "/home/ubuntu/host/my-dot-claude/hooks/beep-if-main-agent.sh beep-harsh"
           }
         ]
       },
@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/sound/play-beep.sh"
+            "command": "/home/ubuntu/host/my-dot-claude/hooks/beep-if-main-agent.sh beep-harsh"
           }
         ]
       }
