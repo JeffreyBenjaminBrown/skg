@@ -61,6 +61,23 @@ comment portions only (never code), plus the two internal message strings the
 comment pass skipped, plus the 'View roots...' string-corruption fix (see "What's
 imperfect"). 'cargo build' + 'cargo test --no-run' clean (0 warnings).
 
+** End-to-end client suites GREEN -- Emacs 222/222, integration 28/28
+- Emacs elisp suite ('bash/emacs-tests.sh'): 222/222.
+- Integration suite (all 28 'tests/integration/*/run-test.sh', sequential
+  against a live TypeDB; each spins up its own skg server): 28/28, INCLUDING
+  every phantom test -- 'containerward-on-phantom', 'git-diff-view-updates',
+  'view-magit-phantom', 'view-magit-phantom-deleted-file',
+  'save_collateral_delete_then_edit_under_it'. These drive the REAL Emacs client
+  against the server, so a passing run is the end-to-end proof that the wire
+  format (and phantom rendering) is byte-for-byte unchanged.
+
+The plan is fully executed and verified at every layer (build, lib+test compile,
+492 nextest, 222 emacs, 28 integration, static wire-format check). No stumper
+mysteries and no unanticipated architectural decisions arose.
+
+Note: I started a TypeDB server on :1729 for the test runs (the baseline had none
+running); it is still up. Stop it with 'pkill -9 -f typedb_server_bin' if unwanted.
+
 * Changes to the plan's envisioned order
 
 ** Mechanical renames done by script, not hand-edit
@@ -137,5 +154,5 @@ ancestors. Easy to reverse (drop the arm) if a phantom ancestor should error.
 Used by ~10 validators. If the set of "TrueNode-ish" Mp kinds ever changes,
 that one method is the place to change it.
 
-* TODO obstacles needing Jeff
-(empty so far -- architectural surprises / stumper mysteries go here, marked TODO)
+* DONE There were no obstacles needing Jeff.
+(empty so far -- architectural surprises / stumper mysteries go here)
