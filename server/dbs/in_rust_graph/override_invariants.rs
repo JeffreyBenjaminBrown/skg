@@ -1,7 +1,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OverrideInvariantViolation {
@@ -105,6 +105,103 @@ pub fn validate_override_invariants (
             final_targets,
           } ); }}}
   dedup_violations (violations) }
+
+/// Save-time override-invariant check, scoped to the nodes a save
+/// touched. The rest of the graph satisfied the invariants before the
+/// save and is unchanged, so a new violation can only involve an
+/// override edge incident to a touched node (whose 'overrides_view_of'
+/// or 'source' changed). Checking each touched node's edges therefore
+/// suffices, and the cost is O(touched) rather than O(whole graph).
+///
+/// 'graph' must be the post-save (simulated) graph, with its inverse
+/// indexes ('overriders_of') already reflecting the save.
+///
+/// For each touched user-owned node T:
+/// - monogamy: for each X that T overrides, flag X if it now has more
+///   than one user-owned overrider. Only this (target) end needs
+///   checking — adding the edge T → X can only over-subscribe X.
+/// - no chains: the new edge T → B can sit at either end of a chain, so
+///   check both: T as the chain's middle (some user-owned node
+///   overrides T, while T overrides anything) and T as the chain's
+///   first (T overrides a user-owned B that itself overrides anything).
+pub fn validate_touched_override_invariants (
+  config  : &SkgConfig,
+  graph   : &InRustGraph,
+  touched : &HashSet<ID>,
+) -> Vec<OverrideInvariantViolation> {
+  let mut violations : Vec<OverrideInvariantViolation> = Vec::new ();
+  for pid in touched {
+    let Some (node) = graph . nodes . get (pid)
+      // A touched id absent post-save (e.g. deleted) has no out-edges,
+      // and deletions can only resolve violations, never create them.
+      else { continue; };
+    let Some (user_owns_pid) = user_owns_node (
+      config, pid, &node . source, &mut violations )
+      else { continue; };
+    if ! user_owns_pid { continue; }
+    let targets : Vec<ID> = // T's override targets, resolved to pids
+      node . overrides_view_of . or_default () . iter ()
+      . map ( |t| graph . pid_of (t)
+              . unwrap_or_else ( || t . clone () ) )
+      . collect ();
+    for overridden in &targets {
+      // monogamy (target end only)
+      let mut overriders : Vec<ID> =
+        user_owned_overriders_of (config, graph, overridden);
+      if overriders . len () > 1 {
+        overriders . sort ();
+        violations . push (
+          OverrideInvariantViolation::MultipleUserOwnedOverriders {
+            overridden : overridden . clone (),
+            overriders, } ); } }
+    if ! targets . is_empty () {
+      // no chains, T as the middle: first(user-owned) → T → targets
+      for first in user_owned_overriders_of (config, graph, pid) {
+        violations . push (
+          OverrideInvariantViolation::UserOwnedOverrideChain {
+            first_overrider  : first,
+            middle_overrider : pid . clone (),
+            final_targets    : targets . clone (), } ); } }
+    for middle_pid in &targets {
+      // no chains, T as the first: T → middle(user-owned) → its targets
+      let Some (middle_node) = graph . nodes . get (middle_pid)
+        else { continue; };
+      let Some (middle_is_user_owned) = user_owns_node (
+        config, middle_pid, &middle_node . source, &mut violations )
+        else { continue; };
+      if ! middle_is_user_owned { continue; }
+      let final_targets : Vec<ID> =
+        middle_node . overrides_view_of . or_default () . iter ()
+        . map ( |t| graph . pid_of (t)
+                . unwrap_or_else ( || t . clone () ) )
+        . collect ();
+      if ! final_targets . is_empty () {
+        violations . push (
+          OverrideInvariantViolation::UserOwnedOverrideChain {
+            first_overrider  : pid . clone (),
+            middle_overrider : middle_pid . clone (),
+            final_targets, } ); } } }
+  dedup_violations (violations) }
+
+/// The user-owned nodes (by pid) that override 'overridden' (a pid), via
+/// the in-Rust graph's 'overriders_of' inverse index. Overriders whose
+/// source is unknown are treated as not-user-owned here: a touched
+/// node's own unknown source is still reported by 'user_owns_node' at
+/// the call site, and untouched neighbors are validated at init.
+fn user_owned_overriders_of (
+  config     : &SkgConfig,
+  graph      : &InRustGraph,
+  overridden : &ID,
+) -> Vec<ID> {
+  let mut result : Vec<ID> = Vec::new ();
+  if let Some (overriders) = graph . overriders_of . get (overridden) {
+    for overrider in overriders {
+      if let Some (overrider_node) = graph . nodes . get (overrider) {
+        if config . sources . get (&overrider_node . source)
+          . map ( |sc| sc . user_owns_it )
+          . unwrap_or (false)
+        { result . push (overrider . clone ()); } } } }
+  result }
 
 /// Returns Some if it can determine the answer.
 /// If it can't, adds to 'violations' and returns None.

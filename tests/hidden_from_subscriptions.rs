@@ -34,7 +34,7 @@ use futures::executor::block_on;
 use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
+use typedb_driver::{TypeDBDriver, Addresses, Credentials, DriverOptions, DriverTlsConfig};
 
 fn mk_test_tcp_stream ()
   -> TcpStream
@@ -68,9 +68,9 @@ async fn setup_test(
   let config: SkgConfig =
     load_config_with_overrides(config_path, Some (db_name), &[])?;
   let driver: TypeDBDriver = TypeDBDriver::new(
-    "127.0.0.1:1729",
+    Addresses::try_from_address_str("127.0.0.1:1729")?,
     Credentials::new("admin", "password"),
-    DriverOptions::new(false, None)?,
+    DriverOptions::new(DriverTlsConfig::disabled()),
   ) . await?;
   let nodes: Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config)?;
@@ -194,6 +194,9 @@ async fn save_buffer_and_read_collateral_views (
   let collateral_views : Vec<String> =
     read_all_lp_messages (&mut reader)
     . into_iter()
+    // Skip the save-relax-lock message (plan_v2 §8.1); only collateral-views
+    // carry a content field.
+    . filter ( |msg| msg . contains ("collateral-view") )
     . map ( |msg|
       extract_string_field_from_sexp (&msg, "content")
       . unwrap_or_else (||
@@ -329,16 +332,6 @@ fn insert_after_line_containing (
       result . extend (
         insertion . lines() . map ( |l| l . to_string() )); }}
   result . join ("\n") + "\n" }
-
-fn assert_line_contains_all (
-  buffer : &str,
-  parts  : &[&str],
-) {
-  assert!(
-    buffer . lines() . any ( |line|
-      parts . iter() . all ( |part| line . contains (part) )),
-    "Expected a line containing {:?}:\n{}",
-    parts, buffer ); }
 
 fn assert_line_order (
   buffer : &str,
@@ -523,7 +516,23 @@ fn test_collateral_view_reflects_newly_hidden_subscribee_content(
       collateral_views . len(), 1,
       "Expected one collateral view:\n{:?}",
       collateral_views);
-    assert_hides_e1_in_subscribee_col (&collateral_views[0]);
+    // e1 was hidden, so it appears under the HiddenInSubscribeeCol. But e1's
+    // in-view subtree (e11) is a user branch, so §6.0 DEMOTES the visible
+    // occurrence to parentIs=Independent rather than deleting it -- chaos-
+    // monkey safety: the user may have deliberately placed content there, and
+    // we must not lose it. So e1 shows twice: once hidden (indef), once as a
+    // preserved Independent branch.
+    let collateral : &str = &collateral_views[0];
+    assert! (
+      collateral . contains (
+        "**** (skg hiddenInSubscribeeCol)\n***** (skg (node (id e1) (source foreign) indef"),
+      "Expected e1 under HiddenInSubscribeeCol:\n{}", collateral );
+    assert! (
+      collateral . lines() . any ( |line|
+        line . starts_with ("**** (skg (node (id e1)")
+        && line . contains ("(parentIs independent)") ),
+      "Expected hidden branch e1 demoted to Independent (subtree preserved):\n{}",
+      collateral );
 
     cleanup_test (
       db_name, &driver, &config . tantivy_folder ) . await?;
@@ -631,7 +640,7 @@ fn test_moving_foreign_subscribee_content_elsewhere_still_hides(
     Ok (( )) }) }
 
 #[test]
-fn test_extra_view_child_under_foreign_subscribee_is_independent(
+fn test_extra_view_child_under_foreign_subscribee_is_deleted(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
     let db_name = "skg-test-extra-foreign-subscribee-child-independent";
@@ -671,9 +680,13 @@ fn test_extra_view_child_under_foreign_subscribee_is_independent(
         &edited, &driver, &config, &mut tantivy, &graph, &mut views_state
       ) . await?;
 
-    assert_line_contains_all (
-      &rerendered,
-      &["(id a)", "(parentIs independent)"]);
+    // §6.0: the extra view-child 'a' is a stale leaf (not in e's contains,
+    // claiming membership, no children), so it is deleted -- not preserved as
+    // an Independent child.
+    assert!(
+      ! rerendered . lines() . any ( |line| line . contains ("(id a)") ),
+      "Extra stale-leaf view-child 'a' should be deleted, not preserved:\n{}",
+      rerendered );
     assert_line_order (&rerendered, "(id e1)", "(id e2)");
     assert_does_not_hide_e1 (&rerendered);
     let e_skg : NodeComplete =
@@ -691,7 +704,7 @@ fn test_extra_view_child_under_foreign_subscribee_is_independent(
     Ok (( )) }) }
 
 #[test]
-fn test_extra_view_child_under_owned_subscribee_is_independent(
+fn test_extra_view_child_under_owned_subscribee_is_deleted(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
     let db_name = "skg-test-extra-owned-subscribee-child-independent";
@@ -721,9 +734,13 @@ fn test_extra_view_child_under_owned_subscribee_is_independent(
         &edited, &driver, &config, &mut tantivy, &graph, &mut views_state
       ) . await?;
 
-    assert_line_contains_all (
-      &rerendered,
-      &["(id e)", "(parentIs independent)"]);
+    // §6.0: the extra view-child 'e' is a stale leaf (not in r's contains,
+    // claiming membership, no children), so it is deleted -- not preserved as
+    // an Independent child.
+    assert!(
+      ! rerendered . lines() . any ( |line| line . contains ("(id e)") ),
+      "Extra stale-leaf view-child 'e' should be deleted, not preserved:\n{}",
+      rerendered );
     assert_line_order (&rerendered, "(id r1)", "(id r2)");
     assert!(
       ! rerendered . contains ("hiddenInSubscribeeCol"),

@@ -6,7 +6,7 @@ use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use super::git::{ExistenceAxes, MembershipAxes, NodeCompleteDiff, Sign, SourceDiff};
+use super::git::{ExistenceAxes, MembershipAxes, NodeCompleteDiff, Sign, SourceDiff, existence_axes_in_source_diff};
 use super::list::Diff_Item;
 use super::misc::{ID, SkgConfig, SourceName};
 
@@ -50,16 +50,10 @@ pub fn phantom_axes (
   // Existence: the child's own file-level status in each stage.
   let child_file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", child_id . 0 ) );
-  let child_sd : Option<&SourceDiff> =
-    source_diffs . and_then ( |d| d . get (child_source) );
-  let ex_staged : Option<Sign> =
-    child_sd . and_then ( |sd| sd . staged . get (&child_file) )
-      . and_then ( |d| d . status . to_existence_sign () );
-  let ex_unstaged : Option<Sign> =
-    child_sd . and_then ( |sd| sd . unstaged . get (&child_file) )
-      . and_then ( |d| d . status . to_existence_sign () );
   let existence : ExistenceAxes =
-    ExistenceAxes { staged: ex_staged, unstaged: ex_unstaged };
+    existence_axes_in_source_diff (
+      source_diffs . and_then ( |d| d . get (child_source) ),
+      &child_file );
 
   // Membership: the child's presence in the parent's contains list
   // in each stage. New(id) -> Plus; Removed(id) -> Minus.
@@ -67,15 +61,24 @@ pub fn phantom_axes (
     PathBuf::from ( format! ( "{}.skg", parent_id . 0 ) );
   let parent_sd : Option<&SourceDiff> =
     source_diffs . and_then ( |d| d . get (parent_source) );
+  // §C: the child appears in exactly one of the parent's relations -- contains
+  // (content / hidden-in member), subscribes_to (subscribee member), or hides
+  // (hidden-outside member) -- so check the per-stage diff of all three and use
+  // whichever carries this child. This gives a PER-STAGE membership axis for
+  // sharing-col members too, not only content children.
   let sign_from_parent_stage =
     | stage_map : &HashMap<PathBuf, NodeCompleteDiff> | -> Option<Sign> {
-      stage_map . get (&parent_file)
-        . and_then ( |d| d . node_changes . as_ref () )
-        . and_then ( |nc| nc . contains_diff . iter ()
-                            . find_map ( |d| match d {
+      let nc = stage_map . get (&parent_file)
+        . and_then ( |d| d . node_changes . as_ref () ) ?;
+      for diff_list in [ & nc . contains_diff,
+                         & nc . subscribes_to_diff,
+                         & nc . hides_diff ] {
+        if let Some (sign) = diff_list . iter () . find_map ( |d| match d {
           Diff_Item::New     (id) if id == child_id => Some (Sign::Plus),
           Diff_Item::Removed (id) if id == child_id => Some (Sign::Minus),
-          _ => None, } ) ) };
+          _ => None, } )
+        { return Some (sign); } }
+      None };
   let mem_staged : Option<Sign> =
     parent_sd . and_then ( |sd| sign_from_parent_stage (&sd . staged) );
   let mem_unstaged : Option<Sign> =
@@ -83,10 +86,14 @@ pub fn phantom_axes (
   let membership : MembershipAxes =
     MembershipAxes { staged: mem_staged, unstaged: mem_unstaged };
 
-  // Fall back to the old "unstaged Minus" assumption when we have
-  // zero per-stage signal for membership. Subscription phantoms go
-  // through this function too, and there's no contains_diff to read
-  // for them — preserve existing behavior in that case.
+  // Fall back to a net "unstaged Minus" only when NO per-stage signal exists in
+  // any of the parent's three relation diffs -- a defensive net for a removed
+  // phantom whose removal the parent's per-stage NodeChanges can't express (e.g.
+  // the parent's source_diff is absent, or a net-only removal). The sharing
+  // cols that DO diff membership -- Subscribee (subscribes_to), HiddenIn
+  // (contains), HiddenOutside (hides) -- are all now covered per-stage above;
+  // the relation cols (Subscriber/Overrider/...) never produce removed members
+  // (their reconcile passes empty removed_ids), so they never reach this path.
   let membership : MembershipAxes =
     if membership . is_empty ()
       { MembershipAxes { staged: None, unstaged: Some (Sign::Minus) } }
@@ -109,110 +116,5 @@ pub fn source_from_disk (
   None }
 
 #[cfg(test)]
-mod tests {
-  use super::*;
-  use super::super::git::{GitDiffStatus, NodeChanges};
-
-  fn source_name (s: &str) -> SourceName { SourceName ( s . to_string () ) }
-  fn id        (s: &str) -> ID         { ID ( s . to_string () ) }
-
-  fn make_parent_diff (
-    contains_diff : Vec<Diff_Item<ID>>,
-  ) -> NodeCompleteDiff {
-    NodeCompleteDiff {
-      status: GitDiffStatus::Modified,
-      node_changes: Some ( NodeChanges {
-        text_changed:  false,
-        aliases_diff:  Vec::new (),
-        ids_diff:      Vec::new (),
-        contains_diff, } ),
-      before_node: None,
-      after_node: None, } }
-
-  fn source_diff_with_parent_contains (
-    parent_pid : &ID,
-    staged_ops   : Vec<Diff_Item<ID>>,
-    unstaged_ops : Vec<Diff_Item<ID>>,
-  ) -> SourceDiff {
-    let parent_file : PathBuf =
-      PathBuf::from ( format! ( "{}.skg", parent_pid . 0 ) );
-    let mut staged   : HashMap<PathBuf, NodeCompleteDiff> = HashMap::new ();
-    let mut unstaged : HashMap<PathBuf, NodeCompleteDiff> = HashMap::new ();
-    if !staged_ops . is_empty () {
-      staged . insert ( parent_file . clone (),
-                        make_parent_diff (staged_ops) ); }
-    if !unstaged_ops . is_empty () {
-      unstaged . insert ( parent_file,
-                          make_parent_diff (unstaged_ops) ); }
-    SourceDiff {
-      is_git_repo: true,
-      staged, unstaged,
-      added_nodes: HashMap::new (),
-      deleted_nodes: HashMap::new (), } }
-
-  #[test]
-  fn staged_removal_is_attributed_to_staged_side () {
-    let parent : ID = id ("parent");
-    let child  : ID = id ("child");
-    let src    : SourceName = source_name ("public");
-    let mut diffs : HashMap<SourceName, SourceDiff> = HashMap::new ();
-    diffs . insert ( src . clone (),
-                     source_diff_with_parent_contains (
-                       &parent,
-                       vec! [ Diff_Item::Removed (child . clone ()) ],
-                       vec! [] ) );
-    let (ex, mem) = phantom_axes (
-      &child, &src, &parent, &src, Some (&diffs) );
-    assert_eq! ( mem, MembershipAxes {
-      staged: Some (Sign::Minus), unstaged: None } );
-    assert_eq! ( ex, ExistenceAxes::default () );
-  }
-
-  #[test]
-  fn unstaged_removal_is_attributed_to_unstaged_side () {
-    let parent : ID = id ("parent");
-    let child  : ID = id ("child");
-    let src    : SourceName = source_name ("public");
-    let mut diffs : HashMap<SourceName, SourceDiff> = HashMap::new ();
-    diffs . insert ( src . clone (),
-                     source_diff_with_parent_contains (
-                       &parent,
-                       vec! [],
-                       vec! [ Diff_Item::Removed (child . clone ()) ] ) );
-    let (_, mem) = phantom_axes (
-      &child, &src, &parent, &src, Some (&diffs) );
-    assert_eq! ( mem, MembershipAxes {
-      staged: None, unstaged: Some (Sign::Minus) } );
-  }
-
-  #[test]
-  fn staged_add_then_unstaged_remove () {
-    let parent : ID = id ("parent");
-    let child  : ID = id ("child");
-    let src    : SourceName = source_name ("public");
-    let mut diffs : HashMap<SourceName, SourceDiff> = HashMap::new ();
-    diffs . insert ( src . clone (),
-                     source_diff_with_parent_contains (
-                       &parent,
-                       vec! [ Diff_Item::New     (child . clone ()) ],
-                       vec! [ Diff_Item::Removed (child . clone ()) ] ) );
-    let (_, mem) = phantom_axes (
-      &child, &src, &parent, &src, Some (&diffs) );
-    assert_eq! ( mem, MembershipAxes {
-      staged: Some (Sign::Plus), unstaged: Some (Sign::Minus) } );
-  }
-
-  #[test]
-  fn no_parent_contains_diff_falls_back_to_unstaged_minus () {
-    // Fallback preserves legacy behavior for callers (e.g. subscription
-    // phantoms) where there's no contains_diff entry for this child.
-    let parent : ID = id ("parent");
-    let child  : ID = id ("child");
-    let src    : SourceName = source_name ("public");
-    let diffs  : HashMap<SourceName, SourceDiff> = HashMap::new ();
-    let (_, mem) = phantom_axes (
-      &child, &src, &parent, &src, Some (&diffs) );
-    assert_eq! ( mem, MembershipAxes {
-      staged: None, unstaged: Some (Sign::Minus) } );
-  }
-}
+#[path = "../../tests/unit/types_phantom.rs"]
+mod tests;

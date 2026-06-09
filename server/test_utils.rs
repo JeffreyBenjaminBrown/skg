@@ -36,7 +36,7 @@ use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use typedb_driver::answer::{QueryAnswer, ConceptRow};
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Transaction, TransactionType, Database, DatabaseManager};
+use typedb_driver::{TypeDBDriver, Addresses, Credentials, DriverOptions, DriverTlsConfig, Transaction, TransactionType, Database, DatabaseManager};
 use crate::dbs::typedb::util::ConceptRowStream;
 use std::sync::Arc;
 use tantivy::{DocAddress, Searcher, TantivyDocument};
@@ -125,9 +125,9 @@ where
     let config: SkgConfig =
       load_config_with_overrides(config_path, Some (db_name), &[])?;
     let driver: TypeDBDriver = TypeDBDriver::new(
-        TYPEDB_ADDRESS,
+        Addresses::try_from_address_str(TYPEDB_ADDRESS)?,
         Credentials::new("admin", "password"),
-        DriverOptions::new(false, None)?,
+        DriverOptions::new(DriverTlsConfig::disabled()),
       ). await?;
     let nodes: Vec<NodeComplete> =
       read_all_skg_files_from_sources (&config)?;
@@ -163,6 +163,10 @@ async fn guarded_test_then_cleanup(
   let test_result: Result<Result<(), Box<dyn Error>>, _> =
     AssertUnwindSafe(test_future)
     . catch_unwind() . await;
+  // A save's Tantivy write now commits in the background and outlives
+  // update_from_and_rerender_buffer; drain it before deleting the test
+  // index out from under the worker.
+  crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
   let cleanup_result: Result<(), Box<dyn Error>> =
     cleanup_test_tantivy_and_typedb_dbs(
       db_name, driver,
@@ -335,9 +339,9 @@ pub async fn setup_test_tantivy_and_typedb_dbs (
     SkgConfig::fromSourcesAndDbName (
       sources, db_name, tantivy_folder ) };
   let driver: TypeDBDriver = TypeDBDriver::new(
-    TYPEDB_ADDRESS,
+    Addresses::try_from_address_str(TYPEDB_ADDRESS)?,
     Credentials::new("admin", "password"),
-    DriverOptions::new(false, None)?
+    DriverOptions::new(DriverTlsConfig::disabled())
   ) . await ?;
   populate_test_db_from_fixtures(
     fixtures_folder,
@@ -366,6 +370,14 @@ pub async fn cleanup_test_tantivy_and_typedb_dbs(
   driver: &TypeDBDriver,
   tantivy_folder: Option<&Path>,
 ) -> Result<(), Box<dyn Error>> {
+  // The Tantivy index is written by a background worker
+  // (server/dbs/tantivy/background_writer.rs). Drain it before touching
+  // the index directory, so no commit or merge thread is still creating
+  // files when we delete it -- otherwise remove_dir_all races them and
+  // fails with DirectoryNotEmpty. (guarded_test_then_cleanup drains too,
+  // but many tests call this helper directly.)
+  crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
+
   { // Delete TypeDB database (with retry).
     let databases : &DatabaseManager = driver . databases();
     if databases . contains (db_name) . await? {
@@ -387,10 +399,21 @@ pub async fn cleanup_test_tantivy_and_typedb_dbs(
             else { last_err = Some ( Box::new (e) ); break; }} } }
       if let Some (e) = last_err { return Err (e); } } }
 
-  // Delete Tantivy index if path provided and exists
+  // Delete Tantivy index if path provided and exists. Belt-and-suspenders:
+  // even after draining the worker, retry on DirectoryNotEmpty in case the
+  // OS or Tantivy is still finishing background file cleanup.
   if let Some (tantivy_path) = tantivy_folder {
     if tantivy_path . exists() {
-      fs::remove_dir_all (tantivy_path)?; }}
+      let max_attempts : usize = 20; // 20 * 50ms = 1s total
+      for attempt in 0 .. max_attempts {
+        match fs::remove_dir_all (tantivy_path) {
+          Ok (()) => break,
+          Err (e)
+            if e . raw_os_error() == Some (39) // ENOTEMPTY
+               && attempt + 1 < max_attempts => {
+            std::thread::sleep (
+              std::time::Duration::from_millis (50) ); }
+          Err (e) => return Err ( Box::new (e) ), } } } }
 
   Ok (( )) }
 
@@ -477,16 +500,19 @@ fn compare_two_viewnode_branches_recursively_modulo_id (
   let n2 : &MpViewnode = node2 . value();
   match (&n1 . kind, &n2 . kind) {
     ( MpViewnodeKind::Vognode (MpVognode::Normal (_)
-                               | MpVognode::Phantom (_)),
-      MpViewnodeKind::Vognode (MpVognode::Normal (t2)
-                               | MpVognode::Phantom (t2))) =>
-    { // Copy the ID from one to the other, then compare.
+                               | MpVognode::DiffPhantom (_)),
+      MpViewnodeKind::Vognode (MpVognode::Normal (_)
+                               | MpVognode::DiffPhantom (_))) =>
+    { // Copy the ID from one to the other, then compare. TODO/DONE/local-view-update/plan_v2.org §11: Normal and
+      // DiffPhantom payloads are now different types, so read n2's id via the
+      // shared accessor and write n1_copy's per variant.
+      let id2 : Option<ID> = n2 . id_opt () . cloned ();
       let mut n1_copy : MpViewnode =
         n1 . clone();
-      if let MpViewnodeKind::Vognode (MpVognode::Normal (t)
-                                      | MpVognode::Phantom (t))
-        = &mut n1_copy . kind
-        { t . id = t2 . id . clone(); }
+      match &mut n1_copy . kind {
+        MpViewnodeKind::Vognode (MpVognode::Normal (t)) => t . id = id2,
+        MpViewnodeKind::Vognode (MpVognode::DiffPhantom (p)) => p . id = id2,
+        _ => {} }
       if n1_copy != *n2 { return false; }}
     ( MpViewnodeKind::QualCol (_)
       | MpViewnodeKind::Qual (_)

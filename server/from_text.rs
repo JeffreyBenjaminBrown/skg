@@ -13,7 +13,7 @@ pub mod validate;
 use crate::merge::mergeInstructionTriple::instructiontriples_from_merge_candidates;
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::SkgConfig;
-use crate::types::save::{Merge, DefineNode, SourceMove};
+use crate::types::save::{Merge, DefineNode, SavePlan};
 use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
 use crate::types::tree::forest::{MpViewForest, ViewForest};
 
@@ -31,14 +31,6 @@ use validate::{validate_and_filter_foreign_instructions, validate_no_simultaneou
 
 use typedb_driver::TypeDBDriver;
 
-#[derive(Debug)]
-pub struct SavePlan {
-  pub viewforest         : ViewForest,
-  pub define_nodes       : Vec<DefineNode>,
-  pub merge_instructions : Vec<Merge>,
-  pub source_moves       : Vec<SourceMove>,
-}
-
 /// Save preparation deliberately validates at several
 /// data-maturity stages:
 /// - raw org parse: errors only visible before tree construction;
@@ -46,11 +38,16 @@ pub struct SavePlan {
 /// - placed, role-aware viewforest: saved-view role policy;
 /// - disk-supplemented DefineNodes: foreign write policy;
 /// - non-merge plus merge plan: cross-plan source-move/merge policy.
+///
+/// Returns the saved view and the plan derived from it as a pair. The two are
+/// kept apart (TODO/DONE/local-view-update/plan_v2.org §11): the graph-mutation
+/// step consumes only the SavePlan; the rerender step consumes the ViewForest
+/// (plus the plan's PIDs, for collateral selection). One parse produces both.
 pub async fn buffer_to_validated_saveplan (
   buffer_text : &str,
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
-) -> Result<SavePlan, SaveError> {
+) -> Result<(ViewForest, SavePlan), SaveError> {
   let ( mut maybePlaced_viewforest, parsing_errors )
     : ( MpViewForest, Vec<BufferValidationError> )
     = { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -113,10 +110,11 @@ pub async fn buffer_to_validated_saveplan (
   validate_no_simultaneous_move_and_merge (
     &nonmerge_plan . source_moves, &merge_instructions )
     . map_err (SaveError::BufferValidationErrors) ?;
-  Ok ( SavePlan { viewforest,
-                  define_nodes,
-                  merge_instructions,
-                  source_moves : nonmerge_plan . source_moves } ) }
+  Ok (( viewforest,
+        SavePlan {
+          define_nodes,
+          merge_instructions,
+          source_moves : nonmerge_plan . source_moves } )) }
 
 async fn extract_merge_save_plan (
   extraction_forest : &SaveAuthority,

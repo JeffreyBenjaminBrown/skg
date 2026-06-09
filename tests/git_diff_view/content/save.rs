@@ -214,6 +214,78 @@ fn test_diff_mode_as_subscribee_regenerates_phantom_children()
       Ok (( )) }) })
 }
 
+/// #1 fix: a subscribee removed from the subscriber's subscribes_to list (but
+/// whose .skg still exists) renders as a phantom with (unstaged removedM). Its
+/// relation is subscribes_to, not contains, so the membership marker comes from
+/// build_child_data's net-removal fallback rather than phantom_axes(contains).
+/// Without the fix the phantom would carry NO membership marker.
+#[test]
+fn test_diff_mode_removed_subscribee_shows_removedM()
+  -> Result<(), Box<dyn Error>>
+{
+  run_save_test_with_setup(
+    "skg-test-save-diff-removed-subscribee",
+    setup_git_repo_with_removed_subscribee_fixtures,
+    |config, driver, tantivy, _repo_path| { Box::pin(async move {
+      let input = "\
+* (skg (node (id 1) (source main))) 1
+** (skg subscribeeCol)
+*** (skg (node (id 11) (source main))) 11
+";
+
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
+        diff_mode_enabled : true,
+        open_views        : OpenViews::new (),};
+      let (mut stream, _) = mk_test_tcp_stream_pair ();
+      let response = update_from_and_rerender_buffer(
+        &mut stream,
+        input, driver, config, tantivy, &graph, true,
+        &Err ( String::new () ), &mut views_state
+      ) . await?;
+
+      assert_buffer_contains(
+        &response . saved_view,
+        "*** (skg (node (id 22) (source main) indef (unstaged removedM))) 22" );
+      Ok (( )) }) })
+}
+
+/// §C: the SAME removed subscribee, but staged -- the phantom must now report
+/// (staged removedM), proving phantom_axes reads subscribes_to PER STAGE (not
+/// just the net unstaged fallback). Guards the per-stage sharing-relation diff.
+#[test]
+fn test_diff_mode_removed_subscribee_staged_shows_stagedM()
+  -> Result<(), Box<dyn Error>>
+{
+  run_save_test_with_setup(
+    "skg-test-save-diff-removed-subscribee-staged",
+    setup_git_repo_with_removed_subscribee_fixtures_staged,
+    |config, driver, tantivy, _repo_path| { Box::pin(async move {
+      let input = "\
+* (skg (node (id 1) (source main))) 1
+** (skg subscribeeCol)
+*** (skg (node (id 11) (source main))) 11
+";
+
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
+        diff_mode_enabled : true,
+        open_views        : OpenViews::new (),};
+      let (mut stream, _) = mk_test_tcp_stream_pair ();
+      let response = update_from_and_rerender_buffer(
+        &mut stream,
+        input, driver, config, tantivy, &graph, true,
+        &Err ( String::new () ), &mut views_state
+      ) . await?;
+
+      assert_buffer_contains(
+        &response . saved_view,
+        "*** (skg (node (id 22) (source main) indef (staged removedM))) 22" );
+      Ok (( )) }) })
+}
+
 //
 // Test runner helper
 //

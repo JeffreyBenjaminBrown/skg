@@ -29,7 +29,7 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::process::Command;
 use std::sync::Arc;
-use typedb_driver::{Credentials, DriverOptions, TypeDBDriver};
+use typedb_driver::{Addresses, Credentials, DriverOptions, DriverTlsConfig, TypeDBDriver};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ActiveSourceSet {
@@ -131,12 +131,16 @@ pub fn apply_source_set_to_viewforest (
       viewforest . get (id)
       . and_then (
         |n| match &n . value () . kind {
-          ViewNodeKind::Vognode (Vognode::Normal (t)
-                                 | Vognode::Phantom (t))
+          ViewNodeKind::Vognode (Vognode::Normal (t))
             if ! active . contains_source (&t . source)
             => Some (( t . id . clone (),
                        t . source . clone (),
                        t . membership )),
+          ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
+            if ! active . contains_source (&p . source)
+            => Some (( p . id . clone (),
+                       p . source . clone (),
+                       p . membership )),
           _ => None } );
     if let Some ((pid, source, membership)) = inactive {
       let mut node_mut : NodeMut<ViewNode> =
@@ -213,9 +217,9 @@ where
     config . tantivy_folder = PathBuf::from (tantivy_folder);
     let driver : TypeDBDriver =
       TypeDBDriver::new (
-        TYPEDB_ADDRESS,
+        Addresses::try_from_address_str (TYPEDB_ADDRESS)?,
         Credentials::new ("admin", "password"),
-        DriverOptions::new (false, None)? ) . await?;
+        DriverOptions::new (DriverTlsConfig::disabled ()) ) . await?;
     let nodes : Vec<NodeComplete> =
       read_all_skg_files_from_sources (&config)?;
     let typedb_nodes : Vec<NodeTypedb> =

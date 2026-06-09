@@ -28,6 +28,9 @@ pub fn handle_rebuild_dbs_request (
   views_state : &mut ViewsState,
 ) {
   tracing::info!("Rebuilding databases from disk...");
+  // Let any in-flight background save-index writes finish before we wipe
+  // and rebuild the index out from under them.
+  crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
   let result : Result<(), String> = (|| {
     let config_path : String =
       env . config . config_path . display () . to_string ();

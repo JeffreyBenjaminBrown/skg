@@ -1,0 +1,489 @@
+#+TITLE: Local view update -- branch review #2 (local-view-updates vs main)
+#+STARTUP: content
+
+Written 2026-06-05. Reviewer: Claude (a fresh instance). This is the SECOND
+whole-branch review; the first is [[./review.org][review.org]], and most of what it found was then
+fixed (see the commit log and plan_v2 §18/§20). So this pass has two jobs:
+(1) VERIFY that the review.org fixes + the plan_v2 phases + the §20 follow-ups
+actually landed in the current code, and (2) hunt for what is still imperfect --
+completeness, elegance, clarity (names), and any correctness I tripped over.
+
+* 0. How this was produced, and how to read it
+I read coding-advice/ (recursively), all of TODO/local-view-update/, then the
+code. I deep-read the central files myself (the BFS driver =complete.rs=, the
+rerender + =finish_viewforest= tail =update_buffer.rs=, the death-leafward
+=ancestry.rs=, the content reconcile =complete_preorder/truenode.rs=, the inline
+diff =render/diff.rs=, the diff types =types/git.rs=, the de-novo entry
+=content_view.rs=), and in parallel ran ten focused subagent reviews (one per
+subsystem) plus an adversarial verify pass on every correctness / high-severity
+finding. Tags below: =[verified]= I reproduced it personally against the code;
+=[verified*]= a reviewer found it and an independent skeptic confirmed it (often
+re-confirming a review.org finding); =[reviewer]= a single reviewer's
+well-evidenced call I did not independently re-run; =[judgment]= a taste call.
+
+Naming note: I have tried to respect your conventions -- verbose-over-terse, and
+camelCase-within-snake when it makes a compound read as one token (=inRustGraph=,
+not =in_rust_graph=). I flag a name only when it is genuinely ambiguous or wrong,
+not for the camel/snake mixing itself.
+
+** The good news up front
+*The test crate compiles again.* =cargo test --no-run= is clean at HEAD
+(exit 0) -- the E0063 that review.org §1 called "the one thing to fix before
+anything else" is fixed (commit fe8e119b), so the suite is testable again.
+=[verified]=
+
+*The destination held, and the debt was largely paid down.* Almost every
+review.org item and every plan_v2 phase/§20 follow-up I checked is genuinely in
+the code (§3.1 below is the confirmed-done ledger). The architecture -- one
+level-order BFS driver, the death-leafward generalized-orphan mechanism, the
+Tentative/Final draw rule + cascade + shared node budget, the inline
+position-correct diff, the de-novo unification, the self-consuming root
+=Containerward= request -- is clean, well-documented, and a pleasure to read.
+
+*What remains* is (a) ONE real latent panic worth fixing (§2.1), (b) a handful
+of low-severity correctness edges, (c) a body of dead/double-work code the long
+path left behind, and (d) a clarity tail: review.org's §4.1 stale-comment sweep
+was only ~90% complete, so a dozen history-comments naming deleted machinery
+survive. None of it is architectural; all of it is debt-paydown.
+
+* 1. Verifying review.org's "suggested order of attack"
+review.org §7 listed eight steps. Status against the current code:
+1. *Fix the test build* -- DONE (fe8e119b). =[verified]=
+2. *Collapse =source_diffs= / =sharing_diffs= into one field* -- DONE. There is
+   no =sharing_diffs= identifier anywhere; =CompletionContext= carries one honest
+   =source_diffs= (0afcc7b9). =[verified]=
+3. *Delete the dead =extendDefinitiveSubtreeFromLeaf= path* -- DONE for the
+   *leaf* expander and its helper chain (=execute_definitive_view_request=,
+   =nodes_after_in_generation=, =content_ids_if_definitive_else_empty=,
+   =truncate_after_node_in_gen.rs= all gone, 33bbfb75). But its sibling, the
+   *removed-node* =extendDefinitiveSubtree_fromGit=, survives and is now
+   *structurally* dead -- see §3.3, a new finding this review escalates.
+   =[verified]=
+4. *Sweep stale "overlay"/deleted-function comments + rename preorder/postorder
+   dirs* -- PARTIAL. The worst (the two contradictory =rerender_view= comments,
+   =apply_diff_to_viewforest= mentions) are gone; ~12 history-comments remain
+   (§5.2). The =complete_preorder/= vs =complete_postorder/= directory split was
+   NOT collapsed (§3.2). =[verified]=
+5. *Idempotence test + locking-lifecycle test* -- BOTH landed (=tests/idempotence.rs=,
+   =tests/integration/save_lock_lifecycle/=), but the idempotence test is one
+   combined fixture, not the per-kind set §15 asked for (§3.4). =[verified]=
+6. *Decide §5.1 (phantom diff cols) + apply §5.2 (deterministic truncation)* --
+   BOTH done. =process_truenode_diff= now gates the IDCol/AliasCol prepend on
+   =! node_flipped_to_phantom= (cfb2fac0); relation goal lists sort by ID before
+   the budget cap (ab7398e8 + sorting INBOUND at the source). =[verified]=
+7. *§3.3 dedups* -- mostly done (validators, the existence-axis helper, the
+   sharing-reconciler wrappers, the TantivyIndex builder, the elisp handlers).
+   Two were missed (§3.2: =correct_subscriber_ancestor_distance=; the
+   should_be_phantom/is_removedhere_phantom method pair). =[verified]=
+8. *Reconcile the §18 deviation log with the code* -- PARTIAL; a few entries now
+   contradict the code in the *other* direction (§3.5). =[verified]=
+
+* 2. Correctness
+Ordered by impact. Only §2.1 is worth treating as a bug to fix; the rest are
+low-severity edges I am reporting because you asked.
+
+** 2.1 LATENT PANIC: an Independent same-id content child aborts the rerender  [verified*]
+=server/update_buffer/complete_preorder/truenode.rs= -- in
+=complete_content_children=, the "already present" predicate counts a Normal
+child only when =t.parentIs == ParentIs::Affected= (truenode.rs:393), but the
+prefetch =build_child_creation_data= builds its skip-set =child_sources= from
+*all* Normal children with no =parentIs= filter (truenode.rs:519-522) and skips
+prefetch for any id already a child (truenode.rs:540). So the skip-set is
+strictly larger than the present-set: a goal id whose only in-tree occurrence is
+an *Independent* Normal child is neither prefetched nor treated as present, so
+=complete_relevant_children_in_viewnodetree= routes it to the create closure,
+which calls =child_data.get(id).expect("complete_content_children: child data
+not pre-fetched")= (truenode.rs:412-413) and *panics*, aborting the (often
+collateral) rerender.
+
+This is reachable, not theoretical: an Independent same-id content child arises
+(a) from the still-live non-root containerward integrate path
+(=build_and_integrate_containerward=, whose =find_child_by_id= reuses an existing
+child as Independent), and (b) from the §6.0 "demote a stale Affected branch to
+Independent" path -- if that id later re-enters the content goal list on a
+rerender (=cap_goal_list_to_budget= keeps it, since it counts Normal children
+regardless of =parentIs= as existing), the panic fires.
+
+*This is already documented*: progress.org §18 (lines 1953-1962) records it as a
+VERIFIED latent crash whose fix was *deliberately not applied* (because the
+root-containerward redesign routed its own trigger away from the integrate
+path). It is worth fixing on its own, because trigger (b) and the non-root
+integrate path (a) still exist.
+
+*Fix* (one line, from §18): gate =build_child_creation_data='s Normal-child
+collection on =t.parentIs == ParentIs::Affected= (truenode.rs:520) so the
+skip-set coincides exactly with the present-set (DiffPhantom/Inactive already
+coincide). Add a regression test: a goal id present only as an Independent child.
+
+** 2.2 Removed-member phantom can land out of HEAD position in a two-stage diff  [verified*]
+=render/diff.rs:129-142= claims a removed-member phantom "lands at its correct
+HEAD position among surviving siblings." That holds for the common single-stage
+case but not when the *same parent's* =contains= changed in *both* staged and
+unstaged. =net_diff_from_per_stage= takes its order from
+=axes_from_per_stage_diffs=, whose baseline is =unstaged.or(staged)= with
+items seen only in the *other* stage appended at the tail (=git.rs:222-245=). A
+worked case: HEAD=[A,X,B], index=[A,B], worktree=[A,C,B] yields net order
+[A,C,B,X], so the removed X is appended *after* B instead of between A and B;
+=phantom_insertion_plan= anchors it to =None= and it renders at the bottom.
+Purely cosmetic (the net classification is still correctly =Removed=; no crash,
+no bad read), and it needs a fairly specific partially-staged state. *Fix*:
+either drop the unqualified "correct HEAD position" claim in the comment, or
+build =net_contains= by diffing HEAD-contains vs worktree-contains directly (an
+interleaved LCS) rather than stitching two per-stage diffs; add a
+=types_git.rs= two-stage ordering test either way. =[verified* -- the skeptic
+reproduced the misordering end-to-end]=
+
+** 2.3 A content-read failure omits =SaveLock= and wedges the test wait-loop  [verified*]
+=serve/handlers/save_buffer.rs= sends the early =SaveLock= only inside the
+=Ok(initial_buffer_content)= arm (~l.90-98); the content-read =Err= arm (~l.144)
+sends only =SaveResult=. The client registers =save-lock= and =save-result= as
+*one-shot* (each bumps =skg-lp--pending-count=), so on a read failure only
+=save-result= fires -- the count decrements to 1, never 0, and the next save's
+wait blocks. *Caveats the skeptic established*: this is *pre-existing* (the same
+asymmetry is on =main=; the branch only added the =SaveLock= body, not the
+arm structure), and the blast radius is the integration-test wait-loop, not
+interactive saves (which don't block on the count, and whose stale one-shot
+handler is harmlessly replaced next save). So: real, low, pre-existing -- worth a
+defensive unconditional =SaveLock= (even with an empty lock-views list in the
+=Err= arm) for the same reason §8.1 made =save-relax-lock= non-one-shot, but not
+urgent. =[verified*]=
+
+** 2.4 The lock handler's error path unlocks the saved buffer too  [verified*]
+=elisp/skg-request-save.el:186-188= -- =skg--save-lock-handler= serves both
+=save-lock= and =save-relax-lock=, and its =condition-case= error branch calls
+=(skg--unlock-all-save-locked)=, which removes the lock overlay from *every*
+buffer including the saved one. A malformed lock payload would thus unlock the
+saved buffer mid-pipeline, breaking the "saved stays locked until =save-result="
+invariant the code's own comment (l.104-105) states; a subsequent
+=collateral-view= / =save-result= then erase-inserts the buffer, silently
+discarding any edit the user slipped in during the unlocked window. Only
+reachable on a malformed message (the server's =format_lock_views_sexp= output
+is always well-formed), so low. *Fix*: on error unlock only the non-saved
+buffers (=skg--unlock-non-collateral-buffers saved-uri nil=), or document the
+fail-open. =[verified*]=
+
+** 2.5 Test-only de-novo shim swallows a file-read error into an empty graph  [verified*]
+=content_view.rs:81-83= -- =read_all_skg_files_from_sources(config).unwrap_or_default()=
+discards an =Err("N unreadable file(s)")= and proceeds with an empty in-Rust
+graph, so a malformed fixture renders against no graph (extra_id reconcile
+resolves nothing) instead of failing loudly. Test-only (production calls
+=multi_root_view_via_env= with the real graph), and the fn already returns
+=Result=, so a =?= is a clean fix. =[verified*]=
+
+* 3. Completeness
+** 3.1 What is confirmed done (the ledger answering "did we do everything?")
+All verified present in the current code, not just the log:
+- *plan_v2 phases 0-8*: phase-0 prereqs (alias UNION on merge,
+  =mergeInstructionTriple.rs=; the at-most-one-writer guard,
+  =subscribee_hiderel_intents.rs=; the slim =DiffPhantomNode=); the single
+  level-order BFS (=complete_viewforest=); §6.0 unified stale handling;
+  Tentative/Final + cascade + the one =node_budget=; the inline diff; the
+  locking relax + handshake; the Inactive->Deleted / Unknown variants; and the
+  de-novo unification (=initial_bfs.rs= + =truncate_after_node_in_gen.rs=
+  DELETED, both paths run the one driver). =[verified]=
+- *review.org §3.1/§5.1/§5.2/§2.3 (leaf)/§4.4 mk_phantom guard/§3.3 most dedups*
+  -- all in (§1 above). =[verified]=
+- *§20.1* validator + existence-axis + sharing-wrapper + elisp-handler dedups;
+  *§20.2* the =save_lock_lifecycle= integration test (a)+(c); *§20.3* the
+  self-consuming root =Containerward= request + =finish_viewforest= unification;
+  *§20.4* =required_ancestor= simplified to a table read (no re-walk); *§20.5*
+  the one =pids_from_viewforest= ({Normal, Inactive}) feeding both pid paths.
+  =[verified]=
+- *§19* the public rename =reconcile_sharing_scaffold_children= ->
+  =_col_children= and =ExpectedAncestor::Scaffold= -> =Col= -- BOTH done (plan_v2
+  §19 still lists them as "Remaining/invasive"; that note is now stale, §3.5).
+  =[verified]=
+- *DiffPhantom slim reduction* -- DONE: =Vognode::DiffPhantom= carries a slim
+  =DiffPhantomNode= (only id/source/title + axes), with
+  =diff_axes_require_phantom= extracted. (The §18 "NOT worth doing/reverted"
+  entry refers to the *further* reduction -- also dropping =parentIs=/
+  =indef_or_def= -- which genuinely was declined; the partial reduction landed.
+  See §3.5.) =[verified]=
+
+That is the substance of the plan and the prior review. The destination is
+reached and the cleanup is mostly done.
+
+** 3.2 review.org items that were NOT acted on
+These slipped through the fix pass; each is small.
+- *=correct_subscriber_ancestor_distance= is still here* (=to_org/complete/sharing/kind.rs:51-60=)
+  with ZERO callers -- its last caller was migrated to =required_ancestor= index
+  0 on this very branch. review.org §3.2 said delete it; dead code. =[verified]=
+- *=collect_matching_nodeids= still takes an unused =preorder: bool=*
+  (=complete.rs:385=); its sole caller (=prune_self_deletable_when_empty=,
+  complete.rs:338) passes =false= literally. review.org §3.4. Inline it or drop
+  the param. =[verified]=
+- *The =complete_preorder/= + =complete_postorder/= directory split survives*
+  (review.org §4.2). It is now fiction: both =truenode.rs=es exist, a
+  =complete_postorder/= col imports =cap_goal_list_to_budget= from a
+  =complete_preorder/= file, and all cols dispatch from one =match=. (Credit: no
+  =mod.rs= docstring still claims a two-pass model; the only "postorder" left
+  correctly names the genuinely-postorder prune sweep.) Collapse the two dirs
+  into one (e.g. =update_buffer/reconcile/=). =[verified]=
+- *=cap_goal_list_to_budget= still lives in =complete_preorder/truenode.rs=*
+  (review.org §3.4) though four sibling reconcilers import it cross-directory; it
+  reads more naturally from =update_buffer/util.rs=. =[verified]=
+- *=tests/extend_definitive_from_leaf.rs= (+ its =fixtures/= dir) still bears the
+  deleted function's name* (review.org §4.3). The bodies were correctly rewritten
+  for the §5.5/§5.3 BFS-budget behavior; only the names point at the wrong (gone)
+  mechanism. Rename to e.g. =definitive_view_cascade_and_budget=. =[verified]=
+- *=apply_definitive_draw_rule= still eagerly computes =hidden_ids= and
+  =is_removed_node= on the path that discards them* (review.org §3.4) -- see §4
+  (it is now wasted work feeding a dead branch). =[verified]=
+- *=process_truenode_diff= still pre-populates IDCol/AliasCol children that the
+  col reconciler recomputes identically* (review.org §3.4) -- see §4. =[verified*]=
+- *Fresh de-novo cols are still reconciled twice* (review.org §3.4): =maybe_add_*=
+  eagerly fills a col to test emptiness, then the BFS reconciles it again at its
+  visit -- two graph reads each. =[verified*]=
+
+** 3.3 NEW: the removed-node DVR branch is now structurally dead code  [verified]
+This is the one completeness item that grew rather than shrank. monolith-design
+§8 deliberately *kept* =extendDefinitiveSubtree_fromGit= "on the removed-node DVR
+branch." But in the final inline-diff architecture that branch is unreachable:
+=is_removed_node= is read from =t.existence= (=definitive.rs:91-99=), and
+existence axes are stamped only at the *end* of a node's visit (by
+=process_truenode_diff=), strictly *after* =apply_definitive_draw_rule= runs --
+so =is_removed_node= is always false when the draw rule fires. complete.rs:224-227
+admits this ("Effectively unreachable"). Consequences:
+- =DrawOutcome::MadeFinal { is_removed_node: true, hidden_ids }= (complete.rs:222)
+  and its ~150-line callee =extendDefinitiveSubtree_fromGit= (plus
+  =mk_removed_child_viewnode=, =membership_minus_from_existence_minus=,
+  =from_git_replace_title_body='s removed-node usage) never execute, are
+  untested, and can silently bit-rot.
+- =hidden_ids= is computed on *every* Final DVR (a =NodeComplete= fetch for a
+  subscribee, a possible disk read) only to be discarded on the live arm.
+- review.org §5.3's "two divergent =take(limit)= windows" hazard lives inside the
+  dead function (=definitive.rs:276-300=) and was never fixed -- moot while dead.
+*Recommend*: make the deadness machine-checked -- replace the
+=is_removed_node: true= arm with =debug_assert!(false, ...)=, drop the
+=is_removed_node= / =hidden_ids= fields from =DrawOutcome::MadeFinal=, and delete
+=extendDefinitiveSubtree_fromGit= and its helper chain. (If the removed-node DVR
+is a real planned feature, add a test that reaches it -- but as written it is an
+unguarded, untested ~150-line path.) This also disposes review §5.3 and the
+eager =hidden_ids= read. =[verified by the code's own "Effectively unreachable"
+comment + the existence-axis timing]=
+
+Lesser dead code: =detach_scaffold_if_empty= (=update_buffer/util.rs:90-100=)
+has zero callers now that self-deletion is centralized in the prune sweep; it
+survives only because it is =pub= (so no dead_code warning), and its docstring
+still advertises the old per-reconciler use. Delete it. =[verified]=
+=SourceName::is_not_found= (=misc.rs:133-134=) is a =pub= predicate with zero
+callers -- the sentinel is only ever constructed, never tested. =[verified]=
+
+** 3.4 Testing gap (§15), correctly tracked but still open  [verified]
+=tests/idempotence.rs= has exactly one test (=rerender_is_idempotent=) over a
+single fixture (Normal / AliasCol / IDCol / SubscribeeCol /
+HiddenOutsideOfSubscribeeCol). plan_v2 §15 asked for "one [idempotence test] per
+ViewNode kind" and the explicit "five order cases" tests -- neither is present.
+Relation cols, HiddenInSubscribeeCol, DeadScaffold, Deleted, and the
+Inactive->Deleted conversion have no idempotence coverage, and the death-leafward
+/ prune-sweep path the refactor rests on is exercised only indirectly. The plan
+is honest about the gap (§15 is not marked DONE), so this is tracked-not-drift.
+Highest-value additions: a nested-empty-DeadScaffold idempotence fixture, a
+relation-col one, and -- pointedly -- a regression test for the §2.1 panic
+(a goal id present only as an Independent child). Also,
+=pid_and_source_from_required_ancestor= (the 5-reconciler ancestry entry point,
+two error branches) has no direct unit test. =[verified]=
+
+** 3.5 Doc drift: plan_v2 §18/§19/§20 now disagree with the code  [verified]
+You said you would lean on these docs instead of re-reading the plan, so the
+drift matters:
+- *§19* lists =reconcile_sharing_scaffold_children -> _col_children= and
+  =ExpectedAncestor::Scaffold -> Col= under "Remaining (INVASIVE ... deferred)" --
+  but BOTH are done in code. (review.org §2.6 already flagged this for some;
+  it is still unreconciled.)
+- *The §18 "DiffPhantom payload reduction is NOT worth doing ... Reverted" entry*
+  reads as if the whole reduction was abandoned, but the slim =DiffPhantomNode=
+  IS the current type. Only the *further* drop of =parentIs=/=indef_or_def= was
+  declined. The wording invites a reader to think =DiffPhantom(TrueNode)= is
+  still live; it is not.
+- *§5.5* still says the budget "counts ... aliases, ids" (line 282-283), but §18
+  and the code agree id/alias cols are UNbudgeted (=truenode.rs:269-270=; neither
+  =id_col.rs= nor =aliascol.rs= calls =cap_goal_list_to_budget=). Update the §5.5
+  bullet.
+A short pass making §18/§19/§20 present-tense-true would stop these from
+misleading future-you. =[verified]=
+
+** 3.6 Pre-existing, noted for completeness (not this branch's work)
+=DefinenodeCandidateKind::Overridden= carries an =overrider= field that is
+constructed (=to_naive_instructions.rs:442-444=) but never consumed (its only
+match arm returns =None=) -- scaffolding for an unimplemented override-write
+feature. A one-line "deliberate not-yet-consumed seam" note, or dropping the
+payload, would remove the dead-data smell. =[reviewer]=
+
+* 4. Elegance
+The recurring shape: a value or subtree is computed twice, or kept alive to feed
+something dead. None is a bug; each will drift.
+- *IDCol/AliasCol diff membership is derived twice.* =process_truenode_diff=
+  fully populates the cols (=prepend_idcol_with_children= /
+  =prepend_aliascol_with_children=, =diff.rs:166-216=) from
+  =axes_from_per_stage_diffs(... ids_diff ...)=; then =reconcile_id_col_children=
+  / =reconcile_alias_col_children= recompute the *same* merge at the col's own
+  visit. Two independent derivations of identical membership from one
+  =ids_diff= -- if one formula changes they silently disagree. Have the diff
+  worker create the *empty* col and let the reconciler be the single populator
+  (review.org §3.4). =[verified*]=
+- *Fresh cols are reconciled twice* (§3.2), each pass doing its own graph reads.
+- *=hidden_ids= is fetched on every Final DVR but consumed only on a dead branch*
+  (§3.3).
+- *The whole removed-node fromGit subtree is dead weight* (§3.3).
+These are independent and individually small; §3.3 (delete the dead branch) is
+the highest elegance-per-line win and also retires review §5.3.
+
+* 5. Clarity / naming
+** 5.1 Names
+- *=expand_true_content_at_node= is the BFS *dispatcher*, not a content worker*
+  (=complete.rs:117=). It deadens orphan cols, then dispatches to
+  =visit_normal_node=, the four sharing-col reconcilers, the QualCol reconcilers,
+  and the Inactive->Deleted conversion. The actual content worker is the
+  near-identically-named =expand_true_content_at_truenode= (=truenode.rs:57=).
+  Two confusable names (=at_node= vs =at_truenode=) for a dispatcher vs a worker;
+  rename the dispatcher (e.g. =visit_node_in_bfs= / =dispatch_node_update=). It
+  also keeps the misleading "true content" verb for a function that mostly
+  doesn't touch content. =[verified]=
+- *§19 internals still say "scaffold" where they mean a col.* The public rename
+  is done, but =child_data.rs= parameters/prose still use =scaffold_node= and
+  "sharing-scaffold" (=child_data.rs:62,141,181=) for things that are
+  specifically cols; =ancestry.rs:16-18= says "a position that must be a specific
+  *scaffold*" where it means the SubscribeeCol (a col); =sharing/kind.rs:90-93='s
+  doc placeholder says =expected <Scaffold>= where the code prints the col kind.
+  These are precision, not bugs (a col IS a scaffold), but they are exactly the
+  §19 distinction the rest of the file now enforces. =[verified]=
+
+** 5.2 Residual history-comments (the review §4.1 sweep was incomplete)  [verified]
+Your no-history-comments rule (describe present logic, not "we used to X").
+Survivors that name deleted/renamed machinery or narrate the change:
+- =complete.rs:129-131= "This subsumes the old =scaffolds_with_deadOrDeleted_parents_become_dead= sweep" (fn deleted).
+- =complete.rs:172-173= "(current code converted only Normal nodes)" -- and it is *self-contradictory*: the current code (right there) converts Inactive nodes; "current code" means the *pre-refactor* code. Mirrored in the docstring at :357-362.
+- =complete.rs:275-277= "(was =ensure_hiddenin_cols_under_definitive_subscribees=)" (renamed to the singular).
+- =complete_preorder/truenode.rs:220-225= "no longer detached here (the former =detach_stale_deleted_content= stopgap is gone ...)" -- review.org §4.4 already flagged this exact one.
+- =complete_preorder/subscribee_col.rs:60-61= "The former =if goal_list.is_empty() { detach }= self-delete is gone."
+- =complete_preorder/relation_col.rs:62-65= "no longer pre-mark non-goal members Independent. The reconciler now ..."
+- =complete_postorder/hiddeninsubscribee_col.rs:72= (and hiddenoutsideof :70) "the old =mark_managed= pre-marking is gone" -- names a function that exists nowhere.
+- =to_org/complete/sharing/child_data.rs:4-6, 95-98= "Each completer used to define a near-identical local copy ..."; "An earlier net-removal fallback HERE ... is gone."
+- =to_org/render/content_view.rs:133-135= "the former extra =render_viewforest_with_source_set= pass is redundant" (fn deleted).
+- =to_org/render/diff.rs:5-6= "there is no longer a separate post-BFS overlay traversal."
+- =types/git.rs:258-261= "Previously each caller rolled its own lookup ..." -- and its "Used by ... de-novo diff-application path" list is now inaccurate (that path uses =existence_axes_in_source_diff=, not this fn).
+- =update_buffer.rs:576-578= "regenerated from scratch by their *postorder* completers" -- perpetuates the retired preorder/postorder model.
+A single present-tense sweep clears all of these.
+
+** 5.3 Stale or wrong docstrings (separate from history-phrasing)
+- *=sync_truenode_from_disk= docstring is now false* (=complete_preorder/truenode.rs:158-160=):
+  "Phase 3 (non-saved views only) ... The saved view ... is excluded." But the
+  =should_sync_from_disk_even_though_definitive= carve-out was removed -- it is
+  now called unconditionally for *every* definitive node (truenode.rs:110, whose
+  own comment correctly cites §8.3 "EVERY definitive node re-syncs"). The
+  docstring states the opposite of the code, and the "Phase 3" label is a stale
+  phase number. =[verified]=
+- *=extendDefinitiveSubtree_fromGit= docstring promises named markings the code
+  doesn't apply* (=definitive.rs:247-248=): "marked as RemovedHere ... marked as
+  Removed", but =mk_removed_child_viewnode= produces a generic =DiffPhantom=
+  with existence/membership axes -- there is no named RemovedHere/Removed state.
+  (Moot if the dead fn is deleted, §3.3.) =[reviewer]=
+- *=ancestry.rs:3= (and =complete.rs:124=) point at a moved file*:
+  =TODO/local-view-update/propagate-death-leafward/plan.org= now lives under
+  =DONE/=. Legitimate path fix. =[verified]=
+- *=DiffPhantomNode_Generic::should_be_phantom= docstring overstates the
+  invariant* (=viewnode.rs:176-178=): "Always true for an actual phantom" -- the
+  body returns =diff_axes_require_phantom(...)=, which depends on the stored axes,
+  not unconditionally true. =[reviewer]=
+- *=content_view.rs:116-118= calls =pids_from_viewforest= a method on the wrong
+  type*: comment says "=OpenViews::pids_from_viewforest=", but it is a free fn in
+  =views_state= (the call two lines down qualifies it correctly). =[verified]=
+
+** 5.4 Convention nits (low)
+- *In-body =::=-qualified long paths* (your "no internal imports" rule):
+  =complete.rs:290= writes =crate::to_org::render::diff::process_truenode_diff(...)=
+  inline though the preamble already imports siblings from that area;
+  =content_view.rs:81-120= adds several
+  (=crate::dbs::filesystem::multiple_nodes::...=,
+  =crate::update_buffer::render_initial_view_via_driver=, =...::finish_viewforest=,
+  =crate::types::views_state::pids_from_viewforest=). Move them to the =use=
+  preambles. =[verified]=
+- *=#[allow(non_snake_case)]= on =reconcile_id_col_children=* (=id_col.rs:24=)
+  appears unnecessary -- the fn and its locals are snake_case, and the sibling
+  =reconcile_alias_col_children= has no such attribute. A leftover that would
+  mask a future genuinely-misnamed local; a quick =cargo check= after removing it
+  will confirm. =[reviewer]=
+- *=skg--save-lock-handler= takes an unused =save-buffer= param*
+  (=skg-request-save.el:176=) passed by both registrations. =[reviewer]=
+- *Typos*: "funciton" (=sharing/child_data.rs:176=); a dropped leading 's' in a
+  fn name reference, "=ubscribee_hiderel_intents_from_candidates=" (=to_naive_instructions.rs:276=). =[verified]=
+
+* 6. Credit where it's due
+- The *death-leafward =ancestry.rs=* remains exemplary: the §3 required-ancestry
+  table is a real single source of truth (the death-check and every reconcile's
+  ancestor read both go through it), the generalized-orphan defining comment is
+  present and correct, and the §20.4 simplification (=required_ancestor= now just
+  reads the table, leaning on the orphan pre-check) is clean.
+- The *§20.3 root-containerward redesign* is genuinely elegant: expressing
+  "de-novo attaches root containerward, a save never re-generates it" as a
+  *self-consuming =ViewRequest::Containerward=* (set by de-novo, left alone by the
+  dispatch, fulfilled-and-dropped by =finish_viewforest=) makes the
+  de-novo/post-save difference pure data, with no mode flag -- a nicer answer than
+  the bool it replaced.
+- The *inline =phantom_insertion_plan=* (position-correct, unit-tested) and the
+  *=finish_viewforest= tail unification* are tidy, and the *one shared
+  =node_budget=* across content + sharing cols correctly closes the famous-node
+  DoS the content-only budget couldn't.
+- The docstrings are, on the whole, unusually thorough and candid about seams --
+  which is also why the *stale* ones (§5.2/§5.3) stand out.
+
+* 7. Suggested order of attack
+1. *Fix the §2.1 latent panic* (one line) and add its regression test -- it is
+   the only real bug here, and it is reachable.
+2. *Delete the dead removed-node fromGit branch* (§3.3): =debug_assert!= the
+   unreachable arm, drop =is_removed_node=/=hidden_ids= from =DrawOutcome=,
+   delete =extendDefinitiveSubtree_fromGit= + helpers. This single move retires
+   §3.3, the eager-=hidden_ids= read (§4), review §5.3, and a stale docstring
+   (§5.3). Highest value-per-line.
+3. *Take the missed review.org cleanups* (§3.2): delete
+   =correct_subscriber_ancestor_distance= and =detach_scaffold_if_empty=; inline
+   =collect_matching_nodeids='s =preorder=; rename =extend_definitive_from_leaf=;
+   collapse the preorder/postorder dirs (or at least stop the cross-dir import).
+4. *Sweep the residual history-comments + stale docstrings* (§5.2/§5.3) in one
+   present-tense pass, including the =sync_truenode_from_disk= contradiction.
+5. *De-duplicate the diff IDCol/AliasCol population* and the fresh-col double
+   reconcile (§4).
+6. *Add the §15 idempotence fixtures* the plan named (esp. relation cols,
+   nested DeadScaffold) -- the safety net is thinner than the prose implies.
+7. *Reconcile the §18/§19/§20 / §5.5 doc drift* (§3.5) so the plan stops lying.
+8. *The low-severity correctness edges* (§2.2-§2.5) as you touch those files.
+
+Items 2-8 are independent and individually small; none changes the architecture
+you built. The destination is sound, and -- unlike at review.org time -- the test
+crate compiles, so each of these can be made and verified green.
+
+* 8. Resolution (2026-06-05): what I did, and what I need from you
+Jeff asked me to do everything I could see how to do without guidance, mark it
+DONE, and raise a child for anything needing a decision. Done. Full Rust suite
+green at every step (489/489 at the end). Commits are on =local-view-updates=.
+
+** DONE -- landed and committed this session
+*** DONE §2.1 latent panic -- gate build_child_creation_data's skip-set on parentIs=Affected; red-green regression test. =[75475b73]=
+*** DONE §3.4 (eager reads) -- apply_definitive_draw_rule computes is_removed_node / the hide-set only after the Deferred return, and the hide-set's disk read only when removed. =[9d7d66f7]=
+*** DONE §3.2/§3.3 dead code -- deleted correct_subscriber_ancestor_distance, detach_scaffold_if_empty, SourceName::is_not_found, and collect_matching_nodeids' unused preorder flag. =[fd5b67d1]=
+*** DONE §3.2 -- moved cap_goal_list_to_budget into update_buffer::util (beside the other shared reconcile tools). =[f8ea4968]=
+*** DONE §2.3/§2.4 locking -- send the early SaveLock before the read so the one-shot count always balances; the elisp lock-error path keeps the saved buffer locked; dropped the unused save-buffer param. =[c83ce322]=
+*** DONE §2.5 + content_view nits -- propagate the de-novo shim's read error (=?=); lift its in-body =crate::= paths; fix the OpenViews:: comment + de-novo history comments. =[548b7d29]=
+*** DONE §5.1/§4.3 renames -- expand_true_content_at_node -> dispatch_node_update; tests/extend_definitive_from_leaf -> definitive_view_cascade_and_budget (file + fixtures). =[a32ee776]=
+*** DONE §5.2/§5.3/§5.4 sweep -- present-tensed ~14 history comments, fixed the sync_truenode_from_disk docstring contradiction, the "<Scaffold>"/"sharing-scaffold" col-vs-scaffold wording, the moved-file path in ancestry.rs, two typos, and the unnecessary #[allow(non_snake_case)]. =[7665a4cf]=
+*** DONE §2.2 (comment half) -- qualified the diff.rs "correct HEAD position" claim to admit the two-stage edge. =[pending with this doc]=
+
+** OPEN -- your call  (RESOLVED 2026-06-05: Jeff answered all eight; 7.5 are now done + committed, only #4b still needs a call -- see the Status section of [[./review-2_left-open.org]])
+The eight open items are MOVED to a standalone, self-contained file -- prefaced
+with a glossary and plain-language context for each, so it reads without having
+followed today's work: [[./review-2_left-open.org]]. In brief:
+1. Delete the dead removed-node "fromGit" expansion, or keep it for a future feature?
+2. Merge =complete_preorder/= + =complete_postorder/= into one folder?
+3. The invasive "scaffold" -> "col" identifier renames now, or as their own pass?
+4. Collapse the two places the diff recomputes the same add/remove info?
+5. Do the real fix for the cosmetic two-stage phantom mis-placement?
+6. Build out the rest of the §15 per-kind idempotence tests?
+7. Correct the two stale statements in plan_v2.org (§19 / §5.5)?
+8. Drop the dead =Overridden.overrider= field, or leave the seam?
+My lean on each is in that file.
+
+** Emotional support
+Taken in the spirit offered :) For the record, deleting your deliberately-kept
+fromGit branch is the only edit here I felt a pang about -- hence I asked rather
+than swung. Everything else was a clean conscience.

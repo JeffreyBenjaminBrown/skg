@@ -1,6 +1,6 @@
 /// Git-related types for diff view functionality.
 
-use crate::types::list::Diff_Item;
+use crate::types::list::{Diff_Item, compute_interleaved_diff};
 use crate::types::misc::{ID, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 
@@ -96,6 +96,13 @@ pub struct NodeChanges {
   pub aliases_diff  : Vec<Diff_Item<String>>,
   pub ids_diff      : Vec<Diff_Item<ID>>,
   pub contains_diff : Vec<Diff_Item<ID>>,
+  /// §C: per-stage diff of the node's sharing relations, so a sharing-col
+  /// member removed from subscribes_to / hides can carry a PER-STAGE membership
+  /// axis (staged vs unstaged) instead of only the net-removal fallback. A
+  /// member appears in exactly one of contains/subscribes_to/hides, so
+  /// phantom_axes consults all three.
+  pub subscribes_to_diff : Vec<Diff_Item<ID>>,
+  pub hides_diff         : Vec<Diff_Item<ID>>,
 }
 
 //
@@ -199,8 +206,8 @@ pub fn per_stage_node_changes_for_truenode<'a> (
 
 /// Union the per-stage signs for a list-field diff into a single
 /// (item, MembershipAxes) list. Order comes from whichever stage is
-/// present (prefers unstaged if both, matching apply_diff_to_viewforest's
-/// baseline choice). Items present in only one stage's diff are
+/// present (prefers unstaged if both -- the worktree-relative baseline).
+/// Items present in only one stage's diff are
 /// included with their stage's sign and the other stage unset.
 ///
 /// 'Unchanged' in a single stage contributes an unset axis for that
@@ -248,159 +255,83 @@ pub fn axes_from_per_stage_diffs<T: Clone + Eq + std::hash::Hash> (
 /// from the file's git status in that stage (Added → Plus,
 /// Deleted → Minus, Modified / absent → None).
 ///
-/// Used by both the de-novo diff-application path (for the TrueNode
-/// itself) and the save-rerender expand path (for phantoms of a
-/// removed parent's children). Previously each caller rolled its own
-/// lookup; extract lets them share + test it.
+/// Used by the definitive-expand path (extendDefinitiveSubtree_fromGit, for the
+/// TrueNode's own existence axes and for phantoms of a removed parent's
+/// children).
 pub fn file_existence_axes_from_source_diff (
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
   pid          : &ID,
   source       : &SourceName,
 ) -> ExistenceAxes {
-  let sd : Option<&SourceDiff> =
-    source_diffs . as_ref () . and_then ( |d| d . get (source) );
   let file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-  let staged : Option<Sign> = sd
-    . and_then ( |sd| sd . staged . get (&file) )
+  existence_axes_in_source_diff (
+    source_diffs . as_ref () . and_then ( |d| d . get (source) ),
+    &file ) }
+
+/// The staged (HEAD->index) and unstaged (index->worktree) EXISTENCE signs for a
+/// `.skg` file within a single source's diff. The one place that reads a file's
+/// per-stage status; the callers differ only in how they pick the SourceDiff to
+/// read (by the node's own source, or with a fallback).
+pub fn existence_axes_in_source_diff (
+  source_diff : Option<&SourceDiff>,
+  file        : &PathBuf,
+) -> ExistenceAxes {
+  let staged : Option<Sign> = source_diff
+    . and_then ( |sd| sd . staged . get (file) )
     . and_then ( |d| d . status . to_existence_sign () );
-  let unstaged : Option<Sign> = sd
-    . and_then ( |sd| sd . unstaged . get (&file) )
+  let unstaged : Option<Sign> = source_diff
+    . and_then ( |sd| sd . unstaged . get (file) )
     . and_then ( |d| d . status . to_existence_sign () );
   ExistenceAxes { staged, unstaged } }
 
-/// Compose two stage diffs into a single HEAD→worktree diff.
+/// Compose two stage diffs into a single HEAD→worktree diff, with each item at
+/// its correct position.
 ///
-/// Classifies each item by presence at HEAD and at worktree:
-///   present in HEAD    iff staged   is None OR Minus
-///   present in worktree iff unstaged is None OR Plus
-/// and emits Unchanged / New / Removed accordingly. Items absent
-/// from both HEAD and worktree (Plus then Minus: added staged, then
-/// removed unstaged) are dropped — they're not part of the net diff.
+/// Reconstructs the HEAD and worktree item-lists from the per-stage diffs --
+/// HEAD = the items a stage marks Unchanged or Removed, worktree = those it
+/// marks Unchanged or New -- then LCS-diffs the two lists directly. This keeps a
+/// cross-stage change at its real position. (Composing the two stages' signs
+/// classifies each item correctly but can mis-ORDER an item that changed in one
+/// stage relative to siblings that changed in the other -- it lands at the tail
+/// rather than interleaved.)
 ///
-/// Used by consumers that need a flat "what changed HEAD vs
-/// worktree" view across both stages. For consumers that need the
-/// per-stage signs separately, use 'axes_from_per_stage_diffs'.
+/// Items absent from both HEAD and worktree (added staged, then removed
+/// unstaged) are dropped — they're not part of the net diff.
+///
+/// Used by consumers that need a flat "what changed HEAD vs worktree" view. For
+/// the per-stage signs separately, use 'axes_from_per_stage_diffs'.
 pub fn net_diff_from_per_stage<T: Clone + Eq + std::hash::Hash> (
   staged_diff   : Option<&[Diff_Item<T>]>,
   unstaged_diff : Option<&[Diff_Item<T>]>,
 ) -> Vec<Diff_Item<T>> {
-  // Determine membership at each snapshot -- HEAD, index, worktree
-  // -- by treating each stage as a transition:
-  //   staged:   HEAD   -> index    (None = same)
-  //   unstaged: index  -> worktree (None = same)
-  // A Plus arrow means "not present before, present after"; Minus
-  // is the reverse; None means "present before iff present after".
-  // When a stage's sign is None we need to decide whether "present
-  // before = present after" resolves to "both present" or "both
-  // absent" -- and that's determined by the OTHER stage, or (if
-  // both stages are None) by the fact that the item appears in
-  // axes at all, which happens via 'Unchanged' in the baseline
-  // diff and therefore means present throughout.
-  let axes : Vec<(T, MembershipAxes)> =
-    axes_from_per_stage_diffs (staged_diff, unstaged_diff);
-  let mut out : Vec<Diff_Item<T>> = Vec::with_capacity (axes . len ());
-  for (id, m) in axes {
-    let in_head : bool = match m . staged {
-      Some (Sign::Plus)  => false,
-      Some (Sign::Minus) => true,
-      None               => match m . unstaged {
-        Some (Sign::Plus)  => false,
-        Some (Sign::Minus) => true,
-        None               => true, }, }; // present throughout
-    let in_wt : bool = match m . unstaged {
-      Some (Sign::Plus)  => true,
-      Some (Sign::Minus) => false,
-      None               => match m . staged {
-        Some (Sign::Plus)  => true,
-        Some (Sign::Minus) => false,
-        None               => true, }, }; // present throughout
-    let item : Option<Diff_Item<T>> = match (in_head, in_wt) {
-      (true,  true)  => Some (Diff_Item::Unchanged (id)),
-      (false, true)  => Some (Diff_Item::New       (id)),
-      (true,  false) => Some (Diff_Item::Removed   (id)),
-      (false, false) => None, };
-    if let Some (d) = item { out . push (d); } }
-  out }
+  // A present-but-EMPTY stage diff carries no list (it lists items only when
+  // that stage actually changed something), so treat empty as absent and read
+  // the list from the other stage.
+  let staged   : Option<&[Diff_Item<T>]> =
+    staged_diff   . filter ( |s| ! s . is_empty () );
+  let unstaged : Option<&[Diff_Item<T>]> =
+    unstaged_diff . filter ( |s| ! s . is_empty () );
+  let head : Vec<T> =
+    // HEAD = items present before the change: a stage marks them Unchanged or
+    // Removed. Prefer the staged stage (HEAD->index); if it is empty/absent then
+    // HEAD == index, so the unstaged stage's before-state (index) serves.
+    staged . or (unstaged) . unwrap_or (&[]) . iter ()
+      . filter_map ( |item| match item {
+          Diff_Item::Unchanged (v) | Diff_Item::Removed (v) => Some (v . clone ()),
+          Diff_Item::New (_) => None } )
+      . collect ();
+  let worktree : Vec<T> =
+    // worktree = items present after the change: a stage marks them Unchanged or
+    // New. Prefer the unstaged stage (index->worktree); if it is empty/absent
+    // then worktree == index, so the staged stage's after-state (index) serves.
+    unstaged . or (staged) . unwrap_or (&[]) . iter ()
+      . filter_map ( |item| match item {
+          Diff_Item::Unchanged (v) | Diff_Item::New (v) => Some (v . clone ()),
+          Diff_Item::Removed (_) => None } )
+      . collect ();
+  compute_interleaved_diff (&head, &worktree) }
 
 #[cfg(test)]
-mod net_diff_tests {
-  use super::*;
-
-  fn removed<T: Clone> (v: T) -> Diff_Item<T> { Diff_Item::Removed (v) }
-  fn new_   <T: Clone> (v: T) -> Diff_Item<T> { Diff_Item::New      (v) }
-  fn same   <T: Clone> (v: T) -> Diff_Item<T> { Diff_Item::Unchanged (v) }
-
-  // The case that motivated lifting this bug: an item removed on
-  // the STAGED side only, with no entry on the unstaged side,
-  // should produce a net Removed -- NOT Unchanged. The earlier
-  // code mis-classified (staged=Minus, unstaged=None) as
-  // Unchanged, causing the rerender pipeline to try reading the
-  // now-missing .skg file.
-  #[test]
-  fn staged_only_remove_is_net_removed () {
-    let staged   : Vec<Diff_Item<&str>> = vec! [ removed ("x") ];
-    let unstaged : Vec<Diff_Item<&str>> = vec! [];
-    let net : Vec<Diff_Item<&str>> =
-      net_diff_from_per_stage (
-        Some (&staged), Some (&unstaged) );
-    assert_eq! ( net, vec! [ Diff_Item::Removed ("x") ] ); }
-
-  #[test]
-  fn staged_only_add_is_net_new () {
-    let staged   : Vec<Diff_Item<&str>> = vec! [ new_ ("x") ];
-    let unstaged : Vec<Diff_Item<&str>> = vec! [];
-    assert_eq! (
-      net_diff_from_per_stage (
-        Some (&staged), Some (&unstaged) ),
-      vec! [ Diff_Item::New ("x") ] ); }
-
-  #[test]
-  fn unstaged_only_remove_is_net_removed () {
-    let staged   : Vec<Diff_Item<&str>> = vec! [];
-    let unstaged : Vec<Diff_Item<&str>> = vec! [ removed ("x") ];
-    assert_eq! (
-      net_diff_from_per_stage (
-        Some (&staged), Some (&unstaged) ),
-      vec! [ Diff_Item::Removed ("x") ] ); }
-
-  #[test]
-  fn unstaged_only_add_is_net_new () {
-    let staged   : Vec<Diff_Item<&str>> = vec! [];
-    let unstaged : Vec<Diff_Item<&str>> = vec! [ new_ ("x") ];
-    assert_eq! (
-      net_diff_from_per_stage (
-        Some (&staged), Some (&unstaged) ),
-      vec! [ Diff_Item::New ("x") ] ); }
-
-  // Unchanged items in the baseline must survive as net Unchanged
-  // (not dropped). Callers rely on goal-list construction seeing
-  // them to preserve order.
-  #[test]
-  fn baseline_unchanged_is_net_unchanged () {
-    let unstaged : Vec<Diff_Item<&str>> = vec! [ same ("x") ];
-    assert_eq! (
-      net_diff_from_per_stage (
-        None, Some (&unstaged) ),
-      vec! [ Diff_Item::Unchanged ("x") ] ); }
-
-  // Added staged then removed unstaged: net is no change (drop).
-  #[test]
-  fn added_staged_then_removed_unstaged_drops () {
-    let staged   : Vec<Diff_Item<&str>> = vec! [ new_    ("x") ];
-    let unstaged : Vec<Diff_Item<&str>> = vec! [ removed ("x") ];
-    assert_eq! (
-      net_diff_from_per_stage (
-        Some (&staged), Some (&unstaged) ),
-      Vec::<Diff_Item<&str>>::new () ); }
-
-  // Removed staged then re-added unstaged: present throughout -> Unchanged.
-  #[test]
-  fn removed_staged_then_readded_unstaged_is_unchanged () {
-    let staged   : Vec<Diff_Item<&str>> = vec! [ removed ("x") ];
-    let unstaged : Vec<Diff_Item<&str>> = vec! [ new_    ("x") ];
-    assert_eq! (
-      net_diff_from_per_stage (
-        Some (&staged), Some (&unstaged) ),
-      vec! [ Diff_Item::Unchanged ("x") ] ); }
-}
+#[path = "../../tests/unit/types_git.rs"]
+mod net_diff_tests;

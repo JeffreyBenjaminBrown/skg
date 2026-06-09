@@ -8,7 +8,7 @@ use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   what_nodes_contain };
 use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
 use crate::to_org::complete::sharing::child_data::{
-  ChildData, reconcile_sharing_scaffold_children };
+  ChildData, reconcile_sharing_col_children };
 use crate::to_org::util::nodecomplete_and_viewnode_from_id;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
@@ -37,7 +37,7 @@ use typedb_driver::TypeDBDriver;
 /// loops this code replaced.
 ///
 /// Returns '(resolved_pids, child_data)': the resolved goal list
-/// and the per-pid data map that 'reconcile_sharing_scaffold_children'
+/// and the per-pid data map that 'reconcile_sharing_col_children'
 /// expects.
 ///
 /// 'phantom' is always 'None' on initial render: there is no diff
@@ -116,7 +116,7 @@ pub async fn maybe_add_subscribeeCol_branch (
                         if t . is_indefinitive () ))
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_indefinitive { return Ok(( )); } }
-  { // Pre-existing SubscribeeCol children are reconciled by the rerender pipeline's 'expand_true_content_until_stable', which dispatches to 'reconcile_subscribee_col_children'.
+  { // Pre-existing SubscribeeCol children are reconciled by view completion (complete_nodes_in_level_order), which dispatches to 'reconcile_subscribee_col_children'.
     if unique_scaffold_child_of_viewnode (
       tree, node_id,
       &ViewNodeKind::PartnerCol (RoleCol::Subscribee) )? . is_some ()
@@ -148,7 +148,7 @@ pub async fn maybe_add_subscribeeCol_branch (
   { let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
       build_initial_render_child_data (
         &subscribee_ids, config, driver ) . await ?;
-    reconcile_sharing_scaffold_children (
+    reconcile_sharing_col_children (
       tree, subscribee_col_nid,
       RoleCol::Subscribee,
       &goal, &data ) ?; }
@@ -164,7 +164,7 @@ pub async fn maybe_add_subscribeeCol_branch (
     let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
       build_initial_render_child_data (
         &hidden_outside_ids, config, driver ) . await ?;
-    reconcile_sharing_scaffold_children (
+    reconcile_sharing_col_children (
       tree, hidden_outside_col_nid,
       RoleCol::HiddenOutsideOfSubscribee,
       &goal, &data ) ?; }
@@ -246,7 +246,7 @@ async fn maybe_add_one_relation_col (
   let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
     build_initial_render_child_data (
       &member_ids, config, driver ) . await ?;
-  reconcile_sharing_scaffold_children (
+  reconcile_sharing_col_children (
     tree, col_nid, kind, &goal, &data ) ?;
   Ok (( )) }
 
@@ -290,7 +290,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
     build_initial_render_child_data (
       &hidden_in_ids, config, driver ) . await ?;
-  reconcile_sharing_scaffold_children (
+  reconcile_sharing_col_children (
     tree, hidden_col_nid,
     RoleCol::HiddenInSubscribee,
     &goal, &data ) ?;

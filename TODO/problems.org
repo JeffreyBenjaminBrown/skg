@@ -454,3 +454,77 @@
    the changed-PID set would make lock and rerender coincide, removing the
    transient lock on buffers that won't change. See the collateral
    resolution in TODO/local-view-update/problems.org.
+
+* Performance: the save-buffer pathway (see profiling-save.org)
+  Profiling the save of an insert-a-child edit (node 846207ef, 'doing')
+  found four inefficiencies, in impact order. Full evidence, numbers,
+  and recommendations are in the top-level 'profiling-save.org'.
+
+** Override validation re-scans the whole graph on every save (~24%)
+   'validate_override_invariants_after_save' (server/save.rs), called
+   unconditionally from 'update_graph_including_merges', runs
+   'validate_override_invariants' (server/dbs/in_rust_graph/
+   override_invariants.rs), which iterates 'graph.nodes' twice over all
+   ~60k nodes. The cost is O(total graph), independent of the save, so
+   every save slows as the user's data grows. Disabling it cut the save
+   from 343 ms to 256 ms. Fix: validate only the saved nodes and their
+   'overrides_view_of' neighborhood.
+
+** Tantivy is written and committed twice per save (~38%)
+   'update_tantivy_from_saveinstructions' (server/save.rs) indexes each
+   saved node with 'context_origin_type = ""'; then
+   'update_context_origin_types' (server/dbs/tantivy/context_update.rs)
+   opens a second 50 MB IndexWriter, reads those docs back, deletes and
+   re-adds them with the computed type, and commits again. Skipping the
+   second pass cut the context phase from 71 ms to 4 ms. The file's own
+   header comment names the fix ("compute origin types before
+   indexing"): compute the type first, index once, commit once, and
+   reuse one long-lived IndexWriter.
+
+** TypeDB relationship update is delete-all-then-recreate-all (~15%, O(children))
+   'update_typedb_from_saveinstructions' (server/save.rs) deletes and
+   recreates ALL outbound edges of each saved node every save, so
+   saving an N-child node is O(N) and building one up is O(N²).
+   'create_all_relationships' grew from 48 ms (~25 children) to 137 ms
+   (~100). Fix: diff old vs new edges (the in-Rust snapshot has the old
+   set) and apply only the delta.
+
+** Save cost degrades 3-4x within a session of repeated saves
+   404 ms -> 1220 ms over 11 consecutive saves; a 'rebuild dbs' resets
+   it. Cause: each tiny Tantivy commit spawns a segment and merges fall
+   behind. Mostly fixed by the single-commit change above; also consider
+   debouncing commits (Tantivy is a rebuildable cache) and dropping the
+   forced per-commit 'reader.reload()' in production.
+
+* Problems found while bumping docker-typedb-rust to TypeDB 3.11.5 (2026-06-08)
+  Found while updating docker-typedb-rust/typedb.nix from 3.10.3 to 3.11.5
+  and adding missing CLI tools to docker.nix.
+
+** (fixed) docker-typedb-rust docs described a Dockerfile that no longer exists
+   There is no Dockerfile in docker-typedb-rust/ (the build is Nix-only:
+   'nix-build docker.nix' + 'docker load'). Yet README.md and
+   PITFALLS.org were framed around "drift between the Dockerfile and
+   docker.nix build paths," and most of PITFALLS.org documented
+   Dockerfile-vs-Nix differences that can no longer drift.
+
+   Fixed 2026-06-08: rewrote PITFALLS.org as "Pitfalls and Maintenance
+   Notes" describing the single Nix path (keeping the load-bearing notes:
+   writable /opt/typedb tree, the FHS loader shim), and reframed
+   README.md away from the Dockerfile. Also fixed a second stale
+   reference there: PITFALLS.org pointed at 'bash/run-servers.sh', which
+   does not exist (the launcher is 'bash/start-servers.sh'; the only
+   run-servers.sh is windows/container/run-servers.sh).
+
+** (fixed) README.md linked to a pre-move absolute path
+   README.md pointed at '/home/ubuntu/docker-typedb-rust/PITFALLS.org',
+   but the folder is now a subfolder at
+   '/home/ubuntu/host/docker-typedb-rust/PITFALLS.org'.
+
+   Fixed 2026-06-08: made it a repo-relative link 'PITFALLS.org', which
+   does not rot when the folder moves.
+
+** (stale-on-bump) idle-CPU note above cites "TypeDB CE 3.10.3"
+   The "One TypeDB process has a fixed idle CPU tax" entry references
+   3.10.3 by version. Left as-is because it records a dated observation,
+   but worth re-measuring on 3.11.5 — its release notes mention query
+   profiling and server-config changes that could move that baseline.

@@ -10,7 +10,7 @@ pub use std::sync::Arc;
 pub use tempfile::TempDir;
 
 pub use futures::executor::block_on;
-pub use typedb_driver::{TypeDBDriver, Credentials, DriverOptions, Database};
+pub use typedb_driver::{TypeDBDriver, Addresses, Credentials, DriverOptions, DriverTlsConfig, Database};
 
 pub use skg::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema, create_empty_tantivy_index};
 pub use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
@@ -91,9 +91,9 @@ pub async fn setup_test_dbs(
   };
 
   let driver = TypeDBDriver::new(
-    "127.0.0.1:1729",
+    Addresses::try_from_address_str("127.0.0.1:1729")?,
     Credentials::new("admin", "password"),
-    DriverOptions::new(false, None)?
+    DriverOptions::new(DriverTlsConfig::disabled())
   ) . await?;
 
   let nodes : Vec<NodeComplete> = {

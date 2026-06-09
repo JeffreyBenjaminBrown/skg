@@ -65,7 +65,7 @@ pub enum ViewNodeKind {
 #[derive( Debug, Clone, PartialEq )]
 pub enum Vognode {
   Normal   (TrueNode),
-  Phantom  (TrueNode), // Absent from git worktree but present in git HEAD ("removed"), or still present in worktree but is no longer a member of its parent ("removedHere").
+  DiffPhantom (DiffPhantomNode), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim DiffPhantomNode, not a TrueNode -- a phantom is always indefinitive/bodyless and its parentIs is never read or rendered, so it needs none of TrueNode's parentIs/birth/viewStats/view_requests/indef_or_def. See DiffPhantomNode_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
   Inactive (InactiveNode), // From a source that is inactive (see "source sets").
   Unknown  (UnknownNode), // If it *ever* existed in the graph, Skg didn't find it.
   Deleted  (DeletedNode), // No longer exists in the graph.
@@ -123,6 +123,64 @@ pub struct TrueNode_Generic < Id, Src > {
   /// A per-source fact, not an axis.
   pub not_in_git    : bool,
   pub indef_or_def  : IndefOrDef,
+}
+
+pub type DiffPhantomNode   = DiffPhantomNode_Generic < ID, SourceName >;
+pub type MpDiffPhantomNode = DiffPhantomNode_Generic < Option < ID >,
+                                                       Option < SourceName >>;
+
+/// The slim payload of a `Vognode::DiffPhantom` (TODO/DONE/local-view-update/plan_v2.org §11 reduction). A phantom is a
+/// diff-only placeholder that is ALWAYS indefinitive and bodyless (enforced by
+/// `normal_to_phantom` / `mk_phantom_viewnode`) and whose parentIs is never read
+/// or rendered (always implicit Affected). So it carries NONE of TrueNode's
+/// parentIs / birth / viewStats / view_requests / indef_or_def -- only what a
+/// phantom actually uses: identity, title, the diff axes, the not_in_git flag,
+/// and graphStats (which IS rendered on phantoms). It needs neither parentIs
+/// (nothing reads a phantom's) nor indef_or_def (every phantom is indefinitive).
+#[derive( Debug, Clone, PartialEq )]
+pub struct DiffPhantomNode_Generic < Id, Src > {
+  pub title      : String,
+  pub id         : Id,
+  pub source     : Src,
+  /// Per-stage diff state for the node's '.skg' file existence.
+  pub existence  : ExistenceAxes,
+  /// Per-stage diff state for the node's membership at this position
+  /// in the parent's contains list.
+  pub membership : MembershipAxes,
+  /// True iff the node's source is not a git repo (or has no commits).
+  pub not_in_git : bool,
+  pub graphStats : GraphNodeStats,
+}
+
+impl < Id, Src > DiffPhantomNode_Generic < Id, Src > {
+  /// Build a phantom payload from a TrueNode, keeping only the phantom-relevant
+  /// fields and discarding parentIs / birth / viewStats / view_requests /
+  /// indef_or_def. Used when flipping a Normal node to a phantom and by the
+  /// placed<->maybe-placed conversions.
+  pub fn from_truenode ( t : TrueNode_Generic < Id, Src > ) -> Self {
+    DiffPhantomNode_Generic {
+      title      : t . title,
+      id         : t . id,
+      source     : t . source,
+      existence  : t . existence,
+      membership : t . membership,
+      not_in_git : t . not_in_git,
+      graphStats : t . graphStats,
+    }}
+
+  /// A phantom is always indefinitive, hence never has a body.
+  pub fn body (&self) -> Option < &String > { None }
+  pub fn is_indefinitive (&self) -> bool { true }
+
+  /// True iff this node's diff axes require phantom display; for a correctly
+  /// constructed phantom this holds, but some shared code asks regardless.
+  pub fn should_be_phantom (&self) -> bool {
+    diff_axes_require_phantom (&self . existence, &self . membership) }
+
+  /// A "removed-here" phantom whose '.skg' file is still in the worktree.
+  pub fn is_removedhere_phantom (&self) -> bool {
+    self . should_be_phantom ()
+    && self . existence . unstaged != Some (Sign::Minus) }
 }
 
 /// Each TrueNode has one of these.
@@ -238,18 +296,26 @@ pub enum ViewRequest {
 // Implementations
 //
 
+/// True when a node's diff axes require displaying it with the
+/// `Vognode::DiffPhantom` variant. Triggered by either:
+/// - any membership axis being '-' (removed in some stage), or
+/// - the worktree existence axis being '-' (file deleted), or
+/// - the "moved twice" pattern: stagedM = +, unstagedM = -.
+/// Shared by TrueNode_Generic and DiffPhantomNode_Generic, which both carry
+/// these axes.
+pub fn diff_axes_require_phantom (
+  existence  : &ExistenceAxes,
+  membership : &MembershipAxes,
+) -> bool {
+  membership . staged   == Some (Sign::Minus)
+  || membership . unstaged == Some (Sign::Minus)
+  || existence  . unstaged == Some (Sign::Minus) }
+
 impl < Id, Src > TrueNode_Generic < Id, Src > {
-  /// True when this node's diff axes require displaying it with the
-  /// `Vognode::Phantom` variant. Triggered by either:
-  /// - any membership axis being '-' (removed in some stage), or
-  /// - the worktree existence axis being '-' (file deleted), or
-  /// - the "moved twice" pattern: stagedM = +, unstagedM = -.
   pub fn should_be_phantom (
     &self,
   ) -> bool {
-    self    . membership . staged   == Some (Sign::Minus)
-    || self . membership . unstaged == Some (Sign::Minus)
-    || self . existence  . unstaged == Some (Sign::Minus) }
+    diff_axes_require_phantom (&self . existence, &self . membership) }
 
   /// A "removed-here" phantom: a phantom whose '.skg' file is still
   /// present in the worktree (so TypeDB still knows the node and can
@@ -374,24 +440,21 @@ impl Qual {
 }
 
 impl Vognode {
-  pub fn normal_or_phantom (&self) -> Option<&TrueNode> {
+  /// The id of a Normal or DiffPhantom vognode (the two TrueNode-ish kinds),
+  /// or None for Inactive/Unknown/Deleted. Since the TODO/DONE/local-view-update/plan_v2.org §11 reduction the Normal
+  /// and DiffPhantom payloads are different types, so this returns just the
+  /// shared identity rather than a `&TrueNode`.
+  pub fn normal_or_phantom_id (&self) -> Option<&ID> {
     match self {
-      Vognode::Normal  (t)
-        | Vognode::Phantom (t) => Some (t),
-      _ => None,
-    } }
-
-  pub fn normal_or_phantom_mut (&mut self) -> Option<&mut TrueNode> {
-    match self {
-      Vognode::Normal  (t)
-        | Vognode::Phantom (t) => Some (t),
+      Vognode::Normal     (t) => Some (&t . id),
+      Vognode::DiffPhantom (p) => Some (&p . id),
       _ => None,
     } }
 
   pub fn id (&self) -> &ID {
     match self {
       Vognode::Normal   (t) => &t . id,
-      Vognode::Phantom  (t) => &t . id,
+      Vognode::DiffPhantom  (p) => &p . id,
       Vognode::Inactive (i) => &i . id,
       Vognode::Unknown  (u) => &u . id,
       Vognode::Deleted  (d) => &d . id,
@@ -401,8 +464,8 @@ impl Vognode {
     &self,
   ) -> Option<(&ID, &SourceName)> {
     match self {
-      Vognode::Normal   (t)
-        | Vognode::Phantom (t) => Some ((&t . id, &t . source)),
+      Vognode::Normal   (t) => Some ((&t . id, &t . source)),
+      Vognode::DiffPhantom (p) => Some ((&p . id, &p . source)),
       Vognode::Inactive (i) => Some ((&i . id, &i . source)),
       Vognode::Deleted  (d) => Some ((&d . id, &d . source)),
       Vognode::Unknown  (_) => None,
@@ -447,14 +510,24 @@ impl ViewNode {
     if let ViewNodeKind::Vognode (Vognode::Normal (t))
       = &self . kind
       { if t . should_be_phantom ()
-        { self . kind = ViewNodeKind::Vognode (
-            Vognode::Phantom (t . clone () )); }}}
+        { // A phantom is ALWAYS indefinitive and renders no body (Jeff's
+          // TODO/DONE/local-view-update/progress.org §9 TODO): the diff view presumes git literacy (magit
+          // shows the real node), and a phantom must never be a node's
+          // definitive instance -- if Removed it has nothing to define, and if
+          // RemovedHere "edit it here, where it isn't" is dangerously
+          // confusing. So drop body/edit_request when flipping a (possibly
+          // Definitive) Normal node to a phantom. mk_phantom_viewnode already
+          // builds from an Indefinitive base, so now every phantom is
+          // indefinitive by construction.
+          let phantom : DiffPhantomNode =
+            DiffPhantomNode::from_truenode ( t . clone () );
+          self . kind = ViewNodeKind::Vognode (
+            Vognode::DiffPhantom (phantom)); }}}
 
   pub fn title (&self) -> &str {
     match &self . kind {
-      ViewNodeKind::Vognode (Vognode::Normal (t))
-        | ViewNodeKind::Vognode (Vognode::Phantom (t)) =>
-        &t . title,
+      ViewNodeKind::Vognode (Vognode::Normal (t)) => &t . title,
+      ViewNodeKind::Vognode (Vognode::DiffPhantom (p)) => &p . title,
       ViewNodeKind::Vognode (Vognode::Deleted (d)) =>
         &d . title,
       ViewNodeKind::Qual (q) =>
@@ -471,8 +544,8 @@ impl ViewNode {
   /// Reasonable for both TrueNodes and Scaffolds.
   pub fn body (&self) -> Option < &String > {
     match &self . kind {
-      ViewNodeKind::Vognode (Vognode::Normal (t))
-        | ViewNodeKind::Vognode (Vognode::Phantom (t)) => t . body (),
+      ViewNodeKind::Vognode (Vognode::Normal (t)) => t . body (),
+      ViewNodeKind::Vognode (Vognode::DiffPhantom (p)) => p . body (),
       ViewNodeKind::Vognode (Vognode::Deleted (d)) => d . body . as_ref (),
       ViewNodeKind::Vognode (Vognode::Unknown (_))
         | ViewNodeKind::Vognode (Vognode::Inactive (_))
@@ -609,7 +682,13 @@ pub fn mk_phantom_viewnode (
   if let ViewNodeKind::Vognode (Vognode::Normal (mut t)) = viewnode . kind
     { t . existence  = existence;
       t . membership = membership;
-      viewnode . kind = ViewNodeKind::Vognode (Vognode::Phantom (t)); }
+      viewnode . kind = ViewNodeKind::Vognode (
+        Vognode::DiffPhantom ( DiffPhantomNode::from_truenode (t) )); }
+  else
+    // mk_indefinitive_viewnode always yields a Normal vognode; if that ever
+    // changes, fail loudly rather than silently return a non-phantom.
+    { unreachable! (
+        "mk_phantom_viewnode: mk_indefinitive_viewnode did not yield a Normal vognode" ); }
   viewnode }
 
 pub fn mk_definitive_viewnode (
@@ -688,14 +767,17 @@ pub fn mk_indefinitive_from_viewnode (
   parentIs    : ParentIs,
   birth       : Birth,
 ) -> Result < ViewNode, String > {
-  let ViewNodeKind::Vognode (Vognode::Normal (t)
-                             | Vognode::Phantom (t))
-    = viewnode . kind
-    else { return Err (
-      "mk_indefinitive_from_viewnode: expected TrueNode"
-        . to_string () ) };
+  let (id, source, title) : (ID, SourceName, String) =
+    match viewnode . kind {
+      ViewNodeKind::Vognode (Vognode::Normal (t)) =>
+        ( t . id, t . source, t . title ),
+      ViewNodeKind::Vognode (Vognode::DiffPhantom (p)) =>
+        ( p . id, p . source, p . title ),
+      _ => return Err (
+        "mk_indefinitive_from_viewnode: expected TrueNode"
+          . to_string () ) };
   Ok ( mk_indefinitive_viewnode_with_birth (
-    t . id, t . source, t . title, parentIs, birth )) }
+    id, source, title, parentIs, birth )) }
 
 /// Create a ViewNode with *nearly* full metadata control.
 /// The exception is that the 'GraphNodeStats' and 'ViewNodeStats' are intentionally omitted,

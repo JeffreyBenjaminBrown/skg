@@ -84,9 +84,10 @@ fn true_child_ids (
 ) -> BTreeSet<ID> {
   tree . get (parent_id) . unwrap () . children ()
     . filter_map ( |child| match &child . value () . kind {
-      ViewNodeKind::Vognode ( Vognode::Normal (node)
-                              | Vognode::Phantom (node))
+      ViewNodeKind::Vognode ( Vognode::Normal (node) )
         => Some (node . id . clone ()),
+      ViewNodeKind::Vognode ( Vognode::DiffPhantom (p) )
+        => Some (p . id . clone ()),
       _ => None, })
     . collect () }
 
@@ -213,10 +214,13 @@ fn content_view_renders_inactive_contained_nodes_as_placeholders (
         ! actual . contains ("private title must not leak"),
         "inactive placeholder must not reveal title: {}",
         actual );
+      // §20.5: the view's pid set (for collateral detection) is {Normal,
+      // Inactive} -- an inactive node is a real graph member, so it IS tracked,
+      // even though it renders as a placeholder (asserted above). The excluded
+      // kinds are Deleted / Unknown / DiffPhantom.
       assert! (
-        ! pids . contains (&ID::from ("private-a")),
-        "initial content traversal should not render inactive-source \
-         children as TrueNodes: {:?}",
+        pids . contains (&ID::from ("private-a")),
+        "an inactive contained node should be in the view's pid set (§20.5): {:?}",
         pids );
       Ok (( )) } )) }
 
@@ -303,7 +307,7 @@ fn saving_inactive_placeholder_moves_and_deletes_update_contains (
       let moved_instructions : Vec<DefineNode> =
         buffer_to_validated_saveplan (
           moved_buffer, config, driver) . await?
-        . define_nodes;
+        . 1 . define_nodes;
       assert_eq! (
         saved_node_by_id (&moved_instructions, "root") . contains,
         vec![ID::from ("active-b"), ID::from ("private-a")],
@@ -320,7 +324,7 @@ fn saving_inactive_placeholder_moves_and_deletes_update_contains (
       let deleted_instructions : Vec<DefineNode> =
         buffer_to_validated_saveplan (
           deleted_buffer, config, driver) . await?
-        . define_nodes;
+        . 1 . define_nodes;
       assert_eq! (
         saved_node_by_id (&deleted_instructions, "root") . contains,
         vec![ID::from ("active-b")],
@@ -392,7 +396,7 @@ fn restricted_source_search_and_save_work_together_end_to_end (
       let instructions : Vec<DefineNode> =
         buffer_to_validated_saveplan (
           edited_buffer, config, driver) . await?
-        . define_nodes;
+        . 1 . define_nodes;
       assert_eq! (
         saved_node_by_id (&instructions, "root") . contains,
         vec![ID::from ("active-b"), ID::from ("private-a")],

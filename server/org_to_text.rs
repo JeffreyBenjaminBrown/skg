@@ -2,7 +2,7 @@ use crate::types::git::MembershipAxes;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ViewNode, ViewNodeKind, Vognode, Qual, QualCol, TrueNode,
+  ViewNode, ViewNodeKind, Vognode, Qual, QualCol, TrueNode, DiffPhantomNode,
   DeletedNode, UnknownNode, InactiveNode, EditRequest, GraphNodeStats,
   Birth, ParentIs,
 };
@@ -155,10 +155,14 @@ pub fn viewnode_to_string (
       Ok ( deleted_scaff_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded )),
-    ViewNodeKind::Vognode (Vognode::Normal (true_node) | Vognode::Phantom (true_node)) =>
+    ViewNodeKind::Vognode (Vognode::Normal (true_node)) =>
       Ok ( true_node_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, true_node, config )),
+    ViewNodeKind::Vognode (Vognode::DiffPhantom (phantom)) =>
+      Ok ( diffphantom_metadata_to_string (
+        viewnode . focused, viewnode . folded,
+        viewnode . body_folded, phantom, config )),
     ViewNodeKind::Vognode (Vognode::Deleted (deleted_node)) =>
       Ok ( deleted_node_metadata_to_string (
         viewnode . focused, viewnode . folded,
@@ -346,6 +350,57 @@ fn true_node_metadata_to_string (
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   parts . push ( node_sexp (true_node, config));
+  parts . join (" ") }
+
+/// Render metadata for a DiffPhantomNode (TODO/DONE/local-view-update/plan_v2.org §11). A phantom is always
+/// indefinitive (so always emits `indef` and never a body, editRequest, or
+/// viewRequests) and its parentIs is implicit Affected and birth Unremarkable
+/// (so neither atom appears, and graphStats is rendered as if Affected /
+/// Unremarkable). It carries no viewStats. What remains: id, source, indef,
+/// graphStats, the staged/unstaged diff axes, and notInGit. This is
+/// byte-identical to what the old shared TrueNode renderer produced for a
+/// phantom (verified: no phantom ever carried parentIs/birth/viewStats/
+/// viewRequests in any oracle).
+fn diffphantom_metadata_to_string (
+  focused     : bool,
+  folded      : bool,
+  body_folded : bool,
+  phantom     : & DiffPhantomNode,
+  config      : & SkgConfig,
+) -> String {
+  fn node_sexp (
+    phantom : & DiffPhantomNode,
+    config  : & SkgConfig,
+  ) -> String {
+    let mut parts : Vec < String > =
+      vec! [ "node" . to_string () ];
+    parts . push ( format! ( "(id {})", phantom . id . 0 ));
+    parts . push ( format! ( "(source {})", phantom . source ));
+    // parentIs is implicit Affected and birth Unremarkable on a phantom, so
+    // neither atom is emitted; both are passed as such to graphnodestats.
+    parts . push ( "indef" . to_string () );
+    if let Some (s) = graphnodestats_to_sexp (
+      & phantom . graphStats, ParentIs::Affected, Birth::Unremarkable )
+    { parts . push (s); }
+    { let mut atoms : Vec<&'static str> = Vec::new ();
+      if let Some (a) = phantom . existence  . staged_atom () { atoms . push (a); }
+      if let Some (a) = phantom . membership . staged_atom () { atoms . push (a); }
+      if ! atoms . is_empty ()
+      { parts . push ( format! ( "(staged {})", atoms . join (" "))); } }
+    { let mut atoms : Vec<&'static str> = Vec::new ();
+      if let Some (a) = phantom . existence  . unstaged_atom () { atoms . push (a); }
+      if let Some (a) = phantom . membership . unstaged_atom () { atoms . push (a); }
+      if ! atoms . is_empty ()
+      { parts . push ( format! ( "(unstaged {})", atoms . join (" "))); } }
+    if phantom . not_in_git
+    { parts . push ( "notInGit" . to_string () ); }
+    let _ = config; // reserved for parity with true_node_metadata_to_string
+    format! ( "({})", parts . join (" ")) }
+  let mut parts : Vec < String > = Vec::new ();
+  if focused     { parts . push ( "focused"    . to_string () ); }
+  if folded      { parts . push ( "folded"     . to_string () ); }
+  if body_folded { parts . push ( "bodyFolded" . to_string () ); }
+  parts . push ( node_sexp (phantom, config));
   parts . join (" ") }
 
 /// Render metadata for a DeletedNode:

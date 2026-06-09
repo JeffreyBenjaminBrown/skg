@@ -4,7 +4,7 @@ use indoc::indoc;
 use std::collections::HashMap;
 use std::error::Error;
 
-use skg::update_buffer::complete_postorder::aliascol::reconcile_alias_col_children;
+use skg::update_buffer::reconcile::aliascol::reconcile_alias_col_children;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::run_with_test_db;

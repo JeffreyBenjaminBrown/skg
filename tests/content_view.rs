@@ -100,7 +100,7 @@ async fn run_path_and_root_tests (
 
 async fn test_multi_root_view_logic (
   config : &SkgConfig,
-  driver : &typedb_driver::TypeDBDriver
+  driver : &std::sync::Arc<typedb_driver::TypeDBDriver>
 ) -> Result<(), Box<dyn std::error::Error>> {
 
   let focii : Vec<ID> = vec![
@@ -110,7 +110,7 @@ async fn test_multi_root_view_logic (
   ];
   let (result, _pids, _)
     : (String, Vec<ID>, _)
-    = multi_root_view ( & driver, & config, None, & focii, false
+    = multi_root_view ( driver, & config, None, & focii, false
                       ) . await ?;
 
   println!("Multi-root view result:\n{}", result);
@@ -228,30 +228,30 @@ fn test_multi_root_view_with_node_limit
 
       println!("Multi root view with limit=3 result:\n{}", result);
 
-      // Expected: roots 1 and 2 (gen 1), then children 2 and 3 truncated (gen 2)
-      // Generation 2 has 2 nodes, so 2+2=4 > 3, apply truncation
-      // Limit node is at index 1 (the 4th node overall, 2nd in gen 2)
-      // That's node 3, child of node 1. Its parent is node 1.
-      // Complete sibling group: truncate both node 2 (repeated) and node 3
-      // Then truncate everything after node 1 in gen 1 - which includes root node 2
-      // Note: Root node 2 has SubscribeeCol added before truncation (when it was definitive),
-      // but since it becomes indef after truncation, this is somewhat inconsistent.
-      // The SubscribeeCol includes Subscribee children created when the node was definitive.
-      // For now we accept this behavior.
+      // §5.5 node budget, limit=3: level-order creation spends the budget on the
+      // content children (2 and 3 under root 1, and root 2's independent
+      // containerward node 1). Those nodes are created DEFINITIVELY (no indef
+      // placeholders), so node 3 and root 2 expand their bodies + SubscribeeCols
+      // (cols are not budget-bound); their subscribee members are indef.
       let expected = indoc! {
         "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 2)))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg (node (id 2) (source main) indef (graphStats (linksInFromLeaves 1) extraIDs subscribing))) title 2
-         ** (skg (node (id 3) (source main) indef (graphStats (linksInFromLeaves 1) extraIDs overriding subscribing))) title 3
-         * (skg (node (id 2) (source main) (parentIs absent) indef (graphStats (containers 1) (linksInFromLeaves 1) extraIDs subscribing))) title 2
+         ** (skg (node (id 3) (source main) (graphStats (linksInFromLeaves 1) extraIDs overriding subscribing))) title 3
+         this one string could span pages
+         *** (skg subscribeeCol)
+         **** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing))) This is a [[id:shgulasdghu][test]] of a second kind.
+         **** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing))) this title includes a [[id:22][textlink to another file]]
+         * (skg (node (id 2) (source main) (parentIs absent) (graphStats (containers 1) (linksInFromLeaves 1) extraIDs subscribing))) title 2
+         this one string could span pages
          ** (skg (node (id 1) (source main) (parentIs independent) (birth containsParent) indef (graphStats (containers 0) (contents 2)) (viewStats containsParent))) title 1
          ** (skg subscribeeCol)
          *** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_eq!(result, expected,
-                 "Multi root view with limit=3 should truncate generation 2 sibling group");
+                 "Multi root view limit=3 truncates by the §5.5 budget");
 
       Ok (( )) } )) }
 
@@ -272,12 +272,12 @@ fn test_limit_with_multiple_sibling_groups
       //   └─ 12 (gen 2)
       //      └─ 121 (gen 3)
       //
-      // With limit=4: 1 (1), 11 (2), 12 (3), 111 (4)
-      // Generation 3 has 3 nodes, so 4+3=7 > 4, apply truncation
-      // Limit node is 111 (index 0 in gen 3)
-      // Complete its sibling group: truncate both 111 and 112
-      // Stop there - do NOT truncate 121 (different parent)
-      // Then truncate 12 (everything after 11 in gen 2)
+      // §5.5 node budget, limit=4 (cost 1 per vognode EXPANSION): expansions are
+      // 1, 11, 12, 111. Each parent draws its WHOLE child group (never a partial
+      // sibling set), and once the budget is spent the remaining children stay
+      // indefinitive: 11's group 111,112 is whole (111 expanded, 112 indef), and
+      // 12's group 121 is whole (indef). graphStats(contents N) flags the
+      // collapsed nodes, so nothing is silently missing.
 
       let mut test_config = config . clone();
       test_config . initial_node_limit = 4;
@@ -294,11 +294,14 @@ fn test_limit_with_multiple_sibling_groups
                               1 body
                               ** (skg (node (id 11) (source main) (graphStats (contents 2)))) 11
                               11 body
-                              *** (skg (node (id 111) (source main) indef)) 111
+                              *** (skg (node (id 111) (source main))) 111
+                              111 body
                               *** (skg (node (id 112) (source main) indef)) 112
-                              ** (skg (node (id 12) (source main) indef (graphStats (contents 1)))) 12
+                              ** (skg (node (id 12) (source main) (graphStats (contents 1)))) 12
+                              12 body
+                              *** (skg (node (id 121) (source main) indef)) 121
                               "};
       assert_eq!(result, expected,
-                 "Truncated nodes should have no children (121 removed)");
+                 "limit=4: whole groups drawn (111,112 and 121); expansion stops at the budget");
 
       Ok (( )) } )) }

@@ -10,6 +10,7 @@
 // GLOSSARY:
 // See the Tantivy section in glossary.md.
 
+pub mod background_writer;
 pub mod context_update;
 pub mod escape;
 pub mod search;
@@ -35,8 +36,15 @@ use std::sync::Arc;
 pub(crate) fn open_existing_tantivy_index (
   index_path : &Path,
 ) -> Result<TantivyIndex, Box<dyn Error>> {
-  let index : Index =
-    Index::open_in_dir (index_path) ?;
+  tantivy_index_from_index ( Index::open_in_dir (index_path) ? ) }
+
+/// Build a TantivyIndex from an already-constructed Index: derive its schema,
+/// look up the fields, and open a reader. Shared by the open-existing,
+/// create-in-dir, and create-in-RAM constructors, which differ only in how the
+/// Index itself is obtained.
+pub(crate) fn tantivy_index_from_index (
+  index : Index,
+) -> Result<TantivyIndex, Box<dyn Error>> {
   let reader : tantivy::IndexReader =
     index . reader () ?;
   let schema : schema::Schema =

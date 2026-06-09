@@ -1,6 +1,5 @@
-use crate::context::update_context_types_for_saved_nodes;
 use crate::dbs::in_rust_graph::in_rust_graph_coherent_with_save_instructions;
-use crate::from_text::{ SavePlan, buffer_to_validated_saveplan};
+use crate::from_text::buffer_to_validated_saveplan;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
 use crate::save::update_graph_including_merges;
@@ -19,7 +18,8 @@ use crate::types::env::SkgEnv;
 use crate::types::errors::SaveError;
 use crate::types::git::{SourceDiff, GitDiffStatus};
 use crate::types::misc::{ID, SourceName, SkgConfig};
-use crate::types::save::{DefineNode, format_save_error_as_org};
+use crate::types::save::{DefineNode, SavePlan, format_save_error_as_org};
+use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::ViewUri;
 use crate::update_buffer::update_views_after_save;
 
@@ -69,8 +69,9 @@ impl SaveResponse {
 
 /// Handles save buffer requests from Emacs.
 /// - Reads the buffer content (with length prefix).
-/// - Builds an initial NodeCompleteMap from the ViewsState.s open views. It can change during the save process.
-/// - 'update_from_and_rerender_buffer'
+/// - Sends the early broad lock (uris_of_views_to_lock) before the slow pipeline.
+/// - Runs 'update_from_and_rerender_buffer' (parse + validate -> SavePlan, update
+///   the graph, then rerender + stream the saved and collateral views).
 /// - Responds to Emacs (with length prefix).
 pub fn handle_save_buffer_request (
   reader     : &mut BufReader <TcpStream>,
@@ -84,17 +85,22 @@ pub fn handle_save_buffer_request (
     view_uri_from_request (request);
   let save_point_position : Option<SavePointPosition> =
     save_point_position_from_request (request);
+  { // Send the early broad lock BEFORE reading the buffer, so the client's
+    // one-shot save-lock handler always fires exactly once and balances its
+    // pending-count -- even when the read below fails (otherwise only
+    // save-result would arrive, leaving the count unbalanced and wedging the
+    // next save's wait). save-result unlocks regardless. Conservative/broad
+    // here: the SavePlan is not yet computed.
+    let uris_to_lock : Vec<ViewUri> =
+      uris_of_views_to_lock (
+        &viewuri_from_request_result, views_state );
+    let lock_sexp : String =
+      format_lock_views_sexp ( &uris_to_lock );
+    send_response_with_length_prefix (
+      stream,
+      & tag_sexp_response ( TcpToClient::SaveLock, &lock_sexp )); }
   match read_length_prefixed_content (reader) {
     Ok (initial_buffer_content) => {
-      { // Send early lock message before the expensive pipeline.
-        let uris_to_lock : Vec<ViewUri> =
-          uris_of_views_to_lock (
-            &viewuri_from_request_result, views_state );
-        let lock_sexp : String =
-          format_lock_views_sexp ( &uris_to_lock );
-        send_response_with_length_prefix (
-          stream,
-          & tag_sexp_response ( TcpToClient::SaveLock, &lock_sexp )); }
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "update_from_and_rerender_buffer" ). entered();
         match block_on(
@@ -229,7 +235,7 @@ fn nat_from_request (
 /// COMPLEX:
 /// - Validation must happen at many stages.
 /// - Merges must follow the execution of other save instructions, because the user may have updated one of the nodes to be merged.
-/// - complete_viewforest is complex: it runs a preorder pass (completing and reconciling each node) followed by a postorder pass (populating scaffolds like IDCol, AliasCol, etc.).
+/// - complete_viewforest is complex: it is one level-order BFS in which each node is completed at its own visit (content, cols, view requests, inline diff), then a postorder prune sweep removes the empty self-deletable nodes.
 pub async fn update_from_and_rerender_buffer (
   stream                      : &mut TcpStream,
   org_buffer_text             : &str,
@@ -245,7 +251,7 @@ pub async fn update_from_and_rerender_buffer (
     validate_no_merge_commits ( &sources, &env . config )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
 
-  let save_plan : SavePlan =
+  let ( viewforest, save_plan ) : ( ViewForest, SavePlan ) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
             "buffer_to_validated_saveplan"
           ) . entered();
@@ -253,16 +259,20 @@ pub async fn update_from_and_rerender_buffer (
           org_buffer_text, &env . config, &env . driver ) . await
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
-  if save_plan . viewforest . is_empty ()
+  if viewforest . is_empty ()
     { return Err ( "Nothing to save found in org_buffer_text"
                    . into() ); }
-  let SavePlan { viewforest,
-                 define_nodes       : nonmerge_defineNodes,
-                 merge_instructions : merges,
-                 source_moves }
+  let SavePlan {
+    define_nodes       : nonmerge_defineNodes,
+    merge_instructions : merges,
+    source_moves }
     = save_plan;
 
-  { // update the graph
+  { // update the graph. Context origin types (for search ranking) are
+    // computed from the post-save in-Rust graph and written inside the
+    // single Tantivy index pass, so there is no separate context pass.
+    let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "update_graph_including_merges" ). entered();
     update_graph_including_merges (
       nonmerge_defineNodes . clone(),
       &merges,
@@ -270,38 +280,37 @@ pub async fn update_from_and_rerender_buffer (
       env . config . clone(),
       &mut env . tantivy_index,
       &env . driver,
-      &env . in_rust_graph ) . await ?;
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "update_context_types_for_saved_nodes" ). entered();
-      update_context_types_for_saved_nodes (
-        &env . tantivy_index, &env . config . db_name,
-        &env . driver, &nonmerge_defineNodes ) . await
-      . unwrap_or_else ( |e| tracing::warn! (
-        "context type recomputation failed: {}", e )); }}
+      &env . in_rust_graph ) . await ?; }
 
   let define_nodes : Vec<DefineNode> = // includes the merges
-    nonmerge_defineNodes . iter () . cloned ()
-    . chain ( merges . iter ()
-              . flat_map ( |merge| merge . to_vec () ))
-    . collect ();
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "define_nodes_build" ). entered();
+      nonmerge_defineNodes . iter () . cloned ()
+      . chain ( merges . iter ()
+                . flat_map ( |merge| merge . to_vec () ))
+      . collect () };
 
-  debug_assert! (
-    // TODO | PITFALL: This is quite a weak assertion.
-    // PURPOSE: The in-Rust graph must already reflect every Save and Delete in 'define_nodes' by the time this function runs. Violating this invariant (e.g. by reordering the save pipeline so that 'update_views_after_save' runs before 'apply_definenodes') would let the rerender read stale NodeCompletes from the in-Rust graph.
-    in_rust_graph_coherent_with_save_instructions (
-        &define_nodes
-      ) . is_ok (),
-    "update_views_after_save: in-Rust graph not coherent with define_nodes" );
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "coherence_debug_assert" ). entered();
+    debug_assert! (
+      // TODO | PITFALL: This is quite a weak assertion.
+      // PURPOSE: The in-Rust graph must already reflect every Save and Delete in 'define_nodes' by the time this function runs. Violating this invariant (e.g. by reordering the save pipeline so that 'update_views_after_save' runs before 'apply_definenodes') would let the rerender read stale NodeCompletes from the in-Rust graph.
+      in_rust_graph_coherent_with_save_instructions (
+          &define_nodes
+        ) . is_ok (),
+      "update_views_after_save: in-Rust graph not coherent with define_nodes" ); }
 
-  update_views_after_save (
-    stream,
-    viewforest,
-    define_nodes,
-    diff_mode_enabled,
-    env,
-    viewuri_from_request_result,
-    views_state,
-    active_source_set ) . await }
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "update_views_after_save" ). entered();
+    update_views_after_save (
+      stream,
+      viewforest,
+      define_nodes,
+      diff_mode_enabled,
+      env,
+      viewuri_from_request_result,
+      views_state,
+      active_source_set ) . await } }
 
 /// Check if any source's HEAD is a merge commit.
 /// Returns an error message if so,

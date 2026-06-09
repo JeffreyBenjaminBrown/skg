@@ -21,7 +21,7 @@ use skg::dbs::typedb::sources::create_all_sources;
 use skg::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema};
 use std::error::Error;
 use std::path::PathBuf;
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
+use typedb_driver::{TypeDBDriver, Addresses, Credentials, DriverOptions, DriverTlsConfig};
 use futures::executor::block_on;
 
 #[test]
@@ -37,9 +37,9 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
     // Set up TypeDB driver
     let driver: TypeDBDriver =
       TypeDBDriver::new(
-        "127.0.0.1:1729",
+        Addresses::try_from_address_str("127.0.0.1:1729")?,
         Credentials::new("admin", "password"),
-        DriverOptions::new(false, None)?
+        DriverOptions::new(DriverTlsConfig::disabled())
       ) . await?;
 
     // Load fixtures into database
@@ -137,9 +137,9 @@ fn test_foreign_node_modification_errors(
     config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-source-errors-2");
     let driver: TypeDBDriver =
       TypeDBDriver::new(
-        "127.0.0.1:1729",
+        Addresses::try_from_address_str("127.0.0.1:1729")?,
         Credentials::new("admin", "password"),
-        DriverOptions::new(false, None)?
+        DriverOptions::new(DriverTlsConfig::disabled())
       ) . await?;
 
     // Load fixtures into database
@@ -315,9 +315,9 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
 
     // Set up TypeDB driver
     let driver: TypeDBDriver = TypeDBDriver::new(
-      "127.0.0.1:1729",
+      Addresses::try_from_address_str("127.0.0.1:1729")?,
       Credentials::new("admin", "password"),
-      DriverOptions::new(false, None)?
+      DriverOptions::new(DriverTlsConfig::disabled())
     ) . await?;
 
     // Load fixtures into database
@@ -354,7 +354,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
               "Source move between owned sources should succeed, got: {:?}",
               result . err());
 
-      let save_plan = result?;
+      let ( _viewforest, save_plan ) = result?;
       assert_eq!(save_plan . source_moves . len(), 1,
                  "Expected exactly 1 source move");
       assert_eq!(save_plan . source_moves[0] . pid . 0, "priv-1");

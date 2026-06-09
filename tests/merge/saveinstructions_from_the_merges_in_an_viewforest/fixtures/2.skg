@@ -1,4 +1,6 @@
 pid: '2'
 title: "2"
 body: "2 body"
+aliases:
+- two-alias
 contains: []

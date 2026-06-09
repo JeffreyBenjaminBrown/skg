@@ -57,18 +57,6 @@ the TCP sentinel, and the busy-initializing handler.")
       (with-current-buffer buf
         (skg--lock-for-save)) )) )
 
-(defun skg--unlock-non-collateral-buffers (saved-uri collateral-uris)
-  "Unlock skg buffers that are NOT SAVED-URI and NOT in COLLATERAL-URIS."
-  (dolist (buf (buffer-list))
-    (when (and (buffer-live-p buf)
-               (buffer-local-value 'skg-view-uri buf)
-               (buffer-local-value 'skg--save-lock-overlay buf))
-      (let ((uri (buffer-local-value 'skg-view-uri buf)))
-        (unless (or (string= uri saved-uri)
-                    (member uri collateral-uris))
-          (with-current-buffer buf
-            (skg--unlock-after-save)) )) )) )
-
 (defun skg--unlock-buffers-not-in-uri-list (uri-list)
   "Unlock skg buffers whose URI is NOT in URI-LIST."
   (dolist (buf (buffer-list))
@@ -79,6 +67,11 @@ the TCP sentinel, and the busy-initializing handler.")
         (unless (member uri uri-list)
           (with-current-buffer buf
             (skg--unlock-after-save)) )) )) )
+
+(defun skg--unlock-non-collateral-buffers (saved-uri collateral-uris)
+  "Unlock skg buffers that are NOT SAVED-URI and NOT in COLLATERAL-URIS.
+The keep-locked set is the collateral views plus the saved view itself."
+  (skg--unlock-buffers-not-in-uri-list (cons saved-uri collateral-uris)))
 
 (defun skg--begin-stream (label)
   "Mark a streaming operation as in progress.

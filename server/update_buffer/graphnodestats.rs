@@ -86,14 +86,20 @@ pub fn set_metadata_relationships_in_node_recursive (
       // current data still falls back to false rather than querying
       // historical graph context for a placeholder.
       match & tree . get (treeid) . unwrap () . value () . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t)
-                               | Vognode::Phantom (t))
+        ViewNodeKind::Vognode (Vognode::Normal (t))
           => { let nodecomplete_opt : Option<NodeComplete>
                  = nodecomplete_rustFirst_by_pid_and_source (
                      config, &t . id, &t . source
                    ). ok ();
                Some ( graphnodestats_for_pid (
                  &t . id, stats, nodecomplete_opt . as_ref () )) },
+        ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
+          => { let nodecomplete_opt : Option<NodeComplete>
+                 = nodecomplete_rustFirst_by_pid_and_source (
+                     config, &p . id, &p . source
+                   ). ok ();
+               Some ( graphnodestats_for_pid (
+                 &p . id, stats, nodecomplete_opt . as_ref () )) },
         _ => None }};
   match new_stats {
     Some (gs) =>
@@ -101,9 +107,10 @@ pub fn set_metadata_relationships_in_node_recursive (
       // vognodes and phantoms can display node-global graphStats.
       match &mut tree . get_mut (treeid)
         . unwrap () . value () . kind
-        { ViewNodeKind::Vognode (Vognode::Normal (t)
-                                 | Vognode::Phantom (t))
+        { ViewNodeKind::Vognode (Vognode::Normal (t))
           => { t . graphStats = gs; },
+        ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
+          => { p . graphStats = gs; },
         _ => {} },
     None => {} }
   let child_treeids : Vec < NodeId > =

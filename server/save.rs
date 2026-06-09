@@ -1,10 +1,11 @@
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
+use crate::context::context_origin_types_for_saved_from_in_rust_graph;
 use crate::dbs::filesystem::multiple_nodes::{
   check_for_duplicate_ids_across_sources,
   delete_all_nodes_from_fs,
   read_all_skg_files_from_sources,
   write_all_nodes_to_fs};
-use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
+use crate::dbs::init::wipe_then_init_typedb_db;
 use crate::dbs::in_rust_graph::{
   InRustGraph,
   InRustGraphHandle,
@@ -12,9 +13,10 @@ use crate::dbs::in_rust_graph::{
   apply_definenodes_to_inRustGraph,
   override_invariants::{
     format_override_invariant_violations,
-    validate_override_invariants,
+    validate_touched_override_invariants,
   },
 };
+use crate::dbs::tantivy::background_writer::{enqueue_tantivy_write, lock_tantivy_writes, TantivyWriteTask};
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
 use crate::merge::merge_nodes;
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
@@ -22,6 +24,7 @@ use crate::dbs::typedb::nodes::delete_nodes_from_pids;
 use crate::dbs::typedb::nodes::overwrite_extra_ids_of_node;
 use crate::dbs::typedb::sources::update_node_source;
 use crate::dbs::typedb::nodes::which_ids_exist;
+use crate::dbs::typedb::relationships::apply_relationship_deltas_for_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::relationships::delete_all_outbound_relationships_to_nodes;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName, TantivyIndex};
@@ -33,11 +36,10 @@ use crate::types::save::{DefineNode, SaveNode, DeleteNode, Merge, SourceMove};
 use crate::types::nodes::complete::NodeComplete;
 use crate::util::path_from_pid_and_source;
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::io;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 use tantivy::IndexWriter;
 use typedb_driver::TypeDBDriver;
 
@@ -56,9 +58,11 @@ pub async fn update_graph_minus_merges (
   graph         : &InRustGraphHandle,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
   tracing::info!("Updating FS, in-Rust graph, TypeDB, and Tantivy ...");
-  let graph_snap : Arc<InRustGraph> = graph . load_full ();
-  apply_delete_propagation_cleanup (&mut node_defs,
-                                    &graph_snap);
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "apply_delete_propagation_cleanup" ). entered();
+    let graph_snap : Arc<InRustGraph> = graph . load_full ();
+    apply_delete_propagation_cleanup (&mut node_defs,
+                                      &graph_snap); }
   apply_define_nodes_to_stores ( node_defs,
                                  source_moves,
                                  config,
@@ -75,6 +79,8 @@ async fn apply_define_nodes_to_stores (
   graph         : &InRustGraphHandle,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
   let db_name : &str = &config . db_name;
+  let old_graph_snap : Arc<InRustGraph> = // pre-apply state, for edge deltas
+    graph . load_full ();
 
   { // FS (source of truth)
     // TODO: Print per-source write information
@@ -97,24 +103,25 @@ async fn apply_define_nodes_to_stores (
       "apply_definenodes_to_inRustGraph") . entered ();
     apply_definenodes (graph, &node_defs); }
 
-  // TypeDB (async) and Tantivy (sync) in parallel.
-  // Both are independent after the FS update.
-  let tantivy_instructions : Vec<DefineNode> = node_defs . clone ();
-  let tantivy_idx : TantivyIndex = tantivy_index . clone ();
-  let tantivy_handle : std::thread::JoinHandle<(Result<usize, String>, Duration)> =
-    std::thread::spawn ( move || {
-      let t0 : Instant = Instant::now ();
-      let result : Result<usize, String> =
-        update_tantivy_from_saveinstructions (
-          &tantivy_instructions, &tantivy_idx )
-        . map_err ( |e| e . to_string () );
-      (result, t0 . elapsed ()) });
+  // Context origin types, read from the post-apply in-Rust graph, so
+  // the Tantivy pass below indexes each saved doc once with its final
+  // type — no separate context writer/commit. Computed here (not on the
+  // Tantivy thread) so the read happens before any further mutation.
+  let context_types : HashMap<ID, String> =
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "context_origin_types_for_saved" ). entered();
+      context_origin_types_for_saved_from_in_rust_graph (
+        & graph . load_full (), &node_defs ) };
 
-  if let Err (e) = { // TypeDB
+  // TypeDB (foreground): only TypeDB must finish before the save
+  // responds, because the response is re-rendered from the in-Rust
+  // graph (never from Tantivy).
+  if let Err (e) = {
     let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "update_typedb_from_saveinstructions") . entered ();
     update_typedb_from_saveinstructions (
-      db_name, driver, &node_defs, source_moves ) . await }
+      db_name, driver, &node_defs, source_moves,
+      Some ( old_graph_snap . as_ref () )) . await }
     { tracing::error!(
         "TypeDB update failed: {}. Rebuilding from disk...", e);
       let nodes : Vec<NodeComplete> =
@@ -135,39 +142,17 @@ async fn apply_define_nodes_to_stores (
     } else {
       tracing::info!("   TypeDB update complete."); }
 
-  // Collect Tantivy result from its thread.
-  let (tantivy_result, tantivy_duration)
-    : (Result<usize, String>, Duration) =
-    tantivy_handle . join ()
-    . map_err (|_| -> Box<dyn Error> {
-      "Tantivy thread panicked" . into () }) ?;
-  tracing::info!("{}: {:.3}s", "update_tantivy_from_saveinstructions",
-    tantivy_duration . as_secs_f64 ());
-  match tantivy_result
-    { Ok (indexed_count) => {
-        tracing::info!( "   Tantivy updated for {} document(s).",
-                  indexed_count );
-        tracing::info!("All updates finished successfully.");
-        Ok (None) }
-      Err (e) => {
-        tracing::error!("Tantivy update failed: {}. Rebuilding from disk...", e);
-        let nodes : Vec<NodeComplete> =
-          read_all_skg_files_from_sources (&config)
-          . map_err (|e2| -> Box<dyn Error> {
-            format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
-            . into () }) ?;
-        check_for_duplicate_ids_across_sources (
-          &nodes, &config . data_root)
-          . map_err (|e2| -> Box<dyn Error> {
-            format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
-            . into () }) ?;
-        let new_index : TantivyIndex =
-          rebuild_tantivy_from_nodes (&config, &nodes)
-          . map_err (|e2| -> Box<dyn Error> {
-            format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
-            . into () }) ?;
-        tracing::warn!("Save succeeded, but Tantivy had to be rebuilt from disk.");
-        Ok (Some (new_index)) } } }
+  // Tantivy (background): the search index is a derived cache that the
+  // save's response never reads, so enqueue the index update to commit
+  // off the critical path, in FIFO order (a single worker). Searches
+  // block on 'wait_for_tantivy_writes_idle' until it lands. A
+  // background failure is logged, not propagated — the filesystem is
+  // the source of truth, so 'rebuild dbs' resyncs the index.
+  enqueue_tantivy_write ( TantivyWriteTask {
+    tantivy_index : tantivy_index . clone (),
+    instructions  : node_defs . clone (),
+    context_types, } );
+  Ok (None) }
 
 /// Runs 'update_graph_minus_merges' and then 'merge_nodes' in that
 /// order, applying any Tantivy rebuild from either step to the
@@ -183,11 +168,13 @@ pub async fn update_graph_including_merges (
   driver             : &TypeDBDriver,
   graph              : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
-  validate_override_invariants_after_save (
-    &save_instructions,
-    merge_instructions,
-    &config,
-    graph ) ?;
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "validate_override_invariants_after_save" ). entered();
+    validate_override_invariants_after_save (
+      &save_instructions,
+      merge_instructions,
+      &config,
+      graph ) } ?;
   let save_replacement : Option<TantivyIndex> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "update_graph_minus_merges" ). entered();
@@ -225,8 +212,14 @@ pub fn validate_override_invariants_after_save (
     . flat_map ( |merge| merge . to_vec () )
     . collect ();
   apply_definenodes_to_inRustGraph (&mut simulated, &merge_definenodes);
+  let touched : HashSet<ID> = // every node this save actually wrote
+    nonmerge . iter () . chain ( merge_definenodes . iter () )
+    . map ( |dn| match dn {
+        DefineNode::Save (SaveNode (n)) => n . pid . clone (),
+        DefineNode::Delete (DeleteNode { id, .. }) => id . clone (), } )
+    . collect ();
   let violations =
-    validate_override_invariants (config, &simulated);
+    validate_touched_override_invariants (config, &simulated, &touched);
   if violations . is_empty () {
     Ok (( ))
   } else {
@@ -250,6 +243,7 @@ pub async fn update_typedb_from_saveinstructions (
   driver       : &TypeDBDriver,
   node_defs    : &[DefineNode],
   source_moves : &[SourceMove],
+  old_graph    : Option<&InRustGraph>, // Some → write only the edge delta vs this pre-save snapshot; None → bulk delete-all + recreate-all (the merge path, where pid migration makes a set-diff subtle).
 ) -> Result<(), Box<dyn Error>> {
 
   // PITFALL: Below, each get(0) on an 'ids' field
@@ -290,6 +284,8 @@ pub async fn update_typedb_from_saveinstructions (
       . map (NodeTypedb::from_complete_parsing_textlinks)
       . collect ();
     let pre_existing_pids : HashSet<String> = { // "Pre-existing" = not being created now. Existing ones need their has_extra_id relations re-synced below; create_only_nodes_with_no_ids_present handles extra_ids only for newly-created nodes via its internal call to 'create_node'.
+      let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "which_ids_exist" ). entered();
       let pids_btreeset : BTreeSet<String> =
         to_write_pids . iter ()
         . map ( |p| p . to_string () )
@@ -308,17 +304,26 @@ pub async fn update_typedb_from_saveinstructions (
         if pre_existing_pids . contains (node . pid . as_str ()) {
           overwrite_extra_ids_of_node (
             db_name, driver, node ) . await ?; } } }
-    { // Delete all 5 outbound relation types before recreating. Otherwise re-saves of existing nodes duplicate every outbound relation except 'contains'.
-      let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "delete_all_outbound_relationships_to_nodes") . entered ();
-      delete_all_outbound_relationships_to_nodes (
-        db_name, driver, & to_write_pids )
-      . await ?; }
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "create_all_relationships") . entered ();
-      create_all_relationships (
-        db_name, driver, & to_write_typedb )
-      . await } ?; }
+    match old_graph {
+      Some (old_graph) => { // incremental: write only the changed edges
+        let _span : tracing::span::EnteredSpan = tracing::info_span!(
+          "apply_relationship_deltas_for_nodes") . entered ();
+        apply_relationship_deltas_for_nodes (
+          db_name, driver, old_graph, & to_write_typedb,
+          & pre_existing_pids )
+        . await ? ; }
+      None => {
+        { // Delete all 5 outbound relation types before recreating. Otherwise re-saves of existing nodes duplicate every outbound relation except 'contains'.
+          let _span : tracing::span::EnteredSpan = tracing::info_span!(
+            "delete_all_outbound_relationships_to_nodes") . entered ();
+          delete_all_outbound_relationships_to_nodes (
+            db_name, driver, & to_write_pids )
+          . await ?; }
+        { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+            "create_all_relationships") . entered ();
+          create_all_relationships (
+            db_name, driver, & to_write_typedb )
+          . await ?; } } } }
 
   for sm in source_moves { // TODO ? parallelize
     update_node_source (
@@ -492,22 +497,29 @@ pub fn update_fs_from_saveinstructions (
 /// Deletes IDs from the index for every instruction,
 /// but only adds documents for instructions where is_save.
 /// Returns the number of documents processed.
-pub(super) fn update_tantivy_from_saveinstructions (
+pub(crate) fn update_tantivy_from_saveinstructions (
   instructions  : &[DefineNode],
   tantivy_index : &TantivyIndex,
+  context_types : &HashMap<ID, String>, // pid -> context_origin_type label, so each doc is indexed once with its final type (no second context pass needed). Empty for the merge path.
 ) -> Result<usize, Box<dyn Error>> {
 
+  let _wlock = // one IndexWriter per directory; serialize all Tantivy writers
+    lock_tantivy_writes ();
   let mut writer: IndexWriter =
-    tantivy_index . index . writer (
-      TANTIVY_WRITER_BUFFER_BYTES)?;
-  delete_nodes_by_id_from_index(
-    // Delete all IDs, be they from Saves or Deletes.
-    // (The entry for each Save is then recreated.)
-    instructions . iter() . map(|instr| match instr {
-      DefineNode::Save(SaveNode (node)) => &node . pid,
-      DefineNode::Delete(DeleteNode { id, .. }) => id }),
-    &mut writer,
-    tantivy_index)?;
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "tantivy_writer_create" ). entered();
+      tantivy_index . index . writer (
+        TANTIVY_WRITER_BUFFER_BYTES)? };
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "tantivy_delete" ). entered();
+    delete_nodes_by_id_from_index(
+      // Delete all IDs, be they from Saves or Deletes.
+      // (The entry for each Save is then recreated.)
+      instructions . iter() . map(|instr| match instr {
+        DefineNode::Save(SaveNode (node)) => &node . pid,
+        DefineNode::Delete(DeleteNode { id, .. }) => id }),
+      &mut writer,
+      tantivy_index)? ; }
   // Add documents only for non-deletion instructions.
   // Convert to NodeTantivy (narrow) at the boundary.
   let nodes_to_add: Vec<NodeTantivy> =
@@ -518,8 +530,22 @@ pub(super) fn update_tantivy_from_saveinstructions (
         DefineNode::Delete (_) => None } )
     . collect();
   let processed_count: usize =
-    add_documents_to_tantivy_writer(
-      & nodes_to_add, &mut writer, tantivy_index )? ;
-  commit_with_status(
-    &mut writer, tantivy_index, processed_count, "Updated")?;
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "tantivy_add" ). entered();
+      add_documents_to_tantivy_writer(
+        & nodes_to_add, &mut writer, tantivy_index,
+        context_types )? };
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "tantivy_commit" ). entered();
+    commit_with_status(
+      &mut writer, tantivy_index, processed_count, "Updated")? ; }
+  // Wait out the writer's background merge threads before returning, so
+  // the index is fully quiescent: 'commit()' alone can leave merge
+  // threads writing segment files, which (when this runs on the
+  // background worker) would race a test's index-directory cleanup, and
+  // makes 'wait_for_tantivy_writes_idle' mean what it says.
+  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "tantivy_wait_merging_threads" ). entered();
+    writer . wait_merging_threads ()
+      . map_err ( |e| -> Box<dyn Error> { e . into () }) ? ; }
   Ok (processed_count) }

@@ -5,7 +5,7 @@ use crate::context::{content_maps_from_nodes, had_id_set_from_nodes};
 use crate::context::link_targets_from_nodes;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::multiple_nodes::read_recently_modified_skgfiles_from_sources;
-use crate::dbs::tantivy::{mk_tantivy_schema, open_existing_tantivy_index};
+use crate::dbs::tantivy::{mk_tantivy_schema, open_existing_tantivy_index, tantivy_index_from_index};
 use crate::dbs::tantivy::write::update_index_with_nodes;
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
@@ -32,7 +32,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
-use tantivy::{schema, Index};
+use tantivy::Index;
 use typedb_driver::{
   Database,
   DatabaseManager,
@@ -391,39 +391,17 @@ pub fn create_empty_tantivy_index (
   if index_path . exists() {
     std::fs::remove_dir_all (index_path) ?; }
   std::fs::create_dir_all (index_path)?;
-  let schema : schema::Schema =
-    mk_tantivy_schema();
-  let id_field: schema::Field =
-    schema . get_field ("id") ?;
-  let title_or_alias_field: schema::Field =
-    schema . get_field ("title_or_alias") ?;
-  let raw_title_field: schema::Field =
-    schema . get_field ("raw_title") ?;
-  let source_field: schema::Field =
-    schema . get_field ("source") ?;
-  let context_origin_type_field: schema::Field =
-    schema . get_field ("context_origin_type") ?;
-  let is_title_field: schema::Field =
-    schema . get_field ("is_title") ?;
-  let had_id_field: schema::Field =
-    schema . get_field ("had_id") ?;
-  let body_field: schema::Field =
-    schema . get_field ("body") ?;
-  let index : Index =
-    Index::create_in_dir ( index_path, schema )?;
-  let reader : tantivy::IndexReader =
-    index . reader () ?;
-  Ok ( TantivyIndex {
-    index : Arc::new (index),
-    reader,
-    id_field,
-    title_or_alias_field,
-    raw_title_field,
-    source_field,
-    context_origin_type_field,
-    is_title_field,
-    had_id_field,
-    body_field, }) }
+  tantivy_index_from_index (
+    Index::create_in_dir ( index_path, mk_tantivy_schema () ) ? ) }
+
+/// An empty in-RAM Tantivy index (no folder IO, nothing wiped). Used to build a
+/// SkgEnv for a DE-NOVO render driven through post-save view completion in paths/tests
+/// that have no real tantivy on hand: find_source falls back past an empty index
+/// to the in-Rust graph / disk, so the index's contents don't matter there.
+pub fn empty_in_ram_tantivy_index (
+) -> Result<TantivyIndex, Box<dyn Error>> {
+  tantivy_index_from_index (
+    Index::create_in_ram ( mk_tantivy_schema () ) ) }
 
 /// Removes any existing index at given path,
 /// creates a new one there,

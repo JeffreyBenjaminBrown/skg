@@ -62,7 +62,7 @@ pub(crate) struct DefinenodeCandidate {
 pub(crate) enum DefinenodeCandidateKind {
   Ordinary,
   Subscribee { subscriber : ID },
-  Overridden { overrider : ID }, }
+  Overridden, }
 
 impl NodeIntent {
   pub(crate) fn pid (
@@ -273,7 +273,7 @@ pub(crate) fn naive_node_edit_intents_from_role_viewforest (
 /// - filtered for no-op saves
 /// - ignorant of the special hiderel interpretation in the case of
 ///   DefinenodeCandidateKind::Subscribee
-///   ('ubscribee_hiderel_intents_from_candidates' does that)
+///   ('subscribee_hiderel_intents_from_candidates' does that)
 pub(crate) fn naive_node_edit_intents_from_candidates (
   role_viewforest : &Tree<ViewNode_in_Role>,
   candidates      : &[DefinenodeCandidate],
@@ -285,7 +285,7 @@ pub(crate) fn naive_node_edit_intents_from_candidates (
         Some (candidate . treeid),
       DefinenodeCandidateKind::Subscribee { .. } =>
         None,
-      DefinenodeCandidateKind::Overridden { .. } =>
+      DefinenodeCandidateKind::Overridden =>
         None,
     })
     . collect();
@@ -439,9 +439,8 @@ pub(crate) fn collect_savenode_candidates (
             SaveRole::Subscribee { subscriber } =>
               Some (DefinenodeCandidateKind::Subscribee {
                 subscriber }),
-            SaveRole::Overridden { overrider } =>
-              Some (DefinenodeCandidateKind::Overridden {
-                overrider }),
+            SaveRole::Overridden { .. } =>
+              Some (DefinenodeCandidateKind::Overridden),
             _ => None };
         if let Some (kind) = candidate_kind {
           if ! t . is_indefinitive() {
@@ -449,7 +448,7 @@ pub(crate) fn collect_savenode_candidates (
               treeid : node_id,
               kind } ); }
           recurse_on_children( tree, node_id, result )?; }},
-      ViewNodeKind::Vognode (Vognode::Phantom (_)) => {} }
+      ViewNodeKind::Vognode (Vognode::DiffPhantom (_)) => {} }
     Ok (( )) }
 
   let mut result: Vec<DefinenodeCandidate> = Vec::new();
@@ -647,7 +646,7 @@ fn collect_subscribees (
                    SaveRole::Subscribee { .. })
                  && member_counts_for_relation_collection (t)
               { subscribees . push(t . id . clone()); }},
-            ViewNodeKind::Vognode (Vognode::Phantom (_))
+            ViewNodeKind::Vognode (Vognode::DiffPhantom (_))
               => continue,
             ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee)
               => continue, // valid child of SubscribeeCol, but not a subscribee
@@ -692,7 +691,7 @@ fn collect_members_from_child_relation_col (
           ViewNodeKind::Vognode (Vognode::Normal (t)) => {
             if member_counts_for_relation_collection (t) {
               members . push (t . id . clone ()); }},
-          ViewNodeKind::Vognode (Vognode::Phantom (_))
+          ViewNodeKind::Vognode (Vognode::DiffPhantom (_))
             | ViewNodeKind::Vognode (Vognode::Deleted (_))
             | ViewNodeKind::DeadScaffold
             | ViewNodeKind::Vognode (Vognode::Inactive (_))

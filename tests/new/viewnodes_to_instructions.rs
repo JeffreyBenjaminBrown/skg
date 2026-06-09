@@ -78,10 +78,10 @@ fn set_membership_unstaged_minus (
   for node_ref in tree . nodes() {
     let is_target : bool =
       match &node_ref . value() . kind {
-        ViewNodeKind::Vognode (
-          Vognode::Normal (t)
-          | Vognode::Phantom (t)) =>
+        ViewNodeKind::Vognode (Vognode::Normal (t)) =>
           t . id == ID::from (id),
+        ViewNodeKind::Vognode (Vognode::DiffPhantom (p)) =>
+          p . id == ID::from (id),
         _ => false,
       };
     if is_target {
@@ -89,9 +89,8 @@ fn set_membership_unstaged_minus (
       break; }}
   let target_id = target_id . unwrap_or_else (||
     panic! ("node not found: {}", id));
-  if let ViewNodeKind::Vognode (
-    Vognode::Normal (t)
-    | Vognode::Phantom (t)) =
+  // The target is a Normal node here; the next line flips it to a phantom.
+  if let ViewNodeKind::Vognode (Vognode::Normal (t)) =
     &mut tree . get_mut (target_id) . unwrap() . value() . kind
   { t . membership . unstaged = Some (Sign::Minus); }
   tree . get_mut (target_id) . unwrap()
@@ -601,6 +600,26 @@ fn subscribee_hiderel_intent_ignores_indefinitive_subscribee (
             * (skg (node (id subscriber) (source main))) subscriber
             ** (skg subscribeeCol)
             *** (skg (node (id subscribee) (source main) indef (viewRequests definitiveView))) subscribee
+            "};
+
+  assert_eq!(
+    hiderel_intents_from_org (input),
+    Vec::<SubscribeeHiderelIntent>::new()); }
+
+#[test]
+fn subscribee_hiderel_intent_ignores_indefinitive_subscriber (
+) {
+  // At-most-one-writer-per-ID (plan_v2 §6.1): even though the subscribee
+  // here is definitive with visible content, its subscriber instance is
+  // indefinitive, so no hide/unhide edits are inferred for the subscriber
+  // -- those belong only to the SubscribeeCol under the definitive
+  // instance of that subscriber.
+  let input : &str =
+    indoc! {"
+            * (skg (node (id subscriber) (source main) indef (viewRequests definitiveView))) subscriber
+            ** (skg subscribeeCol)
+            *** (skg (node (id subscribee) (source main))) subscribee
+            **** (skg (node (id a) (source main))) a
             "};
 
   assert_eq!(

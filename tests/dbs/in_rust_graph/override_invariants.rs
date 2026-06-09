@@ -8,6 +8,7 @@ use skg::dbs::in_rust_graph::audit::{
 use skg::dbs::in_rust_graph::override_invariants::{
   OverrideInvariantViolation,
   validate_override_invariants,
+  validate_touched_override_invariants,
 };
 use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
@@ -60,6 +61,17 @@ fn violations_for (
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes (&nodes);
   validate_override_invariants (&config (), &graph) }
+
+fn touched_violations_for (
+  nodes   : Vec<NodeComplete>,
+  touched : &[&str],
+) -> Vec<OverrideInvariantViolation> {
+  let graph : InRustGraph =
+    InRustGraph::from_nodecompletes (&nodes);
+  let touched_set : HashSet<ID> =
+    touched . iter () . map ( |p| ID::from (*p) ) . collect ();
+  validate_touched_override_invariants (
+    &config (), &graph, &touched_set ) }
 
 #[test]
 fn one_user_owned_overrider_is_valid () {
@@ -155,6 +167,105 @@ fn chain_from_foreign_first_is_valid () {
       node ("x", "foreign", &["y"]),
     ]),
     vec![] ); }
+
+// --- scoped (save-time) validator ---------------------------------
+
+#[test]
+fn touched_monogamy_detected_via_either_overrider () {
+  // target gains a 2nd user-owned overrider; flagged whether the save
+  // touched "one" or "two".
+  let nodes = || vec![
+    node ("target", "owned", &[]),
+    node ("one", "owned", &["target"]),
+    node ("two", "owned", &["target"]),
+  ];
+  for touched in [&["one"][..], &["two"][..]] {
+    let violations : Vec<OverrideInvariantViolation> =
+      touched_violations_for (nodes (), touched);
+    assert! (violations . iter () . any ( |v| matches!(
+      v,
+      OverrideInvariantViolation::MultipleUserOwnedOverriders {
+        overridden, ..
+      } if overridden == &ID::from ("target") )),
+      "touched {:?} should flag the monogamy violation", touched ); } }
+
+#[test]
+fn touched_chain_detected_from_the_first_end () {
+  // x → y → z, all owned. Saving x (the chain's first) flags it.
+  let violations : Vec<OverrideInvariantViolation> =
+    touched_violations_for (vec![
+      node ("z", "owned", &[]),
+      node ("y", "owned", &["z"]),
+      node ("x", "owned", &["y"]),
+    ], &["x"]);
+  assert! (violations . iter () . any ( |v| matches!(
+    v,
+    OverrideInvariantViolation::UserOwnedOverrideChain {
+      first_overrider, middle_overrider, ..
+    } if first_overrider == &ID::from ("x")
+         && middle_overrider == &ID::from ("y") ))); }
+
+#[test]
+fn touched_chain_detected_from_the_middle_end () {
+  // Same chain, but the save touched y (the middle). The new edge could
+  // be at either end, so the middle must also be checked.
+  let violations : Vec<OverrideInvariantViolation> =
+    touched_violations_for (vec![
+      node ("z", "owned", &[]),
+      node ("y", "owned", &["z"]),
+      node ("x", "owned", &["y"]),
+    ], &["y"]);
+  assert! (violations . iter () . any ( |v| matches!(
+    v,
+    OverrideInvariantViolation::UserOwnedOverrideChain {
+      first_overrider, middle_overrider, ..
+    } if first_overrider == &ID::from ("x")
+         && middle_overrider == &ID::from ("y") ))); }
+
+#[test]
+fn touched_foreign_overriders_do_not_count () {
+  assert_eq! (
+    touched_violations_for (vec![
+      node ("target", "owned", &[]),
+      node ("owned-one", "owned", &["target"]),
+      node ("foreign-one", "foreign", &["target"]),
+      node ("foreign-two", "foreign", &["target"]),
+    ], &["owned-one", "foreign-one", "foreign-two"]),
+    vec![] ); }
+
+#[test]
+fn touched_chain_through_foreign_middle_is_valid () {
+  assert_eq! (
+    touched_violations_for (vec![
+      node ("z", "owned", &[]),
+      node ("y", "foreign", &["z"]),
+      node ("x", "owned", &["y"]),
+    ], &["x"]),
+    vec![] ); }
+
+#[test]
+fn untouched_preexisting_violation_is_not_rescanned () {
+  // A pre-existing monogamy violation among nodes the save did not
+  // touch (here the save only touched the overridden "target", which
+  // overrides nothing) is not reported — that is the whole point of
+  // scoping; such states are rejected at init instead.
+  assert_eq! (
+    touched_violations_for (vec![
+      node ("target", "owned", &[]),
+      node ("one", "owned", &["target"]),
+      node ("two", "owned", &["target"]),
+    ], &["target"]),
+    vec![] ); }
+
+#[test]
+fn touched_unknown_source_is_reported () {
+  let violations : Vec<OverrideInvariantViolation> =
+    touched_violations_for (vec![
+      node ("ghost", "nonexistent-source", &[]),
+    ], &["ghost"]);
+  assert! (violations . iter () . any ( |v| matches!(
+    v, OverrideInvariantViolation::UnknownSource { node, .. }
+       if node == &ID::from ("ghost") ))); }
 
 #[test]
 fn audit_format_relationship_mismatch_keeps_relation_and_role () {

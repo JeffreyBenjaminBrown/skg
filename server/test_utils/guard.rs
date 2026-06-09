@@ -2,7 +2,7 @@ use crate::test_utils::cleanup_test_tantivy_and_typedb_dbs;
 use crate::consts::TYPEDB_ADDRESS;
 
 use std::path::PathBuf;
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
+use typedb_driver::{TypeDBDriver, Addresses, Credentials, DriverOptions, DriverTlsConfig};
 
 /// Safety net for test database cleanup.
 ///
@@ -51,17 +51,19 @@ impl Drop for TestDbGuard {
                  for cleanup of '{}': {}", db_name, e);
               return; }, };
         rt . block_on(async {
+          let addresses: Addresses =
+            match Addresses::try_from_address_str(TYPEDB_ADDRESS) {
+              Ok (a) => a,
+              Err (e) => {
+                tracing::error!(
+                  "TestDbGuard: failed to parse TypeDB address \
+                   for cleanup of '{}': {}", db_name, e);
+                return; }, };
           let driver_result: Result<TypeDBDriver, _> =
             TypeDBDriver::new(
-              TYPEDB_ADDRESS,
+              addresses,
               Credentials::new("admin", "password"),
-              match DriverOptions::new(false, None) {
-                Ok (opts) => opts,
-                Err (e) => {
-                  tracing::error!(
-                    "TestDbGuard: failed to create driver options \
-                     for cleanup of '{}': {}", db_name, e);
-                  return; }, },
+              DriverOptions::new(DriverTlsConfig::disabled()),
             ) . await;
           match driver_result {
             Ok (driver) => {

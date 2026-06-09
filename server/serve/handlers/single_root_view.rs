@@ -1,7 +1,7 @@
 use crate::dbs::in_rust_graph::scheduled_audit::take_pending_audit_warning;
 use crate::types::env::SkgEnv;
 use crate::serve::ViewsState;
-use crate::to_org::render::content_view::multi_root_view_with_source_set;
+use crate::to_org::render::content_view::multi_root_view_via_env;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   view_uri_from_request,
@@ -85,13 +85,11 @@ pub fn handle_single_root_view_request (
       { let _span : tracing::span::EnteredSpan =
           tracing::info_span!( "single_root_view" ). entered();
         block_on ( async {
-            match multi_root_view_with_source_set (
-              &env . driver,
-              &env . config,
-              Some (&env . tantivy_index),
+            match multi_root_view_via_env (
+              env,
               &[node_id . clone ()],
               views_state . diff_mode_enabled,
-              active_source_set ) . await
+              Some (active_source_set) ) . await
             { Ok ( (buffer_content, pids, viewforest) ) => {
                 if let Ok (view_uri) = &view_uri_result {
                   views_state . open_views . register_view (

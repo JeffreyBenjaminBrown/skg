@@ -1,5 +1,8 @@
-/// Diff application module for git diff view.
-/// Applies diff information to a viewforest of ViewNodes.
+/// Per-node git-diff decoration for the git diff view.
+/// process_truenode_diff decorates one Normal vognode and generates its
+/// diff-only children. TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): it is now called INLINE, at each
+/// node's own BFS visit (server/update_buffer/complete.rs), for both the
+/// post-save and de-novo paths.
 ///
 /// Each TrueNode and Scaffold is decorated with per-stage diff axes:
 ///   X (existence) describes whether the node's '.skg' file changed
@@ -10,47 +13,24 @@
 /// child but the worktree's parent.contains lacks it.
 
 use crate::types::env::find_source_with_optional_tantivy;
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges, axes_from_per_stage_diffs};
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges, axes_from_per_stage_diffs, existence_axes_in_source_diff, net_diff_from_per_stage};
+use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::phantom::title_for_phantom;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, mk_phantom_viewnode };
 use crate::types::viewnode::{Vognode, QualCol, Qual};
-use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::types::tree::viewnode_nodecomplete::pid_and_source_from_treenode;
 
-use ego_tree::{Tree, NodeMut, NodeRef, NodeId};
+use ego_tree::{NodeMut, NodeRef, NodeId};
 use std::collections::HashMap;
-use std::error::Error;
 use std::path::PathBuf;
 
-/// Apply diff information to a viewforest of ViewNodes.
-/// Modifies nodes in place to add per-stage diff axes
-/// and insert phantom nodes for positions missing from worktree.
-pub fn apply_diff_to_viewforest (
-  viewforest                     : &mut Tree<ViewNode>,
-  source_diffs                   : &HashMap<SourceName, SourceDiff>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  tantivy_index                  : Option<&TantivyIndex>,
-  config                         : &SkgConfig,
-) -> Result<(), Box<dyn Error>> {
-  let root_id : NodeId =
-    viewforest . root() . id();
-  do_everywhere_in_tree_dfs (
-    viewforest, root_id, true,
-    &mut |mut node_mut| {
-      match &node_mut . value() . kind . clone() {
-        ViewNodeKind::Vognode (Vognode::Normal (_)) =>
-          process_truenode_diff (
-            node_mut, source_diffs, deleted_since_head_pid_src_map,
-            tantivy_index, config ),
-        _ => Ok (( )) }} )?;
-  Ok (( )) }
-
-/// This is only used for de-novo views (multi_root_view).
-/// TODO : Sharing relationships (hides, overrides, subscribes) will need processing here.
 /// Decorate a normal vognode and generate any diff-only children
-/// implied by staged and unstaged NodeCompleteDiffs.
-fn process_truenode_diff (
+/// implied by staged and unstaged NodeCompleteDiffs. Called inline per Normal
+/// node at its own BFS visit (for both de-novo and post-save), TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3:
+/// the node flips to a phantom here and its cols then self-deaden via their own
+/// generalized-orphan check at their later visits.
+pub(crate) fn process_truenode_diff (
   mut node_mut                   : NodeMut<ViewNode>,
   source_diffs                   : &HashMap<SourceName, SourceDiff>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
@@ -90,6 +70,9 @@ fn process_truenode_diff (
     { t . existence . staged   = staged_x;
       t . existence . unstaged = unstaged_x; }
   node_mut . value() . normal_to_phantom ();
+  let node_flipped_to_phantom : bool =
+    matches! ( node_mut . value() . kind,
+      ViewNodeKind::Vognode (Vognode::DiffPhantom (_)) );
   // For an Added or Deleted file we don't read node_changes
   // (the comparison is degenerate). NewHere/RemovedHere on children
   // and IDcol/textChanged scaffolds only apply to Modified files.
@@ -115,12 +98,28 @@ fn process_truenode_diff (
           Qual::TextChanged {
             staged   : staged_text,
             unstaged : unstaged_text } ) } ); }
-  let merged_ids : Vec<(ID, MembershipAxes)> =
-    axes_from_per_stage_diffs (
-      staged_changes   . map ( |c| c . ids_diff . as_slice () ),
-      unstaged_changes . map ( |c| c . ids_diff . as_slice () ) );
-  if merged_ids . iter () . any ( |(_, m)| ! m . is_empty () ) {
-    prepend_idcol_with_children ( &mut node_mut, &merged_ids ); }
+  // The IDCol/AliasCol diff scaffolds are cols, so if this node flipped to a
+  // phantom they would be generalized orphans (a col requires a Normal-vognode
+  // ancestor) and get deadened + pruned at their own BFS visit -- i.e. emitted
+  // here only to be destroyed before render. Skip creating them on a flipped
+  // node: same final tree, without the wasted work. (The node's id/alias
+  // sub-diffs are noise on a removed node anyway.)
+  if ! node_flipped_to_phantom {
+    // Emit an EMPTY IDCol / AliasCol when this node's id-list / alias-list
+    // changed. Their per-id / per-alias children (each carrying its membership
+    // axes) are filled when the BFS later reaches the col, by
+    // reconcile_id_col_children / reconcile_alias_col_children -- the single
+    // place that derives them from the per-stage diff. So we only DECIDE here
+    // (cheaply: did any entry get added or removed?), and do not duplicate the
+    // per-stage merge.
+    if list_diff_has_change (
+         staged_changes   . map ( |c| c . ids_diff . as_slice () ),
+         unstaged_changes . map ( |c| c . ids_diff . as_slice () ) ) {
+      prepend_empty_diff_col ( &mut node_mut, QualCol::ID ); }
+    if list_diff_has_change (
+         staged_changes   . map ( |c| c . aliases_diff . as_slice () ),
+         unstaged_changes . map ( |c| c . aliases_diff . as_slice () ) ) {
+      prepend_empty_diff_col ( &mut node_mut, QualCol::Alias ); } }
   // Compute per-stage contains diff for the parent so we can decorate
   // worktree children with M axes and insert phantoms.
   let merged_contains : Vec<(ID, MembershipAxes)> =
@@ -129,37 +128,69 @@ fn process_truenode_diff (
       unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
   mark_membership_on_existing_children (
     &mut node_mut, tree_node_id, &merged_contains );
+  // Net HEAD->worktree contains order (an LCS of the reconstructed HEAD and
+  // worktree contains lists), so each removed-member phantom lands at its
+  // correct HEAD position among surviving siblings -- even when contains changed
+  // in both git stages.
+  let net_contains : Vec<Diff_Item<ID>> =
+    net_diff_from_per_stage (
+      staged_changes   . map ( |c| c . contains_diff . as_slice () ),
+      unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
+  let membership_by_id : HashMap<ID, MembershipAxes> =
+    merged_contains . iter () . cloned () . collect ();
   insert_phantoms_for_missing_contains (
-    &mut node_mut, &merged_contains,
+    &mut node_mut, tree_node_id, &net_contains, &membership_by_id,
     source_diff, source_diffs,
     deleted_since_head_pid_src_map, tantivy_index, config ) ?;
   Ok (( )) }
 
-/// Prepend an IDCol scaffold populated with per-id ID scaffolds.
-fn prepend_idcol_with_children (
-  node_mut   : &mut NodeMut<ViewNode>,
-  merged_ids : &[(ID, MembershipAxes)],
+/// Decide where each removed-member phantom belongs among its surviving
+/// siblings: insert it immediately before the *next* surviving child in
+/// net HEAD->worktree order, or append it (anchor = None) when no surviving
+/// child follows. Returns (removed_id, anchor_id) pairs in the order the
+/// phantoms should be created, so consecutive removals before the same
+/// survivor keep their relative order.
+fn phantom_insertion_plan (
+  net_contains : &[Diff_Item<ID>],
+) -> Vec<(ID, Option<ID>)> {
+  let mut plan : Vec<(ID, Option<ID>)> = Vec::new ();
+  let mut next_survivor : Option<ID> = None;
+  for item in net_contains . iter () . rev () {
+    match item {
+      Diff_Item::Unchanged (id) | Diff_Item::New (id)
+        => { next_survivor = Some ( id . clone () ); },
+      Diff_Item::Removed (id)
+        => { plan . push ( ( id . clone (), next_survivor . clone () )); }, }}
+  plan . reverse ();
+  plan }
+
+/// True iff either stage's list-field diff actually added or removed an entry
+/// (an Unchanged-only diff is no change). The cheap decision used to emit an
+/// empty diff col; reconcile_id_col_children / reconcile_alias_col_children
+/// then fills the col from the same per-stage diff.
+fn list_diff_has_change<T> (
+  staged   : Option<&[Diff_Item<T>]>,
+  unstaged : Option<&[Diff_Item<T>]>,
+) -> bool {
+  let changed = | slice : Option<&[Diff_Item<T>]> | -> bool {
+    slice . is_some_and ( |s| s . iter () . any (
+      |item| matches! ( item,
+        Diff_Item::New (_) | Diff_Item::Removed (_) ) )) };
+  changed (staged) || changed (unstaged) }
+
+/// Prepend an EMPTY QualCol diff scaffold (an IDCol or AliasCol). Its per-entry
+/// children -- each carrying its membership axes -- are filled when the BFS
+/// reaches the col, by reconcile_id_col_children / reconcile_alias_col_children.
+fn prepend_empty_diff_col (
+  node_mut : &mut NodeMut<ViewNode>,
+  kind     : QualCol,
 ) {
-  let idcol_node : ViewNode =
+  node_mut . prepend (
     ViewNode {
       focused     : false,
       folded      : false,
       body_folded : false,
-      kind        : ViewNodeKind::QualCol (QualCol::ID) };
-  let idcol_treeid : NodeId =
-    node_mut . prepend (idcol_node) . id();
-  let mut idcol_mut : NodeMut<ViewNode> =
-    node_mut . tree() . get_mut (idcol_treeid) . unwrap();
-  for (id, membership) in merged_ids {
-    let id_viewnode : ViewNode =
-      ViewNode {
-        focused     : false,
-        folded      : false,
-        body_folded : false,
-        kind        : ViewNodeKind::Qual (
-          Qual::ID {
-            id: id . clone (), membership: *membership } ) };
-    idcol_mut . append (id_viewnode); } }
+      kind        : ViewNodeKind::QualCol (kind) } ); }
 
 /// For each existing child in the worktree's contains list, copy any
 /// per-stage M-axis values from the merged contains diff.
@@ -193,41 +224,69 @@ fn mark_membership_on_existing_children (
         if m . unstaged == Some (Sign::Plus)
           { membership . unstaged = Some (Sign::Plus); }}}} }
 
-/// Insert phantoms for IDs that appear in the merged contains diff with
-/// any '-' (Removed) sign on any stage. These are positions missing
-/// from worktree.contains. Each phantom carries the appropriate M axes
-/// (and X axes if its file is also gone in some stage).
+/// Insert a removed-member phantom for each net-Removed id in the parent's
+/// contains diff (ids present in HEAD but absent from worktree.contains).
+/// Each phantom is placed at its correct HEAD position among surviving
+/// siblings (per 'phantom_insertion_plan'), carrying its M axes (from the
+/// merged contains diff) and X axes (if its file is also gone in some stage).
 fn insert_phantoms_for_missing_contains (
   node_mut                       : &mut NodeMut<ViewNode>,
-  merged_contains                : &[(ID, MembershipAxes)],
+  parent_node_id                 : NodeId,
+  net_contains                   : &[Diff_Item<ID>],
+  membership_by_id               : &HashMap<ID, MembershipAxes>,
   source_diff                    : &SourceDiff,
   source_diffs                   : &HashMap<SourceName, SourceDiff>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   tantivy_index                  : Option<&TantivyIndex>,
   config                         : &SkgConfig,
 ) -> Result<(), String> {
-  for (id, membership) in merged_contains {
-    let has_negative : bool =
-      membership . staged   == Some (Sign::Minus)
-      || membership . unstaged == Some (Sign::Minus);
-    if ! has_negative { continue; }
+  let plan : Vec<(ID, Option<ID>)> =
+    phantom_insertion_plan (net_contains);
+  if plan . is_empty () { return Ok (( )); }
+  // Map each surviving child's id to its NodeId, so an anchor id resolves
+  // to the tree node we insert the phantom before.
+  let child_node_by_id : HashMap<ID, NodeId> = {
+    let node_ref : NodeRef<ViewNode> =
+      node_mut . tree () . get (parent_node_id) . unwrap ();
+    let mut m : HashMap<ID, NodeId> = HashMap::new ();
+    for c in node_ref . children () {
+      match &c . value () . kind {
+        ViewNodeKind::Vognode (Vognode::Normal (t))
+          => { m . insert ( t . id . clone (), c . id () ); },
+        ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
+          => { m . insert ( p . id . clone (), c . id () ); },
+        ViewNodeKind::Vognode (Vognode::Inactive (i))
+          => { m . insert ( i . id . clone (), c . id () ); },
+        _ => {}, }}
+    m };
+  for (id, anchor) in plan {
+    let membership : MembershipAxes =
+      membership_by_id . get (&id) . copied () . unwrap_or_default ();
     let child_source : SourceName =
       find_source_with_optional_tantivy (
-        id, deleted_since_head_pid_src_map,
+        &id, deleted_since_head_pid_src_map,
         tantivy_index, config )
         . ok_or_else ( || format! (
           "find_source: no source for {}", id . 0 )) ?;
     let child_existence : ExistenceAxes =
-      existence_axes_for_phantom (id, &child_source, source_diff, source_diffs);
+      existence_axes_for_phantom (&id, &child_source, source_diff, source_diffs);
     let child_title : String =
       title_for_phantom (
-        id, &child_source,
+        &id, &child_source,
         Some (source_diffs), config );
-    node_mut . prepend (
+    let phantom : ViewNode =
       mk_phantom_viewnode (
         id . clone (), child_source, child_title,
-        child_existence, *membership )); }
+        child_existence, membership );
+    match anchor . and_then ( |a| child_node_by_id . get (&a) . copied () ) {
+      Some (anchor_nid) =>
+        { node_mut . tree () . get_mut (anchor_nid) . unwrap ()
+            . insert_before (phantom); },
+      None =>
+        { node_mut . tree () . get_mut (parent_node_id) . unwrap ()
+            . append (phantom); }, }}
   Ok (( )) }
+
 
 /// Compute existence axes for a phantom: derived from whether the
 /// child's '.skg' file shows up as Deleted in either stage.
@@ -243,8 +302,8 @@ fn existence_axes_for_phantom (
   // otherwise fall back to the parent's source_diff.
   let resolved : &SourceDiff =
     source_diffs . get (source) . unwrap_or (source_diff);
-  let staged_x : Option<Sign> = resolved . staged   . get (&file_path)
-    . and_then ( |d| d . status . to_existence_sign ());
-  let unstaged_x : Option<Sign> = resolved . unstaged . get (&file_path)
-    . and_then ( |d| d . status . to_existence_sign ());
-  ExistenceAxes { staged: staged_x, unstaged: unstaged_x } }
+  existence_axes_in_source_diff ( Some (resolved), &file_path ) }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/render_diff.rs"]
+mod phantom_insertion_plan_tests;

@@ -80,6 +80,18 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
           node1 . extra_ids . contains(&ID::from ("2")),
           "Node 1 should have acquired extra_id '2'"
         );
+
+        // Aliases are unioned on merge (parallel to extra_ids), so the
+        // merged node stays findable by the acquiree's old aliases.
+        let node1_aliases : &[String] = node1 . aliases . or_default();
+        assert!(
+          node1_aliases . contains(&"one-alias" . to_string()),
+          "Node 1 should keep its own alias 'one-alias', got {:?}",
+          node1_aliases );
+        assert!(
+          node1_aliases . contains(&"two-alias" . to_string()),
+          "Node 1 should acquire node 2's alias 'two-alias', got {:?}",
+          node1_aliases );
        assert!(
         matches!(&merge . updated_acquirer,
              SaveNode (_)),

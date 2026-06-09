@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::time::Duration;
 use std::error::Error;
 
@@ -5,8 +6,9 @@ use crate::consts::{
   typedb_concurrent_transactions,
   TYPEDB_TRANSACTION_TIMEOUT_SECS,
 };
-use crate::dbs::in_rust_graph::snapshot_global;
+use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
 use crate::types::misc::ID;
+use crate::types::nodes::rust::NodeRust;
 use crate::types::nodes::typedb::NodeTypedb;
 
 use futures::stream::{self, StreamExt};
@@ -47,6 +49,206 @@ pub async fn create_all_relationships (
     . collect () . await;
   for result in results {
     result ?; }
+  Ok (()) }
+
+/// Bring each node's five outbound relation types into agreement with
+/// its desired (post-save) edge set, issuing only the add/remove delta
+/// against the node's pre-save edges read from 'old_graph'. All five
+/// relations are orderless sets in TypeDB (child order is reconstructed
+/// from disk), so a set-diff is exact. One Write transaction per node —
+/// and none at all for a node whose edges did not change.
+///
+/// This is the save-path counterpart to the bulk
+/// 'delete_all_outbound_relationships_to_nodes' + 'create_all_relationships'
+/// pair: equivalent result, but O(changed edges) rather than O(all edges).
+pub async fn apply_relationship_deltas_for_nodes (
+  db_name           : &str,
+  driver            : &TypeDBDriver,
+  old_graph         : &InRustGraph,
+  nodes             : &[NodeTypedb],
+  pre_existing_pids : &HashSet<String>, // pids already in TypeDB (vs newly created this save)
+) -> Result < (), Box<dyn Error> > {
+  tracing::info! ("Applying relationship deltas ...");
+  let results : Vec < Result < (), Box < dyn Error > > > =
+    stream::iter ( nodes . iter ()
+      . map ( |node| apply_relationship_deltas_for_one_node (
+                db_name, driver, old_graph, node, pre_existing_pids )) )
+    . buffer_unordered (
+        typedb_concurrent_transactions () )
+    . collect () . await;
+  for result in results {
+    result ?; }
+  Ok (()) }
+
+/// One node's outbound-edge update, in a single transaction. Three
+/// cases, by how much the in-Rust 'old' snapshot knows about the node:
+///
+/// - node IS in the snapshot (the live-server norm, where the snapshot
+///   mirrors TypeDB): write only the diff — add each (new − old) edge,
+///   delete each (old − new). Adds clear-before-insert, so even a stale
+///   snapshot cannot cause a duplicate.
+/// - node is NOT in the snapshot but already exists in TypeDB (a
+///   recovery, or a test that loads fixtures into TypeDB yet starts from
+///   an empty in-Rust graph): the diff is untrustworthy, so clear ALL of
+///   the node's outbound edges first, then add the full new set — the
+///   bulk path's robustness, one node at a time.
+/// - node is NOT in the snapshot and not yet in TypeDB (a genuinely new
+///   node): just add the new set; there is nothing to clear.
+///
+/// New/old targets resolve to primary pids the same way
+/// 'insert_relationship_from_list' does (new via the live global
+/// snapshot, old via 'old_graph').
+async fn apply_relationship_deltas_for_one_node (
+  db_name           : &str,
+  driver            : &TypeDBDriver,
+  old_graph         : &InRustGraph,
+  node              : &NodeTypedb,
+  pre_existing_pids : &HashSet<String>,
+) -> Result < (), Box<dyn Error> > {
+  let primary_id : &ID = &node . pid;
+  let old_node : Option<&NodeRust> =
+    old_graph . nodes . get (primary_id);
+  let must_clear_first : bool = // in TypeDB but absent from the snapshot
+    old_node . is_none ()
+    && pre_existing_pids . contains (primary_id . as_str ());
+  let global = snapshot_global ();
+  struct RelPlan {
+    relation  : &'static str,
+    from_role : &'static str,
+    to_role   : &'static str,
+    add       : Vec<ID>,
+    remove    : Vec<ID>, }
+  let plans : Vec<RelPlan> = { // compute first; open no transaction if empty
+    let mut plans : Vec<RelPlan> = Vec::new ();
+    for &(relation, from_role, to_role) in OUTBOUND_RELATIONSHIP_TYPES {
+      let new_pids : HashSet<ID> = resolve_to_pids (
+        global . as_deref (), &new_targets (node, relation) );
+      let old_pids : HashSet<ID> = match old_node {
+        Some (n) => resolve_to_pids (
+          Some (old_graph), &old_targets (n, relation) ),
+        None => HashSet::new (), };
+      let add : Vec<ID> =
+        new_pids . difference (&old_pids) . cloned () . collect ();
+      let remove : Vec<ID> =
+        old_pids . difference (&new_pids) . cloned () . collect ();
+      // When clearing first, every relation needs a plan so stale TypeDB
+      // edges the new buffer drops get removed, even a relation with no adds.
+      if must_clear_first || ! add . is_empty () || ! remove . is_empty () {
+        plans . push ( RelPlan {
+          relation, from_role, to_role, add, remove } ); } }
+    plans };
+  if plans . is_empty () { return Ok (()); }
+  let options : TransactionOptions =
+    TransactionOptions::new () . transaction_timeout (
+      Duration::from_secs ( TYPEDB_TRANSACTION_TIMEOUT_SECS ));
+  let tx : Transaction =
+    driver . transaction_with_options (
+      db_name, TransactionType::Write, options ) . await ?;
+  for p in &plans {
+    if must_clear_first {
+      clear_outbound_relation (
+        &tx, primary_id . as_str (), p . relation, p . from_role ) . await
+      . map_err ( |e| format! (
+          "Failed to clear '{}' relationships of '{}': {}",
+          p . relation, primary_id . as_str (), e )) ?;
+    } else {
+      for target in &p . add { // idempotent: a no-op when the snapshot is accurate
+        delete_one_outbound_link (
+          &tx, primary_id . as_str (), target . as_str (),
+          p . relation, p . from_role, p . to_role ) . await
+        . map_err ( |e| format! (
+            "Failed to clear '{}' relationship '{}' -> '{}' before re-add: {}",
+            p . relation, primary_id . as_str (), target . as_str (), e )) ?; } }
+    if ! p . add . is_empty () {
+      insert_relationship_from_list (
+        primary_id . as_str (), &p . add,
+        p . relation, p . from_role, p . to_role, &tx ) . await
+      . map_err ( |e| format! (
+          "Failed to add '{}' relationships for '{}': {}",
+          p . relation, primary_id . as_str (), e )) ?; }
+    for target in &p . remove {
+      delete_one_outbound_link (
+        &tx, primary_id . as_str (), target . as_str (),
+        p . relation, p . from_role, p . to_role ) . await
+      . map_err ( |e| format! (
+          "Failed to remove '{}' relationship '{}' -> '{}': {}",
+          p . relation, primary_id . as_str (), target . as_str (), e )) ?; } }
+  tx . commit () . await
+    . map_err ( |e| format! (
+        "Failed to commit relationship updates for '{}': {}",
+        primary_id . as_str (), e )) ?;
+  Ok (()) }
+
+/// Delete every outbound instance of 'relation' where 'from_id' plays
+/// 'from_role'. Does not commit.
+async fn clear_outbound_relation (
+  tx        : &typedb_driver::Transaction,
+  from_id   : &str,
+  relation  : &str,
+  from_role : &str,
+) -> Result < (), Box<dyn Error> > {
+  tx . query ( format! (
+    r#"match
+         $n   isa node, has id "{}";
+         $rel isa {} ( {}: $n );
+       delete $rel; "#,
+    from_id, relation, from_role )
+  ) . await ?;
+  Ok (()) }
+
+/// Resolve raw target ids to primary pids via 'graph' (falling back to
+/// the raw id when unknown, matching 'insert_relationship_from_list').
+fn resolve_to_pids (
+  graph : Option<&InRustGraph>,
+  raws  : &[ID],
+) -> HashSet<ID> {
+  raws . iter ()
+    . map ( |raw| graph . and_then ( |g| g . pid_of (raw) )
+            . unwrap_or_else ( || raw . clone () ) )
+    . collect () }
+
+fn new_targets (
+  node     : &NodeTypedb,
+  relation : &str,
+) -> Vec<ID> {
+  match relation {
+    "contains"                     => node . contains . clone (),
+    "textlinks_to"                 => node . textlinks_to . clone (),
+    "subscribes"                   => node . subscribes_to . or_default () . to_vec (),
+    "hides_from_its_subscriptions" => node . hides_from_its_subscriptions . or_default () . to_vec (),
+    "overrides_view_of"            => node . overrides_view_of . or_default () . to_vec (),
+    _ => Vec::new (), } }
+
+fn old_targets (
+  node     : &NodeRust,
+  relation : &str,
+) -> Vec<ID> {
+  match relation {
+    "contains"                     => node . contains . clone (),
+    "textlinks_to"                 => node . textlinks_to . clone (),
+    "subscribes"                   => node . subscribes_to . or_default () . to_vec (),
+    "hides_from_its_subscriptions" => node . hides_from_its_subscriptions . or_default () . to_vec (),
+    "overrides_view_of"            => node . overrides_view_of . or_default () . to_vec (),
+    _ => Vec::new (), } }
+
+/// Delete one specific outbound edge ('from_id' --relation--> 'to_id'),
+/// where 'to_id' is an already-resolved primary pid. Does not commit.
+async fn delete_one_outbound_link (
+  tx        : &typedb_driver::Transaction,
+  from_id   : &str,
+  to_id     : &str,
+  relation  : &str,
+  from_role : &str,
+  to_role   : &str,
+) -> Result < (), Box<dyn Error> > {
+  tx . query ( format! (
+    r#"match
+         $from isa node, has id "{}";
+         $to   isa node, has id "{}";
+         $rel  isa {} ( {}: $from, {}: $to );
+       delete $rel; "#,
+    from_id, to_id, relation, from_role, to_role )
+  ) . await ?;
   Ok (()) }
 
 async fn create_relationships_for_one_node (

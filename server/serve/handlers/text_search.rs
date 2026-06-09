@@ -11,6 +11,7 @@ use coverage::{CoverageMatcher, build_coverage_matcher, coverage_factor};
 
 use crate::consts::SEARCH_DISPLAY_LIMIT;
 use crate::context::ContextOriginType;
+use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
 use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
 use crate::dbs::typedb::search::all_graphnodestats::{
@@ -125,6 +126,9 @@ pub fn handle_text_search_request (
       operators : bool_key ( &sexp, "operators" ), };
   match search_terms {
     Ok (search_terms) => {
+      // Wait for any in-flight background save-index writes to commit, so
+      // the search reflects every save issued so far (read-your-writes).
+      wait_for_tantivy_writes_idle ();
       // --- Phase 1: immediate results without paths ---
       match search_index ( &env . tantivy_index,
                            &search_terms,

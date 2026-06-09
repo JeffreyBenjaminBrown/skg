@@ -30,7 +30,7 @@ use skg::types::nodes::complete::NodeComplete;
 use std::env;
 use std::sync::Arc;
 use typedb_driver::{
-  Credentials, DriverOptions, Transaction, TransactionType, TypeDBDriver,
+  Addresses, Credentials, DriverOptions, DriverTlsConfig, Transaction, TransactionType, TypeDBDriver,
 };
 
 #[tokio::main]
@@ -51,9 +51,9 @@ async fn main () -> Result<(), Box<dyn std::error::Error>> {
   println! ("Loaded graph: {} nodes", snap . nodes . len ());
 
   let driver : TypeDBDriver = TypeDBDriver::new (
-    "127.0.0.1:1729",
+    Addresses::try_from_address_str ("127.0.0.1:1729") ?,
     Credentials::new ("admin", "password"),
-    DriverOptions::new (false, None) ?
+    DriverOptions::new (DriverTlsConfig::disabled ())
   ) . await ?;
   let tx : Transaction = driver . transaction (
     &config . db_name, TransactionType::Read ) . await ?;

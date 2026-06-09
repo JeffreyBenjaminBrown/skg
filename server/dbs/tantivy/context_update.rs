@@ -7,6 +7,7 @@
 // indexing" TODO in the schema doc-comment.
 
 use crate::consts::{TANTIVY_PER_ID_LOOKUP_LIMIT, TANTIVY_WRITER_BUFFER_BYTES};
+use crate::dbs::tantivy::background_writer::lock_tantivy_writes;
 use crate::dbs::tantivy::write::commit_with_status;
 use crate::types::misc::{ID, SourceName, TantivyIndex};
 
@@ -26,6 +27,8 @@ pub fn update_context_origin_types (
 ) -> Result<usize, Box<dyn Error>> {
   let searcher : Searcher =
     tantivy_index . reader . searcher ();
+  let _wlock = // serialize with the background save-index worker & other writers
+    lock_tantivy_writes ();
   let mut writer : IndexWriter =
     tantivy_index . index . writer (
       TANTIVY_WRITER_BUFFER_BYTES) ?;

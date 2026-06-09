@@ -1,4 +1,6 @@
 pid: '1'
 title: "1"
 body: "1 body"
+aliases:
+- one-alias
 contains: []

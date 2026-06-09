@@ -46,6 +46,15 @@ pub(crate) fn subscribee_hiderel_intents_from_candidates (
     let node_ref : NodeRef<ViewNode_in_Role> =
       viewforest . get (candidate . treeid) . ok_or (
         "subscribee hiderel candidate not found")?;
+    // At-most-one-writer-per-ID: a subscribee-as-such infers
+    // hide/unhide edits for its subscriber N, but only the SubscribeeCol
+    // under the *definitive* instance of N may write them. The same
+    // subscriber can recur indefinitively elsewhere with its own
+    // SubscribeeCol; without this guard those would emit contradictory
+    // hide edits for one ID. (TODO/DONE/local-view-update/plan_v2.org §6.1.) The subscribee's own
+    // definitiveness is already required by collect_savenode_candidates.
+    if ! subscriber_instance_is_definitive (&node_ref) {
+      continue; }
     let subscribee : ID =
       match &node_ref . value() . viewnode . kind {
         ViewNodeKind::Vognode (Vognode::Normal (t))
@@ -61,6 +70,22 @@ pub(crate) fn subscribee_hiderel_intents_from_candidates (
         collect_visible_content (&node_ref),
     }); }
   Ok (result) }
+
+/// True iff the subscriber instance this subscribee-as-such hangs under
+/// is a *definitive* Normal vognode. The tree shape is
+/// subscriber -> SubscribeeCol -> subscribee-as-such, so the subscriber
+/// is the candidate's grandparent. See the at-most-one-writer-per-ID
+/// note at the call site (TODO/DONE/local-view-update/plan_v2.org §6.1).
+fn subscriber_instance_is_definitive (
+  subscribee_ref : &NodeRef<ViewNode_in_Role>,
+) -> bool {
+  subscribee_ref . parent()              // SubscribeeCol
+    . and_then (|col| col . parent())    // subscriber vognode
+    . map (|subscriber| matches!(
+        &subscriber . value() . viewnode . kind,
+        ViewNodeKind::Vognode (Vognode::Normal (t))
+          if ! t . is_indefinitive() ) )
+    . unwrap_or (false) }
 
 /// Collect the children that the buffer presents as visible
 /// content of one subscribee-as-such.

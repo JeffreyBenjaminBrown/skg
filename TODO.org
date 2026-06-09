@@ -1,5 +1,16 @@
-* DiffPhantom should carry less data
-no view requests, parentIs, birth, indef_or_def
+* git add for both sides of moved source
+* Emacs, not the server, should remember foldedness and point.
+Keep a tree of IDs.
+If the ID that had point is lost,
+destroy its spaces-in-the-text-of-that-node record,
+and hand it to the nearest surviving ancestor.
+* Split Vognode into
+Vognode = Active | Inactive
+Phantom = Diff | Deleted | Unknown
+
+Promote Phantom to be one of the variants of ViewNode.
+What's the difference between the three kinds of phantom?
+* The AIs want jq, perl
 * each new root view sohuld be drawn with a link sources ancestry
 that is, linksource-ancestry as view-descendents
 * more diff supplement data

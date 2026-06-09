@@ -1,5 +1,4 @@
-use crate::types::misc::ID;
-use crate::types::viewnode::{ParentIs, TrueNode, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{ParentIs, ViewNode, ViewNodeKind};
 use crate::types::viewnode::Vognode;
 use crate::types::tree::generic::{with_node_mut, write_at_ancestor_in_tree};
 
@@ -30,41 +29,6 @@ where
                              { treatment( n . value() ); }
     } ) . map_err( |e| -> String { e . into() } )?; }
   Ok( () ) }
-
-/// Mark managed TrueNode children whose IDs are not in `goal_list` as
-/// independent.
-///
-/// Callers provide `is_managed_child` because different scaffold
-/// completers can define ownership differently.  Generated collection
-/// scaffolds should generally manage children marked parentIs=affected.
-///
-/// Run this before `complete_relevant_children_in_viewnodetree` when
-/// the reconciler would otherwise discard non-goal managed children.
-pub fn mark_managed_children_outside_goal_independent<ManagedPredicate> (
-  tree             : &mut Tree<ViewNode>,
-  node             : NodeId,
-  goal_list        : &[ID],
-  is_managed_child : ManagedPredicate,
-) -> Result<(), Box<dyn Error>>
-where
-  ManagedPredicate : Fn (&TrueNode) -> bool,
-{
-  let goal_set : HashSet<ID> =
-    goal_list . iter () . cloned () . collect ();
-  treat_certain_children (
-    tree, node,
-    |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::Vognode (Vognode::Normal (t)) =>
-        is_managed_child (t)
-        && ! goal_set . contains (&t . id)
-        && ! t . should_be_phantom (),
-      _ => false },
-    |vn : &mut ViewNode| {
-      if let ViewNodeKind::Vognode (Vognode::Normal (t))
-        = &mut vn . kind
-        { t . parentIs = ParentIs::Independent; }} )
-    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
-  Ok (( )) }
 
 /// Classify children of a node based on a classifier function.
 /// Returns a HashMap from classification key to Vec<NodeId>.
@@ -121,20 +85,6 @@ pub fn detach_scaffold_transferring_focus (
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (()) }
 
-/// Like `detach_scaffold_transferring_focus`, but only acts if the
-/// scaffold has no children.
-pub fn detach_scaffold_if_empty (
-  tree : &mut Tree<ViewNode>,
-  node : NodeId,
-) -> Result<(), Box<dyn Error>> {
-  let has_children : bool =
-    tree . get (node)
-      . ok_or ("detach_scaffold_if_empty: node not found") ?
-      . children () . next () . is_some ();
-  if !has_children {
-    detach_scaffold_transferring_focus (tree, node) ?; }
-  Ok (()) }
-
 /// Move an existing child to the end of its parent's children list.
 /// Uses detach() + append_id() to move without cloning.
 pub fn move_child_to_end<Node> (
@@ -173,6 +123,28 @@ where Relevant : Fn (&ViewNode) -> bool,
       subtree_satisfies( tree, node_id, &|n: &ViewNode| n . focused ) };
   let problem_discard_response =
     |n: &mut ViewNode| { n . focused = true; };
+  // TODO/DONE/local-view-update/plan_v2.org §6.0 stale-member rule: a stale member (relevant child not in the goal)
+  // that is a Normal, parentIs=Affected *branch* (has children) is demoted to
+  // Independent so the user's subtree survives; everything else stale -- a
+  // leaf, a diff-phantom, a qual, an inactive placeholder -- is deleted by the
+  // reconciler. Returns true iff it demoted the node (kept it).
+  let demote_invalid =
+    |tree: &mut Tree<ViewNode>, node_id: NodeId|
+      -> Result<bool, Box<dyn Error>> {
+      let demote : bool = {
+        let n : NodeRef<ViewNode> = tree . get (node_id)
+          . ok_or ("demote_invalid: node not found") ?;
+        let has_children : bool = n . children () . next () . is_some ();
+        has_children && matches! ( &n . value () . kind,
+          ViewNodeKind::Vognode (Vognode::Normal (t))
+            if t . parentIs == ParentIs::Affected ) };
+      if demote {
+        with_node_mut ( tree, node_id, |mut n| {
+          if let ViewNodeKind::Vognode (Vognode::Normal (t))
+            = &mut n . value () . kind
+            { t . parentIs = ParentIs::Independent; } } )
+          . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
+      Ok (demote) };
   complete_relevant_children(
     tree,
     treeid,
@@ -181,11 +153,9 @@ where Relevant : Fn (&ViewNode) -> bool,
     goal_list,
     create_child,
     problem_discard,
-    problem_discard_response ) }
+    problem_discard_response,
+    demote_invalid ) }
 
-/// TODO ? Marking parentIs=Independent might be better than deletion.
-/// (Or, keeping it abstract, replacing deletion with a caller-supplied lambda.)
-/// .
 /// PURPOSE:
 /// Reconciles a parent's "relevant" children against a desired list of 'orderkeys'.
 /// The payload of each tree node should be some possibly-improper supertype of 'orderkey' -- that is,
@@ -194,14 +164,18 @@ where Relevant : Fn (&ViewNode) -> bool,
 /// STEPS:
 /// - Partitions children into "relevant" (matching a predicate) and "irrelevant".
 ///   It is not necessary that irrelevant children be able to provide an orderkey.
-/// - Among relevant children, identifies duplicates and those whose orderkey is not in goal_list.
-///   Runs problem_discard on each such node.
-///   If any returns true, will run problem_discard_response on the parent after discarding.
-///   Then discards those nodes.
+/// - Among relevant children, identifies duplicates and "stale" members (those
+///   whose orderkey is not in goal_list).
+///   - Duplicates are always detached.
+///   - A stale member is offered to 'demote_invalid'; if that keeps it (returns
+///     true, e.g. TODO/DONE/local-view-update/plan_v2.org §6.0 demote-a-branch-to-Independent) it survives, otherwise it
+///     is detached.
+///   Runs problem_discard on each node that is actually detached; if any returns
+///   true, runs problem_discard_response on the parent afterward.
 /// - Reorders remaining children: irrelevant first, then relevant in goal_list order.
 ///   Creates new children for any orderkeys missing from the original children.
 pub fn complete_relevant_children
-<Node, Orderkey, Relevant, View, ProblemDiscard, ProblemResponse> (
+<Node, Orderkey, Relevant, View, ProblemDiscard, ProblemResponse, DemoteInvalid> (
   tree                     : &mut Tree<Node>,
   parent_id                : NodeId,
   relevant                 : Relevant,
@@ -210,6 +184,7 @@ pub fn complete_relevant_children
   create_child             : impl Fn (&Orderkey) -> Node,
   problem_discard          : ProblemDiscard,
   mut problem_discard_response : ProblemResponse,
+  demote_invalid           : DemoteInvalid,
 ) -> Result<(), Box<dyn Error>>
 where
   Relevant        : Fn (&Node) -> bool,
@@ -217,6 +192,7 @@ where
   Orderkey        : Eq + Hash + Clone,
   ProblemDiscard  : Fn(&Tree<Node>, NodeId) -> Result<bool, String>,
   ProblemResponse : FnMut (&mut Node),
+  DemoteInvalid   : Fn(&mut Tree<Node>, NodeId) -> Result<bool, Box<dyn Error>>,
 {
   let groups : HashMap<i32, Vec<NodeId>> =
     partition_children (
@@ -246,24 +222,21 @@ where
       duplicate_ids . push( ( node_id, orderkey ) ); // hopefully none
     } else {
       orderkey_to_treeid . insert( orderkey, node_id ); } }
-  let discard_has_problem : bool =
-    { let mut found : bool = false;
-      for &( node_id, _ ) in &duplicate_ids {
-        if problem_discard( tree, node_id )? {
-          found = true; } }
-      for &node_id in &invalid_ids {
-        if problem_discard( tree, node_id )? {
-          found = true; } }
-      found };
-  { // Remove invalid and duplicate nodes
-    for &( node_id, _ ) in &duplicate_ids {
-      with_node_mut( tree, node_id,
-                     |mut n| { n . detach(); } )
-        . map_err( |e| -> Box<dyn Error> { e . into() } )?; }
-    for &node_id in &invalid_ids {
-      with_node_mut( tree, node_id,
-                     |mut n| { n . detach(); } )
-        . map_err( |e| -> Box<dyn Error> { e . into() } )?; } }
+  let mut discard_has_problem : bool = false;
+  // Duplicates are redundant: always detach (recording focus loss).
+  for &( node_id, _ ) in &duplicate_ids {
+    if problem_discard( tree, node_id )? { discard_has_problem = true; }
+    with_node_mut( tree, node_id,
+                   |mut n| { n . detach(); } )
+      . map_err( |e| -> Box<dyn Error> { e . into() } )?; }
+  // Stale members: demote_invalid may keep one (TODO/DONE/local-view-update/plan_v2.org §6.0 demote-a-branch); only a
+  // node it does NOT keep is detached, and only that detach can lose focus.
+  for &node_id in &invalid_ids {
+    if demote_invalid( tree, node_id )? { continue; }
+    if problem_discard( tree, node_id )? { discard_has_problem = true; }
+    with_node_mut( tree, node_id,
+                   |mut n| { n . detach(); } )
+      . map_err( |e| -> Box<dyn Error> { e . into() } )?; }
   if discard_has_problem {
     // Respond to problem if any discard was problematic
     with_node_mut(

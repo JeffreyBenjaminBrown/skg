@@ -111,7 +111,22 @@
           (message "✗ FAIL: Expected cycle and indef markers not found")
           (message "Expected to contain: 'cycle' and 'indef'")
           (message "Got: %s" updated-content)
-          (kill-emacs 1))))))
+          (kill-emacs 1)))))
+  ;; §20.2(c): an invalid save must NOT leak lock/stream state that wedges the
+  ;; NEXT save (save-relax-lock is registered non-one-shot for exactly this).
+  ;; Reaching here already proves the second save's wait RETURNED -- a wedged
+  ;; pending-count would have hung until the outer timeout fired. Assert
+  ;; explicitly that no stream guard or lock overlay lingers after the
+  ;; invalid-then-valid sequence.
+  (when skg--stream-in-progress
+    (message "✗ FAIL [§20.2c]: skg--stream-in-progress still set after valid save: %S"
+             skg--stream-in-progress)
+    (kill-emacs 1))
+  (with-current-buffer "*skg-content-view*"
+    (when skg--save-lock-overlay
+      (message "✗ FAIL [§20.2c]: content buffer left save-locked after the valid save")
+      (kill-emacs 1)))
+  (message "✓ PASS [§20.2c]: invalid-then-valid save did not wedge the second save (no leaked lock/stream state)"))
 
 (defun run-all-tests ()
   "Main orchestrator function that runs all integration tests."

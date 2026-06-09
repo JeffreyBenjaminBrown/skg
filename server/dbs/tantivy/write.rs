@@ -4,12 +4,14 @@
 // this module and `context_update`.
 
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
+use crate::dbs::tantivy::background_writer::lock_tantivy_writes;
 use crate::types::misc::{ID, TantivyIndex};
 use crate::types::nodes::complete::FileProperty;
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::textlinks::replace_each_link_with_its_label;
 
 use tantivy::{IndexWriter, Term, TantivyDocument, doc};
+use std::collections::HashMap;
 use std::error::Error;
 
 /// Updates the index with the provided NodeTantivys.
@@ -21,6 +23,8 @@ pub fn update_index_with_nodes (
   tantivy_index: &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {
 
+  let _wlock = // serialize with the background save-index worker & other writers
+    lock_tantivy_writes ();
   let mut writer: IndexWriter =
     tantivy_index . index . writer (
       TANTIVY_WRITER_BUFFER_BYTES)?;
@@ -29,7 +33,7 @@ pub fn update_index_with_nodes (
     nodes . iter(), &mut writer, tantivy_index)?;
   let processed_count: usize = // Add new associations.
     add_documents_to_tantivy_writer (
-      nodes, &mut writer, tantivy_index)?;
+      nodes, &mut writer, tantivy_index, &HashMap::new ())?;
   commit_with_status(
     &mut writer, tantivy_index, processed_count, "Updated")?;
   Ok (processed_count) }
@@ -63,6 +67,7 @@ pub fn add_documents_to_tantivy_writer<'a, I> (
   nodes         : I,
   writer        : &mut IndexWriter,
   tantivy_index : &TantivyIndex,
+  context_types : &HashMap<ID, String>, // pid -> context_origin_type label; pids absent here index with "" (filled at init/rebuild).
 ) -> Result<usize, Box<dyn Error>>
 where I: IntoIterator<Item = &'a NodeTantivy>, {
 
@@ -70,7 +75,7 @@ where I: IntoIterator<Item = &'a NodeTantivy>, {
   for node in nodes {
     let documents: Vec<TantivyDocument> =
       create_documents_from_node(
-        node, tantivy_index )?;
+        node, tantivy_index, context_types )?;
     for document in documents {
       writer . add_document (document)?;
       indexed_count += 1; }}
@@ -79,9 +84,13 @@ where I: IntoIterator<Item = &'a NodeTantivy>, {
 fn create_documents_from_node (
   node: &NodeTantivy,
   tantivy_index: &TantivyIndex,
+  context_types : &HashMap<ID, String>,
 ) -> Result < Vec < TantivyDocument >,
               Box < dyn Error >> {
   let primary_id : &ID = &node . pid;
+  let context_origin_type : &str =
+    context_types . get (primary_id)
+    . map ( |s| s . as_str () ) . unwrap_or ("");
   let had_id : &str =
     if node . misc . contains (
       &FileProperty::Had_ID_Before_Import )
@@ -122,7 +131,7 @@ fn create_documents_from_node (
         tantivy_index . source_field =>
           node . source . as_str(),
         tantivy_index . context_origin_type_field =>
-          "",
+          context_origin_type,
         tantivy_index . is_title_field =>
           is_title_str,
         tantivy_index . had_id_field =>
@@ -140,14 +149,18 @@ pub fn commit_with_status (
   if indexed_count > 0 {
     tracing::info!( "{} {} documents. Committing changes...",
               operation, indexed_count );
-    writer . commit () ?;
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "tantivy_writer_commit" ). entered();
+      writer . commit () ? ; }
     // Force the shared reader to see the new commit. With the
     // default 'ReloadPolicy::OnCommitWithDelay', the reader
     // refreshes asynchronously after a small delay, which races
     // with code (notably tests) that searches immediately after a
     // commit. Manual reload makes the post-commit state visible
     // synchronously.
-    tantivy_index . reader . reload () ?;
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "tantivy_reader_reload" ). entered();
+      tantivy_index . reader . reload () ? ; }
   } else {
     tracing::debug!("No documents to process found."); }
   Ok (( )) }

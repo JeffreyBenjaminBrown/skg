@@ -1,0 +1,434 @@
+#+TITLE: Local view update -- branch review (local-view-updates vs main)
+#+STARTUP: content
+
+Written 2026-06-05. Reviewer: Claude (a fresh instance, reviewing the whole
+branch rather than any single commit). Scope: the 72 commits on branch
+=local-view-updates= since it diverged from =main= (~2330 insertions / ~1120
+deletions across 48 files).
+
+* 0. How this was produced, and how to read it
+I read coding-advice/ (recursively), all of TODO/local-view-update/, and then the
+code itself. The branch is large and could not be reviewed in one pass, so I
+fanned it out: I deep-read the central files myself (the driver, the ancestry
+mechanism, the inline diff worker, the rerender entry), and in parallel ran ~10
+focused subagent reviews (one per subsystem) plus two cross-cutting audits
+(completeness matrix; naming/dead-code), then adversarially re-verified every
+correctness and high-severity finding against the code. Where a finding below is
+tagged =[verified]= I reproduced it personally; =[verified*]= means a reviewer
+found it and an independent skeptic confirmed it against the code; =[judgment]=
+is a design/taste call with no single right answer.
+
+The grading axes are the three you asked for -- completeness, elegance, clarity
+-- plus correctness (which I was told not to hunt for but to report if found; I
+found a few).
+
+** The one thing to fix before anything else
+*The Rust test crate does not compile at HEAD.* =cargo test --no-run= fails with
+two =E0063= errors; =cargo build --bin skg= is clean. So the production server
+still builds and runs (the emacs/bash integration suite, which drives a running
+=cargo run=, can still execute) -- but *no Rust unit test or =tests/*.rs=
+integration test can have run since commit cc28a8df* (item C, two commits ago).
+Every "full Rust suite (52 ok-blocks) green" claim in the last several
+progress/deviation-log entries is therefore false for the current tip. Details
+in §1. This is a five-minute fix, but it means the last chunk of work was never
+actually test-validated.
+
+** The headline appraisal (so the rest is read in context)
+The *core refactor succeeded*. The thing you set out to build -- one local,
+per-ViewNode BFS driver replacing the old procedural multi-pass completion --
+exists, is genuinely clean, and serves both the post-save and de-novo paths. The
+hard, novel pieces (the generalized-orphan ancestry mechanism; the
+Tentative/Final draw rule + cascade; the position-correct inline diff) are
+well-structured, well-documented, and a pleasure to read. The deletions you
+wanted really happened (the old de-novo BFS and the diff overlay are gone).
+
+The problems are almost entirely *debris from a long, iterative path*, not
+defects in the destination. The branch went overlay -> inline, deferred ->
+landed, "not worth doing" -> done, several times; each reversal left behind a
+dead parameter, a stale comment, or a now-inverted name. The single biggest
+*elegance/clarity* theme is that the =source_diffs= / =sharing_diffs= pair and a
+trail of "overlay" comments still describe an architecture you replaced. None of
+that is wrong at runtime; all of it taxes a reader -- which is exactly what you
+said you cared about.
+
+* 1. MUST FIX -- the test crate does not compile  [verified]
+=server/types/git.rs:104-105= -- item C added two fields to =NodeChanges=
+(=subscribes_to_diff=, =hides_diff=). The production constructor
+(=git_ops/diff.rs:209=) uses field-shorthand and picked them up automatically, so
+=cargo build= is green. But two =#[cfg(test)]= struct literals were never
+updated:
+- =server/types/phantom.rs:137= (=make_parent_diff=)
+- =server/update_buffer/complete_preorder/truenode.rs:678= (=make_diff_entry=)
+
+Both spell =NodeChanges { text_changed, aliases_diff, ids_diff, contains_diff }=
+explicitly (no =..Default::default()=), so the two new mandatory fields make the
+whole lib-test target fail to compile:
+
+: error[E0063]: missing fields `hides_diff` and `subscribes_to_diff`
+:               in initializer of `git::NodeChanges`
+:   --> server/types/phantom.rs:137:28
+:   --> server/update_buffer/complete_preorder/truenode.rs:678:28
+
+Consequences:
+- Nothing in the Rust unit/integration test crate has run since cc28a8df --
+  including the new =ancestry.rs= death-leafward tests, the =phantom_axes= tests,
+  =phantom_insertion_plan_tests=, and item C's own new tests. The "suite green"
+  claims at progress.org:1227-1228 and plan_v2.org:1264/1277 cannot hold for HEAD.
+- The production binary is fine, so this is a stale test fixture, not a runtime
+  bug. But it silently disabled the safety net for the last several commits.
+
+*Fix*: add the two fields (or, better, =..Default::default()= since =NodeChanges=
+derives =Default=) to both literals, then run =cargo test=. Strongly consider a
+pre-commit / CI step that runs =cargo test --no-run= so a "green" claim can never
+again be made while the test crate is broken.
+
+* 2. Completeness
+** 2.1 What is genuinely complete (verified against the code, not the log)
+All of these I confirmed are present and behave as the plan intends:
+- The single level-order BFS driver (=complete_viewforest= ->
+  =expand_true_content_until_stable= -> =expand_true_content_at_node=), dispatch
+  on =(kind, parent-kind)=, with the per-kind logic delegated out (§3).
+- §5.1/§5.2/§5.3: =Finalizable::{Tentative,Final}=, =apply_definitive_draw_rule=
+  returning a =DrawOutcome=, and the cascade (=attach_cascade_dvrs_to_affected_content=).
+- §5.5 one node budget shared across content *and* the four sharing cols
+  (=cap_goal_list_to_budget=) -- the famous-node DoS case is really handled.
+- §3.4: all self-deletion routed through one postorder sweep
+  (=prune_self_deletable_when_empty= / =is_self_deletable_when_empty=) with the
+  correct empty-col exceptions (Subscribee / Overridden / Alias preserved).
+- Death-leafward (§6.6 + the generalized-orphan mechanism) in =ancestry.rs=.
+- Phase 0: alias union on merge (=mergeInstructionTriple.rs:191-198=); the
+  at-most-one-writer gate (=subscribee_hiderel_intents.rs:56=); the =NOT_FOUND=
+  sentinel (=misc.rs:123-134=).
+- §11 DiffPhantom slim payload (=DiffPhantomNode_Generic=); phantom always
+  indefinitive/bodyless by construction.
+- Phase 8: the old de-novo BFS (=render_initial_viewforest_bfs= et al.,
+  =initial_bfs.rs=) is *deleted*; one driver serves both paths.
+- #3: the post-BFS diff overlay (=apply_diff_to_viewforest=) is *deleted*; diff
+  is computed inline per node. Item A (=mark_orphans_under_dead_parents_independent=)
+  and items B/C tests exist.
+- =should_sync_from_disk_even_though_definitive= and =is_saved_view= are gone.
+
+That is the substance of plan_v2 phases 0-8. The destination was reached.
+
+** 2.2 §15 testing was never delivered -- no idempotence, no order-case guards  [verified*]
+plan_v2 §15 names two test deliverables as the validation that the BFS is
+order-robust and that completion is a fixpoint: (a) an idempotence test per
+ViewNode kind (run completion twice, assert no diff), and (b) the "five order
+cases" tests. Neither exists: grep for =idempot= finds one code *comment*
+(=complete.rs:267=), not a test; grep for the order cases finds nothing. These
+are precisely the invariants the whole refactor rests on, and they have no
+regression guard. Combined with §1 (the test crate doesn't even compile), the
+safety net is markedly thinner than the prose suggests. *Recommend* at least the
+idempotence test -- it is cheap and guards the core property directly.
+
+** 2.3 A whole legacy DVR-expansion path is dead-but-reachable, and §18 says it's "gone"  [verified*]
+plan_v2.org:955 ("...and extendDefinitiveSubtreeFromLeaf are gone") is false.
+=extendDefinitiveSubtreeFromLeaf= still exists (=definitive.rs:282=) and is still
+called by =execute_definitive_view_request= (=definitive.rs:95=), reachable from
+the live driver via =execute_truenode_view_requests= -> =execute_view_requests=
+(its =ViewRequest::Definitive= arm). It is only *effectively* dead because
+=visit_normal_node= always consumes the =Definitive= request first (via
+=apply_definitive_draw_rule= or the budget strip) before
+=execute_truenode_view_requests= runs -- so the arm can never fire in this
+driver. The compiler cannot flag it because the chain is reachable on paper.
+
+This is two mechanisms where one should remain: the intended one
+(=apply_definitive_draw_rule= + cascade) and a surviving legacy one
+(=execute_definitive_view_request= + =extendDefinitiveSubtreeFromLeaf= +
+=extract_view_requests_definitive_first='s "Definitive first" ordering). The risk
+is bit-rot / accidental resurrection of DFS-order, order-sensitive expansion.
+*Recommend* deleting the =Definitive= arm of =execute_view_requests=,
+=execute_definitive_view_request=, =extendDefinitiveSubtreeFromLeaf=, and its dead
+helper chain (=content_ids_if_definitive_else_empty= at =util.rs:644=,
+=nodes_after_in_generation= at =util.rs:668=, =truncate_after_node_in_gen.rs= --
+all transitively used only by the dead function); or, if it must stay as a
+fallback, add =debug_assert!(no Definitive request survives)= and correct §18.
+
+** 2.4 The §5.4 cross-buffer "seam" was not stubbed  [verified*]
+§5.4 asked for a defined no-op seam -- =fn registry_owner(id) -> Option<ViewUri>=
+returning =None= today -- so the future one-definitive-view plan has an attach
+point. It is entirely absent; =apply_definitive_draw_rule='s absent-id branch
+falls straight through to register Tentative/Final. Behavior is correct today
+(it is a no-op anyway), but the promised seam doesn't exist. Minor; either add
+the stub or note in §18 that it was deliberately deferred too.
+
+** 2.5 Phase-6 locking BEHAVIOR has no automated coverage  [verified*]
+The relax-lock *message* is exercised (3 collateral tests filter it out), but no
+test asserts the lock *lifecycle*: that a non-collateral buffer actually unlocks
+early, that the saved buffer stays locked until =save-result=, or that an invalid
+save doesn't hang the next save's wait (the exact bug the documented
+"non-one-shot" workaround fixes). progress.org §8.2 already admits this. The
+trickiest, most regression-prone part is the untested part. *Recommend* one emacs
+integration test covering those three assertions (the =valid_and_invalid_saves=
+harness already exists for the third).
+
+** 2.6 Meta: the deviation log (§18) and progress.org have drifted from the code
+This matters because you said you'd lean on these docs instead of re-reading
+plan_v2. Several §18 entries now contradict the code, in *both* directions:
+- "extendDefinitiveSubtreeFromLeaf are gone" -- still present (§2.3).
+- §11 reduction "NOT worth doing ... Reverted" (plan_v2.org:1283-1299) -- but it
+  was subsequently *done* (commit 4c7a47c7; the slim type is the current state).
+- Phase 8 "SCOUTED ... Deferred" (plan_v2.org:1133-1166) -- but it *landed*.
+- §19 lists =ExpectedAncestor::Scaffold -> Col= and =reconcile_sharing_scaffold_children
+  -> _col_children= as "Remaining" -- both already done in code.
+The code is the source of truth and is generally *ahead of* the log. Worth a
+short cleanup pass on §18 so a future reader (or future-you) isn't misled.
+
+** 2.7 Accurately-logged deferral, noted for completeness
+Full §9 "col-descent" (an overlay descending through cols) was superseded by #3
+(inline diff) rather than built; sharing-col diff is computed inline via the
+=sharing_diffs= seam. §18 documents this honestly. No action beyond folding the
+§9 prose into the inline reality if/when §3.1 below is done.
+
+* 3. Elegance
+** 3.1 THE big one: the source_diffs / sharing_diffs two-field seam  [verified]
+After #3 collapsed the overlay into per-node inline diff, =CompletionContext=
+(=complete.rs:33-45=) still carries *two* diff fields, and the result is a
+genuine comprehension hazard:
+- =source_diffs= is *always =None=* in production. Both entry points bind it to a
+  local =None= (=update_buffer.rs:288=, =:324=). Its own doc admits "Always None
+  ... kept ... because several content helpers still take a =source_diffs=
+  argument." It is then threaded through ~10 helpers across 5 files
+  (=expand_true_content_at_truenode= -> =reconcile_content_children= ->
+  =complete_content_children= -> =build_child_creation_data=, plus
+  =execute_truenode_view_requests= and =extendDefinitiveSubtree_fromGit=). With it
+  =None=, the entire phantom branch it feeds (=truenode.rs:614-632=) is
+  unreachable. It is pure dead weight.
+- =sharing_diffs= is the *real* diffs handle now -- it drives =process_truenode_diff=
+  (content axes, the phantom flip, TextChanged, IDCol, AliasCol) *and* the QualCol
+  reconcilers *and* the sharing cols. Its name (and its doc's "Named =sharing_diffs=
+  historically...") is a self-admitted misnomer.
+- The boundary is *inverted*: =complete.rs= passes =context.sharing_diffs= (real)
+  into reconciler params literally named =source_diffs= (=relation_col.rs:29= etc.),
+  while =context.source_diffs= (=None=) goes into a param *also* named
+  =source_diffs= (=truenode.rs:67=). So one identifier, =source_diffs=, carries
+  the real diffs at one call site and =None= at another. And the construction-site
+  local is =real_diffs=, re-destructured as =real_diffs= at =complete.rs:302= --
+  three names for one value.
+
+This is the cleanest high-value cleanup on the branch. *Recommend*: delete the
+=source_diffs= field and its parameter from the content path entirely
+(=process_truenode_diff= owns content phantoms now); rename =sharing_diffs= to one
+honest name in your compound style (e.g. =gitDiffs= or =realDiffs=) and propagate
+that one name to the reconciler parameters; drop the history clause. Low risk
+(=source_diffs= is provably =None= on every reachable path).
+
+** 3.2 Transitional dead-code chains
+Beyond §2.3's DVR path:
+- The dead content-path diff branch (=content_goal_list='s =else= arms at
+  =truenode.rs:386-431=; =build_child_creation_data='s =is_phantom= branch at
+  =:614-632=; the =removed_ids= plumbing) is unreachable when =source_diffs=None=
+  and should go with §3.1. =[verified*]=
+- =correct_subscriber_ancestor_distance= (=to_org/complete/sharing/kind.rs:51-60=)
+  has zero callers -- superseded by the §4 ancestry-table indices -- and its doc
+  still encodes the old "distance from subscriber" mental model. Delete it.
+  =[verified*]=
+
+** 3.3 Quasi-duplication (the dedup opportunities you asked about)
+None of these is a bug; each is copy-paste that will drift. Roughly in
+descending value:
+- =col_is_generalized_orphan= and =required_ancestor= (=ancestry.rs:126-168=)
+  duplicate the same prefix-walk loop byte-for-byte; the former is the special
+  case "does any prefix position mismatch". Extract one =prefix_matches= helper.
+  =[verified*]=
+- The de-novo and post-save *post-completion tails* (=content_view.rs:119-152= and
+  =update_buffer.rs:365-389=) run the same stats/marks/source-set/render sequence
+  verbatim, differing only in the containerward step. Factor a =finish_viewforest=
+  helper. =[verified*]=
+- Three sharing reconcilers each define a =build_*_child_data= wrapper (identical
+  body + comment) and a =compute_*_goal= pass-through (=subscribee_col.rs:118-142=,
+  =hiddeninsubscribee_col.rs:109-137=, =hiddenoutsideof_subscribeecol.rs:99-126=).
+  Inline the pass-throughs; carry the col's owner =(ID, SourceName)= on each
+  context so =build_child_data= can be called directly. =[verified*]=
+- =existence_axes_for_phantom= (=diff.rs:355=) and the existence block in
+  =phantom_axes= (=phantom.rs:50-62=) re-implement
+  =file_existence_axes_from_source_diff= (=git.rs:262=), defeating that helper's
+  stated purpose. =[verified*]=
+- =should_be_phantom= / =is_removedhere_phantom= are duplicated across
+  =TrueNode_Generic= and =DiffPhantomNode_Generic= (=viewnode.rs:178-186= and
+  =308-323=). Extract a free =axes_require_phantom(existence, membership)=.
+  =[verified*]=
+- =validate_phantom= is a near-verbatim copy of =validate_truenode= minus the
+  title check (=local.rs:376-421=). Factor the shared structural checks.
+  =[verified*]=
+- =empty_in_ram_tantivy_index= (=dbs/init.rs:432-466=) is a third copy of the
+  8-field =TantivyIndex= builder. Extract =tantivy_index_from_index(Index)=.
+  =[verified*]=
+- The save-stream and rerender-stream elisp handlers
+  (=skg-request-save.el:190-203= vs =skg-request-rerender-all-views.el:47-62=, and
+  the two unlock helpers) are near-identical per-view/unlock shapes. Factor a
+  shared per-view-update handler. =[verified*]=
+- =uris_of_views_to_lock= (=save_buffer.rs:372-386=) and =find_collateral_view_uris=
+  (=update_buffer.rs:223-245=) are parallel PID->views fan-outs; the lock/relax
+  symmetry the plan describes could share one helper. =[verified*]=
+
+** 3.4 Smaller inefficiencies and redundant work
+- =process_truenode_diff= pre-populates IDCol/AliasCol *children* that the col
+  reconciler then recomputes identically (=diff.rs:160-210= vs =id_col.rs:60-86=).
+  Have the diff worker create the empty col and let the reconciler fill it. (See
+  also the related correctness note §5.1.) =[verified*]=
+- Fresh de-novo cols are reconciled twice: =maybe_add_*= eagerly populates them
+  (to test emptiness) and the BFS reconciles them again at their own visit
+  (=sharing/mod.rs:148-170= vs =complete.rs:148-169=). Each does two graph reads.
+  Let =maybe_add_*= decide emptiness only. =[verified*]=
+- =apply_definitive_draw_rule= eagerly computes =hidden_ids= (a graph read) and
+  =is_removed_node= even on the =Deferred= path that discards them
+  (=definitive.rs:140-164=). Move the map check to the top, return =Deferred=
+  before the reads. =[verified*]=
+- =graphnodestats= re-reads each node's =NodeComplete= for two booleans
+  (=aliasing=, =extra_ids=) that were known where the node was built
+  (=graphnodestats.rs:89-103=). Pre-existing; an O(n) graph/disk read per node.
+- =collect_matching_nodeids= takes a =preorder: bool= its only caller always
+  passes =false= (=complete.rs:400-415=). Inline it.
+- The de-novo entry functions thread an =Option<&TantivyIndex>= that every caller
+  passes as =None= (=content_view.rs:39/55/75/158=); production bypasses them. Drop
+  the parameter and build the empty in-RAM index internally. =[verified*]=
+- =cap_goal_list_to_budget= lives in =complete_preorder/truenode.rs= but is a
+  cross-cutting helper imported by four sibling reconcilers; it reads more
+  naturally from =update_buffer/util.rs= with the other shared reconcile tools.
+
+* 4. Clarity / naming
+** 4.1 A trail of comments names machinery that no longer exists  [verified]
+The overlay->inline (#3) and de-novo-unify (phase 8) reversals left ~25 comments
+describing deleted code as if live. The worst is inside =rerender_view=
+(=update_buffer.rs:314-320=), which says the BFS runs with no diffs and "the
+git-diff overlay below then adds every diff effect ... the same
+=apply_diff_to_viewforest= the de-novo path uses ... (they will be deleted once
+this overlay is fully validated)" -- and then six lines later (=:344-346=)
+correctly says "The post-BFS overlay is deleted entirely." Two contradictory
+comments in one function. Other instances:
+- =diff.rs:31= -- "either by the legacy de-novo overlay (=apply_diff_to_viewforest=)
+  or ... INLINE" (it has exactly one, inline, caller).
+- =diff.rs:106-108=, =complete.rs:173-174,189,256-257,279-280,299-301=,
+  =git.rs:209=, =content_view.rs:8,100-104=, =definitive.rs:261=
+  ("similar to =render_initial_viewforest_bfs=" -- deleted), =truenode.rs:118=
+  (=should_sync_from_disk_even_though_definitive= history), =update_buffer.rs:249,317,519,252-256=.
+- =complete.rs:299-301= and =:173-174= additionally assert de-novo "still has
+  =None= ... until its path is migrated" -- but de-novo *was* migrated, and now
+  feeds real diffs inline. So these don't just date; they state the opposite of
+  what the code does.
+
+These violate your no-history-comments rule and, worse, actively mislead. A
+single sweep replacing them with present-tense descriptions of the inline path
+would help a lot. =[verified for the rerender_view contradiction; verified* for the rest]=
+
+** 4.2 The preorder/postorder directory split is now fiction  [verified*]
+The driver is one level-order BFS, yet the reconcilers still live under
+=complete_preorder/= and =complete_postorder/= -- and *both* directories contain a
+=truenode.rs=. The split is meaningless to dispatch: =aliascol=/=id_col= (in
+postorder) and =relation_col=/=subscribee_col= (in preorder) are all called from
+the same =match= in =expand_true_content_at_node=. Several docstrings still assert
+the dead model: =save_buffer.rs:232= ("a preorder pass ... followed by a
+postorder pass"); =subscribee_col.rs:28= ("INTENDED USE: ... the first, DFS
+preorder ... pass"); =hiddeninsubscribee_col.rs:25= / =hiddenoutsideof_subscribeecol.rs:23=
+("child-first / postorder pass"). *Recommend* collapsing the two dirs into one
+(e.g. =update_buffer/reconcile/=) and rewording those headers to "reconciled at
+this col's own BFS visit." At minimum fix the docstrings even if the move waits.
+
+** 4.3 Misnamed things
+- =sharing_diffs= -- see §3.1 (the field carries all diffs, not sharing only).
+- =expand_true_content_until_stable= (=complete.rs:104=) implies a fixpoint loop;
+  it is a single BFS pass with no iteration. Rename (e.g. =bfs_complete_viewforest=).
+  =[verified by me]=
+- =validate_phantom= emits user-facing errors that say "TrueNode must have an
+  ID." etc. for a node that is a phantom (=local.rs:402-421=) -- the project's own
+  =TryFrom= already says "Phantom ..." elsewhere. Reword to "Phantom ...".
+  =[verified*]=
+- Test file =tests/extend_definitive_from_leaf.rs= now exercises the BFS driver +
+  cascade, never the (dead) =extendDefinitiveSubtreeFromLeaf=; the name points at
+  the wrong function. Rename. =[verified*]=
+- =child_data.rs= internals still say =scaffold_node= / "sharing-scaffold" where
+  they specifically mean a col (the public fn was already renamed to
+  =reconcile_sharing_col_children=). This is the deferred §19 identifier pass;
+  acknowledged in the plan, listed here for completeness.
+
+** 4.4 Smaller clarity nits
+- =mk_phantom_viewnode= (=viewnode.rs:668-682=) silently returns a non-phantom
+  Normal node if its =if let= ever fails to match; the phantom contract is
+  enforced only by an invariant in a *different* constructor. Add an =else {
+  unreachable!(...) }= or build the =DiffPhantomNode= directly. =[verified*]=
+- History-flavored comment "the former =detach_stale_deleted_content= stopgap is
+  gone" (=truenode.rs:241-246=) -- trim to the present-tense behavior.
+- =save_buffer.rs:72= doc still says =handle_save_buffer_request= "builds an
+  initial NodeCompleteMap"; it builds none. Reword to what it now does.
+
+* 5. Correctness (beyond §1)
+These are real but low-impact; I list them because you asked for any I found.
+** 5.1 A flipped phantom prepends IDCol/AliasCol that are then deadened  [verified]
+In =process_truenode_diff= a node can, in one call, both flip to a DiffPhantom
+(=normal_to_phantom=, =diff.rs:74=) *and* get IDCol/AliasCol diff children
+prepended (=:104-114=) -- reachable when its worktree file is Deleted
+(=existence.unstaged=Minus= -> flip) while its staged stage is Modified with a
+non-empty =ids_diff=/=aliases_diff=. Those new cols are enqueued; at their own BFS
+visit the generalized-orphan check sees a =DiffPhantom= parent (cols require a
+=Normal= ancestor), so =deaden_generalized_orphan_col= converts them to
+DeadScaffold and disposes the diff children. The id/alias diff detail is emitted
+and then destroyed before render. No fixture exercises this (progress.org:774-775
+admits it), so it is untested rather than known-good. *Decide* whether a phantom
+should show id/alias sub-diffs: either guard the prepends on "will not flip", or
+exempt a phantom's own diff cols from the deaden -- and add a fixture
+(removed-here node + =ids_diff=) to lock it in.
+
+** 5.2 Relation-col truncation drops a nondeterministic subset  [verified*]
+=inbound_pids_for_relation= returns members in =HashSet= iteration order
+(=relation_accessors.rs:131-138,205=), fed straight into =cap_goal_list_to_budget=
+which truncates the tail. For a famous node (thousands of inbound subscribers/
+hiders/overriders) that exceeds the budget, *which* members survive varies
+run-to-run. Order is user-irrelevant (§6.8) so this is not a spec violation, but
+the plan's own "sort by ID if a test needs stability" applies under truncation
+too. *Recommend* sorting the relation goal list by ID before the budget cap so a
+truncated col is reproducible.
+
+** 5.3 extendDefinitiveSubtree_fromGit: two take(limit) on differently-filtered lists  [verified]
+=definitive.rs:397-408= builds the existence-query input as
+=contents.filter(not hidden).take(limit)= but the append loop is
+=contents.take(limit)= then =if hidden continue= -- the two windows can diverge
+when hidden ids occupy raw slots. Today it is not a bug (every appended child
+still falls inside the query window) and it sits on the dead/defensive path
+(§2.3), but the invariant is non-obvious and fragile. Drive both from one
+filtered+capped list.
+
+** 5.4 SaveRelaxLock is skipped on an unparseable view-uri  [verified* -> partial]
+=save_buffer.rs= always sends the early =SaveLock=, but in =update_views_after_save=
+the =SaveRelaxLock= send sits inside =if let Ok(uri) = ...= (=update_buffer.rs:141=),
+so an =Err= view-uri never relaxes. The verifier downgraded this to minor: in the
+=Err= branch the early lock-set is *empty* (=uris_of_views_to_lock= returns
+=Vec::new()=), and the client guard refuses a nil view-uri, so no real locked
+state lingers; =save-result= unlocks regardless. Worth a one-line defensive
+empty-relax for symmetry, but not impactful.
+
+* 6. Credit where it's due
+So the report isn't all complaints -- these are genuinely well done:
+- =ancestry.rs= (death-leafward) is exemplary: the §3 required-ancestry table is a
+  real single source of truth (both the death-check and every reconcile's
+  ancestor read walk it), the mandated "generalized orphan" defining comment is
+  present, the view-based-death soundness argument is correct, and the deviation
+  from plan §5.1.a (let nested cols self-deaden) is right and well-justified.
+- The =diff.rs= =phantom_insertion_plan= is position-correct and unit-tested.
+- The draw-rule factoring (=DrawOutcome= enum, =Finalizable= map) is clean and is
+  the actual Tentative/Final model, not the old first-wins map.
+- The de-novo/post-save unification via =create_relation_cols_for_fresh_nodes= +
+  =diff_tantivy_index= flags keeps post-save byte-identical while letting one
+  driver expand a bare stub -- a tidy solution to the gap §13 didn't name.
+- Docstrings are, on the whole, unusually thorough and honest about seams (which
+  is also why the *stale* ones stand out).
+
+* 7. Suggested order of attack
+1. *Fix the test build* (§1) and run =cargo test= + the integration suite. Until
+   this is done, nothing else is verified.
+2. Once green, *collapse =source_diffs= / =sharing_diffs= into one well-named
+   field* and delete the dead content-path diff threading (§3.1, §3.2). This is
+   the highest clarity-per-line win and de-risks future diff work.
+3. *Delete or assert-and-document the dead =extendDefinitiveSubtreeFromLeaf=
+   path* (§2.3) and its helper chain.
+4. *Sweep the stale "overlay" / deleted-function comments* (§4.1) and *rename the
+   preorder/postorder dirs + docstrings* (§4.2).
+5. Add the *idempotence test* (§2.2) and a *locking-lifecycle integration test*
+   (§2.5).
+6. Decide §5.1 (phantom diff cols) and apply §5.2 (deterministic truncation).
+7. Opportunistically take the §3.3 dedup items as you touch those files.
+8. Reconcile the §18 deviation log with the code (§2.6) so the docs stop lying.
+
+Items 2-8 are independent and individually small; none changes the architecture
+you built -- they pay down the debt the long path accumulated. The destination is
+sound.

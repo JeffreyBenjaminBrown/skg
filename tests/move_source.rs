@@ -26,7 +26,7 @@ use std::path::{Path, PathBuf};
 use std::fs;
 use tantivy::{DocAddress, TantivyDocument};
 use tantivy::schema::document::Value;
-use typedb_driver::{TypeDBDriver, Credentials, DriverOptions};
+use typedb_driver::{TypeDBDriver, Addresses, Credentials, DriverOptions, DriverTlsConfig};
 
 /// Set up a fresh test environment: copy fixtures to temp,
 /// create TypeDB + Tantivy, return (config, driver, tantivy).
@@ -51,9 +51,9 @@ async fn setup (
          ("foreign", temp_fixtures . join ("foreign")) ] )?;
   let driver : TypeDBDriver =
     TypeDBDriver::new (
-      "127.0.0.1:1729",
+      Addresses::try_from_address_str ("127.0.0.1:1729")?,
       Credentials::new ("admin", "password"),
-      DriverOptions::new (false, None)? ) . await?;
+      DriverOptions::new (DriverTlsConfig::disabled ()) ) . await?;
   let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config)?;
   let typedb_nodes : Vec<NodeTypedb> =
@@ -106,6 +106,10 @@ fn tantivy_source_for_id (
   query         : &str,
   expected_id   : &str,
 ) -> Result<Option<String>, Box<dyn Error>> {
+  // A save commits its Tantivy index update in the background, so wait
+  // for it to land before reading — mirroring the production search
+  // handler. (See server/dbs/tantivy/background_writer.rs.)
+  skg::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
   let (matches, searcher)
     : (Vec<(f32, DocAddress)>, tantivy::Searcher) =
     search_index (tantivy_index, query, &SearchOptions::default ())?;
@@ -146,7 +150,7 @@ fn test_move_node_to_another_owned_source (
       ** (skg (node (id b) (source private))) b
       *** (skg (node (id c) (source public))) c
     "};
-    let save_plan
+    let ( _viewforest, save_plan )
       = buffer_to_validated_saveplan (
           org_text, &config, &driver
           ) . await?;
@@ -242,7 +246,7 @@ fn test_move_node_referenced_by_extra_id (
       ** (skg (node (id b-alias) (source private))) b
       *** (skg (node (id c-alias) (source public))) c
     "};
-    let save_plan
+    let ( _viewforest, save_plan )
       = buffer_to_validated_saveplan (
           org_text, &config, &driver ) . await?;
 
@@ -310,7 +314,7 @@ fn test_move_multiple_nodes (
       ** (skg (node (id b) (source private))) b
       *** (skg (node (id c) (source private))) c
     "};
-    let save_plan
+    let ( _viewforest, save_plan )
       = buffer_to_validated_saveplan (
           org_text, &config, &driver
           ) . await?;
@@ -477,7 +481,7 @@ fn test_no_source_change_produces_no_moves (
       ** (skg (node (id b) (source public))) b
       *** (skg (node (id c) (source public))) c
     "};
-    let save_plan
+    let ( _viewforest, save_plan )
       = buffer_to_validated_saveplan (
           org_text, &config, &driver
           ) . await?;
@@ -510,7 +514,7 @@ fn test_source_only_change_with_populated_pool (
       ** (skg (node (id b) (source private))) b
       *** (skg (node (id c) (source public))) c
     "};
-    let save_plan
+    let ( _viewforest, save_plan )
       = buffer_to_validated_saveplan (
           org_text, &config, &driver ) . await?;
 

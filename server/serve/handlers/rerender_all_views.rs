@@ -62,8 +62,7 @@ pub fn stream_rerender_views (
         ) . entered ();
       rerender_view (
         &mut viewforest,
-        &mut context,
-        false ) . await } )
+        &mut context ) . await } )
     { Ok (text) => {
         views_state . open_views . update_view (&uri, viewforest);
         send_response_with_length_prefix (

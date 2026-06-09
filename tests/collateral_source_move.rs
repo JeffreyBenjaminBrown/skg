@@ -37,7 +37,7 @@ use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::TempDir;
-use typedb_driver::{Credentials, DriverOptions, TypeDBDriver};
+use typedb_driver::{Addresses, Credentials, DriverOptions, DriverTlsConfig, TypeDBDriver};
 
 #[test]
 fn test_source_move_updates_collateral_view_metadata (
@@ -109,8 +109,14 @@ fn test_source_move_updates_collateral_view_metadata (
 
       let mut reader : BufReader<TcpStream> =
         BufReader::new (read_end);
+      // The stream now also carries a save-relax-lock message (plan_v2 §8.1)
+      // before the collateral-view(s); select the collateral-view by its
+      // response-type.
       let collateral_msgs : Vec<String> =
-        read_all_lp_messages (&mut reader);
+        read_all_lp_messages (&mut reader)
+        . into_iter ()
+        . filter ( |m| m . contains ("collateral-view") )
+        . collect ();
       assert_eq! (
         collateral_msgs . len(), 1,
         "expected one collateral message, got {:?}",
@@ -156,9 +162,9 @@ async fn setup_test_dbs (
       .. config };
   let driver : TypeDBDriver =
     TypeDBDriver::new (
-      "127.0.0.1:1729",
+      Addresses::try_from_address_str ("127.0.0.1:1729")?,
       Credentials::new ("admin", "password"),
-      DriverOptions::new (false, None)? ) . await?;
+      DriverOptions::new (DriverTlsConfig::disabled ()) ) . await?;
   let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (&config)?;
   let typedb_nodes : Vec<NodeTypedb> =

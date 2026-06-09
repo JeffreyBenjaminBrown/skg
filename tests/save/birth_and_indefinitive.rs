@@ -45,7 +45,7 @@ fn test_birth_and_indefinitive(
           ** (skg (node (id 2) (source main) (parentIs independent) indef)) 2
           *** (skg (node (id 4) (source main))) 4
         "};
-        let save_plan =
+        let ( _viewforest, save_plan ) =
           buffer_to_validated_saveplan(
             org_text,
             config,
@@ -54,7 +54,8 @@ fn test_birth_and_indefinitive(
           &config . db_name,
           driver,
           &save_plan . define_nodes,
-          &[], ). await?;
+          &[],
+          None, ). await?;
         update_fs_from_saveinstructions(
           &save_plan . define_nodes,
           &[],

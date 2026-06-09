@@ -100,7 +100,7 @@ fn saverole_for_node (
       | ViewNodeKind::Qual (Qual::TextChanged { .. })
       | ViewNodeKind::Vognode (Vognode::Deleted (_))
       | ViewNodeKind::Vognode (Vognode::Inactive (_))
-      | ViewNodeKind::Vognode (Vognode::Phantom (_))
+      | ViewNodeKind::Vognode (Vognode::DiffPhantom (_))
       | ViewNodeKind::Vognode (Vognode::Unknown (_))
       => Ok (SaveRole::NoSaveRole), }}
 
