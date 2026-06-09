@@ -158,7 +158,7 @@ impl OpenViews {
 
 /// The pids a view "contains" for collateral detection (views_containing): the
 /// primary ids of its Normal and Inactive vognodes -- the kinds backed by a
-/// real, current graph node. Deleted / Unknown / DiffPhantom are excluded: they
+/// real, current graph node. Deleted / Unknown / Diff phantom are excluded: they
 /// are not graph members, so a save can change nothing a view showing them would
 /// need to reflect. The single source of which kinds count: update_view derives
 /// its pids through it, and the de-novo caller (multi_root_view_via_env) computes

@@ -175,7 +175,7 @@ async fn dispatch_node_update (
         tree, treeid, context . deleted_by_this_save_pids ) ?,
     _ => {
       // No-op for: Unknown (unresolvable-id placeholder), Deleted,
-      // DeadScaffold, Qual leaves, BufferRoot, and DiffPhantom (a diff-only
+      // DeadScaffold, Qual leaves, BufferRoot, and Diff phantom (a diff-only
       // placeholder, inert here, TODO/DONE/local-view-update/plan_v2.org §6.3). The prune sweep handles empty/dead nodes.
     } }
   Ok(( )) }
@@ -235,9 +235,9 @@ async fn visit_normal_node (
     context . deleted_by_this_save_pids,
     context . active_source_set,
     settled, cascade, &mut context . node_budget ) ?;
-  // The steps below apply only while the node is still a Normal vognode:
+  // The steps below apply only while the node is still an Active vognode:
   // content reconcile may have converted it to Deleted (a node this save
-  // deleted). The flip to a DiffPhantom happens at the END of this visit
+  // deleted). The flip to a Diff phantom happens at the END of this visit
   // (process_truenode_diff, below), after content + cols + view requests.
   let still_normal : bool =
     read_at_node_in_tree ( tree, treeid,
@@ -271,7 +271,7 @@ async fn visit_normal_node (
     tree, treeid, &context . env . config, &context . env . driver ) . await ?;
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3 / Jeff): compute this node's content+scaffold diff LOCALLY,
   // at its own BFS visit. Runs last, after the node is fully completed as a
-  // worktree Normal node (content, cols, view requests), so process_truenode_diff
+  // worktree Active node (content, cols, view requests), so process_truenode_diff
   // sees its final children. The flip to a phantom happens here; the node's cols
   // (visited later, level-order) self-deaden via their own generalized-orphan
   // check. Gated on diff mode (source_diffs = Some); both de-novo and post-save

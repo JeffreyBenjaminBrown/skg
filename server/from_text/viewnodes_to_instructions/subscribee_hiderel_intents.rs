@@ -72,7 +72,7 @@ pub(crate) fn subscribee_hiderel_intents_from_candidates (
   Ok (result) }
 
 /// True iff the subscriber instance this subscribee-as-such hangs under
-/// is a *definitive* Normal vognode. The tree shape is
+/// is a *definitive* Active vognode. The tree shape is
 /// subscriber -> SubscribeeCol -> subscribee-as-such, so the subscriber
 /// is the candidate's grandparent. See the at-most-one-writer-per-ID
 /// note at the call site (TODO/DONE/local-view-update/plan_v2.org §6.1).

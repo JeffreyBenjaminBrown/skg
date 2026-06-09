@@ -41,7 +41,7 @@ pub fn reconcile_alias_col_children (
       . map_err( |e| -> Box<dyn Error> { e . into() } )?;
     if !is_aliascol { return Err(
       "reconcile_alias_col_children: Node is not an AliasCol" . into() ); }}
-  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: parent Normal vognode read through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 0).
+  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: parent Active vognode read through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 0).
   let (parent_pid, parent_source) : (ID, SourceName) =
     pid_and_source_from_required_ancestor(
       tree, aliascol_node_id, 0,
@@ -96,7 +96,7 @@ pub fn reconcile_alias_col_children (
     &goal_list,
     create_alias )?;
   treat_certain_children(
-      // Currently unreachable: validation rejects normal vognode
+      // Currently unreachable: validation rejects active vognode
       // children of AliasCol. If that is later relaxed, only Normal
       // Vognodes need repair; parentIs is a vestigial field in Phantoms.
       tree, aliascol_node_id,

@@ -217,7 +217,7 @@ fn content_view_renders_inactive_contained_nodes_as_placeholders (
       // §20.5: the view's pid set (for collateral detection) is {Normal,
       // Inactive} -- an inactive node is a real graph member, so it IS tracked,
       // even though it renders as a placeholder (asserted above). The excluded
-      // kinds are Deleted / Unknown / DiffPhantom.
+      // kinds are Deleted / Unknown / Diff phantom.
       assert! (
         pids . contains (&ID::from ("private-a")),
         "an inactive contained node should be in the view's pid set (§20.5): {:?}",

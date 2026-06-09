@@ -31,7 +31,7 @@ pub fn reconcile_relation_col_children (
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
   kind . error_unless_node_is_this_kind (tree, node) ?;
-  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the owner Normal vognode *through* the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
+  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the owner Active vognode *through* the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
   // (index 0 = the parent), so this can never read an ancestor the table
   // does not list, and the death-check and this read share one spec.
   let (owner_pid, owner_source) : (ID, SourceName) =

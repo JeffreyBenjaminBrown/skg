@@ -1,5 +1,5 @@
 /// Per-node git-diff decoration for the git diff view.
-/// process_truenode_diff decorates one Normal vognode and generates its
+/// process_truenode_diff decorates one Active vognode and generates its
 /// diff-only children. TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): it is now called INLINE, at each
 /// node's own BFS visit (server/update_buffer/complete.rs), for both the
 /// post-save and de-novo paths.
@@ -25,7 +25,7 @@ use ego_tree::{NodeMut, NodeRef, NodeId};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-/// Decorate a normal vognode and generate any diff-only children
+/// Decorate a active vognode and generate any diff-only children
 /// implied by staged and unstaged NodeCompleteDiffs. Called inline per Normal
 /// node at its own BFS visit (for both de-novo and post-save), TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3:
 /// the node flips to a phantom here and its cols then self-deaden via their own
@@ -99,7 +99,7 @@ pub(crate) fn process_truenode_diff (
             staged   : staged_text,
             unstaged : unstaged_text } ) } ); }
   // The IDCol/AliasCol diff scaffolds are cols, so if this node flipped to a
-  // phantom they would be generalized orphans (a col requires a Normal-vognode
+  // phantom they would be generalized orphans (a col requires a Active-vognode
   // ancestor) and get deadened + pruned at their own BFS visit -- i.e. emitted
   // here only to be destroyed before render. Skip creating them on a flipped
   // node: same final tree, without the wasted work. (The node's id/alias

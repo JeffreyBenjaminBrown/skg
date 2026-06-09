@@ -2,7 +2,7 @@
 //!
 //! This is the machinery for a feature we'd like to have but don't use yet:
 //! opening a node that git says has been DELETED, and drawing its content as of
-//! the last commit (HEAD) -- each child shown as a DiffPhantom, marked removed.
+//! the last commit (HEAD) -- each child shown as a Diff phantom, marked removed.
 //! It works; it's just not reachable in the current renderer. We're keeping it
 //! because it would be a nice thing to use someday, and rebuilding it from
 //! scratch would be a waste.
@@ -111,7 +111,7 @@ fn from_git_replace_title_body (
   Ok (( )) }
 
 /// Expand children for a removed node, by loading content from git HEAD. Each
-/// child is a DiffPhantom; whether it still exists in the worktree (a
+/// child is a Diff phantom; whether it still exists in the worktree (a
 /// removed-here member) or not (fully removed) is encoded in its
 /// existence/membership axes, not in a named state.
 pub async fn extendDefinitiveSubtree_fromGit (

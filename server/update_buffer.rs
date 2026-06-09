@@ -348,7 +348,7 @@ pub async fn rerender_view (
       complete_viewforest (
         viewforest, &mut completion_context ) . await ? }; }
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the content/scaffold diff was applied INLINE during the
-  // BFS above (process_truenode_diff at each Normal node's visit, driven by
+  // BFS above (process_truenode_diff at each Active node's visit, driven by
   // source_diffs = the real diffs).
   let result : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -396,7 +396,7 @@ pub async fn finish_viewforest (
     attach_containerward_ancestries_to_removedhere_phantoms (
       viewforest, config, driver, active_source_set ) . await ? ; }
   mark_view_roots_parent_absent ( viewforest );
-  // §A (Jeff's invariant): a Normal survivor left under a non-container parent
+  // §A (Jeff's invariant): an Active survivor left under a non-container parent
   // (a phantom / Deleted / DeadScaffold) is a non-dead generalized orphan and
   // must become Independent.
   mark_orphans_under_dead_parents_independent ( viewforest );
@@ -450,7 +450,7 @@ fn rewriteInPlace_viewnodes_whose_id_is_newly_extra (
       let n_ref = viewforest . get (nid) . ok_or (
         "rewriteInPlace_viewnodes_whose_id_is_newly_extra: node not found") ?;
       match &n_ref . value () . kind {
-        // Only Normal nodes are rewritten below (a phantom is never an
+        // Only Active nodes are rewritten below (a phantom is never an
         // editable instance), so only they need a swap computed.
         ViewNodeKind::Vognode (Vognode::Active (t))
           => { match graph_snap . pid_of (&t . id)

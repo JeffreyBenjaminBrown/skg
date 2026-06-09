@@ -74,7 +74,7 @@ pub fn expand_true_content_at_truenode (
     tree, node,
     |vn : &ViewNode| matches!( &vn . kind,
                                 ViewNodeKind::Vognode (Vognode::Active (_))),
-    "expand_true_content_at_truenode: expected normal vognode" ) ?;
+    "expand_true_content_at_truenode: expected Active vognode" ) ?;
   if ! settled {
     // A DVR node was already resolved by apply_definitive_draw_rule; running
     // the dedup here would indefinitize it against its own (just-inserted)
@@ -126,7 +126,7 @@ pub fn expand_true_content_at_truenode (
   Ok(( )) }
 
 /// TODO/DONE/local-view-update/plan_v2.org §5.3 cascade: hand a ViewRequest::Definitive to each affected,
-/// non-phantom Normal content child of a Final node -- new and existing
+/// non-phantom Active content child of a Final node -- new and existing
 /// alike -- so the main BFS draws each Final (and it in turn cascades to its
 /// own content). The cascade does *not* flow through scaffolds, so only
 /// parentIs=Affected content children receive it.

@@ -129,8 +129,8 @@ fn containerof_false_claim_flipped () {
 
 #[test]
 fn orphan_under_dead_parent_demoted_member_under_col_kept () {
-  // §A (Jeff's invariant): an Affected Normal node under a non-container
-  // parent (DiffPhantom / DeadScaffold) demotes to Independent; a legitimate
+  // §A (Jeff's invariant): an Affected Active node under a non-container
+  // parent (Diff phantom / DeadScaffold) demotes to Independent; a legitimate
   // col MEMBER (Affected Normal under a PartnerCol) is left untouched.
   use crate::types::viewnode::{ mk_phantom_viewnode, RoleCol };
   use crate::types::git::{ ExistenceAxes, MembershipAxes };
@@ -159,7 +159,7 @@ fn orphan_under_dead_parent_demoted_member_under_col_kept () {
   mark_orphans_under_dead_parents_independent (&mut vf);
 
   assert_eq! (parentIs_if_normal (&vf, under_phantom), ParentIs::Independent,
-    "Affected child under a DiffPhantom must demote to Independent");
+    "Affected child under a Diff phantom must demote to Independent");
   assert_eq! (parentIs_if_normal (&vf, under_dead), ParentIs::Independent,
     "Affected child under a DeadScaffold must demote to Independent");
   assert_eq! (parentIs_if_normal (&vf, member), ParentIs::Affected,

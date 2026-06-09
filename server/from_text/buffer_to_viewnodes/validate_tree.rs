@@ -99,7 +99,7 @@ fn validate_view_roots (
         | MpViewnodeKind::Phantom (MpPhantom::Deleted (_)))
     { errors . push (
         BufferValidationError::Other (
-          "View roots must be TrueNodes or PhantomDeleteds."
+          "View roots must be TrueNodes or deleted nodes."
           . to_string () )); }}}
 
 /// For each node in the viewforest, if it has a definitive view request,
@@ -121,7 +121,7 @@ fn validate_definitive_view_requests (
   { if let Edge::Open (node_ref) = edge
     { let viewnode : &MpViewnode =
         node_ref . value();
-      // TODO/DONE/local-view-update/plan_v2.org §11: only a Normal node carries view_requests; a phantom never can,
+      // TODO/DONE/local-view-update/plan_v2.org §11: only an Active node carries view_requests; a phantom never can,
       // so the Definitive-request validations below apply to Normal only.
       if let MpViewnodeKind::Vognode (
         MpVognode::Active (t))

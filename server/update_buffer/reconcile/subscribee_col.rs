@@ -78,7 +78,7 @@ fn read_subscribee_col_context (
   node : NodeId,
   env  : &SkgEnv,
 ) -> Result<SubscribeeColContext, Box<dyn Error>> {
-  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the subscriber Normal vognode through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
+  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the subscriber Active vognode through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
   // (index 0 = the parent), rather than at a hard-coded generation.
   let subscriber : NodeId =
     required_ancestor (tree, node, 0) ?

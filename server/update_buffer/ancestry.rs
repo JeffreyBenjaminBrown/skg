@@ -17,7 +17,7 @@
 //! be a vognode holding anything but Vognode::Active, or a position that must
 //! be a specific col holding anything but that col, is dead. No
 //! graph / NodeComplete read is involved. This is sound because, in BFS order,
-//! a Normal node converts to Deleted at its own visit, strictly before any
+//! an Active node converts to Deleted at its own visit, strictly before any
 //! descendant col is visited; so by the time a col checks, a dead ancestor
 //! already shows the wrong kind in the tree.
 //!
@@ -66,11 +66,11 @@ fn required_ancestry (
   kind : &ViewNodeKind,
 ) -> &'static [ExpectedAncestor] {
   match kind {
-    // QualCol(Alias) and QualCol(ID): parent Normal vognode.
+    // QualCol(Alias) and QualCol(ID): parent Active vognode.
     ViewNodeKind::QualCol (_) => ANC_NORMAL,
     // Subscribee col: parent = subscriber (Normal).
     // Relation cols (Subscriber/Overridden/Overrider/Hider/Hidden): parent
-    // Normal vognode.
+    // Active vognode.
     ViewNodeKind::PartnerCol (RoleCol::Subscribee)
       | ViewNodeKind::PartnerCol (RoleCol::Subscriber)
       | ViewNodeKind::PartnerCol (RoleCol::Overridden)

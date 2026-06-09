@@ -64,9 +64,9 @@ fn set_viewnodestats_recursive (
     if let Some ( ref pid ) = opt_pid
     { ancestor_ids . remove (pid); } } }
 
-/// Sets sourceAtBoundary on the normal vognode at treeid.
-/// True if no normal vognode ancestor exists (i.e. a root),
-/// or if the nearest normal vognode ancestor has a different source.
+/// Sets sourceAtBoundary on the active vognode at treeid.
+/// True if no active vognode ancestor exists (i.e. a root),
+/// or if the nearest active vognode ancestor has a different source.
 fn set_source_at_boundary (
   tree   : &mut Tree<ViewNode>,
   treeid : NodeId,
@@ -87,7 +87,7 @@ fn set_source_at_boundary (
   { t . viewStats . sourceAtBoundary = at_boundary; }}
 
 /// Walk rootward from treeid (exclusive) to find
-/// the nearest normal vognode ancestor's source.
+/// the nearest active vognode ancestor's source.
 fn nearest_truenode_ancestor_source (
   tree   : &Tree<ViewNode>,
   treeid : NodeId,

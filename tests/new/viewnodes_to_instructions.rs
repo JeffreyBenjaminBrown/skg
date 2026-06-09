@@ -89,7 +89,7 @@ fn set_membership_unstaged_minus (
       break; }}
   let target_id = target_id . unwrap_or_else (||
     panic! ("node not found: {}", id));
-  // The target is a Normal node here; the next line flips it to a phantom.
+  // The target is an Active node here; the next line flips it to a phantom.
   if let ViewNodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (target_id) . unwrap() . value() . kind
   { t . membership . unstaged = Some (Sign::Minus); }

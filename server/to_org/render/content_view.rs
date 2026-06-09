@@ -105,7 +105,7 @@ pub async fn multi_root_view_via_env (
 ) -> Result < (String, Vec<ID>, Tree<ViewNode>),
               Box<dyn Error> > {
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the diff (when diff_mode_enabled) is computed inline by
-  // view completion, per Normal node at its BFS visit.
+  // view completion, per Active node at its BFS visit.
   let mut viewforest : ViewForest =
     render_initial_view (
       env, root_ids, active_source_set, diff_mode_enabled ) . await ?;

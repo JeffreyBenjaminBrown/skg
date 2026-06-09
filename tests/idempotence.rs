@@ -10,7 +10,7 @@
 // not assert de-novo == first-rerender -- those can legitimately differ in
 // metadata; idempotence is specifically that a second rerender changes nothing.)
 //
-// Fixture exercises several ViewNode kinds in one view: Normal content (a -> b,
+// Fixture exercises several ViewNode kinds in one view: Active content (a -> b,
 // c), an AliasCol + Alias (b has alias "bee"), the IDCols, a SubscribeeCol +
 // subscribee-as-such (c subscribes to d), the HiddenOutsideOfSubscribeeCol, and
 // a relation col -- e subscribes to b, so b shows a SubscriberCol listing e.

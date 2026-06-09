@@ -33,7 +33,7 @@ pub fn reconcile_id_col_children (
                          ViewNodeKind::QualCol (QualCol::ID) ),
     "reconcile_id_col_children: Node is not an IDCol" )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
-  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: parent Normal vognode read through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 0).
+  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: parent Active vognode read through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 0).
   let (parent_pid, parent_source) : (ID, SourceName) =
     pid_and_source_from_required_ancestor(
       tree, idcol_node_id, 0,

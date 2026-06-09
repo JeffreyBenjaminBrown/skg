@@ -322,19 +322,19 @@ pub fn validate_parentIs_relationships (
     { t . birth = Birth::Unremarkable; } } }
 
 /// Jeff's invariant (TODO/DONE/local-view-update/progress.org §11 thread): a *non-dead generalized orphan*
-/// must have ParentIs=Independent. A Normal node whose PARENT is a
-/// non-container -- a DiffPhantom, a Deleted, or a DeadScaffold -- is exactly
+/// must have ParentIs=Independent. A Active node whose PARENT is a
+/// non-container -- a Diff phantom, a Deleted, or a DeadScaffold -- is exactly
 /// that: it survives (is not itself dead) but its container is gone, so its
 /// =Affected= claim (that it is part of that parent's collection) cannot hold.
 /// Demote it to Independent so it renders as its own graph-contains root rather
 /// than claiming to affect a parent that no longer contains anything.
 ///
 /// Scope, deliberately narrow:
-/// - PARENT is DiffPhantom / Deleted / DeadScaffold -> demote an Affected child.
+/// - PARENT is Diff phantom / Deleted / DeadScaffold -> demote an Affected child.
 /// - PARENT is a Col (QualCol / PartnerCol): the child is a legitimate col
 ///   MEMBER; Affected is correct -> leave. (A col whose own ancestry broke is
 ///   deadened to DeadScaffold first, and then THIS pass catches its members.)
-/// - PARENT is a Normal vognode: handled by validate_parentIs_relationships.
+/// - PARENT is an Active vognode: handled by validate_parentIs_relationships.
 /// - PARENT is BufferRoot: the child is a forest root, handled by
 ///   mark_view_roots_parent_absent.
 /// Belt-and-suspenders: most cases are already demoted during the BFS

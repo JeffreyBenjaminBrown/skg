@@ -504,7 +504,7 @@ fn compare_two_viewnode_branches_recursively_modulo_id (
       MpViewnodeKind::Vognode (MpVognode::Active (_))
         | MpViewnodeKind::Phantom (MpPhantom::Diff (_))) =>
     { // Copy the ID from one to the other, then compare. TODO/DONE/local-view-update/plan_v2.org §11: Normal and
-      // DiffPhantom payloads are now different types, so read n2's id via the
+      // Diff phantom payloads are now different types, so read n2's id via the
       // shared accessor and write n1_copy's per variant.
       let id2 : Option<ID> = n2 . id_opt () . cloned ();
       let mut n1_copy : MpViewnode =

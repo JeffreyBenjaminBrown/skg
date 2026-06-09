@@ -121,11 +121,11 @@ impl SkgConfig {
 pub struct SourceName ( pub String );
 
 impl SourceName {
-  /// Reserved sentinel source for a *non-Normal* viewnode (e.g. a
-  /// DiffPhantom) whose source could not be determined. It renders like
+  /// Reserved sentinel source for a *non-Active* viewnode (e.g. a
+  /// Diff phantom) whose source could not be determined. It renders like
   /// any other source -- the all-caps name alone flags it to the user --
   /// so that one unresolvable reference does not abort an entire render
-  /// (TODO/DONE/local-view-update/plan_v2.org §7.6). Normal-vognode source failures are caught by
+  /// (TODO/DONE/local-view-update/plan_v2.org §7.6). Active-vognode source failures are caught by
   /// validation (pre-save) or are catastrophic (post-save), never this.
   pub const NOT_FOUND_STR : &'static str = "NOT_FOUND";
   pub fn not_found () -> Self {

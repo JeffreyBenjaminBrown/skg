@@ -135,15 +135,15 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
                    if title == "Alias with body problem and orphaned" && kind == "alias")
         }), "Should find Body_of_Scaffold error for alias"); }
 
-      // View roots must be TrueNodes or PhantomDeleteds.
-      { let viewroot_re = Regex::new(r"(?i)view roots.*must.*truenode.*deletednode") . unwrap();
+      // View roots must be TrueNodes or deleted nodes.
+      { let viewroot_re = Regex::new(r"(?i)view roots.*must.*truenode.*deleted") . unwrap();
         let viewroot_errors: Vec<&BufferValidationError> =
           errors . iter()
           . filter(|e| matches!(e, BufferValidationError::Other (msg)
                                if viewroot_re . is_match (msg)))
           . collect();
         assert_eq!(viewroot_errors . len(), 1,
-                   "Should find 1 'View roots must be TrueNodes or PhantomDeleteds' error"); }
+                   "Should find 1 'View roots must be TrueNodes or deleted nodes' error"); }
 
       // TrueNode child belongs elsewhere (root has Alias children directly, not via AliasCol)
       { let truenode_children_re =

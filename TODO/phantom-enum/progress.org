@@ -47,6 +47,20 @@ Wire-format invariance verified statically: the split diff of 'org_to_text.rs'
 (emit) and 'parse_metadata_sexp.rs' (parse) is ONLY import lines + match-arm
 re-routing -- zero changed atom string literals, zero helper-body changes.
 
+** Full Rust test suite GREEN: 492/492 passed
+'cargo nextest run' (against a live TypeDB on 1729) passes all 492 tests,
+including the git-diff-view / phantom suites and the wire-format render oracles --
+the behavioral proof that the split preserved behavior and the emit/parse bytes.
+(One TypeDB "[DBD2] database in use" teardown flake appeared once under
+concurrency and vanished on isolation/re-run -- infra, not a regression.)
+
+** Polish commit: comment terminology + the string-corruption fix
+Updated ~25 files: stale comment terminology ('Normal vognode' -> 'Active
+vognode', 'DiffPhantom' -> 'Diff phantom', 'non-Normal' -> 'non-Active') on
+comment portions only (never code), plus the two internal message strings the
+comment pass skipped, plus the 'View roots...' string-corruption fix (see "What's
+imperfect"). 'cargo build' + 'cargo test --no-run' clean (0 warnings).
+
 * Changes to the plan's envisioned order
 
 ** Mechanical renames done by script, not hand-edit
@@ -81,6 +95,22 @@ not Rust identifiers and not wire-format strings. The plan lists these exact
 files under "Group 8 -- DO NOT TOUCH" (a diff there during the refactor signals a
 wire-format break), so I left them untouched. They are now mildly stale-named but
 harmless; a future doc pass could update them outside this refactor.
+
+** 0b's blanket sed corrupted a user-facing string literal (found + fixed)
+The 0b struct-rename sed ('DeletedNode' -> 'PhantomDeleted') also hit a STRING
+LITERAL -- the validation message "View roots must be TrueNodes or DeletedNodes."
+became "...PhantomDeleteds." The full test suite caught it
+('test_find_buffer_errors_for_saving', whose regex looked for 'deletednode').
+Fixed in the polish pass: the message now reads "View roots must be TrueNodes or
+deleted nodes." (clean user-facing prose, decoupled from the internal type name),
+and the test's regex/label match. Lesson: a type-name sed can silently rewrite
+prose inside string literals; only this one user-facing string was affected (wire
+atoms are lowercase, so untouched -- verified).
+
+** 'ExpectedAncestor::NormalVognode' left un-renamed (plan deferred)
+The enum variant in 'ancestry.rs' still reads 'NormalVognode' (it now means
+"Active vognode"). The plan marked this rename optional/stylistic; left as-is to
+avoid scope creep. Its doc/uses are internally consistent.
 
 * Choices determining the future
 

@@ -82,7 +82,7 @@ pub fn build_child_data (
   for child_skgid in goal_list {
     if result . contains_key (child_skgid) { continue; }
     if removed_ids . contains (child_skgid) {
-      // A removed-member diff-phantom is a *non-Normal* viewnode. If its
+      // A removed-member diff-phantom is a *non-Active* viewnode. If its
       // source can't be determined, fall back to the NOT_FOUND sentinel
       // rather than aborting the whole render (TODO/DONE/local-view-update/plan_v2.org §7.6).
       let child_src : SourceName =
