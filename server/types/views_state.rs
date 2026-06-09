@@ -169,7 +169,7 @@ pub fn pids_from_viewforest (
   viewforest . nodes ()
     . filter_map ( |n| match &n . value () . kind {
       ViewNodeKind::Vognode (
-        v @ (Vognode::Normal (_) | Vognode::Inactive (_))) =>
+        v @ (Vognode::Active (_) | Vognode::Inactive (_))) =>
         Some ( v . id () . clone () ),
       _ => None } )
     . collect () }
@@ -188,9 +188,7 @@ fn root_ids_from_viewforest (
   let mut ids : HashSet<ID> = HashSet::new ();
   let graph_snap = snapshot_global ();
   for child in viewforest . roots () {
-    if let ViewNodeKind::Vognode (v) = &child . value () . kind {
-      let Some (vid) = v . normal_or_phantom_id ()
-        else { continue; };
+    if let Some (vid) = child . value () . active_or_diff_phantom_id () {
       ids . insert ( vid . clone () );
       if let Some (graph) = graph_snap . as_ref () {
         if let Some (pid) = graph . pid_of ( vid ) {

@@ -37,7 +37,7 @@ use skg::types::viewnode::{
   ViewNode,
   ViewNodeKind,
   viewforest_root_viewnode};
-use skg::types::viewnode::Vognode;
+use skg::types::viewnode::{Vognode, Phantom};
 use skg::types::views_state::{OpenViews, ViewState, ViewUri};
 
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -84,9 +84,9 @@ fn true_child_ids (
 ) -> BTreeSet<ID> {
   tree . get (parent_id) . unwrap () . children ()
     . filter_map ( |child| match &child . value () . kind {
-      ViewNodeKind::Vognode ( Vognode::Normal (node) )
+      ViewNodeKind::Vognode ( Vognode::Active (node) )
         => Some (node . id . clone ()),
-      ViewNodeKind::Vognode ( Vognode::DiffPhantom (p) )
+      ViewNodeKind::Phantom ( Phantom::Diff (p) )
         => Some (p . id . clone ()),
       _ => None, })
     . collect () }

@@ -101,9 +101,9 @@ pub fn reconcile_alias_col_children (
       // Vognodes need repair; parentIs is a vestigial field in Phantoms.
       tree, aliascol_node_id,
       |vn : &ViewNode| matches!( &vn . kind,
-                                  ViewNodeKind::Vognode (Vognode::Normal (_)) ),
+                                  ViewNodeKind::Vognode (Vognode::Active (_)) ),
       |vn : &mut ViewNode| {
-        if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
+        if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
           = vn . kind
           { t . parentIs = ParentIs::Independent; }},
     ) . map_err( |e| -> Box<dyn Error> { e . into() } )?;

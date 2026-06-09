@@ -20,6 +20,12 @@ pub fn pid_and_source_from_ancestor (
         . ok_or_else (|| format!(
           "{}: ancestor {} has no source",
           caller, generation )),
+      ViewNodeKind::Phantom (p) =>
+        p . pid_and_source ()
+        . map ( |(pid, source)| (pid . clone (), source . clone ()) )
+        . ok_or_else (|| format!(
+          "{}: ancestor {} has no source",
+          caller, generation )),
       _ => Err( format!(
         "{}: ancestor {} cannot provide PID and source",
         caller, generation )) } )

@@ -27,7 +27,7 @@ use crate::types::viewnode::{
 };
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind, MpTruenode, MpPhantomDiff,
-    MpVognode,
+    MpVognode, MpPhantom,
 };
 
 use sexp::Sexp;
@@ -114,8 +114,8 @@ pub fn viewnode_from_metadata (
   let (kind, error)
     : (MpViewnodeKind, Option<BufferValidationError>)
     = if let Some (ref uid) = metadata . unknown_node_id {
-        ( MpViewnodeKind::Vognode (
-            MpVognode::Unknown (
+        ( MpViewnodeKind::Phantom (
+            MpPhantom::Unknown (
               PhantomUnknown { id: uid . clone () } ) ), None )
       } else if metadata . is_inactive_node {
         let error : Option<BufferValidationError> =
@@ -137,8 +137,8 @@ pub fn viewnode_from_metadata (
       } else if metadata . is_dead_scaffold {
         ( MpViewnodeKind::DeadScaffold, None )
       } else if metadata . is_deleted_node {
-        ( MpViewnodeKind::Vognode (
-            MpVognode::Deleted ( PhantomDeleted {
+        ( MpViewnodeKind::Phantom (
+            MpPhantom::Deleted ( PhantomDeleted {
             id     : metadata . id . clone ()
                        . unwrap_or_else ( || ID::from ("")),
             source : metadata . source . clone ()
@@ -204,17 +204,18 @@ pub fn viewnode_from_metadata (
             membership       : metadata . truenode_membership,
             not_in_git       : metadata . truenode_not_in_git,
             indef_or_def, };
-        let vognode =
+        let node_kind : MpViewnodeKind =
           if t . should_be_diffPhantom ()
           { // TODO/DONE/local-view-update/plan_v2.org §11: a phantom carries only the slim MpPhantomDiff. The
             // EditRequestOnIndefinitive validation above already fired if this
             // phantom (indefinitive) carried an edit_request, so dropping
             // indef_or_def/parentIs/etc. here loses nothing.
-            MpVognode::DiffPhantom (
-              MpPhantomDiff::from_truenode (t) ) }
+            MpViewnodeKind::Phantom (
+              MpPhantom::Diff (
+                MpPhantomDiff::from_truenode (t) )) }
           else
-          { MpVognode::Normal (t) };
-        ( MpViewnodeKind::Vognode (vognode),
+          { MpViewnodeKind::Vognode ( MpVognode::Active (t) ) };
+        ( node_kind,
           error ) }
     };
   ( MpViewnode { focused     : metadata . focused,
@@ -237,7 +238,7 @@ fn maybeplaced_kind_error_label (
       "forestRoot" . to_string (),
     MpViewnodeKind::DeadScaffold =>
       "deadScaffold" . to_string (),
-    MpViewnodeKind::Vognode (_) =>
+    MpViewnodeKind::Vognode (_) | MpViewnodeKind::Phantom (_) =>
       MpViewnode {
         focused     : false,
         folded      : false,

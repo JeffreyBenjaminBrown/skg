@@ -24,7 +24,7 @@ fn inactive_deleted_by_save_becomes_deleted () {
   convert_inactive_to_deleted_if_deleted (&mut t, kept,  &deleted) . unwrap ();
 
   assert! ( matches! ( &t . get (inact) . unwrap () . value () . kind,
-    ViewNodeKind::Vognode (Vognode::Deleted (d)) if d . id == ID::from ("x") ),
+    ViewNodeKind::Phantom (Phantom::Deleted (d)) if d . id == ID::from ("x") ),
     "an Inactive node deleted by this save must become Deleted" );
   assert! ( matches! ( &t . get (kept) . unwrap () . value () . kind,
     ViewNodeKind::Vognode (Vognode::Inactive (_)) ),

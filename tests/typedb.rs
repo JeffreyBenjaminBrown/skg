@@ -31,7 +31,7 @@ use skg::types::misc::{ID, SkgConfig, SourceName};
 use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::maybe_placed_viewnode::{MpViewnode, maybePlaced_to_placed_tree};
-use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode};
+use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode, Phantom};
 
 use futures::StreamExt;
 use std::collections::HashSet;
@@ -486,10 +486,10 @@ async fn test_recursive_document (
 
   // Root node should be "a"
   assert! ( matches! ( &root_node . kind,
-                        ViewNodeKind::Vognode ( Vognode::Normal (_)
-                                                | Vognode::DiffPhantom (_) )),
+                        ViewNodeKind::Vognode ( Vognode::Active (_) )
+                          | ViewNodeKind::Phantom ( Phantom::Diff (_) )),
     "should be TrueNode" );
-  let ViewNodeKind::Vognode ( Vognode::Normal (root_t) ) =
+  let ViewNodeKind::Vognode ( Vognode::Active (root_t) ) =
     &root_node . kind
     else { unreachable!() };
   assert_eq! ( &root_t . id, &ID::from ("a"),
@@ -504,10 +504,10 @@ async fn test_recursive_document (
   let b_node : &ViewNode = b_node_ref . value ();
 
   assert! ( matches! ( &b_node . kind,
-                        ViewNodeKind::Vognode ( Vognode::Normal (_)
-                                                | Vognode::DiffPhantom (_) )),
+                        ViewNodeKind::Vognode ( Vognode::Active (_) )
+                          | ViewNodeKind::Phantom ( Phantom::Diff (_) )),
     "should be TrueNode" );
-  let ViewNodeKind::Vognode ( Vognode::Normal (b_t) )
+  let ViewNodeKind::Vognode ( Vognode::Active (b_t) )
     = &b_node . kind
     else { unreachable!() };
   assert_eq! ( &b_t . id, &ID::from ("b"),
@@ -526,10 +526,10 @@ async fn test_recursive_document (
   let c_node : &ViewNode = c_node_ref . value ();
 
   assert! ( matches! ( &c_node . kind,
-                        ViewNodeKind::Vognode ( Vognode::Normal (_)
-                                                | Vognode::DiffPhantom (_) )),
+                        ViewNodeKind::Vognode ( Vognode::Active (_) )
+                          | ViewNodeKind::Phantom ( Phantom::Diff (_) )),
     "should be TrueNode" );
-  let ViewNodeKind::Vognode ( Vognode::Normal (c_t) )
+  let ViewNodeKind::Vognode ( Vognode::Active (c_t) )
     = &c_node . kind
     else { unreachable!() };
   assert_eq! ( &c_t . id, &ID::from ("c"),
@@ -544,10 +544,10 @@ async fn test_recursive_document (
   let b_repeat : &ViewNode = b_repeat_ref . value ();
 
   assert! ( matches! ( &b_repeat . kind,
-                        ViewNodeKind::Vognode ( Vognode::Normal (_)
-                                                | Vognode::DiffPhantom (_) )),
+                        ViewNodeKind::Vognode ( Vognode::Active (_) )
+                          | ViewNodeKind::Phantom ( Phantom::Diff (_) )),
     "should be TrueNode" );
-  let ViewNodeKind::Vognode ( Vognode::Normal (b_repeat_t) )
+  let ViewNodeKind::Vognode ( Vognode::Active (b_repeat_t) )
     = &b_repeat . kind
     else { unreachable!() };
   assert_eq! ( &b_repeat_t . id, &ID::from ("b"),

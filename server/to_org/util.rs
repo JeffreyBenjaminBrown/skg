@@ -13,7 +13,7 @@ use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree
 use crate::types::tree::viewnode_nodecomplete::write_at_truenode_in_tree;
 use crate::types::viewnode::ViewRequest;
 use crate::types::viewnode::{ Birth, ViewNode, ViewNodeKind, IndefOrDef, ParentIs, TrueNode, mk_definitive_viewnode, mk_inactive_viewnode, mk_unknown_viewnode };
-use crate::types::viewnode::Vognode;
+use crate::types::viewnode::{Vognode, Phantom};
 use crate::types::tree::forest::{ViewForest, tree_forest_root_ids};
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
@@ -225,7 +225,7 @@ pub fn mark_view_roots_parent_absent (
     let mut node_mut : NodeMut<ViewNode> =
       viewforest . get_mut (root_id) . unwrap ();
     let vn : &mut ViewNode = node_mut . value ();
-    if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
+    if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
       = vn . kind
       { t . parentIs = ParentIs::Absent; }}}
 
@@ -273,13 +273,13 @@ pub fn validate_parentIs_relationships (
     if let Edge::Open (child_ref) = edge {
       let child_tn : &TrueNode =
         match & child_ref . value () . kind {
-          ViewNodeKind::Vognode (Vognode::Normal (t)) => t,
+          ViewNodeKind::Vognode (Vognode::Active (t)) => t,
           _ => continue };
       let parent_ref : NodeRef<ViewNode> = match child_ref . parent () {
         Some (p) => p, None => continue };
       let parent_tn : &TrueNode =
         match & parent_ref . value () . kind {
-          ViewNodeKind::Vognode (Vognode::Normal (t)) => t,
+          ViewNodeKind::Vognode (Vognode::Active (t)) => t,
           // A non-TrueNode parent (BufferRoot, Scaffold, Deleted, DeletedScaff) is not a legitimate subject for any of these relational claims; skip without correcting.
           _ => continue };
       if child_tn . parentIs == ParentIs::Absent {
@@ -305,19 +305,19 @@ pub fn validate_parentIs_relationships (
   for id in to_independent {
     let mut node_mut : NodeMut<ViewNode> =
       viewforest . get_mut (id) . unwrap ();
-    if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
+    if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
       = node_mut . value () . kind
     { t . parentIs = ParentIs::Independent; } }
   for id in to_affected {
     let mut node_mut : NodeMut<ViewNode> =
       viewforest . get_mut (id) . unwrap ();
-    if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
+    if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
       = node_mut . value () . kind
     { t . parentIs = ParentIs::Affected; } }
   for id in to_unremarkable {
     let mut node_mut : NodeMut<ViewNode> =
       viewforest . get_mut (id) . unwrap ();
-    if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
+    if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
       = node_mut . value () . kind
     { t . birth = Birth::Unremarkable; } } }
 
@@ -351,20 +351,20 @@ pub fn mark_orphans_under_dead_parents_independent (
     if let Edge::Open (child_ref) = edge {
       let is_affected_normal : bool =
         matches! ( & child_ref . value () . kind,
-          ViewNodeKind::Vognode (Vognode::Normal (t))
+          ViewNodeKind::Vognode (Vognode::Active (t))
             if t . parentIs == ParentIs::Affected );
       if ! is_affected_normal { continue; }
       let parent_is_non_container : bool =
         child_ref . parent () . map_or ( false, |p|
           matches! ( & p . value () . kind,
-            ViewNodeKind::Vognode (Vognode::DiffPhantom (_))
-              | ViewNodeKind::Vognode (Vognode::Deleted (_))
+            ViewNodeKind::Phantom (Phantom::Diff (_))
+              | ViewNodeKind::Phantom (Phantom::Deleted (_))
               | ViewNodeKind::DeadScaffold ) );
       if parent_is_non_container { targets . push ( child_ref . id () ); }}}
   for id in targets {
     let mut node_mut : NodeMut<ViewNode> =
       viewforest . get_mut (id) . unwrap ();
-    if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
+    if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
       = node_mut . value () . kind
     { t . parentIs = ParentIs::Independent; } } }
 
@@ -425,11 +425,9 @@ pub fn ids_that_can_have_graphnodestats (
   let mut ids : Vec < ID > = Vec::new ();
   for edge in tree . root () . traverse () {
     if let Edge::Open (node_ref) = edge {
-      match &node_ref . value () . kind {
-        ViewNodeKind::Vognode (v) =>
-          if let Some (vid) = v . normal_or_phantom_id ()
-          { ids . push ( vid . clone () ); },
-        _ => {} }}}
+      if let Some (vid) =
+        node_ref . value () . active_or_diff_phantom_id ()
+      { ids . push ( vid . clone () ); }}}
   ids }
 
 /// Check if `target_skgid` appears in the ancestor path of `treeid`.
@@ -608,11 +606,11 @@ pub fn truenode_in_tree_is_indefinitive (
                            |viewnode| viewnode . kind . clone() )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   match node_kind {
-    ViewNodeKind::Vognode (Vognode::Normal (t))   => Ok (t . is_indefinitive ()),
-    ViewNodeKind::Vognode (Vognode::DiffPhantom (p)) => Ok (p . is_indefinitive ()),
-    ViewNodeKind::Vognode (Vognode::Deleted (_))
+    ViewNodeKind::Vognode (Vognode::Active (t))   => Ok (t . is_indefinitive ()),
+    ViewNodeKind::Phantom (Phantom::Diff (p)) => Ok (p . is_indefinitive ()),
+    ViewNodeKind::Phantom (Phantom::Deleted (_))
       | ViewNodeKind::Vognode (Vognode::Inactive (_))
-      | ViewNodeKind::Vognode (Vognode::Unknown (_)) => Ok (false),
+      | ViewNodeKind::Phantom (Phantom::Unknown (_)) => Ok (false),
     _                                                => Err (
       "is_indefinitive: caller must pass a vognode" . into( )),
   }}
@@ -650,7 +648,7 @@ where T: AsMut<ViewNode>,
     errors . push ( format! ( "{}: {}", error_msg, e )); }
   let mut node_mut : NodeMut<T> =
     tree . get_mut (node_id) . ok_or ("remove_completed_view_request: node not found") ?;
-  if let ViewNodeKind::Vognode (Vognode::Normal (t))
+  if let ViewNodeKind::Vognode (Vognode::Active (t))
     = &mut node_mut . value () . as_mut () . kind
     { t . view_requests . remove (&view_request); }
   Ok (()) }

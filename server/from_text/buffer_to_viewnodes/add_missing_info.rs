@@ -59,14 +59,14 @@ pub fn absent_parentIs_under_visible_parent_becomes_isContainer (
       . map ( |p| p . id() != root_id )
       . unwrap_or (false);
     if ! parent_is_visible { continue; }
-    if let MpViewnodeKind::Vognode (MpVognode::Normal (t))
+    if let MpViewnodeKind::Vognode (MpVognode::Active (t))
       = &node_ref . value() . kind
       { if t . parentIs == ParentIs::Absent
         { need_changing . push (node_ref . id()); }}}
   for node_id in need_changing { // change them
     let mut node_mut : NodeMut<MpViewnode> =
       viewforest . get_mut (node_id) . unwrap();
-    if let MpViewnodeKind::Vognode (MpVognode::Normal (t))
+    if let MpViewnodeKind::Vognode (MpVognode::Active (t))
       = &mut node_mut . value() . kind
       { t . parentIs = ParentIs::Affected; }}}
 
@@ -76,7 +76,7 @@ pub fn absent_parentIs_under_visible_parent_becomes_isContainer (
 fn make_alias_if_appropriate(
   node: &mut NodeMut<MpViewnode>
 ) -> Result<(), String> {
-  if let MpViewnodeKind::Vognode (MpVognode::Normal (_))
+  if let MpViewnodeKind::Vognode (MpVognode::Active (_))
     = &node . value() . kind
   { // It is a real, normal gnode.
     let parent_is_aliascol : bool =
@@ -87,7 +87,7 @@ fn make_alias_if_appropriate(
       . unwrap_or (false);
     if parent_is_aliascol { // Make it an Alias.
       let org : &mut MpViewnode = node . value();
-      let MpViewnodeKind::Vognode (MpVognode::Normal (t))
+      let MpViewnodeKind::Vognode (MpVognode::Active (t))
         : &MpViewnodeKind
         = &org . kind
       else { unreachable!() };
@@ -104,18 +104,18 @@ fn inherit_parent_source_if_possible(
 ) -> Result<(), String> {
   let needs_source : bool =
     match &node . value() . kind {
-      MpViewnodeKind::Vognode (MpVognode::Normal (t))
+      MpViewnodeKind::Vognode (MpVognode::Active (t))
         => t . source . is_none(),
       _ => false, };
   if needs_source {
     let parent_source : Option<SourceName> =
       node . parent() . and_then(|mut p| {
         match &p . value() . kind {
-          MpViewnodeKind::Vognode (MpVognode::Normal (pt))
+          MpViewnodeKind::Vognode (MpVognode::Active (pt))
             => pt . source . clone(),
           _ => None, }} );
     if let Some (source) = parent_source {
-      if let MpViewnodeKind::Vognode (MpVognode::Normal (t))
+      if let MpViewnodeKind::Vognode (MpVognode::Active (t))
         = &mut node . value() . kind
       { t . source = Some (source); }}}
   Ok (( )) }
@@ -124,7 +124,7 @@ fn inherit_parent_source_if_possible(
 fn assign_new_id_if_absent(
   node: &mut NodeMut<MpViewnode>
 ) -> Result<(), String> {
-  if let MpViewnodeKind::Vognode (MpVognode::Normal (t))
+  if let MpViewnodeKind::Vognode (MpVognode::Active (t))
     = &mut node . value() . kind {
     if t . id . is_none() {
       let new_id : String = Uuid::new_v4() . to_string();

@@ -81,7 +81,7 @@ fn collect_instructions(
       HashMap<ID, HashSet<SourceName>>
   ) {
     let viewnode : &MpViewnode = node_ref . value();
-    if let MpViewnodeKind::Vognode (MpVognode::Normal (t))
+    if let MpViewnodeKind::Vognode (MpVognode::Active (t))
       = &viewnode . kind
     { if let Some (id) = &t . id {
         if ! t . is_indefinitive () { // indef nodes contribute no instructions

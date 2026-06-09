@@ -19,7 +19,7 @@ fn test_get_id_from_treenode_with_id() {
     ViewNode { focused     : false,
               folded      : false,
               body_folded : false,
-              kind        : ViewNodeKind::Vognode (Vognode::Normal (t)) };
+              kind        : ViewNodeKind::Vognode (Vognode::Active (t)) };
   let tree : Tree<ViewNode> = Tree::new (viewnode);
   let root_id : NodeId = tree . root() . id();
   let result : Result<ID, Box<dyn std::error::Error>> =

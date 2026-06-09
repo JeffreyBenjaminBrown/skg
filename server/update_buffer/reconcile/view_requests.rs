@@ -22,7 +22,7 @@ pub async fn execute_truenode_view_requests (
   error_unless_node_satisfies(
     tree, node,
     |vn : &ViewNode| matches!( &vn . kind,
-                                ViewNodeKind::Vognode (Vognode::Normal (_)) ),
+                                ViewNodeKind::Vognode (Vognode::Active (_)) ),
     "execute_truenode_view_requests: expected TrueNode" )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   let requests : Vec<(NodeId, ViewRequest)> =
@@ -46,7 +46,7 @@ pub async fn ensure_hiddenin_col_under_definitive_subscribee (
   let is_indefinitive : bool =
     read_at_node_in_tree( tree, node,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t))
+        ViewNodeKind::Vognode (Vognode::Active (t))
           => t . is_indefinitive (),
         _ => false } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -66,7 +66,7 @@ fn extract_view_requests (
   let mut view_requests : HashSet<ViewRequest> =
     read_at_node_in_tree( tree, node,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t))
+        ViewNodeKind::Vognode (Vognode::Active (t))
           => t . view_requests . clone(),
         _ => HashSet::new() } )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;

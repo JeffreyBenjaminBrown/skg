@@ -106,13 +106,13 @@ pub async fn maybe_add_subscribeeCol_branch (
   error_unless_node_satisfies(
     tree, node_id,
     |vn| matches!( &vn . kind,
-                    ViewNodeKind::Vognode (Vognode::Normal (_))),
+                    ViewNodeKind::Vognode (Vognode::Active (_))),
     "maybe_add_subscribeeCol_branch: expected TrueNode" ) ?;
   { let is_indefinitive : bool =
       read_at_node_in_tree(
         tree, node_id,
         |vn| matches!( &vn . kind,
-                        ViewNodeKind::Vognode (Vognode::Normal (t))
+                        ViewNodeKind::Vognode (Vognode::Active (t))
                         if t . is_indefinitive () ))
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_indefinitive { return Ok(( )); } }
@@ -182,13 +182,13 @@ pub async fn maybe_add_relation_col_branches (
   error_unless_node_satisfies(
     tree, node_id,
     |vn| matches!( &vn . kind,
-                    ViewNodeKind::Vognode (Vognode::Normal (_) )),
+                    ViewNodeKind::Vognode (Vognode::Active (_) )),
     "maybe_add_relation_col_branches: expected TrueNode" ) ?;
   { let is_indefinitive : bool =
       read_at_node_in_tree(
         tree, node_id,
         |vn| matches!( &vn . kind,
-                        ViewNodeKind::Vognode (Vognode::Normal (t))
+                        ViewNodeKind::Vognode (Vognode::Active (t))
                         if t . is_indefinitive () ) )
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_indefinitive { return Ok(( )); } }
@@ -226,7 +226,7 @@ async fn maybe_add_one_relation_col (
     read_at_node_in_tree (
       tree, node_id,
       |vn| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t))
+        ViewNodeKind::Vognode (Vognode::Active (t))
           => Ok (t . id . clone ()),
         _ => Err ("expected TrueNode" . to_string ()), } )
     .map_err( |e| -> Box<dyn Error> { e . into() } ) ??;

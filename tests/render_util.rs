@@ -12,7 +12,7 @@ fn test_viewnode_to_text_no_metadata () {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind    : ViewNodeKind::Vognode (Vognode::Normal (
+    kind    : ViewNodeKind::Vognode (Vognode::Active (
       default_truenode ( ID::from ("test"),
                          SourceName::from ("main"),
                          "Test Title" . to_string() ))) };
@@ -34,7 +34,7 @@ fn test_viewnode_to_text_with_body () {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind    : ViewNodeKind::Vognode (Vognode::Normal (t)), };
+    kind    : ViewNodeKind::Vognode (Vognode::Active (t)), };
   let result : String =
     viewnode_to_text ( 2, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("TrueNode rendering never fails");
@@ -65,7 +65,7 @@ fn test_viewnode_to_text_with_id_metadata () {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind    : ViewNodeKind::Vognode (Vognode::Normal (t)), };
+    kind    : ViewNodeKind::Vognode (Vognode::Active (t)), };
   let result : String =
     viewnode_to_text ( 3, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("TrueNode rendering never fails");
@@ -85,7 +85,7 @@ fn test_metadata_ordering () {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind    : ViewNodeKind::Vognode (Vognode::Normal (t)), };
+    kind    : ViewNodeKind::Vognode (Vognode::Active (t)), };
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("TrueNode rendering never fails");
@@ -114,7 +114,7 @@ fn test_birth_affects_container_count_emission () {
                             SourceName::from ("main"),
                             "N" . to_string () ) };
     ViewNode { focused : false, folded : false, body_folded : false,
-               kind : ViewNodeKind::Vognode (Vognode::Normal (t)) } };
+               kind : ViewNodeKind::Vognode (Vognode::Active (t)) } };
   let cfg : SkgConfig =
     SkgConfig::dummyFromSources ( HashMap::new () );
   let content      : String = viewnode_to_text (

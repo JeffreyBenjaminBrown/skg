@@ -30,7 +30,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::to_org::util::{mark_view_roots_parent_absent, validate_parentIs_relationships, mark_orphans_under_dead_parents_independent};
 use crate::dbs::in_rust_graph::snapshot_global;
 use crate::types::viewnode::{IndefOrDef, ViewNode, ViewNodeKind};
-use crate::types::viewnode::{Vognode, QualCol, Qual, ViewRequest};
+use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual, ViewRequest};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -279,7 +279,7 @@ pub async fn render_initial_view (
   // ViewRequest::Definitive; adding one would over-trigger the TODO/DONE/local-view-update/plan_v2.org §5.3 cascade.)
   for root_nid in viewforest . root_ids () {
     if let Some (mut node_mut) = viewforest . get_mut (root_nid) {
-      if let ViewNodeKind::Vognode (Vognode::Normal (t)) =
+      if let ViewNodeKind::Vognode (Vognode::Active (t)) =
         &mut node_mut . value () . kind
       { t . view_requests . insert ( ViewRequest::Containerward ); }} }
   let graph_snap : Arc<InRustGraph> = env . in_rust_graph . load_full ();
@@ -452,7 +452,7 @@ fn rewriteInPlace_viewnodes_whose_id_is_newly_extra (
       match &n_ref . value () . kind {
         // Only Normal nodes are rewritten below (a phantom is never an
         // editable instance), so only they need a swap computed.
-        ViewNodeKind::Vognode (Vognode::Normal (t))
+        ViewNodeKind::Vognode (Vognode::Active (t))
           => { match graph_snap . pid_of (&t . id)
                { Some (primary) if primary != t . id => {
                      graph_snap . get (&primary) . map ( |r| (
@@ -465,7 +465,7 @@ fn rewriteInPlace_viewnodes_whose_id_is_newly_extra (
     if let Some ((new_pid, new_source, new_title, new_body)) = swap
     { let mut n_mut = viewforest . get_mut (nid)
         . ok_or ("rewriteInPlace_viewnodes_whose_id_is_newly_extra: node_mut failed") ?;
-      if let ViewNodeKind::Vognode (Vognode::Normal (t))
+      if let ViewNodeKind::Vognode (Vognode::Active (t))
       = &mut n_mut . value () . kind
       { t . id = new_pid;
         t . source = new_source;
@@ -531,7 +531,7 @@ fn remove_branches_that_git_marked_removed (
           None => false } };
       let is_phantom : bool =
         matches! ( &node . value() . kind,
-          ViewNodeKind::Vognode (Vognode::DiffPhantom (_)) );
+          ViewNodeKind::Phantom (Phantom::Diff (_)) );
       if ! is_phantom || is_viewforest_root_child {
         return Ok (true); } // not a strippable phantom: recurse normally
       if node . has_children () {
@@ -590,11 +590,11 @@ fn clear_diff_metadata (
         // but they are regenerated from scratch by their reconcilers at their
         // own BFS visit, so clearing them here is unnecessary.
         match &mut node . value() . kind {
-          ViewNodeKind::Vognode (Vognode::Normal (t)) => {
+          ViewNodeKind::Vognode (Vognode::Active (t)) => {
             t . existence  = ExistenceAxes::default ();
             t . membership = MembershipAxes::default ();
             t . not_in_git = false; }
-          ViewNodeKind::Vognode (Vognode::DiffPhantom (p)) => {
+          ViewNodeKind::Phantom (Phantom::Diff (p)) => {
             p . existence  = ExistenceAxes::default ();
             p . membership = MembershipAxes::default ();
             p . not_in_git = false; }
@@ -625,7 +625,7 @@ async fn fulfill_root_containerward_requests (
     viewforest . root_ids () . into_iter ()
       . filter ( |nid| viewforest . get (*nid)
           . map ( |n| match &n . value () . kind {
-              ViewNodeKind::Vognode (Vognode::Normal (t)) =>
+              ViewNodeKind::Vognode (Vognode::Active (t)) =>
                 t . view_requests . contains (& ViewRequest::Containerward),
               _ => false } )
           . unwrap_or (false) )
@@ -635,7 +635,7 @@ async fn fulfill_root_containerward_requests (
     viewforest, &requesting_root_nodeids, config, driver, active ) . await ?;
   for nid in requesting_root_nodeids { // drop the now-fulfilled request
     if let Some (mut node_mut) = viewforest . get_mut (nid) {
-      if let ViewNodeKind::Vognode (Vognode::Normal (t)) =
+      if let ViewNodeKind::Vognode (Vognode::Active (t)) =
         &mut node_mut . value () . kind
       { t . view_requests . remove (& ViewRequest::Containerward); }} }
   Ok (( )) }
@@ -654,9 +654,9 @@ async fn attach_containerward_ancestries_to_removedhere_phantoms (
     for edge in viewforest . root () . traverse () {
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
         let is_removedhere : bool = match &node_ref . value () . kind {
-          ViewNodeKind::Vognode (Vognode::Normal (t)) =>
+          ViewNodeKind::Vognode (Vognode::Active (t)) =>
             t . is_removedhere_diffPhantom (),
-          ViewNodeKind::Vognode (Vognode::DiffPhantom (p)) =>
+          ViewNodeKind::Phantom (Phantom::Diff (p)) =>
             p . is_removedhere_diffPhantom (),
           _ => false };
         if is_removedhere

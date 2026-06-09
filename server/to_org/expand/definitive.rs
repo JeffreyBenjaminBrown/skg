@@ -131,7 +131,7 @@ fn indefinitize_content_subtree (
       let content_child_treeids : Vec < NodeId > =
         node_ref . children ()
         . filter ( |c| matches! ( &c . value() . kind,
-                                  ViewNodeKind::Vognode (Vognode::Normal (t))
+                                  ViewNodeKind::Vognode (Vognode::Active (t))
                                   if t . parentIs == ParentIs::Affected ))
         . map ( |c| c . id () )
         . collect ();

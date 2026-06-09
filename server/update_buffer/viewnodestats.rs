@@ -32,7 +32,7 @@ fn set_viewnodestats_recursive (
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
   let opt_pid : Option<ID> =
-    if let ViewNodeKind::Vognode (Vognode::Normal (t)) =
+    if let ViewNodeKind::Vognode (Vognode::Active (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     { let node_pid : ID = t . id . clone ();
       detect_and_mark_cycle_v2 (
@@ -72,7 +72,7 @@ fn set_source_at_boundary (
   treeid : NodeId,
 ) {
   let node_source : SourceName = {
-    let ViewNodeKind::Vognode (Vognode::Normal (t)) =
+    let ViewNodeKind::Vognode (Vognode::Active (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
     t . source . clone () };
@@ -82,7 +82,7 @@ fn set_source_at_boundary (
     match ancestor_source {
       None => true,
       Some (s) => s != node_source };
-  if let ViewNodeKind::Vognode (Vognode::Normal (t)) =
+  if let ViewNodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . sourceAtBoundary = at_boundary; }}
 
@@ -96,7 +96,7 @@ fn nearest_truenode_ancestor_source (
   while let Some (parent_ref)
     = tree . get (current) . unwrap () . parent ()
     { current = parent_ref . id ();
-      if let ViewNodeKind::Vognode (Vognode::Normal (t))
+      if let ViewNodeKind::Vognode (Vognode::Active (t))
         = & parent_ref . value () . kind
         { return Some ( t . source . clone () ); }}
   None }
@@ -109,7 +109,7 @@ fn detect_and_mark_cycle_v2 (
   node_pid     : &ID,
   ancestor_ids : &HashSet<ID>,
 ) {
-  if let ViewNodeKind::Vognode (Vognode::Normal (t)) =
+  if let ViewNodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . cycle = ancestor_ids . contains (node_pid); } }
 
@@ -132,7 +132,7 @@ fn set_parent_containment_stats_in_viewnode (
           . map_or ( false, |contents|
                      contents . contains (parent_pid)) )
     } else { (true, false) }; // TODO ? PITFALL: Not ideal. If the parent is not a truenode, this suggests the node is its parent's content and not its container. In truth those concepts simply don't apply. But in that case, using these values for parent_is_container and parent_is_content has the desired effect on the node's metadata: It won't make any noise about either relationship.
-  if let ViewNodeKind::Vognode (Vognode::Normal (t)) =
+  if let ViewNodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . parentIsContainer = parent_is_container;
     t . viewStats . parentIsContent = parent_is_content; }}

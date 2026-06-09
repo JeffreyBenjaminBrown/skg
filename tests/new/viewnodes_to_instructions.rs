@@ -29,7 +29,7 @@ use skg::types::maybe_placed_viewnode::{
   maybePlaced_to_placed_viewforest};
 use skg::types::tree::forest::{MpViewForest, ViewForest};
 use skg::types::viewnode::{ViewNode, ViewNodeKind, viewforest_root_viewnode};
-use skg::types::viewnode::Vognode;
+use skg::types::viewnode::{Vognode, Phantom};
 use std::error::Error;
 
 const SUBSCRIBEE_EDIT_CONFIG: &str =
@@ -78,9 +78,9 @@ fn set_membership_unstaged_minus (
   for node_ref in tree . nodes() {
     let is_target : bool =
       match &node_ref . value() . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t)) =>
+        ViewNodeKind::Vognode (Vognode::Active (t)) =>
           t . id == ID::from (id),
-        ViewNodeKind::Vognode (Vognode::DiffPhantom (p)) =>
+        ViewNodeKind::Phantom (Phantom::Diff (p)) =>
           p . id == ID::from (id),
         _ => false,
       };
@@ -90,7 +90,7 @@ fn set_membership_unstaged_minus (
   let target_id = target_id . unwrap_or_else (||
     panic! ("node not found: {}", id));
   // The target is a Normal node here; the next line flips it to a phantom.
-  if let ViewNodeKind::Vognode (Vognode::Normal (t)) =
+  if let ViewNodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (target_id) . unwrap() . value() . kind
   { t . membership . unstaged = Some (Sign::Minus); }
   tree . get_mut (target_id) . unwrap()

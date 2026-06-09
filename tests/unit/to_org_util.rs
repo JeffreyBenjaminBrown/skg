@@ -45,7 +45,7 @@ fn parentIs_if_normal (
   nid    : NodeId,
 ) -> ParentIs {
   match & viewforest . get (nid) . unwrap () . value () . kind {
-    ViewNodeKind::Vognode (Vognode::Normal (t)) => t . parentIs,
+    ViewNodeKind::Vognode (Vognode::Active (t)) => t . parentIs,
     _ => panic! ("expected TrueNode") } }
 
 fn birth_if_normal (
@@ -53,7 +53,7 @@ fn birth_if_normal (
   nid    : NodeId,
 ) -> Birth {
   match & viewforest . get (nid) . unwrap () . value () . kind {
-    ViewNodeKind::Vognode (Vognode::Normal (t)) => t . birth,
+    ViewNodeKind::Vognode (Vognode::Active (t)) => t . birth,
     _ => panic! ("expected TrueNode") } }
 
 #[test]

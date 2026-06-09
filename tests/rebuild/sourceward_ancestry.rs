@@ -47,7 +47,7 @@ fn children_info (
   tree . get (node_id) . unwrap () . children ()
     . filter_map ( |child| {
       if let ViewNodeKind::Vognode (
-        Vognode::Normal (t)) =
+        Vognode::Active (t)) =
         &child . value () . kind {
         Some (( t.id.0 . clone (), t.birth ))
       } else { None } } )
@@ -62,7 +62,7 @@ fn find_child (
   tree . get (parent) . unwrap () . children ()
     . find ( |child| {
       if let ViewNodeKind::Vognode (
-        Vognode::Normal (t)) =
+        Vognode::Active (t)) =
         &child . value () . kind {
         t.id.0 == pid
       } else { false } } )

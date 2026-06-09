@@ -35,7 +35,7 @@ fn mk_test_viewnode (
   ViewNode { focused     : false,
             folded      : false,
             body_folded : false,
-            kind        : ViewNodeKind::Vognode (Vognode::Normal (t)) }}
+            kind        : ViewNodeKind::Vognode (Vognode::Active (t)) }}
 
 #[test]
 fn test_merge_2_into_1() -> Result<(), Box<dyn Error>> {

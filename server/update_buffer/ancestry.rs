@@ -14,7 +14,7 @@
 //! ancestry chain*: a col is a generalized orphan if ANY ancestor in its
 //! required-ancestry chain -- not only the parent -- is the wrong viewnode
 //! kind. Death is a VIEW property, not a graph property: a position that must
-//! be a vognode holding anything but Vognode::Normal, or a position that must
+//! be a vognode holding anything but Vognode::Active, or a position that must
 //! be a specific col holding anything but that col, is dead. No
 //! graph / NodeComplete read is involved. This is sound because, in BFS order,
 //! a Normal node converts to Deleted at its own visit, strictly before any
@@ -40,7 +40,7 @@ use std::error::Error;
 /// against the *actual ancestor at that tree depth*.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ExpectedAncestor {
-  /// Must be a `Vognode::Normal` (anything else at this depth means death).
+  /// Must be a `Vognode::Active` (anything else at this depth means death).
   NormalVognode,
   /// Must be exactly this col kind (TODO/DONE/local-view-update/plan_v2.org §19: a col = a collecting scaffold). The
   /// only intermediate-chain col the table uses is the SubscribeeCol.
@@ -90,7 +90,7 @@ fn matches_expected (
 ) -> bool {
   match expected {
     ExpectedAncestor::NormalVognode =>
-      matches! ( actual, ViewNodeKind::Vognode (Vognode::Normal (_)) ),
+      matches! ( actual, ViewNodeKind::Vognode (Vognode::Active (_)) ),
     ExpectedAncestor::Col (rc) =>
       matches! ( actual, ViewNodeKind::PartnerCol (r) if r == rc ),
   } }
@@ -222,20 +222,22 @@ pub fn deaden_generalized_orphan_col (
 ///   itself at its own visit too" -- and is what makes leaf members at every
 ///   depth die. A Qual leaf does NOT self-dispatch, so it is still converted
 ///   below.)
-/// - any other non-vognode child (a Qual, a DeadScaffold) -> convert to
-///   DeadScaffold;
-/// - any other child (a non-Affected vognode: an Independent Normal, a
-///   DiffPhantom, an Inactive/Unknown/Deleted) -> keep untouched.
+/// - any other non-vognode, non-phantom child (a Qual, a DeadScaffold) -> convert
+///   to DeadScaffold;
+/// - any other child (a non-Affected vognode -- an Independent Active or an
+///   Inactive -- or any Phantom: Diff/Deleted/Unknown) -> keep untouched.
 fn dispose_orphaned_col_child (
   tree  : &mut Tree<ViewNode>,
   child : NodeId,
 ) -> Result<(), Box<dyn Error>> {
-  let (affected, is_leaf, is_vognode, is_col) : (bool, bool, bool, bool) = {
+  let (affected, is_leaf, is_vognode_or_phantom, is_col)
+    : (bool, bool, bool, bool) = {
     let c : NodeRef<ViewNode> = tree . get (child)
       . ok_or ("dispose_orphaned_col_child: child not found") ?;
     ( c . value () . is_truenode_and_parentIs_affected (),
       c . children () . next () . is_none (),
-      matches! ( &c . value () . kind, ViewNodeKind::Vognode (_) ),
+      matches! ( &c . value () . kind,
+                 ViewNodeKind::Vognode (_) | ViewNodeKind::Phantom (_) ),
       is_col_kind (&c . value () . kind) ) };
   if affected {
     if is_leaf {
@@ -246,11 +248,11 @@ fn dispose_orphaned_col_child (
         . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   } else if is_col {
     // Leave it: a nested col self-deadens at its own visit (see doc above).
-  } else if ! is_vognode {
+  } else if ! is_vognode_or_phantom {
     write_at_node_in_tree ( tree, child,
       |vn : &mut ViewNode| { vn . kind = ViewNodeKind::DeadScaffold; } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
-  // else: a non-Affected vognode -- kept untouched.
+  // else: a non-Affected vognode or a phantom -- kept untouched.
   Ok (( )) }
 
 #[cfg(test)]

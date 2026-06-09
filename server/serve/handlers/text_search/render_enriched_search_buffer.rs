@@ -25,7 +25,7 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
     let root_ref : NodeRef<ViewNode> = viewforest . root ();
     root_ref . children ()
     . filter_map ( |c| match &c . value () . kind {
-      ViewNodeKind::Vognode (Vognode::Normal (t))
+      ViewNodeKind::Vognode (Vognode::Active (t))
         => Some (( c . id (), t . id . clone () )),
       _ => None } )
     . collect () };

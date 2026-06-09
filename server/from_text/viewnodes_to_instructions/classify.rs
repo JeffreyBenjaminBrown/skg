@@ -1,6 +1,6 @@
 use crate::types::misc::ID;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol};
-use crate::types::viewnode::{Vognode, Qual};
+use crate::types::viewnode::{Vognode, Phantom, Qual};
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::HashMap;
 
@@ -87,7 +87,7 @@ fn saverole_for_node (
   node_ref : NodeRef<ViewNode>,
 ) -> Result<SaveRole, String> {
   match &node_ref . value() . kind {
-    ViewNodeKind::Vognode (Vognode::Normal (_)) =>
+    ViewNodeKind::Vognode (Vognode::Active (_)) =>
       classify_truenode (node_ref),
     ViewNodeKind::Qual (Qual::Alias { .. }) =>
       Ok (SaveRole::AliasDisplay),
@@ -98,10 +98,10 @@ fn saverole_for_node (
       | ViewNodeKind::DeadScaffold
       | ViewNodeKind::PartnerCol (_) // involved in save, but no direct save role
       | ViewNodeKind::Qual (Qual::TextChanged { .. })
-      | ViewNodeKind::Vognode (Vognode::Deleted (_))
+      | ViewNodeKind::Phantom (Phantom::Deleted (_))
       | ViewNodeKind::Vognode (Vognode::Inactive (_))
-      | ViewNodeKind::Vognode (Vognode::DiffPhantom (_))
-      | ViewNodeKind::Vognode (Vognode::Unknown (_))
+      | ViewNodeKind::Phantom (Phantom::Diff (_))
+      | ViewNodeKind::Phantom (Phantom::Unknown (_))
       => Ok (SaveRole::NoSaveRole), }}
 
 fn classify_truenode (
@@ -174,6 +174,6 @@ fn vognode_normal_id (
   let node_ref : NodeRef<ViewNode> =
     node_ref . ok_or_else (|| error . to_string())?;
   match &node_ref . value() . kind {
-    ViewNodeKind::Vognode (Vognode::Normal (t))
+    ViewNodeKind::Vognode (Vognode::Active (t))
       => Ok (t . id . clone()),
     _ => Err (error . to_string()), }}

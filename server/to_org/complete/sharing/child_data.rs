@@ -72,7 +72,7 @@ pub fn build_child_data (
         . ok_or ("build_child_data: node not found") ?;
     let mut m : HashMap<ID, (SourceName, String)> = HashMap::new ();
     for child_ref in node_ref . children () {
-      if let ViewNodeKind::Vognode (Vognode::Normal (t))
+      if let ViewNodeKind::Vognode (Vognode::Active (t))
         = & child_ref . value () . kind
         { m . insert ( t . id . clone (),
                        ( t . source . clone (),
@@ -144,10 +144,10 @@ pub fn reconcile_sharing_col_children (
   complete_relevant_children_in_viewnodetree (
     tree, col_node,
     |vn : &ViewNode| matches! ( &vn . kind,
-                                ViewNodeKind::Vognode (Vognode::Normal (t))
+                                ViewNodeKind::Vognode (Vognode::Active (t))
                                 if t . parentIs == ParentIs::Affected ),
     |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::Vognode (Vognode::Normal (t))
+      ViewNodeKind::Vognode (Vognode::Active (t))
         => t . id . clone (),
       _ => panic! ( "{}: relevant child not a normal graph node", label ) },
     goal_list,
@@ -183,12 +183,12 @@ fn mark_goal_children_as_collectionBranch_members (
   treat_certain_children (
     tree, col_node,
     |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::Vognode (Vognode::Normal (t)) =>
+      ViewNodeKind::Vognode (Vognode::Active (t)) =>
         goal_set . contains (&t . id)
         && ! t . should_be_diffPhantom (),
       _ => false },
     |vn : &mut ViewNode| {
-      if let ViewNodeKind::Vognode (Vognode::Normal (t))
+      if let ViewNodeKind::Vognode (Vognode::Active (t))
         = &mut vn . kind
         { t . parentIs = ParentIs::Affected; }} )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;

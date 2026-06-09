@@ -21,8 +21,55 @@ NON-rust files ('.el'/'.org'/'.sh') under tests/integration -- these are the
 plan's "DO NOT TOUCH" wire-format oracle files, so they are deliberately left
 (see "What's imperfect").
 
+** The main split (plan Steps 1-5) -- one commit, lib + tests green
+Redefined the enums: 'ViewNodeKind' gains a 'Phantom (Phantom)' arm; 'Vognode' =
+'Active' | 'Inactive'; new sibling 'Phantom' = 'Diff' | 'Deleted' | 'Unknown';
+mirror in 'maybe_placed_viewnode.rs' ('MpVognode'/'MpPhantom'/'MpViewnodeKind').
+Split the id/source accessors (added 'impl Phantom'), promoted the old
+'normal_or_phantom_id' to 'ViewNode::active_or_diff_phantom_id', fixed the
+ViewNode facade, constructors, the wire emitter/parser, and ~50 consumer files.
+'cargo build' (lib+bins) and 'cargo test --no-run' both green, zero warnings.
+
+All three behavioral hazards applied (the ones that compile silently):
+- HAZARD A 'ancestry.rs:dispose_orphaned_col_child': broadened the keep-untouched
+  test from 'Vognode(_)' to 'Vognode(_) | Phantom(_)' (local renamed
+  'is_vognode_or_phantom'), so a phantom orphan under a deadened col is no longer
+  wrongly converted to DeadScaffold.
+- HAZARD B 'views_state.rs:root_ids_from_viewforest' and
+  'to_org/util.rs:ids_that_can_have_graphnodestats': switched from the removed
+  'normal_or_phantom_id' to 'ViewNode::active_or_diff_phantom_id', so Diff-phantom
+  roots/ids still register.
+- HAZARD C 'generic.rs:pid_and_source_from_ancestor': added a 'Phantom' arm so a
+  Deleted/Diff phantom ancestor still resolves its pid+source (Unknown still
+  errors, as before).
+
+Wire-format invariance verified statically: the split diff of 'org_to_text.rs'
+(emit) and 'parse_metadata_sexp.rs' (parse) is ONLY import lines + match-arm
+re-routing -- zero changed atom string literals, zero helper-body changes.
+
 * Changes to the plan's envisioned order
-(appended as they happen)
+
+** Mechanical renames done by script, not hand-edit
+The plan describes editing each site; for the pure-token renames I used
+'sed'/Python instead (verified unique tokens, then 'cargo build'):
+- 0a/0b token renames; 'Vognode::Normal' -> 'Vognode::Active' (covers
+  'MpVognode::Normal' too); and the regular full-nested 'ViewNodeKind::Vognode
+  (Vognode::DiffPhantom..)' -> 'ViewNodeKind::Phantom (Phantom::Diff..)' moves.
+The irregular sites (or-patterns, bare constructions, spacing variants, the two
+hazards) were hand-edited, driven by the compiler error list.
+
+** lib-green and test-green folded into ONE split commit
+The plan sequences a step-4 (lib first-green) commit then a step-5 (test-green)
+commit. Both reached green together quickly, so the split is a single commit
+(prep commits 0a/0b stay separate). Net commits: 0a, 0b, split.
+
+** Introduced a helper instead of splitting 9 identical or-patterns
+'maybe_placed_viewnode.rs' validators repeated
+'matches!(.., MpVognode::Active(_) | MpVognode::DiffPhantom(_))' ~9 times. Rather
+than split each cross-enum or-pattern inline (plan's literal approach), I added
+'MpViewnode::is_active_or_diff_phantom()' and call it. Cleaner + DRY; same
+behavior. (The placed-side 'find_children_by_ids' and a few test/typedb sites
+were still split inline, as those bind the matched value or mix in other kinds.)
 
 * What's imperfect about what's done
 
@@ -36,7 +83,29 @@ wire-format break), so I left them untouched. They are now mildly stale-named bu
 harmless; a future doc pass could update them outside this refactor.
 
 * Choices determining the future
-(appended as made)
+
+** Three narrow id accessors, no unified 'id()'
+Per the settled decision, identity is read through three named accessors:
+'Vognode::id' / 'Phantom::id' (each enum), 'ViewNode::id_if_vognode'
+(Active/Inactive only), and 'ViewNode::active_or_diff_phantom_id' (Active + Diff).
+No catch-all 'ViewNode::id()'. New callers should pick the accessor whose name
+matches the id-set they actually want.
+
+** Removed the dead 'Vognode::active_id' the plan specified (1d)
+The plan added 'Vognode::active_id', but after promoting the cross-enum reach to
+'ViewNode::active_or_diff_phantom_id' nothing called it. I removed it rather than
+leave an unused 'pub' method. If a Vognode-only "active id, else None" is wanted
+later, re-add it.
+
+** Hazard C resolved toward behavior-preservation
+'pid_and_source_from_ancestor' now resolves through a Diff/Deleted phantom
+ancestor (added 'Phantom' arm). This was the plan's flagged judgment call; I chose
+to preserve the pre-split behavior exactly rather than start erroring on phantom
+ancestors. Easy to reverse (drop the arm) if a phantom ancestor should error.
+
+** 'MpViewnode::is_active_or_diff_phantom' is now a shared predicate
+Used by ~10 validators. If the set of "TrueNode-ish" Mp kinds ever changes,
+that one method is the place to change it.
 
 * TODO obstacles needing Jeff
 (empty so far -- architectural surprises / stumper mysteries go here, marked TODO)

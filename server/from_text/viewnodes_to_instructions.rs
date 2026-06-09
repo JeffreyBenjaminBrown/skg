@@ -185,7 +185,7 @@ pub(crate) async fn validate_no_title_or_body_edit_in_subscribeeAsSuch (
       node_ref . value() . role,
       SaveRole::Subscribee { .. })
     { continue; }
-    let ViewNodeKind::Vognode (Vognode::Normal (t))
+    let ViewNodeKind::Vognode (Vognode::Active (t))
       = &node_ref . value() . viewnode . kind
       else { continue; };
     let IndefOrDef::Definitive { body, .. } =

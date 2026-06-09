@@ -15,7 +15,7 @@ pub use crate::types::misc::SourceSetName;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, mk_inactive_viewnode};
-use crate::types::viewnode::Vognode;
+use crate::types::viewnode::{Vognode, Phantom};
 use crate::test_utils::cleanup_test_tantivy_and_typedb_dbs;
 
 use ego_tree::{NodeId, NodeMut, Tree};
@@ -131,12 +131,12 @@ pub fn apply_source_set_to_viewforest (
       viewforest . get (id)
       . and_then (
         |n| match &n . value () . kind {
-          ViewNodeKind::Vognode (Vognode::Normal (t))
+          ViewNodeKind::Vognode (Vognode::Active (t))
             if ! active . contains_source (&t . source)
             => Some (( t . id . clone (),
                        t . source . clone (),
                        t . membership )),
-          ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
+          ViewNodeKind::Phantom (Phantom::Diff (p))
             if ! active . contains_source (&p . source)
             => Some (( p . id . clone (),
                        p . source . clone (),

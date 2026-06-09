@@ -2,7 +2,7 @@ use super::*;
 use crate::types::git::MembershipAxes;
 use crate::types::viewnode::{
   mk_indefinitive_viewnode, viewforest_root_viewnode,
-  PhantomDeleted, Qual, QualCol };
+  Phantom, PhantomDeleted, Qual, QualCol };
 
 fn sid (s : &str) -> ID { ID::from (s) }
 fn src () -> SourceName { SourceName::from ("main") }
@@ -12,7 +12,7 @@ fn normal (title : &str, pi : ParentIs) -> ViewNode {
 
 fn deleted (title : &str) -> ViewNode {
   ViewNode { focused : false, folded : false, body_folded : false,
-    kind : ViewNodeKind::Vognode (Vognode::Deleted (PhantomDeleted {
+    kind : ViewNodeKind::Phantom (Phantom::Deleted (PhantomDeleted {
       id : sid (title), source : src (),
       title : title . to_string (), body : None })) } }
 
@@ -40,7 +40,7 @@ fn kind_at (tree : &Tree<ViewNode>, id : NodeId) -> ViewNodeKind {
 
 fn parentis_at (tree : &Tree<ViewNode>, id : NodeId) -> Option<ParentIs> {
   match &tree . get (id) . unwrap () . value () . kind {
-    ViewNodeKind::Vognode (Vognode::Normal (t)) => Some (t . parentIs),
+    ViewNodeKind::Vognode (Vognode::Active (t)) => Some (t . parentIs),
     _ => None } }
 
 fn is_detached (tree : &Tree<ViewNode>, parent : NodeId, id : NodeId) -> bool {

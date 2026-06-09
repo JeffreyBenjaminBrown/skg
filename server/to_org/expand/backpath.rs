@@ -359,7 +359,7 @@ async fn attach_containerward_ancestries_to_link_sources (
     let mut result : Vec<NodeId> = Vec::new ();
     for edge in tree . get (node_id) . unwrap () . traverse () {
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
-        if let ViewNodeKind::Vognode (Vognode::Normal (t))
+        if let ViewNodeKind::Vognode (Vognode::Active (t))
           = &node_ref . value () . kind
         { if t . birth == Birth::LinksToParent {
             result . push ( node_ref . id () ); }} }}
@@ -396,7 +396,7 @@ pub async fn attach_containerward_ancestries_at_nodeids_with_source_set (
       . filter_map ( |nid|
         tree . get (*nid) . and_then ( |n|
           match & n . value () . kind {
-            ViewNodeKind::Vognode (Vognode::Normal (t))
+            ViewNodeKind::Vognode (Vognode::Active (t))
               => Some ( (*nid, t . id . clone ()) ),
             _ => None } ) )
       . collect ();

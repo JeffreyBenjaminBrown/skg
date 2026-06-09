@@ -22,7 +22,7 @@ use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::maybe_placed_viewnode::{ MpViewnode, MpViewnodeKind };
-use crate::types::maybe_placed_viewnode::MpVognode;
+use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
 
 use ego_tree::{Tree, NodeRef};
 use futures::FutureExt;
@@ -499,10 +499,10 @@ fn compare_two_viewnode_branches_recursively_modulo_id (
   let n1 : &MpViewnode = node1 . value();
   let n2 : &MpViewnode = node2 . value();
   match (&n1 . kind, &n2 . kind) {
-    ( MpViewnodeKind::Vognode (MpVognode::Normal (_)
-                               | MpVognode::DiffPhantom (_)),
-      MpViewnodeKind::Vognode (MpVognode::Normal (_)
-                               | MpVognode::DiffPhantom (_))) =>
+    ( MpViewnodeKind::Vognode (MpVognode::Active (_))
+        | MpViewnodeKind::Phantom (MpPhantom::Diff (_)),
+      MpViewnodeKind::Vognode (MpVognode::Active (_))
+        | MpViewnodeKind::Phantom (MpPhantom::Diff (_))) =>
     { // Copy the ID from one to the other, then compare. TODO/DONE/local-view-update/plan_v2.org §11: Normal and
       // DiffPhantom payloads are now different types, so read n2's id via the
       // shared accessor and write n1_copy's per variant.
@@ -510,8 +510,8 @@ fn compare_two_viewnode_branches_recursively_modulo_id (
       let mut n1_copy : MpViewnode =
         n1 . clone();
       match &mut n1_copy . kind {
-        MpViewnodeKind::Vognode (MpVognode::Normal (t)) => t . id = id2,
-        MpViewnodeKind::Vognode (MpVognode::DiffPhantom (p)) => p . id = id2,
+        MpViewnodeKind::Vognode (MpVognode::Active (t)) => t . id = id2,
+        MpViewnodeKind::Phantom (MpPhantom::Diff (p)) => p . id = id2,
         _ => {} }
       if n1_copy != *n2 { return false; }}
     ( MpViewnodeKind::QualCol (_)
@@ -523,8 +523,8 @@ fn compare_two_viewnode_branches_recursively_modulo_id (
       | MpViewnodeKind::PartnerCol (_)
       | MpViewnodeKind::BufferRoot) =>
     { if n1 != n2 { return false; }}
-    ( MpViewnodeKind::Vognode (MpVognode::Deleted (_)),
-      MpViewnodeKind::Vognode (MpVognode::Deleted (_))) =>
+    ( MpViewnodeKind::Phantom (MpPhantom::Deleted (_)),
+      MpViewnodeKind::Phantom (MpPhantom::Deleted (_))) =>
     { if n1 != n2 { return false; }}
     ( MpViewnodeKind::DeadScaffold,
       MpViewnodeKind::DeadScaffold) =>

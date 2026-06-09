@@ -57,7 +57,7 @@ pub(crate) fn subscribee_hiderel_intents_from_candidates (
       continue; }
     let subscribee : ID =
       match &node_ref . value() . viewnode . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t))
+        ViewNodeKind::Vognode (Vognode::Active (t))
           => t . id . clone(),
         _ => return Err (
           "subscribee-as-such candidate was not a Normal viewnode"
@@ -83,7 +83,7 @@ fn subscriber_instance_is_definitive (
     . and_then (|col| col . parent())    // subscriber vognode
     . map (|subscriber| matches!(
         &subscriber . value() . viewnode . kind,
-        ViewNodeKind::Vognode (Vognode::Normal (t))
+        ViewNodeKind::Vognode (Vognode::Active (t))
           if ! t . is_indefinitive() ) )
     . unwrap_or (false) }
 
@@ -101,7 +101,7 @@ fn collect_visible_content (
     let child_ref : NodeRef<ViewNode_in_Role> = child_ref;
     let child : &ViewNode = &child_ref . value() . viewnode;
     match &child . kind {
-      ViewNodeKind::Vognode (Vognode::Normal (t)) => {
+      ViewNodeKind::Vognode (Vognode::Active (t)) => {
         if matches!(
              child_ref . value() . role,
              SaveRole::Ordinary)

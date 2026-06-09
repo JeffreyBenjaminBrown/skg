@@ -5,10 +5,10 @@ use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, TrueNode, ParentIs };
-use crate::types::viewnode::{Vognode, QualCol, Qual, RoleCol};
+use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual, RoleCol};
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind };
-use crate::types::maybe_placed_viewnode::MpVognode;
+use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::list::dedup_vector;
 use super::generic::{ unique_scaffold_child, write_at_node_in_tree, with_node_mut };
@@ -31,7 +31,7 @@ where F: FnOnce (&mut TrueNode) -> R {
       // TODO/DONE/local-view-update/plan_v2.org §11: a phantom is not a TrueNode (it carries a slim PhantomDiff), so
       // this Normal-only mutator cannot apply to one (a phantom has no
       // view_requests/indef_or_def/etc).
-      ViewNodeKind::Vognode (Vognode::Normal (t))
+      ViewNodeKind::Vognode (Vognode::Active (t))
         => Ok ( f (t) ),
       _ => Err ( "write_at_truenode_in_tree: expected TrueNode"
                    . to_string () ) }} ) ? }
@@ -69,9 +69,9 @@ pub fn id_from_self_or_nearest_ancestor (
     . ok_or ("id_from_self_or_nearest_ancestor: node not found")?;
   loop {
     match &node . value() . kind {
-      MpViewnodeKind::Vognode (MpVognode::Normal (t)) =>
+      MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
         { if let Some (id) = &t . id { return Ok(id . clone()); }}
-      MpViewnodeKind::Vognode (MpVognode::DiffPhantom (p)) =>
+      MpViewnodeKind::Phantom (MpPhantom::Diff (p)) =>
         { if let Some (id) = &p . id { return Ok(id . clone()); }}
       _ => {} }
     node = node . parent()
@@ -215,12 +215,13 @@ pub fn find_children_by_ids (
   let mut result : HashMap < ID, NodeId > = HashMap::new();
   for child in tree . get (parent_treeid) . unwrap() . children() {
     match &child . value() . kind {
-      ViewNodeKind::Vognode (
-        v @ (Vognode::Normal (_)
-             | Vognode::DiffPhantom (_)
-             | Vognode::Deleted (_))) =>
+      ViewNodeKind::Vognode (v @ Vognode::Active (_)) =>
         if target_skgids . contains (v . id ())
         { result . insert (v . id () . clone (), child . id()); },
+      ViewNodeKind::Phantom (p @ (Phantom::Diff (_)
+                                  | Phantom::Deleted (_))) =>
+        if target_skgids . contains (p . id ())
+        { result . insert (p . id () . clone (), child . id()); },
       _ => {} } }
   result }
 
@@ -309,7 +310,7 @@ fn collect_generation (
                           // TODO/DONE/local-view-update/plan_v2.org §11: a phantom has no parentIs and is implicitly
                           // Affected (content), so it is never filtered here.
                           !matches!(&c . value() . kind,
-                                    MpViewnodeKind::Vognode (MpVognode::Normal (t))
+                                    MpViewnodeKind::Vognode (MpVognode::Active (t))
                                     if t . parentIs != ParentIs::Affected ))
               . map(|c| c . id()) ); }}
       current_gen = next_gen; }

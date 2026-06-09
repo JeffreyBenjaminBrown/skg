@@ -3,7 +3,7 @@ use crate::from_text::viewnodes_to_instructions::classify::{
 use crate::types::viewnode::EditRequest;
 use crate::types::git::Sign;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode, IndefOrDef, InactiveNode, ParentIs, RoleCol};
-use crate::types::viewnode::{Vognode, QualCol, Qual};
+use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual};
 use crate::types::misc::{ID, MSV, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
@@ -423,15 +423,15 @@ pub(crate) fn collect_savenode_candidates (
         | ViewNodeKind::Qual (_)
         | ViewNodeKind::PartnerCol (_)
         | ViewNodeKind::BufferRoot => {},
-      ViewNodeKind::Vognode (Vognode::Deleted (_)) =>
+      ViewNodeKind::Phantom (Phantom::Deleted (_)) =>
         recurse_on_children( tree, node_id, result )?,
       ViewNodeKind::DeadScaffold =>
         recurse_on_children( tree, node_id, result )?,
       ViewNodeKind::Vognode (Vognode::Inactive (_)) => {},
-      ViewNodeKind::Vognode (Vognode::Unknown (_)) =>
+      ViewNodeKind::Phantom (Phantom::Unknown (_)) =>
         // An PhantomUnknown is a placeholder for a missing referent. It cannot generate save instructions itself, but its descendents might, so we recurse.
         recurse_on_children( tree, node_id, result )?,
-      ViewNodeKind::Vognode (Vognode::Normal (t)) => {
+      ViewNodeKind::Vognode (Vognode::Active (t)) => {
         let candidate_kind : Option<DefinenodeCandidateKind> =
           match role {
             SaveRole::Ordinary =>
@@ -448,7 +448,7 @@ pub(crate) fn collect_savenode_candidates (
               treeid : node_id,
               kind } ); }
           recurse_on_children( tree, node_id, result )?; }},
-      ViewNodeKind::Vognode (Vognode::DiffPhantom (_)) => {} }
+      ViewNodeKind::Phantom (Phantom::Diff (_)) => {} }
     Ok (( )) }
 
   let mut result: Vec<DefinenodeCandidate> = Vec::new();
@@ -469,7 +469,7 @@ fn collect_node_edit_basics (
         tree,
         *candidate_id,
         |node| match &node . viewnode . kind {
-          ViewNodeKind::Vognode (Vognode::Normal (t) )
+          ViewNodeKind::Vognode (Vognode::Active (t) )
             => Ok (t . clone()),
           _ => Err ( "intent candidate was not a TrueNode"
                       . to_string() ), } )??;
@@ -640,20 +640,20 @@ fn collect_subscribees (
           let child_node : &ViewNode =
             &subscribeecol_child . value() . viewnode;
           match &child_node . kind {
-            ViewNodeKind::Vognode (Vognode::Normal (t)) => {
+            ViewNodeKind::Vognode (Vognode::Active (t)) => {
               if matches!(
                    subscribeecol_child . value() . role,
                    SaveRole::Subscribee { .. })
                  && member_counts_for_relation_collection (t)
               { subscribees . push(t . id . clone()); }},
-            ViewNodeKind::Vognode (Vognode::DiffPhantom (_))
+            ViewNodeKind::Phantom (Phantom::Diff (_))
               => continue,
             ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee)
               => continue, // valid child of SubscribeeCol, but not a subscribee
-            ViewNodeKind::Vognode (Vognode::Deleted (_))
+            ViewNodeKind::Phantom (Phantom::Deleted (_))
               | ViewNodeKind::DeadScaffold
               | ViewNodeKind::Vognode (Vognode::Inactive (_))
-              | ViewNodeKind::Vognode (Vognode::Unknown (_))
+              | ViewNodeKind::Phantom (Phantom::Unknown (_))
               => continue, // inert in this context
             ViewNodeKind::QualCol (_)
               | ViewNodeKind::Qual (_)
@@ -688,14 +688,14 @@ fn collect_members_from_child_relation_col (
       let mut members : Vec<ID> = Vec::new();
       for child in col_ref . children() {
         match &child . value() . viewnode . kind {
-          ViewNodeKind::Vognode (Vognode::Normal (t)) => {
+          ViewNodeKind::Vognode (Vognode::Active (t)) => {
             if member_counts_for_relation_collection (t) {
               members . push (t . id . clone ()); }},
-          ViewNodeKind::Vognode (Vognode::DiffPhantom (_))
-            | ViewNodeKind::Vognode (Vognode::Deleted (_))
+          ViewNodeKind::Phantom (Phantom::Diff (_))
+            | ViewNodeKind::Phantom (Phantom::Deleted (_))
             | ViewNodeKind::DeadScaffold
             | ViewNodeKind::Vognode (Vognode::Inactive (_))
-            | ViewNodeKind::Vognode (Vognode::Unknown (_))
+            | ViewNodeKind::Phantom (Phantom::Unknown (_))
             => continue,
           ViewNodeKind::QualCol (_)
             | ViewNodeKind::Qual (_)
@@ -727,7 +727,7 @@ fn collect_contents_to_save_from_children<'a> (
     let child_ref : NodeRef<ViewNode_in_Role> = child_ref;
     let child : &ViewNode = &child_ref . value() . viewnode;
     match &child . kind {
-      ViewNodeKind::Vognode (Vognode::Normal (t)) => {
+      ViewNodeKind::Vognode (Vognode::Active (t)) => {
            if matches!(
              child_ref . value() . role,
              SaveRole::Ordinary)

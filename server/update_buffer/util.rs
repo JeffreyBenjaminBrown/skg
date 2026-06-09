@@ -136,11 +136,11 @@ where Relevant : Fn (&ViewNode) -> bool,
           . ok_or ("demote_invalid: node not found") ?;
         let has_children : bool = n . children () . next () . is_some ();
         has_children && matches! ( &n . value () . kind,
-          ViewNodeKind::Vognode (Vognode::Normal (t))
+          ViewNodeKind::Vognode (Vognode::Active (t))
             if t . parentIs == ParentIs::Affected ) };
       if demote {
         with_node_mut ( tree, node_id, |mut n| {
-          if let ViewNodeKind::Vognode (Vognode::Normal (t))
+          if let ViewNodeKind::Vognode (Vognode::Active (t))
             = &mut n . value () . kind
             { t . parentIs = ParentIs::Independent; } } )
           . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }

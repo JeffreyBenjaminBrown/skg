@@ -100,7 +100,7 @@ fn is_dead (tree : &Tree<ViewNode>, nid : NodeId) -> bool {
 
 fn is_unknown (tree : &Tree<ViewNode>, nid : NodeId) -> bool {
   matches! ( & tree . get (nid) . unwrap () . value () . kind,
-             ViewNodeKind::Vognode (Vognode::Unknown (_)) ) }
+             ViewNodeKind::Phantom (Phantom::Unknown (_)) ) }
 
 #[test]
 fn nonmember_unknown_child_becomes_dead () {
@@ -139,7 +139,7 @@ fn independent_same_id_child_is_prefetched () {
   let mut child : ViewNode =
     mk_definitive_viewnode (
       goal . clone (), source_name ("main"), "c" . to_string (), None );
-  if let ViewNodeKind::Vognode (Vognode::Normal (t)) = &mut child . kind
+  if let ViewNodeKind::Vognode (Vognode::Active (t)) = &mut child . kind
     { t . parentIs = ParentIs::Independent; }
   tree . root_mut () . append (child);
   let config : SkgConfig =

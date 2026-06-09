@@ -2,7 +2,7 @@ use crate::types::git::MembershipAxes;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ViewNode, ViewNodeKind, Vognode, Qual, QualCol, TrueNode, PhantomDiff,
+  ViewNode, ViewNodeKind, Vognode, Phantom, Qual, QualCol, TrueNode, PhantomDiff,
   PhantomDeleted, PhantomUnknown, InactiveNode, EditRequest, GraphNodeStats,
   Birth, ParentIs,
 };
@@ -155,19 +155,19 @@ pub fn viewnode_to_string (
       Ok ( deleted_scaff_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded )),
-    ViewNodeKind::Vognode (Vognode::Normal (true_node)) =>
+    ViewNodeKind::Vognode (Vognode::Active (true_node)) =>
       Ok ( true_node_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, true_node, config )),
-    ViewNodeKind::Vognode (Vognode::DiffPhantom (phantom)) =>
+    ViewNodeKind::Phantom (Phantom::Diff (phantom)) =>
       Ok ( phantomDiff_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, phantom, config )),
-    ViewNodeKind::Vognode (Vognode::Deleted (deleted_node)) =>
+    ViewNodeKind::Phantom (Phantom::Deleted (deleted_node)) =>
       Ok ( phantomDeleted_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, deleted_node )),
-    ViewNodeKind::Vognode (Vognode::Unknown (unknown_node)) =>
+    ViewNodeKind::Phantom (Phantom::Unknown (unknown_node)) =>
       Ok ( phantomUnknown_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, unknown_node )),

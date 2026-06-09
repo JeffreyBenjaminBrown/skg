@@ -124,7 +124,7 @@ async fn optmerge_from_viewnode (
 ) -> Result<Option<Merge>,
             Box<dyn Error>> {
   let t : &TrueNode = match &node . kind {
-    ViewNodeKind::Vognode (Vognode::Normal (t)) => t,
+    ViewNodeKind::Vognode (Vognode::Active (t)) => t,
     _                                           => return Ok (None) };
   let acquiree_id = match t . edit_request () {
     Some(EditRequest::Merge (id)) => id,

@@ -3,7 +3,7 @@ pub mod contradictory_instructions;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{ParentIs, ViewRequest};
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
-use crate::types::maybe_placed_viewnode::MpVognode;
+use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
 use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::errors::BufferValidationError;
@@ -95,8 +95,8 @@ fn validate_view_roots (
   for root in viewforest . roots () {
     if ! matches! (
       &root . value () . kind,
-      MpViewnodeKind::Vognode (MpVognode::Normal (_))
-        | MpViewnodeKind::Vognode (MpVognode::Deleted (_)))
+      MpViewnodeKind::Vognode (MpVognode::Active (_))
+        | MpViewnodeKind::Phantom (MpPhantom::Deleted (_)))
     { errors . push (
         BufferValidationError::Other (
           "View roots must be TrueNodes or PhantomDeleteds."
@@ -124,7 +124,7 @@ fn validate_definitive_view_requests (
       // TODO/DONE/local-view-update/plan_v2.org §11: only a Normal node carries view_requests; a phantom never can,
       // so the Definitive-request validations below apply to Normal only.
       if let MpViewnodeKind::Vognode (
-        MpVognode::Normal (t))
+        MpVognode::Active (t))
       = &viewnode . kind
       { if t . view_requests . contains (&ViewRequest::Definitive)
         { if let Some (id) = &t . id {
@@ -136,7 +136,7 @@ fn validate_definitive_view_requests (
             let has_content_children : bool =
               node_ref . children () . any ( |child| matches! (
                 &child . value () . kind,
-                MpViewnodeKind::Vognode (MpVognode::Normal (ct))
+                MpViewnodeKind::Vognode (MpVognode::Active (ct))
                   if ct . parentIs == ParentIs::Affected ));
             if has_content_children
             { errors . push(

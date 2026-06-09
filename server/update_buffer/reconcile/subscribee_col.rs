@@ -89,7 +89,7 @@ fn read_subscribee_col_context (
     = read_at_node_in_tree(
       tree, subscriber,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t))
+        ViewNodeKind::Vognode (Vognode::Active (t))
           => Some(( t . id . clone(),
                     t . source . clone(),
                     t . is_indefinitive () )),

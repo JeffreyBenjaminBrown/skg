@@ -36,7 +36,7 @@ pub async fn validate_merge_requests(
     collect_merge_validation_data (viewforest);
   for node in merge_validation_data . acquirer_viewnodes {
     let t : &MpTruenode = match &node . kind {
-      MpViewnodeKind::Vognode (MpVognode::Normal (t)) => t,
+      MpViewnodeKind::Vognode (MpVognode::Active (t)) => t,
       _ => { errors . push(format!( "Acquirer must be a vognode that exists: {:?}",
                                      node . kind));
              continue; }};
@@ -71,7 +71,7 @@ fn collect_merge_validation_data<'a>(
   for edge in viewforest . root() . traverse() {
     if let ego_tree::iter::Edge::Open (node_ref) = edge {
       let viewnode : &MpViewnode = node_ref . value();
-      if let MpViewnodeKind::Vognode (MpVognode::Normal (t))
+      if let MpViewnodeKind::Vognode (MpVognode::Active (t))
         = &viewnode . kind
       { if let Some (id) = &t . id {
           if matches!(t . edit_request (),

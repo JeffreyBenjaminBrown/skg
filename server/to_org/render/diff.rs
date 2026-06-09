@@ -18,7 +18,7 @@ use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::phantom::title_for_phantom;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, mk_phantom_viewnode };
-use crate::types::viewnode::{Vognode, QualCol, Qual};
+use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual};
 use crate::types::tree::viewnode_nodecomplete::pid_and_source_from_treenode;
 
 use ego_tree::{NodeMut, NodeRef, NodeId};
@@ -48,7 +48,7 @@ pub(crate) fn process_truenode_diff (
       Some (d) => d,
       None => return Ok (( )) };
   if ! source_diff . is_git_repo {
-    if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
+    if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
       = node_mut . value() . kind
       { t . not_in_git = true; }
     return Ok (( )); }
@@ -65,14 +65,14 @@ pub(crate) fn process_truenode_diff (
     staged   . and_then ( |d| d . status . to_existence_sign ());
   let unstaged_x : Option<Sign> =
     unstaged . and_then ( |d| d . status . to_existence_sign ());
-  if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
+  if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
     = node_mut . value() . kind
     { t . existence . staged   = staged_x;
       t . existence . unstaged = unstaged_x; }
   node_mut . value() . normal_to_phantom ();
   let node_flipped_to_phantom : bool =
     matches! ( node_mut . value() . kind,
-      ViewNodeKind::Vognode (Vognode::DiffPhantom (_)) );
+      ViewNodeKind::Phantom (Phantom::Diff (_)) );
   // For an Added or Deleted file we don't read node_changes
   // (the comparison is degenerate). NewHere/RemovedHere on children
   // and IDcol/textChanged scaffolds only apply to Modified files.
@@ -210,7 +210,7 @@ fn mark_membership_on_existing_children (
       node_mut . tree() . get_mut (child_id) . unwrap();
     let child_id_and_membership : Option<(ID, &mut MembershipAxes)> =
       match &mut child . value() . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t)) =>
+        ViewNodeKind::Vognode (Vognode::Active (t)) =>
           Some ((t . id . clone (), &mut t . membership)),
         ViewNodeKind::Vognode (Vognode::Inactive (i)) =>
           Some ((i . id . clone (), &mut i . membership)),
@@ -251,9 +251,9 @@ fn insert_phantoms_for_missing_contains (
     let mut m : HashMap<ID, NodeId> = HashMap::new ();
     for c in node_ref . children () {
       match &c . value () . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t))
+        ViewNodeKind::Vognode (Vognode::Active (t))
           => { m . insert ( t . id . clone (), c . id () ); },
-        ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
+        ViewNodeKind::Phantom (Phantom::Diff (p))
           => { m . insert ( p . id . clone (), c . id () ); },
         ViewNodeKind::Vognode (Vognode::Inactive (i))
           => { m . insert ( i . id . clone (), c . id () ); },

@@ -18,7 +18,7 @@ use crate::update_buffer::util::detach_scaffold_transferring_focus;
 use crate::to_org::render::diff::process_truenode_diff;
 use crate::types::tree::viewnode_nodecomplete::write_at_truenode_in_tree;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol, ViewRequest, IndefOrDef, PhantomDeleted};
-use crate::types::viewnode::{Vognode, QualCol};
+use crate::types::viewnode::{Vognode, Phantom, QualCol};
 use super::reconcile::hiddeninsubscribee_col::reconcile_hiddenin_subscribee_col_children;
 use super::reconcile::hiddenoutsideof_subscribeecol::reconcile_hiddenoutside_subscribee_col_children;
 use super::reconcile::relation_col::reconcile_relation_col_children;
@@ -135,7 +135,7 @@ async fn dispatch_node_update (
     deaden_generalized_orphan_col (tree, treeid) ?;
     return Ok (( )); }
   match &kind {
-    ViewNodeKind::Vognode (Vognode::Normal (_)) =>
+    ViewNodeKind::Vognode (Vognode::Active (_)) =>
       visit_normal_node (tree, treeid, context) . await ?,
     ViewNodeKind::PartnerCol (RoleCol::Subscribee) =>
       // A col fills its members WHOLE and is budget-neutral (TODO/DONE/local-view-update/plan_v2.org §5.5): the owning
@@ -194,7 +194,7 @@ async fn visit_normal_node (
   let had_dvr : bool =
     read_at_node_in_tree ( tree, treeid,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t)) =>
+        ViewNodeKind::Vognode (Vognode::Active (t)) =>
           t . view_requests . contains (& ViewRequest::Definitive),
         _ => false } ) ?;
   let mut settled : bool = false; // TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule already ran
@@ -242,7 +242,7 @@ async fn visit_normal_node (
   let still_normal : bool =
     read_at_node_in_tree ( tree, treeid,
       |vn : &ViewNode| matches! ( &vn . kind,
-        ViewNodeKind::Vognode (Vognode::Normal (_)) ) ) ?;
+        ViewNodeKind::Vognode (Vognode::Active (_)) ) ) ?;
   if ! still_normal { return Ok (( )); }
   // Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): for a DE-NOVO render, create this node's relation cols the
   // way build_node_branch_minus_content does at node birth, so the one view
@@ -306,7 +306,7 @@ fn is_self_deletable_when_empty (
 ) -> bool {
   matches! ( kind,
     ViewNodeKind::DeadScaffold
-    | ViewNodeKind::Vognode (Vognode::Deleted (_))
+    | ViewNodeKind::Phantom (Phantom::Deleted (_))
     | ViewNodeKind::PartnerCol (RoleCol::Subscriber)
     | ViewNodeKind::PartnerCol (RoleCol::Overrider)
     | ViewNodeKind::PartnerCol (RoleCol::Hider)
@@ -368,7 +368,7 @@ fn convert_inactive_to_deleted_if_deleted (
   if let Some ((id, source)) = to_delete {
     write_at_node_in_tree ( tree, treeid,
       |vn : &mut ViewNode| {
-        vn . kind = ViewNodeKind::Vognode ( Vognode::Deleted (
+        vn . kind = ViewNodeKind::Phantom ( Phantom::Deleted (
           PhantomDeleted { id, source,
                         title : String::new (), body : None } )); } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }

@@ -12,7 +12,7 @@ use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, PhantomDeleted, IndefOrDef,
     ParentIs, ViewRequest, mk_definitive_viewnode};
-use crate::types::viewnode::{Vognode, RoleCol};
+use crate::types::viewnode::{Vognode, Phantom, RoleCol};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_nodecomplete::{
     pid_and_source_from_treenode,
@@ -73,7 +73,7 @@ pub fn expand_true_content_at_truenode (
   error_unless_node_satisfies(
     tree, node,
     |vn : &ViewNode| matches!( &vn . kind,
-                                ViewNodeKind::Vognode (Vognode::Normal (_))),
+                                ViewNodeKind::Vognode (Vognode::Active (_))),
     "expand_true_content_at_truenode: expected normal vognode" ) ?;
   if ! settled {
     // A DVR node was already resolved by apply_definitive_draw_rule; running
@@ -90,7 +90,7 @@ pub fn expand_true_content_at_truenode (
   { let is_indefinitive : bool =
       read_at_node_in_tree( tree, node,
         |vn : &ViewNode| match &vn . kind {
-          ViewNodeKind::Vognode (Vognode::Normal (t))
+          ViewNodeKind::Vognode (Vognode::Active (t))
             => t . is_indefinitive (),
           _ => false } ) ?;
     if is_indefinitive {
@@ -138,7 +138,7 @@ fn attach_cascade_dvrs_to_affected_content (
     tree . get (node) . unwrap ()
     . children ()
     . filter ( |c| matches!( &c . value () . kind,
-        ViewNodeKind::Vognode (Vognode::Normal (t))
+        ViewNodeKind::Vognode (Vognode::Active (t))
           if t . parentIs == ParentIs::Affected
              && ! t . should_be_diffPhantom () ) )
     . map ( |c| c . id () )
@@ -251,7 +251,7 @@ fn convert_nonmember_unknown_children_to_dead (
   treat_certain_children(
     tree, node,
     |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::Vognode (Vognode::Unknown (u)) =>
+      ViewNodeKind::Phantom (Phantom::Unknown (u)) =>
         ! member_set . contains (&u . id),
       _ => false },
     |vn : &mut ViewNode| { vn . kind = ViewNodeKind::DeadScaffold; },
@@ -266,14 +266,14 @@ fn mutate_truenode_to_deletednode (
   let (title, body) : (String, Option<String>) =
     read_at_node_in_tree ( tree, node,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t))
+        ViewNodeKind::Vognode (Vognode::Active (t))
           => ( t . title . clone(),
                t . body () . cloned() ),
         _ => ( String::new(), None ) } ) ?;
   write_at_node_in_tree ( tree, node,
     |vn : &mut ViewNode| {
-      vn . kind = ViewNodeKind::Vognode (
-        Vognode::Deleted ( PhantomDeleted {
+      vn . kind = ViewNodeKind::Phantom (
+        Phantom::Deleted ( PhantomDeleted {
         id     : pid . clone(),
         source : source . clone(),
         title,
@@ -289,7 +289,7 @@ fn is_subscribee (
   let is_member_of_parent : bool =
     read_at_node_in_tree( tree, node,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Normal (t))
+        ViewNodeKind::Vognode (Vognode::Active (t))
           => t . parentIs == ParentIs::Affected,
         _ => false } ) ?;
   let parent_is_subscribee_col : bool =
@@ -348,9 +348,9 @@ fn complete_content_children (
   complete_relevant_children_in_viewnodetree(
     tree, node,
     |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::Vognode (Vognode::Normal (t))
+      ViewNodeKind::Vognode (Vognode::Active (t))
         => t . parentIs == ParentIs::Affected,
-      ViewNodeKind::Vognode (Vognode::DiffPhantom (_))
+      ViewNodeKind::Phantom (Phantom::Diff (_))
         // Existing phantoms are reordered or replaced, not duplicated.
         => true,
       ViewNodeKind::Vognode (Vognode::Inactive (_))
@@ -358,9 +358,9 @@ fn complete_content_children (
       _ => false },
     |vn : &ViewNode| match &vn . kind {
       // Both kinds participate in child-list reconciliation.
-      ViewNodeKind::Vognode (Vognode::Normal (t))
+      ViewNodeKind::Vognode (Vognode::Active (t))
         => t . id . clone(),
-      ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
+      ViewNodeKind::Phantom (Phantom::Diff (p))
         => p . id . clone(),
       ViewNodeKind::Vognode (Vognode::Inactive (i))
         => i . id . clone(),
@@ -403,13 +403,13 @@ fn mark_erroneous_content_children_as_indep (
   treat_certain_children(
     tree, node,
     |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::Vognode (Vognode::Normal (t)) =>
+      ViewNodeKind::Vognode (Vognode::Active (t)) =>
         t . parentIs == ParentIs::Affected
         && !content_id_set . contains( &t . id )
         && !t . should_be_diffPhantom(), // see this function's docstring
       _ => false },
     |vn : &mut ViewNode| {
-      if let ViewNodeKind::Vognode (Vognode::Normal ( ref mut t ))
+      if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
         = vn . kind
         { t . parentIs = ParentIs::Independent; }},
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
@@ -431,16 +431,16 @@ fn order_children_as_scaffolds_then_ignored_then_content (
           | ViewNodeKind::PartnerCol (_)
           | ViewNodeKind::BufferRoot
           | ViewNodeKind::DeadScaffold                => 0,
-        ViewNodeKind::Vognode (Vognode::Normal (t))
+        ViewNodeKind::Vognode (Vognode::Active (t))
           if t . parentIs != ParentIs::Affected                  => 1,
-        ViewNodeKind::Vognode (Vognode::DiffPhantom (_))  => 2,
-        ViewNodeKind::Vognode (Vognode::Normal (_))   => 2,
-        ViewNodeKind::Vognode (Vognode::Deleted (_))  => 2,
+        ViewNodeKind::Phantom (Phantom::Diff (_))  => 2,
+        ViewNodeKind::Vognode (Vognode::Active (_))   => 2,
+        ViewNodeKind::Phantom (Phantom::Deleted (_))  => 2,
         ViewNodeKind::Vognode (Vognode::Inactive (_)) => 2,
         // PhantomUnknown is a content-position placeholder: order it
         // alongside the Deleted/True content children rather than as
         // a scaffold.
-        ViewNodeKind::Vognode (Vognode::Unknown (_))  => 2,
+        ViewNodeKind::Phantom (Phantom::Unknown (_))  => 2,
       } ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
   let empty : Vec<NodeId> = Vec::new();
   for &cid in groups . get( &0 ) . unwrap_or (&empty) . iter()
@@ -482,11 +482,11 @@ fn build_child_creation_data (
           // containerward ancestor, or a TODO/DONE/local-view-update/plan_v2.org §6.0-demoted branch), so its goal id
           // must still be pre-fetched here; otherwise the reconcile sends it to
           // the create closure and child_data.get(id).expect(..) panics.
-          ViewNodeKind::Vognode (Vognode::Normal (t))
+          ViewNodeKind::Vognode (Vognode::Active (t))
             if t . parentIs == ParentIs::Affected
             => { m . insert( t . id . clone(),
                              t . source . clone()); },
-          ViewNodeKind::Vognode (Vognode::DiffPhantom (p))
+          ViewNodeKind::Phantom (Phantom::Diff (p))
             => { m . insert( p . id . clone(),
                              p . source . clone()); },
           ViewNodeKind::Vognode (Vognode::Inactive (i))
