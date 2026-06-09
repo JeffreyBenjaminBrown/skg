@@ -28,7 +28,7 @@ use typedb_driver::TypeDBDriver;
 /// Whether an ID's definitive occurrence is Final (claimed by a
 /// definitive view request, DVR) or merely Tentative (an ordinary
 /// saved/completed definitive). A DVR clobbers a Tentative occurrence
-/// but defers to a Final one (plan_v2 §5.2). The DVR cascade (§5.3) is
+/// but defers to a Final one (TODO/DONE/local-view-update/plan_v2.org §5.2). The DVR cascade (TODO/DONE/local-view-update/plan_v2.org §5.3) is
 /// not yet implemented, so today no second DVR ever reaches an
 /// already-Final ID (validation forbids two user DVRs per ID); the
 /// defer-to-Final branch is therefore correct-but-dormant until cascade
@@ -171,7 +171,7 @@ pub fn make_indef_if_repeat_then_extend_defmap (
              t . is_indefinitive () } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   if !is_indefinitive {
-    // Ordinary completed/saved definitive -> Tentative (§5.2).
+    // Ordinary completed/saved definitive -> Tentative (TODO/DONE/local-view-update/plan_v2.org §5.2).
     defMap . insert ( pid, Finalizable::Tentative (node_id) ); }
   Ok (( )) }
 
@@ -321,7 +321,7 @@ pub fn validate_parentIs_relationships (
       = node_mut . value () . kind
     { t . birth = Birth::Unremarkable; } } }
 
-/// Jeff's invariant (progress.org §11 thread): a *non-dead generalized orphan*
+/// Jeff's invariant (TODO/DONE/local-view-update/progress.org §11 thread): a *non-dead generalized orphan*
 /// must have ParentIs=Independent. A Normal node whose PARENT is a
 /// non-container -- a DiffPhantom, a Deleted, or a DeadScaffold -- is exactly
 /// that: it survives (is not itself dead) but its container is gone, so its

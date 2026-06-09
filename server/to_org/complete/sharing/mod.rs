@@ -116,7 +116,7 @@ pub async fn maybe_add_subscribeeCol_branch (
                         if t . is_indefinitive () ))
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_indefinitive { return Ok(( )); } }
-  { // Pre-existing SubscribeeCol children are reconciled by the BFS driver (complete_nodes_in_level_order), which dispatches to 'reconcile_subscribee_col_children'.
+  { // Pre-existing SubscribeeCol children are reconciled by view completion (complete_nodes_in_level_order), which dispatches to 'reconcile_subscribee_col_children'.
     if unique_scaffold_child_of_viewnode (
       tree, node_id,
       &ViewNodeKind::PartnerCol (RoleCol::Subscribee) )? . is_some ()

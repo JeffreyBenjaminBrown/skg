@@ -54,8 +54,9 @@ pub async fn ensure_hiddenin_col_under_definitive_subscribee (
   maybe_add_hiddenInSubscribeeCol_branch (
     tree, node, config, driver ) . await }
 
-/// Read the node's non-consumed view_requests as a Vec. The driver settles
-/// every Definitive request at the node's own visit (the §5.2 draw rule), so
+/// Read the node's non-consumed view_requests as a Vec. View completion
+/// (dispatch_node_update) settles
+/// every Definitive request at the node's own visit (the TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule), so
 /// only Aliases/Containerward/Sourceward should remain here; execute_view_requests
 /// errors loudly if a Definitive one survives.
 fn extract_view_requests (

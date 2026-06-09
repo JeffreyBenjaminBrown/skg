@@ -121,7 +121,7 @@ fn validate_definitive_view_requests (
   { if let Edge::Open (node_ref) = edge
     { let viewnode : &MpViewnode =
         node_ref . value();
-      // §11: only a Normal node carries view_requests; a phantom never can,
+      // TODO/DONE/local-view-update/plan_v2.org §11: only a Normal node carries view_requests; a phantom never can,
       // so the Definitive-request validations below apply to Normal only.
       if let MpViewnodeKind::Vognode (
         MpVognode::Normal (t))

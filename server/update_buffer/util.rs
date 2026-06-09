@@ -123,7 +123,7 @@ where Relevant : Fn (&ViewNode) -> bool,
       subtree_satisfies( tree, node_id, &|n: &ViewNode| n . focused ) };
   let problem_discard_response =
     |n: &mut ViewNode| { n . focused = true; };
-  // §6.0 stale-member rule: a stale member (relevant child not in the goal)
+  // TODO/DONE/local-view-update/plan_v2.org §6.0 stale-member rule: a stale member (relevant child not in the goal)
   // that is a Normal, parentIs=Affected *branch* (has children) is demoted to
   // Independent so the user's subtree survives; everything else stale -- a
   // leaf, a diff-phantom, a qual, an inactive placeholder -- is deleted by the
@@ -168,7 +168,7 @@ where Relevant : Fn (&ViewNode) -> bool,
 ///   whose orderkey is not in goal_list).
 ///   - Duplicates are always detached.
 ///   - A stale member is offered to 'demote_invalid'; if that keeps it (returns
-///     true, e.g. §6.0 demote-a-branch-to-Independent) it survives, otherwise it
+///     true, e.g. TODO/DONE/local-view-update/plan_v2.org §6.0 demote-a-branch-to-Independent) it survives, otherwise it
 ///     is detached.
 ///   Runs problem_discard on each node that is actually detached; if any returns
 ///   true, runs problem_discard_response on the parent afterward.
@@ -229,7 +229,7 @@ where
     with_node_mut( tree, node_id,
                    |mut n| { n . detach(); } )
       . map_err( |e| -> Box<dyn Error> { e . into() } )?; }
-  // Stale members: demote_invalid may keep one (§6.0 demote-a-branch); only a
+  // Stale members: demote_invalid may keep one (TODO/DONE/local-view-update/plan_v2.org §6.0 demote-a-branch); only a
   // node it does NOT keep is detached, and only that detach can lose focus.
   for &node_id in &invalid_ids {
     if demote_invalid( tree, node_id )? { continue; }

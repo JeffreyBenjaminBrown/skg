@@ -37,7 +37,7 @@ pub(super) struct CompletionContext<'a> {
   /// axes, the phantom flip, TextChanged/IDCol/AliasCol), the diff-aware QualCol
   /// reconcilers, and the sharing cols' removed-member phantoms. The content
   /// reconcile itself produces only the pure worktree view; process_truenode_diff
-  /// applies every content diff effect afterward at the node's own visit (§9
+  /// applies every content diff effect afterward at the node's own visit (TODO/DONE/local-view-update/plan_v2.org §9
   /// reversal / #3).
   pub(super) source_diffs                   : &'a Option<HashMap<SourceName, SourceDiff>>,
   pub(super) env                            : &'a SkgEnv,
@@ -46,22 +46,22 @@ pub(super) struct CompletionContext<'a> {
   pub(super) deleted_since_head_pid_src_map : &'a HashMap<ID, SourceName>,
   pub(super) deleted_by_this_save_pids      : &'a HashSet<ID>,
   pub(super) active_source_set              : Option<&'a ActiveSourceSet>,
-  /// §5.5 per-buffer node limit: the remaining budget of *new* ViewNodes
+  /// TODO/DONE/local-view-update/plan_v2.org §5.5 per-buffer node limit: the remaining budget of *new* ViewNodes
   /// the ordinary update pass may create. Initialized once per rerender to
   /// `config.initial_node_limit` and decremented as content children are
   /// created; when it reaches 0 no further new content is drawn (and the
-  /// cascade stops). The inline diff is exempt (§5.5): every diff phantom and
+  /// cascade stops). The inline diff is exempt (TODO/DONE/local-view-update/plan_v2.org §5.5): every diff phantom and
   /// diff scaffold is created regardless of the budget.
   pub(super) node_budget                    : usize,
-  /// Phase 8 (§13): true only for a DE-NOVO (initial) render driven through
-  /// this driver. When set, a fresh CONTENT node (parent is not a PartnerCol)
+  /// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): true only for a DE-NOVO (initial) render driven through
+  /// view completion. When set, a fresh CONTENT node (parent is not a PartnerCol)
   /// gets its relation cols created at its visit, the way
   /// build_node_branch_minus_content does at node birth.
   /// FALSE for post-save rerender, where relation cols are already present in
   /// the saved buffer and re-creating them would change the buffer and break the
-  /// save round-trip (plan_v2 §18). So post-save stays byte-identical.
+  /// save round-trip (TODO/DONE/local-view-update/plan_v2.org §18). So post-save stays byte-identical.
   pub(super) create_relation_cols_for_fresh_nodes : bool,
-  /// §9 reversal (#3): the tantivy index for the inline diff's phantom-source
+  /// TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the tantivy index for the inline diff's phantom-source
   /// resolution. None on the post-save path (the deleted-id map + disk scan
   /// suffice); Some on the de-novo path.
   pub(super) diff_tantivy_index : Option<&'a TantivyIndex>,
@@ -72,9 +72,9 @@ pub(super) async fn complete_viewforest (
   context    : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
   let root_treeid : NodeId = viewforest . root () . id ();
-  // The single plan_v2 §3 level-order BFS: each node's visit
+  // The single TODO/DONE/local-view-update/plan_v2.org §3 level-order BFS: each node's visit
   // (dispatch_node_update) does ALL of its own update -- content
-  // reconcile, the §5.2 draw rule + §5.3 cascade for definitive-view
+  // reconcile, the TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule + TODO/DONE/local-view-update/plan_v2.org §5.3 cascade for definitive-view
   // requests, the inline diff, the other view requests, ensuring a definitive
   // subscribee's HiddenInSubscribeeCol, and per-col reconciliation. Cols and
   // content children created during a node's visit are reached later in the
@@ -86,11 +86,11 @@ pub(super) async fn complete_viewforest (
 
 /// Visit every node in *level order* (BFS), completing each at its own visit.
 ///
-/// This is the core of the plan_v2 §3 driver: a single top-down level-order
-/// traversal in which each node, when visited, may create view-descendants
+/// This is the core of view completion: a single top-down level-order traversal
+/// (TODO/DONE/local-view-update/plan_v2.org §3) in which each node, when visited, may create view-descendants
 /// (content children, subscribee/relation members) that are then visited later
 /// in the same traversal. A FIFO queue (not depth-first recursion) is what makes
-/// the §5.5 node-limit and §5.2 draw-rule semantics order-correct: the first
+/// the TODO/DONE/local-view-update/plan_v2.org §5.5 node-limit and TODO/DONE/local-view-update/plan_v2.org §5.2 draw-rule semantics order-correct: the first
 /// occurrence of a duplicate id reached in BFS order -- not in depth-first order
 /// -- is the one that wins, and the Finalizable draw rule makes that safe. A
 /// node's expansion depends only on its ancestors and the graph, never on
@@ -114,7 +114,7 @@ async fn complete_nodes_in_level_order (
   Ok(( )) }
 
 /// One BFS visit: dispatch on (kind, parent-kind) to the node's update rule
-/// (plan_v2 §3/§4). Cols are reconciled at their own visit (the BFS reaches a
+/// (TODO/DONE/local-view-update/plan_v2.org §3/§4). Cols are reconciled at their own visit (the BFS reaches a
 /// col after its Normal parent created it).
 async fn dispatch_node_update (
   tree    : &mut Tree<ViewNode>,
@@ -123,7 +123,7 @@ async fn dispatch_node_update (
 ) -> Result<(), Box<dyn Error>> {
   let kind : ViewNodeKind =
     tree . get (treeid) . unwrap () . value () . kind . clone ();
-  // Death-leafward (plan propagate-death-leafward §5): before reconciling any
+  // Death-leafward (TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5): before reconciling any
   // col, self-check its required ancestry. If it is a generalized orphan (some
   // required ancestor is the wrong viewnode kind -- full chain, not just the
   // parent), deaden it and dispose its children instead of reconciling, so the
@@ -138,7 +138,7 @@ async fn dispatch_node_update (
     ViewNodeKind::Vognode (Vognode::Normal (_)) =>
       visit_normal_node (tree, treeid, context) . await ?,
     ViewNodeKind::PartnerCol (RoleCol::Subscribee) =>
-      // A col fills its members WHOLE and is budget-neutral (§5.5): the owning
+      // A col fills its members WHOLE and is budget-neutral (TODO/DONE/local-view-update/plan_v2.org §5.5): the owning
       // vognode already spent its 1 budget unit when it expanded, so drawing all
       // the members here costs nothing more and never truncates a group.
       reconcile_subscribee_col_children (
@@ -158,7 +158,7 @@ async fn dispatch_node_update (
         treeid, tree, *role, context . source_diffs,
         context . env, context . graph_snap,
         context . deleted_since_head_pid_src_map ) ?,
-    // §9 reversal (#3): the IDCol/AliasCol diff scaffolds are created inline by
+    // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the IDCol/AliasCol diff scaffolds are created inline by
     // process_truenode_diff at the owner's BFS visit, so their reconcilers must
     // see the real diffs (source_diffs) or they would clobber the just-created
     // diff entries. Diffs flow inline for both de-novo and post-save.
@@ -169,18 +169,18 @@ async fn dispatch_node_update (
       super::reconcile::id_col::reconcile_id_col_children (
         treeid, tree, context . source_diffs, &context . env . config ) ?,
     ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
-      // §6.4/§6.6/§16: an Inactive node deleted by this save becomes Deleted,
+      // TODO/DONE/local-view-update/plan_v2.org §6.4/§6.6/§16: an Inactive node deleted by this save becomes Deleted,
       // parallel to the Normal-node deletion in expand_true_content_at_truenode.
       convert_inactive_to_deleted_if_deleted (
         tree, treeid, context . deleted_by_this_save_pids ) ?,
     _ => {
       // No-op for: Unknown (unresolvable-id placeholder), Deleted,
       // DeadScaffold, Qual leaves, BufferRoot, and DiffPhantom (a diff-only
-      // placeholder, inert here, §6.3). The prune sweep handles empty/dead nodes.
+      // placeholder, inert here, TODO/DONE/local-view-update/plan_v2.org §6.3). The prune sweep handles empty/dead nodes.
     } }
   Ok(( )) }
 
-/// The Normal-node visit (plan_v2 §6.1/§6.2): settle the Finalizable state
+/// The Normal-node visit (TODO/DONE/local-view-update/plan_v2.org §6.1/§6.2): settle the Finalizable state
 /// for a definitive-view request *before* drawing content (so a Final node
 /// can cascade), reconcile content, run the remaining (non-Definitive) view
 /// requests, ensure a definitive subscribee's HiddenInSubscribeeCol, and
@@ -197,9 +197,9 @@ async fn visit_normal_node (
         ViewNodeKind::Vognode (Vognode::Normal (t)) =>
           t . view_requests . contains (& ViewRequest::Definitive),
         _ => false } ) ?;
-  let mut settled : bool = false; // §5.2 draw rule already ran
+  let mut settled : bool = false; // TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule already ran
   let mut cascade : bool = false; // node is Final -> hand DVRs to children
-  // §5.5: the budget counts vognode *expansions* (each costs 1, charged in
+  // TODO/DONE/local-view-update/plan_v2.org §5.5: the budget counts vognode *expansions* (each costs 1, charged in
   // expand_true_content_at_truenode); once it hits 0 every later vognode is left
   // indefinitive -- a visible, collapsed headline. We never truncate a group
   // mid-way (whole groups already drawn keep all their members); we only stop
@@ -244,9 +244,9 @@ async fn visit_normal_node (
       |vn : &ViewNode| matches! ( &vn . kind,
         ViewNodeKind::Vognode (Vognode::Normal (_)) ) ) ?;
   if ! still_normal { return Ok (( )); }
-  // Phase 8 (§13): for a DE-NOVO render, create this node's relation cols the
-  // way build_node_branch_minus_content does at node birth, so the one driver
-  // can expand a bare stub. Only CONTENT nodes/roots get them (a sharing-col
+  // Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): for a DE-NOVO render, create this node's relation cols the
+  // way build_node_branch_minus_content does at node birth, so the one view
+  // completion can expand a bare stub. Only CONTENT nodes/roots get them (a sharing-col
   // MEMBER is rendered bare), so gate on "parent is not a PartnerCol";
   // maybe_add_relation_col_branches is itself idempotent + skips empties. OFF
   // for post-save (flag false), keeping that path byte-identical.
@@ -269,7 +269,7 @@ async fn visit_normal_node (
   // reconciles it on reaching it.
   super::reconcile::view_requests::ensure_hiddenin_col_under_definitive_subscribee (
     tree, treeid, &context . env . config, &context . env . driver ) . await ?;
-  // §9 reversal (#3 / Jeff): compute this node's content+scaffold diff LOCALLY,
+  // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3 / Jeff): compute this node's content+scaffold diff LOCALLY,
   // at its own BFS visit. Runs last, after the node is fully completed as a
   // worktree Normal node (content, cols, view requests), so process_truenode_diff
   // sees its final children. The flip to a phantom happens here; the node's cols
@@ -287,11 +287,11 @@ async fn visit_normal_node (
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   Ok(( )) }
 
-/// Whether a node of this kind is *self-deletable when empty* (plan §3.4): the
+/// Whether a node of this kind is *self-deletable when empty* (TODO/DONE/local-view-update/plan_v2.org §3.4): the
 /// single postorder prune sweep removes it once it is childless. This is the
 /// one place self-deletion lives -- per-kind reconcilers no longer detach
 /// themselves when empty.
-/// - DeadScaffold and a childless Vognode::Deleted (§6.6).
+/// - DeadScaffold and a childless Vognode::Deleted (TODO/DONE/local-view-update/plan_v2.org §6.6).
 /// - the read-only relation cols Subscriber/Overrider/Hider/Hidden (a graph
 ///   relationship the user cannot edit from this side, so an emptied one is
 ///   just noise) -- but NOT Overridden (the editable interface for adding
@@ -300,7 +300,7 @@ async fn visit_normal_node (
 /// - QualCol::ID (largely moot -- an IDCol always holds at least the PID).
 /// PRESERVED when empty (so NOT here): PartnerCol(Subscribee), PartnerCol
 /// (Overridden), QualCol(Alias) -- each an *editable interface onto the origin*
-/// that the user must be able to refill, removed only by hand (§3.4 exception).
+/// that the user must be able to refill, removed only by hand (TODO/DONE/local-view-update/plan_v2.org §3.4 exception).
 fn is_self_deletable_when_empty (
   kind : &ViewNodeKind,
 ) -> bool {
@@ -315,9 +315,9 @@ fn is_self_deletable_when_empty (
     | ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee)
     | ViewNodeKind::QualCol (QualCol::ID) ) }
 
-/// The §3.4 postorder prune sweep -- the *one* place self-deletion happens.
+/// The TODO/DONE/local-view-update/plan_v2.org §3.4 postorder prune sweep -- the *one* place self-deletion happens.
 /// Removes, bottom-up, every childless `is_self_deletable_when_empty` node:
-/// deadened cols whose members all died, a §6.6 childless Deleted, and empty
+/// deadened cols whose members all died, a TODO/DONE/local-view-update/plan_v2.org §6.6 childless Deleted, and empty
 /// read-only relation / Hidden* / ID cols. Postorder so a chain (e.g.
 /// Dead -> Deleted, or a col emptied by the removal of its last member)
 /// collapses completely in one pass. Focus is transferred to the surviving
@@ -346,11 +346,11 @@ fn prune_self_deletable_when_empty (
   }
   Ok (( )) }
 
-/// §6.4/§6.6/§16: convert an Inactive node whose pid is in
+/// TODO/DONE/local-view-update/plan_v2.org §6.4/§6.6/§16: convert an Inactive node whose pid is in
 /// `deleted_by_this_save_pids` into a Deleted node, mirroring the Normal-node
 /// conversion in expand_true_content_at_truenode. An InactiveNode carries no
 /// title/body of its own (its .skg is now gone), so the Deleted placeholder is
-/// built with an empty title. Inert thereafter; the §6.6 prune removes it if it
+/// built with an empty title. Inert thereafter; the TODO/DONE/local-view-update/plan_v2.org §6.6 prune removes it if it
 /// ends childless.
 fn convert_inactive_to_deleted_if_deleted (
   tree                      : &mut Tree<ViewNode>,

@@ -206,7 +206,7 @@ pub fn viewnode_from_metadata (
             indef_or_def, };
         let vognode =
           if t . should_be_phantom ()
-          { // §11: a phantom carries only the slim MpDiffPhantomNode. The
+          { // TODO/DONE/local-view-update/plan_v2.org §11: a phantom carries only the slim MpDiffPhantomNode. The
             // EditRequestOnIndefinitive validation above already fired if this
             // phantom (indefinitive) carried an edit_request, so dropping
             // indef_or_def/parentIs/etc. here loses nothing.

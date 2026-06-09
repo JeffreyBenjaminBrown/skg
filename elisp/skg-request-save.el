@@ -98,7 +98,7 @@ unlocked as save-lock / save-relax-lock / collateral-view arrive."
          (skg--save-lock-handler saved-uri payload))
        t)
       ;; save-relax-lock: same shape/handling as save-lock, but with the
-      ;; EXACT collateral set (post-SavePlan), so buffers locked early that
+      ;; EXACT collateral view set (post-SavePlan), so buffers locked early that
       ;; aren't actually collateral get unlocked. The saved buffer stays
       ;; locked (skg--unlock-non-collateral-buffers keeps saved-uri) until
       ;; save-result. Registered NON-one-shot (like collateral-view) so it does

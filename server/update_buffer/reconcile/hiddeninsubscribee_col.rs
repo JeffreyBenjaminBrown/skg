@@ -52,7 +52,7 @@ pub fn reconcile_hiddenin_subscribee_col_children (
       &context . subscriber_pid, &context . subscriber_source,
       &context . subscribee_contains, &context . subscriber_hides,
       source_diffs, &env . config );
-  // §5.5: a col fills its members WHOLE and is budget-neutral -- the owning
+  // TODO/DONE/local-view-update/plan_v2.org §5.5: a col fills its members WHOLE and is budget-neutral -- the owning
   // subscribee already spent its budget unit when it expanded, so drawing all
   // the hidden members here costs nothing and never truncates the group.
   let child_data : HashMap<ID, ChildData> =
@@ -61,14 +61,14 @@ pub fn reconcile_hiddenin_subscribee_col_children (
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
   reconcile_sharing_col_children(
-    // §6.0: a HiddenInSubscribeeCol child that becomes stale (e.g. the user
+    // TODO/DONE/local-view-update/plan_v2.org §6.0: a HiddenInSubscribeeCol child that becomes stale (e.g. the user
     // moved it into the subscribee-as-such, 'unhiding' it) is removed when it
     // is a view-leaf -- the common case for hidden members -- and demoted to
     // Independent only if it has a user subtree to preserve. The reconciler
     // applies this uniformly.
     tree, node, kind,
     &goal_list, &child_data ) ?;
-  // §3.4: an emptied HiddenInSubscribeeCol is removed by the single postorder
+  // TODO/DONE/local-view-update/plan_v2.org §3.4: an emptied HiddenInSubscribeeCol is removed by the single postorder
   // prune sweep (prune_self_deletable_when_empty), not self-deleted here.
   Ok(( )) }
 
@@ -78,7 +78,7 @@ fn read_hiddenin_context (
   kind : RoleCol,
   env  : &SkgEnv,
 ) -> Result<HiddenInContext, Box<dyn Error>> {
-  // §4: ancestry table indices -- subscribee = index 0 (parent), subscriber =
+  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: ancestry table indices -- subscribee = index 0 (parent), subscriber =
   // index 2 (the full [Normal, SubscribeeCol, Normal] chain), read through the
   // helper so this multi-level read shares the death-check's spec.
   let (subscribee_pid, subscribee_source) : (ID, SourceName) =

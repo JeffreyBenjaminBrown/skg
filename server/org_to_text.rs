@@ -352,7 +352,7 @@ fn true_node_metadata_to_string (
   parts . push ( node_sexp (true_node, config));
   parts . join (" ") }
 
-/// Render metadata for a DiffPhantomNode (§11). A phantom is always
+/// Render metadata for a DiffPhantomNode (TODO/DONE/local-view-update/plan_v2.org §11). A phantom is always
 /// indefinitive (so always emits `indef` and never a body, editRequest, or
 /// viewRequests) and its parentIs is implicit Affected and birth Unremarkable
 /// (so neither atom appears, and graphStats is rendered as if Affected /

@@ -12,7 +12,8 @@
 //! detect a removed node with `truenode_file_absent_from_worktree`, load its
 //! title/body from git with `from_git_replace_title_body`, compute the
 //! subscriber hide-set with `get_hidden_ids_if_subscribee`, and report
-//! `is_removed_node = true`; the BFS driver (complete.rs) would then call
+//! `is_removed_node = true`; view completion (complete_nodes_in_level_order in
+//! complete.rs) would then call
 //! `extendDefinitiveSubtree_fromGit` instead of expanding live content. That
 //! path was unreachable in the inline-diff architecture -- a node's git-existence
 //! axes are stamped at the END of its visit, but the draw rule runs at the

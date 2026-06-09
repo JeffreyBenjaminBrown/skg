@@ -147,7 +147,7 @@ pub async fn update_views_after_save (
     let collateral_uris : Vec<ViewUri> =
       find_collateral_view_uris (
         uri, &define_nodes, views_state);
-    // plan_v2 §8.1 step 3: relax the early (broad) lock to the EXACT collateral
+    // TODO/DONE/local-view-update/plan_v2.org §8.1 step 3: relax the early (broad) lock to the EXACT collateral
     // set now that the SavePlan is known. Emacs keeps saved + these locked and
     // unlocks everything else it locked early, so the user can edit truly-
     // unaffected buffers during the rest of the pipeline. Symmetric with the
@@ -247,22 +247,22 @@ fn find_collateral_view_uris (
     . collect ();
   uris . into_iter () . collect () }
 
-/// Phase 8 (§13): build a DE-NOVO (initial) content view by running the ONE
-/// post-save driver (complete_viewforest) over a stub forest of the requested
-/// roots. The driver
+/// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): build a DE-NOVO (initial) content view by running the ONE
+/// post-save view completion (complete_viewforest) over a stub forest of the
+/// requested roots. View completion
 /// creates each fresh node's relation cols (create_relation_cols_for_fresh_nodes
-/// = true), expands content, reconciles cols, and applies the §5.5 node budget.
-/// When diff_mode, the git diff is computed inline by the driver (per node, at
-/// its BFS visit, via process_truenode_diff) -- the same path post-save uses.
+/// = true), expands content, reconciles cols, and applies the TODO/DONE/local-view-update/plan_v2.org §5.5 node budget.
+/// When diff_mode, the git diff is computed inline by view completion (per node,
+/// at its BFS visit, via process_truenode_diff) -- the same path post-save uses.
 /// The caller (multi_root_view_via_env) then adds containerward ancestry and
 /// stats.
-pub async fn render_initial_view_via_driver (
+pub async fn render_initial_view (
   env       : &SkgEnv,
   root_ids  : &[ID],
   active    : Option<&ActiveSourceSet>,
   diff_mode : bool,
 ) -> Result<ViewForest, Box<dyn Error>> {
-  // Build the stub roots. Its DefinitiveMap is discarded: the driver below uses
+  // Build the stub roots. Its DefinitiveMap is discarded: view completion below uses
   // a FRESH one, so each root is a first occurrence (make_indef_if_repeat treats
   // any pid already in the map as a repeat and would wrongly indefinitize them).
   let mut stub_defmap : DefinitiveMap = DefinitiveMap::new ();
@@ -276,7 +276,7 @@ pub async fn render_initial_view_via_driver (
   // generated once, here, and round-trips in the saved buffer as ordinary content
   // -- a later save never re-generates it. (Roots are already definitive by
   // construction -- first occurrence in the defmap -- so they need no
-  // ViewRequest::Definitive; adding one would over-trigger the §5.3 cascade.)
+  // ViewRequest::Definitive; adding one would over-trigger the TODO/DONE/local-view-update/plan_v2.org §5.3 cascade.)
   for root_nid in viewforest . root_ids () {
     if let Some (mut node_mut) = viewforest . get_mut (root_nid) {
       if let ViewNodeKind::Vognode (Vognode::Normal (t)) =
@@ -285,7 +285,7 @@ pub async fn render_initial_view_via_driver (
   let graph_snap : Arc<InRustGraph> = env . in_rust_graph . load_full ();
   let mut defmap : DefinitiveMap = DefinitiveMap::new ();
   let mut errors : Vec<String> = Vec::new ();
-  // §9 reversal (#3): de-novo diff is computed INLINE by the driver, exactly
+  // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): de-novo diff is computed INLINE by view completion, exactly
   // like post-save -- compute the real diffs here and feed them via source_diffs
   // (which drives the inline process_truenode_diff and the diff-aware QualCol /
   // sharing-col reconcilers).
@@ -328,7 +328,7 @@ pub async fn rerender_view (
       // The real per-source diffs drive ALL diff inline: process_truenode_diff
       // (content axes + phantom flip + TextChanged/IDCol/AliasCol) and the
       // diff-aware QualCol / sharing-col reconcilers, each at its own BFS visit
-      // (§9 reversal / #3). The content reconcile itself stays worktree-only.
+      // (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3). The content reconcile itself stays worktree-only.
       source_diffs                   : &context . source_diffs,
       env                            : context . env,
       graph_snap                     : &context . graph_snap,
@@ -338,7 +338,7 @@ pub async fn rerender_view (
       active_source_set              : context . active_source_set,
       node_budget                    : context . env . config . initial_node_limit,
       // Post-save reuses the saved buffer's relation cols; do not re-create them
-      // (that would change the buffer and break the save round-trip, §18).
+      // (that would change the buffer and break the save round-trip, TODO/DONE/local-view-update/plan_v2.org §18).
       create_relation_cols_for_fresh_nodes : false,
       // Post-save: phantom sources resolve via the deleted-id map + disk scan
       // (the de-novo path passes the tantivy index instead).
@@ -347,7 +347,7 @@ pub async fn rerender_view (
         "complete_viewforest" ). entered();
       complete_viewforest (
         viewforest, &mut completion_context ) . await ? }; }
-  // §9 reversal (#3): the content/scaffold diff was applied INLINE during the
+  // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the content/scaffold diff was applied INLINE during the
   // BFS above (process_truenode_diff at each Normal node's visit, driven by
   // source_diffs = the real diffs).
   let result : String =
@@ -362,12 +362,12 @@ pub async fn rerender_view (
             t_rerender . elapsed () . as_secs_f64 ());
   Ok (result) }
 
-/// The shared post-completion tail for BOTH render paths (§20.3): the de-novo
+/// The shared post-completion tail for BOTH render paths (TODO/DONE/local-view-update/plan_v2.org §20.3): the de-novo
 /// view (multi_root_view_via_env, server/to_org/render/content_view.rs) and the
 /// post-save re-render (rerender_view, above). Given a viewforest whose TrueNode
 /// content + git diff have already been completed, it:
 ///   - fulfills a ViewRequest::Containerward carried by a view-ROOT (only de-novo
-///     sets it; see render_initial_view_via_driver), building that root's
+///     sets it; see render_initial_view), building that root's
 ///     containerward ancestry and dropping the request. This is data-driven:
 ///     post-save roots come from the saved buffer WITHOUT the request, so a save
 ///     never re-generates the containerward (it round-trips as ordinary content).
@@ -487,12 +487,12 @@ fn strip_stale_diff_state (
   Ok (( )) }
 
 /// Strip every stale diff phantom from the viewforest, REGARDLESS of its
-/// relation to its parent (Jeff's progress.org §9 TODO): a phantom anywhere
+/// relation to its parent (Jeff's TODO/DONE/local-view-update/progress.org §9 TODO): a phantom anywhere
 /// but a forest root is removed, whatever its parentIs. Disposal depends on
 /// whether it has children:
 ///   - childless phantom -> detached (deleted) and its branch pruned;
 ///   - phantom WITH children -> demoted to DeadScaffold, so any real user
-///     subtree parented under it survives (the §3.4 postorder prune sweep
+///     subtree parented under it survives (the TODO/DONE/local-view-update/plan_v2.org §3.4 postorder prune sweep
 ///     later removes the DeadScaffold if it ends up childless). We recurse
 ///     into it so nested phantoms are stripped too.
 /// Exception: a forest root (top-level view node) is NOT stripped -- stripping
@@ -607,14 +607,14 @@ fn clear_diff_metadata (
 /// request so it does not round-trip into the saved buffer (a later save must not
 /// re-generate the containerward -- it round-trips as ordinary content instead).
 ///
-/// Only the de-novo render sets this request (render_initial_view_via_driver), so
+/// Only the de-novo render sets this request (render_initial_view), so
 /// this is a no-op post-save. The during-completion view-request dispatch
 /// deliberately leaves view-root Containerward alone (extract_view_requests) so it
 /// reaches here: this AncestryTree-based attach builds a SEPARATE containerward
 /// subtree and handles a cyclic root, whereas the dispatch's
 /// build_and_integrate_containerward would merge it into existing content and
 /// panic on a cyclic root (one whose containerward path cycles back to the root,
-/// e.g. a contains b contains a). See progress.org §17.
+/// e.g. a contains b contains a). See TODO/DONE/local-view-update/progress.org §17.
 async fn fulfill_root_containerward_requests (
   viewforest : &mut ViewForest,
   config     : &SkgConfig,

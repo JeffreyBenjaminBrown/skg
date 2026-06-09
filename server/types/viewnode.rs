@@ -65,7 +65,7 @@ pub enum ViewNodeKind {
 #[derive( Debug, Clone, PartialEq )]
 pub enum Vognode {
   Normal   (TrueNode),
-  DiffPhantom (DiffPhantomNode), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. §11 payload reduction (2026-06-04): now carries a slim DiffPhantomNode, not a TrueNode -- a phantom is always indefinitive/bodyless and its parentIs is never read or rendered, so it needs none of TrueNode's parentIs/birth/viewStats/view_requests/indef_or_def. See DiffPhantomNode_Generic + plan_v2 §18.
+  DiffPhantom (DiffPhantomNode), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim DiffPhantomNode, not a TrueNode -- a phantom is always indefinitive/bodyless and its parentIs is never read or rendered, so it needs none of TrueNode's parentIs/birth/viewStats/view_requests/indef_or_def. See DiffPhantomNode_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
   Inactive (InactiveNode), // From a source that is inactive (see "source sets").
   Unknown  (UnknownNode), // If it *ever* existed in the graph, Skg didn't find it.
   Deleted  (DeletedNode), // No longer exists in the graph.
@@ -129,7 +129,7 @@ pub type DiffPhantomNode   = DiffPhantomNode_Generic < ID, SourceName >;
 pub type MpDiffPhantomNode = DiffPhantomNode_Generic < Option < ID >,
                                                        Option < SourceName >>;
 
-/// The slim payload of a `Vognode::DiffPhantom` (§11 reduction). A phantom is a
+/// The slim payload of a `Vognode::DiffPhantom` (TODO/DONE/local-view-update/plan_v2.org §11 reduction). A phantom is a
 /// diff-only placeholder that is ALWAYS indefinitive and bodyless (enforced by
 /// `normal_to_phantom` / `mk_phantom_viewnode`) and whose parentIs is never read
 /// or rendered (always implicit Affected). So it carries NONE of TrueNode's
@@ -441,7 +441,7 @@ impl Qual {
 
 impl Vognode {
   /// The id of a Normal or DiffPhantom vognode (the two TrueNode-ish kinds),
-  /// or None for Inactive/Unknown/Deleted. Since the §11 reduction the Normal
+  /// or None for Inactive/Unknown/Deleted. Since the TODO/DONE/local-view-update/plan_v2.org §11 reduction the Normal
   /// and DiffPhantom payloads are different types, so this returns just the
   /// shared identity rather than a `&TrueNode`.
   pub fn normal_or_phantom_id (&self) -> Option<&ID> {
@@ -511,7 +511,7 @@ impl ViewNode {
       = &self . kind
       { if t . should_be_phantom ()
         { // A phantom is ALWAYS indefinitive and renders no body (Jeff's
-          // progress.org §9 TODO): the diff view presumes git literacy (magit
+          // TODO/DONE/local-view-update/progress.org §9 TODO): the diff view presumes git literacy (magit
           // shows the real node), and a phantom must never be a node's
           // definitive instance -- if Removed it has nothing to define, and if
           // RemovedHere "edit it here, where it isn't" is dangerously

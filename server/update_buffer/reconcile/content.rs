@@ -31,7 +31,7 @@ use std::sync::Arc;
 enum ContentReality {
   Real, // Real content: Exists in worktree, and parent contains it at this position.
   Inactive,
-  Unknown, // §7.6: a content id that resolves to nothing (a dangling reference) -> an Unknown placeholder, rather than aborting the whole view.
+  Unknown, // TODO/DONE/local-view-update/plan_v2.org §7.6: a content id that resolves to nothing (a dangling reference) -> an Unknown placeholder, rather than aborting the whole view.
 }
 
 struct ChildData {
@@ -42,17 +42,18 @@ struct ChildData {
 }
 
 /// TrueNode content reconcile + content-child creation, for one node, in the
-/// plan_v2 §3 level-order BFS visit. The driver settles the node's
+/// TODO/DONE/local-view-update/plan_v2.org §3 level-order BFS visit. View completion (dispatch_node_update)
+/// settles the node's
 /// Finalizable state *before* calling this (via 'apply_definitive_draw_rule')
 /// and passes:
-/// - `settled`: the §5.2 draw rule already ran for this node (it carried a
+/// - `settled`: the TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule already ran for this node (it carried a
 ///   ViewRequest::Definitive), so its map entry and indef/def are already
 ///   correct -- skip 'make_indef_if_repeat_then_extend_defmap', which would
 ///   otherwise indefinitize a just-made-Final node against its own entry.
-/// - `cascade`: this node is Final (DVR-made); per §5.3 it hands a
+/// - `cascade`: this node is Final (DVR-made); per TODO/DONE/local-view-update/plan_v2.org §5.3 it hands a
 ///   ViewRequest::Definitive to each of its affected content children so the
 ///   BFS draws each Final (clobbering competing Tentative occurrences).
-/// - `node_budget`: the §5.5 remaining budget of new ViewNodes; content-child
+/// - `node_budget`: the TODO/DONE/local-view-update/plan_v2.org §5.5 remaining budget of new ViewNodes; content-child
 ///   creation is capped against it.
 pub fn expand_true_content_at_truenode (
   node               : NodeId,
@@ -85,7 +86,7 @@ pub fn expand_true_content_at_truenode (
                                   "expand_true_content_at_truenode" ) ?;
   // This content path produces the pure worktree view; the node's git diff
   // (axes, phantom flip, diff scaffolds) is applied by process_truenode_diff at
-  // the end of the node's BFS visit (§9 reversal / #3).
+  // the end of the node's BFS visit (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3).
   { let is_indefinitive : bool =
       read_at_node_in_tree( tree, node,
         |vn : &ViewNode| match &vn . kind {
@@ -99,7 +100,7 @@ pub fn expand_true_content_at_truenode (
     mutate_truenode_to_deletednode (
       tree, node, &pid, &initial_source ) ?;
     return Ok (( )); }
-  // §5.5: this vognode is definitive and about to expand -- draw its whole
+  // TODO/DONE/local-view-update/plan_v2.org §5.5: this vognode is definitive and about to expand -- draw its whole
   // content group, and (via the BFS) its cols. Each expansion costs ONE budget
   // unit; an indefinitive node (returned above) costs nothing, and a col fills
   // for free. visit_normal_node already forced this node indefinitive if the
@@ -109,7 +110,7 @@ pub fn expand_true_content_at_truenode (
   let nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
       config, &pid, &initial_source ) ?;
-  // §8.3: EVERY definitive node re-syncs title/body/source from the snapshot,
+  // TODO/DONE/local-view-update/plan_v2.org §8.3: EVERY definitive node re-syncs title/body/source from the snapshot,
   // saved and collateral alike. (After extraction the snapshot already reflects
   // the saved buffer's text, so re-syncing the saved node yields the same
   // content it just defined -- a no-op.)
@@ -124,7 +125,7 @@ pub fn expand_true_content_at_truenode (
     tree, node ) ?;
   Ok(( )) }
 
-/// §5.3 cascade: hand a ViewRequest::Definitive to each affected,
+/// TODO/DONE/local-view-update/plan_v2.org §5.3 cascade: hand a ViewRequest::Definitive to each affected,
 /// non-phantom Normal content child of a Final node -- new and existing
 /// alike -- so the main BFS draws each Final (and it in turn cascades to its
 /// own content). The cascade does *not* flow through scaffolds, so only
@@ -162,7 +163,7 @@ fn clear_edit_request (
   Ok (( )) }
 
 /// Overwrite the viewnode's title, source, and body with the fresh values from
-/// the snapshot. §8.3: every definitive node re-syncs, saved and collateral
+/// the snapshot. TODO/DONE/local-view-update/plan_v2.org §8.3: every definitive node re-syncs, saved and collateral
 /// alike -- after extraction the snapshot already holds the saved buffer's text,
 /// so the saved node re-syncs to the same content it just defined.
 fn sync_truenode_from_disk (
@@ -208,14 +209,14 @@ fn reconcile_content_children (
                  . unwrap_or_else ( || id . clone () ))
     . collect ();
   let is_sub : bool = is_subscribee (tree, node) ?;
-  // §6.1: a definitive subscribee-as-such regenerates its content as
+  // TODO/DONE/local-view-update/plan_v2.org §6.1: a definitive subscribee-as-such regenerates its content as
   // contains-minus-hides, saved and collateral views alike. (View-update is
   // strictly post-extraction, so the hide edits are already in the graph and
-  // regenerating contains-minus-hides is correct. The §5.3 cascade draws
+  // regenerating contains-minus-hides is correct. The TODO/DONE/local-view-update/plan_v2.org §5.3 cascade draws
   // subscribee content through this same path.)
   let apparent_content_ids : Vec<ID> =
     content_goal_list( tree, node, &content_ids, is_sub, config ) ?;
-  // §5.5: the content group is drawn WHOLE -- never truncated mid-group. The
+  // TODO/DONE/local-view-update/plan_v2.org §5.5: the content group is drawn WHOLE -- never truncated mid-group. The
   // budget is spent once per expanding vognode (in expand_true_content_at_truenode),
   // not per child, so a node either fully expands or is left indefinitive; we
   // never create a silent partial sibling set.
@@ -223,7 +224,7 @@ fn reconcile_content_children (
   // becomes a DeletedNode whose cols generalized-orphan and deaden -- so no col
   // reconciles against a missing NodeComplete -- while any user subtree under it
   // is preserved (demoted), and a now-childless DeletedNode is removed by the
-  // §6.6 prune sweep.
+  // TODO/DONE/local-view-update/plan_v2.org §6.6 prune sweep.
   complete_content_children(
     tree, node, &apparent_content_ids, config,
     deleted_since_head_pid_src_map, active_source_set ) ?;
@@ -233,9 +234,9 @@ fn reconcile_content_children (
     tree, node, &apparent_content_ids ) ?;
   Ok (( )) }
 
-/// §6.5: an Unknown content placeholder (a dangling reference the parent kept
+/// TODO/DONE/local-view-update/plan_v2.org §6.5: an Unknown content placeholder (a dangling reference the parent kept
 /// rather than failing the whole view) that is *no longer a member* of the
-/// parent's contains converts to a DeadScaffold; the §3.4 postorder prune sweep
+/// parent's contains converts to a DeadScaffold; the TODO/DONE/local-view-update/plan_v2.org §3.4 postorder prune sweep
 /// then removes it. An Unknown still in contains is retained (a present-but-
 /// unresolvable reference). Self-deletion is the sweep's job -- this only
 /// decides member-vs-convert, so a Dead -> Unknown -> Dead chain collapses in
@@ -299,11 +300,11 @@ fn is_subscribee (
   Ok( is_member_of_parent && parent_is_subscribee_col ) }
 
 /// The worktree content goal list for a node: the (extra-id-resolved) contains,
-/// in order. For a subscribee-as-such (§6.1) it is contains MINUS what the
+/// in order. For a subscribee-as-such (TODO/DONE/local-view-update/plan_v2.org §6.1) it is contains MINUS what the
 /// subscriber hides -- the hidden remainder shows in the HiddenInSubscribeeCol.
 /// The git-diff decorations (removed-member phantoms, membership axes) are NOT
 /// computed here: they are applied per node by process_truenode_diff at its BFS
-/// visit (§9 reversal / #3), so the main content path produces only the pure
+/// visit (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3), so the main content path produces only the pure
 /// worktree view.
 fn content_goal_list (
   tree          : &Tree<ViewNode>,
@@ -478,7 +479,7 @@ fn build_child_creation_data (
           // Only an Affected Normal child counts as "already present" -- the
           // same predicate complete_content_children's reconcile applies. An
           // Independent same-id child is a distinct occurrence (e.g. a
-          // containerward ancestor, or a §6.0-demoted branch), so its goal id
+          // containerward ancestor, or a TODO/DONE/local-view-update/plan_v2.org §6.0-demoted branch), so its goal id
           // must still be pre-fetched here; otherwise the reconcile sends it to
           // the create closure and child_data.get(id).expect(..) panics.
           ViewNodeKind::Vognode (Vognode::Normal (t))
@@ -508,9 +509,9 @@ fn build_child_creation_data (
         id, deleted_since_head_pid_src_map, None, config )
       { Some (s) => s,
         None => {
-          // §7.6: the id resolves to nothing (a dangling reference). Render an
+          // TODO/DONE/local-view-update/plan_v2.org §7.6: the id resolves to nothing (a dangling reference). Render an
           // Unknown placeholder rather than aborting the whole view. This is
-          // what lets the one driver serve de-novo (which must tolerate
+          // what lets the one view completion serve de-novo (which must tolerate
           // dangling refs) and makes post-save robust to them too.
           result . insert ( id . clone (),
             ChildData { title  : String::new (),

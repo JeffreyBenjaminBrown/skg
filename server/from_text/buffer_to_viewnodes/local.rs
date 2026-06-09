@@ -374,7 +374,7 @@ fn validate_inactive_node (
   errors }
 
 /// The identity + child-structure checks shared by a TrueNode and a phantom
-/// (§20.4 dedup): id present, source in config, no wrong-structure child, and
+/// (TODO/DONE/local-view-update/plan_v2.org §20.4 dedup): id present, source in config, no wrong-structure child, and
 /// distinct content-child ids. `label` ("TrueNode" / "Phantom") is woven into the
 /// messages so each kind reports itself. (validate_truenode appends the
 /// definitive-title check; a phantom is title-exempt, being indefinitive.)
@@ -412,7 +412,7 @@ fn validate_truenode (
     errors . push("Definitive node has an empty title." . to_string()); }
   errors }
 
-/// Validate a phantom (§11): same identity and child-structure checks as a
+/// Validate a phantom (TODO/DONE/local-view-update/plan_v2.org §11): same identity and child-structure checks as a
 /// TrueNode, but the "definitive node must have a non-empty title" rule does
 /// not apply -- a phantom is always indefinitive, hence exempt (as
 /// has_empty_title would conclude for it).

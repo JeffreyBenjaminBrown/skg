@@ -1,6 +1,6 @@
 /// Per-node git-diff decoration for the git diff view.
 /// process_truenode_diff decorates one Normal vognode and generates its
-/// diff-only children. §9 reversal (#3): it is now called INLINE, at each
+/// diff-only children. TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): it is now called INLINE, at each
 /// node's own BFS visit (server/update_buffer/complete.rs), for both the
 /// post-save and de-novo paths.
 ///
@@ -27,7 +27,7 @@ use std::path::PathBuf;
 
 /// Decorate a normal vognode and generate any diff-only children
 /// implied by staged and unstaged NodeCompleteDiffs. Called inline per Normal
-/// node at its own BFS visit (for both de-novo and post-save), §9 reversal / #3:
+/// node at its own BFS visit (for both de-novo and post-save), TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3:
 /// the node flips to a phantom here and its cols then self-deaden via their own
 /// generalized-orphan check at their later visits.
 pub(crate) fn process_truenode_diff (

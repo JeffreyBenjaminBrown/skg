@@ -38,35 +38,37 @@ pub async fn execute_view_requests (
           active_source_set )
           . await ?; },
       ViewRequest::Definitive =>
-        // The BFS driver settles every Definitive request at the node's own
-        // visit (apply_definitive_draw_rule, the §5.2 draw rule + §5.3 cascade),
-        // before this post-content view-request pass runs, so none should reach
-        // here. Fail loudly if one does, rather than silently dropping it.
+        // View completion (dispatch_node_update) settles every Definitive
+        // request at the node's own visit (apply_definitive_draw_rule, the TODO/DONE/local-view-update/plan_v2.org §5.2
+        // draw rule + TODO/DONE/local-view-update/plan_v2.org §5.3 cascade), before this post-content view-request pass
+        // runs, so none should reach here. Fail loudly if one does, rather than
+        // silently dropping it.
         return Err ( "execute_view_requests: a ViewRequest::Definitive survived \
           to the view-request pass; it should have been consumed by the draw \
           rule at the node's visit" . into () ), }}
   Ok (( )) }
 
-/// The result of applying the §5.2 Tentative/Final draw rule to a node that
-/// carries a 'ViewRequest::Definitive' (a user DVR, or a §5.3 cascade DVR).
+/// The result of applying the TODO/DONE/local-view-update/plan_v2.org §5.2 Tentative/Final draw rule to a node that
+/// carries a 'ViewRequest::Definitive' (a user DVR, or a TODO/DONE/local-view-update/plan_v2.org §5.3 cascade DVR).
 pub enum DrawOutcome {
   /// An existing Final occurrence of this id won: the DVR was dropped and
   /// the node left indefinitive. No content expansion should follow.
   Deferred,
   /// The node was made Final (and any prior Tentative occurrence of its id
-  /// indefinitized). The caller draws its content next via the §5.3 cascade.
+  /// indefinitized). The caller draws its content next via the TODO/DONE/local-view-update/plan_v2.org §5.3 cascade.
   MadeFinal,
 }
 
-/// Apply the plan_v2 §5.2 draw rule for a node carrying
+/// Apply the TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule for a node carrying
 /// 'ViewRequest::Definitive', WITHOUT expanding its content:
 /// - defer to an existing Final occurrence (drop the DVR, stay
 ///   indefinitive) -> 'DrawOutcome::Deferred';
 /// - otherwise indefinitize any prior Tentative occurrence of the id, mark
 ///   this node Final (resyncing title/body from disk), register it in the map,
 ///   and clear the request -> 'DrawOutcome::MadeFinal'.
-/// Content drawing is the caller's job (the §5.3 cascade), so the rule settles
-/// Final-ness before the BFS driver draws (and cascades) content.
+/// Content drawing is the caller's job (the TODO/DONE/local-view-update/plan_v2.org §5.3 cascade), so the rule settles
+/// Final-ness before view completion (complete_nodes_in_level_order) draws
+/// (and cascades) content.
 pub fn apply_definitive_draw_rule (
   viewforest : &mut Tree<ViewNode>,
   node_id    : NodeId,
@@ -77,8 +79,8 @@ pub fn apply_definitive_draw_rule (
     viewforest, node_id ) ?;
   if let Some (&prior) = visited . get (& node_pid) {
     if prior . is_final () && prior . node_id () != node_id {
-      // §5.2: an existing Final occurrence wins; discard this DVR and make
-      // the node indefinitive. (Setting indefinitive matters for a §5.3
+      // TODO/DONE/local-view-update/plan_v2.org §5.2: an existing Final occurrence wins; discard this DVR and make
+      // the node indefinitive. (Setting indefinitive matters for a TODO/DONE/local-view-update/plan_v2.org §5.3
       // cascade DVR landing on a freshly-created definitive child whose id
       // is already Final elsewhere; for a user DVR on an already-indefinitive
       // node it is a no-op. The expand step then clobbers/refreshes it.)
@@ -102,7 +104,7 @@ pub fn apply_definitive_draw_rule (
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     from_disk_replace_title_body_and_nodecomplete (
       viewforest, node_id, config ) ?;
-    // A DVR target is Final (§5.2): later DVRs for this ID defer to it.
+    // A DVR target is Final (TODO/DONE/local-view-update/plan_v2.org §5.2): later DVRs for this ID defer to it.
     visited . insert ( node_pid . clone(), Finalizable::Final (node_id) ); }
   Ok ( DrawOutcome::MadeFinal ) }
 

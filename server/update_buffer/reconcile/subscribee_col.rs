@@ -49,7 +49,7 @@ pub async fn reconcile_subscribee_col_children (
       &context . parent_pid, &context . parent_source,
       source_diffs, &context . worktree_subscribees, &env . config );
 
-  // §3.4/§6.7 exception: an *empty* SubscribeeCol is PRESERVED, not
+  // TODO/DONE/local-view-update/plan_v2.org §3.4/§6.7 exception: an *empty* SubscribeeCol is PRESERVED, not
   // self-deleted. It is the editable interface onto the origin's outgoing
   // subscriptions; if it vanished when emptied, the user would lose the place
   // to add one back. (A SubscribeeCol is only *created* when subscribes_to is
@@ -58,7 +58,7 @@ pub async fn reconcile_subscribee_col_children (
   // headline so the user can re-add.) Its children still reconcile to empty
   // below, and the HiddenOutsideOfSubscribeeCol is still ensured last.
   if context . parent_indefinitive || source_diffs . is_some() {
-    // §5.5: a col fills its members WHOLE and is budget-neutral -- the owning
+    // TODO/DONE/local-view-update/plan_v2.org §5.5: a col fills its members WHOLE and is budget-neutral -- the owning
     // subscriber already spent its budget unit when it expanded, so drawing all
     // its subscribees here costs nothing and never truncates the group.
     let child_data : HashMap<ID, ChildData> =
@@ -78,7 +78,7 @@ fn read_subscribee_col_context (
   node : NodeId,
   env  : &SkgEnv,
 ) -> Result<SubscribeeColContext, Box<dyn Error>> {
-  // §4: read the subscriber Normal vognode through the §3 ancestry table
+  // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the subscriber Normal vognode through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
   // (index 0 = the parent), rather than at a hard-coded generation.
   let subscriber : NodeId =
     required_ancestor (tree, node, 0) ?

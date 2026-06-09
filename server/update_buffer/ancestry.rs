@@ -21,7 +21,7 @@
 //! descendant col is visited; so by the time a col checks, a dead ancestor
 //! already shows the wrong kind in the tree.
 //!
-//! The §3 required-ancestry table is the single source of truth. Reconciles
+//! The TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 required-ancestry table is the single source of truth. Reconciles
 //! read their ancestors *through* `required_ancestor`, so a reconcile can
 //! never read an ancestor the table does not list, and the death-check and the
 //! reads share one spec (the per-col *field* each reconcile then pulls --
@@ -36,18 +36,18 @@ use crate::update_buffer::util::detach_scaffold_transferring_focus;
 use ego_tree::{ NodeId, NodeRef, Tree };
 use std::error::Error;
 
-/// One position in a col's required ancestry (§3 table). A position is matched
+/// One position in a col's required ancestry (TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 table). A position is matched
 /// against the *actual ancestor at that tree depth*.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ExpectedAncestor {
   /// Must be a `Vognode::Normal` (anything else at this depth means death).
   NormalVognode,
-  /// Must be exactly this col kind (§19: a col = a collecting scaffold). The
+  /// Must be exactly this col kind (TODO/DONE/local-view-update/plan_v2.org §19: a col = a collecting scaffold). The
   /// only intermediate-chain col the table uses is the SubscribeeCol.
   Col (RoleCol),
 }
 
-// The §3 required-ancestry table, nearest -> farthest. required_ancestry[i] is
+// The TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 required-ancestry table, nearest -> farthest. required_ancestry[i] is
 // matched against the actual ancestor at tree depth i+1 (0 = the col itself).
 const ANC_NORMAL : &[ExpectedAncestor] =
   &[ ExpectedAncestor::NormalVognode ];
@@ -60,7 +60,7 @@ const ANC_HIDDEN_IN : &[ExpectedAncestor] =
      ExpectedAncestor::NormalVognode ];
 const ANC_NONE : &[ExpectedAncestor] = &[];
 
-/// The §3 required ancestry for a col kind, nearest -> farthest. Non-col kinds
+/// The TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 required ancestry for a col kind, nearest -> farthest. Non-col kinds
 /// have none (they are never orphan-checked).
 fn required_ancestry (
   kind : &ViewNodeKind,
@@ -95,7 +95,7 @@ fn matches_expected (
       matches! ( actual, ViewNodeKind::PartnerCol (r) if r == rc ),
   } }
 
-/// Whether `kind` is a COL -- in Jeff's terminology (plan_v2 §19) a col is a
+/// Whether `kind` is a COL -- in Jeff's terminology (TODO/DONE/local-view-update/plan_v2.org §19) a col is a
 /// *collecting* scaffold, i.e. a QualCol (ID/Alias) or a PartnerCol. (A SCAFFOLD
 /// is any non-Vognode viewnode; the non-col scaffolds -- Qual leaves, BufferRoot,
 /// DeadScaffold -- are excluded here.) Cols are the kinds that carry a required
@@ -140,7 +140,7 @@ pub fn col_is_generalized_orphan (
     if ! matches { return Ok (true); } }
   Ok (false) }
 
-/// The NodeId of the col's i-th required ancestor (per the §3 table for its
+/// The NodeId of the col's i-th required ancestor (per the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 table for its
 /// kind); `None` if i is past the end of the table for this kind.
 ///
 /// RELIES ON THE ORPHAN PRE-CHECK: it does NOT re-validate that each ancestor is
@@ -163,7 +163,7 @@ pub fn required_ancestor (
   Ok ( ancestor_nodeid (tree, col, i + 1) ) }
 
 /// The (pid, source) of the col's i-th required ancestor, read *through* the
-/// §3 table. Errors if that ancestor is absent (the col is a generalized
+/// TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 table. Errors if that ancestor is absent (the col is a generalized
 /// orphan up to i) -- unreachable in practice, since the BFS dispatch runs the
 /// orphan pre-check and deadens an orphan before its reconcile is ever called,
 /// but the contract is what keeps a reconcile from reading an unlisted ancestor.
@@ -189,7 +189,7 @@ pub fn pid_and_source_from_required_ancestor (
     . ok_or_else ( || format! (
       "{}: required ancestor {} has no pid/source", caller, i ) . into () ) }
 
-/// Deaden a generalized-orphan col at its BFS visit (plan §5): dispose each
+/// Deaden a generalized-orphan col at its BFS visit (TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5): dispose each
 /// direct child, then convert the col itself to a DeadScaffold and skip its
 /// reconcile. The BFS still visits the (disposed) children; a demoted-
 /// Independent survivor is visited normally, a DeadScaffold child is a no-op.
@@ -208,17 +208,17 @@ pub fn deaden_generalized_orphan_col (
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (( )) }
 
-/// Dispose one direct child of a deadened orphan col (plan §5.1.a):
+/// Dispose one direct child of a deadened orphan col (TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5.1.a):
 /// - an Affected (parentIs=Affected Normal) view-leaf -> delete;
 /// - an Affected branch (has children) -> demote to parentIs=Independent, so
 ///   the user's subtree survives;
 /// - a nested col (QualCol / PartnerCol) -> LEAVE it untouched: it is itself a
 ///   generalized orphan under this now-dead col, so it deadens itself -- and
 ///   disposes ITS OWN children -- at its own BFS visit. (This DEVIATES from
-///   plan.org §5.1.a, which converted nested cols to DeadScaffold here; doing
+///   TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5.1.a, which converted nested cols to DeadScaffold here; doing
 ///   so would freeze a nested col before it could dispose its own leaf members,
 ///   leaving them stranded under a dead chain. Leaving it to self-deaden is
-///   what the plan's §5 note actually intends -- "a nested col ... deadens
+///   what the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5 note actually intends -- "a nested col ... deadens
 ///   itself at its own visit too" -- and is what makes leaf members at every
 ///   depth die. A Qual leaf does NOT self-dispatch, so it is still converted
 ///   below.)

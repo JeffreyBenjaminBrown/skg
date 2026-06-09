@@ -51,7 +51,7 @@ pub(crate) fn subscribee_hiderel_intents_from_candidates (
     // under the *definitive* instance of N may write them. The same
     // subscriber can recur indefinitively elsewhere with its own
     // SubscribeeCol; without this guard those would emit contradictory
-    // hide edits for one ID. (plan_v2 §6.1.) The subscribee's own
+    // hide edits for one ID. (TODO/DONE/local-view-update/plan_v2.org §6.1.) The subscribee's own
     // definitiveness is already required by collect_savenode_candidates.
     if ! subscriber_instance_is_definitive (&node_ref) {
       continue; }
@@ -75,7 +75,7 @@ pub(crate) fn subscribee_hiderel_intents_from_candidates (
 /// is a *definitive* Normal vognode. The tree shape is
 /// subscriber -> SubscribeeCol -> subscribee-as-such, so the subscriber
 /// is the candidate's grandparent. See the at-most-one-writer-per-ID
-/// note at the call site (plan_v2 §6.1).
+/// note at the call site (TODO/DONE/local-view-update/plan_v2.org §6.1).
 fn subscriber_instance_is_definitive (
   subscribee_ref : &NodeRef<ViewNode_in_Role>,
 ) -> bool {

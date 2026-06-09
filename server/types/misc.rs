@@ -125,7 +125,7 @@ impl SourceName {
   /// DiffPhantom) whose source could not be determined. It renders like
   /// any other source -- the all-caps name alone flags it to the user --
   /// so that one unresolvable reference does not abort an entire render
-  /// (plan_v2 §7.6). Normal-vognode source failures are caught by
+  /// (TODO/DONE/local-view-update/plan_v2.org §7.6). Normal-vognode source failures are caught by
   /// validation (pre-save) or are catastrophic (post-save), never this.
   pub const NOT_FOUND_STR : &'static str = "NOT_FOUND";
   pub fn not_found () -> Self {
