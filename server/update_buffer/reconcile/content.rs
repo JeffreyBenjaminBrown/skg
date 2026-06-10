@@ -345,6 +345,8 @@ fn complete_content_children (
     build_child_creation_data(
       tree, node, goal_list, config,
       deleted_since_head_pid_src_map, active_source_set ) ?;
+  // The RepairSummary is dropped: content is not a generated
+  // collection, so its reconciliation is not a "repair" to warn about.
   complete_relevant_children_in_viewnodetree(
     tree, node,
     |vn : &ViewNode| match &vn . kind {
@@ -382,7 +384,7 @@ fn complete_content_children (
             id . clone(), d . source . clone(), MembershipAxes::default ()),
         ContentReality::Unknown =>
           mk_unknown_viewnode ( id . clone() ) } ) },
-  ) }
+  ) . map ( |_summary| () ) }
 
 /// 'erroneous content children' are children that look like content,
 /// but are not actually content.

@@ -8,6 +8,8 @@ use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
+use crate::update_buffer::util::RepairSummary;
+use crate::update_buffer::warnings::{CompletionWarning, RepairKind};
 use crate::types::viewnode::{ColPolicy, ParentIs, PartnerCol, ViewNode, ViewNodeKind, Vognode};
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -29,6 +31,7 @@ pub fn reconcile_partnerCol_children (
   env          : &SkgEnv,
   graph_snap   : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  warning_sink : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
 ) -> Result<(), Box<dyn Error>> {
   kind . error_unless_node_is_this_kind (tree, node) ?;
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the owner Active vognode *through* the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
@@ -73,9 +76,37 @@ pub fn reconcile_partnerCol_children (
   // TODO/DONE/local-view-update/plan_v2.org §6.0/§16: the reconciler deletes a stale member that is a view-leaf and
   // demotes one that is a branch, so a read-only PartnerCol
   // drops a stale leaf member instead of preserving it.
-  reconcile_partnerCol_children_against_goal_list (
-    tree, node, kind, &goal_list, &child_data ) ?;
+  let summary : RepairSummary<ID> =
+    reconcile_partnerCol_children_against_goal_list (
+      tree, node, kind, &goal_list, &child_data ) ?;
+  if kind . policy () != ColPolicy::WritableSet {
+    // Repairs to a writable col are not repairs: its membership IS
+    // whatever the user saved. Read-only cols warn (when there is a
+    // sink, i.e. when this completion serves the just-saved view).
+    if let Some (sink) = warning_sink {
+      push_repair_warnings (sink, kind, &owner_pid, summary); }}
   Ok (( )) }
+
+/// Translate a RepairSummary into per-repair-kind CompletionWarnings.
+/// Empty categories contribute nothing.
+pub fn push_repair_warnings (
+  sink    : &mut Vec<CompletionWarning>,
+  col     : PartnerCol,
+  owner   : &ID,
+  summary : RepairSummary<ID>,
+) {
+  let categories : [ (RepairKind, Vec<ID>); 4 ] = [
+    (RepairKind::RestoredMember,   summary . created),
+    (RepairKind::DemotedNonMember, summary . demoted),
+    (RepairKind::RemovedStaleLeaf, summary . deleted_stale),
+    (RepairKind::RemovedDuplicate, summary . deleted_duplicates) ];
+  for (repair, children) in categories {
+    if ! children . is_empty () {
+      sink . push ( CompletionWarning {
+        col,
+        owner : owner . clone (),
+        repair,
+        children } ); }}}
 
 /// The effective goal list for a ColPolicy::ReadOnlySet col:
 /// the col's existing Active parentIs=Affected children, in their

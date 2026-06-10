@@ -15,6 +15,7 @@ use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_n
 use crate::to_org::complete::partner_col::maybe_add_partnerCol_branches;
 use crate::update_buffer::ancestry::{ col_is_generalized_orphan, deaden_generalized_orphan_col, is_col_kind};
 use crate::update_buffer::util::detach_scaffold_transferring_focus;
+use crate::update_buffer::warnings::CompletionWarning;
 use crate::to_org::render::diff::process_truenode_diff;
 use crate::types::tree::viewnode_nodecomplete::write_at_truenode_in_tree;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerCol, ViewRequest, IndefOrDef, PhantomDeleted};
@@ -65,6 +66,12 @@ pub(super) struct CompletionContext<'a> {
   /// resolution. None on the post-save path (the deleted-id map + disk scan
   /// suffice); Some on the de-novo path.
   pub(super) diff_tantivy_index : Option<&'a TantivyIndex>,
+  /// Some only when this completion serves the view the user just
+  /// saved: read-only PartnerCol reconcilers report their repairs
+  /// here, and the save response surfaces them as warnings. None for
+  /// de-novo renders, collateral rerenders and rerender-all, whose
+  /// repairs do not correspond to edits the user just made.
+  pub(super) warning_sink : Option<&'a mut Vec<CompletionWarning>>,
 }
 
 pub(super) async fn complete_viewforest (
@@ -147,11 +154,13 @@ async fn dispatch_node_update (
     ViewNodeKind::PartnerCol (PartnerCol::HiddenInSubscribee) =>
       reconcile_hiddenin_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
-        context . deleted_since_head_pid_src_map ) ?,
+        context . deleted_since_head_pid_src_map,
+        context . warning_sink . as_deref_mut () ) ?,
     ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee) =>
       reconcile_hiddenoutside_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
-        context . deleted_since_head_pid_src_map ) ?,
+        context . deleted_since_head_pid_src_map,
+        context . warning_sink . as_deref_mut () ) ?,
     ViewNodeKind::PartnerCol (role)
       // This arm serves one ColPolicy::WritableSet col (Overridden;
       // Subscribee has its own completer above) and every
@@ -161,7 +170,8 @@ async fn dispatch_node_update (
       reconcile_partnerCol_children (
         treeid, tree, *role, context . source_diffs,
         context . env, context . graph_snap,
-        context . deleted_since_head_pid_src_map ) ?,
+        context . deleted_since_head_pid_src_map,
+        context . warning_sink . as_deref_mut () ) ?,
     // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the IDCol/AliasCol diff scaffolds are created inline by
     // process_truenode_diff at the owner's BFS visit, so their reconcilers must
     // see the real diffs (source_diffs) or they would clobber the just-created

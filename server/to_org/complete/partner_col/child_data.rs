@@ -26,7 +26,7 @@ use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Vognode, ParentIs, PartnerCol, mk_indefinitive_viewnode, mk_phantom_viewnode};
-use crate::update_buffer::util::complete_relevant_children_in_viewnodetree;
+use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -139,9 +139,10 @@ pub fn reconcile_partnerCol_children_against_goal_list (
   kind          : PartnerCol,
   goal_list     : &[ID],
   child_data    : &HashMap<ID, ChildData>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<RepairSummary<ID>, Box<dyn Error>> {
   let label : &'static str = kind . caller_label ();
-  complete_relevant_children_in_viewnodetree (
+  let summary : RepairSummary<ID> =
+    complete_relevant_children_in_viewnodetree (
     tree, col_node,
     |vn : &ViewNode| matches! ( &vn . kind,
                                 ViewNodeKind::Vognode (Vognode::Active (t))
@@ -168,7 +169,7 @@ pub fn reconcile_partnerCol_children_against_goal_list (
             d . title . clone (), ex, mem ) } ) } ) ?;
   mark_goal_children_as_collectionBranch_members (
     tree, col_node, goal_list) ?;
-  Ok (( )) }
+  Ok (summary) }
 
 /// See this module's header for definition of "goal child".
 ///

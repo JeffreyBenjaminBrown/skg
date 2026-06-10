@@ -100,6 +100,28 @@ pub fn move_child_to_end<Node> (
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   Ok( () ) }
 
+/// What 'complete_relevant_children' changed while reconciling: the
+/// orderkeys it created, demoted to Independent (stale branches),
+/// detached as stale leaves, and detached as duplicates. Callers
+/// that warn about repairs to read-only cols consume this
+/// ('CompletionWarning'); other callers ignore it.
+#[derive(Debug)]
+pub struct RepairSummary<Orderkey> {
+  pub created            : Vec<Orderkey>,
+  pub demoted            : Vec<Orderkey>,
+  pub deleted_stale      : Vec<Orderkey>,
+  pub deleted_duplicates : Vec<Orderkey>,
+}
+
+impl<Orderkey> RepairSummary<Orderkey> {
+  fn new () -> RepairSummary<Orderkey> {
+    RepairSummary {
+      created            : Vec::new (),
+      demoted            : Vec::new (),
+      deleted_stale      : Vec::new (),
+      deleted_duplicates : Vec::new (), }}
+}
+
 /// ViewNode-specialized version of complete_relevant_children.
 /// See that one's description for more info.
 /// This one specializes it so that:
@@ -113,7 +135,7 @@ pub fn complete_relevant_children_in_viewnodetree
   view_child_orderkey : View,
   goal_list           : &[Orderkey],
   create_child        : impl Fn (&Orderkey) -> Result<ViewNode, String>,
-) -> Result<(), Box<dyn Error>>
+) -> Result<RepairSummary<Orderkey>, Box<dyn Error>>
 where Relevant : Fn (&ViewNode) -> bool,
       View     : Fn (&ViewNode) -> Result<Orderkey, String>,
       Orderkey : Eq + Hash + Clone,
@@ -174,6 +196,7 @@ where Relevant : Fn (&ViewNode) -> bool,
 ///   true, runs problem_discard_response on the parent afterward.
 /// - Reorders remaining children: irrelevant first, then relevant in goal_list order.
 ///   Creates new children for any orderkeys missing from the original children.
+/// - Returns a RepairSummary of what it created, demoted and detached.
 pub fn complete_relevant_children
 <Node, Orderkey, Relevant, View, ProblemDiscard, ProblemResponse, DemoteInvalid> (
   tree                     : &mut Tree<Node>,
@@ -185,7 +208,7 @@ pub fn complete_relevant_children
   problem_discard          : ProblemDiscard,
   mut problem_discard_response : ProblemResponse,
   demote_invalid           : DemoteInvalid,
-) -> Result<(), Box<dyn Error>>
+) -> Result<RepairSummary<Orderkey>, Box<dyn Error>>
 where
   Relevant        : Fn (&Node) -> bool,
   // The orderkey and create-child closures are fallible so a relevant
@@ -212,7 +235,7 @@ where
   let mut orderkey_to_treeid
     : HashMap<Orderkey, NodeId> = HashMap::new();
   let mut duplicate_ids : Vec<( NodeId, Orderkey )> = Vec::new();
-  let mut invalid_ids : Vec<NodeId> = Vec::new();
+  let mut invalid_ids : Vec<( NodeId, Orderkey )> = Vec::new();
   for &node_id in &relevant_ids { // populate the above three variables
     let node_ref : NodeRef<Node> =
       tree . get (node_id)
@@ -220,26 +243,31 @@ where
     let orderkey : Orderkey =
       view_child_orderkey( node_ref . value() ) ?;
     if !goal_list_as_set . contains (&orderkey) {
-      invalid_ids . push (node_id); // hopefully none
+      invalid_ids . push( ( node_id, orderkey ) ); // hopefully none
     } else if orderkey_to_treeid . contains_key (&orderkey) {
       duplicate_ids . push( ( node_id, orderkey ) ); // hopefully none
     } else {
       orderkey_to_treeid . insert( orderkey, node_id ); } }
+  let mut summary : RepairSummary<Orderkey> = RepairSummary::new();
   let mut discard_has_problem : bool = false;
   // Duplicates are redundant: always detach (recording focus loss).
-  for &( node_id, _ ) in &duplicate_ids {
-    if problem_discard( tree, node_id )? { discard_has_problem = true; }
-    with_node_mut( tree, node_id,
+  for ( node_id, orderkey ) in &duplicate_ids {
+    if problem_discard( tree, *node_id )? { discard_has_problem = true; }
+    with_node_mut( tree, *node_id,
                    |mut n| { n . detach(); } )
-      . map_err( |e| -> Box<dyn Error> { e . into() } )?; }
+      . map_err( |e| -> Box<dyn Error> { e . into() } )?;
+    summary . deleted_duplicates . push( orderkey . clone() ); }
   // Stale members: demote_invalid may keep one (TODO/DONE/local-view-update/plan_v2.org §6.0 demote-a-branch); only a
   // node it does NOT keep is detached, and only that detach can lose focus.
-  for &node_id in &invalid_ids {
-    if demote_invalid( tree, node_id )? { continue; }
-    if problem_discard( tree, node_id )? { discard_has_problem = true; }
-    with_node_mut( tree, node_id,
+  for ( node_id, orderkey ) in &invalid_ids {
+    if demote_invalid( tree, *node_id )? {
+      summary . demoted . push( orderkey . clone() );
+      continue; }
+    if problem_discard( tree, *node_id )? { discard_has_problem = true; }
+    with_node_mut( tree, *node_id,
                    |mut n| { n . detach(); } )
-      . map_err( |e| -> Box<dyn Error> { e . into() } )?; }
+      . map_err( |e| -> Box<dyn Error> { e . into() } )?;
+    summary . deleted_stale . push( orderkey . clone() ); }
   if discard_has_problem {
     // Respond to problem if any discard was problematic
     with_node_mut(
@@ -260,8 +288,9 @@ where
             tree, parent_id,
             |mut p| { p . append (node); }
           ) . map_err( |e| -> Box<dyn Error>
-                      { e . into() } )?; }, }}
-  Ok (( )) }
+                      { e . into() } )?;
+        summary . created . push( orderkey . clone() ); }, }}
+  Ok (summary) }
 
 #[cfg(test)]
 #[path = "../../tests/unit/update_buffer_util.rs"]

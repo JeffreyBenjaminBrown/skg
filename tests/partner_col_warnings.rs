@@ -1,0 +1,132 @@
+// cargo test --test partner_col_warnings -- --nocapture
+//
+// When the completion pass repairs a read-only PartnerCol in the
+// view the user just saved, the save succeeds and
+// SaveResponse.warnings says what was repaired
+// (TODO/full-schema/8_readonly-set-ergonomics.org):
+// - a deleted generated member is restored, with a warning that
+//   explains membership is edited from the other side;
+// - a non-member parked as Affected with a subtree is demoted to
+//   independent, with a warning.
+//
+// Fixture: r and t subscribe to n (so n's view has a SubscriberCol);
+// x is an unrelated node the test parks inside that col.
+
+use std::error::Error;
+use std::net::TcpStream;
+use std::sync::Arc;
+
+use skg::test_utils::{run_with_test_db, graph_handle_from_config};
+use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+use skg::to_org::render::content_view::multi_root_view;
+use skg::serve::ViewsState;
+use skg::types::views_state::OpenViews;
+use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::serve::handlers::save_buffer::SaveResponse;
+
+use skg::dbs::in_rust_graph::InRustGraphHandle;
+use typedb_driver::TypeDBDriver;
+
+#[test]
+fn readonly_col_repairs_warn
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-partner-col-warnings",
+    "tests/partner_col_warnings/fixtures",
+    "/tmp/tantivy-test-partner-col-warnings",
+    |config, driver, tantivy| Box::pin ( async move {
+      readonly_col_repairs_warn_impl (
+        config, driver, tantivy ) . await
+    } )) }
+
+async fn save_buffer (
+  buf     : &str,
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+  graph   : &InRustGraphHandle, // must be the process-global handle, or the save's coherence debug-assert reads a stale graph
+) -> Result<SaveResponse, Box<dyn Error>> {
+  let mut views_state : ViewsState = ViewsState {
+    diff_mode_enabled : false,
+    open_views        : OpenViews::new (),
+  };
+  let listener : std::net::TcpListener =
+    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
+  let mut stream : TcpStream =
+    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
+  update_from_and_rerender_buffer (
+    &mut stream,
+    buf, driver, config, tantivy, graph, false,
+    &Err ( String::new () ), &mut views_state ) . await }
+
+fn line_containing<'a> (
+  buf      : &'a str,
+  fragment : &str,
+) -> &'a str {
+  buf . lines ()
+    . find ( |l| l . contains (fragment) )
+    . unwrap_or_else (
+      || panic! ( "no line contains {:?} in:\n{}", fragment, buf )) }
+
+async fn readonly_col_repairs_warn_impl (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle =
+    graph_handle_from_config (config) ?;
+  skg::dbs::in_rust_graph::init_global_handle_for_first_time_or_panic (
+    graph . clone () );
+  let (complete_buffer, _pids, _tree)
+    : (String, Vec<ID>, _) =
+    multi_root_view (
+      driver, config, Some (tantivy),
+      &[ ID ("n" . to_string ()) ], false ) . await ?;
+  let edited : String = {
+    let r_line : String =
+      line_containing (&complete_buffer, "(id r)") . to_string ();
+    let t_line : String =
+      line_containing (&complete_buffer, "(id t)") . to_string ();
+    let x_line : String = {
+      // x: a definitive Affected leaf parked inside the col, with a
+      // (new) child so the repair is a demotion, not a removal.
+      let mut l : String =
+        r_line
+        . replace ("(id r)", "(id x)")
+        . replace (" indef", "");
+      if l . ends_with (" r") {
+        l . truncate (l . len () - 2);
+        l . push_str (" x"); }
+      l };
+    let x_child : String = {
+      let stars : usize =
+        x_line . chars () . take_while ( |c| *c == '*' ) . count ();
+      format! ( "{} xx", "*" . repeat (stars + 1) ) };
+    complete_buffer
+      . replace ( &format! ("{}\n", r_line), "" ) // delete member r
+      . replace ( &t_line,                        // park x (with child) after t
+                  &format! ("{}\n{}\n{}", t_line, x_line, x_child) ) };
+  let response : SaveResponse =
+    save_buffer (&edited, config, driver, tantivy, &graph) . await ?;
+  assert! ( response . errors . is_empty (),
+    "save must succeed; got errors: {:?}", response . errors );
+  let warning : &String =
+    response . warnings . iter ()
+    . find ( |w| w . contains ("subscriberCol") )
+    . unwrap_or_else (
+      || panic! ( "no subscriberCol warning in {:?}",
+                  response . warnings ));
+  assert! ( warning . contains ("under node n"), "{}", warning );
+  assert! ( warning . contains ("restored 1 member(s): r"),
+            "{}", warning );
+  assert! ( warning . contains ("demoted 1 non-member(s) to independent: x"),
+            "{}", warning );
+  assert! ( warning . contains ("edited from the other side"),
+            "{}", warning );
+  let saved : String = response . saved_view;
+  assert! ( saved . contains ("(id r)"),
+    "deleted member r must respawn:\n{}", saved );
+  { let x_line_after : &str = line_containing (&saved, "(id x)");
+    assert! ( x_line_after . contains ("independent"),
+      "x must be rerendered as independent: {}", x_line_after ); }
+  Ok (( )) }

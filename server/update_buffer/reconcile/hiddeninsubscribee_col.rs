@@ -6,6 +6,8 @@ use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
+use crate::update_buffer::reconcile::partner_col::push_repair_warnings;
+use crate::update_buffer::warnings::CompletionWarning;
 use crate::types::viewnode::{ViewNode, PartnerCol};
 
 use ego_tree::{NodeId, Tree};
@@ -39,6 +41,7 @@ pub fn reconcile_hiddenin_subscribee_col_children (
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  warning_sink                   : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
 ) -> Result<(), Box<dyn Error>> {
   let kind : PartnerCol =
     PartnerCol::HiddenInSubscribee;
@@ -60,14 +63,18 @@ pub fn reconcile_hiddenin_subscribee_col_children (
       tree, node, &context . subscribee_pid, &context . subscribee_source,
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
-  reconcile_partnerCol_children_against_goal_list(
-    // TODO/DONE/local-view-update/plan_v2.org §6.0: a HiddenInSubscribeeCol child that becomes stale (e.g. the user
-    // moved it into the subscribee-as-such, 'unhiding' it) is removed when it
-    // is a view-leaf -- the common case for hidden members -- and demoted to
-    // Independent only if it has a user subtree to preserve. The reconciler
-    // applies this uniformly.
-    tree, node, kind,
-    &goal_list, &child_data ) ?;
+  let summary =
+    reconcile_partnerCol_children_against_goal_list(
+      // TODO/DONE/local-view-update/plan_v2.org §6.0: a HiddenInSubscribeeCol child that becomes stale (e.g. the user
+      // moved it into the subscribee-as-such, 'unhiding' it) is removed when it
+      // is a view-leaf -- the common case for hidden members -- and demoted to
+      // Independent only if it has a user subtree to preserve. The reconciler
+      // applies this uniformly.
+      tree, node, kind,
+      &goal_list, &child_data ) ?;
+  if let Some (sink) = warning_sink {
+    push_repair_warnings (
+      sink, kind, &context . subscribee_pid, summary ); }
   // TODO/DONE/local-view-update/plan_v2.org §3.4: an emptied HiddenInSubscribeeCol is removed by the single postorder
   // prune sweep (prune_self_deletable_when_empty), not self-deleted here.
   Ok(( )) }

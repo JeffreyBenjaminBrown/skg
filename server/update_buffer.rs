@@ -1,4 +1,5 @@
 pub mod ancestry;
+pub mod warnings;
 pub mod complete;
 pub mod reconcile;
 pub mod graphnodestats;
@@ -29,6 +30,7 @@ use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_t
 use crate::types::tree::forest::ViewForest;
 use crate::to_org::util::{mark_view_roots_parent_absent, validate_parentIs_relationships, mark_orphans_under_dead_parents_independent};
 use crate::dbs::in_rust_graph::snapshot_global;
+use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
 use crate::types::viewnode::{IndefOrDef, ViewNode, ViewNodeKind};
 use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual, ViewRequest};
 
@@ -135,12 +137,18 @@ pub async fn update_views_after_save (
       "rewriteInPlace_viewnodes_whose_id_is_newly_extra" ). entered();
     rewriteInPlace_viewnodes_whose_id_is_newly_extra (
       &mut saved_view_mut, &context . graph_snap ) ? };
+  let mut repair_warnings : Vec<CompletionWarning> = Vec::new ();
   let saved_text : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "rerender_view (saved)" ). entered();
       rerender_view ( // saved view first; collateral ones later
         &mut saved_view_mut,
-        &mut context ) . await } ?;
+        &mut context,
+        Some (&mut repair_warnings) ) . await } ?;
+  context . warnings . extend (
+    // Repairs the completion pass made to read-only PartnerCols in
+    // the saved view, batched per (col, owner).
+    render_completion_warnings (&repair_warnings) );
   if let Ok (uri) = viewuri_from_request_result {
     views_state . open_views . update_view (
       uri, saved_view_mut);
@@ -209,7 +217,8 @@ async fn rerender_collateral_view (
         tracing::info_span!( "rerender_view (collateral)" ). entered();
       rerender_view (
         &mut viewforest,
-        context
+        context,
+        None // Collateral views repair silently.
       ) . await . map_err (
         |e| format!( "Collateral view {}: {}",
                       uri . repr_in_client (), e)) ? };
@@ -308,7 +317,8 @@ pub async fn render_initial_view (
     node_budget                    : env . config . initial_node_limit,
     create_partnerCols_for_fresh_nodes : true,
     diff_tantivy_index : if diff_mode { Some (&env . tantivy_index) }
-                         else         { None }, };
+                         else         { None },
+    warning_sink : None, }; // De-novo rendering repairs silently.
   complete_viewforest ( &mut viewforest, &mut context ) . await ?;
   Ok ( viewforest ) }
 
@@ -317,6 +327,7 @@ pub async fn render_initial_view (
 pub async fn rerender_view (
   viewforest    : &mut ViewForest,
   context       : &mut RerenderAfterSaveContext<'_>,
+  warning_sink  : Option<&mut Vec<CompletionWarning>>, // Some only for the view the user just saved.
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
   { tracing::debug!("rerender_view: starting");
@@ -342,7 +353,8 @@ pub async fn rerender_view (
       create_partnerCols_for_fresh_nodes : false,
       // Post-save: phantom sources resolve via the deleted-id map + disk scan
       // (the de-novo path passes the tantivy index instead).
-      diff_tantivy_index : None, };
+      diff_tantivy_index : None,
+      warning_sink, };
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "complete_viewforest" ). entered();
       complete_viewforest (
