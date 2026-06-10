@@ -1,0 +1,600 @@
+This plan is about to be supplanted by
+9-2_source-set-safety.org
+* plan : source-set safety for sharing relations
+This plan covers the metaplan_2.org step
+"preserve source-set safety for sharing relations", as revised by
+two of Jeff's decisions (2026-06-11):
+- Inactive SUBSCRIBEES-as-such must be shown (as placeholders), not
+  omitted, because subscribee order matters, like content order.
+  Only cols whose order does not matter omit inactive members.
+- The write-to-inactive-node protection must not abort the save.  A
+  source-set change can leave a whole subtree inactive; the save
+  rightly reads those now-inactive children as belonging to their
+  parents, and aborting would force the user to delete them from
+  view -- destructive, since inactive nodes can affect their active
+  parents.  Instead, save intentions that would modify an inactive
+  node are suppressed, with the warning "Inactive nodes present in
+  saved buffer remain unchanged in graph."
+
+The organizing principle that fell out: a col's treatment of
+inactive members follows whether its order is semantically
+meaningful.
+- Order matters (content; subscribeeCol): inactive members render
+  as placeholders, count positionally at save, and round-trip.
+  (UNDER RECONSIDERATION -- see the ONGOING open question: Jeff has
+  proposed hiding inactive children everywhere and weaving them
+  back in at save time.)
+- Order does not matter (the six read-only cols; overriddenCol,
+  decided 2026-06-11): inactive members are omitted from
+  display, and saving preserves them via the set-difference merge
+  (where the col is writable) or trivially (where membership is
+  never read).
+
+* scope
+** covered
+- Accepting InactiveNode placeholders under cols at validation, so
+  stale buffers survive a source-set change.
+- SubscribeeCol: inactive subscribees render as placeholders and are
+  saved positionally, mirroring content placeholders.
+- Order-meaningless cols: render-side omission of inactive members;
+  for the writable 'overriddenCol', the set-difference merge so
+  saving preserves invisible 'overrides_view_of' targets.
+- Inactive-node rewrite suppression: save intentions that would
+  modify an inactive node are dropped, not executed and not fatal,
+  with a warning.
+- Small doc updates where behavior changes (api-and-formats.md's
+  source-set passages); the full documentation pass remains the
+  metaplan's last step.
+** not covered
+- Diff-mode/source-set refusals.  A later metaplan step forbids the
+  combination; until then this plan only keeps the combination from
+  leaking (see open questions).
+- Heralds, override rendering, and any change to content placeholder
+  behavior: inactive CONTENT already round-trips correctly.
+- Changing how source-set switches close buffers.  The
+  render-then-switch scenario is served by making the save
+  tolerant; whether switches should keep buffers open is separate.
+
+* current behavior, verified 2026-06-10
+** the bug this plan fixes
+Recorded in TODO/problems.org ("Sharing-col members from inactive
+sources make a buffer unsavable").  Under a restricted source-set,
+'apply_source_set_to_viewforest' ('server/source_sets.rs') converts
+EVERY Active viewnode from an inactive source into an InactiveNode
+placeholder, including members of PartnerCols.  Buffer validation
+('validate_inactive_node',
+'server/from_text/buffer_to_viewnodes/local.rs' near line 343)
+requires an inactive placeholder's parent to be a gnode, so such a
+buffer cannot be saved.  And if that validation were relaxed alone,
+the failure mode would be silent relationship deletion:
+'partnerCol_members' (traverse.rs) collects only Active children,
+the resulting 'SetSubscribesTo' / 'SetOverrides' lowers to
+'MSV::Specified', and 'supplement_unspecified_fields_from_disk'
+fills only Unspecified fields -- the inactive member vanishes from
+disk.
+** what already behaves well
+- Inactive CONTENT placeholders round-trip: 'content_members'
+  (traverse.rs) includes non-phantom Inactive children, so a
+  container's contains list keeps them, positionally.  Tests in
+  'tests/source_sets.rs' cover this
+  ('saving_inactive_placeholder_moves_and_deletes_update_contains',
+  'content_view_renders_inactive_contained_nodes_as_placeholders').
+  This is the model the subscribeeCol now copies.
+- Hides need no merge: 'apply_hiderel_delta' (lower.rs) edits the
+  subscriber's hide list as a DELTA against disk (retain unless
+  inferred-unhidden, add inferred hides), so unmentioned targets are
+  preserved by construction.  Visibility signals only arise from
+  visible subscribee-as-such branches, and a placeholder subscribee
+  shows no content, so inactive subscribees produce no signals.
+- Aliases carry no sources; AliasCol is unaffected.
+** plumbing facts
+- The save pipeline never learns the active source-set today:
+  'handle_save_buffer_request' has it, but
+  'buffer_to_validated_saveplan' ('server/from_text.rs') takes only
+  (buffer, config, driver).  'CompletionContext' DOES carry
+  'active_source_set', so the render side is already wired.
+- Pipeline order in 'extract_nonmergeSavePlan_locally'
+  ('local_instruction_collection/mod.rs'): collect, text claims,
+  lower, resolve visibility, supplement from disk, noop filter.
+- 'ActiveSourceSet' ('server/source_sets.rs') offers 'is_all' and
+  'contains_source'.  It is per connection.
+- 'env.find_source (pid, deleted_map) -> Option<SourceName>'
+  resolves a member's source (in-Rust graph first); 'build_child_data'
+  already uses it.
+
+* desired behavior
+** inactive members under cols do not block saving
+'validate_inactive_node' accepts an InactiveNode whose parent is a
+col (QualCol or PartnerCol), not only a gnode.  What then happens to
+the placeholder depends on the col:
+- under a subscribeeCol it is a real, positional member (next
+  subsection);
+- under an order-meaningless col it is tolerated at save and removed
+  by the rerender (the omission subsection).
+** subscribeeCol: inactive subscribees are placeholders, like content
+Because subscribee order matters, inactive subscribees follow the
+content-placeholder model rather than being omitted:
+- Rendering keeps them: the subscribeeCol's goal list does NOT
+  filter by source activity, and 'apply_source_set_to_viewforest'
+  placeholder-izes them as it already does.
+- Saving counts them: subscribeeCol member extraction includes
+  non-phantom Inactive children at their positions, the way
+  'content_members' already does for content.  'SetSubscribesTo'
+  therefore carries the full list, and NO merge is needed for
+  'subscribes_to'.
+- The placeholder itself stays read-only (editing its title/body/
+  metadata remains a validation error), but moving it within the col
+  changes the saved order, and -- pending an open question --
+  deleting it removes the subscription, exactly parallel to content
+  placeholders, whose moves and deletions are already honored.
+- A placeholder subscribee-as-such shows no content and produces no
+  visibility (hide/unhide) signals; the subscriber's hide list is
+  untouched by its presence.
+** order-meaningless cols omit inactive members
+For the six read-only cols ('Subscriber', 'Overrider', 'Hider',
+'Hidden', and the two hidden-subscription filter cols) and the
+writable 'overriddenCol' (its order does not matter; decided
+2026-06-11), members from
+inactive sources are omitted from display entirely.  Their order
+carries no meaning, so omission loses nothing, and "a private node
+subscribes to public node N" is itself information a placeholder
+would leak.  Three faces:
+- goal lists exclude inactive members (fresh renders and post-save
+  reconciliation never create them);
+- an InactiveNode parsed from a saved buffer as a child of one of
+  these cols is removed during reconciliation.  Decided 2026-06-10:
+  delete it if it is a view-leaf (with the focus safeguard the
+  reconciler already uses); convert one with view-children to a
+  DeadScaffold, so the existing orphan handling
+  ('mark_orphans_under_dead_parents_independent') preserves the
+  user's subtree as independent nodes.  No warning either way.
+- de novo col creation ('maybe_add_partnerCol_branches') filters
+  before deciding the member set is non-empty, so a col whose
+  members are all inactive is not created at all.
+** saving an overriddenCol under a restricted set preserves invisible members
+(Applies to 'overrides_view_of' only; 'subscribes_to' no longer
+needs it, per the subscribeeCol decision.)  Semantics decided
+2026-06-11, replacing an earlier buffer-order-first formulation that
+was too diff-noisy: the saved list is computed as a SET DIFFERENCE
+against disk, preserving disk order.
+- removed = the VISIBLE disk members absent from the saved buffer
+  (only visible members can have been deliberately deleted);
+- added = buffer members not on disk;
+- saved list = the disk list minus removed, in disk order, with
+  added appended at the end.
+Reordering visible members of an overriddenCol therefore has no
+effect on disk, consistent with its order carrying no meaning -- and
+the diff stays quiet.  A disk member that is invisible (inactive
+source) or unresolvable (dangling reference) can never be in
+'removed', so preservation of both falls out automatically.
+Under 'all' (or with no set provided), every member is visible, so
+this still honors any deletion; one named, unit-tested function.  It
+must not depend on the client sending anything about invisible
+members.
+** inactive-node rewrite suppression: no instruction modifies an inactive node, without aborting
+Decided 2026-06-11, replacing the earlier abort-style guard, which
+was infeasible: a source-set change can leave a multi-node subtree
+inactive in a stale buffer; the save rightly reads those
+now-inactive children as belonging to their parents (preserving the
+parents' contains lists), and aborting would force the user to
+delete the subtree from view -- destructive.
+
+Instead, after extraction, any instruction that would modify an
+inactive node is SUPPRESSED:
+- a 'DefineNode' (Save or Delete) whose source is inactive is
+  dropped;
+- a 'SourceMove' with an inactive endpoint is dropped (the node
+  stays put);
+- a nodeMerge whose acquirer or acquiree is inactive is dropped.
+Whenever something was suppressed, the save succeeds and carries
+the warning:
+  "Inactive nodes present in saved buffer remain unchanged in graph."
+Placement: after the noop filter, so an untouched stale node (whose
+instruction the noop filter already discarded) does not trigger the
+warning; only edits that were actually discarded do.  See open
+questions.
+
+This suppression also covers synthesized intents, e.g.
+'apply_hiderel_delta_to_subscriber' creating a save intent for a
+subscriber read from disk whose source is inactive.
+
+* implementation plan, in order
+** thread the active source-set into save extraction
+Pure plumbing, no behavior change:
+- 'buffer_to_validated_saveplan' ('server/from_text.rs') gains
+  'active_source_set : Option<&ActiveSourceSet>'; likewise
+  'extract_nonmergeSavePlan_locally' and the suppression/merge
+  stages below.  None, and Some(all), mean today's behavior
+  everywhere.
+- 'update_from_and_rerender_buffer'
+  ('server/serve/handlers/save_buffer.rs') already receives the
+  Option; pass it through.  The test_utils wrapper passes None, so
+  existing tests are unaffected.
+** subscribeeCol placeholders become positional members
+- Validation: relax 'validate_inactive_node' to accept a col parent.
+- Extraction: in 'traverse.rs', the SubscribeeCol's member collector
+  includes non-phantom Inactive children at their positions
+  (mirror 'content_members'; today 'partnerCol_members' collects
+  only Active children -- keep that behavior for the overriddenCol
+  unless its open question lands the other way).
+- Confirm no visibility signals arise from placeholder subscribees
+  (they should not; they are not definitive) and that the
+  placeholder's read-only-content validation still applies under a
+  col parent.
+- The rendering side needs no change: goal lists already include
+  them and 'apply_source_set_to_viewforest' already placeholder-izes
+  them.  This step REMOVES the temptation to filter the
+  subscribeeCol goal list.
+** the set-difference merge for overrides
+At supplementation ('server/from_text/supplement_from_disk.rs'),
+where the disk node is already in hand: when 'overrides_view_of' is
+Specified, replace it with
+'set_difference_merge (buffer_list, disk_list, is_visible)'.
+Unit-test the helper directly (deleting a visible member removes it;
+invisible and unresolvable members preserved; surviving members keep
+disk order; reordering visible members is a no-op; new members
+append; dedup; 'all'/None makes every member visible, so deletions
+still land).
+** omit inactive members from the order-meaningless cols
+- 'reconcile_partnerCol_children'
+  ('server/update_buffer/reconcile/partner_col.rs'): filter
+  'graph_members' by source activity before the policy/order logic
+  (NOT for the subscribeeCol, which has its own reconciler anyway);
+  remove InactiveNode children per the delete-leaf /
+  deaden-branch rule.  The reconciler gains an 'active_source_set'
+  parameter from 'CompletionContext', like 'warning_sink' did.
+- The two hidden-subscription reconcilers: same goal-list filtering
+  and same removal rule.
+- 'maybe_add_partnerCol_branches'
+  ('server/to_org/complete/partner_col/mod.rs'): filter before the
+  non-empty check.
+- Implementation note (not a decision): after this,
+  'apply_source_set_to_viewforest' should encounter inactive members
+  only under subscribeeCols (load-bearing there) and as content.
+  Verify no other path builds col members without reconciliation;
+  record the finding in progress.org.
+- Omission and removal warn about nothing: an omitted member is not
+  a repair, and warning would itself partially leak.
+** inactive-node rewrite suppression and its warning
+In 'server/from_text/validate.rs' (or a sibling), a stage run after
+the noop filter and over source-moves and flattened nodeMerge
+instructions as well:
+- partition out everything targeting an inactive node;
+- if anything was suppressed, attach the warning
+  "Inactive nodes present in saved buffer remain unchanged in
+  graph." to the save (the parse-warnings channel from stage 8
+  already flows into 'SaveResponse.warnings'; reuse that path).
+The suppression must NOT remove the inactive node from any ACTIVE
+node's relationship lists -- those lists are extracted from the
+buffer, where the stale children still sit, so the parents' contains
+(and the subscribeeCol's subscribes_to) keep them.  Tests must pin
+that.
+** documentation touch-ups
+Update api-and-formats.md's source-set passages: inactive
+subscribees render as placeholders and are saved positionally;
+order-meaningless col members from inactive sources are omitted and
+preserved across saves; edits to inactive nodes themselves are
+suppressed with a warning rather than erroring.  (The full doc pass
+stays with the metaplan's last step.)
+
+* tests
+Prefer the pure seams; the new save-pipeline parameter makes
+extraction testable with a restricted set passed directly.
+** subscribeeCol placeholders
+- De novo render under a restricted set: an inactive subscribee
+  appears as a placeholder (generic headline, no title leak), in
+  its disk position.
+- Reorder the col (placeholder included), save: the saved
+  'subscribes_to' order matches the buffer, placeholder position
+  included; the rerender keeps it.
+- Delete the placeholder, save: behavior per the open question's
+  answer (subscription removed, or preserved); test whichever lands.
+- A stale buffer whose subscribeeCol member is an InactiveNode
+  saves without error (the formerly-unsavable regression).
+** overriddenCol merge
+- Owner overrides [a (active), p (inactive), b (active)]; render
+  under the restricted set (p omitted), delete a, save: disk says
+  overrides [p, b] -- a removed, p preserved, b's disk position
+  kept.
+- Same fixture, reorder b before a in the buffer, save: disk
+  unchanged (reordering an overriddenCol is a no-op).
+** omission
+- subscriberCol / hiderCol / hiddenCol with an inactive member: the
+  member appears nowhere in the rendered buffer (no leak); after a
+  save, still omitted; the relationship survives on disk.
+- A col whose members are ALL inactive is absent from a de novo
+  render.
+- A stale InactiveNode under a read-only col: removed by the save's
+  rerender (leaf) or deadened (branch), subtree preserved as
+  independent.
+** inactive-node rewrite suppression
+- The stale-subtree scenario that motivated the design: active
+  definitive parent with now-inactive definitive children, one
+  child's text EDITED.  Save succeeds; the child's file is
+  unchanged; the parent's contains still lists the children; the
+  warning is present.
+- Same buffer untouched: save succeeds with NO suppression warning
+  (the noop filter got there first).
+- A buffer moving a node into an inactive source: move suppressed,
+  warning present, node unmoved.
+** no regressions
+- Existing 'tests/source_sets.rs' suite (content placeholders,
+  placeholder moves/deletes, rejection of placeholder edits).
+- 'tests/subscribee_col_empty_persists.rs' under set 'all'.
+- Stage-8 targets ('partner_col_order', 'partner_col_warnings').
+
+* verification
+- 'cargo check'
+- 'cargo test --lib'
+- 'cargo test --test source_sets -- --nocapture'
+- 'cargo test --test new -- --nocapture'
+- 'cargo test --test save -- --nocapture'
+- 'cargo test --test subscribee_col -- --nocapture'
+- 'cargo test --test partner_col_order -- --nocapture'
+- 'cargo test --test partner_col_warnings -- --nocapture'
+- 'cargo nextest run'
+- 'bash/emacs-tests.sh'
+- 'bash/all-tests.sh --no-sound'
+
+* open questions
+** ONGOING I've reconsidered the inactive placeholder thing.
+*** motivation and wondering
+It's a giant pain, both to code and (I imagine)
+for a user who could find themselves
+staring at a screen mostly full of empties.
+
+Suppose view-node Nv, corresponding to graph node Ng,
+has view-children Cv_1 ... Cv_k corresponding to graph nodes
+Cg_1 ... Cg_k.
+Suppose a source change renders some of the Cv_i inactive.
+Could the user still be free to manipulate the visible Cv_i,
+without clobbering the invisible ones?
+
+Inserting new nodes should be no problem.
+(It's a little ambiguous where they should go,
+but a deterministic algorithm seems easy to write.)
+Deleting nodes should be even easier.
+Moving nodes around will be the tricky part.
+
+When git sees that a passage moved,
+somehow it finds a way to present the diff
+to minimize the amount of red.
+That would be ideal, but I think we can forego it
+for a simpler greedy algorithm on this first pass.
+*** a proposed algorithm
+- The graph knows about gnodes, and the view, vnodes.
+- When first displaying Nv's children, partition them
+  (without reordering them) into 'visibility groups',
+  each of type <(visible : bool, nodes : <NodeId>)>.
+  Display only the visible groups, in order.
+  (The total visible node order is defined by
+  the order of the groups and the order within each group.)
+- To apply a source change to an already-drawn buffer,
+  first convert every inactive node to an InactiveNode.
+  Then prune the tree, via DFS postorder, of every:
+  - Inactive leaf
+  - Qual leaf whose owning gnode (grandparent) is inactive
+  - indefinitive leaf partner (child of PartnerCol)
+  - empty QualCol or PartnerCol
+  - DeadScaffold leaf (because why not)
+- There might still be visible inactive nodes after the prune.
+  Recurse into them, but otherwise ignore them;
+  in particular, don't count them as children of their parents.
+- When the buffer is saved, recompute visibility groups from disk.
+- The server processes the view-children it receives
+  from the client in order, to generate a list of gnodes
+  to use as the intended saved content.
+  - For the first view-child:
+    - If it is new, prepend it to the first visible group.
+    - If it is not new:
+      - Read through the visible visibility groups for it
+        (since it can't be in an invisible visibility group).
+        If it is found, place it there.
+        If it is not found, we have an error,
+        but I believe this is unreachable
+        (we just stipulated it's visible and not new,
+        so it must be in one of the visibile groups).
+  - For every viewchild Cv after the first:
+    - Read through the visible visibility groups (gnodes)
+      starting from where the last-processed vchild was placed.
+      This is the greedy part.
+      Read forward until finding the gnode corresponding to Cv.
+      Put Cv there.
+      If Cv is not in the list, then just place Cv
+      right after wherever the last viewchild was placed.
+- Now we have a list of visibility groups,
+  in which some of the visible gnodes represent spots
+  where saved vnodes were placed.
+  Remove the other gnodes from those visible groups.
+  Leave the invisible groups of gnodes as-is.
+- Now we have the order of gnodes to save as content children.
+  It has all the same invisible gnodes as before,
+  and the visible gnodes appear
+  in the order in which they were saved.
+  It's possible that the visible and invisible ones
+  are more shuffled than necessary, but whatever, good enough.
+
+I've been talking about content but
+the same logic applies to subscribees.
+This logic is not necessary for the orderless OverriddenCol.
+*** ONGOING claude: yes -- and the simpler standard solution
+is one you already wrote down
+The shape great minds settled on for this problem is ANCHORING, and
+TODO.org already contains it in your own words, under "Privacy:
+Permit user to hide certain sources from view": "Figure out the
+diff logic for insertions when some are hidden. I think I see how:
+Just pin each thing to its last visible sibling."
+**** the anchored weave
+Classify the disk children into visible and invisible.  Each
+maximal invisible RUN is anchored to the visible item immediately
+before it in disk order (a leading run is anchored to START).  The
+user edits only the visible sequence, producing V'.  The saved list
+is rebuilt in one pass: START's run first, then for each item of
+V', in the user's order: the item, then the run anchored to it (if
+any).  A run whose anchor was DELETED reattaches to the anchor's
+nearest preceding visible sibling that survived, else to START.
+Properties:
+- One pure function, 'weave (disk_list, is_visible, buffer_list)
+  -> merged_list'.  O(n), no scanning state, exhaustively
+  unit-testable.
+- MOVES behave well: an invisible run follows its anchor wherever
+  the user drags it.  Your greedy scan re-places visible nodes
+  against a fixed group skeleton, so dragging a visible node far
+  from home can strand the invisible nodes that followed it.
+- Inserts and deletes are trivial; when everything is visible, or
+  the user changed nothing, it degenerates to the identity.
+- The invariant is one sentence: "invisible children cling to the
+  visible sibling they followed."
+***** TODO love it, yes please
+**** what adopting this does to the plan
+A real simplification, with churn concentrated in tests:
+- Inactive children stop being RENDERED anywhere: content and
+  subscribees omit them like every other col.  No screens of
+  empties, and better privacy than placeholders, which leak that
+  something exists and where.
+- Saving 'contains' and 'subscribes_to' under a restricted set
+  applies the weave at supplementation, where the disk list is
+  already in hand.  'overrides_view_of' keeps the (simpler)
+  set-difference merge, which is just the weave minus order
+  preservation.  Read-only cols are unchanged.
+- The InactiveNode placeholder kind likely becomes vestigial:
+  tolerated as input from stale buffers (then dropped, the weave
+  preserving the data), never produced by rendering.  Several
+  placeholder behaviors in 'tests/source_sets.rs' (placeholder
+  rendering, placeholder moves/deletes editing contains) would be
+  retired -- that is the main churn -- plus the diff-mode paths
+  that special-case InactiveNode.
+- The open question "may the user delete an inactive subscribee
+  placeholder" dissolves: nothing visible to delete.  Invisible
+  relationships become uniformly untouchable while invisible.
+***** TODO but note that inactive nodes can still be on screen
+I described how to prune an existing buffer when the active source set changes.
+That pruning will (probably, usually) remove most inactive nodes,
+but if an inactive node has active children, it will stay on-screen.
+It can't affect its parent, and its children can't affect it,
+but its children can have lives of their own.
+**** questions your write-up raises, whichever algorithm wins
+*****  Your "apply a source change to an already-drawn buffer" prune
+  step implies source-set switches would RE-RENDER open views
+  rather than CLOSE them (today they close, per
+  api-and-formats.md).  Is keeping views open across a switch now
+  in scope for this plan, or does that pruning logic serve only as
+  save-time cleanup of stale buffers?
+****** TODO good! yes, let's rerender
+Closing them all was a wart.
+*****  One prune bullet reads "indefinitive leaf partner (child of
+  PartnerCol)" with no inactivity condition -- taken literally it
+  would prune ACTIVE read-only col members too.  I assume you mean
+  partners whose gnode is inactive?
+****** TODO no, both active and inactive
+Since it's indefinitive, the user is not using it to define anything,
+and since it's in a PartnerCol, its only in-use meaning was
+as a partner to something that is now inactive.
+*****  With omission everywhere, a user can no longer deliberately
+  remove an INVISIBLE relationship at all (under placeholders they
+  could delete the placeholder).  I think that is the right price
+  for the cleanliness and privacy, but it deserves a deliberate
+  yes.
+****** TODO Good! That was dangerous.
+***** If you bless the anchored weave, I will rewrite the plan around it.
+****** TODO Bless you and keep you.
+** terms these questions rely on
+(So the questions can be answered without reading the plan.)
+*****  "Inactive source": a source excluded by the connection's active
+  source-set.  E.g. with sources public and private and active set
+  'public', private is inactive.
+*****  "Inactive member of a col": a node from an inactive source that a
+  PartnerCol would list -- e.g. a private node that subscribes to
+  the public node N belongs in N's subscriberCol.
+*****  "Placeholder": the read-only stand-in ('InactiveNode') that
+  represents an inactive node without leaking its title or body.
+*****  "The set-difference merge": on saving an order-meaningless
+  writable col (after the subscribee decision, only
+  'overrides_view_of'), the disk list keeps its own order; members
+  the user visibly deleted are subtracted, new members are appended,
+  and nothing else changes -- so invisible members survive and the
+  diff stays quiet.
+*****  Inactive-node rewrite suppression": the save stage (replacing the
+  abandoned abort-style guard) that silently drops instructions
+  which would modify an inactive node, warning
+  "Inactive nodes present in saved buffer remain unchanged in
+  graph."
+*** DONE re. the "visible-subset merge"
+CLOSED: 2026-06-11
+That rewrite principle above (about four sentences above)
+is too diff-noisy.
+We should instead calculate the set difference,
+subtract any gone things from disk,
+and append any new things,
+without otherwise changing the order on disk.
+**** claude: folded into the plan body and the terms entry above
+Now called the set-difference merge.  A nice consequence: an
+invisible or unresolvable disk member can never be in the
+subtracted set (only visible members can be deliberately deleted),
+so the old "unresolvable-source members" open question dissolved --
+see its updated text below.
+*** DONE let's rename "write-suppression"
+CLOSED: 2026-06-11
+to "inactive-node rewrite suppresion"
+**** claude: renamed throughout the plan.
+** DONE does overriddenCol order matter?
+CLOSED: 2026-06-11
+The subscribee curveball's principle -- placeholders where order
+matters, omission where it does not -- needs a ruling for the one
+other writable col.  'overrides_view_of' is a list on disk, but
+nothing seems to consume its order: overriding is per-overridden
+(monogamy), and no view renders "the overridden, in order" with
+semantic weight.  The plan assumes order does NOT matter:
+overriddenCol omits inactive members and saves via the
+visible-subset merge.  If you rule that its order matters (or
+should, for symmetry or future use), it instead gets the
+subscribeeCol treatment -- placeholders, positional save -- and the
+visible-subset merge has no remaining user and dies, simplifying
+the plan.
+*** DONE its order does not matter
+**** claude: folded into the plan body
+The overriddenCol omits inactive members and saves via the
+set-difference merge; the hedges are gone from the body.
+** may the user delete an inactive subscribee placeholder?
+Content placeholders set the precedent: moving or deleting one is
+allowed and edits the active parent's contains list, because the
+placeholder is VISIBLE (as a placeholder), so the action is
+deliberate.  The parallel rule says deleting an inactive subscribee
+placeholder from a subscribeeCol unsubscribes from it.  The
+alternative is to respawn it (treat the deletion as a repair),
+which would make subscribeeCol placeholders the one placeholder
+kind deletion cannot touch.  The plan assumes the parallel rule
+(deletion unsubscribes).  Confirm or reverse.  (NOTE: if the
+ONGOING reconsideration above lands on omission everywhere, this
+question dissolves -- there is no placeholder to delete.)
+** when should the suppression warning fire?
+Your wording -- "Inactive nodes present in saved buffer remain
+unchanged in graph" -- reads as presence-based.  The plan instead
+fires it only when an instruction was actually suppressed, i.e.
+when the user's edits to inactive nodes were discarded.  The
+difference: a stale buffer whose inactive nodes are UNTOUCHED saves
+silently under the plan's choice, but would warn on every save
+under the presence-based reading -- which seemed like warning
+fatigue.  Confirm the edits-only trigger, or ask for
+presence-based.
+** diff mode under restricted sets, until the refusal step lands
+(Unanswered from the previous round; restated.)  Git diff mode
+re-renders views decorated with changes since HEAD; a col can show
+a phantom entry for a member REMOVED since HEAD.  An upcoming
+metaplan step will forbid combining diff mode with restricted
+source-sets (each side will refuse while the other is on), but it
+is not built, so today the combination is reachable.  This plan's
+omission will also swallow removed-member phantoms whose member is
+inactive: a restricted diff view shows less relation history than
+an unrestricted one (leak-free, just lossy).  For the interim
+window: is quiet omission acceptable, or should the two refusals be
+pulled forward into this plan?  My lean: accept the quiet omission;
+the window is short and the refusals belong with the diff-policy
+step.
+** DONE unresolvable-source members in the overrides merge
+CLOSED: 2026-06-11
+Dissolved by the set-difference reformulation of the merge: only
+VISIBLE members can be deliberately deleted, so only they can be
+subtracted from the disk list.  An unresolvable (dangling) member
+was never visible, can never be in the subtracted set, and is
+therefore preserved automatically -- no separate decision needed.

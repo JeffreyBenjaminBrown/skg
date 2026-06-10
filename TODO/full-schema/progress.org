@@ -8,6 +8,79 @@ marked 'Affected'. Stage 7 was never executed as written; parts of
 its territory were covered differently by the local-view-update
 overhaul, and the remainder is re-planned in
 [[./metaplan_2.org]], which supersedes metaplan 1.
+** stage 9 : source-set safety for sharing relations
+*** planned
+Wrote 'TODO/full-schema/9_source-set-safety.org', covering the
+metaplan_2.org step "preserve source-set safety for sharing
+relations" and the folded-in 2026-06-10 decision that an inactive
+member under a col must not block saving.
+
+In order: thread the active source-set into save extraction
+(plumbing); the visible-subset merge at supplementation (one named,
+unit-tested function for 'subscribes_to' and 'overrides_view_of');
+only then relax 'validate_inactive_node' to accept col parents
+(relaxing first would turn today's loud failure into silent data
+loss); omit inactive members from rendered cols (goal-list
+filtering, detaching parsed placeholders, filtered de novo col
+creation); the after-noop-filter guard rejecting any instruction
+that writes an inactive source; small api-and-formats.md updates.
+
+Ends with open questions: whether detaching a stale inactive col
+member should warn (chosen: silent), guard placement after the noop
+filter (chosen: yes, so stale buffers no-op rather than error),
+diff-mode behavior until the refusal step lands, whether
+'apply_source_set_to_viewforest' still needs to placeholder-ize col
+members afterward, and preserving unresolvable-source members in
+the merge.
+*** replanned (2026-06-11)
+Rewrote the plan around two of Jeff's decisions:
+- Inactive subscribees-as-such are SHOWN as placeholders and saved
+  positionally (subscribee order matters, like content), so
+  'subscribes_to' needs no merge; omission now applies only to
+  order-meaningless cols, and the visible-subset merge only to
+  'overrides_view_of'.
+- The abort-style write guard was infeasible (a stale buffer can
+  hold a whole now-inactive subtree whose children the save rightly
+  reads as belonging to their parents); replaced by
+  write-suppression: instructions that would modify an inactive
+  node are dropped, with the warning "Inactive nodes present in
+  saved buffer remain unchanged in graph."
+Remaining open questions: whether overriddenCol order matters
+(if yes, the merge dies entirely), whether deleting an inactive
+subscribee placeholder unsubscribes (plan assumes yes, parallel to
+content), suppression-warning timing (edits-only vs
+presence-based), the diff-mode interim window, and
+unresolvable-source members in the overrides merge.
+*** replanned again (2026-06-11): 9-2 supersedes 9-1
+9-1 (renamed from 9_source-set-safety.org) became a dialog; its
+decisions are baked into the clean rewrite
+'TODO/full-schema/9-2_source-set-safety.org':
+- the anchored weave is blessed: inactive children are OMITTED from
+  display everywhere (no placeholders), and the save weaves
+  invisible members back into 'contains' and 'subscribes_to';
+  'overrides_view_of' uses the set-difference merge;
+- exception: an inactive node with active view-children stays on
+  screen (read-only) in views that were open when the set switched;
+- source-set switches now RE-RENDER open views in place instead of
+  closing them (new scope; "closing them all was a wart"), via a
+  convert-and-prune pass plus completion with col creation enabled;
+- the prune removes ALL indefinitive leaf partners, active or
+  inactive (completion regenerates current membership);
+- invisible relationships are deliberately untouchable.
+Still-open questions in 9-2: suppression-warning timing
+(edits-only vs presence-based), the silent failure of deleting a
+retained inactive node, recursive omission of whole inactive
+branches in fresh renders, and the diff-mode interim window.
+*** open questions closed (2026-06-11); plan final
+All four answered and folded into 9-2's body: suppression warning
+fires edits-only; recursive omission of inactive branches in fresh
+renders confirmed; diff-mode interim accepts quiet omission; and
+the retained-inactive-deletion question mostly dissolved -- Jeff
+caught an error in the plan's respawn claim.  Corrected behavior:
+deleting a retained inactive node's subtree sticks in the view
+(omission keeps it out of the goal lists), while the graph
+relationship survives via the weave; view-deletion edits the view,
+never the graph.
 ** stage 8 : read-only set ergonomics
 *** planned
 Wrote 'TODO/full-schema/8_readonly-set-ergonomics.org', the first

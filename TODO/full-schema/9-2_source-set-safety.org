@@ -1,0 +1,447 @@
+* plan : source-set safety for sharing relations, take 2
+This supersedes [[./9-1_source-set-safety.org]], which became a
+dialog; the decisions that emerged from it (all Jeff's, 2026-06-11)
+are baked in here:
+- The ANCHORED WEAVE is blessed.  Inactive children are omitted from
+  display everywhere -- content, subscribees, every col -- and the
+  save weaves the invisible members back into the saved lists, so
+  nothing is clobbered.  No more screens full of empty placeholders.
+- EXCEPTION: an inactive node that has active view-children stays on
+  screen (as an InactiveNode).  It cannot affect its parent, and its
+  children cannot affect it, but its children have lives of their
+  own.
+- Source-set switches now RE-RENDER open views in place instead of
+  closing them ("closing them all was a wart").  This is new scope.
+- The switch-rerender prunes, among other things, ALL indefinitive
+  leaf partners (children of PartnerCols), active or inactive: an
+  indefinitive partner defines nothing, and completion regenerates
+  the cols that belong under the new active set anyway.
+- Deliberately removing an INVISIBLE relationship is impossible, and
+  that is good ("That was dangerous").
+- 'overrides_view_of' saves via the set-difference merge (its order
+  does not matter); 'contains' and 'subscribes_to' save via the
+  weave (their order matters).
+- The write-protection is "inactive-node rewrite suppression":
+  instructions that would modify an inactive node are dropped, not
+  fatal, with the warning "Inactive nodes present in saved buffer
+  remain unchanged in graph."
+
+* scope
+** covered
+- The anchored weave for 'contains' and 'subscribes_to'; the
+  set-difference merge for 'overrides_view_of'; plain omission for
+  the read-only cols.
+- Render-side omission of inactive children everywhere, with the
+  retained-inactive exception (active view-children).
+- Source-set switches re-rendering open views in place (server and
+  Emacs), including the convert-and-prune step.
+- Inactive-node rewrite suppression, with its warning.
+- Validation updates so buffers containing InactiveNodes (under cols,
+  or with children) parse and save.
+- Doc updates where behavior changes (api-and-formats.md source-set
+  passages); the full documentation pass remains the metaplan's
+  last step.
+** not covered
+- Diff-mode/source-set refusals (a later metaplan step).  For the
+  interim, decided 2026-06-11: restricted diff views quietly omit
+  inactive members' removed-member phantoms along with everything
+  else inactive -- leak-free, merely lossy, and short-lived.
+- Heralds and override rendering.
+- 'textlinks_to': derived from the user's own body text, no col, no
+  source-set interaction to manage.
+
+* current behavior, verified 2026-06-10/11
+** the bug this plan fixes
+Recorded in TODO/problems.org ("Sharing-col members from inactive
+sources make a buffer unsavable").  Under a restricted source-set,
+'apply_source_set_to_viewforest' ('server/source_sets.rs') converts
+EVERY Active viewnode from an inactive source into an InactiveNode
+placeholder, including members of PartnerCols.  Buffer validation
+('validate_inactive_node',
+'server/from_text/buffer_to_viewnodes/local.rs' near line 343)
+requires an inactive placeholder's parent to be a gnode, so such a
+buffer cannot be saved.  And if that validation were relaxed alone,
+the failure mode would be silent relationship deletion:
+'partnerCol_members' (traverse.rs) collects only Active children,
+the resulting 'SetSubscribesTo' / 'SetOverrides' lowers to
+'MSV::Specified', and 'supplement_unspecified_fields_from_disk'
+fills only Unspecified fields -- the inactive member vanishes from
+disk.
+** facts the design leans on
+- Content placeholders currently round-trip positionally
+  ('content_members' includes non-phantom Inactive children); the
+  weave REPLACES this placeholder model, so several behaviors in
+  'tests/source_sets.rs' (placeholder rendering, placeholder
+  moves/deletes editing contains) will be retired -- the main test
+  churn.
+- Hides need no merge: 'apply_hiderel_delta' (lower.rs) edits the
+  subscriber's hide list as a DELTA against disk, so unmentioned
+  targets are preserved by construction, and omitted (invisible)
+  subscribees produce no visibility signals.
+- Aliases carry no sources; AliasCol is unaffected.
+- The save pipeline never learns the active source-set today:
+  'handle_save_buffer_request' has it, but
+  'buffer_to_validated_saveplan' ('server/from_text.rs') takes only
+  (buffer, config, driver).  'CompletionContext' (render side)
+  already carries 'active_source_set'.
+- Pipeline order in 'extract_nonmergeSavePlan_locally'
+  ('local_instruction_collection/mod.rs'): collect, text claims,
+  lower, resolve visibility, supplement from disk, noop filter.
+- Switching the active source-set today closes every open Skg view:
+  'set_active_source_set' ('server/serve/handlers/source_sets.rs')
+  clears the server's view registry, and Emacs closes the buffers
+  (api-and-formats.md).  The streaming machinery the replacement
+  needs already exists: rerender-all's lock / per-view / done
+  message flow ('server/serve/handlers/rerender_all_views.rs').
+- Direct view requests for inactive-source nodes are already
+  refused, so an inactive view ROOT cannot arise from a fresh
+  render.
+- 'ActiveSourceSet' offers 'is_all' and 'contains_source'; it is per
+  connection.  'env.find_source (pid, deleted_map)' resolves a
+  member's source, in-Rust graph first.
+
+* desired behavior
+** rendering: inactive children are omitted
+Under a restricted set, a fresh render never draws a node from an
+inactive source: content goal lists and every col's goal list
+exclude them, and de novo col creation skips a col whose members
+are all inactive.  No placeholders.  Note the recursive consequence:
+omitting an inactive container omits its whole branch, even active
+descendants (they remain reachable by direct visit or search); the
+retained-inactive exception below arises only in views that were
+ALREADY OPEN when a switch occurred.  Confirmed 2026-06-11,
+including the asymmetry that a fresh render of the same root shows
+less than a switched-in-place view does.
+** the retained inactive node
+When a source-set switch is applied to an open view (below), an
+inactive node whose view-children include active nodes stays on
+screen, converted to an InactiveNode.  It is read-only; its
+relationship lists cannot be affected from this view (rewrite
+suppression below); its active children remain editable self-writers.
+Because the buffer then CONTAINS that InactiveNode, it acts as an
+ordinary positional item in its parent's saved list (the weave sees
+it in the buffer), so MOVING it within its parent is honored.
+DELETING it (with its subtree) is honored as a VIEW edit only:
+omission keeps inactive nodes out of the content goal lists, so
+nothing recreates it in this view -- it stays gone from the screen.
+The GRAPH relationship survives regardless: the weave preserves
+invisible disk members, so under 'all' the parent still contains
+it.  (2026-06-11: corrected from an earlier draft that wrongly
+claimed it would respawn in the view; Jeff caught this.)
+** saving: the anchored weave for contains and subscribes_to
+One pure function,
+'weave (disk_list, is_visible, buffer_list) -> merged_list', applied
+at supplementation (disk in hand) to 'contains' and 'subscribes_to'
+when the buffer specified them and the active set is restricted:
+- Classify disk members: visible iff their source is active.
+  (Unresolvable sources count as invisible, hence preserved.)
+- Each maximal run of invisible disk members is ANCHORED to the
+  visible member immediately before it in disk order; a leading run
+  anchors to START.
+- Output: START's run, then each buffer member in buffer order
+  followed by its anchored run (if that member survived as an
+  anchor).  A run whose anchor is gone from the buffer reattaches
+  to the anchor's nearest PRECEDING visible disk-sibling that
+  survived, else to START.
+Invariant: "invisible children cling to the visible sibling they
+followed."  Moves of visible members carry their invisible
+followers; inserts and deletes are trivial; with everything visible
+(set 'all', or no set) it degenerates to the identity, i.e. today's
+behavior.  A buffer-present InactiveNode (retained case) is just a
+buffer member like any other.
+Consequences worth stating:
+- The user cannot delete what they cannot see; an explicitly emptied
+  col or parent still keeps its invisible members.
+- 'subscribes_to' and 'contains' get identical treatment; no
+  positional placeholder machinery remains.
+** saving: the set-difference merge for overrides_view_of
+Order does not matter, so simpler than the weave: the disk list
+keeps its order; members the user visibly deleted (visible on disk,
+absent from buffer) are subtracted; new buffer members are appended;
+nothing else changes.  Reordering an overriddenCol is a no-op and
+the diff stays quiet.  Invisible and unresolvable members can never
+be subtracted, so they survive automatically.
+** read-only cols
+Membership is never read from the buffer, so omission alone
+suffices.  Goal lists exclude inactive members; a stale InactiveNode
+under such a col (from an old buffer) is deleted if a view-leaf and
+deadened (DeadScaffold; existing orphan handling preserves the
+subtree as independent) if it has view-children.  No warnings: an
+omitted member is not a repair, and warning would partially leak.
+** source-set switches re-render open views in place
+Replacing today's close-all behavior, on both sides:
+- Server ('set_active_source_set'): instead of clearing the view
+  registry, for each open view: apply the CONVERT-AND-PRUNE step
+  below, then run completion with col creation enabled (a switch
+  can also ACTIVATE sources, so newly visible members and cols must
+  appear), then the usual finishing pass.  Stream the results with
+  the existing rerender-all message flow (lock, per-view, done).
+- Emacs: stop closing buffers on switch; reuse the rerender-all
+  handlers to lock, replace and unlock them.  The existing
+  confirmation prompt and the cancellation of in-flight search
+  enrichment stay.
+- View-local niceties that pruning destroys (e.g. a read-only col's
+  user-chosen member order) normalize, exactly as closing and
+  reopening used to normalize them.
+** convert-and-prune (applying a switch to a drawn view)
+1. Convert every Active viewnode from a now-inactive source to an
+   InactiveNode.
+2. Prune by DFS postorder (so emptied parents prune in the same
+   pass), removing every:
+   - InactiveNode leaf;
+   - Qual leaf whose owning gnode is inactive;
+   - indefinitive leaf partner (child of a PartnerCol), ACTIVE OR
+     INACTIVE -- an indefinitive partner defines nothing, and
+     completion regenerates current membership;
+   - empty QualCol or PartnerCol;
+   - DeadScaffold leaf.
+3. What survives includes: active nodes; inactive nodes with
+   surviving children (the retained case); definitive partners (the
+   user may be mid-edit inside them).
+Completion then rebuilds cols and members for the new active set.
+** inactive-node rewrite suppression
+Unchanged from 9-1 (decided 2026-06-11): after the noop filter, any
+instruction that would modify an inactive node is dropped --
+'DefineNode' Save/Delete on an inactive source, 'SourceMove' with an
+inactive endpoint, nodeMerge touching an inactive node, and
+synthesized intents (e.g. 'apply_hiderel_delta_to_subscriber' for an
+inactive subscriber).  If anything was suppressed, the save succeeds
+and carries the warning
+"Inactive nodes present in saved buffer remain unchanged in graph."
+Timing decided 2026-06-11: edits-only -- the warning fires only when
+an instruction was actually suppressed.  An untouched stale node
+saves silently, because the noop filter discards its
+identical-to-disk instruction before suppression looks.
+** validation updates
+- 'validate_inactive_node' accepts an InactiveNode under a col
+  parent (stale buffers) and WITH children (the retained case);
+  editing the placeholder's own title/body/metadata stays an error.
+- Extraction continues to count buffer-present InactiveNodes as
+  positional members of content and subscribeeCols (they are
+  anchors), and to ignore them under read-only cols.
+
+* implementation plan, in order
+** thread the active source-set into save extraction
+Pure plumbing: 'buffer_to_validated_saveplan',
+'extract_nonmergeSavePlan_locally' and the supplementation stage
+gain 'active_source_set : Option<&ActiveSourceSet>'.  None and
+Some(all) mean today's behavior.  'update_from_and_rerender_buffer'
+already receives the Option; pass it through.  The test_utils
+wrapper passes None, leaving existing tests untouched.
+** the two pure merge functions
+'weave' and 'set_difference_merge', beside the supplementation code,
+each with exhaustive unit tests (visible deletes honored; invisible
+and unresolvable preserved; moves carry followers (weave); reorder
+is a no-op (set-difference); orphaned runs reattach; identity under
+'all'; dedup).  Wire them into 'supplement_saveintent_from_disk'
+for 'contains' + 'subscribes_to' (weave) and 'overrides_view_of'
+(set-difference).
+** accept stale and retained InactiveNodes at validation
+Relax 'validate_inactive_node' per "validation updates".  This is
+safe only now, after the weave exists (otherwise tolerated
+placeholders would save destructively).
+** omission at render
+- Content goal lists ('reconcile/content.rs' and its goal sources):
+  filter inactive members out; keep an existing InactiveNode child
+  that has view-children (the retained case), delete childless
+  ones.
+- Col goal lists: 'reconcile_partnerCol_children' filters
+  'graph_members' by activity; the subscribee and
+  hidden-subscription reconcilers filter their goal lists; stale
+  InactiveNode col children get the delete-leaf / deaden-branch
+  rule.  Reconcilers read the active set from 'CompletionContext'
+  (already carried), gaining a parameter like 'warning_sink' did.
+- 'maybe_add_partnerCol_branches': filter before the non-empty
+  check.
+- Implementation note: once goal lists filter, ordinary renders
+  should produce no inactive Actives for
+  'apply_source_set_to_viewforest' to convert (inactive view roots
+  are already refused); the converter's remaining job is step 1 of
+  convert-and-prune.  Verify, and narrow or re-home it accordingly;
+  record findings in progress.org.
+** inactive-node rewrite suppression
+After the noop filter, partition out instructions targeting
+inactive nodes (including source-moves and flattened nodeMerges);
+when anything was suppressed, attach the warning through the
+existing parse-warnings channel into 'SaveResponse.warnings'.
+Must NOT touch active nodes' relationship lists: those come from
+the buffer plus the weave.
+** switch-rerender
+- Server: rework 'set_active_source_set' to lock, convert-and-prune,
+  complete (col creation enabled), finish, and stream each view via
+  the rerender-all message flow; update the view registry instead of
+  clearing it.
+- Emacs: on switch, stop closing buffers; subscribe the rerender
+  handlers instead.  Keep the confirmation prompt and enrichment
+  cancellation.
+- The prune is a small pure-ish tree pass; implement beside the
+  reconcilers and unit-test it directly (each bullet of the prune
+  list, plus the retained-inactive survival).
+** documentation touch-ups
+api-and-formats.md: switches re-render instead of closing;
+inactive children are omitted (no placeholder metadata in ordinary
+renders); retained InactiveNodes; saving preserves invisible
+members; suppression warning.  (Full doc pass: metaplan's last
+step.)
+
+* tests
+Prefer the pure seams (the two merge functions and the prune are
+pure; extraction takes the set directly).
+** weave (unit)
+Deletes, inserts, moves-carry-followers, orphaned-run reattachment,
+leading runs, identity under 'all', buffer-present InactiveNode as
+positional anchor, dedup.
+** set-difference merge (unit)
+Visible delete lands; reorder no-op; append; invisible and
+unresolvable preserved; identity under 'all'.
+** rendering omission
+- Fresh render under a restricted set: inactive content child and
+  its (active) descendants absent; inactive subscribee absent;
+  read-only col member absent; col with only inactive members
+  absent; no inactive titles anywhere in the buffer (no leak).
+** save round-trips under a restricted set
+- Reorder/insert/delete among visible content where disk also has
+  invisible members: disk reflects the visible edits, invisible
+  members still present, anchored near their old neighbors.
+- Same for subscribees via the subscribeeCol.
+- overriddenCol: visible delete lands, invisible member survives,
+  reorder is a no-op.
+- The formerly-unsavable stale buffer (InactiveNode under a col)
+  saves; the relationship survives.
+** retained inactive nodes
+- Open view, switch deactivates a container with active children:
+  it remains as an InactiveNode, children intact; moving it within
+  its parent is honored on save; deleting its subtree removes it
+  from this view while the graph relationship survives (a fresh
+  'all' view still shows it under the parent).
+- Switch deactivates a childless branch: gone after the rerender.
+** switch-rerender
+- Open views survive a switch in both directions (restrict and
+  widen); widening reveals previously omitted members and cols.
+- The prune bullets each fire (unit test the pass directly).
+- Emacs integration: buffers locked, replaced, unlocked; none
+  closed.
+** suppression
+- Stale buffer with an EDITED now-inactive definitive node: save
+  succeeds, file unchanged, parent's contains intact, warning
+  present.
+- Untouched equivalent: no warning (the noop filter discards its
+  instruction before suppression looks).
+** no regressions
+- 'tests/source_sets.rs' minus the retired placeholder behaviors
+  (replaced by the above).
+- 'tests/subscribee_col_empty_persists.rs' under 'all'.
+- Stage-8 targets ('partner_col_order', 'partner_col_warnings').
+
+* verification
+- 'cargo check'
+- 'cargo test --lib'
+- 'cargo test --test source_sets -- --nocapture'
+- 'cargo test --test new -- --nocapture'
+- 'cargo test --test save -- --nocapture'
+- 'cargo test --test subscribee_col -- --nocapture'
+- 'cargo test --test partner_col_order -- --nocapture'
+- 'cargo test --test partner_col_warnings -- --nocapture'
+- 'cargo nextest run'
+- 'bash/emacs-tests.sh'
+- 'bash/all-tests.sh --no-sound'
+
+* open questions -- all closed 2026-06-11, answers folded into the body
+** glossary for the questions below
+- "Inactive source": a source excluded by the connection's active
+  source-set; its nodes are hidden from view.  ("Active" = in the
+  set.)
+- "Omission": this plan's rule that rendering simply skips inactive
+  nodes (no placeholder).
+- "Retained inactive node": the exception -- an inactive node that
+  stays on screen (read-only) because it has active children, which
+  can only happen in a view that was already open when the
+  source-set switched.
+- "The weave": the save-time function that merges the buffer's
+  visible list with the disk list, so invisible members survive a
+  save, anchored near their old neighbors.
+- "Inactive-node rewrite suppression": the save stage that silently
+  drops any instruction which would modify an inactive node,
+  warning "Inactive nodes present in saved buffer remain unchanged
+  in graph."
+- "The noop filter": an existing save stage that drops instructions
+  whose content is identical to what is already on disk.
+- "Diff mode": the git diff view -- open views re-rendered with
+  decorations showing changes since HEAD, including phantom entries
+  for members REMOVED since HEAD.
+** DONE when should the suppression warning fire?
+CLOSED: 2026-06-11
+(Carried over from 9-1.)  Suppose a buffer contains a
+now-inactive node.  If the user EDITED it, the suppression drops
+the write and should clearly warn.  But if the user left it
+untouched, its write instruction is already identical to disk and
+the noop filter discards it before suppression looks: under the
+plan's current choice the save is then SILENT.  The alternative is
+presence-based warning: warn whenever inactive nodes were in the
+saved buffer at all, even untouched -- closer to your original
+wording, but it would warn on every save of such a buffer, which
+risks training the user to ignore warnings.  Choose: warn only when
+an edit was discarded (plan's choice), or warn on presence.
+*** DONE agreed
+**** claude: folded into the suppression sections (body and tests).
+** DONE deleting a retained inactive node silently fails -- acceptable?
+CLOSED: 2026-06-11
+The weave cannot distinguish "this invisible disk member was
+omitted at render" (must preserve) from "this retained inactive
+node was visible and the user deleted it" (deletion intended) --
+in both cases the member is on disk and absent from the buffer.
+The plan preserves in both cases, so deleting a retained inactive
+node from the buffer silently undoes itself: it respawns on the
+next render.  Moving it, by contrast, IS honored.  Options:
+- Accept the asymmetry (plan's choice): movable but undeletable,
+  consistent with "inactive data is untouchable".
+- Add a warning when the rerender restores one (the stage-8 repair
+  warning machinery could carry it).
+- Make deletion work by consulting the server's stored copy of the
+  view (it knows the node was displayed); costs coupling the weave
+  to per-view state.
+*** DONE I don't understand.
+Suppose node N has viewnode Vi which just became inactive,
+and Vi was retained because it has an active viewchild.
+If the user deletes the Vi subtree, why would Vi respawn in the view?
+The view doesn't have it when it goes to the server,
+and because it's inactive, the server has no reason to insert it.
+**** claude: you are right; I was wrong, and the question mostly dissolves
+The respawn claim was an error.  Omission keeps inactive nodes out
+of the content goal lists, so after the user deletes Vi's subtree
+and saves, nothing recreates Vi in this view -- the deletion sticks
+ON SCREEN, exactly as you reasoned.  What survives is only the
+GRAPH fact: the weave preserves invisible disk members, so the
+parent still contains N, and a fresh view under 'all' would show
+it.  So the real behavior is: view-deletion of a retained inactive
+node edits the view, never the graph -- consistent with "inactive
+data is untouchable", and with no visible weirdness.  The body and
+tests sections are corrected accordingly.  (If the view/graph
+divergence -- gone from this view, still contained under 'all' --
+bothers you, reopen; I think it is right.)
+** DONE fresh renders omit whole inactive branches -- confirm
+CLOSED: 2026-06-11
+Omission is recursive: a fresh render that skips an inactive
+container also skips everything beneath it, including ACTIVE
+descendants (still reachable by search or direct visit).  Retained
+inactive nodes arise only when a switch is applied to an
+already-open view -- a fresh render of the same root right
+afterward would show LESS than the switched view does.  That
+asymmetry seems acceptable (the open view is preserving the user's
+working context; the fresh render is answering from scratch), but
+it deserves a deliberate yes.
+*** DONE yes
+**** claude: recorded in the rendering section.
+** DONE diff mode under restricted sets, until the refusal step lands
+CLOSED: 2026-06-11
+(Carried over from 9-1.)  An upcoming metaplan step will
+forbid combining diff mode with restricted source-sets, but it is
+not built, so today the combination is reachable.  This plan's
+omission will also swallow a col's removed-member phantoms whose
+member is inactive, so a restricted diff view shows less relation
+history than an unrestricted one (leak-free, just lossy).  For the
+interim: accept quiet omission (my lean -- the window is short and
+the refusals belong with the diff-policy step), or pull the two
+refusals forward into this plan?
+*** DONE yeah whatever
+**** claude: quiet omission it is; recorded under "not covered".
