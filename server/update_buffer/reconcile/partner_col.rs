@@ -8,9 +8,9 @@ use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
-use crate::types::viewnode::{PartnerCol, ViewNode};
+use crate::types::viewnode::{ColPolicy, ParentIs, PartnerCol, ViewNode, ViewNodeKind, Vognode};
 
-use ego_tree::{NodeId, Tree};
+use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::sync::Arc;
@@ -43,8 +43,23 @@ pub fn reconcile_partnerCol_children (
       kind . caller_label (), kind) . into ()); };
   let owner_role =
     member_role . opposite_role ();
-  let goal_list : Vec<ID> =
-    graph_snap . other_member_pids (&owner_pid, owner_role);
+  let goal_list : Vec<ID> = {
+    let graph_members : Vec<ID> =
+      graph_snap . other_member_pids (&owner_pid, owner_role);
+    match kind . policy () {
+      ColPolicy::WritableSet =>
+        // Graph (disk) order is meaningful here: the user's own save
+        // defines it.
+        graph_members,
+      ColPolicy::ReadOnlySet =>
+        // The user may have reordered this generated col; the order
+        // is view-local and respected (metaplan_2.org, "preserve
+        // user-visible order in read-only sets").
+        view_order_preserving_goal_list (tree, node, &graph_members) ?,
+      ColPolicy::ReadOnlyFilter =>
+        // Unreachable: the let-else above already returned, because
+        // the filter cols have no relation member role.
+        graph_members, }};
   let removed_ids : HashSet<ID> = HashSet::new ();
   // TODO/DONE/local-view-update/plan_v2.org §5.5: a col fills its members WHOLE and is budget-neutral -- the owning
   // vognode already spent its budget unit when it expanded, so drawing all the
@@ -61,3 +76,41 @@ pub fn reconcile_partnerCol_children (
   reconcile_partnerCol_children_against_goal_list (
     tree, node, kind, &goal_list, &child_data ) ?;
   Ok (( )) }
+
+/// The effective goal list for a ColPolicy::ReadOnlySet col:
+/// the col's existing Active parentIs=Affected children, in their
+/// current view order, filtered to graph-real members (first
+/// occurrence of a duplicate wins; the reconciler detaches the
+/// duplicates themselves), then every graph member not yet listed,
+/// appended in the deterministic order 'other_member_pids' returns
+/// (sorted by ID, for the inbound relations these cols hold).
+/// The resulting order is view-local: it is never written to disk,
+/// and two open views of the same col may disagree.
+fn view_order_preserving_goal_list (
+  tree          : &Tree<ViewNode>,
+  col           : NodeId,
+  graph_members : &[ID],
+) -> Result<Vec<ID>, Box<dyn Error>> {
+  let member_set : HashSet<&ID> =
+    graph_members . iter () . collect ();
+  let mut seen : HashSet<ID> = HashSet::new ();
+  let mut goal : Vec<ID> = Vec::new ();
+  { let col_ref : NodeRef<ViewNode> =
+      tree . get (col)
+      . ok_or ("view_order_preserving_goal_list: col not found") ?;
+    for child in col_ref . children () {
+      if let ViewNodeKind::Vognode (Vognode::Active (t))
+        = & child . value () . kind
+      { if t . parentIs == ParentIs::Affected
+          && member_set . contains (&t . id)
+          && seen . insert (t . id . clone ())
+        { goal . push (t . id . clone ()); }}}}
+  for member in graph_members {
+    if seen . insert (member . clone ()) {
+      goal . push (member . clone ()); }}
+  Ok (goal) }
+
+#[cfg(test)]
+#[allow(non_snake_case)]
+#[path = "../../../tests/unit/reconcile_partner_col.rs"]
+mod tests;
