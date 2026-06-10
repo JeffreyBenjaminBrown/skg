@@ -148,14 +148,16 @@ pub fn reconcile_partnerCol_children_against_goal_list (
                                 if t . parentIs == ParentIs::Affected ),
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Active (t))
-        => t . id . clone (),
-      _ => panic! ( "{}: relevant child not a normal graph node", label ) },
+        => Ok ( t . id . clone () ),
+      _ => Err ( format! (
+        "{}: relevant child not a normal graph node", label )) },
     goal_list,
     |id : &ID| {
       let d : &ChildData =
-        child_data . get (id) . unwrap_or_else (
-          || panic! ( "{}: child data not pre-fetched", label ));
-      match d . phantom {
+        child_data . get (id) . ok_or_else (
+          || format! ( "{}: child data not pre-fetched for {}",
+                       label, id . 0 )) ?;
+      Ok ( match d . phantom {
         None => mk_indefinitive_viewnode ( id . clone (),
                                            d . source . clone (),
                                            d . title . clone (),
@@ -163,7 +165,7 @@ pub fn reconcile_partnerCol_children_against_goal_list (
         Some ((ex, mem)) =>
           mk_phantom_viewnode (
             id . clone (), d . source . clone (),
-            d . title . clone (), ex, mem ) } } ) ?;
+            d . title . clone (), ex, mem ) } ) } ) ?;
   mark_goal_children_as_collectionBranch_members (
     tree, col_node, goal_list) ?;
   Ok (( )) }

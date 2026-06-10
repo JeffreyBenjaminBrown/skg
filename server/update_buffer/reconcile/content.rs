@@ -359,18 +359,20 @@ fn complete_content_children (
     |vn : &ViewNode| match &vn . kind {
       // Both kinds participate in child-list reconciliation.
       ViewNodeKind::Vognode (Vognode::Active (t))
-        => t . id . clone(),
+        => Ok ( t . id . clone() ),
       ViewNodeKind::Phantom (Phantom::Diff (p))
-        => p . id . clone(),
+        => Ok ( p . id . clone() ),
       ViewNodeKind::Vognode (Vognode::Inactive (i))
-        => i . id . clone(),
-      _ => panic!(
-        "complete_content_children: relevant child had no content ID" ) },
+        => Ok ( i . id . clone() ),
+      _ => Err(
+        "complete_content_children: relevant child had no content ID"
+        . to_string() ) },
     goal_list,
     |id : &ID| {
-      let d : &ChildData = child_data . get (id) . expect(
-        "complete_content_children: child data not pre-fetched" );
-      match d . kind {
+      let d : &ChildData = child_data . get (id) . ok_or_else( || format!(
+        "complete_content_children: child data not pre-fetched for {}",
+        id . 0 )) ?;
+      Ok ( match d . kind {
         ContentReality::Real =>
           mk_definitive_viewnode(
             id . clone(), d . source . clone(),
@@ -379,7 +381,7 @@ fn complete_content_children (
           mk_inactive_viewnode (
             id . clone(), d . source . clone(), MembershipAxes::default ()),
         ContentReality::Unknown =>
-          mk_unknown_viewnode ( id . clone() ) } },
+          mk_unknown_viewnode ( id . clone() ) } ) },
   ) }
 
 /// 'erroneous content children' are children that look like content,

@@ -74,20 +74,21 @@ pub fn reconcile_alias_col_children (
     // relevance to complete_relevant_children
     |viewnode| matches!( &viewnode . kind,
                         ViewNodeKind::Qual (Qual::Alias { .. } ) );
-  let view_alias_text : fn (&ViewNode) -> String =
+  let view_alias_text : fn (&ViewNode) -> Result<String, String> =
     |viewnode| match &viewnode . kind {
       ViewNodeKind::Qual (Qual::Alias { text, .. } ) =>
-        text . clone(),
-      _ => unreachable!(), }; // relevance means Qual::Alias
-  let create_alias = |text: &String| -> ViewNode {
+        Ok ( text . clone() ),
+      _ => Err ( "reconcile_alias_col_children: relevant child is not an alias"
+                 . to_string() ), }; // relevance means Qual::Alias
+  let create_alias = |text: &String| -> Result<ViewNode, String> {
     let membership : MembershipAxes =
       axes_map . get (text) . copied () . unwrap_or_default ();
-    ViewNode {
+    Ok ( ViewNode {
       focused     : false,
       folded      : false,
       body_folded : false,
       kind : ViewNodeKind::Qual (Qual::Alias { text : text . clone(),
-                                               membership } ), }};
+                                               membership } ), })};
   complete_relevant_children_in_viewnodetree(
     tree,
     aliascol_node_id,

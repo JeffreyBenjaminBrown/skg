@@ -68,21 +68,22 @@ pub fn reconcile_id_col_children (
   let is_id : fn (&ViewNode) -> bool =
     |viewnode| matches!( &viewnode . kind,
                          ViewNodeKind::Qual (Qual::ID { .. } ) );
-  let view_id_text : fn (&ViewNode) -> ID =
+  let view_id_text : fn (&ViewNode) -> Result<ID, String> =
     |viewnode| match &viewnode . kind {
       ViewNodeKind::Qual (Qual::ID { id, .. } ) =>
-        id . clone(),
-      _ => unreachable!(), };
-  let create_id = |id: &ID| -> ViewNode {
+        Ok ( id . clone() ),
+      _ => Err ( "reconcile_id_col_children: relevant child is not an ID scaffold"
+                 . to_string() ), };
+  let create_id = |id: &ID| -> Result<ViewNode, String> {
     let membership : MembershipAxes =
       axes_map . get (id) . copied () . unwrap_or_default ();
-    ViewNode {
+    Ok ( ViewNode {
       focused     : false,
       folded      : false,
       body_folded : false,
       kind        : ViewNodeKind::Qual (
         Qual::ID {
-          id: id . clone(), membership } ) } };
+          id: id . clone(), membership } ) } ) };
   complete_relevant_children_in_viewnodetree(
     tree,
     idcol_node_id,

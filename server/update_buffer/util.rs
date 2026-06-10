@@ -112,10 +112,10 @@ pub fn complete_relevant_children_in_viewnodetree
   relevant            : Relevant,
   view_child_orderkey : View,
   goal_list           : &[Orderkey],
-  create_child        : impl Fn (&Orderkey) -> ViewNode,
+  create_child        : impl Fn (&Orderkey) -> Result<ViewNode, String>,
 ) -> Result<(), Box<dyn Error>>
 where Relevant : Fn (&ViewNode) -> bool,
-      View     : Fn (&ViewNode) -> Orderkey,
+      View     : Fn (&ViewNode) -> Result<Orderkey, String>,
       Orderkey : Eq + Hash + Clone,
 {
   let problem_discard =
@@ -181,14 +181,17 @@ pub fn complete_relevant_children
   relevant                 : Relevant,
   view_child_orderkey      : View,
   goal_list                : &[Orderkey],
-  create_child             : impl Fn (&Orderkey) -> Node,
+  create_child             : impl Fn (&Orderkey) -> Result<Node, String>,
   problem_discard          : ProblemDiscard,
   mut problem_discard_response : ProblemResponse,
   demote_invalid           : DemoteInvalid,
 ) -> Result<(), Box<dyn Error>>
 where
   Relevant        : Fn (&Node) -> bool,
-  View            : Fn (&Node) -> Orderkey,
+  // The orderkey and create-child closures are fallible so a relevant
+  // child of an unexpected kind, or an unprefetched orderkey, surfaces
+  // as an Err from this function rather than a panic in a closure.
+  View            : Fn (&Node) -> Result<Orderkey, String>,
   Orderkey        : Eq + Hash + Clone,
   ProblemDiscard  : Fn(&Tree<Node>, NodeId) -> Result<bool, String>,
   ProblemResponse : FnMut (&mut Node),
@@ -215,7 +218,7 @@ where
       tree . get (node_id)
       . ok_or ("complete_relevant_children: node not found")?;
     let orderkey : Orderkey =
-      view_child_orderkey( node_ref . value() );
+      view_child_orderkey( node_ref . value() ) ?;
     if !goal_list_as_set . contains (&orderkey) {
       invalid_ids . push (node_id); // hopefully none
     } else if orderkey_to_treeid . contains_key (&orderkey) {
@@ -252,10 +255,14 @@ where
       Some (&child_id) => {
         move_child_to_end( tree, parent_id, child_id )?; },
       None => {
-        let node : Node = create_child (orderkey);
+        let node : Node = create_child (orderkey) ?;
         with_node_mut(
             tree, parent_id,
             |mut p| { p . append (node); }
           ) . map_err( |e| -> Box<dyn Error>
                       { e . into() } )?; }, }}
   Ok (( )) }
+
+#[cfg(test)]
+#[path = "../../tests/unit/update_buffer_util.rs"]
+mod tests;
