@@ -638,3 +638,16 @@
    stand-in relationship is data rather than convention. Jeff
    approved this direction 2026-06-10; it is deliberately deferred
    until a second consumer exists.
+** Flaky test: 'ids::save' group in tests/git_diff_view.rs
+   'test_delete_id_scaffolds_respawns' (since renamed
+   'test_delete_id_scaffolds_aborts') fails intermittently when the
+   whole 'git_diff_view' target (or even just its 'ids::save' group)
+   runs under plain 'cargo test', and passes in isolation and under
+   'cargo nextest run' (which gives each test its own process).
+   Confirmed pre-existing: it reproduces at commit 63feeef1, before
+   the full-schema stage-8 work. Probably a shared-resource race
+   among the tests in that target (the kind common-gotchas.md
+   warns about); each uses its own db name, so the shared resource
+   is something else (possibly git or tempdir state under
+   run_save_test). Worth a look before trusting plain 'cargo test'
+   runs of that target.

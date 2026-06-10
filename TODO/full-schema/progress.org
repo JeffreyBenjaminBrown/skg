@@ -24,6 +24,109 @@ the saved view, delivered via 'SaveResponse.warnings'; a parse-time
 warning for edited col headline text; save abortion on IDCol
 membership edits; and two small ride-alongs (panic -> Err in the
 reconcile helper, the 'MSV' rule comment).
+*** implemented
+Eight commits on branch 'full-schema', the three ride-alongs first
+and separate per Jeff's instruction:
+1. Rename RoleCol and its vague aliases to PartnerCol.  Beyond the
+   type: 'reconcile_relation_col_children' ->
+   'reconcile_partnerCol_children', 'reconcile_sharing_col_children'
+   -> 'reconcile_partnerCol_children_against_goal_list',
+   'relation_col_members' -> 'partnerCol_members',
+   'maybe_add_relation_col_branches' ->
+   'maybe_add_partnerCol_branches',
+   'member_counts_for_relation_collection' ->
+   'member_counts_for_partnerCol',
+   'create_relation_cols_for_fresh_nodes' ->
+   'create_partnerCols_for_fresh_nodes', the file
+   'reconcile/relation_col.rs' -> 'partner_col.rs', the module
+   'to_org/complete/sharing/' -> 'partner_col/', and ~36 prose
+   comments.  "relation" survives where it means 'NodeRelation'.
+   Also fixed the stale api-and-formats.md passage that still
+   described 'Scaffold::RoleCol'.
+2. Made 'complete_relevant_children's orderkey and create-child
+   closures fallible; the panics in 'child_data.rs' (and the
+   'unreachable!'s in the AliasCol/IDCol reconcilers, and the
+   panic/expect in the content reconciler) became Errs.
+3. The 'MSV' comment naming the absent-versus-empty col rule.
+4. 'ColPolicy' on 'PartnerCol' ('server/types/viewnode.rs'), with
+   the demote-not-discard decision documented at the definition.
+   The per-kind methods needing 'RelationRole' stay in
+   'partner_col/kind.rs' (the types layer should not import dbs);
+   a header comment there explains the split.
+5. Order preservation: 'view_order_preserving_goal_list' in
+   'reconcile/partner_col.rs', used when 'policy() == ReadOnlySet'.
+   WritableSet keeps graph/disk order.
+6. Warnings: 'complete_relevant_children' returns a
+   'RepairSummary'; new 'server/update_buffer/warnings.rs' defines
+   'CompletionWarning'/'RepairKind' and per-(col, owner) batching;
+   'CompletionContext.warning_sink' is Some only for the saved view
+   ('rerender_view' gained the parameter; collateral, rerender-all
+   and de-novo pass None); 'update_views_after_save' renders the
+   warnings into 'SaveResponse.warnings'.
+7. Parse-time col-headline warning: 'viewnode_from_metadata' returns
+   a warning when a QualCol/PartnerCol header carries title text;
+   warnings flow through 'org_to_uninterpreted_viewforest' and
+   'buffer_to_validated_saveplan' (both signatures widened) into
+   'SaveResponse.warnings'.  Scaffold bodies still abort
+   ('Body_of_Scaffold').
+8. IDCol membership validation: 'idCol_membership_errors'
+   ('validate_tree.rs') compares each present idCol's ID-scaffold
+   multiset (in diff mode, excluding net-removed entries, via the
+   new 'MembershipAxes::net_is_present') against the owner's
+   pid + extra_ids; mismatch aborts with the new
+   'BufferValidationError::IDCol_Edited'.  Reordering passes;
+   absence means no opinion.
+*** deviations from the plan as written
+- The plan said "warn on duplicate member removed".  The warning
+  category exists and is unit-tested, but no integration test
+  triggers it through a save: validation
+  ('partnerCol_children_have_distinct_ids') rejects duplicate
+  read-only col members before reconciliation can see them.  The
+  category remains reachable only by non-save completion paths,
+  which carry no sink today.  Harmless dead-ish code, kept for
+  symmetry.
+- "Collateral views produce no warnings" is enforced by
+  construction (None is passed at both collateral call sites and
+  rerender-all) but not by an integration test: constructing a
+  registered second view in the test harness was judged not worth
+  the weight.  The de-novo no-warning case is structural (the
+  de-novo path has no warnings channel at all).
+- The three git_diff_view 'ids::save' tests encoded the old
+  silently-respawn IDCol policy; they now assert the abort, and a
+  new test asserts reordering still saves.
+- tests/move_source.rs, tests/multi_source_errors.rs and several
+  tests/new helpers needed mechanical tuple updates for the widened
+  parser/saveplan signatures.
+*** unanticipated future costs and benefits
+- 'buffer_to_validated_saveplan' now returns a triple; any future
+  caller must decide what to do with parse warnings.  A struct
+  return might read better if a fourth element ever appears.
+- The IDCol check does one in-Rust-graph (rustFirst) lookup per
+  visible idCol per save; negligible now, and it short-circuits
+  disk in the normal case.
+- 'RepairSummary' gives any future col policy free repair
+  accounting; the visible-subset merge work (next metaplan step)
+  can likely reuse it.
+- The restored-member warning's accepted false positive (a member
+  newly created by the same save being reported as "restored") is
+  documented in the plan's open questions; Jeff accepted it
+  (2026-06-10), revisit if annoying.
+*** problems discovered along the way
+- Pre-existing flaky test recorded in TODO/problems.org: the
+  git_diff_view 'ids::save' group fails intermittently under plain
+  'cargo test' (shared-resource race; passes under nextest and in
+  isolation; reproduces at commit 63feeef1, before this work).
+*** tested
+- 'cargo nextest run': 513/513 passed.
+- 'bash/emacs-tests.sh': 222/222 passed.
+- Focused targets passed throughout: unit (lib), new, save,
+  subscribee_col, subscribee_col_empty_persists,
+  hidden_from_subscriptions, content_view, idempotence,
+  git_diff_view, initial_view_bfs, move_source, multi_source_errors,
+  plus the two new targets partner_col_order and
+  partner_col_warnings.
+- 'bash/all-tests.sh --no-sound': all passed (Emacs tests, Nextest,
+  28 integration tests; 108s total).
 ** stage 7 : saving read-only RoleCols
 *** planned
 Wrote 'TODO/full-schema/7_saving-readonly-cols.org',
