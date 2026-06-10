@@ -26,6 +26,16 @@ use crate::consts::{DEFAULT_INITIAL_NODE_LIMIT, DEFAULT_PORT};
 /// not asking for any changes). This type distinguishes the case
 /// where the user did not mention the field from the case
 /// where the user wants it empty.
+///
+/// THE COL RULE these values encode at save extraction
+/// ('server/from_text/local_instruction_collection/traverse.rs'
+/// enforces it; 'supplement_unspecified_fields_from_disk' consumes
+/// it): a buffer with NO col for a field (no AliasCol, SubscribeeCol
+/// or OverriddenCol under the defining node) emits no intent for that
+/// field, which lowers to 'Unspecified' -- no opinion, so the value
+/// is filled from disk. A PRESENT-BUT-EMPTY col emits an empty list,
+/// which lowers to 'Specified(vec![])' -- the user explicitly wants
+/// the field empty.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum MSV<T> {
   Unspecified,
