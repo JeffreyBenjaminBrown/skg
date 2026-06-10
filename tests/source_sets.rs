@@ -662,3 +662,125 @@ fn titles_by_ids_omits_inactive_source_titles (
     ! titles . contains_key (&ID::from ("private-a")),
     "inactive-source title lookup must omit private-a" );
   Ok (( )) }
+
+#[test]
+fn stale_inactive_placeholders_under_cols_save_without_error (
+) -> Result<(), Box<dyn Error>> {
+  // TODO/full-schema/9-2_source-set-safety.org: the formerly-unsavable
+  // buffer. A buffer rendered before a source-set switch can hold
+  // InactiveNodes under cols; saving it must not error.
+  run_with_source_set_test_db (
+    "skg-test-source-sets-stale-col-placeholder",
+    "tests/source_sets/fixtures/skgconfig.toml",
+    "/tmp/tantivy-test-source-sets-stale-col-placeholder",
+    |config, driver, _tantivy| Box::pin ( async move {
+      let buffer = indoc! {"
+        * (skg (node (id root) (source public))) root
+        ** (skg subscriberCol)
+        *** (skg (inactiveNode (id private-a) (source private)))
+        ** (skg (node (id active-b) (source public) indef)) active-b
+      "};
+      let active : ActiveSourceSet =
+        ActiveSourceSet::named (
+          config, SourceSetName ("public" . to_string ())) ?;
+      let result =
+        buffer_to_validated_saveplan (
+          buffer, config, driver, Some (&active) ) . await;
+      assert! ( result . is_ok (),
+        "an InactiveNode under a col must not block saving: {:?}",
+        result . err () . map ( |e| format! ("{:?}", e)) );
+      Ok (( )) } )) }
+
+#[test]
+fn inactive_subscribee_placeholder_counts_positionally (
+) -> Result<(), Box<dyn Error>> {
+  // TODO/full-schema/9-2_source-set-safety.org: subscribee order
+  // matters, so a buffer-present placeholder is a positional member
+  // of the subscribeeCol.
+  run_with_source_set_test_db (
+    "skg-test-source-sets-subscribee-placeholder",
+    "tests/source_sets/fixtures/skgconfig.toml",
+    "/tmp/tantivy-test-source-sets-subscribee-placeholder",
+    |config, driver, _tantivy| Box::pin ( async move {
+      let buffer = indoc! {"
+        * (skg (node (id root) (source public))) root
+        ** (skg subscribeeCol)
+        *** (skg (inactiveNode (id private-a) (source private)))
+        *** (skg (node (id active-b) (source public) indef)) active-b
+      "};
+      let active : ActiveSourceSet =
+        ActiveSourceSet::named (
+          config, SourceSetName ("public" . to_string ())) ?;
+      let instructions : Vec<DefineNode> =
+        buffer_to_validated_saveplan (
+          buffer, config, driver, Some (&active) ) . await ?
+        . 1 . define_nodes;
+      assert_eq! (
+        saved_node_by_id (&instructions, "root")
+          . subscribes_to . or_default (),
+        &[ ID::from ("private-a"), ID::from ("active-b") ],
+        "the placeholder must count as a positional subscribee" );
+      Ok (( )) } )) }
+
+#[test]
+fn weave_preserves_omitted_inactive_content_members (
+) -> Result<(), Box<dyn Error>> {
+  // TODO/full-schema/9-2_source-set-safety.org: under a restricted
+  // set, a buffer that omits inactive members must not delete them;
+  // visible edits (reorder, delete) still land.
+  run_with_source_set_test_db (
+    "skg-test-source-sets-weave-contains",
+    "tests/source_sets/fixtures/skgconfig.toml",
+    "/tmp/tantivy-test-source-sets-weave-contains",
+    |config, driver, _tantivy| Box::pin ( async move {
+      let active : ActiveSourceSet =
+        ActiveSourceSet::named (
+          config, SourceSetName ("public" . to_string ())) ?;
+      { // Disk: root contains [active-a, private-a, active-b].
+        // The restricted buffer omits private-a; saving must keep it,
+        // anchored after active-a.
+        let buffer = indoc! {"
+          * (skg (node (id root) (source public))) root
+          ** (skg (node (id active-a) (source public) indef)) active-a
+          ** (skg (node (id active-b) (source public) indef)) active-b
+        "};
+        let instructions : Vec<DefineNode> =
+          buffer_to_validated_saveplan (
+            buffer, config, driver, Some (&active) ) . await ?
+          . 1 . define_nodes;
+        assert_eq! (
+          saved_node_by_id (&instructions, "root") . contains,
+          vec![ ID::from ("active-a"), ID::from ("private-a"),
+                ID::from ("active-b") ],
+          "omitted inactive member must survive, anchored" ); }
+      { // Reordering the visible members carries the anchored
+        // invisible member with its anchor.
+        let buffer = indoc! {"
+          * (skg (node (id root) (source public))) root
+          ** (skg (node (id active-b) (source public) indef)) active-b
+          ** (skg (node (id active-a) (source public) indef)) active-a
+        "};
+        let instructions : Vec<DefineNode> =
+          buffer_to_validated_saveplan (
+            buffer, config, driver, Some (&active) ) . await ?
+          . 1 . define_nodes;
+        assert_eq! (
+          saved_node_by_id (&instructions, "root") . contains,
+          vec![ ID::from ("active-b"), ID::from ("active-a"),
+                ID::from ("private-a") ],
+          "the invisible member follows its anchor" ); }
+      { // Deleting a visible member lands; the invisible member
+        // reattaches leftward (here, to START's successor region).
+        let buffer = indoc! {"
+          * (skg (node (id root) (source public))) root
+          ** (skg (node (id active-b) (source public) indef)) active-b
+        "};
+        let instructions : Vec<DefineNode> =
+          buffer_to_validated_saveplan (
+            buffer, config, driver, Some (&active) ) . await ?
+          . 1 . define_nodes;
+        assert_eq! (
+          saved_node_by_id (&instructions, "root") . contains,
+          vec![ ID::from ("private-a"), ID::from ("active-b") ],
+          "visible deletion lands; invisible member survives" ); }
+      Ok (( )) } )) }

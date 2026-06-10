@@ -160,10 +160,11 @@ fn validate_view_roots (
     if ! matches! (
       &root . value () . kind,
       MpViewnodeKind::Vognode (MpVognode::Active (_))
+        | MpViewnodeKind::Vognode (MpVognode::Inactive (_)) // a retained inactive root (TODO/full-schema/9-2_source-set-safety.org)
         | MpViewnodeKind::Phantom (MpPhantom::Deleted (_)))
     { errors . push (
         BufferValidationError::Other (
-          "View roots must be TrueNodes or deleted nodes."
+          "View roots must be TrueNodes, inactive placeholders or deleted nodes."
           . to_string () )); }}}
 
 /// For each node in the viewforest, if it has a definitive view request,

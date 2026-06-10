@@ -290,7 +290,7 @@ fn visit_subscribeecol (
         collected . instructionMerge_intent (
           owner . id . clone(),
           NodeIntent_Local::SetSubscribesTo (
-            partnerCol_members (node_ref) )) ?; }
+            subscribeeCol_members (node_ref) )) ?; }
       recurse_with_uniform_context (
         node_ref,
         // The subscriber's identity is passed even when the owner is
@@ -327,10 +327,12 @@ fn visit_overriddencol (
     &LocalContext::UnderVognode { parent_if_writeable : None },
     collected) }
 
-/// This returns the members of a writeable PartnerCol (a
-/// SubscribeeCol or OverriddenCol): its Active children that pass
-/// the PartnerCol membership predicate, silently deduplicated,
-/// preserving first-occurrence order.
+/// This returns the members of an OverriddenCol: its Active
+/// children that pass the PartnerCol membership predicate, silently
+/// deduplicated, preserving first-occurrence order.  (Inactive
+/// children are NOT members here: the overriddenCol omits inactive
+/// members from display, and the set-difference merge preserves
+/// them at save.  TODO/full-schema/9-2_source-set-safety.org.)
 fn partnerCol_members (
   node_ref : NodeRef<ViewNode>,
 ) -> Vec<ID> {
@@ -340,6 +342,27 @@ fn partnerCol_members (
       = &child . value() . kind
     { if member_counts_for_partnerCol (t) {
         members . push (t . id . clone()); }}}
+  dedup_vector (members) }
+
+/// This returns the members of a SubscribeeCol.  Unlike the
+/// OverriddenCol, subscribee order matters, so a buffer-present
+/// InactiveNode (a retained placeholder) counts as a positional
+/// member, mirroring 'content_members'
+/// (TODO/full-schema/9-2_source-set-safety.org).
+#[allow(non_snake_case)]
+fn subscribeeCol_members (
+  node_ref : NodeRef<ViewNode>,
+) -> Vec<ID> {
+  let mut members : Vec<ID> = Vec::new();
+  for child in node_ref . children() {
+    match &child . value() . kind {
+      ViewNodeKind::Vognode (Vognode::Active (t)) => {
+        if member_counts_for_partnerCol (t) {
+          members . push (t . id . clone()); }},
+      ViewNodeKind::Vognode (Vognode::Inactive (i)) => {
+        if ! inactiveNode_is_phantom (i) {
+          members . push (i . id . clone()); }},
+      _ => {}, }}
   dedup_vector (members) }
 
 /// This returns the content of a definitive vognode: its Active

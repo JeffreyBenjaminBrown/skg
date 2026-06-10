@@ -665,7 +665,10 @@ fn test_inactive_placeholder_content_edits_rejected_at_parse_time () {
 }
 
 #[test]
-fn test_inactive_placeholder_active_children_rejected_locally () {
+fn test_inactive_placeholder_active_children_allowed_locally () {
+  // TODO/full-schema/9-2_source-set-safety.org, the retained case:
+  // an inactive node stays on screen because of its active
+  // children, so an InactiveNode with active children must pass.
   let input : &str =
     indoc! {"
       * (skg (node (id root) (source main))) parent
@@ -693,17 +696,10 @@ fn test_inactive_placeholder_active_children_rejected_locally () {
     . next ()
     . expect ("inactive placeholder should exist");
 
-  let error = validate_local_structure (
+  validate_local_structure (
       &viewforest, inactive_id, &config)
-    . expect_err (
-      "Inactive placeholder with an active child should fail validation");
-  assert!(
-    error . message . contains ("Inactive placeholder must have no active children"),
-    "Unexpected inactive-placeholder validation error: {:?}",
-    error );
-  assert_eq! (
-    error . id . 0, "root",
-    "Inactive-placeholder child errors should report the nearest active ancestor");
+    . expect (
+      "an Inactive placeholder with an active child (the retained case) must pass validation");
 }
 
 #[test]

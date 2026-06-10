@@ -222,14 +222,17 @@ fn validate_subscribeecol (
     tree, node_id, 1, true,
     |node| node . is_active_or_diff_phantom ()
            || matches!(&node . kind,
-                    MpViewnodeKind::PartnerCol (
-                      PartnerCol::HiddenOutsideOfSubscribee) ))
-    { errors . push( "SubscribeeCol's children must include only TrueNodes or HiddenOutsideOfSubscribeeCol." . to_string()); }
+                    MpViewnodeKind::Vognode (MpVognode::Inactive (_)) // a retained inactive subscribee is a positional member (TODO/full-schema/9-2_source-set-safety.org)
+                      | MpViewnodeKind::PartnerCol (
+                          PartnerCol::HiddenOutsideOfSubscribee) ))
+    { errors . push( "SubscribeeCol's children must include only TrueNodes, inactive placeholders or HiddenOutsideOfSubscribeeCol." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
         t . parentIs == ParentIs::Affected,
+      MpViewnodeKind::Vognode (MpVognode::Inactive (_)) =>
+        true,
       MpViewnodeKind::Phantom (MpPhantom::Diff (_)) =>
         true,
       MpViewnodeKind::PartnerCol (
@@ -259,13 +262,17 @@ fn validate_relation_col (
     { errors . push(format!("{} must have a TrueNode parent.", label)); }
   if !generation_includes_only(
     tree, node_id, 1, true,
-    |node| node . is_active_or_diff_phantom ())
-    { errors . push(format!("{}'s children must include only TrueNodes.", label)); }
+    |node| node . is_active_or_diff_phantom ()
+           || matches!(&node . kind,
+                       MpViewnodeKind::Vognode (MpVognode::Inactive (_)))) // tolerated from stale buffers; the rerender removes it (TODO/full-schema/9-2_source-set-safety.org)
+    { errors . push(format!("{}'s children must include only TrueNodes or inactive placeholders.", label)); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t))
         => t . parentIs == ParentIs::Affected,
+      MpViewnodeKind::Vognode (MpVognode::Inactive (_))
+        => true,
       MpViewnodeKind::Phantom (MpPhantom::Diff (_))
         => true,
       _ => false, } )
@@ -344,15 +351,25 @@ fn validate_inactive_node (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
+  // TODO/full-schema/9-2_source-set-safety.org: an InactiveNode may
+  // sit under a col (a stale buffer from before a source-set
+  // switch) or under another gnode, and it may have children (the
+  // retained case: an inactive node kept on screen because of its
+  // active children).  Its own content stays read-only -- the
+  // parser rejects title/body text on it -- so the only structural
+  // demand left is a parent that can carry it at all.
   let mut errors : Vec<String> = Vec::new();
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
-    |node| node . is_active_or_diff_phantom ())
-    { errors . push("Inactive placeholder must have a TrueNode parent."
+    |node| node . is_active_or_diff_phantom ()
+           || matches! ( &node . kind,
+                         MpViewnodeKind::Vognode (MpVognode::Inactive (_))
+                         | MpViewnodeKind::QualCol (_)
+                         | MpViewnodeKind::PartnerCol (_)
+                         | MpViewnodeKind::DeadScaffold
+                         | MpViewnodeKind::BufferRoot )) // an InactiveNode can be a view root: a root that went inactive but was retained for its active children
+    { errors . push("Inactive placeholder must have a TrueNode, col or DeadScaffold parent, or be a view root."
                     . to_string()); }
-  if !generation_does_not_exist(tree, node_id, 1, true) {
-    errors . push("Inactive placeholder must have no active children."
-                  . to_string()); }
   errors }
 
 /// The identity + child-structure checks shared by a TrueNode and a phantom
