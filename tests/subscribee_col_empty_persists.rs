@@ -78,7 +78,7 @@ async fn empty_subscribee_col_persists_impl (
     response . errors );
   Ok (( )) }
 
-// Contrast (plan_v2 §3.4/§6.8): an empty *read-only* relation col -- here a
+// Contrast (plan_v2 §3.4/§6.8): an empty *read-only* PartnerCol -- here a
 // subscriberCol -- IS removed by the postorder prune sweep, because (unlike the
 // SubscribeeCol) it is not an editable interface; an emptied one is just noise.
 #[test]

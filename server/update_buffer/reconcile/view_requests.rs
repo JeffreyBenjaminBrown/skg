@@ -1,4 +1,4 @@
-use crate::to_org::complete::sharing::{ maybe_add_hiddenInSubscribeeCol_branch, type_and_parent_type_consistent_with_subscribee };
+use crate::to_org::complete::partner_col::{ maybe_add_hiddenInSubscribeeCol_branch, type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::expand::definitive::execute_view_requests;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::SkgConfig;

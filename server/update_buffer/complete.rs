@@ -12,16 +12,16 @@ use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName, TantivyIndex};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, read_at_ancestor_in_tree, write_at_node_in_tree};
-use crate::to_org::complete::sharing::maybe_add_relation_col_branches;
+use crate::to_org::complete::partner_col::maybe_add_partnerCol_branches;
 use crate::update_buffer::ancestry::{ col_is_generalized_orphan, deaden_generalized_orphan_col, is_col_kind};
 use crate::update_buffer::util::detach_scaffold_transferring_focus;
 use crate::to_org::render::diff::process_truenode_diff;
 use crate::types::tree::viewnode_nodecomplete::write_at_truenode_in_tree;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, RoleCol, ViewRequest, IndefOrDef, PhantomDeleted};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerCol, ViewRequest, IndefOrDef, PhantomDeleted};
 use crate::types::viewnode::{Vognode, Phantom, QualCol};
 use super::reconcile::hiddeninsubscribee_col::reconcile_hiddenin_subscribee_col_children;
 use super::reconcile::hiddenoutsideof_subscribeecol::reconcile_hiddenoutside_subscribee_col_children;
-use super::reconcile::relation_col::reconcile_relation_col_children;
+use super::reconcile::partner_col::reconcile_partnerCol_children;
 use super::reconcile::subscribee_col::reconcile_subscribee_col_children;
 use super::reconcile::content::expand_true_content_at_truenode;
 
@@ -35,7 +35,7 @@ pub(super) struct CompletionContext<'a> {
   /// The per-source git diffs (Some in diff mode, None otherwise). This is the
   /// single diff handle: it drives the per-node process_truenode_diff (content
   /// axes, the phantom flip, TextChanged/IDCol/AliasCol), the diff-aware QualCol
-  /// reconcilers, and the sharing cols' removed-member phantoms. The content
+  /// reconcilers, and the PartnerCols' removed-member phantoms. The content
   /// reconcile itself produces only the pure worktree view; process_truenode_diff
   /// applies every content diff effect afterward at the node's own visit (TODO/DONE/local-view-update/plan_v2.org §9
   /// reversal / #3).
@@ -55,12 +55,12 @@ pub(super) struct CompletionContext<'a> {
   pub(super) node_budget                    : usize,
   /// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): true only for a DE-NOVO (initial) render driven through
   /// view completion. When set, a fresh CONTENT node (parent is not a PartnerCol)
-  /// gets its relation cols created at its visit, the way
+  /// gets its PartnerCols created at its visit, the way
   /// build_node_branch_minus_content does at node birth.
-  /// FALSE for post-save rerender, where relation cols are already present in
+  /// FALSE for post-save rerender, where PartnerCols are already present in
   /// the saved buffer and re-creating them would change the buffer and break the
   /// save round-trip (TODO/DONE/local-view-update/plan_v2.org §18). So post-save stays byte-identical.
-  pub(super) create_relation_cols_for_fresh_nodes : bool,
+  pub(super) create_partnerCols_for_fresh_nodes : bool,
   /// TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the tantivy index for the inline diff's phantom-source
   /// resolution. None on the post-save path (the deleted-id map + disk scan
   /// suffice); Some on the de-novo path.
@@ -137,24 +137,24 @@ async fn dispatch_node_update (
   match &kind {
     ViewNodeKind::Vognode (Vognode::Active (_)) =>
       visit_normal_node (tree, treeid, context) . await ?,
-    ViewNodeKind::PartnerCol (RoleCol::Subscribee) =>
+    ViewNodeKind::PartnerCol (PartnerCol::Subscribee) =>
       // A col fills its members WHOLE and is budget-neutral (TODO/DONE/local-view-update/plan_v2.org §5.5): the owning
       // vognode already spent its 1 budget unit when it expanded, so drawing all
       // the members here costs nothing more and never truncates a group.
       reconcile_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
         context . deleted_since_head_pid_src_map ) . await ?,
-    ViewNodeKind::PartnerCol (RoleCol::HiddenInSubscribee) =>
+    ViewNodeKind::PartnerCol (PartnerCol::HiddenInSubscribee) =>
       reconcile_hiddenin_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
         context . deleted_since_head_pid_src_map ) ?,
-    ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee) =>
+    ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee) =>
       reconcile_hiddenoutside_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
         context . deleted_since_head_pid_src_map ) ?,
     ViewNodeKind::PartnerCol (role)
       if role . relation_member_role () . is_some () =>
-      reconcile_relation_col_children (
+      reconcile_partnerCol_children (
         treeid, tree, *role, context . source_diffs,
         context . env, context . graph_snap,
         context . deleted_since_head_pid_src_map ) ?,
@@ -244,20 +244,20 @@ async fn visit_normal_node (
       |vn : &ViewNode| matches! ( &vn . kind,
         ViewNodeKind::Vognode (Vognode::Active (_)) ) ) ?;
   if ! still_normal { return Ok (( )); }
-  // Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): for a DE-NOVO render, create this node's relation cols the
+  // Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): for a DE-NOVO render, create this node's PartnerCols the
   // way build_node_branch_minus_content does at node birth, so the one view
-  // completion can expand a bare stub. Only CONTENT nodes/roots get them (a sharing-col
+  // completion can expand a bare stub. Only CONTENT nodes/roots get them (a PartnerCol
   // MEMBER is rendered bare), so gate on "parent is not a PartnerCol";
-  // maybe_add_relation_col_branches is itself idempotent + skips empties. OFF
+  // maybe_add_partnerCol_branches is itself idempotent + skips empties. OFF
   // for post-save (flag false), keeping that path byte-identical.
-  if context . create_relation_cols_for_fresh_nodes {
+  if context . create_partnerCols_for_fresh_nodes {
     let parent_is_partner_col : bool =
       read_at_ancestor_in_tree ( tree, treeid, 1,
         |vn : &ViewNode| matches! ( &vn . kind,
           ViewNodeKind::PartnerCol (_) ) )
       . unwrap_or (false);
     if ! parent_is_partner_col {
-      maybe_add_relation_col_branches (
+      maybe_add_partnerCol_branches (
         tree, treeid, &context . env . config,
         &context . env . driver ) . await ?; } }
   // Remaining view requests (Aliases / Containerward / Sourceward); the
@@ -292,7 +292,7 @@ async fn visit_normal_node (
 /// one place self-deletion lives -- per-kind reconcilers no longer detach
 /// themselves when empty.
 /// - DeadScaffold and a childless Vognode::Deleted (TODO/DONE/local-view-update/plan_v2.org §6.6).
-/// - the read-only relation cols Subscriber/Overrider/Hider/Hidden (a graph
+/// - the read-only PartnerCols Subscriber/Overrider/Hider/Hidden (a graph
 ///   relationship the user cannot edit from this side, so an emptied one is
 ///   just noise) -- but NOT Overridden (the editable interface for adding
 ///   overrides, preserved when empty like AliasCol).
@@ -307,12 +307,12 @@ fn is_self_deletable_when_empty (
   matches! ( kind,
     ViewNodeKind::DeadScaffold
     | ViewNodeKind::Phantom (Phantom::Deleted (_))
-    | ViewNodeKind::PartnerCol (RoleCol::Subscriber)
-    | ViewNodeKind::PartnerCol (RoleCol::Overrider)
-    | ViewNodeKind::PartnerCol (RoleCol::Hider)
-    | ViewNodeKind::PartnerCol (RoleCol::Hidden)
-    | ViewNodeKind::PartnerCol (RoleCol::HiddenInSubscribee)
-    | ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee)
+    | ViewNodeKind::PartnerCol (PartnerCol::Subscriber)
+    | ViewNodeKind::PartnerCol (PartnerCol::Overrider)
+    | ViewNodeKind::PartnerCol (PartnerCol::Hider)
+    | ViewNodeKind::PartnerCol (PartnerCol::Hidden)
+    | ViewNodeKind::PartnerCol (PartnerCol::HiddenInSubscribee)
+    | ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee)
     | ViewNodeKind::QualCol (QualCol::ID) ) }
 
 /// The TODO/DONE/local-view-update/plan_v2.org §3.4 postorder prune sweep -- the *one* place self-deletion happens.

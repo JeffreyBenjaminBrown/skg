@@ -28,7 +28,7 @@ use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
 use crate::dbs::typedb::nodes::which_ids_exist;
 use crate::git_ops::read_repo::nodecomplete_from_index_or_head;
 use crate::source_sets::ActiveSourceSet;
-use crate::to_org::complete::sharing::type_and_parent_type_consistent_with_subscribee;
+use crate::to_org::complete::partner_col::type_and_parent_type_consistent_with_subscribee;
 use crate::to_org::util::{ DefinitiveMap, Finalizable };
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
 use crate::types::misc::{ID, SkgConfig, SourceName};

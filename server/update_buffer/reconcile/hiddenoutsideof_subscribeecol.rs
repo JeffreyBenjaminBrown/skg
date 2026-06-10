@@ -1,12 +1,12 @@
 use crate::types::env::SkgEnv;
-use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_col_children};
-use crate::to_org::complete::sharing::goal_list::goal_list_for_hiddenoutsideof_subscribeecol;
+use crate::to_org::complete::partner_col::child_data::{ChildData, build_child_data, reconcile_partnerCol_children_against_goal_list};
+use crate::to_org::complete::partner_col::goal_list::goal_list_for_hiddenoutsideof_subscribeecol;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
-use crate::types::viewnode::{ViewNode, RoleCol};
+use crate::types::viewnode::{ViewNode, PartnerCol};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -38,8 +38,8 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
   env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
-  let kind : RoleCol =
-    RoleCol::HiddenOutsideOfSubscribee;
+  let kind : PartnerCol =
+    PartnerCol::HiddenOutsideOfSubscribee;
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: the parent-is-SubscribeeCol check is subsumed by reading the
@@ -60,7 +60,7 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
       tree, node, &context . subscriber_pid, &context . subscriber_source,
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
-  reconcile_sharing_col_children(
+  reconcile_partnerCol_children_against_goal_list(
     // TODO/DONE/local-view-update/plan_v2.org §6.0: a stale member of this read-only col is removed when a view-leaf
     // (the common case) and demoted to Independent only if it has a user
     // subtree. Handled uniformly by the reconciler.
@@ -73,7 +73,7 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
 fn read_hiddenoutside_context (
   tree : &Tree<ViewNode>,
   node : NodeId,
-  kind : RoleCol,
+  kind : PartnerCol,
   env  : &SkgEnv,
 ) -> Result<HiddenOutsideContext, Box<dyn Error>> {
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: subscriber = ancestry-table index 1 (the [SubscribeeCol, Normal] chain).

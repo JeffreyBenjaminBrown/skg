@@ -10,7 +10,7 @@ use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
 use super::git::{ExistenceAxes, MembershipAxes};
-use super::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Vognode, Phantom, QualCol, Qual, RoleCol, PhantomDeleted, InactiveNode, PhantomUnknown, GraphNodeStats, ViewNodeStats, Birth, IndefOrDef, ParentIs, };
+use super::viewnode::{ ViewNode, ViewNodeKind, TrueNode, Vognode, Phantom, QualCol, Qual, PartnerCol, PhantomDeleted, InactiveNode, PhantomUnknown, GraphNodeStats, ViewNodeStats, Birth, IndefOrDef, ParentIs, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -38,7 +38,7 @@ pub enum MpViewnodeKind {
   Phantom      (MpPhantom),
   QualCol      (QualCol),
   Qual         (Qual),
-  PartnerCol   (RoleCol),
+  PartnerCol   (PartnerCol),
   BufferRoot,
   DeadScaffold,
 }
@@ -402,8 +402,8 @@ impl MpViewnode {
         "qual:textChanged" . to_string (),
       MpViewnodeKind::QualCol (col) =>
         format!("qualCol:{}", col . repr_in_client ()),
-      MpViewnodeKind::PartnerCol (roleCol) =>
-        format!("partnerCol:{}", roleCol . repr_in_client ()),
+      MpViewnodeKind::PartnerCol (partnerCol) =>
+        format!("partnerCol:{}", partnerCol . repr_in_client ()),
       MpViewnodeKind::BufferRoot =>
         "forestRoot" . to_string (),
       MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>

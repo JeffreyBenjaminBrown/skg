@@ -7,6 +7,6 @@ pub mod content;
 pub mod hiddeninsubscribee_col;
 pub mod hiddenoutsideof_subscribeecol;
 pub mod id_col;
-pub mod relation_col;
+pub mod partner_col;
 pub mod subscribee_col;
 pub mod view_requests;

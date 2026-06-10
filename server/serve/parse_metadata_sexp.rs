@@ -22,7 +22,7 @@ use crate::types::errors::BufferValidationError;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
 use crate::types::viewnode::{
   GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest,
-  Qual, QualCol, RoleCol, PhantomDeleted, InactiveNode, PhantomUnknown,
+  Qual, QualCol, PartnerCol, PhantomDeleted, InactiveNode, PhantomUnknown,
   Birth, IndefOrDef, NodeContainRels, NodeLinksourceRels, ParentIs,
 };
 use crate::types::maybe_placed_viewnode::{
@@ -232,8 +232,8 @@ fn maybeplaced_kind_error_label (
       col . repr_in_client () . to_string (),
     MpViewnodeKind::Qual (qual) =>
       qual . repr_in_client () . to_string (),
-    MpViewnodeKind::PartnerCol (roleCol) =>
-      roleCol . repr_in_client () . to_string (),
+    MpViewnodeKind::PartnerCol (partnerCol) =>
+      partnerCol . repr_in_client () . to_string (),
     MpViewnodeKind::BufferRoot =>
       "forestRoot" . to_string (),
     MpViewnodeKind::DeadScaffold =>
@@ -342,21 +342,21 @@ pub fn parse_metadata_to_viewnodemd (
           "aliasCol" => result . non_vognode = Some (MpViewnodeKind::QualCol (QualCol::Alias)),
           "forestRoot" => result . non_vognode = Some (MpViewnodeKind::BufferRoot),
           "hiddenInSubscribeeCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (RoleCol::HiddenInSubscribee)),
+            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::HiddenInSubscribee)),
           "hiddenOutsideOfSubscribeeCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee)),
+            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee)),
           "hiddenCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (RoleCol::Hidden)),
+            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::Hidden)),
           "hiderCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (RoleCol::Hider)),
+            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::Hider)),
           "overriddenCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (RoleCol::Overridden)),
+            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::Overridden)),
           "overriderCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (RoleCol::Overrider)),
+            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::Overrider)),
           "subscriberCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (RoleCol::Subscriber)),
+            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::Subscriber)),
           "subscribeeCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (RoleCol::Subscribee)),
+            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::Subscribee)),
           "textChanged" =>
             result . non_vognode = Some (
               MpViewnodeKind::Qual (

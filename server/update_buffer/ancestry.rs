@@ -30,7 +30,7 @@
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::{ read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree };
 use crate::types::tree::viewnode_nodecomplete::write_at_truenode_in_tree;
-use crate::types::viewnode::{ ParentIs, RoleCol, ViewNode, ViewNodeKind, Vognode };
+use crate::types::viewnode::{ ParentIs, PartnerCol, ViewNode, ViewNodeKind, Vognode };
 use crate::update_buffer::util::detach_scaffold_transferring_focus;
 
 use ego_tree::{ NodeId, NodeRef, Tree };
@@ -44,7 +44,7 @@ enum ExpectedAncestor {
   NormalVognode,
   /// Must be exactly this col kind (TODO/DONE/local-view-update/plan_v2.org §19: a col = a collecting scaffold). The
   /// only intermediate-chain col the table uses is the SubscribeeCol.
-  Col (RoleCol),
+  Col (PartnerCol),
 }
 
 // The TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 required-ancestry table, nearest -> farthest. required_ancestry[i] is
@@ -52,11 +52,11 @@ enum ExpectedAncestor {
 const ANC_NORMAL : &[ExpectedAncestor] =
   &[ ExpectedAncestor::NormalVognode ];
 const ANC_HIDDEN_OUTSIDE : &[ExpectedAncestor] =
-  &[ ExpectedAncestor::Col (RoleCol::Subscribee),
+  &[ ExpectedAncestor::Col (PartnerCol::Subscribee),
      ExpectedAncestor::NormalVognode ];
 const ANC_HIDDEN_IN : &[ExpectedAncestor] =
   &[ ExpectedAncestor::NormalVognode,
-     ExpectedAncestor::Col (RoleCol::Subscribee),
+     ExpectedAncestor::Col (PartnerCol::Subscribee),
      ExpectedAncestor::NormalVognode ];
 const ANC_NONE : &[ExpectedAncestor] = &[];
 
@@ -69,17 +69,17 @@ fn required_ancestry (
     // QualCol(Alias) and QualCol(ID): parent Active vognode.
     ViewNodeKind::QualCol (_) => ANC_NORMAL,
     // Subscribee col: parent = subscriber (Normal).
-    // Relation cols (Subscriber/Overridden/Overrider/Hider/Hidden): parent
+    // PartnerCols (Subscriber/Overridden/Overrider/Hider/Hidden): parent
     // Active vognode.
-    ViewNodeKind::PartnerCol (RoleCol::Subscribee)
-      | ViewNodeKind::PartnerCol (RoleCol::Subscriber)
-      | ViewNodeKind::PartnerCol (RoleCol::Overridden)
-      | ViewNodeKind::PartnerCol (RoleCol::Overrider)
-      | ViewNodeKind::PartnerCol (RoleCol::Hider)
-      | ViewNodeKind::PartnerCol (RoleCol::Hidden) => ANC_NORMAL,
-    ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee) =>
+    ViewNodeKind::PartnerCol (PartnerCol::Subscribee)
+      | ViewNodeKind::PartnerCol (PartnerCol::Subscriber)
+      | ViewNodeKind::PartnerCol (PartnerCol::Overridden)
+      | ViewNodeKind::PartnerCol (PartnerCol::Overrider)
+      | ViewNodeKind::PartnerCol (PartnerCol::Hider)
+      | ViewNodeKind::PartnerCol (PartnerCol::Hidden) => ANC_NORMAL,
+    ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee) =>
       ANC_HIDDEN_OUTSIDE,
-    ViewNodeKind::PartnerCol (RoleCol::HiddenInSubscribee) =>
+    ViewNodeKind::PartnerCol (PartnerCol::HiddenInSubscribee) =>
       ANC_HIDDEN_IN,
     _ => ANC_NONE,
   } }

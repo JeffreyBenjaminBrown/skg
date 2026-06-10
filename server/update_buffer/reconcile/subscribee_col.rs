@@ -1,13 +1,13 @@
 use crate::types::env::SkgEnv;
-use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_col_children};
-use crate::to_org::complete::sharing::goal_list::goal_list_for_subscribee_col;
+use crate::to_org::complete::partner_col::child_data::{ChildData, build_child_data, reconcile_partnerCol_children_against_goal_list};
+use crate::to_org::complete::partner_col::goal_list::goal_list_for_subscribee_col;
 use crate::types::git::SourceDiff;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::read_at_node_in_tree;
 use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child_of_viewnode, insert_scaffold_as_child};
 use crate::update_buffer::ancestry::required_ancestor;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, RoleCol};
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, PartnerCol};
 use crate::types::viewnode::Vognode;
 use crate::update_buffer::util::move_child_to_end;
 
@@ -39,7 +39,7 @@ pub async fn reconcile_subscribee_col_children (
   env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
-  let kind : RoleCol = RoleCol::Subscribee;
+  let kind : PartnerCol = PartnerCol::Subscribee;
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
   let context : SubscribeeColContext =
@@ -66,7 +66,7 @@ pub async fn reconcile_subscribee_col_children (
         tree, node, &context . parent_pid, &context . parent_source,
         &goal_list, &removed_ids,
         source_diffs, deleted_since_head_pid_src_map, env ) ?;
-    reconcile_sharing_col_children(
+    reconcile_partnerCol_children_against_goal_list(
       tree, node, kind,
       &goal_list, &child_data ) ?; }
 
@@ -115,12 +115,12 @@ fn ensure_hiddenoutsideofsubscribeecol_is_last (
   let hidden_outside : Option<NodeId> =
     unique_scaffold_child_of_viewnode(
       tree, node,
-      &ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee) ) ?;
+      &ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee) ) ?;
   match hidden_outside {
     Some (child) => { move_child_to_end( tree, node, child ) ?; },
     None => {
       insert_scaffold_as_child(
         tree, node,
-        ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee),
+        ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee),
         false ) ?; }}
   Ok (( )) }

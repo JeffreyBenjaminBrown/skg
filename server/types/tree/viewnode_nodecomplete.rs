@@ -5,7 +5,7 @@ use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, TrueNode, ParentIs };
-use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual, RoleCol};
+use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual, PartnerCol};
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind };
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
@@ -123,7 +123,7 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
     node_ref . parent ()
     . ok_or ("Subscribee has no parent (SubscribeeCol)") ?;
   if ! matches! ( &parent_ref . value () . kind,
-                  ViewNodeKind::PartnerCol (RoleCol::Subscribee)) {
+                  ViewNodeKind::PartnerCol (PartnerCol::Subscribee)) {
     return Err ( "Subscribee's parent is not a SubscribeeCol" .
                  into () ); }
   let grandparent_ref : NodeRef < ViewNode > =

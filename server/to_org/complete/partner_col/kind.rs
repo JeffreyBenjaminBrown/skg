@@ -1,4 +1,4 @@
-//! RoleCol metadata used by sharing-col completion paths.
+//! PartnerCol metadata used by PartnerCol completion paths.
 //!
 //! The three rerender-time completers — for SubscribeeCol,
 //! HiddenInSubscribeeCol, and HiddenOutsideOfSubscribeeCol — share
@@ -9,7 +9,7 @@
 //! guard.
 
 use crate::types::tree::generic::error_unless_node_satisfies;
-use crate::types::viewnode::{RoleCol, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{PartnerCol, ViewNode, ViewNodeKind};
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition,
   NodeRelation,
@@ -19,48 +19,48 @@ use crate::dbs::in_rust_graph::relation_accessors::{
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
 
-impl RoleCol {
+impl PartnerCol {
   /// Stable label used in panic messages from
-  /// 'reconcile_sharing_col_children' and similar helpers.
+  /// 'reconcile_partnerCol_children_against_goal_list' and similar helpers.
   /// Mirrors the function name of the corresponding completer so a
   /// crash gives the reader an immediately greppable hit.
   pub fn caller_label (self) -> &'static str {
     match self {
-      RoleCol::Subscribee =>
+      PartnerCol::Subscribee =>
         "reconcile_subscribee_col_children",
-      RoleCol::Subscriber
-        | RoleCol::Overridden
-        | RoleCol::Overrider
-        | RoleCol::Hider
-        | RoleCol::Hidden =>
-        "reconcile_relation_col_children",
-      RoleCol::HiddenInSubscribee =>
+      PartnerCol::Subscriber
+        | PartnerCol::Overridden
+        | PartnerCol::Overrider
+        | PartnerCol::Hider
+        | PartnerCol::Hidden =>
+        "reconcile_partnerCol_children",
+      PartnerCol::HiddenInSubscribee =>
         "reconcile_hiddenin_subscribee_col_children",
-      RoleCol::HiddenOutsideOfSubscribee =>
+      PartnerCol::HiddenOutsideOfSubscribee =>
         "reconcile_hiddenoutside_subscribee_col_children", } }
 
   pub fn relation_member_role (self) -> Option<RelationRole> {
     match self {
-      RoleCol::Subscribee =>
+      PartnerCol::Subscribee =>
         Some (RelationRole::new (
           NodeRelation::Subscribes, BinaryRolePosition::Second)),
-      RoleCol::Subscriber =>
+      PartnerCol::Subscriber =>
         Some (RelationRole::new (
           NodeRelation::Subscribes, BinaryRolePosition::First)),
-      RoleCol::Overridden =>
+      PartnerCol::Overridden =>
         Some (RelationRole::new (
           NodeRelation::OverridesViewOf, BinaryRolePosition::Second)),
-      RoleCol::Overrider =>
+      PartnerCol::Overrider =>
         Some (RelationRole::new (
           NodeRelation::OverridesViewOf, BinaryRolePosition::First)),
-      RoleCol::Hider =>
+      PartnerCol::Hider =>
         Some (RelationRole::new (
           NodeRelation::HidesFromItsSubscriptions, BinaryRolePosition::First)),
-      RoleCol::Hidden =>
+      PartnerCol::Hidden =>
         Some (RelationRole::new (
           NodeRelation::HidesFromItsSubscriptions, BinaryRolePosition::Second)),
-      RoleCol::HiddenInSubscribee |
-      RoleCol::HiddenOutsideOfSubscribee =>
+      PartnerCol::HiddenInSubscribee |
+      PartnerCol::HiddenOutsideOfSubscribee =>
         None,
     } }
 
@@ -78,7 +78,7 @@ impl RoleCol {
       tree, node,
       |vn : &ViewNode| matches! (
         &vn . kind,
-        ViewNodeKind::PartnerCol (roleCol) if *roleCol == self ),
+        ViewNodeKind::PartnerCol (partnerCol) if *partnerCol == self ),
       &format! ( "{}: expected {:?}",
                  self . caller_label (),
                  self ),

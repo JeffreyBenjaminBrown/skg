@@ -250,7 +250,7 @@ fn find_collateral_view_uris (
 /// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): build a DE-NOVO (initial) content view by running the ONE
 /// post-save view completion (complete_viewforest) over a stub forest of the
 /// requested roots. View completion
-/// creates each fresh node's relation cols (create_relation_cols_for_fresh_nodes
+/// creates each fresh node's PartnerCols (create_partnerCols_for_fresh_nodes
 /// = true), expands content, reconciles cols, and applies the TODO/DONE/local-view-update/plan_v2.org §5.5 node budget.
 /// When diff_mode, the git diff is computed inline by view completion (per node,
 /// at its BFS visit, via process_truenode_diff) -- the same path post-save uses.
@@ -288,7 +288,7 @@ pub async fn render_initial_view (
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): de-novo diff is computed INLINE by view completion, exactly
   // like post-save -- compute the real diffs here and feed them via source_diffs
   // (which drives the inline process_truenode_diff and the diff-aware QualCol /
-  // sharing-col reconcilers).
+  // PartnerCol reconcilers).
   let real_diffs : Option<HashMap<SourceName, SourceDiff>> =
     if diff_mode { Some ( compute_diff_for_every_source (&env . config) ) }
     else         { None };
@@ -306,7 +306,7 @@ pub async fn render_initial_view (
     deleted_by_this_save_pids      : &empty_deleted_pids,
     active_source_set              : active,
     node_budget                    : env . config . initial_node_limit,
-    create_relation_cols_for_fresh_nodes : true,
+    create_partnerCols_for_fresh_nodes : true,
     diff_tantivy_index : if diff_mode { Some (&env . tantivy_index) }
                          else         { None }, };
   complete_viewforest ( &mut viewforest, &mut context ) . await ?;
@@ -327,7 +327,7 @@ pub async fn rerender_view (
       defmap                         : &mut defmap,
       // The real per-source diffs drive ALL diff inline: process_truenode_diff
       // (content axes + phantom flip + TextChanged/IDCol/AliasCol) and the
-      // diff-aware QualCol / sharing-col reconcilers, each at its own BFS visit
+      // diff-aware QualCol / PartnerCol reconcilers, each at its own BFS visit
       // (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3). The content reconcile itself stays worktree-only.
       source_diffs                   : &context . source_diffs,
       env                            : context . env,
@@ -337,9 +337,9 @@ pub async fn rerender_view (
       deleted_by_this_save_pids      : &context . deleted_by_this_save_pids,
       active_source_set              : context . active_source_set,
       node_budget                    : context . env . config . initial_node_limit,
-      // Post-save reuses the saved buffer's relation cols; do not re-create them
+      // Post-save reuses the saved buffer's PartnerCols; do not re-create them
       // (that would change the buffer and break the save round-trip, TODO/DONE/local-view-update/plan_v2.org §18).
-      create_relation_cols_for_fresh_nodes : false,
+      create_partnerCols_for_fresh_nodes : false,
       // Post-save: phantom sources resolve via the deleted-id map + disk scan
       // (the de-novo path passes the tantivy index instead).
       diff_tantivy_index : None, };

@@ -1,12 +1,12 @@
 use crate::types::env::SkgEnv;
-use crate::to_org::complete::sharing::child_data::{ChildData, build_child_data, reconcile_sharing_col_children};
-use crate::to_org::complete::sharing::goal_list::goal_list_for_hiddeninsubscribee_col;
+use crate::to_org::complete::partner_col::child_data::{ChildData, build_child_data, reconcile_partnerCol_children_against_goal_list};
+use crate::to_org::complete::partner_col::goal_list::goal_list_for_hiddeninsubscribee_col;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
-use crate::types::viewnode::{ViewNode, RoleCol};
+use crate::types::viewnode::{ViewNode, PartnerCol};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -40,8 +40,8 @@ pub fn reconcile_hiddenin_subscribee_col_children (
   env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
 ) -> Result<(), Box<dyn Error>> {
-  let kind : RoleCol =
-    RoleCol::HiddenInSubscribee;
+  let kind : PartnerCol =
+    PartnerCol::HiddenInSubscribee;
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
   let context : HiddenInContext =
@@ -60,7 +60,7 @@ pub fn reconcile_hiddenin_subscribee_col_children (
       tree, node, &context . subscribee_pid, &context . subscribee_source,
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
-  reconcile_sharing_col_children(
+  reconcile_partnerCol_children_against_goal_list(
     // TODO/DONE/local-view-update/plan_v2.org §6.0: a HiddenInSubscribeeCol child that becomes stale (e.g. the user
     // moved it into the subscribee-as-such, 'unhiding' it) is removed when it
     // is a view-leaf -- the common case for hidden members -- and demoted to
@@ -75,7 +75,7 @@ pub fn reconcile_hiddenin_subscribee_col_children (
 fn read_hiddenin_context (
   tree : &Tree<ViewNode>,
   node : NodeId,
-  kind : RoleCol,
+  kind : PartnerCol,
   env  : &SkgEnv,
 ) -> Result<HiddenInContext, Box<dyn Error>> {
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: ancestry table indices -- subscribee = index 0 (parent), subscriber =

@@ -145,10 +145,10 @@ pub fn viewnode_to_string (
       qual_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, qual ),
-    ViewNodeKind::PartnerCol (roleCol) =>
+    ViewNodeKind::PartnerCol (partnerCol) =>
       Ok ( non_vognode_atom_metadata_to_string (
         viewnode . focused, viewnode . folded,
-        viewnode . body_folded, roleCol . repr_in_client () ) ),
+        viewnode . body_folded, partnerCol . repr_in_client () ) ),
     ViewNodeKind::BufferRoot =>
       Err ( "viewnode_to_string: BufferRoot should never be rendered" . into () ),
     ViewNodeKind::DeadScaffold =>

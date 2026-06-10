@@ -21,7 +21,7 @@
 ///   have distinct IDs per
 ///   'nonignored_children_have_distinct_ids', and read-only-col
 ///   members have distinct IDs per
-///   'relation_col_children_have_distinct_ids'. The defining cols
+///   'partnerCol_children_have_distinct_ids'. The defining cols
 ///   (AliasCol, SubscribeeCol, OverriddenCol) may contain
 ///   duplicates; emission dedups them silently.
 /// Collection performs no ancestry re-verification. On shapes that
@@ -44,7 +44,7 @@ use crate::from_text::local_instruction_collection::predicates::{
   active_child_counts_as_content,
   active_child_counts_as_visible_content,
   inactiveNode_is_phantom,
-  member_counts_for_relation_collection };
+  member_counts_for_partnerCol };
 use crate::from_text::local_instruction_collection::types::{
   CollectedIntents, DefiningColOwner, LocalContext, NodeIntent_Local,
   SubscribeeTextClaim, SubscribeeVisibility };
@@ -52,7 +52,7 @@ use crate::types::misc::ID;
 use crate::types::list::dedup_vector;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  EditRequest, ParentIs, Qual, QualCol, RoleCol, TrueNode, ViewNode,
+  EditRequest, ParentIs, Qual, QualCol, PartnerCol, TrueNode, ViewNode,
   ViewNodeKind, Vognode };
 
 use ego_tree::NodeRef;
@@ -106,9 +106,9 @@ fn visit (
         node_ref, &LocalContext::TopLevel, collected),
     ViewNodeKind::QualCol (QualCol::Alias) =>
       visit_aliascol (node_ref, context, collected),
-    ViewNodeKind::PartnerCol (RoleCol::Subscribee) =>
+    ViewNodeKind::PartnerCol (PartnerCol::Subscribee) =>
       visit_subscribeecol (node_ref, context, collected),
-    ViewNodeKind::PartnerCol (RoleCol::Overridden) =>
+    ViewNodeKind::PartnerCol (PartnerCol::Overridden) =>
       visit_overriddencol (node_ref, context, collected),
     ViewNodeKind::QualCol (QualCol::ID)
       | ViewNodeKind::Qual (_)
@@ -217,8 +217,8 @@ fn recurse_under_gnode (
     let child_context : LocalContext =
       match &child . value() . kind {
         ViewNodeKind::QualCol (QualCol::Alias)
-          | ViewNodeKind::PartnerCol (RoleCol::Subscribee)
-          | ViewNodeKind::PartnerCol (RoleCol::Overridden) =>
+          | ViewNodeKind::PartnerCol (PartnerCol::Subscribee)
+          | ViewNodeKind::PartnerCol (PartnerCol::Overridden) =>
           match &owner {
             Some (o) =>
               LocalContext::UnderDefiningCol (o . clone()),
@@ -283,7 +283,7 @@ fn visit_subscribeecol (
         collected . instructionMerge_intent (
           owner . id . clone(),
           NodeIntent_Local::SetSubscribesTo (
-            relation_col_members (node_ref) )) ?; }
+            partnerCol_members (node_ref) )) ?; }
       recurse_with_uniform_context (
         node_ref,
         // The subscriber's identity is passed even when the owner is
@@ -312,7 +312,7 @@ fn visit_overriddencol (
       collected . instructionMerge_intent (
         owner . id . clone(),
         NodeIntent_Local::SetOverrides (
-          relation_col_members (node_ref) )) ?; }}
+          partnerCol_members (node_ref) )) ?; }}
   recurse_with_uniform_context (
     node_ref,
     // The members are self-writers; their membership was read just
@@ -320,18 +320,18 @@ fn visit_overriddencol (
     &LocalContext::UnderVognode { parent_if_writeable : None },
     collected) }
 
-/// This returns the members of a writeable relation col (a
+/// This returns the members of a writeable PartnerCol (a
 /// SubscribeeCol or OverriddenCol): its Active children that pass
-/// the relation-col membership predicate, silently deduplicated,
+/// the PartnerCol membership predicate, silently deduplicated,
 /// preserving first-occurrence order.
-fn relation_col_members (
+fn partnerCol_members (
   node_ref : NodeRef<ViewNode>,
 ) -> Vec<ID> {
   let mut members : Vec<ID> = Vec::new();
   for child in node_ref . children() {
     if let ViewNodeKind::Vognode (Vognode::Active (t))
       = &child . value() . kind
-    { if member_counts_for_relation_collection (t) {
+    { if member_counts_for_partnerCol (t) {
         members . push (t . id . clone()); }}}
   dedup_vector (members) }
 

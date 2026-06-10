@@ -65,7 +65,7 @@ pub fn phantom_axes (
   // (content / hidden-in member), subscribes_to (subscribee member), or hides
   // (hidden-outside member) -- so check the per-stage diff of all three and use
   // whichever carries this child. This gives a PER-STAGE membership axis for
-  // sharing-col members too, not only content children.
+  // PartnerCol members too, not only content children.
   let sign_from_parent_stage =
     | stage_map : &HashMap<PathBuf, NodeCompleteDiff> | -> Option<Sign> {
       let nc = stage_map . get (&parent_file)
@@ -92,7 +92,7 @@ pub fn phantom_axes (
   // the parent's source_diff is absent, or a net-only removal). The sharing
   // cols that DO diff membership -- Subscribee (subscribes_to), HiddenIn
   // (contains), HiddenOutside (hides) -- are all now covered per-stage above;
-  // the relation cols (Subscriber/Overrider/...) never produce removed members
+  // the PartnerCols (Subscriber/Overrider/...) never produce removed members
   // (their reconcile passes empty removed_ids), so they never reach this path.
   let membership : MembershipAxes =
     if membership . is_empty ()

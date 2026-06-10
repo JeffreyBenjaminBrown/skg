@@ -13,10 +13,10 @@ use crate::types::git::Sign;
 use crate::types::viewnode::{EditRequest, InactiveNode, ParentIs, TrueNode};
 
 /// This returns true iff the given Active vognode counts as a
-/// member of the writeable relation collection (a SubscribeeCol or
+/// member of the writeable PartnerCol (a SubscribeeCol or
 /// OverriddenCol) that is its parent. To count, it must be Affected,
 /// not a would-be diff phantom, and not marked for deletion.
-pub fn member_counts_for_relation_collection (
+pub fn member_counts_for_partnerCol (
   t : &TrueNode,
 ) -> bool {
   t . parentIs == ParentIs::Affected
@@ -26,7 +26,7 @@ pub fn member_counts_for_relation_collection (
 
 /// This returns true iff the given Active vognode counts as content
 /// of its parent. The condition coincides with
-/// 'member_counts_for_relation_collection' -- the same three
+/// 'member_counts_for_partnerCol' -- the same three
 /// membership axes govern both -- but the two policies are
 /// conceptually distinct, so each keeps its own name.
 /// (The caller must also know the child is in content position;
@@ -34,7 +34,7 @@ pub fn member_counts_for_relation_collection (
 pub fn active_child_counts_as_content (
   t : &TrueNode,
 ) -> bool {
-  member_counts_for_relation_collection (t) }
+  member_counts_for_partnerCol (t) }
 
 /// This returns true iff the given Active vognode, a child of a
 /// definitive subscribee-as-such, counts as visible content of the

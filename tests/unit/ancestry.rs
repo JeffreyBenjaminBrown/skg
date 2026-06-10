@@ -16,7 +16,7 @@ fn deleted (title : &str) -> ViewNode {
       id : sid (title), source : src (),
       title : title . to_string (), body : None })) } }
 
-fn role_col (rc : RoleCol) -> ViewNode {
+fn role_col (rc : PartnerCol) -> ViewNode {
   ViewNode { focused : false, folded : false, body_folded : false,
     kind : ViewNodeKind::PartnerCol (rc) } }
 
@@ -72,7 +72,7 @@ fn relation_col_under_deadscaffold_is_orphan () {
   let dead : NodeId = child (&mut t, root,
     ViewNode { focused : false, folded : false, body_folded : false,
       kind : ViewNodeKind::DeadScaffold });
-  let rc : NodeId = child (&mut t, dead, role_col (RoleCol::Subscriber));
+  let rc : NodeId = child (&mut t, dead, role_col (PartnerCol::Subscriber));
   assert! ( col_is_generalized_orphan (&t, rc) . unwrap () ); }
 
 // Multi-level: the immediate parent (subscribee) is a live Normal, but the
@@ -84,11 +84,11 @@ fn build_subscribee_chain (
   let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let sber : NodeId = child (&mut t, root, subscriber);
-  let scol : NodeId = child (&mut t, sber, role_col (RoleCol::Subscribee));
+  let scol : NodeId = child (&mut t, sber, role_col (PartnerCol::Subscribee));
   let sbee : NodeId = child (&mut t, scol,
     normal ("subscribee", ParentIs::Affected));
   let hin : NodeId = child (&mut t, sbee,
-    role_col (RoleCol::HiddenInSubscribee));
+    role_col (PartnerCol::HiddenInSubscribee));
   (t, sber, scol, sbee, hin) }
 
 #[test]
@@ -138,7 +138,7 @@ fn deaden_disposes_each_child_kind () {
   let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let d : NodeId = child (&mut t, root, deleted ("D"));
-  let scol : NodeId = child (&mut t, d, role_col (RoleCol::Subscribee));
+  let scol : NodeId = child (&mut t, d, role_col (PartnerCol::Subscribee));
   // Affected leaf -> delete.
   let leaf : NodeId = child (&mut t, scol, normal ("L", ParentIs::Affected));
   // Affected branch (has a child) -> demote to Independent, keep.
@@ -146,7 +146,7 @@ fn deaden_disposes_each_child_kind () {
   let _bchild : NodeId = child (&mut t, branch, normal ("Bc", ParentIs::Affected));
   // Nested col -> leave it (self-deadens at its own visit).
   let nested : NodeId = child (&mut t, scol,
-    role_col (RoleCol::HiddenOutsideOfSubscribee));
+    role_col (PartnerCol::HiddenOutsideOfSubscribee));
   // Non-Affected vognode -> keep untouched.
   let indep : NodeId = child (&mut t, scol, normal ("I", ParentIs::Independent));
 
@@ -160,7 +160,7 @@ fn deaden_disposes_each_child_kind () {
     "an Affected branch is demoted to Independent and kept" );
   assert! ( ! is_detached (&t, scol, branch) );
   assert! ( matches! ( kind_at (&t, nested),
-                       ViewNodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee) ),
+                       ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee) ),
     "a nested col is left untouched to self-deaden at its visit" );
   assert_eq! ( parentis_at (&t, indep), Some (ParentIs::Independent),
     "a non-Affected vognode is kept untouched" ); }

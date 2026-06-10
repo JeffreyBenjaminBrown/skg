@@ -2,7 +2,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::typedb::search::pid_and_source_from_id;
 use crate::source_sets::ActiveSourceSet;
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
-use crate::to_org::complete::sharing::maybe_add_relation_col_branches;
+use crate::to_org::complete::partner_col::maybe_add_partnerCol_branches;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::env::find_source_with_optional_tantivy;
 use crate::types::git::MembershipAxes;
@@ -143,8 +143,8 @@ pub async fn complete_branch_minus_content (
   { clobberIndefinitiveViewnode (
       tree, node_id, config ) ?; }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "maybe_add_relation_col_branches" ). entered();
-    maybe_add_relation_col_branches (
+      "maybe_add_partnerCol_branches" ). entered();
+    maybe_add_partnerCol_branches (
       tree, node_id, config, driver ) . await } ?;
   Ok (( )) }
 

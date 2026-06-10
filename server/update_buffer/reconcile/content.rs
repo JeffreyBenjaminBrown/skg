@@ -12,7 +12,7 @@ use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, PhantomDeleted, IndefOrDef,
     ParentIs, ViewRequest, mk_definitive_viewnode};
-use crate::types::viewnode::{Vognode, Phantom, RoleCol};
+use crate::types::viewnode::{Vognode, Phantom, PartnerCol};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_nodecomplete::{
     pid_and_source_from_treenode,
@@ -295,7 +295,7 @@ fn is_subscribee (
   let parent_is_subscribee_col : bool =
     read_at_ancestor_in_tree( tree, node, 1,
       |vn : &ViewNode| matches!( &vn . kind,
-        ViewNodeKind::PartnerCol (RoleCol::Subscribee)))
+        ViewNodeKind::PartnerCol (PartnerCol::Subscribee)))
     . unwrap_or (false);
   Ok( is_member_of_parent && parent_is_subscribee_col ) }
 

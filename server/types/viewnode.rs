@@ -14,8 +14,8 @@ use std::str::FromStr;
 
 /// Whether this node participates in the collection represented by
 /// its visible parent. For an ordinary Vognode parent, that collection
-/// is the parent's content. For a PartnerCol parent, the RoleCol
-/// decides the relation collection. For other kinds of parent's,
+/// is the parent's content. For a PartnerCol parent, the PartnerCol
+/// decides the collection (per its relation and role). For other kinds of parent's,
 /// a node's ParentIs has no effect.
 ///
 /// PITFALL: If a vognode is indefinitive, *none* of it children affect it,
@@ -58,7 +58,7 @@ pub enum ViewNodeKind {
   Phantom       (Phantom),
   QualCol       (QualCol),
   Qual          (Qual),
-  PartnerCol    (RoleCol),
+  PartnerCol    (PartnerCol),
   BufferRoot,
   DeadScaffold,
 }
@@ -336,7 +336,7 @@ pub enum Qual {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum RoleCol {
+pub enum PartnerCol {
   Subscribee, // Collects subscribees its parent subscribes to. Writeable.
   Subscriber, // Collects nodes that subscribe to its parent. Read-only (editable from the other side of the relationship).
   Overridden, // Collects nodes whose view its parent overrides. Writeable.
@@ -448,42 +448,42 @@ impl NodeLinksourceRels {
                        self . sources_without_content, 0,
                        "→" ) } }
 
-impl RoleCol {
+impl PartnerCol {
   pub fn repr_in_client (self) -> &'static str {
     match self {
-      RoleCol::Subscribee                => "subscribeeCol",
-      RoleCol::Subscriber                => "subscriberCol",
-      RoleCol::Overridden                => "overriddenCol",
-      RoleCol::Overrider                 => "overriderCol",
-      RoleCol::Hider                     => "hiderCol",
-      RoleCol::Hidden                    => "hiddenCol",
-      RoleCol::HiddenInSubscribee        => "hiddenInSubscribeeCol",
-      RoleCol::HiddenOutsideOfSubscribee => "hiddenOutsideOfSubscribeeCol",
+      PartnerCol::Subscribee                => "subscribeeCol",
+      PartnerCol::Subscriber                => "subscriberCol",
+      PartnerCol::Overridden                => "overriddenCol",
+      PartnerCol::Overrider                 => "overriderCol",
+      PartnerCol::Hider                     => "hiderCol",
+      PartnerCol::Hidden                    => "hiddenCol",
+      PartnerCol::HiddenInSubscribee        => "hiddenInSubscribeeCol",
+      PartnerCol::HiddenOutsideOfSubscribee => "hiddenOutsideOfSubscribeeCol",
     }}
 
-  pub fn from_client_string (s : &str) -> Option<RoleCol> {
+  pub fn from_client_string (s : &str) -> Option<PartnerCol> {
     match s {
-      "subscribeeCol"                => Some (RoleCol::Subscribee),
-      "subscriberCol"                => Some (RoleCol::Subscriber),
-      "overriddenCol"                => Some (RoleCol::Overridden),
-      "overriderCol"                 => Some (RoleCol::Overrider),
-      "hiderCol"                     => Some (RoleCol::Hider),
-      "hiddenCol"                    => Some (RoleCol::Hidden),
-      "hiddenInSubscribeeCol"        => Some (RoleCol::HiddenInSubscribee),
-      "hiddenOutsideOfSubscribeeCol" => Some (RoleCol::HiddenOutsideOfSubscribee),
+      "subscribeeCol"                => Some (PartnerCol::Subscribee),
+      "subscriberCol"                => Some (PartnerCol::Subscriber),
+      "overriddenCol"                => Some (PartnerCol::Overridden),
+      "overriderCol"                 => Some (PartnerCol::Overrider),
+      "hiderCol"                     => Some (PartnerCol::Hider),
+      "hiddenCol"                    => Some (PartnerCol::Hidden),
+      "hiddenInSubscribeeCol"        => Some (PartnerCol::HiddenInSubscribee),
+      "hiddenOutsideOfSubscribeeCol" => Some (PartnerCol::HiddenOutsideOfSubscribee),
       _                              => None,
     } }
 
   pub fn origin_depth (self) -> usize {
     match self {
-      RoleCol::Subscribee
-        | RoleCol::Subscriber
-        | RoleCol::Overridden
-        | RoleCol::Overrider
-        | RoleCol::Hider
-        | RoleCol::Hidden => 1,
-      RoleCol::HiddenInSubscribee => 3,
-      RoleCol::HiddenOutsideOfSubscribee => 2, } }
+      PartnerCol::Subscribee
+        | PartnerCol::Subscriber
+        | PartnerCol::Overridden
+        | PartnerCol::Overrider
+        | PartnerCol::Hider
+        | PartnerCol::Hidden => 1,
+      PartnerCol::HiddenInSubscribee => 3,
+      PartnerCol::HiddenOutsideOfSubscribee => 2, } }
 }
 
 impl QualCol {

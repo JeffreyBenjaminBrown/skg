@@ -5,7 +5,7 @@
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpTruenode, MpPhantomDiff};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
 use crate::types::git::Sign;
-use crate::types::viewnode::{EditRequest, IndefOrDef, ParentIs, RoleCol, Qual, QualCol};
+use crate::types::viewnode::{EditRequest, IndefOrDef, ParentIs, PartnerCol, Qual, QualCol};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::viewnode_nodecomplete::{
   generation_includes_only,
@@ -48,18 +48,18 @@ pub fn validate_local_structure (
           validate_alias(tree, node_id),
       MpViewnodeKind::QualCol (QualCol::Alias) =>
           validate_aliascol(tree, node_id),
-      MpViewnodeKind::PartnerCol (RoleCol::HiddenInSubscribee) =>
+      MpViewnodeKind::PartnerCol (PartnerCol::HiddenInSubscribee) =>
           validate_hidden_in_subscribee_col(tree, node_id),
-      MpViewnodeKind::PartnerCol (RoleCol::HiddenOutsideOfSubscribee) =>
+      MpViewnodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee) =>
           validate_hidden_outside_of_subscribee_col(tree, node_id),
       MpViewnodeKind::PartnerCol (
-        role @ (RoleCol::Hidden
-          | RoleCol::Hider
-          | RoleCol::Overridden
-          | RoleCol::Overrider
-          | RoleCol::Subscriber))
+        role @ (PartnerCol::Hidden
+          | PartnerCol::Hider
+          | PartnerCol::Overridden
+          | PartnerCol::Overrider
+          | PartnerCol::Subscriber))
         => validate_relation_col(tree, node_id, *role),
-      MpViewnodeKind::PartnerCol (RoleCol::Subscribee) =>
+      MpViewnodeKind::PartnerCol (PartnerCol::Subscribee) =>
           validate_subscribeecol(tree, node_id),
       MpViewnodeKind::Qual (Qual::TextChanged { .. }) =>
           validate_text_changed(tree, node_id),
@@ -158,10 +158,10 @@ fn validate_hidden_in_subscribee_col (
     tree, node_id,
     |node| matches!(&node . kind,
                     MpViewnodeKind::PartnerCol (
-                      RoleCol::HiddenInSubscribee )))
+                      PartnerCol::HiddenInSubscribee )))
     { errors . push("HiddenInSubscribeeCol must be unique among its siblings."
                     . to_string()); }
-  if !relation_col_children_have_distinct_ids(tree, node_id)
+  if !partnerCol_children_have_distinct_ids(tree, node_id)
     { errors . push(
       "HiddenInSubscribeeCol must not have duplicate TrueNode children."
         . to_string() ); }
@@ -176,7 +176,7 @@ fn validate_hidden_outside_of_subscribee_col (
     tree, node_id, -1, false,
     |node| matches!(&node . kind,
                     MpViewnodeKind::PartnerCol (
-                      RoleCol::Subscribee)))
+                      PartnerCol::Subscribee)))
     { errors . push(
         "HiddenOutsideOfSubscribeeCol must have a SubscribeeCol parent."
         . to_string()); }
@@ -199,11 +199,11 @@ fn validate_hidden_outside_of_subscribee_col (
     tree, node_id,
     |node| matches!(&node . kind,
                     MpViewnodeKind::PartnerCol (
-                      RoleCol::HiddenOutsideOfSubscribee )))
+                      PartnerCol::HiddenOutsideOfSubscribee )))
     { errors . push(
         "HiddenOutsideOfSubscribeeCol must be unique among its siblings."
         . to_string()); }
-  if !relation_col_children_have_distinct_ids(tree, node_id)
+  if !partnerCol_children_have_distinct_ids(tree, node_id)
     { errors . push(
         "HiddenOutsideOfSubscribeeCol must not have duplicate TrueNode children."
         . to_string() ); }
@@ -223,7 +223,7 @@ fn validate_subscribeecol (
     |node| node . is_active_or_diff_phantom ()
            || matches!(&node . kind,
                     MpViewnodeKind::PartnerCol (
-                      RoleCol::HiddenOutsideOfSubscribee) ))
+                      PartnerCol::HiddenOutsideOfSubscribee) ))
     { errors . push( "SubscribeeCol's children must include only TrueNodes or HiddenOutsideOfSubscribeeCol." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
@@ -233,7 +233,7 @@ fn validate_subscribeecol (
       MpViewnodeKind::Phantom (MpPhantom::Diff (_)) =>
         true,
       MpViewnodeKind::PartnerCol (
-        RoleCol::HiddenOutsideOfSubscribee)
+        PartnerCol::HiddenOutsideOfSubscribee)
         => true,
       _ => false, } )
     { errors . push("SubscribeeCol TrueNode children must have parentIs=affected."
@@ -249,10 +249,10 @@ fn validate_subscribeecol (
 fn validate_relation_col (
   tree     : &Tree<MpViewnode>,
   node_id  : NodeId,
-  roleCol  : RoleCol,
+  partnerCol  : PartnerCol,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
-  let label : String = roleCol . repr_in_client () . to_string ();
+  let label : String = partnerCol . repr_in_client () . to_string ();
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| node . is_active_or_diff_phantom ())
@@ -275,13 +275,13 @@ fn validate_relation_col (
     tree, node_id,
     |node| matches!(&node . kind,
                     MpViewnodeKind::PartnerCol (r)
-                    if *r == roleCol))
+                    if *r == partnerCol))
     { errors . push(format!("{} must be unique among its siblings.", label)); }
-  if roleCol != RoleCol::Overridden
+  if partnerCol != PartnerCol::Overridden
     // OverriddenCol is a defining col: duplicate members are silently
     // deduplicated at emission rather than bouncing the save. The
     // read-only roles keep the check.
-    && !relation_col_children_have_distinct_ids(tree, node_id) {
+    && !partnerCol_children_have_distinct_ids(tree, node_id) {
     errors . push(format!(
       "{} must not have duplicate TrueNode children.", label)); }
   errors }
@@ -417,8 +417,8 @@ fn cannot_be_child_of_gnode (
   matches!(&node . kind,
     MpViewnodeKind::BufferRoot |
     MpViewnodeKind::Qual (Qual::Alias { .. } | Qual::ID { .. }) |
-    MpViewnodeKind::PartnerCol (RoleCol::HiddenInSubscribee |
-                                         RoleCol::HiddenOutsideOfSubscribee)) }
+    MpViewnodeKind::PartnerCol (PartnerCol::HiddenInSubscribee |
+                                         PartnerCol::HiddenOutsideOfSubscribee)) }
 
 /// Check if an MpTruenode has an ID.
 pub fn has_id ( t : &MpTruenode ) -> bool {
@@ -471,7 +471,7 @@ pub fn nonignored_children_have_distinct_ids (
         return false; }}}
   true }
 
-fn relation_col_children_have_distinct_ids (
+fn partnerCol_children_have_distinct_ids (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
 ) -> bool {

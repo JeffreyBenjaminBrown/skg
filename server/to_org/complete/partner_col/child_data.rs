@@ -1,4 +1,4 @@
-/// Shared per-child information for sharing-col reconciliation.
+/// Shared per-child information for PartnerCol reconciliation.
 ///
 /// Used by the rerender-time completers for SubscribeeCol,
 /// HiddenInSubscribeeCol, and HiddenOutsideOfSubscribeeCol.
@@ -12,7 +12,7 @@
 ///   that `goal_list`, whether it already existed in the buffer or
 ///   was created during reconciliation.
 /// - A relevant child is one this reconciliation pass is allowed to
-///   manage: for sharing cols, a TrueNode marked parentIs=affected.
+///   manage: for PartnerCols, a TrueNode marked parentIs=affected.
 ///   Relevant children whose IDs are not in the goal list are removed
 ///   or otherwise demoted by the caller-specific cleanup step.
 /// - `ChildData` is the pre-fetched title/source/phantom metadata
@@ -25,7 +25,7 @@ use crate::types::misc::{ID, SourceName};
 use crate::types::phantom::{title_for_phantom, phantom_axes};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Vognode, ParentIs, RoleCol, mk_indefinitive_viewnode, mk_phantom_viewnode};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Vognode, ParentIs, PartnerCol, mk_indefinitive_viewnode, mk_phantom_viewnode};
 use crate::update_buffer::util::complete_relevant_children_in_viewnodetree;
 use crate::update_buffer::util::treat_certain_children;
 
@@ -90,9 +90,9 @@ pub fn build_child_data (
         . unwrap_or_else ( SourceName::not_found );
       // §C: phantom_axes derives the membership axis from the parent's per-stage
       // relation diffs -- contains_diff, subscribes_to_diff, AND hides_diff -- so
-      // a removed sharing-col member (subscribee / hidden-outside) now gets a
+      // a removed PartnerCol member (subscribee / hidden-outside) now gets a
       // PER-STAGE removedM, and phantom_axes itself net-falls-back to unstaged
-      // Minus for the relation-col case it can't express per-stage.
+      // Minus for the relationful-PartnerCol case it can't express per-stage.
       let axes : (ExistenceAxes, MembershipAxes) =
         phantom_axes ( child_skgid, &child_src,
                        parent_skgid, parent_source,
@@ -123,9 +123,9 @@ pub fn build_child_data (
                                     phantom : None } ); }}
   Ok (result) }
 
-/// Reconcile a sharing-col's children against a goal list.
+/// Reconcile a PartnerCol's children against a goal list.
 ///
-/// All three rerender-time sharing-col completers
+/// The rerender-time PartnerCol completers
 /// (SubscribeeCol, HiddenInSubscribeeCol,
 /// HiddenOutsideOfSubscribeeCol) share the same call shape: build
 /// per-child data before mutation, then call
@@ -133,10 +133,10 @@ pub fn build_child_data (
 /// relevance/key/create closures. Phantom-flagged ChildData entries
 /// produce phantom viewnodes; non-phantom entries produce
 /// indefinitive viewnodes marked ParentIs::Affected.
-pub fn reconcile_sharing_col_children (
+pub fn reconcile_partnerCol_children_against_goal_list (
   tree          : &mut Tree<ViewNode>,
   col_node      : NodeId,
-  kind          : RoleCol,
+  kind          : PartnerCol,
   goal_list     : &[ID],
   child_data    : &HashMap<ID, ChildData>,
 ) -> Result<(), Box<dyn Error>> {

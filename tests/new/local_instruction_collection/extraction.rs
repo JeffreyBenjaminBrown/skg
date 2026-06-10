@@ -1500,7 +1500,7 @@ fn independent_member_is_excluded_from_overriddens (
 fn would_be_diff_phantom_child_still_counts_as_visible_content (
 ) {
   // This pins an asymmetry: the visible-content predicate has no
-  // diff-phantom condition, unlike the contains and relation-col
+  // diff-phantom condition, unlike the contains and PartnerCol
   // membership predicates. See
   // 'active_child_counts_as_visible_content'.
   let input : &str =

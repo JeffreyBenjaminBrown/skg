@@ -1,2 +1,2 @@
 pub mod contents;
-pub mod sharing;
+pub mod partner_col;

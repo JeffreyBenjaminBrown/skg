@@ -1,30 +1,30 @@
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::to_org::complete::sharing::child_data::{
+use crate::to_org::complete::partner_col::child_data::{
   build_child_data,
   ChildData,
-  reconcile_sharing_col_children,
+  reconcile_partnerCol_children_against_goal_list,
 };
 use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
-use crate::types::viewnode::{RoleCol, ViewNode};
+use crate::types::viewnode::{PartnerCol, ViewNode};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::sync::Arc;
 
-/// Reconciles one relation col (TODO/DONE/local-view-update/plan_v2.org §19 terminology: a col = a collecting scaffold)
+/// Reconciles one PartnerCol (TODO/DONE/local-view-update/plan_v2.org §19 terminology: a col = a collecting scaffold)
 /// from a node in the view tree with the current in-Rust graph snapshot's data
 /// about that node.
 /// Makes the col's TrueNode children marked parentIs=affected match a goal list,
 /// preserving reusable children and creating missing ones,
 /// then demotes stale children marked parentIs=affected to 'parentIs=independent'.
-pub fn reconcile_relation_col_children (
-  node         : NodeId, // The relation col. Its parent is a TrueNode.
+pub fn reconcile_partnerCol_children (
+  node         : NodeId, // The PartnerCol. Its parent is a TrueNode.
   tree         : &mut Tree<ViewNode>,
-  kind         : RoleCol,
+  kind         : PartnerCol,
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
   env          : &SkgEnv,
   graph_snap   : &Arc<InRustGraph>,
@@ -39,7 +39,7 @@ pub fn reconcile_relation_col_children (
       tree, node, 0, kind . caller_label () ) ?;
   let Some (member_role) = kind . relation_member_role () else {
     return Err (format!(
-      "{} called for non-relation collection {:?}",
+      "{} called for PartnerCol {:?}, which has no relation member role",
       kind . caller_label (), kind) . into ()); };
   let owner_role =
     member_role . opposite_role ();
@@ -56,8 +56,8 @@ pub fn reconcile_relation_col_children (
       &goal_list, &removed_ids,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §6.0/§16: the reconciler deletes a stale member that is a view-leaf and
-  // demotes one that is a branch, so a relation col (read-only from this side)
+  // demotes one that is a branch, so a read-only PartnerCol
   // drops a stale leaf member instead of preserving it.
-  reconcile_sharing_col_children (
+  reconcile_partnerCol_children_against_goal_list (
     tree, node, kind, &goal_list, &child_data ) ?;
   Ok (( )) }

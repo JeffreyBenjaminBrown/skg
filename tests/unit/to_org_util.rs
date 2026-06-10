@@ -132,7 +132,7 @@ fn orphan_under_dead_parent_demoted_member_under_col_kept () {
   // §A (Jeff's invariant): an Affected Active node under a non-container
   // parent (Diff phantom / DeadScaffold) demotes to Independent; a legitimate
   // col MEMBER (Affected Normal under a PartnerCol) is left untouched.
-  use crate::types::viewnode::{ mk_phantom_viewnode, RoleCol };
+  use crate::types::viewnode::{ mk_phantom_viewnode, PartnerCol };
   use crate::types::git::{ ExistenceAxes, MembershipAxes };
   let mut vf : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = vf . root () . id ();
@@ -151,7 +151,7 @@ fn orphan_under_dead_parent_demoted_member_under_col_kept () {
                               ParentIs::Affected) ) . id ();
   let col : NodeId = vf . get_mut (root) . unwrap () . append (
     ViewNode { focused: false, folded: false, body_folded: false,
-               kind: ViewNodeKind::PartnerCol (RoleCol::Subscribee) } ) . id ();
+               kind: ViewNodeKind::PartnerCol (PartnerCol::Subscribee) } ) . id ();
   let member : NodeId = vf . get_mut (col) . unwrap () . append (
     mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
                               ParentIs::Affected) ) . id ();
