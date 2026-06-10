@@ -41,6 +41,12 @@ pub fn init_global_handle_for_first_time_or_panic (handle: InRustGraphHandle) {
   GLOBAL_HANDLE . set (handle) . ok ()
     . expect ("GLOBAL_HANDLE initialized twice"); }
 
+/// Idempotent variant, for tests whose process may already have a
+/// handle (in-process test runners share the OnceLock). Returns
+/// whether this call installed it.
+pub fn try_init_global_handle (handle: InRustGraphHandle) -> bool {
+  GLOBAL_HANDLE . set (handle) . is_ok () }
+
 /// Snap the current in-Rust graph if the global handle has been
 /// initialized; returns None otherwise. In the running server
 /// 'init_global_handle_for_first_time_or_panic' is called during startup before any request

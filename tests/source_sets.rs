@@ -781,3 +781,4 @@ fn weave_preserves_omitted_inactive_content_members (
           vec![ ID::from ("private-a"), ID::from ("active-b") ],
           "visible deletion lands; invisible member survives" ); }
       Ok (( )) } )) }
+

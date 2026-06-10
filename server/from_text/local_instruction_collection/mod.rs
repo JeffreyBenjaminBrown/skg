@@ -24,7 +24,8 @@ use crate::dbs::node_lookup::nodecomplete_from_in_rust_graph;
 use crate::from_text::supplement_from_disk::{
   build_diskSupplemented_defineNodes,
   Definenodes_with_Sourcemoves };
-use crate::from_text::validate::buffernode_differs_from_disknode;
+use crate::from_text::validate::{buffernode_differs_from_disknode, suppress_writes_to_inactive_nodes};
+use crate::from_text::weave::member_is_visible;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
@@ -41,6 +42,7 @@ use typedb_driver::TypeDBDriver;
 pub struct NonmergeSavePlan {
   pub define_nodes : Vec<DefineNode>,
   pub source_moves : Vec<SourceMove>,
+  pub warnings     : Vec<String>, // nonfatal, destined for SaveResponse.warnings (e.g. inactive-node rewrite suppression)
 }
 
 /// This is the whole non-nodeMerge half of save extraction, done via
@@ -73,9 +75,37 @@ pub async fn extract_nonmergeSavePlan_locally (
       config, driver, restricted_source_set ) . await ?;
   let sans_noops : Vec<DefineNode> =
     filter_wouldbe_noop_defineNodes (with_disk . instructions);
+  let (define_nodes, source_moves, suppressed_writes)
+    : (Vec<DefineNode>, Vec<SourceMove>, bool)
+    = suppress_writes_to_inactive_nodes (
+        sans_noops, with_disk . source_moves,
+        restricted_source_set );
+  let (nodeMerge_acquisitions, suppressed_merges)
+    : (Vec<(ID, ID)>, bool)
+    = match restricted_source_set {
+        None => (nodeMerge_acquisitions, false),
+        Some (active) => {
+          // A nodeMerge writes both nodes' files; under a restricted
+          // set it is suppressed unless both sides are provably
+          // active (TODO/full-schema/9-2_source-set-safety.org).
+          let before : usize = nodeMerge_acquisitions . len ();
+          let kept : Vec<(ID, ID)> =
+            nodeMerge_acquisitions . into_iter ()
+            . filter ( |(acquirer, acquiree)|
+                member_is_visible (acquirer, config, active)
+                && member_is_visible (acquiree, config, active) )
+            . collect ();
+          let suppressed : bool = kept . len () < before;
+          (kept, suppressed) }};
+  let warnings : Vec<String> =
+    if suppressed_writes || suppressed_merges {
+      vec! [ "Inactive nodes present in saved buffer remain unchanged in graph."
+             . to_string () ] }
+    else { Vec::new () };
   Ok (( NonmergeSavePlan {
-          define_nodes : sans_noops,
-          source_moves : with_disk . source_moves },
+          define_nodes,
+          source_moves,
+          warnings },
         nodeMerge_acquisitions )) }
 
 /// Filters out Save instructions that would be no-ops,

@@ -1,3 +1,4 @@
+use crate::source_sets::ActiveSourceSet;
 use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
@@ -204,3 +205,44 @@ pub(super) fn validate_no_simultaneous_move_and_nodeMerge (
           nodeMerge . acquiree_id() . clone() )); }}
   if errors . is_empty() { Ok (())
   } else { Err (errors) }}
+
+/// TODO/full-schema/9-2_source-set-safety.org, inactive-node rewrite
+/// suppression: under a restricted source-set, any instruction that
+/// would modify an inactive node is DROPPED rather than executed or
+/// fatal.  A stale buffer (rendered before a source-set switch) can
+/// legitimately hold whole now-inactive subtrees; aborting would
+/// force the user to delete them from view, which would itself be
+/// destructive.  Runs after the noop filter, so an untouched stale
+/// node (whose identical-to-disk instruction the noop filter already
+/// discarded) does not count as suppressed.  Returns whether
+/// anything was dropped, so the caller can attach the warning
+/// "Inactive nodes present in saved buffer remain unchanged in
+/// graph."
+pub fn suppress_writes_to_inactive_nodes (
+  define_nodes : Vec<DefineNode>,
+  source_moves : Vec<SourceMove>,
+  restricted_source_set : Option<&ActiveSourceSet>,
+) -> (Vec<DefineNode>, Vec<SourceMove>, bool) {
+  let Some (active) = restricted_source_set else {
+    return (define_nodes, source_moves, false); };
+  let mut suppressed : bool = false;
+  let define_nodes : Vec<DefineNode> =
+    define_nodes . into_iter ()
+    . filter ( |instruction| {
+        let source : &SourceName = match instruction {
+          DefineNode::Save (SaveNode (node)) => &node . source,
+          DefineNode::Delete (d)             => &d . source };
+        let keep : bool = active . contains_source (source);
+        if ! keep { suppressed = true; }
+        keep } )
+    . collect ();
+  let source_moves : Vec<SourceMove> =
+    source_moves . into_iter ()
+    . filter ( |mv| {
+        let keep : bool =
+          active . contains_source (&mv . old_source)
+          && active . contains_source (&mv . new_source);
+        if ! keep { suppressed = true; }
+        keep } )
+    . collect ();
+  (define_nodes, source_moves, suppressed) }

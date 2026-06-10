@@ -111,9 +111,13 @@ pub async fn buffer_to_validated_saveplan (
   validate_no_simultaneous_move_and_nodeMerge (
     &nonmerge_plan . source_moves, &nodeMerge_instructions )
     . map_err (SaveError::BufferValidationErrors) ?;
+  let warnings : Vec<String> = {
+    let mut warnings : Vec<String> = parsing_warnings;
+    warnings . extend ( nonmerge_plan . warnings );
+    warnings };
   Ok (( viewforest,
         SavePlan {
           define_nodes,
           nodeMerge_instructions,
           source_moves : nonmerge_plan . source_moves },
-        parsing_warnings )) }
+        warnings )) }
