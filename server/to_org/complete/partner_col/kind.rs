@@ -1,12 +1,15 @@
 //! PartnerCol metadata used by PartnerCol completion paths.
 //!
-//! The three rerender-time completers — for SubscribeeCol,
-//! HiddenInSubscribeeCol, and HiddenOutsideOfSubscribeeCol — share
-//! enough structure (build child data, reconcile against a goal
-//! list) that several pieces of per-kind metadata are worth
-//! capturing as methods: the caller-label string used in panic
-//! messages, the corresponding PartnerCol variant, and a self-type
-//! guard.
+//! The rerender-time completers share enough structure (build child
+//! data, reconcile against a goal list) that several pieces of
+//! per-kind metadata are worth capturing as methods: the
+//! caller-label string used in error messages, the corresponding
+//! relation role, and a self-type guard.
+//!
+//! These methods live here rather than beside the type because they
+//! depend on 'RelationRole' (the dbs layer), which
+//! 'server/types/viewnode.rs' should not import. The pure per-kind
+//! fact, 'PartnerCol::policy', lives with the type.
 
 use crate::types::tree::generic::error_unless_node_satisfies;
 use crate::types::viewnode::{PartnerCol, ViewNode, ViewNodeKind};

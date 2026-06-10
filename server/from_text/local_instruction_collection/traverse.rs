@@ -106,6 +106,10 @@ fn visit (
         node_ref, &LocalContext::TopLevel, collected),
     ViewNodeKind::QualCol (QualCol::Alias) =>
       visit_aliascol (node_ref, context, collected),
+    // The two arms below are exactly the ColPolicy::WritableSet
+    // PartnerCols; the catch-all PartnerCol arm after them covers the
+    // ReadOnlySet and ReadOnlyFilter policies. If a new PartnerCol is
+    // added, 'PartnerCol::policy' says which group it joins.
     ViewNodeKind::PartnerCol (PartnerCol::Subscribee) =>
       visit_subscribeecol (node_ref, context, collected),
     ViewNodeKind::PartnerCol (PartnerCol::Overridden) =>
@@ -217,6 +221,9 @@ fn recurse_under_gnode (
     let child_context : LocalContext =
       match &child . value() . kind {
         ViewNodeKind::QualCol (QualCol::Alias)
+          // The two PartnerCols here are exactly the
+          // ColPolicy::WritableSet ones; the read-only policies fall
+          // to the UnderReadOnlyCol arm below.
           | ViewNodeKind::PartnerCol (PartnerCol::Subscribee)
           | ViewNodeKind::PartnerCol (PartnerCol::Overridden) =>
           match &owner {

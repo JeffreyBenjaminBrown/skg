@@ -348,6 +348,34 @@ pub enum PartnerCol {
   // TODO | PITFALL: HiddenOutsideOfSubscribee should be editable. Currently the client offers no easy way for a user to unhide things unnecessarily hidden. (It is technically possible, by creating a node you own, subscribing to it, and then modifying a subscribee-as-such representative of the new node. But that's baroque.)
 }
 
+/// How a PartnerCol's membership relates to user edits.
+/// Every layer that treats some PartnerCols differently from others
+/// (save extraction, reconciliation, herald metadata) should consult
+/// 'PartnerCol::policy' rather than matching on col variants, so the
+/// policies cannot drift apart per file.
+///
+/// STALE-MEMBER RULE (uniform; decided 2026-06-10, superseding the
+/// discard policy once planned for the filter cols in
+/// TODO/full-schema/7_saving-readonly-cols.org): during
+/// reconciliation, a stale member that is a leaf is deleted, and one
+/// with children is demoted to parentIs=Independent, whatever the
+/// policy. The policies differ in:
+/// - whether buffer membership is read at save extraction
+///   (only 'WritableSet'),
+/// - where the goal list comes from ('WritableSet' and 'ReadOnlySet'
+///   from 'relation_member_role'; 'ReadOnlyFilter' from hide state),
+/// - goal-list order ('WritableSet': graph/disk order, which the
+///   user's own save defines; 'ReadOnlySet': the view's current
+///   member order, then missing members appended; 'ReadOnlyFilter':
+///   derived),
+/// - whether repairs warn (the read-only policies, in the saved view).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ColPolicy {
+  WritableSet,    // Membership edits are graph edits. An absent col means no opinion; a present-but-empty col means an explicit empty set (see 'MSV').
+  ReadOnlySet,    // Membership is generated from the graph. User order is respected view-locally; membership edits are repaired, with a warning.
+  ReadOnlyFilter, // Membership is derived from hide state rather than from a relation role. Repaired, with a warning.
+}
+
 /// Requests for editing operations on a node.
 /// Only one edit request is allowed per node.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -449,6 +477,21 @@ impl NodeLinksourceRels {
                        "→" ) } }
 
 impl PartnerCol {
+  pub fn policy (self) -> ColPolicy {
+    match self {
+      PartnerCol::Subscribee
+        | PartnerCol::Overridden
+        => ColPolicy::WritableSet,
+      PartnerCol::Subscriber
+        | PartnerCol::Overrider
+        | PartnerCol::Hider
+        | PartnerCol::Hidden
+        => ColPolicy::ReadOnlySet,
+      PartnerCol::HiddenInSubscribee
+        | PartnerCol::HiddenOutsideOfSubscribee
+        => ColPolicy::ReadOnlyFilter,
+    } }
+
   pub fn repr_in_client (self) -> &'static str {
     match self {
       PartnerCol::Subscribee                => "subscribeeCol",
@@ -898,3 +941,8 @@ pub fn viewforest_root_viewnode () -> ViewNode {
     body_folded : false,
     kind        : ViewNodeKind::BufferRoot,
   }}
+
+#[cfg(test)]
+#[allow(non_snake_case)]
+#[path = "../../tests/unit/viewnode.rs"]
+mod tests;

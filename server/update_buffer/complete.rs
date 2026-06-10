@@ -153,6 +153,10 @@ async fn dispatch_node_update (
         treeid, tree, context . source_diffs, context . env,
         context . deleted_since_head_pid_src_map ) ?,
     ViewNodeKind::PartnerCol (role)
+      // This arm serves one ColPolicy::WritableSet col (Overridden;
+      // Subscribee has its own completer above) and every
+      // ColPolicy::ReadOnlySet col. The reconciler branches on
+      // 'PartnerCol::policy' where their treatment differs.
       if role . relation_member_role () . is_some () =>
       reconcile_partnerCol_children (
         treeid, tree, *role, context . source_diffs,
