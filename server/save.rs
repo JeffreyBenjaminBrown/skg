@@ -18,7 +18,7 @@ use crate::dbs::in_rust_graph::{
 };
 use crate::dbs::tantivy::background_writer::{enqueue_tantivy_write, lock_tantivy_writes, TantivyWriteTask};
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
-use crate::merge::merge_nodes;
+use crate::nodeMerge::merge_nodes;
 use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
 use crate::dbs::typedb::nodes::delete_nodes_from_pids;
 use crate::dbs::typedb::nodes::overwrite_extra_ids_of_node;
@@ -32,7 +32,7 @@ use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::nodes::rust::NodeRust;
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::nodes::typedb::NodeTypedb;
-use crate::types::save::{DefineNode, SaveNode, DeleteNode, Merge, SourceMove};
+use crate::types::save::{DefineNode, SaveNode, DeleteNode, NodeMerge, SourceMove};
 use crate::types::nodes::complete::NodeComplete;
 use crate::util::path_from_pid_and_source;
 
@@ -49,7 +49,7 @@ use typedb_driver::TypeDBDriver;
 ///   3) Tantivy (with recovery: rebuild from disk on failure)
 /// Returns `None` when all three stores updated normally.
 /// Returns `Some(new_index)` when Tantivy had to be rebuilt.
-pub async fn update_graph_minus_merges (
+pub async fn update_graph_minus_nodeMerges (
   mut node_defs : Vec<DefineNode>,
   source_moves  : &[SourceMove],
   config        : SkgConfig,
@@ -154,14 +154,14 @@ async fn apply_define_nodes_to_stores (
     context_types, } );
   Ok (None) }
 
-/// Runs 'update_graph_minus_merges' and then 'merge_nodes' in that
+/// Runs 'update_graph_minus_nodeMerges' and then 'merge_nodes' in that
 /// order, applying any Tantivy rebuild from either step to the
 /// caller's '&mut TantivyIndex'. The sole place the save pipeline
 /// should call when it has both save_instructions and
-/// merge_instructions in hand.
-pub async fn update_graph_including_merges (
+/// nodeMerge_instructions in hand.
+pub async fn update_graph_including_nodeMerges (
   save_instructions  : Vec<DefineNode>,
-  merge_instructions : &[Merge],
+  nodeMerge_instructions : &[NodeMerge],
   source_moves       : &[SourceMove],
   config             : SkgConfig,
   tantivy_index      : &mut TantivyIndex,
@@ -172,30 +172,30 @@ pub async fn update_graph_including_merges (
       "validate_override_invariants_after_save" ). entered();
     validate_override_invariants_after_save (
       &save_instructions,
-      merge_instructions,
+      nodeMerge_instructions,
       &config,
       graph ) } ?;
   let save_replacement : Option<TantivyIndex> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "update_graph_minus_merges" ). entered();
-      update_graph_minus_merges (
+        "update_graph_minus_nodeMerges" ). entered();
+      update_graph_minus_nodeMerges (
         save_instructions, source_moves, config . clone(),
         tantivy_index, driver, graph ) . await } ?;
   if let Some (new_index) = save_replacement {
     *tantivy_index = new_index; }
-  let merge_replacement : Option<TantivyIndex> =
+  let nodeMerge_replacement : Option<TantivyIndex> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "merge_nodes" ). entered();
       merge_nodes (
-        merge_instructions, config,
+        nodeMerge_instructions, config,
         tantivy_index, driver, graph ) . await } ?;
-  if let Some (new_index) = merge_replacement {
+  if let Some (new_index) = nodeMerge_replacement {
     *tantivy_index = new_index; }
   Ok (( )) }
 
 pub fn validate_override_invariants_after_save (
   save_instructions  : &[DefineNode],
-  merge_instructions : &[Merge],
+  nodeMerge_instructions : &[NodeMerge],
   config             : &SkgConfig,
   graph              : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
@@ -207,13 +207,13 @@ pub fn validate_override_invariants_after_save (
     save_instructions . to_vec ();
   apply_delete_propagation_cleanup (&mut nonmerge, &graph_snap);
   apply_definenodes_to_inRustGraph (&mut simulated, &nonmerge);
-  let merge_definenodes : Vec<DefineNode> =
-    merge_instructions . iter ()
-    . flat_map ( |merge| merge . to_vec () )
+  let nodeMerge_definenodes : Vec<DefineNode> =
+    nodeMerge_instructions . iter ()
+    . flat_map ( |nodeMerge| nodeMerge . to_vec () )
     . collect ();
-  apply_definenodes_to_inRustGraph (&mut simulated, &merge_definenodes);
+  apply_definenodes_to_inRustGraph (&mut simulated, &nodeMerge_definenodes);
   let touched : HashSet<ID> = // every node this save actually wrote
-    nonmerge . iter () . chain ( merge_definenodes . iter () )
+    nonmerge . iter () . chain ( nodeMerge_definenodes . iter () )
     . map ( |dn| match dn {
         DefineNode::Save (SaveNode (n)) => n . pid . clone (),
         DefineNode::Delete (DeleteNode { id, .. }) => id . clone (), } )
@@ -243,7 +243,7 @@ pub async fn update_typedb_from_saveinstructions (
   driver       : &TypeDBDriver,
   node_defs    : &[DefineNode],
   source_moves : &[SourceMove],
-  old_graph    : Option<&InRustGraph>, // Some → write only the edge delta vs this pre-save snapshot; None → bulk delete-all + recreate-all (the merge path, where pid migration makes a set-diff subtle).
+  old_graph    : Option<&InRustGraph>, // Some → write only the edge delta vs this pre-save snapshot; None → bulk delete-all + recreate-all (the nodeMerge path, where pid migration makes a set-diff subtle).
 ) -> Result<(), Box<dyn Error>> {
 
   // PITFALL: Below, each get(0) on an 'ids' field
@@ -500,7 +500,7 @@ pub fn update_fs_from_saveinstructions (
 pub(crate) fn update_tantivy_from_saveinstructions (
   instructions  : &[DefineNode],
   tantivy_index : &TantivyIndex,
-  context_types : &HashMap<ID, String>, // pid -> context_origin_type label, so each doc is indexed once with its final type (no second context pass needed). Empty for the merge path.
+  context_types : &HashMap<ID, String>, // pid -> context_origin_type label, so each doc is indexed once with its final type (no second context pass needed). Empty for the nodeMerge path.
 ) -> Result<usize, Box<dyn Error>> {
 
   let _wlock = // one IndexWriter per directory; serialize all Tantivy writers

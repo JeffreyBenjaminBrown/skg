@@ -12,14 +12,20 @@ mod validate_tree;
 #[path = "new/buffer_to_viewnodes/add_missing_info.rs"]
 mod add_missing_info;
 
-#[path = "new/viewnodes_to_instructions.rs"]
-mod viewnodes_to_instructions;
+#[path = "new/local_instruction_collection/predicates.rs"]
+mod local_instruction_collection_predicates;
 
-#[path = "new/viewnodes_to_instructions/classify.rs"]
-mod classify;
+#[path = "new/local_instruction_collection/types.rs"]
+mod local_instruction_collection_types;
 
-#[path = "new/viewnodes_to_instructions/reconcile_same_id_instructions.rs"]
-mod reconcile_same_id_instructions;
+#[path = "new/local_instruction_collection/traverse.rs"]
+mod local_instruction_collection_traverse;
 
-#[path = "new/viewnodes_to_instructions/reconcile_same_id_instructions/by_claude.rs"]
-mod reconcile_same_id_instructions_by_claude;
+#[path = "new/local_instruction_collection/lower.rs"]
+mod local_instruction_collection_lower;
+
+#[path = "new/local_instruction_collection/pipeline.rs"]
+mod local_instruction_collection_pipeline;
+
+#[path = "new/local_instruction_collection/extraction.rs"]
+mod local_instruction_collection_extraction;

@@ -13,7 +13,7 @@ use skg::dbs::typedb::relationships::create_all_relationships;
 use skg::dbs::typedb::sources::create_all_sources;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::save::update_graph_minus_merges;
+use skg::save::update_graph_minus_nodeMerges;
 use skg::test_utils::{cleanup_test_tantivy_and_typedb_dbs, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::errors::{SaveError, BufferValidationError};
 
@@ -163,7 +163,7 @@ fn test_move_node_to_another_owned_source (
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
-      update_graph_minus_merges (
+      update_graph_minus_nodeMerges (
         save_plan . define_nodes, &save_plan . source_moves,
         config . clone(), &tantivy_index, &driver,
         &graph ) . await?;
@@ -259,7 +259,7 @@ fn test_move_node_referenced_by_extra_id (
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
-      update_graph_minus_merges (
+      update_graph_minus_nodeMerges (
         save_plan . define_nodes, &save_plan . source_moves,
         config . clone(), &tantivy_index, &driver,
         &graph ) . await?;
@@ -330,7 +330,7 @@ fn test_move_multiple_nodes (
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
-      update_graph_minus_merges (
+      update_graph_minus_nodeMerges (
         save_plan . define_nodes, &save_plan . source_moves,
         config . clone(), &_tantivy_index, &driver,
         &graph ) . await?;
@@ -493,7 +493,7 @@ fn test_no_source_change_produces_no_moves (
 
 /// Reproduces the bug: changing only the source (nothing else)
 /// with a populated pool caused the instruction to be filtered out
-/// by filter_wouldbe_noop_definenodes (which didn't compare source).
+/// by filter_wouldbe_noop_defineNodes (which didn't compare source).
 #[test]
 fn test_source_only_change_with_populated_pool (
 ) -> Result<(), Box<dyn Error>> {
@@ -535,7 +535,7 @@ fn test_source_only_change_with_populated_pool (
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
-      update_graph_minus_merges (
+      update_graph_minus_nodeMerges (
         save_plan . define_nodes, &save_plan . source_moves,
         config . clone(), &tantivy_index, &driver,
         &graph ) . await?;

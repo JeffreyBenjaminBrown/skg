@@ -228,7 +228,7 @@ fn test_merge_with_foreign_acquirer_rejected() -> Result<(), Box<dyn Error>> {
       let result: Result<_, _> = buffer_to_validated_saveplan(
         org_text, config, driver ) . await;
       // Should fail - can't merge into foreign node (would modify it)
-      assert!(result . is_err(), "Merge into foreign acquirer should be rejected");
+      assert!(result . is_err(), "NodeMerge into foreign acquirer should be rejected");
       match result . unwrap_err() {
         SaveError::BufferValidationErrors (errors) => {
           assert!(errors . iter() . any(|e| matches!(
@@ -254,7 +254,7 @@ fn test_merge_with_foreign_acquiree_rejected() -> Result<(), Box<dyn Error>> {
       let result: Result<_, _> = buffer_to_validated_saveplan(
         org_text, config, driver ) . await;
       // Should fail - can't merge foreign node (would delete it)
-      assert!(result . is_err(), "Merge with foreign acquiree should be rejected");
+      assert!(result . is_err(), "NodeMerge with foreign acquiree should be rejected");
       match result . unwrap_err() {
         SaveError::BufferValidationErrors (errors) => {
           assert!(errors . iter() . any(|e| matches!(
@@ -271,7 +271,7 @@ fn test_merge_with_both_owned_allowed() -> Result<(), Box<dyn Error>> {
     "skg-test-merge-owned",
     CONFIG_PATH,
     |config, driver| Box::pin(async move {
-      // Merge where both nodes are owned - should work
+      // NodeMerge where both nodes are owned - should work
       let org_text: &str = indoc! {"
         * (skg (node (id node1) (source main) (editRequest (merge child1)))) Node merging into child
         * (skg (node (id child1) (source main))) Child node
@@ -279,7 +279,7 @@ fn test_merge_with_both_owned_allowed() -> Result<(), Box<dyn Error>> {
       let result: Result<_, _> = buffer_to_validated_saveplan(
         org_text, config, driver ) . await;
       // Should succeed - both nodes are owned
-      assert!(result . is_ok(), "Merge with both owned nodes should be allowed");
+      assert!(result . is_ok(), "NodeMerge with both owned nodes should be allowed");
       Ok(())
     } ))
 }

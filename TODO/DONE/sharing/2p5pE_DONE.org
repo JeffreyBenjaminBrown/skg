@@ -16,7 +16,7 @@ The save path currently does this:
 naive Vec<NodeIntent>
   -> reconcile_nodeIntents -> Vec<NodeIntent>
   -> apply_hiderels_from_intents scans the Vec by PID
-  -> build_disk_supplemented_define_nodes iterates the Vec
+  -> build_diskSupplemented_defineNodes iterates the Vec
 #+end_src
 
 That works, but the vector is carrying two responsibilities:
@@ -135,14 +135,14 @@ for a PID.
 
 ** 5. Keep disk supplementation boring
 
-=build_disk_supplemented_define_nodes= can still iterate ordered
+=build_diskSupplemented_defineNodes= can still iterate ordered
 =NodeIntent= values, but the conversion from keyed collection to
 ordered values should happen at the boundary:
 
 #+begin_src text
 ReconciledNodeIntents
   -> into_ordered_intents()
-  -> build_disk_supplemented_define_nodes
+  -> build_diskSupplemented_defineNodes
 #+end_src
 
 Do not mix disk supplementation with collection lookup policy.

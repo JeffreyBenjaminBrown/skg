@@ -352,7 +352,7 @@ pub enum RoleCol {
 /// Only one edit request is allowed per node.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EditRequest {
-  Merge (ID), // The node with this request is the acquirer. The node with the ID that this request specifies is the acquiree.
+  NodeMerge (ID), // The node with this request is the acquirer. The node with the ID that this request specifies is the acquiree.
   Delete, // request to delete this node
 }
 
@@ -662,7 +662,7 @@ impl fmt::Display for EditRequest {
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
     match self {
-      EditRequest::Merge (id) => write!(f, "(merge {})", id . 0),
+      EditRequest::NodeMerge (id) => write!(f, "(merge {})", id . 0),
       EditRequest::Delete    => write!(f, "toDelete"),
     }} }
 
@@ -677,7 +677,7 @@ impl FromStr for EditRequest {
       _ => {
         // Try to parse as "merge <id>"
         if let Some (id_str) = s . strip_prefix ("merge ") {
-          Ok ( EditRequest::Merge ( ID::from (id_str) ) )
+          Ok ( EditRequest::NodeMerge ( ID::from (id_str) ) )
         } else {
           Err ( format! ( "Unknown EditRequest value: {}", s ))
         }} }} }

@@ -58,7 +58,7 @@ of nodeMerge extraction.
 
 It does NOT replace (these stay downstream, consuming its output):
 visibility resolution (rewritten -- see below), disk
-supplementation, the noop filter ('filter_wouldbe_noop_definenodes',
+supplementation, the noop filter ('filter_wouldbe_noop_defineNodes',
 which must stay after supplementation), foreign-instruction
 validation, and nodeMerge triple expansion.
 * assumptions, stated in the traversal's header comment
@@ -256,7 +256,7 @@ Consuming 'CollectedIntents', replacing the same region of
   (empty slots -> 'MSV::Unspecified'; 'delete' -> Delete intent), in
   'order'. Downstream code keeps its types.
 - disk supplementation: unchanged
-  ('build_disk_supplemented_define_nodes' and the
+  ('build_diskSupplemented_defineNodes' and the
   'supplement_from_disk' module).
 - noop filter: unchanged, stays after supplementation.
 - foreign-instruction validation and
@@ -279,7 +279,7 @@ Consuming 'CollectedIntents', replacing the same region of
 | 'validate_no_title_or_body_edit_in_subscribeeAsSuch' | deleted; rewritten as text-claim validation     |
 | 'NodeIntent' / 'NodeSaveIntent'                | kept, as the lowering target                          |
 | 'supplement_from_disk.rs'                      | kept                                                  |
-| 'filter_wouldbe_noop_definenodes'              | kept                                                  |
+| 'filter_wouldbe_noop_defineNodes'              | kept                                                  |
 | 'mergeInstructionTriple.rs' disk logic         | kept; input changes to map pairs; renamed (nodeMerge) |
 | legacy wrappers ('extract_nonmergeSavePlan', 'instructiontriples_from_the_merges_in_a_viewforest', 'subscribee_hiderel_intents_from_tree') | deleted; tests re-pointed |
 * module layout

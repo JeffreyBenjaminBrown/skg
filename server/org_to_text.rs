@@ -275,7 +275,7 @@ fn true_node_metadata_to_string (
                     ) -> Option < String > {
       true_node . edit_request () . map ( | edit_req | {
         let edit_str : String = match edit_req {
-          EditRequest::Merge (id) => format! ( "(merge {})", id . 0 ),
+          EditRequest::NodeMerge (id) => format! ( "(merge {})", id . 0 ),
           EditRequest::Delete => "delete" . to_string () };
         format! ( "(editRequest {})", edit_str ) } ) }
     fn view_requests ( true_node : & TrueNode

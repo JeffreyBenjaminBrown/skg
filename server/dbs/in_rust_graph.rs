@@ -151,7 +151,7 @@ fn id_to_pid_if_found (g: &InRustGraph, id: &ID) -> ID {
 ///
 /// PITFALL: the 'extra_id_to_pid' update happens FIRST, so the
 /// loops below see this node's newly-acquired aliases when they look
-/// up corresponding pids. This matters in a merge batch: if a
+/// up corresponding pids. This matters in a nodeMerge batch: if a
 /// subsequent neighbor Save references an acquiree pid that's now an
 /// extra_id of this node, 'id_to_pid_if_found' during that neighbor's add
 /// maps the reference to this node's canonical pid.
@@ -275,9 +275,9 @@ fn remove_from_inverse_map (
 ///
 /// Per-Save ordering: remove-old-inverse → migrate-inverse-for-new-
 /// extraids → insert-new-node → add-new-inverse. The migration step
-/// is load-bearing for merges: when an acquirer gains the acquiree's
+/// is load-bearing for nodeMerges: when an acquirer gains the acquiree's
 /// pid as an extra_id, any inverse-index entries keyed under the
-/// acquiree pid (pre-merge references from neighbors) need to move
+/// acquiree pid (pre-nodeMerge references from neighbors) need to move
 /// to the acquirer pid. The add step then runs with extra_id_to_pid
 /// already updated, so subsequent Saves in the same batch look up
 /// corresponding pids through the new alias.

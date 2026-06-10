@@ -759,6 +759,70 @@ fn test_duplicate_inactive_placeholder_content_rejected_locally () {
   assert_eq! (error . id . 0, "root");
 }
 
+#[test]
+fn duplicate_members_of_defining_cols_pass_validation () {
+  // Defining cols (SubscribeeCol, OverriddenCol; aliases were always
+  // exempt) silently deduplicate at emission instead of bouncing the
+  // save (TODO/local-instruction-collection/3_plan.org).
+  let input : &str =
+    indoc! {"
+      * (skg (node (id owner) (source main))) owner
+      ** (skg subscribeeCol)
+      *** (skg (node (id dup) (source main) indef)) dup
+      *** (skg (node (id dup) (source main) indef)) dup
+      ** (skg overriddenCol)
+      *** (skg (node (id dup2) (source main) indef)) dup2
+      *** (skg (node (id dup2) (source main) indef)) dup2
+    "};
+  let (viewforest, parsing_errors)
+    : (MpViewForest, Vec<BufferValidationError>)
+    = org_to_uninterpreted_viewforest (input) . unwrap ();
+  assert_eq! (
+    parsing_errors . len(), 0,
+    "Test fixture should not have parse errors: {:?}",
+    parsing_errors );
+  let config : SkgConfig = validation_config ();
+  for col_id in partner_col_treeids (&viewforest) {
+    validate_local_structure (&viewforest, col_id, &config)
+      . expect ("duplicate members of a defining col should pass validation"); }}
+
+#[test]
+fn duplicate_members_of_readonly_cols_are_still_rejected () {
+  let input : &str =
+    indoc! {"
+      * (skg (node (id owner) (source main))) owner
+      ** (skg hiddenCol)
+      *** (skg (node (id dup) (source main) indef)) dup
+      *** (skg (node (id dup) (source main) indef)) dup
+    "};
+  let (viewforest, parsing_errors)
+    : (MpViewForest, Vec<BufferValidationError>)
+    = org_to_uninterpreted_viewforest (input) . unwrap ();
+  assert_eq! (
+    parsing_errors . len(), 0,
+    "Test fixture should not have parse errors: {:?}",
+    parsing_errors );
+  let config : SkgConfig = validation_config ();
+  for col_id in partner_col_treeids (&viewforest) {
+    let error = validate_local_structure (
+        &viewforest, col_id, &config)
+      . expect_err (
+        "duplicate members of a read-only col should fail validation");
+    assert!(
+      error . message . contains ("must not have duplicate TrueNode children"),
+      "Unexpected read-only-col validation error: {:?}",
+      error ); }}
+
+fn partner_col_treeids (
+  viewforest : &MpViewForest,
+) -> Vec<ego_tree::NodeId> {
+  viewforest . nodes ()
+    . filter ( |node_ref| matches! (
+        node_ref . value () . kind,
+        MpViewnodeKind::PartnerCol (_) ))
+    . map ( |node_ref| node_ref . id () )
+    . collect () }
+
 fn validation_config () -> SkgConfig {
   let mut sources : HashMap<SourceName, SkgfileSource> =
     HashMap::new ();

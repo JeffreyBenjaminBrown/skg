@@ -1,7 +1,7 @@
-// todo ? These tests are AI-generated,
-// and no human has verified (most of) them.
-// (The library code looks bulletproof to me,
-// so revising these tests feels low-priority.)
+// These tests pin the behavior of save extraction via local
+// instruction collection, lowered to DefineNodes. Most of the
+// expectations were carried over from the old extraction path; the
+// ones that changed (the new recursion surface) say so in comments.
 
 use indoc::indoc;
 use ego_tree::Tree;
@@ -9,13 +9,12 @@ use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_v
 use skg::from_text::buffer_to_viewnodes::uninterpreted::{
   org_to_uninterpreted_nodes,
   org_to_uninterpreted_viewforest};
+use skg::from_text::local_instruction_collection::extract_nonmergeSavePlan_locally;
+use skg::from_text::local_instruction_collection::lower::{
+  lower_collected_intents, LoweringOutput, NodeIntent };
+use skg::from_text::local_instruction_collection::traverse::collect_instructions_locally;
+use skg::from_text::local_instruction_collection::types::SubscribeeVisibility;
 use skg::from_text::validate::validate_and_filter_foreign_instructions;
-use skg::from_text::viewnodes_to_instructions::classify::{
-  viewforest_with_saveroles, ViewNode_in_Role };
-use skg::from_text::viewnodes_to_instructions::subscribee_hiderel_intents::{
-  subscribee_hiderel_intents_from_tree, SubscribeeHiderelIntent };
-use skg::from_text::viewnodes_to_instructions::to_naive_instructions::naive_saveinstructions_from_tree;
-use skg::from_text::viewnodes_to_instructions::extract_nonmergeSavePlan;
 use skg::test_utils::extract_nodecomplete_if_save_else_error;
 use skg::test_utils::run_with_test_db_from_config;
 use skg::types::errors::BufferValidationError;
@@ -60,21 +59,68 @@ fn checked_viewforest_from_org (
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap() }
 
-fn hiderel_intents_from_org (
+/// This runs collection plus lowering, with no disk involved: the
+/// pure half of extraction.
+fn definenodes_from_tree (
+  viewforest : Tree<ViewNode>,
+) -> Result<Vec<DefineNode>, String> {
+  let forest : ViewForest =
+    ViewForest::from_internal_tree (viewforest);
+  let LoweringOutput { intents, .. } =
+    lower_collected_intents (
+      collect_instructions_locally (&forest) ? ) ?;
+  intents . into_ordered_intents()
+    . into_iter()
+    . map (NodeIntent::into_define_node)
+    . collect() }
+
+/// This returns the (subscriber, visibility-signal) pairs that
+/// collection emits.
+fn visibility_pairs_from_tree (
+  viewforest : Tree<ViewNode>,
+) -> Vec<(ID, SubscribeeVisibility)> {
+  let forest : ViewForest =
+    ViewForest::from_internal_tree (viewforest);
+  let LoweringOutput { visibility, .. } =
+    lower_collected_intents (
+      collect_instructions_locally (&forest) . unwrap() ) . unwrap();
+  visibility }
+
+fn visibility_pairs_from_org (
   input : &str,
-) -> Vec<SubscribeeHiderelIntent> {
-  let viewforest : Tree<ViewNode> =
-    checked_viewforest_from_org (input);
-  let role_viewforest : Tree<ViewNode_in_Role> =
-    viewforest_with_saveroles (&viewforest) . unwrap();
-  subscribee_hiderel_intents_from_tree (
-    &role_viewforest) . unwrap() }
+) -> Vec<(ID, SubscribeeVisibility)> {
+  visibility_pairs_from_tree (
+    checked_viewforest_from_org (input) ) }
 
 fn set_membership_unstaged_minus (
   tree : &mut Tree<ViewNode>,
   id   : &str,
 ) {
-  let mut target_id = None;
+  set_membership_unstaged_minus_keeping_active (tree, id);
+  let target_id : ego_tree::NodeId =
+    find_active_or_phantom (tree, id);
+  // The target is an Active node here; the next line flips it to a phantom.
+  tree . get_mut (target_id) . unwrap()
+    . value()
+    . normal_to_phantom (); }
+
+/// This is like 'set_membership_unstaged_minus', but it leaves the
+/// node Active: a would-be diff phantom that has not been converted,
+/// which is how such nodes reach save extraction.
+fn set_membership_unstaged_minus_keeping_active (
+  tree : &mut Tree<ViewNode>,
+  id   : &str,
+) {
+  let target_id : ego_tree::NodeId =
+    find_active_or_phantom (tree, id);
+  if let ViewNodeKind::Vognode (Vognode::Active (t)) =
+    &mut tree . get_mut (target_id) . unwrap() . value() . kind
+  { t . membership . unstaged = Some (Sign::Minus); }}
+
+fn find_active_or_phantom (
+  tree : &Tree<ViewNode>,
+  id   : &str,
+) -> ego_tree::NodeId {
   for node_ref in tree . nodes() {
     let is_target : bool =
       match &node_ref . value() . kind {
@@ -85,17 +131,8 @@ fn set_membership_unstaged_minus (
         _ => false,
       };
     if is_target {
-      target_id = Some (node_ref . id());
-      break; }}
-  let target_id = target_id . unwrap_or_else (||
-    panic! ("node not found: {}", id));
-  // The target is an Active node here; the next line flips it to a phantom.
-  if let ViewNodeKind::Vognode (Vognode::Active (t)) =
-    &mut tree . get_mut (target_id) . unwrap() . value() . kind
-  { t . membership . unstaged = Some (Sign::Minus); }
-  tree . get_mut (target_id) . unwrap()
-    . value()
-    . normal_to_phantom (); }
+      return node_ref . id(); }}
+  panic! ("node not found: {}", id) }
 
 async fn save_instructions_from_org_with_disk (
   org_text : &str,
@@ -109,9 +146,9 @@ async fn save_instructions_from_org_with_disk (
     &mut maybePlaced_viewforest, &config . db_name, driver) . await?;
   let viewforest : ViewForest =
     maybePlaced_to_placed_viewforest (maybePlaced_viewforest) ?;
-  let save_plan =
-    extract_nonmergeSavePlan (
-      viewforest . as_internal_tree (), config, driver) . await?;
+  let (save_plan, _nodeMerge_acquisitions) =
+    extract_nonmergeSavePlan_locally (
+      &viewforest, config, driver) . await?;
   Ok (save_plan . define_nodes) }
 
 #[test]
@@ -131,7 +168,7 @@ fn test_extract_nonmergeSavePlan_basic() {
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap();
+    definenodes_from_tree (viewforest) . unwrap();
 
   assert_eq!(instructions . len(), 3, "Should have 3 instructions");
 
@@ -184,7 +221,7 @@ fn test_extract_nonmergeSavePlan_with_aliases() {
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap();
+    definenodes_from_tree (viewforest) . unwrap();
 
   // Should have 2 instructions: main node and content_child
   // AliasCol and Alias nodes should not appear in output
@@ -225,7 +262,7 @@ fn test_extract_nonmergeSavePlan_no_aliases() {
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap();
+    definenodes_from_tree (viewforest) . unwrap();
 
   assert_eq!(instructions . len(), 2);
 
@@ -248,7 +285,7 @@ fn inactive_placeholders_are_saved_as_content_positions () {
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
   let instructions : Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap ();
+    definenodes_from_tree (viewforest) . unwrap ();
 
   assert_eq!(
     save_ids (&instructions),
@@ -273,7 +310,7 @@ fn inactive_placeholder_moves_reorder_contains () {
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
   let instructions : Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap ();
+    definenodes_from_tree (viewforest) . unwrap ();
 
   assert_eq!(
     saved_node_by_id (&instructions, "root") . contains,
@@ -293,7 +330,7 @@ fn inactive_placeholder_deletions_remove_contains () {
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
   let instructions : Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap ();
+    definenodes_from_tree (viewforest) . unwrap ();
 
   assert_eq!(
     saved_node_by_id (&instructions, "root") . contains,
@@ -320,10 +357,11 @@ fn test_extract_nonmergeSavePlan_multiple_alias_cols() {
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let result : Result<Vec<DefineNode>, String> =
-    naive_saveinstructions_from_tree (viewforest);
+    definenodes_from_tree (viewforest);
 
   assert!(result . is_err());
-  assert!(result . unwrap_err() . contains ("Expected at most one"));
+  // The two cols emit conflicting alias intents for one ID.
+  assert!(result . unwrap_err() . contains ("Conflicting aliases"));
 }
 
 #[test]
@@ -344,7 +382,7 @@ fn test_extract_nonmergeSavePlan_mixed_relations() {
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap();
+    definenodes_from_tree (viewforest) . unwrap();
 
   // Should have instructions for: root, unrelated1, content1, content2, unrelated2
   // AliasCol and Alias should be skipped
@@ -359,7 +397,7 @@ fn test_extract_nonmergeSavePlan_mixed_relations() {
 }
 
 #[test]
-fn role_aware_extraction_preserves_content_and_independent_children (
+fn extraction_preserves_content_and_independent_children (
 ) {
   let input: &str =
     indoc! {"
@@ -373,7 +411,7 @@ fn role_aware_extraction_preserves_content_and_independent_children (
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap();
+    definenodes_from_tree (viewforest) . unwrap();
 
   assert_eq!(
     save_ids (&instructions),
@@ -383,7 +421,7 @@ fn role_aware_extraction_preserves_content_and_independent_children (
     vec![ID::from ("ordinary")]); }
 
 #[test]
-fn role_aware_extraction_skips_alias_and_id_display_nodes (
+fn extraction_skips_alias_and_id_display_nodes (
 ) {
   let input: &str =
     indoc! {"
@@ -400,7 +438,7 @@ fn role_aware_extraction_skips_alias_and_id_display_nodes (
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap();
+    definenodes_from_tree (viewforest) . unwrap();
 
   assert_eq!(
     save_ids (&instructions),
@@ -413,7 +451,7 @@ fn role_aware_extraction_skips_alias_and_id_display_nodes (
     vec![ID::from ("child")]); }
 
 #[test]
-fn role_aware_extraction_collects_subscribees_without_hidden_branches (
+fn extraction_collects_subscribees_without_hidden_branches (
 ) {
   let input: &str =
     indoc! {"
@@ -432,13 +470,18 @@ fn role_aware_extraction_collects_subscribees_without_hidden_branches (
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap();
+    definenodes_from_tree (viewforest) . unwrap();
 
   assert_eq!(
     save_ids (&instructions),
+    // hidden-in and hidden-outside are definitive members of
+    // read-only cols, so they are self-writers on the new recursion
+    // surface.
     vec![
       ID::from ("subscriber"),
-      ID::from ("subscribee-content")]);
+      ID::from ("hidden-in"),
+      ID::from ("subscribee-content"),
+      ID::from ("hidden-outside")]);
   assert_eq!(
     saved_node_by_id (&instructions, "subscriber") . subscribes_to,
     MSV::Specified (vec![ID::from ("subscribee")]));
@@ -449,7 +492,7 @@ fn role_aware_extraction_collects_subscribees_without_hidden_branches (
     ! save_ids (&instructions) . contains (&ID::from ("subscribee"))); }
 
 #[test]
-fn role_aware_extraction_collects_overridden_col (
+fn extraction_collects_overridden_col (
 ) {
   let input: &str =
     indoc! {"
@@ -464,11 +507,16 @@ fn role_aware_extraction_collects_overridden_col (
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap();
+    definenodes_from_tree (viewforest) . unwrap();
 
   assert_eq!(
     save_ids (&instructions),
-    vec![ID::from ("overrider")]);
+    // OverriddenCol members are self-writers: their membership is
+    // read for the parent's overrides_view_of, and they also save
+    // their own gnodes. This is part of the new recursion surface.
+    vec![ID::from ("overrider"),
+         ID::from ("overridden-a"),
+         ID::from ("overridden-b")]);
   assert_eq!(
     saved_node_by_id (&instructions, "overrider") . overrides_view_of,
     MSV::Specified (vec![
@@ -489,14 +537,14 @@ fn empty_overridden_col_means_empty_override_set (
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap();
+    definenodes_from_tree (viewforest) . unwrap();
 
   assert_eq!(
     saved_node_by_id (&instructions, "overrider") . overrides_view_of,
     MSV::Specified (vec![])); }
 
 #[test]
-fn read_only_relation_col_children_do_not_become_save_instructions (
+fn read_only_col_members_save_themselves_but_not_their_owner (
 ) {
   let input: &str =
     indoc! {"
@@ -516,11 +564,17 @@ fn read_only_relation_col_children_do_not_become_save_instructions (
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap();
+    definenodes_from_tree (viewforest) . unwrap();
 
   assert_eq!(
     save_ids (&instructions),
-    vec![ID::from ("owner")]);
+    // The members are self-writers, on the new recursion surface;
+    // the owner is unaffected by any of these read-only cols.
+    vec![ID::from ("owner"),
+         ID::from ("subscriber"),
+         ID::from ("overrider"),
+         ID::from ("hider"),
+         ID::from ("hidden")]);
   assert_eq!(
     saved_node_by_id (&instructions, "owner") . contains,
     Vec::<ID>::new()); }
@@ -538,12 +592,12 @@ fn subscribee_hiderel_intent_collects_visible_content (
             "};
 
   assert_eq!(
-    hiderel_intents_from_org (input),
-    vec![SubscribeeHiderelIntent {
-      subscriber      : ID::from ("subscriber"),
-      subscribee      : ID::from ("subscribee"),
-      visible_content : vec![ID::from ("a"), ID::from ("b")],
-    }]); }
+    visibility_pairs_from_org (input),
+    vec![(ID::from ("subscriber"),
+       SubscribeeVisibility {
+         subscribee : ID::from ("subscribee"),
+         visible    : vec![ID::from ("a"), ID::from ("b")],
+       })]); }
 
 #[test]
 fn subscribee_hiderel_intents_preserve_subscribee_tree_order (
@@ -559,18 +613,18 @@ fn subscribee_hiderel_intents_preserve_subscribee_tree_order (
             "};
 
   assert_eq!(
-    hiderel_intents_from_org (input),
+    visibility_pairs_from_org (input),
     vec![
-      SubscribeeHiderelIntent {
-        subscriber      : ID::from ("subscriber"),
-        subscribee      : ID::from ("first"),
-        visible_content : vec![ID::from ("first-child")],
-      },
-      SubscribeeHiderelIntent {
-        subscriber      : ID::from ("subscriber"),
-        subscribee      : ID::from ("second"),
-        visible_content : vec![ID::from ("second-child")],
-      }]); }
+      (ID::from ("subscriber"),
+         SubscribeeVisibility {
+           subscribee : ID::from ("first"),
+           visible    : vec![ID::from ("first-child")],
+         }),
+      (ID::from ("subscriber"),
+         SubscribeeVisibility {
+           subscribee : ID::from ("second"),
+           visible    : vec![ID::from ("second-child")],
+         })]); }
 
 #[test]
 fn subscribee_hiderel_intent_uses_only_children (
@@ -585,12 +639,12 @@ fn subscribee_hiderel_intent_uses_only_children (
             "};
 
   assert_eq!(
-    hiderel_intents_from_org (input),
-    vec![SubscribeeHiderelIntent {
-      subscriber      : ID::from ("subscriber"),
-      subscribee      : ID::from ("subscribee"),
-      visible_content : vec![ID::from ("child")],
-    }]); }
+    visibility_pairs_from_org (input),
+    vec![(ID::from ("subscriber"),
+       SubscribeeVisibility {
+         subscribee : ID::from ("subscribee"),
+         visible    : vec![ID::from ("child")],
+       })]); }
 
 #[test]
 fn subscribee_hiderel_intent_ignores_indefinitive_subscribee (
@@ -603,8 +657,8 @@ fn subscribee_hiderel_intent_ignores_indefinitive_subscribee (
             "};
 
   assert_eq!(
-    hiderel_intents_from_org (input),
-    Vec::<SubscribeeHiderelIntent>::new()); }
+    visibility_pairs_from_org (input),
+    Vec::<(ID, SubscribeeVisibility)>::new()); }
 
 #[test]
 fn subscribee_hiderel_intent_ignores_indefinitive_subscriber (
@@ -623,8 +677,8 @@ fn subscribee_hiderel_intent_ignores_indefinitive_subscriber (
             "};
 
   assert_eq!(
-    hiderel_intents_from_org (input),
-    Vec::<SubscribeeHiderelIntent>::new()); }
+    visibility_pairs_from_org (input),
+    Vec::<(ID, SubscribeeVisibility)>::new()); }
 
 #[test]
 fn subscribee_hiderel_intent_excludes_non_content_delete_and_phantom_children (
@@ -642,19 +696,16 @@ fn subscribee_hiderel_intent_excludes_non_content_delete_and_phantom_children (
   let mut viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
   set_membership_unstaged_minus (&mut viewforest, "phantom");
-  let role_viewforest : Tree<ViewNode_in_Role> =
-    viewforest_with_saveroles (&viewforest) . unwrap();
-  let intents : Vec<SubscribeeHiderelIntent> =
-    subscribee_hiderel_intents_from_tree (
-      &role_viewforest) . unwrap();
+  let intents : Vec<(ID, SubscribeeVisibility)> =
+    visibility_pairs_from_tree (viewforest);
 
   assert_eq!(
     intents,
-    vec![SubscribeeHiderelIntent {
-      subscriber      : ID::from ("subscriber"),
-      subscribee      : ID::from ("subscribee"),
-      visible_content : vec![ID::from ("keep")],
-    }]); }
+    vec![(ID::from ("subscriber"),
+       SubscribeeVisibility {
+         subscribee : ID::from ("subscribee"),
+         visible    : vec![ID::from ("keep")],
+       })]); }
 
 #[test]
 fn subscribee_hiderel_intent_ignores_hidden_scaffold_contents (
@@ -672,12 +723,12 @@ fn subscribee_hiderel_intent_ignores_hidden_scaffold_contents (
             "};
 
   assert_eq!(
-    hiderel_intents_from_org (input),
-    vec![SubscribeeHiderelIntent {
-      subscriber      : ID::from ("subscriber"),
-      subscribee      : ID::from ("subscribee"),
-      visible_content : vec![ID::from ("visible")],
-    }]); }
+    visibility_pairs_from_org (input),
+    vec![(ID::from ("subscriber"),
+       SubscribeeVisibility {
+         subscribee : ID::from ("subscribee"),
+         visible    : vec![ID::from ("visible")],
+       })]); }
 
 #[test]
 fn intent_layer_preserves_mixed_naive_instruction_shape (
@@ -701,7 +752,7 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap();
+    definenodes_from_tree (viewforest) . unwrap();
 
   assert_eq!(
     save_ids (&instructions),
@@ -745,7 +796,7 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap();
+    definenodes_from_tree (viewforest) . unwrap();
 
   assert_eq!(
     save_ids (&instructions),
@@ -1015,7 +1066,7 @@ fn ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_subscribee (
       Ok (()) })) }
 
 #[test]
-fn display_only_scaffold_children_do_not_become_save_instructions (
+fn idcol_resident_truenode_saves_itself_but_is_not_content (
 ) {
   let input : &str =
     indoc! {"
@@ -1028,11 +1079,15 @@ fn display_only_scaffold_children_do_not_become_save_instructions (
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap();
+    definenodes_from_tree (viewforest) . unwrap();
 
   assert_eq!(
     save_ids (&instructions),
-    vec![ID::from ("root"), ID::from ("real-child")]);
+    // display-child is a self-writer inside the IDCol, on the new
+    // recursion surface; the IDCol's membership is never read.
+    vec![ID::from ("root"),
+         ID::from ("display-child"),
+         ID::from ("real-child")]);
   assert_eq!(
     saved_node_by_id (&instructions, "root") . contains,
     vec![ID::from ("real-child")]); }
@@ -1179,7 +1234,7 @@ fn test_extract_nonmergeSavePlan_deep_nesting() {
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap();
+    definenodes_from_tree (viewforest) . unwrap();
 
   assert_eq!(instructions . len(), 5);
 
@@ -1229,7 +1284,7 @@ fn test_extract_nonmergeSavePlan_error_missing_id() {
 fn test_extract_nonmergeSavePlan_empty_input() {
   let viewforest: Tree<ViewNode> = Tree::new(viewforest_root_viewnode());
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap();
+    definenodes_from_tree (viewforest) . unwrap();
 
   assert_eq!(instructions . len(), 0, "Empty input should produce empty output");
 }
@@ -1249,7 +1304,7 @@ fn test_extract_nonmergeSavePlan_only_aliases() {
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap();
+    definenodes_from_tree (viewforest) . unwrap();
 
   assert_eq!(instructions . len(), 1); // Only main node
 
@@ -1282,7 +1337,7 @@ fn test_extract_nonmergeSavePlan_complex_scenario() {
   let viewforest: Tree<ViewNode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
-    naive_saveinstructions_from_tree (viewforest) . unwrap();
+    definenodes_from_tree (viewforest) . unwrap();
 
   assert_eq!(instructions . len(), 7); // doc1, section1, subsection1a, section2, section3, doc2, ref_section
 
@@ -1315,3 +1370,195 @@ fn test_extract_nonmergeSavePlan_complex_scenario() {
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(section1_skg . contains, vec![ID::from ("subsection1a")]);
 }
+
+// The next several tests pin the membership-predicate wiring of
+// extraction, with one test per condition not already covered above
+// (TODO/local-instruction-collection/3_plan.org, predicate test
+// audit).
+
+#[test]
+fn would_be_diff_phantom_child_is_excluded_from_contains (
+) {
+  let input : &str =
+    indoc! {"
+            * (skg (node (id root) (source main))) root
+            ** (skg (node (id a) (source main))) a
+            ** (skg (node (id b) (source main))) b
+        "};
+  let mut viewforest : Tree<ViewNode> =
+    checked_viewforest_from_org (input);
+  set_membership_unstaged_minus_keeping_active (&mut viewforest, "b");
+  let instructions : Vec<DefineNode> =
+    definenodes_from_tree (viewforest) . unwrap ();
+  assert_eq!(
+    saved_node_by_id (&instructions, "root") . contains,
+    vec![ID::from ("a")]); }
+
+#[test]
+fn inactive_child_with_negative_membership_is_excluded_from_contains (
+) {
+  let input : &str =
+    indoc! {"
+            * (skg (node (id root) (source main))) root
+            ** (skg (node (id a) (source main))) a
+            ** (skg (inactiveNode (id hidden) (source private)))
+        "};
+  let mut viewforest : Tree<ViewNode> =
+    checked_viewforest_from_org (input);
+  { let inactive_treeid : ego_tree::NodeId =
+      viewforest . nodes()
+      . find ( |n| matches!(
+          &n . value() . kind,
+          ViewNodeKind::Vognode (Vognode::Inactive (i))
+            if i . id == ID::from ("hidden") ))
+      . map ( |n| n . id() )
+      . expect ("inactive node not found");
+    if let ViewNodeKind::Vognode (Vognode::Inactive (i)) =
+      &mut viewforest . get_mut (inactive_treeid) . unwrap()
+        . value() . kind
+    { i . membership . staged = Some (Sign::Minus); }}
+  let instructions : Vec<DefineNode> =
+    definenodes_from_tree (viewforest) . unwrap ();
+  assert_eq!(
+    saved_node_by_id (&instructions, "root") . contains,
+    vec![ID::from ("a")]); }
+
+#[test]
+fn toDelete_member_is_excluded_from_subscribees (
+) {
+  let input : &str =
+    indoc! {"
+            * (skg (node (id subscriber) (source main))) subscriber
+            ** (skg subscribeeCol)
+            *** (skg (node (id keep) (source main))) keep
+            *** (skg (node (id doomed) (source main) (editRequest delete))) doomed
+        "};
+  let viewforest : Tree<ViewNode> =
+    checked_viewforest_from_org (input);
+  let instructions : Vec<DefineNode> =
+    definenodes_from_tree (viewforest) . unwrap ();
+  assert_eq!(
+    saved_node_by_id (&instructions, "subscriber") . subscribes_to,
+    MSV::Specified (vec![ID::from ("keep")])); }
+
+#[test]
+fn would_be_diff_phantom_member_is_excluded_from_subscribees (
+) {
+  let input : &str =
+    indoc! {"
+            * (skg (node (id subscriber) (source main))) subscriber
+            ** (skg subscribeeCol)
+            *** (skg (node (id keep) (source main))) keep
+            *** (skg (node (id ghost) (source main))) ghost
+        "};
+  let mut viewforest : Tree<ViewNode> =
+    checked_viewforest_from_org (input);
+  set_membership_unstaged_minus_keeping_active (&mut viewforest, "ghost");
+  let instructions : Vec<DefineNode> =
+    definenodes_from_tree (viewforest) . unwrap ();
+  assert_eq!(
+    saved_node_by_id (&instructions, "subscriber") . subscribes_to,
+    MSV::Specified (vec![ID::from ("keep")])); }
+
+#[test]
+fn toDelete_member_is_excluded_from_overriddens (
+) {
+  let input : &str =
+    indoc! {"
+            * (skg (node (id overrider) (source main))) overrider
+            ** (skg overriddenCol)
+            *** (skg (node (id keep) (source main))) keep
+            *** (skg (node (id doomed) (source main) (editRequest delete))) doomed
+        "};
+  let viewforest : Tree<ViewNode> =
+    checked_viewforest_from_org (input);
+  let instructions : Vec<DefineNode> =
+    definenodes_from_tree (viewforest) . unwrap ();
+  assert_eq!(
+    saved_node_by_id (&instructions, "overrider") . overrides_view_of,
+    MSV::Specified (vec![ID::from ("keep")])); }
+
+#[test]
+fn independent_member_is_excluded_from_overriddens (
+) {
+  let input : &str =
+    indoc! {"
+            * (skg (node (id overrider) (source main))) overrider
+            ** (skg overriddenCol)
+            *** (skg (node (id keep) (source main))) keep
+            *** (skg (node (id bystander) (source main) (parentIs independent))) bystander
+        "};
+  let viewforest : Tree<ViewNode> =
+    checked_viewforest_from_org (input);
+  let instructions : Vec<DefineNode> =
+    definenodes_from_tree (viewforest) . unwrap ();
+  assert_eq!(
+    saved_node_by_id (&instructions, "overrider") . overrides_view_of,
+    MSV::Specified (vec![ID::from ("keep")])); }
+
+#[test]
+fn would_be_diff_phantom_child_still_counts_as_visible_content (
+) {
+  // This pins an asymmetry: the visible-content predicate has no
+  // diff-phantom condition, unlike the contains and relation-col
+  // membership predicates. See
+  // 'active_child_counts_as_visible_content'.
+  let input : &str =
+    indoc! {"
+            * (skg (node (id subscriber) (source main))) subscriber
+            ** (skg subscribeeCol)
+            *** (skg (node (id subscribee) (source main))) subscribee
+            **** (skg (node (id still-visible) (source main))) still visible
+        "};
+  let mut viewforest : Tree<ViewNode> =
+    checked_viewforest_from_org (input);
+  set_membership_unstaged_minus_keeping_active (
+    &mut viewforest, "still-visible");
+  let intents : Vec<(ID, SubscribeeVisibility)> =
+    visibility_pairs_from_tree (viewforest);
+  assert_eq!(
+    intents,
+    vec![(ID::from ("subscriber"),
+       SubscribeeVisibility {
+         subscribee : ID::from ("subscribee"),
+         visible    : vec![ID::from ("still-visible")],
+       })]); }
+
+#[test]
+fn duplicate_members_of_defining_cols_are_silently_deduplicated (
+) {
+  // Defining cols never squawk about repeats: emission
+  // deduplicates, preserving first-occurrence order
+  // (TODO/local-instruction-collection/3_plan.org).
+  let input : &str =
+    indoc! {"
+            * (skg (node (id owner) (source main))) owner
+            ** (skg aliasCol) aliases
+            *** (skg alias) echo
+            *** (skg alias) other
+            *** (skg alias) echo
+            ** (skg subscribeeCol)
+            *** (skg (node (id s1) (source main) indef)) s1
+            *** (skg (node (id s2) (source main) indef)) s2
+            *** (skg (node (id s1) (source main) indef)) s1
+            ** (skg overriddenCol)
+            *** (skg (node (id o1) (source main) indef)) o1
+            *** (skg (node (id o2) (source main) indef)) o2
+            *** (skg (node (id o1) (source main) indef)) o1
+        "};
+  let viewforest : Tree<ViewNode> =
+    checked_viewforest_from_org (input);
+  let instructions : Vec<DefineNode> =
+    definenodes_from_tree (viewforest) . unwrap ();
+  let owner : &NodeComplete =
+    saved_node_by_id (&instructions, "owner");
+  assert_eq!(
+    owner . aliases,
+    MSV::Specified (vec![
+      "echo" . to_string(), "other" . to_string()]));
+  assert_eq!(
+    owner . subscribes_to,
+    MSV::Specified (vec![ID::from ("s1"), ID::from ("s2")]));
+  assert_eq!(
+    owner . overrides_view_of,
+    MSV::Specified (vec![ID::from ("o1"), ID::from ("o2")])); }

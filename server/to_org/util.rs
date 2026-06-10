@@ -249,7 +249,7 @@ pub fn mark_view_roots_parent_absent (
 ///   include this very child; the check would always pass.
 ///
 /// Both sides of every comparison resolve through 'graph.pid_of'
-/// so extra_id aliasing (typically a merge side-effect) doesn't
+/// so extra_id aliasing (typically a nodeMerge side-effect) doesn't
 /// produce false mismatches.
 ///
 /// Forest roots have no TrueNode parent and therefore

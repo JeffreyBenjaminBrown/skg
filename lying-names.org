@@ -2005,7 +2005,7 @@ is now : id_to_pid_if_found
    - True?: Partly. The function also returns SourceMoves (the function name only mentions DefineNodes), and silently filters out unchanged saves before disk-supplementation.
    - Omits?: It omits the SourceMove return channel and the unchanged-save filtering step.
 
-** filter_wouldbe_noop_definenodes (line 53)
+** filter_wouldbe_noop_defineNodes (line 53)
    - True?: Yes.
    - Omits?: Nothing material.
 

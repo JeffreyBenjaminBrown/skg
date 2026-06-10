@@ -1,5 +1,5 @@
 * Problems found during herald overhaul research
-** Save validation and extraction use different edit-request surfaces
+** (mostly fixed) Save validation and extraction use different edit-request surfaces
    The save extraction path uses 'collect_savenode_candidates' to define
    which view positions can produce save/merge instructions. Some
    validation still walks the whole viewforest directly, especially
@@ -11,6 +11,14 @@
    changes. The cleaner fix is probably to validate write-intent
    metadata through the same candidate/role policy used by extraction,
    and explicitly reject edit requests outside that surface.
+
+   Mostly fixed 2026-06-10 by local instruction collection: extraction
+   now recurses into every position, so a definitive node's self-edits
+   (including edit requests) are honored wherever validation can see
+   them. The residual gap is positions where edit requests are
+   deliberately ignored rather than rejected: a Delete or nodeMerge
+   request on a subscribee-as-such is silently dropped, which validation
+   could instead flag.
 
 ** Save rerender may not insert missing HiddenInSubscribeeCol
    While experimenting with the "delete as-a-subscribee content
@@ -535,7 +543,11 @@
   premise; if the rewrite happens they die with the old code, but they
   are real today.
 
-** 'DefinenodeCandidateKind::Overridden' is computed and discarded everywhere
+  FIXED 2026-06-10: all four died with the old extraction path when
+  local instruction collection replaced it
+  (TODO/local-instruction-collection/progress.org).
+
+** (fixed) 'DefinenodeCandidateKind::Overridden' is computed and discarded everywhere
    'collect_savenode_candidates' pushes candidates of kind Overridden,
    but every consumer filters them out:
    - 'naive_node_edit_intents_from_candidates' keeps only Ordinary;
@@ -547,7 +559,7 @@
    case the variant should be removed, or their subtrees were meant to
    be searched for instruction owners and are not — a latent bug.
 
-** Four 'SaveRole' variants are computed but never consumed
+** (fixed) Four 'SaveRole' variants are computed but never consumed
    'classify.rs' computes 'AliasDisplay', 'IdDisplay',
    'HiddenInSubscribeeCol { subscriber, subscribee }', and
    'HiddenOutsideOfSubscribeeCol { subscriber }'. The latter two do
@@ -556,14 +568,14 @@
    (they are handled only by catch-all arms). Wasted work on every
    save, and an error surface with no corresponding feature.
 
-** 'viewforest_with_saveroles' deep-clones the whole buffer per save
+** (fixed) 'viewforest_with_saveroles' deep-clones the whole buffer per save
    It clones every ViewNode in the viewforest just to pair it with a
    SaveRole ('ViewNode_in_Role'), and 'SaveAuthority::from_viewforest'
    runs on every save (and again in the legacy test wrappers). For
    large buffers this is a meaningful allocation on the save critical
    path; profiling-save.org may already reflect it.
 
-** 'reconcile_same_id_instructions.rs' is dead in production
+** (fixed) 'reconcile_same_id_instructions.rs' is dead in production
    'server/from_text/viewnodes_to_instructions/reconcile_same_id_instructions.rs'
    (DefineNode-level same-ID reconciliation) is referenced only by its
    tests and by a doc comment in 'viewnodes_to_instructions.rs' --

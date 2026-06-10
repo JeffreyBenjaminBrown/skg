@@ -38,9 +38,9 @@ parse, enrich, validate, place, and then the part at issue:
   visibility signals into hides/unhides deltas on subscriber intents.
   This consults disk, and consults the subscriber's own post-save
   'contains' from the same intent map.
-- 'build_disk_supplemented_define_nodes' fills 'MSV::Unspecified'
+- 'build_diskSupplemented_defineNodes' fills 'MSV::Unspecified'
   fields from disk, canonicalizes IDs, detects source moves.
-- 'filter_wouldbe_noop_definenodes' drops saves identical to the
+- 'filter_wouldbe_noop_defineNodes' drops saves identical to the
   in-Rust graph.
 
 Separately, 'instructiontriples_from_merge_candidates' (merge
@@ -181,7 +181,7 @@ from the completed map. New code, new types, same module family --
 "part of local instruction collection" in that sense. OK?
 ***** TODO agreed
 **** DONE (Claude) yes, that is what I meant by noop filter
-'filter_wouldbe_noop_definenodes', which discards Save instructions
+'filter_wouldbe_noop_defineNodes', which discards Save instructions
 identical to the pre-save in-Rust graph. It stays downstream, and
 must in fact stay *after* disk supplementation, since unspecified
 fields have to be restored before the comparison makes sense.

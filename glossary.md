@@ -40,6 +40,16 @@ See schema.tql for what a "hides" relationship is.
 
 ## kv-pair = key-value pair
 
+## local instruction collection
+
+The save path's instruction extraction: one pure DFS preorder over
+the buffer's viewforest, in which each position reads only itself and
+its direct children, plus a context that flows down from its
+ancestors. Each visit emits per-field intents into a map keyed by
+node ID; downstream stages (validation, lowering, visibility
+resolution, disk supplementation) consume the map. Lives in
+`server/from_text/local_instruction_collection/`.
+
 ## lp = length-prefixed
 
 Sometimes an API response is prefixed with a length, letting the receiver know how many characters to expect in the response.
@@ -61,6 +71,15 @@ The metadata is used for Rust to know what to do with it,
 and for Emacs to let the user know how to interpret it.
 
 ## mk = make / create
+
+## "merge" is always qualified: nodeMerge vs instructionMerge
+
+A *nodeMerge* is the acquirer/acquiree operation on graph nodes (the
+`NodeMerge` type, requested via `(editRequest (merge ID))`). An
+*instructionMerge* is the combining of emitted save intents into the
+map during local instruction collection. In prose, say "merge nodes"
+or "merge instructions"; bare "merge" appears only in client-facing
+wire strings, where only nodes can merge.
 
 ## mp = maybe-placed
 

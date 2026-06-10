@@ -138,7 +138,7 @@ subscriber visibility.
 Delete 'restore_subscribee_content_from_disk_if_needed' and remove the
 corresponding argument flow through:
 
-- 'build_disk_supplemented_define_nodes';
+- 'build_diskSupplemented_defineNodes';
 - 'supplement_definenode_from_disk';
 - 'supplement_savenode_from_disk'.
 

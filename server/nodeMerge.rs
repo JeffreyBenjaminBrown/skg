@@ -1,20 +1,20 @@
-pub mod mergeInstructionTriple;
-pub mod validate_merge;
+pub mod nodeMergeInstructionTriple;
+pub mod validate_nodeMerge;
 
 use crate::dbs::filesystem::multiple_nodes::{
   check_for_duplicate_ids_across_sources,
   read_all_skg_files_from_sources};
 use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
 use crate::dbs::in_rust_graph::{InRustGraphHandle, apply_definenodes};
-use crate::merge::mergeInstructionTriple::neighbor_savenodes_for_merges;
+use crate::nodeMerge::nodeMergeInstructionTriple::neighbor_savenodes_for_nodeMerges;
 use crate::save::{ update_fs_from_saveinstructions, update_tantivy_from_saveinstructions, update_typedb_from_saveinstructions };
 use crate::types::misc::{SkgConfig, TantivyIndex};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::save::{DefineNode, Merge, SaveNode};
+use crate::types::save::{DefineNode, NodeMerge, SaveNode};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-/// Applies Merges by fanning a single 'Vec<DefineNode>' through the
+/// Applies NodeMerges by fanning a single 'Vec<DefineNode>' through the
 /// four ordinary sink functions. Four sinks, in order:
 ///   1) Filesystem (source of truth)
 ///   2) In-Rust graph
@@ -25,7 +25,7 @@ use typedb_driver::TypeDBDriver;
 /// Returns 'Some(new_index)' when Tantivy had to be rebuilt.
 ///
 /// PITFALL: TypeDB receives neighbor SaveNodes in addition to the
-/// primary 3N DefineNodes from 'Merge::to_vec()'. Their purpose is to
+/// primary 3N DefineNodes from 'NodeMerge::to_vec()'. Their purpose is to
 /// close the temporal gap where TypeDB's cascade-delete of the
 /// acquiree destroys inbound edges and nothing re-creates them until
 /// neighbors are saved. FS, graph, and Tantivy see only the primary
@@ -35,25 +35,25 @@ use typedb_driver::TypeDBDriver;
 /// Tantivy indexes title+body+aliases, none of which change on a
 /// neighbor during a merge.
 pub async fn merge_nodes (
-  merge_instructions : &[Merge],
+  nodeMerge_instructions : &[NodeMerge],
   config             : SkgConfig,
   tantivy_index      : &TantivyIndex,
   driver             : &TypeDBDriver,
   graph              : &InRustGraphHandle,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
-  if merge_instructions . is_empty () {
+  if nodeMerge_instructions . is_empty () {
     return Ok (None); }
   tracing::info!(
     "Merging nodes in FS, in-Rust graph, TypeDB, and Tantivy, in that order ..." );
   let db_name : &str = &config . db_name;
 
   let primary_definenodes : Vec<DefineNode> =
-    merge_instructions . iter ()
+    nodeMerge_instructions . iter ()
     . flat_map ( |m| m . to_vec () )
     . collect ();
   let neighbor_savenodes : Vec<SaveNode> =
-    neighbor_savenodes_for_merges (
-      merge_instructions, &config, driver ) . await ?;
+    neighbor_savenodes_for_nodeMerges (
+      nodeMerge_instructions, &config, driver ) . await ?;
 
   { // Filesystem.
     tracing::info!("1) Merging in filesystem ...");
@@ -94,7 +94,7 @@ pub async fn merge_nodes (
            "TypeDB rebuild also failed: {}. Restart the server.", e2)
            . into () } ) ?;
       tracing::warn!(
-        "Merge succeeded, but TypeDB had to be rebuilt from disk.");
+        "NodeMerge succeeded, but TypeDB had to be rebuilt from disk.");
     } else {
       tracing::info!("   TypeDB merge complete."); } }
 
@@ -124,5 +124,5 @@ pub async fn merge_nodes (
             format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
             . into () }) ?;
         tracing::warn!(
-          "Merge succeeded, but Tantivy had to be rebuilt from disk.");
+          "NodeMerge succeeded, but Tantivy had to be rebuilt from disk.");
         Ok (Some (new_index)) }}} }

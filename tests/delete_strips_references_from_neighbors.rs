@@ -30,7 +30,7 @@ use skg::dbs::filesystem::one_node::{
   nodecomplete_from_pid_and_source,
   nodecomplete_from_pid_and_source as load_nc};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::save::update_graph_minus_merges;
+use skg::save::update_graph_minus_nodeMerges;
 use skg::test_utils::{run_with_test_db, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
@@ -140,7 +140,7 @@ async fn delete_strips_references_impl (
 // instructions can't easily produce this configuration -- buffer
 // validation rejects it as AmbiguousDeletion -- but the strip pass
 // shouldn't depend on buffer-level invariants. This test calls
-// update_graph_minus_merges directly to exercise that.)
+// update_graph_minus_nodeMerges directly to exercise that.)
 //
 // With the strip pass, container.contains ends up empty after the
 // save even though the user-supplied SaveNode said otherwise.
@@ -178,7 +178,7 @@ async fn strip_pass_amends_user_supplied_savenode_impl (
       source: main . clone (), } ), ];
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
-  update_graph_minus_merges (
+  update_graph_minus_nodeMerges (
     node_defs, &[], config . clone (), tantivy, driver, &graph
   ) . await ?;
   let container : NodeComplete =

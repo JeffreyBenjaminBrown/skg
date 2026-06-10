@@ -8,11 +8,114 @@
 /// which means it must be read from disk
 /// and inserted into the NodeComplete.
 
+use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
+use crate::from_text::local_instruction_collection::lower::{
+  NodeIntent, NodeSaveIntent };
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::save::SourceMove;
+use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use std::error::Error;
+use typedb_driver::TypeDBDriver;
+
+pub struct Definenodes_with_Sourcemoves {
+  pub instructions : Vec<DefineNode>,
+  pub source_moves : Vec<SourceMove>,
+}
+
+struct Definenode_with_Opt_Sourcemove {
+  instruction : DefineNode,
+  source_move : Option<SourceMove>,
+}
+
+impl Definenodes_with_Sourcemoves {
+  fn with_capacity (
+    capacity : usize,
+  ) -> Definenodes_with_Sourcemoves {
+    Definenodes_with_Sourcemoves {
+      instructions : Vec::with_capacity (capacity),
+      source_moves : Vec::new(),
+    }}
+
+  fn push (
+    &mut self,
+    node : Definenode_with_Opt_Sourcemove,
+  ) {
+    self . instructions . push (node . instruction);
+    if let Some (sm) = node . source_move {
+      let sm : SourceMove = sm;
+      self . source_moves . push (sm); }}
+}
+
+pub async fn build_diskSupplemented_defineNodes (
+  intents : Vec<NodeIntent>,
+  config  : &SkgConfig,
+  driver  : &TypeDBDriver,
+) -> Result<Definenodes_with_Sourcemoves, Box<dyn Error>> {
+  let mut result : Definenodes_with_Sourcemoves =
+    Definenodes_with_Sourcemoves::with_capacity (intents . len());
+  for intent in intents {
+    let supplemented : Definenode_with_Opt_Sourcemove =
+      supplement_nodeeditintent_from_disk (
+        intent, config, driver ) . await ?;
+    result . push (supplemented); }
+  Ok (result) }
+
+async fn supplement_nodeeditintent_from_disk (
+  intent : NodeIntent,
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+) -> Result<Definenode_with_Opt_Sourcemove, Box<dyn Error>> {
+  match intent {
+    NodeIntent::Delete (_) =>
+      Ok (Definenode_with_Opt_Sourcemove {
+        instruction : intent . into_define_node()
+          . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
+        source_move : None,
+      }),
+    _ => supplement_saveintent_from_disk (
+      intent . save_intent()
+        . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
+      config, driver ) . await,
+  }}
+
+async fn supplement_saveintent_from_disk (
+  from_buffer : NodeSaveIntent,
+  config      : &SkgConfig,
+  driver      : &TypeDBDriver,
+) -> Result<Definenode_with_Opt_Sourcemove, Box<dyn Error>> {
+  let pid : ID =
+    from_buffer . pid . clone();
+  let from_disk : Option<NodeComplete> =
+    optNodeComplete_rustFIrst_by_id (
+      config, driver, &pid) . await ?;
+  match from_disk {
+    None =>
+      Ok (Definenode_with_Opt_Sourcemove {
+        instruction :
+          NodeIntent::Save (from_buffer) . into_define_node()
+          . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
+        source_move : None, } ),
+    Some (disk_node) => {
+      let disk_node : NodeComplete = disk_node;
+      let mut from_buffer : NodeSaveIntent = from_buffer;
+      from_buffer . fill_unspecified_contains (
+        &disk_node . contains);
+      let from_buffer : NodeComplete =
+        from_buffer . into_nodecomplete();
+      let canonicalized : NodeComplete =
+        canonicalize_ids_from_disk (from_buffer, &disk_node) ?;
+      let maybe_move : Option<SourceMove> =
+        detect_source_move ( config,  &pid,
+                             &canonicalized . source,
+                             &disk_node . source) ?;
+      let supplemented : NodeComplete =
+        supplement_unspecified_fields_from_disk (
+          canonicalized, &disk_node);
+      Ok (Definenode_with_Opt_Sourcemove {
+        instruction : DefineNode::Save (SaveNode (supplemented)),
+        source_move : maybe_move,
+      }) }}}
 
 /// Replace buffer's (singleton) ids with disk's (possibly multiple) ids.
 pub fn canonicalize_ids_from_disk (

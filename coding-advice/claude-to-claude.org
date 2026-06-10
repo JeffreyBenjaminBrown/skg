@@ -70,16 +70,25 @@ There are three ways to test the code:
      - New nodes get UUIDs; sourceless nodes inherit parent's source
   3. Validates tree structure ('find_buffer_errors_for_saving')
   4. Converts to placed types ('maybePlaced_to_placed_tree')
-  5. Generates save instructions ('viewnode_forest_to_nonmerge_save_instructions')
-     - Sub-steps: naive -> reconcile same-ID -> filter unchanged -> supplement from disk
+  5. Extracts save intents via local instruction collection
+     ('extract_nonmergeSavePlan_locally' in
+     'server/from_text/local_instruction_collection/'): one pure DFS
+     preorder in which each buffer position reads only itself and its
+     direct children plus a downward-flowing 'LocalContext', emitting
+     per-field intents into a map keyed by PID. Downstream stages
+     consume the map, in order: text-claim validation, lowering to
+     NodeIntents, visibility resolution (subscribee-as-such signals
+     -> subscriber hides/unhides), disk supplementation, the noop
+     filter.
   6. Validates foreign nodes ('validate_and_filter_foreign_instructions')
-  7. Extracts merge instructions if any
-  8. Updates graph ('update_graph_minus_merges'):
+  7. Builds nodeMerge instructions from the same map's
+     (acquirer, acquiree) pairs ('nodeMerge_instructions_from_pairs')
+  8. Updates graph ('update_graph_minus_nodeMerges'):
      FS first (source of truth), then TypeDB + Tantivy in parallel
   9. Re-renders saved view and collateral views ('update_views_after_save')
 
   Key entry point: 'handle_save_buffer_request' in server/serve/handlers/save_buffer.rs.
-  Key data flow: buffer text -> MpViewnode -> ViewNode -> DefineNode (Save|Delete) -> FS/TypeDB/Tantivy.
+  Key data flow: buffer text -> MpViewnode -> ViewNode -> CollectedIntents -> NodeIntent -> DefineNode (Save|Delete) -> FS/TypeDB/Tantivy.
 
 * Source (SourceName)
 
