@@ -1,3 +1,4 @@
+use crate::source_sets::ActiveSourceSet;
 use crate::types::env::SkgEnv;
 use crate::to_org::complete::partner_col::child_data::{ChildData, build_child_data, reconcile_partnerCol_children_against_goal_list};
 use crate::to_org::complete::partner_col::goal_list::goal_list_for_hiddenoutsideof_subscribeecol;
@@ -6,6 +7,7 @@ use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
+use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::update_buffer::reconcile::partner_col::push_repair_warnings;
 use crate::update_buffer::warnings::CompletionWarning;
 use crate::types::viewnode::{ViewNode, PartnerCol};
@@ -39,6 +41,7 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  active_source_set              : Option<&ActiveSourceSet>,
   warning_sink                   : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
 ) -> Result<(), Box<dyn Error>> {
   let kind : PartnerCol =
@@ -55,6 +58,12 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
       &context . subscriber_pid, &context . subscriber_source,
       &context . subscriber_hides, &context . subscribees,
       source_diffs, &env . config );
+  let goal_list : Vec<ID> =
+    // TODO/full-schema/9-2_source-set-safety.org: omit inactive
+    // members; no retention for this filter col.
+    omit_inactive_members (
+      goal_list, active_source_set, &HashSet::new (),
+      |id : &ID| env . find_source (id, deleted_since_head_pid_src_map) );
   // TODO/DONE/local-view-update/plan_v2.org §5.5: a col fills its members WHOLE and is budget-neutral -- the owning
   // subscriber already spent its budget unit when it expanded, so drawing all
   // these hidden members here costs nothing and never truncates the group.

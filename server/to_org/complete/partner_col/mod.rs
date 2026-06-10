@@ -2,6 +2,9 @@ pub mod child_data;
 pub mod goal_list;
 pub mod kind;
 
+use crate::source_sets::ActiveSourceSet;
+use crate::types::phantom::source_from_disk;
+use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::dbs::typedb::search::hidden_in_subscribee_content::{
   partition_subscribee_content_for_subscriber,
   what_node_hides,
@@ -102,6 +105,7 @@ pub async fn maybe_add_subscribeeCol_branch (
   node_id : NodeId, // if applicable, this is the subscriber
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
+  active_source_set : Option<&ActiveSourceSet>,
 ) -> Result < (), Box<dyn Error> > {
   error_unless_node_satisfies(
     tree, node_id,
@@ -123,6 +127,18 @@ pub async fn maybe_add_subscribeeCol_branch (
     { return Ok (( )); }}
   let ( subscriber_pid, subscribee_ids ) : ( ID, Vec < ID > ) =
     pids_for_subscriber_and_its_subscribees ( tree, node_id, config ) ?;
+  let subscribee_ids : Vec<ID> =
+    // TODO/full-schema/9-2_source-set-safety.org: inactive
+    // subscribees are omitted at de novo creation (no retained
+    // members exist yet); a col left empty by this is not created.
+    omit_inactive_members (
+      subscribee_ids,
+      active_source_set,
+      &std::collections::HashSet::new (),
+      |id : &ID| snapshot_global ()
+                 . and_then ( |g| g . pid_and_source (id)
+                                  . map ( |(_pid, src)| src ))
+                 . or_else ( || source_from_disk (id, config) ));
   if subscribee_ids . is_empty () { // Skip because it would be empty.
     return Ok (( )); }
 
@@ -178,6 +194,7 @@ pub async fn maybe_add_partnerCol_branches (
   node_id : NodeId,
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
+  active_source_set : Option<&ActiveSourceSet>,
 ) -> Result < (), Box<dyn Error> > {
   error_unless_node_satisfies(
     tree, node_id,
@@ -193,7 +210,7 @@ pub async fn maybe_add_partnerCol_branches (
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_indefinitive { return Ok(( )); } }
   maybe_add_subscribeeCol_branch (
-    tree, node_id, config, driver) . await ?;
+    tree, node_id, config, driver, active_source_set) . await ?;
   let Some (graph) = snapshot_global () else {
     return Ok (( )); };
   for kind in [
@@ -203,7 +220,8 @@ pub async fn maybe_add_partnerCol_branches (
     PartnerCol::Hider,
     PartnerCol::Hidden,
   ] { maybe_add_one_partnerCol (
-        tree, node_id, kind, config, driver, &graph ) . await ?; }
+        tree, node_id, kind, config, driver, &graph,
+        active_source_set ) . await ?; }
   Ok (( )) }
 
 /// Add a generated PartnerCol for `node_id` if it would
@@ -216,6 +234,7 @@ async fn maybe_add_one_partnerCol (
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
   graph   : &Arc<InRustGraph>,
+  active_source_set : Option<&ActiveSourceSet>,
 ) -> Result < (), Box<dyn Error> > {
   if unique_scaffold_child_of_viewnode (
       tree, node_id, &ViewNodeKind::PartnerCol (kind)
@@ -236,7 +255,16 @@ async fn maybe_add_one_partnerCol (
   let owner_role =
     member_role . opposite_role ();
   let member_ids : Vec<ID> =
-    graph . other_member_pids (&owner_pid, owner_role);
+    // TODO/full-schema/9-2_source-set-safety.org: inactive members
+    // are omitted, so a col whose members are all inactive is not
+    // created at all (de novo creation has no retained members).
+    omit_inactive_members (
+      graph . other_member_pids (&owner_pid, owner_role),
+      active_source_set,
+      &std::collections::HashSet::new (),
+      |id : &ID| graph . pid_and_source (id)
+                 . map ( |(_pid, src)| src )
+                 . or_else ( || source_from_disk (id, config) ));
   if member_ids . is_empty () {
     // It would be empty, so don't draw it.
     return Ok (( )); }

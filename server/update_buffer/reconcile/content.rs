@@ -6,6 +6,7 @@ use crate::types::git::MembershipAxes;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::env::find_source_with_optional_tantivy;
+use crate::types::phantom::source_from_disk;
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::util::setlike_vector_subtraction;
@@ -17,6 +18,7 @@ use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_fr
 use crate::types::tree::viewnode_nodecomplete::{
     pid_and_source_from_treenode,
     write_at_truenode_in_tree};
+use crate::update_buffer::reconcile::{omit_inactive_members, retained_inactive_children};
 use crate::update_buffer::util::{
     complete_relevant_children_in_viewnodetree,
     partition_children,
@@ -216,6 +218,16 @@ fn reconcile_content_children (
   // subscribee content through this same path.)
   let apparent_content_ids : Vec<ID> =
     content_goal_list( tree, node, &content_ids, is_sub, config ) ?;
+  let apparent_content_ids : Vec<ID> =
+    // TODO/full-schema/9-2_source-set-safety.org: rendering omits
+    // inactive members (the weave preserves them at save), except
+    // InactiveNode children retained for their view-children.
+    omit_inactive_members (
+      apparent_content_ids, active_source_set,
+      &retained_inactive_children (tree, node),
+      |id : &ID| graph_snap . pid_and_source (id)
+                 . map ( |(_pid, src)| src )
+                 . or_else ( || source_from_disk (id, config) ));
   // TODO/DONE/local-view-update/plan_v2.org §5.5: the content group is drawn WHOLE -- never truncated mid-group. The
   // budget is spent once per expanding vognode (in expand_true_content_at_truenode),
   // not per child, so a node either fully expands or is left indefinitive; we

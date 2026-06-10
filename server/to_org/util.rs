@@ -135,6 +135,7 @@ pub async fn complete_branch_minus_content (
   visited  : &mut DefinitiveMap,
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
+  active_source_set : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
   detect_and_mark_cycle_v1 ( tree, node_id ) ?;
   make_indef_if_repeat_then_extend_defmap (
@@ -145,7 +146,7 @@ pub async fn complete_branch_minus_content (
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "maybe_add_partnerCol_branches" ). entered();
     maybe_add_partnerCol_branches (
-      tree, node_id, config, driver ) . await } ?;
+      tree, node_id, config, driver, active_source_set ) . await } ?;
   Ok (( )) }
 
 /// Does only what it says -- in particular,
@@ -202,6 +203,7 @@ pub async fn stub_viewforest_from_root_ids (
   config   : &SkgConfig,
   driver   : &TypeDBDriver,
   visited  : &mut DefinitiveMap,
+  active_source_set : Option<&ActiveSourceSet>,
 ) -> Result < ViewForest, Box<dyn Error> > {
   let mut viewforest : ViewForest =
     ViewForest::new ();
@@ -211,7 +213,7 @@ pub async fn stub_viewforest_from_root_ids (
     build_node_branch_minus_content (
       Some ( (viewforest . as_internal_tree_mut (),
               viewforest_root_treeid) ),
-      root_skgid, config, driver, visited
+      root_skgid, config, driver, visited, active_source_set
     ) . await ?; }
   Ok (viewforest) }
 
@@ -538,6 +540,7 @@ pub async fn build_node_branch_minus_content (
   config          : &SkgConfig,
   driver          : &TypeDBDriver,
   visited         : &mut DefinitiveMap,
+  active_source_set : Option<&ActiveSourceSet>,
 ) -> Result < NodeId, Box<dyn Error> > {
   let t0 : time::Instant = time::Instant::now();
   let result : Result < NodeId, Box<dyn Error> > =
@@ -556,7 +559,7 @@ pub async fn build_node_branch_minus_content (
               . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
             complete_branch_minus_content (
               tree, child_treeid, visited,
-              config, driver ) . await ?;
+              config, driver, active_source_set ) . await ?;
             Ok (child_treeid) },
           None => { // Uknown node. Add it, don't 'complete' it.
             let viewnode : ViewNode =
@@ -579,7 +582,7 @@ pub async fn build_node_branch_minus_content (
             let root_treeid : NodeId = tree . root () . id ();
             complete_branch_minus_content (
               &mut tree, root_treeid, visited,
-              config, driver ) . await ?;
+              config, driver, active_source_set ) . await ?;
             Ok (root_treeid) },
           None => { // A singleton tree with an PhantomUnknown.
             let viewnode : ViewNode =

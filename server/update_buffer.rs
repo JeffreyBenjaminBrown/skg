@@ -277,7 +277,8 @@ pub async fn render_initial_view (
   let mut stub_defmap : DefinitiveMap = DefinitiveMap::new ();
   let mut viewforest : ViewForest =
     crate::to_org::util::stub_viewforest_from_root_ids (
-      root_ids, &env . config, &env . driver, &mut stub_defmap ) . await ?;
+      root_ids, &env . config, &env . driver, &mut stub_defmap,
+      active ) . await ?;
   // De-novo (and ONLY de-novo) asks each view-root for its containerward
   // ancestry, as a self-consuming view request. The during-completion dispatch
   // leaves view-root Containerward alone (extract_view_requests); finish_viewforest

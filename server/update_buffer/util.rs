@@ -147,26 +147,42 @@ where Relevant : Fn (&ViewNode) -> bool,
     |n: &mut ViewNode| { n . focused = true; };
   // TODO/DONE/local-view-update/plan_v2.org §6.0 stale-member rule: a stale member (relevant child not in the goal)
   // that is a Normal, parentIs=Affected *branch* (has children) is demoted to
-  // Independent so the user's subtree survives; everything else stale -- a
-  // leaf, a diff-phantom, a qual, an inactive placeholder -- is deleted by the
-  // reconciler. Returns true iff it demoted the node (kept it).
+  // Independent so the user's subtree survives; a stale InactiveNode
+  // *branch* is deadened to a DeadScaffold instead (it has no
+  // parentIs to demote; the orphan handling then preserves its
+  // subtree as independent -- TODO/full-schema/9-2_source-set-safety.org);
+  // everything else stale -- a leaf, a diff-phantom, a qual -- is
+  // deleted by the reconciler. Returns true iff it kept the node.
   let demote_invalid =
     |tree: &mut Tree<ViewNode>, node_id: NodeId|
       -> Result<bool, Box<dyn Error>> {
-      let demote : bool = {
+      enum StaleTreatment { Demote, Deaden, Detach }
+      let treatment : StaleTreatment = {
         let n : NodeRef<ViewNode> = tree . get (node_id)
           . ok_or ("demote_invalid: node not found") ?;
         let has_children : bool = n . children () . next () . is_some ();
-        has_children && matches! ( &n . value () . kind,
+        match &n . value () . kind {
           ViewNodeKind::Vognode (Vognode::Active (t))
-            if t . parentIs == ParentIs::Affected ) };
-      if demote {
-        with_node_mut ( tree, node_id, |mut n| {
-          if let ViewNodeKind::Vognode (Vognode::Active (t))
-            = &mut n . value () . kind
-            { t . parentIs = ParentIs::Independent; } } )
-          . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
-      Ok (demote) };
+            if has_children && t . parentIs == ParentIs::Affected
+            => StaleTreatment::Demote,
+          ViewNodeKind::Vognode (Vognode::Inactive (_))
+            if has_children
+            => StaleTreatment::Deaden,
+          _ => StaleTreatment::Detach } };
+      match treatment {
+        StaleTreatment::Detach => Ok (false),
+        StaleTreatment::Demote => {
+          with_node_mut ( tree, node_id, |mut n| {
+            if let ViewNodeKind::Vognode (Vognode::Active (t))
+              = &mut n . value () . kind
+              { t . parentIs = ParentIs::Independent; } } )
+            . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+          Ok (true) },
+        StaleTreatment::Deaden => {
+          with_node_mut ( tree, node_id, |mut n| {
+            n . value () . kind = ViewNodeKind::DeadScaffold; } )
+            . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+          Ok (true) }, }};
   complete_relevant_children(
     tree,
     treeid,

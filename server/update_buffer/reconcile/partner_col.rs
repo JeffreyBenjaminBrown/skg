@@ -7,7 +7,10 @@ use crate::to_org::complete::partner_col::child_data::{
 use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName};
+use crate::source_sets::ActiveSourceSet;
+use crate::types::phantom::source_from_disk;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
+use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::update_buffer::util::RepairSummary;
 use crate::update_buffer::warnings::{CompletionWarning, RepairKind};
 use crate::types::viewnode::{ColPolicy, ParentIs, PartnerCol, ViewNode, ViewNodeKind, Vognode};
@@ -31,6 +34,7 @@ pub fn reconcile_partnerCol_children (
   env          : &SkgEnv,
   graph_snap   : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  active_source_set : Option<&ActiveSourceSet>,
   warning_sink : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
 ) -> Result<(), Box<dyn Error>> {
   kind . error_unless_node_is_this_kind (tree, node) ?;
@@ -48,7 +52,16 @@ pub fn reconcile_partnerCol_children (
     member_role . opposite_role ();
   let goal_list : Vec<ID> = {
     let graph_members : Vec<ID> =
-      graph_snap . other_member_pids (&owner_pid, owner_role);
+      // TODO/full-schema/9-2_source-set-safety.org: these cols omit
+      // inactive members, with no retention (a stale InactiveNode
+      // child gets the reconciler's delete-leaf / deaden-branch rule).
+      omit_inactive_members (
+        graph_snap . other_member_pids (&owner_pid, owner_role),
+        active_source_set,
+        &HashSet::new (),
+        |id : &ID| graph_snap . pid_and_source (id)
+                   . map ( |(_pid, src)| src )
+                   . or_else ( || source_from_disk (id, &env . config) ));
     match kind . policy () {
       ColPolicy::WritableSet =>
         // Graph (disk) order is meaningful here: the user's own save

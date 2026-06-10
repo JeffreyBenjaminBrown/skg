@@ -59,7 +59,7 @@ fn test_update_nodes_and_relationships2 (
     let (nonmerge_plan, _nodeMerge_acquisitions) =
       extract_nonmergeSavePlan_locally (
         & ViewForest::from_internal_tree (viewforest),
-        & config, & driver ) . await ?;
+        & config, & driver, None ) . await ?;
 
     // Apply the update
     update_typedb_from_saveinstructions (

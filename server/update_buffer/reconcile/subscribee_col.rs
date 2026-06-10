@@ -1,5 +1,7 @@
+use crate::source_sets::ActiveSourceSet;
 use crate::types::env::SkgEnv;
 use crate::to_org::complete::partner_col::child_data::{ChildData, build_child_data, reconcile_partnerCol_children_against_goal_list};
+use crate::update_buffer::reconcile::{omit_inactive_members, retained_inactive_children};
 use crate::to_org::complete::partner_col::goal_list::goal_list_for_subscribee_col;
 use crate::types::git::SourceDiff;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
@@ -38,6 +40,7 @@ pub async fn reconcile_subscribee_col_children (
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  active_source_set              : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
   let kind : PartnerCol = PartnerCol::Subscribee;
   kind . error_unless_node_is_this_kind (tree, node) ?;
@@ -48,6 +51,14 @@ pub async fn reconcile_subscribee_col_children (
     goal_list_for_subscribee_col (
       &context . parent_pid, &context . parent_source,
       source_diffs, &context . worktree_subscribees, &env . config );
+  let goal_list : Vec<ID> =
+    // TODO/full-schema/9-2_source-set-safety.org: omit inactive
+    // subscribees, except retained placeholders (InactiveNode
+    // children with view-children), which are positional members.
+    omit_inactive_members (
+      goal_list, active_source_set,
+      &retained_inactive_children (tree, node),
+      |id : &ID| env . find_source (id, deleted_since_head_pid_src_map) );
 
   // TODO/DONE/local-view-update/plan_v2.org §3.4/§6.7 exception: an *empty* SubscribeeCol is PRESERVED, not
   // self-deleted. It is the editable interface onto the origin's outgoing

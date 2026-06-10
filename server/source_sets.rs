@@ -127,26 +127,41 @@ pub fn apply_source_set_to_viewforest (
     . map ( |n| n . id () )
     . collect ();
   for id in ids {
-    let inactive : Option<(ID, SourceName, MembershipAxes)> =
-      viewforest . get (id)
-      . and_then (
-        |n| match &n . value () . kind {
-          ViewNodeKind::Vognode (Vognode::Active (t))
-            if ! active . contains_source (&t . source)
-            => Some (( t . id . clone (),
-                       t . source . clone (),
-                       t . membership )),
-          ViewNodeKind::Phantom (Phantom::Diff (p))
-            if ! active . contains_source (&p . source)
-            => Some (( p . id . clone (),
-                       p . source . clone (),
-                       p . membership )),
-          _ => None } );
-    if let Some ((pid, source, membership)) = inactive {
-      let mut node_mut : NodeMut<ViewNode> =
-        viewforest . get_mut (id) . unwrap ();
-      node_mut . value () . kind =
-        mk_inactive_viewnode (pid, source, membership) . kind; }}}
+    enum Treatment { Convert (ID, SourceName, MembershipAxes), Detach }
+    let treatment : Option<Treatment> = {
+      let Some (n) = viewforest . get (id) else { continue; }; // already detached with an ancestor
+      let has_children : bool = n . has_children ();
+      match &n . value () . kind {
+        ViewNodeKind::Vognode (Vognode::Active (t))
+          if ! active . contains_source (&t . source)
+          => Some ( Treatment::Convert ( t . id . clone (),
+                                         t . source . clone (),
+                                         t . membership )),
+        ViewNodeKind::Phantom (Phantom::Diff (p))
+          if ! active . contains_source (&p . source)
+          // TODO/full-schema/9-2_source-set-safety.org (interim,
+          // until diff mode and restricted sets refuse to combine):
+          // a removed-member phantom for an inactive node is
+          // quietly omitted, like every other inactive member. One
+          // with children (e.g. an attached ancestry) is converted
+          // instead, so nothing active is silently dropped.
+          => if has_children {
+               Some ( Treatment::Convert ( p . id . clone (),
+                                           p . source . clone (),
+                                           p . membership )) }
+             else { Some ( Treatment::Detach ) },
+        _ => None } };
+    match treatment {
+      None => {},
+      Some (Treatment::Convert (pid, source, membership)) => {
+        let mut node_mut : NodeMut<ViewNode> =
+          viewforest . get_mut (id) . unwrap ();
+        node_mut . value () . kind =
+          mk_inactive_viewnode (pid, source, membership) . kind; },
+      Some (Treatment::Detach) => {
+        let mut node_mut : NodeMut<ViewNode> =
+          viewforest . get_mut (id) . unwrap ();
+        node_mut . detach (); }, }}}
 
 pub fn render_viewforest_with_source_set (
   viewforest : &mut Tree<ViewNode>,

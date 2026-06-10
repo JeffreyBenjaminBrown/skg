@@ -187,8 +187,11 @@ fn source_set_switch_closes_views_and_cancels_stale_search_enrichment (
   Ok (( )) }
 
 #[test]
-fn content_view_renders_inactive_contained_nodes_as_placeholders (
+fn content_view_omits_inactive_contained_nodes (
 ) -> Result<(), Box<dyn Error>> {
+  // TODO/full-schema/9-2_source-set-safety.org: rendering OMITS
+  // inactive children (no placeholders); the weave preserves their
+  // memberships at save.
   run_with_source_set_test_db (
     "skg-test-source-sets-content-placeholder",
     "tests/source_sets/fixtures/skgconfig.toml",
@@ -204,28 +207,24 @@ fn content_view_renders_inactive_contained_nodes_as_placeholders (
           &[ID::from ("root")],
           false,
           &active ) . await ?;
-      assert! (actual . contains (
-        "(skg (inactiveNode (id private-a) (source private)))"),
-        "inactive contained node should render as a placeholder: {}",
+      assert! (
+        ! actual . contains ("private-a"),
+        "an inactive contained node must be omitted entirely: {}",
         actual );
       assert! (actual . contains ("active-a"));
       assert! (actual . contains ("active-b"));
       assert! (
         ! actual . contains ("private title must not leak"),
-        "inactive placeholder must not reveal title: {}",
+        "inactive content must not reveal its title: {}",
         actual );
-      // §20.5: the view's pid set (for collateral detection) is {Normal,
-      // Inactive} -- an inactive node is a real graph member, so it IS tracked,
-      // even though it renders as a placeholder (asserted above). The excluded
-      // kinds are Deleted / Unknown / Diff phantom.
       assert! (
-        pids . contains (&ID::from ("private-a")),
-        "an inactive contained node should be in the view's pid set (§20.5): {:?}",
+        ! pids . contains (&ID::from ("private-a")),
+        "an omitted inactive node is not in the view, so not in its pid set: {:?}",
         pids );
       Ok (( )) } )) }
 
 #[test]
-fn diff_view_marks_inactive_placeholders_newhere_and_removedhere_without_content_leak (
+fn diff_view_omits_inactive_members_without_content_leak (
 ) -> Result<(), Box<dyn Error>> {
   run_with_source_set_test_db (
     "skg-test-source-sets-diff-placeholder",
@@ -242,17 +241,13 @@ fn diff_view_marks_inactive_placeholders_newhere_and_removedhere_without_content
           &[ID::from ("diff-root")],
           true,
           &active ) . await ?;
-      assert! (
-        actual . contains (
-          "(skg (inactiveNode (id private-new) (source private) (unstaged newM)))"),
-        "inactive new-here placeholder should carry only relationship-position diff metadata: {}",
-        actual );
-      assert! (
-        actual . contains (
-          "(skg (inactiveNode (id private-removed) (source private) (unstaged removedM)))"),
-        "inactive removed-here placeholder should carry only relationship-position diff metadata: {}",
-        actual );
+      // TODO/full-schema/9-2_source-set-safety.org (interim, until
+      // diff mode and restricted sets refuse to combine): inactive
+      // members are omitted from restricted diff views entirely --
+      // current members and removed-member phantoms alike.
       for forbidden in [
+        "private-new",
+        "private-removed",
         "private new title must not leak",
         "private removed title must not leak",
         "private body must not leak",
@@ -260,9 +255,11 @@ fn diff_view_marks_inactive_placeholders_newhere_and_removedhere_without_content
       ] {
         assert! (
           ! actual . contains (forbidden),
-          "inactive diff placeholder leaked '{}': {}",
+          "restricted diff view leaked '{}': {}",
           forbidden,
           actual ); }
+      assert! ( actual . contains ("active-a"),
+        "active content still renders: {}", actual );
       Ok (( )) } )) }
 
 #[test]
@@ -384,24 +381,24 @@ fn restricted_source_search_and_save_work_together_end_to_end (
           false,
           &active ) . await ?;
       assert! (
-        rendered . contains (
-          "(skg (inactiveNode (id private-a) (source private)))"),
-        "restricted content view should include an inactive placeholder: {}",
+        ! rendered . contains ("private-a"),
+        "restricted content view must omit inactive members: {}",
         rendered );
       let edited_buffer = indoc! {"
         * (skg (node (id root) (source public))) root
+        ** (skg (node (id active-a) (source public) indef)) active-a
         ** (skg (node (id active-b) (source public))) active-b edited through restricted view
-        ** (skg (inactiveNode (id private-a) (source private)))
       "};
       let instructions : Vec<DefineNode> =
         buffer_to_validated_saveplan (
-          edited_buffer, config, driver, None ) . await?
+          edited_buffer, config, driver, Some (&active) ) . await?
         . 1 . define_nodes;
       assert_eq! (
         saved_node_by_id (&instructions, "root") . contains,
-        vec![ID::from ("active-b"), ID::from ("private-a")],
-        "restricted save should preserve inactive placeholders as \
-         content positions" );
+        vec![ ID::from ("active-a"), ID::from ("private-a"),
+              ID::from ("active-b") ],
+        "restricted save should preserve the omitted inactive member \
+         via the weave" );
       assert! (
         ! save_ids (&instructions) . contains (&ID::from ("private-a")),
         "restricted save should not write inactive-source nodes" );

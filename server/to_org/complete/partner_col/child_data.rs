@@ -144,12 +144,22 @@ pub fn reconcile_partnerCol_children_against_goal_list (
   let summary : RepairSummary<ID> =
     complete_relevant_children_in_viewnodetree (
     tree, col_node,
-    |vn : &ViewNode| matches! ( &vn . kind,
-                                ViewNodeKind::Vognode (Vognode::Active (t))
-                                if t . parentIs == ParentIs::Affected ),
+    // An InactiveNode child is relevant too
+    // (TODO/full-schema/9-2_source-set-safety.org): a retained
+    // placeholder is a positional subscribeeCol member; under the
+    // other cols its goal omits it, so it is stale and the
+    // reconciler's stale rule deletes (leaf) or deadens (branch) it.
+    |vn : &ViewNode| match &vn . kind {
+      ViewNodeKind::Vognode (Vognode::Active (t))
+        => t . parentIs == ParentIs::Affected,
+      ViewNodeKind::Vognode (Vognode::Inactive (_))
+        => true,
+      _ => false },
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Active (t))
         => Ok ( t . id . clone () ),
+      ViewNodeKind::Vognode (Vognode::Inactive (i))
+        => Ok ( i . id . clone () ),
       _ => Err ( format! (
         "{}: relevant child not a normal graph node", label )) },
     goal_list,

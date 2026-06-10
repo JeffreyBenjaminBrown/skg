@@ -150,16 +150,19 @@ async fn dispatch_node_update (
       // the members here costs nothing more and never truncates a group.
       reconcile_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
-        context . deleted_since_head_pid_src_map ) . await ?,
+        context . deleted_since_head_pid_src_map,
+        context . active_source_set ) . await ?,
     ViewNodeKind::PartnerCol (PartnerCol::HiddenInSubscribee) =>
       reconcile_hiddenin_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
         context . deleted_since_head_pid_src_map,
+        context . active_source_set,
         context . warning_sink . as_deref_mut () ) ?,
     ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee) =>
       reconcile_hiddenoutside_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
         context . deleted_since_head_pid_src_map,
+        context . active_source_set,
         context . warning_sink . as_deref_mut () ) ?,
     ViewNodeKind::PartnerCol (role)
       // This arm serves one ColPolicy::WritableSet col (Overridden;
@@ -171,6 +174,7 @@ async fn dispatch_node_update (
         treeid, tree, *role, context . source_diffs,
         context . env, context . graph_snap,
         context . deleted_since_head_pid_src_map,
+        context . active_source_set,
         context . warning_sink . as_deref_mut () ) ?,
     // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the IDCol/AliasCol diff scaffolds are created inline by
     // process_truenode_diff at the owner's BFS visit, so their reconcilers must
@@ -273,7 +277,8 @@ async fn visit_normal_node (
     if ! parent_is_partner_col {
       maybe_add_partnerCol_branches (
         tree, treeid, &context . env . config,
-        &context . env . driver ) . await ?; } }
+        &context . env . driver,
+        context . active_source_set ) . await ?; } }
   // Remaining view requests (Aliases / Containerward / Sourceward); the
   // Definitive request was already consumed by apply_definitive_draw_rule.
   super::reconcile::view_requests::execute_truenode_view_requests (
