@@ -11,9 +11,10 @@
 use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::from_text::local_instruction_collection::lower::{
   NodeIntent, NodeSaveIntent };
+use crate::from_text::weave::{member_is_visible, set_difference_merge, weave};
 use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use std::error::Error;
@@ -88,7 +89,6 @@ async fn supplement_saveintent_from_disk (
   driver      : &TypeDBDriver,
   restricted_source_set : Option<&ActiveSourceSet>,
 ) -> Result<Definenode_with_Opt_Sourcemove, Box<dyn Error>> {
-  let _ = restricted_source_set; // consumed by the weave/merge wiring in the next commit
   let pid : ID =
     from_buffer . pid . clone();
   let from_disk : Option<NodeComplete> =
@@ -114,13 +114,51 @@ async fn supplement_saveintent_from_disk (
         detect_source_move ( config,  &pid,
                              &canonicalized . source,
                              &disk_node . source) ?;
-      let supplemented : NodeComplete =
-        supplement_unspecified_fields_from_disk (
-          canonicalized, &disk_node);
+      let supplemented : NodeComplete = {
+        let supplemented : NodeComplete =
+          supplement_unspecified_fields_from_disk (
+            canonicalized, &disk_node);
+        match restricted_source_set {
+          None => supplemented,
+          Some (active) => preserve_invisible_members (
+            supplemented, &disk_node, config, active ) }};
       Ok (Definenode_with_Opt_Sourcemove {
         instruction : DefineNode::Save (SaveNode (supplemented)),
         source_move : maybe_move,
       }) }}}
+
+/// Under a restricted source-set, the buffer shows only some of a
+/// node's relationship-list members, so its lists describe only the
+/// visible subset.  This merges each list with its disk counterpart
+/// (TODO/full-schema/9-2_source-set-safety.org): the anchored
+/// 'weave' for the order-meaningful 'contains' and 'subscribes_to',
+/// the 'set_difference_merge' for the order-meaningless
+/// 'overrides_view_of'.  A field is replaced only when the merge
+/// changed it, so an untouched field keeps its MSV shape (and the
+/// noop filter can still recognize an unchanged node).
+fn preserve_invisible_members (
+  mut supplemented : NodeComplete,
+  disk_node        : &NodeComplete,
+  config           : &SkgConfig,
+  active           : &ActiveSourceSet,
+) -> NodeComplete {
+  let is_visible = |id : &ID| -> bool {
+    member_is_visible (id, config, active) };
+  { let merged : Vec<ID> = weave (
+      &disk_node . contains, &is_visible,
+      &supplemented . contains );
+    supplemented . contains = merged; }
+  { let merged : Vec<ID> = weave (
+      disk_node . subscribes_to . or_default (), &is_visible,
+      supplemented . subscribes_to . or_default () );
+    if merged != supplemented . subscribes_to . or_default () {
+      supplemented . subscribes_to = MSV::Specified (merged); }}
+  { let merged : Vec<ID> = set_difference_merge (
+      disk_node . overrides_view_of . or_default (), &is_visible,
+      supplemented . overrides_view_of . or_default () );
+    if merged != supplemented . overrides_view_of . or_default () {
+      supplemented . overrides_view_of = MSV::Specified (merged); }}
+  supplemented }
 
 /// Replace buffer's (singleton) ids with disk's (possibly multiple) ids.
 pub fn canonicalize_ids_from_disk (

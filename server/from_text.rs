@@ -8,6 +8,7 @@
 pub mod buffer_to_viewnodes;
 pub mod local_instruction_collection;
 pub mod supplement_from_disk;
+pub mod weave;
 pub mod validate;
 
 use crate::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
