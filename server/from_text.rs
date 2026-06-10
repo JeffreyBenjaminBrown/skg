@@ -36,7 +36,9 @@ use typedb_driver::TypeDBDriver;
 /// - disk-supplemented DefineNodes: foreign write policy;
 /// - non-nodeMerge plus nodeMerge plan: cross-plan source-move/nodeMerge policy.
 ///
-/// Returns the saved view and the plan derived from it as a pair. The two are
+/// Returns the saved view, the plan derived from it, and nonfatal
+/// parse warnings (e.g. discarded col headline text, destined for
+/// 'SaveResponse.warnings'). View and plan are
 /// kept apart (TODO/DONE/local-view-update/plan_v2.org §11): the graph-mutation
 /// step consumes only the SavePlan; the rerender step consumes the ViewForest
 /// (plus the plan's PIDs, for collateral selection). One parse produces both.
@@ -44,9 +46,9 @@ pub async fn buffer_to_validated_saveplan (
   buffer_text : &str,
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
-) -> Result<(ViewForest, SavePlan), SaveError> {
-  let ( mut maybePlaced_viewforest, parsing_errors )
-    : ( MpViewForest, Vec<BufferValidationError> )
+) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
+  let ( mut maybePlaced_viewforest, parsing_errors, parsing_warnings )
+    : ( MpViewForest, Vec<BufferValidationError>, Vec<String> )
     = { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "org_to_uninterpreted_viewforest" ). entered();
         // parse the raw buffer
@@ -106,4 +108,5 @@ pub async fn buffer_to_validated_saveplan (
         SavePlan {
           define_nodes,
           nodeMerge_instructions,
-          source_moves : nonmerge_plan . source_moves } )) }
+          source_moves : nonmerge_plan . source_moves },
+        parsing_warnings )) }

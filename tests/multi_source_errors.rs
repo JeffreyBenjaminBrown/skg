@@ -354,7 +354,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
               "Source move between owned sources should succeed, got: {:?}",
               result . err());
 
-      let ( _viewforest, save_plan ) = result?;
+      let ( _viewforest, save_plan, _warnings ) = result?;
       assert_eq!(save_plan . source_moves . len(), 1,
                  "Expected exactly 1 source move");
       assert_eq!(save_plan . source_moves[0] . pid . 0, "priv-1");

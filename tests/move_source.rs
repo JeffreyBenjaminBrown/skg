@@ -150,7 +150,7 @@ fn test_move_node_to_another_owned_source (
       ** (skg (node (id b) (source private))) b
       *** (skg (node (id c) (source public))) c
     "};
-    let ( _viewforest, save_plan )
+    let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
           org_text, &config, &driver
           ) . await?;
@@ -246,7 +246,7 @@ fn test_move_node_referenced_by_extra_id (
       ** (skg (node (id b-alias) (source private))) b
       *** (skg (node (id c-alias) (source public))) c
     "};
-    let ( _viewforest, save_plan )
+    let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
           org_text, &config, &driver ) . await?;
 
@@ -314,7 +314,7 @@ fn test_move_multiple_nodes (
       ** (skg (node (id b) (source private))) b
       *** (skg (node (id c) (source private))) c
     "};
-    let ( _viewforest, save_plan )
+    let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
           org_text, &config, &driver
           ) . await?;
@@ -481,7 +481,7 @@ fn test_no_source_change_produces_no_moves (
       ** (skg (node (id b) (source public))) b
       *** (skg (node (id c) (source public))) c
     "};
-    let ( _viewforest, save_plan )
+    let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
           org_text, &config, &driver
           ) . await?;
@@ -514,7 +514,7 @@ fn test_source_only_change_with_populated_pool (
       ** (skg (node (id b) (source private))) b
       *** (skg (node (id c) (source public))) c
     "};
-    let ( _viewforest, save_plan )
+    let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
           org_text, &config, &driver ) . await?;
 

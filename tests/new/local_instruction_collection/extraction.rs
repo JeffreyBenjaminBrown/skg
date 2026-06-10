@@ -139,8 +139,8 @@ async fn save_instructions_from_org_with_disk (
   config   : &skg::types::misc::SkgConfig,
   driver   : &typedb_driver::TypeDBDriver,
 ) -> Result<Vec<DefineNode>, Box<dyn Error>> {
-  let (mut maybePlaced_viewforest, _parsing_errors)
-    : (MpViewForest, Vec<BufferValidationError>) =
+  let (mut maybePlaced_viewforest, _parsing_errors, _warnings)
+    : (MpViewForest, Vec<BufferValidationError>, Vec<String>) =
     org_to_uninterpreted_viewforest (org_text) ?;
   add_missing_info_to_viewforest (
     &mut maybePlaced_viewforest, &config . db_name, driver) . await?;

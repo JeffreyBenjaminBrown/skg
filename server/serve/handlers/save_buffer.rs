@@ -251,7 +251,8 @@ pub async fn update_from_and_rerender_buffer (
     validate_no_merge_commits ( &sources, &env . config )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
 
-  let ( viewforest, save_plan ) : ( ViewForest, SavePlan ) =
+  let ( viewforest, save_plan, parse_warnings )
+    : ( ViewForest, SavePlan, Vec<String> ) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
             "buffer_to_validated_saveplan"
           ) . entered();
@@ -302,15 +303,22 @@ pub async fn update_from_and_rerender_buffer (
 
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "update_views_after_save" ). entered();
-    update_views_after_save (
-      stream,
-      viewforest,
-      define_nodes,
-      diff_mode_enabled,
-      env,
-      viewuri_from_request_result,
-      views_state,
-      active_source_set ) . await } }
+    let mut response : SaveResponse =
+      update_views_after_save (
+        stream,
+        viewforest,
+        define_nodes,
+        diff_mode_enabled,
+        env,
+        viewuri_from_request_result,
+        views_state,
+        active_source_set ) . await ?;
+    { // Nonfatal parse warnings (e.g. discarded col headline text)
+      // precede the completion-repair warnings.
+      let mut warnings : Vec<String> = parse_warnings;
+      warnings . extend ( response . warnings );
+      response . warnings = warnings; }
+    Ok (response) } }
 
 /// Check if any source's HEAD is a merge commit.
 /// Returns an error message if so,

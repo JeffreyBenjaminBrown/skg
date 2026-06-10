@@ -37,8 +37,8 @@ fn test_find_buffer_errors_for_saving() -> Result<(), Box<dyn Error>> {
                 * (skg (node (id conflict) (source main))) Same ID but no toDelete flag
             "};
 
-      let (viewforest, parsing_errors)
-        : (MpViewForest, Vec<BufferValidationError>)
+      let (viewforest, parsing_errors, _warnings)
+        : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
         = org_to_uninterpreted_viewforest(
             input_with_errors) . unwrap();
       let validation_errors: Vec<BufferValidationError> =
@@ -183,7 +183,8 @@ fn test_find_buffer_errors_for_saving_valid_input() -> Result<(), Box<dyn Error>
                 This body is allowed on normal nodes
             "};
 
-      let (viewforest, parsing_errors): (MpViewForest, Vec<BufferValidationError>) =
+      let (viewforest, parsing_errors, _warnings)
+        : (MpViewForest, Vec<BufferValidationError>, Vec<String>) =
         org_to_uninterpreted_viewforest (valid_input) . unwrap();
       let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
 
@@ -582,8 +583,8 @@ fn test_edit_request_on_indefinitive_is_rejected_at_parse_time() {
       * (skg (node (id root) (source main))) parent
       ** (skg (node (id phantom) (source main) indef (unstaged removedM) (editRequest delete))) phantom child
     "};
-  let (_viewforest, parsing_errors)
-    : (MpViewForest, Vec<BufferValidationError>)
+  let (_viewforest, parsing_errors, _warnings)
+    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
     = org_to_uninterpreted_viewforest (input_delete) . unwrap ();
   let matching : Vec<&BufferValidationError> =
     parsing_errors . iter ()
@@ -601,8 +602,8 @@ fn test_edit_request_on_indefinitive_is_rejected_at_parse_time() {
       * (skg (node (id root) (source main))) parent
       ** (skg (node (id phantom) (source main) indef (editRequest (merge other)))) phantom child
     "};
-  let (_viewforest2, parsing_errors2)
-    : (MpViewForest, Vec<BufferValidationError>)
+  let (_viewforest2, parsing_errors2, _warnings__viewforest2)
+    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
     = org_to_uninterpreted_viewforest (input_merge) . unwrap ();
   let matching2 : Vec<&BufferValidationError> =
     parsing_errors2 . iter ()
@@ -620,8 +621,8 @@ fn test_edit_request_on_indefinitive_is_rejected_at_parse_time() {
       * (skg (node (id root) (source main))) parent
       ** (skg (node (id leaf) (source main) (editRequest delete))) leaf
     "};
-  let (_viewforest3, parsing_errors3)
-    : (MpViewForest, Vec<BufferValidationError>)
+  let (_viewforest3, parsing_errors3, _warnings__viewforest3)
+    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
     = org_to_uninterpreted_viewforest (input_definitive) . unwrap ();
   assert! ( ! parsing_errors3 . iter () . any ( |e|
     matches! (e, BufferValidationError::EditRequestOnIndefinitive (_)) ),
@@ -636,8 +637,8 @@ fn test_inactive_placeholder_content_edits_rejected_at_parse_time () {
       * (skg (node (id root) (source main))) parent
       ** (skg (inactiveNode (id hidden) (source private))) edited title
     "};
-  let (_viewforest, parsing_errors)
-    : (MpViewForest, Vec<BufferValidationError>)
+  let (_viewforest, parsing_errors, _warnings)
+    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
     = org_to_uninterpreted_viewforest (input_with_title_edit) . unwrap ();
   assert!(
     parsing_errors . iter () . any ( |e| matches!(
@@ -652,8 +653,8 @@ fn test_inactive_placeholder_content_edits_rejected_at_parse_time () {
       ** (skg (inactiveNode (id hidden) (source private)))
       edited body
     "};
-  let (_viewforest2, parsing_errors2)
-    : (MpViewForest, Vec<BufferValidationError>)
+  let (_viewforest2, parsing_errors2, _warnings__viewforest2)
+    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
     = org_to_uninterpreted_viewforest (input_with_body_edit) . unwrap ();
   assert!(
     parsing_errors2 . iter () . any ( |e| matches!(
@@ -671,8 +672,8 @@ fn test_inactive_placeholder_active_children_rejected_locally () {
       ** (skg (inactiveNode (id hidden) (source private)))
       *** (skg (node (id child) (source main))) active child
     "};
-  let (viewforest, parsing_errors)
-    : (MpViewForest, Vec<BufferValidationError>)
+  let (viewforest, parsing_errors, _warnings_viewforest)
+    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
     = org_to_uninterpreted_viewforest (input) . unwrap ();
   assert_eq! (
     parsing_errors . len(), 0,
@@ -712,8 +713,8 @@ fn test_inactive_placeholder_under_truenode_allowed_locally () {
       * (skg (node (id root) (source main))) parent
       ** (skg (inactiveNode (id hidden) (source private)))
     "};
-  let (viewforest, parsing_errors)
-    : (MpViewForest, Vec<BufferValidationError>)
+  let (viewforest, parsing_errors, _warnings_viewforest)
+    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
     = org_to_uninterpreted_viewforest (input) . unwrap ();
   assert_eq! (
     parsing_errors . len(), 0,
@@ -736,8 +737,8 @@ fn test_duplicate_inactive_placeholder_content_rejected_locally () {
       ** (skg (node (id hidden) (source main))) active child
       ** (skg (inactiveNode (id hidden) (source private)))
     "};
-  let (viewforest, parsing_errors)
-    : (MpViewForest, Vec<BufferValidationError>)
+  let (viewforest, parsing_errors, _warnings_viewforest)
+    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
     = org_to_uninterpreted_viewforest (input) . unwrap ();
   assert_eq! (
     parsing_errors . len(), 0,
@@ -774,8 +775,8 @@ fn duplicate_members_of_defining_cols_pass_validation () {
       *** (skg (node (id dup2) (source main) indef)) dup2
       *** (skg (node (id dup2) (source main) indef)) dup2
     "};
-  let (viewforest, parsing_errors)
-    : (MpViewForest, Vec<BufferValidationError>)
+  let (viewforest, parsing_errors, _warnings_viewforest)
+    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
     = org_to_uninterpreted_viewforest (input) . unwrap ();
   assert_eq! (
     parsing_errors . len(), 0,
@@ -795,8 +796,8 @@ fn duplicate_members_of_readonly_cols_are_still_rejected () {
       *** (skg (node (id dup) (source main) indef)) dup
       *** (skg (node (id dup) (source main) indef)) dup
     "};
-  let (viewforest, parsing_errors)
-    : (MpViewForest, Vec<BufferValidationError>)
+  let (viewforest, parsing_errors, _warnings_viewforest)
+    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
     = org_to_uninterpreted_viewforest (input) . unwrap ();
   assert_eq! (
     parsing_errors . len(), 0,

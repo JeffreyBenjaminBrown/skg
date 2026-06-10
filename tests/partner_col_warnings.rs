@@ -102,19 +102,23 @@ async fn readonly_col_repairs_warn_impl (
       let stars : usize =
         x_line . chars () . take_while ( |c| *c == '*' ) . count ();
       format! ( "{} xx", "*" . repeat (stars + 1) ) };
+    let col_line : String =
+      line_containing (&complete_buffer, "subscriberCol") . to_string ();
     complete_buffer
       . replace ( &format! ("{}\n", r_line), "" ) // delete member r
       . replace ( &t_line,                        // park x (with child) after t
-                  &format! ("{}\n{}\n{}", t_line, x_line, x_child) ) };
+                  &format! ("{}\n{}\n{}", t_line, x_line, x_child) )
+      . replace ( &col_line,                      // edit the col headline text
+                  &format! ("{} HELLO", col_line) ) };
   let response : SaveResponse =
     save_buffer (&edited, config, driver, tantivy, &graph) . await ?;
   assert! ( response . errors . is_empty (),
     "save must succeed; got errors: {:?}", response . errors );
   let warning : &String =
     response . warnings . iter ()
-    . find ( |w| w . contains ("subscriberCol") )
+    . find ( |w| w . contains ("Repaired subscriberCol") )
     . unwrap_or_else (
-      || panic! ( "no subscriberCol warning in {:?}",
+      || panic! ( "no subscriberCol repair warning in {:?}",
                   response . warnings ));
   assert! ( warning . contains ("under node n"), "{}", warning );
   assert! ( warning . contains ("restored 1 member(s): r"),
@@ -123,10 +127,27 @@ async fn readonly_col_repairs_warn_impl (
             "{}", warning );
   assert! ( warning . contains ("edited from the other side"),
             "{}", warning );
+  assert! ( response . warnings . iter ()
+            . any ( |w| w . contains ("Headline text on a subscriberCol") ),
+    "discarded col headline text must warn: {:?}",
+    response . warnings );
   let saved : String = response . saved_view;
   assert! ( saved . contains ("(id r)"),
     "deleted member r must respawn:\n{}", saved );
   { let x_line_after : &str = line_containing (&saved, "(id x)");
     assert! ( x_line_after . contains ("independent"),
       "x must be rerendered as independent: {}", x_line_after ); }
+  assert! ( ! line_containing (&saved, "subscriberCol")
+              . contains ("HELLO"),
+    "the col headline edit must not survive the rerender:\n{}", saved );
+  { // A BODY on a scaffold still aborts the save (Body_of_Scaffold).
+    let col_line : String =
+      line_containing (&saved, "subscriberCol") . to_string ();
+    let with_body : String =
+      saved . replace ( &col_line,
+                        &format! ("{}\nan illegal body", col_line) );
+    let result =
+      save_buffer (&with_body, config, driver, tantivy, &graph) . await;
+    assert! ( result . is_err (),
+      "a body on a col scaffold must still abort the save" ); }
   Ok (( )) }

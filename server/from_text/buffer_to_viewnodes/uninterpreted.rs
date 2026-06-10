@@ -45,19 +45,24 @@ pub fn org_to_uninterpreted_nodes(
 ) -> Result < ( Tree<MpViewnode>,
                 Vec<BufferValidationError> ),
               String > {
-  let (viewforest, parsing_errors)
-    : (MpViewForest, Vec<BufferValidationError>) =
+  let (viewforest, parsing_errors, _warnings)
+    : (MpViewForest, Vec<BufferValidationError>, Vec<String>) =
     org_to_uninterpreted_viewforest (input)?;
   Ok ( ( viewforest . into_internal_tree (), parsing_errors ) ) }
 
+/// The third element of the result is nonfatal parse warnings
+/// (e.g. discarded headline text on a col scaffold), destined for
+/// 'SaveResponse.warnings'.
 pub fn org_to_uninterpreted_viewforest(
   input: &str
 ) -> Result < ( MpViewForest,
-                Vec<BufferValidationError> ),
+                Vec<BufferValidationError>,
+                Vec<String> ),
               String > {
   let mut viewforest: MpViewForest =
     MpViewForest::new();
   let mut parsing_errors: Vec<BufferValidationError> = Vec::new();
+  let mut parsing_warnings: Vec<String> = Vec::new();
   // treeid_stack[0] is the internal forest root,
   // treeid_stack[1] is the current view root, etc.
   let mut treeid_stack: Vec<NodeId> = vec![ {
@@ -68,11 +73,13 @@ pub fn org_to_uninterpreted_viewforest(
     let view_node_line_cols: Vec<ViewNodeLineCol> =
       divide_into_viewNodeLineCols (input)?;
     view_node_line_cols } {
-    let (level, viewnode, error_opt)
-      : (usize, MpViewnode, Option<BufferValidationError>)
+    let (level, viewnode, error_opt, warning_opt)
+      : (usize, MpViewnode, Option<BufferValidationError>, Option<String>)
       = linecol_to_viewnode (view_node_line_col)?;
     if let Some (error) = error_opt {
       parsing_errors . push (error); }
+    if let Some (warning) = warning_opt {
+      parsing_warnings . push (warning); }
     // Adjust treeid_stack to proper level
     // (the internal forest root is level 0; view roots are level 1).
     while treeid_stack . len() > level {
@@ -91,7 +98,7 @@ pub fn org_to_uninterpreted_viewforest(
           viewforest . get_mut (parent_treeid) . unwrap();
         parent_mut . append (viewnode) . id() };
       new_treeid } ); }
-  Ok ( ( viewforest, parsing_errors ) ) }
+  Ok ( ( viewforest, parsing_errors, parsing_warnings ) ) }
 
 /// Parse input text into org node line collections.
 /// Each org node consists of a headline and its following body lines.
@@ -134,10 +141,12 @@ fn divide_into_viewNodeLineCols (
 
 /// Create an MpViewnode from an ViewNodeLineCol.
 /// This helper extracts the node creation logic from the main parsing function.
-/// Returns (level, MpViewnode, Option<BufferValidationError>).
+/// Returns (level, MpViewnode, error, warning).
 fn linecol_to_viewnode(
   view_node_line_col: &ViewNodeLineCol
-) -> Result < ( usize, MpViewnode, Option<BufferValidationError> ),
+) -> Result < ( usize, MpViewnode,
+                Option<BufferValidationError>,
+                Option<String> ),
               String > {
   let (level, metadata_option, title): HeadlineInfo =
     view_node_line_col . headline . clone();
@@ -150,8 +159,8 @@ fn linecol_to_viewnode(
       parsed_metadata
     } else { // No metadata, so use defaults.
       default_metadata () };
-  let ( viewnode, error_opt )
-    : ( MpViewnode, Option<BufferValidationError> )
+  let ( viewnode, error_opt, warning_opt )
+    : ( MpViewnode, Option<BufferValidationError>, Option<String> )
     = viewnode_from_metadata ( &metadata, title, body_text );
   if matches! (
     &viewnode . kind,
@@ -159,7 +168,7 @@ fn linecol_to_viewnode(
   { return Err (
       "forestRoot metadata is internal and cannot appear in buffer text"
       . to_string () ); }
-  Ok ( ( level, viewnode, error_opt ) ) }
+  Ok ( ( level, viewnode, error_opt, warning_opt ) ) }
 
 /// Check if a line is a valid headline and extract level, metadata, and title.
 /// Returns Ok(HeadlineInfo) if it's a valid headline with valid metadata.

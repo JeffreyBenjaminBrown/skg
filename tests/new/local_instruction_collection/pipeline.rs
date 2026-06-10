@@ -50,8 +50,8 @@ async fn placed_forest_from_org_with_disk (
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result<ViewForest, Box<dyn Error>> {
-  let (mut maybePlaced_viewforest, _parsing_errors)
-    : (MpViewForest, Vec<BufferValidationError>) =
+  let (mut maybePlaced_viewforest, _parsing_errors, _warnings)
+    : (MpViewForest, Vec<BufferValidationError>, Vec<String>) =
     org_to_uninterpreted_viewforest (input) ?;
   add_missing_info_to_viewforest (
     &mut maybePlaced_viewforest, &config . db_name, driver) . await?;

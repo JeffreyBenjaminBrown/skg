@@ -105,18 +105,24 @@ pub fn default_metadata() -> ViewnodeMetadata {
 
 /// Create an MpViewnode from parsed metadata components.
 /// This is the bridge between parsing (ViewnodeMetadata) and runtime (MpViewnode).
-/// Returns (MpViewnode, Option<BufferValidationError>) - error if Scaffold has body.
+/// Returns (MpViewnode, error, warning):
+/// - error if a Scaffold has a body;
+/// - warning if a col header (QualCol or PartnerCol) has nonempty
+///   title text, which the server discards: col headlines are
+///   titleless server-side (heralds supply their labels), so any
+///   text there is a user edit that cannot be saved. Qual leaves
+///   are exempt -- their title IS their data.
 pub fn viewnode_from_metadata (
   metadata : &ViewnodeMetadata,
   title    : String,
   body     : Option < String >,
-) -> ( MpViewnode, Option < BufferValidationError > ) {
-  let (kind, error)
-    : (MpViewnodeKind, Option<BufferValidationError>)
+) -> ( MpViewnode, Option < BufferValidationError >, Option < String > ) {
+  let (kind, error, warning)
+    : (MpViewnodeKind, Option<BufferValidationError>, Option<String>)
     = if let Some (ref uid) = metadata . unknown_node_id {
         ( MpViewnodeKind::Phantom (
             MpPhantom::Unknown (
-              PhantomUnknown { id: uid . clone () } ) ), None )
+              PhantomUnknown { id: uid . clone () } ) ), None, None )
       } else if metadata . is_inactive_node {
         let error : Option<BufferValidationError> =
           if body . is_some ()
@@ -133,9 +139,9 @@ pub fn viewnode_from_metadata (
               source     : metadata . source . clone ()
                            . unwrap_or_else ( || SourceName::from ("")),
               membership : metadata . inactive_membership } ) ),
-          error )
+          error, None )
       } else if metadata . is_dead_scaffold {
-        ( MpViewnodeKind::DeadScaffold, None )
+        ( MpViewnodeKind::DeadScaffold, None, None )
       } else if metadata . is_deleted_node {
         ( MpViewnodeKind::Phantom (
             MpPhantom::Deleted ( PhantomDeleted {
@@ -145,7 +151,7 @@ pub fn viewnode_from_metadata (
                        . unwrap_or_else ( || SourceName::from ("")),
             title,
             body,
-          } ) ), None )
+          } ) ), None, None )
       } else if let Some ( ref non_vognode ) = metadata . non_vognode {
         let error : Option<BufferValidationError> =
           if body . is_some () {
@@ -153,6 +159,16 @@ pub fn viewnode_from_metadata (
               title . clone (),
               maybeplaced_kind_error_label (non_vognode) ))
           } else { None };
+        let col_title_warning : Option<String> =
+          if ! title . is_empty ()
+            && matches! ( non_vognode,
+                          MpViewnodeKind::QualCol (_)
+                          | MpViewnodeKind::PartnerCol (_) )
+          { Some ( format! (
+              "Headline text on a {} is not saved; discarded: {:?}",
+              maybeplaced_kind_error_label (non_vognode),
+              title )) }
+          else { None };
         let non_vognode_with_title : MpViewnodeKind = match non_vognode {
           // Use headline title for string and apply scaffold membership axes
           MpViewnodeKind::Qual (Qual::Alias { .. }) =>
@@ -168,7 +184,7 @@ pub fn viewnode_from_metadata (
                               staged   : metadata . textchanged_staged,
                               unstaged : metadata . textchanged_unstaged }),
           other => other . clone () };
-        ( non_vognode_with_title, error )
+        ( non_vognode_with_title, error, col_title_warning )
       } else {
       // MpTruenode
       { let indef_or_def : IndefOrDef =
@@ -216,13 +232,13 @@ pub fn viewnode_from_metadata (
           else
           { MpViewnodeKind::Vognode ( MpVognode::Active (t) ) };
         ( node_kind,
-          error ) }
+          error, None ) }
     };
   ( MpViewnode { focused     : metadata . focused,
                        folded      : metadata . folded,
                        body_folded : metadata . body_folded,
                        kind },
-    error ) }
+    error, warning ) }
 
 fn maybeplaced_kind_error_label (
   kind : &MpViewnodeKind,

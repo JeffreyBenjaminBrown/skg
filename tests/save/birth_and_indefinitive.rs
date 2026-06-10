@@ -45,7 +45,7 @@ fn test_birth_and_indefinitive(
           ** (skg (node (id 2) (source main) (parentIs independent) indef)) 2
           *** (skg (node (id 4) (source main))) 4
         "};
-        let ( _viewforest, save_plan ) =
+        let ( _viewforest, save_plan, _warnings ) =
           buffer_to_validated_saveplan(
             org_text,
             config,
