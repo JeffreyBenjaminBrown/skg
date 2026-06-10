@@ -1,3 +1,12 @@
+* SUPERSEDED -- do not execute
+This plan was never executed.  It was written before the
+local-instruction-collection and local-view-update overhauls, and is
+wrong about the codebase in load-bearing ways ('parentIs=collector'
+no longer exists; the "likely edit points" name deleted files).
+Its territory is re-planned in [[./metaplan_2.org]] and
+[[./8_readonly-set-ergonomics.org]].  It is kept (outside DONE/,
+which holds executed plans) only as a record of the earlier policy
+discussion.
 * plan : saving read-only RoleCols
 This plan covers the metaplan section:
 "Make read-only sets predictable under save and rerender".

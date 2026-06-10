@@ -583,3 +583,58 @@
    pipeline actually performs is 'reconcile_nodeIntents' (NodeIntent
    level) in 'to_naive_instructions.rs'. Slated for deletion in
    TODO/local-instruction-collection/3_plan.org.
+
+* Problems found during full-schema metaplan 2 research (2026-06-10)
+** Sharing-col members from inactive sources make a buffer unsavable
+   Under a restricted source-set,
+   'apply_source_set_to_viewforest' ('server/source_sets.rs')
+   converts EVERY Active viewnode from an inactive source into an
+   InactiveNode placeholder -- including members of sharing cols
+   (subscribeeCol, overriddenCol, and the read-only relation cols).
+   But buffer validation ('validate_inactive_node' in
+   'server/from_text/buffer_to_viewnodes/local.rs') requires an
+   inactive placeholder's parent to be a gnode. So a buffer whose
+   subscribeeCol contains a member from an inactive source cannot be
+   saved at all: the save aborts with "Inactive placeholder must
+   have a TrueNode parent."
+
+   Worse, the failure mode if that validation were relaxed without
+   further work is silent data loss: 'relation_col_members'
+   ('server/from_text/local_instruction_collection/traverse.rs')
+   collects only Active children, so the inactive member would be
+   dropped from the 'SetSubscribesTo' / 'SetOverrides' list, which
+   lowers to 'MSV::Specified' and overwrites the disk list
+   ('supplement_unspecified_fields_from_disk' fills only Unspecified
+   fields). The subscription/override to the invisible node would be
+   silently deleted.
+
+   Planned fix: TODO/full-schema/metaplan_2.org, section "preserve
+   source-set safety for sharing relations" (omit inactive members
+   from col display; merge visible-subset edits with disk's
+   inactive members at save; assert no instruction touches an
+   inactive source).
+** 'complete_relevant_children_in_viewnodetree' panics on non-Active relevant children
+   Its orderkey closure panics ("relevant child not a normal graph
+   node") if the relevance predicate ever admits a non-Active
+   viewnode. Today every caller's predicate requires
+   Vognode::Active, so the panic is unreachable, but the invariant
+   lives in a pair of closures rather than in a type or a Result.
+   A future relevance predicate that admits, say, InactiveNode
+   members would turn a save into a server crash. Returning Err
+   would cost little.
+** Architecture note: nothing can represent "drawn in place of another node"
+   Once override substitution lands (TODO/full-schema/metaplan_2.org,
+   "define override rendering and navigation"), a viewnode can stand
+   in for a different graph node than the one whose ID it carries:
+   the buffer draws overrider R where the container's contains list
+   says N. The planned representation is a bool ('overridesHere' on
+   'ViewNodeStats') plus the convention that save extraction
+   round-trips the original ID.
+
+   If a second substitution-like feature ever appears (redirects,
+   merge previews, etc.), do not add a second bool-plus-convention.
+   Replace the pattern with an explicit field, something like
+   'drawn_in_place_of : Option<ID>' on the viewnode, so the
+   stand-in relationship is data rather than convention. Jeff
+   approved this direction 2026-06-10; it is deliberately deferred
+   until a second consumer exists.

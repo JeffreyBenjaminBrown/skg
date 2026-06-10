@@ -1,0 +1,662 @@
+* metaplan 2 : full schema UI
+** purpose of this document
+This supersedes [[./metaplan_1.org]].  Write sub-plans from the
+"steps, in order" section below, one file per step, as was done for
+metaplan 1.  Move finished sub-plans to [[./DONE/]] and log progress
+in [[./progress.org]].
+
+The goal is unchanged: make every relationship in 'schema.tql'
+('contains', 'textlinks_to', 'subscribes',
+'hides_from_its_subscriptions', 'overrides_view_of') inspectable,
+editable where owned, safe under source-set filtering, clear in
+heralds, and coherent under save, rerender and git diff views.
+
+The destination this work aims to unlock is [[../../docs/forks.md]]:
+a user clones a branch of someone else's (foreign, read-only)
+document into their own document; the clone subscribes to the
+original (so upstream additions appear, foldably, as unintegrated
+content); the clone overrides the view of the original (so the user
+sees their own version wherever the original would have been drawn);
+and read-only inbound collections let the original's owner discover
+who has forked their data.  Subscription machinery mostly exists.
+The largest missing piece on the path to forks is override
+rendering and navigation.
+** what changed while full-schema was paused
+The code was overhauled after metaplan 1 stalled.  Sub-plans drawn
+from this metaplan should trust the descriptions below over anything
+in metaplan 1, vision.org, or 7_saving-readonly-cols.org.
+*** save extraction was replaced by local instruction collection
+'server/from_text/local_instruction_collection/' (see glossary.md
+and TODO/DONE/local-instruction-collection/).  One pure DFS preorder
+('collect_instructions_locally' in 'traverse.rs') emits per-field
+intents into a map keyed by PID; downstream stages consume the map in
+order: text-claim validation, lowering to 'NodeIntent's,
+visibility resolution, disk supplementation
+('build_diskSupplemented_defineNodes'), the noop filter.
+
+Facts that matter for the remaining full-schema work:
+- The writable cols are AliasCol, SubscribeeCol and OverriddenCol.
+  Each emits a Set* intent ('SetAliases', 'SetSubscribesTo',
+  'SetOverrides') only when its owner is save-eligible.  An absent
+  col lowers to 'MSV::Unspecified' (no opinion, filled from disk by
+  'supplement_unspecified_fields_from_disk'); a present-but-empty col
+  lowers to 'MSV::Specified(vec![])' (explicit empty set).
+- The six read-only RoleCols, the IDCol, and Qual leaves give their
+  vognode descendants 'LocalContext::UnderReadOnlyCol': those nodes
+  are self-writers; their membership in the col is never read.
+- 'relation_col_members' (traverse.rs) collects only
+  'Vognode::Active' children with 'parentIs=Affected'.
+  Inactive placeholders are counted as content
+  ('content_members') but NOT as relation-col members.  See the
+  source-set step below; this asymmetry is load-bearing.
+*** rendering and post-save updating are one unified process
+'complete_viewforest' in 'server/update_buffer/complete.rs' (see
+TODO/DONE/local-view-update/plan_v2.org) is a single level-order BFS
+used both for de novo views ('render_initial_view') and post-save
+rerendering ('rerender_view', driven by 'update_views_after_save').
+Per-collection reconcilers live in 'server/update_buffer/reconcile/';
+the sharing-col reconcilers share
+'reconcile_sharing_col_children' and 'build_child_data'
+('server/to_org/complete/sharing/child_data.rs'), which delegate to
+'complete_relevant_children_in_viewnodetree'
+('server/update_buffer/util.rs').
+
+The uniform stale-member rule (plan_v2.org §6.0): a stale
+parentIs=Affected member that is a leaf is deleted; one with children
+is demoted to 'parentIs=Independent'; duplicates are deleted.
+Missing goal members are created.  Children are reordered to
+goal-list order, irrelevant (e.g. independent) children first.
+*** the viewnode vocabulary changed
+- 'parentIs=collector' no longer exists.  'ParentIs' is now
+  '{Affected, Independent, Absent}'.  Collection membership is
+  marked 'Affected' (the default); demotion targets 'Independent'.
+  Metaplan 1's stage 6 introduced 'collector', and
+  7_saving-readonly-cols.org speaks 'collector' throughout; both are
+  stale on this point.
+- 'ViewNodeKind' is now: 'Vognode(Active(TrueNode) | Inactive)',
+  'Phantom(Diff | Deleted | Unknown)', 'QualCol(ID | Alias)',
+  'Qual', 'PartnerCol(RoleCol)', 'BufferRoot', 'DeadScaffold'.
+- 'RoleCol' has eight variants: writable 'Subscribee' and
+  'Overridden'; read-only 'Subscriber', 'Overrider', 'Hider',
+  'Hidden', 'HiddenInSubscribee', 'HiddenOutsideOfSubscribee'.
+*** inbound relation order is deterministic but not user-controlled
+'inbound_pids_for_relation'
+('server/dbs/in_rust_graph/relation_accessors.rs') sorts inbound
+members by ID so renders are stable.  Reconciliation then reimposes
+that sorted order, so a user's reordering of a read-only col is
+reset on every save.  Outbound (writable) col order is the disk
+Vec order, which the user's save defines, so it is preserved.
+** status of metaplan 1's sections
+- DONE (plans in [[./DONE/]], logged in [[./progress.org]]):
+  role rename; explicit warning channel (protocol + Emacs); TypeDB
+  source entities with 'user_owns_it'; override-invariant validation
+  at rebuild and save; scalar source-mismatch audit; relation
+  accessors and generated collections.
+- Done better than planned: metaplan 1's 'awaits' item "restrict
+  override validation to neighbors of changed nodes" already exists
+  as 'validate_touched_override_invariants'
+  ('server/dbs/in_rust_graph/override_invariants.rs'), used by
+  'validate_override_invariants_after_save' ('server/save.rs').
+- Partially superseded: "Make read-only sets predictable under save
+  and rerender" (the unexecuted 7_saving-readonly-cols.org).  The
+  local-view-update overhaul delivered uniform reconciliation
+  (restore missing members, delete stale leaves, demote stale
+  branches, delete duplicates) but NOT user-order preservation and
+  NOT repair warnings.  7_saving-readonly-cols.org should not be
+  executed as written: its edit-point file list is stale, and its
+  'collector' vocabulary no longer exists.  The first step below
+  replaces it.
+- Not started: heralds and view-specific stats; override rendering
+  and navigation; source-set safety for sharing relations; diff-mode
+  policy (the diff-analysis half exists: it covers all five
+  relations in both roles and refuses non-'all' source-sets, per
+  'server/serve/handlers/diff_analysis.rs'; the
+  diff-mode-toggle refusals and inline-diff override support do
+  not exist); the relationship-matrix tests; the documentation pass.
+* steps, in order
+Each section below is large enough to deserve its own sub-plan.
+** make read-only sets ergonomic under save and rerender
+Supersedes 7_saving-readonly-cols.org.  The reconciliation machinery
+already restores missing members, deletes stale leaves, demotes
+stale branches and removes duplicates.  Three behaviors are missing.
+*** one typed col policy
+Add a policy method on 'RoleCol' (beside 'relation_member_role' and
+'caller_label', consolidating them where natural) returning an enum,
+something like:
+- 'WritableSet' for 'Subscribee' and 'Overridden': membership edits
+  are graph edits; absent col means no opinion; empty col means
+  explicit empty set.
+- 'ReadOnlySet' for 'Subscriber', 'Overrider', 'Hider', 'Hidden':
+  membership is generated; user order is respected view-locally;
+  repairs warn.
+- 'ReadOnlyFilter' for 'HiddenInSubscribee' and
+  'HiddenOutsideOfSubscribee': membership is derived (these cols
+  have no direct relation role; their goal lists are computed from
+  hide state, not from 'relation_member_role').
+Reconciliation dispatch, save extraction's read-only treatment, and
+the herald metadata should all consult this one method, so the next
+relation we add cannot have inconsistent policies in different
+layers.
+
+Stale-member policy, decided 2026-06-10: demote, not discard.  The
+current reconciler's uniform rule (delete a stale leaf, demote a
+stale branch to independent) is confirmed for ALL col kinds,
+including the filter cols, superseding the earlier discard decision
+from 7_saving-readonly-cols.org.  The user keeps any subtree they
+built under a stale hidden entry.  Record this in the enum's
+documentation so the policy cannot drift per-file again.
+*** preserve user-visible order in read-only sets
+For 'ReadOnlySet' cols, compute the goal list as:
+1. the col's existing Active parentIs=Affected children, in current
+   buffer order, filtered to graph-real members;
+2. then any graph members not present, appended in sorted-ID order
+   (determinism for the appended tail only).
+This is a change to how 'reconcile_relation_col_children' computes
+'goal_list' before calling 'reconcile_sharing_col_children'; the
+reconciler itself already applies goal-list order.  The order is
+view-local: it lives in the Emacs buffer and in the 'ViewState'
+viewforest, never on disk.  Two buffers showing the same read-only
+set may disagree on order.  Closing and reopening a view may
+normalize to sorted order.
+*** warn when reconciliation repairs user edits
+Add a warning sink to the completion pass (e.g. a field on
+'CompletionContext' in 'server/update_buffer/complete.rs'), drained
+into 'SaveResponse.warnings' via the existing
+'RerenderAfterSaveContext::warnings'.  Emit warnings only when
+completing the view the user saved; de novo rendering, collateral
+rerenders and rerender-all repair silently (those repairs do not
+correspond to edits the user just made in that buffer).
+
+Make the warning a typed enum (col kind, owner PID, affected child
+PIDs, repair kind), rendered to strings late.  Batch per col owner:
+"Repaired subscriberCol under <owner>: restored 2 members, demoted 1
+non-member to independent."  Useful categories:
+- non-member relabeled independent,
+- stale leaf member removed,
+- missing member restored,
+- duplicate member removed,
+- filter-col stale member discarded.
+*** col headline text edits
+Col scaffolds are titleless server-side; Emacs heralds supply their
+labels.  The parser currently extracts each headline's title and
+discards it for scaffolds ('viewnode_from_metadata' has no title
+field for them).  At parse time, if a scaffold headline carries
+nonempty title text, emit a warning that the text was discarded.
+This needs no new state in 'ViewNode'; it is a check at the
+'MpViewnode' construction site.  If inspection shows the title is
+unavailable even there, document the impossibility in the sub-plan
+and drop the warning rather than adding parser state.
+*** IDCol edits abort the save
+Decision from vision.org stands: editing IDs through the UI is
+dangerous and pointless; direct file editing remains the escape
+hatch.  Current behavior: structurally invalid IDCol shapes already
+error ('server/from_text/buffer_to_viewnodes/local.rs'), but
+deleting or reordering ID scaffolds is silently ignored and
+regenerated.  Add validation that the multiset of ID scaffolds under
+each IDCol equals the node's disk/graph ID list, erroring with an
+explanation if not.  This is a buffer-validation-stage check; the
+in-Rust graph already knows each node's ID list, so no extra disk
+read is needed.
+*** ride-along fixes while in this code
+Small items decided 2026-06-10, owned by this step because it
+touches the relevant files anyway:
+- Standardize the vocabulary on "PartnerCol": rename the payload
+  type 'RoleCol' to 'PartnerCol' (the 'ViewNodeKind' variant already
+  has that name), and update prose and comments that say "role
+  col", "relation col" or "sharing col" for the general concept.
+  (A name like "sharing-col reconcilers" may survive where it
+  genuinely denotes only the subscribee-related completers, but
+  prefer naming the cols.)  The documentation step records the term
+  in glossary.md.
+- Replace the panic in
+  'complete_relevant_children_in_viewnodetree's orderkey closure
+  with an Err.  Today's relevance predicates make it unreachable,
+  but the invariant lives in a closure pair, not a type
+  (TODO/problems.org records this).
+- Put a comment on 'MSV' stating the absent-versus-empty col rule
+  (absent col -> 'Unspecified' -> no opinion; present-but-empty col
+  -> 'Specified(vec![])' -> explicit empty set), so the invariant is
+  findable from the type rather than only from emission logic in
+  'traverse.rs'.
+** preserve source-set safety for sharing relations
+Source-set filtering must neither leak inactive-source data nor
+destroy invisible relationship targets.  Currently
+'apply_source_set_to_viewforest' ('server/source_sets.rs') converts
+EVERY Active node from an inactive source into an
+'InactiveNode' placeholder, including members of relation cols.
+Buffer validation then requires an inactive placeholder's parent to
+be a gnode ('validate_inactive_node'), so a buffer whose
+subscribeeCol contains an inactive-source member cannot be saved at
+all.  (Recorded in TODO/problems.org.)  And if that validation were
+relaxed without further work, 'relation_col_members' would drop the
+inactive member from the 'Specified' list and the save would
+silently delete the relationship: 'supplement_from_disk' fills only
+'Unspecified' fields.
+*** an inactive member under a col must not block saving
+Decided 2026-06-10: a buffer containing an inactive-source member
+under a sharing col must still be savable.  (A user might render
+subscribees and then change the active source-set -- say, because
+someone walked into the room -- and they should still be able to
+save.)  So 'validate_inactive_node' must accept an InactiveNode
+whose parent is a col, rather than erroring.  Extraction already
+ignores such children ('relation_col_members' collects only Active
+members), and the visible-subset merge below preserves their
+memberships from disk; tolerating them at validation is the missing
+piece.  The save's rerender then omits them per the next
+subsection.  Note the consequence: the user cannot remove an
+invisible member's relationship while it is invisible, by design.
+*** render: omit, do not placeholder-ize, col members
+For all eight RoleCols, members from inactive sources should be
+omitted from the display entirely.  Order is not semantically
+meaningful for sharing relations, so omission loses nothing, and "a
+private node subscribes to public node N" is itself information the
+placeholder would leak.  Content placeholders are unchanged: content
+order matters, so inactive content stays placeholder-represented.
+*** save: writable col lists are visible-subset edits
+When the active source-set is restricted, a 'SetSubscribesTo' or
+'SetOverrides' list extracted from the buffer describes only the
+visible subset.  Define one named merge operation (tested once, used
+for both relations): the saved list is the buffer's visible list
+(user order preserved), followed by the disk list's members whose
+sources are inactive (order meaningless, so append).  Visible
+members absent from the buffer are removed; invisible members are
+always preserved.  When the active source-set is 'all', the
+operation degenerates to the current overwrite.
+
+This probably belongs at the lowering or supplementation stage,
+where disk state is already in hand; it must NOT depend on the
+client sending anything about invisible members.
+*** guard: no instruction may touch an inactive source
+Add an explicit save-stage check, after supplementation, that no
+'DefineNode' (Save or Delete) and no 'SourceMove' targets an
+inactive source; reject with an explanatory error.  This protects
+against present and future leak paths, e.g. visibility resolution's
+'apply_hiderel_delta_to_subscriber', which can synthesize a save
+intent for a subscriber read from disk; that subscriber's source
+might be inactive in the current view.
+** add heralds and the remaining stats
+*** the H graphstat
+Add a 'hiding' boolean to 'GraphNodeStats' (true iff the node plays
+either role of 'hides_from_its_subscriptions', anywhere), parallel to
+'overriding' and 'subscribing'.  Compute it in both stats paths
+('server/dbs/typedb/search/all_graphnodestats.rs': the TypeQL fetch
+and the in-Rust computation via 'hiders_of' plus the outbound list).
+Serialize it; add the elisp herald rule ("H", same family as "S" and
+"O") in 'elisp/heralds-minor-mode.el'.  It is deliberately broad;
+users wanting detail request the relation cols.
+*** view-specific stats gO and gS
+Extend 'ViewNodeStats' ('server/types/viewnode.rs', computed in
+'server/update_buffer/viewnodestats.rs'):
+- 'grandparentOverrides': computed only for subscribees-as-such
+  (Affected children of a SubscribeeCol) when the col's owner also
+  overrides that node.  Herald: red "gO".
+- 'grandparentSubscribes': computed only for Affected children of an
+  OverriddenCol when the col's owner also subscribes to that node.
+  Herald: red "gS".
+Do not emit the redundant cases (no gS under a subscribeeCol, no gO
+under an overriddenCol): the col itself already says it.
+The third stat from metaplan 1, 'overridesHere' (herald "Oh"),
+depends on override substitution and lands with the next step.
+*** read-only herald audit
+The green col labels already exist for all eight RoleCols and the
+QualCols.  Verify the indef/peace presentation is consistent for
+IDCol and both hidden-subscription cols, and that the new
+warnings (step above) plus the herald story agree on which cols are
+read-only.  This is a small verification-and-polish item, not a
+build item.
+*** one vocabulary, machine-checkable
+The herald rules in 'elisp/heralds-minor-mode.el' form a parallel
+table to the server's metadata vocabulary, coupled only by strings;
+adding a stat has been a scavenger hunt.  Fix that while this step
+is adding three new atoms:
+- Add a Rust generator (a test or tiny binary) that writes a JSON
+  enumeration of every metadata atom the server can emit: the col
+  atoms (from 'repr_in_client'), the graphStats and viewStats field
+  names, parentIs values, birth values, and so on.  Rust's existing
+  enums remain the source of truth; the JSON is generated FROM
+  them, never read BY them.  (Making JSON the source of truth for
+  Rust would cost exhaustive-match checking, or require build-step
+  codegen to win it back; not worth it.)
+- Add a conformance test: every atom in the JSON has an elisp
+  herald rule, and every herald rule names a live atom.  This is
+  the required core; it turns "forgot the herald" into a test
+  failure.
+- Optionally, 'heralds-minor-mode.el' can load its rule table from
+  that JSON (Emacs parses JSON natively), keeping only presentation
+  (colors, symbols, ordering) in elisp.  Nice if cheap; the
+  conformance test already delivers the safety.
+The largest step, and the bridge to forks.  No override substitution
+exists today; the relation is stored, validated (monogamy and
+no-owned-chains, at save and rebuild) and displayed in cols, but
+never changes what is drawn.
+*** the resolution rule, as one type
+Define a resolver in one place (probably beside
+'override_invariants.rs' in 'server/dbs/in_rust_graph/'):
+given a PID, follow user-owned 'overrides_view_of' edges from
+overridden to overrider, transitively, with a seen-set cycle guard.
+Return a type, something like:
+- 'effective' : the PID to draw (equal to the input when no
+  user-owned overrider exists),
+- 'path' : the chain traversed (empty when no substitution),
+- 'cycle_detected' : bool.
+Foreign override edges never participate in substitution; they are
+display-only facts.  Valid saved data cannot contain user-owned
+chains, but the resolver must still terminate on invalid or foreign
+data (imports, hand-edited files), hence the guard, not an assert.
+A path longer than one signals legacy data; surface the minibuffer
+notice "Compound overrides relationship traversed..." from
+vision.org when it happens.
+*** substitution inside unified completion
+When completion would CREATE a viewnode for node N as recursive
+content (de novo views, definitive expansion, and new children
+introduced during post-save reconciliation), it draws
+resolve(N).effective instead.  Existing viewnodes are never
+rewritten: a buffer already showing the original keeps showing, and
+editing, the original; closing and reopening normalizes.  This
+matches the collateral-rerender decision in vision.org.
+
+Substitution must be OFF when diff mode is enabled (diff views show
+raw graph facts) and is unaffected by source-sets ("user-owned"
+means 'user_owns_it', not "currently active").
+
+Two interactions need explicit treatment in the sub-plan:
+- the contains list still names the original N; the drawn child is
+  resolve(N).effective.  Save extraction reads the buffer, so the
+  drawn overrider's presence as content must round-trip to the
+  ORIGINAL ID in the container's contains list, or saving a
+  container would silently rewrite its contains.  This likely needs
+  the substitution recorded on the viewnode (see 'overridesHere'
+  below), consulted by 'content_members'.
+- the overridden-as-such exception: an Affected child of an
+  OverriddenCol always draws the original, and definitive expansion
+  requested from it expands the original (the overrider is already
+  its grandparent).  Mirror of the existing subscribee-as-such
+  pattern, including: expansion from an overriddenCol does NOT apply
+  the owner's hides (those are scoped to subscriptions), whereas
+  expansion from a subscribeeCol does.  vision.org's R/E/G/H example
+  is the test fixture for this.
+*** the overridesHere stat
+'overridesHere' on 'ViewNodeStats': true iff this viewnode was drawn
+in place of a node it overrides.  Herald: red "Oh".  Set by the
+substitution code path; this is also the marker save extraction can
+consult to round-trip contains lists (previous subsection).
+*** the override-choice buffer
+When the user requests a NEW single-root content view of a node that
+is overridden (by anyone, user-owned or foreign), do not choose for
+them.  Show an ordinary Skg buffer of indefinitive nodes: the
+requested node as root, each overrider as a child of what it
+overrides, following 'overrides_view_of' from overridden to
+overrider recursively, all edges including foreign ones, stopping
+any branch that repeats an ID with a cycle marker.  Put the
+explanation in the minibuffer, not in buffer text.  The source
+herald already distinguishes owned from foreign destinations.
+
+Reuse the ancestry machinery
+('server/to_org/expand/backpath.rs',
+'attach_containerward_ancestries_at_nodeids_with_source_set') rather
+than inventing a new traversal-to-forest path; the overrides
+traversal is the same shape with a different relation.
+*** navigation surface classification
+- following a textlink to an overridden node: the menu.
+- 'skg-goto' and friends, including visiting a search result: the
+  menu.
+- readable-ID jumps from magit: the original raw node, no menu.
+- requesting a definitive view inside an existing buffer: bypass
+  substitution iff the node is overridden-as-such (under an
+  overriddenCol); otherwise apply substitution to NEW recursive
+  content beneath it.
+- opening (new buffer) from an overriddenCol child: the menu.
+- collateral rerender after save: existing viewnodes unchanged; new
+  content substituted.
+** define diff-mode policy for the full schema
+*** refusals
+Diff mode and restricted source-sets must not compose:
+- toggling diff mode ('handle_git_diff_toggle_and_rerender' in
+  'server/serve/handlers/rerender_all_views.rs') refuses unless the
+  active source-set is 'all';
+- switching the source-set away from 'all'
+  ('server/serve/handlers/source_sets.rs') refuses while diff mode
+  is on, and the refusal must happen BEFORE any buffers are closed.
+Diff analysis already refuses; reuse its message style.
+*** override diffs in inline diff views
+'NodeChanges' ('server/types/git.rs') carries 'subscribes_to_diff'
+and 'hides_diff', so removed subscribees and hidden members already
+phantom correctly in diff mode.  Add the missing
+'overrides_view_of' counterpart so overriddenCol (and overriderCol)
+members removed or added since HEAD render with the same per-stage
+membership axes.  'phantom_axes' ('server/types/phantom.rs') and
+'build_child_data' consume the new field.
+*** no substitution in diff surfaces
+Assert (and test) that override substitution from the previous step
+is disabled in diff mode and absent from diff analysis.  "No
+substitution" must not mean "ignore override relationship diffs":
+the relationship changes themselves are precisely what diff surfaces
+must show.
+** test the relationship matrix
+Organize by relationship and role, as metaplan 1 specified; the
+matrix itself is unchanged and is not repeated here (see metaplan 1,
+"Test the relationship matrix").  Adjustments for the new code:
+***  reconciliation behavior (order preservation, demotion, restoring,
+  warnings) is testable at the 'complete_viewforest' /
+  'reconcile_relation_col_children' level without TypeDB round-trips
+  where possible; prefer that, since the full suite is already slow.
+***  save-extraction behavior (writable cols, read-only cols ignored,
+  visible-subset merges) is testable at the
+  'extract_nonmergeSavePlan_locally' level, which is pure given a
+  placed forest plus mocked disk reads at supplementation.
+***  the override tests from metaplan 1's list all still apply
+  (monogamy at rebuild and save, foreign overriders displayed but
+  not substituted, chains rejected, cycle-safe menus, extra-ID
+  resolution before monogamy, bypass behavior, diff views raw).
+***  add regressions for: the previously-unsavable buffer (inactive
+  member under a writable col), inactive-member preservation across
+  a restricted save, warning delivery on a successful save, and
+  order preservation of a reordered read-only set across save.
+** document the resulting model
+As metaplan 1 specified: 'schema.tql' comments, 'api-and-formats.md'
+(new stats metadata, override-choice behavior, diff-mode refusals,
+visible-subset save semantics), 'glossary.md' (read-only set is
+already defined; add the col-policy vocabulary and override
+resolution terms), sharing docs, and command docs for
+override-choice navigation.  Also mark vision.org and metaplan 1 as
+historical, and note in 7_saving-readonly-cols.org that it was
+superseded (or move it to a graveyard, per taste).  Documentation
+should use graph-role vocabulary (overrider/overridden,
+subscriber/subscribee, hider/hidden) for graph facts and
+parent/child only for org/view structure.
+
+Additional items decided 2026-06-10:
+***  Document (do not change) the col-reconciliation ordering
+  behavior: independent (non-member) children are moved above the
+  generated members on save.  State it both in a comment at
+  'complete_relevant_children' and wherever user-facing docs
+  describe col behavior.
+***  The save pipeline is sketched in both glossary.md ("local
+  instruction collection") and coding-advice/claude-to-claude.org.
+  Make the glossary entry canonical and have the other link to it.
+***  Record the "PartnerCol" naming decision in glossary.md (the
+  general concept is a PartnerCol; "role col" and bare "sharing
+  col" are retired -- see the first step's ride-along list).
+* awaits
+Adjacent opportunities, not part of the plan.
+** the forks UX itself
+This metaplan completes the schema UI that forks need, but
+docs/forks.md promises gestures the schema UI does not provide:
+***  a "clone this foreign branch into my document" command that
+  creates the clone, the subscription, and (probably) the override
+  in one gesture, with the joined default title ("eggs / mystical");
+***  the generated, foldable "unintegrated subscribed content" branch
+  -- the subscribee-as-such machinery shows unhidden upstream
+  content today, but the forks document implies a friendlier
+  presentation of "new since you last integrated", which likely
+  needs a notion of what has been integrated;
+***  the social half: publishing the fact of a fork, and the indicator
+  in the original owner's view (the subscriberCol and overriderCol
+  read-only sets are the data for this; the cross-user transport is
+  not designed).
+These deserve their own vision document once this metaplan lands.
+** reuse richer TypeDB source facts
+Unchanged from metaplan 1: code that recovers source facts from the
+filesystem, Tantivy, or the in-Rust graph because TypeDB once could
+not answer source questions may now be simplifiable.
+** full-rebuild override validation cost
+Save-time validation is already O(touched), via
+'validate_touched_override_invariants'.  Full rebuild/init
+validation iterates the whole graph; fine for now, worth profiling
+on real data eventually.
+** revisit source-set and diff-mode composition
+After relation diffs exist for the full schema, revisit whether
+restricted source-sets and inline diff mode can compose.  The
+refusals in this plan keep the first implementation coherent.
+** reconsider the override-choice view type
+After override-choice buffers exist as ordinary indefinitive
+buffers, consider whether they deserve a dedicated view type.
+** read-only set order across reopen
+This plan preserves read-only set order view-locally.  If users turn
+out to want it durable, the natural home would be per-view state
+that survives buffer death, which does not exist and should not be
+invented preemptively.
+* DONE critique (all issues solved)
+** (incorrect) 7_saving-readonly-cols.org misdescribes the codebase
+In two load-bearing ways: 'parentIs=collector' (its membership
+marker throughout) no longer exists, and its "likely edit points"
+('server/update_buffer/complete_preorder/relation_col.rs',
+'complete_postorder/*') name files that are gone.  Anyone executing
+it verbatim would re-introduce a removed concept.  Solved by its
+supersession: the first step above replaces it, and the
+documentation step marks it superseded.
+** (incorrect) progress.org's stage-6 record is stale
+It describes 'parentIs=collector' as current behavior; true when
+written, misleading now.  Solved: a warning for readers was added
+at the top of progress.org in this round of edits.
+** (incorrect) the hidden-subscription stale-member policy drifted
+From the decided spec (discard stale members) to the uniform rule
+(demote stale branches, delete stale leaves).  Maybe an improvement,
+but it happened by unification rather than by decision.  Solved by
+decision (2026-06-10): demote, not discard -- the uniform rule is
+confirmed for all col kinds.  The col-policy step records it in the
+'ColPolicy' enum's documentation so it cannot drift again.
+** (dangerous) inactive-source members of sharing cols break saving
+Restricted source-set plus a sharing col with an inactive-source
+member makes the buffer unsavable today, and the failure mode if
+that validation were relaxed is silent relationship deletion
+('MSV::Specified' overwrite semantics).  Both recorded in
+TODO/problems.org.  The source-set step's visible-subset merge is
+the fix.  Until it lands, restricted-set users can hit a save error
+with no workaround inside the buffer.
+** (dangerous) override traversals can hit cycles in unvalidated data
+Override substitution is a rendering-time graph traversal over data
+that validation does not fully control (foreign sources, imports,
+hand-edited files).  An assert or an unguarded loop is a server hang
+one bad import away.  Solved by spec: the resolution-rule step
+requires the resolver (and the override-choice traversal) to be
+cycle-guarded and total.  The sub-plan must keep that requirement.
+** (dangerous) substitution creates an ID-aliasing hazard at save
+The buffer draws overrider R where the contains list says N.  If
+save extraction naively read children, every save of such a
+container would rewrite its contains from N to R -- a silent graph
+edit the user never made.  Solved by spec: the substitution step
+requires the round-trip through the original ID, marked by
+'overridesHere'.  The sub-plan should treat this as its hardest
+correctness obligation, with tests.
+** (dangerous) repair warnings could misattribute collateral repairs
+The same reconcilers run for the saved view, collateral views and
+rerender-all; warning from the latter two would blame the user for
+edits they never made, training them to ignore warnings.  Solved by
+spec: the warnings step scopes the sink to the saved view.
+** (awkward) RoleCol policy is scattered across four files
+Writability is implicit in 'traverse.rs' match arms, reconciliation
+dispatch is in 'reconcile/mod.rs' plus 'caller_label', the
+member-role mapping is in 'sharing/kind.rs', the external atoms in
+'viewnode.rs'.  Four files must agree for any one col to behave
+coherently.  Solved by spec: the col-policy step exists to fix
+exactly this.
+** (awkward) two generations of override herald names coexist
+vision.org used Og/Se/On; metaplan 1 and this file use Oh/gO/gS.
+Only this file should be load-bearing.  Solved by spec: the
+documentation step marks vision.org and metaplan 1 historical.
+** (missing abstraction) ColPolicy
+Writable / read-only-set / read-only-filter.  Planned, in the
+col-policy step.
+** (missing abstraction) an override-resolution result type
+'effective', 'path', 'cycle_detected' -- so completion, the choice
+menu, navigation handlers and tests all consume one resolver instead
+of re-walking edges.  Planned, in the resolution-rule step.
+** (missing abstraction) a typed completion warning
+Col kind, owner, children, repair kind -- rather than 'Vec<String>'
+plumbing.  Planned, in the warnings step.
+** (missing abstraction) a named visible-subset merge
+For relationship lists under restricted source-sets, so "invisible
+members are preserved" is one tested function, not a property
+smeared across extraction and supplementation.  Planned, in the
+source-set step.
+** (other) the relationship-matrix tests could bloat the slow suite
+The two pure seams (placed-forest extraction; viewforest
+reconciliation) make most new tests cheap.  Solved by spec: the
+test-matrix step directs sub-plans to default to those seams and
+reserve integration tests for the wiring.
+** (dangerous) a panic where an error would do
+'complete_relevant_children_in_viewnodetree' panics (rather than
+erroring) in its orderkey closure when a relevant child is not an
+Active vognode.  The relevance predicate currently guarantees
+safety, but the invariant lives in a closure pair, not a type; a
+future relevance predicate that admits another kind makes it a
+server crash.  Also recorded in TODO/problems.org.  Solved by
+decision (2026-06-10): fix it; the first step's ride-along list now
+owns replacing the panic with an Err.
+** (awkward) four names for one concept
+'PartnerCol' (the 'ViewNodeKind' variant), 'RoleCol' (the payload
+type), "relation col", and "sharing col" all denoted the same idea
+in different files.  Solved by decision (2026-06-10): the name is
+'PartnerCol'.  The first step's ride-along list owns renaming the
+'RoleCol' type to match, and the documentation step records the
+term in glossary.md.
+** (awkward) sorted-by-UUID order looks arbitrary to a human
+Inbound read-only cols render their members sorted by UUID.  Once
+user order is preserved, that affects only the deterministic tail
+(first render and appended members); a title-sorted tail would read
+better and costs one lookup per member.  Solved by decision
+(2026-06-10): ignore for now; UUID-sorted stays the tail order.
+** (awkward) independent children leap to the front of a col
+'complete_relevant_children' moves irrelevant (e.g. independent)
+children to the FRONT of a col, above the generated members, so a
+user who parks an independent note inside a col sees it jump above
+the membership on save.  Solved by decision (2026-06-10): the
+behavior is correct; document it.  The documentation step owns
+stating it at 'complete_relevant_children' and in the user-facing
+col docs.
+** (awkward) the absent-versus-empty col rule lives far from its type
+An absent col lowers to 'MSV::Unspecified', a present-but-empty col
+to 'MSV::Specified(vec![])', but that rule is enforced by emission
+logic in 'traverse.rs', far from the 'MSV' type that encodes it.
+Solved by decision (2026-06-10): the first step's ride-along list
+owns adding the comment on 'MSV' that names the rule.
+** (missing abstraction) generalizing "drawn in place of"
+Nothing today can represent "this viewnode stands in for a different
+graph node than the one whose ID it carries"; 'overridesHere' plus
+the contains round-trip rule will introduce that concept as a bool
+plus convention.  A 'drawn_in_place_of : Option<ID>' field would
+generalize it, but is not worth building before a second
+substitution-like consumer (redirects, merge previews) exists.
+Solved by decision (2026-06-10): promoted to TODO/problems.org as a
+forward-looking architecture note, to be acted on when that second
+consumer appears.
+** (other) the save pipeline is documented twice
+glossary.md ("local instruction collection") and
+coding-advice/claude-to-claude.org both sketch it.  Solved by
+decision (2026-06-10): the documentation step now names it -- make
+the glossary entry canonical and have the other link to it.
+** (other) herald rules and server stats are string-coupled
+The rules in 'elisp/heralds-minor-mode.el' form a parallel table to
+the server's metadata vocabulary, coupled only by strings, so adding
+a stat (like 'hiding') has been a scavenger hunt.  Jeff asked
+(2026-06-10) whether both sides could refer to one data file, JSON
+perhaps.  Solved: almost exactly that, with one refinement -- the
+heralds step now includes "one vocabulary, machine-checkable": Rust
+GENERATES a JSON enumeration of the metadata vocabulary from its
+existing enums, a conformance test checks the elisp herald table
+against it, and elisp may additionally load its rule table from the
+JSON.  Rust generates rather than refers because making JSON the
+source of truth for Rust would cost exhaustive-match checking (or
+require build-step codegen to win it back), while Emacs, having no
+compile-time checks to lose, can refer freely.

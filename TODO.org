@@ -1,3 +1,4 @@
+* ONGOING [[./TODO/full-schema]]
 * DONE , probably :: Phantom = Diff | Deleted | Unknown
 [[./TODO/DONE/phantom-enum/]]
 claude --resume 51f722b5-8564-4c61-9d86-c1b98945f07a
@@ -8,10 +9,16 @@ claude --resume a2d5b32b-876e-4236-997e-3a0a8582b1f1
 Simple upstream fix would be to make the poll frequency configurable,
 * git add for both sides of moved source
 * Emacs, not the server, should remember foldedness and point.
+** the idea
 Keep a tree of IDs.
 If the ID that had point is lost,
 destroy its spaces-in-the-text-of-that-node record,
 and hand it to the nearest surviving ancestor.
+
+Continue to apply foldedness leafward from the root as before.
+** It's hard because two viewnodes can share an ID.
+The incoming tree would have to be compared to the outgoing one.
+But (although they usually don't) things can shift around dramatically.
 * The AIs want jq, perl
 * each new root view sohuld be drawn with a link sources ancestry
 that is, linksource-ancestry as view-descendents
@@ -46,8 +53,6 @@ Maybe simplify the rule: always suppress 1 and nothing else.
 where Vnode is the new name of what was ViewNodeKind.
 * ParentIs, Birth and maybe other things are vestigial for Phantoms
 * autoload elisp/skg-view-org-ancestry.el
-* PAUSED [[./TODO/full-schema]]
-codex resume 019e64c9-1ff6-75a3-91c5-2c54b644440b
 * DONE ? [[./TODO/source-sets/]]
 Seems to work.
 * [[./TODO/incremental-init-might-be-broken.org]]

@@ -1,4 +1,29 @@
 * progress
+** WARNING for readers orienting from this file
+This log predates the local-instruction-collection and
+local-view-update overhauls. In particular, 'parentIs=collector'
+(described under stage 6 below) was later removed: 'ParentIs' is now
+'{Affected, Independent, Absent}', and collection membership is
+marked 'Affected'. Stage 7 was never executed as written; parts of
+its territory were covered differently by the local-view-update
+overhaul, and the remainder is re-planned in
+[[./metaplan_2.org]], which supersedes metaplan 1.
+** stage 8 : read-only set ergonomics
+*** planned
+Wrote 'TODO/full-schema/8_readonly-set-ergonomics.org', the first
+sub-plan drawn from metaplan_2.org ("make read-only sets ergonomic
+under save and rerender").  It supersedes the never-executed
+7_saving-readonly-cols.org, which now carries a SUPERSEDED header
+and stays outside DONE/ (DONE/ holds executed plans).
+
+The plan covers: the RoleCol -> PartnerCol rename; a typed
+'ColPolicy' (WritableSet / ReadOnlySet / ReadOnlyFilter, with the
+demote-not-discard decision recorded); view-local order
+preservation for ReadOnlySet cols; typed repair warnings scoped to
+the saved view, delivered via 'SaveResponse.warnings'; a parse-time
+warning for edited col headline text; save abortion on IDCol
+membership edits; and two small ride-alongs (panic -> Err in the
+reconcile helper, the 'MSV' rule comment).
 ** stage 7 : saving read-only RoleCols
 *** planned
 Wrote 'TODO/full-schema/7_saving-readonly-cols.org',

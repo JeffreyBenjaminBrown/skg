@@ -1,2 +1,0 @@
-These were written chronologically.
-Later decisions supercede earlier ones if they contradict.

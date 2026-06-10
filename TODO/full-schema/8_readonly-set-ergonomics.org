@@ -1,0 +1,397 @@
+* plan : read-only set ergonomics under save and rerender
+This plan covers the metaplan_2.org step
+"make read-only sets ergonomic under save and rerender".
+It supersedes 7_saving-readonly-cols.org, which was written for a
+codebase that no longer exists (see metaplan_2.org,
+"what changed while full-schema was paused").
+
+* scope
+** covered
+- One typed col policy ('ColPolicy') consulted by reconciliation,
+  save extraction and (later) herald metadata.
+- View-local order preservation for read-only set cols.
+- Typed repair warnings, emitted only for the saved view, delivered
+  through 'SaveResponse.warnings'.
+- A parse-time warning when a col scaffold's headline text was
+  edited (the text is discarded).
+- Save abortion with an explanatory error when an IDCol's membership
+  was edited.
+- Ride-along fixes: the RoleCol -> PartnerCol rename, the
+  panic-to-Err fix in the reconcile helper, the 'MSV' rule comment.
+*** TODO the ride-along fixes should be separate and early commits
+(Early as in before the main portion of the plan.)
+** not covered
+- Source-set behavior (inactive col members, the visible-subset
+  merge, the inactive-write guard).  That is the next metaplan step.
+- New heralds and stats.  Later metaplan step.
+- Any behavior change to the writable cols ('Subscribee',
+  'Overridden').  Their semantics (absent = no opinion,
+  present-but-empty = explicit empty set, disk order preserved)
+  must survive unchanged, and tests should prove it.
+- Any behavior change to the stale-member rule.  Decided 2026-06-10:
+  demote, not discard -- the uniform rule (delete a stale leaf,
+  demote a stale branch to independent) stands for ALL col kinds,
+  including the hidden-subscription filter cols.  This plan only
+  adds warnings on top of it.
+
+* current behavior, verified 2026-06-10
+Facts an implementer needs, with where they live.
+** reconciliation dispatch
+'dispatch_node_update' ('server/update_buffer/complete.rs', the
+match near line 137) routes:
+- 'RoleCol::Subscribee' to 'reconcile_subscribee_col_children',
+- the two hidden-subscription cols to their own reconcilers,
+- every other PartnerCol whose 'relation_member_role()' is Some --
+  which includes the WRITABLE 'RoleCol::Overridden' as well as the
+  four read-only cols -- to 'reconcile_relation_col_children'
+  ('server/update_buffer/reconcile/relation_col.rs').
+So the shared relation-col reconciler serves both a writable col and
+the read-only cols; the order treatment added here must dispatch on
+policy, not on which reconciler ran.
+** order
+'reconcile_relation_col_children' computes its goal list from
+'graph_snap.other_member_pids'.  For inbound roles that list is
+sorted by ID ('inbound_pids_for_relation',
+'server/dbs/in_rust_graph/relation_accessors.rs'); for outbound
+roles it is the disk Vec order.  'complete_relevant_children'
+('server/update_buffer/util.rs') then reorders the col's children to
+goal-list order, irrelevant children first.  Net effect: a user's
+reordering of a read-only col is reset to sorted-by-ID order on
+every save.
+** warnings
+'SaveResponse.warnings' exists
+('server/serve/handlers/save_buffer.rs') and
+'RerenderAfterSaveContext.warnings' exists
+('server/update_buffer.rs'), but the only writer is the scheduled
+audit ('take_pending_audit_warning', 'update_views_after_save').
+'CompletionContext' ('server/update_buffer/complete.rs') has an
+'errors' sink but no warnings sink; reconcilers repair silently.
+'rerender_view' is called for the saved view and for each collateral
+view with the same context type, so scoping warnings to the saved
+view needs an explicit distinction at the call sites in
+'update_views_after_save'.
+** col scaffold headline text
+At parse time the title is available:
+'linecol_to_viewnode'
+('server/from_text/buffer_to_viewnodes/uninterpreted.rs') passes it
+to 'viewnode_from_metadata'
+('server/serve/parse_metadata_sexp.rs', the 'non_vognode' branch
+near line 149).  A scaffold with a BODY already aborts the save
+('BufferValidationError::Body_of_Scaffold').  A col scaffold
+(QualCol or PartnerCol) with a nonempty TITLE is silently dropped
+(the 'other => other.clone()' arm).  Qual leaves are different:
+their title IS their data (an alias's text; an ID scaffold's id is
+parsed from the title, 'id: title.clone().into()').
+** IDCol
+Structural validation exists
+('server/from_text/buffer_to_viewnodes/local.rs', near line 315):
+an IDCol must have a TrueNode parent, only ID-scaffold children,
+and be unique among siblings.  But membership edits -- deleting,
+adding, or text-editing an ID scaffold -- are silently ignored at
+save ('LocalContext::UnderReadOnlyCol'; membership never read) and
+regenerated at rerender.  The metaplan decision (from vision.org)
+is that they should abort the save instead.
+** the panic
+'reconcile_sharing_col_children'
+('server/to_org/complete/sharing/child_data.rs') passes
+'complete_relevant_children_in_viewnodetree' an orderkey closure
+that panics ("relevant child not a normal graph node") and a
+create-child closure that panics ("child data not pre-fetched").
+Both are unreachable under current relevance predicates, but the
+invariant lives in closures, not types.  Jeff approved converting
+these to Err (2026-06-10; also recorded in TODO/problems.org).
+
+* desired behavior
+** ColPolicy
+A method on the col type returning one of three policies:
+- 'WritableSet' ('Subscribee', 'Overridden'): membership edits are
+  graph edits; goal order is the graph (disk) order; no repair
+  warnings.
+- 'ReadOnlySet' ('Subscriber', 'Overrider', 'Hider', 'Hidden'):
+  membership is generated; goal order preserves the view's current
+  order (below); repairs warn.
+- 'ReadOnlyFilter' ('HiddenInSubscribee',
+  'HiddenOutsideOfSubscribee'): membership is derived from hide
+  state, not from 'relation_member_role'; stale handling follows the
+  same uniform rule; repairs warn.
+The policy should be documented at its definition, including the
+demote-not-discard decision, so per-file drift cannot recur.
+** order preservation for ReadOnlySet cols
+The effective goal list for a 'ReadOnlySet' col is:
+1. the col's existing Active parentIs=Affected children, in current
+   buffer order, filtered to IDs in the graph-derived member set,
+   first occurrence winning (duplicates are detached by the
+   reconciler as before);
+2. then any graph members not yet listed, appended in the
+   deterministic sorted-by-ID order 'other_member_pids' already
+   returns.
+The order is view-local: it lives in the buffer text and in the
+'ViewState' viewforest, never on disk.  Two open views of the same
+col may disagree.  Closing and reopening a view may normalize to
+sorted order.  Collateral views and rerender-all preserve each
+view's own order, because the same reconciler logic runs there.
+'WritableSet' cols keep today's behavior: graph (disk) order, which
+for the just-saved view equals the buffer order the user saved.
+** repair warnings
+When completion repairs a read-only col ('ReadOnlySet' or
+'ReadOnlyFilter') in the view the user just saved, the save response
+carries a warning.  Warning-worthy repairs:
+- a missing generated member was restored,
+- a generated-looking nonmember (Affected, not in the member set)
+  was demoted to independent (branch) or removed (leaf),
+- a duplicate member was removed.
+Warnings are typed at collection time (col kind, owner PID, child
+PIDs, repair kind) and rendered to strings late, batched per col
+owner, e.g.:
+  "Repaired subscriberCol under <owner>: restored 2 members,
+   demoted 1 non-member to independent."
+The restored-member warning should explain that membership is
+edited from the other side (e.g. a subscriber's own subscribeeCol),
+since "I deleted it and it came back" is the confusing case.
+
+No warnings from: de novo rendering, collateral views,
+rerender-all, or writable cols.  Those repairs do not correspond to
+edits the user just made in the saved buffer.
+** col headline text edits warn; bodies still abort
+A nonempty title on a col scaffold (any QualCol or PartnerCol
+header) yields a save WARNING saying the text was discarded; the
+save proceeds and the rerender restores the titleless headline.
+A body on any scaffold continues to ABORT via the existing
+'Body_of_Scaffold' error.  Qual leaves are exempt from the title
+warning (their title is data).
+** IDCol membership edits abort
+For each present IDCol, the multiset of its ID-scaffold ids must
+equal the owner's real ID list (pid plus extra_ids).  Reordering
+passes (multiset equality; the rerender re-sorts anyway).  Adding,
+deleting, or text-editing an ID scaffold aborts the save with an
+explanatory error naming the owner, the buffer's ids, the real ids,
+and the escape hatch (IDs are edited only by editing .skg files
+directly).  An absent IDCol is fine (absence means no opinion,
+as for other cols).  In diff mode, ID scaffolds whose membership
+axes mark them as removed-in-git are git history, not membership
+claims; exclude them from the multiset before comparing.
+
+* implementation plan, in order
+** rename RoleCol to PartnerCol
+Decided 2026-06-10 (metaplan_2.org, first step's ride-along list).
+Do this first so the rest of this plan's code uses the final name.
+- Rename the TYPE 'RoleCol' ('server/types/viewnode.rs') to
+  'PartnerCol'.  The 'ViewNodeKind::PartnerCol' variant already has
+  the right name.  The compiler finds the use sites.
+- Update comments and prose that say "relation col", "role col" or
+  "sharing col" for the general concept.  Keep "relation" where it
+  denotes the graph relation ('NodeRelation',
+  'relation_member_role'), and keep "sharing-col reconcilers" only
+  if it still reads as "the subscribee-family completers"
+  specifically; when in doubt, name the cols.
+- Renaming functions and files is in scope where their name asserts
+  the general concept: e.g.
+  'reconcile_relation_col_children' / 'relation_col.rs' ->
+  'reconcile_partnerCol_children' / 'partner_col.rs', and
+  'relation_col_members' (traverse.rs) ->
+  'partnerCol_members'.  Do not rename things whose "relation"
+  means 'NodeRelation'.
+- External org metadata atoms ('subscribeeCol' etc.) are untouched.
+** add ColPolicy
+- Define 'enum ColPolicy { WritableSet, ReadOnlySet, ReadOnlyFilter }'
+  beside 'PartnerCol' in 'server/types/viewnode.rs', with a
+  'PartnerCol::policy()' method, documented with the
+  demote-not-discard decision.
+- Consult it at the dispatch sites that currently hard-code the
+  split:
+  - 'dispatch_node_update' keeps routing by reconciler (the
+    subscribee and hidden-subscription cols genuinely have their
+    own completers), but the shared relation-col reconciler's
+    order treatment (next item) branches on 'policy()'.
+  - 'traverse.rs': the read-only treatment (the catch-all
+    'PartnerCol(_)' arms near lines 113 and 232) can assert policy
+    agreement -- the writable arms handle exactly the
+    'WritableSet' cols -- via a debug assertion or a comment tying
+    the match arms to 'policy()'.  Do not restructure the traversal
+    for its own sake.
+  - 'sharing/kind.rs' metadata ('caller_label',
+    'relation_member_role') stays, but consider moving these
+    methods beside 'policy()' so the per-col facts live in one impl.
+** make the reconcile helper fallible
+In 'server/update_buffer/util.rs' and
+'server/to_org/complete/sharing/child_data.rs':
+- Change 'complete_relevant_children's orderkey closure type from
+  'Fn(&Node) -> Orderkey' to 'Fn(&Node) -> Result<Orderkey, String>'
+  (or Option treated as error), and the create-child closure
+  likewise, so the two panics in 'child_data.rs' become Errs that
+  propagate.
+- Callers to update: the sharing-col reconcilers and any other user
+  of 'complete_relevant_children_in_viewnodetree' (the compiler
+  will list them; 'tests/unit/reconcile_content.rs' has precedent
+  for testing at this level).
+** order-aware goal lists for ReadOnlySet cols
+In 'reconcile_partnerCol_children' (renamed):
+- When 'kind.policy() == ColPolicy::ReadOnlySet', compute the
+  effective goal list per "desired behavior" above: read the col's
+  existing Active+Affected children in buffer order (a small tree
+  read before mutation, like 'build_child_data' already does),
+  intersect with the graph member set, dedup keeping first
+  occurrence, append missing members in the sorted order
+  'other_member_pids' returns.
+- When 'WritableSet', keep the raw 'other_member_pids' list
+  (disk order) as today.
+- 'build_child_data' and 'reconcile_sharing_col_children' take the
+  effective goal list unchanged -- same set, different order -- so
+  no signature changes are needed there.
+** repair summaries and the warnings channel
+- Make 'complete_relevant_children' (and the viewnodetree wrapper)
+  return a repair summary: which orderkeys it created, demoted,
+  detached as stale leaves, and detached as duplicates.  Callers
+  that do not care ignore it.
+- Define a typed warning, e.g. in a new
+  'server/update_buffer/warnings.rs':
+  'CompletionWarning { col : PartnerCol, owner : ID,
+   repair : RepairKind, children : Vec<ID> }'
+  with 'RepairKind { RestoredMember, DemotedNonMember,
+  RemovedStaleLeaf, RemovedDuplicate }' and a Display impl that
+  batches per (col, owner) -- or batch at render time in one
+  function that consumes the whole Vec.
+- Add 'warning_sink : Option<&'a mut Vec<CompletionWarning>>' to
+  'CompletionContext'.  The read-only col reconcilers (the four
+  ReadOnlySet cols via the shared reconciler, plus the two
+  hidden-subscription reconcilers) translate their repair summaries
+  into warnings when the sink is Some and 'policy()' is read-only.
+- Wire the call sites:
+  - 'rerender_view' gains a 'warning_sink' parameter it forwards
+    into the 'CompletionContext' it builds;
+  - 'update_views_after_save' passes Some for the saved view and
+    None for each collateral view ('rerender_collateral_view');
+  - 'render_initial_view' and the rerender-all path pass None.
+  After the saved-view rerender, 'update_views_after_save' renders
+  the collected warnings to strings and appends them to
+  'context.warnings', which already flows into
+  'SaveResponse.warnings'.
+** parse-time col headline warning
+- In 'viewnode_from_metadata'
+  ('server/serve/parse_metadata_sexp.rs', the 'non_vognode'
+  branch): when the kind is a QualCol or PartnerCol header and the
+  title is nonempty, produce a warning ("headline text on a
+  <colkind> is not saved; it was discarded") alongside the existing
+  body error logic.  Qual leaves keep consuming their titles as
+  data.
+- Plumb parse warnings out: 'org_to_uninterpreted_viewforest'
+  returns parse errors already; extend its return (and
+  'linecol_to_viewnode's) to carry warnings too, then
+  'buffer_to_validated_saveplan' ('server/from_text.rs') returns
+  them beside the '(ViewForest, SavePlan)' pair (a third tuple slot
+  or a small struct), and the save handler seeds
+  'RerenderAfterSaveContext.warnings' (or appends to the
+  SaveResponse directly) so they reach the client.
+** IDCol membership validation
+- Add a check to the validation phase
+  ('find_buffer_errors_for_saving' /
+  'server/from_text/buffer_to_viewnodes/local.rs'): for each
+  QualCol::ID, collect its Qual::ID children's ids -- excluding, in
+  diff mode, entries whose membership axes mark them
+  removed-in-git -- and compare the multiset against the owner's
+  pid plus extra_ids.  The owner's real ID list comes from the
+  in-Rust graph snapshot ('NodeRust.extra_ids'); validation runs
+  after 'add_missing_info_to_viewforest', so the owner has a PID.
+- On mismatch, abort with a dedicated
+  'BufferValidationError' variant (preferable to 'Other') whose
+  message names the owner, both ID lists, and the escape hatch:
+  IDs are edited only by editing the .skg files directly.
+- A node absent from the graph (brand-new) with a user-authored
+  IDCol fails the same check; the message should make sense for
+  that case too ("a new node cannot carry an IDCol").
+** the MSV comment
+On the 'MSV' type ('server/types/misc.rs' or wherever it is
+defined), add a comment naming the rule its values encode at save
+extraction: an absent col emits no intent and lowers to
+'Unspecified' (no opinion; filled from disk); a present-but-empty
+col emits 'Specified(vec![])' (explicit empty set).  Point at
+'traverse.rs' as the enforcement site.
+
+* tests
+Prefer the pure seams: viewforest-level reconcile tests (precedent:
+'tests/unit/reconcile_content.rs', 'tests/unit/complete.rs') and
+extraction-level tests ('tests/new.rs' targets).  Reserve
+TypeDB-backed save tests for the wiring.
+** policy and rename
+- 'PartnerCol::policy()' maps the eight variants as specified.
+- Compile-time: the rename leaves no 'RoleCol' references (grep).
+** order preservation
+- Reconcile-level: a subscriberCol with members reordered in the
+  tree, reconciled against the same member set, keeps the user's
+  order; a missing member is appended at the end.
+- Save-level: render a view with a subscriberCol, reorder its
+  members in the buffer, save, assert the saved-view response
+  preserves the order; repeat for one of overriderCol / hiderCol /
+  hiddenCol.
+- Writable regression: an overriddenCol's saved order equals the
+  buffer order (it defines disk order), and absent versus
+  present-but-empty semantics for subscribeeCol and overriddenCol
+  are unchanged ('tests/subscribee_col_empty_persists.rs' covers
+  part of this already).
+** warnings
+- Deleting a real member of a read-only col: save succeeds, member
+  respawns, 'SaveResponse.warnings' contains one batched warning
+  naming the col, the owner, and the restored member.
+- Adding an Affected nonmember branch under a read-only col: save
+  succeeds, child is demoted to independent, warning present.
+- Duplicate member: one copy detached, warning present.
+- A stale member in a hidden-subscription col: repaired per the
+  uniform rule, warning present.
+- Collateral view containing the same read-only col: its repairs
+  produce NO warnings.
+- An ordinary de novo render produces no warnings.
+** col headline text
+- Col scaffold with nonempty title: save succeeds, warning present,
+  rerendered headline is titleless.
+- Scaffold with body: save still aborts ('Body_of_Scaffold').
+** IDCol
+- Reordering ID scaffolds: save succeeds, no error.
+- Deleting an ID scaffold: save aborts with the new error.
+- Adding an ID scaffold: save aborts.
+- Editing an ID scaffold's text: save aborts.
+- Diff mode with a removed-in-git ID entry: no false positive
+  ('tests/git_diff_view' precedent).
+** the fallible helper
+- A directly-constructed tree whose relevance predicate admits a
+  non-Active child yields Err, not a panic.
+
+* verification
+Run, in roughly this order:
+- 'cargo check'
+- 'cargo test --test unit -- --nocapture'
+- 'cargo test --test new -- --nocapture'
+- 'cargo test --test save -- --nocapture'
+- 'cargo test --test subscribee_col -- --nocapture'
+- 'cargo test --test hidden_from_subscriptions -- --nocapture'
+- 'cargo test --test content_view -- --nocapture'
+- 'cargo test --test git_diff_view -- --nocapture'
+- 'bash/emacs-tests.sh'
+- 'bash/all-tests.sh --no-sound'
+TypeDB-backed targets need 'typedb server' running; Emacs and
+integration targets need 'cargo run --bin skg' (see
+'bash/start-servers.sh').
+
+* open questions
+** a restored-member warning can be a false positive
+If the SAME save creates a new inbound relationship (the user
+edited node Y's subscribeeCol elsewhere in the buffer, so the
+owner's subscriberCol legitimately gains Y), the reconciler will
+append Y to the read-only col and the warning will say a member was
+"restored" although the user deleted nothing.  Distinguishing
+"restored after user deletion" from "newly appeared because of this
+save" would require comparing against the pre-save graph, which the
+rerender context does not keep.  This plan accepts the imprecision:
+the warning is rare, and "this read-only col gained a member" is
+arguably useful information even then.  If that proves annoying,
+the fix is to thread the pre-save member set for the saved view's
+cols through 'RerenderAfterSaveContext'.
+*** TODO Agreed; we can revisit if it becomes annoying.
+** how far the rename reaches
+The type rename and the prose rule are decided.  The list of
+function/file renames above is a judgment call; if it churns more
+than expected (e.g. test fixture names), prefer stopping at the
+type + comments and reporting the remainder in progress.org rather
+than blowing up the diff.
+*** TODO I value legible code more than a legible diff.
+And I prefer complete names to concise ones that might be opaque.
+(Although the ideal, of course, is concise and transparent.)

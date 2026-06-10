@@ -1,0 +1,8 @@
+These were written chronologically.
+Later decisions supercede earlier ones if they contradict.
+
+It was executed by the Claude with ID
+  claude --resume 440c1c01-a2e6-4ba6-b671-d22a2ede5f06
+in my
+  skg3
+worktree.
