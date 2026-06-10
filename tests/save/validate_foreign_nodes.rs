@@ -21,7 +21,7 @@ fn test_unmodified_foreign_node_allowed() -> Result<(), Box<dyn Error>> {
         This is a foreign node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver ) . await;
+        org_text, config, driver , None) . await;
       assert!(result . is_ok(), "Unmodified foreign node should be allowed");
       let ( _viewforest, save_plan, _warnings ) = result?;
       // Foreign nodes should be filtered out (no need to write)
@@ -43,7 +43,7 @@ fn test_modified_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
         Original body
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver ) . await;
+        org_text, config, driver , None) . await;
       // Should fail with ModifiedForeignNode error
       assert!(result . is_err(), "Modified foreign node should be rejected");
       match result . unwrap_err() {
@@ -71,7 +71,7 @@ fn test_modified_foreign_node_body_rejected() -> Result<(), Box<dyn Error>> {
         MODIFIED BODY
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver ) . await;
+        org_text, config, driver , None) . await;
       // Should fail with ModifiedForeignNode error
       assert!(result . is_err(), "Foreign node with modified body should be rejected");
       match result . unwrap_err() {
@@ -94,7 +94,7 @@ fn test_indefinitive_foreign_node_filtered() -> Result<(), Box<dyn Error>> {
         * (skg (node (id foreign3) (source foreign) indef)) Foreign indef node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver) . await;
+        org_text, config, driver, None) . await;
       // Should succeed - indef foreign nodes are allowed but filtered
       assert!(result . is_ok(), "Indefinitive foreign node should be allowed");
       let ( _viewforest, save_plan, _warnings ) = result?;
@@ -118,7 +118,7 @@ fn test_owned_node_unchanged_behavior() -> Result<(), Box<dyn Error>> {
         ** (skg (node (id child2) (source main))) _
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver ) . await;
+        org_text, config, driver , None) . await;
       // Should succeed - owned nodes can be modified
       assert!(result . is_ok(), "Owned node modification should be allowed");
       let ( _viewforest, save_plan, _warnings ) = result?;
@@ -141,7 +141,7 @@ fn test_delete_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
         This is a foreign node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver ) . await;
+        org_text, config, driver , None) . await;
       // Should fail with ModifiedForeignNode error
       assert!(result . is_err(), "Deleting foreign node should be rejected");
       match result . unwrap_err() {
@@ -166,7 +166,7 @@ fn test_new_foreign_node_rejected() -> Result<(), Box<dyn Error>> {
         This should not be allowed
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver ) . await;
+        org_text, config, driver , None) . await;
       // Should fail with CreatedForeignNode error
       assert!(result . is_err(), "Creating new foreign node should be rejected");
       match result . unwrap_err() {
@@ -194,7 +194,7 @@ fn test_mixed_owned_and_foreign_nodes() -> Result<(), Box<dyn Error>> {
         This is a foreign node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver ) . await;
+        org_text, config, driver , None) . await;
       // Should succeed
       assert!(result . is_ok(), "Mixed owned and unmodified foreign should be allowed");
       let ( _viewforest, save_plan, _warnings ) = result?;
@@ -226,7 +226,7 @@ fn test_merge_with_foreign_acquirer_rejected() -> Result<(), Box<dyn Error>> {
         This is a foreign node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver ) . await;
+        org_text, config, driver , None) . await;
       // Should fail - can't merge into foreign node (would modify it)
       assert!(result . is_err(), "NodeMerge into foreign acquirer should be rejected");
       match result . unwrap_err() {
@@ -252,7 +252,7 @@ fn test_merge_with_foreign_acquiree_rejected() -> Result<(), Box<dyn Error>> {
         * (skg (node (id node1) (source main))) Owned node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver ) . await;
+        org_text, config, driver , None) . await;
       // Should fail - can't merge foreign node (would delete it)
       assert!(result . is_err(), "NodeMerge with foreign acquiree should be rejected");
       match result . unwrap_err() {
@@ -277,7 +277,7 @@ fn test_merge_with_both_owned_allowed() -> Result<(), Box<dyn Error>> {
         * (skg (node (id child1) (source main))) Child node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver ) . await;
+        org_text, config, driver , None) . await;
       // Should succeed - both nodes are owned
       assert!(result . is_ok(), "NodeMerge with both owned nodes should be allowed");
       Ok(())

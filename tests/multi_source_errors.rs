@@ -179,7 +179,7 @@ fn test_foreign_node_modification_errors(
         &buffer_text,
         &config,
         &driver,
-      ) . await;
+        None ) . await;
 
       assert!(result . is_err(), "Expected errors for foreign node modifications");
 
@@ -255,7 +255,7 @@ fn test_foreign_node_modification_errors(
         &buffer_text,
         &config,
         &driver,
-      ) . await;
+        None ) . await;
 
       assert!(result . is_err(),
               "Expected errors for foreign merge operations");
@@ -348,7 +348,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         &buffer_text,
         &config,
         &driver,
-      ) . await;
+        None ) . await;
 
       assert!(result . is_ok(),
               "Source move between owned sources should succeed, got: {:?}",
@@ -378,7 +378,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         &buffer_text,
         &config,
         &driver,
-      ) . await;
+        None ) . await;
 
       println!("\n=== InconsistentSources test ===");
 

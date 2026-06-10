@@ -11,6 +11,7 @@
 use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::from_text::local_instruction_collection::lower::{
   NodeIntent, NodeSaveIntent };
+use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
@@ -51,13 +52,14 @@ pub async fn build_diskSupplemented_defineNodes (
   intents : Vec<NodeIntent>,
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
+  restricted_source_set : Option<&ActiveSourceSet>, // None means no restriction; callers normalize 'all' to None.
 ) -> Result<Definenodes_with_Sourcemoves, Box<dyn Error>> {
   let mut result : Definenodes_with_Sourcemoves =
     Definenodes_with_Sourcemoves::with_capacity (intents . len());
   for intent in intents {
     let supplemented : Definenode_with_Opt_Sourcemove =
       supplement_nodeeditintent_from_disk (
-        intent, config, driver ) . await ?;
+        intent, config, driver, restricted_source_set ) . await ?;
     result . push (supplemented); }
   Ok (result) }
 
@@ -65,6 +67,7 @@ async fn supplement_nodeeditintent_from_disk (
   intent : NodeIntent,
   config : &SkgConfig,
   driver : &TypeDBDriver,
+  restricted_source_set : Option<&ActiveSourceSet>,
 ) -> Result<Definenode_with_Opt_Sourcemove, Box<dyn Error>> {
   match intent {
     NodeIntent::Delete (_) =>
@@ -76,14 +79,16 @@ async fn supplement_nodeeditintent_from_disk (
     _ => supplement_saveintent_from_disk (
       intent . save_intent()
         . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
-      config, driver ) . await,
+      config, driver, restricted_source_set ) . await,
   }}
 
 async fn supplement_saveintent_from_disk (
   from_buffer : NodeSaveIntent,
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
+  restricted_source_set : Option<&ActiveSourceSet>,
 ) -> Result<Definenode_with_Opt_Sourcemove, Box<dyn Error>> {
+  let _ = restricted_source_set; // consumed by the weave/merge wiring in the next commit
   let pid : ID =
     from_buffer . pid . clone();
   let from_disk : Option<NodeComplete> =

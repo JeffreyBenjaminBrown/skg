@@ -11,6 +11,7 @@ pub mod supplement_from_disk;
 pub mod validate;
 
 use crate::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
+use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{NodeMerge, DefineNode, SavePlan};
@@ -46,7 +47,12 @@ pub async fn buffer_to_validated_saveplan (
   buffer_text : &str,
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
+  active_source_set : Option<&ActiveSourceSet>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
+  let restricted_source_set : Option<&ActiveSourceSet> =
+    // The set 'all' restricts nothing; downstream stages treat None
+    // as "no restriction", so normalize here, once.
+    active_source_set . filter ( |a| ! a . is_all () );
   let ( mut maybePlaced_viewforest, parsing_errors, parsing_warnings )
     : ( MpViewForest, Vec<BufferValidationError>, Vec<String> )
     = { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -83,7 +89,7 @@ pub async fn buffer_to_validated_saveplan (
   let ( nonmerge_plan, nodeMerge_acquisitions )
     : ( NonmergeSavePlan, Vec<(ID, ID)> )
     = extract_nonmergeSavePlan_locally (
-        &viewforest, config, driver )
+        &viewforest, config, driver, restricted_source_set )
       . await . map_err (SaveError::DatabaseError) ?;
   let nodeMerge_instructions : Vec<NodeMerge> =
     // PITFALL: The edit_requests consumed here remain in viewforest until cleared by expand_true_content_at_truenode, during complete_viewforest. NodeMerge extraction only plans nodeMerge mutations; it does not mutate the saved viewforest.

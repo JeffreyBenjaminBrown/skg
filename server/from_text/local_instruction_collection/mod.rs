@@ -25,6 +25,7 @@ use crate::from_text::supplement_from_disk::{
   build_diskSupplemented_defineNodes,
   Definenodes_with_Sourcemoves };
 use crate::from_text::validate::buffernode_differs_from_disknode;
+use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use crate::types::tree::forest::ViewForest;
@@ -50,6 +51,7 @@ pub async fn extract_nonmergeSavePlan_locally (
   viewforest : &ViewForest,
   config     : &SkgConfig,
   driver     : &TypeDBDriver,
+  restricted_source_set : Option<&ActiveSourceSet>, // None means no restriction; callers normalize 'all' to None.
 ) -> Result<(NonmergeSavePlan, Vec<(ID, ID)>), Box<dyn Error>> {
   let _span : tracing::span::EnteredSpan = tracing::info_span!(
     "extract_nonmergeSavePlan_locally" ). entered();
@@ -68,7 +70,7 @@ pub async fn extract_nonmergeSavePlan_locally (
   let with_disk : Definenodes_with_Sourcemoves =
     build_diskSupplemented_defineNodes (
       resolved . into_ordered_intents(),
-      config, driver ) . await ?;
+      config, driver, restricted_source_set ) . await ?;
   let sans_noops : Vec<DefineNode> =
     filter_wouldbe_noop_defineNodes (with_disk . instructions);
   Ok (( NonmergeSavePlan {

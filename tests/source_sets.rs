@@ -306,7 +306,7 @@ fn saving_inactive_placeholder_moves_and_deletes_update_contains (
       "};
       let moved_instructions : Vec<DefineNode> =
         buffer_to_validated_saveplan (
-          moved_buffer, config, driver) . await?
+          moved_buffer, config, driver, None ) . await?
         . 1 . define_nodes;
       assert_eq! (
         saved_node_by_id (&moved_instructions, "root") . contains,
@@ -323,7 +323,7 @@ fn saving_inactive_placeholder_moves_and_deletes_update_contains (
       "};
       let deleted_instructions : Vec<DefineNode> =
         buffer_to_validated_saveplan (
-          deleted_buffer, config, driver) . await?
+          deleted_buffer, config, driver, None ) . await?
         . 1 . define_nodes;
       assert_eq! (
         saved_node_by_id (&deleted_instructions, "root") . contains,
@@ -347,7 +347,7 @@ fn saving_edits_to_inactive_placeholder_content_are_rejected (
       "};
       let result =
         buffer_to_validated_saveplan (
-          buffer, config, driver) . await;
+          buffer, config, driver, None ) . await;
       assert! (
         matches! ( result, Err (SaveError::BufferValidationErrors (_)) ),
         "editing inactive placeholder title/body should be rejected: {:?}",
@@ -395,7 +395,7 @@ fn restricted_source_search_and_save_work_together_end_to_end (
       "};
       let instructions : Vec<DefineNode> =
         buffer_to_validated_saveplan (
-          edited_buffer, config, driver) . await?
+          edited_buffer, config, driver, None ) . await?
         . 1 . define_nodes;
       assert_eq! (
         saved_node_by_id (&instructions, "root") . contains,

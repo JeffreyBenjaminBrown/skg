@@ -153,7 +153,7 @@ fn test_move_node_to_another_owned_source (
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
           org_text, &config, &driver
-          ) . await?;
+          , None ) . await?;
     assert_eq!(save_plan . source_moves . len(), 1,
                "Expected exactly 1 source move");
     assert_eq!(save_plan . source_moves[0] . pid . 0, "b");
@@ -248,7 +248,7 @@ fn test_move_node_referenced_by_extra_id (
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
-          org_text, &config, &driver ) . await?;
+          org_text, &config, &driver , None ) . await?;
 
     // source_moves should use the PID, not the extra_id
     assert_eq!(save_plan . source_moves . len(), 1,
@@ -317,7 +317,7 @@ fn test_move_multiple_nodes (
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
           org_text, &config, &driver
-          ) . await?;
+          , None ) . await?;
     assert_eq!(save_plan . source_moves . len(), 2,
                "Expected 2 source moves");
 
@@ -380,7 +380,7 @@ fn test_move_to_foreign_source_rejected (
     let result =
       buffer_to_validated_saveplan (
         org_text, &config, &driver
-        ) . await;
+        , None ) . await;
     assert!(result . is_err(),
             "Moving to foreign source should be rejected");
     if let Err (SaveError::DatabaseError (e)) = &result {
@@ -417,7 +417,7 @@ fn test_move_from_foreign_source_rejected (
     let result =
       buffer_to_validated_saveplan (
         org_text, &config, &driver
-        ) . await;
+        , None ) . await;
     assert!(result . is_err(),
             "Moving from foreign source should be rejected");
 
@@ -448,7 +448,7 @@ fn test_move_and_merge_simultaneously_rejected (
     let result =
       buffer_to_validated_saveplan (
         org_text, &config, &driver
-        ) . await;
+        , None ) . await;
     assert!(result . is_err(),
             "Moving and merging same node should be rejected");
     match result {
@@ -484,7 +484,7 @@ fn test_no_source_change_produces_no_moves (
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
           org_text, &config, &driver
-          ) . await?;
+          , None ) . await?;
     assert_eq!(save_plan . source_moves . len(), 0,
                "No source changes => no source moves");
 
@@ -516,7 +516,7 @@ fn test_source_only_change_with_populated_pool (
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
-          org_text, &config, &driver ) . await?;
+          org_text, &config, &driver , None ) . await?;
 
     // The source move must be detected even with populated pool.
     assert_eq!(save_plan . source_moves . len(), 1,

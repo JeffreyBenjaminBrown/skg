@@ -257,7 +257,8 @@ pub async fn update_from_and_rerender_buffer (
             "buffer_to_validated_saveplan"
           ) . entered();
         buffer_to_validated_saveplan (
-          org_buffer_text, &env . config, &env . driver ) . await
+          org_buffer_text, &env . config, &env . driver,
+          active_source_set ) . await
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
   if viewforest . is_empty ()
