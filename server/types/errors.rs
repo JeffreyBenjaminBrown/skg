@@ -40,6 +40,9 @@ pub enum BufferValidationError {
   EmptyTitle                             (ID),
   LocalStructureViolation        (String, ID), // (error message, nearest ancestor ID)
   EditRequestOnIndefinitive      (ID), // Indefinitive (read-only) nodes -- phantoms in particular -- cannot carry write instructions like (editRequest delete) or (editRequest (merge X)). The user must visit a definitive view of the node first.
+  IDCol_Edited                   (ID,       // owner of the IDCol
+                                  Vec<ID>,  // ids the buffer's IDCol claims
+                                  Vec<ID>), // the owner's real ids (pid + extra_ids); empty if the owner is not in the graph
   Other                          (String),
 }
 
@@ -104,6 +107,8 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Node {:?} has an empty title. Every definitive node must have a non-empty title.", id),
       BufferValidationError::LocalStructureViolation(msg, id) =>
         write!(f, "Local structure violation at ID {:?}: {}", id, msg),
+      BufferValidationError::IDCol_Edited(owner, buffer_ids, real_ids) =>
+        write!(f, "The idCol under node {:?} was edited (buffer claims {:?}; real ids are {:?}). Reordering is fine, but IDs cannot be added, removed or edited through the buffer; edit the .skg file directly.", owner, buffer_ids, real_ids),
       BufferValidationError::EditRequestOnIndefinitive (id) =>
         write!(f, "Edit request on indefinitive (phantom) node {:?}. Phantoms are indefinitive; indefinitive nodes cannot carry write instructions. Visit a definitive view of the node first (C-c g RET).", id),
       BufferValidationError::Other (msg) =>

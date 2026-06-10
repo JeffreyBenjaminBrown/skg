@@ -130,6 +130,16 @@ fn format_buffer_validation_error (
     BufferValidationError::Body_of_Scaffold(title, kind) => {
       format!("{} node has a body (not allowed):\n- Title: {}\n",
               kind, title) },
+    BufferValidationError::IDCol_Edited(owner, buffer_ids, real_ids) => {
+      let fmt_ids = |ids : &Vec<ID>| -> String {
+        ids . iter() . map(|i| i . 0 . as_str())
+          . collect::<Vec<&str>>() . join(", ") };
+      if real_ids . is_empty() {
+        format!("Node {} is not in the graph, so it cannot carry an idCol:\n- ids claimed by the buffer: {}\n- IDs cannot be created through the buffer. To edit a node's ID list, edit its .skg file directly.\n",
+                owner . 0, fmt_ids(buffer_ids))
+      } else {
+        format!("The idCol under node {} was edited; saving would not honor that, so the save was aborted:\n- ids claimed by the buffer: {}\n- the node's real ids: {}\n- Reordering is fine, but IDs cannot be added, removed or edited through the buffer. To edit a node's ID list, edit its .skg file directly.\n",
+                owner . 0, fmt_ids(buffer_ids), fmt_ids(real_ids)) }},
     BufferValidationError::Multiple_Defining_Viewnodes (id) => {
       format!("ID has multiple defining containers:\n- ID: {}\n",
               id . 0) },

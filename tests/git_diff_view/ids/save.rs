@@ -1,5 +1,10 @@
 /// Tests for git diff view - save behavior with id changes.
-/// IdCol scaffolds and their children should be disregarded during save.
+/// Deleting the whole idCol is a no-op (absence means no opinion),
+/// but editing an idCol's membership -- deleting, adding, editing or
+/// relocating id scaffolds -- aborts the save with IDCol_Edited
+/// (TODO/full-schema/8_readonly-set-ergonomics.org). Net-removed
+/// diff entries (removedM) are git history, not membership claims,
+/// and do not trip the check.
 
 use super::common::*;
 use std::sync::Arc;
@@ -45,10 +50,10 @@ fn test_delete_id_col_scaffold_respawns()
       Ok(()) }) })
 }
 
-/// Deleting individual id scaffolds should be a no-op.
-/// The scaffolds respawn in the returned buffer.
+/// Deleting individual id scaffolds (keeping the idCol) aborts the
+/// save with an IDCol_Edited error, and the disk is untouched.
 #[test]
-fn test_delete_id_scaffolds_respawns()
+fn test_delete_id_scaffolds_aborts()
   -> Result<(), Box<dyn Error>>
 {
   run_save_test(
@@ -64,26 +69,29 @@ fn test_delete_id_scaffolds_respawns()
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
-      let response = update_from_and_rerender_buffer(
+      let result = update_from_and_rerender_buffer(
         &mut stream,
         &input, driver, config, tantivy, &graph, true,
-        &Err ( String::new () ), &mut views_state ) . await?;
+        &Err ( String::new () ), &mut views_state ) . await;
+
+      let err : String =
+        format! ( "{:?}",
+                  result . err ()
+                  . expect ("editing idCol membership must abort the save") );
+      assert!(err . contains ("IDCol_Edited"),
+        "the error should be IDCol_Edited: {}", err);
 
       // DISK: 1.skg should still have the worktree ids
       let node_1 = read_nodecomplete(repo_path, "1")?;
       assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
         "1.skg should still have id '2''");
-
-      // BUFFER: id scaffolds should respawn
-      assert_buffer_contains(
-        &response . saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 
-/// Editing an id scaffold should be a no-op.
-/// The scaffold respawns unchanged in the returned buffer.
+/// Editing an id scaffold's text aborts the save with an
+/// IDCol_Edited error, and the disk is untouched.
 #[test]
-fn test_edit_id_scaffold_respawns()
+fn test_edit_id_scaffold_aborts()
   -> Result<(), Box<dyn Error>>
 {
   run_save_test(
@@ -99,10 +107,17 @@ fn test_edit_id_scaffold_respawns()
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
-      let response = update_from_and_rerender_buffer(
+      let result = update_from_and_rerender_buffer(
         &mut stream,
         &input, driver, config, tantivy, &graph, true,
-        &Err ( String::new () ), &mut views_state ) . await?;
+        &Err ( String::new () ), &mut views_state ) . await;
+
+      let err : String =
+        format! ( "{:?}",
+                  result . err ()
+                  . expect ("editing an id scaffold must abort the save") );
+      assert!(err . contains ("IDCol_Edited"),
+        "the error should be IDCol_Edited: {}", err);
 
       // DISK: 1.skg should still have the original worktree ids
       let node_1 = read_nodecomplete(repo_path, "1")?;
@@ -110,17 +125,43 @@ fn test_edit_id_scaffold_respawns()
         "1.skg should still have id '2''");
       assert!(!node_1 . all_ids () . any(|id| id == &ID("2-modified" . to_string())),
         "1.skg should not have the modified id");
+      Ok(()) }) })
+}
 
-      // BUFFER: id scaffolds should respawn with original values
+/// Reordering id scaffolds passes the membership check (multiset
+/// equality); the rerender re-sorts them anyway.
+#[test]
+fn test_reorder_id_scaffolds_saves()
+  -> Result<(), Box<dyn Error>>
+{
+  run_save_test(
+    "skg-test-save-reorder-ids",
+    |config, driver, tantivy, _repo_path| { Box::pin(async move {
+      let input = GIT_DIFF_VIEW
+        // Swap the two plain id lines (1 and 3).
+        . replace ("*** (skg id) 1", "*** (skg id) SWAP")
+        . replace ("*** (skg id) 3", "*** (skg id) 1")
+        . replace ("*** (skg id) SWAP", "*** (skg id) 3");
+      assert_ne! (input, GIT_DIFF_VIEW);
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
+        diff_mode_enabled : true,
+        open_views            : OpenViews::new (),};
+      let (mut stream, _) = mk_test_tcp_stream_pair ();
+      let response = update_from_and_rerender_buffer(
+        &mut stream,
+        &input, driver, config, tantivy, &graph, true,
+        &Err ( String::new () ), &mut views_state ) . await?;
       assert_buffer_contains(
         &response . saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 
-/// Moving id scaffolds to another node should be a no-op.
-/// The scaffolds respawn in their original location.
+/// Moving the idCol to another node aborts the save: the receiving
+/// node's real ID list does not match the moved idCol's claims.
 #[test]
-fn test_move_id_scaffolds_to_child_respawns()
+fn test_move_id_scaffolds_to_child_aborts()
   -> Result<(), Box<dyn Error>>
 {
   run_save_test(
@@ -143,10 +184,17 @@ fn test_move_id_scaffolds_to_child_respawns()
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
-      let response = update_from_and_rerender_buffer(
+      let result = update_from_and_rerender_buffer(
         &mut stream,
         &input, driver, config, tantivy, &graph, true,
-        &Err ( String::new () ), &mut views_state ) . await?;
+        &Err ( String::new () ), &mut views_state ) . await;
+
+      let err : String =
+        format! ( "{:?}",
+                  result . err ()
+                  . expect ("an idCol moved under another node must abort the save") );
+      assert!(err . contains ("IDCol_Edited"),
+        "the error should be IDCol_Edited: {}", err);
 
       // DISK: child.skg should not have any new ids
       let node_child = read_nodecomplete(repo_path, "child")?;
@@ -159,10 +207,6 @@ fn test_move_id_scaffolds_to_child_respawns()
       let node_1 = read_nodecomplete(repo_path, "1")?;
       assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
         "1.skg should still have id '2''");
-
-      // BUFFER: id scaffolds should respawn under node 1
-      assert_buffer_contains(
-        &response . saved_view, GIT_DIFF_VIEW);
       Ok(()) }) })
 }
 

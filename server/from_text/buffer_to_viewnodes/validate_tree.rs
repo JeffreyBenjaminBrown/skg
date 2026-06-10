@@ -1,7 +1,8 @@
 pub mod contradictory_instructions;
 
+use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::viewnode::{ParentIs, ViewRequest};
+use crate::types::viewnode::{ParentIs, Qual, QualCol, ViewRequest};
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
 use crate::types::tree::forest::MpViewForest;
@@ -71,6 +72,8 @@ pub async fn find_buffer_errors_for_saving (
         BufferValidationError::Other (error_msg)); }}
   validate_definitive_view_requests(
     viewforest, &mut errors);
+  idCol_membership_errors (
+    viewforest, config, driver, &mut errors ) . await ?;
   validate_view_roots (
       viewforest, &mut errors);
   { // local structure validation
@@ -87,6 +90,67 @@ pub async fn find_buffer_errors_for_saving (
                 e . message, e . id )); }
           Ok(( )) }); }}
   Ok (errors) }
+
+/// Edits to an idCol's membership abort the save (decision from
+/// vision.org, via metaplan_2.org and
+/// TODO/full-schema/8_readonly-set-ergonomics.org): for each present
+/// idCol whose parent is a TrueNode with an ID, the multiset of ID
+/// scaffolds beneath it must equal the owner's real ID list (pid
+/// plus extra_ids). Reordering passes (the rerender re-sorts
+/// anyway); adding, deleting or text-editing an ID scaffold fails,
+/// with a message naming the escape hatch (edit the .skg file
+/// directly). In diff mode, an ID entry whose membership axes mark
+/// it net-removed is git history, not a membership claim, and is
+/// excluded before comparing. An absent idCol means no opinion, as
+/// for other cols. Shapes that other validations reject (an idCol
+/// without a TrueNode parent, a parent without an ID) are skipped
+/// here rather than double-reported.
+#[allow(non_snake_case)]
+async fn idCol_membership_errors (
+  viewforest : &MpViewForest,
+  config     : &SkgConfig,
+  driver     : &TypeDBDriver,
+  errors     : &mut Vec<BufferValidationError>,
+) -> Result<(), Box<dyn std::error::Error>> {
+  for edge in viewforest . root () . traverse () {
+    let node_ref = match edge {
+      Edge::Open (node_ref)
+        if matches! ( &node_ref . value () . kind,
+                      MpViewnodeKind::QualCol (QualCol::ID) )
+        => node_ref,
+      _ => continue };
+    let owner : ID =
+      match node_ref . parent ()
+        . map ( |p| &p . value () . kind ) {
+        Some (MpViewnodeKind::Vognode (MpVognode::Active (t)))
+          => match &t . id {
+              Some (id) => id . clone (),
+              None      => continue },
+        _ => continue };
+    let mut buffer_ids : Vec<ID> =
+      node_ref . children ()
+      . filter_map ( |child| match &child . value () . kind {
+          MpViewnodeKind::Qual (Qual::ID { id, membership })
+            if membership . net_is_present ()
+            => Some ( id . clone () ),
+          _ => None } )
+      . collect ();
+    let real_ids : Option<Vec<ID>> =
+      optNodeComplete_rustFIrst_by_id (config, driver, &owner)
+      . await ?
+      . map ( |nc| nc . all_ids () . cloned () . collect () );
+    match real_ids {
+      None =>
+        errors . push ( BufferValidationError::IDCol_Edited (
+          owner, buffer_ids, Vec::new () )),
+      Some (real) => {
+        let mut real_sorted : Vec<ID> = real . clone ();
+        real_sorted . sort ();
+        buffer_ids . sort ();
+        if buffer_ids != real_sorted {
+          errors . push ( BufferValidationError::IDCol_Edited (
+            owner, buffer_ids, real )); }}, }}
+  Ok (( )) }
 
 fn validate_view_roots (
   viewforest : &MpViewForest,

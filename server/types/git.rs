@@ -138,6 +138,16 @@ impl ExistenceAxes {
     Self::atom_for_stage (self . staged) }
   pub fn unstaged_atom (&self) -> Option<&'static str> {
     Self::atom_for_stage (self . unstaged) }
+
+  /// Whether the member is present after both stages: the later
+  /// stage with a sign wins (unstaged follows staged); no signs at
+  /// all means unchanged, hence present.
+  pub fn net_is_present (&self) -> bool {
+    match (self . staged, self . unstaged) {
+      (_, Some (Sign::Minus))    => false,
+      (_, Some (Sign::Plus))     => true,
+      (Some (Sign::Minus), None) => false,
+      _                          => true, } }
 }
 
 impl MembershipAxes {
@@ -154,6 +164,16 @@ impl MembershipAxes {
     Self::atom_for_stage (self . staged) }
   pub fn unstaged_atom (&self) -> Option<&'static str> {
     Self::atom_for_stage (self . unstaged) }
+
+  /// Whether the member is present after both stages: the later
+  /// stage with a sign wins (unstaged follows staged); no signs at
+  /// all means unchanged, hence present.
+  pub fn net_is_present (&self) -> bool {
+    match (self . staged, self . unstaged) {
+      (_, Some (Sign::Minus))    => false,
+      (_, Some (Sign::Plus))     => true,
+      (Some (Sign::Minus), None) => false,
+      _                          => true, } }
 }
 
 impl SourceDiff {
