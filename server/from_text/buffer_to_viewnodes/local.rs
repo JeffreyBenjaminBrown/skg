@@ -238,9 +238,9 @@ fn validate_subscribeecol (
       _ => false, } )
     { errors . push("SubscribeeCol TrueNode children must have parentIs=affected."
                     . to_string() ); }
-  if !relation_col_children_have_distinct_ids(tree, node_id) {
-    errors . push("SubscribeeCol must not have duplicate TrueNode children."
-                  . to_string() ); }
+  // There is no duplicate-member check here: SubscribeeCol is a
+  // defining col, and duplicate members of defining cols are
+  // silently deduplicated at emission rather than bouncing the save.
   errors }
 
 /// PURPOSE: See the error messages it could return.
@@ -277,7 +277,11 @@ fn validate_relation_col (
                     MpViewnodeKind::PartnerCol (r)
                     if *r == roleCol))
     { errors . push(format!("{} must be unique among its siblings.", label)); }
-  if !relation_col_children_have_distinct_ids(tree, node_id) {
+  if roleCol != RoleCol::Overridden
+    // OverriddenCol is a defining col: duplicate members are silently
+    // deduplicated at emission rather than bouncing the save. The
+    // read-only roles keep the check.
+    && !relation_col_children_have_distinct_ids(tree, node_id) {
     errors . push(format!(
       "{} must not have duplicate TrueNode children.", label)); }
   errors }

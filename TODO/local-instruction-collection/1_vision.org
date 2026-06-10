@@ -17,7 +17,7 @@ That creates some instructions, in a map from IDs to sets of instructions.
 
 Then it recurses into the vnode's children.
 Any collections that can generate instructions --
-I think that's just AliasCol and OverridddenCol, but I'm not sure --
+I think that's just AliasCol and OverriddenCol, but I'm not sure --
 generate their own instructions, which are merged into the map
 value keyed by their parent's ID.
 

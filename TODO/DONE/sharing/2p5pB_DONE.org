@@ -1,10 +1,10 @@
-* Plan: simplify 'build_disk_supplemented_define_nodes'
+* Plan: simplify 'build_diskSupplemented_defineNodes'
 
 This plan addresses item b in
 [[./2p5_simplify-save.org][2p5_simplify-save.org]].
 
 Item a has already extracted
-'build_disk_supplemented_define_nodes' from
+'build_diskSupplemented_defineNodes' from
 [[../../server/from_text/viewnodes_to_instructions.rs][viewnodes_to_instructions.rs]].
 The goal here is still behavior-preserving: make that helper read as a
 small pipeline of named disk-related phases, without changing save
@@ -18,12 +18,12 @@ sequence:
 - build a role-annotated viewforest;
 - extract graph edit intents and subscribee visibility intents;
 - reconcile duplicate graph edit intents;
-- call 'build_disk_supplemented_define_nodes';
+- call 'build_diskSupplemented_defineNodes';
 - fold subscribee visibility into subscriber hide relations;
-- call 'filter_wouldbe_noop_definenodes'.
+- call 'filter_wouldbe_noop_defineNodes'.
 
 The remaining dense part is inside
-'build_disk_supplemented_define_nodes'. For each reconciled
+'build_diskSupplemented_defineNodes'. For each reconciled
 'NodeIntent', it currently:
 
 - remembers whether children affect only hiding;
@@ -43,7 +43,7 @@ hide in one loop.
 
 * Target shape
 
-After this pass, 'build_disk_supplemented_define_nodes' should read
+After this pass, 'build_diskSupplemented_defineNodes' should read
 roughly like:
 
 #+begin_src rust
@@ -100,7 +100,7 @@ Output:
 - 'Result<DefineNode, Box<dyn Error>>'
 
 This helper is intentionally thin. Its purpose is to keep
-'build_disk_supplemented_define_nodes' from mixing pipeline structure
+'build_diskSupplemented_defineNodes' from mixing pipeline structure
 with error-conversion mechanics.
 
 ** 3. Extract per-'DefineNode' disk supplementation
@@ -206,7 +206,7 @@ Do not:
 - make disk supplementation policy-neutral yet.
 
 This item only names the existing internal phases of
-'build_disk_supplemented_define_nodes'.
+'build_diskSupplemented_defineNodes'.
 
 * Suggested file changes
 
@@ -236,7 +236,7 @@ source-move tests are the important guards.
 
 * Acceptance criteria
 
-- 'build_disk_supplemented_define_nodes' reads as a short named
+- 'build_diskSupplemented_defineNodes' reads as a short named
   per-intent pipeline.
 - Delete handling is visibly separate from save disk supplementation.
 - New saves, existing saves, source moves, disk field supplementation,

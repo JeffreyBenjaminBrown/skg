@@ -1,0 +1,164 @@
+* progress : local instruction collection
+Report on executing [[./3_plan.org]], written 2026-06-10 (Claude).
+Categories per when-to-stop.org. Items marked TODO want your input;
+none of them blocked execution, because all are easily reversed.
+* what's done and went well
+Every step of the plan's implementation order is done, and every step
+left all three suites green ('cargo nextest run' 505 tests,
+'bash/emacs-tests.sh' 222, 'bash/integration-tests.sh' all):
+
+- Membership predicates extracted to
+  'local_instruction_collection/predicates.rs', with the audit:
+  direct unit tests pin every condition each predicate encodes
+  (tests/new/local_instruction_collection/predicates.rs), and new
+  through-the-collector tests pinned the previously untested
+  conditions (toDelete / would-be-phantom members of relation cols,
+  inactive-with-negative-membership in contains, and the
+  visible-content predicate's deliberate lack of a diff-phantom
+  condition).
+- Duplicate-member checks removed from the defining cols' validators
+  (SubscribeeCol entirely; 'validate_relation_col' now applies the
+  check only to the read-only roles), with tests pinning both the new
+  silence and the read-only cols' surviving squawk.
+- The new module, per the plan's layout: types.rs (LocalContext,
+  NodeIntent_Local, the IntentsForOneId slot struct, CollectedIntents,
+  the instructionMerge insert function), predicates.rs, traverse.rs,
+  lower.rs, resolve_visibility.rs, validate_text_claims.rs, and the
+  composed pipeline ('extract_nonmergeSavePlan_locally') in mod.rs.
+- All the traversal unit tests from the plan's explicit list pass,
+  including the AliasCol-under-subscribee-as-such trap.
+- The differential test ran old-vs-new over ten cases (basic trees,
+  duplicates, hiderel inference and unhiding, same-ID
+  ordinary+as-subscribee, read-only-col members, inactive subtrees,
+  phantom subtrees, nodeMerges, text-claim rejection) and passed
+  before the old path was deleted. It caught one real divergence
+  (see instruction order, below).
+- Production switched: 'buffer_to_validated_saveplan' now collects
+  once, validates text claims, lowers, resolves visibility,
+  supplements, filters noops, and feeds nodeMerge expansion from the
+  same map's (acquirer, acquiree) pairs.
+- Old machinery deleted: classify.rs, candidates, SaveAuthority, the
+  five collectors, subscribee_hiderel_intents.rs, both reconcile
+  modules, apply_hiderels_from_intents,
+  validate_no_title_or_body_edit_in_subscribeeAsSuch, the legacy
+  wrappers, and their tests (re-pointed or superseded). Survivors
+  moved: NodeIntent/NodeSaveIntent into lower.rs, disk
+  supplementation into supplement_from_disk.rs, NonmergeSavePlan and
+  the noop filter into the new module's mod.rs.
+- The nodeMerge/instructionMerge renames are applied across Rust
+  identifiers (type NodeMerge, EditRequest::NodeMerge,
+  SavePlan.nodeMerge_instructions, the validators, the
+  server/nodeMerge/ module, locals); wire strings ('(merge ID)',
+  the "merge" metadata key) untouched, verified by grep and by the
+  Emacs and integration suites.
+- Docs updated: the save-pipeline section (which lives in
+  coding-advice/claude-to-claude.org -- the plan said ai-agents.org,
+  but the section was never there), two new glossary entries ('local
+  instruction collection' and the merge-terminology rule), and the
+  four 2026-06-09 problems.org entries marked fixed (plus a
+  "mostly fixed" note on the older edit-request-surfaces entry).
+* changes to the plan's envisioned order
+- The downstream-stage rewrites (text-claim validation, visibility
+  resolution) were written before the parallel entry point, because
+  the entry point composes them. The plan listed the entry point
+  first.
+- The nodeMerge-pairs feed was implemented before the differential
+  test rather than after, because the differential test compares
+  nodeMerge output too.
+- Differential-to-regression conversion: the differential cases now
+  live as tests/new/local_instruction_collection/pipeline.rs,
+  asserting concrete new-path outputs (pid sequences plus the
+  distinguishing fields) rather than exhaustive plan equality.
+* what's imperfect about what's done
+- Two order vectors. The differential test caught that a bare
+  first-emission order saves an ID at its first appearance even when
+  that appearance is signals-only (e.g. subscribee-as-such first,
+  definitive instance later), where the old path saved it at its
+  definitive instance's position. 'CollectedIntents' therefore
+  carries 'order' (first emission, used by claim validation and
+  visibility extraction) and 'lowerable_order' (first save-or-delete
+  emission, used by lowering). Faithful, but two orders is less
+  elegant than one.
+- Two emission variants carry a source. The plan's NodeIntent_Local
+  shapes had no source, but lowering to DeleteNode/NodeSaveIntent
+  needs one, and only the self-emissions know it; so SetTitleAndBody
+  and Delete carry 'source', and IntentsForOneId has a source slot.
+- 'visit_active_vognode' centralizes all vognode emission. It is the
+  longest function in the new module (~70 lines), though each arm is
+  small.
+- The pipeline regression tests assert key fields, not whole plans;
+  the deleted differential harness checked more exhaustively (it
+  compared entire DefineNode values). The extraction-behavior suite
+  (tests/new/local_instruction_collection/extraction.rs, the
+  re-pointed descendant of tests/new/viewnodes_to_instructions.rs)
+  covers the per-field semantics.
+- The error for two same-kind defining cols under one node changed
+  from the collector's "Expected at most one ..." to the
+  instructionMerge conflict error ("Conflicting aliases intents for
+  ID ..."). Validation ('siblings_cannot_include') still rejects the
+  shape first in production, so users should never see either.
+* choices determining the future
+** the new recursion surface, as implemented
+The plan's allowlist (definitive members of read-only cols and their
+subtrees, descendants of Inactive vognodes, descendants of
+Phantom::Diff now save their own edits) is implemented, and the
+plan's two user-visible changes (self-edits honored there; defining
+cols never squawk about duplicates) are tested. Two further surfaces
+fell out of recurse-into-everything; both seem right to me, and both
+are pinned by tests, but you should know about them:
+*** TODO Delete and nodeMerge requests are honored in newly recursed positions
+A definitive member of (say) a subscriberCol carrying
+'(editRequest delete)' now deletes that node -- a self-edit like any
+other. Previously the request was silently discarded. Same for
+nodeMerge requests. (In subscribee-as-such position both requests
+are still ignored, as before.)
+*** TODO an independent child of a SubscribeeCol is a self-writer
+Subscribee-as-such position is defined as: Active, parentIs=Affected,
+direct child of a SubscribeeCol. A parentIs=independent child parked
+under a SubscribeeCol is therefore an ordinary self-writer (its own
+edits save; it joins nothing). The old path made such nodes entirely
+inert -- not even recursed into. This matches how classify assigned
+roles (affected children only) and parallels the read-only-set rule
+in the glossary.
+** TODO subscribee-as-such under a diff phantom no longer breaks the save
+Validation permits a SubscribeeCol under a diff phantom
+('is_active_or_diff_phantom'), but the old classify hard-errored on
+any affected TrueNode child of such a col, killing the whole save.
+Now the phantom passes its identity down (indefinitive, not
+save-eligible), so those children stay in subscribee-as-such
+position: their title/body edits bounce via text claims, unedited
+they contribute nothing, and no visibility signal is emitted (the
+subscriber instance is indefinitive). The plan's literal rule
+("phantom children get UnderVognode{None}") would instead have made
+them self-writers, letting a title edit in subscribee-as-such
+display silently become a real edit; I judged that dangerous and
+deviated.
+** TODO 'nonmerge' compounds kept
+'NonmergeSavePlan', 'extract_nonmergeSavePlan_locally',
+'nonmerge_plan', 'nonmerge_defineNodes' survive. No bare 'merge'
+token appears in them, and "non-nodeMerge" spellings read terribly,
+so I left them. Say the word if you want a rename (and a preferred
+spelling).
+** TODO 'merge'-family names deliberately kept
+- 'merge_nodes' (the verb phrase you endorsed).
+- 'merge_into_existing' (import_org_roam.rs): merges duplicate
+  import records; not the nodeMerge operation.
+- git-merge-commit identifiers ('head_is_merge_commit',
+  'validate_no_merge_commits') and prose about git merges.
+- Tantivy segment-"merge" comments; the diff renderer's
+  'merged_contains' (merging per-stage diff data).
+- "merger" inside diff-analysis report strings (user-facing prose).
+- The tests/merge/ directory, its fixture paths, and test function
+  names like 'test_single_merge' (filesystem paths and test-only
+  names; the plan scoped renames to Rust identifiers, and renaming
+  the directory would churn every fixture path string).
+** locations of things, for your review
+- Traversal spec lives as the header comment of
+  server/from_text/local_instruction_collection/traverse.rs,
+  including the save-eligibility and subscribee-as-such-position
+  definitions.
+- The instructionMerge rules live as the doc comment of
+  'CollectedIntents::instructionMerge_intent' in types.rs.
+- Performance was not measured (the plan calls it incidental), but
+  the per-save whole-forest clone and the ~7 passes are gone;
+  profiling-save.org numbers can be re-taken whenever you like.

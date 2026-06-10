@@ -7,7 +7,7 @@ use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
 use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::errors::BufferValidationError;
-use crate::merge::validate_merge::validate_merge_requests;
+use crate::nodeMerge::validate_nodeMerge::validate_nodeMerge_requests;
 use contradictory_instructions::find_inconsistent_instructions;
 use super::local;
 use ego_tree::iter::Edge;
@@ -64,9 +64,9 @@ pub async fn find_buffer_errors_for_saving (
       }} }
   { // merge validation
     for error_msg in {
-      let merge_errors: Vec<String> =
-        validate_merge_requests(viewforest, config, driver) . await?;
-      merge_errors }
+      let nodeMerge_errors: Vec<String> =
+        validate_nodeMerge_requests(viewforest, config, driver) . await?;
+      nodeMerge_errors }
     { errors . push(
         BufferValidationError::Other (error_msg)); }}
   validate_definitive_view_requests(

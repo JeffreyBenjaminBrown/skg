@@ -730,7 +730,7 @@ fn parse_editrequest_sexp (
           let id_str : String =
             atom_to_string ( &subitems[1] ) ?;
           metadata . edit_request = Some (
-            EditRequest::Merge ( ID::from (id_str)));
+            EditRequest::NodeMerge ( ID::from (id_str)));
         } else {
           return Err ( format! ( "Unknown editRequest key: {}", key )); }
       },

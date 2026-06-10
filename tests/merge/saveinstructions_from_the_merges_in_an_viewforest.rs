@@ -1,5 +1,6 @@
 use indoc::indoc;
-use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_a_viewforest;
+use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_viewforest;
+use skg::types::tree::forest::ViewForest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::test_utils::run_with_test_db;
 use skg::types::misc::{ID, MSV, SourceName};
@@ -22,24 +23,24 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
 
         let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
         let viewforest = maybePlaced_to_placed_tree (unchecked_viewforest)?;
-        let merge_instructions =
-        instructiontriples_from_the_merges_in_a_viewforest(
-         &viewforest, config, driver)
+        let nodeMerge_instructions =
+        nodeMerge_instructions_from_viewforest(
+         &ViewForest::from_internal_tree (viewforest), config, driver)
         . await?;
 
         // Should produce exactly 1 MergeInstructionTriple
         assert_eq!(
-          merge_instructions . len(),
+          nodeMerge_instructions . len(),
           1,
           "Expected 1 MergeInstructionTriple"
         );
 
         // Get the single merge instruction
-        let merge = &merge_instructions[0];
+        let merge = &nodeMerge_instructions[0];
         let ( acquiree_text_preserver,
               node1,
               (node2_id, node2_source) )
-          = merge . targets_from_merge();
+          = merge . targets_from_nodeMerge();
 
         // Verify acquiree_text_preserver properties
        assert_eq!(acquiree_text_preserver . title,

@@ -33,7 +33,7 @@ pub struct NodeComplete {
   pub aliases: MSV<String>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.)
   pub source: SourceName, // source name, inferred from file location and SkgConfig
   pub pid: ID, // Primary ID. Determines filename, TypeDB identity, Tantivy key, map key. Never changes.
-  pub extra_ids: Vec<ID>, // Extra IDs accumulated through merges. Usually empty.
+  pub extra_ids: Vec<ID>, // Extra IDs accumulated through nodeMerges. Usually empty.
   pub body: Option<String>, // Unknown to both Tantivy & TypeDB. The body is all text (if any) between the preceding org headline, to which it belongs, and the next (if there is a next).
 
   pub contains                     : Vec<ID>, // See schema.tql.

@@ -1,0 +1,409 @@
+* plan : local instruction collection
+Successor to [[./1_vision.org]] and [[./2_discussion.org]].
+Every decision here was settled in the discussion, except the three
+in "flagged defaults" below, which I chose and you can veto.
+
+The canonical term is 'local instruction collection'
+(BFS dropped, per discussion; the traversal is DFS preorder,
+though visit order is provably irrelevant to the output).
+* flagged defaults -- veto here
+These three I decided by default; everything else was agreed
+explicitly in 2_discussion.org.
+** the per-ID accumulator is a slot struct
+One 'Option' field per exclusive intent kind, one 'Vec' field per
+combineable kind, so "at most one of each exclusive kind" is the
+shape of the type rather than a checked rule. (The alternative, a
+wrapper enum over Exclusive|Combineable inserted into a Vec, was
+described in the discussion.) One cross-slot rule remains procedural:
+Delete excludes the other exclusive slots.
+** the scope of silent dedup for defining cols
+Decided in discussion: duplicate members of *defining* cols are
+silently deduplicated at emission, never a validation error. Two
+defaults I chose within that decision:
+- You named only OverriddenCol as the "other defining col"; I
+  include SubscribeeCol as well, since 'subscribes_to' is writeable
+  through it and it currently squawks the same way.
+- The six read-only cols keep their duplicate-member checks
+  unchanged. Their members are inert on save, so the checks have no
+  save semantics; quieting them would serve the same vibe principle
+  but is out of scope here.
+Note this *removes* two existing checks (SubscribeeCol and
+OverriddenCol both bounce saves on duplicate members today, via
+'relation_col_children_have_distinct_ids'); only AliasCol keeps
+exactly its current behavior (silent collapse, never validated).
+Duplicate *contains* members remain a validation error
+('nonignored_children_have_distinct_ids') -- a model violation, per
+the discussion, not vibe-harshing.
+** nodeMerge renames touch Rust identifiers only
+Client-facing wire/metadata strings -- '(merge ID)' in headline
+metadata -- stay as they are, since in user-land only nodes can
+merge. Flag if you want those renamed too.
+* terminology
+- 'local instruction collection' :: the pure traversal defined here.
+- 'merge' is always qualified :: 'merge nodes' / 'nodeMerge' for the
+  acquirer/acquiree operation; 'merge instructions' /
+  'instructionMerge' for combining intents into the map. Bare
+  'merge' appears in neither code nor docs after this change.
+- 'intent' vs 'instruction' :: what collection emits are *intents*
+  (some are unresolved signals); they become DefineNode
+  *instructions* only after downstream resolution and disk
+  supplementation. Type names keep 'intent' until that boundary.
+** TODO in each comment how it differs from the other
+* scope
+Local instruction collection replaces, on the save path:
+role classification ('classify.rs'), candidate collection,
+the five per-field collectors, hiderel-intent extraction,
+NodeIntent-level same-ID reconciliation, and the tree-walking half
+of nodeMerge extraction.
+
+It does NOT replace (these stay downstream, consuming its output):
+visibility resolution (rewritten -- see below), disk
+supplementation, the noop filter ('filter_wouldbe_noop_defineNodes',
+which must stay after supplementation), foreign-instruction
+validation, and nodeMerge triple expansion.
+* assumptions, stated in the traversal's header comment
+The traversal assumes 'find_buffer_errors_for_saving' has passed:
+- every vognode has a PID and a config-valid source;
+- at most one definitive instance per ID
+  ('Multiple_Defining_Viewnodes');
+- consistent toDelete and sources across same-ID instances;
+- col shapes are valid: each col's child kinds, each col unique
+  among its siblings, distinct content-member IDs per
+  'nonignored_children_have_distinct_ids', and distinct member IDs
+  in the read-only cols per
+  'relation_col_children_have_distinct_ids'. The defining cols
+  (AliasCol, SubscribeeCol, OverriddenCol) may contain duplicates;
+  emission dedups them silently.
+No suspenders: collection performs no ancestry re-verification and
+no debug_asserts (agreed in discussion).
+* new types
+Names provisional; the shapes are the spec. All live in the new
+module (layout below). Pure data, no async, no disk.
+
+#+begin_src text
+/// What flows down the traversal. Computed by each node for its
+/// children; replaces classify.rs's upward walks.
+enum LocalContext {
+  TopLevel,                       // child of BufferRoot
+  UnderVognode {                  // parent is a vognode (or phantom etc.)
+    parent_if_writeable : Option<ID>, }, // Some iff parent is save-eligible
+  UnderDefiningCol {              // inside AliasCol/SubscribeeCol/OverriddenCol
+    owner_if_writeable : Option<ID>, },  // the col's parent, if save-eligible
+  SubscribeeAsSuchPosition {      // direct child of a SubscribeeCol
+    subscriber : ID,
+    subscriber_is_definitive : bool, },
+  UnderReadOnlyCol,               // the six read-only RoleCols, IDCol, Quals
+}
+
+/// What one visit can emit. The (target, intent) pairs are
+/// instructionMerged into the accumulator map.
+enum NodeIntent_Local {           // exclusive kinds first
+  SetTitleAndBody { title : String, body : Option<String> },
+  SetContains     (Vec<ID>),
+  SetAliases      (Vec<String>),
+  SetSubscribesTo (Vec<ID>),
+  SetOverrides    (Vec<ID>),
+  Delete,
+  NodeMerge       { acquiree : ID },
+  // combineable kinds:
+  SubscribeeVisibility { subscribee : ID, visible : Vec<ID> },
+  SubscribeeTextClaim  { title : String, body : Option<String> },
+}
+
+/// Accumulator for one ID. Slot struct: exclusivity is the shape.
+struct IntentsForOneId {
+  title_and_body : Option<(String, Option<String>)>,
+  contains       : Option<Vec<ID>>,
+  aliases        : Option<Vec<String>>,
+  subscribes_to  : Option<Vec<ID>>,
+  overrides      : Option<Vec<ID>>,
+  delete         : bool,
+  node_merge     : Option<ID>,            // the acquiree
+  visibility     : Vec<SubscribeeVisibility>, // combineable
+  text_claims    : Vec<SubscribeeTextClaim>,  // combineable, validation-only
+}
+
+/// The traversal's output.
+struct CollectedIntents {
+  order  : Vec<ID>,               // first-emission order
+  by_pid : HashMap<ID, IntentsForOneId>,
+}
+#+end_src
+
+instructionMerge rules (the insert function):
+- a combineable intent always pushes;
+- an exclusive intent into an empty slot fills it;
+- an exclusive intent into an occupied slot with an EQUAL payload is
+  a silent no-op;
+- an exclusive intent into an occupied slot with a different payload
+  is an error ("should be caught by validation" -- kept as a real
+  error so collection catches upstream regressions);
+- 'Delete' alongside any other filled exclusive slot (or vice versa)
+  is an error, matching today's "Cannot have both Delete and Save
+  for same ID";
+- 'visibility' and 'text_claims' coexist with anything, including
+  'delete' (resolution ignores them for deleted subscribers, as
+  'apply_hiderel_delta' does today).
+* the traversal
+One pure function, recursive DFS preorder over the placed
+'ViewForest'. Recursion is UNCONDITIONAL -- every node's children
+are visited, whatever the node's kind (agreed: the user can attach
+independent nodes anywhere). Only emission is conditional, on
+(kind, context). Each visit reads the node and its direct children,
+nothing deeper, nothing upward.
+
+Definition: a vognode is *save-eligible* iff it is Active,
+definitive, lacks a Delete edit request, and is not in
+subscribee-as-such position. (Its position may be anywhere else --
+including as a member of a read-only col, where it is save-eligible
+for itself but invisible to the col's owner.)
+** emission rules, by kind and context
+- BufferRoot :: emits nothing. Children get 'TopLevel'.
+- Active vognode, definitive, NOT in subscribee-as-such position ::
+  - with a Delete edit request: emits 'Delete' into its own entry,
+    nothing else. Its QualCol/PartnerCol children emit nothing
+    (owner not save-eligible).
+  - otherwise: emits into its own entry 'SetTitleAndBody', always a
+    'SetContains' (even if empty -- a definitive node's content is
+    always Specified), and 'NodeMerge { acquiree }' if it carries a
+    Merge edit request. Members for 'SetContains' are chosen by the
+    contains predicate (below).
+  - children's contexts: vognode children get
+    'UnderVognode { parent_if_writeable : Some(id) }' (or None if
+    toDelete); defining-col children get
+    'UnderDefiningCol { owner_if_writeable : ... }'; read-only col
+    children get their own kind's context.
+- Active vognode, definitive, in subscribee-as-such position ::
+  - always emits 'SubscribeeTextClaim { title, body }' into its OWN
+    entry (validated downstream against disk; replaces
+    'validate_no_title_or_body_edit_in_subscribeeAsSuch', and like
+    that function it applies whether or not the subscriber instance
+    is definitive);
+  - iff 'subscriber_is_definitive' (the at-most-one-writer-per-ID
+    guard, preserved from 'subscriber_instance_is_definitive'):
+    emits 'SubscribeeVisibility { subscribee : own id, visible }'
+    into the SUBSCRIBER's entry, members per the visible-content
+    predicate;
+  - emits no Set*; its own cols emit nothing; a Delete edit request
+    here is ignored (today's behavior);
+  - its vognode children get 'UnderVognode { None }' -- they are
+    self-writers but do not form anyone's contains.
+- Active vognode, indefinitive (any position) :: emits nothing; its
+  cols emit nothing; children get 'UnderVognode { None }'.
+- Inactive vognode :: emits nothing (the parent's contains predicate
+  counts it); children get 'UnderVognode { None }'.
+- Phantom::Diff, Phantom::Deleted, Phantom::Unknown, DeadScaffold ::
+  emit nothing; children get 'UnderVognode { None }'.
+- AliasCol :: iff its context says 'owner_if_writeable = Some(id)',
+  emits 'SetAliases' (texts of its Alias children, silently
+  deduplicated via 'dedup_vector', preserving first-occurrence
+  order) into the owner's entry. MSV semantics: col absent = no
+  intent = Unspecified; col present and empty = Specified(vec![]).
+- SubscribeeCol :: same pattern (including the silent dedup),
+  'SetSubscribesTo', members per the relation-col member predicate.
+  Its children get 'SubscribeeAsSuchPosition { subscriber : owner
+  id, subscriber_is_definitive }' -- note the subscriber's identity
+  is passed even when the owner is not save-eligible, because text
+  claims outlive the visibility guard.
+- OverriddenCol :: same pattern (including the silent dedup),
+  'SetOverrides'.
+- the six read-only RoleCols, IDCol, Qual::ID, Qual::Alias,
+  Qual::TextChanged :: emit nothing. Children get
+  'UnderReadOnlyCol' (vognodes found inside are self-writers; their
+  membership in the col is never read).
+** membership predicates, reused verbatim
+Extracted (not rewritten) from the old collectors into the new
+module, so old and new code share them during the transition:
+- contains member: an Active child that is Affected, not a would-be
+  diff phantom ('should_be_diffPhantom'), and not toDelete; or an
+  Inactive child whose membership axes are not negative
+  ('inactiveNode_is_phantom'). From
+  'collect_contents_to_save_from_children'.
+- relation-col member: Affected, not a would-be diff phantom, not
+  toDelete. From 'member_counts_for_relation_collection'.
+- visible-content member (subscribee-as-such children): Affected and
+  not toDelete -- NOTE: no diff-phantom condition, faithfully
+  preserving 'collect_visible_content'. The asymmetry is documented
+  at the predicate.
+Dedup policy: the three defining-col emissions (alias texts,
+subscribee IDs, overridden IDs) silently deduplicate via
+'dedup_vector', preserving first-occurrence order ("aliases are
+unordered... I don't want to harsh the user's vibe by complaining
+that they repeated themselves" -- discussion). 'SetContains' does
+not dedup; a comment there names
+'nonignored_children_have_distinct_ids' as the validator that makes
+dedup unnecessary.
+* downstream stages, in order
+Consuming 'CollectedIntents', replacing the same region of
+'extract_nonmergeSavePlan_from_authority':
+- text-claim validation (async, disk): each 'SubscribeeTextClaim'
+  must match the node's disk title/body, else
+  BufferValidationError. Replaces
+  'validate_no_title_or_body_edit_in_subscribeeAsSuch' (which dies
+  with 'SaveAuthority').
+- visibility conflict validation: the existing
+  per-(subscriber, content) check
+  ('validate_no_overlapping_subscribee_hiderel_conflicts'),
+  re-pointed at the map's visibility intents.
+- visibility resolution: a REWRITE of 'apply_hiderels_from_intents'
+  (same policy, stated in its comment today), consuming the
+  completed map: for each visibility intent, infer hides/unhides
+  from the subscribee's disk contains, the subscriber's disk hides,
+  and the subscriber's post-save contains (read from the map itself,
+  falling back to disk). Ignores deleted subscribers. The old
+  function is deleted.
+- lowering: 'IntentsForOneId' -> the existing 'NodeIntent' shape
+  (empty slots -> 'MSV::Unspecified'; 'delete' -> Delete intent), in
+  'order'. Downstream code keeps its types.
+- disk supplementation: unchanged
+  ('build_diskSupplemented_defineNodes' and the
+  'supplement_from_disk' module).
+- noop filter: unchanged, stays after supplementation.
+- foreign-instruction validation and
+  'validate_no_simultaneous_move_and_merge': unchanged, in
+  'from_text.rs'.
+- nodeMerge triple expansion: 'optmerge_from_viewnode's disk logic
+  survives, but is fed '(acquirer, acquiree)' pairs from the map's
+  'node_merge' slots instead of walking the tree.
+* fate of each existing piece
+| piece                                          | fate                                                  |
+|------------------------------------------------+-------------------------------------------------------|
+| 'classify.rs' (SaveRole, viewforest_with_saveroles) | deleted                                          |
+| 'DefinenodeCandidate', 'collect_savenode_candidates' | deleted                                         |
+| 'SaveAuthority'                                | deleted                                               |
+| five per-field collectors                      | deleted; predicates extracted first                   |
+| 'subscribee_hiderel_intents.rs'                | deleted; emission moves into the traversal            |
+| 'reconcile_nodeIntents' + 'SameIdReconciledNodeIntents' | deleted; subsumed by instructionMerge        |
+| 'reconcile_same_id_instructions.rs'            | deleted; already dead in production (see problems.org) |
+| 'apply_hiderels_from_intents'                  | deleted; rewritten as visibility resolution           |
+| 'validate_no_title_or_body_edit_in_subscribeeAsSuch' | deleted; rewritten as text-claim validation     |
+| 'NodeIntent' / 'NodeSaveIntent'                | kept, as the lowering target                          |
+| 'supplement_from_disk.rs'                      | kept                                                  |
+| 'filter_wouldbe_noop_defineNodes'              | kept                                                  |
+| 'mergeInstructionTriple.rs' disk logic         | kept; input changes to map pairs; renamed (nodeMerge) |
+| legacy wrappers ('extract_nonmergeSavePlan', 'instructiontriples_from_the_merges_in_a_viewforest', 'subscribee_hiderel_intents_from_tree') | deleted; tests re-pointed |
+* module layout
+New module 'server/from_text/local_instruction_collection/' with an
+old-style 'mod.rs', files roughly:
+- 'types.rs' -- LocalContext, NodeIntent_Local, IntentsForOneId,
+  CollectedIntents, the instructionMerge insert function
+- 'predicates.rs' -- the extracted membership predicates
+- 'traverse.rs' -- the pure traversal
+- 'lower.rs' -- IntentsForOneId -> NodeIntent
+- 'resolve_visibility.rs' -- the rewritten resolution stage
+- 'validate_text_claims.rs' -- the rewritten claim validation
+'viewnodes_to_instructions/' shrinks to what survives, or its
+survivors move and the directory dies; decide at implementation
+time by what reads cleanest.
+* renames (merge -> nodeMerge / instructionMerge)
+Rust identifiers only (see flagged defaults). Inventory, not
+exhaustive but representative; the rule is: any identifier where
+'merge' means node-merge gains the 'nodeMerge' (or 'NodeMerge')
+qualification:
+- type 'Merge' -> 'NodeMerge'; 'EditRequest::Merge' ->
+  'EditRequest::NodeMerge'
+- 'SavePlan { merge_instructions }' -> 'nodeMerge_instructions'
+- 'instructiontriples_from_merge_candidates',
+  'extract_merge_save_plan', 'validate_merge_requests',
+  'validate_no_simultaneous_move_and_merge',
+  'neighbor_savenodes_for_merges', 'affected_neighbors_of_merge',
+  'mergeInstructionTriple.rs', the 'server/merge/' module name ->
+  nodeMerge spellings
+- the new insert function and its docs use 'instructionMerge'
+  spellings
+Wire strings ('(merge ID)') and on-disk formats unchanged.
+* validation changes
+- The duplicate-member checks are REMOVED from the defining cols:
+  'validate_subscribeecol' drops its
+  'relation_col_children_have_distinct_ids' call, and
+  'validate_relation_col' -- which serves Overridden plus four
+  read-only roles -- applies that check only to the read-only
+  roles. 'validate_aliascol' is unchanged (it never checked
+  alias-text distinctness).
+- Audit that every error the old collectors could raise has a
+  validator twin in 'validate_local_structure' /
+  'find_buffer_errors_for_saving'. Believed already true for: col
+  child kinds, col uniqueness among siblings, contains-member
+  distinctness. Any check found twinless moves into
+  'validate_local_structure' (agreed posture: validation before
+  extraction; collection total).
+* testing
+In addition to keeping the full suites green ('cargo nextest run',
+'bash/emacs-tests.sh', 'bash/integration-tests.sh'):
+- predicate test audit: for each extracted predicate, enumerate the
+  conditions it encodes; ensure one test per condition; add what is
+  missing BEFORE the rewrite starts, so the predicates are pinned.
+- traversal unit tests: the traversal is pure and sync, so these are
+  cheap. Explicit cases at minimum:
+  - AliasCol under a subscribee-as-such emits nothing (the
+    discussion's "naive implementation would write the subscribee's
+    aliases" trap);
+  - cols under a toDelete or indefinitive owner emit nothing;
+  - a definitive member of a read-only col emits for itself only;
+  - a definitive child of an Inactive vognode emits;
+  - a definitive node inside a Phantom::Diff subtree emits;
+  - an indefinitive subscribee-as-such emits nothing;
+  - a definitive subscribee-as-such under an indefinitive subscriber
+    emits a text claim but no visibility intent;
+  - present-but-empty col vs absent col (Specified(vec![]) vs
+    Unspecified) for each defining col;
+  - duplicate members of each defining col are silently
+    deduplicated, preserving first-occurrence order, and do not
+    error;
+  - instructionMerge conflict cases: equal re-insert is a no-op,
+    differing payload errors, Delete-vs-Set* errors,
+    visibility/claims always combine.
+- differential test: build the new path beside the old; for every
+  viewforest the suite constructs, compare 'NonmergeSavePlan' and
+  nodeMerge outputs old-vs-new. Differences must fall inside an
+  explicit allowlist -- exactly the new-recursion-surface emissions
+  (members of read-only cols and their subtrees, descendants of
+  Inactive vognodes, descendants of Phantom::Diff). Anything else
+  fails. Delete the old path only after this passes suite-wide.
+* implementation order
+In order (each step leaves the suite green):
+- Extract the membership predicates to the new module; point the old
+  collectors at them. Audit and complete the predicate tests.
+- Remove the duplicate-member checks from the defining cols'
+  validators (see "validation changes"); run the
+  collector-error/validator-twin audit and move any twinless checks.
+- Add the new types and the instructionMerge insert function, with
+  unit tests.
+- Write the traversal and the lowering; unit-test them directly.
+- Wire a parallel entry point producing 'NonmergeSavePlan' via the
+  new path; add the differential test with its allowlist.
+- Rewrite the downstream stages: text-claim validation, visibility
+  conflict validation re-pointing, visibility resolution; switch
+  'from_text.rs' to the new pipeline (old path still compiled, for
+  the differential test).
+- Feed nodeMerge extraction from the map; delete the tree-walking
+  half.
+- Delete the old machinery: 'classify.rs', candidates,
+  'SaveAuthority', the five collectors,
+  'subscribee_hiderel_intents.rs', both reconcile modules,
+  'apply_hiderels_from_intents',
+  'validate_no_title_or_body_edit_in_subscribeeAsSuch', the legacy
+  wrappers, and the differential harness's old-path dependency
+  (keep the harness's expectations as ordinary regression tests).
+- Apply the nodeMerge/instructionMerge rename inventory.
+- Update docs: the save-pipeline section of
+  'coding-advice/ai-agents.org', a glossary entry for 'local
+  instruction collection', and mark the four extraction entries in
+  'TODO/problems.org' fixed.
+* expected user-visible behavior changes
+- Self-edits are honored in newly recursed positions: definitive
+  vognodes that are members of read-only cols (or anywhere in their
+  subtrees), inside Inactive vognodes' subtrees, or inside
+  Phantom::Diff subtrees now save their own title/body/content
+  edits. Previously these were silently discarded.
+- Duplicate members under a SubscribeeCol or OverriddenCol no longer
+  bounce the save; they are silently deduplicated, as aliases always
+  were. (Aliases themselves behave exactly as before.)
+- Nothing else: all other behavior is pinned by the differential
+  test.
+* performance note, in passing
+The old path clones the whole viewforest per save
+('viewforest_with_saveroles') and walks it about seven times. The
+new path is one clone-free walk plus map operations. Performance is
+not the motivation, but the save critical path should get measurably
+lighter; 'profiling-save.org' numbers can be re-taken after cutover.

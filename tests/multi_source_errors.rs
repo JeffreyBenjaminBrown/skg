@@ -283,7 +283,7 @@ fn test_foreign_node_modification_errors(
               } else { None }
             } ) . collect();
 
-          println!("Merge errors for IDs: {:?}", error_ids);
+          println!("NodeMerge errors for IDs: {:?}", error_ids);
 
           assert!(error_ids . contains(&"ext-8" . to_string()), "Expected error for ext-8 (foreign acquirer)");
           assert!(error_ids . contains(&"ext-9" . to_string()), "Expected error for ext-9 (foreign acquiree)");

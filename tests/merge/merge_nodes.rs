@@ -1,13 +1,14 @@
 // cargo test merge::merge_nodes
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::merge::mergeInstructionTriple::instructiontriples_from_the_merges_in_a_viewforest;
-use skg::merge::merge_nodes;
+use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_viewforest;
+use skg::nodeMerge::merge_nodes;
 use skg::test_utils::{run_with_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SourceName};
+use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{EditRequest, ViewNode, ViewNodeKind, Vognode, TrueNode, IndefOrDef, viewforest_root_viewnode, default_truenode};
 use skg::types::nodes::complete::NodeComplete;
-use skg::types::save::Merge;
+use skg::types::save::NodeMerge;
 use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_source;
 use skg::util::path_from_pid_and_source;
 use skg::dbs::typedb::search::contains_from_pids::contains_from_pids;
@@ -78,27 +79,27 @@ async fn test_merge_2_into_1_impl(
   tantivy: &TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // Create viewnode viewforest with node 1 requesting to merge node 2
-  let view_node_1 = mk_test_viewnode("1", "1", Some(EditRequest::Merge(ID::from ("2"))));
+  let view_node_1 = mk_test_viewnode("1", "1", Some(EditRequest::NodeMerge(ID::from ("2"))));
   let mut viewforest: Tree<ViewNode> = Tree::new(viewforest_root_viewnode());
   viewforest . root_mut() . append (view_node_1);
 
-  // Generate Merge from merge request
-  let merge_instructions: Vec<Merge> =
-    instructiontriples_from_the_merges_in_a_viewforest(
-      &viewforest,
+  // Generate NodeMerge from merge request
+  let nodeMerge_instructions: Vec<NodeMerge> =
+    nodeMerge_instructions_from_viewforest(
+      &ViewForest::from_internal_tree (viewforest),
       config,
       driver,
   ) . await?;
 
-  // Expect 1 Merge (containing 3 DefineNodes)
-  assert_eq!(merge_instructions . len(),
+  // Expect 1 NodeMerge (containing 3 DefineNodes)
+  assert_eq!(nodeMerge_instructions . len(),
              1,
-             "Should have 1 Merge");
+             "Should have 1 NodeMerge");
 
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   merge_nodes(
-    &merge_instructions,
+    &nodeMerge_instructions,
     config . clone(),
     tantivy,
     driver,
@@ -109,9 +110,9 @@ async fn test_merge_2_into_1_impl(
   verify_typedb_after_merge_2_into_1(
     config, driver) . await?;
   verify_filesystem_after_merge_2_into_1(
-    config, &merge_instructions)?;
+    config, &nodeMerge_instructions)?;
   verify_tantivy_after_merge_2_into_1(
-    tantivy, &merge_instructions )?;
+    tantivy, &nodeMerge_instructions )?;
   audit_inrustgraph_or_panic (&graph, &config . db_name, driver) . await?;
   Ok(( )) }
 
@@ -173,7 +174,7 @@ async fn verify_typedb_after_merge_2_into_1 (
 
 fn verify_filesystem_after_merge_2_into_1(
   config: &SkgConfig,
-  merge_instructions: &[Merge],
+  nodeMerge_instructions: &[NodeMerge],
 ) -> Result<(), Box<dyn Error>> {
   let node_2_path: String =
     path_from_pid_and_source ( config,
@@ -196,7 +197,7 @@ fn verify_filesystem_after_merge_2_into_1(
               "Node 1 should contain 7 items (with overlap deduplicated)");
 
   let acquiree_text_preserver_id: &ID =
-    &merge_instructions[0] . targets_from_merge() . 0 . pid;
+    &nodeMerge_instructions[0] . targets_from_nodeMerge() . 0 . pid;
   assert_eq!(&node_1 . contains[0], acquiree_text_preserver_id,
              "First content should be acquiree_text_preserver");
   assert_eq!(&node_1 . contains[1], &ID::from ("11"));
@@ -270,7 +271,7 @@ fn verify_filesystem_after_merge_2_into_1(
 
 fn verify_tantivy_after_merge_2_into_1(
   tantivy_index: &TantivyIndex,
-  merge_instructions: &[Merge],
+  nodeMerge_instructions: &[NodeMerge],
 ) -> Result<(), Box<dyn Error>> {
 
   // Search for node 2 - should NOT find it (it was merged and deleted)
@@ -287,7 +288,7 @@ fn verify_tantivy_after_merge_2_into_1(
 
   // Search for acquiree_text_preserver - SHOULD find it
   let acquiree_text_preserver_id: &ID =
-    &merge_instructions[0] . targets_from_merge() . 0 . pid;
+    &nodeMerge_instructions[0] . targets_from_nodeMerge() . 0 . pid;
   let found_acquiree_text_preserver: bool =
     tantivy_contains_id(tantivy_index, "MERGED: 2", &acquiree_text_preserver_id . 0)?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");
@@ -339,27 +340,27 @@ async fn test_merge_1_into_2_impl(
   tantivy: &TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // Create viewnode viewforest with node 2 requesting to merge node 1
-  let view_node_2 = mk_test_viewnode("2", "2", Some(EditRequest::Merge(ID::from ("1"))));
+  let view_node_2 = mk_test_viewnode("2", "2", Some(EditRequest::NodeMerge(ID::from ("1"))));
   let mut viewforest: Tree<ViewNode> = Tree::new(viewforest_root_viewnode());
   viewforest . root_mut() . append (view_node_2);
 
-  // Generate Merge from merge request
-  let merge_instructions: Vec<Merge> =
-    instructiontriples_from_the_merges_in_a_viewforest(
-      &viewforest,
+  // Generate NodeMerge from merge request
+  let nodeMerge_instructions: Vec<NodeMerge> =
+    nodeMerge_instructions_from_viewforest(
+      &ViewForest::from_internal_tree (viewforest),
       config,
       driver,
   ) . await?;
 
-  // Expect 1 Merge (containing 3 DefineNodes)
-  assert_eq!(merge_instructions . len(),
+  // Expect 1 NodeMerge (containing 3 DefineNodes)
+  assert_eq!(nodeMerge_instructions . len(),
              1,
-             "Should have 1 Merge");
+             "Should have 1 NodeMerge");
 
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   merge_nodes(
-    &merge_instructions,
+    &nodeMerge_instructions,
     config . clone(),
     tantivy,
     driver,
@@ -368,18 +369,18 @@ async fn test_merge_1_into_2_impl(
 
   // Verify results
   verify_typedb_after_merge_1_into_2(
-    config, driver, &merge_instructions) . await?;
+    config, driver, &nodeMerge_instructions) . await?;
   verify_filesystem_after_merge_1_into_2(
-    config, &merge_instructions)?;
+    config, &nodeMerge_instructions)?;
   verify_tantivy_after_merge_1_into_2(
-    tantivy, &merge_instructions)?;
+    tantivy, &nodeMerge_instructions)?;
   audit_inrustgraph_or_panic (&graph, &config . db_name, driver) . await?;
   Ok(( )) }
 
 async fn verify_typedb_after_merge_1_into_2 (
   config: &SkgConfig,
   driver: &TypeDBDriver,
-  merge_instructions: &[Merge],
+  nodeMerge_instructions: &[NodeMerge],
 ) -> Result<(), Box<dyn Error>> {
   let db_name: &String = &config . db_name;
 
@@ -428,7 +429,7 @@ async fn verify_typedb_after_merge_1_into_2 (
   // The old link from 1 to 1-links-to should now be from acquiree_text_preserver,
   // because acquiree_text_preserver has what was node 1's body text.
   let acquiree_text_preserver_id: &ID =
-    &merge_instructions[0] . targets_from_merge() . 0 . pid;
+    &nodeMerge_instructions[0] . targets_from_nodeMerge() . 0 . pid;
   let acquiree_text_preserver_textlink_dests: HashSet<ID> =
     find_related_nodes(
       db_name, driver, & [ acquiree_text_preserver_id . clone () ],
@@ -522,7 +523,7 @@ async fn verify_typedb_after_merge_1_into_2 (
 
 fn verify_filesystem_after_merge_1_into_2(
   config: &SkgConfig,
-  merge_instructions: &[Merge],
+  nodeMerge_instructions: &[NodeMerge],
 ) -> Result<(), Box<dyn Error>> {
   let node_1_path: String =
     path_from_pid_and_source ( config,
@@ -546,7 +547,7 @@ fn verify_filesystem_after_merge_1_into_2(
   assert_eq!( node_2 . contains . len(), 7,
               "Node 2 should contain 7 items (with overlap deduplicated)");
   let acquiree_text_preserver_id: &ID =
-    &merge_instructions[0] . targets_from_merge() . 0 . pid;
+    &nodeMerge_instructions[0] . targets_from_nodeMerge() . 0 . pid;
   assert_eq!(&node_2 . contains[0], acquiree_text_preserver_id,
              "First content should be acquiree_text_preserver");
   assert_eq!(&node_2 . contains[1], &ID::from ("21"));
@@ -623,7 +624,7 @@ fn verify_filesystem_after_merge_1_into_2(
 
 fn verify_tantivy_after_merge_1_into_2(
   tantivy_index: &TantivyIndex,
-  merge_instructions: &[Merge],
+  nodeMerge_instructions: &[NodeMerge],
 ) -> Result<(), Box<dyn Error>> {
 
   // Search for node 1 - should NOT find it (it was merged and deleted)
@@ -640,7 +641,7 @@ fn verify_tantivy_after_merge_1_into_2(
 
   // Search for acquiree_text_preserver - SHOULD find it
   let acquiree_text_preserver_id: &ID =
-    &merge_instructions[0] . targets_from_merge() . 0 . pid;
+    &nodeMerge_instructions[0] . targets_from_nodeMerge() . 0 . pid;
   let found_acquiree_text_preserver: bool = tantivy_contains_id(
     tantivy_index, "MERGED: 1", &acquiree_text_preserver_id . 0 )?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");
@@ -686,19 +687,20 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   driver  : &TypeDBDriver,
   tantivy : &TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // Merge 1 into 2. Acquirer=2, acquiree=1.
+  // NodeMerge 1 into 2. Acquirer=2, acquiree=1.
   let view_node_2 =
     mk_test_viewnode ("2", "2",
-                      Some (EditRequest::Merge (ID::from ("1"))));
+                      Some (EditRequest::NodeMerge (ID::from ("1"))));
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   viewforest . root_mut () . append (view_node_2);
-  let merge_instructions : Vec<Merge> =
-    instructiontriples_from_the_merges_in_a_viewforest (
-      &viewforest, config, driver ) . await?;
+  let nodeMerge_instructions : Vec<NodeMerge> =
+    nodeMerge_instructions_from_viewforest (
+      &ViewForest::from_internal_tree (viewforest),
+      config, driver ) . await?;
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   merge_nodes (
-    &merge_instructions, config . clone (),
+    &nodeMerge_instructions, config . clone (),
     tantivy, driver, &graph ) . await?;
 
   let snap = graph . load_full ();

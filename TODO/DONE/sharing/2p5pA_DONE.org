@@ -49,7 +49,7 @@ let extracted =
 let reconciled =
   reconcile_save_intents (extracted)?;
 let with_disk =
-  build_disk_supplemented_define_nodes (
+  build_diskSupplemented_defineNodes (
     reconciled, config, driver ) . await?;
 let with_visibility =
   apply_hiderels_from_intents (
@@ -58,7 +58,7 @@ let with_visibility =
     config,
     driver ) . await?;
 let changed =
-  filter_wouldbe_noop_definenodes (with_visibility);
+  filter_wouldbe_noop_defineNodes (with_visibility);
 Ok ((changed, with_disk.source_moves))
 #+end_src
 
@@ -132,7 +132,7 @@ struct Definenodes_with_Sourcemoves {
 #+end_src
 
 A reasonable helper name is
-'build_disk_supplemented_define_nodes'.
+'build_diskSupplemented_defineNodes'.
 
 Preserve the exact current order inside that helper:
 
@@ -154,7 +154,7 @@ named and isolated, making items b and f easier.
 ** 5. Leave visibility folding and unchanged filtering in place
 
 Keep 'apply_hiderels_from_intents' after disk
-supplementation and before 'filter_wouldbe_noop_definenodes'.
+supplementation and before 'filter_wouldbe_noop_defineNodes'.
 
 That position matters because a subscriber whose only edit is an
 inferred hide must survive no-op filtering. Moving the phase belongs

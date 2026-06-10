@@ -70,7 +70,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
       . unwrap_or_default();
     let deleted_by_this_save_pids : HashSet<ID> =
       // PITFALL: Can overlap deleted_since_head_pid_src_map, but neither is necessarily a subset of the other. If you delete something that you added since head, it will only be here. And if you deleted something since head but not in this save, it will only be there.
-      // PITFALL: Looks dangerous but isn't: Each merge includes an acquiree deletion. This would make ViewNodes with that ID invalid (since ViewNodes by this point should have PIDs). It doesn't, though, because rewriteInPlace_viewnodes_whose_id_is_newly_extra will rewrite those ViewNodes to instead use the acquirer's PID (i.e. to depict the acquirer now, instead of the acquiree as before) before using this set.
+      // PITFALL: Looks dangerous but isn't: Each nodeMerge includes an acquiree deletion. This would make ViewNodes with that ID invalid (since ViewNodes by this point should have PIDs). It doesn't, though, because rewriteInPlace_viewnodes_whose_id_is_newly_extra will rewrite those ViewNodes to instead use the acquirer's PID (i.e. to depict the acquirer now, instead of the acquiree as before) before using this set.
       define_nodes . iter()
       . filter_map( |instr| match instr {
         DefineNode::Delete (d) => Some( d . id . clone() ),
@@ -425,7 +425,7 @@ pub async fn finish_viewforest (
 /// When the server first receives the buffer, it replaces
 /// each ViewNode's ID with a PID (`replace_ids_with_pids`).
 /// Later it updates the graph, which can involve merging nodes.
-/// After a merge, the acquiree is gone, and what was the ViewNode
+/// After a nodeMerge, the acquiree is gone, and what was the ViewNode
 /// onto it now an extra_id of the acquirer, not a PID.
 /// This is intended to replaces such a
 /// viewnode to carry the primary's pid, source, title, and body.
@@ -434,7 +434,7 @@ pub async fn finish_viewforest (
 /// 'reconcile_content_children' will later update it
 /// to include the rest of the subscriber's content.
 ///
-/// PITFALL: The function does not actually remember the merge history.
+/// PITFALL: The function does not actually remember the nodeMerge history.
 /// It merely identifies each TrueNode in 'viewforest'
 /// whose pid is an extra_id of some distinct node in the snapshot.
 fn rewriteInPlace_viewnodes_whose_id_is_newly_extra (

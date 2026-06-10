@@ -9,11 +9,12 @@ use skg::types::misc::SourceName;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::save::{DefineNode, SaveNode};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::from_text::viewnodes_to_instructions::extract_nonmergeSavePlan;
+use skg::from_text::local_instruction_collection::extract_nonmergeSavePlan_locally;
 use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
 use skg::types::misc::ID;
 use skg::types::viewnode::ViewNode;
 use skg::types::maybe_placed_viewnode::{MpViewnode, maybePlaced_to_placed_tree};
+use skg::types::tree::forest::ViewForest;
 
 use ego_tree::Tree;
 use indoc::indoc;
@@ -55,9 +56,10 @@ fn test_update_nodes_and_relationships2 (
              inconsistent_sources );
 
     // Convert to instructions (adds missing info and reconciles)
-    let nonmerge_plan =
-      extract_nonmergeSavePlan (
-        & viewforest, & config, & driver ) . await ?;
+    let (nonmerge_plan, _nodeMerge_acquisitions) =
+      extract_nonmergeSavePlan_locally (
+        & ViewForest::from_internal_tree (viewforest),
+        & config, & driver ) . await ?;
 
     // Apply the update
     update_typedb_from_saveinstructions (

@@ -2,7 +2,7 @@ use crate::dbs::in_rust_graph::in_rust_graph_coherent_with_save_instructions;
 use crate::from_text::buffer_to_validated_saveplan;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
-use crate::save::update_graph_including_merges;
+use crate::save::update_graph_including_nodeMerges;
 use crate::serve::ViewsState;
 use crate::source_sets::ActiveSourceSet;
 use crate::serve::protocol::TcpToClient;
@@ -234,7 +234,7 @@ fn nat_from_request (
 /// ERRORS: If the buffer is invalid.
 /// COMPLEX:
 /// - Validation must happen at many stages.
-/// - Merges must follow the execution of other save instructions, because the user may have updated one of the nodes to be merged.
+/// - NodeMerges must follow the execution of other save instructions, because the user may have updated one of the nodes to be merged.
 /// - complete_viewforest is complex: it is one level-order BFS in which each node is completed at its own visit (content, cols, view requests, inline diff), then a postorder prune sweep removes the empty self-deletable nodes.
 pub async fn update_from_and_rerender_buffer (
   stream                      : &mut TcpStream,
@@ -264,7 +264,7 @@ pub async fn update_from_and_rerender_buffer (
                    . into() ); }
   let SavePlan {
     define_nodes       : nonmerge_defineNodes,
-    merge_instructions : merges,
+    nodeMerge_instructions : nodeMerges,
     source_moves }
     = save_plan;
 
@@ -272,22 +272,22 @@ pub async fn update_from_and_rerender_buffer (
     // computed from the post-save in-Rust graph and written inside the
     // single Tantivy index pass, so there is no separate context pass.
     let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "update_graph_including_merges" ). entered();
-    update_graph_including_merges (
+      "update_graph_including_nodeMerges" ). entered();
+    update_graph_including_nodeMerges (
       nonmerge_defineNodes . clone(),
-      &merges,
+      &nodeMerges,
       &source_moves,
       env . config . clone(),
       &mut env . tantivy_index,
       &env . driver,
       &env . in_rust_graph ) . await ?; }
 
-  let define_nodes : Vec<DefineNode> = // includes the merges
+  let define_nodes : Vec<DefineNode> = // includes the nodeMerges
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "define_nodes_build" ). entered();
       nonmerge_defineNodes . iter () . cloned ()
-      . chain ( merges . iter ()
-                . flat_map ( |merge| merge . to_vec () ))
+      . chain ( nodeMerges . iter ()
+                . flat_map ( |nodeMerge| nodeMerge . to_vec () ))
       . collect () };
 
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(

@@ -5,7 +5,7 @@ pub mod diff_analysis;
 pub mod from_text;
 pub mod git_ops;
 pub mod import_org_roam;
-pub mod merge;
+pub mod nodeMerge;
 pub mod org_to_text;
 pub mod save;
 pub mod serve;

@@ -55,10 +55,10 @@ pipeline: role annotation and extraction, same-ID node-edit
 reconciliation, subscribee visibility folding, disk supplementation,
 and unchanged filtering are separate phases.
 
-** DONE b. Simplify 'build_disk_supplemented_define_nodes'
+** DONE b. Simplify 'build_diskSupplemented_defineNodes'
 
 Item a should leave behind a helper shaped roughly like
-'build_disk_supplemented_define_nodes'. That helper will be an
+'build_diskSupplemented_defineNodes'. That helper will be an
 improvement over the current top-level tangle, but it should not
 become the new place where unrelated save policies hide.
 
@@ -81,7 +81,7 @@ enough that the later policy changes have one obvious edit point.
 
 Acceptance criterion: after this item, both
 'viewforest_to_nonmerge_save_instructions' and
-'build_disk_supplemented_define_nodes' should read as short named
+'build_diskSupplemented_defineNodes' should read as short named
 pipelines.
 
 Status: complete. Disk supplementation now has explicit save/delete

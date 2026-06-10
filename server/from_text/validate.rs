@@ -1,7 +1,7 @@
 use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
-use crate::types::save::{DefineNode, SaveNode, DeleteNode, Merge, SourceMove};
+use crate::types::save::{DefineNode, SaveNode, DeleteNode, NodeMerge, SourceMove};
 use crate::types::nodes::complete::NodeComplete;
 
 use std::collections::HashSet;
@@ -19,20 +19,20 @@ use typedb_driver::TypeDBDriver;
 /// and foreign creates are recognized by checking disk for the pid.
 pub async fn validate_and_filter_foreign_instructions(
   instructions       : Vec<DefineNode>,
-  merge_instructions : &[Merge],
+  nodeMerge_instructions : &[NodeMerge],
   config             : &SkgConfig,
   driver             : &TypeDBDriver,
 ) -> Result<Vec<DefineNode>,
             Vec<BufferValidationError>> {
   let mut outcomes : Vec<ForeignPolicyOutcome> =
     Vec::new();
-  let merge_definenodes : Vec<DefineNode> =
-    merge_instructions . iter ()
-    . flat_map ( |merge| merge . to_vec () )
+  let nodeMerge_definenodes : Vec<DefineNode> =
+    nodeMerge_instructions . iter ()
+    . flat_map ( |nodeMerge| nodeMerge . to_vec () )
     . collect ();
   for instruction in
     instructions . iter ()
-    . chain (merge_definenodes . iter ())
+    . chain (nodeMerge_definenodes . iter ())
   { outcomes . push (
       apply_foreign_policy(
         instruction, config, driver
@@ -180,27 +180,27 @@ pub(crate) fn flatten_ms<T: Clone>(
 
 /// Validates that no node is both moved and merged in the same save.
 ///
-/// Requires both completed non-merge extraction and merge extraction:
+/// Requires both completed non-nodeMerge extraction and nodeMerge extraction:
 /// source moves are detected during disk supplementation of
 /// DefineNodes, while merge acquiree/acquirer ids come from merge
 /// requests in the "placed" (i.e. no longer "maybePlaced") viewforest.
-pub(super) fn validate_no_simultaneous_move_and_merge (
+pub(super) fn validate_no_simultaneous_move_and_nodeMerge (
   source_moves       : &[SourceMove],
-  merge_instructions : &[Merge],
+  nodeMerge_instructions : &[NodeMerge],
 ) -> Result<(), Vec<BufferValidationError>> {
-  if source_moves . is_empty() || merge_instructions . is_empty() {
+  if source_moves . is_empty() || nodeMerge_instructions . is_empty() {
     return Ok (()); }
   let move_ids : HashSet<&ID> =
     source_moves . iter() . map(|sm| &sm . pid) . collect();
   let mut errors : Vec<BufferValidationError> = Vec::new();
-  for merge in merge_instructions {
-    if move_ids . contains (merge . acquirer_id()) {
+  for nodeMerge in nodeMerge_instructions {
+    if move_ids . contains (nodeMerge . acquirer_id()) {
       errors . push (
         BufferValidationError::CannotMoveAndMergeSimultaneously(
-          merge . acquirer_id() . clone() )); }
-    if move_ids . contains (merge . acquiree_id()) {
+          nodeMerge . acquirer_id() . clone() )); }
+    if move_ids . contains (nodeMerge . acquiree_id()) {
       errors . push (
         BufferValidationError::CannotMoveAndMergeSimultaneously(
-          merge . acquiree_id() . clone() )); }}
+          nodeMerge . acquiree_id() . clone() )); }}
   if errors . is_empty() { Ok (())
   } else { Err (errors) }}

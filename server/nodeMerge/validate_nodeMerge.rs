@@ -17,7 +17,7 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
-struct MergeValidationData<'a> {
+struct NodeMergeValidationData<'a> {
   acquirer_viewnodes    : Vec<&'a MpViewnode>,
   acquirer_to_acquirees : HashMap<ID, HashSet<ID>>,
   acquiree_to_acquirers : HashMap<ID, HashSet<ID>>,
@@ -26,15 +26,15 @@ struct MergeValidationData<'a> {
 /// Validates merge requests in an viewnode viewforest.
 /// Returns a vector of validation error messages,
 /// which is empty if all are valid.
-pub async fn validate_merge_requests(
+pub async fn validate_nodeMerge_requests(
   viewforest: &Tree<MpViewnode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
 ) -> Result<Vec<String>, Box<dyn Error>> {
   let mut errors: Vec<String> = Vec::new();
-  let merge_validation_data : MergeValidationData =
-    collect_merge_validation_data (viewforest);
-  for node in merge_validation_data . acquirer_viewnodes {
+  let nodeMerge_validation_data : NodeMergeValidationData =
+    collect_nodeMerge_validation_data (viewforest);
+  for node in nodeMerge_validation_data . acquirer_viewnodes {
     let t : &MpTruenode = match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t)) => t,
       _ => { errors . push(format!( "Acquirer must be a vognode that exists: {:?}",
@@ -45,25 +45,25 @@ pub async fn validate_merge_requests(
       None => { errors . push(format!(
                   "Acquirer node '{}' must have an ID", t . title));
                 continue; }};
-    if let Some(EditRequest::Merge (acquiree_id))
+    if let Some(EditRequest::NodeMerge (acquiree_id))
       = t . edit_request ()
-    { let pair_errors : Vec<String> = validate_merge_pair(
+    { let pair_errors : Vec<String> = validate_nodeMerge_pair(
         config, driver, acquirer_id, acquiree_id,
-        &merge_validation_data . to_delete_ids) . await?;
+        &nodeMerge_validation_data . to_delete_ids) . await?;
       errors . extend (pair_errors); }}
   errors . extend( {
     let monogamy_errors : Vec<String> =
-      validate_monogamy_for_all_merges(
-        &merge_validation_data . acquirer_to_acquirees,
-        &merge_validation_data . acquiree_to_acquirers );
+      validate_monogamy_for_all_nodeMerges(
+        &nodeMerge_validation_data . acquirer_to_acquirees,
+        &nodeMerge_validation_data . acquiree_to_acquirers );
     monogamy_errors } );
   Ok (errors) }
 
 /// To understand what this function does,
 /// it's easiest to read the definition of its return type.
-fn collect_merge_validation_data<'a>(
+fn collect_nodeMerge_validation_data<'a>(
   viewforest: &'a Tree<MpViewnode>,
-) -> MergeValidationData<'a> {
+) -> NodeMergeValidationData<'a> {
   let mut acquirer_viewnodes : Vec<&MpViewnode> = Vec::new();
   let mut acquirer_to_acquirees : HashMap<ID, HashSet<ID>> = HashMap::new();
   let mut acquiree_to_acquirers : HashMap<ID, HashSet<ID>> = HashMap::new();
@@ -77,7 +77,7 @@ fn collect_merge_validation_data<'a>(
           if matches!(t . edit_request (),
                       Some (EditRequest::Delete)) {
             to_delete_ids . insert(id . clone()); } // mutate!
-          if let Some(EditRequest::Merge (acquiree_id))
+          if let Some(EditRequest::NodeMerge (acquiree_id))
           = t . edit_request ()
           { acquirer_viewnodes . push (viewnode); // mutate!
             acquirer_to_acquirees // mutate!
@@ -88,7 +88,7 @@ fn collect_merge_validation_data<'a>(
               . entry(acquiree_id . clone())
               . or_insert_with (HashSet::new)
               . insert(id . clone()); }} }} }
-  MergeValidationData { acquirer_viewnodes,
+  NodeMergeValidationData { acquirer_viewnodes,
                         acquirer_to_acquirees,
                         acquiree_to_acquirers,
                         to_delete_ids, }}
@@ -96,7 +96,7 @@ fn collect_merge_validation_data<'a>(
 /// Validates a single merge pair (acquirer + acquiree).
 /// Returns a vector of validation errors for this pair.
 /// The error messages explain what each passage does.
-async fn validate_merge_pair(
+async fn validate_nodeMerge_pair(
   config: &SkgConfig,
   driver: &TypeDBDriver,
   acquirer_id: &ID,
@@ -143,7 +143,7 @@ async fn validate_merge_pair(
 /// Validates monogamy rules for all merges.
 /// Returns a vector of validation errors.
 /// The error text explains what each passage does.
-fn validate_monogamy_for_all_merges(
+fn validate_monogamy_for_all_nodeMerges(
   acquirer_to_acquirees: &HashMap<ID, HashSet<ID>>,
   acquiree_to_acquirers: &HashMap<ID, HashSet<ID>>,
 ) -> Vec<String> {

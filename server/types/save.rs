@@ -18,13 +18,13 @@ pub struct SourceMove {
 }
 
 /// Defines what to do with a single node: save it or delete it.
-/// PITFALL: Don't merge the 'Merge' type into this one.
+/// PITFALL: Don't merge the 'NodeMerge' type into this one.
 /// It might seem natural, but there are places where you expect
-/// a save or a delete and do not expect a merge. I tried it anyway.
+/// a save or a delete and do not expect a nodeMerge. I tried it anyway.
 /// The resulting pattern-matching and error-guarding was ugly.
-/// (Maybe especially because a Merge naturally consists of
+/// (Maybe especially because a NodeMerge naturally consists of
 /// two Saves and a Delete, neither of which it is reasonable
-/// to represent with a Merge.)
+/// to represent with a NodeMerge.)
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DefineNode {
   // PITFALL: Save(SaveNode) might smell funny, but consider that
@@ -55,16 +55,16 @@ pub struct DeleteNode {
 #[derive(Debug)]
 pub struct SavePlan {
   pub define_nodes       : Vec<DefineNode>,
-  pub merge_instructions : Vec<Merge>,
+  pub nodeMerge_instructions : Vec<NodeMerge>,
   pub source_moves       : Vec<SourceMove>,
 }
 
 /// When an 'acquiree' merges into an 'acquirer',
 /// we need two SaveNodes and a DeleteNode.
 #[derive(Debug, Clone)]
-pub struct Merge {
+pub struct NodeMerge {
   pub acquiree_text_preserver : SaveNode, // new node with acquiree's title and body
-  pub updated_acquirer        : SaveNode, // acquirer with acquiree's IDs, contents, and relationships merged in. (This is complex; see 'three_merged_nodecompletes'.)
+  pub updated_acquirer        : SaveNode, // acquirer with acquiree's IDs, contents, and relationships merged in. (This is complex; see 'three_nodeMerged_nodecompletes'.)
   pub acquiree_to_delete      : DeleteNode,
 }
 
@@ -216,7 +216,7 @@ impl From<DeleteNode> for DefineNode {
   }
 }
 
-impl Merge {
+impl NodeMerge {
   pub fn to_vec (
     &self
   ) -> Vec<DefineNode> {
@@ -238,11 +238,11 @@ impl Merge {
     &self . acquiree_to_delete . id
   }
 
-  /// Extracts the three targets from a Merge:
+  /// Extracts the three targets from a NodeMerge:
   /// - acquiree_text_preserver -> &NodeComplete
   /// - updated_acquirer -> &NodeComplete
   /// - acquiree_to_delete -> (&ID, &SourceName)
-  pub fn targets_from_merge (
+  pub fn targets_from_nodeMerge (
     &self
   ) -> (&NodeComplete, &NodeComplete, (&ID, &SourceName)) {
     ( &self . acquiree_text_preserver . 0,

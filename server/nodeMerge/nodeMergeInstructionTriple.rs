@@ -1,19 +1,16 @@
 use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
 use crate::dbs::typedb::search::find_related_nodes;
-use crate::from_text::viewnodes_to_instructions::SaveAuthority;
-use crate::from_text::viewnodes_to_instructions::to_naive_instructions::{
-  DefinenodeCandidateKind };
 use crate::dbs::node_lookup::nodeComplete_rustFIrst_by_id;
-use crate::types::save::{Merge, SaveNode, DeleteNode};
+use crate::from_text::local_instruction_collection::lower::nodeMerge_pairs;
+use crate::from_text::local_instruction_collection::traverse::collect_instructions_locally;
+use crate::from_text::local_instruction_collection::types::CollectedIntents;
+use crate::types::save::{NodeMerge, SaveNode, DeleteNode};
 use crate::types::misc::{MSV, SkgConfig, ID};
-use crate::types::viewnode::EditRequest;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, TrueNode};
-use crate::types::viewnode::Vognode;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::list::dedup_vector;
+use crate::types::tree::forest::ViewForest;
 use crate::util::setlike_vector_subtraction;
 
-use ego_tree::Tree;
 use std::collections::HashSet;
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
@@ -27,7 +24,7 @@ use typedb_driver::TypeDBDriver;
 /// acquiree is deleted; they must be re-saved so the save pipeline
 /// re-creates the edges (extra_id resolution then redirects them to
 /// the acquirer).
-pub async fn affected_neighbors_of_merge (
+pub async fn affected_neighbors_of_nodeMerge (
   db_name     : &str,
   driver      : &TypeDBDriver,
   acquiree_id : &ID,
@@ -49,22 +46,22 @@ pub async fn affected_neighbors_of_merge (
 /// — the acquiree_id stays in whatever vectors it's in, and extra_id
 /// resolution handles the redirection to acquirer at TypeDB
 /// relationship-creation time.
-pub async fn neighbor_savenodes_for_merges (
-  merges : &[Merge],
+pub async fn neighbor_savenodes_for_nodeMerges (
+  nodeMerges : &[NodeMerge],
   config : &SkgConfig,
   driver : &TypeDBDriver,
 ) -> Result < Vec<SaveNode>, Box<dyn Error> > {
-  if merges . is_empty () {
+  if nodeMerges . is_empty () {
     return Ok (Vec::new ()); }
-  let primary_pids : HashSet<ID> = merges . iter ()
+  let primary_pids : HashSet<ID> = nodeMerges . iter ()
     . flat_map ( |m| [
         m . acquirer_id () . clone (),
         m . acquiree_id () . clone () ] )
     . collect ();
   let mut neighbors : HashSet<ID> = HashSet::new ();
-  for merge in merges {
-    let for_this : HashSet<ID> = affected_neighbors_of_merge (
-      &config . db_name, driver, merge . acquiree_id ()
+  for nodeMerge in nodeMerges {
+    let for_this : HashSet<ID> = affected_neighbors_of_nodeMerge (
+      &config . db_name, driver, nodeMerge . acquiree_id ()
     ) . await ?;
     neighbors . extend (for_this); }
   let to_load : Vec<ID> =
@@ -77,59 +74,49 @@ pub async fn neighbor_savenodes_for_merges (
     save_nodes . push ( SaveNode (node) ); }
   Ok (save_nodes) }
 
-/// Supplanted by 'instructiontriples_from_merge_candidates'.
-/// It now exists only to avoid test churn.
-pub async fn instructiontriples_from_the_merges_in_a_viewforest(
-  viewforest: &Tree<ViewNode>,
-  config: &SkgConfig,
-  driver: &TypeDBDriver,
-) -> Result<Vec<Merge>,
-            Box<dyn Error>> {
-  let extraction_forest : SaveAuthority =
-    SaveAuthority::from_viewforest (viewforest)
-    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  instructiontriples_from_merge_candidates (
-    &extraction_forest, config, driver ) . await }
-
-/// PURPOSE: For each ViewNode with a merge instruction, creates a Merge:
+/// PURPOSE: For each nodeMerge request in the viewforest, this
+/// creates a NodeMerge:
 /// - acquiree_text_preserver: new node containing the acquiree's title and body
 /// - updated_acquirer: acquirer node with modified contents and extra IDs
 /// - acquiree_to_delete: acquiree marked for deletion
-pub(crate) async fn instructiontriples_from_merge_candidates (
-  extraction_forest : &SaveAuthority,
-  config            : &SkgConfig,
-  driver            : &TypeDBDriver,
-) -> Result<Vec<Merge>, Box<dyn Error>> {
-  let mut merges : Vec<Merge> =
-    Vec::new();
-  for candidate in extraction_forest . candidates () {
-    if ! matches!( candidate . kind,
-                   DefinenodeCandidateKind::Ordinary)
-    { continue; }
-    let node_ref =
-      extraction_forest . role_viewforest () . get (candidate . treeid)
-      . ok_or ("merge candidate not found") ?;
-    if let Some (merge) =
-      optmerge_from_viewnode (
-        &node_ref . value() . viewnode, config, driver ) . await?
-    { merges . push (merge); }}
+/// It is a convenience wrapper over local instruction collection
+/// plus 'nodeMerge_instructions_from_pairs'; the production save
+/// pipeline collects once and calls the pair form directly.
+#[allow(non_snake_case)]
+pub async fn nodeMerge_instructions_from_viewforest (
+  viewforest : &ViewForest,
+  config     : &SkgConfig,
+  driver     : &TypeDBDriver,
+) -> Result<Vec<NodeMerge>, Box<dyn Error>> {
+  let collected : CollectedIntents =
+    collect_instructions_locally (viewforest)
+    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
+  nodeMerge_instructions_from_pairs (
+    &nodeMerge_pairs (&collected), config, driver ) . await }
+
+/// This builds the NodeMerge triples for a batch of (acquirer,
+/// acquiree) pairs, as collected from the buffer by local
+/// instruction collection ('nodeMerge_pairs').
+#[allow(non_snake_case)]
+pub async fn nodeMerge_instructions_from_pairs (
+  pairs  : &[(ID, ID)],
+  config : &SkgConfig,
+  driver : &TypeDBDriver,
+) -> Result<Vec<NodeMerge>, Box<dyn Error>> {
+  let mut merges : Vec<NodeMerge> =
+    Vec::with_capacity (pairs . len());
+  for (acquirer_id, acquiree_id) in pairs {
+    merges . push (
+      nodeMerge_from_acquirer_and_acquiree (
+        acquirer_id, acquiree_id, config, driver ) . await ? ); }
   Ok (merges) }
 
-/// Returns Some(Merge) if the viewnode has a merge instruction,
-/// None otherwise.
-async fn optmerge_from_viewnode (
-  node   : &ViewNode,
-  config : &SkgConfig,
-  driver : &TypeDBDriver
-) -> Result<Option<Merge>,
-            Box<dyn Error>> {
-  let t : &TrueNode = match &node . kind {
-    ViewNodeKind::Vognode (Vognode::Active (t)) => t,
-    _                                           => return Ok (None) };
-  let acquiree_id = match t . edit_request () {
-    Some(EditRequest::Merge (id)) => id,
-    _ => return Ok (None) };
-  let acquirer_id : &ID = &t . id;
+async fn nodeMerge_from_acquirer_and_acquiree (
+  acquirer_id : &ID,
+  acquiree_id : &ID,
+  config      : &SkgConfig,
+  driver      : &TypeDBDriver,
+) -> Result<NodeMerge, Box<dyn Error>> {
   let acquirer_from_disk : NodeComplete =
     nodeComplete_rustFIrst_by_id (
       config, driver, acquirer_id ) . await?;
@@ -139,10 +126,10 @@ async fn optmerge_from_viewnode (
   let acquiree_text_preserver : NodeComplete =
     create_acquiree_text_preserver (&acquiree_from_disk);
   let updated_acquirer : NodeComplete =
-    three_merged_nodecompletes( &acquirer_from_disk,
+    three_nodeMerged_nodecompletes( &acquirer_from_disk,
                            &acquiree_from_disk,
                            &acquiree_text_preserver)?;
-  Ok(Some(Merge {
+  Ok(NodeMerge {
     acquiree_text_preserver :
       SaveNode (acquiree_text_preserver),
     updated_acquirer :
@@ -150,7 +137,7 @@ async fn optmerge_from_viewnode (
     acquiree_to_delete :
       DeleteNode {
         id     : acquiree_id . clone(),
-        source : acquiree_from_disk . source . clone() }} )) }
+        source : acquiree_from_disk . source . clone() }} ) }
 
 /// Computes the updated acquirer node with all fields properly merged.
 /// Returns a new NodeComplete with:
@@ -159,7 +146,7 @@ async fn optmerge_from_viewnode (
 ///   - 'Novel' = not among the acquirer's contents
 /// - Combined relationship fields (subscribes_to, overrides_view_of)
 /// - Filtered hides_from_its_subscriptions (can't hide your own content)
-fn three_merged_nodecompletes(
+fn three_nodeMerged_nodecompletes(
   acquirer_from_disk: &NodeComplete,
   acquiree_from_disk: &NodeComplete,
   acquiree_text_preserver: &NodeComplete,

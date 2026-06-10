@@ -120,7 +120,7 @@ filter_unchanged_foreign_saves(instructions) -> instructions
 #+end_src
 
 That would also make the relationship with
-=filter_wouldbe_noop_definenodes= clearer. Today no-op filtering
+=filter_wouldbe_noop_defineNodes= clearer. Today no-op filtering
 happens once during disk-supplemented define-node construction and
 again, specifically for unchanged foreign nodes, during foreign
 validation.
@@ -392,7 +392,7 @@ function fragmentation.
 
 ** Moving all no-op filtering to one global place immediately
 
-It is tempting to unify =filter_wouldbe_noop_definenodes= and the
+It is tempting to unify =filter_wouldbe_noop_defineNodes= and the
 unchanged-foreign filtering. That might be right eventually, but the
 foreign validator also needs disk reads to distinguish harmless
 unchanged foreign views from forbidden foreign edits. Split

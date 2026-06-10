@@ -1,6 +1,0 @@
-pid: 1
-title: title from disk
-body: body from disk
-contains:
-- 2
-- 3
