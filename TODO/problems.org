@@ -563,9 +563,11 @@
    large buffers this is a meaningful allocation on the save critical
    path; profiling-save.org may already reflect it.
 
-** 'contains' is the one collected list that is not deduplicated
-   'collect_aliases...', 'collect_subscribees', and
-   'collect_members_from_child_relation_col' all apply 'dedup_vector';
-   'collect_contents_to_save_from_children' does not. Repeated content
-   under one parent may be legal by design (repeated nodes exist), but
-   the asymmetry is undocumented at the collection site.
+** 'reconcile_same_id_instructions.rs' is dead in production
+   'server/from_text/viewnodes_to_instructions/reconcile_same_id_instructions.rs'
+   (DefineNode-level same-ID reconciliation) is referenced only by its
+   tests and by a doc comment in 'viewnodes_to_instructions.rs' --
+   and that comment is misleading, because the reconciliation the
+   pipeline actually performs is 'reconcile_nodeIntents' (NodeIntent
+   level) in 'to_naive_instructions.rs'. Slated for deletion in
+   TODO/local-instruction-collection/3_plan.org.

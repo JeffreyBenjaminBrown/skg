@@ -90,7 +90,7 @@ OverriddenCol too. But the spec should state explicitly that
 SubscribeeCol emits the 'subscribes_to' field into its parent's map
 entry, exactly as AliasCol emits 'aliases' and OverriddenCol emits
 'overrides_view_of'. Do you agree?
-*** TODO right!
+*** DONE right!
 ** the full inventory of instruction-generating positions
 You asked whether AliasCol and OverriddenCol are the only
 instruction-generating collections. Per the current code the full
@@ -138,7 +138,7 @@ spec must define which parents are eligible (a col under an
 indefinitive or subscribee-as-such or read-only-positioned vognode
 must not emit; today those cols are simply never consulted because
 field collection happens only at 'Ordinary' candidates).
-*** TODO right, the second
+*** DONE right, the second
 * decisions remaining
 ** where does the procedure start and end?
 QUESTION: Does 'local BFS instruction collection' replace only the
@@ -154,7 +154,7 @@ procedure would feed 'apply_hiderels_from_intents' nearly unchanged.
 Trying to fold disk supplementation into the traversal would
 reintroduce async into a procedure that is otherwise pure, and purity
 here is worth a lot for testing.
-*** TODO
+*** DONE
 - apply_hiderels_from_intents feels like it should be rewritten
 to be part of local BFS instruction collection.
 
@@ -163,6 +163,28 @@ to be part of local BFS instruction collection.
 - When you say 'noop fitler' do you mean the bit that discards
 save instructions that would do nothing?
 If so, yes, that should be downstream too.
+**** DONE (Claude) on rewriting 'apply_hiderels_from_intents'
+Agreed it should be rewritten; one constraint to flag. The
+*emission* half is already inside collection in this design:
+visiting a definitive subscribee-as-such emits a
+'SubscribeeVisibility' intent into the subscriber's map entry. But
+the *resolution* half -- turning that signal into hides/unhides --
+cannot run during the traversal, because it needs (a) disk (the
+subscribee's contains, the subscriber's hides) and (b) the
+subscriber's own post-save contains, i.e. a *finished* entry
+elsewhere in the same map. Running it mid-traversal would make
+collection async and visit-order-dependent, undoing the main
+simplification.
+So I propose: delete 'apply_hiderels_from_intents'; write a new
+resolution stage that consumes the 'SubscribeeVisibility' intents
+from the completed map. New code, new types, same module family --
+"part of local instruction collection" in that sense. OK?
+***** TODO agreed
+**** DONE (Claude) yes, that is what I meant by noop filter
+'filter_wouldbe_noop_definenodes', which discards Save instructions
+identical to the pre-save in-Rust graph. It stays downstream, and
+must in fact stay *after* disk supplementation, since unspecified
+fields have to be restored before the comparison makes sense.
 ** what is an "instruction"? (granularity)
 The vision says the map's values are *sets* of instructions. Today's
 'NodeIntent' is a monolith: one struct carrying every field. Sets of
@@ -195,7 +217,7 @@ monoliths don't merge well. I see three options:
 
 QUESTION: which granularity do you want? Everything below assumes
 per-field.
-*** TODO yes! per-field
+*** DONE yes! per-field
 ** merge/conflict semantics inside the map
 If values are sets of per-field instructions, the rules I propose:
 
@@ -220,7 +242,7 @@ If values are sets of per-field instructions, the rules I propose:
   ('apply_hiderel_delta' ignores Delete intents).
 
 QUESTION: any of these you'd decide differently?
-*** TODO
+*** ONGOING
 Agree on everything except:
 
 - "same-variant instructions with different payloads for one ID"
@@ -231,9 +253,78 @@ Agree on everything except:
 
   Oh wait, maybe you covered merging the 'hides' change instructions
   from multiple subscribees under 'SubscribeeVisibility'.
-*** TODO
+**** ONGOING (Claude) yes, that case was covered
+'SubscribeeVisibility' is deliberately the one same-variant exception
+that combines freely: a subscriber's map entry may hold several, one
+per subscribee branch. They never conflict at insertion time, because
+each names a different subscribee. Genuinely contradictory opinions
+about one (subscriber, content) pair are caught downstream by
+'validate_no_overlapping_subscribee_hiderel_conflicts', which needs
+disk contains lists and so cannot run during collection.
+For the Set* variants, a payload conflict can only arise from two
+definitive instances of one ID, which upstream validation already
+forbids -- so keeping it an error costs nothing and makes collection
+catch upstream regressions instead of silently picking a winner.
+***** TODO would it be awkward
+to use an enum that distinguishes 'combineable' instructions from
+'exclusive' instructions? So far this would be the only combineable one,
+but others might come along -- and even if they don't,
+I like to keep as much logic as possible in types rather than functions,
+because they're easier to follow.
+****** TODO (Claude) not awkward, and there is an even more typed encoding
+Two ways to put combineability in types:
+
+- wrapper enum :: 'enum Intent { Exclusive (ExclusiveIntent),
+  Combineable (CombineableIntent) }', map value =
+  'Vec<Intent>'. Insertion matches the wrapper: Exclusive errors if
+  an intent of the same variant is already present (a runtime
+  discriminant comparison); Combineable just pushes.
+
+- slot struct (my recommendation) :: the map *value* is a struct
+  with one 'Option' field per exclusive intent kind and one 'Vec'
+  field per combineable kind. Then "at most one of each exclusive
+  kind" is not a rule a function checks against a Vec; it is the
+  shape of the type. Inserting into an occupied slot is the only
+  error case, and combineability is literally visible as Vec vs
+  Option. It also echoes the MSV idiom: an empty slot lowers to
+  'MSV::Unspecified'.
+
+The slot struct leaves exactly one cross-slot rule that the type
+cannot express: Delete excludes the Set* slots. (It could be typed
+too -- an enum over { Delete, Edit (slots) } at the top of the value
+-- but insertion across that boundary still needs a check, so the
+enum buys little; the plan pins one choice.) Per-position *emission*
+stays a small enum either way: a visit returns a list of
+(target ID, intent) pairs, and insertion into the accumulator
+enforces the slot discipline. Details in 3_plan.org; veto there if
+the slot struct is not what you wanted.
+*** ONGOING language
 We need to be careful to keep a clear distinction
 between merging nodes and merging instructions.
+**** ONGOING (Claude) proposed vocabulary
+Reserve 'merge' exclusively for node-merge (the 'EditRequest::Merge'
+/ 'Merge' triple machinery). For putting instructions into the map,
+the plan and the code will say 'combine' (e.g. a function named
+something like 'combine_instruction_into_map'), never 'merge'. I will
+state this in the plan's terminology section.
+***** TODO no, that's dangerous
+That effectively asks the user to remember that 'combine' means
+'combine instructions' and 'merge' means 'merge nodes'.
+Just say 'merge nodes' or 'merge instructions'.
+And where we are talking about a noun phrase, 'nodeMerge' or 'instructionMerge'.
+(This means updating a lot of function names. That's fine.
+I care more about readable code than a readable diff.)
+****** TODO (Claude) adopted; one scope question
+3_plan.org carries a rename inventory ('Merge' -> 'NodeMerge',
+'merge_instructions' -> 'nodeMerge_instructions',
+'EditRequest::Merge' -> 'EditRequest::NodeMerge', the 'merge/'
+module names, etc.). The scope question: I plan to rename Rust
+identifiers only, leaving client-facing wire/metadata strings
+unchanged -- '(merge ID)' in headline metadata, the "merge" the
+user types. In user-land only nodes can merge, so the short word is
+unambiguous there, and renaming it would touch the elisp client and
+saved-buffer syntax. Flag in the plan if you want the wire strings
+renamed too.
 ** ordering
 A bare 'HashMap<ID, HashSet<Instruction>>' loses buffer order.
 Today's 'SameIdReconciledNodeIntents' deliberately keeps first-
@@ -245,7 +336,7 @@ debugging worse.
 Recommendation: keep what 'SameIdReconciledNodeIntents' already does
 -- a map plus a first-appearance order vector. (Or an IndexMap-style
 type, but the two-field struct is already idiomatic here.)
-*** TODO sure
+*** DONE sure
 ** BFS, preorder, and what must flow down
 The vision says "a simple BFS preorder procedure". BFS and preorder
 are different traversals; preorder normally means DFS. Since
@@ -283,11 +374,32 @@ The context that must flow down (this is what *replaces*
 That's a three-or-four-variant context enum passed as a function
 argument. No tree cloning, no upward walks, no roles computed that
 nobody reads.
-*** TODO I would add
+*** ONGOING I would add
 "the nearest vognode ancestor's ID" is not enough;
 we need to be sure the path to that ancestor makes sense.
 Somewhere in the code there is a table describing permissible ancestries,
 and there already exist functions to check parts of a viewtree against it.
+**** ONGOING (Claude) found them; here is how I propose to use them
+The table is 'required_ancestry' in 'server/update_buffer/ancestry.rs'
+(checker: 'col_is_generalized_orphan'), from the
+propagate-death-leafward work -- but that lives on the *update* path.
+On the *save* path, the corresponding checks already run before
+extraction: 'validate_local_structure' in
+'server/from_text/buffer_to_viewnodes/local.rs' (per-node shape
+checks -- alias under AliasCol, col parent kinds, etc.), called by
+'find_buffer_errors_for_saving'.
+
+Proposal: collection does not re-verify ancestries. It assumes
+'find_buffer_errors_for_saving' passed (stated in its header
+comment, as agreed under "losing the upstream guarantees silently"),
+and the downward context carries the only path facts it needs
+(eligible-writer parent; enclosing subscriber). The shape checks we
+agreed to move out of the collectors land in
+'validate_local_structure', where their siblings already live. If
+you want belt and suspenders, collection can also debug_assert the
+ancestry of any col it emits from.
+***** TODO yes, that's good
+and no suspenders needed
 ** the emission/recursion matrix
 Drawn from 'collect_savenode_candidates' and the collectors. Each row
 says what the current code does; please confirm or amend each "keep?"
@@ -333,18 +445,38 @@ Three rows deserve attention:
 - Phantom::Diff: no recursion today, so a definitive node nested
   under a diff phantom is also silently ignored. Probably correct
   (diff mode is read-only-ish) but worth a deliberate yes/no.
-*** TODO Active vognode under read-only col
+*** DONE Active vognode under read-only col
 It emits if it is definitive, for the gnode it represents,
 just like any other vognode.
 But it emits nothing at ancestor that owns the Col that owns it.
-*** TODO Inactive vognode
+**** DONE (Claude) agreed; noting it is a behavior change
+Today such a subtree is invisible to extraction entirely, so its
+definitive members' self-edits are silently discarded. The new rule
+(emit for self, never for the col's owner) goes on the
+expected-differences allowlist for the differential tests.
+*** DONE Inactive vognode
 Do recurse into it.
 It never spawned children, so none of its children should have ParentIs=Affected.
 But thee user might have put some definitive children there to recurse into.
-*** TODO actually just recurse into everything
+*** DONE actually just recurse into everything
 This is for the same reason -- the user can attach independent nodes anywhere.
-*** TODO OverriddenCol members
+**** DONE (Claude) agreed -- recursion becomes unconditional
+This kills the matrix's recurse column entirely; only emission stays
+conditional on (kind, context), which is a real simplification.
+One consequence to confirm: taking "everything" literally includes
+'Phantom::Diff' and 'Phantom::Deleted' subtrees, so a definitive
+vognode found beneath a phantom now emits for its own gnode (it
+still cannot affect the phantom). My default is the literal rule;
+flag it if diff mode deserves an exception.
+*** DONE OverriddenCol members
 The Col that owns them does emit override instructions for its parent, right?
+**** DONE (Claude) yes
+'collect_members_from_child_relation_col (.., RoleCol::Overridden, ..)'
+turns the col's membership into the parent's 'overrides_view_of',
+with the usual absent-vs-empty MSV semantics. That is preserved. The
+members themselves were dead ends only as instruction *owners*; with
+recurse-into-everything, a definitive member now also emits for its
+own gnode.
 ** rules under a subscribee-as-such
 The locality rule needs care here, because a subscribee-as-such is a
 definitive Active vognode whose *own* fields must mostly not be
@@ -365,7 +497,7 @@ written:
   Worth an explicit test.
 - ordinary definitive *children* of a subscribee-as-such do emit
   their own instructions today (their role is Ordinary). Keep.
-*** TODO yes to all, minus one correction
+*** ONGOING yes to all, minus one correction
 You wrote
 ```
 a subscribee-as-such is a
@@ -373,6 +505,20 @@ definitive Active vognode
 ```
 but it's not necessarily definitive. I hope. I believe when those are created,
 they are created indefinitive.
+**** ONGOING (Claude) right -- correction accepted, with one refinement
+They are indeed created indefinitive (the local-view-update vision
+says of SubscribeeCol: "children it creates are indefinitive").
+The refinement: only a *definitive* subscribee-as-such emits the
+visibility signal. That is today's behavior too --
+'collect_savenode_candidates' skips indefinitive ones -- so an
+indefinitive subscribee-as-such emits nothing, and deleting children
+beneath it changes no hide relationships. My matrix row described
+only the emitting case; the plan will carry both rows
+(definitive: emits the signal; indefinitive: silent; both recurse).
+I assume keeping the definitiveness requirement is what you want,
+since it parallels how an indefinitive ordinary vognode ignores
+edits to itself and its collections. Confirm?
+***** TODO agreed
 ** should Merge join the same map?
 Today merges are extracted by a second traversal over the same
 candidates ('instructiontriples_from_merge_candidates'). Your
@@ -389,7 +535,7 @@ merge extraction and the subscribee title/body validation), which is
 when the old machinery actually disappears. My vote: in scope, since
 otherwise classify+candidates must survive in parallel just for
 merges, and the simplification mostly fails to materialize.
-*** TODO love it, yes
+*** DONE love it, yes
 ** what happens to the existing collector-embedded validations
 The collectors currently throw errors like "AliasCol has non-Alias
 child" and "SubscribeeCol has unexpected non-vognode child". The
@@ -401,7 +547,7 @@ erroring on shape). I weakly prefer moving them, since
 stated posture, and a total collection function is easier to reason
 about. But it does mean the same shapes get pattern-matched in two
 places. Your call.
-*** TODO yes, let's separate them
+*** DONE yes, let's separate them
 The performance cost seems minimal, and despite the redundant shape-checking,
 the cognitive burden seems lower that way.
 * dangers
@@ -424,8 +570,82 @@ hard-won policy:
 Recommendation: the new code should *call these same predicates*, not
 re-derive them. Move them somewhere both old and new code can reach
 during the transition, and port the tests that pin them down.
-*** TODO also make sure the tests for those
+*** DONE also make sure the tests for those
 are complete -- that they test enough to pin the behavior.
+**** DONE (Claude) will do
+The plan will include an audit step: for each predicate, enumerate
+the conditions it encodes and check a test exists per condition,
+adding any missing ones before the rewrite starts.
+*** ONGOING (Claude) one question above went unanswered: contains dedup
+From the parent section: 'dedup_vector' is applied to aliases,
+subscribees, and overriddens, but not to contains. Is that
+deliberate? My default for the plan: preserve the asymmetry exactly
+(repeated content under one parent stays legal, since repeated nodes
+are a supported if dangerous feature), and document it at the
+predicate. Say the word if you'd rather dedup contains too.
+**** ONGOING I think that's a model violation caught at validation.
+If I'm right, then wherever we would have deduped,
+let's insert a comment explaining why it's not necessary.
+(If I'm wrong let me know how it actually works!)
+***** ONGOING (Claude) verified: right for contains and the relation cols; one gap: aliases
+How it actually works, per
+'server/from_text/buffer_to_viewnodes/local.rs':
+
+- contains: 'nonignored_children_have_distinct_ids' runs for every
+  TrueNode and Phantom (via 'validate_gnode_identity_and_structure')
+  and rejects two Affected content children sharing an ID. It skips
+  parentIs!=Affected children and diff-phantom members -- exactly
+  the children collection also skips -- so collection sees a
+  duplicate-free list. You are right; the missing 'dedup_vector' was
+  never needed, and the new code gets the explanatory comment.
+- SubscribeeCol, OverriddenCol (and the read-only cols):
+  'relation_col_children_have_distinct_ids' runs for each via its
+  validator, so their 'dedup_vector' calls are redundant today.
+  Comment instead of dedup, as you said.
+- AliasCol: 'validate_aliascol' checks child kind and
+  col-uniqueness-among-siblings but NOT distinctness of alias texts.
+  So today two identical alias lines pass validation and
+  'dedup_vector' silently collapses them. To make the no-dedup rule
+  uniform, the plan adds an alias-text distinctness check to
+  'validate_aliascol', making duplicate aliases a validation error
+  like duplicate subscribees. Note this is a small user-visible
+  behavior change: duplicate alias lines currently save fine
+  (silently collapsed); they would now bounce the save. Veto in the
+  plan if you would rather keep the silent collapse for aliases.
+****** TODO disagree
+Aliases should be silently dedup'd, because aliases are unordered.
+I don't want to harsh the user's vibe
+by complaining that they repeated themselves.
+
+Similarly, any other defining col (I think only OverriddenCol qualifies)
+should have repeats silently dedup'd, rather than squawking.
+******* TODO (Claude) adopted; note this removes two existing checks
+The plan now says: defining cols silently dedup, never squawk.
+Three things to know about what that means in the code:
+
+- There are three defining cols, not two: AliasCol, OverriddenCol,
+  and SubscribeeCol ('subscribes_to' is writeable through it). You
+  named only OverriddenCol; I have included SubscribeeCol as well.
+- For SubscribeeCol and OverriddenCol this is a behavior *change*,
+  not a preservation: both currently bounce the save on duplicate
+  members ('relation_col_children_have_distinct_ids', called from
+  'validate_subscribeecol' and 'validate_relation_col'). Honoring
+  the vibe principle means deleting those calls for the defining
+  cols. Only aliases keep exactly today's behavior (silent
+  collapse; no validator existed).
+- Dedup happens at the col's emission, via the existing
+  'dedup_vector', which preserves first-occurrence order -- so
+  SubscribeeCol's display order survives deduplication.
+
+Unchanged, deliberately: duplicate *contains* members remain a
+validation error ('nonignored_children_have_distinct_ids'), per
+your earlier model-violation answer. Also unchanged: the six
+read-only cols keep their duplicate-member checks. Their members
+are inert on save, so those checks have no save semantics; but by
+the same vibe principle a user who duplicates a line in a read-only
+col gets their save bounced today. Quieting them too would be
+consistent; I left them alone as out of scope. Flag if you want
+them quieted.
 ** equivalence testing before deleting the old path
 'extract_nonmergeSavePlan' (the legacy wrapper) and the old pipeline
 already exist and are tested. The new procedure can be built
@@ -436,11 +656,16 @@ old path. This is cheap insurance against the predicate-drift risk
 above, and the vision's own claim ("in principle it could be a
 simple BFS preorder procedure") becomes a checked theorem instead of
 a hope.
-*** TODO They actually might not produce the same thing
+*** DONE They actually might not produce the same thing
 because there were, if your analysis was correct,
 places we did not recurse during save collection that this new plan will do.
 But we can still make similar tests, and verify that the two procedures
 only differ in the ways that they should.
+**** DONE (Claude) agreed
+The differential test carries an explicit allowlist of expected
+differences -- exactly the new-recursion-surface emissions (members
+of read-only cols, descendants of inactive vognodes and phantoms)
+-- and any difference outside the allowlist fails the test.
 ** mixed map values: field values vs unresolved signals
 The map will contain both real field assignments and
 'SubscribeeVisibility' signals that *cannot* be resolved during
@@ -456,7 +681,7 @@ signals. If you'd rather keep the map values uniform, the
 alternative is returning the signals beside the map (what
 'SaveExtraction' does today); slightly less elegant, slightly more
 typed.
-*** TODO no, I agree
+*** DONE no, I agree
 The types should be honest.
 More types are in general better than more procedures.
 (I mean there's always a tradeoff but
@@ -471,7 +696,7 @@ should state its assumptions in its header comment the way
 "just works" can mask upstream regressions (two definitive instances
 would merge instead of erroring, unless the same-variant-conflict
 rule above is kept as an error).
-*** TODO absolutely
+*** DONE absolutely, it should
 * a concrete sketch, to argue about
 Pure function, sync, no disk. Names are provisional.
 
