@@ -195,7 +195,7 @@ fn handle_emacs (
             handle_source_set_request (
               &mut stream,
               &request_header,
-              &env . config,
+              &env,
               &mut views_state,
               &mut active_source_set,
               &enrichment_slot,

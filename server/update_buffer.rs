@@ -1,4 +1,5 @@
 pub mod ancestry;
+pub mod source_switch;
 pub mod warnings;
 pub mod complete;
 pub mod reconcile;
@@ -144,7 +145,8 @@ pub async fn update_views_after_save (
       rerender_view ( // saved view first; collateral ones later
         &mut saved_view_mut,
         &mut context,
-        Some (&mut repair_warnings) ) . await } ?;
+        Some (&mut repair_warnings),
+        false ) . await } ?;
   context . warnings . extend (
     // Repairs the completion pass made to read-only PartnerCols in
     // the saved view, batched per (col, owner).
@@ -218,7 +220,8 @@ async fn rerender_collateral_view (
       rerender_view (
         &mut viewforest,
         context,
-        None // Collateral views repair silently.
+        None, // Collateral views repair silently.
+        false
       ) . await . map_err (
         |e| format!( "Collateral view {}: {}",
                       uri . repr_in_client (), e)) ? };
@@ -329,6 +332,7 @@ pub async fn rerender_view (
   viewforest    : &mut ViewForest,
   context       : &mut RerenderAfterSaveContext<'_>,
   warning_sink  : Option<&mut Vec<CompletionWarning>>, // Some only for the view the user just saved.
+  create_partnerCols : bool, // false post-save (cols round-trip from the buffer); true for the source-switch rerender, where pruning removed them and the new set decides which return.
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
   { tracing::debug!("rerender_view: starting");

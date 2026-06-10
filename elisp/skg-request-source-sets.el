@@ -3,6 +3,8 @@
 (require 'skg-buffer)
 (require 'skg-config)
 (require 'skg-length-prefix)
+(require 'skg-lock-buffers)
+(require 'skg-request-rerender-all-views) ; for skg--register-rerender-stream-handlers
 (require 'skg-state)
 
 (defun skg-list-source-sets ()
@@ -51,10 +53,12 @@
              "\n"))))
 
 (defun skg-set-active-source-set (name)
-  "Set the active source-set for this TCP connection to NAME."
+  "Set the active source-set for this TCP connection to NAME.
+Open SKG buffers are kept and re-rendered in place: the server
+replies with the active-source-set confirmation followed by the
+rerender stream (rerender-lock, rerender-view*, rerender-done)."
   (interactive (list (skg--prompt-for-source-set)))
-  (when (yes-or-no-p "Close all SKG buffers before switching source-set? ")
-    (skg-close-all-skg-buffers)
+  (when (yes-or-no-p "Switch source-set and re-render all SKG buffers? ")
     (let ((tcp-proc (skg-tcp-connect-to-rust)))
       (skg-register-response-handler
        'active-source-set
@@ -66,6 +70,9 @@
            (error
             (message "skg-set-active-source-set: %S" err))))
        t)
+      (skg--begin-stream "rerender")
+      (skg--lock-all-skg-buffers)
+      (skg--register-rerender-stream-handlers)
       (skg-lp-reset)
       (process-send-string
        tcp-proc

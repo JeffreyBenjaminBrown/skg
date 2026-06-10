@@ -19,17 +19,23 @@ pub fn handle_rerender_all_views_request (
   active_source_set : &ActiveSourceSet,
 ) {
   stream_rerender_views (
-    stream, env, views_state, Some (active_source_set)); }
+    stream, env, views_state, Some (active_source_set),
+    None, false); }
 
 /// Stream re-rendered views to Emacs.
 /// Sends: rerender-lock → rerender-view* → rerender-done.
-/// Shared by 'handle_rerender_all_views_request' and (in Change 3)
-/// 'handle_git_diff_toggle_and_rerender'.
+/// Shared by 'handle_rerender_all_views_request',
+/// 'handle_git_diff_toggle_and_rerender', and the source-set switch
+/// ('set_active_source_set'), which passes a per-view prepass (the
+/// convert-and-prune step) and asks for PartnerCol re-creation
+/// (TODO/full-schema/9-2_source-set-safety.org).
 pub fn stream_rerender_views (
   stream     : &mut TcpStream,
   env        : &SkgEnv,
   views_state : &mut ViewsState,
   active_source_set : Option<&ActiveSourceSet>,
+  prepass    : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
+  create_partnerCols : bool,
 ) {
   let uris : Vec<ViewUri> =
     views_state . open_views . views . keys () . cloned () . collect ();
@@ -55,6 +61,12 @@ pub fn stream_rerender_views (
             "View {}: no viewforest found",
             uri . repr_in_client () ));
           continue; } };
+    if let Some (prepass) = prepass {
+      if let Err (e) = prepass (&mut viewforest) {
+        context . errors . push ( format! (
+          "View {}: {}",
+          uri . repr_in_client (), e ));
+        continue; }}
     match block_on ( async {
       let _span : tracing::span::EnteredSpan =
         tracing::info_span! (
@@ -63,7 +75,8 @@ pub fn stream_rerender_views (
       rerender_view (
         &mut viewforest,
         &mut context,
-        None // rerender-all repairs silently.
+        None, // streamed rerenders repair silently.
+        create_partnerCols
       ) . await } )
     { Ok (text) => {
         views_state . open_views . update_view (&uri, viewforest);
@@ -103,7 +116,8 @@ pub fn handle_git_diff_toggle_and_rerender (
     stream,
     & tag_text_response ( TcpToClient::GitDiffMode, &msg ));
   stream_rerender_views (
-    stream, env, views_state, Some (active_source_set)); }
+    stream, env, views_state, Some (active_source_set),
+    None, false); }
 
 /// Build the human-readable message for a diff-mode toggle,
 /// including warnings for sources not tracked in git.

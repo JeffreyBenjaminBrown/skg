@@ -136,55 +136,73 @@ fn config_rejects_reserved_all_source_and_source_set_names (
 }
 
 #[test]
-fn source_set_switch_closes_views_and_cancels_stale_search_enrichment (
+fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
 ) -> Result<(), Box<dyn Error>> {
-  let config =
-    load_config ("tests/source_sets/fixtures/skgconfig.toml")?;
-  let mut active : ActiveSourceSet =
-    ActiveSourceSet::named (
-      &config,
-      SourceSetName::from ("public"))?;
-  let mut views_state : ViewsState =
-    ViewsState {
-      diff_mode_enabled : false,
-      open_views        : OpenViews::new (), };
-  views_state . open_views . views . insert (
-    ViewUri::SearchView ("shared ranking term" . to_string ()),
-    ViewState {
-      viewforest : Tree::new (viewforest_root_viewnode ()) . into (),
-      pids       : HashSet::from ([ID::from ("active-search-hit")]), });
-  let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
-    Arc::new (Mutex::new (Some (SearchEnrichmentPayload {
-      terms          : "shared ranking term" . to_string (),
-      search_results : vec![ID::from ("active-search-hit")],
-      ancestry_by_id : HashMap::new (),
-      graphnodestats : AllGraphNodeStats::empty (), })));
-  let search_cancelled : Arc<AtomicBool> =
-    Arc::new (AtomicBool::new (false));
-  let (mut server_stream, _client_stream) =
-    connected_tcp_stream_pair ()?;
-  handle_source_set_request (
-    &mut server_stream,
-    "((request . \"set active source set\") (name . \"all\"))",
-    &config,
-    &mut views_state,
-    &mut active,
-    &enrichment_slot,
-    &search_cancelled);
-  assert_eq! (
-    active . name,
-    SourceSetName::from ("all"),
-    "source-set switch should update the active set" );
-  assert! (
-    views_state . open_views . views . is_empty (),
-    "source-set switch should close registered views" );
-  assert! (
-    enrichment_slot . lock () . unwrap () . is_none (),
-    "source-set switch should drop stale search enrichment payloads" );
-  assert! (
-    search_cancelled . load (Ordering::SeqCst),
-    "source-set switch should cancel in-flight search enrichment" );
-  Ok (( )) }
+  // TODO/full-schema/9-2_source-set-safety.org: a switch RE-RENDERS
+  // open views in place instead of closing them.
+  run_with_source_set_test_db (
+    "skg-test-source-sets-switch-rerenders",
+    "tests/source_sets/fixtures/skgconfig.toml",
+    "/tmp/tantivy-test-source-sets-switch-rerenders",
+    |config, driver, tantivy| Box::pin ( async move {
+      let graph : skg::dbs::in_rust_graph::InRustGraphHandle =
+        skg::test_utils::graph_handle_from_config (config) ?;
+      let env : skg::types::env::SkgEnv =
+        skg::test_utils::skg_env_from_parts (
+          config, std::sync::Arc::clone (driver), tantivy, &graph );
+      let mut active : ActiveSourceSet =
+        ActiveSourceSet::named (
+          config,
+          SourceSetName::from ("public"))?;
+      let mut views_state : ViewsState =
+        ViewsState {
+          diff_mode_enabled : false,
+          open_views        : OpenViews::new (), };
+      let uri : ViewUri =
+        ViewUri::SearchView ("shared ranking term" . to_string ());
+      views_state . open_views . views . insert (
+        uri . clone (),
+        ViewState {
+          viewforest : Tree::new (viewforest_root_viewnode ()) . into (),
+          pids       : HashSet::from ([ID::from ("active-search-hit")]), });
+      let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
+        Arc::new (Mutex::new (Some (SearchEnrichmentPayload {
+          terms          : "shared ranking term" . to_string (),
+          search_results : vec![ID::from ("active-search-hit")],
+          ancestry_by_id : HashMap::new (),
+          graphnodestats : AllGraphNodeStats::empty (), })));
+      let search_cancelled : Arc<AtomicBool> =
+        Arc::new (AtomicBool::new (false));
+      let (mut server_stream, _client_stream) =
+        connected_tcp_stream_pair ()?;
+      std::thread::scope ( |scope| {
+        // The handler is sync and calls block_on internally (as the
+        // real connection thread does); it cannot run inside this
+        // test's executor, so give it its own thread.
+        scope . spawn ( || {
+          handle_source_set_request (
+            &mut server_stream,
+            "((request . \"set active source set\") (name . \"all\"))",
+            &env,
+            &mut views_state,
+            &mut active,
+            &enrichment_slot,
+            &search_cancelled); } ); } );
+      assert_eq! (
+        active . name,
+        SourceSetName::from ("all"),
+        "source-set switch should update the active set" );
+      assert! (
+        views_state . open_views . views . contains_key (&uri),
+        "source-set switch should KEEP registered views (re-rendered \
+         in place), not close them" );
+      assert! (
+        enrichment_slot . lock () . unwrap () . is_none (),
+        "source-set switch should drop stale search enrichment payloads" );
+      assert! (
+        search_cancelled . load (Ordering::SeqCst),
+        "source-set switch should cancel in-flight search enrichment" );
+      Ok (( )) } )) }
 
 #[test]
 fn content_view_omits_inactive_contained_nodes (
