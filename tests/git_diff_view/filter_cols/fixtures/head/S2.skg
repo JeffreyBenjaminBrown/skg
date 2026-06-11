@@ -1,0 +1,7 @@
+pid: 'S2'
+title: "S2"
+subscribes_to:
+  - "B2"
+hides_from_its_subscriptions:
+  - "x2"
+  - "y2"

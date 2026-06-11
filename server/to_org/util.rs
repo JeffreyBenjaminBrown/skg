@@ -146,7 +146,12 @@ pub async fn complete_branch_minus_content (
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "maybe_add_partnerCol_branches" ). entered();
     maybe_add_partnerCol_branches (
-      tree, node_id, config, driver, active_source_set ) . await } ?;
+      tree, node_id, config, driver, active_source_set,
+      // This birth path runs outside the diff-aware BFS (search
+      // results, ancestry attachment, stubs); diff-mode col
+      // existence is decided at each node's completion visit, which
+      // passes the real diffs.
+      &None ) . await } ?;
   Ok (( )) }
 
 /// Does only what it says -- in particular,

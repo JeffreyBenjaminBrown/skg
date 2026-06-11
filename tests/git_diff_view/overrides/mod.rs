@@ -8,6 +8,11 @@
 /// in the worktree R overrides [Z, O] and hides [ha, hc].  Every
 /// leaf file exists unchanged on both sides, so all signs are
 /// membership-only (no X axes).
+///
+/// Col-existence companions (every relation EMPTIED since HEAD, so
+/// in diff mode each col must still render, holding only phantoms):
+/// E overrode [EZ] and hid [EH]; ER overrode [EN] (so EN's
+/// overriderCol is the inbound case); ES subscribed to [EB].
 
 use super::common::*;
 use skg::test_utils::{graph_handle_from_config, skg_env_from_parts};
@@ -95,6 +100,67 @@ fn outbound_cols_show_phantoms_and_newM_de_novo_unstaged (
   run_overrides_view_test (
     "skg-test-git-diff-overrides-unstaged", false,
     EXPECTED_UNSTAGED ) }
+
+/// Col existence: in diff mode, a col whose worktree membership is
+/// EMPTY but whose HEAD side is not still renders, holding only
+/// phantoms -- in a de novo render, for an outbound col
+/// (overriddenCol, hiddenCol), an inbound col (overriderCol, via the
+/// inverse scan), and the subscribeeCol.  Outside diff mode the
+/// emptied cols still do not appear.
+#[test]
+fn emptied_cols_still_render_in_diff_mode_de_novo (
+) -> Result<(), Box<dyn Error>> {
+  let db_name : &str =
+    "skg-test-git-diff-col-existence";
+  let tantivy_folder : String =
+    format! ("/tmp/tantivy-{}", db_name);
+  let temp_dir : TempDir = TempDir::new ()?;
+  let repo_path : &Path = temp_dir . path ();
+  setup_overrides_fixtures (repo_path)?;
+  block_on ( async {
+    let (config, driver, tantivy) =
+      setup_test_dbs (
+        db_name, repo_path . to_str () . unwrap (),
+        &tantivy_folder ) . await ?;
+    let graph = graph_handle_from_config (&config)?;
+    skg::dbs::in_rust_graph::try_init_global_handle (
+      graph_handle_from_config (&config)? );
+    let env : SkgEnv =
+      skg_env_from_parts (
+        &config, Arc::clone (&driver), &tantivy, &graph );
+    let roots : [ID; 3] =
+      [ ID::from ("E"), ID::from ("EN"), ID::from ("ES") ];
+    { let mut warnings : Vec<String> = Vec::new ();
+      let (diff_view, _pids, _tree) =
+        multi_root_view_via_env (
+          &env, &roots, true, None, &mut warnings ) . await ?;
+      assert_buffer_contains ( &diff_view, "\
+* (skg (node (id E) (source main))) E
+** (skg overriddenCol)
+*** (skg (node (id EZ) (source main) indef (unstaged removedM))) EZ
+** (skg hiddenCol)
+*** (skg (node (id EH) (source main) indef (unstaged removedM))) EH
+* (skg (node (id EN) (source main))) EN
+** (skg overriderCol)
+*** (skg (node (id ER) (source main) indef (unstaged removedM))) ER
+* (skg (node (id ES) (source main))) ES
+** (skg subscribeeCol)
+*** (skg (node (id EB) (source main) indef (unstaged removedM))) EB
+" ); }
+    { // Outside diff mode, the emptied cols still do not appear.
+      let mut warnings : Vec<String> = Vec::new ();
+      let (plain_view, _pids, _tree) =
+        multi_root_view_via_env (
+          &env, &roots, false, None, &mut warnings ) . await ?;
+      for col in [ "overriddenCol", "hiddenCol",
+                   "overriderCol", "subscribeeCol" ] {
+        assert! ( ! plain_view . contains (col),
+          "an empty {} must not render outside diff mode:\n{}",
+          col, plain_view ); }}
+    cleanup_test_dbs (
+      db_name, &driver, Some (Path::new (&tantivy_folder))
+    ) . await ?;
+    Ok (( )) } ) }
 
 #[test]
 fn outbound_cols_show_phantoms_and_newM_de_novo_staged (

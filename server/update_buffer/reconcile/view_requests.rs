@@ -1,13 +1,14 @@
 use crate::to_org::complete::partner_col::{ maybe_add_hiddenInSubscribeeCol_branch, type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::expand::definitive::execute_view_requests;
 use crate::source_sets::ActiveSourceSet;
-use crate::types::misc::SkgConfig;
+use crate::types::git::SourceDiff;
+use crate::types::misc::{SkgConfig, SourceName};
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest};
 use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId, Tree};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
@@ -38,6 +39,7 @@ pub async fn ensure_hiddenin_col_under_definitive_subscribee (
   node   : NodeId,
   config : &SkgConfig,
   driver : &TypeDBDriver,
+  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
 ) -> Result<(), Box<dyn Error>> {
   let is_subscribee : bool =
     type_and_parent_type_consistent_with_subscribee (
@@ -52,7 +54,7 @@ pub async fn ensure_hiddenin_col_under_definitive_subscribee (
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
   if is_indefinitive { return Ok (( )); }
   maybe_add_hiddenInSubscribeeCol_branch (
-    tree, node, config, driver ) . await }
+    tree, node, config, driver, source_diffs ) . await }
 
 /// Read the node's non-consumed view_requests as a Vec. View completion
 /// (dispatch_node_update) settles

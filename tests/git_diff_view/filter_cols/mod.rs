@@ -129,6 +129,64 @@ fn filter_cols_show_exact_phantoms_and_newM_unstaged (
     "skg-test-git-diff-filter-unstaged", false,
     EXPECTED_UNSTAGED ) }
 
+/// Col existence for the filter cols: a DERIVED membership emptied
+/// since HEAD (S2 stopped hiding x2 and y2; x2 was hidden-in B2, y2
+/// hidden-outside) still yields each col, holding only phantoms.
+/// Outside diff mode the emptied cols do not appear.
+#[test]
+fn emptied_filter_cols_still_render_in_diff_mode (
+) -> Result<(), Box<dyn Error>> {
+  let db_name : &str =
+    "skg-test-git-diff-filter-existence";
+  let tantivy_folder : String =
+    format! ("/tmp/tantivy-{}", db_name);
+  let temp_dir : TempDir = TempDir::new ()?;
+  let repo_path : &Path = temp_dir . path ();
+  setup_filter_fixtures (repo_path)?;
+  let input : &str = "\
+* (skg (node (id S2) (source main))) S2
+** (skg subscribeeCol)
+*** (skg (node (id B2) (source main))) B2
+**** (skg (node (id x2) (source main))) x2
+";
+  block_on ( async {
+    let (config, driver, tantivy) =
+      setup_test_dbs (
+        db_name, repo_path . to_str () . unwrap (),
+        &tantivy_folder ) . await ?;
+    let graph = graph_handle_from_config (&config)?;
+    { let mut views_state : ViewsState = ViewsState {
+        diff_mode_enabled : true,
+        open_views        : OpenViews::new (), };
+      let (mut stream, _keepalive) = mk_test_tcp_stream_pair ();
+      let response = update_from_and_rerender_buffer (
+        &mut stream, input, &driver, &config, &tantivy, &graph,
+        true, &Err (String::new ()), &mut views_state ) . await ?;
+      assert_buffer_contains ( &response . saved_view, "\
+**** (skg hiddenInSubscribeeCol)
+***** (skg (node (id x2) (source main) indef (unstaged removedM))) x2
+**** (skg (node (id x2) (source main))) x2
+*** (skg hiddenOutsideOfSubscribeeCol)
+**** (skg (node (id y2) (source main) indef (unstaged removedM))) y2
+" ); }
+    { // The same save outside diff mode creates neither col.
+      let mut views_state : ViewsState = ViewsState {
+        diff_mode_enabled : false,
+        open_views        : OpenViews::new (), };
+      let (mut stream, _keepalive) = mk_test_tcp_stream_pair ();
+      let response = update_from_and_rerender_buffer (
+        &mut stream, input, &driver, &config, &tantivy, &graph,
+        false, &Err (String::new ()), &mut views_state ) . await ?;
+      for col in [ "hiddenInSubscribeeCol",
+                   "hiddenOutsideOfSubscribeeCol" ] {
+        assert! ( ! response . saved_view . contains (col),
+          "an empty {} must not render outside diff mode:\n{}",
+          col, response . saved_view ); }}
+    cleanup_test_dbs (
+      db_name, &driver, Some (Path::new (&tantivy_folder))
+    ) . await ?;
+    Ok (( )) } ) }
+
 #[test]
 fn filter_cols_show_exact_phantoms_and_newM_staged (
 ) -> Result<(), Box<dyn Error>> {
