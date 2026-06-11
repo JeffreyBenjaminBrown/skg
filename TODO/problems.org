@@ -148,12 +148,17 @@
    wire-level emission is a per-truenode 'notInGit' atom too. A
    per-source banner / source-herald prefix would scale better.
 
-** Stringly-typed cell-merge in herald post-pass
+** (obsolete) Stringly-typed cell-merge in herald post-pass
    elisp/heralds-minor-mode.el / 'heralds--merge-stage-tokens'.
    The post-pass identifies stage groups by parsing token strings
    (matching the literal "staged:" / "unstaged:" prefix). If the
    herald rule strings are ever changed, the regex must be updated in
    lockstep. Manageable but a new fragility introduced by this design.
+
+   Noted obsolete 2026-06-11 (heralds stage audit): the post-pass no
+   longer exists; 'heralds--merge-stage-tokens' appears nowhere in the
+   repo. Stage grouping is handled by the INTERC rules in the rule
+   table (now defined in server/heralds.rs).
 
 * Performance
 

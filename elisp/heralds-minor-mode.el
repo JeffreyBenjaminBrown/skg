@@ -24,9 +24,12 @@ source of truth for every visual decision in the herald display:
 match atoms, labels, colors, presentation order. Emacs fetches it
 over the \"herald rules\" endpoint at connect time
 (`skg-request-herald-rules', called by `skg-client-init') and caches
-it here for the session; reconnecting re-fetches it. Tests inject a
-table directly via `heralds-install-rules' (see
-`skg-test-install-herald-rules'), so batch-mode tests need no server.
+it here; re-running `skg-client-init' re-fetches it. (A lazy
+reconnect by a request function does NOT re-fetch -- the cached
+table survives, which is correct unless the server binary changed
+under the session.) Tests inject a table directly via
+`heralds-install-rules' (see `skg-test-install-herald-rules'), so
+batch-mode tests need no server.
 
 While this is nil (fetch failed, or not yet connected), enabling
 `heralds-minor-mode' disables itself with a one-line message; there
