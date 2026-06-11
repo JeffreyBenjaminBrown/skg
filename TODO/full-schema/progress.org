@@ -867,81 +867,115 @@ Focused checks passed:
 
 Full suite passed:
 - 'bash/all-tests.sh --no-sound'
-** stage 1 : rename override relationship roles
+** stage 5 : source mismatch representation
 *** planned
-Wrote 'TODO/full-schema/1_rename-override-rels.org',
-a focused implementation plan for renaming 'overrides_view_of'
-roles from 'replacement' / 'replaced' to
-'overrider' / 'overridden' across schema, TypeDB queries,
-in-Rust inverse-map vocabulary, tests and docs.
+Wrote 'TODO/full-schema/5_source-mismatch-representation.org',
+a focused implementation plan for replacing the audit's set-shaped
+source mismatch adapter with a scalar source mismatch representation.
+
+The plan keeps relationship role-player-set mismatches as sets, adds
+an explicit source mismatch variant, and updates audit formatting so
+source names are not represented as node IDs.
 *** implemented
-Renamed the TypeDB roles for 'overrides_view_of' to
-'overrider' and 'overridden'.
+Replaced the audit's single set-shaped 'Mismatch' struct with a
+variant representation:
+- relationship mismatches keep relation, role and role-player ID sets,
+- source mismatches carry the node PID, the in-Rust source name, and
+  the TypeDB source name,
+- missing TypeDB nodes are represented as their own mismatch variant.
 
-Updated the schema, TypeDB relationship helpers, TypeDB search
-helpers, graph-stats TypeQL, in-Rust inverse-map vocabulary,
-diff-analysis role labels, audit references, override-role tests,
-merge override queries, confusing merge fixture IDs, and the old
-overview doc sentence.
+Updated audit formatting and the ad-hoc audit probe so source
+mismatches are printed as node-level source facts rather than as
+'relation=has_source role=node' relationship-set mismatches.
 
-The on-disk field remains 'overrides_view_of'.
-*** verified
-Focused checks passed:
-- 'cargo check'
-- 'cargo test --test typedb'
-- 'cargo test --test merge merge_nodes'
-- 'cargo test --test save none_overrides'
+Updated scheduled-audit org output and audit-store recording to handle
+the new mismatch variants.  The audit store still uses six CSV fields,
+but recorded payloads are now strings, so source names are not forced
+through 'ID'.
 
-Full suite passed:
-- 'bash/all-tests.sh'
-  - passed once after the role rename
-  - passed again after renaming the merge override fixture IDs
-** stage 2 : explicit warning channel
-*** planned
-Wrote 'TODO/full-schema/2_explicit-warning-channel.org',
-a focused implementation plan for separating protocol warnings from
-errors across structured server responses and Emacs handlers.
+The first implementation briefly added an audit-specific TypeDB source
+cardinality helper, but that duplicated the TypeDB schema constraint
+that each node plays 'has_source:node' exactly once.  The implementation
+now uses the existing scalar source-name lookup and represents the
+TypeDB side of source mismatches as a concrete 'SourceName'.  If the
+node+source query returns no row, the audit records a distinct missing
+TypeDB node mismatch instead.
 
-The plan also includes the small documentation item from the same
-metaplan section: defining "read-only set" in 'glossary.md'.
-*** implemented
-Added an explicit 'warnings' field alongside 'errors' for the
-structured response shapes used by:
-- save-result
-- single-root content view
-- rerender-done
-- diff-analysis
-- search-enrichment
-
-Updated the shared Rust response-formatting helpers so buffer-like
-responses emit:
-#+begin_example
-((content "...") (errors (...)) (warnings (...)))
-#+end_example
-
-Updated rerender-done formatting to emit:
-#+begin_example
-((errors (...)) (warnings (...)))
-#+end_example
-
-Moved existing nonfatal audit messages out of the save/content-view
-error path and into the warning path.  Existing fatal validation and
-generation failures still travel as errors.
-
-Updated the Emacs handlers to parse 'errors' and 'warnings'
-separately and to show both, when present, in a single org buffer with
-top-level 'errors' and 'warnings' headings.
-
-Updated 'api-and-formats.md' for the new protocol shape and added the
-"read-only set" definition to 'glossary.md'.
 *** tested
-Focused checks passed:
+Passed:
 - 'cargo check'
-- 'cargo test serve::util --lib'
-- 'bash/emacs-tests.sh'
-
-Full suite passed:
+- 'cargo test --test dbs -- --nocapture'
+- 'cargo test audit --lib -- --nocapture'
+- 'cargo test --lib -- --nocapture'
+- 'cargo test --test typedb -- --nocapture'
 - 'bash/all-tests.sh --no-sound'
+- after moving audit-store tests out of the module:
+  - 'cargo test --test dbs -- --nocapture'
+  - 'cargo test audit --lib -- --nocapture'
+- after simplifying missing-source audit states into a missing-TypeDB-node variant:
+  - 'cargo test --test dbs -- --nocapture'
+  - 'cargo test audit --lib -- --nocapture'
+  - 'cargo test --test typedb -- --nocapture'
+** stage 4 : validate override invariants
+*** planned
+Wrote 'TODO/full-schema/4_validate-override-invariants.org',
+a focused implementation plan for rejecting ambiguous or recursive
+user-owned override states at rebuild/init and save time.
+
+The plan centers the stage on one shared graph-shaped validator,
+save-time post-apply simulation before persistence, full-graph
+startup validation even after incremental database updates, extra-ID
+resolution before comparison, and client-facing validation errors.
+*** implemented
+Added a shared override-invariant validator for the in-Rust graph.
+It rejects:
+- more than one user-owned overrider for the same resolved overridden
+  PID,
+- user-owned override chains of the form X overrides Y overrides Z
+  where X and Y are user-owned,
+- nodes whose source is absent from the loaded config.
+
+The validator resolves override targets through the graph's primary-ID
+mapping before checking collisions.
+
+Factored the in-Rust graph DefineNode application logic so the save
+path and validation simulation share one mutation semantics.
+
+Save-time validation now simulates the real post-save graph before any
+store is mutated.  The simulation applies the same delete-propagation
+cleanup as the save path, then applies merge DefineNodes, and returns
+a structured buffer validation error if override invariants would be
+violated.
+
+Full TypeDB rebuild/init now validates the full node set before
+populating TypeDB.  Incremental startup validates the full graph after
+the all-node read and before publishing the server environment.
+Manual database rebuild also validates before replacing stores.
+
+Separated graph construction from override-invariant validation in the
+init/rebuild paths.  Callers now build an 'InRustGraph' explicitly and
+then call 'error_unless_override_invariants_hold', so validate-only
+uses no longer look like they are depending on a returned graph.
+*** tested
+Passed:
+- 'cargo check'
+- 'cargo test override --lib -- --nocapture'
+- 'cargo test --lib -- --nocapture'
+- after moving override-invariant validator tests out of the module:
+  - 'cargo test --test dbs -- --nocapture'
+  - 'cargo test --lib -- --nocapture'
+- after moving save-time override-invariant tests out of 'server/save.rs':
+  - 'cargo test --test save override_invariants -- --nocapture'
+  - 'cargo test --lib -- --nocapture'
+
+'cargo fmt' could not be run because the local cargo installation has
+no 'fmt' subcommand.
+
+TypeDB-backed integration test binaries compiled, but the tests could
+not run because TypeDB was not accepting TCP connections:
+- 'cargo test --test save -- --nocapture'
+- 'cargo test --test merge -- --nocapture'
+- 'cargo test --test typedb -- --nocapture'
 ** stage 3 : TypeDB knows source ownership
 *** planned
 Wrote 'TODO/full-schema/3_typedb-knows-ownership.org',
@@ -1013,115 +1047,81 @@ After the 'update_node_source' helper cleanup:
   not run because TypeDB was not accepting TCP connections
 - after TypeDB was restarted,
   'cargo test --test move_source -- --nocapture' passed
-** stage 4 : validate override invariants
+** stage 2 : explicit warning channel
 *** planned
-Wrote 'TODO/full-schema/4_validate-override-invariants.org',
-a focused implementation plan for rejecting ambiguous or recursive
-user-owned override states at rebuild/init and save time.
+Wrote 'TODO/full-schema/2_explicit-warning-channel.org',
+a focused implementation plan for separating protocol warnings from
+errors across structured server responses and Emacs handlers.
 
-The plan centers the stage on one shared graph-shaped validator,
-save-time post-apply simulation before persistence, full-graph
-startup validation even after incremental database updates, extra-ID
-resolution before comparison, and client-facing validation errors.
+The plan also includes the small documentation item from the same
+metaplan section: defining "read-only set" in 'glossary.md'.
 *** implemented
-Added a shared override-invariant validator for the in-Rust graph.
-It rejects:
-- more than one user-owned overrider for the same resolved overridden
-  PID,
-- user-owned override chains of the form X overrides Y overrides Z
-  where X and Y are user-owned,
-- nodes whose source is absent from the loaded config.
+Added an explicit 'warnings' field alongside 'errors' for the
+structured response shapes used by:
+- save-result
+- single-root content view
+- rerender-done
+- diff-analysis
+- search-enrichment
 
-The validator resolves override targets through the graph's primary-ID
-mapping before checking collisions.
+Updated the shared Rust response-formatting helpers so buffer-like
+responses emit:
+#+begin_example
+((content "...") (errors (...)) (warnings (...)))
+#+end_example
 
-Factored the in-Rust graph DefineNode application logic so the save
-path and validation simulation share one mutation semantics.
+Updated rerender-done formatting to emit:
+#+begin_example
+((errors (...)) (warnings (...)))
+#+end_example
 
-Save-time validation now simulates the real post-save graph before any
-store is mutated.  The simulation applies the same delete-propagation
-cleanup as the save path, then applies merge DefineNodes, and returns
-a structured buffer validation error if override invariants would be
-violated.
+Moved existing nonfatal audit messages out of the save/content-view
+error path and into the warning path.  Existing fatal validation and
+generation failures still travel as errors.
 
-Full TypeDB rebuild/init now validates the full node set before
-populating TypeDB.  Incremental startup validates the full graph after
-the all-node read and before publishing the server environment.
-Manual database rebuild also validates before replacing stores.
+Updated the Emacs handlers to parse 'errors' and 'warnings'
+separately and to show both, when present, in a single org buffer with
+top-level 'errors' and 'warnings' headings.
 
-Separated graph construction from override-invariant validation in the
-init/rebuild paths.  Callers now build an 'InRustGraph' explicitly and
-then call 'error_unless_override_invariants_hold', so validate-only
-uses no longer look like they are depending on a returned graph.
+Updated 'api-and-formats.md' for the new protocol shape and added the
+"read-only set" definition to 'glossary.md'.
 *** tested
-Passed:
+Focused checks passed:
 - 'cargo check'
-- 'cargo test override --lib -- --nocapture'
-- 'cargo test --lib -- --nocapture'
-- after moving override-invariant validator tests out of the module:
-  - 'cargo test --test dbs -- --nocapture'
-  - 'cargo test --lib -- --nocapture'
-- after moving save-time override-invariant tests out of 'server/save.rs':
-  - 'cargo test --test save override_invariants -- --nocapture'
-  - 'cargo test --lib -- --nocapture'
+- 'cargo test serve::util --lib'
+- 'bash/emacs-tests.sh'
 
-'cargo fmt' could not be run because the local cargo installation has
-no 'fmt' subcommand.
-
-TypeDB-backed integration test binaries compiled, but the tests could
-not run because TypeDB was not accepting TCP connections:
-- 'cargo test --test save -- --nocapture'
-- 'cargo test --test merge -- --nocapture'
-- 'cargo test --test typedb -- --nocapture'
-** stage 5 : source mismatch representation
-*** planned
-Wrote 'TODO/full-schema/5_source-mismatch-representation.org',
-a focused implementation plan for replacing the audit's set-shaped
-source mismatch adapter with a scalar source mismatch representation.
-
-The plan keeps relationship role-player-set mismatches as sets, adds
-an explicit source mismatch variant, and updates audit formatting so
-source names are not represented as node IDs.
-*** implemented
-Replaced the audit's single set-shaped 'Mismatch' struct with a
-variant representation:
-- relationship mismatches keep relation, role and role-player ID sets,
-- source mismatches carry the node PID, the in-Rust source name, and
-  the TypeDB source name,
-- missing TypeDB nodes are represented as their own mismatch variant.
-
-Updated audit formatting and the ad-hoc audit probe so source
-mismatches are printed as node-level source facts rather than as
-'relation=has_source role=node' relationship-set mismatches.
-
-Updated scheduled-audit org output and audit-store recording to handle
-the new mismatch variants.  The audit store still uses six CSV fields,
-but recorded payloads are now strings, so source names are not forced
-through 'ID'.
-
-The first implementation briefly added an audit-specific TypeDB source
-cardinality helper, but that duplicated the TypeDB schema constraint
-that each node plays 'has_source:node' exactly once.  The implementation
-now uses the existing scalar source-name lookup and represents the
-TypeDB side of source mismatches as a concrete 'SourceName'.  If the
-node+source query returns no row, the audit records a distinct missing
-TypeDB node mismatch instead.
-
-*** tested
-Passed:
-- 'cargo check'
-- 'cargo test --test dbs -- --nocapture'
-- 'cargo test audit --lib -- --nocapture'
-- 'cargo test --lib -- --nocapture'
-- 'cargo test --test typedb -- --nocapture'
+Full suite passed:
 - 'bash/all-tests.sh --no-sound'
-- after moving audit-store tests out of the module:
-  - 'cargo test --test dbs -- --nocapture'
-  - 'cargo test audit --lib -- --nocapture'
-- after simplifying missing-source audit states into a missing-TypeDB-node variant:
-  - 'cargo test --test dbs -- --nocapture'
-  - 'cargo test audit --lib -- --nocapture'
-  - 'cargo test --test typedb -- --nocapture'
+** stage 1 : rename override relationship roles
+*** planned
+Wrote 'TODO/full-schema/1_rename-override-rels.org',
+a focused implementation plan for renaming 'overrides_view_of'
+roles from 'replacement' / 'replaced' to
+'overrider' / 'overridden' across schema, TypeDB queries,
+in-Rust inverse-map vocabulary, tests and docs.
+*** implemented
+Renamed the TypeDB roles for 'overrides_view_of' to
+'overrider' and 'overridden'.
+
+Updated the schema, TypeDB relationship helpers, TypeDB search
+helpers, graph-stats TypeQL, in-Rust inverse-map vocabulary,
+diff-analysis role labels, audit references, override-role tests,
+merge override queries, confusing merge fixture IDs, and the old
+overview doc sentence.
+
+The on-disk field remains 'overrides_view_of'.
+*** verified
+Focused checks passed:
+- 'cargo check'
+- 'cargo test --test typedb'
+- 'cargo test --test merge merge_nodes'
+- 'cargo test --test save none_overrides'
+
+Full suite passed:
+- 'bash/all-tests.sh'
+  - passed once after the role rename
+  - passed again after renaming the merge override fixture IDs
 * problems discovered along the way, open
 * problems discovered along the way, solved
 ** TypeDB-backed verification was blocked
