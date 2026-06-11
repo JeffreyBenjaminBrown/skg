@@ -1,0 +1,169 @@
+// cargo nextest run --test view_stats_sharing
+//
+// The position-relative sharing view-stats
+// (TODO/full-schema/10_heralds-and-stats.org):
+// - grandparentOverrides ("gO"): a subscribee-as-such whose col owner
+//   also overrides it;
+// - grandparentSubscribes ("gS"): an overriddenCol member whose col
+//   owner also subscribes to it;
+// - overridesParent ("Op"): a node drawn under a gnode it overrides.
+// One fixture serves all three: R subscribes to E and F and overrides
+// E (so E under R's subscribeeCol carries gO and under R's
+// overriddenCol carries gS, while F carries neither); R contains P,
+// P contains C, and C overrides P (so C as content of P carries Op,
+// and C as a view root does not). Each stat round-trips through a
+// save (the viewStats parser errors on unknown atoms, so this also
+// pins the parse arms).
+//
+// PITFALL: these stats read the process-global in-Rust graph
+// snapshot; the tests install it via try_init_global_handle, which
+// is per-process (nextest's model). Both tests load the same
+// fixture content, so handle reuse under plain 'cargo test' is
+// harmless.
+
+use std::error::Error;
+use std::net::TcpStream;
+use std::sync::Arc;
+
+use skg::test_utils::{run_with_test_db, graph_handle_from_config};
+use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+use skg::to_org::render::content_view::multi_root_view;
+use skg::serve::ViewsState;
+use skg::types::views_state::OpenViews;
+use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+
+use skg::dbs::in_rust_graph::InRustGraphHandle;
+use typedb_driver::TypeDBDriver;
+
+fn lines_containing<'a> (
+  buf      : &'a str,
+  fragment : &str,
+) -> Vec<&'a str> {
+  buf . lines ()
+    . filter ( |l| l . contains (fragment) )
+    . collect () }
+
+/// The col (by its metadata atom) most recently opened above each
+/// E line. The fixture draws E only as a col member, so this
+/// attributes each E copy to its col regardless of col order.
+fn e_lines_by_enclosing_col (
+  buf : &str,
+) -> Vec<(&'static str, &str)> {
+  let mut current_col : &'static str = "";
+  let mut result : Vec<(&'static str, &str)> = Vec::new ();
+  for line in buf . lines () {
+    if line . contains ("subscribeeCol)") { current_col = "subscribeeCol"; }
+    else if line . contains ("overriddenCol)") { current_col = "overriddenCol"; }
+    else if line . contains ("(id E)") {
+      result . push ((current_col, line)); }}
+  result }
+
+fn assert_sharing_stats_in_view_of_R (
+  buf   : &str,
+  label : &str,
+) {
+  let e_lines : Vec<(&'static str, &str)> =
+    e_lines_by_enclosing_col (buf);
+  assert_eq! ( e_lines . len (), 2,
+    "{}: E should appear under both the subscribeeCol and the \
+     overriddenCol:\n{}", label, buf );
+  for (col, line) in &e_lines {
+    match *col {
+      "subscribeeCol" => {
+        assert! ( line . contains ("grandparentOverrides"),
+          "{}: the subscribee-as-such copy of E carries gO:\n{}",
+          label, buf );
+        assert! ( ! line . contains ("grandparentSubscribes"),
+          "{}: the subscribee-as-such copy of E must not carry gS \
+           (the col itself already says R subscribes):\n{}",
+          label, buf ); },
+      "overriddenCol" => {
+        assert! ( line . contains ("grandparentSubscribes"),
+          "{}: the overriddenCol copy of E carries gS:\n{}",
+          label, buf );
+        assert! ( ! line . contains ("grandparentOverrides"),
+          "{}: the overriddenCol copy of E must not carry gO:\n{}",
+          label, buf ); },
+      other => panic! (
+        "{}: E drawn outside any col ({:?}):\n{}", label, other, buf ),
+    }}
+  for f_line in lines_containing (buf, "(id F)") {
+    assert! ( ! f_line . contains ("grandparentOverrides")
+              && ! f_line . contains ("grandparentSubscribes")
+              && ! f_line . contains ("overridesParent"),
+      "{}: F, a subscribee R does not override, carries none of the \
+       three stats:\n{}", label, buf ); }
+  { let c_lines : Vec<&str> = lines_containing (buf, "(id C)");
+    assert! ( c_lines . iter ()
+              . any ( |l| l . contains ("overridesParent") ),
+      "{}: C drawn as content of P (which it overrides) carries \
+       Op:\n{}", label, buf ); }}
+
+async fn save_and_rerender (
+  buf     : &str,
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<String, Box<dyn Error>> {
+  let graph : InRustGraphHandle =
+    graph_handle_from_config (config) ?;
+  let mut views_state : ViewsState = ViewsState {
+    diff_mode_enabled : false,
+    open_views        : OpenViews::new (),
+  };
+  let listener : std::net::TcpListener =
+    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
+  let mut stream : TcpStream =
+    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
+  let response = update_from_and_rerender_buffer (
+    &mut stream,
+    buf, driver, config, tantivy, &graph, false,
+    &Err ( String::new () ), &mut views_state ) . await ?;
+  assert! ( response . errors . is_empty (),
+    "save must not error; got: {:?}", response . errors );
+  Ok ( response . saved_view ) }
+
+#[test]
+fn sharing_view_stats_appear_and_roundtrip
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-view-stats-sharing",
+    "tests/view_stats_sharing/fixtures",
+    "/tmp/tantivy-test-view-stats-sharing",
+    |config, driver, tantivy| Box::pin ( async move {
+      skg::dbs::in_rust_graph::try_init_global_handle (
+        graph_handle_from_config (config) ? );
+      let (de_novo, _pids, _tree)
+        : (String, Vec<ID>, _) =
+        multi_root_view (
+          driver, config, Some (tantivy),
+          &[ ID ("R" . to_string ()) ], false ) . await ?;
+      assert_sharing_stats_in_view_of_R (&de_novo, "de novo");
+      let saved : String = // The save parses the buffer, so this also pins the parse arms.
+        save_and_rerender (&de_novo, config, driver, tantivy) . await ?;
+      assert_sharing_stats_in_view_of_R (&saved, "after save");
+      Ok (( )) } )) }
+
+#[test]
+fn overridesParent_is_position_relative
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-view-stats-op-root",
+    "tests/view_stats_sharing/fixtures",
+    "/tmp/tantivy-test-view-stats-op-root",
+    |config, driver, tantivy| Box::pin ( async move {
+      skg::dbs::in_rust_graph::try_init_global_handle (
+        graph_handle_from_config (config) ? );
+      let (view_of_c, _pids, _tree)
+        : (String, Vec<ID>, _) =
+        multi_root_view (
+          driver, config, Some (tantivy),
+          &[ ID ("C" . to_string ()) ], false ) . await ?;
+      let c_root_line : &str =
+        view_of_c . lines ()
+        . find ( |l| l . starts_with ("* ") && l . contains ("(id C)") )
+        . expect ("view of C should have C as its root");
+      assert! ( ! c_root_line . contains ("overridesParent"),
+        "C as a view root has no visible parent to override:\n{}",
+        view_of_c );
+      Ok (( )) } )) }

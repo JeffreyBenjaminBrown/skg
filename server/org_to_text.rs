@@ -263,6 +263,12 @@ fn true_node_metadata_to_string (
         parts . push ( "cycle" . to_string () ); }
       if true_node . viewStats . parentIsContent {
         parts . push ( "containsParent" . to_string () ); }
+      if true_node . viewStats . grandparentOverrides {
+        parts . push ( "grandparentOverrides" . to_string () ); }
+      if true_node . viewStats . grandparentSubscribes {
+        parts . push ( "grandparentSubscribes" . to_string () ); }
+      if true_node . viewStats . overridesParent {
+        parts . push ( "overridesParent" . to_string () ); }
       if true_node . viewStats . sourceAtBoundary {
         if let Some (src_config)
         = config . sources . get ( &true_node . source )

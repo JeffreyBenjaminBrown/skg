@@ -258,6 +258,9 @@ pub fn herald_rule_table () -> HeraldRule {
         crule (Blue, "viewStats", vec! [
           leaf (Blue, "cycle", "⟳"),
           rule ("containsParent", vec! [ s ("}") ]),
+          leaf (Red, "grandparentOverrides",  "gO"),
+          leaf (Red, "grandparentSubscribes", "gS"),
+          leaf (Red, "overridesParent",       "Op"),
           crule (Green, "sourceHerald", vec! [ any (vec! [RuleChild::It]) ]) ]),
         rule ("editRequest", vec! [
           leaf (Red, "delete", "delete"),
@@ -404,9 +407,14 @@ fn viewstats_atoms () -> Vec<&'static str> {
       parentIsContainer : _, // never serialized (the default state makes no noise)
       parentIsContent : _,   // -> the containsParent atom
       sourceAtBoundary : _,  // -> the sourceHerald atom
+      grandparentOverrides : _,
+      grandparentSubscribes : _,
+      overridesParent : _,
     } = v; }
   let _ = guard;
-  vec! [ "cycle", "containsParent", "sourceHerald" ] }
+  vec! [ "cycle", "containsParent", "sourceHerald",
+         "grandparentOverrides", "grandparentSubscribes",
+         "overridesParent" ] }
 
 /// ParentIs values the serializer can emit (Affected stays implicit).
 fn parentIs_emitted_atoms () -> Vec<&'static str> {

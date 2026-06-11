@@ -319,6 +319,19 @@ pub struct ViewNodeStats {
   pub parentIsContainer : bool,
   pub parentIsContent   : bool,
   pub sourceAtBoundary  : bool, // True if a root or if source differs from source of nearest truenode ancestor.
+  /// For a subscribee-as-such (Affected child of a SubscribeeCol):
+  /// the col's owner also overrides this node. Herald red "gO".
+  /// Not computed under an OverriddenCol, where the col already says it.
+  pub grandparentOverrides  : bool,
+  /// For an Affected child of an OverriddenCol: the col's owner also
+  /// subscribes to this node. Herald red "gS". Not computed under a
+  /// SubscribeeCol, ditto.
+  pub grandparentSubscribes : bool,
+  /// This node overrides its visible org-parent's node. Herald red
+  /// "Op". Like 'parentIsContent' (containsParent), necessarily a
+  /// view stat: the same node can sit under different parents in
+  /// different positions.
+  pub overridesParent       : bool,
 }
 
 #[derive( Debug, Clone, Copy, PartialEq, Eq )]
@@ -770,6 +783,9 @@ impl Default for ViewNodeStats {
       parentIsContainer : true,
       parentIsContent   : false,
       sourceAtBoundary  : false,
+      grandparentOverrides  : false,
+      grandparentSubscribes : false,
+      overridesParent       : false,
     }} }
 
 //

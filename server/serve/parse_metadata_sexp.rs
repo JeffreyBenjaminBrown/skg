@@ -719,6 +719,9 @@ fn parse_viewstats_sexp (
         match bare_value . as_str () {
           "cycle"          => stats . cycle = true,
           "containsParent" => stats . parentIsContent   = true,
+          "grandparentOverrides"  => stats . grandparentOverrides  = true,
+          "grandparentSubscribes" => stats . grandparentSubscribes = true,
+          "overridesParent"       => stats . overridesParent       = true,
           _ => {
             return Err ( format! ( "Unknown viewStats value: {}",
                                     bare_value )); }} },
