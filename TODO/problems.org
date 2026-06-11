@@ -638,6 +638,20 @@
    stand-in relationship is data rather than convention. Jeff
    approved this direction 2026-06-10; it is deliberately deferred
    until a second consumer exists.
+** (fixed) 'rerender_view' ignored its 'create_partnerCols' flag
+   Found 2026-06-11 during the heralds stage (the compiler's
+   unused-variable warning exposed it). Stage 9's switch-rerender
+   gave 'rerender_view' ('server/update_buffer.rs') a
+   'create_partnerCols' parameter, documented as "true for the
+   source-switch rerender, where pruning removed them and the new
+   set decides which return" -- but the function hardcoded
+   'create_partnerCols_for_fresh_nodes : false', dropping the flag.
+   Consequence: after a source-set switch, PartnerCols that the
+   convert-and-prune prepass removed were never re-created, so
+   widening the set did NOT reveal cols as intended; the stage-9
+   handler test did not assert col re-creation, so it passed.
+   Fixed 2026-06-11 (one line: pass the flag through). The heralds
+   stage's progress notes record the verification.
 ** Flaky test: 'ids::save' group in tests/git_diff_view.rs
    'test_delete_id_scaffolds_respawns' (since renamed
    'test_delete_id_scaffolds_aborts') fails intermittently when the

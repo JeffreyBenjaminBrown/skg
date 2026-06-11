@@ -353,9 +353,12 @@ pub async fn rerender_view (
       deleted_by_this_save_pids      : &context . deleted_by_this_save_pids,
       active_source_set              : context . active_source_set,
       node_budget                    : context . env . config . initial_node_limit,
-      // Post-save reuses the saved buffer's PartnerCols; do not re-create them
-      // (that would change the buffer and break the save round-trip, TODO/DONE/local-view-update/plan_v2.org §18).
-      create_partnerCols_for_fresh_nodes : false,
+      // Post-save (and rerender-all) reuse the saved buffer's PartnerCols and
+      // pass false: re-creating them would change the buffer and break the save
+      // round-trip (TODO/DONE/local-view-update/plan_v2.org §18). The
+      // source-switch rerender passes true: its prune removed the cols, and the
+      // new set decides which return.
+      create_partnerCols_for_fresh_nodes : create_partnerCols,
       // Post-save: phantom sources resolve via the deleted-id map + disk scan
       // (the de-novo path passes the tantivy index instead).
       diff_tantivy_index : None,
