@@ -1,0 +1,8 @@
+pid: 'R'
+title: "R"
+overrides_view_of:
+  - "Z"
+  - "W"
+hides_from_its_subscriptions:
+  - "ha"
+  - "hb"

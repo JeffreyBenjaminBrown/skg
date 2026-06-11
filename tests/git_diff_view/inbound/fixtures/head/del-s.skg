@@ -1,0 +1,4 @@
+pid: 'del-s'
+title: "del-s"
+subscribes_to:
+  - "SN"

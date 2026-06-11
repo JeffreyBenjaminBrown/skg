@@ -20,9 +20,9 @@
 ///   the tree is being mutated.
 
 use crate::types::env::SkgEnv;
-use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff};
 use crate::types::misc::{ID, SourceName};
-use crate::types::phantom::{title_for_phantom, phantom_axes};
+use crate::types::phantom::title_for_phantom;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Vognode, ParentIs, PartnerCol, mk_indefinitive_viewnode, mk_phantom_viewnode};
@@ -51,17 +51,19 @@ pub struct ChildData {
 /// stays explicit: read tree and graph facts, compute the goal list,
 /// prepare child data, then reconcile col children.
 ///
-/// `parent_skgid` and `parent_source` are the col's containing
-/// node (the subscribee for HiddenIn; the subscriber for
-/// SubscribeeCol and HiddenOutsideOf). They feed into
-/// `phantom_axes`'s membership-side axes.
+/// `axes_for_removed` supplies each removed member's per-stage diff
+/// axes.  The caller must name the relation its col represents when
+/// building that closure (outbound cols call `phantom_axes` with
+/// their relation; inbound cols read the inverse scan; filter cols
+/// compare derived membership), so an axis can never silently come
+/// from a different relation involving the same ID.
 pub fn build_child_data (
   tree                           : &Tree<ViewNode>,
   col_node                       : NodeId,
-  parent_skgid                   : &ID,
-  parent_source                  : &SourceName,
   goal_list                      : &[ID],
   removed_ids                    : &HashSet<ID>,
+  axes_for_removed               : &dyn Fn (&ID, &SourceName)
+                                     -> (ExistenceAxes, MembershipAxes),
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   env                            : &SkgEnv,
@@ -88,15 +90,8 @@ pub fn build_child_data (
       let child_src : SourceName =
         env . find_source (child_skgid, deleted_since_head_pid_src_map)
         . unwrap_or_else ( SourceName::not_found );
-      // §C: phantom_axes derives the membership axis from the parent's per-stage
-      // relation diffs -- contains_diff, subscribes_to_diff, AND hides_diff -- so
-      // a removed PartnerCol member (subscribee / hidden-outside) now gets a
-      // PER-STAGE removedM, and phantom_axes itself net-falls-back to unstaged
-      // Minus for the relationful-PartnerCol case it can't express per-stage.
       let axes : (ExistenceAxes, MembershipAxes) =
-        phantom_axes ( child_skgid, &child_src,
-                       parent_skgid, parent_source,
-                       source_diffs . as_ref () );
+        axes_for_removed ( child_skgid, &child_src );
       let child_title : String =
         title_for_phantom ( child_skgid, &child_src,
                             source_diffs . as_ref (), &env . config );
@@ -180,6 +175,45 @@ pub fn reconcile_partnerCol_children_against_goal_list (
   mark_goal_children_as_collectionBranch_members (
     tree, col_node, goal_list) ?;
   Ok (summary) }
+
+/// Stamp per-stage membership signs onto a col's existing Active
+/// members, from a per-member axes map (an outbound col reads the
+/// owner's relation diff via 'outbound_member_axes'; an inbound col
+/// reads the inverse scan):
+/// - a member PRESENT after both stages gets only its Plus signs
+///   ('newM'), mirroring 'mark_membership_on_existing_children's
+///   rule for content children (Minus positions are phantoms,
+///   handled by the goal list);
+/// - an Active child whose net result is REMOVED -- reachable only
+///   when a stale saved buffer still holds, as an Active member, a
+///   read-only-col member whose edge is gone -- gets the full axes
+///   and flips to a phantom, so the rendered buffer cannot show a
+///   removed edge as a live member.
+pub fn apply_membership_axes_to_col_members (
+  tree       : &mut Tree<ViewNode>,
+  col_node   : NodeId,
+  axes_by_id : &HashMap<ID, MembershipAxes>,
+) -> Result<(), Box<dyn Error>> {
+  if axes_by_id . is_empty () { return Ok (( )); }
+  treat_certain_children (
+    tree, col_node,
+    |vn : &ViewNode| matches! (
+      &vn . kind, ViewNodeKind::Vognode (Vognode::Active (_)) ),
+    |vn : &mut ViewNode| {
+      if let ViewNodeKind::Vognode (Vognode::Active (t))
+        = &mut vn . kind
+      { if let Some (m) = axes_by_id . get (&t . id) {
+          if m . net_is_present () {
+            if m . staged   == Some (Sign::Plus)
+              { t . membership . staged   = Some (Sign::Plus); }
+            if m . unstaged == Some (Sign::Plus)
+              { t . membership . unstaged = Some (Sign::Plus); }
+          } else {
+            t . membership = *m; }}}
+      vn . normal_to_phantom (); // flips only when the axes require
+    } )
+    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+  Ok (( )) }
 
 /// See this module's header for definition of "goal child".
 ///

@@ -286,6 +286,43 @@ fn test_diff_mode_removed_subscribee_staged_shows_stagedM()
       Ok (( )) }) })
 }
 
+/// The added direction for an outbound col: a subscribee newly added
+/// to the subscriber's subscribes_to renders PRESENT with
+/// (unstaged newM), mirroring content's mark_membership rule.
+#[test]
+fn test_diff_mode_added_subscribee_shows_newM()
+  -> Result<(), Box<dyn Error>>
+{
+  run_save_test_with_setup(
+    "skg-test-save-diff-added-subscribee",
+    setup_git_repo_with_added_subscribee_fixtures,
+    |config, driver, tantivy, _repo_path| { Box::pin(async move {
+      let input = "\
+* (skg (node (id 1) (source main))) 1
+** (skg subscribeeCol)
+*** (skg (node (id 11) (source main))) 11
+*** (skg (node (id 22) (source main))) 22
+";
+
+      let graph : InRustGraphHandle =
+        new_handle (InRustGraph::new ());
+      let mut views_state : ViewsState = ViewsState {
+        diff_mode_enabled : true,
+        open_views        : OpenViews::new (),};
+      let (mut stream, _) = mk_test_tcp_stream_pair ();
+      let response = update_from_and_rerender_buffer(
+        &mut stream,
+        input, driver, config, tantivy, &graph, true,
+        &Err ( String::new () ), &mut views_state
+      ) . await?;
+
+      assert_buffer_contains(
+        &response . saved_view,
+        "*** (skg (node (id 11) (source main))) 11\n\
+         *** (skg (node (id 22) (source main) (unstaged newM))) 22" );
+      Ok (( )) }) })
+}
+
 //
 // Test runner helper
 //

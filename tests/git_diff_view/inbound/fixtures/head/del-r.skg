@@ -1,0 +1,4 @@
+pid: 'del-r'
+title: "del-r"
+overrides_view_of:
+  - "N1"

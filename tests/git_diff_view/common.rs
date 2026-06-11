@@ -132,6 +132,10 @@ pub async fn cleanup_test_dbs(
     database . delete() . await?;
   }
   if let Some (path) = tantivy_folder {
+    // A save's Tantivy update commits on a background worker
+    // (coding-advice/common-gotchas.md); removing the folder while a
+    // commit is in flight flakes with DirectoryNotEmpty.
+    skg::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
     if path . exists() { fs::remove_dir_all (path)?; }
   }
   Ok(())

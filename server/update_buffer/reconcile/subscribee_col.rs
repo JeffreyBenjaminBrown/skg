@@ -1,9 +1,11 @@
 use crate::source_sets::ActiveSourceSet;
 use crate::types::env::SkgEnv;
-use crate::to_org::complete::partner_col::child_data::{ChildData, build_child_data, reconcile_partnerCol_children_against_goal_list};
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
+use crate::to_org::complete::partner_col::child_data::{ChildData, build_child_data, apply_membership_axes_to_col_members, reconcile_partnerCol_children_against_goal_list};
 use crate::update_buffer::reconcile::{omit_inactive_members, retained_inactive_children};
-use crate::to_org::complete::partner_col::goal_list::goal_list_for_subscribee_col;
-use crate::types::git::SourceDiff;
+use crate::to_org::complete::partner_col::goal_list::{goal_list_for_outbound_col, outbound_member_axes};
+use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
+use crate::types::phantom::phantom_axes;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::read_at_node_in_tree;
@@ -48,9 +50,10 @@ pub async fn reconcile_subscribee_col_children (
   let context : SubscribeeColContext =
     read_subscribee_col_context (tree, node, env) ?;
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
-    goal_list_for_subscribee_col (
+    goal_list_for_outbound_col (
       &context . parent_pid, &context . parent_source,
-      source_diffs, &context . worktree_subscribees, &env . config );
+      NodeRelation::Subscribes,
+      source_diffs, &context . worktree_subscribees );
   let goal_list : Vec<ID> =
     // TODO/full-schema/9-2_source-set-safety.org: omit inactive
     // subscribees, except retained placeholders (InactiveNode
@@ -72,14 +75,29 @@ pub async fn reconcile_subscribee_col_children (
     // TODO/DONE/local-view-update/plan_v2.org §5.5: a col fills its members WHOLE and is budget-neutral -- the owning
     // subscriber already spent its budget unit when it expanded, so drawing all
     // its subscribees here costs nothing and never truncates the group.
+    let axes_for_removed = // the relation this col represents
+      |child : &ID, child_src : &SourceName|
+      -> (ExistenceAxes, MembershipAxes) {
+      phantom_axes ( child, child_src,
+                     &context . parent_pid, &context . parent_source,
+                     NodeRelation::Subscribes,
+                     source_diffs . as_ref () ) };
     let child_data : HashMap<ID, ChildData> =
       build_child_data (
-        tree, node, &context . parent_pid, &context . parent_source,
-        &goal_list, &removed_ids,
+        tree, node,
+        &goal_list, &removed_ids, &axes_for_removed,
         source_diffs, deleted_since_head_pid_src_map, env ) ?;
     reconcile_partnerCol_children_against_goal_list(
       tree, node, kind,
-      &goal_list, &child_data ) ?; }
+      &goal_list, &child_data ) ?;
+    if source_diffs . is_some () {
+      // Present members whose edge is New in some stage get that
+      // stage's 'newM'; removed members are the phantoms above.
+      apply_membership_axes_to_col_members (
+        tree, node,
+        & outbound_member_axes (
+          &context . parent_pid, &context . parent_source,
+          NodeRelation::Subscribes, source_diffs )) ?; }}
 
   ensure_hiddenoutsideofsubscribeecol_is_last (tree, node) ?;
   Ok(( )) }

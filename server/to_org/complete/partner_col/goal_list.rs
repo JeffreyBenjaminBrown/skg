@@ -6,45 +6,70 @@
 /// worktree). Outside diff view, the second element is empty.
 
 use crate::dbs::in_rust_graph::snapshot_global;
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::git_ops::read_repo::nodecomplete_from_git_head;
-use crate::types::git::{SourceDiff, NodeChanges, net_diff_from_per_stage, per_stage_node_changes_for_truenode};
+use crate::types::git::{MembershipAxes, SourceDiff, NodeChanges, axes_from_per_stage_diffs, net_diff_from_per_stage, per_stage_node_changes_for_truenode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::nodes::complete::NodeComplete;
 use crate::types::phantom::source_from_disk;
 
 use std::collections::{HashMap, HashSet};
 
-/// Goal list for a SubscribeeCol: the parent's worktree subscribees,
-/// optionally diffed against HEAD subscribees so that removed
-/// subscriptions appear as phantoms.
-pub fn goal_list_for_subscribee_col (
-  subscriber_pid       : &ID,
-  subscriber_source    : &SourceName,
-  source_diffs         : &Option<HashMap<SourceName, SourceDiff>>,
-  worktree_subscribees : &[ID],
-  config               : &SkgConfig,
+/// Goal list for an OUTBOUND col -- one whose membership is a
+/// relation list stored in the owner's own file (subscribeeCol,
+/// overriddenCol, hiddenCol): the owner's worktree list, in diff
+/// mode LCS-interleaved against the owner's HEAD-side list so
+/// removed members appear as phantoms at their HEAD positions.
+///
+/// Reads no git objects: when neither stage map lists the owner's
+/// file as Modified, HEAD = worktree for this list and the worktree
+/// list is returned unchanged (the short-circuit); otherwise the
+/// HEAD and worktree lists are reconstructed from the per-stage
+/// relation diffs already in hand ('net_diff_from_per_stage').
+/// An owner whose file is Added (not Modified) in some stage has no
+/// HEAD side, so -- like content under a new file -- its members
+/// carry no membership marks from here.
+pub fn goal_list_for_outbound_col (
+  owner_pid     : &ID,
+  owner_source  : &SourceName,
+  relation      : NodeRelation,
+  source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
+  worktree_list : &[ID],
 ) -> (Vec<ID>, HashSet<ID>) {
-  let head_subscribees : Option<Vec<ID>> =
-    source_diffs . as_ref ()
-      . and_then ( |diffs| diffs . get (subscriber_source) )
-      . filter ( |sd| sd . is_git_repo )
-      . and_then (
-         |_| { let skg : NodeComplete =
-                 nodecomplete_from_git_head (
-                   subscriber_pid, subscriber_source, config )
-                 . ok () ?;
-               if skg . subscribes_to . is_unspecified () { None }
-               else { Some (
-                 skg . subscribes_to . into_vec () ) }} );
-  match head_subscribees {
-    None =>
-      (worktree_subscribees . to_vec (), HashSet::new ()),
-    Some (head) => {
-      let diff : Vec<Diff_Item<ID>> =
-        compute_interleaved_diff ( &head, worktree_subscribees );
-      itemlist_and_removedset_from_diff (&diff) } } }
+  if source_diffs . is_none () {
+    return (worktree_list . to_vec (), HashSet::new ()); }
+  let (staged_nc, unstaged_nc)
+    : (Option<&NodeChanges>, Option<&NodeChanges>) =
+    per_stage_node_changes_for_truenode (
+      source_diffs, owner_pid, owner_source );
+  if staged_nc . is_none () && unstaged_nc . is_none () {
+    return (worktree_list . to_vec (), HashSet::new ()); }
+  let net : Vec<Diff_Item<ID>> =
+    net_diff_from_per_stage (
+      staged_nc   . and_then ( |c| relation . diff_in_nodechanges (c) ),
+      unstaged_nc . and_then ( |c| relation . diff_in_nodechanges (c) ));
+  itemlist_and_removedset_from_diff (&net) }
+
+/// The per-stage membership axes of an outbound col's members, read
+/// from the owner's per-stage diff of the named relation.  Used to
+/// stamp 'newM' on PRESENT members; removed members are phantoms,
+/// which carry their axes already.  Empty when the owner's file is
+/// Modified in neither stage map.
+pub fn outbound_member_axes (
+  owner_pid    : &ID,
+  owner_source : &SourceName,
+  relation     : NodeRelation,
+  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+) -> HashMap<ID, MembershipAxes> {
+  let (staged_nc, unstaged_nc)
+    : (Option<&NodeChanges>, Option<&NodeChanges>) =
+    per_stage_node_changes_for_truenode (
+      source_diffs, owner_pid, owner_source );
+  axes_from_per_stage_diffs (
+    staged_nc   . and_then ( |c| relation . diff_in_nodechanges (c) ),
+    unstaged_nc . and_then ( |c| relation . diff_in_nodechanges (c) ))
+    . into_iter () . collect () }
 
 /// Goal list for a HiddenInSubscribeeCol: the intersection of the
 /// subscriber's hides-list and the subscribee's contains-list,

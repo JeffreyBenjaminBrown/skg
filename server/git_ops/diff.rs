@@ -206,10 +206,15 @@ fn compare_nodecompletes (
     compute_interleaved_diff (
       old . hides_from_its_subscriptions . or_default (),
       new . hides_from_its_subscriptions . or_default () );
+  let overrides_view_of_diff : Vec<Diff_Item<ID>> =
+    compute_interleaved_diff (
+      old . overrides_view_of . or_default (),
+      new . overrides_view_of . or_default () );
   NodeChanges {
     text_changed,
     aliases_diff,
     ids_diff,
     contains_diff,
     subscribes_to_diff,
-    hides_diff }}
+    hides_diff,
+    overrides_view_of_diff }}

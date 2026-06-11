@@ -1,0 +1,5 @@
+pid: '1'
+title: "1"
+subscribes_to:
+  - "11"
+  - "22"

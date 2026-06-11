@@ -1,8 +1,10 @@
 use crate::source_sets::ActiveSourceSet;
 use crate::types::env::SkgEnv;
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::to_org::complete::partner_col::child_data::{ChildData, build_child_data, reconcile_partnerCol_children_against_goal_list};
 use crate::to_org::complete::partner_col::goal_list::goal_list_for_hiddeninsubscribee_col;
-use crate::types::git::SourceDiff;
+use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
+use crate::types::phantom::phantom_axes;
 use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
@@ -67,10 +69,21 @@ pub fn reconcile_hiddenin_subscribee_col_children (
   // TODO/DONE/local-view-update/plan_v2.org §5.5: a col fills its members WHOLE and is budget-neutral -- the owning
   // subscribee already spent its budget unit when it expanded, so drawing all
   // the hidden members here costs nothing and never truncates the group.
+  let axes_for_removed =
+    // This col's membership is DERIVED (subscriber hides ∩ subscribee
+    // contains), so no single relation diff is authoritative; the
+    // subscribee's contains list is the input relation read here.
+    |child : &ID, child_src : &SourceName|
+    -> (ExistenceAxes, MembershipAxes) {
+    phantom_axes ( child, child_src,
+                   &context . subscribee_pid,
+                   &context . subscribee_source,
+                   NodeRelation::Contains,
+                   source_diffs . as_ref () ) };
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
-      tree, node, &context . subscribee_pid, &context . subscribee_source,
-      &goal_list, &removed_ids,
+      tree, node,
+      &goal_list, &removed_ids, &axes_for_removed,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
   let summary =
     reconcile_partnerCol_children_against_goal_list(

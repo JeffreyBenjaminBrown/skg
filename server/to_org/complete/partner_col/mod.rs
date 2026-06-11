@@ -1,5 +1,6 @@
 pub mod child_data;
 pub mod goal_list;
+pub mod inverse_scan;
 pub mod kind;
 
 use crate::source_sets::ActiveSourceSet;

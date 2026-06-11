@@ -10,12 +10,8 @@ fn make_parent_diff (
   NodeCompleteDiff {
     status: GitDiffStatus::Modified,
     node_changes: Some ( NodeChanges {
-      text_changed:       false,
-      aliases_diff:       Vec::new (),
-      ids_diff:           Vec::new (),
       contains_diff,
-      subscribes_to_diff: Vec::new (),
-      hides_diff:         Vec::new (), } ),
+      .. NodeChanges::default () } ),
     before_node: None,
     after_node: None, } }
 
@@ -52,7 +48,8 @@ fn staged_removal_is_attributed_to_staged_side () {
                      vec! [ Diff_Item::Removed (child . clone ()) ],
                      vec! [] ) );
   let (ex, mem) = phantom_axes (
-    &child, &src, &parent, &src, Some (&diffs) );
+    &child, &src, &parent, &src,
+    NodeRelation::Contains, Some (&diffs) );
   assert_eq! ( mem, MembershipAxes {
     staged: Some (Sign::Minus), unstaged: None } );
   assert_eq! ( ex, ExistenceAxes::default () );
@@ -70,7 +67,8 @@ fn unstaged_removal_is_attributed_to_unstaged_side () {
                      vec! [],
                      vec! [ Diff_Item::Removed (child . clone ()) ] ) );
   let (_, mem) = phantom_axes (
-    &child, &src, &parent, &src, Some (&diffs) );
+    &child, &src, &parent, &src,
+    NodeRelation::Contains, Some (&diffs) );
   assert_eq! ( mem, MembershipAxes {
     staged: None, unstaged: Some (Sign::Minus) } );
 }
@@ -87,7 +85,8 @@ fn staged_add_then_unstaged_remove () {
                      vec! [ Diff_Item::New     (child . clone ()) ],
                      vec! [ Diff_Item::Removed (child . clone ()) ] ) );
   let (_, mem) = phantom_axes (
-    &child, &src, &parent, &src, Some (&diffs) );
+    &child, &src, &parent, &src,
+    NodeRelation::Contains, Some (&diffs) );
   assert_eq! ( mem, MembershipAxes {
     staged: Some (Sign::Plus), unstaged: Some (Sign::Minus) } );
 }
@@ -101,7 +100,60 @@ fn no_parent_contains_diff_falls_back_to_unstaged_minus () {
   let src    : SourceName = source_name ("public");
   let diffs  : HashMap<SourceName, SourceDiff> = HashMap::new ();
   let (_, mem) = phantom_axes (
-    &child, &src, &parent, &src, Some (&diffs) );
+    &child, &src, &parent, &src,
+    NodeRelation::Contains, Some (&diffs) );
   assert_eq! ( mem, MembershipAxes {
     staged: None, unstaged: Some (Sign::Minus) } );
+}
+
+#[test]
+fn each_relation_reads_its_own_diff_when_one_owner_bears_both () {
+  // The mislabeling case that motivated relation-true attribution:
+  // one owner both contains and overrides the same child, each edge
+  // removed in a DIFFERENT stage. The contains-phantom must carry
+  // the contains stage and the overriddenCol-phantom the overrides
+  // stage; a first-hit scan across relations would label both from
+  // whichever relation it checked first.
+  let parent : ID = id ("parent");
+  let child  : ID = id ("child");
+  let src    : SourceName = source_name ("public");
+  let parent_file : PathBuf =
+    PathBuf::from ( format! ( "{}.skg", parent . 0 ) );
+  let diff_for = | contains_ops : Vec<Diff_Item<ID>>,
+                   overrides_ops : Vec<Diff_Item<ID>> |
+    -> NodeCompleteDiff {
+    NodeCompleteDiff {
+      status: GitDiffStatus::Modified,
+      node_changes: Some ( NodeChanges {
+        contains_diff          : contains_ops,
+        overrides_view_of_diff : overrides_ops,
+        .. NodeChanges::default () } ),
+      before_node: None,
+      after_node: None, } };
+  let mut diffs : HashMap<SourceName, SourceDiff> = HashMap::new ();
+  diffs . insert ( src . clone (), SourceDiff {
+    is_git_repo: true,
+    staged: HashMap::from ([ // contains edge removed STAGED
+      ( parent_file . clone (),
+        diff_for ( vec! [ Diff_Item::Removed (child . clone ()) ],
+                   vec! [] )) ]),
+    unstaged: HashMap::from ([ // overrides edge removed UNSTAGED
+      ( parent_file,
+        diff_for ( vec! [],
+                   vec! [ Diff_Item::Removed (child . clone ()) ] )) ]),
+    added_nodes: HashMap::new (),
+    deleted_nodes: HashMap::new (), } );
+  let (_, contains_mem) = phantom_axes (
+    &child, &src, &parent, &src,
+    NodeRelation::Contains, Some (&diffs) );
+  assert_eq! ( contains_mem, MembershipAxes {
+    staged: Some (Sign::Minus), unstaged: None },
+    "the content phantom is labeled from contains_diff only" );
+  let (_, overrides_mem) = phantom_axes (
+    &child, &src, &parent, &src,
+    NodeRelation::OverridesViewOf, Some (&diffs) );
+  assert_eq! ( overrides_mem, MembershipAxes {
+    staged: None, unstaged: Some (Sign::Minus) },
+    "the overriddenCol phantom is labeled from \
+     overrides_view_of_diff only" );
 }
