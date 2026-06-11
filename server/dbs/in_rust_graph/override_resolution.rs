@@ -1,0 +1,109 @@
+//! The override resolver: given an ID, which node should be DRAWN
+//! in its place? Follows user-owned 'overrides_view_of' edges from
+//! overridden to overrider, transitively, with a seen-set cycle
+//! guard. Foreign override edges never participate in substitution;
+//! they are display-only facts (cols, heralds, the override-choice
+//! buffer).
+//!
+//! Two gates, applied per edge:
+//! - OWNERSHIP is set-independent: an edge is followed only if its
+//!   overrider's source has 'user_owns_it = true', regardless of the
+//!   active source-set.
+//! - VISIBILITY: when an 'ActiveSourceSet' is supplied, an edge is
+//!   followed only if its overrider's source is active. An inactive
+//!   overrider cannot be drawn, so it must not substitute; the walk
+//!   stops and the last visible node is the effective one. Callers
+//!   that ask "what marker would the server have written, ever?"
+//!   (the tamper check) pass None, i.e. visibility-ungated.
+//!
+//! Valid saved data cannot contain user-owned chains or monogamy
+//! violations (see [[./override_invariants.rs]]), so a path longer
+//! than one, a cycle, or a multi-overrider hop signals legacy or
+//! hand-edited data. The resolver must still terminate and be
+//! sensible on such data — a guard, not an assert.
+
+use crate::dbs::in_rust_graph::InRustGraph;
+use crate::source_sets::ActiveSourceSet;
+use crate::types::misc::{ID, SkgConfig};
+
+use std::collections::HashSet;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OverrideResolution {
+  /// The PID to draw. Equal to the (resolved) input when no
+  /// user-owned, visible overrider exists.
+  pub effective      : ID,
+  /// The chain of overriders traversed, in order. Empty = no
+  /// substitution. A length > 1 signals a legacy compound chain;
+  /// consumers surface the "Compound overrides relationship
+  /// traversed..." notice.
+  pub path           : Vec<ID>,
+  /// True iff the walk met an already-seen PID. In that case no
+  /// substitution is performed ('effective' = the input, 'path'
+  /// empty), since a cyclic override chain names no sensible
+  /// destination.
+  pub cycle_detected : bool,
+}
+
+pub fn resolve_override (
+  config : &SkgConfig,
+  graph  : &InRustGraph,
+  active : Option<&ActiveSourceSet>,
+  id     : &ID,
+) -> OverrideResolution {
+  let input_pid : ID = // extra-ID safety: resolve before walking
+    graph . pid_of (id)
+    . unwrap_or_else ( || id . clone () );
+  let mut seen : HashSet<ID> =
+    HashSet::from ( [ input_pid . clone () ] );
+  let mut current : ID = input_pid . clone ();
+  let mut path : Vec<ID> = Vec::new ();
+  loop {
+    let candidates : Vec<ID> =
+      followable_overriders_of (config, graph, active, &current);
+    if candidates . len () != 1 {
+      // 0: nothing (visible, user-owned) overrides 'current'.
+      // >1: monogamy-violating data; refuse to choose a branch.
+      // Either way 'current' is the destination.
+      return OverrideResolution {
+        effective      : current,
+        path           : path,
+        cycle_detected : false, }; }
+    let next : ID = candidates [0] . clone ();
+    if ! seen . insert ( next . clone () ) {
+      return OverrideResolution {
+        // A cyclic chain names no sensible destination, so no
+        // substitution at all: effective reverts to the input.
+        effective      : input_pid,
+        path           : Vec::new (),
+        cycle_detected : true, }; }
+    path . push ( next . clone () );
+    current = next; }}
+
+/// The overriders of 'pid' that substitution may follow: user-owned
+/// (per the config; an unknown source counts as not followable) and,
+/// when 'active' is supplied, from an active source. Modeled on
+/// 'user_owned_overriders_of' in [[./override_invariants.rs]], which
+/// serves validation and so applies no visibility filter.
+fn followable_overriders_of (
+  config : &SkgConfig,
+  graph  : &InRustGraph,
+  active : Option<&ActiveSourceSet>,
+  pid    : &ID,
+) -> Vec<ID> {
+  let mut result : Vec<ID> = Vec::new ();
+  if let Some (overriders) = graph . overriders_of . get (pid) {
+    for overrider in overriders {
+      if let Some (overrider_node) = graph . nodes . get (overrider) {
+        let user_owned : bool =
+          config . sources . get (&overrider_node . source)
+          . map ( |sc| sc . user_owns_it )
+          . unwrap_or (false);
+        let visible : bool =
+          active
+          . map ( |a| a . is_all ()
+                  || a . contains_source (&overrider_node . source) )
+          . unwrap_or (true);
+        if user_owned && visible {
+          result . push ( overrider . clone () ); }}}}
+  result }
