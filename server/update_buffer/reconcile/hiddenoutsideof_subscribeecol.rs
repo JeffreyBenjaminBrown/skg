@@ -1,10 +1,8 @@
 use crate::source_sets::ActiveSourceSet;
 use crate::types::env::SkgEnv;
-use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::to_org::complete::partner_col::child_data::{ChildData, build_child_data, reconcile_partnerCol_children_against_goal_list};
+use crate::to_org::complete::partner_col::child_data::{ChildData, apply_membership_axes_to_col_members, build_child_data, reconcile_partnerCol_children_against_goal_list};
 use crate::to_org::complete::partner_col::goal_list::goal_list_for_hiddenoutsideof_subscribeecol;
-use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
-use crate::types::phantom::phantom_axes;
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
 use crate::types::misc::{ID, SourceName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
@@ -55,7 +53,8 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
   // [SubscribeeCol, Normal] prefix), so a separate validation is unneeded.
   let context : HiddenOutsideContext =
     read_hiddenoutside_context (tree, node, kind, env) ?;
-  let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
+  let (goal_list, removed_ids, member_axes)
+    : (Vec<ID>, HashSet<ID>, HashMap<ID, MembershipAxes>) =
     goal_list_for_hiddenoutsideof_subscribeecol (
       &context . subscriber_pid, &context . subscriber_source,
       &context . subscriber_hides, &context . subscribees,
@@ -72,15 +71,16 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
   let axes_for_removed =
     // This col's membership is DERIVED (subscriber hides minus
     // subscribee content), so no single relation diff is
-    // authoritative; the subscriber's hides list is the input
-    // relation read here.
+    // authoritative: the membership signs come from the
+    // three-snapshot comparison; existence from the member's own
+    // file statuses.
     |child : &ID, child_src : &SourceName|
     -> (ExistenceAxes, MembershipAxes) {
-    phantom_axes ( child, child_src,
-                   &context . subscriber_pid,
-                   &context . subscriber_source,
-                   NodeRelation::HidesFromItsSubscriptions,
-                   source_diffs . as_ref () ) };
+    ( file_existence_axes_from_source_diff (
+        source_diffs, child, child_src ),
+      member_axes . get (child) . copied ()
+        . unwrap_or ( MembershipAxes {
+            staged : None, unstaged : Some (Sign::Minus) } )) };
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
       tree, node,
@@ -93,6 +93,11 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
       // subtree. Handled uniformly by the reconciler.
       tree, node, kind,
       &goal_list, &child_data ) ?;
+  if source_diffs . is_some () {
+    // Present members newly derived-in in some stage get that
+    // stage's 'newM'; removed members are the phantoms above.
+    apply_membership_axes_to_col_members (
+      tree, node, &member_axes ) ?; }
   if let Some (sink) = warning_sink {
     push_repair_warnings (
       sink, kind, &context . subscriber_pid, summary ); }
