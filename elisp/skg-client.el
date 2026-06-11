@@ -12,6 +12,7 @@
 (require 'skg-modify-graph)
 (require 'skg-view-new-empty)
 (require 'skg-request-file-path)
+(require 'skg-request-herald-rules)
 (require 'skg-request-diff-analysis)
 (require 'skg-request-git-diff-mode)
 (require 'skg-request-rebuild-dbs)
@@ -29,7 +30,8 @@
   (defvar skg-port (skg-port-from-toml file))
   (setq skg-config-dir (file-name-directory (expand-file-name file)))
   (skg-tcp-connect-to-rust)
-  (skg-connection-verify))
+  (skg-connection-verify)
+  (skg-request-herald-rules))
   ;; Skg, magit and global keybindings are in skg-keymaps-and-aliases.el.
 
 (defun skg-tcp-connect-to-rust ()

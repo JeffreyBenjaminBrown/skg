@@ -11,6 +11,7 @@
 (require 'skg-id-search)
 (require 'skg-modify-graph)
 (require 'skg-compare-sexpr)
+(skg-test-install-herald-rules)
 
 (ert-deftest test-skg-parse-headline-metadata ()
   "Test skg-parse-headline-metadata with various inputs."

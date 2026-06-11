@@ -16,157 +16,46 @@
 (require 'cl-lib)
 (require 'skg-sexpr-search)
 
-(defconst heralds--transform-rules
-  '(skg
-    (focused)
-    (folded)
-    (GREEN aliasCol "aliases")
-    (GREEN alias "alias")
-    (GREEN hiddenInSubscribeeCol "hiddenIn")
-    (GREEN hiddenOutsideOfSubscribeeCol "hiddenOut")
-    (GREEN subscribeeCol "it subscribes to these")
-    (GREEN subscriberCol "these subscribe to it")
-    (GREEN hiddenCol "it hides these from its subscriptions")
-    (GREEN hiderCol "these hide it from their subscriptions")
-    (GREEN overriddenCol "it overrides the view of these")
-    (GREEN overriderCol "these override the view of it")
-    (GREEN idCol "IDs")
-    (GREEN id "ID")
-    (GREEN textChanged "text changed : "
-      (RED staged   "staged")
-      (RED unstaged "unstaged"))
-    (RED deletedScaffold (ANY "DELETED" IT))
-    (RED deleted "DELETED"
-      (id)
-      (source))
-    (ORANGE unknownNode "Parent references unknown node."
-      (id))
-    (BLUE inactiveNode "node from inactive source"
-      (id)
-      (source)
-      (staged)
-      (unstaged))
-    (GREEN INTERC "" staged "staged:"
-      (GREEN newM     "M")
-      (RED   removedM "-M"))
-    (GREEN INTERC "" unstaged "unstaged:"
-      (GREEN newM     "M")
-      (RED   removedM "-M"))
-    (node
-      (source) ;; ignored
-      (parentIs
-        ;; The server omits affected parentIs. Normalisation inserts
-        ;; the internal-only `container' atom so omitted content keeps
-        ;; its herald while explicit `(parentIs affected)' stays quiet.
-        (BLUE   container   "{")
-        (absent)
-        (affected)
-        (ORANGE independent "⊥"))
-      (birth
-        (ORANGE containsParent "}")
-        (ORANGE linksToParent  "←"))
-      ;; Server emits the abbreviated atom `indef' (see
-      ;; org_to_text.rs); we match that here.
-      (GREEN indef ABUT "☮")
-      (graphStats
-        (YELLOW INTERC "→"
-          (linksInFromContainers (ANY IT))
-          (linksInFromLeaves     (ANY IT)))
-        (BLUE INTERC "{"
-          (YELLOW containers (ANY IT))
-          (BLUE   contents   (ANY IT)))
-        (BLUE aliasing "A")
-        (BLUE extraIDs "I")
-        (BLUE overriding "O")
-        (BLUE subscribing "S"))
-      (BLUE viewStats
-        (BLUE cycle "⟳")
-        (containsParent "}")
-        (GREEN sourceHerald (ANY IT)))
-      (editRequest
-        (RED delete "delete")
-        (RED merge (ANY "merge:" IT)))
-      (GREEN viewRequests
-        (aliases "req:aliases")
-        (containerwardView "req:containers")
-        (sourcewardView "req:sources")
-        (definitiveView "req:definitive"))
-      (GREEN INTERC "" staged "staged:"
-        (GREEN newX     "X")
-        (RED   removedX "-X")
-        (GREEN newM     "M")
-        (RED   removedM "-M"))
-      (GREEN INTERC "" unstaged "unstaged:"
-        (GREEN newX     "X")
-        (RED   removedX "-X")
-        (GREEN newM     "M")
-        (RED   removedM "-M"))
-      (RED notInGit "diff:not-in-git")))
+(defvar heralds--transform-rules nil
   "Rules for lensing `(skg ...)` metadata into a line of herald tokens.
 
-This table is the single source of truth for every visual decision
-in the herald display. It is interpreted by the generic engine in
-skg-lens.el (`skg-transform-sexp-flat'), whose full semantics for
-colour directives, ANY/IT, ABUT, and INTERC are documented there.
+The table itself LIVES IN RUST (`server/heralds.rs`), the single
+source of truth for every visual decision in the herald display:
+match atoms, labels, colors, presentation order. Emacs fetches it
+over the \"herald rules\" endpoint at connect time
+(`skg-request-herald-rules', called by `skg-client-init') and caches
+it here for the session; reconnecting re-fetches it. Tests inject a
+table directly via `heralds-install-rules' (see
+`skg-test-install-herald-rules'), so batch-mode tests need no server.
 
-SERVER-EMITTED ATOMS VS. RULE FORM
+While this is nil (fetch failed, or not yet connected), enabling
+`heralds-minor-mode' disables itself with a one-line message; there
+is deliberately no vendored fallback table, which would re-create
+the two-homes problem the Rust move ended.
 
-The server emits metadata atoms as small labeled tuples; the rules sexp
-converts them 1:1 into short herald strings.
-The rules' order is presentation order, independent of the raw metadata order.
-The rules can repeat a head of a path
- -- e.g. '(x a) (y a) (x b)` can be used to interleave
-the presentations of lists x and y.
-
-A few patterns:
-
-  * Simple rules (COLOR? LABEL CHILDREN...) -- e.g.
-    `(GREEN alias \"alias\")' matches `(alias \"foo\")' and emits the
-    literal `alias' in green. Children are consumed positionally;
-    use `(ANY ...)' in a child position to match any leaf/atom.
-
-  * INTERC rules -- used when the server emits a parent whose
-    children should be glued together with a separator, preserving
-    each child's own colour. Two forms:
-
-    - Labelled: `(GREEN INTERC \"\" staged \"staged:\" ...)' matches
-      `(staged ...)' and emits `staged:-M' etc. by running each sub-
-      rule against `staged' s children and joining the results.
-    - Unlabelled: sub-rules run against the current object's
-      own children (no wrapper atom required). Used at
-      `(graphStats ...)' level to turn raw sibling atoms into
-      compact tokens like `N→M' and `N{M', without needing fake
-      wrappers on the server side.
-
-  * ABUT marker -- `(GREEN indef ABUT \"☮\")' tells the renderer to
-    glue the `☮' onto the preceding token with no space. Used so
-    the indefinitive marker sits directly on its parentIs glyph.
-
-WHY SOME RULES LOOK EMPTY OR REDUNDANT
-
-  * `(focused)', `(folded)', `(node (source) ...)', `(deleted (id)
-    (source))' -- these match and emit nothing, so the atom is
-    consumed without contributing to the display. Without these the
-    default engine behaviour would reproduce the atom verbatim.
-
-  * `(RED deletedScaffold (ANY \"DELETED\" IT))' vs `(RED deleted
-    \"DELETED\" (id) (source))' -- two shapes come in from the server
-    depending on whether the deletion is on a scaffold row (like a
-    deleted aliasCol) or on a file-level node. Each gets its own
-    matcher; both render as `DELETED ...'.
-
-  * Two `(GREEN INTERC \"\" staged ...)' rules and two `(GREEN
-    INTERC \"\" unstaged ...)' -- the scaffold-level pair omits the
-    `X' / `-X' axes because existence-change markers only apply to
-    TrueNodes, not to scaffolds.
+The table is interpreted by the generic engine in skg-lens.el
+\(`skg-transform-sexp-flat'), whose full semantics for colour
+directives, ANY/IT, ABUT, and INTERC are documented there. The rule
+patterns the table uses are documented on `herald_rule_table` in
+server/heralds.rs.
 
 NORMALISATION
 
 The server leaves parentIs=affected implicit in `(node ...)'. Before
 this table runs, `heralds--read-metadata' calls
 `heralds--inject-default-parentIs' to add `(parentIs container)' when
-missing, so the `(parentIs (BLUE container \"{\") ...)' sub-rule can
-fire for omitted ordinary content.")
+missing, so the table's `(parentIs (BLUE container \"{\") ...)'
+sub-rule can fire for omitted ordinary content. `container' is thus
+an Emacs-internal atom; the server never emits it.")
+
+(defun heralds-install-rules (rules)
+  "Install RULES (a list whose car is `skg') as the herald rule table.
+Called by the connect-time fetch (`skg-request-herald-rules') and by
+tests. Signals an error if RULES does not look like a rule table."
+  (unless (and (listp rules)
+               (eq (car-safe rules) 'skg))
+    (error "heralds-install-rules: not a rule table: %S" rules))
+  (setq heralds--transform-rules rules))
 
 (defun heralds--tokens->text (tokens)
   "Convert list of TOKENS (propertized strings) to a display string.
@@ -237,7 +126,11 @@ coloured tokens that summarise view and code information. Every
 piece of display logic lives in `heralds--transform-rules'."
   :lighter " ⟪Y⟫"
   (if heralds-minor-mode
-      (progn
+      (if (null heralds--transform-rules)
+          (progn ;; No rule table (server fetch failed or never ran):
+                 ;; heralds cannot display, so stay off.
+            (message "Heralds disabled: no herald rule table from the server.")
+            (setq heralds-minor-mode nil))
         (heralds-apply-to-buffer)
         (add-hook ;; When a user edits some lines, redisplay heralds only for those lines.
          'after-change-functions

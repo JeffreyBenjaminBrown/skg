@@ -592,7 +592,9 @@ impl Phantom {
 
 impl ViewRequest {
   /// Single source of truth for ViewRequest <-> client string bijection.
-  const REPRS_IN_CLIENT: &'static [(&'static str, ViewRequest)] = &[
+  /// Public so the herald conformance test (server/heralds.rs) can
+  /// enumerate the emittable atoms from it.
+  pub const REPRS_IN_CLIENT: &'static [(&'static str, ViewRequest)] = &[
     ("aliases",            ViewRequest::Aliases),
     ("containerwardView",  ViewRequest::Containerward),
     ("sourcewardView",     ViewRequest::Sourceward),

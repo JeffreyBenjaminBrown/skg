@@ -2,6 +2,7 @@
                              (file-name-directory load-file-name)))
 (require 'ert)
 (require 'heralds-minor-mode)
+(skg-test-install-herald-rules)
 
 (ert-deftest test-heralds-minor-mode-toggle ()
   "Test that heralds-minor-mode properly adds and removes overlays."

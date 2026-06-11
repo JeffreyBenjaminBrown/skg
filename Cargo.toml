@@ -22,6 +22,10 @@ name = "cleanup-test-dbs"
 path = "tools/cleanup-test-dbs.rs"
 
 [[bin]]
+name = "emit-herald-rules"
+path = "tools/emit-herald-rules.rs"
+
+[[bin]]
 name = "delete-one-db"
 path = "tools/delete-one-db.rs"
 

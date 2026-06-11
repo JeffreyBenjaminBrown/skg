@@ -4,6 +4,7 @@ pub mod dbs;
 pub mod diff_analysis;
 pub mod from_text;
 pub mod git_ops;
+pub mod heralds;
 pub mod import_org_roam;
 pub mod nodeMerge;
 pub mod org_to_text;

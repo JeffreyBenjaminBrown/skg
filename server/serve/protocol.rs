@@ -14,6 +14,7 @@ pub enum RequestType {
   Shutdown,
   GetFilePath,
   GitDiffModeToggle,
+  HeraldRules,
   RebuildDbs,
   RerenderAllViews,
   TitlesByIds,
@@ -37,6 +38,7 @@ impl RequestType {
       "shutdown"                 => Ok (RequestType::Shutdown),
       "get file path"            => Ok (RequestType::GetFilePath),
       "git diff mode toggle"     => Ok (RequestType::GitDiffModeToggle),
+      "herald rules"             => Ok (RequestType::HeraldRules),
       "rebuild dbs"              => Ok (RequestType::RebuildDbs),
       "rerender all views"       => Ok (RequestType::RerenderAllViews),
       "titles by ids"            => Ok (RequestType::TitlesByIds),
@@ -64,6 +66,7 @@ pub enum TcpToClient {
   SearchEnrichment, // replaces SearchResults, once it's computed. Includes containerward ancestries and graphnodestats.
   RequestSnapshot, // Asks Emacs for a snapshot of one buffer (the search buffer matching the given terms), so that Rust can integrate enrichment data into the user's current edits.
   GetFilePath,
+  HeraldRules,
   VerifyConnection,
   Shutdown,
   GitDiffMode,
@@ -93,6 +96,7 @@ impl TcpToClient {
       TcpToClient::SearchEnrichment => "search-enrichment",
       TcpToClient::RequestSnapshot  => "request-snapshot",
       TcpToClient::GetFilePath      => "get-file-path",
+      TcpToClient::HeraldRules      => "herald-rules",
       TcpToClient::VerifyConnection => "verify-connection",
       TcpToClient::Shutdown         => "shutdown",
       TcpToClient::GitDiffMode      => "git-diff-mode",

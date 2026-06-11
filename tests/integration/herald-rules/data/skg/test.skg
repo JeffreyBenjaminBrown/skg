@@ -1,0 +1,4 @@
+title: "Integration Test Node"
+pid: test
+body: "This is a test node for integration testing."
+contains: []

@@ -82,6 +82,22 @@ So far there are these endpoints:
     responses include diff annotations showing changes
     between git HEAD and the worktree.
 
+## Herald rules
+  - Request: ((request . "herald rules"))
+  - Response: LP response-type "herald-rules" with `((content "RULES_SEXP"))`.
+    `RULES_SEXP` is the herald rule table -- one sexp, rooted at `(skg ...)`,
+    in the grammar `elisp/skg-sexpr/skg-lens.el` interprets. Inside it,
+    strings are always double-quoted and match atoms are bare symbols;
+    the distinction is load-bearing for the lens engine.
+  - The table is defined in `server/heralds.rs`, the single home of the
+    herald vocabulary and its presentation (labels, colors, order). Emacs
+    fetches it once per connection (at `skg-client-init`), caches it for
+    the session, and re-fetches on reconnect. If the fetch fails, heralds
+    are disabled for the session; there is no client-side fallback table.
+  - A Rust unit test (`herald_rules_cover_the_emittable_vocabulary`)
+    pins the table to the metadata vocabulary the server can emit, in
+    both directions. It pins atom coverage only, not presentation.
+
 ## Diff analysis
   - Request: `((request . "diff analysis") (include-staged . "BOOL") (include-unstaged . "BOOL"))`
     - `include-staged=true`, `include-unstaged=true`: compare HEAD to worktree.
@@ -320,7 +336,9 @@ in-memory types those keys correspond to are in
 and `server/types/git.rs` (`ExistenceAxes`, `MembershipAxes`, `Sign`).
 
 Metadata is not WYSIWYG; its appearance in the client
-is determined by `elisp/heralds-minor-mode`.
+is determined by `elisp/heralds-minor-mode`, whose rule table is
+served by Rust (see "Herald rules" above; the table lives in
+`server/heralds.rs`).
 
 PartnerCol scaffolds are represented in Rust as
 `ViewNodeKind::PartnerCol (PartnerCol)`, but their external metadata

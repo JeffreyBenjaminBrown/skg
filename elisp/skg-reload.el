@@ -24,9 +24,17 @@ Two files are deliberately absent from the unload list:
 Both files are idempotent on re-evaluation (no top-level
 hooks, no advice, just `defvar', `define-derived-mode',
 `define-key', and `defun's), so we pick up edits to them via
-plain `load-file' instead."
+plain `load-file' instead.
+
+The herald rule table (`heralds--transform-rules', fetched from
+the server at connect time) is captured before the unload and
+re-installed after, since `unload-feature' on
+`heralds-minor-mode' would otherwise wipe it until the next
+connect."
   (interactive)
-  (let ((skg-features
+  (let ((herald-rules (and (boundp 'heralds--transform-rules)
+                           heralds--transform-rules))
+        (skg-features
          '( skg-client
             skg-compare-sexpr
             skg-config
@@ -65,13 +73,15 @@ plain `load-file' instead."
             heralds-minor-mode )))
     (dolist (feat skg-features)
       (when (featurep feat)
-        (unload-feature feat t))))
-  (let ((elisp-dir
-         (file-name-directory
-          (symbol-file 'skg-reload 'defun))))
-    (load-file (expand-file-name "skg-keymaps-and-aliases.el" elisp-dir))
-    (load-file (expand-file-name "skg-init.el"                elisp-dir))
-    (load-file (expand-file-name "skg-buffer.el"              elisp-dir)))
+        (unload-feature feat t)))
+    (let ((elisp-dir
+           (file-name-directory
+            (symbol-file 'skg-reload 'defun))))
+      (load-file (expand-file-name "skg-keymaps-and-aliases.el" elisp-dir))
+      (load-file (expand-file-name "skg-init.el"                elisp-dir))
+      (load-file (expand-file-name "skg-buffer.el"              elisp-dir)))
+    (when herald-rules
+      (heralds-install-rules herald-rules)))
   (message "skg: all modules reloaded"))
 
 (provide 'skg-reload)
