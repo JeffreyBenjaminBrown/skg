@@ -1,0 +1,21 @@
+db_name = "placeholder"
+tantivy_folder = "/tmp/placeholder"
+
+[[sources]]
+name = "main"
+path = "main"
+user_owns_it = true
+
+[[sources]]
+name = "other"
+path = "other"
+user_owns_it = true
+
+[[sources]]
+name = "foreign"
+path = "foreign"
+user_owns_it = false
+
+[[source_sets]]
+name = "main"
+sources = ["main"]

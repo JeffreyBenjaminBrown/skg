@@ -1,0 +1,4 @@
+pid: C1
+title: C1
+overrides_view_of:
+  - C2

@@ -14,8 +14,9 @@ use std::collections::{HashMap, HashSet};
 /// Identifies a buffer in the client.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ViewUri {
-  ContentView (String), // UUID
-  SearchView  (String), // query
+  ContentView  (String), // UUID
+  SearchView   (String), // query
+  OverrideMenu (String), // the requested (overridden) node's PID. One menu per node: requesting it again switches to the open menu. Deliberately not a ContentView, so an open menu never hijacks 'content_view_uri_for_root_id' -- a raw view of the node and its menu can coexist.
 }
 
 /// Per-connection view bookkeeping. Each entry in 'views' is a
@@ -49,12 +50,15 @@ impl ViewUri {
   /// Serialize to the client string format.
   pub fn repr_in_client ( &self ) -> String {
     match self {
-      ViewUri::ContentView (s) => s . clone (),
-      ViewUri::SearchView  (q) => format! ("search:{}", q) } }
+      ViewUri::ContentView  (s) => s . clone (),
+      ViewUri::SearchView   (q) => format! ("search:{}", q),
+      ViewUri::OverrideMenu (p) => format! ("override-menu:{}", p) } }
   /// Parse a client string to a ViewUri.
   pub fn from_client_string ( s : String ) -> ViewUri {
     if let Some (query) = s . strip_prefix ("search:") {
       ViewUri::SearchView ( query . to_string () )
+    } else if let Some (pid) = s . strip_prefix ("override-menu:") {
+      ViewUri::OverrideMenu ( pid . to_string () )
     } else {
       ViewUri::ContentView (s) } }
   pub fn is_search ( &self ) -> bool {
@@ -85,15 +89,17 @@ impl OpenViews {
     self . views . get (uri)
       . map ( |vs| &vs . viewforest ) }
 
-  /// Returns the first (if any exists) non-search buffer
-  /// for which the ID is a root (level-1 headline).
+  /// Returns the first (if any exists) CONTENT buffer (not a search
+  /// view, not an override menu) for which the ID is a root
+  /// (level-1 headline).
   pub fn content_view_uri_for_root_id (
     &self,
     id : &ID,
   ) -> Option<&ViewUri> {
     self . root_ids . get_right (id)
       . and_then ( |uris| uris . iter ()
-                   . find ( |u| ! u . is_search () )) }
+                   . find ( |u| matches! (
+                       u, ViewUri::ContentView (_) ))) }
 
   pub fn register_view (
     &mut self,

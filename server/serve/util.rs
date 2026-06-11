@@ -117,6 +117,33 @@ pub(crate) fn format_buffer_response_sexp (
     format_string_list_sexp ("warnings", warnings) ] )
     . to_string () }
 
+/// Format the override-choice buffer response: a content-view
+/// response that additionally tells the client which URI the server
+/// registered the menu under (the client would otherwise assume its
+/// own generated UUID) and what to echo in the minibuffer.
+/// Format:
+///   ((content "...") (view-uri "override-menu:PID")
+///    (to-minibuffer "...") (errors ()) (warnings (...)))
+pub(crate) fn format_override_menu_response_sexp (
+  buffer_content : &str,
+  uri            : &ViewUri,
+  to_minibuffer  : &str,
+  warnings       : &[String],
+) -> String {
+  Sexp::List ( vec! [
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "content" . to_string () )),
+      Sexp::Atom ( Atom::S ( buffer_content . to_string () )) ] ),
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "view-uri" . to_string () )),
+      Sexp::Atom ( Atom::S ( uri . repr_in_client () )) ] ),
+    Sexp::List ( vec! [
+      Sexp::Atom ( Atom::S ( "to-minibuffer" . to_string () )),
+      Sexp::Atom ( Atom::S ( to_minibuffer . to_string () )) ] ),
+    format_string_list_sexp ("errors", &[]),
+    format_string_list_sexp ("warnings", warnings) ] )
+    . to_string () }
+
 /// Format a single view update as an s-expression.
 /// Format: ((view-uri "URI") (content "CONTENT"))
 /// Used for any streamed per-view message (collateral-view,

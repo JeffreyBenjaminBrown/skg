@@ -2,11 +2,13 @@ use crate::dbs::in_rust_graph::scheduled_audit::take_pending_audit_warning;
 use crate::types::env::SkgEnv;
 use crate::serve::ViewsState;
 use crate::to_org::render::content_view::multi_root_view_via_env;
+use crate::to_org::render::override_menu::override_menu_view;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   view_uri_from_request,
   send_response_with_length_prefix,
   format_buffer_response_sexp,
+  format_override_menu_response_sexp,
   tag_sexp_response,
   tag_text_response};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
@@ -68,7 +70,9 @@ pub fn handle_single_root_view_request (
       if let Some (existing_uri)
         = views_state . open_views
           . content_view_uri_for_root_id ( &node_id )
-        { let switch_sexp : String =
+        { // An open raw view of the node beats the menu: this check
+          // runs first, so following a link lands in the open buffer.
+          let switch_sexp : String =
             Sexp::List ( vec! [
               Sexp::List ( vec! [
                 Sexp::Atom ( Atom::S (
@@ -81,10 +85,60 @@ pub fn handle_single_root_view_request (
             & tag_sexp_response (
               TcpToClient::ContentView, &switch_sexp ));
           return; }
+      let pid : ID = // the menu is per resolved node, extra-IDs included
+        env . in_rust_graph . load_full ()
+        . pid_of (&node_id)
+        . unwrap_or_else ( || node_id . clone () );
+      let menu_uri : ViewUri =
+        ViewUri::OverrideMenu ( pid . 0 . clone () );
+      if views_state . open_views . views
+        . contains_key (&menu_uri)
+        { // One menu per node: a second request switches to it.
+          let switch_sexp : String =
+            Sexp::List ( vec! [
+              Sexp::List ( vec! [
+                Sexp::Atom ( Atom::S (
+                  "switch-to-view" . to_string () )),
+                Sexp::Atom ( Atom::S (
+                  menu_uri . repr_in_client () )) ] ) ] )
+            . to_string ();
+          send_response_with_length_prefix (
+            stream,
+            & tag_sexp_response (
+              TcpToClient::ContentView, &switch_sexp ));
+          return; }
       let response_sexp : String =
       { let _span : tracing::span::EnteredSpan =
           tracing::info_span!( "single_root_view" ). entered();
         block_on ( async {
+            // The override-choice buffer: a NEW single-root view of
+            // an overridden node offers the chain of overriders
+            // instead of silently choosing. Offered in diff mode
+            // too (decided 2026-06-11): the menu is navigation, not
+            // decoration, and it presents raw graph facts.
+            match override_menu_view (
+              env, &pid, Some (active_source_set) ) . await
+            { Ok ( Some ((menu_content, menu_pids, menu_forest)) ) => {
+                views_state . open_views . register_view (
+                  menu_uri . clone (),
+                  menu_forest,
+                  &menu_pids );
+                let warnings : Vec<String> =
+                  take_pending_audit_warning ()
+                    . map ( |w| vec! [w] )
+                    . unwrap_or_default ();
+                return format_override_menu_response_sexp (
+                  &menu_content,
+                  &menu_uri,
+                  "The requested node is overridden. Choose a destination.",
+                  &warnings ); },
+              Ok (None) => {}, // not overridden (visibly): render normally
+              Err (e) => {
+                return format_buffer_response_sexp (
+                  &String::new (),
+                  &[ format! (
+                      "Error generating override menu: {}", e ) ],
+                  &[] ); }}
             match multi_root_view_via_env (
               env,
               &[node_id . clone ()],

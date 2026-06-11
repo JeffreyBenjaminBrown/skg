@@ -54,6 +54,11 @@ VIEW-URI is the pre-generated UUID to assign to the new buffer."
           (let* ((content-value (cadr (assoc 'content response)))
                  (errors-list (cadr (assoc 'errors response)))
                  (warnings-list (cadr (assoc 'warnings response)))
+                 (server-uri ;; The server may override the client-generated URI; it does for override-choice menus, registered under "override-menu:PID".
+                  (cadr (assoc 'view-uri response)))
+                 (effective-uri (or server-uri view-uri))
+                 (to-minibuffer ;; Optional one-line echo: minibuffer only, never buffer text, never a popped window.
+                  (cadr (assoc 'to-minibuffer response)))
                  (has-errors (skg--message-list-nonempty-p errors-list))
                  (has-warnings (skg--message-list-nonempty-p warnings-list))
                  (has-content (and content-value
@@ -62,7 +67,9 @@ VIEW-URI is the pre-generated UUID to assign to the new buffer."
               (let ((buf-name (skg-content-view-buffer-name
                                content-value)))
                 (skg-open-org-buffer-from-text
-                 tcp-proc content-value buf-name view-uri)))
+                 tcp-proc content-value buf-name effective-uri)))
+            (when to-minibuffer
+              (message "%s" to-minibuffer))
             (when (or has-errors has-warnings)
               (skg-big-nonfatal-message
                "*SKG Content View Messages*"
