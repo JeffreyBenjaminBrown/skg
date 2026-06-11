@@ -1,0 +1,936 @@
+* plan : override rendering and navigation
+This plan covers the metaplan_2.org step "define override rendering
+and navigation" -- the largest step, and the bridge to
+[[../../docs/forks.md]].  Today the 'overrides_view_of' relation is
+stored, validated (monogamy and no-owned-chains, at save and
+rebuild) and displayed in cols, but never changes what is drawn.
+After this plan: recursive content draws the user-owned overrider in
+place of what it overrides; saving such a view round-trips to the
+original IDs (the hardest correctness obligation here); visiting an
+overridden node offers a choice instead of choosing silently; and
+each navigation surface is classified, with a bypass for the
+surfaces that must see the raw node.
+
+* scope
+** covered
+*** The override resolver
+one cycle-guarded function, one result
+type, beside the existing invariant validators.
+*** Substitution inside unified completion,
+applied only where
+completion CREATES a viewnode as recursive content; off in diff
+mode; gated by visibility; ownership read set-independently.
+*** The save-side round-trip: a drawn overrider stands for the
+  original in every collected list, so saving a container never
+  silently rewrites its contains.
+*** The 'overridesHere' marker and its red "Oh" herald.
+*** The overridden-as-such exception (draw and expand the original,
+  no hides applied), with vision.org's R/E/G/H example as fixture.
+*** The override-choice buffer (the "menu") for new single-root views
+  of overridden nodes, foreign overriders included.
+*** Navigation surface classification, including the bypass request
+  parameter and its Emacs surfaces.
+*** api-and-formats.md and glossary.md touch-ups where behavior
+  changes (the full documentation pass remains the metaplan's last
+  step).
+** not covered
+*** The diff-mode policy step (refusals; 'overrides_view_of' diffs in
+  'NodeChanges'; the no-substitution-in-diff-surfaces assertions
+  beyond the gate this plan installs and tests).
+*** The forks UX (the clone gesture, the social half) -- the
+  metaplan's awaits.
+*** Generalizing "drawn in place of" beyond overrides (recorded in
+  TODO/problems.org; see the problems section below, which amends
+  that note).
+*** Surfaces that deliberately never substitute: search results,
+  titles-by-ids, readable-ID annotation, containerward/sourceward
+  ancestry, diff analysis, diff phantoms.  Only navigation FROM
+  them changes.
+* current behavior, verified 2026-06-11
+** the relation and its building blocks
+*** Validation: 'validate_override_invariants_after_save'
+  ('server/save.rs', simulating the post-save graph, then
+  'validate_touched_override_invariants') and the full-graph check
+  at init/rebuild ('server/dbs/in_rust_graph/override_invariants.rs')
+  enforce monogamy (at most one user-owned overrider per resolved
+  overridden PID) and no user-owned chains (X overrides Y overrides
+  Z with X, Y user-owned).  A running server therefore never holds
+  data violating either; the resolver's defensive cases below are
+  belt-and-suspenders, reachable only by constructing invalid
+  graphs directly in tests.
+*** Resolver building blocks: the inverse index
+  'InRustGraph.overriders_of'; 'pid_of' resolves extra IDs;
+  'user_owns_node' / 'user_owned_overriders_of'
+  (override_invariants.rs) read 'config.sources[..].user_owns_it';
+  'ActiveSourceSet.contains_source' answers visibility;
+  'snapshot_global ()' supplies the graph.
+** where completion creates viewnodes
+*** One BFS, 'complete_viewforest'
+  ('server/update_buffer/complete.rs').  Content children are
+  created in 'complete_content_children'
+  ('server/update_buffer/reconcile/content.rs' ~385-398) via
+  'complete_relevant_children_in_viewnodetree'
+  ('server/update_buffer/util.rs' ~130), which matches existing
+  children to a goal list through a 'view_child_orderkey' closure
+  and creates only the missing members through 'create_child', with
+  'build_child_creation_data' prefetching title/source per goal ID.
+  That orderkey/create pair is the substitution seam: matching can
+  compare collected identities while creation substitutes.
+*** 'content_goal_list' (content.rs ~321) is the node's contains,
+  minus the col owner's hides iff the node is a subscribee-as-such
+  ('is_subscribee' checks parentIs=Affected under a Subscribee
+  PartnerCol).  An overridden-as-such fails that check, so its
+  expansion already uses full contains -- the no-hides half of the
+  overridden-as-such exception exists by default, unverified by any
+  test.
+*** Diff mode reaches completion as
+  'CompletionContext.source_diffs : Option<..>' -- the natural
+  off-switch.  'CompletionContext.active_source_set' is already
+  carried (stage 9).
+*** PartnerCol members are created separately
+  ('server/to_org/complete/partner_col/child_data.rs',
+  'mk_indefinitive_viewnode'); roots, ancestry insertions
+  ('server/to_org/expand/backpath.rs', indefinitive Independent
+  children with birth markers) and search-result roots
+  ('build_search_viewforest') are separate creation sites that this
+  plan deliberately leaves raw.
+** save extraction reads buffer IDs raw
+*** 'content_members'
+  ('server/from_text/local_instruction_collection/traverse.rs'
+  ~373) pushes each content child's own ID into 'SetContains';
+  'visible_content_members' (~393) does the analogue for
+  subscribee-as-such hide/unhide inference; the distinctness
+  validators ('nonignored_children_have_distinct_ids',
+  'buffer_to_viewnodes/local.rs') compare own IDs.  If a drawn
+  overrider's own ID reached any of these, saving would silently
+  rewrite graph facts -- the metaplan's ID-aliasing hazard.
+*** viewStats parsing ('parse_viewstats_sexp',
+  'server/serve/parse_metadata_sexp.rs' ~710): unknown bare atoms
+  error; unknown keyed forms error; 'sourceHerald' alone is
+  silently discarded as output-only.  A new keyed viewstat without
+  a parse arm fails loudly, not silently.  Good.
+** navigation funnels
+*** 'skg-visit-link', 'skg-goto', 'skg-goto-by-id' and search-result
+  visits ('elisp/skg-id-search.el') all call
+  'skg-request-single-root-content-view-from-id', i.e. one request:
+  "single root content view".  Its handler
+  ('server/serve/handlers/single_root_view.rs') refuses inactive
+  roots, short-circuits to '(switch-to-view URI)' when a content
+  view with that root is open, else renders, registers the view,
+  and replies with ((content ..) (errors ..) (warnings ..)).
+*** 'skg-readable-ids-mode' only annotates; a "jump from magit" is
+  'skg-goto' invoked with point on a UUID in a magit buffer --
+  today indistinguishable, server-side, from any other goto.
+*** Definitive expansion inside a buffer is '(viewRequests
+  definitiveView)' metadata, consumed by completion under the
+  defmap draw rule ('server/to_org/expand/definitive.rs').
+*** The protocol has no minibuffer-only channel; errors and warnings
+  display via 'skg-big-nonfatal-message' (a popped messages buffer
+  plus a minibuffer line).
+*** The heralds the menu needs already exist: 'overridesParent'
+  ("Op", stage 10, computed everywhere), the 'cycle' viewstat, and
+  the source herald that distinguishes owned from foreign.
+
+* desired behavior
+** the resolver, one type
+'server/dbs/in_rust_graph/override_resolution.rs', beside the
+invariants it complements:
+#+begin_example
+resolve_override (config, graph, active, id) -> OverrideResolution
+  { effective       : ID,      // the PID to draw
+    path            : Vec<ID>, // overriders traversed; empty = none
+    cycle_detected  : bool }
+#+end_example
+*** The input resolves through 'pid_of' first (extra-ID safety).
+*** Walk: from the current PID, find its user-owned overriders
+  ('user_owned_overriders_of' is the model).  An edge is followed
+  iff its overrider is user-owned (OWNERSHIP is set-independent:
+  'user_owns_it', never "currently active") AND its overrider's
+  source is active (VISIBILITY gates substitution, per edge: an
+  inactive overrider does not substitute, so the walk stops and the
+  last visible node is the effective one).  Foreign edges are never
+  followed; they are display-only facts.
+*** Total on any data: a seen-set guards cycles ('cycle_detected',
+  effective = the input, no substitution); more than one user-owned
+  overrider at a hop (invalid data) stops the walk at that hop.
+  Both are unreachable in a validated graph (see current behavior)
+  but must not hang or panic on imports or hand-edited files.
+*** 'path.len () > 1' signals a legacy compound chain; consumers
+  surface the vision.org notice "Compound overrides relationship
+  traversed. Such chains are legal but potentially confusing."
+** substitution inside unified completion
+When completion would CREATE a viewnode for node N as recursive
+CONTENT -- de novo recursive content, definitive expansion, new
+children introduced during post-save or collateral reconciliation --
+it draws 'resolve_override (N).effective' = R instead, marked
+'(overridesHere N)' whenever R differs from N.  Precisely:
+*** CREATION-ONLY.  Existing viewnodes are never rewritten: a buffer
+  already showing the original keeps showing, and editing, the
+  original.  Closing and reopening normalizes.
+*** CONTENT-ONLY.  PartnerCol members (all eight kinds), QualCol/Qual
+  scaffolds, view roots, search-result roots, ancestry/backpath
+  insertions, and diff phantoms always draw the raw node.
+*** GATES, in order:
+  1. omission first: if N's source is inactive, stage 9's omission
+     removes it from the goal list before substitution is consulted.
+     (Drawing R there would require a marker naming the inactive N
+     -- a leak.  So an inactive original draws nothing, even when
+     its overrider is active.)
+  2. diff off: no substitution when
+     'CompletionContext.source_diffs' is Some.
+  3. the resolver's own per-edge ownership and visibility gates.
+*** MATCHING.  The orderkey becomes the collected ID.
+Background: the reconciler
+('complete_relevant_children_in_viewnodetree') makes a parent's
+actual children agree with a GOAL LIST -- the members the graph
+says belong there, in order.  To do that it must decide, for each
+existing child viewnode, which goal member it corresponds to.
+That correspondence is the 'view_child_orderkey' closure: it
+extracts an identity (the "orderkey") from each child; a child
+whose orderkey appears in the goal list is kept (and reordered to
+goal position), a goal member with no matching child is created
+via 'create_child', and a child whose orderkey is not in the goal
+list gets the stale treatment (deleted if leaf, demoted if
+branch).
+
+The problem substitution creates: P's goal list says N (contains
+lists always hold original IDs), but the child drawn for N
+carries R's own ID.  If the orderkey stayed "the child's own ID"
+(today's definition), every rerender of P would misfire twice:
+goal member N looks MISSING (so a second R is created for it),
+and the existing R looks STALE (so it is deleted or demoted).
+The buffer would churn on every save.
+
+The fix is to define the orderkey as the COLLECTED ID -- the
+'(overridesHere N)' original when the marker is present, else the
+child's own ID.  Then the existing R-marked-N has orderkey N,
+matches goal member N, and is simply kept.  Concretely, for P
+contains [N], R overrides N:
+- fresh expansion: no child has orderkey N, so 'create_child (N)'
+  runs and (under the gates above) creates R marked
+  '(overridesHere N)';
+- post-save rerender: the marked child's orderkey is N, so it
+  matches and nothing is recreated -- this is what makes saves
+  idempotent;
+- legacy buffer drawing raw N (no marker): its orderkey is its
+  own ID, N, so it also matches and is kept as-is -- existing
+  viewnodes are never force-upgraded to the overrider, which is
+  the "creation-only" rule falling out of the same mechanism.
+*** The created R is an ordinary content child: definitive-eligible
+  (R is user-owned by construction, since only user-owned edges
+  substitute), deduped buffer-wide by the existing defmap draw
+  rule, budgeted like any new node.
+*** Two goal members resolving to the same R: both are drawn, each
+  marked with its own original.  The buffer shows the same drawn ID
+  twice under one parent; collected-ID distinctness still holds,
+  and the defmap keeps at most one occurrence definitive.
+*** Compound chains emit the resolver's notice through the warning
+  channel of whatever response carries the render (save responses
+  via the existing sinks; de novo content-view responses need a
+  small warnings-plumbing addition in 'multi_root_view_via_env').
+** the round-trip through the original ID
+The buffer draws R where the contains list says N; saving must not
+rewrite N to R.
+*** 'ViewNodeStats.overridesHere : Option<ID>' -- Some(N) means "this
+  viewnode was drawn here in place of N, which it (transitively)
+  overrides".  Serialized as the keyed form '(overridesHere N)'
+  inside '(viewStats ...)'; parsed back by a new arm in
+  'parse_viewstats_sexp'.  (Decided 2026-06-11: the marker carries
+  the original ID, superseding the recorded bare-bool intent, and
+  lives in viewStats as proposed.)
+*** COLLECTED-ID RULE: 'content_members', 'visible_content_members'
+  and the content distinctness validators all read the marker --
+  for a marked child they collect N, not R.  Everything downstream
+  (lowering, the weave, supplementation, the noop filter) already
+  operates on collected IDs and needs no change.
+*** The marker does NOT change self-writing: edits to the drawn R's
+  title, body or cols save to R, keyed by R's own ID, like any
+  definitive node.  Moving the marked child to another parent moves
+  N (the lens travels with the viewnode); deleting it deletes N
+  from the parent's list; reordering it positions N.
+*** TAMPER VALIDATION.  A marker the server would not have drawn aborts the save.
+Background: the marker is load-bearing text.  It travels to Emacs
+as ordinary buffer characters, and the save pipeline trusts the
+parsed metadata -- so anything a render can write there, a hand
+edit, a killed-and-yanked headline, or a bug can write too.  And
+wherever a marker appears, save extraction collects the marker's
+ID instead of the child's own.  That is exactly the power that
+must not be extended to arbitrary text.
+
+The problem if unvalidated: put '(overridesHere M)' on any
+visible child X of P, where M is ANY ID whatsoever.  On save, X
+contributes M instead of X to P's collected contains, so P
+silently loses X and gains M -- while the buffer still LOOKS like
+it shows X under P.  No render produced that marker, so the save
+would rewrite a graph fact the user never saw change: the
+ID-aliasing hazard this whole section exists to kill, re-entering
+through the metadata door.  Malice is not required; a yanked
+headline carries its old metadata along.
+
+The check, at buffer validation: every node carrying
+'(overridesHere N)' must have its own ID equal
+'resolve_override (N).effective' computed with active = None --
+ownership-gated but visibility-UNGATED.  Both halves of that form
+matter:
+- "effective", not "a direct edge exists": resolution is
+  transitive, so on a legacy chain Z over Y over X the drawn node
+  is X marked '(overridesHere Z)' with no direct X-to-Z edge.  A
+  direct-edge check would reject markers the server itself wrote.
+- visibility-ungated: a marker that was honest when rendered must
+  not start failing because the source-set switched afterward.
+  The visibility gate governs what NEW renders draw; it says
+  nothing about what an old buffer may truthfully claim.
+
+On failure the save aborts with an explanatory error, like other
+buffer validation failures.  Abort is the only safe response:
+ignoring the marker would collect the carrier's own ID, honoring
+it would collect N -- each a silent contains rewrite in one
+direction or the other -- and the server cannot know which the
+user meant.
+*** Saves in diff mode still honor markers already present in the
+  buffer (a stale marked buffer must not corrupt on save); the
+  diff-mode gate governs creation only.
+*** SOURCE-SET SWITCHES: the marker survives InactiveNode conversion.
+(Found 2026-06-11 while specifying the tamper check; see the TODO
+problem below, which awaits your blessing.)  Stage 9's
+switch-rerender converts a now-inactive Active viewnode into an
+InactiveNode, whose representation today carries only id and
+source.  If a retained marked child -- R marked '(overridesHere
+N)', kept because it has active view-children -- lost its marker
+in that conversion, R would thereafter act as an ordinary
+positional content member, so the next save would collect R where
+P's disk says N and the weave would insert R into P's contains: a
+graph edit the user never made.  So InactiveNode gains an
+optional drawn-in-place-of field; conversion copies the marker;
+the collected-ID and orderkey rules read it exactly as they read
+the Active marker.  (The childless case needs nothing:
+convert-and-prune removes InactiveNode leaves, and completion
+redraws the position from the goal list.)
+** the overridden-as-such exception
+An Affected child of an OverriddenCol always draws the original
+(cols never substitute, so this is automatic), and definitive
+expansion requested from it expands the original: full contains, no
+hides applied (the owner's hides are scoped to subscriptions;
+'content_goal_list' already behaves this way because the node is
+not a subscribee-as-such).  Its immediate children are created
+WITHOUT substitution -- the user asked to see the original, and the
+overrider is already its grandparent.  Deeper levels follow the
+general rule (decided 2026-06-11: no cascade).
+vision.org's example is the fixture: R subscribes to and overrides
+E, R hides H, E contains G and H; with both cols expanded:
+#+begin_example
+  * R
+  ** subscribeeCol
+  *** E
+  **** G
+  ** overriddenCol
+  *** E
+  **** G
+  **** H
+#+end_example
+** the Oh herald
+Red "Oh" on any node carrying 'overridesHere', added to the rule
+table in 'server/heralds.rs' (the conformance test forces the rule;
+regenerate 'tests/elisp/herald-rules.sexp' per the stage-10
+constraint).  The herald shows the label only, swallowing the ID
+payload: an ANY rule without the IT directive outputs just its
+fixed tokens and discards the matched value (verified in
+'skg-lens.el'; the viewRequests rules already work this way).  If
+some untested subtlety blocks that, the documented fallback is a
+derived display-only bare atom beside the keyed form (details in
+the problems note "the herald payload-swallowing question is
+presentational"); the keyed form remains the single load-bearing
+fact either way.  If the fallback turns out to be needed, the
+implementation must report that finding in progress.org (per
+Jeff, 2026-06-11).
+*** DONE If such blocking subtlety does exist, report that in progress.org during implementation.
+**** claude: folded into the paragraph above
+** the override-choice buffer
+When a "single root content view" request names a node Z that is
+overridden by ANYONE -- any edge in 'overriders_of', user-owned or
+foreign, with at least one overrider visible under the active
+source-set -- the handler returns, after the inactive-root refusal
+and the switch-to-view short-circuit but before rendering, an
+ordinary Skg buffer of indefinitive nodes instead of a content
+view.  (Not read-only as a buffer, decided 2026-06-11: like a
+search buffer, its generated lines define nothing, but the user
+can edit and save it, e.g. parking their own content under a
+line.)
+*** Root: Z, indefinitive, ParentIs::Absent.
+*** Children: each overrider drawn as an indefinitive Independent
+  child of what it overrides, following 'overrides_view_of' from
+  overridden to overrider recursively, ALL edges including foreign,
+  each branch stopping with the 'cycle' viewstat at the first
+  repeated ID.  Overriders from inactive sources are omitted, with
+  their branches.
+*** Built from the in-Rust graph ('overriders_of') by a small
+  seen-set BFS (model: the containerward ancestry traversal),
+  reusing backpath.rs's indefinitive-Independent child-insertion
+  helpers where they fit; run the standard finishing pass so the
+  source heralds and "Op" (this node overrides its parent) appear
+  -- both land for free.
+*** If NO overrider is visible, fall through to a normal render: a
+  menu with no choices would be noise.
+*** The menu appears in diff mode too (decided 2026-06-11): it is
+  navigation, not decoration, and it presents raw facts.  The
+  diff-policy step will assert this.
+*** Registered as a view under a dedicated URI kind, deduped by root,
+  so it can be locked and rerendered without hijacking
+  'content_view_uri_for_root_id'.  Precedence, decided 2026-06-11:
+  an open raw content view of Z beats the menu (the switch-to-view
+  check runs first); a second menu request for Z switches to the
+  open menu; a raw view opened via bypass coexists with Z's menu.
+*** The explanation goes to the minibuffer, never buffer text:
+  "The requested node is overridden. Choose a destination."
+  Delivered (decided 2026-06-11) via a new optional
+  '(to-minibuffer "...")' field on the content-view response,
+  which Emacs shows with 'message' alone -- no popped messages
+  buffer.  The rare compound-chain notice keeps the warnings
+  channel.
+From inside the menu the normal gestures work: 'skg-goto' on an
+overrider opens it; requesting a definitive view of any line --
+including the root -- edits that node in place; and the bypass
+command below opens the original as its own buffer.
+**** DONE let's rename 'notice' to 'to-minibuffer' in the API
+***** claude: renamed at every live-spec site
+The bullet above, the implementation step, the docs step and the
+menu tests now say '(to-minibuffer "...")'; the DONE dialog under
+problems keeps the old name as history.
+** navigation surface classification
+The "single root content view" request gains an optional field,
+'(override-choice . "menu" | "bypass")', defaulting to menu.
+Bypass skips the menu and renders the requested root raw; recursive
+content beneath it still follows the substitution rules.
+*** following a textlink to an overridden node: the menu (no Emacs
+  change; it funnels through the one request).
+*** 'skg-goto' and friends, including visiting a search result: the
+  menu (ditto).
+*** readable-ID jumps from magit: bypass -- 'skg-goto' sends bypass
+  when invoked in a magit buffer.
+*** requesting a definitive view inside an existing buffer: no
+  request involved.  The node itself is an existing viewnode (never
+  rewritten); its new children substitute, except under an
+  overridden-as-such, whose immediate children draw raw (above).
+*** opening (new buffer) from an overriddenCol child: the menu (falls
+  out: the child is overridden by the col's owner at least).
+*** collateral rerender after save: existing viewnodes unchanged; new
+  content substituted (falls out of creation-only).
+*** a new command, 'skg-goto-bypassOverride', sends bypass explicitly: the
+  menu's escape hatch, usable anywhere.
+* implementation plan, in order
+Ordering principle (stage-9 precedent: build the safety net before
+relaxing anything): the save-side round-trip machinery lands before
+anything can mark a buffer, and the marker lands before
+substitution can draw one.
+** the resolver
+The type, the function, and direct unit tests over hand-built
+'InRustGraph's (no TypeDB): no overrider; foreign-only ignored;
+single owned; owned-but-inactive gated; chain of two (path length
+2); cycle guard; extra-ID input; the defensive multi-overrider
+case.
+** the marker, inert
+'overridesHere' on 'ViewNodeStats'; serialization (keyed form);
+the 'parse_viewstats_sexp' arm; tamper validation; the
+collected-ID rule in 'content_members', 'visible_content_members'
+and the distinctness validators; the "Oh" rule in heralds.rs plus
+fixture regeneration.  All inert -- nothing sets the field yet; the
+whole suite must pass unchanged.
+** substitution at the content creation seam
+The orderkey returns collected IDs; 'build_child_creation_data' and
+the create closure resolve through the resolver under the three
+gates; the compound-chain warning plumbing.  The save round-trip
+tests below land here, in the same commit as the first substituted
+render.
+** the overridden-as-such fixture
+Verify the existing no-hides expansion, pin the raw immediate
+children, and add the R/E/G/H tests; assert col members never
+substitute.
+** the override-choice buffer
+The traversal, buffer assembly, URI kind, handler wiring, the
+'(to-minibuffer ...)' response field and its Emacs-side
+minibuffer-only display, and the menu tests.
+** the bypass parameter and Emacs surfaces
+The request field; handler support; 'skg-goto' magit detection;
+'skg-goto-bypassOverride'; an integration test through the fetch path.
+** documentation touch-ups
+api-and-formats.md: the request field, menu behavior, the
+'(to-minibuffer ...)' response field, the 'overridesHere'
+metadata, the compound notice.  glossary.md:
+override resolution terms (effective overrider, substitution,
+override-choice buffer, overridden-as-such).  TODO/problems.org:
+rewrite the "drawn in place of" architecture note to match the
+decision taken in the problems section below.
+
+* tests
+Prefer the pure seams: the resolver is pure given a graph; the
+extraction seam ('extract_nonmergeSavePlan_locally') is pure given
+a placed forest; reconciliation is testable at 'complete_viewforest'
+without TypeDB round-trips.  Fixtures needing gO/gS-style global
+facts call 'try_init_global_handle' (stage-10 constraint); invalid
+graphs (chains, cycles) must be built directly, since save and
+rebuild rightly refuse them.
+** resolver (unit)
+The list under "the resolver" above.
+** substitution rendering
+*** De novo: P contains N; user-owned active R overrides N -> P's
+  child is drawn R with '(overridesHere N)'.
+*** Foreign overrider -> raw N.  Inactive overrider -> raw N.  Diff
+  mode -> raw N.  Inactive N, active R -> neither drawn.
+*** Chain X over Y over Z (hand-built graph) -> drawing Z draws X,
+  path length 2, the compound notice in the response warnings.
+*** Subscribee-as-such expansion: hides filter first, substitution
+  after, on the survivors.
+*** Two members of one parent resolving to one R: both drawn, marked
+  distinctly.
+** save round-trips (the hardest obligation)
+*** Save the de novo buffer above: P's contains on disk still names
+  N; R's file untouched by P's save; a second save is a noop
+  (idempotence through the orderkey matching).
+*** Edit the drawn R's title -> R's file changes, N's does not.
+*** Delete the drawn child -> P loses N.  Move it under P2 -> N moves.
+  Reorder it -> contains order reflects N's new position.
+*** Subscribee-as-such: 'visible_content_members' reports N for a
+  marked child, so no phantom hide of N is inferred.
+*** Tamper: a hand-written marker failing the resolve check aborts
+  the save with an explanation.
+*** A legacy buffer drawing N raw still saves identically.
+*** A marked buffer saved while diff mode is on still collects N.
+*** A switch deactivating the drawn R: childless marked R is pruned
+  and the position redraws raw N; a marked R with active children
+  is retained as an InactiveNode that still collects N, so P's
+  contains is unchanged by the next save.
+*** Tamper-check staleness: a marked buffer still validates after a
+  switch deactivates R's source (the check is visibility-ungated).
+** overridden-as-such (R/E/G/H)
+*** subscribeeCol expansion of E shows G only; overriddenCol
+  expansion of E shows G and H; the overriddenCol expansion's
+  children are unmarked (raw); the stage-10 gO/gS fixture extends
+  rather than duplicates.
+** the menu
+*** Visiting overridden Z returns the menu: Z as root, overriders as
+  Independent indefinitive children, foreign included, Op and
+  source heralds present, a cycle fixture stops with the cycle
+  marker, inactive overriders omitted, all-overriders-inactive
+  falls through to a normal view.
+*** The to-minibuffer message reaches the minibuffer and no
+  messages buffer pops;
+  the generated lines are indefinitive; saving the menu is harmless
+  (overrider children Independent), and content the user adds
+  under a line survives the save, as in search buffers.
+*** Visiting an overridden node in diff mode still offers the menu.
+*** Bypass renders Z normally with substituted content beneath; the
+  magit surface and 'skg-goto-bypassOverride' exercise it (elisp or
+  integration).
+*** Precedence pinned: an open raw view of Z wins (switch-to-view);
+  a second menu request switches to the open menu.
+** no regressions
+content_view, save, new, subscribee_col, hidden_from_subscriptions,
+source_sets, partner_col_order, partner_col_warnings,
+view_stats_sharing, git_diff_view, idempotence, merge.
+
+* verification
+** 'cargo check'
+** 'cargo test --lib'
+** 'cargo test --test save -- --nocapture'
+** 'cargo test --test content_view -- --nocapture'
+** 'cargo test --test subscribee_col -- --nocapture'
+** 'cargo test --test hidden_from_subscriptions -- --nocapture'
+** 'cargo test --test source_sets -- --nocapture'
+** 'cargo test --test view_stats_sharing -- --nocapture'
+** 'cargo test --test git_diff_view -- --nocapture'
+** 'cargo nextest run'
+** 'bash/emacs-tests.sh'
+** 'bash/all-tests.sh --no-sound'
+
+* problems
+Anything awkward, potentially incorrect, dangerous, or undecided.
+All decisions were made 2026-06-11 and folded into the plan body;
+the DONE headings preserve the dialog, and the remaining notes
+were always awareness-only.  One problem found later that day,
+while elaborating the tamper check, remains open: the TODO below
+on switch-converted substitutes.
+** glossary for this section
+*** "Substitution"
+Drawing the user-owned overrider R in place of
+node N wherever completion would create N as recursive content..
+*** "The resolver"
+The one function computing overrider R from overridden N
+(transitive, cycle-guarded, ownership- and visibility-gated).
+*** "Transitive"
+The resolver follows chains: if N's user-owned overrider Y is
+itself overridden by user-owned X, the walk continues, and X is
+the effective node.  Valid data cannot contain such chains (the
+no-owned-chains invariant), so a walk longer than one edge signals
+legacy data and surfaces the "Compound overrides relationship
+traversed..." notice.
+*** "Cycle-guarded"
+The walk keeps a seen-set of visited PIDs.  On a repeated PID it
+stops, reports 'cycle_detected', and substitutes nothing (effective
+= the input).  Unreachable in a validated graph; the guard exists
+so one bad import or hand-edited file cannot hang the server.
+*** "Ownership-gated"
+An edge is followed only if its overrider's source has
+'user_owns_it = true'.  Foreign override edges never substitute;
+they are display-only facts (cols, heralds, the menu).  Ownership
+is read from the config alone, independent of the active
+source-set.
+*** "Visibility-gated"
+An edge is followed only if its overrider's source is active in
+the connection's source-set.  An inactive overrider cannot be
+drawn, so it does not substitute: the walk stops there and the
+last visible node is drawn instead.  Switching source-sets can
+therefore change which node a view draws.
+*** "The marker" / '(overridesHere N)':
+metadata on a drawn viewnode
+recording which original it stands for; what save extraction
+consults to round-trip the parent's contains list.
+*** "Collected ID"
+the ID a child contributes to its parent's saved
+lists -- the marker's original if present, else the child's own.
+*** "The menu" / override-choice buffer
+the buffer of indefinitive nodes offered instead of a content view
+when the requested root is overridden.  An ordinary editable,
+savable buffer, like a search buffer: only its generated lines
+define nothing.
+**** DONE I don't think this needs to be read-only.
+Just like search results aren't.
+***** claude: agreed; "read-only" was the wrong word
+The definition above, the buffer-assembly passage in "the
+override-choice buffer", and the menu tests now say indefinitive
+generated lines in an ordinary editable, savable buffer, with the
+search-buffer comparison made explicit.
+*** "Bypass"
+The request flag that skips the menu and renders the
+requested root raw.
+*** "Overridden-as-such"
+An Affected child of an OverriddenCol --
+the position that always shows the original.
+** DONE the marker must carry the original ID, contradicting a recorded decision
+The 2026-06-10 decision (recorded in TODO/problems.org,
+"Architecture note: nothing can represent 'drawn in place of
+another node'") was a bare bool plus the convention that save
+extraction recovers the original.  I believe the bool is unsafe.
+Recovery would have to invert the resolver against the parent's
+disk contains ("which disk member resolves to this drawn R?"), and
+that inversion is ambiguous exactly when R overrides two members of
+the same parent: rendering can only draw R once for both... or
+twice indistinguishably; either way, when the user then deletes one
+of them, extraction cannot tell WHICH original was deleted, and the
+failure mode is silent contains corruption -- the precise hazard
+class this plan exists to kill.  Carrying the original ID in the
+marker eliminates the whole class, at the cost of one UUID in the
+metadata of substituted nodes only.  This is, in effect, the
+deferred 'drawn_in_place_of : Option<ID>' arriving early, under the
+metaplan's name 'overridesHere'.  Needs your blessing, plus one
+sub-choice: placement.  The plan follows the metaplan ("the
+'overridesHere' stat" on 'ViewNodeStats', as the keyed form
+'(overridesHere N)'), but this makes it the first LOAD-BEARING,
+round-tripped viewstat -- every other viewstat is recomputed at
+render and ignorable at parse.  The alternative is a node-level
+form beside '(birth ...)' and '(parentIs ...)', which is where the
+other save-relevant per-position facts live.  Both are mechanically
+equivalent (both parse paths error on unknowns); say which you
+prefer.
+*** DONE This is great! Yes.
+**** claude: folded into "the round-trip through the original ID"
+The hedge there is replaced by the decision; placement stays the
+viewStats keyed form '(overridesHere N)', as the plan proposed --
+veto there if you wanted the node-level alternative.  The
+documentation step still owns rewriting TODO/problems.org's
+"drawn in place of" architecture note accordingly.
+** DONE how deep does the overridden-as-such bypass reach?
+The plan says: an overridden-as-such's IMMEDIATE children draw raw;
+deeper levels substitute normally.  This mirrors the
+subscribee-as-such hides precedent ("this rule only applies to the
+subscribee's children") and is cheap, because completion's BFS has
+the positional fact at exactly that depth.  But consider a user who
+forked a subtree -- clones overriding E AND several of E's
+descendants.  Expanding "the original" E from the overriddenCol
+would then show their own clones two levels down: a mongrel view,
+neither the original nor the fork.  Making the bypass cascade
+through the whole expanded branch would fix that, but needs a
+context flag flowing down completion (a per-branch bit on
+viewnodes, since 'CompletionContext' is global to the pass) --
+real machinery, and it would also raise the same question for
+subscribee-as-such expansion (should upstream content show your
+forks of it?  arguably yes there, since "you already integrated
+this" is information).  Decide: one level (plan's lean) or
+cascade; and if cascade, whether subscribee-as-such cascades too.
+*** DONE agreed, no cascade
+**** claude: folded into "the overridden-as-such exception"
+Its depth pointer now reads "(decided 2026-06-11: no cascade)";
+the body already specified immediate-children-raw, so nothing
+else moved.
+** DONE bypass surfaces and their Emacs detection
+*** glossary for this question
+**** "Navigation surface"
+Any gesture that asks to visit a node: following a textlink,
+'skg-goto' and friends, visiting a search result, a readable-ID
+jump from magit, opening a node from inside an existing view.  The
+plan classifies each surface as a menu surface or a bypass surface.
+**** "The menu"
+The override-choice buffer: when a visited node is overridden, the
+server offers the chain of overriders instead of silently picking
+one.
+**** "Bypass"
+The other classification: skip the menu and open the requested
+node itself as the buffer root.
+**** "Raw"
+Drawn as itself -- no overrider substituted for it.
+**** "Root selection vs recursive content"
+A bypass decides only WHICH node becomes the buffer's root.  The
+content drawn beneath that root still substitutes per the normal
+rules.  ("Fully raw" -- no substitution anywhere in the buffer --
+exists today only in diff mode.)
+**** '(override-choice . "menu" | "bypass")'
+The proposed optional field on the "single root content view"
+request, defaulting to menu, by which Emacs tells the server which
+classification this gesture wants.
+**** "Readable-ID jump from magit"
+'skg-readable-ids-mode' annotates UUIDs in magit buffers with
+their titles; the "jump" is 'skg-goto' invoked with point on such
+a UUID.  The metaplan classifies this surface as raw: it lands on
+the original node, no menu.
+**** 'skg-goto'
+The existing Emacs command that finds an ID near point (metadata,
+link, bare UUID, or .skg filename) and requests a single-root
+content view of it.
+**** 'skg-goto-bypassOverride'
+The proposed new command that sends bypass explicitly, from
+anywhere -- in particular the menu's escape hatch for opening the
+overridden original as its own buffer.
+*** the question
+Confirm the surface set and mechanics: the field name and values
+('(override-choice . "menu" | "bypass")'); that "readable-ID jump
+from magit" = 'skg-goto' in a 'magit-*' major mode (is any other
+non-Skg surface a raw surface?); the new command's name
+('skg-goto-bypassOverride'); and one semantic point -- bypass affects
+ONLY root selection, so the magit jump's recursive content still
+substitutes beneath a raw root.  If you want magit jumps fully raw,
+that is a different (deeper) flag.
+**** DONE agree to all
+***** claude: nothing left to fold
+The body already states the field, the magit detection, the
+root-only semantics, and (via your rename, now consistent
+throughout) the command name 'skg-goto-bypassOverride'; the
+stage-11 progress.org entry was updated to match the rename.
+** DONE notice delivery: a minibuffer-only channel
+You specified minibuffer, not buffer text.  Today's only channels
+are 'errors'/'warnings', which Emacs shows by POPPING a messages
+buffer plus a minibuffer line -- heavier than you asked for, on
+every visit to an overridden node.  Plan's lean: add an optional
+'(notice "...")' field to the content-view response, displayed via
+'message' only; the menu uses it.  The rare compound-chain notice
+would keep using the warnings channel (it can fire from save
+responses too, where a popped buffer is acceptable and the event
+signals odd legacy data).  Bless the protocol addition, or tell me
+warnings are fine for both and I drop the new field.
+*** DONE This sounds good but what does popping refer to here?
+**** DONE claude: 'display-buffer' -- an extra window opens to show the messages
+Warnings and errors are displayed by 'skg-big-nonfatal-message'
+('elisp/skg-request-save.el' ~388-398).  It writes the messages,
+rendered as org text, into a dedicated buffer (e.g. "*SKG Content
+View Messages*") and calls 'display-buffer' on it: Emacs then opens
+a window for that buffer -- usually by splitting the frame, or by
+commandeering another window -- so the messages appear on screen
+beside your view.  That window-opening is what I meant by
+"popping" (standard Emacs jargon: a pop-up window).  It also calls
+'message', which writes the one-line echo in the minibuffer.
+
+So the difference at stake: if the menu's explanation traveled via
+the warnings channel, every visit to an overridden node would
+split your frame with a messages window you then have to dismiss,
+in addition to the minibuffer line.  The proposed '(notice "...")'
+field would produce only the minibuffer line, which is what you
+asked for.  Since you wrote "this sounds good": when you mark this
+resolved I will fold the notice field into the plan body as
+decided.
+***** DONE agreed
+****** claude: folded into "the override-choice buffer"
+The notice bullet there now names the '(notice "...")' field and
+its 'message'-only display; the implementation step, docs step and
+menu tests mention it too.
+** DONE does the menu appear in diff mode?
+Substitution is off in diff mode (raw facts).  But the menu is
+navigation, not decoration, and it presents raw facts -- so the
+plan's lean is that visiting an overridden node in diff mode still
+offers the menu.  The alternative (diff mode means every visit is
+bypass) is simpler to state.  The diff-policy step will assert
+whichever we choose; choosing now avoids re-litigating there.
+*** DONE agreed; offer the menu
+**** claude: folded into "the override-choice buffer"
+A new bullet there states the menu appears in diff mode and that
+the diff-policy step will assert it; the menu tests gained the
+case.
+** DONE menu registration and switch-to-view precedence
+The menu registers under a dedicated URI kind (not
+'ViewUri::ContentView'), deduped by root.  Consequences to bless:
+an open RAW view of Z beats the menu (the existing switch-to-view
+check runs first, so following a link to Z lands in your open
+buffer -- no menu); a second menu request for Z switches to the
+open menu rather than building another; and a raw view opened via
+bypass coexists with a menu for the same Z.
+*** DONE definitions I need
+**** deduped by root
+At most one menu view per overridden node.  The registry would key
+menus by the requested node's PID, the way it keys content views
+('root_ids' in 'server/types/views_state.rs'); a menu request for
+a node whose menu is already open switches to that open menu
+buffer instead of building a second.  ("Root" = the requested
+node, which the menu draws as its root headline.)
+**** beats
+Wins the precedence race when the handler could respond either
+way.  The handler's checks run in order: first the existing
+switch-to-view check (is a content view rooted at the requested
+node already open?  then reply '(switch-to-view URI)'); only after
+that, the new override check (is the node overridden?  then the
+menu).  So an open raw view "beats" the menu: following a link to
+that node lands in your open buffer, and no menu appears.
+**** Z
+Just the example name for the requested node -- the overridden
+node the user is trying to visit, which becomes the menu's root.
+Same letter the plan body and vision.org use ("X overrides Y
+overrides Z").
+*** DONE agreed to all
+**** claude: folded into "the override-choice buffer"
+The registration bullet there now states the precedence outright
+(open raw view beats the menu; second menu request switches; a
+bypass-opened raw view coexists) instead of pointing here; the
+menu tests already pinned it.
+** ONGOING a switch-converted substitute would corrupt its parent's contains
+The scenario: under set 'all', P's content draws R marked
+'(overridesHere N)' (P's disk contains says N); the user expands
+R, giving it view-children; a source-set switch then deactivates
+R's source.  Stage 9's convert-and-prune RETAINS R (it has active
+children) as an InactiveNode -- whose representation today has no
+marker field, so the marker would silently vanish.  From there,
+rules that are each correct on their own compose into corruption:
+stage 9 deliberately counts a retained InactiveNode as an ordinary
+positional content member (right, for genuine members), so the
+next save collects R where P's disk says N, and the weave inserts
+R into P's contains -- a graph edit the user never made, of
+exactly the kind the round-trip machinery exists to prevent.
+
+Proposed fix, now in the body ("SOURCE-SET SWITCHES: the marker
+survives InactiveNode conversion"): give InactiveNode an optional
+drawn-in-place-of field, serialized only when present; the
+conversion copies the marker; the collected-ID and orderkey rules
+read it like the Active marker; the tamper check (deliberately
+visibility-ungated) accepts it.  The childless case needs nothing,
+since InactiveNode leaves are pruned and the position redraws from
+the goal list.  Alternatives, if you dislike growing InactiveNode:
+prune retained substitutes despite their children (discards the
+user's subtree -- seems worse), or forbid saving such a buffer
+(loud, but punishes an innocent user mid-edit).  Bless the field
+or pick another treatment.
+*** ONGOING I think this is unneeded.
+IIRC, an inactive node emits no save instructions at the vognode that owns it.
+**** ONGOING claude: true, but the corruption travels through P's instruction, not R's
+Your recollection is right and stays right: the InactiveNode for R
+emits nothing for itself, and suppression would drop anything that
+tried to write R's file.  But the hazard never touches R's file.
+It is P -- active, definitive, fully save-eligible -- whose
+'SetContains' is built from its children's IDs, and
+'content_members' (traverse.rs ~373) deliberately includes
+non-phantom InactiveNode children in that list.  That inclusion is
+a load-bearing stage-9 feature, not an accident: it is precisely
+how "moving a retained inactive member within its parent is
+honored on save" works (9-2, the retained-inactive section).  For
+a GENUINE retained member that is correct, because the inactive
+node's own ID is what P's disk list names.  For a retained
+SUBSTITUTE it is wrong, because P's disk names N while the
+viewnode carries R's ID -- and with the marker lost in conversion,
+nothing remains to translate R back to N.  Concretely, after the
+switch: P's children are InactiveNode(R) (kept; orderkey = its own
+ID, R) plus a freshly created raw N (goal member N looked
+missing); 'content_members' collects [R, N]; the weave sees two
+buffer members and disk [N], with N visible, so it outputs [R, N];
+P's file -- not R's -- is rewritten, and suppression never fires
+because the instruction targets P's active source.  So the fix has
+to live where the information dies: the marker must survive the
+conversion (the proposed InactiveNode field), after which the
+collected-ID rule translates R to N exactly as it does for the
+Active marker and P's instruction noops.  If you meant something
+else by the recollection, reopen; otherwise bless the field (or
+one of the listed alternatives).
+***** TODO ah I think I see
+You're saying that if P contains N, R replaces N in the view,
+and R becomes inactive while N is still active,
+then it looks like P lost N, unless the now-inactive R
+still has metadata explaining that it stands in for N.
+
+If I understood correctly, your proposed fix sounds perfect.
+If not please push back.
+** DONE on arrival
+*** omission beats substitution
+Under a restricted set, P contains inactive N whose overrider R is
+active: nothing is drawn.  Drawing R would require the marker to
+name the inactive N -- a leak.  Consequence: a restricted view can
+hide your own active clone because its original is inactive.  R
+stays reachable directly.
+*** per-edge visibility on legacy chains
+Z over Y over X with Y's source inactive draws Z, not X, even
+though X is active.  Only reachable on invalid (chain-bearing)
+data; the per-edge rule is the simplest leak-free one.
+*** duplicate drawn IDs are possible and tolerated
+R can appear twice under one parent when it overrides two
+co-members.  Distinctness validation moves to collected IDs; the
+defmap already caps definitive occurrences at one buffer-wide.
+Looks odd on screen; it is honest.
+*** the resolver's defensive cases are untestable through the UI
+Monogamy violations and cycles cannot enter a validated running
+graph; tests construct them directly ('try_init_global_handle').
+The guard stays anyway, per the metaplan: one bad import must not
+hang the server.
+*** the herald payload-swallowing question is presentational
+The situation: a substituted node's metadata will contain
+'(overridesHere N)', where N is a UUID.  With heralds on, the user
+should see a red "Oh" there -- and should NOT see the UUID.
+"Swallowing the payload" means the herald rule matches the keyed
+form, displays its fixed label, and discards the value.
+
+Verified 2026-06-11 that the lens engine supports exactly this, so
+the question is settled, not just presentational: in
+'skg-lens.el', a rule's ANY directive matches whatever follows a
+label, and its output is ONLY the fixed tokens listed after ANY --
+the matched values are echoed only where the IT directive appears
+among those tokens.  (The file's own example: rule
+'(a (b (ANY x)))' outputs 'x' for object '(a (b c))' -- the 'c' is
+discarded.)  The existing table uses both modes: the
+'(sourceHerald V)' and '(merge ID)' rules include IT, so their
+values show; the viewRequests rules list only fixed strings, so
+the matched atom is replaced wholesale.  The "Oh" rule is
+therefore one line in the existing style -- match 'overridesHere',
+ANY with the single fixed token "Oh", no IT -- and the UUID never
+reaches the screen.
+
+The fallback mentioned in "the Oh herald" stays documented only as
+a contingency in case some untested subtlety bites: the serializer
+would additionally emit a derived display-only bare atom whenever
+the marker is present, the "Oh" rule would match that atom, and
+the keyed form would get a value-discarding rule.  That bare atom
+would also need an accept-and-discard arm in
+'parse_viewstats_sexp' (which errors on unknown bare atoms) so
+buffers round-trip.  Cost: one redundant atom in the metadata of
+substituted nodes.
+
+Either way nothing load-bearing is at stake -- hence
+"presentational": save extraction and the tamper check read only
+the keyed form, the conformance test forces a rule to exist in
+either shape, and the two branches differ only in what the
+metadata's displayed form looks like.
+*** stage-10 constraints apply
+Editing the rule table requires regenerating
+'tests/elisp/herald-rules.sexp'; substitution and menu fixtures
+that read global facts need 'try_init_global_handle'.
+*** the menu shows foreign titles
+True of every surface already (foreign sources are readable); noted
+because the menu actively gathers them in one place.
+*** users can type under menu nodes
+The menu is an ordinary registered indefinitive buffer (like search
+results): new children a user adds are Independent and survive a
+save without graph effect.  Not a bug; noting the symmetry.
+*** TODO/problems.org needs a follow-up edit
+The marker decision above (carry the original ID) supersedes the
+"drawn in place of" architecture note there; the documentation
+step owns rewriting it.

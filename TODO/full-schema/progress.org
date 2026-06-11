@@ -8,6 +8,62 @@ marked 'Affected'. Stage 7 was never executed as written; parts of
 its territory were covered differently by the local-view-update
 overhaul, and the remainder is re-planned in
 [[./metaplan_2.org]], which supersedes metaplan 1.
+** stage 11 : override rendering and navigation
+*** planned
+Wrote 'TODO/full-schema/11_override-rendering-and-navigation.org',
+covering the metaplan_2.org step "define override rendering and
+navigation" -- the bridge to forks.
+
+In order: the cycle-guarded resolver (one type, beside the override
+invariants; ownership set-independent, visibility gating per edge);
+the save-side round-trip machinery landed INERT first (the
+'(overridesHere N)' marker, its parse arm, tamper validation, and
+the collected-ID rule in 'content_members' /
+'visible_content_members' / the distinctness validators), so
+nothing can mark a buffer before saving such a buffer is safe; then
+substitution at the content-creation seam (creation-only,
+content-only, off in diff mode, omission-first), exploiting the
+'view_child_orderkey' / 'create_child' seam in
+'complete_relevant_children_in_viewnodetree'; the
+overridden-as-such fixture (vision.org's R/E/G/H); the
+override-choice buffer (in-Rust 'overriders_of' BFS, all edges
+incl. foreign, cycle markers, dedicated view-URI kind, minibuffer
+notice); the bypass request parameter and its Emacs surfaces
+(magit jumps, 'skg-goto-bypassOverride'); doc touch-ups.
+
+Ends with a problems section.  TODO-marked decisions: the marker
+carries the original ID rather than the recorded bool-plus-
+convention (the inversion is ambiguous when R overrides two
+co-members -- silent contains corruption), plus its placement
+(viewStats vs node-level); how deep the overridden-as-such bypass
+reaches (one level vs cascading, and whether subscribee-as-such
+should ever cascade); the bypass surface set and detection; a
+minibuffer-only '(notice ...)' protocol field; whether the menu
+appears in diff mode; menu registration / switch-to-view
+precedence.
+*** problems all decided (2026-06-11); plan final
+Jeff answered every problem; all folded into the plan body:
+- the marker carries the original ID, in viewStats as proposed;
+- the overridden-as-such bypass does not cascade (one level);
+- bypass surfaces agreed; the escape-hatch command is named
+  'skg-goto-bypassOverride' (Jeff's rename);
+- the minibuffer-only content-view field is blessed, named
+  '(to-minibuffer "...")' (renamed from 'notice' later that day);
+  compound-chain notices stay on the warnings channel;
+- the menu IS offered in diff mode;
+- menu registration/precedence blessed (open raw view beats the
+  menu; menus dedup by root; bypass-opened raw views coexist);
+- the menu is not read-only: indefinitive generated lines in an
+  ordinary editable, savable buffer, like search results (a
+  correction to the plan's earlier wording, from Jeff's glossary
+  comment).
+Later the same day, elaborating the tamper check at Jeff's request
+exposed two refinements: the check must use visibility-UNGATED
+resolution (an honest marker must not start failing after a
+source-set switch), and -- one new open TODO -- a switch-converted
+retained substitute would lose its marker and corrupt its parent's
+contains; the proposed fix (an optional drawn-in-place-of field on
+InactiveNode, copied by the conversion) awaits Jeff.
 ** stage 10 : heralds and the remaining stats
 *** implemented (2026-06-11)
 Five commits on branch 'full-schema', executing

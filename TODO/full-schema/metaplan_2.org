@@ -275,7 +275,9 @@ against present and future leak paths, e.g. visibility resolution's
 'apply_hiderel_delta_to_subscriber', which can synthesize a save
 intent for a subscriber read from disk; that subscriber's source
 might be inactive in the current view.
-** ONGOING add heralds and the remaining stats
+** DONE add heralds and the remaining stats
+Executed 2026-06-11; plan in [[./DONE/10_heralds-and-stats.org]],
+log in [[./progress.org]] (stage 10).
 *** the H graphstat
 Add a 'hiding' boolean to 'GraphNodeStats' (true iff the node plays
 either role of 'hides_from_its_subscriptions', anywhere), parallel to
