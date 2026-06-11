@@ -62,8 +62,9 @@ exposed two refinements: the check must use visibility-UNGATED
 resolution (an honest marker must not start failing after a
 source-set switch), and -- one new open TODO -- a switch-converted
 retained substitute would lose its marker and corrupt its parent's
-contains; the proposed fix (an optional drawn-in-place-of field on
-InactiveNode, copied by the conversion) awaits Jeff.
+contains; the fix (an optional drawn-in-place-of field on
+InactiveNode, copied by the conversion) was discussed and blessed
+by Jeff the same day.  The plan is final; execution follows.
 ** stage 10 : heralds and the remaining stats
 *** implemented (2026-06-11)
 Five commits on branch 'full-schema', executing

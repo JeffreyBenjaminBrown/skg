@@ -546,9 +546,9 @@ view_stats_sharing, git_diff_view, idempotence, merge.
 Anything awkward, potentially incorrect, dangerous, or undecided.
 All decisions were made 2026-06-11 and folded into the plan body;
 the DONE headings preserve the dialog, and the remaining notes
-were always awareness-only.  One problem found later that day,
-while elaborating the tamper check, remains open: the TODO below
-on switch-converted substitutes.
+were always awareness-only.  The problem found later that day
+while elaborating the tamper check (switch-converted substitutes)
+was discussed and its fix blessed; nothing remains open.
 ** glossary for this section
 *** "Substitution"
 Drawing the user-owned overrider R in place of
@@ -797,7 +797,7 @@ The registration bullet there now states the precedence outright
 (open raw view beats the menu; second menu request switches; a
 bypass-opened raw view coexists) instead of pointing here; the
 menu tests already pinned it.
-** ONGOING a switch-converted substitute would corrupt its parent's contains
+** DONE a switch-converted substitute would corrupt its parent's contains
 The scenario: under set 'all', P's content draws R marked
 '(overridesHere N)' (P's disk contains says N); the user expands
 R, giving it view-children; a source-set switch then deactivates
@@ -823,9 +823,9 @@ prune retained substitutes despite their children (discards the
 user's subtree -- seems worse), or forbid saving such a buffer
 (loud, but punishes an innocent user mid-edit).  Bless the field
 or pick another treatment.
-*** ONGOING I think this is unneeded.
+*** DONE I think this is unneeded.
 IIRC, an inactive node emits no save instructions at the vognode that owns it.
-**** ONGOING claude: true, but the corruption travels through P's instruction, not R's
+**** DONE claude: true, but the corruption travels through P's instruction, not R's
 Your recollection is right and stays right: the InactiveNode for R
 emits nothing for itself, and suppression would drop anything that
 tried to write R's file.  But the hazard never touches R's file.
@@ -853,7 +853,7 @@ collected-ID rule translates R to N exactly as it does for the
 Active marker and P's instruction noops.  If you meant something
 else by the recollection, reopen; otherwise bless the field (or
 one of the listed alternatives).
-***** TODO ah I think I see
+***** DONE ah I think I see
 You're saying that if P contains N, R replaces N in the view,
 and R becomes inactive while N is still active,
 then it looks like P lost N, unless the now-inactive R
@@ -861,6 +861,14 @@ still has metadata explaining that it stands in for N.
 
 If I understood correctly, your proposed fix sounds perfect.
 If not please push back.
+****** claude: understood correctly; field blessed; executing
+That is the heart of it.  (One nuance, changing nothing: without
+the marker P would not just lose N -- completion would also
+re-create a raw N beside the retained R, so P would collect
+[R, N] where disk says [N]; either way P's contains is rewritten
+unless the InactiveNode keeps the stands-in-for-N metadata.)  The
+body's "SOURCE-SET SWITCHES" bullet is the spec; nothing further
+moved.
 ** DONE on arrival
 *** omission beats substitution
 Under a restricted set, P contains inactive N whose overrider R is
