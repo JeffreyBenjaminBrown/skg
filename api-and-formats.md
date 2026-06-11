@@ -107,6 +107,13 @@ So far there are these endpoints:
     When enabled, subsequent `single root content view` and `save buffer`
     responses include diff annotations showing changes
     between git HEAD and the worktree.
+  - Refusal: ENABLING diff mode requires the active source-set `all`.
+    Under a restricted set the server refuses: the git-diff-mode
+    response carries the refusal text as `content`, followed by an
+    EMPTY rerender stream (a rerender-lock naming no views, then
+    rerender-done with no errors or warnings), so the client's
+    preemptive buffer locks and stream guard unwind. Nothing else
+    changes. Disabling diff mode is always allowed.
 
 ## Herald rules
   - Request: ((request . "herald rules"))
@@ -188,6 +195,18 @@ So far there are these endpoints:
     written back to the config. Changing it requires confirmation in
     Emacs, re-renders (not closes) all active Skg buffers for that
     connection, and cancels any in-flight search enrichment.
+  - Refusal: switching to a set other than `all` while git diff mode
+    is on is refused, before any side effect (no enrichment
+    cancellation, no set change, no rerendering). The refusal — and
+    likewise the endpoint's error paths (missing or unknown set
+    name) — answers in the normal active-source-set response-type,
+    carrying the explanatory text as `content` and the UNCHANGED set
+    as `active`, followed by an EMPTY rerender stream (a
+    rerender-lock naming no views, then rerender-done), so the
+    client's preemptive buffer locks and stream guard unwind.
+    Switching TO `all` is always allowed. The resulting
+    per-connection invariant: diff mode on implies active source-set
+    `all`.
 
 ## Titles by ids
   - Request: ((request . "titles by ids") (ids "uuid1" "uuid2" ...))
@@ -412,8 +431,24 @@ Inside a `(node ...)` form (TrueNodes):
   of bare atoms drawn from `{newX, removedX, newM, removedM}`. `X` =
   existence (the node's `.skg` file appeared/disappeared in this
   stage); `M` = membership (the node's appearance at this position in
-  the parent's contains list appeared/disappeared in this stage).
+  its parent's collection appeared/disappeared in this stage).
 - bare atom `notInGit` if the node's source is not a git repo.
+
+PartnerCol members carry the same axes, in both directions, for
+every col: a member removed since HEAD appears as a phantom with
+per-stage `removedM`; a member added since HEAD carries per-stage
+`newM`; `X` axes describe the member's own file as usual. For an
+outbound col (subscribeeCol, overriddenCol, hiddenCol) the signs
+come from the owner's relation diff; for an inbound col
+(subscriberCol, overriderCol, hiderCol) from the members' files'
+diffs (the inverse scan), with phantoms appended after the real
+members in sorted-ID order; for the filter cols
+(hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol) from comparing
+the derived membership at HEAD, index and worktree. A col whose
+worktree membership is empty but whose HEAD-side membership is not
+still renders in diff mode, holding only phantoms. Phantoms define
+nothing: saving a buffer ignores them, and a writable col's phantom
+is never collected as a member.
 
 At top level inside `(skg ...)` (Scaffolds for Alias / ID):
 - `(staged AXES)` and/or `(unstaged AXES)` with `AXES` drawn only
