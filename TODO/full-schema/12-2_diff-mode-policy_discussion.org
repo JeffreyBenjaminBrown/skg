@@ -1,0 +1,883 @@
+* plan : diff-mode policy for the full schema, take 2
+This supersedes [[./12-1_diff-mode-policy.org]], which became a
+dialog; the decisions that emerged from it (all Jeff's, 2026-06-11)
+are baked in here:
+- PARTNERCOL DIFF COMPLETENESS is the organizing principle: in diff
+  mode, every PartnerCol shows every direction of every axis.  A
+  member removed since HEAD appears as a phantom with per-stage
+  'removedM'; a member added since HEAD carries per-stage 'newM';
+  existence axes already arrive in both directions at each member's
+  own visit; and a col whose worktree side is empty but whose
+  HEAD side is not must still appear, so its phantoms have a home.
+- The INVERSE SCAN is in scope for all three inbound cols
+  (subscriberCol, overriderCol, hiderCol), including edges that
+  appeared or vanished because a member's FILE was added or deleted
+  (read from the kept snapshots).
+- The FILTER COLS are in scope in both directions (retracting an
+  earlier skip): the three-snapshot derived-membership comparison
+  gives their added direction 'newM' marks and upgrades their
+  existing removed-member phantoms to exact per-stage labels.
+- The CROSS-RELATION ATTRIBUTION bug is fixed now, first: phantoms
+  must not lie, in their stage labels or otherwise.  Every
+  membership-sign consumer names which relation its col represents.
+- COL EXISTENCE: the nonexistence of phantoms (and their col) must
+  not lie either.  In diff mode a col renders whenever either side
+  of its membership is non-empty.
+- The REFUSALS take the QUIET SHAPE: the endpoint's normal first
+  message carries the refusal text, followed by an empty rerender
+  stream, so Emacs unwinds with zero elisp changes.
+- A CROSS-SOURCE MOVE fabricates no membership change: a moved file
+  shows existence changes only; no 'newM' for an edge that existed
+  before and after the move.
+
+The plan covers the metaplan_2.org step "define diff-mode policy for
+the full schema".  Three pieces: the refusals (diff mode and
+restricted source-sets must not compose), PartnerCol diff
+completeness, and pinning that override substitution stays out of
+diff surfaces.
+
+* glossary
+Every term of art used below, in plain English.  Graph-role
+vocabulary (overrider/overridden, subscriber/subscribee) names graph
+facts; parent/child names positions in an Emacs org buffer.
+** "diff mode" (also "inline diff view", "git diff view")
+A per-connection display mode, toggled by the Emacs command
+'skg-view-diff-mode'.  While it is on, every rendered view is
+decorated with annotations describing how the rendered nodes differ
+between git HEAD and the working tree: changed text, added or
+removed list members, added or deleted files.  It changes how
+views LOOK; it does not change the graph.
+** "diff analysis"
+A different feature from diff mode: a one-shot report (an org
+document, requested by the Emacs command bound to "diff analysis")
+summarizing every changed node across all sources.  It already
+refuses to run under a restricted source-set.  This plan touches it
+only to pin, by test, that it never applies override substitution.
+** the two "stages": "staged" and "unstaged"
+Git distinguishes changes that have been staged (added to the
+index) from changes that have not.  The "staged" stage compares
+HEAD to the index; the "unstaged" stage compares the index to the
+working tree.  Diff annotations carry each stage separately, so the
+user can see whether a change is already staged.
+** "membership axis" (M) and "existence axis" (X)
+The two kinds of per-stage diff annotation on a rendered node.  The
+existence axis says the node's '.skg' FILE appeared ('newX') or
+disappeared ('removedX') in that stage.  The membership axis says
+the node's APPEARANCE AT THIS POSITION in its parent's list
+appeared ('newM') or disappeared ('removedM') in that stage.
+** "phantom" (here always a diff phantom)
+A display-only placeholder, drawn in diff mode, for a node that
+some list contained at HEAD (or in the index) but does not contain
+in the working tree.  Phantoms show what was removed.  They define
+nothing: saving a buffer ignores them.
+** 'NodeChanges'
+The Rust type ('server/types/git.rs') describing how one '.skg'
+file differs between the two snapshots of one stage: whether its
+text changed, plus item-by-item diffs of its aliases, its IDs, its
+'contains' list, its 'subscribes_to' list, and its
+'hides_from_its_subscriptions' list.  This plan adds the
+item-by-item diff of its 'overrides_view_of' list.
+** 'before_node' and 'after_node' (the kept snapshots)
+'NodeChanges' exists only for files git calls Modified.  But the
+diff machinery also KEEPS whole-node snapshots for the other two
+statuses: a Deleted file's entire pre-deletion content
+('NodeCompleteDiff.before_node', also gathered into
+'SourceDiff.deleted_nodes') and an Added file's entire content
+('after_node' / 'added_nodes').  Those snapshots include the
+node's relationship lists, so the edges a vanished file used to
+assert, and the edges a new file now asserts, are recoverable --
+this plan starts reading them.
+** "source" and "source-set"
+A source is one configured directory of '.skg' files, with a name
+and an ownership flag ('user_owns_it').  A source-set is a named
+list of sources.  The ACTIVE source-set, chosen per connection,
+restricts what the user sees: nodes from sources outside the
+active set ("inactive sources") are omitted from rendering.  The
+set named 'all' is predefined and means every configured source; a
+"restricted" source-set is any active set other than 'all'.
+** "refusal"
+A server response that declines to perform a requested state
+change, explains why in human-readable text, and changes nothing.
+** "the rerender stream"
+The three-part message sequence the server streams to Emacs after
+an operation that re-renders every open view: one "rerender-lock"
+message naming the views about to be replaced, then zero or more
+"rerender-view" messages (one per view, as each finishes), then
+one "rerender-done" message carrying any errors and warnings.
+Both the diff-mode toggle and the source-set switch end with this
+stream.
+** "the stream guard" and "buffer locks" (Emacs-side)
+Before sending a diff-mode toggle or a source-set switch, Emacs
+sets a flag ('skg--stream-in-progress', the stream guard) that
+blocks starting any other streaming operation, and locks every Skg
+buffer against edits.  Only the arrival of the rerender stream
+clears them: "rerender-lock" unlocks buffers not named in it, and
+"rerender-done" clears the guard and removes the per-view handler.
+If the server replies with anything else and never sends the
+stream, Emacs stays locked ("wedged") until the connection drops.
+** "PartnerCol", and the cols named here
+A PartnerCol is a generated collection scaffold drawn under a node,
+listing that node's partners in one graph relation.  The
+OVERRIDDENCOL under node R lists the nodes R overrides (R's
+outbound 'overrides_view_of' list -- R is the overrider).  The
+OVERRIDERCOL under node N lists the nodes that override N (the
+inbound direction).  Similarly the subscribeeCol is outbound (whom
+the node subscribes to) and the subscriberCol inbound; the
+hiderCol and hiddenCol are the inbound and outbound faces of
+'hides_from_its_subscriptions'.
+** "outbound" vs "inbound" cols; "owner" vs "member"
+The OWNER of a col is the node the col hangs under; the MEMBERS
+are its children.  An outbound col shows a relationship list
+stored in the OWNER's own file (subscribeeCol, overriddenCol,
+hiddenCol), so the owner's file diff describes the col's
+membership changes.  An inbound col shows edges stored in the
+MEMBERS' files (subscriberCol, overriderCol, hiderCol), so the
+owner's file diff says NOTHING about them -- seeing their changes
+requires looking at other files' diffs (the inverse scan).
+** "the inverse scan"
+The new machinery that answers, for an inbound col: which nodes'
+files asserted an edge to this owner at HEAD or assert one now,
+and in which stage did each edge appear or disappear?  It scans
+every source's per-stage diff maps -- which list only CHANGED
+files, so they are small -- reading Modified files' relation
+diffs, Deleted files' 'before_node' lists, and Added files'
+'after_node' lists.
+** "filter cols"
+The hiddenInSubscribeeCol and hiddenOutsideOfSubscribeeCol
+('ColPolicy::ReadOnlyFilter').  Their membership is DERIVED -- an
+intersection or difference of two other lists -- rather than read
+from any single relation, which is why their diff treatment is
+partly separate: their per-stage signs come from comparing the
+derived membership at the three snapshots (HEAD, index, worktree)
+rather than from any one relation's diff.
+** "writable col" vs "read-only col"
+A writable col ('ColPolicy::WritableSet': the subscribeeCol and
+the overriddenCol) is an editable interface: adding or removing
+members there edits the owner's relationship list on save.  A
+read-only col ('ColPolicy::ReadOnlySet', e.g. the overriderCol and
+subscriberCol) displays generated membership; edits to it do not
+change the graph.  Inbound relations are read-only because the
+relationship fact lives in the OTHER node's file.
+** "goal list" and "reconciliation"
+Completion makes each collection's actual children agree with a
+computed GOAL LIST: the ordered members the graph (and, in diff
+mode, git history) says belong there.  RECONCILIATION is that
+adjustment: matching existing children to goal members, creating
+missing ones, and deleting or demoting stale ones.
+** "interleaved diff" / "LCS"
+'compute_interleaved_diff' compares two lists using a longest
+common subsequence, returning one merged list where each item is
+marked Unchanged, New, or Removed -- so each removed member keeps
+its correct position among the survivors.  This is how a goal list
+comes to contain phantom positions.
+** "override substitution" and "the marker"
+When completion would create a viewnode for node N as recursive
+content, and a user-owned, currently-visible overrider R of N
+exists, it draws R instead, marked with '(overridesHere N)' (the
+marker), which names the original N so saving round-trips to N.
+Substitution is CREATION-ONLY (existing viewnodes are never
+rewritten) and is OFF in diff mode -- diff surfaces show raw graph
+facts.  Built in stage 11.
+** "the override-choice menu"
+The buffer offered instead of a content view when the user visits
+an overridden node: the node as root, its overriders (foreign
+included) as children, so the user picks a destination.  Decided
+in stage 11: the menu appears in diff mode too.  This plan adds the
+test asserting that.
+** "de novo" vs "rerender"
+A de novo render builds a view fresh from a request (e.g. visiting
+a node).  A rerender re-completes an already-open view (after a
+save, a diff-mode toggle, or a source-set switch).  Both run the
+same unified completion BFS.
+** "per-connection state"
+Both diff mode and the active source-set live in per-TCP-connection
+server state ('ViewsState.diff_mode_enabled' and the connection's
+'ActiveSourceSet').  Two Emacs connections can disagree; each
+connection starts with diff mode off and the config's default
+source-set.
+
+* scope
+** covered
+*** The two refusals: enabling diff mode under a restricted
+  source-set, and switching to a restricted source-set while diff
+  mode is on.  Message text modeled on diff analysis's existing
+  refusal.  Disabling diff mode, and switching TO 'all', are always
+  allowed.
+*** The refusal response shape (the quiet shape): the endpoint's
+  normal first message carries the refusal text, followed by an
+  EMPTY rerender stream (a "rerender-lock" naming no views, then
+  "rerender-done"), so Emacs's preemptive locks and stream guard
+  unwind with zero elisp changes.
+*** Ride-along bugfix: the source-set switch's existing early error
+  paths (missing or unknown set name) reply with a response-type
+  Emacs has no handler for, leaving Emacs wedged.  Route them
+  through the same unwinding shape.
+*** 'NodeChanges.overrides_view_of_diff': producer
+  ('compare_nodecompletes') and consumers, completing the relation
+  coverage of the per-file diff.
+*** Relation-true axis attribution: every consumer that derives a
+  membership sign names WHICH relation its col represents, instead
+  of scanning all relation diffs and taking the first hit, so a
+  phantom's stage label cannot come from a different relation that
+  happens to involve the same ID.
+*** Outbound col completeness: the subscribeeCol, overriddenCol
+  and hiddenCol show removed members as per-stage phantoms AND
+  mark added members with per-stage 'newM', all read from the
+  owner's per-stage relation diff.  (The subscribeeCol's removed
+  direction exists today; the rest is new.)
+*** Inbound col completeness: the subscriberCol, overriderCol and
+  hiderCol show removed members as per-stage phantoms and mark
+  added members with per-stage 'newM', via the inverse scan --
+  including edges that appeared or vanished because a member's
+  FILE was added or deleted (read from the kept snapshots).
+*** Filter col completeness: the hiddenInSubscribeeCol and
+  hiddenOutsideOfSubscribeeCol mark added members with per-stage
+  'newM', and their existing removed-member phantoms gain exact
+  per-stage labels, both by comparing the derived membership at
+  the three snapshots (HEAD, index, worktree).
+*** Col existence completeness: in diff mode, a col whose worktree
+  membership is empty but whose HEAD-side membership is not still
+  renders (phantoms need a home); both the de novo creation gates
+  and the rerender creation path learn this.
+*** Tests pinning the no-substitution rules: the menu still appears
+  in diff mode; diff analysis reports override-relation changes on
+  raw nodes; a view containing a drawn substitute stays shape-stable
+  across a diff-mode toggle.
+*** Documentation touch-ups where behavior changes:
+  api-and-formats.md (refusals on both endpoints; PartnerCol
+  members in the diff-metadata section), and rewording the interim
+  comment in tests/source_sets.rs (see "current behavior").
+** not covered
+*** Recomposing diff mode with restricted source-sets (the
+  metaplan's awaits: "revisit source-set and diff-mode
+  composition").  The refusals keep the first implementation
+  coherent.
+*** The relationship-matrix tests and the documentation pass (the
+  metaplan's remaining steps).
+
+* current behavior, verified 2026-06-11
+First verified for 12-1; re-verified against the code for this
+rewrite the same day (no code commits intervened; only plan files
+changed).
+** state and handlers
+*** Both flags are per-connection: 'ViewsState.diff_mode_enabled'
+  (server/serve.rs; starts false) and the connection's
+  'ActiveSourceSet' (starts as the config's 'default_source_set',
+  which MAY be restricted).
+*** 'handle_git_diff_toggle_and_rerender'
+  (server/serve/handlers/rerender_all_views.rs) toggles
+  unconditionally, sends the git-diff-mode response (with
+  not-in-git warnings when enabling), then streams rerenders via
+  'stream_rerender_views'.  It already receives the active
+  source-set; no check exists.
+*** 'set_active_source_set' (server/serve/handlers/source_sets.rs)
+  parses the name, resolves the set, cancels in-flight search
+  enrichment, assigns the new set, sends the active-source-set
+  response, then streams rerenders with the convert-and-prune
+  prepass.  It already receives 'views_state'; no diff-mode check
+  exists.  Its two early error paths (unparseable 'name'; unknown
+  set name) call 'send_error', the wedge below.  The dispatcher
+  above it ('handle_source_set_request') has two more 'send_error'
+  paths, reachable only from malformed requests.
+*** Diff analysis refuses restricted sets
+  ('handle_diff_analysis_request_with_source_set'):
+  "Diff analysis requires active source-set all; current active
+  source-set is {}".  The save handler refuses diff-mode saves when
+  a source's HEAD is a merge commit -- the other refusal precedent.
+** the Emacs-side wedge hazard
+*** Both 'skg-view-diff-mode' and 'skg-set-active-source-set' set
+  the stream guard ('skg--begin-stream'), lock ALL Skg buffers,
+  and register the three rerender handlers BEFORE sending the
+  request (elisp/skg-request-git-diff-mode.el,
+  elisp/skg-request-source-sets.el).  Only "rerender-lock" (unlocks
+  buffers not named) and "rerender-done" (clears the guard, removes
+  the per-view handler, safety-net unlock) unwind them.
+*** A response with no registered handler is logged and dropped
+  (elisp/skg-length-prefix.el: "no handler for response type").  So
+  the switch handler's existing 'send_error' paths leave Emacs
+  wedged: guard set, all buffers locked, handlers dangling, until
+  the TCP sentinel or a busy-initializing message clears them.
+  Nobody has noticed because those errors require a malformed
+  request; the refusals this plan adds would hit the same wedge
+  through ordinary use, so the shape must unwind.  (Also reported
+  in TODO/problems.org.)
+*** Both endpoints' first-message handlers display 'content' via
+  'message'.  One subtlety: the diff-toggle handler additionally
+  pops a window ('skg-big-nonfatal-message') when 'content'
+  contains the substring "\nWarning:" (how the not-in-git warnings
+  surface).  Refusal text must avoid that substring to stay quiet.
+*** The empty-stream unwind works with today's elisp, verified:
+  'format_lock_views_sexp' of an empty list yields
+  '((lock-views ()))', whose nil URI list makes
+  'skg--unlock-buffers-not-in-uri-list' unlock every locked
+  buffer; "rerender-done" with empty errors and warnings clears
+  the guard and pops nothing.
+** what the renderer does today when the modes mix
+*** Stage 9-2 left an interim behavior, pinned by
+  'diff_view_omits_inactive_members_without_content_leak'
+  (tests/source_sets.rs): a restricted diff view omits inactive
+  members entirely -- current members and removed-member phantoms
+  alike -- so nothing private leaks.  Its comment says "interim,
+  until diff mode and restricted sets refuse to combine".  The
+  refusals land here, but the render seam remains directly
+  constructible (tests do; a future bug could), so the no-leak
+  behavior stays as defense in depth and the comment is reworded,
+  not deleted.
+** what each collection shows in diff mode today
+*** Content children: complete.  Both directions of M (existing
+  children get 'newM' via 'mark_membership_on_existing_children';
+  removed members phantom via 'insert_phantoms_for_missing_contains',
+  both in server/to_org/render/diff.rs), and both directions of X
+  (each Active vognode's own BFS visit runs
+  'process_truenode_diff', which stamps its existence axes from
+  its own file's per-stage status and flips it to a phantom when
+  the axes require -- this applies to PartnerCol members too,
+  since they are Active vognodes with their own visits).
+*** The QualCols (IDCol, AliasCol): complete in M (their
+  reconcilers stamp per-entry membership axes in both directions
+  from 'axes_from_per_stage_diffs'); X does not apply (scaffolds
+  own no file).
+*** The subscribeeCol: removed members phantom with per-stage
+  'removedM' ('goal_list_for_subscribee_col' in
+  server/to_org/complete/partner_col/goal_list.rs, LCS of the
+  git-HEAD list against the worktree list; pinned by
+  tests/git_diff_view/content/save.rs).  Added members render
+  UNMARKED -- nothing stamps M on col members.  Note also: it
+  reads the owner's HEAD file ('nodecomplete_from_git_head') on
+  every diff render, even when the owner's file is unchanged in
+  both stage maps; the shared goal-list function below
+  short-circuits that.
+*** The overriddenCol and hiddenCol: nothing.  They go through the
+  generic 'reconcile_partnerCol_children'
+  (server/update_buffer/reconcile/partner_col.rs), whose
+  'removed_ids' is hardcoded empty.  ('NodeChanges' also lacks the
+  'overrides_view_of' diff entirely.)
+*** The three inbound cols (subscriberCol, overriderCol, hiderCol):
+  nothing.  Their members come from the worktree graph only; an
+  edge removed since HEAD silently vanishes.  No machinery can
+  currently see those changes: the edges live in the members'
+  files, and 'phantom_axes' reads only the OWNER's 'NodeChanges'.
+*** The two filter cols: removed members phantom (their goal-list
+  computers in goal_list.rs diff the derived membership against
+  the HEAD-side derived membership, reconstructing HEAD-side
+  inputs from the per-stage diffs); added members render unmarked.
+  The phantoms' stage labels come from the 'phantom_axes' scan
+  over the INPUT relations' diffs, not from the derived membership
+  itself -- an approximation.
+*** Deleted and Added files: 'NodeChanges' is only read for
+  Modified files, but the whole-node snapshots survive
+  ('before_node' / 'deleted_nodes' for Deleted, 'after_node' /
+  'added_nodes' for Added) -- including their relationship lists.
+  Today only titles are read from them.
+*** Membership extraction at save excludes phantoms (they are
+  'Phantom' viewnodes, and 'partnerCol_members' in
+  local_instruction_collection/traverse.rs collects only Active
+  members), so col phantoms cannot corrupt a diff-mode save.
+*** 'phantom_axes' (server/types/phantom.rs) attributes a
+  phantom's stage sign by scanning the owner's THREE relation
+  diffs in fixed order and taking the first hit for the child's
+  ID -- the cross-relation mislabeling this plan fixes, since one
+  owner can bear the same ID in two relations.
+*** Useful precedent for the inverse scan:
+  'reconcile_partnerCol_children' already receives both
+  'source_diffs' and a 'deleted_since_head_pid_src_map' (a
+  per-render product of the diff maps), so per-render diff-derived
+  context already flows to exactly the right seam.
+** substitution and diff surfaces
+*** The gate exists and is tested: completion passes
+  'substitution_enabled = source_diffs.is_none()'
+  (server/update_buffer/complete.rs, threaded through
+  reconcile/content.rs), and 'diff_mode_disables_substitution'
+  (tests/override_substitution.rs) pins it.  A marked buffer saved
+  in diff mode still collects the original (stage 11's save tests).
+*** The menu-in-diff-mode behavior was DECIDED in stage 11 but is
+  untested: tests/override_menu.rs builds its 'ViewsState' with
+  'diff_mode_enabled : false' throughout.
+*** Diff analysis never substitutes -- structurally: it reads
+  NodeComplete snapshots directly and never consults the resolver
+  -- and it already reports 'overrides_view_of' changes in both
+  roles (server/diff_analysis/diff.rs).  Nothing pins either fact.
+*** Menus and search buffers are registered views, so a diff-mode
+  toggle reruns completion over them too.  Their generated lines
+  are indefinitive Independent children; how a menu interacts with
+  diff decoration is untested.
+
+* desired behavior
+** refusals
+*** Enabling diff mode refuses unless the active source-set is
+  'all'.  DISABLING diff mode is always allowed (it only ever makes
+  the state legal).  Message, in diff analysis's style:
+  "Git diff mode requires active source-set all; current active
+  source-set is {name}. Switch the source-set to all first."
+*** Switching the source-set refuses if diff mode is on AND the
+  requested set is not 'all'.  Switching TO 'all' is always
+  allowed.  Message:
+  "Cannot switch to source-set {name}: git diff mode is on, and it
+  requires active source-set all. Disable diff mode first."
+*** Each refusal happens BEFORE every side effect: before the
+  toggle, before search-enrichment cancellation, before the set
+  assignment, before any rerender work.  A refused request changes
+  nothing observable but the response.
+*** The resulting invariant, per connection: diff mode on implies
+  active source-set 'all'.  Both doors are guarded and both flags
+  reset at connection start (diff off; the config default set --
+  which may be restricted, in which case diff mode simply refuses
+  until the user switches to 'all').
+*** Refusal response shape (the quiet shape), for both endpoints:
+  the endpoint's normal first message (git-diff-mode or
+  active-source-set response-type) with the refusal text as its
+  'content' (and, for the source-set endpoint, the UNCHANGED set as
+  its 'active'), followed by an empty rerender stream:
+  "rerender-lock" with an empty view list, then "rerender-done"
+  with empty errors and warnings.  Emacs's existing handlers then
+  do the right thing with no elisp changes: the first message is
+  displayed via 'message' (no popped window -- refusal text must
+  not contain the substring "\nWarning:", which the diff-toggle
+  handler treats as a pop trigger), the empty lock list unlocks
+  every buffer, and the done message clears the guard and the
+  handlers.  A small shared helper (e.g. 'stream_empty_rerender'
+  beside 'stream_rerender_views') sends the empty stream.
+*** Ride-along: the switch handler's pre-existing error paths
+  (missing 'name' field; unknown set name) adopt the same shape --
+  the active-source-set response carrying the error text plus the
+  empty stream -- replacing the unhandled error response-type that
+  wedges Emacs today.  The dispatcher-level 'send_error' paths in
+  'handle_source_set_request' are reachable only from malformed
+  requests no current client sends; convert them too if cheap,
+  else leave a comment naming the hazard.
+** relation-true axis attribution
+The foundation for everything below; phantoms must not lie.
+*** Every consumer that derives a membership sign for a col member
+  passes WHICH relation its col represents.  'phantom_axes' (and
+  the new member-marking code) reads exactly one relation diff --
+  the col's own -- rather than scanning
+  contains/subscribes_to/hides (/overrides) in fixed order and
+  taking the first hit for the ID.  Content positions pass
+  'contains'.
+*** The natural parameter is the relation itself (e.g. the
+  'PartnerCol' kind, or the relation enum the in-Rust graph's
+  accessors already speak); the plan leaves the exact type to
+  implementation, requiring only that it be impossible to call the
+  attribution code without naming a relation.
+*** The net-removal fallback ("no per-stage signal found ->
+  unstaged removedM") survives only where a per-stage signal is
+  genuinely unavailable, and the comment explains when that is.
+*** Unit tests pin the mislabeling case that motivated the fix: an
+  owner that both contains and overrides N, removing each edge in
+  a DIFFERENT stage, yields a contains-phantom labeled with the
+  contains stage and an overriddenCol-phantom labeled with the
+  overrides stage.
+** PartnerCol diff completeness
+The principle (Jeff, 2026-06-11): every PartnerCol shows every
+direction of every axis when in diff mode.  Concretely, for each
+col: members removed since HEAD appear as phantoms carrying
+per-stage 'removedM'; members added since HEAD carry per-stage
+'newM'; existence axes in both directions already come from each
+member's own visit (verified above) and need no new machinery;
+and the col itself must exist wherever it has something to say
+(its own subsection below).  The axes mean for sharing relations
+exactly what they mean for content: M = this edge, X = this file.
+*** the overrides_view_of diff
+'NodeChanges' gains
+'overrides_view_of_diff : Vec<Diff_Item<ID>>', computed in
+'compare_nodecompletes' exactly as 'subscribes_to_diff' is.  This
+completes per-relation diff coverage for Modified files.
+*** outbound cols (subscribeeCol, overriddenCol, hiddenCol)
+The owner's per-stage relation diff is the single source:
+- REMOVED: one shared goal-list function (deduplicating, not
+  copying, 'goal_list_for_subscribee_col' -- e.g.
+  'goal_list_for_writable_col' generalized over the relation)
+  computes the owner's HEAD-side list LCS-interleaved against the
+  worktree list, returning the goal list and the removed-ID set;
+  'build_child_data' turns removed IDs into phantoms as it does
+  for subscribees today.  Wired into
+  'reconcile_partnerCol_children' for the overriddenCol and
+  hiddenCol (the subscribeeCol keeps its dedicated completer,
+  now sharing the goal-list function).  The shared function
+  short-circuits when neither stage map lists the owner's file
+  (HEAD = worktree, so no git read) -- the technique the
+  filter-col computers already use via
+  'per_stage_node_changes_for_truenode' -- which also retires
+  today's per-render HEAD read for unchanged subscribers.
+- ADDED (new behavior, all three cols): present members whose
+  edge is New in some stage get that stage's Plus sign stamped
+  into their 'membership' axes -- the same
+  'TrueNode.membership' field content children use, so
+  serialization, herald display and parsing all exist already.
+  Mirrors 'mark_membership_on_existing_children's rule: only
+  Plus signs are stamped on present members; Minus positions are
+  phantoms, handled by the goal list.
+- The hiddenCol's relation is 'hides_from_its_subscriptions',
+  whose diff already exists ('hides_diff'); only the col wiring
+  is new.  (The filter cols are handled in their own subsection
+  below.)
+*** inbound cols (subscriberCol, overriderCol, hiderCol)
+The edges live in the members' files, so the owner's diff is
+silent about them; the INVERSE SCAN supplies the signs.  For
+owner N and relation rel:
+- Scan each source's staged and unstaged maps (they list only
+  changed files): a Modified file's 'node_changes' rel-diff
+  containing 'New (N)' / 'Removed (N)' contributes that stage's
+  Plus / Minus for that member; a Deleted file whose
+  'before_node' rel-list contains N contributes that stage's
+  Minus; an Added file whose 'after_node' rel-list contains N
+  contributes that stage's Plus.
+- Members present in the worktree graph get any Plus signs
+  stamped as 'newM' (per stage).  Members whose net result is
+  "gone from the worktree" join the goal list as phantoms
+  carrying their per-stage 'removedM' -- and their existence
+  axes, when their file also changed, come from the same scan's
+  file statuses (a vanished overrider R thus shows BOTH
+  'removedX' and 'removedM' under N's overriderCol -- both axes'
+  senses, per the 12-1 dialog).
+- Placement: inbound cols have no meaningful HEAD order (their
+  display order is view-local), so phantoms append after the
+  real members, in sorted-ID order -- the same deterministic
+  tail rule the stage-8 order-preservation work established.
+  (Implementation note: 'view_order_preserving_goal_list'
+  filters to graph-real members, so the phantom tail must be
+  appended after that pass, not fed through it.)
+- The scan runs once per inbound col per render; the diff maps
+  hold only changed files, so the cost is proportional to the
+  size of the change, not the graph.  Plumbing precedent: the
+  per-render 'deleted_since_head_pid_src_map' already reaches
+  'reconcile_partnerCol_children'; the scan's product can ride
+  the same context.
+*** filter cols (hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol)
+Included, both directions.  Their membership is DERIVED (the
+subscriber's hides intersected with, or minus, subscribee
+content), so honest per-stage signs come from the derivation
+itself rather than from any one relation's diff: compute the
+derived membership at the three snapshots -- HEAD, index, and
+worktree; the index-side input lists are reconstructible from the
+per-stage diffs already in hand (an interleaved diff's Unchanged
+plus Removed items are the before-list, Unchanged plus New the
+after-list), so no new git reads -- then the staged signs are the
+HEAD-to-index membership changes and the unstaged signs the
+index-to-worktree ones.
+- ADDED: a present member whose derived membership is new in a
+  stage gets that stage's 'newM'.
+- REMOVED: the existing phantoms stay, and their stage labels
+  become EXACT -- today they come from the 'phantom_axes' scan
+  over the input relations (the approximation the attribution
+  fix retires), so this work upgrades the removed direction while
+  adding the added one.
+- Calibration: knowing WHETHER a member is newly derived-in is
+  easy (the net HEAD-to-worktree diff already says so); the
+  three-snapshot comparison exists to make the STAGE labels
+  exact, and once built it serves both directions uniformly.
+  This is the most intricate piece of the stage.
+*** col existence (the nonexistence of phantoms must not lie)
+In diff mode, a col renders whenever EITHER side of its
+membership is non-empty:
+- De novo creation: the creation sites
+  ('maybe_add_subscribeeCol_branch', 'maybe_add_one_partnerCol',
+  and the filter-col sites such as
+  'maybe_add_hiddenInSubscribeeCol_branch', all in
+  server/to_org/complete/partner_col/mod.rs) currently gate on
+  non-empty WORKTREE membership; in diff mode they also consult
+  the HEAD side (outbound: the owner's HEAD-side list, via the
+  shared goal-list function; inbound: the inverse scan; filter:
+  the HEAD-side derived membership) and create the col when
+  only the HEAD side is non-empty -- containing only phantoms.
+  The creation sites need the diff handle threaded to them; today
+  they receive none.
+- Rerender: the diff-aware goal lists above already keep an
+  existing col alive (phantoms are goal members), and the
+  'create_partnerCols' path gains the same either-side gate.
+- Outside diff mode nothing changes: empty cols are not created,
+  and the subscribeeCol's empty-but-preserved exception stands.
+- Boundary: cols render under ACTIVE owners only.  An owner whose
+  own file was deleted phantoms via its own visit and shows no
+  cols; its edges stay visible from the other end (the partners'
+  cols, via the inverse scan or their own member positions) and
+  in diff analysis.  See the problems section.
+*** the cross-source move corner
+A file moved ACROSS SOURCES appears as Deleted in the old source
+and Added in the new one, while the edge existed at HEAD and
+exists now -- the membership did not change.  Honest axes: under
+the partner's col, the moved node shows 'removedX' attributed to
+the old source's file and 'newX' to the new source's -- but NO
+'newM', because the edge is not new.  A move must not fabricate a
+membership change.  How the two per-source existence facts
+combine on one member line is answered conservatively: the
+member's own source's axes win, since each viewnode carries one
+source.  (Decided in the 12-1 dialog, including the related
+correction: the axes are independent truths -- "both senses"
+means both shown WHEN both changed, not "either implies both".
+If R's list already named N as a dangling reference and N's file
+then appeared, the member shows 'newX' alone, no 'newM'.)
+** no substitution in diff surfaces
+No new gate is needed -- the creation seam's gate landed in stage
+11 -- but the policy gets its missing assertions, all as tests:
+*** The override-choice menu still appears in diff mode (the stage
+  11 decision, currently untested): a handler-level test with
+  'diff_mode_enabled : true' receives the menu, not a content view.
+*** Diff analysis renders raw nodes and reports the override
+  relation's changes: a fixture whose 'overrides_view_of' changed
+  since HEAD yields a report naming the change in both roles, with
+  every node under its own title (no substitution).
+*** A view already containing a drawn substitute (R marked
+  '(overridesHere N)') is shape-stable across a diff-mode toggle:
+  the rerender keeps the marked child (creation-only substitution;
+  the reconciler matches by collected ID), creates no duplicate raw
+  N and no phantom for N, and a save in diff mode still collects N.
+*** An open menu survives a diff-mode toggle intact (its generated
+  indefinitive lines neither phantom nor duplicate).
+*** "No substitution" does not mean "no override diffs": the
+  overriddenCol/overriderCol phantoms and axes above and the
+  diff-analysis sections are the relationship diffs, and they show
+  precisely in diff surfaces.
+
+* implementation plan, in order
+Ordering principle: land the refusals first (they shrink the state
+space every later test must consider), then the attribution fix
+(everything later depends on relation-true signs), then outbound
+before inbound before filter (each reuses progressively less
+existing machinery), then col existence, then the assertion tests,
+then docs.  The work falls into two natural tranches -- the
+refusals, and PartnerCol diff completeness -- which can land as
+separate commit groups.
+** the refusals and the unwinding response shape
+The check in 'handle_git_diff_toggle_and_rerender' (only when
+enabling); the check in 'set_active_source_set' (after resolving
+the requested set, before any side effect); the
+'stream_empty_rerender' helper; the ride-along conversion of the
+switch handler's early error paths to the unwinding shape.
+Handler-level tests over a connected TCP stream pair (the
+override_menu.rs / source_sets.rs pattern), asserting: refusal text
+arrives in the normal response-type, the empty stream trio follows,
+and neither flag changed.  Success-path tests: toggling at 'all'
+works; switching to 'all' while diff mode is on works; disabling
+diff mode under any set works.  Also rewrite the interim comment in
+tests/source_sets.rs
+('diff_view_omits_inactive_members_without_content_leak') to say
+the behavior is now defense in depth behind the refusals.
+** relation-true attribution
+The relation parameter through 'phantom_axes' and its callers;
+content positions pass 'contains'; the mislabeling unit tests
+(beside the existing types_phantom tests).  Lands before any new
+consumer so nothing is built on the scanning behavior.
+** the overrides_view_of diff, and outbound completeness
+The 'NodeChanges' field and its producer; the shared writable-col
+goal-list function (subscribee wrapper included; short-circuit for
+unchanged owners); the 'reconcile_partnerCol_children' wiring for
+the overriddenCol and hiddenCol; 'newM' stamping on present
+outbound members.  Tests in a new tests/git_diff_view/overrides/
+module (fixtures modeled on content/fixtures-removed-subscribee)
+plus an added-member case in the existing subscribee group:
+unstaged and staged removal phantoms; added members show
+'(unstaged newM)' / '(staged newM)'; diff-mode save is a no-op for
+the relation and regenerates the phantoms (idempotence); a phantom
+under a writable col is never collected as a member.
+** the inverse scan, and inbound completeness
+The scan function (one module, near the goal-list computers or
+beside 'phantom_axes', whichever reads better); per-stage signs
+from Modified/Deleted/Added files; wiring into
+'reconcile_partnerCol_children' for the three inbound cols
+(phantom members appended sorted after real members; 'newM'
+stamping on present members).  Tests: an overrider whose file was
+deleted phantoms under the overridden node's overriderCol with
+'removedX removedM'; an overrider whose edge (not file) was
+removed phantoms with 'removedM' only; a new overrider shows
+'newM' (and 'newX' if its file is new); the subscriberCol and
+hiderCol analogues; per-stage variants (staged vs unstaged);
+read-only-col saves remain unaffected by phantoms.
+** filter-col completeness
+The three-snapshot derived-membership comparison (HEAD, index,
+worktree; index-side inputs reconstructed from the per-stage
+diffs already in hand); 'newM' stamping on present members; exact
+per-stage labels on the existing phantoms, replacing their
+'phantom_axes' approximation.  Tests: a member newly hidden-in
+because the subscriber's hides gained it vs because the
+subscribee's contains gained it (each, staged and unstaged);
+removed members keep phantoming, now with exact labels; the
+hiddenOutside analogues.
+** col existence in diff mode
+The either-side gates at both de novo creation sites and the
+'create_partnerCols' rerender path, with the diff handle threaded
+to them.  Tests: a relation list entirely emptied since HEAD still
+yields the col, holding only phantoms, in BOTH a de novo diff
+render and a rerender; outside diff mode the col still does not
+appear.
+** the no-substitution assertion tests
+The menu-in-diff-mode handler test; the diff-analysis
+override-change fixture test; the marked-buffer toggle
+shape-stability test; the open-menu toggle test.  No production
+code is expected to change here; if any test exposes a gap, fixing
+it belongs to this step.
+** documentation touch-ups
+api-and-formats.md: the refusal on "Git diff mode toggle" and on
+"set active source set" (including the empty-stream refusal shape);
+the diff-metadata section gains PartnerCol members (membership
+axes both directions, phantoms, filter cols included).
+TODO/problems.org: mark the wedge bug fixed; mark the
+cross-relation attribution note fixed.  The full documentation
+pass remains the metaplan's last step.
+
+* tests
+Summarizing the lists above, by seam:
+** handler seam (TCP pair, no Emacs)
+*** toggle refused under restricted set: text, empty stream, flag
+  unchanged.
+*** switch to restricted set refused while diff on: text, empty
+  stream, set unchanged, no search cancellation observable side
+  effects (the enrichment slot is untouched).
+*** allowed paths: toggle at 'all'; toggle OFF under any set;
+  switch to 'all' with diff on; switch between restricted sets with
+  diff off (existing behavior, unchanged).
+*** the ride-along: unknown set name yields the unwinding shape.
+*** menu still offered in diff mode.
+** save/rerender pipeline seam ('update_from_and_rerender_buffer')
+*** outbound: removed-member phantoms (unstaged and staged) and
+  added-member 'newM' for subscribeeCol, overriddenCol, hiddenCol.
+*** inbound: removed-member phantoms and added-member 'newM' for
+  subscriberCol, overriderCol, hiderCol, including the
+  deleted-file ('removedX removedM') and added-file ('newX newM')
+  cases.
+*** filter: added-member 'newM' and exactly-labeled removed
+  phantoms for hiddenIn and hiddenOutside, driven by changes to
+  either input list, staged and unstaged.
+*** col existence: emptied-since-HEAD cols render with phantoms,
+  de novo and rerender; absent outside diff mode.
+*** diff-mode save no-op + phantom regeneration (idempotence), for
+  a writable col bearing phantoms.
+*** marked-substitute view shape-stable across a toggle; save in
+  diff mode still collects the original.
+*** open menu shape-stable across a toggle.
+** pure seams
+*** the shared outbound goal-list function: no diff present
+  (degenerates to the worktree list); removal interleaved at the
+  right position; unspecified-at-HEAD handling identical to the
+  subscribee behavior; unchanged-owner short-circuit (no git
+  read, identical result).
+*** the inverse scan: signs from Modified/Deleted/Added member
+  files, per stage, per relation; an owner ID absent from every
+  diff yields nothing; a cross-source move yields existence signs
+  only (no fabricated membership change).
+*** the three-snapshot derived-membership comparison: index
+  reconstruction from per-stage diffs; signs for changes driven
+  by either input list; degenerates to no signs when neither
+  input changed.
+*** relation-true attribution: the double-relation mislabeling
+  case, fixed (each col's phantom labeled with its own relation's
+  stage).
+** no regressions
+git_diff_view, source_sets, override_substitution, override_menu,
+overridden_as_such, override_chain_notice, subscribee_col,
+hidden_from_subscriptions, diff_analysis, save, content_view,
+idempotence; the elisp suite (no elisp changes expected); the
+integration suite (git-diff-view-updates, source-cycling,
+override-menu).
+
+* verification
+** 'cargo check'
+** 'cargo test --lib'
+** 'cargo test --test git_diff_view -- --nocapture'
+** 'cargo test --test source_sets -- --nocapture'
+** 'cargo test --test override_substitution -- --nocapture'
+** 'cargo test --test override_menu -- --nocapture'
+** 'cargo test --test diff_analysis -- --nocapture'
+** 'cargo test --test subscribee_col -- --nocapture'
+** 'cargo test --test hidden_from_subscriptions -- --nocapture'
+** 'cargo nextest run'
+** 'bash/emacs-tests.sh'
+** 'bash/all-tests.sh --no-sound'
+
+* problems
+Anything awkward, potentially incorrect, dangerous, or undecided.
+TODO-marked items need your attention; the rest are awareness-only.
+The first two are new since 12-1, found while re-verifying the code
+for this rewrite.
+** DONE cols do not render under phantom owners -- bless the boundary
+The col-existence rule ("a col renders whenever either side of its
+membership is non-empty") applies to cols under ACTIVE owners.  An
+owner whose own FILE was deleted is drawn as a phantom, and
+phantoms grow no cols -- so its HEAD-side relationship lists do
+not phantom beneath it.  I read the 12-1 dialog ("the owner itself
+phantoms, which communicates more", which your follow-up cases did
+not contest) as accepting this, and the information survives
+elsewhere: every edge a dead owner's outbound col would have shown
+appears on the partner's inbound col via the inverse scan (dead R
+overriding N -> phantom R under N's overriderCol, 'removedX
+removedM'), and diff analysis reports the change on raw nodes.
+But it is the one place where "the nonexistence of phantoms must
+not lie" is still approximated, so it gets a TODO rather than
+silence: veto here if you want cols (holding only phantoms) under
+phantom owners, and I will scope it; otherwise this entry is the
+spec.
+*** DONE agreed (Jeff speaking)
+** the diff-toggle handler's "\nWarning:" substring dispatch
+New observation (awareness only; the plan works around it).
+elisp/skg-request-git-diff-mode.el decides whether to pop a
+warnings window by searching the response 'content' for the
+literal substring "\nWarning:".  Any first-message text containing
+it -- including a future refusal or error -- pops a window instead
+of staying in the echo area.  This plan's refusal texts avoid the
+substring, and a comment at the refusal site will name the
+constraint; a typed flag in the response would be the real fix,
+not worth building now.  Recorded in TODO/problems.org.
+** the pre-existing Emacs wedge, fixed en route
+The switch handler's early error paths reply with response-type
+"error", which Emacs's switch flow has no handler for, after Emacs
+has already locked every buffer and set the stream guard: a
+malformed or unknown set name wedges the client until the TCP
+connection drops.  The plan converts these paths to the unwinding
+refusal shape.  (The dispatcher-level 'send_error' paths above the
+handler are reachable only from requests no current client sends;
+they get the same conversion if cheap.)  Reported in
+TODO/problems.org with this plan named as the fix.
+** the render seam can still be driven with both modes at once
+The refusals guard the two STATE doors, per connection.  The
+renderer itself ('multi_root_view_with_source_set' and friends)
+still accepts a restricted set and diffs together -- tests do
+exactly this, and stage 9-2's no-leak omission behavior remains
+correct and load-bearing there as defense in depth.  The interim
+comment in tests/source_sets.rs is reworded to say so; the
+behavior and test stay.
+** connect-time state can make diff mode unreachable until a switch
+'default_source_set' may be restricted, so a fresh connection may
+need to switch to 'all' before diff mode will enable.  The refusal
+message says how.  This is intended, not a bug, but worth knowing
+when a user reports "diff mode won't turn on".
+** the menu under diff decoration is lightly specified
+The menu is a registered view, so a diff-mode toggle reruns
+completion over it.  Its lines are indefinitive and its structure
+comes from override edges, not contains, so the expectation is
+"unchanged, perhaps with existence axes on changed nodes"; the
+plan pins shape-stability but deliberately does not pin every
+decoration detail.  If the test exposes something uglier (e.g.
+phantom insertion into the menu), the fix lands in the
+assertion-tests step and gets recorded in progress.org.
+** refusals are per-connection; the invariant is too
+Nothing prevents one connection from running diff mode at 'all'
+while another browses a restricted set.  All state involved is
+per-connection, so this is coherent; noted because "the server is
+in diff mode" is not a well-formed sentence -- a CONNECTION is.
+** this stage roughly doubled; it lands as two tranches
+PartnerCol diff completeness (every col, every direction, the
+inverse scan, the filter cols' three-snapshot comparison, col
+existence, the attribution fix) is substantially more work than
+the original overrides-parity scope.  The implementation order
+isolates the refusals tranche from the completeness tranche, so
+progress is committable at the seam; if execution reveals the
+second tranche deserves its own plan file (the stage-9 and now
+stage-12 precedent), it splits then rather than pre-emptively.
+** inbound 'newM' on a member drawn for another reason
+A subtlety of inbound marking, awareness only: the inverse scan
+stamps 'newM' on a present member when some stage's diff says its
+edge is new.  A member can also appear in an inbound col while
+its OWN file is unchanged (the edge change lives in its file's
+diff -- that is the point of the scan), so 'newM' on a col member
+whose own node shows no other decoration is correct and expected,
+and may look surprising next to content children, where 'newM'
+always co-occurs with a change to the parent.  No action; noting
+it so the first screenshot does not read as a bug.
+** today's per-render git HEAD reads for unchanged subscribers
+Small inefficiency found while re-verifying (awareness; the
+outbound step fixes it in passing): 'goal_list_for_subscribee_col'
+calls 'nodecomplete_from_git_head' for every subscribeeCol on
+every diff-mode render, even when the owner's file appears in
+neither stage map (HEAD = worktree).  The shared goal-list
+function short-circuits that case, as the filter-col computers
+already do.  Recorded in TODO/problems.org.
