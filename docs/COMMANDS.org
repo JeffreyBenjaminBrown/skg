@@ -151,10 +151,23 @@ a bare UUID, or a .skg filename
 will open a new view from the ID it finds there,
 or go to the view of it that was already open if that exists.
 
+If the node is overridden, this opens the override-choice menu
+instead -- the node as root, its overriders beneath it -- and
+explains so in the minibuffer; run skg-goto on the overrider you
+want, or skg-goto-bypassOverride to open the original. From a
+magit buffer, skg-goto bypasses the menu automatically (a
+readable-ID jump lands on the raw node).
+
 If you're not sure whether the cursor is on something visitable
 (a link or a node's metadata),
 use skg-id-next and skg-id-prev
 to identify where those are.
+*** M-x skg-goto-bypassOverride
+Like skg-goto, but if the node is overridden, opens the node
+itself instead of the override-choice menu. The escape hatch from
+the menu (or from anywhere) to the original node. Recursive
+content beneath the opened node still draws overriders in place
+of what they override.
 *** C-c G RET : skg-goto-and-close-this
 Like skg-goto, but also closes the buffer it was called from.
 *** C-c g b   : skg-goto-biggest-branch

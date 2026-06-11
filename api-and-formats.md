@@ -33,11 +33,37 @@ So far there are these endpoints:
       containers.
 
 ## Single root content tree view from ID
-  - Request: ((request . "single root content view") (id . "NODE_ID") (view-uri . "URI"))
+  - Request: ((request . "single root content view") (id . "NODE_ID") (view-uri . "URI") (override-choice . "CHOICE"))
+    - `override-choice` is optional; values are "menu" (the default)
+      and "bypass". See "the override-choice menu" below.
   - Response: length-prefixed content, formatted `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` constitutes `LENGTH` bytes. PAYLOAD may contain quotation marks; hence the length prefix. The payload shape is `((content "...") (errors ("..." ...)) (warnings ("..." ...)))`. The document structure is detailed below, under `Single root content tree view`.
   - If `NODE_ID` resolves to an inactive source, the server refuses the
     request with a human-readable message and does not open a buffer.
     Following a link to an inactive-source node behaves the same way.
+  - The override-choice menu: when the requested node is overridden
+    (an `overrides_view_of` edge points at it, user-owned or
+    foreign) and at least one overrider's source is active, the
+    server returns, instead of a content view, an ordinary buffer
+    of indefinitive nodes: the requested node as root, each visible
+    overrider an Independent child of what it overrides, following
+    the relation recursively (all edges), each branch stopping with
+    the `cycle` viewstat at the first repeated ID. The response
+    then carries two extra fields:
+    `((content "...") (view-uri "override-menu:PID")
+      (to-minibuffer "The requested node is overridden. Choose a destination.")
+      (errors ()) (warnings (...)))`.
+    The client must adopt the supplied `view-uri` (the server
+    registers the menu under it; one menu per node, deduped) and
+    show `to-minibuffer` via the echo area only -- never buffer
+    text, never a popped window.
+    Precedence: an open content view rooted at the node wins (the
+    usual `(switch-to-view ...)` reply); a second menu request
+    switches to the open menu; the menu appears in diff mode too.
+  - `(override-choice . "bypass")` skips the menu and opens the
+    requested node itself; recursive content beneath it still
+    applies override substitution. Emacs sends bypass from magit
+    buffers (readable-ID jumps land on the raw node) and from the
+    command `skg-goto-bypassOverride`, the menu's escape hatch.
 
 ## Save buffer
   - Request: First `((request . "save buffer") (view-uri . "URI") (point-lines-below-focused-headline . "N") (point-screen-lines-below-window-start . "M"))\n`, then `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` is the buffer content (`LENGTH` bytes).
@@ -228,6 +254,33 @@ node participates in the collection represented by its visible parent:
 - omitted `birth` means `unremarkable`;
 - `(birth containsParent)` marks containerward ancestry;
 - `(birth linksToParent)` marks sourceward link-source ancestry.
+
+## Override substitution and the overridesHere marker
+
+When view completion would CREATE a viewnode for node N as
+recursive content, and a user-owned overrider R of N is visible
+under the active source-set, it draws R instead -- transitively
+(legacy compound chains surface the warning "Compound overrides
+relationship traversed..."), cycle-guarded, and never in diff mode.
+Existing viewnodes are never rewritten (closing and reopening
+normalizes), and only content substitutes: PartnerCol members,
+view roots, search results, ancestry insertions and phantoms always
+draw the raw node. The immediate children of an overridden-as-such
+(an Affected child of an overriddenCol) also draw raw: the user
+asked to see the original.
+
+A substituted viewnode carries the keyed viewStats form
+`(overridesHere N)` -- herald red "Oh" -- naming the original it
+stands for. The marker is LOAD-BEARING at save: wherever it
+appears, extraction collects N rather than the carrying node's own
+ID, so a container's contains list round-trips to the original
+instead of being rewritten to the overrider. Edits to the drawn
+node itself (title, body, cols) still save to the drawn node.
+A buffer whose marker the server would not have drawn (the carrier
+is not the ownership-gated, visibility-UNGATED resolution of N)
+aborts the save with an explanation. When a source-set switch
+converts a drawn substitute to an InactiveNode, the marker survives
+inside the `(inactiveNode ...)` form.
 
 # skgconfig.toml
 

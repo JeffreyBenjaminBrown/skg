@@ -9,6 +9,127 @@ its territory were covered differently by the local-view-update
 overhaul, and the remainder is re-planned in
 [[./metaplan_2.org]], which supersedes metaplan 1.
 ** stage 11 : override rendering and navigation
+*** implemented (2026-06-11)
+Seven commits on branch 'full-schema', executing
+'TODO/full-schema/11_override-rendering-and-navigation.org' in its
+planned order:
+1. The resolver ('server/dbs/in_rust_graph/override_resolution.rs'):
+   'resolve_override' -> {effective, path, cycle_detected};
+   ownership-gated (set-independent), visibility-gated per edge,
+   transitive, seen-set cycle guard, defensive multi-overrider stop;
+   11 unit tests over hand-built graphs.
+2. The marker, inert: 'ViewNodeStats.overridesHere : Option<ID>'
+   and the parallel 'InactiveNode.overridesHere' (the switch
+   conversion copies it); serialization '(overridesHere N)' in
+   viewStats and inactiveNode forms; parse arms; 'collected_id ()'
+   read by 'content_members', 'visible_content_members' and the
+   content distinctness validator; tamper validation
+   ('overridesHere_marker_errors', visibility-UNGATED resolve,
+   fail-closed without the global graph handle); red "Oh" herald
+   (ANY without IT swallows the payload); fixture regenerated.
+   Landed with the full suite passing unchanged.
+3. Substitution at the content creation seam: orderkey, prefetch
+   keys and stale-demotion compare COLLECTED ids;
+   'build_child_creation_data' resolves missing goal members under
+   the gates (omission first, diff off, resolver's own);
+   'is_overridden_as_such' disables substitution for an
+   overridden-as-such's immediate children (no cascade);
+   'CompletionWarning' became an enum gaining
+   'CompoundOverrideChain'. tests/override_substitution.rs: de novo
+   marking, the full save round-trip (idempotent; delete/move/
+   reorder act on the original; edits hit the drawn node; tamper
+   aborts; no phantom hide under a subscribee-as-such), diff gate,
+   and the three multi-source gates.
+4. The R/E/G/H fixture (tests/overridden_as_such.rs), extended with
+   X overriding G so no-cascade is observable: subscribeeCol
+   expansion hides H and draws G as marked X; overriddenCol
+   expansion shows raw G and H; col members never substitute.
+5. The menu ('server/to_org/render/override_menu.rs' +
+   'ViewUri::OverrideMenu', "override-menu:PID", deduped by root,
+   excluded from 'content_view_uri_for_root_id'); handler wiring
+   after the switch-to-view check; '(view-uri ...)' and
+   '(to-minibuffer ...)' response fields; Emacs adopts the server
+   URI and echoes the notice with 'message' only.
+   tests/override_menu.rs: shape with Op heralds, foreign chains,
+   foreign cycles (stop with the cycle viewstat), visibility
+   omission and empty-menu fall-through, handler precedence.
+6. The bypass: '(override-choice . "menu" | "bypass")' (unknown
+   values error loudly); 'skg-goto' bypasses from magit buffers
+   (major-mode name, magit not required); new command
+   'skg-goto-bypassOverride'; pure request-builder helper with
+   elisp unit tests; new integration test
+   tests/integration/override-menu drives the real fetch path.
+7. Docs: api-and-formats.md (request field, menu response,
+   substitution + marker semantics), glossary.md (the override
+   vocabulary), COMMANDS.org (menu behavior on skg-goto;
+   skg-goto-bypassOverride), TODO/problems.org ("drawn in place
+   of" note rewritten to match the executed design).
+*** changes to the plan's envisioned order
+None; executed in plan order. The save-side round-trip machinery
+landed inert (step 2) before substitution could mark anything
+(step 3), as planned.
+*** deviations from the plan as written
+- Compound-chain notices surface only on SAVES of the affected
+  view. The plan's "small warnings-plumbing addition in
+  multi_root_view_via_env" for de novo renders was not built: no
+  end-to-end fixture can produce a compound chain (owned chains are
+  rejected at save and rebuild), so the de novo channel would be
+  untestable code. The enum variant, its renderer and the emission
+  are unit-tested; the plumbing is a few lines if ever wanted.
+- The marker is honored in CONTENT position only: a marked viewnode
+  moved under a writable PartnerCol contributes its own ID to the
+  col's list, not the original's. (Substitution never creates that
+  position; only a user gesture can.) Easily revisited.
+- The menu response's '(view-uri ...)' field was not in the plan:
+  Emacs generates content-view URIs, so the server must tell it the
+  menu's canonical URI. Ride-along pitfall fixed: the server's sexp
+  printer leaves space-free strings bare, so Emacs normalizes the
+  arriving symbol to a string.
+- Two content_view expected strings and view_stats_sharing's Op
+  fixture were updated because substitution is now real: a view of
+  R draws C in place of P, so the Op position (C under raw P) is
+  asserted from a view rooted at P instead.
+- Handler detail: switch-to-view precedence runs before
+  override-choice value validation, so a bad value with an open raw
+  view still switches. Deemed harmless (pinned in the test).
+- The elisp surface tests are unit tests (request builder, magit
+  detection) plus the integration test, rather than mocked
+  end-to-end elisp tests.
+*** unanticipated future potential costs and benefits
+- CONSTRAINT: tamper validation fails CLOSED -- a buffer carrying a
+  marker cannot save when the process-global graph handle is
+  uninitialized. Production always initializes it; test harnesses
+  saving marked buffers must call 'try_init_global_handle'.
+- COST: each missing content goal member costs one resolver walk
+  (O(1) im-map lookups per hop); each definitive content node costs
+  one 'is_overridden_as_such' check (two tree reads). Negligible.
+- BENEFIT: 'collected_id ()' is the one seam a future stand-in
+  feature (redirects, merge previews) would reuse.
+- BENEFIT: menus ride the existing view-registry machinery; a
+  collateral rerender refreshes a menu's titles for free
+  ('clobberIndefinitiveViewnode' resets title/source only, so the
+  menu's shape survives).
+- CONSTRAINT: one menu per node ('override-menu:PID'); a menu and a
+  raw view of the same node can coexist, and the raw view wins
+  navigation.
+*** tested
+- 'cargo nextest run': 564/564 passed (24 new tests across four new
+  targets: dbs::override_resolution, override_substitution,
+  overridden_as_such, override_menu; plus the updated content_view
+  and view_stats_sharing expectations).
+- 'bash/emacs-tests.sh': 225/225 passed (3 new bypass tests).
+- New integration test override-menu passed standalone;
+  'bash/all-tests.sh --no-sound' all green (Emacs tests, Nextest,
+  30 integration tests; 96s).
+*** open questions
+None blocking (per when-to-stop.org: no unanticipated architectural
+decisions, no stumper mysteries). Small items for Jeff's eyes:
+- TODO (Jeff): 'skg-goto-bypassOverride' has no keybinding yet
+  (M-x only; COMMANDS.org documents it that way). Assign per taste.
+- TODO (Jeff): compound-chain notices reach you only via save
+  responses (see deviations). Fine, or want the de novo plumbing?
+- TODO (Jeff): a marked child moved under a writable col speaks for
+  ITSELF there (the marker is a content-position concept). Fine?
 *** planned
 Wrote 'TODO/full-schema/11_override-rendering-and-navigation.org',
 covering the metaplan_2.org step "define override rendering and

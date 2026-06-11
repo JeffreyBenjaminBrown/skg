@@ -627,22 +627,27 @@
    A future relevance predicate that admits, say, InactiveNode
    members would turn a save into a server crash. Returning Err
    would cost little.
-** Architecture note: nothing can represent "drawn in place of another node"
-   Once override substitution lands (TODO/full-schema/metaplan_2.org,
-   "define override rendering and navigation"), a viewnode can stand
-   in for a different graph node than the one whose ID it carries:
-   the buffer draws overrider R where the container's contains list
-   says N. The planned representation is a bool ('overridesHere' on
-   'ViewNodeStats') plus the convention that save extraction
-   round-trips the original ID.
+** Architecture note: "drawn in place of another node" is override-specific data
+   Override substitution (TODO/full-schema/
+   11_override-rendering-and-navigation.org, executed 2026-06-11)
+   lets a viewnode stand in for a different graph node than the one
+   whose ID it carries: the buffer draws overrider R where the
+   container's contains list says N. The representation is
+   'ViewNodeStats.overridesHere : Option<ID>' (and a parallel field
+   on 'InactiveNode', for substitutes a source-set switch retains),
+   carrying the original's ID -- data, not the earlier-planned
+   bool-plus-convention, which was rejected 2026-06-11 because
+   inverting the resolution at save time is ambiguous when one
+   overrider stands for two members of the same parent. Save
+   extraction, the content distinctness validators and the content
+   reconciler's orderkey all read it through 'collected_id ()'.
 
-   If a second substitution-like feature ever appears (redirects,
-   merge previews, etc.), do not add a second bool-plus-convention.
-   Replace the pattern with an explicit field, something like
-   'drawn_in_place_of : Option<ID>' on the viewnode, so the
-   stand-in relationship is data rather than convention. Jeff
-   approved this direction 2026-06-10; it is deliberately deferred
-   until a second consumer exists.
+   The name is override-specific. If a second substitution-like
+   feature ever appears (redirects, merge previews, etc.), do not
+   add a second marker field beside it; generalize this one (e.g.
+   rename to 'drawn_in_place_of', adding a reason enum if consumers
+   need distinguishing). Deferred until that second consumer exists
+   (Jeff, 2026-06-10).
 ** (fixed) 'rerender_view' ignored its 'create_partnerCols' flag
    Found 2026-06-11 during the heralds stage (the compiler's
    unused-variable warning exposed it). Stage 9's switch-rerender

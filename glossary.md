@@ -86,6 +86,35 @@ wire strings, where only nodes can merge.
 A viewnode that might have an ID and source,
 but might not, is maybe-placed.
 
+## override substitution, and the vocabulary around it
+
+When view completion would CREATE a viewnode for node N as
+recursive content, it draws the EFFECTIVE OVERRIDER of N instead:
+the end of the chain of user-owned, currently-visible
+'overrides_view_of' edges leading out of N (usually one edge; the
+resolver is 'resolve_override' in
+'server/dbs/in_rust_graph/override_resolution.rs'). Foreign
+override edges are display-only facts and never substitute.
+
+The drawn substitute carries the MARKER '(overridesHere N)'
+(herald red "Oh"), naming the original it stands for. A viewnode's
+COLLECTED ID is what it contributes to its parent's saved lists:
+the marker's original if present, else its own ID -- so saving a
+view that draws R in place of N keeps N in the parent's contains.
+
+An OVERRIDDEN-AS-SUCH is an Affected child of an overriddenCol --
+the position that always shows the original; its definitive
+expansion applies neither the owner's hides nor substitution to
+its immediate children.
+
+The OVERRIDE-CHOICE BUFFER (the "menu") is what a new single-root
+view of an overridden node returns: the node as root, each visible
+overrider an Independent indefinitive child of what it overrides,
+all edges shown, foreign included. BYPASS
+('(override-choice . "bypass")' on the request;
+'skg-goto-bypassOverride' in Emacs; automatic from magit buffers)
+skips the menu and opens the requested node itself.
+
 ## "subscribee as such"
 
 In Skg some nodes are "subscribers", which "subscribe" to "subscribees".

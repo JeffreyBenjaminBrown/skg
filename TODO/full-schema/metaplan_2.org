@@ -328,7 +328,10 @@ is adding three new atoms:
   that JSON (Emacs parses JSON natively), keeping only presentation
   (colors, symbols, ordering) in elisp.  Nice if cheap; the
   conformance test already delivers the safety.
-** define override rendering and navigation
+** DONE define override rendering and navigation
+Executed 2026-06-11; plan in
+[[./DONE/11_override-rendering-and-navigation.org]], log in
+[[./progress.org]] (stage 11).
 (2026-06-11: this heading was accidentally lost in an earlier edit,
 which made the subsections below look like part of the heralds
 step; restored.)
