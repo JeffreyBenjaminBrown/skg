@@ -69,13 +69,20 @@ None; executed in plan order. The save-side round-trip machinery
 landed inert (step 2) before substitution could mark anything
 (step 3), as planned.
 *** deviations from the plan as written
-- Compound-chain notices surface only on SAVES of the affected
-  view. The plan's "small warnings-plumbing addition in
-  multi_root_view_via_env" for de novo renders was not built: no
-  end-to-end fixture can produce a compound chain (owned chains are
-  rejected at save and rebuild), so the de novo channel would be
-  untestable code. The enum variant, its renderer and the emission
-  are unit-tested; the plumbing is a few lines if ever wanted.
+- Compound-chain notices initially surfaced only on SAVES of the
+  affected view; the de novo plumbing was skipped as untestable
+  (owned chains are rejected at save and rebuild, so no fixture can
+  hold one). SUPERSEDED the same day: Jeff asked for fresh-view
+  notices, so the plumbing was built ('render_initial_view' returns
+  render warnings, filtered to the compound variant -- col repairs
+  stay silent for de novo; 'multi_root_view_via_env' gained a
+  'warnings_out' parameter; the handler merges them into the
+  content-view response). The testability wall fell to a dedicated
+  target (tests/override_chain_notice.rs) whose chain lives only in
+  graphs constructed in-test, installed as the process-global
+  handle -- its own target deliberately, so plain 'cargo test'
+  cannot leak the poisoned graph into sibling tests' tamper checks.
+  Collateral rerenders and rerender-all remain silent.
 - The marker is honored in CONTENT position only: a marked viewnode
   moved under a writable PartnerCol contributes its own ID to the
   col's list, not the original's. (Substitution never creates that
@@ -124,12 +131,61 @@ landed inert (step 2) before substitution could mark anything
 *** open questions
 None blocking (per when-to-stop.org: no unanticipated architectural
 decisions, no stumper mysteries). Small items for Jeff's eyes:
-- TODO (Jeff): 'skg-goto-bypassOverride' has no keybinding yet
+**** DONE (Jeff): 'skg-goto-bypassOverride' has no keybinding yet
   (M-x only; COMMANDS.org documents it that way). Assign per taste.
-- TODO (Jeff): compound-chain notices reach you only via save
+***** TODO that's fine; will do later
+**** DONE (Jeff): compound-chain notices reach you only via save
   responses (see deviations). Fine, or want the de novo plumbing?
-- TODO (Jeff): a marked child moved under a writable col speaks for
+***** DONE notices for fresh views would be good
+****** claude: built (2026-06-11)
+Fresh views now surface the notice through the content-view
+response's warnings; details folded into the deviations bullet
+above, end-to-end test in tests/override_chain_notice.rs.
+**** DONE (Jeff): a marked child moved under a writable col speaks for
   ITSELF there (the marker is a content-position concept). Fine?
+***** claude: elaboration -- the scenario, the choice, and the alternative
+The scenario takes a user gesture to reach; rendering never
+produces it.  Suppose P contains N, and R overrides N, so a view
+of P draws the marked line
+
+  ** (skg (node (id R) ... (viewStats (overridesHere N)))) R
+
+Now the user KILLS that line and YANKS it somewhere else -- the
+metadata, marker included, travels with the text.  Where it lands
+determines what the marker means:
+
+- Yanked into CONTENT position (under some container Q): the
+  marker is honored.  Q's contains gains N, the original -- the
+  line is still "N, shown through R".  This is the round-trip rule
+  working as designed.
+
+- Yanked under a WRITABLE PartnerCol -- S's subscribeeCol, say:
+  the col's membership list is read from each member's OWN id, not
+  its collected id.  So S comes to subscribe to R, the node whose
+  title the user was looking at -- NOT to N.
+
+That asymmetry is the decision I made unilaterally (it is cheap to
+reverse).  The case for it: what the user SEES on that line is R's
+title, and "subscribe to the thing I dragged here" is the least
+spooky reading; honoring the marker instead would make the
+relationship silently target a node the user may never have heard
+of, steered by a metadata tail the heralds render as just "Oh".
+The case against: a user who thinks of the line as "really N,
+just displayed as R" would expect S to subscribe to N, and gets R
+without any warning.
+
+(Read-only cols are unaffected -- their membership is never read
+from the buffer.  And within content position there is no choice
+to make: collecting R there would rewrite P's contains, the
+corruption this whole stage exists to prevent.)
+
+If you prefer the other reading, the change is one line per
+writable-col collector ('subscribeeCol_members' /
+'partnerCol_members' switching to 'collected_id ()') plus tests;
+say the word.  A third option: refuse the save when a marked node
+sits under a writable col, forcing the user to strip the marker
+and choose explicitly.
+****** TODO Ah. That seems good. We'll keep it.
 *** planned
 Wrote 'TODO/full-schema/11_override-rendering-and-navigation.org',
 covering the metaplan_2.org step "define override rendering and

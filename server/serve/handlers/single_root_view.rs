@@ -167,11 +167,13 @@ pub fn handle_single_root_view_request (
                   &[ format! (
                       "Error generating override menu: {}", e ) ],
                   &[] ); }}
+            let mut render_warnings : Vec<String> = Vec::new ();
             match multi_root_view_via_env (
               env,
               &[node_id . clone ()],
               views_state . diff_mode_enabled,
-              Some (active_source_set) ) . await
+              Some (active_source_set),
+              &mut render_warnings ) . await
             { Ok ( (buffer_content, pids, viewforest) ) => {
                 if let Ok (view_uri) = &view_uri_result {
                   views_state . open_views . register_view (
@@ -179,9 +181,11 @@ pub fn handle_single_root_view_request (
                     viewforest,
                     &pids ); }
                 let warnings : Vec<String> =
-                  take_pending_audit_warning ()
-                    . map ( |w| vec! [w] )
-                    . unwrap_or_default ();
+                  { let mut warnings : Vec<String> =
+                      render_warnings;
+                    warnings . extend (
+                      take_pending_audit_warning () );
+                    warnings };
                 format_buffer_response_sexp (
                   & buffer_content,
                   &[],

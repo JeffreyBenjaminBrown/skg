@@ -91,24 +91,35 @@ async fn multi_root_view_inner (
     tantivy_index : tantivy_owned,
     driver        : Arc::clone (driver), };
   multi_root_view_via_env (
-    &env, root_ids, diff_mode_enabled, active_source_set ) . await }
+    &env, root_ids, diff_mode_enabled, active_source_set,
+    // The test shims discard render warnings; the production
+    // caller (the single-root handler) surfaces them.
+    &mut Vec::new () ) . await }
 
 /// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): the de-novo view, built through the ONE view completion path
 /// (render_initial_view). Takes a SkgEnv (carries
 /// config/driver/tantivy/graph), runs view completion over a stub forest of the
 /// requested roots, then attaches containerward ancestry and stats and renders.
+/// Warning strings the render produces (today only the
+/// compound-override-chain notice) are appended to 'warnings_out'.
 pub async fn multi_root_view_via_env (
   env               : &SkgEnv,
   root_ids          : &[ID],
   diff_mode_enabled : bool,
   active_source_set : Option<&ActiveSourceSet>,
+  warnings_out      : &mut Vec<String>,
 ) -> Result < (String, Vec<ID>, Tree<ViewNode>),
               Box<dyn Error> > {
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the diff (when diff_mode_enabled) is computed inline by
   // view completion, per Active node at its BFS visit.
   let mut viewforest : ViewForest =
-    render_initial_view (
-      env, root_ids, active_source_set, diff_mode_enabled ) . await ?;
+    { let (viewforest, render_warnings)
+        : (ViewForest, Vec<String>) =
+        render_initial_view (
+          env, root_ids, active_source_set,
+          diff_mode_enabled ) . await ?;
+      warnings_out . extend (render_warnings);
+      viewforest };
   // TODO/DONE/local-view-update/plan_v2.org §20.3: the de-novo and post-save render tails are one shared helper now.
   // Root containerward is requested per-root in render_initial_view
   // (de-novo only) and fulfilled + dropped inside finish_viewforest, so the tail

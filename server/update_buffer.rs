@@ -268,12 +268,16 @@ fn find_collateral_view_uris (
 /// at its BFS visit, via process_truenode_diff) -- the same path post-save uses.
 /// The caller (multi_root_view_via_env) then adds containerward ancestry and
 /// stats.
+/// Returns the completed viewforest plus any warning strings the
+/// render itself produced -- today only compound-override-chain
+/// notices. (Col-repair warnings stay silent for de novo renders;
+/// see the warning-sink filtering at the bottom.)
 pub async fn render_initial_view (
   env       : &SkgEnv,
   root_ids  : &[ID],
   active    : Option<&ActiveSourceSet>,
   diff_mode : bool,
-) -> Result<ViewForest, Box<dyn Error>> {
+) -> Result<(ViewForest, Vec<String>), Box<dyn Error>> {
   // Build the stub roots. Its DefinitiveMap is discarded: view completion below uses
   // a FRESH one, so each root is a first occurrence (make_indef_if_repeat treats
   // any pid already in the map as a repeat and would wrongly indefinitize them).
@@ -309,6 +313,7 @@ pub async fn render_initial_view (
     real_diffs . as_ref () . map ( |d| deleted_ids_to_source (d) )
       . unwrap_or_default ();
   let empty_deleted_pids : HashSet<ID> = HashSet::new ();
+  let mut sink : Vec<CompletionWarning> = Vec::new ();
   let mut context : CompletionContext = CompletionContext {
     defmap                         : &mut defmap,
     source_diffs                   : &real_diffs,
@@ -322,9 +327,20 @@ pub async fn render_initial_view (
     create_partnerCols_for_fresh_nodes : true,
     diff_tantivy_index : if diff_mode { Some (&env . tantivy_index) }
                          else         { None },
-    warning_sink : None, }; // De-novo rendering repairs silently.
+    warning_sink : Some (&mut sink), };
   complete_viewforest ( &mut viewforest, &mut context ) . await ?;
-  Ok ( viewforest ) }
+  let denovo_warnings : Vec<String> =
+    { let compound_only : Vec<CompletionWarning> =
+        // De-novo rendering REPAIRS silently (repairs do not
+        // correspond to edits the user just made), but a legacy
+        // compound override chain deserves its notice on fresh
+        // views too (Jeff, 2026-06-11) -- so keep only that kind.
+        sink . into_iter ()
+        . filter ( |w| matches! (
+            w, CompletionWarning::CompoundOverrideChain { .. } ))
+        . collect ();
+      render_completion_warnings (&compound_only) };
+  Ok (( viewforest, denovo_warnings )) }
 
 /// Strip stale diff data, re-complete the viewforest,
 /// set graph/view stats, and render to string.
