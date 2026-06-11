@@ -70,6 +70,41 @@ fn diff_analysis_report_includes_inbound_and_textlink_changes (
   Ok (( )) }
 
 #[test]
+fn diff_analysis_reports_override_changes_on_raw_nodes (
+) -> Result<(), Box<dyn Error>> {
+  // No substitution in diff surfaces
+  // (TODO/full-schema/12-2_diff-mode-policy_discussion.org): diff
+  // analysis renders raw nodes -- each under its own title -- and
+  // reports an overrides_view_of change in both roles.
+  let fixture : DiffFixture =
+    DiffFixture::new () ?;
+  fixture . write_node ("n", "Original", "", &[]) ?;
+  fixture . write_node ("r", "Overrider", "", &[]) ?;
+  fixture . commit_all ("initial") ?;
+  fs::write (
+    fixture . source . join ("r.skg"),
+    "title: Overrider\npid: r\noverrides_view_of:\n- n\n" ) ?;
+  let report : String =
+    diff_analysis_report (
+      &fixture . config,
+      DiffSelection {
+        include_staged: true,
+        include_unstaged: true }) ?;
+  assert! (
+    report . contains ("overrider"),
+    "the gaining node reports its outbound override change:\n{}",
+    report );
+  assert! (
+    report . contains ("overridden"),
+    "the overridden node reports the inbound change:\n{}",
+    report );
+  assert! (
+    report . contains ("Overrider") && report . contains ("Original"),
+    "each node appears under its OWN title -- no substitution:\n{}",
+    report );
+  Ok (( )) }
+
+#[test]
 fn diff_analysis_distinguishes_head_index_and_worktree (
 ) -> Result<(), Box<dyn Error>> {
   let fixture : DiffFixture =

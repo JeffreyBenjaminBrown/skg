@@ -321,6 +321,131 @@ fn diff_mode_disables_substitution
         "N draws raw in diff mode:\n{}", view );
       Ok (( )) } )) }
 
+/// A view already containing a drawn substitute (R marked
+/// '(overridesHere N)') is shape-stable across a diff-mode toggle:
+/// the rerender keeps the marked child (creation-only substitution;
+/// the reconciler matches by collected ID), creates no duplicate raw
+/// N and no phantom for N
+/// (TODO/full-schema/12-2_diff-mode-policy_discussion.org).
+#[test]
+fn marked_view_is_shape_stable_across_diff_toggle
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_db (
+    "skg-test-override-subst-toggle",
+    "tests/override_substitution/fixtures",
+    "/tmp/tantivy-test-override-subst-toggle",
+    |config, driver, tantivy| Box::pin ( async move {
+      skg::dbs::in_rust_graph::try_init_global_handle (
+        graph_handle_from_config (config) ? );
+      { // git-init the temp fixture copy, so the toggle's diff is
+        // real (and clean: HEAD == worktree).
+        let source_path : &std::path::Path =
+          & config . sources . values () . next () . unwrap () . path;
+        let repo : git2::Repository =
+          git2::Repository::init (source_path) ?;
+        { let mut git_config : git2::Config = repo . config () ?;
+          git_config . set_str ("user.email", "test@test.invalid") ?;
+          git_config . set_str ("user.name", "skg tests") ?; }
+        let mut index : git2::Index = repo . index () ?;
+        index . add_all (
+          ["*.skg"] . iter (), git2::IndexAddOption::DEFAULT, None ) ?;
+        index . write () ?;
+        let tree_id : git2::Oid = index . write_tree () ?;
+        let tree : git2::Tree = repo . find_tree (tree_id) ?;
+        let sig : git2::Signature = repo . signature () ?;
+        repo . commit (
+          Some ("HEAD"), &sig, &sig, "baseline", &tree, &[] ) ?; }
+      let graph : InRustGraphHandle =
+        graph_handle_from_config (config) ?;
+      let env : skg::types::env::SkgEnv =
+        skg::test_utils::skg_env_from_parts (
+          config, Arc::clone (driver), tantivy, &graph );
+      let mut views_state : ViewsState =
+        ViewsState {
+          diff_mode_enabled : false,
+          open_views        : OpenViews::new (), };
+      let before : String = {
+        let (view, pids, tree) =
+          multi_root_view (
+            driver, config, None,
+            &[ ID::from ("P") ], false ) . await ?;
+        views_state . open_views . register_view (
+          skg::types::views_state::ViewUri::ContentView (
+            "toggle-subst-uuid" . to_string ()),
+          tree, &pids );
+        view };
+      assert_eq! ( marked_lines (&before, "N") . len (), 1,
+        "precondition: P's view draws marked R for N:\n{}", before );
+      let connected_tcp_stream_pair = || -> (TcpStream, TcpStream) {
+        let listener : std::net::TcpListener =
+          std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
+        let client : TcpStream =
+          TcpStream::connect (listener . local_addr () . unwrap ())
+          . unwrap ();
+        let (server, _) = listener . accept () . unwrap ();
+        (server, client) };
+      let toggle = |views_state : &mut ViewsState| -> String {
+        let (mut server, client) =
+          connected_tcp_stream_pair ();
+        std::thread::scope ( |scope| {
+          scope . spawn ( || {
+            skg::serve::handlers::rerender_all_views::handle_git_diff_toggle_and_rerender (
+              &mut server, &env, views_state,
+              & ActiveSourceSet::named (
+                  config, SourceSetName ("all" . to_string ()))
+                . expect ("set all resolves") ); } ); } );
+        drop (server);
+        let mut reader : std::io::BufReader<TcpStream> =
+          std::io::BufReader::new (client);
+        let mut rerendered : Option<String> = None;
+        while let Ok (m) =
+          skg::test_utils::read_lp_message (&mut reader) {
+          if m . contains ("rerender-view")
+             && m . contains ("toggle-subst-uuid") {
+            rerendered = Some (m); }}
+        rerendered . expect ("the registered view rerenders") };
+      let shape = | buf : &str | -> Vec<(usize, String)> {
+        // (depth, id) per headline carrying an id; decoration-blind.
+        buf . lines ()
+          . filter_map ( |l| {
+              let depth : usize =
+                l . chars () . take_while ( |c| *c == '*' ) . count ();
+              l . find ("(id ")
+                . map ( |start| ( depth,
+                    l [start + 4 ..]
+                      . chars ()
+                      . take_while ( |c| *c != ')' )
+                      . collect () )) } )
+          . collect () };
+      let content_of = | msg : &str | -> String {
+        let start : usize =
+          msg . find ("(content \"")
+          . expect ("rerender-view carries content")
+          + "(content \"" . len ();
+        let end : usize =
+          msg . rfind ("\"))")
+          . expect ("rerender-view content terminates");
+        msg [start .. end] . to_string () };
+      let before_shape : Vec<(usize, String)> = shape (&before);
+      let assert_stable = | view : &str, when : &str | {
+        assert_eq! ( shape (view), before_shape,
+          "{}: same nodes at the same depths -- the marked child \
+           is kept, no duplicate raw N, no phantom:\n{}",
+          when, view );
+        assert_eq! ( marked_lines (view, "N") . len (), 1,
+          "{}: exactly one marked substitute survives:\n{}",
+          when, view );
+        assert! ( ! view . contains ("removedM"),
+          "{}: no phantom -- P's contains still names N, and the \
+           marked R collects N:\n{}", when, view ); };
+      { let on : String = toggle (&mut views_state);
+        assert! ( views_state . diff_mode_enabled );
+        assert_stable ( & content_of (&on), "diff on" ); }
+      { let off : String = toggle (&mut views_state);
+        assert! ( ! views_state . diff_mode_enabled );
+        assert_stable ( & content_of (&off), "diff off" ); }
+      Ok (( )) } )) }
+
 #[test]
 fn ownership_and_visibility_gate_substitution
   () -> Result<(), Box<dyn Error>> {
