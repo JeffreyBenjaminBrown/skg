@@ -259,10 +259,14 @@ fn diff_view_omits_inactive_members_without_content_leak (
           &[ID::from ("diff-root")],
           true,
           &active ) . await ?;
-      // TODO/full-schema/9-2_source-set-safety.org (interim, until
-      // diff mode and restricted sets refuse to combine): inactive
-      // members are omitted from restricted diff views entirely --
-      // current members and removed-member phantoms alike.
+      // Defense in depth: the connection-level refusals
+      // (TODO/full-schema/12-2_diff-mode-policy_discussion.org) keep
+      // diff mode and restricted source-sets from combining through
+      // the two state doors, but this render seam remains directly
+      // constructible (as this test does), so when the modes mix,
+      // inactive members are omitted from restricted diff views
+      // entirely -- current members and removed-member phantoms
+      // alike -- and nothing private leaks.
       for forbidden in [
         "private-new",
         "private-removed",

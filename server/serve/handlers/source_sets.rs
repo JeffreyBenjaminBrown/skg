@@ -1,5 +1,5 @@
 use crate::serve::ViewsState;
-use crate::serve::handlers::rerender_all_views::stream_rerender_views;
+use crate::serve::handlers::rerender_all_views::{ stream_empty_rerender, stream_rerender_views};
 use crate::serve::handlers::text_search::SearchEnrichmentPayload;
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{
@@ -36,9 +36,14 @@ pub fn handle_source_set_request (
         stream, request, env, views_state,
         active_source_set, enrichment_slot, search_cancelled ),
     Ok (_) =>
-      send_error (stream, "not a source-set request"),
+      // Reachable only from malformed requests no current client
+      // sends, but Emacs may have locked buffers and set its stream
+      // guard before any source-set request, so even these paths
+      // answer in the unwinding shape.
+      refuse_unwinding (
+        stream, active_source_set, "not a source-set request"),
     Err (e) =>
-      send_error (stream, &e), }}
+      refuse_unwinding (stream, active_source_set, &e), }}
 
 /// TODO/full-schema/9-2_source-set-safety.org: a source-set switch
 /// RE-RENDERS open views in place rather than closing them.  Each
@@ -62,14 +67,27 @@ fn set_active_source_set (
     match value_from_request_sexp ("name", request) {
       Ok (name) => SourceSetName::from (name),
       Err (e) => {
-        send_error (stream, &e);
+        refuse_unwinding (stream, active_source_set, &e);
         return; }};
   let active : ActiveSourceSet =
     match ActiveSourceSet::named (&env . config, name) {
       Ok (active) => active,
       Err (e) => {
-        send_error (stream, &e . to_string ());
+        refuse_unwinding (
+          stream, active_source_set, &e . to_string ());
         return; }};
+  if views_state . diff_mode_enabled
+     && ! active . is_all () {
+    { // Refuse to switch to a restricted set while diff mode is
+      // on.  (Switching TO 'all' is always allowed.)  This check
+      // precedes every side effect: search-enrichment
+      // cancellation, the set assignment, and the rerenders.
+      let msg : String = format! (
+        "Cannot switch to source-set {}: git diff mode is on, and it requires active source-set all. Disable diff mode first.",
+        active . name . 0 );
+      tracing::info! ( msg = %msg, "Source-set switch refused" );
+      refuse_unwinding (stream, active_source_set, &msg);
+      return; }}
   search_cancelled . store (true, Ordering::SeqCst);
   if let Ok (mut slot) = enrichment_slot . lock () {
     *slot = None; }
@@ -124,16 +142,26 @@ fn send_active_source_set_response (
       escape_string (name));
   send_response_with_length_prefix (stream, &response); }
 
-fn send_error (
+/// The unwinding refusal shape (the quiet shape): the endpoint's
+/// normal active-source-set response-type carrying explanatory text
+/// and the UNCHANGED active set, followed by an empty rerender
+/// stream.  Emacs locks all Skg buffers and sets its stream guard
+/// before sending a switch request; a response-type it has no
+/// handler for would leave it wedged, so refusals and errors alike
+/// must answer in this shape.
+fn refuse_unwinding (
   stream : &mut TcpStream,
+  active : &ActiveSourceSet,
   msg    : &str,
 ) {
   let response : String =
     format! (
-      "((response-type {}) (content \"{}\"))",
-      TcpToClient::Error . repr_in_client (),
+      "((response-type {}) (active \"{}\") (content \"{}\"))",
+      TcpToClient::ActiveSourceSet . repr_in_client (),
+      escape_string (&active . name . 0),
       escape_string (msg));
-  send_response_with_length_prefix (stream, &response); }
+  send_response_with_length_prefix (stream, &response);
+  stream_empty_rerender (stream); }
 
 fn escape_string (
   s : &str,

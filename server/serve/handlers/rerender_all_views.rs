@@ -99,6 +99,26 @@ pub fn stream_rerender_views (
         &context . errors,
         &context . warnings) )); }
 
+/// Send an EMPTY rerender stream: a "rerender-lock" naming no views,
+/// then "rerender-done" with no errors or warnings.  Used after a
+/// refusal: Emacs locks every Skg buffer and sets its stream guard
+/// BEFORE sending a diff-mode toggle or source-set switch, and only
+/// the rerender stream unwinds them.  The empty lock list makes
+/// Emacs unlock every buffer; the done message clears the guard.
+pub fn stream_empty_rerender (
+  stream : &mut TcpStream,
+) {
+  send_response_with_length_prefix (
+    stream,
+    & tag_sexp_response (
+      TcpToClient::RerenderLock,
+      & format_lock_views_sexp ( &[] ) ));
+  send_response_with_length_prefix (
+    stream,
+    & tag_sexp_response (
+      TcpToClient::RerenderDone,
+      & format_errors_warnings_sexp ( &[], &[] ) )); }
+
 /// Handle "git diff mode toggle" request.
 /// Toggles diff mode, sends the GitDiffMode response with warnings,
 /// then streams re-rendered views.
@@ -108,6 +128,25 @@ pub fn handle_git_diff_toggle_and_rerender (
   views_state : &mut ViewsState,
   active_source_set : &ActiveSourceSet,
 ) {
+  if ! views_state . diff_mode_enabled
+     && ! active_source_set . is_all () {
+    { // Refuse to ENABLE diff mode under a restricted source-set.
+      // (Disabling is always allowed: it only makes state legal.)
+      // The refusal takes the quiet shape: the endpoint's normal
+      // first message carries the refusal text, then an empty
+      // rerender stream unwinds Emacs's preemptive locks.
+      // PITFALL: the text must not contain the substring
+      // "\nWarning:", which the Emacs diff-toggle handler treats
+      // as a window-pop trigger.
+      let msg : String = format! (
+        "Git diff mode requires active source-set all; current active source-set is {}. Switch the source-set to all first.",
+        active_source_set . name . 0 );
+      tracing::info! ( msg = %msg, "Git diff mode toggle refused" );
+      send_response_with_length_prefix (
+        stream,
+        & tag_text_response ( TcpToClient::GitDiffMode, &msg ));
+      stream_empty_rerender (stream);
+      return; }}
   views_state . diff_mode_enabled = ! views_state . diff_mode_enabled;
   let msg : String =
     git_diff_mode_message (views_state . diff_mode_enabled, &env . config);
