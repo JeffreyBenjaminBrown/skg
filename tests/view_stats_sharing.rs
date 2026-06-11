@@ -93,11 +93,24 @@ fn assert_sharing_stats_in_view_of_R (
               && ! f_line . contains ("overridesParent"),
       "{}: F, a subscribee R does not override, carries none of the \
        three stats:\n{}", label, buf ); }
-  { let c_lines : Vec<&str> = lines_containing (buf, "(id C)");
+  { // Since override substitution (plan 11), a fresh view of R draws
+    // C in place of P (C overrides P), marked; the Op position (C
+    // under a drawn P) is asserted from a view of P instead, in
+    // assert_op_in_view_of_P.
+    let c_lines : Vec<&str> = lines_containing (buf, "(id C)");
     assert! ( c_lines . iter ()
-              . any ( |l| l . contains ("overridesParent") ),
-      "{}: C drawn as content of P (which it overrides) carries \
-       Op:\n{}", label, buf ); }}
+              . any ( |l| l . contains ("(overridesHere P)") ),
+      "{}: C is drawn in place of P, marked:\n{}", label, buf ); }}
+
+fn assert_op_in_view_of_P (
+  buf   : &str,
+  label : &str,
+) {
+  let c_lines : Vec<&str> = lines_containing (buf, "(id C)");
+  assert! ( c_lines . iter ()
+            . any ( |l| l . contains ("overridesParent") ),
+    "{}: C drawn as content of P (which it overrides) carries \
+     Op:\n{}", label, buf ); }
 
 async fn save_and_rerender (
   buf     : &str,
@@ -142,6 +155,19 @@ fn sharing_view_stats_appear_and_roundtrip
       let saved : String = // The save parses the buffer, so this also pins the parse arms.
         save_and_rerender (&de_novo, config, driver, tantivy) . await ?;
       assert_sharing_stats_in_view_of_R (&saved, "after save");
+      { // Op needs P drawn as a parent, which substitution prevents
+        // in a view of R; a view rooted at P draws P raw (roots
+        // never substitute) with C as its content.
+        let (view_of_p, _pids, _tree)
+          : (String, Vec<ID>, _) =
+          multi_root_view (
+            driver, config, Some (tantivy),
+            &[ ID ("P" . to_string ()) ], false ) . await ?;
+        assert_op_in_view_of_P (&view_of_p, "de novo, view of P");
+        let saved_p : String =
+          save_and_rerender (&view_of_p, config, driver, tantivy)
+          . await ?;
+        assert_op_in_view_of_P (&saved_p, "after save, view of P"); }
       Ok (( )) } )) }
 
 #[test]

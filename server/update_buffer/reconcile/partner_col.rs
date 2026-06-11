@@ -115,7 +115,7 @@ pub fn push_repair_warnings (
     (RepairKind::RemovedDuplicate, summary . deleted_duplicates) ];
   for (repair, children) in categories {
     if ! children . is_empty () {
-      sink . push ( CompletionWarning {
+      sink . push ( CompletionWarning::ColRepair {
         col,
         owner : owner . clone (),
         repair,

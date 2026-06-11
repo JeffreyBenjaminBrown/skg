@@ -186,11 +186,8 @@ fn test_multi_root_view_with_shared_nodes
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg (node (id 2) (source main) indef (graphStats (linksInFromLeaves 1) extraIDs subscribing))) title 2
-         ** (skg (node (id 3) (source main) (graphStats (linksInFromLeaves 1) extraIDs overriding subscribing))) title 3
-         this one string could span pages
-         *** (skg subscribeeCol)
-         **** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing hiding))) This is a [[id:shgulasdghu][test]] of a second kind.
-         **** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing hiding))) this title includes a [[id:22][textlink to another file]]
+         ** (skg (node (id 5) (source main) (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing hiding) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
+         this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
          * (skg (node (id 2) (source main) (parentIs absent) (graphStats (containers 1) (linksInFromLeaves 1) extraIDs subscribing))) title 2
          this one string could span pages
          ** (skg (node (id 1) (source main) (parentIs independent) (birth containsParent) indef (graphStats (containers 0) (contents 2) hiding) (viewStats containsParent))) title 1
@@ -229,20 +226,18 @@ fn test_multi_root_view_with_node_limit
       println!("Multi root view with limit=3 result:\n{}", result);
 
       // §5.5 node budget, limit=3: level-order creation spends the budget on the
-      // content children (2 and 3 under root 1, and root 2's independent
-      // containerward node 1). Those nodes are created DEFINITIVELY (no indef
-      // placeholders), so node 3 and root 2 expand their bodies + SubscribeeCols
-      // (cols are not budget-bound); their subscribee members are indef.
+      // content children (2, and node 5 drawn in place of 3, under root 1; and
+      // root 2's independent containerward node 1). Those nodes are created
+      // DEFINITIVELY (no indef placeholders), so the drawn 5 and root 2 expand
+      // their bodies + cols (cols are not budget-bound); subscribee members
+      // are indef.
       let expected = indoc! {
         "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 2) hiding))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg (node (id 2) (source main) indef (graphStats (linksInFromLeaves 1) extraIDs subscribing))) title 2
-         ** (skg (node (id 3) (source main) (graphStats (linksInFromLeaves 1) extraIDs overriding subscribing))) title 3
-         this one string could span pages
-         *** (skg subscribeeCol)
-         **** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing hiding))) This is a [[id:shgulasdghu][test]] of a second kind.
-         **** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing hiding))) this title includes a [[id:22][textlink to another file]]
+         ** (skg (node (id 5) (source main) (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing hiding) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
+         this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
          * (skg (node (id 2) (source main) (parentIs absent) (graphStats (containers 1) (linksInFromLeaves 1) extraIDs subscribing))) title 2
          this one string could span pages
          ** (skg (node (id 1) (source main) (parentIs independent) (birth containsParent) indef (graphStats (containers 0) (contents 2) hiding) (viewStats containsParent))) title 1

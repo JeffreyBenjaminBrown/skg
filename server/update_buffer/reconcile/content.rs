@@ -5,6 +5,9 @@ use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap
 use crate::types::git::MembershipAxes;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::override_resolution::{
+    OverrideResolution, resolve_override};
+use crate::update_buffer::warnings::CompletionWarning;
 use crate::types::env::find_source_with_optional_tantivy;
 use crate::types::phantom::source_from_disk;
 use crate::types::nodes::complete::NodeComplete;
@@ -41,6 +44,11 @@ struct ChildData {
   source : SourceName,
   body   : Option<String>,
   kind   : ContentReality,
+  /// Some(R) = override substitution applies: draw R, marked
+  /// '(overridesHere goal-id)', in place of the goal member. The
+  /// title/source/body above are then R's. Only ContentReality::Real
+  /// children substitute.
+  drawn_id : Option<ID>,
 }
 
 /// TrueNode content reconcile + content-child creation, for one node, in the
@@ -69,6 +77,8 @@ pub fn expand_true_content_at_truenode (
   settled                        : bool,
   cascade                        : bool,
   node_budget                    : &mut usize,
+  substitution_enabled           : bool, // false in diff mode: diff surfaces show raw graph facts.
+  warning_sink                   : Option<&mut Vec<CompletionWarning>>,
 ) -> Result<(), Box<dyn Error>> {
   // Phantoms are diff placeholders; this pass mutates and expands
   // real content nodes.
@@ -120,7 +130,9 @@ pub fn expand_true_content_at_truenode (
   reconcile_content_children (
     tree, node, &nodecomplete, config, graph_snap,
     deleted_since_head_pid_src_map,
-    active_source_set ) ?;
+    active_source_set,
+    substitution_enabled,
+    warning_sink ) ?;
   if cascade {
     attach_cascade_dvrs_to_affected_content( tree, node ) ?; }
   order_children_as_scaffolds_then_ignored_then_content(
@@ -196,6 +208,8 @@ fn reconcile_content_children (
   graph_snap                     : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   active_source_set              : Option<&ActiveSourceSet>,
+  substitution_enabled           : bool,
+  warning_sink                   : Option<&mut Vec<CompletionWarning>>,
 ) -> Result<(), Box<dyn Error>> {
   // Resolve each id through the in-Rust-graph extra_id map so that an
   // id appearing in a node's 'contains' after merging into another
@@ -237,9 +251,17 @@ fn reconcile_content_children (
   // reconciles against a missing NodeComplete -- while any user subtree under it
   // is preserved (demoted), and a now-childless PhantomDeleted is removed by the
   // TODO/DONE/local-view-update/plan_v2.org §6.6 prune sweep.
+  let substitution_for_children : bool =
+    // The overridden-as-such exception (plan 11): the user asked to
+    // see the ORIGINAL, so its immediate children draw raw; deeper
+    // levels follow the general rule (decided 2026-06-11: no
+    // cascade).
+    substitution_enabled
+    && ! is_overridden_as_such (tree, node) ?;
   complete_content_children(
-    tree, node, &apparent_content_ids, config,
-    deleted_since_head_pid_src_map, active_source_set ) ?;
+    tree, node, &apparent_content_ids, config, graph_snap,
+    deleted_since_head_pid_src_map, active_source_set,
+    substitution_for_children, warning_sink ) ?;
   mark_erroneous_content_children_as_indep(
     tree, node, &apparent_content_ids ) ?;
   convert_nonmember_unknown_children_to_dead(
@@ -291,6 +313,26 @@ fn mutate_truenode_to_deletednode (
         title,
         body, } ) ); }
   ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) }
+
+/// Whether this node is an overridden-as-such: it claims
+/// parentIs=affected and is a child of an OverriddenCol. Mirrors
+/// 'is_subscribee'; the parallel position with the parallel meaning.
+fn is_overridden_as_such (
+  tree : &Tree<ViewNode>,
+  node : NodeId,
+) -> Result<bool, Box<dyn Error>> {
+  let is_member_of_parent : bool =
+    read_at_node_in_tree( tree, node,
+      |vn : &ViewNode| match &vn . kind {
+        ViewNodeKind::Vognode (Vognode::Active (t))
+          => t . parentIs == ParentIs::Affected,
+        _ => false } ) ?;
+  let parent_is_overridden_col : bool =
+    read_at_ancestor_in_tree( tree, node, 1,
+      |vn : &ViewNode| matches!( &vn . kind,
+        ViewNodeKind::PartnerCol (PartnerCol::Overridden)))
+    . unwrap_or (false);
+  Ok( is_member_of_parent && parent_is_overridden_col ) }
 
 /// Whether this node claims parentIs=affected
 /// and is a child of SubscribeeCol (and not a phantom).
@@ -350,13 +392,22 @@ fn complete_content_children (
   node               : NodeId,
   goal_list          : &[ID],
   config             : &SkgConfig,
+  graph_snap         : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   active_source_set  : Option<&ActiveSourceSet>,
+  substitution_enabled : bool,
+  warning_sink       : Option<&mut Vec<CompletionWarning>>,
 ) -> Result<(), Box<dyn Error>> {
-  let child_data : HashMap<ID, ChildData> =
-    build_child_creation_data(
-      tree, node, goal_list, config,
-      deleted_since_head_pid_src_map, active_source_set ) ?;
+  let child_data : HashMap<ID, ChildData> = {
+    let mut compound_warnings : Vec<CompletionWarning> = Vec::new ();
+    let data : HashMap<ID, ChildData> =
+      build_child_creation_data(
+        tree, node, goal_list, config, graph_snap,
+        deleted_since_head_pid_src_map, active_source_set,
+        substitution_enabled, &mut compound_warnings ) ?;
+    if let Some (sink) = warning_sink {
+      sink . extend (compound_warnings); }
+    data };
   // The RepairSummary is dropped: content is not a generated
   // collection, so its reconciliation is not a "repair" to warn about.
   complete_relevant_children_in_viewnodetree(
@@ -371,13 +422,18 @@ fn complete_content_children (
         => true,
       _ => false },
     |vn : &ViewNode| match &vn . kind {
-      // Both kinds participate in child-list reconciliation.
+      // All three kinds participate in child-list reconciliation.
+      // COLLECTED ids (the overridesHere original when present), so
+      // goal lists stay in original IDs, an existing drawn
+      // substitute satisfies its original goal member, and only
+      // genuinely missing members are created. This is also what
+      // keeps post-save rerendering stable (idempotent saves).
       ViewNodeKind::Vognode (Vognode::Active (t))
-        => Ok ( t . id . clone() ),
+        => Ok ( t . collected_id () ),
       ViewNodeKind::Phantom (Phantom::Diff (p))
         => Ok ( p . id . clone() ),
       ViewNodeKind::Vognode (Vognode::Inactive (i))
-        => Ok ( i . id . clone() ),
+        => Ok ( i . collected_id () ),
       _ => Err(
         "complete_content_children: relevant child had no content ID"
         . to_string() ) },
@@ -388,9 +444,23 @@ fn complete_content_children (
         id . 0 )) ?;
       Ok ( match d . kind {
         ContentReality::Real =>
-          mk_definitive_viewnode(
-            id . clone(), d . source . clone(),
-            d . title . clone(), d . body . clone() ),
+          match &d . drawn_id {
+            None =>
+              mk_definitive_viewnode(
+                id . clone(), d . source . clone(),
+                d . title . clone(), d . body . clone() ),
+            Some (drawn) => {
+              // Override substitution: draw the overrider, marked
+              // with the original it stands for.
+              let mut vn : ViewNode =
+                mk_definitive_viewnode(
+                  drawn . clone(), d . source . clone(),
+                  d . title . clone(), d . body . clone() );
+              if let ViewNodeKind::Vognode (
+                Vognode::Active (ref mut t)) = vn . kind
+              { t . viewStats . overridesHere =
+                  Some ( id . clone() ); }
+              vn }},
         ContentReality::Inactive =>
           mk_inactive_viewnode (
             id . clone(), d . source . clone(),
@@ -422,7 +492,9 @@ fn mark_erroneous_content_children_as_indep (
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Active (t)) =>
         t . parentIs == ParentIs::Affected
-        && !content_id_set . contains( &t . id )
+        // collected_id: a drawn substitute is a member via its
+        // original, and must not be demoted to Independent.
+        && !content_id_set . contains( &t . collected_id () )
         && !t . should_be_diffPhantom(), // see this function's docstring
       _ => false },
     |vn : &mut ViewNode| {
@@ -483,8 +555,11 @@ fn build_child_creation_data (
   node               : NodeId,
   goal_list          : &[ID],
   config             : &SkgConfig,
+  graph_snap         : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   active_source_set  : Option<&ActiveSourceSet>,
+  substitution_enabled : bool,
+  compound_warnings  : &mut Vec<CompletionWarning>,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
   let child_sources : HashMap<ID, SourceName> =
     { let node_ref : NodeRef<ViewNode> =
@@ -499,15 +574,17 @@ fn build_child_creation_data (
           // containerward ancestor, or a TODO/DONE/local-view-update/plan_v2.org §6.0-demoted branch), so its goal id
           // must still be pre-fetched here; otherwise the reconcile sends it to
           // the create closure and child_data.get(id).expect(..) panics.
+          // Keys are COLLECTED ids, matching the reconcile's orderkey:
+          // an existing drawn substitute registers under its original.
           ViewNodeKind::Vognode (Vognode::Active (t))
             if t . parentIs == ParentIs::Affected
-            => { m . insert( t . id . clone(),
+            => { m . insert( t . collected_id (),
                              t . source . clone()); },
           ViewNodeKind::Phantom (Phantom::Diff (p))
             => { m . insert( p . id . clone(),
                              p . source . clone()); },
           ViewNodeKind::Vognode (Vognode::Inactive (i))
-            => { m . insert( i . id . clone(),
+            => { m . insert( i . collected_id (),
                              i . source . clone()); },
           _ => {}, }}
       m };
@@ -534,24 +611,56 @@ fn build_child_creation_data (
             ChildData { title  : String::new (),
                         source : SourceName::not_found (),
                         body   : None,
-                        kind   : ContentReality::Unknown } );
+                        kind   : ContentReality::Unknown,
+                        drawn_id : None } );
           continue; } };
     if active_source_set
       . is_some_and ( |active| !active . contains_source (&child_source) )
     {
+      // Omission precedes substitution: an inactive original draws
+      // nothing (this arm is the safety net; the goal list normally
+      // omitted it already), so its overrider is not consulted.
       result . insert( id . clone(),
                      ChildData { title: String::new (),
                                  source: child_source,
                                  body: None,
-                                 kind: ContentReality::Inactive } );
+                                 kind: ContentReality::Inactive,
+                                 drawn_id : None } );
       continue; }
+    let drawn_id : Option<ID> =
+      if substitution_enabled {
+        let resolution : OverrideResolution =
+          resolve_override (
+            config, graph_snap, active_source_set, id );
+        if resolution . effective != *id {
+          if resolution . path . len () > 1 {
+            compound_warnings . push (
+              CompletionWarning::CompoundOverrideChain {
+                original  : id . clone (),
+                effective : resolution . effective . clone () } ); }
+          Some ( resolution . effective )
+        } else { None }
+      } else { None };
+    let fetch_id : &ID = drawn_id . as_ref () . unwrap_or (id);
+    let fetch_source : SourceName = match &drawn_id {
+      None => child_source,
+      Some (drawn) =>
+        // The overrider is user-owned and active (the resolver's
+        // gates), so the graph knows its source.
+        graph_snap . pid_and_source (drawn)
+        . map ( |(_pid, src)| src )
+        . ok_or_else ( || format! (
+          "build_child_creation_data: no source for overrider {}",
+          drawn . 0 )) ? };
     let skg : NodeComplete =
-      nodecomplete_rustFirst_by_pid_and_source ( config, id, &child_source ) ?;
+      nodecomplete_rustFirst_by_pid_and_source (
+        config, fetch_id, &fetch_source ) ?;
     result . insert( id . clone(),
                    ChildData { title: skg . title . clone(),
                                source: skg . source . clone(),
                                body: skg . body . clone(),
-                               kind: ContentReality::Real } ); }
+                               kind: ContentReality::Real,
+                               drawn_id } ); }
   Ok (result) }
 
 #[cfg(test)]
