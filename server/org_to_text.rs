@@ -520,6 +520,8 @@ fn graphnodestats_to_sexp (
     parts . push ( "overriding" . to_string () ); }
   if gs . subscribing {
     parts . push ( "subscribing" . to_string () ); }
+  if gs . hiding {
+    parts . push ( "hiding" . to_string () ); }
   if parts . is_empty () { None }
   else { Some ( format! (
            "(graphStats {})", parts . join (" ") )) }}

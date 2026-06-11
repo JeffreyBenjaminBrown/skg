@@ -305,6 +305,7 @@ pub struct GraphNodeStats {
   pub extraIDs          : bool, // whether it has extra IDs (from merging)
   pub overriding        : bool, // overrides *or* overridden, anywhere
   pub subscribing       : bool, // subscriber *or* subscribee, anywhere
+  pub hiding            : bool, // hides *or* is hidden, anywhere
   pub containRels       : Option<NodeContainRels>,
   pub linksourceRels    : Option<NodeLinksourceRels>,
 }
@@ -754,6 +755,7 @@ impl Default for GraphNodeStats {
       extraIDs          : false,
       overriding        : false,
       subscribing       : false,
+      hiding            : false,
       containRels       : Some ( NodeContainRels {
         containers : 1, contents : 0 } ),
       linksourceRels    : Some ( NodeLinksourceRels {

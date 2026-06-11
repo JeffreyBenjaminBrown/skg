@@ -37,6 +37,7 @@ pub struct AllGraphNodeStats {
   pub num_links_in_from_leaves     : HashMap < ID, usize >,
   pub has_subscribes               : HashSet < ID >,
   pub has_overrides                : HashSet < ID >,
+  pub has_hides                    : HashSet < ID >,
   pub container_to_contents        : HashMap < ID, HashSet < ID > >,
   pub content_to_containers        : HashMap < ID, HashSet < ID > >,
 }
@@ -50,6 +51,7 @@ impl AllGraphNodeStats {
       num_links_in_from_leaves     : HashMap::new (),
       has_subscribes               : HashSet::new (),
       has_overrides                : HashSet::new (),
+      has_hides                    : HashSet::new (),
       container_to_contents        : HashMap::new (),
       content_to_containers        : HashMap::new (),
     } } }
@@ -91,6 +93,7 @@ pub fn graphnodestats_for_pid (
     extraIDs       : extra_ids,
     overriding     : stats . has_overrides  . contains (pid),
     subscribing    : stats . has_subscribes . contains (pid),
+    hiding         : stats . has_hides      . contains (pid),
     containRels    : contain_rels,
     linksourceRels : linksource_rels, }}
 
@@ -103,6 +106,7 @@ struct OnePidStats {
   num_links_in_from_leaves     : usize,
   subscribes                   : bool,
   overrides                    : bool,
+  hides                        : bool,
   container_ids                : Vec < ID >,
   content_ids                  : Vec < ID >,
 }
@@ -134,8 +138,8 @@ pub async fn fetch_all_graphnodestats_with_source_set (
     return Ok ( fetch_all_graphnodestats_in_rust (
       &graph_snap, pids, &pid_set, active ) ); }
   // PITFALL | TODO: TypeDB fallback graphStats are not source-set-aware:
-  // contents, containers, linksIn, subscribing, and overriding still count
-  // inactive-source related nodes. The running server normally uses the
+  // contents, containers, linksIn, subscribing, overriding, and hiding still
+  // count inactive-source related nodes. The running server normally uses the
   // in-Rust graph path above; this fallback is for tests/startup paths that
   // bypass the global graph handle.
   fetch_all_graphnodestats_from_typedb (
@@ -165,6 +169,7 @@ async fn fetch_all_graphnodestats_from_typedb (
     HashMap::new ();
   let mut has_subscribes : HashSet < ID > = HashSet::new ();
   let mut has_overrides  : HashSet < ID > = HashSet::new ();
+  let mut has_hides      : HashSet < ID > = HashSet::new ();
   let mut container_to_contents : HashMap < ID, HashSet < ID > > =
     HashMap::new ();
   let mut content_to_containers : HashMap < ID, HashSet < ID > > =
@@ -181,6 +186,8 @@ async fn fetch_all_graphnodestats_from_typedb (
       has_subscribes . insert ( s . pid . clone () ); }
     if s . overrides {
       has_overrides . insert ( s . pid . clone () ); }
+    if s . hides {
+      has_hides . insert ( s . pid . clone () ); }
     for cid in s . container_ids {
       if pid_set . contains (&cid) {
         content_to_containers
@@ -200,6 +207,7 @@ async fn fetch_all_graphnodestats_from_typedb (
     num_links_in_from_leaves,
     has_subscribes,
     has_overrides,
+    has_hides,
     container_to_contents,
     content_to_containers,
   }) }
@@ -207,9 +215,9 @@ async fn fetch_all_graphnodestats_from_typedb (
 /// In-Rust-graph implementation. Computes every field from NodeRust and
 /// the inverse indexes — no TypeDB round-trips.
 ///
-/// PITFALL: 'has_subscribes' and 'has_overrides' are "in either
-/// role": a node qualifies if it's on /either/ side of a
-/// subscribes / overrides relation.
+/// PITFALL: 'has_subscribes', 'has_overrides' and 'has_hides' are
+/// "in either role": a node qualifies if it's on /either/ side of a
+/// subscribes / overrides / hides_from_its_subscriptions relation.
 /// Matches the TypeDB version's behaviour.
 fn fetch_all_graphnodestats_in_rust (
   graph   : &InRustGraph,
@@ -223,6 +231,7 @@ fn fetch_all_graphnodestats_in_rust (
   let mut num_links_in_from_leaves     : HashMap<ID, usize> = HashMap::new ();
   let mut has_subscribes               : HashSet<ID> = HashSet::new ();
   let mut has_overrides                : HashSet<ID> = HashSet::new ();
+  let mut has_hides                    : HashSet<ID> = HashSet::new ();
   let mut container_to_contents
     : HashMap<ID, HashSet<ID>> = HashMap::new ();
   let mut content_to_containers
@@ -300,6 +309,21 @@ fn fetch_all_graphnodestats_in_rust (
           pid_source_is_active (graph, active, related_pid) ) )
       . unwrap_or (false);
     if out_ov || in_ov { has_overrides . insert ( pid . clone () ); }
+    let out_hide : bool = // hides out-links
+      node_opt . map ( |n| n . hides_from_its_subscriptions
+                        . or_default () . iter ()
+                        . filter_map ( |id| graph . pid_of (id) )
+                        . any ( |related_pid|
+                          pid_source_is_active (
+                            graph, active, &related_pid) ) )
+      . unwrap_or (false);
+    let in_hide  : bool = // hides in-links
+      graph . hiders_of . get (pid)
+      . map ( |s| s . iter ()
+        . any ( |related_pid|
+          pid_source_is_active (graph, active, related_pid) ) )
+      . unwrap_or (false);
+    if out_hide || in_hide { has_hides . insert ( pid . clone () ); }
     // container_to_contents[pid] = contains ∩ pid_set.
     // n.contains carries raw IDs; map each to its corresponding pid
     // (which might be itself) before the set-membership test
@@ -333,6 +357,7 @@ fn fetch_all_graphnodestats_in_rust (
     num_links_in_from_leaves,
     has_subscribes,
     has_overrides,
+    has_hides,
     container_to_contents,
     content_to_containers,
 	  } }
@@ -414,6 +439,15 @@ async fn fetch_one_pid_stats (
               {{ $rel5 isa overrides_view_of ( overrider:  $ov,
                                                overridden: $node ); }};
             fetch {{ "id": $ovid }};
+          ],
+          "hides_related": [
+            match
+              $h isa node, has id $hid;
+              {{ $rel6 isa hides_from_its_subscriptions ( hider:  $node,
+                                                          hidden: $h ); }} or
+              {{ $rel6 isa hides_from_its_subscriptions ( hider:  $h,
+                                                          hidden: $node ); }};
+            fetch {{ "id": $hid }};
           ]
         }};"#,
       pid );
@@ -425,6 +459,7 @@ async fn fetch_one_pid_stats (
   let mut num_links_in_from_containers : usize = 0;
   let mut subscribes                   : bool = false;
   let mut overrides                    : bool = false;
+  let mut hides                        : bool = false;
   if let QueryAnswer::ConceptDocumentStream ( _, mut stream )
     = tx . query (query) . await ?
   { while let Some (doc_result) = stream . next () . await {
@@ -453,7 +488,10 @@ async fn fetch_one_pid_stats (
         { subscribes = ! list . is_empty (); }
         if let Some ( Node::List (list) ) =
           map . get ("overrides_related")
-        { overrides = ! list . is_empty (); }}}}
+        { overrides = ! list . is_empty (); }
+        if let Some ( Node::List (list) ) =
+          map . get ("hides_related")
+        { hides = ! list . is_empty (); }}}}
   Ok ( OnePidStats {
     pid : pid . clone (),
     num_containers,
@@ -463,6 +501,7 @@ async fn fetch_one_pid_stats (
       : num_links_in_total - num_links_in_from_containers,
     subscribes,
     overrides,
+    hides,
     container_ids,
     content_ids,
   }) }

@@ -182,21 +182,21 @@ fn test_multi_root_view_with_shared_nodes
       // indef Content) as the first child of the level-1 view of
       // node 2.
       let expected = indoc! {
-        "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 2)))) title 1
+        "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 2) hiding))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg (node (id 2) (source main) indef (graphStats (linksInFromLeaves 1) extraIDs subscribing))) title 2
          ** (skg (node (id 3) (source main) (graphStats (linksInFromLeaves 1) extraIDs overriding subscribing))) title 3
          this one string could span pages
          *** (skg subscribeeCol)
-         **** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing))) This is a [[id:shgulasdghu][test]] of a second kind.
-         **** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing))) this title includes a [[id:22][textlink to another file]]
+         **** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing hiding))) This is a [[id:shgulasdghu][test]] of a second kind.
+         **** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing hiding))) this title includes a [[id:22][textlink to another file]]
          * (skg (node (id 2) (source main) (parentIs absent) (graphStats (containers 1) (linksInFromLeaves 1) extraIDs subscribing))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (source main) (parentIs independent) (birth containsParent) indef (graphStats (containers 0) (contents 2)) (viewStats containsParent))) title 1
+         ** (skg (node (id 1) (source main) (parentIs independent) (birth containsParent) indef (graphStats (containers 0) (contents 2) hiding) (viewStats containsParent))) title 1
          ** (skg subscribeeCol)
-         *** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing hiding))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing hiding))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_eq!(result, expected,
                  "Multi root view should detect cross-tree duplicates");
@@ -234,21 +234,21 @@ fn test_multi_root_view_with_node_limit
       // placeholders), so node 3 and root 2 expand their bodies + SubscribeeCols
       // (cols are not budget-bound); their subscribee members are indef.
       let expected = indoc! {
-        "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 2)))) title 1
+        "* (skg (node (id 1) (source main) (parentIs absent) (graphStats (contents 2) hiding))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg (node (id 2) (source main) indef (graphStats (linksInFromLeaves 1) extraIDs subscribing))) title 2
          ** (skg (node (id 3) (source main) (graphStats (linksInFromLeaves 1) extraIDs overriding subscribing))) title 3
          this one string could span pages
          *** (skg subscribeeCol)
-         **** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing))) This is a [[id:shgulasdghu][test]] of a second kind.
-         **** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing))) this title includes a [[id:22][textlink to another file]]
+         **** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing hiding))) This is a [[id:shgulasdghu][test]] of a second kind.
+         **** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing hiding))) this title includes a [[id:22][textlink to another file]]
          * (skg (node (id 2) (source main) (parentIs absent) (graphStats (containers 1) (linksInFromLeaves 1) extraIDs subscribing))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (source main) (parentIs independent) (birth containsParent) indef (graphStats (containers 0) (contents 2)) (viewStats containsParent))) title 1
+         ** (skg (node (id 1) (source main) (parentIs independent) (birth containsParent) indef (graphStats (containers 0) (contents 2) hiding) (viewStats containsParent))) title 1
          ** (skg subscribeeCol)
-         *** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (source main) indef (graphStats (containers 0) extraIDs overriding subscribing hiding))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) indef (graphStats (containers 0) (linksInFromLeaves 1) extraIDs overriding subscribing hiding))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_eq!(result, expected,
                  "Multi root view limit=3 truncates by the §5.5 budget");

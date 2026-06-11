@@ -253,7 +253,8 @@ pub fn herald_rule_table () -> HeraldRule {
           leaf (Blue, "aliasing",    "A"),
           leaf (Blue, "extraIDs",    "I"),
           leaf (Blue, "overriding",  "O"),
-          leaf (Blue, "subscribing", "S") ]),
+          leaf (Blue, "subscribing", "S"),
+          leaf (Blue, "hiding",      "H") ]),
         crule (Blue, "viewStats", vec! [
           leaf (Blue, "cycle", "⟳"),
           rule ("containsParent", vec! [ s ("}") ]),
@@ -384,11 +385,12 @@ fn graphstats_atoms () -> Vec<&'static str> {
   fn guard ( g : GraphNodeStats ) {
     let GraphNodeStats {
       aliasing : _, extraIDs : _, overriding : _, subscribing : _,
+      hiding : _,
       containRels : _,    // -> the containers / contents atoms
       linksourceRels : _, // -> the linksInFrom* atoms
     } = g; }
   let _ = guard;
-  vec! [ "aliasing", "extraIDs", "overriding", "subscribing",
+  vec! [ "aliasing", "extraIDs", "overriding", "subscribing", "hiding",
          "containers", "contents",
          "linksInFromContainers", "linksInFromLeaves" ] }
 

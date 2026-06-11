@@ -647,6 +647,7 @@ fn parse_graphstats_sexp (
           "extraIDs"    => { stats . extraIDs    = true; },
           "overriding"  => { stats . overriding  = true; },
           "subscribing" => { stats . subscribing = true; },
+          "hiding"      => { stats . hiding      = true; },
           _ => { return Err ( format! (
             "Unknown graphStats atom: {}", key )); }} },
       Sexp::List (kv_pair) if kv_pair . len () == 2 => {

@@ -1,0 +1,4 @@
+pid: hider
+title: hider
+hides_from_its_subscriptions:
+  - hidden
