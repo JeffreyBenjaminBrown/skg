@@ -472,7 +472,15 @@ herald.  Veto in plan 10's open questions if I've misread.
 - opening (new buffer) from an overriddenCol child: the menu.
 - collateral rerender after save: existing viewnodes unchanged; new
   content substituted.
-** ONGOING define diff-mode policy for the full schema
+** DONE define diff-mode policy for the full schema
+Executed 2026-06-11; plan in
+[[./DONE/12-2_diff-mode-policy_discussion.org]] (which supersedes
+[[./DONE/12-1_diff-mode-policy.org]], the dialog), log in
+[[./progress.org]] (stage 12).  The executed scope grew beyond the
+subsections below, to full PartnerCol diff completeness: every col,
+both membership directions, per-stage labels; the inverse scan for
+inbound cols; the filter cols' three-snapshot comparison; col
+existence for emptied memberships.
 *** refusals
 Diff mode and restricted source-sets must not compose:
 - toggling diff mode ('handle_git_diff_toggle_and_rerender' in

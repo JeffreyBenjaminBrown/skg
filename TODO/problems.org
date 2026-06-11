@@ -679,7 +679,7 @@
    run_save_test). Worth a look before trusting plain 'cargo test'
    runs of that target.
 * Problems found while planning the diff-mode-policy stage (2026-06-11)
-** A refused or failed source-set switch wedges the Emacs client
+** (fixed) A refused or failed source-set switch wedges the Emacs client
    Both 'skg-view-diff-mode' and 'skg-set-active-source-set' set the
    stream guard ('skg--stream-in-progress'), lock EVERY Skg buffer,
    and register the three rerender handlers BEFORE sending their
@@ -697,13 +697,16 @@
    busy-initializing message resets state.  One malformed set name
    wedges the client.
 
-   Fix planned in TODO/full-schema/12-2_diff-mode-policy_discussion.org
-   (the refusals stage hits the same path through ordinary use): error
-   and refusal responses keep the endpoint's normal response-type,
+   Fixed 2026-06-11, executing
+   TODO/full-schema/12-2_diff-mode-policy_discussion.org: error and
+   refusal responses keep the endpoint's normal response-type,
    carrying the explanation as content, followed by an EMPTY
    rerender stream ("rerender-lock" naming no views, then
-   "rerender-done"), which unwinds Emacs with no elisp changes.
-** (fix planned) 'phantom_axes' can misattribute a stage sign across relations
+   "rerender-done"), which unwinds Emacs with no elisp changes
+   ('refuse_unwinding' in source_sets.rs; 'stream_empty_rerender'
+   beside 'stream_rerender_views'; pinned by
+   tests/diff_mode_refusals.rs).
+** (fixed) 'phantom_axes' can misattribute a stage sign across relations
    'phantom_axes' (server/types/phantom.rs) derives a diff-phantom's
    per-stage membership sign by scanning the parent's relation
    diffs ('contains_diff', 'subscribes_to_diff', 'hides_diff') in a
@@ -719,10 +722,13 @@
    callers to pass which relation their col represents.  Decided
    2026-06-11 (Jeff): fix it now -- phantoms should not lie, and the
    mislabeling could become hard to recognize later.
-   TODO/full-schema/12-2_diff-mode-policy_discussion.org owns the fix
-   ("relation-true axis attribution"), landing before that plan's
-   new consumers (including 'overrides_view_of_diff', which would
-   otherwise widen the corner).
+   Fixed the same day, executing
+   TODO/full-schema/12-2_diff-mode-policy_discussion.org:
+   'phantom_axes' takes a 'NodeRelation' and reads exactly that
+   relation's diff ('NodeRelation::diff_in_nodechanges');
+   'build_child_data' takes an axes closure, so a removed member's
+   axes cannot be derived without naming a relation.  Pinned by the
+   double-relation unit test in tests/unit/types_phantom.rs.
 ** 'skg-view-diff-mode' branches on a "\nWarning:" substring
    elisp/skg-request-git-diff-mode.el.  The git-diff-mode response
    handler pops a window ('skg-big-nonfatal-message') iff the
@@ -732,12 +738,59 @@
    unintentionally.  The diff-mode-policy stage's refusal texts avoid
    the substring; a typed flag in the response would be the real fix,
    deferred until a second message kind needs the pop.
-** 'goal_list_for_subscribee_col' reads git HEAD for unchanged owners
+** (fixed) 'goal_list_for_subscribee_col' reads git HEAD for unchanged owners
    server/to_org/complete/partner_col/goal_list.rs.  In diff mode it
    calls 'nodecomplete_from_git_head' for every subscribeeCol on
    every render, even when the owner's file appears in neither
    per-stage diff map (so HEAD = worktree and the read changes
    nothing).  The filter-col goal computers in the same file already
-   short-circuit via 'per_stage_node_changes_for_truenode'.  The
-   diff-mode-policy stage's shared writable-col goal-list function
-   adopts that short-circuit, retiring the wasted read.
+   short-circuit via 'per_stage_node_changes_for_truenode'.
+   Fixed 2026-06-11: the shared 'goal_list_for_outbound_col'
+   reconstructs both sides from the per-stage diffs already in hand
+   and short-circuits unchanged owners; the filter cols'
+   three-snapshot comparison likewise reads no git objects, so diff
+   rendering now performs NO git reads beyond the initial per-source
+   diff collection.
+* Problems found while executing the diff-mode-policy stage (2026-06-11)
+** (fixed) A buffer containing a hiddenInSubscribeeCol could not be saved
+   Two validators contradicted each other: 'validate_hiddenin'
+   (server/from_text/buffer_to_viewnodes/local.rs) REQUIRES the col
+   to sit under a gnode (the subscribee), while
+   'validate_gnode_identity_and_structure' FORBADE any gnode child
+   of that kind ('cannot_be_child_of_gnode').  So the buffer
+   rendering produces for any definitive subscribee with hidden
+   members could not round-trip through save -- every save of it
+   failed with "TrueNode has a child whose structure belongs
+   elsewhere".  Apparently never noticed because no test saved a
+   buffer holding the col.  Fixed: the gnode check now permits a
+   HiddenInSubscribeeCol child when the gnode is a
+   subscribee-as-such (its parent is a SubscribeeCol), the one
+   position rendering puts it.  Surfaced by, and pinned in,
+   tests/git_diff_view/filter_cols/.
+** A stale saved buffer can show a removed read-only-col member as live
+   Awareness, handled: a read-only col member whose edge vanished
+   outside Emacs can still sit in a user's buffer as an Active
+   child; the reconciler matches it to the goal list's phantom
+   position by ID and would have kept it Active (an undecorated
+   lie).  'apply_membership_axes_to_col_members' therefore stamps
+   the full axes onto a net-removed Active member and flips it to a
+   phantom ('normal_to_phantom').  Mentioned here because the flip
+   path is reachable only through that stale-buffer gesture, so a
+   test exercising it directly would need to fabricate the state.
+** Flaky test: whole-suite 'cargo nextest run' failed once in text::view
+   'text::view::test_title_diff_staged_shows_staged_scaffolds'
+   failed once during a full parallel 'cargo nextest run'
+   (2026-06-11), then passed on every retry (5x in isolation, full
+   suite re-run).  Same family as the pre-existing 'ids::save'
+   flake above: per-test dbs, so the shared resource is something
+   else.  Not chased.
+** 'cargo test --test override_substitution' races on the global graph handle
+   Pre-existing (reproduces at the parent of this stage's commits):
+   several tests in that target install the process-global in-Rust
+   graph handle from DIFFERENT fixture sets; under plain 'cargo
+   test' (one process per target) only the first init wins, so
+   later tests can resolve substitution against the wrong graph and
+   fail nondeterministically.  Under 'cargo nextest run' (one
+   process per test) all pass.  The target's header documents the
+   nextest assumption; a fix would mean per-test fixture-compatible
+   globals or a resettable handle.

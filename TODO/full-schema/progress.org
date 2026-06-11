@@ -8,7 +8,185 @@ marked 'Affected'. Stage 7 was never executed as written; parts of
 its territory were covered differently by the local-view-update
 overhaul, and the remainder is re-planned in
 [[./metaplan_2.org]], which supersedes metaplan 1.
-** stage 11 : override rendering and navigation
+** stage 12 : diff-mode policy for the full schema
+*** implemented (2026-06-11)
+Six commits on branch 'full-schema', executing
+'TODO/full-schema/12-2_diff-mode-policy_discussion.org' in its
+planned order:
+1. The refusals, in the quiet unwinding shape: enabling diff mode
+   refuses under a restricted source-set; switching to a restricted
+   set refuses while diff mode is on; both answer with the
+   endpoint's normal first message plus an EMPTY rerender stream
+   ('stream_empty_rerender'), so Emacs unwinds with zero elisp
+   changes.  The switch handler's pre-existing error paths (the
+   Emacs wedge) adopt the same shape, dispatcher-level paths
+   included ('refuse_unwinding').  Handler tests over TCP pairs in
+   tests/diff_mode_refusals.rs; the stage 9-2 interim comment
+   reworded to "defense in depth".
+2. Relation-true attribution: 'phantom_axes' takes a 'NodeRelation'
+   and reads exactly that relation's diff
+   ('NodeRelation::diff_in_nodechanges'); 'build_child_data' takes
+   an axes closure, so deriving a removed member's axes REQUIRES
+   naming a relation.  'NodeChanges.overrides_view_of_diff' landed
+   here too (producer: 'compare_nodecompletes') so the accessor
+   could be total.  Double-relation mislabeling pinned in
+   tests/unit/types_phantom.rs.
+3. Outbound completeness: 'goal_list_for_outbound_col' (shared by
+   subscribeeCol / overriddenCol / hiddenCol) reconstructs both
+   sides from the per-stage diffs in hand -- NO git reads, retiring
+   the per-render HEAD read for unchanged subscribers -- and
+   'apply_membership_axes_to_col_members' stamps per-stage 'newM'
+   on present members.  Tests de novo and through the save seam
+   (idempotence; a phantom under a writable col is never
+   collected), in a new target (see problems).
+4. Inbound completeness: 'inverse_scan_for_inbound_col' reads each
+   source's stage maps -- Modified relation diffs, Deleted
+   'before_node' lists, Added 'after_node' lists -- with
+   per-(member, stage) sign CANCELLATION so a cross-source move
+   fabricates no membership change.  Phantoms append after real
+   members in sorted-ID order; existence axes come from the
+   member's own file statuses ('removedX removedM' for a deleted
+   overrider).  Unit tests for the scan; save-seam tests for all
+   three inbound cols, staged and unstaged.
+5. Filter-col completeness: the three-snapshot comparison
+   ('three_snapshots_of_relation_list' reconstructs each input list
+   at HEAD / index / worktree from the diffs;
+   'axes_from_three_snapshots' derives exact per-stage signs from
+   the DERIVED memberships).  Removed members keep phantoming with
+   exact labels; newly derived-in members get 'newM'; changes
+   driven by either input list, including a member that moved
+   hidden-outside -> hidden-in with no hides change.
+6. Col existence: the de novo creation sites
+   ('maybe_add_one_partnerCol', 'maybe_add_subscribeeCol_branch'
+   incl. its hiddenOutside creation,
+   'maybe_add_hiddenInSubscribeeCol_branch') consult the HEAD side
+   in diff mode and create an emptied col bare, for its phantoms;
+   the diff handle is threaded from 'CompletionContext'.
+7. The no-substitution assertions (all tests, no production code):
+   menu offered in diff mode; open menu shape-stable across a
+   toggle; diff analysis reports the override relation in both
+   roles on raw nodes; a marked-substitute view shape-stable across
+   a toggle.
+8. Docs: api-and-formats.md (both refusals and the empty-stream
+   shape; PartnerCol members in the diff-metadata section);
+   TODO/problems.org (wedge, attribution and HEAD-read entries
+   marked fixed; new entries below).
+*** changes to the plan's envisioned order
+- 'overrides_view_of_diff' (planned for the outbound step) landed
+  with the attribution step, so 'diff_in_nodechanges' could be
+  total from birth.  No consumer saw a difference.
+- Everything else in plan order.  The two tranches landed as six
+  commits rather than two groups: refusals; attribution + outbound
+  + inbound; filter; col existence; assertions; docs.
+*** deviations from the plan as written
+- 'build_child_data' takes an axes CLOSURE rather than a relation
+  parameter: the inbound cols' axes come from the inverse scan and
+  the filter cols' from the three-snapshot comparison, so "name the
+  relation" generalized to "supply the axes policy"; the
+  impossible-to-call-without-naming-a-relation property survives
+  (each closure is built from a named relation or a named scan).
+- The shared goal-list function is named 'goal_list_for_outbound_col'
+  (not 'goal_list_for_writable_col'): the hiddenCol is outbound but
+  not writable, so the plan's example name was wrong about the
+  grouping it itself defined.
+- In diff mode an outbound ReadOnlySet col (the hiddenCol) uses the
+  diff-derived goal order (disk order with phantoms interleaved at
+  HEAD positions), superseding the view-local reordering while diff
+  mode is on -- a phantom belongs at its HEAD position, which a
+  view-local order cannot express.  Inbound cols keep view-local
+  order (their phantoms are a sorted tail), as planned.
+- 'apply_membership_axes_to_col_members' also FLIPS a stale Active
+  member to a phantom when the axes say net-removed.  Reachable
+  only when a stale saved buffer still holds, as Active, a
+  read-only-col member whose edge vanished outside Emacs; without
+  the flip the rendered buffer would show a removed edge as a live
+  member.  (See TODO/problems.org.)
+- The de novo outbound/col-existence tests live in their own test
+  target (tests/git_diff_view_partner_cols.rs) because they install
+  the PROCESS-GLOBAL graph handle, which leaks across tests of one
+  target under plain 'cargo test' (precedent:
+  tests/override_chain_notice.rs).  The inbound and filter tests
+  need no global handle and live in tests/git_diff_view.rs.
+*** bad news / problems surfaced (details in TODO/problems.org)
+- PRE-EXISTING BUG, fixed en route: a buffer containing a
+  hiddenInSubscribeeCol could not be SAVED at all -- two validators
+  contradicted each other ('validate_hiddenin' requires a gnode
+  parent; the gnode child-structure check forbade the col).  Every
+  rendered view of a definitive subscribee with hidden members
+  failed to round-trip.  Surfaced by the filter-col tests; fixed by
+  permitting the col under a subscribee-as-such.
+- PRE-EXISTING FLAKE, fixed en route: tests/git_diff_view's cleanup
+  raced the Tantivy background writer (DirectoryNotEmpty), exactly
+  the common-gotchas.md hazard; its cleanup now drains the worker.
+- PRE-EXISTING RACE, not fixed: 'cargo test --test
+  override_substitution' (plain cargo test, one process) races on
+  the process-global graph handle across tests using different
+  fixtures; fails nondeterministically before and after this stage.
+  'cargo nextest run' (process per test) is reliable.
+- One full-suite 'cargo nextest run' failed once in
+  text::view::test_title_diff_staged_shows_staged_scaffolds, then
+  passed on every retry; same family as the recorded 'ids::save'
+  flake.  Recorded, not chased.
+*** constraints this work imposes on future work or use
+- The per-connection invariant "diff mode on implies active set
+  'all'" now has two guarded doors.  Any future entry point that
+  mutates either flag (e.g. a config-reload feature, a future
+  per-view mode) must preserve it or re-derive the refusals.
+- Refusal texts for the diff-toggle endpoint must never contain the
+  substring "\nWarning:" (the Emacs handler's window-pop trigger);
+  a comment at the refusal site says so.
+- The quiet shape is now load-bearing protocol: anything Emacs
+  sends after preemptively locking buffers must be answered either
+  by the real rerender stream or by the empty one.
+- 'NodeChanges' now diffs all four stored relation lists; a future
+  relation must extend 'diff_in_nodechanges' (the compiler forces
+  the match arm) and gets attribution, outbound goal lists, the
+  inverse scan and col existence for free if it follows the same
+  shapes.
+- The inverse scan runs once per inbound col per diff render,
+  scanning only CHANGED files; cost is proportional to the change.
+  A pathological diff (thousands of changed files) pays it per
+  inbound col on screen; if that ever bites, the scan's product
+  could be computed once per render and cached in the context (the
+  plumbing precedent exists).
+*** unanticipated future potential costs and benefits
+- BENEFIT: diff-mode rendering now performs NO git object reads
+  beyond the initial per-source diff collection (the outbound and
+  filter goal lists reconstruct everything from the per-stage
+  diffs), removing a per-col render cost that grew with col count.
+- BENEFIT: 'three_snapshots_of_relation_list' is general (any
+  relation, any node) and would serve any future derived-membership
+  surface needing exact stage labels.
+- COST / AWARENESS: 'newM' on an inbound col member can appear on a
+  member whose own node shows no other decoration (the edge change
+  lives in the member's file); correct and expected, may look
+  surprising next to content children (the plan's awareness note
+  stands).
+- AWARENESS: under a new owner FILE (Added, not Modified), outbound
+  col members carry no 'newM', matching content behavior for new
+  files (node_changes is only read for Modified files).
+*** tested
+- 'cargo nextest run': 593/593 (about 40 new tests: refusals,
+  attribution units, inverse-scan units, three-snapshot units,
+  outbound/inbound/filter/col-existence suites, the four
+  no-substitution assertions).
+- 'bash/emacs-tests.sh': 225/225 (no elisp changes).
+- 'bash/all-tests.sh --no-sound' run after restarting the
+  long-running server on the new binary (the problems.org hazard).
+*** open questions
+None blocking (per when-to-stop.org).  Small items for Jeff's eyes:
+**** TODO (Jeff): in diff mode, the hiddenCol's view-local member order
+  is superseded by the diff-derived order (phantoms interleave at
+  HEAD positions).  Toggling diff off restores order preservation,
+  but the buffer may meanwhile have normalized.  Veto if you want
+  view-local order to survive diff mode (phantoms would then have
+  to tail instead of interleave).
+**** TODO (Jeff): saving a diff-mode buffer in which an OUTBOUND col
+  shows phantoms is a no-op (pinned by test) -- but a user who
+  DELETES the phantom line and saves changes nothing either (it
+  regenerates), which may surprise users who read deletion as "stop
+  showing me this".  Expected per "phantoms define nothing", just
+  flagging the UX.
 *** implemented (2026-06-11)
 Seven commits on branch 'full-schema', executing
 'TODO/full-schema/11_override-rendering-and-navigation.org' in its
