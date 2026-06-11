@@ -273,4 +273,30 @@ fn handler_precedence_and_menu_dedup
               "test-uuid-PLAIN" . to_string ()))
           . expect ("normal views register under the client URI")
           . pids; }
+      { // Bypass: the overridden node itself opens, no menu.
+        views_state . open_views . unregister_view (
+          &ViewUri::ContentView ("raw-z-uuid" . to_string ()));
+        let bypass_request : String =
+          "((request . \"single root content view\") \
+            (id . \"Z\") (view-uri . \"bypass-z-uuid\") \
+            (override-choice . \"bypass\"))" . to_string ();
+        let response : String =
+          respond (&mut views_state, &bypass_request);
+        assert! ( response . contains ("(id Z)"),
+                  "{}", response );
+        assert! ( ! response . contains ("to-minibuffer")
+                  && ! response . contains ("override-menu"),
+          "bypass opens the raw node, no menu:\n{}", response ); }
+      { // An unknown override-choice value errors loudly. (Z2, not
+        // Z: the bypass request above registered a raw view of Z,
+        // and the switch-to-view check would win before the
+        // override-choice value is even parsed.)
+        let bad_request : String =
+          "((request . \"single root content view\") \
+            (id . \"Z2\") (view-uri . \"bad-uuid\") \
+            (override-choice . \"sideways\"))" . to_string ();
+        let response : String =
+          respond (&mut views_state, &bad_request);
+        assert! ( response . contains ("Unknown override-choice"),
+                  "{}", response ); }
       Ok (( )) } )) }

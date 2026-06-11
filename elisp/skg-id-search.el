@@ -92,14 +92,38 @@ Point is always restored."
               (setq result (skg--id-at-point)) )) )) )
     result ))
 
+(defun skg--bypass-override-here-p ()
+  "Whether a goto from the current buffer should bypass the
+override-choice menu. True in magit buffers: a readable-ID jump
+from magit should land on the original raw node
+\(TODO/full-schema/11_override-rendering-and-navigation.org).
+Detected by major-mode name so magit need not be loaded."
+  (string-prefix-p "magit-" (symbol-name major-mode)))
+
 (defun skg-goto ()
-  "Open a content view for the nearest ID on the current line."
+  "Open a content view for the nearest ID on the current line.
+From a magit buffer this bypasses the override-choice menu (the
+jump lands on the original raw node); elsewhere, visiting an
+overridden node offers the menu."
   (interactive)
   (let (( result (skg-nearest-id) ))
     (if result
         (let (( id (car result) ))
           (message "Visiting node: %s" id)
-          (skg-request-single-root-content-view-from-id id))
+          (skg-request-single-root-content-view-from-id
+           id nil (skg--bypass-override-here-p)))
+      (message "No ID found on this line")) ))
+
+(defun skg-goto-bypassOverride ()
+  "Like `skg-goto', but always bypass the override-choice menu:
+open the nearest ID itself, even if it is overridden. The escape
+hatch from the menu (and from anywhere) to the original node."
+  (interactive)
+  (let (( result (skg-nearest-id) ))
+    (if result
+        (let (( id (car result) ))
+          (message "Visiting node (bypassing overriders): %s" id)
+          (skg-request-single-root-content-view-from-id id nil t))
       (message "No ID found on this line")) ))
 
 (defun skg-goto-by-id (id)

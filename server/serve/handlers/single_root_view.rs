@@ -6,6 +6,7 @@ use crate::to_org::render::override_menu::override_menu_view;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   view_uri_from_request,
+  value_from_request_sexp,
   send_response_with_length_prefix,
   format_buffer_response_sexp,
   format_override_menu_response_sexp,
@@ -85,13 +86,38 @@ pub fn handle_single_root_view_request (
             & tag_sexp_response (
               TcpToClient::ContentView, &switch_sexp ));
           return; }
+      let bypass_menu : bool =
+        // The optional (override-choice . "menu" | "bypass") field,
+        // defaulting to menu. Bypass surfaces (magit jumps,
+        // skg-goto-bypassOverride) skip the menu and open the
+        // requested root raw; recursive content beneath it still
+        // follows the substitution rules.
+        match value_from_request_sexp ("override-choice", request) {
+          Err (_)  => false, // absent: the default, menu
+          Ok (v) => match v . as_str () {
+            "menu"   => false,
+            "bypass" => true,
+            other => {
+              let response_sexp : String =
+                format_buffer_response_sexp (
+                  &String::new (),
+                  &vec! [format! (
+                    "Unknown override-choice value: {} (expected \"menu\" or \"bypass\")",
+                    other )],
+                  &[] );
+              send_response_with_length_prefix (
+                stream,
+                & tag_sexp_response (
+                  TcpToClient::ContentView, &response_sexp ));
+              return; }}};
       let pid : ID = // the menu is per resolved node, extra-IDs included
         env . in_rust_graph . load_full ()
         . pid_of (&node_id)
         . unwrap_or_else ( || node_id . clone () );
       let menu_uri : ViewUri =
         ViewUri::OverrideMenu ( pid . 0 . clone () );
-      if views_state . open_views . views
+      if ! bypass_menu
+        && views_state . open_views . views
         . contains_key (&menu_uri)
         { // One menu per node: a second request switches to it.
           let switch_sexp : String =
@@ -116,8 +142,10 @@ pub fn handle_single_root_view_request (
             // instead of silently choosing. Offered in diff mode
             // too (decided 2026-06-11): the menu is navigation, not
             // decoration, and it presents raw graph facts.
-            match override_menu_view (
-              env, &pid, Some (active_source_set) ) . await
+            match if bypass_menu { Ok (None) }
+                  else { override_menu_view (
+                           env, &pid,
+                           Some (active_source_set) ) . await }
             { Ok ( Some ((menu_content, menu_pids, menu_forest)) ) => {
                 views_state . open_views . register_view (
                   menu_uri . clone (),

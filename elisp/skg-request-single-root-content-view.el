@@ -7,10 +7,27 @@
 (require 'skg-buffer)
 (require 'skg-request-save) ; For message formatting/display helpers
 
-(defun skg-request-single-root-content-view-from-id (node-id &optional tcp-proc)
+(defun skg--single-root-view-request-string (clean-id view-uri bypass-override)
+  "The request sexp string for a single root content view of CLEAN-ID.
+When BYPASS-OVERRIDE is non-nil, the request carries
+\(override-choice . \"bypass\")."
+  (concat (prin1-to-string
+           (append
+            `((request . "single root content view")
+              (id . ,clean-id)
+              (view-uri . ,view-uri))
+            (when bypass-override
+              '((override-choice . "bypass")))))
+          "\n"))
+
+(defun skg-request-single-root-content-view-from-id (node-id &optional tcp-proc bypass-override)
   "Ask Rust for an single root content view view of NODE-ID.
 Registers a response handler in the dispatch map.
-Optional TCP-PROC allows reusing an existing connection."
+Optional TCP-PROC allows reusing an existing connection.
+When BYPASS-OVERRIDE is non-nil, the request carries
+\(override-choice . \"bypass\"): if NODE-ID is overridden, the
+server opens the node itself instead of the override-choice menu.
+\(Recursive content beneath the root still substitutes.)"
   (interactive "sNode ID: ")
   (let* ((tcp-proc (or tcp-proc (skg-tcp-connect-to-rust)))
          (view-uri (org-id-uuid))
@@ -18,11 +35,8 @@ Optional TCP-PROC allows reusing an existing connection."
                        (substring-no-properties node-id)
                      node-id))
          (request-s-exp
-          (concat (prin1-to-string
-                   `((request . "single root content view")
-                     (id . ,clean-id)
-                     (view-uri . ,view-uri)))
-                  "\n")))
+          (skg--single-root-view-request-string
+           clean-id view-uri bypass-override)))
     ;; Register handler in dispatch map (one-shot)
     (skg-register-response-handler
      'content-view
@@ -54,8 +68,9 @@ VIEW-URI is the pre-generated UUID to assign to the new buffer."
           (let* ((content-value (cadr (assoc 'content response)))
                  (errors-list (cadr (assoc 'errors response)))
                  (warnings-list (cadr (assoc 'warnings response)))
-                 (server-uri ;; The server may override the client-generated URI; it does for override-choice menus, registered under "override-menu:PID".
-                  (cadr (assoc 'view-uri response)))
+                 (server-uri ;; The server may override the client-generated URI; it does for override-choice menus, registered under "override-menu:PID". PITFALL: the server's sexp printer leaves space-free strings unquoted, so this can arrive as a symbol; normalize to a string.
+                  (let ((u (cadr (assoc 'view-uri response))))
+                    (when u (format "%s" u))))
                  (effective-uri (or server-uri view-uri))
                  (to-minibuffer ;; Optional one-line echo: minibuffer only, never buffer text, never a popped window.
                   (cadr (assoc 'to-minibuffer response)))
