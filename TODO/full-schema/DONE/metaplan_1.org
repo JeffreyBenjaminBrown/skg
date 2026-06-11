@@ -1,3 +1,10 @@
+* THE TAIL OF THIS IS OBSOLETE
+It is supplanted by metaplan_2.org.
+The portions here marked DONE really were done,
+but the rest are stale -- the code has drifted
+from the assumptions they make.
+* What's this "metaplan"?
+Each section is large enough to deserve its own dedicated sub-plan.
 * metaplan : full schema UI
 ** overview & goal
 This plan completes the user-facing UI for every relationship in
@@ -16,7 +23,6 @@ clear in heralds,
 and coherent under save, rerender and git diff views.
 
 The implementation should proceed in the order below.
-Each section is large enough to deserve its own dedicated sub-plan.
 * steps, in order
 ** DONE Rename the roles of 'overrides_view_of' everywhere:
 ```

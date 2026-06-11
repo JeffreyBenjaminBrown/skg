@@ -8,6 +8,51 @@ marked 'Affected'. Stage 7 was never executed as written; parts of
 its territory were covered differently by the local-view-update
 overhaul, and the remainder is re-planned in
 [[./metaplan_2.org]], which supersedes metaplan 1.
+** stage 10 : heralds and the remaining stats
+*** planned
+Wrote 'TODO/full-schema/10_heralds-and-stats.org', covering the
+metaplan_2.org step "add heralds and the remaining stats", as
+amended by Jeff's 2026-06-11 directive that a herald's rules must
+not be spread across Rust and Emacs.
+
+In order: move the herald-rule table (atoms, labels, colors,
+ordering) from 'elisp/heralds-minor-mode.el' into one Rust module,
+served to Emacs over a new "herald rules" endpoint, with a Rust
+conformance test (every emittable atom has a rule, every rule names
+a live atom -- the earlier JSON idea dissolved, since both sides of
+the check now live in Rust) and a one-time migration-equivalence
+test; then the H graphstat ('GraphNodeStats.hiding', both
+computation paths); then the gO/gS view stats
+('grandparentOverrides' for subscribees-as-such,
+'grandparentSubscribes' for overriddenCol members, computed
+position-aware via 'relation_membership_is_real', with the
+serialization AND parse arms landing together -- the viewStats
+parser errors on unknown atoms, so a serialized-but-unparsed stat
+would make buffers unsavable); then the read-only herald audit.
+'overridesHere' ("Oh") stays with the override-rendering step.
+
+Ends with open questions: how typed the Rust rule table should be
+(lean: typed-lite), how Emacs obtains it (lean: fetch at connect),
+the failure mode when unavailable (lean: disable heralds with a
+message), whether the lens engine stays in elisp (lean: yes), and
+whether the conformance test should also pin presentation (lean:
+no).
+*** open questions answered; Op stat added (2026-06-11)
+Jeff confirmed all five leans; folded into the plan body.
+Separately, the metaplan had lost its "define override rendering
+and navigation" heading in an earlier edit, which made two of
+Jeff's comments look like part of the heralds step; the heading is
+restored.  Of those comments: the substitution/source-set
+correction is folded into the override step (ownership is
+set-independent, visibility gates substitution -- an inactive
+overrider does not substitute, the original is drawn); and the
+"Op (overrides parent) herald" request moved into plan 10 as the
+'overridesParent' view stat, computed everywhere, as a viewstat
+rather than a graphstat for the same reason as 'containsParent'
+(the fact is org-parent-relative; Jeff confirmed the placement).
+Also answered Jeff's awaits comment: the "unintegrated subscribed
+content" presentation already exists, so that forks-gap bullet is
+withdrawn.
 ** stage 9 : source-set safety for sharing relations
 *** planned
 Wrote 'TODO/full-schema/9_source-set-safety.org', covering the
@@ -71,6 +116,100 @@ Still-open questions in 9-2: suppression-warning timing
 (edits-only vs presence-based), the silent failure of deleting a
 retained inactive node, recursive omission of whole inactive
 branches in fresh renders, and the diff-mode interim window.
+*** implemented (2026-06-11)
+Six commits on branch 'full-schema', executing
+'TODO/full-schema/9-2_source-set-safety.org' in its planned order:
+1. Plumbing: 'buffer_to_validated_saveplan',
+   'extract_nonmergeSavePlan_locally' and
+   'build_diskSupplemented_defineNodes' gained
+   'active_source_set : Option<&ActiveSourceSet>', normalized once
+   ('all' -> None).
+2. The merges ('server/from_text/weave.rs'): 'weave' (anchored;
+   contains + subscribes_to) and 'set_difference_merge'
+   (overrides_view_of), applied at supplementation;
+   'member_is_visible' resolves member sources via the in-Rust
+   graph snapshot with disk fallback; unresolvable counts as
+   invisible, hence preserved.  Fields are replaced only when the
+   merge changed them, preserving MSV shape for the noop filter.
+3. Validation/extraction: InactiveNodes accepted under cols, under
+   gnodes, with children, and as view roots; their own content
+   stays read-only.  'subscribeeCol_members' counts buffer-present
+   placeholders positionally (mirroring 'content_members');
+   'partnerCol_members' (overriddenCol) stays Active-only.
+4. Omission: goal lists filter by activity
+   ('omit_inactive_members' + 'retained_inactive_children' in
+   'reconcile/mod.rs'); content and subscribeeCol retain
+   view-present InactiveNodes with children; the reconciler's stale
+   rule deadens InactiveNode branches and deletes leaves; de novo
+   col creation filters before the non-empty check; inactive
+   removed-member diff phantoms are quietly omitted (interim
+   diff-mode policy).
+5. Inactive-node rewrite suppression
+   ('suppress_writes_to_inactive_nodes', validate.rs): after the
+   noop filter, drops DefineNodes targeting inactive sources,
+   SourceMoves with inactive endpoints, and nodeMerge pairs not
+   provably active on both sides; warns
+   "Inactive nodes present in saved buffer remain unchanged in
+   graph." only when something was suppressed (edits-only timing,
+   as decided).
+6. Switch-rerender: 'set_active_source_set' re-renders open views
+   in place via the rerender-all stream, with the convert-and-prune
+   prepass ('server/update_buffer/source_switch.rs') and PartnerCol
+   creation enabled; Emacs stops closing buffers and reuses the
+   rerender stream handlers.
+api-and-formats.md's source-set passages were rewritten (omission,
+retention, save preservation, suppression, switch semantics).
+*** deviations from the plan as written
+- The suppression tests live in their own target
+  ('tests/inactive_suppression.rs'): the silent-untouched case
+  needs the process-global in-Rust graph (the noop filter reads
+  it), and installing that inside the shared-process
+  'tests/source_sets.rs' target would couple unrelated tests.
+  Added an idempotent 'try_init_global_handle' for tests.
+- The plan's "verify whether apply_source_set_to_viewforest still
+  needs its col-member case": it remains load-bearing as the final
+  safety net (e.g. stale buffers re-rendered after save) and for
+  content placeholders parsed from old buffers; it additionally
+  learned to DETACH childless inactive diff phantoms (quiet
+  omission in diff mode) while converting ones with children.
+- 'rerender_view' gained a 'create_partnerCols' flag rather than a
+  new entry point; 'stream_rerender_views' gained prepass and
+  col-creation parameters shared by rerender-all, diff toggle and
+  the switch.
+- No Emacs-side integration test drives the switch-rerender end to
+  end; the server handler is covered by a direct test
+  (scoped-thread, since the handler calls block_on internally) and
+  the Emacs side reuses the already-tested rerender stream
+  handlers.  Worth an integration test eventually.
+- Three tests in 'tests/source_sets.rs' that encoded the
+  placeholder-rendering model were rewritten for omission; the
+  old no-active-children validation test now asserts the retained
+  case passes; the git_diff_view suite needed no changes.
+*** unanticipated future costs and benefits
+- 'member_is_visible' (save side) and 'omit_inactive_members'
+  (render side) resolve sources per member; both are in-memory
+  lookups with disk fallback, negligible today.
+- The weave runs for every definitive node's contains under a
+  restricted set, including unchanged ones; it is O(children) and
+  identity-stable, so the noop filter still sees unchanged nodes.
+- The switch-rerender normalizes view-local niceties (e.g.
+  stage-8's read-only col order), exactly as close-and-reopen used
+  to.
+- 'NonmergeSavePlan' gained a 'warnings' field; future save stages
+  can reuse it.
+*** tested
+- 'cargo nextest run': 532/532 passed.
+- 'bash/emacs-tests.sh': 222/222 passed.
+- New coverage: 12 weave/set-difference unit tests; 3 source-switch
+  prune unit tests; suppression target (3 scenarios); stale-buffer,
+  positional-subscribee and weave-through-the-pipeline tests in
+  tests/source_sets.rs; the rewritten omission tests.
+- 'bash/all-tests.sh --no-sound': all passed (Emacs tests, Nextest,
+  28 integration tests; 87s total).
+*** open questions
+None for Jeff; the plan's open questions were all closed before
+execution, and no stoppers arose (per when-to-stop.org: no
+unanticipated architectural decisions, no stumper mysteries).
 *** open questions closed (2026-06-11); plan final
 All four answered and folded into 9-2's body: suppression warning
 fires edits-only; recursive omission of inactive branches in fresh

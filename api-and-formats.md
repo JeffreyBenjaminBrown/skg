@@ -134,11 +134,17 @@ So far there are these endpoints:
   - Response: Multiple length-prefixed messages, sent sequentially:
     1. Source-set response:
        `Content-Length: N\r\n\r\n(("response-type" "active-source-set") ("active" "NAME") ("content" "Active source-set: NAME"))`
-    2. View-close/lock messages as needed by the Emacs client.
+    2. The rerender stream, as in "rerender all views":
+       rerender-lock → rerender-view* → rerender-done. Each open view
+       is re-rendered in place under the new set: nodes whose source
+       became inactive are converted and pruned (an inactive node
+       with active view-children is retained, read-only), and
+       PartnerCols regenerate per the new set, so widening the set
+       reveals members and cols.
   - Behavior: The active source-set is per Emacs TCP connection. It
     defaults from `skgconfig.toml`, resets on reconnect, and is not
     written back to the config. Changing it requires confirmation in
-    Emacs, closes/unregisters all active Skg buffers for that
+    Emacs, re-renders (not closes) all active Skg buffers for that
     connection, and cancels any in-flight search enrichment.
 
 ## Titles by ids
@@ -357,28 +363,40 @@ Examples:
 (skg (textChanged staged unstaged))
 ```
 
-## Inactive-source placeholder metadata
+## Inactive-source nodes: omission, retention, and save preservation
 
-When a node from an inactive source appears as content of an active
-container, it renders as a placeholder rather than as a TrueNode:
+Under a restricted source-set, rendering OMITS nodes from inactive
+sources entirely -- content, subscribees, and every PartnerCol's
+members alike. No placeholder appears, and omission is recursive: an
+omitted container's whole branch is omitted, active descendants
+included (they stay reachable by search or direct visit).
+
+Saving preserves what rendering omitted: an omitted relationship
+member cannot be deleted (or even seen), so the save merges the
+buffer's visible lists with the disk lists -- order-preserving (the
+anchored weave) for `contains` and `subscribes_to`, set-difference
+for `overrides_view_of`. Edits to visible members, including
+deletions, are honored.
+
+The one place an inactive node still appears is RETENTION: when a
+source-set switch is applied to an open view, an inactive node with
+active view-children stays on screen as an InactiveNode placeholder:
 
 ```
 (skg (inactiveNode (id NODE_ID) (source SOURCE)))
 ```
 
-The headline text is generic, e.g. `node from inactive source`. The
-real ID and source are kept in metadata so saving can preserve, reorder,
-duplicate, or remove the placeholder in the active container's
-`contains` list. Herald rules must not display the source, and title
-lookup/readable-ID helpers must not resolve the ID to a title while its
-source is inactive.
+The headline text is empty/generic; herald rules must not display
+the source, and title lookup/readable-ID helpers must not resolve
+the ID to a title while its source is inactive. The retained node is
+read-only (editing its title, body, metadata, source, or ID is a
+buffer validation error), its children remain editable, moving it
+within its parent is honored on save, and deleting its subtree edits
+only the view -- the graph relationship survives.
 
-The placeholder's own content is read-only: editing its title, body,
-metadata, source, or ID is a buffer validation error. Moving or deleting
-the placeholder as content of an active container is allowed and changes
-that container's `contains` list.
-
-In git diff mode, inactive placeholders may show only relationship
-position markers such as `(unstaged newM)` or `(unstaged removedM)`.
-They must not reveal title/body/alias/source-change diffs or deleted
-phantom titles.
+Edits to inactive nodes themselves are SUPPRESSED at save, not
+fatal: any instruction that would write an inactive source is
+dropped and the save succeeds with the warning "Inactive nodes
+present in saved buffer remain unchanged in graph." An untouched
+stale node saves silently (its identical-to-disk instruction is
+discarded as a no-op first).

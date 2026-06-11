@@ -8,6 +8,8 @@ claude --resume a2d5b32b-876e-4236-997e-3a0a8582b1f1
   in skg (not skg2, not skg3)
 Simple upstream fix would be to make the poll frequency configurable,
 * Does the new inactive node treatment mean they don't need IDs?
+* potential optimization : usually don't check gO, gS, etc.
+Some viewstats are unliekly in most places.
 * git add for both sides of moved source
 * Emacs, not the server, should remember foldedness and point.
 ** the idea

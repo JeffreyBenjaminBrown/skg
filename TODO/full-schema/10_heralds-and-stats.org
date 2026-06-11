@@ -1,0 +1,316 @@
+* plan : heralds and the remaining stats
+This plan covers the metaplan_2.org step "add heralds and the
+remaining stats", as amended by Jeff's 2026-06-11 directive on the
+"one vocabulary, machine-checkable" subsection: the rules for a
+herald should not be spread across Rust and Emacs.  Everything that
+defines a herald -- the atoms it matches, its label, its color, its
+ordering -- lives in ONE place, in Rust, even though Rust itself
+will not use the presentation parts.  Emacs keeps only the display
+ENGINE that interprets the rules (see open questions).
+
+The third view-stat from metaplan 1, 'overridesHere' (herald "Oh"),
+is deliberately NOT here: it depends on override substitution and
+lands with the override-rendering step.
+
+* scope
+** covered
+- The herald-rule table moves from 'elisp/heralds-minor-mode.el'
+  into Rust, as the single home of both the metadata vocabulary and
+  its presentation; Emacs fetches it from the server.  A conformance
+  test (now a plain Rust unit test, since vocabulary and rules share
+  a language) ensures every emitted atom has a rule and every rule
+  names a live atom.
+- The H graphstat: 'GraphNodeStats.hiding', true iff the node plays
+  either role of 'hides_from_its_subscriptions', anywhere; herald
+  "H", same family as "S" and "O".
+- The view-specific stats 'grandparentOverrides' (red "gO", for
+  subscribees-as-such the col's owner also overrides) and
+  'grandparentSubscribes' (red "gS", for overriddenCol members the
+  col's owner also subscribes to).
+- The 'overridesParent' view stat (red "Op": this node overrides its
+  org-parent), added 2026-06-11 from Jeff's metaplan comment,
+  computed for all nodes everywhere -- the override-choice buffer
+  (a later step) then gets its \O-style markers for free.
+- The read-only herald audit (verification, not construction).
+** not covered
+- 'overridesHere' / "Oh" (override-rendering step).
+- Any change to which cols exist, to ColPolicy, or to the lens
+  engine's semantics ('elisp/skg-lens.el' stays as is).
+- The diff-mode policy step and everything after it.
+
+* current behavior, verified 2026-06-11
+** the herald rule table and its engine
+'elisp/heralds-minor-mode.el' holds 'heralds--transform-rules': one
+big sexp constant mapping server-emitted metadata atoms to colored
+herald tokens, interpreted by the generic lens engine in
+'elisp/skg-lens.el' ('skg-transform-sexp-flat').  A rule combines an
+optional color directive (GREEN / BLUE / RED / ORANGE / YELLOW), a
+match atom, a label string, and occasionally engine directives (ANY,
+IT, ABUT, INTERC).  Rule ORDER is presentation order.  Nothing
+checks the table against what the server can actually emit; adding a
+stat has been a scavenger hunt across the two languages.
+** where stats are computed, serialized and parsed
+- Graph-wide stats: 'AllGraphNodeStats'
+  ('server/dbs/typedb/search/all_graphnodestats.rs') carries
+  'has_subscribes' / 'has_overrides' ID-sets, filled by BOTH a
+  TypeQL fetch (the per-pid path) and an in-Rust computation (the
+  all-pids path, via the outbound lists plus the 'subscribers_of' /
+  'overriders_of' inverse indexes); 'graphnodestats_for_pid'
+  converts them to the booleans on 'GraphNodeStats'
+  ('server/types/viewnode.rs').
+- Serialization: 'graphnodestats_to_sexp' ('server/org_to_text.rs'
+  near line 515) emits the booleans as bare atoms ('aliasing',
+  'extraIDs', 'overriding', 'subscribing'); viewStats serialize
+  similarly near line 262 ('cycle', 'sourceHerald', ...).
+- Parsing: 'parse_metadata_sexp.rs' parses them back (graphStats
+  near line 648; 'parse_viewstats_sexp' near line 707).  PITFALL:
+  'parse_viewstats_sexp' ERRORS on unknown atoms, so a new viewStat
+  that serializes without a matching parse arm makes every buffer
+  displaying it UNSAVABLE.  New stats must land serialization and
+  parsing together.
+- View stats: 'set_viewnodestats_in_viewforest'
+  ('server/update_buffer/viewnodestats.rs') runs in
+  'finish_viewforest' after graph stats, receiving the
+  container/content maps and config.  It does not currently consult
+  sharing relations; 'snapshot_global ()' is available (other
+  finish-stage passes use it), and
+  'InRustGraph::relation_membership_is_real'
+  ('relation_accessors.rs') answers exactly the gO/gS questions.
+- The in-Rust graph indexes needed for H already exist: 'hiders_of'
+  plus the outbound 'hides_from_its_subscriptions' list.
+
+* desired behavior
+** herald rules live in Rust
+One Rust module (somewhere near the metadata vocabulary it
+describes, e.g. 'server/heralds.rs') defines the complete rule
+table: every rule's match atom(s), label, color, engine directives,
+and presentation order.  Properties:
+- It is the SINGLE source of truth.  'heralds--transform-rules'
+  disappears from the elisp; Emacs obtains the table from the
+  server and hands it to the unchanged lens engine.
+- It is TYPED-LITE (decided 2026-06-11): a small enum/struct family
+  -- rule = match atom + color + label + directive + children --
+  mirroring the sexp grammar one-to-one, with a serializer.  The
+  conformance test walks real data; match atoms are '&'static str's
+  referenced from the same constants 'repr_in_client' uses where
+  possible.  The data lives in Rust; the code that USES the data
+  (the lens engine) stays entirely in Emacs.
+- A serializer emits exactly the sexp shape 'skg-lens.el' already
+  interprets, so the engine needs no changes.
+- A new endpoint serves it (request "herald rules", LP response
+  with the sexp).  Decided 2026-06-11: Emacs FETCHES AT CONNECT,
+  caches in a defvar for the session, re-fetches on reconnect.  A
+  failed fetch is not fatal beyond killing heralds: disable the
+  minor mode for the session with a one-line message; no vendored
+  fallback table (that would re-create the two-homes problem).
+  Tests can inject a table directly into the cache variable, so
+  batch-mode elisp tests need no server.
+** the conformance test
+A Rust unit test, not a JSON artifact (the earlier JSON idea
+dissolved once both sides of the comparison live in Rust):
+- every metadata atom the server can emit -- col atoms
+  ('repr_in_client'), graphStats and viewStats atoms, parentIs and
+  birth values, editRequest and viewRequests atoms, the diff-axis
+  atoms, 'indef', 'notInGit', 'inactiveNode' and the phantom kinds
+  -- appears somewhere in the rule table;
+- every match atom in the rule table is one the server can emit
+  (no rules for retired vocabulary).
+The emittable-atom list must itself be derived from the enums
+(match exhaustively, so adding a variant breaks the test until the
+list and table learn it), not hand-copied.  The test pins ATOM
+COVERAGE ONLY (decided 2026-06-11): no label/color snapshots --
+Jeff will tweak presentation freely, and those tweaks must not
+break tests.
+** the H graphstat
+'GraphNodeStats.hiding': true iff the node hides anything or is
+hidden by anything, anywhere in the graph -- deliberately broad,
+like "S" and "O"; users wanting detail request the cols.  Computed
+in BOTH stats paths (TypeQL fetch arm modeled on the
+'overrides_related' sub-fetch; in-Rust arm via outbound list plus
+'hiders_of'), serialized as the atom 'hiding', parsed back, and
+given the herald "H" (blue, beside "O" and "S") in the rule table.
+** the gO and gS view stats
+Two new 'ViewNodeStats' booleans, computed only at the positions
+where they are non-redundant:
+- 'grandparentOverrides' ("gO", red): for an Affected child of a
+  SubscribeeCol (a subscribee-as-such), true iff the col's owner
+  (the member's grandparent) also OVERRIDES the member.  Not
+  computed under an overriddenCol, where the col already says it.
+- 'grandparentSubscribes' ("gS", red): for an Affected child of an
+  OverriddenCol, true iff the col's owner also SUBSCRIBES TO the
+  member.  Not computed under a subscribeeCol, ditto.
+Computed in 'set_viewnodestats_in_viewforest' (which already walks
+parent context) via 'relation_membership_is_real' on the global
+graph snapshot; serialized as 'grandparentOverrides' /
+'grandparentSubscribes' atoms inside '(viewStats ...)'; parsed back
+(remember the parser errors on unknown atoms); heralded "gO" / "gS".
+The retained-inactive case needs no special handling: an
+InactiveNode member carries no viewStats.
+** the overridesParent view stat
+(From Jeff's metaplan comment, 2026-06-11.)  'overridesParent'
+(red "Op"): true iff this node overrides its org-parent's node --
+the org-relative analogue of 'containsParent', and like it
+necessarily a VIEW stat, because one node can sit under different
+parents in different positions (Jeff confirmed the viewstat
+placement 2026-06-11).  Computed for every Active node whose parent is a
+gnode, in the same pass as gO/gS, via 'relation_membership_is_real'
+(parent as the overridden, this node as overrider); serialized,
+parsed, heralded like the others.  The graph-wide "overrides
+something, somewhere" fact already exists as 'overriding' / "O".
+** the read-only herald audit
+Verify, and fix only if wrong:
+- IDCol, both hidden-subscription cols, and the four read-only
+  relation cols present consistently with their read-only nature
+  (the green col labels exist; check nothing contradicts them);
+- the stage-8 repair warnings and the herald story agree on which
+  cols are read-only ('ColPolicy' is the arbiter);
+- the herald the new rule table emits for each col matches what the
+  old elisp table emitted (a snapshot comparison during the
+  migration commit catches accidental drift).
+
+* implementation plan, in order
+** move the herald rules to Rust
+First, so the new stats below are added the new way (one file, one
+test), proving the workflow:
+- Define the rule types and the table in Rust; write the
+  sexp serializer; assert (one-time migration test) that its output
+  is equivalent to the current 'heralds--transform-rules' sexp, then
+  delete the elisp constant.
+- Add the "herald rules" endpoint (request/response shapes in
+  api-and-formats.md), the Emacs fetch-and-cache, and the
+  test-injection hook for batch-mode elisp tests.
+- Add the conformance test.
+** add the H graphstat
+Struct field, both computation paths, serialization, parsing, rule
+in the Rust table.  Mirror 'overriding' at every site; the compiler
+plus the conformance test enumerate the sites.
+** add gO, gS and Op
+'ViewNodeStats' fields, computation in
+'set_viewnodestats_in_viewforest' (position-aware, snapshot-based),
+serialization, parsing (do not forget 'parse_viewstats_sexp'),
+rules in the table.
+** the audit
+Walk the checklist in "desired behavior"; record findings in
+progress.org; fix only discrepancies.
+
+* tests
+- Conformance: the Rust unit test described above.
+- Migration equivalence: generated sexp == the old elisp constant
+  (kept only for the migration commit, then the elisp constant is
+  gone and the test with it).
+- H: extend whatever pins 'overriding' today (TypeQL-vs-in-Rust
+  parity and rendering); a fixture where a node hides another shows
+  'hiding' on both, in both stats paths, and round-trips through a
+  save.
+- gO / gS: one fixture serves both, vision.org's pair -- R
+  subscribes to E and overrides E.  A view of R shows E under both
+  cols: the subscribeeCol copy carries 'grandparentOverrides' (and
+  not 'grandparentSubscribes'); the overriddenCol copy carries
+  'grandparentSubscribes' (and not 'grandparentOverrides').  Both
+  round-trip through a save (the parser pitfall).  A subscribee the
+  owner does NOT override carries neither.
+- Op: a fixture where child C overrides its container P: C drawn as
+  content of P carries 'overridesParent'; C drawn elsewhere (e.g.
+  as a view root, or under a parent it does not override) does
+  not; round-trips through a save.
+- Emacs: heralds tests keep passing with the table injected via the
+  test hook; one test exercises the fetch path against a running
+  server (integration).
+
+* verification
+- 'cargo check'
+- 'cargo test --lib'
+- 'cargo test --test typedb -- --nocapture' (stats parity)
+- 'cargo test --test new -- --nocapture'
+- 'cargo test --test save -- --nocapture'
+- 'cargo test --test subscribee_col -- --nocapture'
+- 'cargo nextest run'
+- 'bash/emacs-tests.sh'
+- 'bash/all-tests.sh --no-sound'
+
+* DONE open questions (all closed)
+** glossary for the questions below
+- "Herald": the short colored token (e.g. a green "☮", a blue "O")
+  that Emacs displays in place of a node's raw metadata.
+- "The rule table": the data that maps each metadata atom to its
+  herald -- match atom, label, color, presentation order, and
+  occasional engine directives.  Today an elisp constant; this plan
+  moves it to Rust.
+- "The lens engine": 'elisp/skg-lens.el', the generic interpreter
+  that walks a node's metadata sexp under the rule table and
+  produces the displayed tokens.  Unchanged by this plan.
+- "Conformance test": the Rust unit test checking that the set of
+  metadata atoms the server can emit and the set of atoms the rule
+  table matches are equal.
+** DONE how typed should the Rust rule table be?
+Three candidate strengths:
+- VERBATIM STRING: the table is one Rust string constant holding
+  the sexp.  Least code; but the conformance test would have to
+  parse it, and nothing stops a typo'd atom or unbalanced paren
+  until runtime.
+- TYPED-LITE (my lean): a small enum/struct family -- rule = match
+  atom + color + label + directive + children -- mirroring the
+  sexp grammar one-to-one, with a serializer.  The conformance
+  test walks real data; atoms are '&'static str's referenced from
+  the same constants 'repr_in_client' uses where possible.
+- FULLY TYPED: match atoms are the actual Rust enums (PartnerCol,
+  ParentIs, ...) rather than strings.  Maximal safety, but the
+  table spans every metadata-producing type and may fight the
+  one-file goal with import sprawl.
+*** DONE agreed, typed-lite
+**** claude: folded into "herald rules live in Rust".
+** DONE how does Emacs get the table?
+- FETCH AT CONNECT (my lean): a "herald rules" request right after
+  the connection verifies; cached in a defvar for the session;
+  re-fetched on reconnect.  Always matches the server version.
+- GENERATED FILE: Rust writes an .el or sexp file at build time
+  that Emacs loads.  No protocol addition, but introduces a
+  build artifact that can go stale against a running server.
+- LAZY FETCH: first heralds activation requests it.  Saves a
+  round-trip when heralds are unused, costs latency at first use.
+*** DONE agreed, fetch at connect
+**** claude: folded into "herald rules live in Rust".
+** DONE what happens when the table is unavailable?
+If the fetch fails (old server, race at startup): disable heralds
+for the session with a one-line message (my lean), or retry on next
+heralds activation, or hard-error?  There is no point keeping a
+vendored fallback table in elisp -- that would re-create the
+two-homes problem this plan exists to end.
+*** DONE agreed; should not be fatal beyond killing heralds
+**** claude: folded into "herald rules live in Rust".
+** DONE does the lens engine stay in elisp?
+Jeff's directive moves the RULES to Rust.  I read it as keeping the
+ENGINE (skg-lens.el) in elisp: it is presentation execution, it is
+already generic, and moving it would mean Rust rendering display
+properties it cannot test.  But "all in the same place" could be
+read more aggressively -- confirm the rules/engine split is the
+intended line.
+*** DONE you are correct
+The rule data moves into Rust,
+but code to mess with that data is still entirely in Emacs.
+**** claude: recorded in the typed-lite paragraph (data in Rust, engine in Emacs).
+** DONE should the conformance test also pin presentation?
+Atom coverage is the required core.  Should the test additionally
+snapshot labels/colors (so an accidental edit to, say, the "O"
+herald's color fails a test), or is presentation free to drift
+without ceremony?  My lean: no snapshot; presentation changes
+should be cheap.
+*** DONE agreed
+I will definitely tweak that table,
+and don't want those tweaks to break tests.
+**** claude: recorded in the conformance-test section (atom coverage only).
+** DONE is overridesParent a viewstat, against your graphStats instinct?
+CLOSED: 2026-06-11 -- confirmed: viewstat.
+(New 2026-06-11, from your "Op heralds" metaplan comment; the stat
+itself is now in this plan.)  You proposed putting "overrides
+parent" in graphStats for all nodes.  But the fact is relative to
+the node's CURRENT org-parent: the same node can deserve the herald
+in one buffer position and not in another, which a graph-wide
+boolean cannot express -- the same reason 'containsParent' lives in
+viewStats.  The plan therefore computes 'overridesParent' as a view
+stat, for every position, everywhere (so the override-choice buffer
+needs nothing special).  The graph-wide neighbor facts already
+exist: 'overriding' ("O") says "overrides or is overridden by
+something, somewhere".  Confirm the viewstat placement, or tell me
+what graph-wide fact I am missing.
+*** TODO You're right!

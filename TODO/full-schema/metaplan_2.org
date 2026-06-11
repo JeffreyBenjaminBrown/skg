@@ -115,7 +115,8 @@ Vec order, which the user's save defines, so it is preserved.
   not exist); the relationship-matrix tests; the documentation pass.
 * steps, in order
 Each section below is large enough to deserve its own sub-plan.
-** make read-only sets ergonomic under save and rerender
+These "start" after the last DONE item from the first metaplan.
+** DONE make read-only sets ergonomic under save and rerender
 Supersedes 7_saving-readonly-cols.org.  The reconciliation machinery
 already restores missing members, deletes stale leaves, demotes
 stale branches and removes duplicates.  Three behaviors are missing.
@@ -218,7 +219,7 @@ touches the relevant files anyway:
   -> 'Specified(vec![])' -> explicit empty set), so the invariant is
   findable from the type rather than only from emission logic in
   'traverse.rs'.
-** preserve source-set safety for sharing relations
+** DONE preserve source-set safety for sharing relations
 Source-set filtering must neither leak inactive-source data nor
 destroy invisible relationship targets.  Currently
 'apply_source_set_to_viewforest' ('server/source_sets.rs') converts
@@ -274,7 +275,7 @@ against present and future leak paths, e.g. visibility resolution's
 'apply_hiderel_delta_to_subscriber', which can synthesize a save
 intent for a subscriber read from disk; that subscriber's source
 might be inactive in the current view.
-** add heralds and the remaining stats
+** ONGOING add heralds and the remaining stats
 *** the H graphstat
 Add a 'hiding' boolean to 'GraphNodeStats' (true iff the node plays
 either role of 'hides_from_its_subscriptions', anywhere), parallel to
@@ -325,10 +326,30 @@ is adding three new atoms:
   that JSON (Emacs parses JSON natively), keeping only presentation
   (colors, symbols, ordering) in elisp.  Nice if cheap; the
   conformance test already delivers the safety.
+** define override rendering and navigation
+(2026-06-11: this heading was accidentally lost in an earlier edit,
+which made the subsections below look like part of the heralds
+step; restored.)
 The largest step, and the bridge to forks.  No override substitution
 exists today; the relation is stored, validated (monogamy and
 no-owned-chains, at save and rebuild) and displayed in cols, but
 never changes what is drawn.
+**** DONE I like the idea of keeping it all in Rust.
+The rules for a herald should not be spread across Rust and Emacs.
+Even if Rust won't use information like colors and ordering,
+let's have that information live there,
+just so it's all in the same place.
+(Assuming it can actually be in one place.
+If it has to be spread across many files,
+that defeats the point.)
+***** claude: folded into 10_heralds-and-stats.org
+The plan moves the whole rule table (atoms, labels, colors,
+ordering) into one Rust module served to Emacs, which keeps only
+the lens engine; the JSON idea dissolved (both sides of the
+conformance check now live in Rust).  Open questions there cover
+how typed the table should be, the fetch mechanism, the
+failure mode, and whether the engine staying in elisp matches your
+intent.
 *** the resolution rule, as one type
 Define a resolver in one place (probably beside
 'override_invariants.rs' in 'server/dbs/in_rust_graph/'):
@@ -356,8 +377,13 @@ editing, the original; closing and reopening normalizes.  This
 matches the collateral-rerender decision in vision.org.
 
 Substitution must be OFF when diff mode is enabled (diff views show
-raw graph facts) and is unaffected by source-sets ("user-owned"
-means 'user_owns_it', not "currently active").
+raw graph facts).  Source-sets interact in two distinct ways
+(corrected 2026-06-11, see the discussion below): OWNERSHIP is
+set-independent ("user-owned" means 'user_owns_it', never "currently
+active"), but VISIBILITY gates substitution -- an overrider from an
+inactive source cannot be drawn, so it does not substitute, and the
+original is drawn instead.  Switching source-sets can therefore
+change which node a view draws, necessarily.
 
 Two interactions need explicit treatment in the sub-plan:
 - the contains list still names the original N; the drawn child is
@@ -375,6 +401,20 @@ Two interactions need explicit treatment in the sub-plan:
   the owner's hides (those are scoped to subscriptions), whereas
   expansion from a subscribeeCol does.  vision.org's R/E/G/H example
   is the test fixture for this.
+**** DONE re. substitution "is unaffected by source-sets"
+That can't be right:
+If A is active, I is inactive, and I overrides A,
+then when drawing the buffer, I should not substitute for A.
+
+Or did you mean something else?
+***** claude: you are right; the sentence overstated, and is now corrected above
+I meant only that OWNERSHIP does not depend on the active set (an
+edge does not stop being user-owned when its source is filtered
+out).  But drawing is another matter: rendering cannot draw an
+inactive node at all, so an inactive overrider must not substitute;
+the original A is drawn, exactly as you say.  The bullet above now
+states both halves: ownership is set-independent, visibility gates
+substitution.
 *** the overridesHere stat
 'overridesHere' on 'ViewNodeStats': true iff this viewnode was drawn
 in place of a node it overrides.  Herald: red "Oh".  Set by the
@@ -396,6 +436,25 @@ Reuse the ancestry machinery
 'attach_containerward_ancestries_at_nodeids_with_source_set') rather
 than inventing a new traversal-to-forest path; the overrides
 traversal is the same shape with a different relation.
+**** DONE these will need Op (overrides parent) heralds
+That is a graph fact much like 'contains parent',
+and should at least initially be included in graphStats
+for all nodes, not just nodes in an overrider-choice buffer.
+***** DONE claude: added to plan 10, with one adjustment -- it must be a viewstat, not a graphstat
+CLOSED: 2026-06-11 -- Jeff confirmed the viewstat placement.
+Agreed on computing it for all nodes everywhere, and
+10_heralds-and-stats.org now includes it ('overridesParent', herald
+red "Op"), so the override-choice buffer will get it for free.  The
+adjustment: "this node overrides its parent" depends on WHICH parent
+the viewnode happens to sit under, so one node can warrant the
+herald in one buffer position and not another -- a graph-wide
+boolean cannot express that.  This is the same situation as
+'containsParent', which lives in viewStats for the same reason.  So
+the all-nodes part of your instinct lands as a viewstat computed at
+every position (alongside the new gO/gS), rather than in
+graphStats.  If you wanted a graph-wide fact too ("this node
+overrides SOMETHING"), that already exists: 'overriding' / the "O"
+herald.  Veto in plan 10's open questions if I've misread.
 *** navigation surface classification
 - following a textlink to an overridden node: the menu.
 - 'skg-goto' and friends, including visiting a search result: the
@@ -417,7 +476,8 @@ Diff mode and restricted source-sets must not compose:
 - switching the source-set away from 'all'
   ('server/serve/handlers/source_sets.rs') refuses while diff mode
   is on, and the refusal must happen BEFORE any buffers are closed.
-Diff analysis already refuses; reuse its message style.
+Diff analysis already refuses when source-set is limited;
+reuse its message style.
 *** override diffs in inline diff views
 'NodeChanges' ('server/types/git.rs') carries 'subscribes_to_diff'
 and 'hides_diff', so removed subscribees and hidden members already
@@ -490,6 +550,14 @@ docs/forks.md promises gestures the schema UI does not provide:
   content today, but the forks document implies a friendlier
   presentation of "new since you last integrated", which likely
   needs a notion of what has been integrated;
+**** DONE no, this is already done
+That's how subscribees present. If you hid it and/or moved it,
+you integrated it. If you haven't, it's unintegrated,
+and that's exactly what you already see.
+***** claude: acknowledged; bullet withdrawn
+Hiding and moving ARE the integration record, so "unintegrated" is
+precisely what a subscribee-as-such already displays.  The forks
+gap shrinks to the clone gesture and the social half.
 ***  the social half: publishing the fact of a fork, and the indicator
   in the original owner's view (the subscriberCol and overriderCol
   read-only sets are the data for this; the cross-user transport is
