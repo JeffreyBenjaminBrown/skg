@@ -472,7 +472,7 @@ herald.  Veto in plan 10's open questions if I've misread.
 - opening (new buffer) from an overriddenCol child: the menu.
 - collateral rerender after save: existing viewnodes unchanged; new
   content substituted.
-** define diff-mode policy for the full schema
+** ONGOING define diff-mode policy for the full schema
 *** refusals
 Diff mode and restricted source-sets must not compose:
 - toggling diff mode ('handle_git_diff_toggle_and_rerender' in

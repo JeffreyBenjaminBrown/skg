@@ -101,7 +101,10 @@
    that mix staged + unstaged on the same file. Without these, the
    remaining node_changes_for_truenode callers could easily regress.
 
-** 'head_node' field on NodeCompleteDiff is a misnomer
+** (obsolete) 'head_node' field on NodeCompleteDiff is a misnomer
+   Noted obsolete 2026-06-11 (diff-mode-policy replanning): the field
+   was renamed 'before_node', with a comment explaining it holds the
+   stage's baseline (HEAD for staged, INDEX for unstaged).
    server/types/git.rs, populated in server/git_ops/diff.rs.
    The struct comment says "only for deleted files", but the field
    is populated with the 'before' state of the stage: HEAD for the
@@ -675,3 +678,66 @@
    is something else (possibly git or tempdir state under
    run_save_test). Worth a look before trusting plain 'cargo test'
    runs of that target.
+* Problems found while planning the diff-mode-policy stage (2026-06-11)
+** A refused or failed source-set switch wedges the Emacs client
+   Both 'skg-view-diff-mode' and 'skg-set-active-source-set' set the
+   stream guard ('skg--stream-in-progress'), lock EVERY Skg buffer,
+   and register the three rerender handlers BEFORE sending their
+   request.  Only the rerender stream unwinds that state:
+   "rerender-lock" unlocks buffers not named in it, and
+   "rerender-done" clears the guard and removes the per-view
+   handler.  But the switch handler's early error paths
+   ('set_active_source_set' in server/serve/handlers/source_sets.rs:
+   missing 'name' field, unknown set name) reply with response-type
+   "error", which the switch flow has no handler for -- Emacs logs
+   "no handler for response type: error" and drops it.  Result: the
+   stream guard stays set (blocking every future save, rerender,
+   toggle and switch), all buffers stay locked, and the rerender
+   handlers dangle, until the TCP connection drops or a
+   busy-initializing message resets state.  One malformed set name
+   wedges the client.
+
+   Fix planned in TODO/full-schema/12-2_diff-mode-policy_discussion.org
+   (the refusals stage hits the same path through ordinary use): error
+   and refusal responses keep the endpoint's normal response-type,
+   carrying the explanation as content, followed by an EMPTY
+   rerender stream ("rerender-lock" naming no views, then
+   "rerender-done"), which unwinds Emacs with no elisp changes.
+** (fix planned) 'phantom_axes' can misattribute a stage sign across relations
+   'phantom_axes' (server/types/phantom.rs) derives a diff-phantom's
+   per-stage membership sign by scanning the parent's relation
+   diffs ('contains_diff', 'subscribes_to_diff', 'hides_diff') in a
+   fixed order and taking the FIRST sign found for the child's ID.
+   The comment claims "a member appears in exactly one of" those
+   lists, but a parent can bear the same ID in two relations (e.g.
+   it both contains and subscribes to N).  If both relations
+   changed for that ID in DIFFERENT stages, the phantom in one col
+   can display the other relation's stage label.  The phantom's
+   existence is never wrong (goal lists are relation-specific);
+   only the staged-vs-unstaged label can mislabel, and only in that
+   double-relation corner.  Correct attribution would require
+   callers to pass which relation their col represents.  Decided
+   2026-06-11 (Jeff): fix it now -- phantoms should not lie, and the
+   mislabeling could become hard to recognize later.
+   TODO/full-schema/12-2_diff-mode-policy_discussion.org owns the fix
+   ("relation-true axis attribution"), landing before that plan's
+   new consumers (including 'overrides_view_of_diff', which would
+   otherwise widen the corner).
+** 'skg-view-diff-mode' branches on a "\nWarning:" substring
+   elisp/skg-request-git-diff-mode.el.  The git-diff-mode response
+   handler pops a window ('skg-big-nonfatal-message') iff the
+   response 'content' contains the literal substring "\nWarning:";
+   otherwise it echoes via 'message'.  Any future first-message text
+   containing that substring -- a refusal, an error -- pops a window
+   unintentionally.  The diff-mode-policy stage's refusal texts avoid
+   the substring; a typed flag in the response would be the real fix,
+   deferred until a second message kind needs the pop.
+** 'goal_list_for_subscribee_col' reads git HEAD for unchanged owners
+   server/to_org/complete/partner_col/goal_list.rs.  In diff mode it
+   calls 'nodecomplete_from_git_head' for every subscribeeCol on
+   every render, even when the owner's file appears in neither
+   per-stage diff map (so HEAD = worktree and the read changes
+   nothing).  The filter-col goal computers in the same file already
+   short-circuit via 'per_stage_node_changes_for_truenode'.  The
+   diff-mode-policy stage's shared writable-col goal-list function
+   adopts that short-circuit, retiring the wasted read.
