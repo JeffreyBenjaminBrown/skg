@@ -516,7 +516,8 @@ pub async fn make_and_append_child_pair_with_source_set (
         if ! active . contains_source (&source) {
           let inactive : ViewNode =
             mk_inactive_viewnode (
-              child_skgid . clone (), source, MembershipAxes::default () );
+              child_skgid . clone (), source,
+              MembershipAxes::default (), None );
           let child_treeid : NodeId =
             with_node_mut (
               tree, parent_treeid,

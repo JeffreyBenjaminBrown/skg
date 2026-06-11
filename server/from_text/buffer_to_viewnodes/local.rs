@@ -474,14 +474,18 @@ pub fn nonignored_children_have_distinct_ids (
   let mut seen : HashSet<ID> = HashSet::new();
   for child in node_ref . children() {
     let content_id : Option<ID> =
+      // collected IDs, not own IDs: distinctness guards the
+      // collected contains list, and a drawn overrider can
+      // legitimately appear twice when it stands for two distinct
+      // originals.
       match &child . value() . kind {
         MpViewnodeKind::Vognode (MpVognode::Active (t))
           if t . parentIs == ParentIs::Affected
-          => t . id . clone(),
+          => t . collected_id (),
         MpViewnodeKind::Vognode (MpVognode::Inactive (i))
           if i . membership . staged != Some (Sign::Minus)
           && i . membership . unstaged != Some (Sign::Minus)
-          => Some (i . id . clone()),
+          => Some (i . collected_id ()),
         _ => None };
     if let Some (id) = content_id {
       if !seen . insert(id) {

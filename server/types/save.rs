@@ -140,6 +140,12 @@ fn format_buffer_validation_error (
       } else {
         format!("The idCol under node {} was edited; saving would not honor that, so the save was aborted:\n- ids claimed by the buffer: {}\n- the node's real ids: {}\n- Reordering is fine, but IDs cannot be added, removed or edited through the buffer. To edit a node's ID list, edit its .skg file directly.\n",
                 owner . 0, fmt_ids(buffer_ids), fmt_ids(real_ids)) }},
+    BufferValidationError::OverridesHere_Mismatch(carrier, original, effective) => {
+      let fmt_opt = |id : &Option<ID>| -> String {
+        id . as_ref () . map ( |i| i . 0 . clone () )
+          . unwrap_or_else ( || "<none>" . to_string () ) };
+      format!("Invalid (overridesHere ...) marker; saving it would rewrite a contains list, so the save was aborted:\n- the node carrying the marker: {}\n- the original the marker claims it stands for: {}\n- what the server would draw in place of that original: {}\n- The marker looks hand-edited or stale. Re-render the view (close and reopen, or C-c g RET) and retry.\n",
+              fmt_opt (carrier), original . 0, fmt_opt (effective)) },
     BufferValidationError::Multiple_Defining_Viewnodes (id) => {
       format!("ID has multiple defining containers:\n- ID: {}\n",
               id . 0) },

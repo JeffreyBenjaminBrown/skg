@@ -43,6 +43,9 @@ pub enum BufferValidationError {
   IDCol_Edited                   (ID,       // owner of the IDCol
                                   Vec<ID>,  // ids the buffer's IDCol claims
                                   Vec<ID>), // the owner's real ids (pid + extra_ids); empty if the owner is not in the graph
+  OverridesHere_Mismatch         (Option<ID>, // the carrier's own ID
+                                  ID,         // the original the marker claims
+                                  Option<ID>), // who the graph says substitutes for that original; None if the graph was unavailable
   Other                          (String),
 }
 
@@ -111,6 +114,8 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "The idCol under node {:?} was edited (buffer claims {:?}; real ids are {:?}). Reordering is fine, but IDs cannot be added, removed or edited through the buffer; edit the .skg file directly.", owner, buffer_ids, real_ids),
       BufferValidationError::EditRequestOnIndefinitive (id) =>
         write!(f, "Edit request on indefinitive (phantom) node {:?}. Phantoms are indefinitive; indefinitive nodes cannot carry write instructions. Visit a definitive view of the node first (C-c g RET).", id),
+      BufferValidationError::OverridesHere_Mismatch(carrier, original, effective) =>
+        write!(f, "Node {:?} carries the marker (overridesHere {:?}), but the server would draw {:?} in place of that original. The marker looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, original, effective),
       BufferValidationError::Other (msg) =>
         write!(f, "{}", msg), }} }
 

@@ -13,10 +13,10 @@ fn inactive_deleted_by_save_becomes_deleted () {
   let root : NodeId = t . root () . id ();
   let inact : NodeId = t . get_mut (root) . unwrap () . append (
     mk_inactive_viewnode ( ID::from ("x"), SourceName::from ("main"),
-                           MembershipAxes::default () ) ) . id ();
+                           MembershipAxes::default (), None ) ) . id ();
   let kept : NodeId = t . get_mut (root) . unwrap () . append (
     mk_inactive_viewnode ( ID::from ("y"), SourceName::from ("main"),
-                           MembershipAxes::default () ) ) . id ();
+                           MembershipAxes::default (), None ) ) . id ();
   let deleted : HashSet<ID> =
     [ ID::from ("x") ] . into_iter () . collect ();
 

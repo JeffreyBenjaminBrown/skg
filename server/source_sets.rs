@@ -127,7 +127,9 @@ pub fn apply_source_set_to_viewforest (
     . map ( |n| n . id () )
     . collect ();
   for id in ids {
-    enum Treatment { Convert (ID, SourceName, MembershipAxes), Detach }
+    enum Treatment { Convert (ID, SourceName, MembershipAxes,
+                              Option<ID>), // overridesHere: an Active substitute keeps its marker; phantoms carry none
+                     Detach }
     let treatment : Option<Treatment> = {
       let Some (n) = viewforest . get (id) else { continue; }; // already detached with an ancestor
       let has_children : bool = n . has_children ();
@@ -136,7 +138,9 @@ pub fn apply_source_set_to_viewforest (
           if ! active . contains_source (&t . source)
           => Some ( Treatment::Convert ( t . id . clone (),
                                          t . source . clone (),
-                                         t . membership )),
+                                         t . membership,
+                                         t . viewStats . overridesHere
+                                           . clone () )),
         ViewNodeKind::Phantom (Phantom::Diff (p))
           if ! active . contains_source (&p . source)
           // TODO/full-schema/9-2_source-set-safety.org (interim,
@@ -148,16 +152,19 @@ pub fn apply_source_set_to_viewforest (
           => if has_children {
                Some ( Treatment::Convert ( p . id . clone (),
                                            p . source . clone (),
-                                           p . membership )) }
+                                           p . membership,
+                                           None )) }
              else { Some ( Treatment::Detach ) },
         _ => None } };
     match treatment {
       None => {},
-      Some (Treatment::Convert (pid, source, membership)) => {
+      Some (Treatment::Convert (pid, source, membership,
+                                overridesHere)) => {
         let mut node_mut : NodeMut<ViewNode> =
           viewforest . get_mut (id) . unwrap ();
         node_mut . value () . kind =
-          mk_inactive_viewnode (pid, source, membership) . kind; },
+          mk_inactive_viewnode (pid, source, membership,
+                                overridesHere) . kind; },
       Some (Treatment::Detach) => {
         let mut node_mut : NodeMut<ViewNode> =
           viewforest . get_mut (id) . unwrap ();

@@ -269,6 +269,10 @@ fn true_node_metadata_to_string (
         parts . push ( "grandparentSubscribes" . to_string () ); }
       if true_node . viewStats . overridesParent {
         parts . push ( "overridesParent" . to_string () ); }
+      if let Some (ref original) =
+        true_node . viewStats . overridesHere {
+        parts . push ( format! ("(overridesHere {})",
+                                 original . 0 )); }
       if true_node . viewStats . sourceAtBoundary {
         if let Some (src_config)
         = config . sources . get ( &true_node . source )
@@ -458,6 +462,9 @@ fn inactive_node_metadata_to_string (
       "inactiveNode" . to_string (),
       format! ("(id {})", inactive_node . id . 0),
       format! ("(source {})", inactive_node . source) ];
+  if let Some (ref original) = inactive_node . overridesHere {
+    inactive_parts . push ( format! ("(overridesHere {})",
+                                      original . 0 )); }
   append_membership_stage_forms (
     &mut inactive_parts,
     &inactive_node . membership );

@@ -112,7 +112,8 @@ fn inactive_phantomhood_conditions () {
     InactiveNode {
       id         : ID::from ("i"),
       source     : SourceName::from ("private"),
-      membership } };
+      membership,
+      overridesHere : None } };
   assert!( ! inactiveNode_is_phantom ( &inactive (
     MembershipAxes::default() )));
   assert!( inactiveNode_is_phantom ( &inactive (

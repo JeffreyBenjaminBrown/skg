@@ -378,10 +378,13 @@ fn content_members (
     match &child . value() . kind {
       ViewNodeKind::Vognode (Vognode::Active (t)) => {
         if active_child_counts_as_content (t) {
-          contents . push (t . id . clone()); }},
+          contents . push (
+            // collected_id, not id: a drawn overrider stands for
+            // the original member it was drawn in place of.
+            t . collected_id ()); }},
       ViewNodeKind::Vognode (Vognode::Inactive (i)) => {
         if ! inactiveNode_is_phantom (i) {
-          contents . push (i . id . clone()); }},
+          contents . push (i . collected_id ()); }},
       _ => {}, }}
   contents }
 
@@ -398,5 +401,8 @@ fn visible_content_members (
     if let ViewNodeKind::Vognode (Vognode::Active (t))
       = &child . value() . kind
     { if active_child_counts_as_visible_content (t) {
-        visible . push (t . id . clone()); }}}
+        visible . push (
+          // collected_id: a drawn overrider presents the original,
+          // so hide/unhide inference must speak of the original.
+          t . collected_id ()); }}}
   visible }

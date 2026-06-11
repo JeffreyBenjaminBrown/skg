@@ -15,7 +15,7 @@ fn relevant_child_of_wrong_kind_yields_err_not_panic () {
   let root : NodeId = t . root () . id ();
   t . get_mut (root) . unwrap () . append (
     mk_inactive_viewnode ( ID::from ("x"), SourceName::from ("main"),
-                           MembershipAxes::default () ) );
+                           MembershipAxes::default (), None ) );
   let result : Result<RepairSummary<ID>, Box<dyn Error>> =
     complete_relevant_children_in_viewnodetree (
       &mut t, root,

@@ -52,7 +52,13 @@ fn convert_now_inactive_actives (
             => Some ( mk_inactive_viewnode (
                         t . id . clone (),
                         t . source . clone (),
-                        t . membership ) . kind ),
+                        t . membership,
+                        // The marker survives conversion: a drawn
+                        // substitute still stands for its original,
+                        // else the retained node's own ID would
+                        // reach its parent's collected contains.
+                        t . viewStats . overridesHere . clone ()
+                      ) . kind ),
           _ => None } );
     if let Some (kind) = conversion {
       tree . get_mut (id) . unwrap () . value () . kind = kind; }}}

@@ -1,5 +1,7 @@
 pub mod contradictory_instructions;
 
+use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
+use crate::dbs::in_rust_graph::override_resolution::resolve_override;
 use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{ParentIs, Qual, QualCol, ViewRequest};
@@ -74,6 +76,8 @@ pub async fn find_buffer_errors_for_saving (
     viewforest, &mut errors);
   idCol_membership_errors (
     viewforest, config, driver, &mut errors ) . await ?;
+  overridesHere_marker_errors (
+    viewforest, config, &mut errors );
   validate_view_roots (
       viewforest, &mut errors);
   { // local structure validation
@@ -151,6 +155,51 @@ async fn idCol_membership_errors (
           errors . push ( BufferValidationError::IDCol_Edited (
             owner, buffer_ids, real )); }}, }}
   Ok (( )) }
+
+/// Tamper validation for the '(overridesHere N)' marker (plan 11).
+/// The marker is load-bearing text: wherever it appears, save
+/// extraction collects N instead of the carrier's own ID. So a
+/// marker the server would not have drawn must abort the save --
+/// otherwise hand-edited (or yanked, or stale) metadata could
+/// rewrite arbitrary contains members. The check: the carrier's ID
+/// must equal 'resolve_override (N).effective' computed
+/// VISIBILITY-UNGATED (active = None): ownership still gates, but a
+/// marker that was honest when rendered must not start failing
+/// because the source-set switched afterward. Markers on retained
+/// InactiveNodes are checked identically. If the global graph
+/// handle is unavailable (some test harnesses), a present marker is
+/// an error too: fail closed, since the marker cannot be verified.
+#[allow(non_snake_case)]
+fn overridesHere_marker_errors (
+  viewforest : &MpViewForest,
+  config     : &SkgConfig,
+  errors     : &mut Vec<BufferValidationError>,
+) {
+  let graph : Option<std::sync::Arc<InRustGraph>> =
+    snapshot_global ();
+  for edge in viewforest . root () . traverse () {
+    let Edge::Open (node_ref) = edge else { continue; };
+    let (carrier, original) : (Option<ID>, ID) =
+      match &node_ref . value () . kind {
+        MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
+          match &t . viewStats . overridesHere {
+            Some (original) =>
+              ( t . id . clone (), original . clone () ),
+            None => continue },
+        MpViewnodeKind::Vognode (MpVognode::Inactive (i)) =>
+          match &i . overridesHere {
+            Some (original) =>
+              ( Some ( i . id . clone () ), original . clone () ),
+            None => continue },
+        _ => continue };
+    let effective : Option<ID> =
+      graph . as_ref () . map ( |g|
+        resolve_override (config, g, None, &original)
+        . effective );
+    if effective . as_ref () != carrier . as_ref () {
+      errors . push (
+        BufferValidationError::OverridesHere_Mismatch (
+          carrier, original, effective )); }}}
 
 fn validate_view_roots (
   viewforest : &MpViewForest,

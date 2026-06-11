@@ -74,6 +74,7 @@ pub struct ViewnodeMetadata {
   // node content.
   pub is_inactive_node : bool,
   pub inactive_membership : MembershipAxes,
+  pub inactive_overridesHere : Option<ID>,
 }
 
 pub fn default_metadata() -> ViewnodeMetadata {
@@ -101,7 +102,8 @@ pub fn default_metadata() -> ViewnodeMetadata {
     is_dead_scaffold: false,
     unknown_node_id: None,
     is_inactive_node: false,
-    inactive_membership: MembershipAxes::default(), }}
+    inactive_membership: MembershipAxes::default(),
+    inactive_overridesHere: None, }}
 
 /// Create an MpViewnode from parsed metadata components.
 /// This is the bridge between parsing (ViewnodeMetadata) and runtime (MpViewnode).
@@ -138,7 +140,9 @@ pub fn viewnode_from_metadata (
                            . unwrap_or_else ( || ID::from ("")),
               source     : metadata . source . clone ()
                            . unwrap_or_else ( || SourceName::from ("")),
-              membership : metadata . inactive_membership } ) ),
+              membership : metadata . inactive_membership,
+              overridesHere : metadata . inactive_overridesHere
+                              . clone () } ) ),
           error, None )
       } else if metadata . is_dead_scaffold {
         ( MpViewnodeKind::DeadScaffold, None, None )
@@ -582,6 +586,15 @@ fn parse_inactivenode_sexp (
           "unstaged" => {
             apply_axis_atoms_to_membership_scaffold (
               &subitems[1..], false, &mut membership ) ?; },
+          "overridesHere" => {
+            if subitems . len () != 2 {
+              return Err (
+                "inactiveNode overridesHere requires exactly one value"
+                . to_string () ); }
+            let value : String =
+              atom_to_string ( &subitems[1] ) ?;
+            metadata . inactive_overridesHere =
+              Some ( ID::from (value)); },
           _ => { return Err ( format! (
             "Unknown inactiveNode key: {}", key )); }} },
       _ => { return Err (
@@ -729,6 +742,12 @@ fn parse_viewstats_sexp (
         let key : String = atom_to_string ( &kv_pair[0] ) ?;
         match key . as_str () {
           "sourceHerald" => {}, // output-only, silently discard
+          "overridesHere" => {
+            // LOAD-BEARING, unlike the other view stats: save
+            // extraction round-trips the original ID through it.
+            let value : String =
+              atom_to_string ( &kv_pair[1] ) ?;
+            stats . overridesHere = Some ( ID::from (value)); },
           _ => { return Err ( format! (
             "Unknown viewStats key: {}", key )); }} },
       _ => { return Err ( "Unexpected element in viewStats"

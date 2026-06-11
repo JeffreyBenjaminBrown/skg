@@ -149,6 +149,13 @@ pub struct InactiveNode {
   pub id         : ID,
   pub source     : SourceName,
   pub membership : MembershipAxes,
+  /// Carried over from a TrueNode's 'viewStats.overridesHere' when a
+  /// source-set switch converts a drawn substitute to an
+  /// InactiveNode. Without it the marker would die in conversion and
+  /// the retained node's own ID would reach its parent's collected
+  /// contains, rewriting the original member (see plan 11,
+  /// "SOURCE-SET SWITCHES").
+  pub overridesHere : Option<ID>,
 }
 
 pub type TrueNode            = TrueNode_Generic < ID, SourceName >;
@@ -332,6 +339,17 @@ pub struct ViewNodeStats {
   /// view stat: the same node can sit under different parents in
   /// different positions.
   pub overridesParent       : bool,
+  /// Some(N) means this viewnode was drawn here in place of N,
+  /// which it (transitively) overrides. Herald red "Oh".
+  /// LOAD-BEARING, unlike the other view stats: save extraction
+  /// collects N (not this node's own ID) into the parent's lists
+  /// wherever this marker appears, so a substituted child
+  /// round-trips to the original ID instead of rewriting the
+  /// parent's contains. Serialized as the keyed form
+  /// '(overridesHere N)'; tamper-checked at buffer validation
+  /// (the carrier's ID must equal the visibility-ungated
+  /// 'resolve_override (N).effective').
+  pub overridesHere         : Option<ID>,
 }
 
 #[derive( Debug, Clone, Copy, PartialEq, Eq )]
@@ -458,6 +476,35 @@ impl < Id, Src > TrueNode_Generic < Id, Src > {
       IndefOrDef::Definitive { edit_request, .. } =>
         edit_request . as_ref(),
       IndefOrDef::Indefinitive => None, }}
+}
+
+impl TrueNode {
+  /// The COLLECTED ID: what this viewnode contributes to its
+  /// parent's collected lists -- the 'overridesHere' original when
+  /// the node was drawn in place of one, else its own ID. Save
+  /// extraction, the distinctness validators and the content
+  /// reconciler's orderkey all read this, never the raw 'id', so a
+  /// drawn overrider round-trips to the original member instead of
+  /// rewriting its parent's contains.
+  pub fn collected_id (&self) -> ID {
+    self . viewStats . overridesHere . clone ()
+    . unwrap_or_else ( || self . id . clone () ) }
+}
+
+impl InactiveNode {
+  /// As 'TrueNode::collected_id': a retained substitute (converted
+  /// by a source-set switch) still stands for the original member.
+  pub fn collected_id (&self) -> ID {
+    self . overridesHere . clone ()
+    . unwrap_or_else ( || self . id . clone () ) }
+}
+
+impl MpTruenode {
+  /// As 'TrueNode::collected_id', for the maybe-placed stage (the
+  /// node might not have an ID yet; a marker, if present, wins).
+  pub fn collected_id (&self) -> Option<ID> {
+    self . viewStats . overridesHere . clone ()
+    . or_else ( || self . id . clone () ) }
 }
 
 fn herald_from_pair (
@@ -786,6 +833,7 @@ impl Default for ViewNodeStats {
       grandparentOverrides  : false,
       grandparentSubscribes : false,
       overridesParent       : false,
+      overridesHere         : None,
     }} }
 
 //
@@ -871,16 +919,18 @@ pub fn mk_unknown_viewnode (
   }}
 
 pub fn mk_inactive_viewnode (
-  id         : ID,
-  source     : SourceName,
-  membership : MembershipAxes,
+  id            : ID,
+  source        : SourceName,
+  membership    : MembershipAxes,
+  overridesHere : Option<ID>, // Some only when converting a drawn substitute (see the field's comment on InactiveNode); fresh placeholders pass None.
 ) -> ViewNode {
   ViewNode {
     focused     : false,
     folded      : false,
     body_folded : false,
     kind        : ViewNodeKind::Vognode (
-      Vognode::Inactive ( InactiveNode { id, source, membership } ) ),
+      Vognode::Inactive ( InactiveNode {
+        id, source, membership, overridesHere } ) ),
   }}
 
 /// Create an indefinitive ViewNode from disk data.

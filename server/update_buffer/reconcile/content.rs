@@ -393,7 +393,8 @@ fn complete_content_children (
             d . title . clone(), d . body . clone() ),
         ContentReality::Inactive =>
           mk_inactive_viewnode (
-            id . clone(), d . source . clone(), MembershipAxes::default ()),
+            id . clone(), d . source . clone(),
+            MembershipAxes::default (), None ),
         ContentReality::Unknown =>
           mk_unknown_viewnode ( id . clone() ) } ) },
   ) . map ( |_summary| () ) }
